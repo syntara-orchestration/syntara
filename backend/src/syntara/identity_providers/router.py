@@ -17,6 +17,7 @@ from syntara.core.config.base import get_settings
 from syntara.core.database.session import get_db
 from syntara.core.models import User, UserIdentity
 from syntara.core.services.secret_service import create_secret_service
+from syntara.identity_providers.exceptions import AAPSetupError
 from syntara.identity_providers.models import IdentityProviderListParams
 from syntara.identity_providers.models.aap_setup import AAPOIDCSetupRequest
 from syntara.identity_providers.models.identity_provider import (
@@ -25,7 +26,7 @@ from syntara.identity_providers.models.identity_provider import (
     IdentityProviderRead,
     IdentityProviderUpdate,
 )
-from syntara.identity_providers.services.aap_oidc_setup_service import AAPOIDCSetupService
+from syntara.identity_providers.services.aap_oidc_setup_service import IDP_NAME, AAPOIDCSetupService
 from syntara.identity_providers.services.identity_provider_service import IdentityProviderService
 from syntara.identity_providers.services.oidc_discovery import OIDCTestResult, test_oidc_connection
 
@@ -105,7 +106,22 @@ async def setup_aap_oidc_provider(
     """Set up an AAP OIDC identity provider."""
     settings = get_settings()
     setup_service = AAPOIDCSetupService(idp_service=service, settings=settings)
-    return await setup_service.setup(setup_request)
+    provider = await setup_service.setup(setup_request)
+    if provider is not None:
+        return provider
+
+    # The OAuth2 application already existed on AAP (idempotent no-op). Fall back to
+    # the identity provider Syntara already has configured for it, if any.
+    existing = await service.list_providers(query_params_items=[("name", IDP_NAME)], limit=1)
+    if existing.resources:
+        return existing.resources[0]
+
+    msg = (
+        "An OAuth2 application for this product already exists on AAP, but no matching "
+        "identity provider is configured. Delete the existing application from AAP before "
+        "retrying, or configure the identity provider manually."
+    )
+    raise AAPSetupError(msg)
 
 
 # ============================================================================
