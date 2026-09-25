@@ -47,7 +47,7 @@ does not pin the target
    Scheduler applies that pin. Listed `outputs` never place.
 2. **Git and HTTP downloads are ordinary WorkItems.** There is no
    `data.inputs` list on the playbook (or other) WorkItem. To get a
-   repo or a file onto disk, AO submits a WorkItem whose
+   repo or a file onto disk, AO submits another WorkItem whose
    `activity.image` is a Git client (for example
    `registry.redhat.io/ao/git-clone:1.0.0`) or an HTTP client (for
    example `registry.redhat.io/ao/http-request:1.0.0`). That
