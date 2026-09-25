@@ -210,7 +210,7 @@ export class SlackNotifier {
               type: 'section',
               text: {
                 type: 'mrkdwn',
-                text: `:eyes: Visual regression baseline PR ready for review: <${prUrl}|Review PR>`,
+                text: `Visual regression baseline PR ready for review: <${prUrl}|Review PR>`,
               },
             },
           ],

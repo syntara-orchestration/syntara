@@ -172,7 +172,7 @@ describe('SlackNotifier', () => {
                 type: 'section',
                 text: {
                   type: 'mrkdwn',
-                  text: ':eyes: Visual regression baseline PR ready for review: <https://github.com/owner/repo/pull/42|Review PR>',
+                  text: 'Visual regression baseline PR ready for review: <https://github.com/owner/repo/pull/42|Review PR>',
                 },
               },
             ],
