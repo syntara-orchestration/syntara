@@ -44,7 +44,7 @@ jobs:
   verify-label-authority:
     # Only act when the privileged label is the one that was added.
     if: github.event.label.name == 'breaking-change-approved'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Ensure org-read token is configured
         env:
