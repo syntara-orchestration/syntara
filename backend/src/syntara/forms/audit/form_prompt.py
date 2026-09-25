@@ -33,7 +33,7 @@ class FormPromptCreatedEvent:
 
 @dataclass
 class FormPromptSubmittedEvent:
-    """Fired after a user successfully submits a form prompt response."""
+    """Fired after a user successfully submits a form prompt."""
 
     prompt_id: UUID
     workflow_id: UUID | None

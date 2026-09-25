@@ -379,16 +379,13 @@ class ProjectService(BaseService):
         )
 
         # 6. Credentials + secrets
-        secret_ids = list(
-            (
-                await self.session.exec(
-                    select(Credential.secret_id).where(
-                        Credential.project_id == project_id,
-                        Credential.secret_id.isnot(None),  # type: ignore[union-attr]
-                    )
-                )
-            ).all()
+        secret_ids_result = await self.session.exec(
+            select(Credential.secret_id).where(
+                Credential.project_id == project_id,
+                Credential.secret_id.isnot(None),  # type: ignore[union-attr]
+            )
         )
+        secret_ids = list(secret_ids_result.all())
 
         await self.session.exec(
             delete(Credential).where(Credential.project_id == project_id)  # type: ignore[arg-type]
