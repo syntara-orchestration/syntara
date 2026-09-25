@@ -34742,11 +34742,6 @@ components:
             - type: 'null'
           description: Originating interface (ui or api)
           title: Interface
-        is_stalled:
-          default: false
-          description: Whether any activity in this execution has been flagged as stalled.
-          title: Is Stalled
-          type: boolean
         labels:
           additionalProperties: true
           type: object
