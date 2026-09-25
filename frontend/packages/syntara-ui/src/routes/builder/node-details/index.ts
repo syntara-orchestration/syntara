@@ -1,4 +1,5 @@
 export { ApprovalNodeDetails } from './ApprovalNodeDetails'
+export { FormPromptNodeDetails } from './FormPromptNodeDetails'
 export { ConditionNodeDetails } from './ConditionNodeDetails'
 export { ConvergeNodeDetails } from './ConvergeNodeDetails'
 export { LoopNodeDetails } from './LoopNodeDetails'

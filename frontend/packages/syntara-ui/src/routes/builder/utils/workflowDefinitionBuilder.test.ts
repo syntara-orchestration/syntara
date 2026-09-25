@@ -178,6 +178,72 @@ describe('buildWorkflowDefinition', () => {
       expect(result.nodes[0]).toHaveProperty('settings', { timeout: 300, continue_on_failure: true })
     })
 
+    it('omits fallback_behavior from saved definition (backend schema uses fallback_decision only)', () => {
+      const activities: Activity[] = [
+        {
+          id: 'form-1',
+          type: ActivityTypeEnum.FORM_PROMPT,
+          parameters: { form_definition: { type: 'object' }, fallback_decision: 'fallback' },
+          settings: { continue_on_failure: false },
+        },
+      ]
+      const edges: EdgeConnection[] = [
+        { id: 'e-fallback', source: 'form-1', target: 'next-1', sourceHandle: 'fallback' },
+      ]
+
+      const result = buildWorkflowDefinition('Test', '', [...activities, activity('next-1')], [], { edges })
+
+      expect(result.nodes[0]).toHaveProperty('settings', { continue_on_failure: false })
+      expect(result.nodes[0].parameters).toMatchObject({
+        fallback_decision: 'fallback',
+      })
+      expect(result.nodes[0].parameters).not.toHaveProperty('fallback_behavior')
+    })
+
+    it('persists form_prompt parameters and settings in workflow definition', () => {
+      const activities: Activity[] = [
+        {
+          id: 'form-1',
+          name: 'Collect details',
+          type: ActivityTypeEnum.FORM_PROMPT,
+          parameters: {
+            form_definition: { type: 'object', properties: { notes: { type: 'string' } } },
+            message: 'Please complete the form',
+            responder_users: ['alice'],
+            responder_groups: ['operators'],
+            response_window: 7200,
+            fallback_decision: 'submit',
+            submit_label: 'Send',
+            success_message: 'Done',
+            timezone: 'UTC',
+          },
+          settings: { continue_on_failure: true, timeout: 600 },
+        },
+      ]
+      const edges: EdgeConnection[] = [
+        { id: 'e-submitted', source: 'form-1', target: 'next-1', sourceHandle: 'submitted' },
+      ]
+
+      const result = buildWorkflowDefinition('Test', '', [...activities, activity('next-1')], [], { edges })
+
+      expect(result.nodes[0]).toMatchObject({
+        id: 'form-1',
+        name: 'Collect details',
+        type: ActivityTypeEnum.FORM_PROMPT,
+        settings: { continue_on_failure: true, timeout: 600 },
+      })
+      expect(result.nodes[0].parameters).toMatchObject({
+        message: 'Please complete the form',
+        responder_users: ['alice'],
+        responder_groups: ['operators'],
+        response_window: 7200,
+        fallback_decision: 'submit',
+        submit_label: 'Send',
+        success_message: 'Done',
+        timezone: 'UTC',
+      })
+    })
+
     it('transforms approval node approver users from objects to string arrays', () => {
       const activities: Activity[] = [
         {

@@ -19,7 +19,9 @@ const REGISTRY_SUBTYPE_DOC_KEYS: Readonly<Record<string, string>> = {
   [RegistryNodeId.TRIGGER_EDA]: 'eventDrivenAnsibleTrigger',
   [RegistryNodeId.ACTION_API]: 'restApi',
   [RegistryNodeId.AGENT]: 'taskAgent',
+  [RegistryNodeId.HUMAN_TASKS]: 'builder',
   [RegistryNodeId.APPROVAL]: 'approval',
+  [RegistryNodeId.FORM_PROMPT]: 'builder',
   [RegistryNodeId.LOGIC_CONDITION]: 'conditional',
   [RegistryNodeId.LOGIC_CONVERGE]: 'converge',
   [RegistryNodeId.LOGIC_LOOP]: 'loop',
@@ -46,6 +48,7 @@ const EXECUTOR_TYPE_DOC_KEYS: Readonly<Record<string, string>> = {
 
 const FLOW_TYPE_DOC_KEYS: Readonly<Record<string, string>> = {
   [FlowNodeType.APPROVAL]: 'approval',
+  [FlowNodeType.FORM_PROMPT]: 'builder',
   [FlowNodeType.CONDITION]: 'conditional',
   [FlowNodeType.CONVERGE]: 'converge',
   [FlowNodeType.LOOP]: 'loop',

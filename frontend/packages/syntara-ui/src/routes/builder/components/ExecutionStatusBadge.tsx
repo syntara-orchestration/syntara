@@ -10,7 +10,7 @@ import {
 import { ActivityTypeEnum } from '@syntara/contracts'
 
 import type { ActivityStatus } from '../../../routes/workflows/execution/types'
-import { activityStatusColors } from '../executionStatusConstants'
+import { activityStatusColors, getActivityStatusDisplayLabel } from '../executionStatusConstants'
 
 export const EXECUTION_BADGE_DATA_ATTR = 'data-execution-badge'
 export const EXECUTION_BADGE_SELECTOR = `[${EXECUTION_BADGE_DATA_ATTR}]`
@@ -74,7 +74,10 @@ function normalizeStatus(status: ActivityStatus, nodeType?: string): { visualSta
       if (nodeType === ActivityTypeEnum.WAIT) {
         return { visualStatus: 'running', label: 'Running' }
       }
-      return { visualStatus: 'waiting', label: 'Waiting for approval' }
+      return {
+        visualStatus: 'waiting',
+        label: getActivityStatusDisplayLabel('waiting', nodeType),
+      }
     case 'retrying':
       return { visualStatus: 'running', label: 'Retrying' }
     case 'pending':

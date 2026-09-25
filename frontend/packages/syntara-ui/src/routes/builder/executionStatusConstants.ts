@@ -1,4 +1,4 @@
-import type { ExecutionsAPI } from '@syntara/contracts'
+import { ActivityTypeEnum, type ExecutionsAPI } from '@syntara/contracts'
 
 import type { ActivityStatus } from '../workflows/execution/types'
 
@@ -33,6 +33,24 @@ export const activityStatusDisplayLabels: Record<ActivityStatus, string> = {
   retrying: 'Retrying',
   skipped: 'Skipped',
   cancelled: 'Cancelled',
+}
+
+/** Human-facing activity status label; ``waiting`` depends on step type (approval vs form prompt). */
+export function getActivityStatusDisplayLabel(status: ActivityStatus, nodeType?: string): string {
+  if (status === 'waiting') {
+    if (nodeType === ActivityTypeEnum.FORM_PROMPT) {
+      return 'Waiting for input'
+    }
+    if (nodeType === ActivityTypeEnum.WAIT) {
+      return 'Running'
+    }
+    return activityStatusDisplayLabels.waiting
+  }
+  const label = activityStatusDisplayLabels[status as ActivityStatus]
+  if (label) {
+    return label
+  }
+  return status.charAt(0).toUpperCase() + status.slice(1)
 }
 
 export const activityStatusColors: Record<ActivityStatus, string> = {

@@ -250,7 +250,7 @@ export async function addAapNode(page: Page, name: string) {
 /** Add an approval node (v2 type: "approval") without completing branches. */
 export async function addApprovalNode(page: Page, name: string) {
   await openAddNodePanel(page)
-  await selectDirectNodeType(page, 'Approval')
+  await selectCategoryAndType(page, 'Human tasks', 'Approval')
   const nameInput = page.getByRole('textbox', { name: 'Name', exact: true })
   await expect(nameInput).toBeVisible({ timeout: 10_000 })
   await nameInput.fill(name)

@@ -34,6 +34,7 @@ import { renderNodeIcon } from '../workflows/canvas/nodes/renderNodeIcon'
 
 import {
   ApprovalNodeDetails,
+  FormPromptNodeDetails,
   ConditionNodeDetails,
   ConvergeNodeDetails,
   LoopNodeDetails,
@@ -78,9 +79,17 @@ function getAddModeFormId(
     [RegistryNodeId.TRIGGER]: 'trigger-node-form',
     [RegistryNodeId.ACTION]: 'action-node-form',
     [RegistryNodeId.AGENT]: 'ai-agent-node-form',
-    [RegistryNodeId.APPROVAL]: 'approval-node-form',
   }
   if (nodeTypeId && nodeTypeId in simpleFormMap) return simpleFormMap[nodeTypeId]
+
+  // Human task subtypes
+  if (nodeTypeId === RegistryNodeId.HUMAN_TASKS && nodeSubtypeId) {
+    const humanTaskFormMap: Record<string, string> = {
+      [RegistryNodeId.APPROVAL]: 'approval-node-form',
+      [RegistryNodeId.FORM_PROMPT]: 'form-prompt-node-form',
+    }
+    return humanTaskFormMap[nodeSubtypeId]
+  }
 
   // Logic node subtypes
   if (nodeTypeId === RegistryNodeId.LOGIC && nodeSubtypeId) {
@@ -142,6 +151,7 @@ function getEditModeFormId(node: Node<NodeType['data']> | undefined): string | u
   if (node.type === FlowNodeType.CONVERGE) return 'converge-node-form'
   if (node.type === FlowNodeType.WAIT) return 'wait-node-form'
   if (node.type === FlowNodeType.APPROVAL) return 'approval-node-form'
+  if (node.type === FlowNodeType.FORM_PROMPT) return 'form-prompt-node-form'
   if (node.type === FlowNodeType.SWITCH) return 'switch-node-form'
   if (node.type === FlowNodeType.TASK) {
     return getTaskFormId(node.data as TaskActivity)
@@ -214,6 +224,18 @@ function renderEditModeContent(
     return (
       <ApprovalNodeDetails
         taskData={node.data as TaskActivity}
+        nodeId={node.id}
+        onClose={onClose}
+        onHeaderContentChange={onHeaderContentChange}
+        projectId={projectId}
+      />
+    )
+  }
+
+  if (node.type === FlowNodeType.FORM_PROMPT) {
+    return (
+      <FormPromptNodeDetails
+        taskData={node.data as Activity}
         nodeId={node.id}
         onClose={onClose}
         onHeaderContentChange={onHeaderContentChange}

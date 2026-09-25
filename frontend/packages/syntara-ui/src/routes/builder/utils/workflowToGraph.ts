@@ -61,6 +61,7 @@ export function extractTaskActivities(activities: Activity[]): Activity[] {
       activity.type === ActivityTypeEnum.AAP_JOB_TEMPLATE ||
       activity.type === ActivityTypeEnum.AAP_WORKFLOW_JOB_TEMPLATE ||
       activity.type === ActivityTypeEnum.APPROVAL ||
+      activity.type === ActivityTypeEnum.FORM_PROMPT ||
       activity.type === ActivityTypeEnum.INTERNAL_ACTIVITY ||
       activity.type === 'generic'
     ) {

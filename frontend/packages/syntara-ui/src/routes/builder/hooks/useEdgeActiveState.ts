@@ -84,6 +84,8 @@ export function useEdgeActiveState({
             EdgeHandleEnum.LOOP,
             EdgeHandleEnum.APPROVED,
             EdgeHandleEnum.REJECTED,
+            EdgeHandleEnum.SUBMITTED,
+            EdgeHandleEnum.FALLBACK,
           ] as const
           const isSpecificHandle = (specificHandles as readonly string[]).includes(edgeHandle)
           const isActive = isSpecificHandle

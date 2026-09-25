@@ -15,6 +15,8 @@ import { validateWorkflow } from '../utils/validation'
 import { validateMinimumWorkflow } from '../utils/validation/rules/validateMinimumWorkflow'
 import type { ConflictInfo } from '../VersionConflictDialog'
 
+import { useWorkflowEngineDefaults } from './useWorkflowEngineDefaults'
+
 type ShowAlert = (options: AlertMessage) => void
 
 async function checkVersionConflictBeforeRun(
@@ -103,6 +105,8 @@ export function useBuilderToolbarHandlers({
   loadedVersionCreatedAt,
   onRunConflict,
 }: UseBuilderToolbarHandlersOptions) {
+  const { defaults } = useWorkflowEngineDefaults()
+
   const handleRunWorkflow = useCallback(
     async (
       inputData?: Record<string, unknown>,
@@ -160,7 +164,10 @@ export function useBuilderToolbarHandlers({
       }
 
       // Check all other validation rules (dangling nodes, invalid connections, etc.)
-      const validationResult = validateWorkflow(activities, edges, { triggers })
+      const validationResult = validateWorkflow(activities, edges, {
+        triggers,
+        systemContinueOnFailure: defaults?.continueOnFailure ?? false,
+      })
       if (!validationResult.valid) {
         const errorMessages = validationResult.errors.map((error) => error.message).join('\n• ')
         showError({ title: 'Cannot run workflow', description: `Workflow validation failed:\n• ${errorMessages}` })
@@ -213,6 +220,7 @@ export function useBuilderToolbarHandlers({
       loadedVersionName,
       loadedVersionCreatedAt,
       onRunConflict,
+      defaults?.continueOnFailure,
     ]
   )
 

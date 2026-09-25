@@ -1,5 +1,12 @@
-import { ActivityTypeEnum, EdgeHandleEnum, type Activity, type NodeSettings } from '@syntara/contracts'
+import {
+  ActivityTypeEnum,
+  EdgeHandleEnum,
+  type Activity,
+  type FormDefinition,
+  type NodeSettings,
+} from '@syntara/contracts'
 
+import { buildFormPromptActivityParameters } from '../routes/builder/utils/formPromptActivityParameters'
 import { PROTOTYPE_POLLUTION_KEYS, safeJSONReviver } from '../utils/jsonSafeParse'
 import { parseJsonEnvironment } from '../utils/parseJsonEnvironment'
 
@@ -341,6 +348,36 @@ export function createApprovalActivity(options: CreateApprovalActivityOptions): 
       ...(approver_users !== undefined && approver_users.length > 0 && { approver_users }),
       ...(approver_groups !== undefined && approver_groups.length > 0 && { approver_groups }),
     },
+    ...(settings ? { settings } : {}),
+  }
+}
+
+export type CreateFormPromptActivityOptions = {
+  id: string
+  name: string
+  form_definition: FormDefinition
+  message?: string | null
+  responder_users?: string[]
+  responder_groups?: string[]
+  response_window?: number | null
+  fallback_decision?: 'submit' | 'fallback' | null
+  submit_label?: string | null
+  success_message?: string | null
+  timezone?: string | null
+  css_override?: string | null
+  settings?: Activity['settings']
+}
+
+/**
+ * Create a form_prompt (interactive prompt) node (v2).
+ */
+export function createFormPromptActivity(options: CreateFormPromptActivityOptions): Activity {
+  const { id, name, settings, ...parameterInput } = options
+  return {
+    id,
+    type: ActivityTypeEnum.FORM_PROMPT,
+    name,
+    parameters: buildFormPromptActivityParameters(parameterInput),
     ...(settings ? { settings } : {}),
   }
 }

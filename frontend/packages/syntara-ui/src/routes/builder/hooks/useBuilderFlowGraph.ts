@@ -176,15 +176,21 @@ export function useBuilderFlowGraph({
     taskActivities.forEach((activity: Activity) => {
       const isGeneric = (activity as ActivityWithMetadata).metadata?.__isGeneric === true
       const isApproval = activity.type === ActivityTypeEnum.APPROVAL
+      const isFormPrompt = activity.type === ActivityTypeEnum.FORM_PROMPT
 
       const position = { x: 0, y: 0 }
 
-      let nodeType: typeof FlowNodeType.GENERIC | typeof FlowNodeType.APPROVAL | typeof FlowNodeType.TASK =
-        FlowNodeType.TASK
+      let nodeType:
+        | typeof FlowNodeType.GENERIC
+        | typeof FlowNodeType.APPROVAL
+        | typeof FlowNodeType.FORM_PROMPT
+        | typeof FlowNodeType.TASK = FlowNodeType.TASK
       if (isGeneric) {
         nodeType = FlowNodeType.GENERIC
       } else if (isApproval) {
         nodeType = FlowNodeType.APPROVAL
+      } else if (isFormPrompt) {
+        nodeType = FlowNodeType.FORM_PROMPT
       }
 
       const activityData = executionStateEnricher.enrichActivity(

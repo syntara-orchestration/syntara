@@ -45,7 +45,7 @@ export function createDefaultField(
   type: FormFieldType = FormFieldTypeEnum.TEXT,
   takenNames: ReadonlyArray<string> = []
 ): FormField {
-  const label = ''
+  const label = takenNames.length === 0 ? 'Field 1' : `Field ${takenNames.length + 1}`
   const base = {
     value_name: labelToValueName(label, takenNames),
     label,
