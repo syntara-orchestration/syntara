@@ -583,6 +583,7 @@ VERBOSITY ?= -v
 api-spec-validation: ## Validate syntax of OpenAPI and AsyncAPI spec files
 	@echo "🔍 Validating API specifications..."
 	@uv run python tools/ci/validate_api_specs.py
+	@uv run python tools/ci/check_dynamic_map_field_registry.py
 
 .PHONY: verify-test-structure
 verify-test-structure: ## Verify test directory structure matches source code domains
