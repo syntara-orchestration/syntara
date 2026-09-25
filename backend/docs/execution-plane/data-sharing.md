@@ -30,9 +30,8 @@ Listed outputs are filesystem paths.
 
 Placement stays in [syntara#620](https://github.com/syntara-orchestration/syntara/pull/620).
 The reconciler does not read this payload.
-[syntara#634](https://github.com/syntara-orchestration/syntara/pull/634)
-example 02 is a cold-start inventory that ignores data sharing when
-matching.
+[Example 02](examples/02-data-sharing-with-workspace.md) is three WorkItems on one
+volume workspace. Matching still ignores `data`.
 
 ## Principles
 
@@ -422,9 +421,9 @@ they cannot leave files on a workspace for the next WorkItem.
 Cross-run files on that backend go through use-case 2 (listed
 outputs) or stay in that one container.
 
-[Example 02](examples/02-volume-mount.md) used
-`payload.volume_mounts` as a stand-in. Read that as the workspace
-volume, not as an input list.
+[Example 02](examples/02-data-sharing-with-workspace.md) is three WorkItems on one
+volume workspace. Files under `/workspace` are still there for the
+next WorkItem. There is no `data.inputs` list.
 
 ## Payload shape
 
@@ -460,9 +459,8 @@ Illustrative keys only. Not the final field design.
 Omitted `outputs` / `workspace` mean "none". There is no
 `data.inputs`.
 
-`payload.volume_mounts` in [example 02](examples/02-volume-mount.md)
-should be read as a sketch of the workspace volume, not of an input
-list. This document replaces that sketch.
+[Example 02](examples/02-data-sharing-with-workspace.md) is the volume workspace
+payload (`data.workspace`), not an input list.
 
 ## Who does what
 
@@ -543,9 +541,8 @@ mount the same id while the first WorkItem is running. Two different
 ids are different volumes. That is not a per-WorkItem PVC create; it
 is one id, one mount, one WorkItem.
 
-Treat [example 02](examples/02-volume-mount.md) as the workspace
-volume, not as an input list. Workspace is at `/workspace` unless
-overridden.
+[Example 02](examples/02-data-sharing-with-workspace.md) is the volume workspace,
+not an input list. Workspace is at `/workspace` unless overridden.
 
 ## Sequence (workspace on one ExecutionTarget, two nodes)
 
@@ -642,9 +639,9 @@ Extension, not this contract.
 
 ## Coordination
 
-- **[example 02](examples/02-volume-mount.md):** cold-start inventory
-  with a stand-in `volume_mounts` field. Read that field as the
-  workspace volume. Matching still ignores it.
+- **[example 02](examples/02-data-sharing-with-workspace.md):** three WorkItems on
+  one volume workspace at `/workspace`. Matching still ignores
+  `data`. The tree remains after each unmount.
 - **[labels.md](labels.md):** HTTP and Git activity params and
   workspace UUID are not labels. A workspace UUID is unique across
   all ExecutionTargets and the volume lives on one of them; AO uses

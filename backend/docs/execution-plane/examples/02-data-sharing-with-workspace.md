@@ -1,0 +1,256 @@
+# Example: volume workspace, three WorkItems, `/workspace` stays
+
+Builds on
+[00-one-workload-default-target.md](00-one-workload-default-target.md).
+Same Cluster, same default ExecutionTarget, empty selectors. AO shares
+one **workspace** volume across three successive WorkItems. Each
+container mounts it at `/workspace`. Files written by an earlier
+WorkItem are still there for the next.
+
+- Ticket: [AAP-94189](https://redhat.atlassian.net/browse/AAP-94189)
+- Feature: [ANSTRAT-1803](https://redhat.atlassian.net/browse/ANSTRAT-1803)
+- Parent epic: [AAP-82060](https://redhat.atlassian.net/browse/AAP-82060)
+- Contract: [data-sharing.md](../data-sharing.md)
+
+## What this example is
+
+A concrete inventory of a **volume-based workspace** (Kubernetes PVC
+on this target). Not an object-store snapshot. Not listed `outputs`.
+
+AO has already minted the workspace UUID and created the volume on
+`ep-default`. EP sees three WorkItems. It does not see the AO
+workflow, nodes, or project. Matching still ignores `data`; there is
+no `volume-mount` selector.
+
+The three WorkItems run **one at a time** (ReadWriteOnce). After each
+exits, the Worker Manager unmounts. The volume is not deleted. The
+next WorkItem mounts the same UUID and sees the same tree.
+
+```text
+workspace id 7c1a9f3e-4b2d-41a8-9c1f-91c0d4e5a6b7
+                          →  volume on ExecutionTarget ep-default
+                          →  mounted at /workspace
+
+AO execution
+  WorkItem A  git-clone         →  writes /workspace/src
+  WorkItem B  http-request      →  writes /workspace/site.yml
+                               →  /workspace/src is still there
+  WorkItem C  ansible-playbook  →  reads /workspace/src and site.yml
+                               →  writes /workspace/out/report.json
+```
+
+## Workspace create
+
+AO creates the volume **before** the first WorkItem. Size is the
+ExecutionTarget default. Illustrative keys only.
+
+```json
+POST /workspaces
+{
+  "id": "7c1a9f3e-4b2d-41a8-9c1f-91c0d4e5a6b7",
+  "target": "ep-default",
+  "ttl": "3h"
+}
+```
+
+EP refuses the UUID if it already exists anywhere. The WorkItems carry
+that UUID, not a PVC name.
+
+## Incoming WorkItems
+
+`selectors` is empty on all three: [default
+routing](../executiontarget-reconciler.md#default-routing) to
+`ep-default`, which already holds the volume.
+
+### WorkItem A — clone into `/workspace`
+
+```json
+{
+  "selectors": {},
+  "payload": {
+    "activity": {
+      "image": "registry.redhat.io/ao/git-clone:1.0.0",
+      "params": {
+        "uri": "git+https://gitlab.example.com/org/playbooks.git",
+        "ref": "a1b2c3d4e5f6",
+        "dest": "/workspace/src"
+      }
+    },
+    "data": {
+      "workspace": "7c1a9f3e-4b2d-41a8-9c1f-91c0d4e5a6b7"
+    }
+  }
+}
+```
+
+### WorkItem B — download beside the clone
+
+```json
+{
+  "selectors": {},
+  "payload": {
+    "activity": {
+      "image": "registry.redhat.io/ao/http-request:1.0.0",
+      "params": {
+        "url": "https://files.example.com/files/abc123/site.yml",
+        "dest": "/workspace/site.yml"
+      }
+    },
+    "data": {
+      "workspace": "7c1a9f3e-4b2d-41a8-9c1f-91c0d4e5a6b7"
+    }
+  }
+}
+```
+
+B does not re-clone. `/workspace/src` is already on the volume from A.
+
+### WorkItem C — playbook using both files
+
+```json
+{
+  "selectors": {},
+  "payload": {
+    "activity": {
+      "image": "registry.redhat.io/ao/ansible-playbook:1.0.0",
+      "params": {
+        "playbook": "/workspace/src/site.yml",
+        "extra_vars_file": "/workspace/site.yml"
+      }
+    },
+    "data": {
+      "workspace": "7c1a9f3e-4b2d-41a8-9c1f-91c0d4e5a6b7"
+    }
+  }
+}
+```
+
+C does not fetch. It reads what A and B left under `/workspace` and
+writes `/workspace/out/report.json`.
+
+| Field | Meaning for EP |
+|---|---|
+| `selectors` | Empty → default routing. Not derived from the workspace id. |
+| `payload.activity.image` | Container image. Git, HTTP, and playbook are ordinary WorkItems. |
+| `payload.activity.params` | Owned by that activity. `dest` / playbook paths under `/workspace` are the activity's. |
+| `payload.data.workspace` | Workspace UUID. Worker Manager mounts that volume at `/workspace`. The reconciler does not read this. |
+
+There is no `data.inputs` list and no `payload.volume_mounts`.
+
+## Registered Cluster and default ExecutionTarget
+
+Same inventory as [example 00](00-one-workload-default-target.md).
+
+```yaml
+cluster:
+  name: local-openshift
+  cluster_type: openshift
+  endpoint: https://api.cluster.local:6443
+  status: active
+  enabled: true
+  labels:
+    cluster: local-openshift
+```
+
+```yaml
+# Illustrative keys only. Names such as endpoint, namespace, and labels
+# are for readability and are not the final field design.
+execution_target:
+  name: ep-default
+  cluster: local-openshift
+  namespace: ao-execution
+  backend_type: k8s
+  endpoint: https://api.cluster.local:6443
+  is_default: true
+  status: active
+  enabled: true
+  labels: {}
+```
+
+The workspace volume lives on this target. Effective labels for
+matching are still only `{ cluster: local-openshift }`. The workspace
+id is not a label.
+
+## What is on `/workspace`
+
+The directory outlives each container. Only the mount comes and goes.
+
+| After | `/workspace` contains |
+|---|---|
+| WorkItem A exits | `src/` (clone of the pinned SHA) |
+| WorkItem B exits | `src/` **and** `site.yml` |
+| WorkItem C exits | `src/`, `site.yml`, **and** `out/report.json` |
+
+If AO submits a fourth WorkItem with the same UUID, that tree is still
+there until TTL (from last unmount) or `DELETE`.
+
+## What EP does
+
+For each WorkItem:
+
+1. **Reconcile.** `selectors: {}` takes default routing. Eligible set
+   `{ep-default}`. The reconciler does not read `data.workspace`.
+2. **Dispatch.** The Work Scheduler waits until no other WorkItem
+   holds this UUID (ReadWriteOnce). Then it sends the work to the
+   Kubernetes Worker Manager for `ep-default`.
+3. **Run.** That Worker Manager mounts workspace
+   `7c1a9f3e-4b2d-41a8-9c1f-91c0d4e5a6b7` at `/workspace` and
+   cold-starts a pod from `payload.activity.image`. On exit it
+   unmounts. It does not delete the volume.
+
+```text
+WorkItem A, B, C
+  selectors {}                 →  ep-default (is_default)
+  data.workspace               →  volume on ep-default → /workspace
+  payload.activity.image       →  container image
+  payload.activity.params      →  container input
+```
+
+```mermaid
+sequenceDiagram
+    participant AO as Automation Orchestrator
+    participant EP as Execution Plane API
+    participant WS as Work Store
+    participant ETR as ExecutionTarget Reconciler
+    participant Sch as Work Scheduler
+    participant WM as k8s Worker Manager
+    participant Vol as /workspace on ep-default
+
+    AO->>EP: POST workspace 7c1a9f3e-… on ep-default
+    EP->>Vol: create volume
+
+    AO->>WS: WorkItem A { git-clone, workspace: 7c1a9f3e-… }
+    Sch->>ETR: resolve(selectors={})
+    ETR-->>Sch: available = [ep-default]
+    Sch->>WM: dispatch A
+    WM->>Vol: mount
+    Note over Vol: write /workspace/src
+    WM->>Vol: unmount
+
+    AO->>WS: WorkItem B { http-request, workspace: 7c1a9f3e-… }
+    Sch->>WM: dispatch B
+    WM->>Vol: mount
+    Note over Vol: src still there; write /workspace/site.yml
+    WM->>Vol: unmount
+
+    AO->>WS: WorkItem C { ansible-playbook, workspace: 7c1a9f3e-… }
+    Sch->>WM: dispatch C
+    WM->>Vol: mount
+    Note over Vol: src and site.yml still there; write /workspace/out/report.json
+    WM->>Vol: unmount
+
+    Note over Vol: tree remains until TTL or DELETE
+```
+
+## Out of scope here
+
+| Omitted | Why |
+|---|---|
+| Empty selectors without a workspace | [Example 00](00-one-workload-default-target.md) |
+| `region` / `env` placement | [Example 01](01-select-region-and-env.md) |
+| Selectors that match nothing | [Example 04](04-no-matching-targets.md) |
+| OpenShell sandbox policy | [Example 03](03-openshell-sandbox-policy.md). OpenShell has no volume attach. |
+| Listed `outputs` / sidecar / S3 artifacts | [data-sharing.md](../data-sharing.md) use-case 2 |
+| Object-store workspace snapshot | [data-sharing.md](../data-sharing.md) (cross-cluster path) |
+| Warm pools | Volume workspace is a cold-start mount in this example |
+| AO workflow / node / Execution Profile rows | Not visible to EP |

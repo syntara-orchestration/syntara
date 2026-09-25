@@ -181,7 +181,7 @@ outcome would be `NO_MATCHING_TARGETS` and the work would fail; see
 |---|---|
 | Empty selectors / default routing | [Example 00](00-one-workload-default-target.md) |
 | Selectors that match nothing | [Example 04](04-no-matching-targets.md) |
-| Volume mount | [Example 02](02-volume-mount.md) |
+| Volume workspace | [Example 02](02-data-sharing-with-workspace.md) |
 | OpenShell sandbox policy | [Example 03](03-openshell-sandbox-policy.md) |
 | Warm pools | MVP is cold-start vanilla Kubernetes |
 | Preferred (soft) affinities | Out of MVP; matching is boolean |

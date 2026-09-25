@@ -148,7 +148,7 @@ intended.
 |---|---|
 | Empty selectors / default routing | [Example 00](00-one-workload-default-target.md) |
 | Selectors that match | [Example 01](01-select-region-and-env.md) |
-| Volume mount | [Example 02](02-volume-mount.md) |
+| Volume workspace | [Example 02](02-data-sharing-with-workspace.md) |
 | OpenShell sandbox policy | [Example 03](03-openshell-sandbox-policy.md) |
 | Re-queue on `CAPACITY_EXHAUSTED` | Resource Monitor ([AAP-92724](https://redhat.atlassian.net/browse/AAP-92724)); not this miss |
 | Retry with empty selectors after claim failure | Work Scheduler ([AAP-92722](https://redhat.atlassian.net/browse/AAP-92722)) |

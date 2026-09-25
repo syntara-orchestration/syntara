@@ -13,8 +13,8 @@ Cluster has only its protected default ExecutionTarget.
 A concrete inventory of the objects EP sees in the MVP cold-start path.
 [Example 01](01-select-region-and-env.md) adds Cluster and namespace
 selectors (`region`, `env`).
-[Example 02](02-volume-mount.md) adds a workload that needs a volume
-mount.
+[Example 02](02-data-sharing-with-workspace.md) shares a volume workspace across three
+WorkItems.
 [Example 03](03-openshell-sandbox-policy.md) adds an OpenShell
 ExecutionTarget and a sandbox policy on the payload.
 [Example 04](04-no-matching-targets.md) is example 01 when no target
@@ -153,7 +153,7 @@ sequenceDiagram
 | Non-empty `selectors` (`region`, `env`) | [Example 01](01-select-region-and-env.md) |
 | Selectors that match nothing | [Example 04](04-no-matching-targets.md) |
 | Other user labels (`gpu`, team) | Later examples |
-| Volume mount | [Example 02](02-volume-mount.md) |
+| Volume workspace | [Example 02](02-data-sharing-with-workspace.md) |
 | OpenShell sandbox policy | [Example 03](03-openshell-sandbox-policy.md) |
 | Warm pools | MVP is cold-start vanilla Kubernetes |
 | AO workflow / node / Execution Profile rows | Not visible to EP |
