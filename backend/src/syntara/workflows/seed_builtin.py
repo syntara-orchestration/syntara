@@ -5,6 +5,17 @@ even in container images that only sync ``*.py`` files (e.g. Skaffold).
 
 Registered as a **required** seeder — always runs during seeding.
 Built-in workflows cannot be deleted or modified by users.
+
+Operational contract: this seeder must stay idempotent, and re-runs must be
+concurrency-safe. It is expected to be re-run after the initial seed —
+typically at API startup from a process that can reach Temporal — because the
+initial seed may run before Temporal exists, in which case the Temporal
+Schedule sync for scheduled built-in workflows degrades to a warning. Runs
+that are expected to reach Temporal pass ``--strict`` so that a failed sync
+fails the command instead. Re-runs against an unchanged
+definition must not create new workflow versions, the schedule sync must
+remain create-or-update, and concurrent invocations (e.g. several replicas
+starting together) must converge to the same state.
 """
 
 from __future__ import annotations
@@ -17,6 +28,7 @@ from sqlmodel import col, select
 
 from syntara.authz.models import Project
 from syntara.core.models import User
+from syntara.core.seed import strict_mode
 from syntara.workflows.constants import BUILTIN_PROJECT_NAME
 from syntara.workflows.exceptions import ScheduledTriggerSyncError
 from syntara.workflows.models import Workflow, WorkflowVersion
@@ -201,6 +213,9 @@ async def seed_builtin_workflows(session: AsyncSession) -> None:
     for workflow_dict in _BUILTIN_DEFINITIONS:
         try:
             await _seed_one(session, workflow_dict, user.id, project_id)
+        except ScheduledTriggerSyncError:
+            # Only reaches here in strict mode; fail the whole seed pass.
+            raise
         except Exception:
             logger.exception("Failed to seed builtin workflow", workflow_name=workflow_dict.get("name"))
             continue
@@ -232,9 +247,11 @@ async def _sync_builtin_schedules(workflow_id: UUID, workflow_dict: dict[str, An
                 trigger_count=count,
             )
     except ScheduledTriggerSyncError as exc:
-        # Non-fatal: the workflow row itself is still seeded correctly even
-        # if Temporal is unreachable at startup. Mirrors the same
-        # degrade-gracefully behaviour WorkflowService uses on publish.
+        if strict_mode.get():
+            raise
+        # Non-fatal by default: the workflow row itself is still seeded
+        # correctly even if Temporal is unreachable at startup. Mirrors the
+        # same degrade-gracefully behaviour WorkflowService uses on publish.
         logger.warning(
             "Scheduled trigger sync failed for builtin workflow — schedule not created/updated",
             workflow_name=name,

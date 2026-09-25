@@ -8,6 +8,7 @@ from uuid import uuid4
 
 import pytest
 
+from syntara.core.seed import strict_mode
 from syntara.workflows.exceptions import ScheduledTriggerSyncError
 from syntara.workflows.models.workflow import Workflow
 from syntara.workflows.models.workflow_publish_event import WorkflowPublishEvent
@@ -293,6 +294,28 @@ class TestSeedBuiltinWorkflows:
         workflows_added = [c[0][0] for c in session.add.call_args_list if isinstance(c[0][0], Workflow)]
         assert len(workflows_added) == len(_BUILTIN_DEFINITIONS)
         session.commit.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_sync_error_fails_seeding_when_strict(self) -> None:
+        """Under ``--strict`` the sync error aborts the seed pass.
+
+        Used by seed runs that are expected to reach Temporal: a missing
+        schedule must surface as a non-zero exit, not a warning.
+        """
+        self.mock_scheduler.sync_scheduled_triggers = AsyncMock(
+            side_effect=ScheduledTriggerSyncError("some-workflow-id", 1)
+        )
+        admin, project = _mock_admin(), _mock_project()
+        session = _mock_session(admin, project, *[None] * len(_BUILTIN_DEFINITIONS))
+
+        token = strict_mode.set(True)
+        try:
+            with pytest.raises(ScheduledTriggerSyncError):
+                await seed_builtin_workflows(session)
+        finally:
+            strict_mode.reset(token)
+
+        session.commit.assert_not_awaited()
 
     @pytest.mark.asyncio
     async def test_health_check_definition_has_scheduled_trigger(self) -> None:
