@@ -1,5 +1,5 @@
 ---
-schema_version: '2.0.0'
+schema_version: "2.0.0"
 name: error-parallel-no-branches
 description: Test error when parallel activity has no branches
 

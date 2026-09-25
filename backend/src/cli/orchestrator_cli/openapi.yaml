@@ -11,7 +11,7 @@
 openapi: 3.1.0
 info:
   title: Orchestrator API
-  version: 1.4.0
+  version: 1.3.0
   description: A distributed multi-agent workflow orchestration system
 servers:
   - url: /api/v1
@@ -34742,11 +34742,6 @@ components:
             - type: 'null'
           description: Originating interface (ui or api)
           title: Interface
-        is_stalled:
-          default: false
-          description: Whether any activity in this execution has been flagged as stalled.
-          title: Is Stalled
-          type: boolean
         labels:
           additionalProperties: true
           type: object
@@ -34874,20 +34869,6 @@ components:
             - type: 'null'
           description: Iteration number if activity is within a loop (0-indexed)
           title: Iteration
-        expected_duration:
-          anyOf:
-            - type: integer
-              minimum: 1.0
-            - type: 'null'
-          description: Resolved expected duration in seconds, copied from node settings at dispatch time.
-          title: Expected Duration
-        stall_alert_at:
-          anyOf:
-            - format: date-time
-              type: string
-            - type: 'null'
-          description: Timestamp when stall was first detected by PeriodicWorker. Written once, never cleared.
-          title: Stall Alert At
       required:
         - execution_id
         - activity_name
@@ -37110,13 +37091,6 @@ components:
             - type: boolean
             - type: 'null'
           title: Disabled
-        expected_duration:
-          anyOf:
-            - type: integer
-              minimum: 1.0
-            - type: 'null'
-          description: Expected duration in seconds. Nodes running longer are flagged as stalled.
-          title: Expected Duration
         timeout:
           anyOf:
             - type: integer
@@ -37126,7 +37100,7 @@ components:
       additionalProperties: false
       type: object
       title: NodeSettingsNoRetry
-      description: Settings with disabled, continue_on_failure, timeout, and expected_duration (script, agentic, approval).
+      description: Settings with disabled, continue_on_failure, and timeout (script, agentic, approval).
     NodeSettingsFull:
       properties:
         continue_on_failure:
@@ -37139,13 +37113,6 @@ components:
             - type: boolean
             - type: 'null'
           title: Disabled
-        expected_duration:
-          anyOf:
-            - type: integer
-              minimum: 1.0
-            - type: 'null'
-          description: Expected duration in seconds. Nodes running longer are flagged as stalled.
-          title: Expected Duration
         timeout:
           anyOf:
             - type: integer

@@ -1,5 +1,5 @@
 ---
-schema_version: '2.0.0'
+schema_version: "2.0.0"
 name: foreach-loop-test
 description: Test forEach loop with bash
 

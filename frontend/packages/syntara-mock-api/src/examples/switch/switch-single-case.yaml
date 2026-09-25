@@ -1,5 +1,5 @@
 ---
-schema_version: '2.0.0'
+schema_version: "2.0.0"
 name: switch-single-case-test
 description: Test switch node with one case plus default
 
@@ -15,7 +15,7 @@ nodes:
       cases:
         - port: case_0
           label: Match
-          condition: 'True'
+          condition: "True"
       default_port: default
 
   - id: matched

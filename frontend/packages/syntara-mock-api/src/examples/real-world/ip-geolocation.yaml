@@ -1,5 +1,5 @@
 ---
-schema_version: '2.0.0'
+schema_version: "2.0.0"
 name: ip-geolocation
 description: Fetch IP geolocation data and generate location report
 metadata:
