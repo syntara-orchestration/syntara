@@ -83,7 +83,10 @@ export function ImportWorkflowDialog({ isOpen, onClose, onSuccess }: ImportWorkf
       name: '',
       file: undefined,
     },
-    onClose,
+    onClose: () => {
+      setSaveAttemptedWithoutProject(false)
+      onClose()
+    },
   })
   const { handleSubmit, handleClose, setError } = form
 
