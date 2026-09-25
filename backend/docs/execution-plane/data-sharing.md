@@ -33,6 +33,9 @@ The reconciler does not read this payload for the **first** WorkItem.
 Reusing a volume workspace pins later WorkItems to the ExecutionTarget
 that holds the volume
 ([example 02](examples/02-data-sharing-with-workspace.md)).
+Reusing an object-store workspace hydrates `/workspace` from S3 and
+does not pin the target
+([example 03](examples/03-data-sharing-with-workspace-object-store.md)).
 
 ## Principles
 
@@ -204,6 +207,8 @@ does not wait on S3.
 Leaning for MVP: **volume**. Snapshot is the path when AO must place
 WorkItems on different clusters, run `ro` / `copy` in parallel, or
 share a tree on a backend with no volume attach.
+[Example 03](examples/03-data-sharing-with-workspace-object-store.md)
+is three WorkItems on two Clusters.
 
 ### Workspace life time
 
@@ -648,6 +653,10 @@ Extension, not this contract.
   one volume workspace at `/workspace`. The first places via
   selectors. Reuse pins B and C to that ExecutionTarget. The tree
   remains after each unmount.
+- **[example 03](examples/03-data-sharing-with-workspace-object-store.md):**
+  three WorkItems on an object-store workspace. Each places via
+  selectors. Reuse hydrates `/workspace` from S3 and does **not** pin
+  the ExecutionTarget. The next `rw` WorkItem waits for the snapshot.
 - **[labels.md](labels.md):** HTTP and Git activity params and
   workspace UUID are not labels. Reuse of a volume workspace is a
   Work Scheduler placement constraint to the ExecutionTarget that

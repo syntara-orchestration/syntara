@@ -15,9 +15,11 @@ A concrete inventory of the objects EP sees in the MVP cold-start path.
 selectors (`region`, `env`).
 [Example 02](02-data-sharing-with-workspace.md) shares a volume workspace across three
 WorkItems.
-[Example 03](03-openshell-sandbox-policy.md) adds an OpenShell
+[Example 03](03-data-sharing-with-workspace-object-store.md) shares a
+workspace via object-store snapshots across two Clusters.
+[Example 04](04-openshell-sandbox-policy.md) adds an OpenShell
 ExecutionTarget and a sandbox policy on the payload.
-[Example 04](04-no-matching-targets.md) is example 01 when no target
+[Example 05](05-no-matching-targets.md) is example 01 when no target
 matches: the work fails (`NO_MATCHING_TARGETS`).
 
 EP's unit of work is the submitted workload. EP does not read AO
@@ -151,9 +153,10 @@ sequenceDiagram
 | Extra Clusters | [Example 01](01-select-region-and-env.md) |
 | Extra ExecutionTargets / namespaces | [Example 01](01-select-region-and-env.md) |
 | Non-empty `selectors` (`region`, `env`) | [Example 01](01-select-region-and-env.md) |
-| Selectors that match nothing | [Example 04](04-no-matching-targets.md) |
+| Selectors that match nothing | [Example 05](05-no-matching-targets.md) |
 | Other user labels (`gpu`, team) | Later examples |
 | Volume workspace | [Example 02](02-data-sharing-with-workspace.md) |
-| OpenShell sandbox policy | [Example 03](03-openshell-sandbox-policy.md) |
+| Object-store workspace | [Example 03](03-data-sharing-with-workspace-object-store.md) |
+| OpenShell sandbox policy | [Example 04](04-openshell-sandbox-policy.md) |
 | Warm pools | MVP is cold-start vanilla Kubernetes |
 | AO workflow / node / Execution Profile rows | Not visible to EP |

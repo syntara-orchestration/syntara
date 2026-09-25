@@ -264,9 +264,9 @@ sequenceDiagram
 |---|---|
 | Empty selectors without a workspace | [Example 00](00-one-workload-default-target.md) |
 | `region` / `env` placement | [Example 01](01-select-region-and-env.md) |
-| Selectors that match nothing | [Example 04](04-no-matching-targets.md) |
-| OpenShell sandbox policy | [Example 03](03-openshell-sandbox-policy.md). OpenShell has no volume attach. |
+| Selectors that match nothing | [Example 05](05-no-matching-targets.md) |
 | Listed `outputs` / sidecar / S3 artifacts | [data-sharing.md](../data-sharing.md) use-case 2 |
-| Object-store workspace snapshot | [data-sharing.md](../data-sharing.md) (cross-cluster path) |
+| Object-store workspace snapshot | [Example 03](03-data-sharing-with-workspace-object-store.md) |
+| OpenShell sandbox policy | [Example 04](04-openshell-sandbox-policy.md). OpenShell has no volume attach. |
 | Warm pools | Volume workspace is a cold-start mount in this example |
 | AO workflow / node / Execution Profile rows | Not visible to EP |

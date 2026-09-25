@@ -20,7 +20,8 @@ re-specify that algorithm. It exists because review of that design
 showed the *vocabulary* and *ownership* of labels were still ambiguous.
 
 Worked inventories (empty selectors, `region` / `env`, volume
-mounts, OpenShell) are in [examples/](examples/). Key names in those
+workspace, object-store workspace, OpenShell) are in
+[examples/](examples/). Key names in those
 files are for readability; they are not the final field or label
 vocabulary.
 
@@ -90,7 +91,7 @@ requires the reconciler to understand live infrastructure.
 |---|---|---|
 | Lifecycle (`active`, `degraded`, …) and `enabled` | Discrete fields on Cluster / ExecutionTarget; `IneligibilityReason` | A closed enum stays typed; stuffing status into labels loses that. |
 | Live capacity, health, network reachability | Resource Monitor ([AAP-92724](https://redhat.atlassian.net/browse/AAP-92724)) | Eligibility that depends on current load is a filter, not a static advertisement. |
-| Isolation / sandbox policy | Isolation Policy ([AAP-92726](https://redhat.atlassian.net/browse/AAP-92726)); work payload and target `default_policies` | Policy is not a key-value subset match. Extra sandbox constraints travel on the work payload; a target may hold baseline policy. See [example 03](examples/03-openshell-sandbox-policy.md). |
+| Isolation / sandbox policy | Isolation Policy ([AAP-92726](https://redhat.atlassian.net/browse/AAP-92726)); work payload and target `default_policies` | Policy is not a key-value subset match. Extra sandbox constraints travel on the work payload; a target may hold baseline policy. See [example 04](examples/04-openshell-sandbox-policy.md). |
 | Volume mounts, CPU/memory requests as *live* resources | Work payload / Worker Manager; Extension metadata | The reconciler must not inspect volume or network *state* of a target in order to match. A **new** workspace is not a selector. **Reusing** a volume workspace is a Work Scheduler placement constraint to the ExecutionTarget that holds the volume. See [example 02](examples/02-data-sharing-with-workspace.md). |
 | Default ExecutionTarget identity | `ExecutionTarget.is_default` | A boolean field, not a label. Empty work selectors take default routing. |
 | Kubernetes pod template fields | Worker Manager / backend integration | Affinity labels are not copied onto pods unless a backend explicitly maps a reserved key. |
@@ -167,7 +168,7 @@ effective labels:        { region: us-east-1, cluster: prod-a, gpu: true }
 the Worker Manager is selected and how it connects, not how work is
 matched. Copy the value onto labels when work must select a
 non-default backend (for example `backend_type=openshell` in
-[example 03](examples/03-openshell-sandbox-policy.md)). Matching still
+[example 04](examples/04-openshell-sandbox-policy.md)). Matching still
 uses the label map; the discrete field still selects the Worker
 Manager after the target is chosen.
 
@@ -316,7 +317,7 @@ or the ExecutionTarget relationship above.
 
 - **[examples/](examples/):** concrete WorkItem, Cluster, and
   ExecutionTarget inventories for default routing, `region` / `env`,
-  volume mounts, and OpenShell.
+  volume workspace, object-store workspace, and OpenShell.
 - **[ExecutionTarget Reconciler](executiontarget-reconciler.md):** matcher, default
   routing, lifecycle filter. Reads `ClusterSnapshot.labels` and
   `ExecutionTargetSnapshot.labels` as opaque `dict[str, str]`.
