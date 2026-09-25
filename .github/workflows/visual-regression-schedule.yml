@@ -106,14 +106,14 @@ jobs:
         run: |
           git add e2e/visual-regression/page-screenshots.spec.ts-snapshots/
           if git diff --cached --quiet; then
-            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+            echo "has_changes=false"
           else
             ADDED=$(git diff --cached --diff-filter=A --name-only --relative | wc -l | tr -d ' ')
             MODIFIED=$(git diff --cached --diff-filter=M --name-only --relative | wc -l | tr -d ' ')
-            echo "has_changes=true" >> "$GITHUB_OUTPUT"
-            echo "added=${ADDED}" >> "$GITHUB_OUTPUT"
-            echo "modified=${MODIFIED}" >> "$GITHUB_OUTPUT"
-          fi
+            echo "has_changes=true"
+            echo "added=${ADDED}"
+            echo "modified=${MODIFIED}"
+          fi >> "$GITHUB_OUTPUT"
           # create-pull-request stages its own changes from the working tree.
           git reset
 
@@ -167,25 +167,27 @@ jobs:
           BASELINE_MODIFIED: ${{ steps.detect.outputs.modified }}
           BASELINE_PR_URL: ${{ github.server_url }}/${{ github.repository }}/pulls?q=head%3A${{ env.BASELINE_REFRESH_BRANCH }}
         run: |
-          if [[ "$FILTER_NOISE_OUTCOME" == "failure" ]]; then
-            echo "### :x: Visual Regression — baseline noise filter failed" >> "$GITHUB_STEP_SUMMARY"
-            echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "Screenshot PNGs were rewritten but the keep/restore filter crashed. No weekly PR was opened. See the Filter noisy baseline diffs step log." >> "$GITHUB_STEP_SUMMARY"
-          elif [[ "$SCREENSHOTS_OUTCOME" == "failure" ]]; then
-            echo "### :x: Visual Regression — screenshot generation had errors" >> "$GITHUB_STEP_SUMMARY"
-            echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "Check the \`visual-regression-weekly-results\` artifact — this means a real test error (timeout, crash), not a pixel diff." >> "$GITHUB_STEP_SUMMARY"
-          elif [[ "$BASELINES_OUTCOME" == "failure" ]]; then
-            echo "### :warning: Baseline coverage check failed" >> "$GITHUB_STEP_SUMMARY"
-            echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "Missing baselines or uncovered routes detected. See the step log above for details." >> "$GITHUB_STEP_SUMMARY"
-          elif [[ "$HAS_CHANGES" == "true" ]]; then
-            echo "### :camera: Visual Regression — $BASELINE_ADDED new, $BASELINE_MODIFIED changed" >> "$GITHUB_STEP_SUMMARY"
-            echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "Opened/updated the [weekly baseline refresh PR]($BASELINE_PR_URL)." >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "### :white_check_mark: Visual Regression — no drift this week" >> "$GITHUB_STEP_SUMMARY"
-          fi
+          {
+            if [[ "$FILTER_NOISE_OUTCOME" == "failure" ]]; then
+              echo "### :x: Visual Regression — baseline noise filter failed"
+              echo ""
+              echo "Screenshot PNGs were rewritten but the keep/restore filter crashed. No weekly PR was opened. See the Filter noisy baseline diffs step log."
+            elif [[ "$SCREENSHOTS_OUTCOME" == "failure" ]]; then
+              echo "### :x: Visual Regression — screenshot generation had errors"
+              echo ""
+              echo "Check the \`visual-regression-weekly-results\` artifact — this means a real test error (timeout, crash), not a pixel diff."
+            elif [[ "$BASELINES_OUTCOME" == "failure" ]]; then
+              echo "### :warning: Baseline coverage check failed"
+              echo ""
+              echo "Missing baselines or uncovered routes detected. See the step log above for details."
+            elif [[ "$HAS_CHANGES" == "true" ]]; then
+              echo "### :camera: Visual Regression — $BASELINE_ADDED new, $BASELINE_MODIFIED changed"
+              echo ""
+              echo "Opened/updated the [weekly baseline refresh PR]($BASELINE_PR_URL)."
+            else
+              echo "### :white_check_mark: Visual Regression — no drift this week"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
 
       # `continue-on-error: true` on "Regenerate screenshots" exists so later
       # steps (baseline diff, PR open, summary) still run after a real test
