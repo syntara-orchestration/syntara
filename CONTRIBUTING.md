@@ -57,6 +57,9 @@ don't reference a Jira work item are considered community contributions and
 should have the `community` label. Please add it, or ask a maintainer to add it
 if you don't have permission to manage labels.
 
+Note: We're currently focusing on bug fixes and active roadmap items, so we aren't accepting out-of-scope feature PRs at this time.
+We warmly welcome bug fixes and appreciate your support.
+
 ## CI Checks
 
 Pull requests to `devel` run **GitHub Actions** and **Konflux**. Both are
