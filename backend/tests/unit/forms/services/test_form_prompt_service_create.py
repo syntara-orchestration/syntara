@@ -42,17 +42,17 @@ def _make_service(*, raise_integrity_error: bool = False) -> tuple[FormPromptSer
     session.get = AsyncMock(return_value=SimpleNamespace(project_id=_TEST_PROJECT_ID))
 
     if raise_integrity_error:
-        # Simulate uniqueness constraint violation
+        # Prompt creation flushes before dispatch, so an immediate uniqueness
+        # constraint violation is raised here before the audit event is staged.
         orig_error = Exception('duplicate key value violates unique constraint "uix_execution_prompt_node_path"')
-        session.commit = AsyncMock(
+        session.flush = AsyncMock(
             side_effect=IntegrityError(
                 'duplicate key value violates unique constraint "uix_execution_prompt_node_path"',
                 params=None,
                 orig=orig_error,
             )
         )
-    else:
-        session.commit = AsyncMock()
+    session.commit = AsyncMock()
 
     # Create mock user for BaseService
     user = Mock()
@@ -100,8 +100,8 @@ class TestFormPromptServiceCreate:
         assert result.status == "pending"
 
     @pytest.mark.asyncio
-    async def test_success_dispatches_created_event_after_commit(self, mock_audit_dispatcher: Mock) -> None:
-        """Creation audit data uses workflow context and is emitted after persistence."""
+    async def test_success_stages_created_event_in_transaction(self, mock_audit_dispatcher: Mock) -> None:
+        """Creation audit data is staged with the prompt in the same transaction."""
         service, session = _make_service()
         workflow_id = uuid4()
         initiated_by = uuid4()
@@ -121,7 +121,7 @@ class TestFormPromptServiceCreate:
             order.append("commit")
 
         session.commit.side_effect = commit
-        mock_audit_dispatcher.side_effect = lambda _event: order.append("dispatch")
+        mock_audit_dispatcher.side_effect = lambda _event, **_kwargs: order.append("dispatch")
 
         await service.create(request)
 
@@ -133,7 +133,8 @@ class TestFormPromptServiceCreate:
         assert event.prompt_node_id == "form1"
         assert event.initiated_by == initiated_by
         assert event.created_at is not None
-        assert order == ["commit", "dispatch"]
+        assert mock_audit_dispatcher.call_args.kwargs["session"] is session
+        assert order == ["dispatch", "commit"]
 
     @pytest.mark.asyncio
     async def test_success_adds_to_session(self) -> None:

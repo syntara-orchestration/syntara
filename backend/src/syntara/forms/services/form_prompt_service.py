@@ -237,8 +237,8 @@ class FormPromptService(BaseService):
                     )
                     self.session.add(responder_group)
 
-            await self.session.commit()
-
+            # Stage the business audit record in this transaction so the prompt
+            # and its lifecycle event commit or roll back together.
             AuditEventDispatcher.dispatch(
                 FormPromptCreatedEvent(
                     prompt_id=form_prompt.id,
@@ -247,8 +247,12 @@ class FormPromptService(BaseService):
                     prompt_node_id=request.prompt_node_id,
                     initiated_by=execution.created_by,
                     created_at=form_prompt.created_at,
-                )
+                ),
+                # AsyncSession.add() is synchronous, which is all the outbox writer uses.
+                session=self.session,  # type: ignore[arg-type]
             )
+
+            await self.session.commit()
 
             logger.info(
                 "Created form prompt",
