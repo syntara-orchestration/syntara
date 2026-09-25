@@ -388,6 +388,7 @@ class ProjectService(BaseService):
                     )
                 )
             ).all()
+        )
 
         await self.session.exec(
             delete(Credential).where(Credential.project_id == project_id)  # type: ignore[arg-type]
