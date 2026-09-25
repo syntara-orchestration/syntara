@@ -1,25 +1,26 @@
 import {
   Button,
-  FormGroup,
-  FormHelperText,
-  HelperText,
-  HelperTextItem,
   InputGroup,
   InputGroupItem,
   MenuToggle,
   type MenuToggleElement,
+  Popover,
   SelectList,
   SelectOption,
   Switch,
   TextArea,
   TextInput,
 } from '@patternfly/react-core'
-import { RhUiErrorIcon, RhUiViewIcon, RhUiViewOffIcon } from '@patternfly/react-icons'
-import { useMemo, useState, type Ref } from 'react'
+import { RhUiViewIcon, RhUiViewOffIcon } from '@patternfly/react-icons'
+import { useMemo, useState, type ReactElement, type Ref } from 'react'
+import type { FieldPath } from 'react-hook-form'
 
-import { FormLabelWithHelp } from '../../../../components/FormLabelWithHelp'
+import { FieldHelpIcon } from '../../../../components/FieldHelpIcon'
+import { SynFormField } from '../../../../components/forms/SynFormField'
 import { SynSelect } from '../../../../components/SynSelect'
 import { ENCRYPTED_SENTINEL } from '../credentialConstants'
+
+import type { CredentialFormData } from './credentialFormSchema'
 
 export type FieldDefinition = {
   id: string
@@ -35,11 +36,23 @@ export type FieldDefinition = {
 
 type DynamicFieldRendererProps = {
   field: FieldDefinition
-  value: unknown
-  onChange: (fieldId: string, value: unknown) => void
   isRequired?: boolean
   isEditMode?: boolean
-  error?: string
+  onSecretTouch?: (fieldId: string) => void
+}
+
+function inputFieldName(fieldId: string): FieldPath<CredentialFormData> {
+  return `inputs.${fieldId}` as FieldPath<CredentialFormData>
+}
+
+/** Matches legacy `FormLabelWithHelp` aria labels for credential dynamic fields (E2E + a11y). */
+function dynamicFieldLabelHelp(label: string, helpText: string): ReactElement {
+  const helpAriaLabel = `${label} help`
+  return (
+    <Popover bodyContent={helpText} aria-label={helpAriaLabel}>
+      <Button variant="plain" aria-label={helpAriaLabel} icon={<FieldHelpIcon />} />
+    </Popover>
+  )
 }
 
 function toFieldString(value: unknown): string {
@@ -48,61 +61,51 @@ function toFieldString(value: unknown): string {
     : ''
 }
 
-function FieldHelperText({ error, helpText }: Readonly<{ error?: string; helpText?: string }>) {
-  if (error) {
-    return (
-      <FormHelperText>
-        <HelperText>
-          <HelperTextItem icon={<RhUiErrorIcon />} variant="error">
-            {error}
-          </HelperTextItem>
-        </HelperText>
-      </FormHelperText>
-    )
-  }
-  if (helpText) {
-    return (
-      <FormHelperText>
-        <HelperText>
-          <HelperTextItem>{helpText}</HelperTextItem>
-        </HelperText>
-      </FormHelperText>
-    )
-  }
-  return null
+type DynamicSynFormFieldProps = DynamicFieldRendererProps & {
+  children: (renderProps: {
+    value: unknown
+    onValueChange: (value: unknown) => void
+    validated: 'error' | 'default'
+  }) => React.ReactNode
 }
 
-type FieldWrapperProps = {
-  field: FieldDefinition
-  isRequired?: boolean
-  error?: string
-  children: React.ReactNode
-}
-
-function FieldWrapper({ field, isRequired, error, children }: Readonly<FieldWrapperProps>) {
-  const fieldLabel = useMemo(() => {
-    if (field.help_text) return <FormLabelWithHelp label={field.label} helpText={field.help_text} />
-    return field.label
-  }, [field.label, field.help_text])
+function DynamicSynFormField({ field, isRequired, children }: Readonly<DynamicSynFormFieldProps>) {
+  const labelHelp = useMemo(
+    () => (field.help_text ? dynamicFieldLabelHelp(field.label, field.help_text) : undefined),
+    [field.label, field.help_text]
+  )
 
   return (
-    <FormGroup label={fieldLabel} isRequired={isRequired} fieldId={field.id}>
-      {children}
-      <FieldHelperText error={error} />
-    </FormGroup>
+    <SynFormField
+      name={inputFieldName(field.id)}
+      label={field.label}
+      fieldId={field.id}
+      isRequired={isRequired}
+      labelHelp={labelHelp}
+    >
+      {({ field: rhfField, fieldState }) =>
+        children({
+          value: rhfField.value,
+          onValueChange: rhfField.onChange,
+          validated: fieldState.error ? 'error' : 'default',
+        })
+      }
+    </SynFormField>
   )
 }
 
-function BooleanField({ field, value, onChange, error }: DynamicFieldRendererProps) {
+function BooleanField({ field, isRequired }: Readonly<DynamicFieldRendererProps>) {
   return (
-    <FieldWrapper field={field} error={error}>
-      <Switch
-        id={field.id}
-        isChecked={value === true || value === 'true'}
-        onChange={(_event, checked) => onChange(field.id, checked)}
-        label="Enabled"
-      />
-    </FieldWrapper>
+    <DynamicSynFormField field={field} isRequired={isRequired}>
+      {({ value, onValueChange }) => (
+        <Switch
+          id={field.id}
+          isChecked={value === true || value === 'true'}
+          onChange={(_event, checked) => onValueChange(checked)}
+          label="Enabled"
+        />
+      )}
+    </DynamicSynFormField>
   )
 }
 
@@ -158,109 +161,111 @@ function ChoicesSelect({
   )
 }
 
-function ChoicesField({ field, value, onChange, isRequired, error }: DynamicFieldRendererProps) {
-  const stringValue = toFieldString(value)
-
+function ChoicesField({ field, isRequired }: Readonly<DynamicFieldRendererProps>) {
   return (
-    <FieldWrapper field={field} isRequired={isRequired} error={error}>
-      <ChoicesSelect
-        value={stringValue}
-        onChange={(val) => onChange(field.id, val)}
-        choices={field.choices ?? []}
-        fieldId={field.id}
-        label={field.label}
-        validated={error ? 'error' : 'default'}
-      />
-    </FieldWrapper>
+    <DynamicSynFormField field={field} isRequired={isRequired}>
+      {({ value, onValueChange, validated }) => (
+        <ChoicesSelect
+          value={toFieldString(value)}
+          onChange={onValueChange}
+          choices={field.choices ?? []}
+          fieldId={field.id}
+          label={field.label}
+          validated={validated}
+        />
+      )}
+    </DynamicSynFormField>
   )
 }
 
-function MultilineField({ field, value, onChange, isRequired, error }: DynamicFieldRendererProps) {
-  const stringValue = toFieldString(value)
-  const validated = error ? 'error' : 'default'
-
+function MultilineField({ field, isRequired }: Readonly<DynamicFieldRendererProps>) {
   return (
-    <FieldWrapper field={field} isRequired={isRequired} error={error}>
-      <TextArea
-        id={field.id}
-        value={stringValue}
-        onChange={(_event, val) => onChange(field.id, val)}
-        validated={validated}
-        rows={6}
-        placeholder={field.placeholder ?? field.help_text}
-        aria-label={field.label}
-      />
-    </FieldWrapper>
+    <DynamicSynFormField field={field} isRequired={isRequired}>
+      {({ value, onValueChange, validated }) => (
+        <TextArea
+          id={field.id}
+          value={toFieldString(value)}
+          onChange={(_event, val) => onValueChange(val)}
+          validated={validated}
+          rows={6}
+          placeholder={field.placeholder ?? field.help_text}
+          aria-label={field.label}
+        />
+      )}
+    </DynamicSynFormField>
   )
 }
 
-function SecretField({ field, value, onChange, isRequired, isEditMode, error }: DynamicFieldRendererProps) {
+function SecretField({ field, isRequired, isEditMode, onSecretTouch }: Readonly<DynamicFieldRendererProps>) {
   const [showSecret, setShowSecret] = useState(false)
   const [secretTouched, setSecretTouched] = useState(false)
 
-  const stringValue = toFieldString(value)
-  const isEncryptedPlaceholder = isEditMode && !secretTouched && stringValue === ENCRYPTED_SENTINEL
-  const displayValue = isEncryptedPlaceholder ? '' : stringValue
-  const validated = error ? 'error' : 'default'
-
-  const handleSecretChange = (_event: React.FormEvent, val: string) => {
-    if (!secretTouched) setSecretTouched(true)
-    onChange(field.id, val)
-  }
-
   return (
-    <FieldWrapper field={field} isRequired={isRequired} error={error}>
-      <InputGroup>
-        <InputGroupItem isFill>
-          <TextInput
-            id={field.id}
-            type={showSecret ? 'text' : 'password'}
-            autoComplete="off"
-            value={displayValue}
-            onChange={handleSecretChange}
-            validated={validated}
-            placeholder={
-              isEncryptedPlaceholder
-                ? '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022'
-                : (field.placeholder ?? field.help_text)
-            }
-            aria-label={field.label}
-          />
-        </InputGroupItem>
-        <InputGroupItem>
-          <Button
-            variant="control"
-            onClick={() => setShowSecret(!showSecret)}
-            aria-label={showSecret ? 'Hide secret' : 'Show secret'}
-          >
-            {showSecret ? <RhUiViewOffIcon /> : <RhUiViewIcon />}
-          </Button>
-        </InputGroupItem>
-      </InputGroup>
-    </FieldWrapper>
+    <DynamicSynFormField field={field} isRequired={isRequired}>
+      {({ value, onValueChange, validated }) => {
+        const stringValue = toFieldString(value)
+        const isEncryptedPlaceholder = isEditMode && !secretTouched && stringValue === ENCRYPTED_SENTINEL
+        const displayValue = isEncryptedPlaceholder ? '' : stringValue
+
+        const handleSecretChange = (_event: React.FormEvent, val: string) => {
+          if (!secretTouched) setSecretTouched(true)
+          onSecretTouch?.(field.id)
+          onValueChange(val)
+        }
+
+        return (
+          <InputGroup>
+            <InputGroupItem isFill>
+              <TextInput
+                id={field.id}
+                type={showSecret ? 'text' : 'password'}
+                autoComplete="off"
+                value={displayValue}
+                onChange={handleSecretChange}
+                validated={validated}
+                placeholder={
+                  isEncryptedPlaceholder
+                    ? '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022'
+                    : (field.placeholder ?? field.help_text)
+                }
+                aria-label={field.label}
+              />
+            </InputGroupItem>
+            <InputGroupItem>
+              <Button
+                variant="control"
+                onClick={() => setShowSecret(!showSecret)}
+                aria-label={showSecret ? 'Hide secret' : 'Show secret'}
+              >
+                {showSecret ? <RhUiViewOffIcon /> : <RhUiViewIcon />}
+              </Button>
+            </InputGroupItem>
+          </InputGroup>
+        )
+      }}
+    </DynamicSynFormField>
   )
 }
 
-function PlainTextField({ field, value, onChange, isRequired, error }: DynamicFieldRendererProps) {
-  const stringValue = toFieldString(value)
-  const validated = error ? 'error' : 'default'
-
+function PlainTextField({ field, isRequired }: Readonly<DynamicFieldRendererProps>) {
   return (
-    <FieldWrapper field={field} isRequired={isRequired} error={error}>
-      <TextInput
-        id={field.id}
-        type="text"
-        value={stringValue}
-        onChange={(_event, val) => onChange(field.id, val)}
-        validated={validated}
-        placeholder={field.placeholder ?? field.help_text}
-        aria-label={field.label}
-      />
-    </FieldWrapper>
+    <DynamicSynFormField field={field} isRequired={isRequired}>
+      {({ value, onValueChange, validated }) => (
+        <TextInput
+          id={field.id}
+          type="text"
+          value={toFieldString(value)}
+          onChange={(_event, val) => onValueChange(val)}
+          validated={validated}
+          placeholder={field.placeholder ?? field.help_text}
+          aria-label={field.label}
+        />
+      )}
+    </DynamicSynFormField>
   )
 }
 
-export function DynamicFieldRenderer(props: DynamicFieldRendererProps) {
+export function DynamicFieldRenderer(props: Readonly<DynamicFieldRendererProps>) {
   const { field } = props
 
   if (field.type === 'boolean') return <BooleanField {...props} />

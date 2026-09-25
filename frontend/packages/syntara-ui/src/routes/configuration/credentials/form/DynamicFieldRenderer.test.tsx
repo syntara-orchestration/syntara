@@ -1,13 +1,41 @@
-import { render, screen } from '@testing-library/react'
+import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 
+import { SynForm } from '../../../../components/forms/SynForm'
+import { renderWithForm } from '../../../../test/renderWithForm'
+
+import { credentialFormSchema } from './credentialFormSchema'
 import type { FieldDefinition } from './DynamicFieldRenderer'
 import { DynamicFieldRenderer } from './DynamicFieldRenderer'
 
-describe('DynamicFieldRenderer', () => {
-  const onChange = vi.fn()
+const defaultFormValues = {
+  name: '',
+  description: '',
+  project_id: '',
+  credential_type_id: '',
+  inputs: {} as Record<string, unknown>,
+}
 
+function renderDynamicField(
+  field: FieldDefinition,
+  inputs: Record<string, unknown> = {},
+  options?: { isRequired?: boolean; isEditMode?: boolean }
+) {
+  return renderWithForm(
+    {
+      schema: credentialFormSchema,
+      defaultValues: { ...defaultFormValues, inputs },
+    },
+    (form) => (
+      <SynForm form={form}>
+        <DynamicFieldRenderer field={field} isRequired={options?.isRequired} isEditMode={options?.isEditMode} />
+      </SynForm>
+    )
+  )
+}
+
+describe('DynamicFieldRenderer', () => {
   const textField: FieldDefinition = {
     id: 'host',
     label: 'Host',
@@ -47,29 +75,29 @@ describe('DynamicFieldRenderer', () => {
   }
 
   it('renders a text input for string fields', () => {
-    render(<DynamicFieldRenderer field={textField} value="example.com" onChange={onChange} />)
+    renderDynamicField(textField, { host: 'example.com' })
 
     expect(screen.getByRole('textbox', { name: 'Host' })).toBeInTheDocument()
     expect(screen.getByDisplayValue('example.com')).toBeInTheDocument()
   })
 
   it('renders help icon when help_text is provided', () => {
-    render(<DynamicFieldRenderer field={textField} value="" onChange={onChange} />)
+    renderDynamicField(textField)
 
     expect(screen.getByRole('button', { name: 'Host help' })).toBeInTheDocument()
   })
 
-  it('calls onChange when text input changes', async () => {
+  it('updates text input value on change', async () => {
     const user = userEvent.setup()
-    render(<DynamicFieldRenderer field={textField} value="" onChange={onChange} />)
+    renderDynamicField(textField)
 
     await user.type(screen.getByRole('textbox', { name: 'Host' }), 'a')
 
-    expect(onChange).toHaveBeenCalledWith('host', 'a')
+    expect(screen.getByDisplayValue('a')).toBeInTheDocument()
   })
 
   it('renders a password input for secret fields', () => {
-    render(<DynamicFieldRenderer field={secretField} value="my-secret" onChange={onChange} />)
+    renderDynamicField(secretField, { token: 'my-secret' })
 
     const input = screen.getByLabelText('Token', { selector: 'input' })
     expect(input).toHaveAttribute('type', 'password')
@@ -77,7 +105,7 @@ describe('DynamicFieldRenderer', () => {
 
   it('toggles password visibility', async () => {
     const user = userEvent.setup()
-    render(<DynamicFieldRenderer field={secretField} value="my-secret" onChange={onChange} />)
+    renderDynamicField(secretField, { token: 'my-secret' })
 
     const toggleButton = screen.getByRole('button', { name: 'Show secret' })
     await user.click(toggleButton)
@@ -87,24 +115,24 @@ describe('DynamicFieldRenderer', () => {
   })
 
   it('renders a switch for boolean fields', () => {
-    render(<DynamicFieldRenderer field={booleanField} value={true} onChange={onChange} />)
+    renderDynamicField(booleanField, { verify_ssl: true })
 
     expect(screen.getByText('Enabled')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Verify SSL help' })).toBeInTheDocument()
   })
 
-  it('calls onChange for boolean toggle', async () => {
+  it('updates boolean value on toggle', async () => {
     const user = userEvent.setup()
-    render(<DynamicFieldRenderer field={booleanField} value={true} onChange={onChange} />)
+    renderDynamicField(booleanField, { verify_ssl: true })
 
     const switchInput = screen.getByRole('switch')
     await user.click(switchInput)
 
-    expect(onChange).toHaveBeenCalledWith('verify_ssl', false)
+    expect(switchInput).not.toBeChecked()
   })
 
   it('renders a select for choices fields', () => {
-    render(<DynamicFieldRenderer field={choicesField} value="openai" onChange={onChange} />)
+    renderDynamicField(choicesField, { provider: 'openai' })
 
     expect(screen.getByRole('button', { name: 'Provider' })).toHaveTextContent('openai')
   })
@@ -115,7 +143,7 @@ describe('DynamicFieldRenderer', () => {
       ...choicesField,
       choices: Array.from({ length: 20 }, (_, i) => `choice-${i + 1}`),
     }
-    render(<DynamicFieldRenderer field={longChoicesField} value="" onChange={onChange} />)
+    renderDynamicField(longChoicesField)
 
     await user.click(screen.getByRole('button', { name: 'Provider' }))
 
@@ -125,20 +153,20 @@ describe('DynamicFieldRenderer', () => {
   })
 
   it('renders a textarea for multiline fields', () => {
-    render(<DynamicFieldRenderer field={multilineField} value="key-content" onChange={onChange} />)
+    renderDynamicField(multilineField, { ssh_key: 'key-content' })
 
     const textarea = screen.getByRole('textbox', { name: 'SSH Key' })
     expect(textarea.tagName).toBe('TEXTAREA')
   })
 
   it('shows required indicator when isRequired is true', () => {
-    render(<DynamicFieldRenderer field={textField} value="" onChange={onChange} isRequired />)
+    renderDynamicField(textField, {}, { isRequired: true })
 
     expect(screen.getByRole('textbox', { name: 'Host' })).toBeInTheDocument()
   })
 
   it('shows placeholder dots for encrypted values in edit mode', () => {
-    render(<DynamicFieldRenderer field={secretField} value="$encrypted$" onChange={onChange} isEditMode />)
+    renderDynamicField(secretField, { token: '$encrypted$' }, { isEditMode: true })
 
     const input = screen.getByLabelText('Token', { selector: 'input' })
     expect(input).toHaveAttribute('placeholder', '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022')
