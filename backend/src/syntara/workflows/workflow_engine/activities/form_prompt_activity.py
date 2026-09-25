@@ -179,27 +179,17 @@ async def _batch_update_form_prompts(
                 return {result_key: 0}
 
             prompt_ids = [UUID(p["id"]) for p in pending]
-            # Built before the mutating call: if a record is ever missing a required
-            # field, fail before anything is changed rather than after.
-            prompt_records = [{"id": p["id"], "prompt_node_id": p["prompt_node_id"]} for p in pending]
-
             # Chunk requests to respect 100-item limit per batch
             batch_fn = getattr(client, batch_method_name)
             chunk_size = 100
             total_success = 0
             total_failed = 0
-            successful_prompt_ids: set[str] = set()
 
             for i in range(0, len(prompt_ids), chunk_size):
                 chunk = prompt_ids[i : i + chunk_size]
                 batch_result = await batch_fn(chunk)
                 total_success += batch_result.get("total_success", 0)
                 total_failed += batch_result.get("total_failed", 0)
-                successful_prompt_ids.update(
-                    item["prompt_id"]
-                    for item in batch_result.get("results", [])
-                    if item.get("success") is True and item.get("prompt_id")
-                )
 
             logger.info(
                 "Batch %s form prompts completed",
@@ -210,8 +200,7 @@ async def _batch_update_form_prompts(
                 failed_count=total_failed,
                 total_prompts=len(prompt_ids),
             )
-            successful_prompt_records = [record for record in prompt_records if record["id"] in successful_prompt_ids]
-            return {result_key: total_success, "_prompt_records": successful_prompt_records}
+            return {result_key: total_success}
 
     except FormPromptsApiClientError as e:
         logger.warning("Failed to %s form prompts", operation, execution_id=execution_id, error=str(e))
@@ -233,32 +222,7 @@ async def expire_form_prompts_activity(
     execution are expired (the workflow reached a terminal state while other form
     prompt nodes were still awaiting a response).
     """
-    result = await _batch_update_form_prompts(execution_id, "expire", "batch_expire", "expired_count", node_id=node_id)
-
-    # Dispatch audit events for each expired prompt
-    prompt_records = result.pop("_prompt_records", [])
-    if prompt_records:
-        from uuid import UUID  # noqa: PLC0415
-
-        from syntara.audit.dispatcher import AuditEventDispatcher  # noqa: PLC0415
-        from syntara.forms.audit.form_prompt import FormPromptExpiredEvent  # noqa: PLC0415
-
-        for record in prompt_records:
-            AuditEventDispatcher.dispatch(
-                FormPromptExpiredEvent(
-                    prompt_id=UUID(record["id"]),
-                    execution_id=UUID(execution_id),
-                    prompt_node_id=record["prompt_node_id"],
-                )
-            )
-
-        logger.info(
-            "Expired form prompts and dispatched audit events",
-            execution_id=execution_id,
-            count=len(prompt_records),
-        )
-
-    return result
+    return await _batch_update_form_prompts(execution_id, "expire", "batch_expire", "expired_count", node_id=node_id)
 
 
 @activity.defn(name=ActivityName.CANCEL_FORM_PROMPT)
@@ -266,9 +230,7 @@ async def cancel_form_prompts_activity(
     execution_id: str,
 ) -> dict[str, Any]:
     """Cancel all pending form prompts when a workflow is cancelled."""
-    result = await _batch_update_form_prompts(execution_id, "cancel", "batch_cancel", "cancelled_count")
-    result.pop("_prompt_records", None)
-    return result
+    return await _batch_update_form_prompts(execution_id, "cancel", "batch_cancel", "cancelled_count")
 
 
 @activity.defn(name=ActivityName.FAIL_DETACHED_FORM_PROMPT)

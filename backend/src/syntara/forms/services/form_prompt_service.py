@@ -23,7 +23,11 @@ if TYPE_CHECKING:
 from syntara.audit.dispatcher import AuditEventDispatcher
 from syntara.core.models.user_reference import UserReference
 from syntara.core.services import BaseService, GroupMembershipService
-from syntara.forms.audit.form_prompt import FormPromptSubmittedEvent
+from syntara.forms.audit.form_prompt import (
+    FormPromptCreatedEvent,
+    FormPromptExpiredEvent,
+    FormPromptSubmittedEvent,
+)
 from syntara.forms.exceptions import (
     FormPromptAlreadyRequestedError,
     FormPromptAlreadyRespondedError,
@@ -33,6 +37,7 @@ from syntara.forms.exceptions import (
 )
 from syntara.forms.models.api_models import (
     BatchFormPromptRequest,
+    BatchFormPromptUpdate,
     BatchUpdateResponse,
     BatchUpdateResult,
     FormPromptCreateRequest,
@@ -170,13 +175,14 @@ class FormPromptService(BaseService):
 
         return None
 
-    async def _validate_execution_project(self, request: FormPromptCreateRequest) -> None:
+    async def _validate_execution_project(self, request: FormPromptCreateRequest) -> Execution:
         execution = await self.session.get(Execution, request.execution_id)
         if execution is None:
             raise ExecutionNotFoundError(request.execution_id)
         if execution.project_id != request.project_id:
             msg = f"project_id {request.project_id} does not match execution's project {execution.project_id}"
             raise ValueError(msg)
+        return execution
 
     async def create(self, request: FormPromptCreateRequest) -> FormPromptSummary:
         """Create a new form prompt.
@@ -191,7 +197,7 @@ class FormPromptService(BaseService):
             FormPromptAlreadyRequestedError: If a prompt for this already exists
 
         """
-        await self._validate_execution_project(request)
+        execution = await self._validate_execution_project(request)
 
         try:
             # Create the prompt
@@ -230,6 +236,21 @@ class FormPromptService(BaseService):
                         group_id=group_id,
                     )
                     self.session.add(responder_group)
+
+            # Stage the business audit record in this transaction so the prompt
+            # and its lifecycle event commit or roll back together.
+            AuditEventDispatcher.dispatch(
+                FormPromptCreatedEvent(
+                    prompt_id=form_prompt.id,
+                    workflow_id=execution.workflow_id,
+                    execution_id=request.execution_id,
+                    prompt_node_id=request.prompt_node_id,
+                    initiated_by=execution.created_by,
+                    created_at=form_prompt.created_at,
+                ),
+                # AsyncSession.add() is synchronous, which is all the outbox writer uses.
+                session=self.session,  # type: ignore[arg-type]
+            )
 
             await self.session.commit()
 
@@ -319,6 +340,81 @@ class FormPromptService(BaseService):
             raise FormPromptNotFoundError(prompt_id)
         return self._to_read_model(form_prompt)
 
+    async def _apply_prompt_status_update(
+        self,
+        update_request: BatchFormPromptUpdate,
+        prompt: FormPrompt | None,
+        execution: Execution | None,
+    ) -> tuple[BatchUpdateResult, bool, FormPromptExpiredEvent | None]:
+        """Apply one guarded status transition and build its expiry event if changed."""
+        if prompt is None:
+            return (
+                BatchUpdateResult(
+                    prompt_id=str(update_request.prompt_id), success=False, error="Form prompt not found"
+                ),
+                False,
+                None,
+            )
+
+        current_status = FormPromptStatus(prompt.status)
+        target_status = FormPromptStatus(update_request.status.value)
+        if not can_transition(current_status, target_status):
+            if current_status == target_status:
+                return (
+                    BatchUpdateResult(
+                        prompt_id=str(update_request.prompt_id),
+                        success=True,
+                        message=f"Already {target_status.value}",
+                    ),
+                    True,
+                    None,
+                )
+            return (
+                BatchUpdateResult(
+                    prompt_id=str(update_request.prompt_id),
+                    success=False,
+                    error=f"Cannot transition from {current_status.value} to {target_status.value}",
+                ),
+                False,
+                None,
+            )
+
+        update_values: dict[str, Any] = {"status": target_status}
+        if update_request.notes is not None:
+            update_values["notes"] = update_request.notes
+        stmt = (
+            update(FormPrompt)
+            .where(FormPrompt.id == update_request.prompt_id)  # type: ignore[arg-type]
+            .where(FormPrompt.status == current_status)  # type: ignore[arg-type]
+            .values(**update_values)
+        )
+        update_result = await self.session.exec(stmt)
+        if update_result.rowcount == 0:
+            return (
+                BatchUpdateResult(
+                    prompt_id=str(update_request.prompt_id),
+                    success=False,
+                    error=f"Status changed (was {current_status.value}, concurrent update detected)",
+                ),
+                False,
+                None,
+            )
+
+        expired_event = None
+        if target_status == FormPromptStatus.EXPIRED:
+            # execution_id is a soft reference; if its execution was hard-deleted,
+            # expiry still succeeds but the audit event has no workflow/user context.
+            expired_event = FormPromptExpiredEvent(
+                prompt_id=prompt.id,
+                workflow_id=execution.workflow_id if execution is not None else None,
+                execution_id=prompt.execution_id,
+                prompt_node_id=prompt.prompt_node_id,
+                initiated_by=execution.created_by if execution is not None else None,
+                expired_at=datetime.now(UTC),
+                timeout_at=prompt.timeout_at,
+            )
+        return BatchUpdateResult(prompt_id=str(update_request.prompt_id), success=True), True, expired_event
+
     async def batch_update_status(self, request: BatchFormPromptRequest) -> BatchUpdateResponse:
         """Batch update form prompt statuses with concurrency safety and project scoping.
 
@@ -332,96 +428,53 @@ class FormPromptService(BaseService):
             Typed batch update response with results and counts
 
         """
-        results: list[BatchUpdateResult] = []
-        success_count = 0
-        failed_count = 0
-
-        # Load all prompts to check existence and current status
         prompt_ids = [update_request.prompt_id for update_request in request.updates]
         query = select(FormPrompt).where(FormPrompt.id.in_(prompt_ids))  # type: ignore[attr-defined]
         result = await self.session.exec(query)
         prompts_by_id = {p.id: p for p in result.all()}
+        expiring_prompt_ids = {
+            item.prompt_id for item in request.updates if item.status.value == FormPromptStatus.EXPIRED.value
+        }
+        execution_ids = {
+            prompts_by_id[prompt_id].execution_id for prompt_id in expiring_prompt_ids if prompt_id in prompts_by_id
+        }
+        executions_by_id: dict[UUID, Execution] = {}
+        if execution_ids:
+            execution_result = await self.session.exec(
+                select(Execution).where(Execution.id.in_(execution_ids))  # type: ignore[attr-defined]
+            )
+            executions_by_id = {execution.id: execution for execution in execution_result.all()}
 
+        results: list[BatchUpdateResult] = []
+        expired_events: list[FormPromptExpiredEvent] = []
+        success_count = 0
+        failed_count = 0
         for update_request in request.updates:
             prompt = prompts_by_id.get(update_request.prompt_id)
-            if prompt is None:
-                results.append(
-                    BatchUpdateResult(
-                        prompt_id=str(update_request.prompt_id),
-                        success=False,
-                        error="Form prompt not found",
-                    )
-                )
-                failed_count += 1
-                continue
-
-            # Check current status and transition validity
-            current_status = FormPromptStatus(prompt.status)
-            target_status = FormPromptStatus(update_request.status.value)
-
-            if not can_transition(current_status, target_status):
-                # Idempotent: if already at target status, treat as success
-                if current_status == target_status:
-                    results.append(
-                        BatchUpdateResult(
-                            prompt_id=str(update_request.prompt_id),
-                            success=True,
-                            message=f"Already {target_status.value}",
-                        )
-                    )
-                    success_count += 1
-                else:
-                    results.append(
-                        BatchUpdateResult(
-                            prompt_id=str(update_request.prompt_id),
-                            success=False,
-                            error=f"Cannot transition from {current_status.value} to {target_status.value}",
-                        )
-                    )
-                    failed_count += 1
-                continue
-
-            # SECURITY: Conditional UPDATE prevents race conditions.
-            # Only updates prompts still in the expected current status.
-            # If status changed between check and update, rowcount will be 0.
-            update_values: dict[str, Any] = {"status": target_status}
-            if update_request.notes is not None:
-                update_values["notes"] = update_request.notes
-
-            stmt = (
-                update(FormPrompt)
-                .where(FormPrompt.id == update_request.prompt_id)  # type: ignore[arg-type]
-                .where(FormPrompt.status == current_status)  # type: ignore[arg-type]
-                .values(**update_values)
+            execution = executions_by_id.get(prompt.execution_id) if prompt is not None else None
+            update_result, succeeded, expired_event = await self._apply_prompt_status_update(
+                update_request,
+                prompt,
+                execution,
             )
-
-            update_result = await self.session.exec(stmt)
-            affected_rows = update_result.rowcount
-
-            if affected_rows == 0:
-                # Status changed between check and update (race condition)
-                results.append(
-                    BatchUpdateResult(
-                        prompt_id=str(update_request.prompt_id),
-                        success=False,
-                        error=f"Status changed (was {current_status.value}, concurrent update detected)",
-                    )
-                )
-                failed_count += 1
-            else:
-                results.append(
-                    BatchUpdateResult(
-                        prompt_id=str(update_request.prompt_id),
-                        success=True,
-                    )
-                )
+            results.append(update_result)
+            if succeeded:
                 success_count += 1
+            else:
+                failed_count += 1
+            if expired_event is not None:
+                expired_events.append(expired_event)
 
         try:
             await self.session.commit()
         except Exception:
             await self.session.rollback()
             raise
+
+        # Emit from the state-transition path after commit: the workflow activity only
+        # has a pre-update snapshot, while this path can exclude retries and failed updates.
+        for expired_event in expired_events:
+            AuditEventDispatcher.dispatch(expired_event)
 
         logger.info(
             "Batch updated form prompt statuses",
@@ -511,6 +564,7 @@ class FormPromptService(BaseService):
                 raise FormPromptAlreadyRespondedError(prompt_id, prompt.status)
             raise FormPromptNotFoundError(prompt_id)
 
+        execution = await self.session.get(Execution, prompt.execution_id)
         await self.session.commit()
 
         # Refresh to get the updated state
@@ -565,10 +619,11 @@ class FormPromptService(BaseService):
                 exc_info=True,
             )
 
-        # Emit audit event with telemetry data
+        # Emit the lifecycle event with metadata only
         AuditEventDispatcher.dispatch(
             FormPromptSubmittedEvent(
                 prompt_id=prompt_id,
+                workflow_id=execution.workflow_id if execution is not None else None,
                 execution_id=prompt.execution_id,
                 prompt_node_id=prompt.prompt_node_id,
                 submitted_by=self.user.id,

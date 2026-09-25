@@ -1664,13 +1664,15 @@ class WorkflowService(BaseService):
         webhook_service = WebhookTriggerService(self.session, self.user)
         await webhook_service.delete_triggers_for_workflow(workflow_id)
 
-        # Clean up ApprovalRequests (soft reference, no FK — CASCADE won't handle these)
+        # Clean up workflow-scoped records with soft execution references (no FK — CASCADE won't handle these).
         from sqlalchemy import delete as sa_delete  # noqa: PLC0415
 
         from syntara.approvals.models.approval_request import ApprovalRequest  # noqa: PLC0415
+        from syntara.forms.models.form_prompt import FormPrompt  # noqa: PLC0415
 
         exec_ids_subq = select(Execution.id).where(Execution.workflow_id == workflow_id).scalar_subquery()
         await self.session.exec(sa_delete(ApprovalRequest).where(col(ApprovalRequest.execution_id).in_(exec_ids_subq)))
+        await self.session.exec(sa_delete(FormPrompt).where(col(FormPrompt.execution_id).in_(exec_ids_subq)))
 
         # Break self-referential FK before delete
         # (constraint: is_enabled must be False when published_version_id is NULL)

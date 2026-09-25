@@ -264,30 +264,6 @@ class TestExpireFormPromptsActivity:
         assert result["expired_count"] == 0
         mock_client.batch_expire.assert_not_called()
 
-    async def test_records_snapshotted_before_batch_call(self):
-        """Records are captured before the mutating call (for future audit events)."""
-        exec_id = str(uuid4())
-        prompt_id = str(uuid4())
-        mock_client = AsyncMock()
-        mock_client.__aenter__.return_value = mock_client
-        mock_client.__aexit__.return_value = None
-        mock_client.list_form_prompts_by_execution = AsyncMock(
-            return_value=[{"id": prompt_id, "prompt_node_id": "form1"}]
-        )
-
-        # Make batch_expire raise to verify records were built before the call
-        mock_client.batch_expire = AsyncMock(side_effect=Exception("Batch failed"))
-
-        with patch(
-            "syntara.workflows.workflow_engine.activities.form_prompt_activity.FormPromptsApiClient",
-            return_value=mock_client,
-        ):
-            result = await expire_form_prompts_activity(exec_id)
-
-        # Should fail gracefully, but records were already built
-        assert result["expired_count"] == 0
-        assert "error" in result
-
 
 class TestCancelFormPromptsActivity:
     """Tests for cancel_form_prompts_activity."""
