@@ -325,6 +325,26 @@ describe('SynFormFieldBuilder', () => {
     })
   })
 
+  it('shows validation alert when value name is invalid and does not persist to parent', async () => {
+    const user = userEvent.setup()
+    const onChange = vi.fn()
+    const definition = parseFormDefinition({
+      fields: [{ type: FormFieldTypeEnum.TEXT, value_name: 'valid_name', label: 'Title' }],
+    })
+
+    renderBuilder(<SynFormFieldBuilder value={definition} onChange={onChange} />)
+    onChange.mockClear()
+
+    const valueNameInput = screen.getByRole('textbox', { name: 'Value name' })
+    await user.clear(valueNameInput)
+    await user.type(valueNameInput, '1bad')
+
+    expect(
+      screen.getByText('Fix validation errors before changes are saved to the parent form.')
+    ).toBeInTheDocument()
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
   it('shows an error when JSON Schema import is invalid', async () => {
     const user = userEvent.setup()
     renderBuilder(<SynFormFieldBuilder value={createEmptyFormDefinition()} onChange={vi.fn()} />)

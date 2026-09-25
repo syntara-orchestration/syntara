@@ -63,6 +63,12 @@ export function FormFieldBuilderJsonSchemaTab() {
   return (
     <Stack hasGutter>
       <StackItem>
+        <Content component={ContentVariants.small}>
+          Import supports schemas exported from this builder. Arbitrary JSON Schema may lose field types, defaults, or
+          dynamic options.
+        </Content>
+      </StackItem>
+      <StackItem>
         <FormGroup label="Import JSON Schema" fieldId="form-builder-json-import">
           <TextArea
             id="form-builder-json-import"

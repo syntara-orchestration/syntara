@@ -1,6 +1,7 @@
 import type { FormDefinition, FormField } from '@syntara/contracts'
 
 import { FormFieldTypeEnum } from './formFieldTypeEnum'
+import { SYNTARA_FORM_OPTIONS_EXTENSION, type SyntaraFormOptionsExtension } from './jsonSchemaFormExtensions'
 
 type JsonSchemaObject = {
   $schema: string
@@ -25,6 +26,29 @@ function jsonSchemaTypeForScalarValues(values: readonly OptionScalar[]): string 
     return typeof first
   }
   return 'string'
+}
+
+function defaultForJsonSchema(field: FormField): unknown | undefined {
+  if (!Object.hasOwn(field, 'default')) {
+    return undefined
+  }
+  const value = field.default
+  return value === undefined ? undefined : value
+}
+
+function syntaraOptionsExtension(field: FormField): SyntaraFormOptionsExtension | undefined {
+  if (field.type !== FormFieldTypeEnum.DROPDOWN && field.type !== FormFieldTypeEnum.MULTI_SELECT) {
+    return undefined
+  }
+  if (field.options.source !== 'dynamic') {
+    return undefined
+  }
+  return {
+    source: 'dynamic',
+    expression: field.options.expression,
+    label_key: field.options.label_key ?? null,
+    value_key: field.options.value_key ?? null,
+  }
 }
 
 function propertySchemaForField(field: FormField): Record<string, unknown> {
@@ -75,10 +99,19 @@ export function formDefinitionToJsonSchema(definition: FormDefinition): JsonSche
   const required: string[] = []
 
   for (const field of definition.fields) {
-    properties[field.value_name] = {
+    const property: Record<string, unknown> = {
       ...propertySchemaForField(field),
       title: field.label,
     }
+    const defaultValue = defaultForJsonSchema(field)
+    if (defaultValue !== undefined) {
+      property.default = defaultValue
+    }
+    const optionsExtension = syntaraOptionsExtension(field)
+    if (optionsExtension) {
+      property[SYNTARA_FORM_OPTIONS_EXTENSION] = optionsExtension
+    }
+    properties[field.value_name] = property
     if (field.required) {
       required.push(field.value_name)
     }

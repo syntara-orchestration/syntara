@@ -6,6 +6,87 @@ import { FormFieldTypeEnum } from './formFieldTypeEnum'
 import { jsonSchemaStringToFormDefinition, jsonSchemaToFormDefinition } from './jsonSchemaToFormDefinition'
 
 describe('jsonSchemaToFormDefinition', () => {
+  it('round-trips field defaults and numeric dropdown enums', () => {
+    const original = parseFormDefinition({
+      fields: [
+        { type: FormFieldTypeEnum.TEXT, value_name: 'title', label: 'Title', default: 'preset' },
+        { type: FormFieldTypeEnum.NUMBER, value_name: 'qty', label: 'Qty', default: 3 },
+        { type: FormFieldTypeEnum.CHECKBOX, value_name: 'agree', label: 'Agree', default: true },
+        { type: FormFieldTypeEnum.DATE, value_name: 'due', label: 'Due', default: '2026-01-02' },
+        {
+          type: FormFieldTypeEnum.DROPDOWN,
+          value_name: 'tier',
+          label: 'Tier',
+          default: 2,
+          options: {
+            source: 'static',
+            values: [
+              { display_label: 'One', value: 1 },
+              { display_label: 'Two', value: 2 },
+            ],
+          },
+        },
+      ],
+    })
+
+    const imported = jsonSchemaToFormDefinition(formDefinitionToJsonSchema(original))
+    expect(imported.success).toBe(true)
+    if (!imported.success) {
+      return
+    }
+    const fields = imported.data.fields
+    expect(fields[0]?.type).toBe(FormFieldTypeEnum.TEXT)
+    expect(fields[0]?.default).toBe('preset')
+    expect(fields[1]?.default).toBe(3)
+    expect(fields[2]?.default).toBe(true)
+    expect(fields[3]?.default).toBe('2026-01-02')
+    const tier = fields[4]
+    expect(tier?.type).toBe(FormFieldTypeEnum.DROPDOWN)
+    if (tier?.type === FormFieldTypeEnum.DROPDOWN) {
+      expect(tier.default).toBe(2)
+      if (tier.options.source === 'static') {
+        expect(tier.options.values.map((option) => option.value)).toEqual([1, 2])
+      }
+    }
+  })
+
+  it('round-trips dynamic dropdown and multi-select options via extension', () => {
+    const original = parseFormDefinition({
+      fields: [
+        {
+          type: FormFieldTypeEnum.DROPDOWN,
+          value_name: 'env',
+          label: 'Env',
+          options: { source: 'dynamic', expression: '${nodes.upstream.envs}', label_key: 'name', value_key: 'id' },
+        },
+        {
+          type: FormFieldTypeEnum.MULTI_SELECT,
+          value_name: 'tags',
+          label: 'Tags',
+          options: { source: 'dynamic', expression: 'options.tags', label_key: null, value_key: null },
+        },
+      ],
+    })
+
+    const imported = jsonSchemaToFormDefinition(formDefinitionToJsonSchema(original))
+    expect(imported.success).toBe(true)
+    if (!imported.success) {
+      return
+    }
+    const env = imported.data.fields[0]
+    const tags = imported.data.fields[1]
+    expect(env?.type).toBe(FormFieldTypeEnum.DROPDOWN)
+    if (env?.type === FormFieldTypeEnum.DROPDOWN && env.options.source === 'dynamic') {
+      expect(env.options.expression).toBe('${nodes.upstream.envs}')
+      expect(env.options.label_key).toBe('name')
+      expect(env.options.value_key).toBe('id')
+    }
+    expect(tags?.type).toBe(FormFieldTypeEnum.MULTI_SELECT)
+    if (tags?.type === FormFieldTypeEnum.MULTI_SELECT && tags.options.source === 'dynamic') {
+      expect(tags.options.expression).toBe('options.tags')
+    }
+  })
+
   it('round-trips definitions produced by formDefinitionToJsonSchema', () => {
     const original = parseFormDefinition({
       fields: [
@@ -69,7 +150,7 @@ describe('jsonSchemaToFormDefinition', () => {
     expect(imported.data.fields.map((f) => f.type)).toEqual([
       FormFieldTypeEnum.TEXT,
       FormFieldTypeEnum.TEXT,
-      FormFieldTypeEnum.TEXT,
+      FormFieldTypeEnum.EMAIL,
     ])
   })
 
