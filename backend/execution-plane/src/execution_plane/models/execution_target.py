@@ -54,6 +54,13 @@ class ExecutionTarget(SQLModel, table=True):
         ),
     )
     endpoint: str
+    # Namespace in which this target provisions ephemeral worker pods.
+    namespace: str
+    # Non-secret reference describing how the worker obtains Kubernetes credentials.
+    credential_ref: dict[str, Any] = Field(
+        default={},
+        sa_column=Column(JSONB, nullable=False, server_default="{}"),
+    )
     status: TargetStatus = Field(
         default=TargetStatus.REGISTERING,
         sa_column=Column(

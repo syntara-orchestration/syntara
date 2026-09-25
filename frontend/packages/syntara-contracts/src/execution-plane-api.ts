@@ -44,6 +44,26 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/execution_plane/v1/submit': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Submit a cold-start execution-plane work item
+     * @description Queue a JSONL task for execution on a matching registered target.
+     */
+    post: operations['submit_execution_plane_work_item']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
 }
 export type webhooks = Record<string, never>
 export interface components {
@@ -69,6 +89,15 @@ export interface components {
       backend_type: components['schemas']['BackendType']
       /** Endpoint */
       endpoint: string
+      /** Namespace */
+      namespace: string
+      /**
+       * Credential Ref
+       * @default {}
+       */
+      credential_ref?: {
+        [key: string]: unknown
+      }
       /** @default registering */
       status?: components['schemas']['TargetStatus']
       /**
@@ -130,31 +159,39 @@ export interface components {
       ctx?: Record<string, never>
     }
     /**
-     * WorkItem
-     * @description A unit of work written by the Temporal Worker and consumed by the Task Executor.
+     * WorkItemListResponse
+     * @description Paginated list response for WorkItem.
      */
-    WorkItem: {
+    WorkItemListResponse: {
+      /** Resources */
+      resources: components['schemas']['WorkItemRead'][]
+      /** Next */
+      next?: string | null
+      /** Prev */
+      prev?: string | null
+      /** Total */
+      total?: number | null
+    }
+    /**
+     * WorkItemRead
+     * @description Public work-item representation that excludes execution inputs and task tokens.
+     */
+    WorkItemRead: {
       /**
        * Id
        * Format: uuid
        */
-      id?: string
+      id: string
       /**
        * Work Correlation Id
        * Format: uuid
        */
       work_correlation_id: string
-      /** Activity Handle */
-      activity_handle: string
-      /** @default pending */
-      status?: components['schemas']['WorkItemStatus']
+      status: components['schemas']['WorkItemStatus']
       /** Execution Target Id */
       execution_target_id?: string | null
-      /**
-       * Payload
-       * @default {}
-       */
-      payload?: {
+      /** Payload */
+      payload: {
         [key: string]: unknown
       }
       /** Result */
@@ -174,25 +211,55 @@ export interface components {
       signaled_at?: string | null
     }
     /**
-     * WorkItemListResponse
-     * @description Paginated list response for WorkItem.
-     */
-    WorkItemListResponse: {
-      /** Resources */
-      resources: components['schemas']['WorkItem'][]
-      /** Next */
-      next?: string | null
-      /** Prev */
-      prev?: string | null
-      /** Total */
-      total?: number | null
-    }
-    /**
      * WorkItemStatus
      * @description Lifecycle states of a dispatched work item.
      * @enum {string}
      */
     WorkItemStatus: 'pending' | 'claimed' | 'dispatched' | 'completed' | 'failed' | 'cancelled'
+    /**
+     * WorkItemSubmit
+     * @description Direct Task Executor submission request.
+     */
+    WorkItemSubmit: {
+      /**
+       * Work Correlation Id
+       * Format: uuid
+       */
+      work_correlation_id?: string
+      /** Activity Handle */
+      activity_handle?: string | null
+      /** Target Selector */
+      target_selector?: {
+        [key: string]: unknown
+      }
+      task_definition: components['schemas']['WorkerTaskDefinition']
+    }
+    /**
+     * WorkerTaskDefinition
+     * @description OCI image and JSONL invocation used for a cold-start worker.
+     */
+    WorkerTaskDefinition: {
+      /** Image */
+      image: string
+      /** Pod Command */
+      pod_command?: string[] | null
+      /** Command */
+      command: string[]
+      /** Input */
+      input: {
+        [key: string]: unknown
+      }
+      /**
+       * Timeout Seconds
+       * @default 120
+       */
+      timeout_seconds?: number
+      /**
+       * Image Pull Policy
+       * @default IfNotPresent
+       */
+      image_pull_policy?: string
+    }
   }
   responses: never
   parameters: never
@@ -251,6 +318,39 @@ export interface operations {
         }
         content: {
           'application/json': components['schemas']['WorkItemListResponse']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/problem+json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  submit_execution_plane_work_item: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['WorkItemSubmit']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      202: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['WorkItemRead']
         }
       }
       /** @description Validation Error */

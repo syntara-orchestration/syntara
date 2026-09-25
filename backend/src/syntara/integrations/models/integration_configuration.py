@@ -9,6 +9,7 @@ tokens, passwords) are stored in the linked Credential, not here.
 import ssl
 from enum import StrEnum
 from typing import Annotated, ClassVar, Literal, Self
+from uuid import UUID
 
 from pydantic import ConfigDict, Field, field_validator, model_validator
 from sqlmodel import SQLModel
@@ -141,8 +142,30 @@ class AAPConfiguration(IntegrationSecurityMixin):
         return self
 
 
+class OpenShiftConfiguration(IntegrationSecurityMixin):
+    """Non-secret OpenShift connection and its registered execution target."""
+
+    integration_type: Literal["openshift"] = "openshift"
+    base_url: str = Field(description="OpenShift Kubernetes API URL, including port")
+    namespace: str = Field(min_length=1, description="Namespace for ephemeral executor pods")
+    execution_target_id: UUID = Field(description="Execution Plane target linked to this cluster")
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")  # type: ignore[assignment]
+
+    @model_validator(mode="after")
+    def validate_base_url_scheme(self) -> Self:
+        """Accept only a TLS-protected API endpoint without a path or query."""
+        self.base_url = validate_host_url(self.base_url, allow_http=False)
+        if self.insecure_skip_tls_verify:
+            msg = "OpenShift integrations require TLS verification"
+            raise ValueError(msg)
+        return self
+
+
 # Configuration types (used by DB model, read schema, and create/patch)
-IntegrationConfigurationTypes = MCPServerConfigurationInput | LLMProviderConfiguration | AAPConfiguration
+IntegrationConfigurationTypes = (
+    MCPServerConfigurationInput | LLMProviderConfiguration | AAPConfiguration | OpenShiftConfiguration
+)
 IntegrationConfiguration = Annotated[
     IntegrationConfigurationTypes,
     Field(discriminator="integration_type"),

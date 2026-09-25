@@ -23,6 +23,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any, Self
 from urllib.parse import urlparse
+from uuid import UUID
 
 from pydantic import Field, HttpUrl, SecretStr, computed_field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -1501,6 +1502,37 @@ class WorkflowEngineSettings(BaseSettings):
     script_nodes_enabled: bool = Field(
         default=False,
         description="Enable Script node execution in workflows (Developer Preview)",
+    )
+
+    ep_cold_start_workflow_nodes: bool = Field(
+        default=False,
+        description="Route HTTP and Script workflow nodes through the OpenShift Execution Plane integration",
+    )
+
+    ep_openshift_integration_id: UUID | None = Field(
+        default=None,
+        description="Default Syntara OpenShift integration for cold-start workflow nodes",
+    )
+
+    @field_validator("ep_openshift_integration_id", mode="before")
+    @classmethod
+    def empty_ep_integration_id_is_unset(cls, value: Any) -> Any:  # noqa: ANN401
+        """Compose passes an empty value while the optional feature is disabled."""
+        return None if value == "" else value
+
+    ep_http_executor_image: str = Field(
+        default="quay.io/ahetheri/http-executor:amd64",
+        description="HTTP executor image for OpenShift cold-start nodes",
+    )
+
+    ep_script_python_executor_image: str = Field(
+        default="quay.io/ahetheri/script-python-executor:amd64",
+        description="Python script executor image for OpenShift cold-start nodes",
+    )
+
+    ep_script_bash_executor_image: str | None = Field(
+        default=None,
+        description="Bash script executor image for OpenShift cold-start nodes",
     )
 
     agent_orchestrator_base_url: HttpUrl = Field(  # type: ignore[assignment]

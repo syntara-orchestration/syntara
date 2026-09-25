@@ -21,7 +21,7 @@ Each is a deliberate shortcut that avoids inter-service complexity (service disc
 
 | # | What it does |
 |---|---|
-| 1 | EP's web router ([`router.py`](https://github.com/syntara-orchestration/syntara/tree/devel/backend/execution-plane/src/execution_plane/router.py)) — temporarily served by Syntara's web server ([`main.py`](https://github.com/syntara-orchestration/syntara/tree/devel/backend/src/syntara/api/main.py)); imports `SyntaraRouter`, `PermissionChecker`, and `get_db` from syntara; reads `execution_plane.*` tables |
+| 1 | EP's web router ([`router.py`](https://github.com/syntara-orchestration/syntara/tree/devel/backend/execution-plane/src/execution_plane/router.py)) — temporarily served by Syntara's web server ([`main.py`](https://github.com/syntara-orchestration/syntara/tree/devel/backend/src/syntara/api/main.py)); imports `SyntaraRouter`, `PermissionChecker`, and `get_db` from syntara; reads `execution_plane.*` tables and exposes a development `POST /submit` path |
 | 2 | [`ep_dispatch_activity.py`](https://github.com/syntara-orchestration/syntara/tree/devel/backend/src/syntara/workflows/workflow_engine/activities/ep/ep_dispatch_activity.py) — Writes `WorkItem` row, issues `pg_notify`, stores Temporal task token for EP worker's gRPC callback |
 | 3 | [`worker.py`](https://github.com/syntara-orchestration/syntara/tree/devel/backend/execution-plane/src/execution_plane/worker.py) — EP worker calls `handle.complete()` — a gRPC call directly into Syntara's Temporal; requires network access to Temporal :7233 |
 
@@ -33,8 +33,10 @@ Each is a deliberate shortcut that avoids inter-service complexity (service disc
 
 ### Current state
 
-The EP router is temporarily mounted inside the Syntara web server. Work is
-submitted by writing directly to the shared database rather than calling an API.
+The EP router is temporarily mounted inside the Syntara web server. Temporal
+activities still submit by writing directly to the shared database. The
+development `/submit` endpoint uses the same `WorkStore` path and exists to
+exercise the future service boundary without replacing the current integration.
 
 ```mermaid
 flowchart TD
@@ -70,7 +72,7 @@ flowchart TD
 
 This diagram is **[speculative]**, the exact
 mechanism for routing and auth is still open. Although this shows a reverse-proxy,
-`/api/execution-plane/` is a temporary path and may move to a different path or host when EP becomes a standalone service.
+`/api/execution_plane/` is a temporary path and may move to a different path or host when EP becomes a standalone service.
 
 ```mermaid
 flowchart TD

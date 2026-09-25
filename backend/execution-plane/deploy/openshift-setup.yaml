@@ -1,0 +1,46 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ep-dev-workers
+  labels:
+    app.kubernetes.io/part-of: syntara-execution-plane
+    syntara.io/environment: development
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: execution-plane-executor
+  namespace: ep-dev-workers
+  labels:
+    app.kubernetes.io/part-of: syntara-execution-plane
+automountServiceAccountToken: false
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: execution-plane-executor
+  namespace: ep-dev-workers
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch", "create", "delete"]
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["create", "get"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: execution-plane-executor
+  namespace: ep-dev-workers
+subjects:
+  - kind: ServiceAccount
+    name: execution-plane-executor
+    namespace: ep-dev-workers
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: execution-plane-executor

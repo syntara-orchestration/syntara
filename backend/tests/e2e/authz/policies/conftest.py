@@ -381,11 +381,15 @@ SYSTEM_SCOPED_REPRESENTATIVE: list[PolicyTestCase] = [
 EXECUTION_PLANE_SCOPED_CASES: list[PolicyTestCase] = [
     PolicyTestCase(
         "execution_target:read:any",
-        description="GET /api/execution-plane/v1/execution-targets",
+        description="GET /api/execution_plane/v1/execution_targets",
     ),
     PolicyTestCase(
         "work_item:read:any",
-        description="GET /api/execution-plane/v1/work-items",
+        description="GET /api/execution_plane/v1/work_items",
+    ),
+    PolicyTestCase(
+        "work_item:create:any",
+        description="POST /api/execution_plane/v1/submit",
     ),
 ]
 

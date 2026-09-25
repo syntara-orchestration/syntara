@@ -6,7 +6,7 @@ info:
     REST API for managing Integrations.
 
     Integrations are named, managed connections to external services -
-    MCP servers, LLM providers, and Ansible Automation Platform - that workflows use
+    MCP servers, LLM providers, Ansible Automation Platform, and OpenShift - that workflows use
     as building blocks.
 
     ## Key Features
@@ -1019,6 +1019,7 @@ components:
         - mcp_server
         - llm_provider
         - ansible_automation_platform
+        - openshift
       title: IntegrationType
       description: Type of external integration.
 
@@ -1117,6 +1118,7 @@ components:
             - $ref: '#/components/schemas/MCPServerConfigurationInput'
             - $ref: '#/components/schemas/LLMProviderConfiguration'
             - $ref: '#/components/schemas/AAPConfiguration'
+            - $ref: '#/components/schemas/OpenShiftConfiguration'
           title: Configuration
           description: Integration-specific configuration
           discriminator:
@@ -1125,6 +1127,7 @@ components:
               ansible_automation_platform: '#/components/schemas/AAPConfiguration'
               llm_provider: '#/components/schemas/LLMProviderConfiguration'
               mcp_server: '#/components/schemas/MCPServerConfigurationInput'
+              openshift: '#/components/schemas/OpenShiftConfiguration'
         management_credential_id:
           anyOf:
             - type: string
@@ -1270,12 +1273,14 @@ components:
                 - $ref: '#/components/schemas/MCPServerConfigurationInput'
                 - $ref: '#/components/schemas/LLMProviderConfiguration'
                 - $ref: '#/components/schemas/AAPConfiguration'
+                - $ref: '#/components/schemas/OpenShiftConfiguration'
               discriminator:
                 propertyName: integration_type
                 mapping:
                   ansible_automation_platform: '#/components/schemas/AAPConfiguration'
                   llm_provider: '#/components/schemas/LLMProviderConfiguration'
                   mcp_server: '#/components/schemas/MCPServerConfigurationInput'
+                  openshift: '#/components/schemas/OpenShiftConfiguration'
             - type: "null"
           title: Configuration
           description: Integration-specific configuration
@@ -1323,10 +1328,12 @@ components:
               mcp_server: "#/components/schemas/MCPServerConfigurationInput"
               llm_provider: "#/components/schemas/LLMProviderConfiguration"
               ansible_automation_platform: "#/components/schemas/AAPConfiguration"
+              openshift: "#/components/schemas/OpenShiftConfiguration"
           oneOf:
             - $ref: "#/components/schemas/MCPServerConfigurationInput"
             - $ref: "#/components/schemas/LLMProviderConfiguration"
             - $ref: "#/components/schemas/AAPConfiguration"
+            - $ref: "#/components/schemas/OpenShiftConfiguration"
           title: Configuration
         credential_id:
           anyOf:
@@ -1383,6 +1390,7 @@ components:
                 - $ref: '#/components/schemas/MCPServerConfigurationInput'
                 - $ref: '#/components/schemas/LLMProviderConfiguration'
                 - $ref: '#/components/schemas/AAPConfiguration'
+                - $ref: '#/components/schemas/OpenShiftConfiguration'
               title: Configuration
               description: Integration-specific configuration
               discriminator:
@@ -1391,6 +1399,7 @@ components:
                   ansible_automation_platform: '#/components/schemas/AAPConfiguration'
                   llm_provider: '#/components/schemas/LLMProviderConfiguration'
                   mcp_server: '#/components/schemas/MCPServerConfigurationInput'
+                  openshift: '#/components/schemas/OpenShiftConfiguration'
             last_validated_at:
               anyOf:
                 - type: string
@@ -1576,6 +1585,52 @@ components:
       required:
         - base_url
       title: AAPConfiguration
+      type: object
+
+    OpenShiftConfiguration:
+      description: Non-secret OpenShift connection and its registered execution target.
+      additionalProperties: false
+      properties:
+        integration_type:
+          type: string
+          const: openshift
+          default: openshift
+          title: Integration Type
+        base_url:
+          type: string
+          title: Base Url
+          description: OpenShift Kubernetes API URL, including port
+        namespace:
+          type: string
+          minLength: 1
+          title: Namespace
+          description: Namespace for ephemeral executor pods
+        execution_target_id:
+          type: string
+          format: uuid
+          title: Execution Target Id
+          description: Execution Plane target linked to this cluster
+        allow_http:
+          type: boolean
+          title: Allow Http
+          description: Allow HTTP (unencrypted) connections. Loopback addresses are always permitted over HTTP.
+          default: false
+        insecure_skip_tls_verify:
+          type: boolean
+          title: Insecure Skip Tls Verify
+          description: Disable TLS certificate verification for connections to this integration.
+          default: false
+        ca_certificate:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Ca Certificate
+          description: PEM-encoded CA certificate to trust for this integration's TLS connections.
+      required:
+        - base_url
+        - namespace
+        - execution_target_id
+      title: OpenShiftConfiguration
       type: object
 
     DiscoveredLLMModel:

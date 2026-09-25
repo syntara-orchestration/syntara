@@ -1,0 +1,47 @@
+{
+  "schema_version": "2.0.0",
+  "name": "openshift-http-script",
+  "description": "Verify an HTTP node and Python Script node through the OpenShift execution integration",
+  "triggers": [
+    {
+      "id": "trigger_manual",
+      "type": "manual_trigger",
+      "parameters": {
+        "input_schema": {
+          "type": "object",
+          "properties": {}
+        }
+      }
+    }
+  ],
+  "nodes": [
+    {
+      "id": "fetch_zen",
+      "name": "Fetch GitHub Zen",
+      "type": "http_request",
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.github.com/zen",
+        "headers": {
+          "Accept": "application/json",
+          "User-Agent": "Syntara-OpenShift-Integration-Test"
+        }
+      },
+      "timeout": 60
+    },
+    {
+      "id": "run_python",
+      "name": "Run Python in OpenShift",
+      "type": "script",
+      "parameters": {
+        "language": "python",
+        "code": "import json; print(json.dumps({'value': 7 + 11}))"
+      },
+      "timeout": 60
+    }
+  ],
+  "edges": [
+    {"from": "trigger_manual", "to": "fetch_zen"},
+    {"from": "fetch_zen", "to": "run_python"}
+  ]
+}

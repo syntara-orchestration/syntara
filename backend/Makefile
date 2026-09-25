@@ -241,11 +241,22 @@ endif
 
 # Development workflow
 # ========================================================
-.PHONY: ep-migrate
+.PHONY: ep-migrate ep-openshift-setup ep-register-dev-target
 ep-migrate: check-deps ## Apply execution_plane schema migrations (separate from main Syntara migrations)
 	@echo "🔄 Running execution_plane migrations..."
-	@cd execution-plane && APP_ADMIN_PASSWORD_PATH=../.secrets/admin-password uv run alembic upgrade head
+	@cd execution-plane && APP_ADMIN_PASSWORD_PATH=../.secrets/admin-password \
+		APP_DATABASE_URL="$${APP_DATABASE_URL:-postgresql+asyncpg://$${APP_DB_USER:-admin}:$${APP_DB_PASSWORD:-admin}@localhost:$${APP_DB_PORT:-5432}/$${APP_DB_NAME:-syntara_api}}" \
+		uv run alembic upgrade head
 	@echo "✅ execution_plane migrations complete"
+
+ep-openshift-setup: ## Create the development worker namespace/RBAC and rotate its local token
+	@bash execution-plane/scripts/setup-openshift-dev.sh
+
+ep-register-dev-target: ep-migrate ## Register the current oc cluster as an execution target
+	@endpoint="$$(oc whoami --show-server)"; \
+	$(COMPOSE_FINAL_CMD) exec -T database psql \
+		-U "$${APP_DB_USER:-admin}" -d "$${APP_DB_NAME:-syntara_api}" \
+		-v endpoint="$$endpoint" < execution-plane/deploy/register-dev-target.sql
 
 .PHONY: db-seed
 db-seed: check-deps ## Run all required database seeders

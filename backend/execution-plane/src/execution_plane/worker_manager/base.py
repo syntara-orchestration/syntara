@@ -19,3 +19,7 @@ class WorkerManager(Protocol):
     async def dispatch(self, work_item: WorkItem) -> dict[str, Any]:
         """Dispatch work_item to an available worker and return the terminal result."""
         ...
+
+
+class WorkerDispatchError(RuntimeError):
+    """Raised when a remote worker cannot be provisioned or returns failure."""
