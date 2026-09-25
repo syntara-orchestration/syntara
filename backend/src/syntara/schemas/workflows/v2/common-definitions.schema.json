@@ -63,6 +63,11 @@
           "type": "integer",
           "minimum": 1,
           "description": "Timeout in seconds."
+        },
+        "expected_duration": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Expected duration in seconds. Nodes running longer are flagged as stalled. Independent of timeout."
         }
       },
       "additionalProperties": false
@@ -86,6 +91,11 @@
         },
         "retry_policy": {
           "$ref": "#/$defs/retry_policy"
+        },
+        "expected_duration": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Expected duration in seconds. Nodes running longer are flagged as stalled. Independent of timeout."
         }
       },
       "additionalProperties": false
