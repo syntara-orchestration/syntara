@@ -210,6 +210,7 @@ function TimeoutSection({ timeoutFormat, timeoutDefault, timeoutPlaceholder, isD
         labelHelp={nodeHelp.timeout}
         fieldId="node-settings-timeout-seconds"
         type="number"
+        min={1}
         placeholder={timeoutPlaceholder}
         isDisabled={isDisabled}
       />
@@ -241,6 +242,7 @@ function RetryPolicyFields({ retryDefaults, isDisabled }: RetryFieldsProps) {
           labelHelp={nodeHelp.maxRetries}
           fieldId="node-settings-max-retries"
           type="number"
+          min={0}
           placeholder={retryPlaceholder(retryDefaults?.maxRetries, '0 = no retry')}
           isDisabled={isDisabled}
           hint="Number of retries after the initial attempt. 0 = explicitly no retry."
@@ -253,6 +255,7 @@ function RetryPolicyFields({ retryDefaults, isDisabled }: RetryFieldsProps) {
           labelHelp={nodeHelp.initialInterval}
           fieldId="node-settings-initial-interval"
           type="number"
+          min={1}
           placeholder={retryPlaceholder(retryDefaults?.initialInterval, 'System default')}
           isDisabled={isDisabled}
         />
@@ -264,6 +267,7 @@ function RetryPolicyFields({ retryDefaults, isDisabled }: RetryFieldsProps) {
           labelHelp={nodeHelp.maxInterval}
           fieldId="node-settings-max-interval"
           type="number"
+          min={1}
           placeholder={retryPlaceholder(retryDefaults?.maxInterval, 'System default')}
           isDisabled={isDisabled}
         />
@@ -275,6 +279,8 @@ function RetryPolicyFields({ retryDefaults, isDisabled }: RetryFieldsProps) {
           labelHelp={nodeHelp.backoffCoefficient}
           fieldId="node-settings-backoff-coefficient"
           type="number"
+          min={1}
+          step={0.1}
           placeholder={retryPlaceholder(retryDefaults?.backoffCoefficient, 'System default')}
           isDisabled={isDisabled}
         />
