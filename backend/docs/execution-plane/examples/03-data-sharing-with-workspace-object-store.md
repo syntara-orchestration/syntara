@@ -280,7 +280,7 @@ sequenceDiagram
     Sch->>ETR: resolve({region: us-east-1})
     ETR-->>Sch: available = [ep-default on ocp-us-east-1]
     Sch->>WM: dispatch A
-    Note over WM: empty /workspace; write /workspace/src
+    Note over WM: empty /workspace, write /workspace/src
     WM->>S3: PUT snapshot generation 1
     Note over S3: available
 
@@ -291,7 +291,7 @@ sequenceDiagram
     Note over Sch: wait until snapshot available
     Sch->>WM: dispatch B
     WM->>S3: GET snapshot generation 1
-    Note over WM: hydrate /workspace; src still there; write site.yml
+    Note over WM: hydrate /workspace, src still there, write site.yml
     WM->>S3: PUT snapshot generation 2
     Note over S3: available
 
@@ -302,7 +302,7 @@ sequenceDiagram
     Note over Sch: wait until snapshot available
     Sch->>WM: dispatch C
     WM->>S3: GET snapshot generation 2
-    Note over WM: hydrate; src and site.yml still there; write out/report.json
+    Note over WM: hydrate, src and site.yml still there, write out/report.json
     WM->>S3: PUT snapshot generation 3
 ```
 
