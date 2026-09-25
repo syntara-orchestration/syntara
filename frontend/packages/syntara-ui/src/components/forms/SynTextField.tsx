@@ -48,6 +48,18 @@ export type SynTextFieldProps<
   autoComplete?: string
   /** Input type. Defaults to `'text'`. */
   type?: 'text' | 'email' | 'password' | 'search' | 'tel' | 'url' | 'number'
+  /** Forwarded to `TextInput` when `type="number"`. */
+  min?: number
+  /** Forwarded to `TextInput` when `type="number"`. */
+  max?: number
+  /** Forwarded to `TextInput` when `type="number"`. */
+  step?: number
+}
+
+function optionalNumberFromInput(value: string | number | undefined): number | undefined {
+  if (value === '' || value === undefined || value === null) return undefined
+  const n = typeof value === 'number' ? value : Number(value)
+  return Number.isNaN(n) ? undefined : n
 }
 
 /**
@@ -85,8 +97,12 @@ export function SynTextField<
   ariaLabel,
   autoComplete,
   type = 'text',
+  min,
+  max,
+  step,
 }: Readonly<SynTextFieldProps<TFieldValues, TName>>) {
   const resolvedFieldId = fieldId ?? name
+  const isNumberInput = type === 'number'
 
   return (
     <SynFormField
@@ -106,12 +122,21 @@ export function SynTextField<
           aria-label={ariaLabel}
           placeholder={placeholder}
           validated={fieldState.error ? 'error' : 'default'}
-          value={field.value ?? ''}
-          onChange={field.onChange}
+          value={isNumberInput && (field.value === undefined || field.value === null) ? '' : (field.value ?? '')}
+          onChange={(_event, value) => {
+            if (isNumberInput) {
+              field.onChange(optionalNumberFromInput(value))
+            } else {
+              field.onChange(value)
+            }
+          }}
           onBlur={field.onBlur}
           name={field.name}
           isDisabled={isDisabled}
           autoComplete={autoComplete}
+          min={isNumberInput ? min : undefined}
+          max={isNumberInput ? max : undefined}
+          step={isNumberInput ? step : undefined}
         />
       )}
     </SynFormField>
