@@ -1,17 +1,14 @@
 # Execution Plane: Workload data sharing
 
-Two jobs:
+This document introduces two concepts:
 
-1. Successive WorkItems in one Automation Orchestrator (AO) workflow
-   share a directory (`/workspace`).
-2. After a run, listed files are uploaded so later nodes or the UI
-   can get them without stuffing bytes into `WorkItem.result`.
-
-To clone a Git repo or download a file, AO does **not** ask the
-Execution Plane to implement fetch. It runs a normal WorkItem whose
-image is already a Git client or an HTTP client. That container
-writes into `/workspace`. The next WorkItem on the same workspace
-UUID just reads the disk.
+1. **Workspace.** Successive WorkItems in one Automation Orchestrator
+   (AO) workflow share a volume. That volume is the **workspace**: a
+   UUID, on one ExecutionTarget, mounted at `/workspace` by default.
+2. **Listed outputs.** Is a declarative list of files to retrieve.
+   After a run, listed files are uploaded so later
+   nodes or the UI can get them without stuffing bytes into
+   `WorkItem.result`.
 
 - Ticket: [AAP-94189](https://redhat.atlassian.net/browse/AAP-94189)
 - Feature: [ANSTRAT-1803](https://redhat.atlassian.net/browse/ANSTRAT-1803)
@@ -21,11 +18,12 @@ UUID just reads the disk.
 
 ## What this document is
 
-A first cut of the **data-sharing contract** on the WorkItem payload.
-It names the use-cases, who owns each side, and a payload shape EP can
-implement without knowing what a Project or Workflow is.
+A first cut of the **data-sharing contract** on the WorkItem payload:
+data sharing via the **workspace** feature. It names the use-cases,
+who owns each side, and a payload shape EP can implement without
+knowing what a Project or Workflow is.
 
-The workspace is the same idea on every backend (Kubernetes PVC or
+The **workspace** is the same idea on every backend (Kubernetes PVC or
 Podman volume). This is not a PVC spec, not AO FileManager
 ([file-storage.md](../file-storage.md)), and not the in-container SDK.
 Listed outputs are filesystem paths.
