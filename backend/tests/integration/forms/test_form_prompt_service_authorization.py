@@ -46,6 +46,8 @@ _GET_SINGLE_CASES = [
     ("project-user", "other", 403),
     ("project-auditor", "same", 200),
     ("project-auditor", "other", 403),
+    ("user", "same", 403),
+    ("user", "other", 403),
 ]
 _SUBMIT_PERMISSION_CASES = [
     ("admin", "same", 200),
@@ -56,6 +58,8 @@ _SUBMIT_PERMISSION_CASES = [
     ("project-user", "same", 200),
     ("project-user", "other", 403),
     ("project-auditor", "same", 403),
+    ("user", "same", 403),
+    ("user", "other", 403),
 ]
 
 
@@ -200,10 +204,11 @@ class TestFormPromptServiceAuthorizationAPI:
             ("project-admin", "assigned"),
             ("project-user", "assigned"),
             ("project-auditor", "assigned"),
+            ("user", "none"),
         ],
     )
     async def test_list_prompts_role_visibility(self, role_name: str, expected_visibility: str) -> None:
-        """List reads expose all prompts to system readers and assigned-project prompts to project readers."""
+        """List reads follow system/project visibility and hide prompts from roles without read permission."""
         other_project = await self.setup.create_project()
         await self.setup.assign_role(role_name)
         own_prompt = await self.setup.create_prompt()
@@ -213,9 +218,12 @@ class TestFormPromptServiceAuthorizationAPI:
 
         assert response.status_code == 200
         visible_ids = {resource["id"] for resource in response.json()["resources"]}
-        expected_ids = {str(own_prompt.id)}
         if expected_visibility == "all":
-            expected_ids.add(str(other_prompt.id))
+            expected_ids = {str(own_prompt.id), str(other_prompt.id)}
+        elif expected_visibility == "none":
+            expected_ids = set()
+        else:
+            expected_ids = {str(own_prompt.id)}
         assert visible_ids == expected_ids
 
     @pytest.mark.parametrize(("role_name", "project_relation", "expected_status"), _SUBMIT_PERMISSION_CASES)
@@ -297,7 +305,9 @@ class TestFormPromptServiceAuthorizationAPI:
         assert response.status_code == 403
         assert response.json()["code"] == "AUTHORIZATION_DENIED"
 
-    @pytest.mark.parametrize("role_name", ["admin", "auditor", "project-admin", "project-user", "project-auditor"])
+    @pytest.mark.parametrize(
+        "role_name", ["admin", "auditor", "project-admin", "project-user", "project-auditor", "user"]
+    )
     async def test_batch_update_permission_is_admin_only(self, role_name: str) -> None:
         """The batch endpoint's form_prompt:create permission is currently admin-only."""
         await self.setup.assign_role(role_name)
@@ -314,6 +324,25 @@ class TestFormPromptServiceAuthorizationAPI:
         else:
             assert response.status_code == 403
             assert response.json()["code"] == "AUTHORIZATION_DENIED"
+
+    async def test_create_permission_denied_for_user_role(self) -> None:
+        """The built-in user role cannot create form prompts."""
+        await self.setup.assign_role("user")
+
+        response = await self.setup.client.post(
+            FORM_PROMPTS_URL,
+            json={
+                "execution_id": str(uuid4()),
+                "project_id": str(self.setup.project_id),
+                "prompt_node_id": "form-prompt-authz-test",
+                "name": "Authorization test form",
+                "temporal_activity_id": "form-activity",
+                "form_definition": _FORM_DEFINITION,
+            },
+        )
+
+        assert response.status_code == 403
+        assert response.json()["code"] == "AUTHORIZATION_DENIED"
 
 
 @pytest.mark.integration

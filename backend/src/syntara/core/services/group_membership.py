@@ -6,7 +6,7 @@ Used across multiple domains (approvals, RBAC, notifications, etc.).
 
 from uuid import UUID
 
-from sqlmodel import select
+from sqlalchemy import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from syntara.core.models import Group
@@ -55,8 +55,8 @@ class GroupMembershipService:
             .where(user_groups.c.user_id == user_id)
             .where(Group.name.in_(group_names))  # type: ignore[attr-defined]
         )
-        result = await self.session.exec(stmt)
-        groups = result.all()
+        result = await self.session.execute(stmt)
+        groups = result.scalars().all()
 
         return len(groups) > 0
 
@@ -88,7 +88,7 @@ class GroupMembershipService:
             .where(user_groups.c.user_id == user_id)
             .where(Group.id.in_(group_ids))  # type: ignore[attr-defined]
         )
-        result = await self.session.exec(stmt)
-        groups = result.all()
+        result = await self.session.execute(stmt)
+        groups = result.scalars().all()
 
         return len(groups) > 0
