@@ -1,0 +1,38 @@
+.storyCanvas {
+  overflow: hidden;
+  background: var(--pf-t--global--background--color--secondary--default);
+}
+
+.storyCanvas :global(.react-flow__node) :global(.react-flow__handle),
+.semanticZoomCanvas :global(.react-flow__node) :global(.react-flow__handle) {
+  /* Semantic-zoom branch handles set pointer-events inline for workflow connections. */
+  pointer-events: none !important;
+}
+
+.storyCanvasNode {
+  width: calc(100% - 9rem);
+}
+
+.comparisonGrid,
+.gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(22.5rem, 1fr));
+  gap: var(--pf-t--global--spacer--2xl);
+  align-items: start;
+}
+
+.nodeExample {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pf-t--global--spacer--sm);
+  min-width: 0;
+}
+
+.nodeLabel {
+  color: var(--pf-t--global--text--color--subtle);
+}
+
+.semanticZoomCanvas {
+  height: 12rem;
+  background: var(--pf-t--global--background--color--secondary--default);
+}
