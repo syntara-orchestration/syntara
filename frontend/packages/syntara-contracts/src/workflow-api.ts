@@ -944,12 +944,6 @@ export interface components {
        * @description Originating interface (ui or api)
        */
       interface?: string | null
-      /**
-       * Is Stalled
-       * @description Whether any activity in this execution has been flagged as stalled.
-       * @default false
-       */
-      is_stalled?: boolean
       /** Labels */
       labels?: {
         [key: string]: unknown

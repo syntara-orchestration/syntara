@@ -96,16 +96,14 @@ class ExecutionsEnrichQueryMixin(EnrichQueryMixin):
     """Eager-load workflow and workflow_version relationships so list queries include the name and version number."""
 
     def enrich(self, query: Select) -> Select:  # type: ignore[type-arg]
-        """Add selectinload for workflow, workflow_version, and activities to the query.
+        """Add selectinload for workflow and workflow_version to the query.
 
         Only applies when the root entity is Execution (skips ActivityExecution queries).
-        Activities are loaded for the is_stalled computed field (AAP-92824).
         """
         if any(col.get("entity") is Execution for col in query.column_descriptions):
             return query.options(
                 selectinload(Execution.workflow_version),  # type: ignore[arg-type]
                 selectinload(Execution.workflow),  # type: ignore[arg-type]
-                selectinload(Execution.activities),  # type: ignore[arg-type]
             )
         return query
 
@@ -147,7 +145,6 @@ class ExecutionsConvertResourceMixin(ConvertResourceMixin):
             error_details=resource.error_details,
             labels=resource.labels,
             approval_pending=resource.approval_pending,
-            is_stalled=any(a.stall_alert_at is not None for a in (resource.activities if resource.activities else [])),
             mode=resource.mode,
             execution_metadata=resource.execution_metadata,
             retried_from_execution_id=resource.retried_from_execution_id,

@@ -484,12 +484,6 @@ class ExecutionRead(UserReferenceFieldsMixin, SQLModel):
         description="Originating interface (ui or api)",
     )
 
-    # Stall detection (AAP-92824): computed from activities — True if any activity has stall_alert_at set.
-    is_stalled: bool = Field(
-        default=False,
-        description="Whether any activity in this execution has been flagged as stalled.",
-    )
-
     # Optional: Only populated when ?include=workflow_definition
     workflow_definition: WorkflowDefinition | None = Field(
         default=None,

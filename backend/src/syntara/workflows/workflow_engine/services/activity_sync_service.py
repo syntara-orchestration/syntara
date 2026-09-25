@@ -53,8 +53,9 @@ from syntara.workflows.workflow_engine.activities.common import (
     HEARTBEAT_PARTIAL_OUTPUT_KEY,
     HEARTBEAT_STOP_MONITOR,
 )
+from syntara.workflows.workflow_engine.graph import ActivityNode
 from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName, NodeType
-from syntara.workflows.workflow_engine.node_settings_resolver import get_default_expected_duration
+from syntara.workflows.workflow_engine.node_settings_resolver import resolve_expected_duration
 from syntara.workflows.workflow_engine.utils.credential_scrubber import scrub_credentials
 from syntara.workflows.workflow_engine.utils.loop_iteration_ids import (
     innermost_iteration_index,
@@ -2834,12 +2835,11 @@ class ActivitySyncService:
 
                     # V2 workflows: Create records for all node types (triggers, control, executors)
                     # Resolve expected_duration: per-node override → catalog default → None.
-                    node_settings = activity_def.get("settings") or {}
-                    raw_expected_duration = node_settings.get("expected_duration")
-                    if raw_expected_duration is not None:
-                        expected_duration: int | None = int(raw_expected_duration)
-                    else:
-                        expected_duration = get_default_expected_duration(node_type.value, runtime_settings)
+                    try:
+                        node = ActivityNode.from_dict(activity_def)
+                        expected_duration = resolve_expected_duration(node, runtime_settings)
+                    except (KeyError, ValueError):
+                        expected_duration = None
 
                     new_activity = ActivityExecution(
                         execution_id=execution_id,
