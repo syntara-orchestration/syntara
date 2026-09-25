@@ -44,6 +44,8 @@ export type SynTextAreaFieldProps<
   maxLength?: number
   /** Disables the textarea. */
   isDisabled?: boolean
+  /** Accessible name when the visible `FormGroup` label is not exposed to assistive tech. */
+  ariaLabel?: string
 }
 
 /**
@@ -79,6 +81,7 @@ export function SynTextAreaField<
   resizeOrientation,
   maxLength,
   isDisabled,
+  ariaLabel,
 }: Readonly<SynTextAreaFieldProps<TFieldValues, TName>>) {
   const resolvedFieldId = fieldId ?? name
 
@@ -105,6 +108,7 @@ export function SynTextAreaField<
           resizeOrientation={resizeOrientation}
           maxLength={maxLength}
           isDisabled={isDisabled}
+          aria-label={ariaLabel}
         />
       )}
     </SynFormField>

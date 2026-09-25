@@ -1,27 +1,23 @@
-import { zodResolver } from '@hookform/resolvers/zod'
 import {
   AlertActionLink,
   Button,
-  FileUpload,
   Form,
   FormGroup,
-  FormHelperText,
-  HelperText,
-  HelperTextItem,
   Modal,
   ModalBody,
   ModalFooter,
   ModalHeader,
-  TextInput,
 } from '@patternfly/react-core'
-import type { DropEvent } from '@patternfly/react-core'
 import type { V2WorkflowDefinition } from '@syntara/contracts'
 import { useNavigate } from '@tanstack/react-router'
 import { useState } from 'react'
-import { Controller, useForm } from 'react-hook-form'
 
 import { workflowFetchClient } from '../../client'
+import { SynFileField } from '../../components/forms/SynFileField'
+import { SynForm } from '../../components/forms/SynForm'
+import { SynTextField } from '../../components/forms/SynTextField'
 import { useProjectSelector } from '../../hooks/useProjectSelector'
+import { useSynForm } from '../../hooks/useSynForm'
 import { useAlerts } from '../../providers/alerts'
 import { detachPromise } from '../../utils/detachPromise'
 import {
@@ -72,9 +68,6 @@ type ImportWorkflowDialogProps = Readonly<{
 export function ImportWorkflowDialog({ isOpen, onClose, onSuccess }: ImportWorkflowDialogProps) {
   const { showAlert, showError } = useAlerts()
   const navigate = useNavigate()
-  const [file, setFile] = useState<File | null>(null)
-  const [filename, setFilename] = useState('')
-  const [fileError, setFileError] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [saveAttemptedWithoutProject, setSaveAttemptedWithoutProject] = useState(false)
 
@@ -84,40 +77,18 @@ export function ImportWorkflowDialog({ isOpen, onClose, onSuccess }: ImportWorkf
     onProjectSelect: () => setSaveAttemptedWithoutProject(false),
   })
 
-  const formMethods = useForm<ImportWorkflowFormData>({
-    resolver: zodResolver(importWorkflowSchema, undefined, { mode: 'sync' }),
+  const form = useSynForm({
+    schema: importWorkflowSchema,
     defaultValues: {
       name: '',
+      file: undefined,
+    },
+    onClose: () => {
+      setSaveAttemptedWithoutProject(false)
+      onClose()
     },
   })
-
-  const {
-    control,
-    handleSubmit,
-    reset,
-    formState: { errors },
-  } = formMethods
-
-  const handleClose = () => {
-    reset({ name: '' })
-    setFile(null)
-    setFilename('')
-    setFileError(null)
-    setSaveAttemptedWithoutProject(false)
-    onClose()
-  }
-
-  const handleFileInputChange = (_event: DropEvent, inputFile: File) => {
-    setFileError(null)
-    setFile(inputFile)
-    setFilename(inputFile.name)
-  }
-
-  const handleFileClear = () => {
-    setFile(null)
-    setFilename('')
-    setFileError(null)
-  }
+  const { handleSubmit, handleClose, setError } = form
 
   const onImportSuccess = (
     wfName: string,
@@ -144,17 +115,15 @@ export function ImportWorkflowDialog({ isOpen, onClose, onSuccess }: ImportWorkf
       return
     }
 
-    setIsSaving(true)
-    setFileError(null)
-
-    // handleImportClick validates file presence before invoking handleSubmit
+    const file = data.file
     if (!file) return
 
     if (file.size > MAX_WORKFLOW_IMPORT_FILE_SIZE_BYTES) {
-      setFileError(WORKFLOW_IMPORT_FILE_TOO_LARGE_MESSAGE)
-      setIsSaving(false)
+      setError('file', { type: 'manual', message: WORKFLOW_IMPORT_FILE_TOO_LARGE_MESSAGE })
       return
     }
+
+    setIsSaving(true)
 
     let fullDefinition: V2WorkflowDefinition
     try {
@@ -162,7 +131,7 @@ export function ImportWorkflowDialog({ isOpen, onClose, onSuccess }: ImportWorkf
       const parsed = parseWorkflowFile(content, file.name)
       fullDefinition = buildFullDefinition(parsed, data.name)
     } catch (err: unknown) {
-      setFileError(getImportWorkflowFileErrorMessage(err))
+      setError('file', { type: 'manual', message: getImportWorkflowFileErrorMessage(err) })
       setIsSaving(false)
       return
     }
@@ -195,71 +164,34 @@ export function ImportWorkflowDialog({ isOpen, onClose, onSuccess }: ImportWorkf
     }
   }
 
-  const handleImportClick = () => {
-    if (!file) {
-      setFileError('Workflow file is required')
-      return
-    }
-    detachPromise(handleSubmit(onSubmit)())
-  }
-
   return (
     <Modal isOpen={isOpen} onClose={handleClose} variant="small" aria-label="Import workflow">
       <ModalHeader title="Import workflow" />
       <ModalBody>
-        <Form>
-          <FormGroup label="Workflow file" fieldId="import-file" isRequired>
-            <FileUpload
-              id="import-file"
-              value={file ?? undefined}
-              filename={filename}
-              filenamePlaceholder="Drag and drop a file or upload one"
-              onFileInputChange={handleFileInputChange}
-              onClearClick={handleFileClear}
-              browseButtonText="Upload"
+        <Form id="import-workflow-form" onSubmit={handleSubmit(onSubmit)}>
+          <SynForm form={form}>
+            <SynFileField
+              name="file"
+              label="Workflow file"
+              fieldId="import-file"
+              isRequired
               dropzoneProps={{ accept: { 'application/json': ['.json'] } }}
-              validated={fileError ? 'error' : 'default'}
-              hideDefaultPreview
             />
-            {fileError && (
-              <HelperText>
-                <HelperTextItem variant="error">{fileError}</HelperTextItem>
-              </HelperText>
-            )}
-          </FormGroup>
-
-          <FormGroup label="Workflow name" fieldId="import-name" isRequired>
-            <Controller
+            <SynTextField
               name="name"
-              control={control}
-              render={({ field }) => (
-                <TextInput
-                  id="import-name"
-                  type="text"
-                  value={field.value}
-                  onChange={(_event, value) => field.onChange(value)}
-                  placeholder="Enter a name for the imported workflow"
-                  isRequired
-                  validated={errors.name ? 'error' : 'default'}
-                />
-              )}
+              label="Workflow name"
+              fieldId="import-name"
+              isRequired
+              placeholder="Enter a name for the imported workflow"
             />
-            {errors.name && (
-              <FormHelperText>
-                <HelperText>
-                  <HelperTextItem variant="error">{errors.name.message}</HelperTextItem>
-                </HelperText>
-              </FormHelperText>
-            )}
-          </FormGroup>
-
-          <FormGroup label="Project" fieldId="import-project" isRequired>
-            {ProjectSelector}
-          </FormGroup>
+            <FormGroup label="Project" fieldId="import-project" isRequired>
+              {ProjectSelector}
+            </FormGroup>
+          </SynForm>
         </Form>
       </ModalBody>
       <ModalFooter>
-        <Button variant="primary" onClick={handleImportClick} isDisabled={isSaving} isLoading={isSaving}>
+        <Button variant="primary" type="submit" form="import-workflow-form" isDisabled={isSaving} isLoading={isSaving}>
           Import workflow
         </Button>
         <Button variant="link" onClick={handleClose} isDisabled={isSaving}>

@@ -1,28 +1,13 @@
-import { zodResolver } from '@hookform/resolvers/zod'
-import {
-  Button,
-  Form,
-  FormGroup,
-  FormHelperText,
-  HelperText,
-  HelperTextItem,
-  Modal,
-  ModalBody,
-  ModalFooter,
-  ModalHeader,
-  TextArea,
-  TextInput,
-} from '@patternfly/react-core'
+import { Button, Form, Modal, ModalBody, ModalFooter, ModalHeader } from '@patternfly/react-core'
 import { useEffect } from 'react'
-import { Controller, useForm } from 'react-hook-form'
-import { z } from 'zod'
 
-const editVersionSchema = z.object({
-  name: z.string().max(255).optional().or(z.literal('')),
-  change_description: z.string().max(1024).optional().or(z.literal('')),
-})
+import { SynForm } from '../../components/forms/SynForm'
+import { SynTextAreaField } from '../../components/forms/SynTextAreaField'
+import { SynTextField } from '../../components/forms/SynTextField'
+import { useSynForm } from '../../hooks/useSynForm'
 
-type EditVersionFormData = z.infer<typeof editVersionSchema>
+import { editVersionSchema } from './editVersionSchema'
+import type { EditVersionFormData } from './editVersionSchema'
 
 type EditVersionDialogProps = Readonly<{
   isOpen: boolean
@@ -41,15 +26,12 @@ export function EditVersionDialog({
   initialName,
   initialDescription,
 }: EditVersionDialogProps) {
-  const {
-    control,
-    handleSubmit,
-    reset,
-    formState: { errors },
-  } = useForm<EditVersionFormData>({
-    resolver: zodResolver(editVersionSchema, undefined, { mode: 'sync' }),
+  const form = useSynForm({
+    schema: editVersionSchema,
     defaultValues: { name: '', change_description: '' },
+    onClose,
   })
+  const { handleSubmit, handleClose, reset } = form
 
   useEffect(() => {
     if (isOpen) {
@@ -67,58 +49,28 @@ export function EditVersionDialog({
   }
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} variant="small">
+    <Modal isOpen={isOpen} onClose={handleClose} variant="small">
       <ModalHeader title="Edit version name and description" />
       <ModalBody>
         <Form onSubmit={handleSubmit(onSubmit)} id="edit-version-form">
-          <FormGroup label="Version name" fieldId="edit-version-name">
-            <Controller
-              name="name"
-              control={control}
-              render={({ field }) => (
-                <>
-                  <TextInput
-                    id="edit-version-name"
-                    type="text"
-                    aria-label="Version name"
-                    validated={errors.name ? 'error' : 'default'}
-                    value={field.value ?? ''}
-                    onChange={(_event, value) => field.onChange(value)}
-                  />
-                  {errors.name && (
-                    <FormHelperText>
-                      <HelperText>
-                        <HelperTextItem variant="error">{errors.name.message}</HelperTextItem>
-                      </HelperText>
-                    </FormHelperText>
-                  )}
-                </>
-              )}
-            />
-          </FormGroup>
-          <FormGroup label="Description" fieldId="edit-version-description">
-            <Controller
+          <SynForm form={form}>
+            <SynTextField name="name" label="Version name" fieldId="edit-version-name" ariaLabel="Version name" />
+            <SynTextAreaField
               name="change_description"
-              control={control}
-              render={({ field }) => (
-                <TextArea
-                  id="edit-version-description"
-                  aria-label="Description"
-                  placeholder="Describe what changed"
-                  value={field.value ?? ''}
-                  onChange={(_event, value) => field.onChange(value)}
-                  rows={4}
-                />
-              )}
+              label="Description"
+              fieldId="edit-version-description"
+              placeholder="Describe what changed"
+              rows={4}
+              ariaLabel="Description"
             />
-          </FormGroup>
+          </SynForm>
         </Form>
       </ModalBody>
       <ModalFooter>
         <Button variant="primary" type="submit" form="edit-version-form" isLoading={isSaving} isDisabled={isSaving}>
           Save version
         </Button>
-        <Button variant="link" onClick={onClose} isDisabled={isSaving}>
+        <Button variant="link" onClick={handleClose} isDisabled={isSaving}>
           Cancel
         </Button>
       </ModalFooter>
