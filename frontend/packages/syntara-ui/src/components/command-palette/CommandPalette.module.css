@@ -1,0 +1,19 @@
+.results {
+  max-height: min(60vh, 28rem);
+  overflow: auto;
+}
+
+.search {
+  width: 100%;
+}
+
+.itemTitle {
+  display: flex;
+  align-items: center;
+  gap: var(--pf-t--global--spacer--sm);
+  min-width: 0;
+}
+
+.itemTitleText {
+  min-width: 0;
+}

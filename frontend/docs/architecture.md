@@ -1125,6 +1125,18 @@ queryClient.invalidateQueries({ queryKey: ['get', '/workflows'] })
 2. `NodeRegistry` auto-discovers it at startup
 3. Add/extend the React Flow node component in `routes/workflows/canvas/nodes/` (maps activities to canvas steps)
 
+### Add a command-palette search source
+
+Global search (Ctrl/Cmd+K) lives in `packages/syntara-ui/src/components/command-palette/`. To add a catalog (credentials, users, executions, …):
+
+1. Add a `mapXToCommandPaletteItems` mapper in `mapCommandPaletteItems.ts`
+2. Fetch the full list with `fetchAllPages` + a `useAllX({ enabled })` hook (same pattern as `useAllProjects`)
+3. Concatenate the mapped items in `useCommandPaletteItems`
+
+Empty-query results only include items with `showWhenEmpty: true` (pages and builder steps). Remote catalogs appear once the user types.
+
+Choosing a **step** while `/workflow-builder/...` is open queues `OPEN_NODE_EDITOR_ADD` on the current canvas (no navigation). Off the builder, the same hit still opens `/workflow-builder/new` and then the add-step editor.
+
 ### Add filters to a list page
 
 1. Define `FilterFieldDefinition[]` in a colocated `*Filters.ts` / `*FilterDefinitions.ts`
