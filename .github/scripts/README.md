@@ -2,14 +2,6 @@
 
 TypeScript GitHub Actions scripts for merge-queue monitoring and visual-regression review notifications.
 
-## Available Commands
-
-| Command                               | Purpose                                                              |
-| ------------------------------------- | -------------------------------------------------------------------- |
-| `npm run notify:dequeue-burst`        | Alerts Slack when multiple PRs are dequeued in a short period.       |
-| `npm run notify:queue-health`         | Alerts Slack when the merge queue becomes unhealthy or recovers.     |
-| `npm run notify:visual-regression-pr` | Posts the weekly visual regression baseline PR review link to Slack. |
-
 ## Development
 
 ### Install Dependencies
@@ -37,6 +29,7 @@ export GITHUB_HEAD_REF="gh-readonly-queue/devel/pr-123-abc123"
 
 npm run notify:dequeue-burst
 npm run notify:queue-health
+npm run notify:visual-regression-pr
 ```
 
 ## Testing in CI
