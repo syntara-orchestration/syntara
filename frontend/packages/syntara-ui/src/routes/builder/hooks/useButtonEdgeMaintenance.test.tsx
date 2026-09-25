@@ -27,13 +27,13 @@ vi.mock('../utils/filterHelpers', () => ({
 
 type SetNodesFn = React.Dispatch<React.SetStateAction<NodeType[]>>
 type SetEdgesFn = React.Dispatch<React.SetStateAction<EdgeType[]>>
-type OnAddNodeFn = (
-  sourceNodeId: string,
-  targetNodeId?: string,
-  edgeId?: string,
-  sourceHandle?: string,
+type OnAddNodeFn = (options: {
+  sourceNodeId: string
+  targetNodeId?: string
+  edgeId?: string
+  sourceHandle?: string
   desiredPosition?: { x: number; y: number }
-) => void
+}) => void
 
 describe('useButtonEdgeMaintenance', () => {
   const mockSetNodes = vi.fn<SetNodesFn>()

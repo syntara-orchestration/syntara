@@ -106,7 +106,12 @@ describe('useEdgeHandlers', () => {
     })
 
     expect(mockStopPropagation).toHaveBeenCalled()
-    expect(mockOnAddNode).toHaveBeenCalledWith('node-1', 'node-2', 'edge-1', 'source-handle')
+    expect(mockOnAddNode).toHaveBeenCalledWith({
+      sourceNodeId: 'node-1',
+      targetNodeId: 'node-2',
+      edgeId: 'edge-1',
+      sourceHandle: 'source-handle',
+    })
   })
 
   it('handleAddNode does nothing when data.onAddNode is not defined', () => {
