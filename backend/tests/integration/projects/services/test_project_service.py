@@ -626,9 +626,14 @@ async def test_delete_project_blocked_when_credential_referenced_by_integration(
 
 
 @pytest.mark.asyncio
-async def test_delete_project_hard_deletes_approval_requests(seeded_db: AsyncSession, test_user: User) -> None:
-    """Deleting a project hard-deletes all approval requests within it."""
+async def test_delete_project_hard_deletes_workflow_soft_reference_rows(
+    seeded_db: AsyncSession,
+    test_user: User,
+) -> None:
+    """Deleting a project removes approval and form prompt rows before executions."""
     from syntara.approvals.models.approval_request import ApprovalRequest
+    from syntara.forms.models.api_models import FormPromptStatus
+    from syntara.forms.models.form_prompt import FormPrompt
 
     svc = ProjectService(seeded_db, test_user)
     user_id = test_user.id
@@ -675,14 +680,28 @@ async def test_delete_project_hard_deletes_approval_requests(seeded_db: AsyncSes
         labels={},
     )
     seeded_db.add(approval)
+    prompt = FormPrompt(
+        name="test-form-prompt",
+        execution_id=execution.id,
+        project_id=project.id,
+        prompt_node_id="form-1",
+        temporal_activity_id="form-1",
+        form_definition={"fields": [{"value_name": "name", "type": "text", "label": "Name", "required": False}]},
+        status=FormPromptStatus.PENDING,
+        labels={},
+    )
+    seeded_db.add(prompt)
     await seeded_db.commit()
     approval_id = approval.id
+    prompt_id = prompt.id
 
     await svc.delete_project(project.id)
 
     seeded_db.expire_all()
     row = (await seeded_db.exec(select(ApprovalRequest).where(ApprovalRequest.id == approval_id))).first()
     assert row is None
+    prompt_row = (await seeded_db.exec(select(FormPrompt).where(FormPrompt.id == prompt_id))).first()
+    assert prompt_row is None
 
 
 @pytest.mark.asyncio
