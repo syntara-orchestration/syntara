@@ -33,6 +33,8 @@ with workflow.unsafe.imports_passed_through():
     from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName
     from syntara.workflows.workflow_engine.node_settings_resolver import (
         resolve_continue_on_failure,
+        resolve_decision_window,
+        resolve_form_prompt_response_window,
         resolve_max_iterations,
         resolve_max_output_bytes,
         resolve_retry_policy,
@@ -44,6 +46,7 @@ with workflow.unsafe.imports_passed_through():
 from syntara.workflows.utils.namespace_resolver import NamespaceResolver
 from syntara.workflows.workflow_engine.approval_mixin import WorkflowApprovalMixin
 from syntara.workflows.workflow_engine.converge_mixin import WorkflowConvergeMixin
+from syntara.workflows.workflow_engine.form_prompt_mixin import WorkflowFormPromptMixin
 from syntara.workflows.workflow_engine.graph import ActivityNode, WorkflowGraph
 from syntara.workflows.workflow_engine.models.workflow_definition import (
     NODE_OUTPUT_MODELS,
@@ -81,7 +84,7 @@ def _parse_items(items: Any) -> Any:  # noqa: ANN401
 
 
 @workflow.defn(name="orchestrator_workflow")
-class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
+class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin, WorkflowFormPromptMixin):
     """Temporal workflow for executing v2 graph-based workflows."""
 
     @workflow.run
@@ -151,12 +154,16 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
 
             if self._detached_nodes:
                 await self._expire_remaining_approvals(graph)
+                await self._expire_remaining_form_prompts(graph)
 
             return self._build_result(execution_id, include_node_results)
 
         except asyncio.CancelledError:
-            workflow.logger.info("Workflow cancelled, cleaning up pending approvals and agentic invocations")
+            workflow.logger.info(
+                "Workflow cancelled, cleaning up pending approvals, form prompts, and agentic invocations"
+            )
             await self._cancel_approval_requests()
+            await self._cancel_form_prompts()
             await self._cancel_agentic_invocations()
             raise
 
@@ -320,6 +327,7 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
             cof = resolve_continue_on_failure(node, self._runtime_settings)
             self._handle_node_failure(completed_node_id, node_error, graph, pending_tasks, continue_on_failure=cof)
             await self._maybe_expire_approval(completed_node_id, node, node_error)
+            await self._maybe_expire_form_prompt(completed_node_id, node, node_error)
             await self._maybe_cancel_agentic_invocation(node, node_error)
             if cof:
                 self._route_failed_node(completed_node_id, node)
@@ -428,7 +436,13 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         is_timeout = isinstance(error, ActivityError) and isinstance(error.cause, TemporalTimeoutError)
         if is_timeout:
             node = graph.get_node(node_id)
-            timeout_seconds = resolve_timeout(node, self._runtime_settings)
+            # For form_prompt and approval nodes, use response/decision window instead of node timeout
+            if node.type == NodeType.FORM_PROMPT:
+                timeout_seconds = resolve_form_prompt_response_window(node, self._runtime_settings)
+            elif node.type == NodeType.APPROVAL:
+                timeout_seconds = resolve_decision_window(node, self._runtime_settings)
+            else:
+                timeout_seconds = resolve_timeout(node, self._runtime_settings)
             node_name = node.name or node.id
             return build_timeout_error_message(
                 step_name=node_name,
@@ -501,8 +515,11 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
 
         For approval nodes, validates and applies fallback_decision routing before
         scheduling successors. Raises ApplicationError for invalid fallback_decision.
+
+        For form_prompt nodes, validates and applies fallback_decision routing (submitted/fallback).
         """
         if node.type == NodeType.APPROVAL:
+            # Apply fallback_decision routing
             resolved = self.node_inputs.get(node_id, node.parameters)
             fallback = resolved.get("fallback_decision", "reject")
             if fallback not in {"approve", "reject"}:
@@ -510,8 +527,23 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
                 raise ApplicationError(msg, type="ConfigError", non_retryable=True)
             port = "approved" if fallback == "approve" else "rejected"
             self.node_control_data[node_id] = {"next_port": port}
-        await self._schedule_successors(node_id, graph, pending_tasks)
-        self._cancel_skipped_pending_tasks(pending_tasks)
+            await self._schedule_successors(node_id, graph, pending_tasks)
+            self._cancel_skipped_pending_tasks(pending_tasks)
+        elif node.type == NodeType.FORM_PROMPT:
+            # Apply fallback_decision routing
+            resolved = self.node_inputs.get(node_id, node.parameters)
+            fallback = resolved.get("fallback_decision", "fallback")
+            if fallback not in {"submit", "fallback"}:
+                msg = f"Invalid fallback_decision '{fallback}' on node {node_id}: must be 'submit' or 'fallback'"
+                raise ApplicationError(msg, type="ConfigError", non_retryable=True)
+            port = "submitted" if fallback == "submit" else "fallback"
+            self.node_control_data[node_id] = {"next_port": port}
+            await self._schedule_successors(node_id, graph, pending_tasks)
+            self._cancel_skipped_pending_tasks(pending_tasks)
+        else:
+            # All other node types: schedule successors normally when CoF is enabled
+            await self._schedule_successors(node_id, graph, pending_tasks)
+            self._cancel_skipped_pending_tasks(pending_tasks)
 
     def _cancel_skipped_pending_tasks(self, pending_tasks: dict[str, asyncio.Task[Any]]) -> None:
         """Cancel pending tasks for nodes that were marked as skipped."""
@@ -600,6 +632,7 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
             NodeType.CONDITION,
             NodeType.LOOP,
             NodeType.APPROVAL,
+            NodeType.FORM_PROMPT,
             NodeType.SWITCH,
         ):
             workflow.logger.warning(
@@ -608,7 +641,12 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
             )
 
         # Handle branch skipping for control-flow nodes
-        if from_port and completed_node.type in (NodeType.CONDITION, NodeType.APPROVAL, NodeType.SWITCH):
+        if from_port and completed_node.type in (
+            NodeType.CONDITION,
+            NodeType.APPROVAL,
+            NodeType.FORM_PROMPT,
+            NodeType.SWITCH,
+        ):
             self._skip_non_taken_branches(completed_node_id, from_port, graph)
 
         # Stop after nodes: return after branch-skipping but before scheduling successors
@@ -1557,7 +1595,7 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         finally:
             self._scrub_activity_credentials(resolved_parameters)
 
-    async def _dispatch_node_to_executor(
+    async def _dispatch_node_to_executor(  # noqa: PLR0911
         self,
         node: ActivityNode,
         resolved_parameters: dict[str, Any],
@@ -1596,6 +1634,8 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
             )
         if node_type == NodeType.APPROVAL:
             return await self._execute_approval_node(node, graph, resolved_parameters)
+        if node_type == NodeType.FORM_PROMPT:
+            return await self._execute_form_prompt_node(node, graph, resolved_parameters)
         if node_type == NodeType.WAIT:
             return await self._execute_wait_node(node_id, resolved_parameters, node.outputs)
         if node_type == NodeType.CONVERGE:

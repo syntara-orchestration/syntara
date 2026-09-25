@@ -1,5 +1,6 @@
 import * as ApprovalsAPI from './approvals-api.js'
 import * as ExecutionsAPI from './executions-api.js'
+import * as FormsAPI from './forms-api.js'
 import * as ToolManagerAPI from './tool-manager.js'
 import * as UsersAPI from './users-api.js'
 import * as WorkflowAPI from './workflow-api.js'
@@ -27,6 +28,7 @@ export const ActivityTypeEnum = {
   AAP_JOB_TEMPLATE: 'aap_job_template',
   AAP_WORKFLOW_JOB_TEMPLATE: 'aap_workflow_job_template',
   APPROVAL: 'approval',
+  FORM_PROMPT: 'form_prompt',
   CONDITION: 'condition',
   LOOP: 'loop',
   CONVERGE: 'converge',
@@ -74,6 +76,23 @@ export const MissedSchedulePolicyEnum = {
 export type MissedSchedulePolicy = (typeof MissedSchedulePolicyEnum)[keyof typeof MissedSchedulePolicyEnum]
 
 /**
+ * Form field type discriminators — matches OpenAPI / backend `type` values.
+ */
+export const FormFieldTypeEnum = {
+  TEXT: 'text',
+  TEXTAREA: 'textarea',
+  MASKED_TEXT: 'masked_text',
+  EMAIL: 'email',
+  NUMBER: 'number',
+  CHECKBOX: 'checkbox',
+  DATE: 'date',
+  DROPDOWN: 'dropdown',
+  MULTI_SELECT: 'multi_select',
+} as const
+
+export type FormFieldType = (typeof FormFieldTypeEnum)[keyof typeof FormFieldTypeEnum]
+
+/**
  * Trigger types that share webhook-style config (webhook_path, input_schema).
  */
 export const WEBHOOK_TRIGGER_TYPES: ReadonlySet<string> = new Set([
@@ -106,6 +125,8 @@ export const EdgeHandleEnum = {
   FALSE: 'false',
   APPROVED: 'approved',
   REJECTED: 'rejected',
+  SUBMITTED: 'submitted',
+  FALLBACK: 'fallback',
   DONE: 'done',
   DEFAULT: 'default',
   // Target handles
@@ -236,6 +257,9 @@ export type AgenticConfig = WorkflowAPI.components['schemas']['AgenticExecutorPa
 export type AAPJobTemplateConfig = WorkflowAPI.components['schemas']['AAPJobTemplateExecutorParameters']
 export type AAPWorkflowJobTemplateConfig = WorkflowAPI.components['schemas']['AAPWorkflowJobTemplateExecutorParameters']
 export type ApprovalConfig = WorkflowAPI.components['schemas']['ApprovalNodeParameters']
+export type FormPromptConfig = WorkflowAPI.components['schemas']['FormPromptNodeParameters']
+export type FormDefinition = FormsAPI.components['schemas']['FormDefinition']
+export type FormField = FormDefinition['fields'][number]
 export type ConditionConfig = WorkflowAPI.components['schemas']['ConditionNodeParameters']
 export type LoopConfig =
   | WorkflowAPI.components['schemas']['ForEachLoopParameters']

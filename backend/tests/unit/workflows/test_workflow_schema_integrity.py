@@ -209,3 +209,52 @@ class TestWorkflowSchemaReferenceIntegrity:
                 if result:
                     return result
         return None
+
+
+class TestCatalogCompleteness:
+    """Catalog includes all expected node types."""
+
+    def test_catalog_includes_all_node_types(self) -> None:
+        """node_type_catalog.json includes all expected node types."""
+        import json
+
+        from syntara.schemas import SCHEMA_DIR
+
+        catalog_path = SCHEMA_DIR / "workflows" / "v2" / "catalog" / "node_type_catalog.json"
+        catalog = json.loads(catalog_path.read_text())
+        actual_types = {entry["type"] for entry in catalog["node_types"]}
+
+        # All expected node types (triggers, executors, and control flow)
+        expected_types = {
+            # Triggers
+            "manual_trigger",
+            "webhook_trigger",
+            "scheduled_trigger",
+            "eda_trigger",
+            # Executors
+            "script",
+            "aap_job_template",
+            "aap_workflow_job_template",
+            "http_request",
+            "agentic",
+            "approval",
+            "form_prompt",
+            "internal_activity",
+            # Control flow
+            "condition",
+            "loop",
+            "converge",
+            "switch",
+            "wait",
+        }
+
+        missing = expected_types - actual_types
+        assert not missing, f"Catalog is missing expected node types: {sorted(missing)}"
+
+        # Also check for unexpected types (might indicate typos or undocumented additions)
+        unexpected = actual_types - expected_types
+        if unexpected:
+            pytest.warns(
+                UserWarning,
+                match=f"Catalog contains unexpected node types: {sorted(unexpected)}",
+            )

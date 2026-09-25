@@ -15,7 +15,7 @@ import pytest
 from syntara.integrations.services.model_profile_lookup import lookup_model_profile
 
 CURATED_OPENAI_MODELS = [
-    pytest.param("gpt-5.6-sol", marks=pytest.mark.xfail(reason="Not yet in langchain-openai profiles")),
+    "gpt-5.6-sol",
     "gpt-5.5",
     "gpt-5.4",
     "gpt-5.4-mini",

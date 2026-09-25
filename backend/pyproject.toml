@@ -249,6 +249,11 @@ warn_unreachable = true
 strict_equality = true
 
 [[tool.mypy.overrides]]
+# Auto-generated API client - suppress redundant cast warnings
+module = "syntara_api_client.*"
+disable_error_code = ["redundant-cast"]
+
+[[tool.mypy.overrides]]
 module = "tests.*"
 disallow_untyped_defs = false
 disallow_incomplete_defs = false

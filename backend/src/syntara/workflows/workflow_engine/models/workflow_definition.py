@@ -17,8 +17,11 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validat
 from pydantic.functional_validators import ModelWrapValidatorHandler
 
 from syntara.aap.models.responses import AAPJobType as AAPJobType  # noqa: PLC0414
-from syntara.core.constants import WebhookLimits
+from syntara.core.constants import FieldLimits, WebhookLimits
 from syntara.core.exceptions import SafeValueError
+from syntara.core.utils.security import validate_css_security
+from syntara.forms.models.form_fields import FormDefinition
+from syntara.forms.validators.form_definition import validate_form_definition
 from syntara.workflows.json_schema_validation import validate_json_schema_definition
 from syntara.workflows.utils.iso8601_interval import parse_iso8601_repeating_interval
 from syntara.workflows.utils.output_mapping import apply_output_mapping
@@ -135,6 +138,7 @@ class ActivityName(StrEnum):
     AAP_WORKFLOW_JOB_TEMPLATE = "execute_aap_workflow_job_template_activity"
     AGENTIC = "execute_agentic_activity"
     APPROVAL = "execute_approval_activity"
+    FORM_PROMPT = "execute_form_prompt_activity"
     HTTP_REQUEST = "execute_http_request_activity"
     INTERNAL_ACTIVITY = "execute_internal_activity"
     SCRIPT = "execute_script_activity"
@@ -145,6 +149,9 @@ class ActivityName(StrEnum):
     EXPIRE_APPROVAL = "expire_approval_requests"
     CANCEL_APPROVAL = "cancel_approval_requests"
     FAIL_DETACHED_APPROVAL = "fail_detached_approval"
+    EXPIRE_FORM_PROMPT = "expire_form_prompts"
+    CANCEL_FORM_PROMPT = "cancel_form_prompts"
+    FAIL_DETACHED_FORM_PROMPT = "fail_detached_form_prompt"
     CANCEL_AGENTIC = "cancel_agentic_invocation"
     ACTIVITY_MONITORING = "register_activity_monitoring"
     COMPLETE_WAIT = "complete_wait"
@@ -172,6 +179,7 @@ class NodeType(str, Enum):
     AAP_WORKFLOW_JOB_TEMPLATE = "aap_workflow_job_template"
     AGENTIC = "agentic"
     APPROVAL = "approval"
+    FORM_PROMPT = "form_prompt"
     HTTP_REQUEST = "http_request"
     INTERNAL_ACTIVITY = "internal_activity"
     SCRIPT = "script"
@@ -485,7 +493,7 @@ class AgenticExecutorParameters(TemplateAwareBaseModel, populate_by_name=True):
 
         Checks structural validity, rejects $ref (SSRF prevention), and detects
         ReDoS-vulnerable regex patterns. Uses the same validation as webhook
-        input_schema for consistency.
+        form_definition for consistency.
 
         Template expressions (str matching ${...}) bypass this validator via
         TemplateAwareBaseModel's wrap validator and arrive here as str.
@@ -851,6 +859,93 @@ class ApprovalNodeParameters(BaseModel):
     decision_window: int | None = Field(default=None, ge=1, description="Response timeout in seconds")
 
 
+class FormPromptNodeParameters(BaseModel):
+    """Parameters for form prompt nodes."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    message: str | None = Field(
+        default=None,
+        max_length=FieldLimits.DESCRIPTION_MAX_LENGTH,
+        description="Message shown above the form. Supports ${...} template expressions.",
+    )
+    form_definition: FormDefinition = Field(
+        description="Form definition describing the fields shown to responders.",
+    )
+    responder_users: list[str] | None = Field(
+        default=None,
+        max_length=100,
+        description="Usernames allowed to respond. Empty/omitted = any user with form_prompt:submit.",
+    )
+    responder_groups: list[str] | None = Field(
+        default=None,
+        max_length=50,
+        description="Group names whose members may respond. Empty/omitted = any user with form_prompt:submit.",
+    )
+    response_window: int | None = Field(
+        default=None,
+        ge=1,
+        description="Seconds the responder has before the prompt expires. "
+        "Falls back to workflow_engine.form_prompt_response_window_seconds.",
+    )
+    fallback_decision: Literal["submit", "fallback"] | None = Field(
+        default=None,
+        description="Decision when form prompt times out with continue_on_failure enabled",
+    )
+    submit_label: str | None = Field(
+        default=None,
+        max_length=FieldLimits.FORM_SUBMIT_LABEL_MAX_LENGTH,
+        description="Submit button label.",
+    )
+    success_message: str | None = Field(
+        default=None,
+        max_length=FieldLimits.FORM_SUCCESS_MESSAGE_MAX_LENGTH,
+        description="Shown after submission.",
+    )
+    timezone: str | None = Field(
+        default=None,
+        max_length=FieldLimits.FORM_TIMEZONE_MAX_LENGTH,
+        description="IANA timezone for interpreting date/datetime field values in the form.",
+    )
+    css_override: str | None = Field(
+        default=None,
+        max_length=FieldLimits.FORM_CSS_OVERRIDE_MAX_LENGTH,
+        description="Custom CSS applied to the form view.",
+    )
+
+    @field_validator("form_definition", mode="after")
+    @classmethod
+    def validate_form_defaults(cls, v: FormDefinition) -> FormDefinition:
+        """Validate that field defaults are valid for their field types."""
+        validate_form_definition(v, form_id=None)
+        return v
+
+    @field_validator("timezone")
+    @classmethod
+    def validate_timezone(cls, v: str | None) -> str | None:
+        """Validate that timezone is a valid IANA timezone name."""
+        if v is None:
+            return v
+        if v not in _get_valid_timezones():
+            msg = f"Invalid timezone: '{v}'. Must be a valid IANA timezone name (e.g., 'America/New_York')."
+            raise SafeValueError(msg)
+        return v
+
+    @field_validator("css_override")
+    @classmethod
+    def validate_css_override(cls, v: str | None) -> str | None:
+        """Validate CSS for security (reject patterns that enable data exfiltration or code execution)."""
+        if v is None:
+            return v
+
+        try:
+            validate_css_security(v)
+        except ValueError as exc:
+            raise SafeValueError(str(exc)) from exc
+
+        return v
+
+
 class WebhookTriggerParameters(TemplateAwareBaseModel):
     """Parameters for webhook trigger nodes.
 
@@ -991,6 +1086,17 @@ class ApprovalOutput(NodeOutput):
     decision_notes: str | None = None
 
 
+class FormPromptOutput(NodeOutput):
+    """Output model for form prompt executor nodes."""
+
+    status: ActivityTerminalStatus | None = None
+    outcome: str | None = None  # "submitted" | "expired" | "cancelled"
+    response_data: dict[str, Any] | None = None
+    responded_by: str | None = None
+    responded_at: str | None = None
+    prompt_id: str | None = None
+
+
 class ConditionOutput(NodeOutput):
     """Output model for condition control nodes."""
 
@@ -1029,6 +1135,7 @@ NODE_OUTPUT_MODELS: dict[str, type[NodeOutput]] = {
     NodeType.AAP_WORKFLOW_JOB_TEMPLATE: AAPWorkflowJobTemplateOutput,
     NodeType.AGENTIC: AgenticOutput,
     NodeType.APPROVAL: ApprovalOutput,
+    NodeType.FORM_PROMPT: FormPromptOutput,
     NodeType.CONDITION: ConditionOutput,
     NodeType.SWITCH: SwitchOutput,
     NodeType.CONVERGE: ConvergeOutput,

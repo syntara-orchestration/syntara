@@ -105,6 +105,19 @@ def approval_temporal_activity_id(
     return join_loop_iteration_id(node_id, loop_index_chain(node_id, loop_body_map, node_control_data))
 
 
+def form_prompt_temporal_activity_id(
+    node_id: str,
+    loop_body_map: Mapping[str, str],
+    node_control_data: Mapping[str, Mapping[str, Any]],
+) -> str:
+    """Temporal activity ID for a form_prompt node.
+
+    Form prompt is a brand-new node type with no legacy Temporal histories,
+    so it always uses the loop-index chain with no workflow.patched() gate.
+    """
+    return join_loop_iteration_id(node_id, loop_index_chain(node_id, loop_body_map, node_control_data))
+
+
 def loop_control_activity_id(
     node_id: str,
     current_index: int,
