@@ -1,4 +1,15 @@
-"""Integration tests for form prompt permissions and responder authorization."""
+"""Integration tests for form prompt permissions and responder authorization.
+
+Test boundaries:
+- ``auth_client`` injects the fixture user, so login and token validation are not exercised.
+- The API tests replace the suite's allow-all evaluator getter with a wrapper around the production
+  ``evaluate_policy_input``; policy decisions run through the real Rego policy.
+- Submit tests that reach workflow signaling mock ``WorkflowApiClient.send_form_signal`` to avoid
+  contacting Temporal and verify whether a signal would be sent.
+
+The API routes, service, database records, role assignments, and responder memberships use the real
+integration test setup.
+"""
 
 from typing import Any
 from unittest.mock import AsyncMock, patch
@@ -26,24 +37,24 @@ _FORM_DEFINITION = {"fields": [{"value_name": "reason", "type": "text", "label":
 _PROJECT_ROLES = {"project-admin", "project-user", "project-auditor"}
 _GET_SINGLE_CASES = [
     ("admin", "same", 200),
-    ("admin", "foreign", 200),
+    ("admin", "other", 200),
     ("auditor", "same", 200),
-    ("auditor", "foreign", 200),
+    ("auditor", "other", 200),
     ("project-admin", "same", 200),
-    ("project-admin", "foreign", 403),
+    ("project-admin", "other", 403),
     ("project-user", "same", 200),
-    ("project-user", "foreign", 403),
+    ("project-user", "other", 403),
     ("project-auditor", "same", 200),
-    ("project-auditor", "foreign", 403),
+    ("project-auditor", "other", 403),
 ]
 _SUBMIT_PERMISSION_CASES = [
     ("admin", "same", 200),
-    ("admin", "foreign", 200),
+    ("admin", "other", 200),
     ("auditor", "same", 403),
     ("project-admin", "same", 200),
-    ("project-admin", "foreign", 403),
+    ("project-admin", "other", 403),
     ("project-user", "same", 200),
-    ("project-user", "foreign", 403),
+    ("project-user", "other", 403),
     ("project-auditor", "same", 403),
 ]
 
@@ -56,335 +67,272 @@ class _RealPolicyEvaluator:
         return evaluate_policy_input(authz_input)
 
 
-def _use_real_policy_evaluator(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Make API authorization use the repository's Rego policy in this integration test."""
-    clear_authz_cache()
-    evaluator = _RealPolicyEvaluator()
-    monkeypatch.setattr("syntara.authz.dependencies.get_authz_evaluator", lambda _request: evaluator)
+class _FormPromptAuthorizationSetup:
+    """Create the common policy, role, project, prompt, and responder test state."""
+
+    client: AsyncClient
+
+    def __init__(self, session: AsyncSession, project_id: UUID, user: User) -> None:
+        self.session = session
+        self.project_id = project_id
+        self.user = user
+
+    def configure_api(self, client: AsyncClient, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Use the production policy evaluator for route authorization tests."""
+        self.client = client
+        clear_authz_cache()
+        evaluator = _RealPolicyEvaluator()
+        monkeypatch.setattr("syntara.authz.dependencies.get_authz_evaluator", lambda _request: evaluator)
+
+    async def assign_role(self, role_name: str) -> None:
+        """Assign a built-in role globally or to this setup's project."""
+        project_id = self.project_id if role_name in _PROJECT_ROLES else None
+        self.session.add(RoleAssignment(principal_id=self.user.id, role_name=role_name, project_id=project_id))
+        await self.session.commit()
+
+    async def create_project(self, *, name_prefix: str = "form-prompt-authz") -> Project:
+        """Create a project for a cross-project access case."""
+        project = Project(name=f"{name_prefix}-{uuid4().hex[:8]}", description="Authorization test project")
+        self.session.add(project)
+        await self.session.commit()
+        return project
+
+    async def create_prompt(self, project_id: UUID | None = None) -> FormPrompt:
+        """Persist a pending prompt in the selected or default test project."""
+        prompt = FormPrompt(
+            project_id=project_id if project_id is not None else self.project_id,
+            execution_id=uuid4(),
+            prompt_node_id=f"form-{uuid4().hex[:8]}",
+            temporal_activity_id="form-activity",
+            name="Test form",
+            form_definition=_FORM_DEFINITION,
+            status=FormPromptStatus.PENDING,
+        )
+        self.session.add(prompt)
+        await self.session.commit()
+        await self.session.refresh(prompt)
+        return prompt
+
+    async def create_role_prompt(self, role_name: str, project_relation: str = "same") -> FormPrompt:
+        """Assign a role and create its target prompt in the requested project relation."""
+        await self.assign_role(role_name)
+        project_id = self.project_id
+        if project_relation == "other":
+            project_id = (await self.create_project()).id
+        elif project_relation != "same":
+            msg = f"Unknown project relation: {project_relation}"
+            raise ValueError(msg)
+        return await self.create_prompt(project_id)
+
+    async def configure_responders(
+        self,
+        prompt: FormPrompt,
+        mode: str,
+        group: Group,
+        other_users: list[User],
+    ) -> None:
+        """Persist responder rules and group membership for the selected case."""
+        if mode == "user":
+            self.session.add(FormPromptResponderUser(form_prompt_id=prompt.id, user_id=self.user.id))
+        elif mode == "group":
+            self.session.add(FormPromptResponderGroup(form_prompt_id=prompt.id, group_id=group.id))
+            await self.session.exec(insert(user_groups).values(user_id=self.user.id, group_id=group.id))
+        elif mode == "group_nonmember":
+            self.session.add(FormPromptResponderGroup(form_prompt_id=prompt.id, group_id=group.id))
+        elif mode == "neither":
+            self.session.add(FormPromptResponderUser(form_prompt_id=prompt.id, user_id=other_users[0].id))
+        elif mode != "empty":
+            msg = f"Unknown responder test mode: {mode}"
+            raise ValueError(msg)
+        await self.session.commit()
 
 
-async def _assign_role(
-    session: AsyncSession,
-    user: User,
-    role_name: str,
-    project_id: UUID | None = None,
-) -> None:
-    """Assign a built-in role directly to a user, optionally within a project."""
-    session.add(RoleAssignment(principal_id=user.id, role_name=role_name, project_id=project_id))
-    await session.commit()
-
-
-async def _create_project(session: AsyncSession, *, name_prefix: str = "form-prompt-authz") -> Project:
-    """Create a project for cross-project access cases."""
-    project = Project(name=f"{name_prefix}-{uuid4().hex[:8]}", description="Authorization test project")
-    session.add(project)
-    await session.commit()
-    return project
-
-
-async def _create_prompt(session: AsyncSession, project_id: UUID) -> FormPrompt:
-    """Persist a pending prompt with a valid minimal response schema."""
-    prompt = FormPrompt(
-        project_id=project_id,
-        execution_id=uuid4(),
-        prompt_node_id=f"form-{uuid4().hex[:8]}",
-        temporal_activity_id="form-activity",
-        name="Test form",
-        form_definition=_FORM_DEFINITION,
-        status=FormPromptStatus.PENDING,
-    )
-    session.add(prompt)
-    await session.commit()
-    await session.refresh(prompt)
-    return prompt
-
-
-async def _configure_responders(
-    session: AsyncSession,
-    prompt: FormPrompt,
-    current_user: User,
-    mode: str,
-    group: Group,
-    other_users: list[User],
-) -> None:
-    """Configure the requested responder case and persist real membership rows."""
-    if mode == "user":
-        session.add(FormPromptResponderUser(form_prompt_id=prompt.id, user_id=current_user.id))
-    elif mode == "group":
-        session.add(FormPromptResponderGroup(form_prompt_id=prompt.id, group_id=group.id))
-        await session.exec(insert(user_groups).values(user_id=current_user.id, group_id=group.id))
-    elif mode == "group_nonmember":
-        session.add(FormPromptResponderGroup(form_prompt_id=prompt.id, group_id=group.id))
-    elif mode == "neither":
-        session.add(FormPromptResponderUser(form_prompt_id=prompt.id, user_id=other_users[0].id))
-    elif mode != "empty":
-        msg = f"Unknown responder test mode: {mode}"
-        raise ValueError(msg)
-    await session.commit()
+@pytest.fixture
+def form_prompt_setup(
+    test_db_session: AsyncSession,
+    test_project_id: UUID,
+    test_user: User,
+) -> _FormPromptAuthorizationSetup:
+    """Provide reusable prompt authorization setup backed by this test's fixtures."""
+    return _FormPromptAuthorizationSetup(test_db_session, test_project_id, test_user)
 
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-@pytest.mark.parametrize(("role_name", "project_relation", "expected_status"), _GET_SINGLE_CASES)
-async def test_get_single_prompt_role_scope(
-    auth_client: AsyncClient,
-    test_db_session: AsyncSession,
-    test_project_id: UUID,
-    test_user: User,
-    monkeypatch: pytest.MonkeyPatch,
-    role_name: str,
-    project_relation: str,
-    expected_status: int,
-) -> None:
-    """Single-prompt reads follow system-wide or assigned-project read policies."""
-    _use_real_policy_evaluator(monkeypatch)
-    target_project_id = test_project_id
-    if project_relation == "foreign":
-        target_project_id = (await _create_project(test_db_session)).id
-    await _assign_role(
-        test_db_session,
-        test_user,
-        role_name,
-        test_project_id if role_name in _PROJECT_ROLES else None,
+class TestFormPromptServiceAuthorizationAPI:
+    """Integration tests for form prompt permissions and responder authorization."""
+
+    setup: _FormPromptAuthorizationSetup
+
+    @pytest.fixture(autouse=True)
+    def _create_setup(
+        self,
+        form_prompt_setup: _FormPromptAuthorizationSetup,
+        auth_client: AsyncClient,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        form_prompt_setup.configure_api(auth_client, monkeypatch)
+        self.setup = form_prompt_setup
+
+    @pytest.mark.parametrize(("role_name", "project_relation", "expected_status"), _GET_SINGLE_CASES)
+    async def test_get_single_prompt_role_scope(
+        self,
+        role_name: str,
+        project_relation: str,
+        expected_status: int,
+    ) -> None:
+        """Single-prompt reads follow system-wide or assigned-project read policies."""
+        prompt = await self.setup.create_role_prompt(role_name, project_relation)
+
+        response = await self.setup.client.get(f"{FORM_PROMPTS_URL}/{prompt.id}")
+
+        assert response.status_code == expected_status
+        if expected_status == 200:
+            assert response.json()["id"] == str(prompt.id)
+        else:
+            assert response.json()["code"] == "AUTHORIZATION_DENIED"
+
+    @pytest.mark.parametrize(
+        ("role_name", "expected_visibility"),
+        [
+            ("admin", "all"),
+            ("auditor", "all"),
+            ("project-admin", "assigned"),
+            ("project-user", "assigned"),
+            ("project-auditor", "assigned"),
+        ],
     )
-    prompt = await _create_prompt(test_db_session, target_project_id)
+    async def test_list_prompts_role_visibility(self, role_name: str, expected_visibility: str) -> None:
+        """List reads expose all prompts to system readers and assigned-project prompts to project readers."""
+        other_project = await self.setup.create_project()
+        await self.setup.assign_role(role_name)
+        own_prompt = await self.setup.create_prompt()
+        other_prompt = await self.setup.create_prompt(other_project.id)
 
-    response = await auth_client.get(f"{FORM_PROMPTS_URL}/{prompt.id}")
+        response = await self.setup.client.get(FORM_PROMPTS_URL)
 
-    assert response.status_code == expected_status
-    if expected_status == 200:
-        assert response.json()["id"] == str(prompt.id)
-    else:
-        assert response.json()["code"] == "AUTHORIZATION_DENIED"
+        assert response.status_code == 200
+        visible_ids = {resource["id"] for resource in response.json()["resources"]}
+        expected_ids = {str(own_prompt.id)}
+        if expected_visibility == "all":
+            expected_ids.add(str(other_prompt.id))
+        assert visible_ids == expected_ids
 
+    @pytest.mark.parametrize(("role_name", "project_relation", "expected_status"), _SUBMIT_PERMISSION_CASES)
+    async def test_submit_role_and_project_permission(
+        self,
+        role_name: str,
+        project_relation: str,
+        expected_status: int,
+    ) -> None:
+        """Submit permission is checked before the empty-responder fallback."""
+        prompt = await self.setup.create_role_prompt(role_name, project_relation)
 
-@pytest.mark.integration
-@pytest.mark.asyncio
-@pytest.mark.parametrize(
-    ("role_name", "expected_visibility"),
-    [
-        ("admin", "all"),
-        ("auditor", "all"),
-        ("project-admin", "assigned"),
-        ("project-user", "assigned"),
-        ("project-auditor", "assigned"),
-    ],
-)
-async def test_list_prompts_role_visibility(
-    auth_client: AsyncClient,
-    test_db_session: AsyncSession,
-    test_project_id: UUID,
-    test_user: User,
-    monkeypatch: pytest.MonkeyPatch,
-    role_name: str,
-    expected_visibility: str,
-) -> None:
-    """List reads expose all prompts to system readers and assigned-project prompts to project readers."""
-    _use_real_policy_evaluator(monkeypatch)
-    foreign_project = await _create_project(test_db_session)
-    await _assign_role(
-        test_db_session,
-        test_user,
-        role_name,
-        test_project_id if role_name in _PROJECT_ROLES else None,
-    )
-    own_prompt = await _create_prompt(test_db_session, test_project_id)
-    foreign_prompt = await _create_prompt(test_db_session, foreign_project.id)
+        with patch("syntara.forms.clients.workflow_client.WorkflowApiClient") as client_class:
+            client = client_class.return_value.__aenter__.return_value
+            client.send_form_signal = AsyncMock()
+            response = await self.setup.client.post(
+                f"{FORM_PROMPTS_URL}/{prompt.id}/submit",
+                json={"response_data": {"reason": "authorized by role"}},
+            )
 
-    response = await auth_client.get(FORM_PROMPTS_URL)
+        assert response.status_code == expected_status
+        if expected_status == 200:
+            assert response.json()["status"] == "submitted"
+            client.send_form_signal.assert_awaited_once()
+        else:
+            assert response.json()["code"] == "AUTHORIZATION_DENIED"
+            client.send_form_signal.assert_not_awaited()
 
-    assert response.status_code == 200
-    visible_ids = {resource["id"] for resource in response.json()["resources"]}
-    expected_ids = {str(own_prompt.id)}
-    if expected_visibility == "all":
-        expected_ids.add(str(foreign_prompt.id))
-    assert visible_ids == expected_ids
+    @pytest.mark.parametrize("role_name", ["admin", "project-admin", "project-user"])
+    @pytest.mark.parametrize("responder_mode", ["user", "group", "neither", "group_nonmember", "empty"])
+    async def test_submit_responder_membership_for_roles_with_submit_permission(
+        self,
+        multiple_local_users: list[User],
+        test_group: Group,
+        role_name: str,
+        responder_mode: str,
+    ) -> None:
+        """Direct responders and group members may submit; configured nonresponders may not."""
+        await self.setup.assign_role(role_name)
+        prompt = await self.setup.create_prompt()
+        await self.setup.configure_responders(prompt, responder_mode, test_group, multiple_local_users)
 
+        with patch("syntara.forms.clients.workflow_client.WorkflowApiClient") as client_class:
+            client = client_class.return_value.__aenter__.return_value
+            client.send_form_signal = AsyncMock()
+            response = await self.setup.client.post(
+                f"{FORM_PROMPTS_URL}/{prompt.id}/submit",
+                json={"response_data": {"reason": "responder authorization"}},
+            )
 
-@pytest.mark.integration
-@pytest.mark.asyncio
-@pytest.mark.parametrize(("role_name", "project_relation", "expected_status"), _SUBMIT_PERMISSION_CASES)
-async def test_submit_role_and_project_permission(
-    auth_client: AsyncClient,
-    test_db_session: AsyncSession,
-    test_project_id: UUID,
-    test_user: User,
-    monkeypatch: pytest.MonkeyPatch,
-    role_name: str,
-    project_relation: str,
-    expected_status: int,
-) -> None:
-    """Submit permission is checked before the empty-responder fallback."""
-    _use_real_policy_evaluator(monkeypatch)
-    target_project_id = test_project_id
-    if project_relation == "foreign":
-        target_project_id = (await _create_project(test_db_session)).id
-    await _assign_role(
-        test_db_session,
-        test_user,
-        role_name,
-        test_project_id if role_name in _PROJECT_ROLES else None,
-    )
-    prompt = await _create_prompt(test_db_session, target_project_id)
+        if responder_mode in {"neither", "group_nonmember"}:
+            assert response.status_code == 403
+            assert response.json()["code"] == "FORM_PROMPT_NOT_AUTHORIZED"
+            client.send_form_signal.assert_not_awaited()
+        else:
+            assert response.status_code == 200
+            assert response.json()["status"] == "submitted"
+            client.send_form_signal.assert_awaited_once()
 
-    with patch("syntara.forms.clients.workflow_client.WorkflowApiClient") as client_class:
-        client = client_class.return_value.__aenter__.return_value
-        client.send_form_signal = AsyncMock()
-        response = await auth_client.post(
+    @pytest.mark.parametrize("role_name", ["auditor", "project-auditor"])
+    @pytest.mark.parametrize("responder_mode", ["user", "group"])
+    async def test_submit_responder_membership_does_not_grant_submit_permission(
+        self,
+        multiple_local_users: list[User],
+        test_group: Group,
+        role_name: str,
+        responder_mode: str,
+    ) -> None:
+        """A responder assignment cannot replace the required submit policy."""
+        await self.setup.assign_role(role_name)
+        prompt = await self.setup.create_prompt()
+        await self.setup.configure_responders(prompt, responder_mode, test_group, multiple_local_users)
+
+        response = await self.setup.client.post(
             f"{FORM_PROMPTS_URL}/{prompt.id}/submit",
-            json={"response_data": {"reason": "authorized by role"}},
+            json={"response_data": {"reason": "role denied"}},
         )
 
-    assert response.status_code == expected_status
-    if expected_status == 200:
-        assert response.json()["status"] == "submitted"
-        client.send_form_signal.assert_awaited_once()
-    else:
+        assert response.status_code == 403
         assert response.json()["code"] == "AUTHORIZATION_DENIED"
-        client.send_form_signal.assert_not_awaited()
 
+    @pytest.mark.parametrize("role_name", ["admin", "auditor", "project-admin", "project-user", "project-auditor"])
+    async def test_batch_update_permission_is_admin_only(self, role_name: str) -> None:
+        """The batch endpoint's form_prompt:create permission is currently admin-only."""
+        await self.setup.assign_role(role_name)
+        prompt = await self.setup.create_prompt()
 
-@pytest.mark.integration
-@pytest.mark.asyncio
-@pytest.mark.parametrize("role_name", ["admin", "project-admin", "project-user"])
-@pytest.mark.parametrize("responder_mode", ["user", "group", "neither", "group_nonmember", "empty"])
-async def test_submit_responder_membership_for_roles_with_submit_permission(
-    auth_client: AsyncClient,
-    test_db_session: AsyncSession,
-    test_project_id: UUID,
-    test_user: User,
-    multiple_local_users: list[User],
-    test_group: Group,
-    monkeypatch: pytest.MonkeyPatch,
-    role_name: str,
-    responder_mode: str,
-) -> None:
-    """Direct responders and group members may submit; configured nonresponders may not."""
-    _use_real_policy_evaluator(monkeypatch)
-    await _assign_role(
-        test_db_session,
-        test_user,
-        role_name,
-        test_project_id if role_name in _PROJECT_ROLES else None,
-    )
-    prompt = await _create_prompt(test_db_session, test_project_id)
-    await _configure_responders(test_db_session, prompt, test_user, responder_mode, test_group, multiple_local_users)
-
-    with patch("syntara.forms.clients.workflow_client.WorkflowApiClient") as client_class:
-        client = client_class.return_value.__aenter__.return_value
-        client.send_form_signal = AsyncMock()
-        response = await auth_client.post(
-            f"{FORM_PROMPTS_URL}/{prompt.id}/submit",
-            json={"response_data": {"reason": "responder authorization"}},
+        response = await self.setup.client.post(
+            f"{FORM_PROMPTS_URL}/batch",
+            json={"updates": [{"prompt_id": str(prompt.id), "status": "expired"}]},
         )
 
-    if responder_mode in {"neither", "group_nonmember"}:
-        assert response.status_code == 403
-        assert response.json()["code"] == "FORM_PROMPT_NOT_AUTHORIZED"
-        client.send_form_signal.assert_not_awaited()
-    else:
-        assert response.status_code == 200
-        assert response.json()["status"] == "submitted"
-        client.send_form_signal.assert_awaited_once()
-
-
-@pytest.mark.integration
-@pytest.mark.asyncio
-@pytest.mark.parametrize("role_name", ["auditor", "project-auditor"])
-@pytest.mark.parametrize("responder_mode", ["user", "group"])
-async def test_submit_responder_membership_does_not_grant_submit_permission(
-    auth_client: AsyncClient,
-    test_db_session: AsyncSession,
-    test_project_id: UUID,
-    test_user: User,
-    multiple_local_users: list[User],
-    test_group: Group,
-    monkeypatch: pytest.MonkeyPatch,
-    role_name: str,
-    responder_mode: str,
-) -> None:
-    """A responder assignment cannot replace the required submit policy."""
-    _use_real_policy_evaluator(monkeypatch)
-    await _assign_role(
-        test_db_session,
-        test_user,
-        role_name,
-        test_project_id if role_name in _PROJECT_ROLES else None,
-    )
-    prompt = await _create_prompt(test_db_session, test_project_id)
-    await _configure_responders(test_db_session, prompt, test_user, responder_mode, test_group, multiple_local_users)
-
-    response = await auth_client.post(
-        f"{FORM_PROMPTS_URL}/{prompt.id}/submit",
-        json={"response_data": {"reason": "role denied"}},
-    )
-
-    assert response.status_code == 403
-    assert response.json()["code"] == "AUTHORIZATION_DENIED"
-
-
-@pytest.mark.integration
-@pytest.mark.asyncio
-@pytest.mark.parametrize("role_name", ["admin", "auditor", "project-admin", "project-user", "project-auditor"])
-async def test_batch_update_permission_is_admin_only(
-    auth_client: AsyncClient,
-    test_db_session: AsyncSession,
-    test_project_id: UUID,
-    test_user: User,
-    monkeypatch: pytest.MonkeyPatch,
-    role_name: str,
-) -> None:
-    """The batch endpoint's form_prompt:create permission is currently admin-only."""
-    _use_real_policy_evaluator(monkeypatch)
-    await _assign_role(
-        test_db_session,
-        test_user,
-        role_name,
-        test_project_id if role_name in _PROJECT_ROLES else None,
-    )
-    prompt = await _create_prompt(test_db_session, test_project_id)
-
-    response = await auth_client.post(
-        f"{FORM_PROMPTS_URL}/batch",
-        json={"updates": [{"prompt_id": str(prompt.id), "status": "expired"}]},
-    )
-
-    if role_name == "admin":
-        assert response.status_code == 200
-        assert response.json()["total_success"] == 1
-    else:
-        assert response.status_code == 403
-        assert response.json()["code"] == "AUTHORIZATION_DENIED"
+        if role_name == "admin":
+            assert response.status_code == 200
+            assert response.json()["total_success"] == 1
+        else:
+            assert response.status_code == 403
+            assert response.json()["code"] == "AUTHORIZATION_DENIED"
 
 
 @pytest.mark.integration
 @pytest.mark.asyncio
 @pytest.mark.parametrize("responder_mode", ["user", "group"])
 async def test_service_submit_raises_not_authorized_for_nonresponder(
-    test_db_session: AsyncSession,
-    test_project_id: UUID,
-    test_user: User,
+    form_prompt_setup: _FormPromptAuthorizationSetup,
     multiple_local_users: list[User],
     test_group: Group,
     responder_mode: str,
 ) -> None:
     """FormPromptService raises its domain exception when neither responder rule matches."""
-    prompt = await _create_prompt(test_db_session, test_project_id)
-    if responder_mode == "group":
-        await _configure_responders(
-            test_db_session,
-            prompt,
-            test_user,
-            "group_nonmember",
-            test_group,
-            multiple_local_users,
-        )
-    else:
-        await _configure_responders(test_db_session, prompt, test_user, "neither", test_group, multiple_local_users)
+    prompt = await form_prompt_setup.create_prompt()
+    configured_mode = "group_nonmember" if responder_mode == "group" else "neither"
+    await form_prompt_setup.configure_responders(prompt, configured_mode, test_group, multiple_local_users)
 
-    service = FormPromptService(session=test_db_session, user=test_user)
+    service = FormPromptService(session=form_prompt_setup.session, user=form_prompt_setup.user)
     with pytest.raises(FormPromptNotAuthorizedError) as exc_info:
         await service.submit(prompt.id, {})
 
     assert exc_info.value.form_prompt_id == prompt.id
-    assert exc_info.value.user_id == test_user.id
+    assert exc_info.value.user_id == form_prompt_setup.user.id
