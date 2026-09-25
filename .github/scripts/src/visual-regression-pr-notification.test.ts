@@ -4,10 +4,14 @@ import { server } from './__tests__/setup.js'
 import { notifyVisualRegressionBaseline } from './visual-regression-pr-notification.js'
 
 describe('notifyVisualRegressionBaseline', () => {
+  /** Fake Slack webhook URL used by MSW during notification tests. */
   const webhookUrl = 'https://hooks.example.com/visual-regression'
+
+  /** Fake pull request URL expected in the Slack payload. */
   const prUrl = 'https://github.com/owner/repo/pull/42'
 
   it('posts the configured PR URL to the configured webhook', async () => {
+    /** JSON body received by the MSW webhook handler. */
     let requestBody: unknown = null
 
     server.use(
@@ -40,6 +44,7 @@ describe('notifyVisualRegressionBaseline', () => {
   })
 
   it('skips when the Slack webhook is not configured', async () => {
+    /** Tracks whether the notification attempted an HTTP request. */
     let requestReceived = false
 
     server.use(

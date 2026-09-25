@@ -1,17 +1,26 @@
+/** Represents a Block Kit element included in a Slack attachment. */
 type SlackBlock = {
   type: string
   [key: string]: unknown
 }
 
+/** Represents a color-coded Slack attachment containing Block Kit elements. */
 type SlackAttachment = {
   color: string
   blocks: SlackBlock[]
 }
 
+/** Represents the payload sent to a Slack incoming webhook. */
 type SlackMessage = {
   attachments: SlackAttachment[]
 }
 
+/**
+ * Builds the concise review message for a visual regression baseline PR.
+ *
+ * @param prUrl URL of the pull request that contains the updated baseline.
+ * @returns Slack Block Kit payload linking to the pull request.
+ */
 export function buildVisualRegressionBaselineReadyMessage(prUrl: string): SlackMessage {
   return {
     attachments: [
@@ -36,8 +45,14 @@ export function buildVisualRegressionBaselineReadyMessage(prUrl: string): SlackM
  * Sends color-coded alerts for merge queue health events.
  */
 export class SlackNotifier {
+  /** Slack incoming webhook URL used for all notifications from this client. */
   private readonly webhookUrl: string
 
+  /**
+   * Creates a Slack notification client.
+   *
+   * @param webhookUrl Slack incoming webhook URL that receives notifications.
+   */
   constructor(webhookUrl: string) {
     this.webhookUrl = webhookUrl
   }
@@ -218,6 +233,8 @@ export class SlackNotifier {
 
   /**
    * Sends a concise review notification for the weekly visual regression PR.
+   *
+   * @param prUrl URL of the pull request that contains the updated baseline.
    */
   async sendVisualRegressionBaselineReady(prUrl: string): Promise<void> {
     await this.send(buildVisualRegressionBaselineReadyMessage(prUrl))
