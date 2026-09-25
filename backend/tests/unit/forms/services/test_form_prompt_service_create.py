@@ -24,6 +24,14 @@ _MINIMAL_FORM_DEFINITION = {
 _TEST_PROJECT_ID = uuid4()
 
 
+@pytest.fixture(autouse=True)
+def mock_audit_dispatcher(monkeypatch: pytest.MonkeyPatch) -> Mock:
+    """Keep service unit tests focused on dispatch calls, not outbox side effects."""
+    dispatcher = Mock()
+    monkeypatch.setattr("syntara.forms.services.form_prompt_service.AuditEventDispatcher.dispatch", dispatcher)
+    return dispatcher
+
+
 def _make_service(*, raise_integrity_error: bool = False) -> tuple[FormPromptService, Mock]:
     """Build FormPromptService with mocked session."""
     session = Mock(spec=AsyncSession)
@@ -58,6 +66,8 @@ def _mock_execution_project(session: Mock, project_id: UUID) -> None:
     """Configure the mocked execution to match a create request's project."""
     execution = Mock()
     execution.project_id = project_id
+    execution.workflow_id = uuid4()
+    execution.created_by = uuid4()
     session.get = AsyncMock(return_value=execution)
 
 
@@ -90,6 +100,42 @@ class TestFormPromptServiceCreate:
         assert result.status == "pending"
 
     @pytest.mark.asyncio
+    async def test_success_dispatches_created_event_after_commit(self, mock_audit_dispatcher: Mock) -> None:
+        """Creation audit data uses workflow context and is emitted after persistence."""
+        service, session = _make_service()
+        workflow_id = uuid4()
+        initiated_by = uuid4()
+        execution = Mock(project_id=_TEST_PROJECT_ID, workflow_id=workflow_id, created_by=initiated_by)
+        session.get = AsyncMock(return_value=execution)
+        request = FormPromptCreateRequest(
+            execution_id=uuid4(),
+            project_id=_TEST_PROJECT_ID,
+            prompt_node_id="form1",
+            name="Form",
+            form_definition=_MINIMAL_FORM_DEFINITION,
+            temporal_activity_id="form1",
+        )
+        order: list[str] = []
+
+        async def commit() -> None:
+            order.append("commit")
+
+        session.commit.side_effect = commit
+        mock_audit_dispatcher.side_effect = lambda _event: order.append("dispatch")
+
+        await service.create(request)
+
+        mock_audit_dispatcher.assert_called_once()
+        event = mock_audit_dispatcher.call_args.args[0]
+        assert event.prompt_id == session.add.call_args.args[0].id
+        assert event.workflow_id == workflow_id
+        assert event.execution_id == request.execution_id
+        assert event.prompt_node_id == "form1"
+        assert event.initiated_by == initiated_by
+        assert event.created_at is not None
+        assert order == ["commit", "dispatch"]
+
+    @pytest.mark.asyncio
     async def test_success_adds_to_session(self) -> None:
         """Session.add is called with the new FormPrompt."""
         service, session = _make_service()
@@ -111,7 +157,7 @@ class TestFormPromptServiceCreate:
         assert isinstance(added, FormPrompt)
 
     @pytest.mark.asyncio
-    async def test_duplicate_raises_form_prompt_already_requested_error(self) -> None:
+    async def test_duplicate_raises_form_prompt_already_requested_error(self, mock_audit_dispatcher: Mock) -> None:
         """Duplicate (execution_id, prompt_node_id, loop_iteration_path) raises error."""
         service, session = _make_service(raise_integrity_error=True)
 
@@ -128,6 +174,8 @@ class TestFormPromptServiceCreate:
         _mock_execution_project(session, request.project_id)
         with pytest.raises(FormPromptAlreadyRequestedError, match="already exists"):
             await service.create(request)
+
+        mock_audit_dispatcher.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_temporal_activity_id_uses_provided_value(self) -> None:
