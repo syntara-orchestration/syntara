@@ -373,6 +373,23 @@ SYSTEM_SCOPED_REPRESENTATIVE: list[PolicyTestCase] = [
 ]
 
 # ---------------------------------------------------------------------------
+# Execution-plane policy cases — system-wide read permissions from
+# execution_plane/router.py. These entries track policies only; HTTP
+# authorization tests are not yet wired to this list.
+# ---------------------------------------------------------------------------
+
+EXECUTION_PLANE_SCOPED_CASES: list[PolicyTestCase] = [
+    PolicyTestCase(
+        "execution_target:read:any",
+        description="GET /api/execution-plane/v1/execution-targets",
+    ),
+    PolicyTestCase(
+        "work_item:read:any",
+        description="GET /api/execution-plane/v1/work-items",
+    ),
+]
+
+# ---------------------------------------------------------------------------
 # Self-scoped policy test cases (5)
 # Tested via test_baseline.py; included here for completeness tracking.
 # ---------------------------------------------------------------------------

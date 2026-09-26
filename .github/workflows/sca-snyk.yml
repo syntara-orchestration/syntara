@@ -96,7 +96,11 @@ jobs:
         working-directory: scan/backend
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          # uv exports workspace packages as local paths alongside their pinned
+          # third-party dependencies. pip cannot install local paths when the
+          # manifest enables hash checking, so scan the pinned packages only.
+          sed '/^\.\//d' requirements.txt > requirements-snyk.txt
+          pip install -r requirements-snyk.txt
 
       - name: Scan dependencies
         working-directory: scan/backend
@@ -107,7 +111,7 @@ jobs:
           snyk test \
             --json-file-output=../../snyk-scan-backend.json \
             --project-name="${{ github.repository }}/python" \
-            --file=requirements.txt \
+            --file=requirements-snyk.txt \
             --package-manager=pip || rc=$?
           # Exit 0=clean, 1=vulnerabilities found (both valid). Exit 2+=scan failure — abort.
           if [[ $rc -gt 1 ]]; then echo "Snyk scan failed (exit $rc)"; exit 1; fi
@@ -125,7 +129,8 @@ jobs:
         working-directory: base/backend
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          sed '/^\.\//d' requirements.txt > requirements-snyk.txt
+          pip install -r requirements-snyk.txt
 
       - name: Scan base branch dependencies
         if: github.event.pull_request != null || github.event.merge_group != null
@@ -137,7 +142,7 @@ jobs:
           snyk test \
             --json-file-output=../../snyk-base-backend.json \
             --project-name="${{ github.repository }}/python" \
-            --file=requirements.txt \
+            --file=requirements-snyk.txt \
             --package-manager=pip || rc=$?
           # Exit 0=clean, 1=vulnerabilities found (both valid). Exit 2+=scan failure — abort.
           if [[ $rc -gt 1 ]]; then echo "Snyk scan failed (exit $rc)"; exit 1; fi
@@ -202,7 +207,7 @@ jobs:
           snyk test \
             --severity-threshold=high \
             --project-name="${{ github.repository }}/python" \
-            --file=requirements.txt \
+            --file=requirements-snyk.txt \
             --package-manager=pip \
             --sarif-file-output=snyk-python.sarif \
             --json-file-output=snyk-python.json

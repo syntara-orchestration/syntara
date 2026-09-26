@@ -72,6 +72,7 @@ dependencies = [
     "uuid-utils>=0.9.0",
     "pypdf>=6.15.0",
     "nh3>=0.2.21",
+    "execution-plane",
 ]
 
 [project.optional-dependencies]
@@ -137,6 +138,7 @@ constraint-dependencies = [
 syntara-api-client = { path = "src/api_client", editable = true }
 orchestrator-cli = { path = "src/cli", editable = true }
 orchestrator-test-sdk = { path = "test-sdk", editable = true }
+execution-plane = { path = "execution-plane", editable = true }
 
 [project.scripts]
 orchestrator-admin = "syntara.orchestrator_admin:app"
@@ -179,7 +181,7 @@ ignore = [
 "src/syntara/core/models/base/resource.py" = ["A005"]  # Allow module name shadowing stdlib
 "tools/**/*.py" = ["T201", "INP001", "PLC0415", "ARG001", "ANN401", "TRY003", "EM102"]  # CLI tools: print, deferred imports, unused args
 "scripts/**/*.py" = ["T201", "INP001", "D103"]  # Standalone scripts: print, no package, no docstrings
-"tests/**/*.py" = [
+"**/tests/**/*.py" = [
     "S101",     # Allow assert statements in tests
     "ANN001",   # Don't require type annotations for test function arguments (fixtures)
     "ANN201",   # Don't require return type annotations for test functions
@@ -202,6 +204,8 @@ ignore = [
     "PGH003",   # Allow generic type: ignore comments in tests
     "SIM117",   # Allow nested with statements (required for SonarQube S5707 — pytest.raises in own block)
 ]
+"execution-plane/tests/**/*.py" = ["INP001"]  # Keep this separate test tree out of the tests package namespace
+"execution-plane/src/execution_plane/migrations/**/*.py" = ["INP001", "D400", "D415", "PLR0915"]
 "tests/performance/conftest.py" = ["E402"]  # pytest_plugins must precede imports
 "src/syntara/api/repositories/*.py" = ["ANN401"]  # Allow Any for database row types
 "src/syntara/core/database/migrations/**/*.py" = ["INP001", "D400", "D415", "PLR0915"]  # Alembic files (auto-generated)
@@ -217,7 +221,10 @@ ignore = [
 # Mypy (strict) continues to run in CI via a dedicated GitHub Actions job.
 [tool.pyrefly]
 python-version = "3.12.0"
-project-includes = ["src"]
+project-includes = ["src", "execution-plane/src"]
+# Editable installs are otherwise inferred as third-party directories and skipped.
+disable-project-excludes-heuristics = true
+project-excludes = ["**/__pycache__", "**/node_modules", ".venv/**", "src/api_client", "src/cli", "test-sdk/src"]
 
 # SQLModel/SQLAlchemy stubs cause false positives for these rules.
 # unbound-name and bad-return have a few false positives in existing code
@@ -293,7 +300,7 @@ ignore_missing_imports = true
 [tool.pytest.ini_options]
 minversion = "7.0"
 addopts = "-ra -q --strict-markers --strict-config"
-testpaths = ["tests"]
+testpaths = ["tests", "execution-plane/tests"]
 python_files = ["test_*.py", "*_test.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
@@ -315,7 +322,7 @@ markers = [
 
 # Coverage configuration
 [tool.coverage.run]
-source = ["src"]
+source = ["src", "execution-plane/src"]
 relative_files = true
 concurrency = ["greenlet", "thread"]
 omit = [
@@ -325,6 +332,7 @@ omit = [
     "tools/*",  # Manual utilities, not production code
     "src/api_client/*",  # Auto-generated API client, not production code
     "src/cli/*",  # CLI package, tested separately
+    "execution-plane/src/execution_plane/migrations/**",  # Alembic migrations
     "src/syntara/core/database/migrations/**",  # Alembic migrations, not unit-testable
     "src/syntara/workflows/worker.py",  # Entrypoint scripts, not unit-testable
     "src/syntara/workflows/background_worker.py",
@@ -348,7 +356,7 @@ exclude_lines = [
 
 [tool.vulture]
 min_confidence = 100
-paths = ["src/syntara"]
+paths = ["src/syntara", "execution-plane/src/execution_plane"]
 exclude = ["*tests*", "*test_*", "*alembic*", "*migrations*", "*__pycache__*"]
 ignore_decorators = [
     "@app.*",

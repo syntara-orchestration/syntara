@@ -44,6 +44,11 @@ DATABASES: list[DatabaseConfig] = [
         ini_file="alembic.ini",
         script_location="src/syntara/core/database/migrations",
     ),
+    DatabaseConfig(
+        name="execution-plane",
+        ini_file="execution-plane/alembic.ini",
+        script_location="execution-plane/src/execution_plane/migrations",
+    ),
 ]
 
 

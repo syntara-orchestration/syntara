@@ -12,6 +12,7 @@ from syntara.integrations.models.integration_configuration import (
     IntegrationConfigurationTypes,
     LLMProviderConfiguration,
     MCPServerConfiguration,
+    OpenShiftConfiguration,
 )
 
 
@@ -62,6 +63,12 @@ class IntegrationFactory:
             configuration = AAPConfiguration(
                 integration_type="ansible_automation_platform",
                 base_url=base_url,
+            )
+        elif integration_type == IntegrationType.OPENSHIFT:
+            configuration = OpenShiftConfiguration(
+                integration_type="openshift",
+                base_url=base_url,
+                namespace="ep-dev-workers",
             )
         else:
             assert_never(integration_type)

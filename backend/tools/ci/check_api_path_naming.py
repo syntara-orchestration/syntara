@@ -1,6 +1,6 @@
 """Check that API endpoint paths use snake_case (no hyphens).
 
-Scans all Python files under src/syntara/ for FastAPI router definitions and
+Scans Syntara and execution-plane Python sources for FastAPI router definitions and
 verifies that URL path segments do not contain hyphens. Path parameters
 (e.g., {project_id}) are ignored.
 
@@ -65,7 +65,7 @@ def main() -> int:
     """Scan router files and report any hyphenated API path segments."""
     all_violations: list[tuple[Path, int, str, list[str]]] = []
 
-    for filepath in sorted(SRC_DIR.rglob("*.py")):
+    for filepath in sorted([*SRC_DIR.rglob("*.py"), *(ROOT / "execution-plane/src/execution_plane").rglob("*.py")]):
         if "__pycache__" in filepath.parts:
             continue
         for line_num, path, bad_segments in check_file(filepath):

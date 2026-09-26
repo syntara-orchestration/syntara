@@ -14,6 +14,7 @@ from typing import Annotated, Any
 
 import structlog
 import uvicorn
+from execution_plane.router import router as ep_router
 from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -216,6 +217,17 @@ async def _lifespan_startup(app: FastAPI) -> dict[str, Any]:  # noqa: PLR0915
     else:
         logger.warning("Router discovery disabled - no routers will be automatically registered")
 
+    # ========================================================================
+    # TEMPORARY SYNTARA / EXECUTION PLANE BOUNDARY
+    # ------------------------------------------------------------------------
+    # BOUNDARY CROSSING — see docs/execution-plane/integration.md.
+    # The EP public API (GET /execution_targets, GET /work_items) is temporarily
+    # hosted by Syntara. When the EP worker becomes a standalone service this
+    # include_router call and its import move out with it.
+    # ------------------------------------------------------------------------
+    app.include_router(ep_router)
+    # ========================================================================
+
     # Register WebSocket router manually (excluded from router discovery)
     # WebSocket routers use AsyncAPI specification instead of OpenAPI,
     # so they're excluded from the OpenAPI-based validation system and
@@ -224,7 +236,7 @@ async def _lifespan_startup(app: FastAPI) -> dict[str, Any]:  # noqa: PLR0915
     app.include_router(ws_router)
 
     # Build the resource_actions registry by introspecting all registered
-    # routes and merging with BUILTIN_POLICIES.  Must run after all routers
+    # routes and merging with BUILTIN_POLICIES. Must run after all routers
     # (including WebSocket) are registered.
     from syntara.authz.resource_actions import build_resource_actions  # noqa: PLC0415
 

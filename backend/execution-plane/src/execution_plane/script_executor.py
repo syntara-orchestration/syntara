@@ -1,11 +1,14 @@
-"""Script activity executors for bash and Python.
+"""Script execution utilities for the Execution Plane worker.
 
-This module provides functionality to execute bash and Python scripts as workflow activities.
-Scripts run in isolated subprocesses with timeout and error handling.
+Everything a TE worker needs to run a script and produce a Temporal-compatible
+activity result. No dependencies on the main syntara package.
 """
+
+from __future__ import annotations
 
 import asyncio
 import contextlib
+import dataclasses
 import json
 import os
 import subprocess
@@ -13,19 +16,14 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from temporalio import activity
-from temporalio.exceptions import ApplicationError
+import structlog
 
-from syntara.core.config.base import get_settings
-from syntara.core.exceptions import SafeValueError
-from syntara.workflows.workflow_engine import constants
-from syntara.workflows.workflow_engine.models.workflow_definition import (
-    ActivityName,
-    ScriptExecutorParameters,
-    ScriptOutput,
-)
+from execution_plane.config import get_script_executor_settings
+from execution_plane.models.script_output import ScriptOutput
 
-from .common import HEARTBEAT_STOP_MONITOR, ActivityExecutionError
+logger = structlog.stdlib.get_logger(__name__)
+
+# --- Constants ---
 
 SAFE_ENV_ALLOWLIST: frozenset[str] = frozenset(
     {
@@ -45,8 +43,15 @@ SAFE_ENV_ALLOWLIST: frozenset[str] = frozenset(
     }
 )
 
+ENGINE_TIMEOUT_SECONDS_KEY = "_engine_timeout_seconds"
+ENGINE_MAX_OUTPUT_BYTES_KEY = "_engine_max_output_bytes"
+DEFAULT_MAX_OUTPUT_BYTES = 1_048_576  # 1 MB
 
-class ScriptExecutionError(ActivityExecutionError):
+
+# --- Errors ---
+
+
+class ScriptExecutionError(Exception):
     """Raised when script execution fails."""
 
     exit_code: int
@@ -67,6 +72,9 @@ class ScriptExecutionError(ActivityExecutionError):
         self.exit_code = exit_code
         self.stdout = stdout
         self.stderr = stderr
+
+
+# --- Subprocess utilities ---
 
 
 def _raise_script_error(return_code: int, stdout: str, stderr: str) -> None:
@@ -101,23 +109,24 @@ async def _cleanup_process(process: asyncio.subprocess.Process) -> None:
 
     """
     if process.returncode is None:
+        settings = get_script_executor_settings()
         # Process still running, terminate it gracefully
         try:
             process.terminate()
-            await asyncio.wait_for(process.wait(), timeout=constants.SCRIPT_CLEANUP_TERMINATE_TIMEOUT)
-            activity.logger.debug("Process terminated gracefully")
+            await asyncio.wait_for(process.wait(), timeout=settings.script_cleanup_terminate_timeout)
+            logger.debug("Process terminated gracefully")
         except TimeoutError:
-            activity.logger.warning("Process didn't terminate gracefully, force killing")
+            logger.warning("Process didn't terminate gracefully, force killing")
             try:
                 process.kill()
-                await asyncio.wait_for(process.wait(), timeout=constants.SCRIPT_CLEANUP_KILL_TIMEOUT)
-                activity.logger.info("Process force killed successfully")
+                await asyncio.wait_for(process.wait(), timeout=settings.script_cleanup_kill_timeout)
+                logger.info("Process force killed successfully")
             except TimeoutError:
-                activity.logger.error("Process didn't die after kill signal, may be zombie")
+                logger.warning("Process didn't die after kill signal, may be zombie")
             except ProcessLookupError:
-                activity.logger.debug("Process already terminated after kill attempt")
+                logger.debug("Process already terminated after kill attempt")
         except ProcessLookupError:
-            activity.logger.debug("Process already terminated before cleanup")
+            logger.debug("Process already terminated before cleanup")
 
     # Close all streams to prevent event loop warnings
     # This ensures transport cleanup happens before event loop closes
@@ -186,7 +195,7 @@ async def _read_stream_limited(
                 chunks.append(chunk[:remaining])
                 total_buffered += remaining
                 truncated = True
-        # When truncated, we still read (drain) but discard
+        # When truncated, continue reading (drain) but discard
 
     return b"".join(chunks), truncated
 
@@ -217,23 +226,24 @@ async def _communicate_limited(
 
 def _enforce_payload_limit(
     result_dict: dict[str, Any],
-    max_bytes: int = constants.TEMPORAL_PAYLOAD_MAX_BYTES,
+    max_bytes: int | None = None,
 ) -> dict[str, Any]:
     """Truncate stdout/stderr so the serialized activity result fits within Temporal's payload limit.
 
-    Temporal's server-side limit.blobSize.error (default 2MB) rejects oversized
-    activity results. The SDK treats the rejection as retryable, causing futile
-    retries until the activity times out. This check prevents that by truncating
-    before the payload leaves the worker.
+    Temporal's server-side limit.blobSize.error rejects oversized activity results.
+    The SDK treats the rejection as retryable, causing futile retries until the
+    activity times out. This check prevents that by truncating before the payload
+    leaves the worker.
 
-    Returns a new dict (does not mutate the input).
+    ``max_bytes`` defaults to ``EPSettings.temporal_payload_max_bytes`` (90% of
+    ``temporal_blob_size_error``). The 10% headroom covers JSON escaping expansion
+    and protobuf envelope overhead. Pass an explicit value in tests.
 
-    Truncation operates on raw UTF-8 bytes, not the JSON-escaped form. JSON
-    escaping can expand certain characters (e.g. newlines, quotes), so the
-    truncated payload may be slightly larger than ``max_bytes`` after
-    re-serialization. The 10% headroom in TEMPORAL_PAYLOAD_MAX_BYTES absorbs
-    this expansion.
+    Returns a new dict (does not mutate the input). Truncation operates on raw
+    UTF-8 bytes, not the JSON-escaped form.
     """
+    if max_bytes is None:
+        max_bytes = get_script_executor_settings().temporal_payload_max_bytes
     serialized = json.dumps(result_dict)
     payload_size = len(serialized.encode("utf-8"))
     if payload_size <= max_bytes:
@@ -287,14 +297,15 @@ def _sanitize_env_value(value: object) -> str:
     # Check for null bytes (not allowed in environment variables)
     if "\0" in str_value:
         msg = "Environment variable values cannot contain null bytes"
-        raise SafeValueError(msg)
+        raise ValueError(msg)
 
     # Limit environment variable size to prevent resource exhaustion
     # Note: Systems have limits on total env size (all vars combined), typically 128-256KB
     # We limit individual vars to prevent resource exhaustion and leave room for system variables
-    if len(str_value) > constants.MAX_ENV_VAR_LENGTH:
-        msg = f"Environment variable value exceeds maximum length ({constants.MAX_ENV_VAR_LENGTH} bytes)"
-        raise SafeValueError(msg)
+    max_len = get_script_executor_settings().max_env_var_length
+    if len(str_value) > max_len:
+        msg = f"Environment variable value exceeds maximum length ({max_len} bytes)"
+        raise ValueError(msg)
 
     return str_value
 
@@ -361,7 +372,7 @@ async def _execute_script_common(
     command: list[str],
     environment: dict[str, str] | None = None,
     timeout_seconds: float | None = None,
-    max_output_bytes: int = constants.DEFAULT_MAX_OUTPUT_BYTES,
+    max_output_bytes: int = DEFAULT_MAX_OUTPUT_BYTES,
 ) -> dict[str, Any]:
     """Execute a script with common subprocess handling logic (DRY).
 
@@ -411,7 +422,7 @@ async def _execute_script_common(
             result["stderr"] = result["stderr"] + truncation_notice
         return result
 
-    except (ScriptExecutionError, RuntimeError, SafeValueError):
+    except (ScriptExecutionError, RuntimeError, ValueError):
         # Re-raise these errors as-is
         raise
 
@@ -441,116 +452,59 @@ async def _execute_script_common(
             await _cleanup_process(process)
 
 
-@activity.defn(name=ActivityName.SCRIPT)
-async def execute_script_activity(  # noqa: C901
+async def execute_script(
     input_config: dict[str, Any],
     output_config: dict[str, str] | None,
 ) -> dict[str, Any]:
-    """Execute a script for V2 workflows (unified bash/python activity).
+    """Run a script from a WorkItem payload and return a Temporal activity result dict.
 
-    SECURITY: Script nodes execute arbitrary user-supplied code (bash/Python)
-    directly in the Temporal worker process without additional sandboxing. Enabling this
-    grants any user with workflow:create + execution:run permissions the ability
-    to run arbitrary commands on the worker infrastructure, with access to all
-    environment variables.
-    Enabling Script Node is not recommended for production deployments.
+    Parses language/code/environment directly from the payload dict (no Pydantic validation).
+    Applies cgroup memory limits, executes the subprocess, parses JSON output for Python scripts,
+    and enforces the Temporal payload size limit before returning.
 
-    This activity handles both bash and python scripts based on the 'language'
-    field in config, delegating to the appropriate helper function.
-
-    Returns normalized structure with output portion (no control needed for executor nodes).
-    Output mapping is applied internally before returning to avoid storing suppressed fields in Temporal.
-
-    Args:
-        input_config: Script configuration (already template-resolved in V2)
-                      Expected keys: 'code', 'language' (optional, defaults to 'python'),
-                      'environment' (optional), 'timeout' (optional)
-        output_config: Output mapping configuration (field_name -> template expression)
-                       None = return full result, {} = suppress all, {...} = extract specific fields
-
-    Returns:
-        {
-            "output": {
-                "status": "completed",
-                "return_code": 0,
-                "stdout": "...",
-                "stderr": "...",
-                "stdout_json": {...}  // Only for Python scripts with JSON output
-            }
-        }
-
+    Raises ScriptExecutionError on non-zero exit, TimeoutError on timeout.
     """
-    activity.heartbeat({HEARTBEAT_STOP_MONITOR: True})
+    language = input_config.get("language", "python")
+    code = input_config["code"]
+    environment = dict(input_config.get("environment") or {})
 
-    if not get_settings().script_nodes_enabled:
-        msg = "Script node execution is not enabled."
-        raise ApplicationError(msg, type="ScriptNodeDisabled", non_retryable=True)
+    timeout = int(input_config.get(ENGINE_TIMEOUT_SECONDS_KEY, 300))
+    max_output_bytes = int(input_config.get(ENGINE_MAX_OUTPUT_BYTES_KEY, DEFAULT_MAX_OUTPUT_BYTES))
 
-    try:
-        # Validate config via Pydantic model
+    cgroup_limit = _get_cgroup_memory_limit()
+    if cgroup_limit:
+        code = _prepend_memory_limit(code, language, int(cgroup_limit * 0.75))
+
+    command = ["bash", "-c", code] if language == "bash" else [sys.executable, "-c", code]
+
+    result = await _execute_script_common(command, environment, timeout, max_output_bytes)
+
+    if language == "python" and result["stdout"].strip():
         try:
-            config = ScriptExecutorParameters.model_validate(input_config)
-        except Exception:  # noqa: BLE001
-            msg = "Script activity configuration validation failed"
-            raise ApplicationError(msg, type="ConfigError", non_retryable=True) from None
+            result["output"] = json.loads(result["stdout"])
+        except json.JSONDecodeError:
+            lines = [line for line in result["stdout"].strip().split("\n") if line.strip()]
+            if lines:
+                with contextlib.suppress(json.JSONDecodeError):
+                    result["output"] = json.loads(lines[-1])
 
-        # Read values from the validated model
-        language = config.language.value
-        code = config.code
-        environment = dict(config.environment)
+    script_output = ScriptOutput(
+        return_code=result["return_code"],
+        stdout=result["stdout"],
+        stderr=result["stderr"],
+        stdout_json=result.get("output"),
+    )
+    full_output = dataclasses.asdict(script_output)
 
-        timeout = int(input_config.get(constants.ENGINE_TIMEOUT_SECONDS_KEY, 300))
-        max_output_bytes = int(
-            input_config.get(constants.ENGINE_MAX_OUTPUT_BYTES_KEY, constants.DEFAULT_MAX_OUTPUT_BYTES)
-        )
+    # Apply output_config field selection.
+    # Template expression evaluation (e.g. "${result.stdout}") requires NamespaceResolver
+    # from syntara and is not available here — tracked in AAP-93073. For keyed configs,
+    # we select by field name and ignore the template expression value.
+    if output_config is None:
+        mapped_output: dict[str, Any] = full_output
+    elif not output_config:
+        mapped_output = {}
+    else:
+        mapped_output = {k: full_output[k] for k in output_config if k in full_output}
 
-        # Inject subprocess memory limit from the container's cgroup limit
-        cgroup_limit = _get_cgroup_memory_limit()
-        if cgroup_limit:
-            code = _prepend_memory_limit(code, language, int(cgroup_limit * 0.75))
-
-        # Build command based on language
-        command = ["bash", "-c", code] if language == "bash" else [sys.executable, "-c", code]
-
-        # Execute script
-        result = await _execute_script_common(command, environment, timeout, max_output_bytes)
-
-        # For Python scripts, try to parse stdout as JSON
-        if language == "python" and result["stdout"].strip():
-            # First, try parsing entire stdout as JSON
-            try:
-                result["output"] = json.loads(result["stdout"])
-            except json.JSONDecodeError:
-                # Fallback: try parsing the last non-empty line as JSON
-                # This allows debug prints before the final JSON output
-                lines = [line for line in result["stdout"].strip().split("\n") if line.strip()]
-                if lines:
-                    with contextlib.suppress(json.JSONDecodeError):
-                        result["output"] = json.loads(lines[-1])
-
-        output = ScriptOutput(
-            return_code=result["return_code"],
-            stdout=result["stdout"],
-            stderr=result["stderr"],
-            stdout_json=result.get("output"),
-        )
-        return _enforce_payload_limit({"output": output.dump(output_config)})
-
-    except ApplicationError:
-        raise
-    except ScriptExecutionError as e:
-        output = ScriptOutput(return_code=e.exit_code, stdout=e.stdout, stderr=e.stderr)
-        detail = _enforce_payload_limit({"output": output.dump(output_config)})
-        raise ApplicationError(str(e), detail, type="ScriptExecutionError", non_retryable=True) from None
-    except TimeoutError:
-        output = ScriptOutput()
-        msg = f"Script execution timed out after {timeout} seconds"
-        raise ApplicationError(
-            msg, {"output": output.dump(output_config)}, type="TimeoutError", non_retryable=True
-        ) from None
-    except Exception as e:  # noqa: BLE001
-        output = ScriptOutput()
-        msg = "Script activity failed unexpectedly"
-        raise ApplicationError(
-            msg, {"output": output.dump(output_config)}, type=type(e).__name__, non_retryable=True
-        ) from None
+    return _enforce_payload_limit({"output": mapped_output})

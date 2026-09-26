@@ -43,9 +43,6 @@ class TestConstantsModuleLoading:
         expected_constants = [
             "DEFAULT_ACTIVITY_TIMEOUT_SECONDS",
             "AGENT_ORCHESTRATOR_BASE_URL",
-            "SCRIPT_CLEANUP_TERMINATE_TIMEOUT",
-            "SCRIPT_CLEANUP_KILL_TIMEOUT",
-            "MAX_ENV_VAR_LENGTH",
         ]
 
         for const_name in expected_constants:
@@ -56,24 +53,15 @@ class TestConstantsModuleLoading:
 
         settings = get_settings()
         assert str(settings.agent_orchestrator_base_url) == constants.AGENT_ORCHESTRATOR_BASE_URL
-        assert settings.script_cleanup_terminate_timeout == constants.SCRIPT_CLEANUP_TERMINATE_TIMEOUT
-        assert settings.script_cleanup_kill_timeout == constants.SCRIPT_CLEANUP_KILL_TIMEOUT
-        assert settings.max_env_var_length == constants.MAX_ENV_VAR_LENGTH
 
     def test_static_constants_respect_env_vars(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("APP_AGENT_ORCHESTRATOR_BASE_URL", "http://custom.example.com/api/v1")
-        monkeypatch.setenv("APP_SCRIPT_CLEANUP_TERMINATE_TIMEOUT", "2.0")
-        monkeypatch.setenv("APP_SCRIPT_CLEANUP_KILL_TIMEOUT", "1.0")
-        monkeypatch.setenv("APP_MAX_ENV_VAR_LENGTH", "65536")
 
         import syntara.workflows.workflow_engine.constants as constants_module
 
         constants = importlib.reload(constants_module)
 
         assert constants.AGENT_ORCHESTRATOR_BASE_URL == "http://custom.example.com/api/v1"
-        assert constants.SCRIPT_CLEANUP_TERMINATE_TIMEOUT == 2.0
-        assert constants.SCRIPT_CLEANUP_KILL_TIMEOUT == 1.0
-        assert constants.MAX_ENV_VAR_LENGTH == 65536
 
     def test_runtime_settings_not_in_constants(self) -> None:
         """Runtime-configurable settings should NOT be in constants."""

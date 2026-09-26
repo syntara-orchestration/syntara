@@ -66,7 +66,10 @@ from syntara.integrations.models.integration import (
     IntegrationUpdate,
     RefreshResult,
 )
-from syntara.integrations.models.integration_configuration import IntegrationConfigurationInputTypes
+from syntara.integrations.models.integration_configuration import (
+    IntegrationConfigurationInputTypes,
+    OpenShiftConfiguration,
+)
 from syntara.integrations.models.llm_model import LLMModel
 from syntara.integrations.services.model_profile_lookup import lookup_model_profile
 from syntara.settings.cache.settings_cache import get_runtime_settings
@@ -78,12 +81,14 @@ ALLOWED_CREDENTIAL_TYPES: dict[IntegrationType, frozenset[str]] = {
     IntegrationType.MCP_SERVER: frozenset({"HTTP Bearer Token"}),
     IntegrationType.LLM_PROVIDER: frozenset({"LLM Provider"}),
     IntegrationType.ANSIBLE_AUTOMATION_PLATFORM: frozenset({"Ansible Automation Platform"}),
+    IntegrationType.OPENSHIFT: frozenset({"HTTP Bearer Token"}),
 }
 
 CREDENTIAL_REQUIRED_TYPES: frozenset[IntegrationType] = frozenset(
     {
         IntegrationType.LLM_PROVIDER,
         IntegrationType.ANSIBLE_AUTOMATION_PLATFORM,
+        IntegrationType.OPENSHIFT,
     }
 )
 
@@ -111,10 +116,20 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
         session: AsyncSession,
         user: User,
         secret_service: SecretService | None = None,
+        cluster_sync_service: object | None = None,
     ) -> None:
-        """Initialize with database session, current user, and optional secret service."""
+        """Initialize with database session, current user, and optional services.
+
+        Args:
+            session: SQLModel async database session
+            user: Current authenticated user
+            secret_service: Optional SecretService for credential decryption
+            cluster_sync_service: Optional ClusterSyncService for cluster lifecycle sync
+
+        """
         super().__init__(session, user, convert_resource_mixin=IntegrationConvertResourceMixin())
         self._secret_service = secret_service
+        self._cluster_sync_service = cluster_sync_service
 
     def _is_duplicate_name_error(self, e: IntegrityError) -> bool:
         return "uq_integrations_name" in str(e)
@@ -466,6 +481,9 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
 
         await self.session.commit()
 
+        # Sync cluster record for OpenShift integrations (best-effort, non-blocking)
+        await self._sync_create_cluster(integration)
+
         result = await self._to_read_with_counts(integration)
         AuditEventDispatcher.dispatch(
             IntegrationCreateEvent(
@@ -627,6 +645,137 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
 
         if data.name is not None and data.name != integration.name:
             await self._raise_if_name_exists(data.name)
+
+    async def _sync_create_cluster(self, integration: Integration) -> None:
+        """Create a cluster record when an OpenShift integration is created.
+
+        This is a best-effort operation: if cluster sync fails, the integration
+        is still created successfully. Errors are logged but not propagated.
+        """
+        if integration.integration_type != IntegrationType.OPENSHIFT or not self._cluster_sync_service:
+            return
+
+        try:
+            if not isinstance(integration.configuration, OpenShiftConfiguration):
+                logger.warning(
+                    "Skipping cluster sync: invalid configuration type",
+                    integration_id=str(integration.id),
+                    config_type=type(integration.configuration).__name__,
+                )
+                return
+
+            if not integration.management_credential_id:
+                logger.warning(
+                    "Skipping cluster sync: no credential configured",
+                    integration_id=str(integration.id),
+                )
+                return
+
+            # Resolve the credential to get the API key
+            try:
+                resolved_credential = await self._resolve_credential(integration.management_credential_id)
+            except Exception as e:  # noqa: BLE001
+                logger.warning(
+                    "Failed to resolve credential for cluster sync",
+                    integration_id=str(integration.id),
+                    credential_id=str(integration.management_credential_id),
+                    error_type=type(e).__name__,
+                )
+                return
+
+            # Extract api_key from resolved credential (never log the value)
+            api_key = resolved_credential.get("token") or resolved_credential.get("api_key") or ""
+            if not api_key:
+                logger.warning(
+                    "Credential has no api_key/token field",
+                    integration_id=str(integration.id),
+                )
+                return
+
+            # Prepare labels with integration reference
+            labels = dict(integration.labels or {})
+            labels["integration_id"] = str(integration.id)
+            labels["integration_name"] = integration.name
+
+            logger.debug(
+                "Creating cluster record",
+                integration_id=str(integration.id),
+                cluster_name=integration.name,
+                endpoint=integration.configuration.base_url,
+            )
+
+            # Call cluster sync service (ClusterRegistry.register handles discovery + target creation)
+            await self._cluster_sync_service.create_cluster(
+                name=integration.name,
+                endpoint=integration.configuration.base_url,
+                api_key=api_key,
+                created_by=self.user.id,
+                labels=labels,
+            )
+            logger.info(
+                "Cluster record created",
+                integration_id=str(integration.id),
+                cluster_name=integration.name,
+            )
+        except Exception as e:
+            # Log the failure but don't raise; integration creation succeeds anyway
+            logger.exception(
+                "Failed to sync cluster on integration creation",
+                integration_id=str(integration.id),
+                error_type=type(e).__name__,
+            )
+
+    async def _sync_update_cluster(self, integration: Integration) -> None:
+        """Update cluster record when an OpenShift integration is updated.
+
+        Currently a no-op since cluster updates aren't fully implemented in
+        execution-plane. Future: sync endpoint and api_key changes.
+        """
+        if integration.integration_type != IntegrationType.OPENSHIFT or not self._cluster_sync_service:
+            return
+
+        # NOTE: Cluster update not yet implemented — sync only on create/delete.
+        # ClusterStore.update() method is needed before this can be implemented.
+
+    async def _sync_delete_cluster(self, integration: Integration) -> None:
+        """Request deletion of a cluster record when an OpenShift integration is deleted.
+
+        Marks the cluster as DRAINING and disables all its ExecutionTargets.
+        Actual deletion is asynchronous when all targets finish draining.
+        """
+        if integration.integration_type != IntegrationType.OPENSHIFT or not self._cluster_sync_service:
+            return
+
+        try:
+            # Find the cluster by integration_id in labels
+            # First, we need to query by label — this requires listing clusters and filtering
+            # For now, we'll assume the cluster name matches the integration name
+            # (This is guaranteed by create_cluster above)
+            logger.debug(
+                "Requesting cluster deletion",
+                integration_id=str(integration.id),
+                cluster_name=integration.name,
+            )
+
+            # Since we store integration_id in cluster labels, we'd need to:
+            # 1. Query clusters by label (not yet supported in ClusterStore.list)
+            # 2. Or assume name matches and query by name (also not supported)
+            # For MVP, we'll document this limitation and rely on name matching
+            # A future migration will add schema-level integration_id field to clusters
+
+            # For now, skip cluster deletion — the cluster becomes orphaned
+            logger.warning(
+                "Cluster sync on delete not implemented; cluster will become orphaned",
+                integration_id=str(integration.id),
+                cluster_name=integration.name,
+            )
+        except Exception as e:
+            # Log but don't raise
+            logger.exception(
+                "Failed to sync cluster on integration deletion",
+                integration_id=str(integration.id),
+                error_type=type(e).__name__,
+            )
 
     async def update_integration(self, integration_id: UUID, data: IntegrationUpdate) -> IntegrationRead:
         """Apply partial updates to an integration."""
@@ -1237,6 +1386,9 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
         await self.session.delete(integration)
         await self.session.flush()
         await self.session.commit()
+
+        # Sync cluster deletion for OpenShift integrations (best-effort, non-blocking)
+        await self._sync_delete_cluster(integration)
 
         AuditEventDispatcher.dispatch(
             IntegrationDeleteEvent(

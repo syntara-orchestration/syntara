@@ -144,6 +144,18 @@ make lint
 
 > **Note:** The API server requires Redis (`make cache-run`) for authentication and streaming. Authorization is evaluated in-process via regopy from `src/syntara/authz/rego/authz.rego`.
 
+### Execution-plane CI coverage
+
+Unit and combined test targets include `execution-plane/tests/`. CLI,
+integration, and E2E targets retain their own suites. Coverage reports and
+SonarCloud include `execution-plane/src/`, excluding generated migrations
+from coverage in the same way as the main backend.
+
+`make format`, `make lint`, and `make typecheck` include execution-plane source
+and tests. `make typecheck-pyrefly` checks its source alongside the main backend.
+The pre-commit workflow uses these shared targets. Static checks also inspect
+execution-plane API paths, dead code, imports, test structure, and migrations.
+
 ### Database Setup
 
 The project includes a PostgreSQL 17 database for local development.
@@ -541,6 +553,13 @@ make test-e2e
 If `APP_BASE_URL` is not set, the target automatically starts the database and dev server, waits for the API to be ready, runs the tests, then tears everything down. If `APP_BASE_URL` is already set, it runs the tests against that instance directly.
 
 > **Note:** The E2E tests use an auto-generated Python API client. If you change the OpenAPI schema, regenerate the client with `make generate-api-client` before running E2E tests.
+
+Workflow integration tests run a real execution-plane worker alongside the Temporal
+test server, using the same PostgreSQL testcontainer as the test. Database setup
+applies both the backend and execution-plane migrations. Processing starts after
+each database restore and stops before teardown; completion callbacks use the test
+Temporal client. Automatic time skipping is disabled while this fixture is active
+so external script execution is not overtaken by activity timeouts.
 
 ### Syntara Test SDK
 

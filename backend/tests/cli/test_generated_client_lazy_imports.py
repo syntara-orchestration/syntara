@@ -23,6 +23,15 @@ def test_models_package_lazy_loads_requested_model() -> None:
     assert models.GroupCreate is group_create
 
 
+def test_openshift_model_uses_product_spelling() -> None:
+    """The generated module and lazy loader must agree on OpenShift spelling."""
+    models = importlib.import_module("syntara_api_client.models")
+
+    openshift_configuration = models.OpenShiftConfiguration
+
+    assert openshift_configuration.__module__ == "syntara_api_client.models.openshift_configuration"
+
+
 def test_api_registry_imports_groups_package_on_demand() -> None:
     """Accessing the groups registry should import only that tag package."""
     for module_name in list(sys.modules):

@@ -29,6 +29,7 @@ from syntara.integrations.models.integration import (
     IntegrationType,
     IntegrationUpdate,
 )
+from syntara.integrations.models.integration_configuration import OpenShiftConfiguration
 from syntara.integrations.services.integration_service import IntegrationService
 
 _UNRESTRICTED = AllowedProjectsResult(all_projects=True, project_ids=[])
@@ -124,6 +125,37 @@ class TestCreateIntegration:
         assert result.integration_type == IntegrationType.ANSIBLE_AUTOMATION_PLATFORM
         assert result.configuration.base_url == "https://gateway.example.com"
         assert result.configuration.insecure_skip_tls_verify is True
+
+    @pytest.mark.asyncio
+    async def test_create_openshift_with_bearer_credential(
+        self,
+        test_db_session: AsyncSession,
+        integration_service: IntegrationService,
+        credential_factory,
+    ) -> None:
+        ct = await credential_factory.create_type("HTTP Bearer Token")
+        project = await credential_factory.create_project()
+        credential = await credential_factory.create(ct, project)
+
+        created = await integration_service.create_integration(
+            IntegrationCreate(
+                name="Development OpenShift",
+                integration_type=IntegrationType.OPENSHIFT,
+                configuration={
+                    "integration_type": "openshift",
+                    "base_url": "https://api.example.com:6443",
+                    "namespace": "ep-dev-workers",
+                },
+                management_credential_id=credential.id,
+            )
+        )
+        reloaded = await integration_service.get_integration(created.id)
+
+        assert reloaded.integration_type == IntegrationType.OPENSHIFT
+        assert isinstance(reloaded.configuration, OpenShiftConfiguration)
+        assert reloaded.configuration.namespace == "ep-dev-workers"
+        assert reloaded.management_credential_id == credential.id
+        assert "execution_target_id" not in reloaded.configuration.model_dump()
 
     @pytest.mark.asyncio
     async def test_create_duplicate_name_raises(
@@ -688,6 +720,11 @@ class TestCredentialTypeValidation:
                     "base_url": "https://gateway.example.com",
                     "insecure_skip_tls_verify": True,
                 },
+            ),
+            (
+                IntegrationType.OPENSHIFT,
+                "HTTP Bearer Token",
+                {"integration_type": "openshift", "base_url": "https://api.example.com", "namespace": "workers"},
             ),
         ],
     )

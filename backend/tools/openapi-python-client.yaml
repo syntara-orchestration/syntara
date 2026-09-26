@@ -5,6 +5,12 @@
 project_name_override: syntara-api-client
 package_name_override: syntara_api_client
 
+# Keep the OpenShift product name intact in generated module paths. The
+# generator otherwise splits the capital S into open_shift_configuration.
+class_overrides:
+  OpenShiftConfiguration:
+    module_name: openshift_configuration
+
 # Post-generation hooks to run after client generation
 # Note: These commands run from the generated client directory (temp dir)
 # BACKEND_DIR is set by the Makefile to the backend directory path

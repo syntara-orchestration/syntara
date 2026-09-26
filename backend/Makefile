@@ -17,6 +17,7 @@ PODMAN_PROJECT ?= syntara
 POSTGRES_IMAGE ?= quay.io/sclorg/postgresql-15-c9s
 REDIS_IMAGE ?= mirror.gcr.io/library/redis:6
 APP_IMAGE ?= localhost/syntara:latest
+EP_IMAGE ?= localhost/execution-plane:latest
 APP_UI_IMAGE ?= quay.io/ansible/syntara-ui
 APP_UI_VERSION ?= latest
 XFAIL_ARGS := $(if $(SYNTARA_XFAIL_SOURCE),--xfail-from-url $(SYNTARA_XFAIL_SOURCE)backend.md,)
@@ -110,7 +111,7 @@ test: test-unit ## Alias to unit tests
 
 .PHONY: test-unit
 test-unit: check-deps ## Run unit tests only
-	$(call run-tests,tests/unit/ -v -n auto)
+	$(call run-tests,tests/unit/ execution-plane/tests/ -v -n auto)
 
 .PHONY: test-api-compliance
 test-api-compliance: check-deps ## Run API compliance tests
@@ -150,39 +151,39 @@ endif
 .PHONY: test-unit-coverage
 test-unit-coverage: check-deps ## Run unit tests with coverage report
 	@echo "📊 Running unit tests with coverage..."
-	$(call run-tests,tests/unit/ -v -n auto --cov=src --cov-report=html:htmlcov-unit --cov-report=term --cov-config=pyproject.toml --cov-fail-under=85 --junitxml=pytest-results-unit.xml)
+	$(call run-tests,tests/unit/ execution-plane/tests/ -v -n auto --cov=src --cov=execution-plane/src --cov-report=html:htmlcov-unit --cov-report=term --cov-config=pyproject.toml --cov-fail-under=85 --junitxml=pytest-results-unit.xml)
 	@echo "✅ Unit test coverage report: htmlcov-unit/index.html"
 
 .PHONY: test-cli-coverage
 test-cli-coverage: check-deps ## Run CLI tests with coverage report
 	@echo "📊 Running CLI tests with coverage..."
-	$(call run-tests,tests/cli/ -v -n auto --cov=src --cov-report=html:htmlcov-cli --cov-report=term --cov-config=pyproject.toml --cov-fail-under=0 --junitxml=pytest-results-cli.xml)
+	$(call run-tests,tests/cli/ -v -n auto --cov=src --cov=execution-plane/src --cov-report=html:htmlcov-cli --cov-report=term --cov-config=pyproject.toml --cov-fail-under=0 --junitxml=pytest-results-cli.xml)
 	@echo "✅ CLI test coverage report: htmlcov-cli/index.html"
 
 .PHONY: test-integration-coverage
 test-integration-coverage: check-deps ## Run integration tests with coverage report
 	@echo "📊 Running integration tests with coverage..."
-	$(call run-tests,tests/integration/ -v -n auto -m "not mcp" --cov=src --cov-report=html:htmlcov-integration --cov-report=term --cov-config=pyproject.toml --cov-fail-under=0 --junitxml=pytest-results-integration.xml)
+	$(call run-tests,tests/integration/ -v -n auto -m "not mcp" --cov=src --cov=execution-plane/src --cov-report=html:htmlcov-integration --cov-report=term --cov-config=pyproject.toml --cov-fail-under=0 --junitxml=pytest-results-integration.xml)
 	@echo "✅ Integration test coverage report: htmlcov-integration/index.html"
 
 .PHONY: test-coverage
 test-coverage: check-deps ## Run tests with combined coverage report (XML for CI)
-	$(call run-tests,tests/ -n auto -m "not mcp" --cov=src --cov-report=xml --cov-report=term --cov-config=pyproject.toml --junitxml=pytest-results.xml)
+	$(call run-tests,tests/ execution-plane/tests/ -n auto -m "not mcp" --cov=src --cov=execution-plane/src --cov-report=xml --cov-report=term --cov-config=pyproject.toml --junitxml=pytest-results.xml)
 
 .PHONY: test-coverage-report
 test-coverage-report: check-deps ## Run tests with combined coverage report (HTML)
-	$(call run-tests,tests/ -n auto -m "not mcp" --cov=src --cov-report=html --cov-report=term --cov-config=pyproject.toml --junitxml=pytest-results.xml)
+	$(call run-tests,tests/ execution-plane/tests/ -n auto -m "not mcp" --cov=src --cov=execution-plane/src --cov-report=html --cov-report=term --cov-config=pyproject.toml --junitxml=pytest-results.xml)
 
 .PHONY: test-fast
 test-fast: check-deps ## Run tests with fail-fast and short traceback
-	$(call run-tests,tests/ -x --tb=short)
+	$(call run-tests,tests/ execution-plane/tests/ -x --tb=short)
 
 .PHONY: test-all
 test-all: check-deps ## Run all tests (unit + integration; E2E runs separately via test-e2e)
 	# E2E tests require a full running stack (API, Temporal, MCP server) and are
 	# run by the dedicated `test-e2e` target; ignore them here so this target can
 	# run against the testcontainers-only environment.
-	$(call run-tests,tests/ -v -n auto -m "not mcp" --ignore=tests/e2e --cov=src --cov-config=pyproject.toml)
+	$(call run-tests,tests/ execution-plane/tests/ -v -n auto -m "not mcp" --ignore=tests/e2e --cov=src --cov=execution-plane/src --cov-config=pyproject.toml)
 
 # _e2e-run: shared infrastructure setup for all e2e targets.
 # Starts mock Segment, database, Temporal, and the API server,
@@ -240,6 +241,12 @@ endif
 
 # Development workflow
 # ========================================================
+.PHONY: ep-migrate
+ep-migrate: check-deps ## Apply execution_plane schema migrations (separate from main Syntara migrations)
+	@echo "🔄 Running execution_plane migrations..."
+	@cd execution-plane && APP_ADMIN_PASSWORD_PATH=../.secrets/admin-password uv run alembic upgrade head
+	@echo "✅ execution_plane migrations complete"
+
 .PHONY: db-seed
 db-seed: check-deps ## Run all required database seeders
 	@echo "🌱 Seeding database..."
@@ -262,6 +269,7 @@ db-seed-all: check-deps ## Run all database seeders including dev samples
 dev: check-deps _ensure-secrets _ensure-certs ## Run development server with auto-reload
 	@echo "🔄 Running database migrations..."
 	@APP_ADMIN_PASSWORD_PATH=.secrets/admin-password uv run alembic upgrade head
+	@$(MAKE) ep-migrate
 	@$(MAKE) db-seed
 	@echo "✅ Migrations and seeding complete"
 	@echo "🪣 Ensuring S3 bucket exists on moto..."
@@ -311,6 +319,20 @@ worker-run: check-deps _ensure-secrets _ensure-certs ## Run Temporal workflow wo
 	APP_APPROVALS_API_BASE_URL=$(WORKER_BASE_URL) \
 	APP_TOOL_MANAGER_BASE_URL=$(WORKER_BASE_URL) \
 	uv run python -m syntara.workflows.worker
+
+.PHONY: ep-worker-run
+# NOTE: uv run uses the shared workspace venv (syntara is importable but never imported by
+# the EP worker). For true package-level isolation use the container image built from
+# containers/execution-plane/Containerfile, which installs only execution-plane and its deps.
+ep-worker-run: check-deps _ensure-secrets _ensure-certs ## Run execution plane TE worker (polls work_items and completes Temporal activities)
+	@echo "🔄 Starting Execution Plane worker..."
+	APP_DATABASE_URL=$${APP_DATABASE_URL:-postgresql+asyncpg://admin:admin@localhost:5432/syntara_api} \
+	APP_TEMPORAL_ADDRESS=$${APP_TEMPORAL_ADDRESS:-localhost:7233} \
+	APP_TEMPORAL_NAMESPACE=$${APP_TEMPORAL_NAMESPACE:-default} \
+	$(S2S_TLS_VARS) \
+	APP_S2S_TLS_CERT_PATH=.secrets/certs/worker.crt \
+	APP_S2S_TLS_KEY_PATH=.secrets/certs/worker.key \
+	uv run python -m execution_plane.worker
 
 .PHONY: background-worker-run
 background-worker-run: check-deps _ensure-secrets _ensure-certs ## Run Temporal workflow background worker
@@ -389,12 +411,15 @@ temporal-clean: ## Stop Temporal and remove data
 
 
 .PHONY: build-images
-build-images: ## Build container images for syntara and temporal-worker
+build-images: ## Build container images for syntara, temporal-worker, and execution-plane
 	@echo "🔨 Building container images..."
 	@echo "📦 Building syntara image..."
 	$(COMPOSE_FINAL_CMD) build syntara
+	@echo "📦 Building execution-plane image..."
+	$(COMPOSE_FINAL_CMD) build execution-plane-worker
 	@echo "✅ Container images built successfully"
-	@echo "   Image: $${APP_IMAGE:-localhost/syntara:latest}"
+	@echo "   Syntara image:         $${APP_IMAGE:-localhost/syntara:latest}"
+	@echo "   Execution Plane image: $${EP_IMAGE:-localhost/execution-plane:latest}"
 
 
 # Secrets management
@@ -575,7 +600,8 @@ services-clean: ## Stop all services and remove all data (destructive)
 OPENAPI_SPEC ?= src/syntara/schemas/openapi.yaml
 OPENAPI_PUBLIC_SPEC ?= src/syntara/schemas/openapi-public.yaml
 OPENAPI_PUBLIC_SPEC_JSON ?= src/syntara/schemas/openapi-public.json
-OPENAPI_GENERATED_FILES = $(OPENAPI_SPEC) $(OPENAPI_PUBLIC_SPEC) $(OPENAPI_PUBLIC_SPEC_JSON)
+OPENAPI_EP_SPEC ?= src/syntara/schemas/execution_plane/openapi.yaml
+OPENAPI_GENERATED_FILES = $(OPENAPI_SPEC) $(OPENAPI_PUBLIC_SPEC) $(OPENAPI_PUBLIC_SPEC_JSON) $(OPENAPI_EP_SPEC)
 OPENAPI_BASE_REF ?= devel
 VERBOSITY ?= -v
 
@@ -615,11 +641,23 @@ api-spec-drift-public: ## Check that committed public spec matches the generated
 	@echo "🔍 Checking public OpenAPI spec is up to date..."
 	@uv run python tools/export_openapi.py --public 2>/dev/null | uv run python tools/ci/check_openapi_spec.py $(OPENAPI_PUBLIC_SPEC) $(VERBOSITY)
 
+.PHONY: api-spec-bundle-ep
+api-spec-bundle-ep: ## Generate the Execution Plane OpenAPI spec from the FastAPI router
+	@echo "📦 Generating Execution Plane OpenAPI spec..."
+	@uv run python tools/export_openapi.py --execution-plane -o $(OPENAPI_EP_SPEC) 2>/dev/null
+	@uv run pre-commit run yamlfmt --files $(OPENAPI_EP_SPEC) > /dev/null 2>&1 || true
+	@echo "✅ EP spec written to $(OPENAPI_EP_SPEC)"
+
+.PHONY: api-spec-drift-ep
+api-spec-drift-ep: ## Check that committed EP spec matches the generated spec (VERBOSITY=-v/-vv/-vvv)
+	@echo "🔍 Checking Execution Plane OpenAPI spec is up to date..."
+	@uv run python tools/export_openapi.py --execution-plane 2>/dev/null | uv run python tools/ci/check_openapi_spec.py $(OPENAPI_EP_SPEC) $(VERBOSITY)
+
 .PHONY: api-spec-bundle-all
-api-spec-bundle-all: api-spec-bundle api-spec-bundle-public ## Bundle both full and public specs
+api-spec-bundle-all: api-spec-bundle api-spec-bundle-public api-spec-bundle-ep ## Bundle both full and public specs, and regenerate EP spec
 
 .PHONY: api-spec-drift-all
-api-spec-drift-all: api-spec-drift api-spec-drift-public ## Check both specs match implementation
+api-spec-drift-all: api-spec-drift api-spec-drift-public api-spec-drift-ep ## Check all specs match implementation
 
 .PHONY: print-openapi-generated-files
 print-openapi-generated-files: ## Print the list of generated OpenAPI spec files (for CI drift checks)
@@ -694,7 +732,7 @@ endif
 
 # Code quality
 # ========================================================
-FORMAT_PATHS := src/ tools/ tests/
+FORMAT_PATHS := src/ tools/ tests/ execution-plane/src/ execution-plane/tests/
 SDK_SRC := test-sdk/src/
 
 .PHONY: reachability
@@ -746,7 +784,7 @@ lint: ## Run linters and type checking (no file modifications)
 .PHONY: typecheck
 typecheck: ## Run type checking only with mypy
 	@echo "🔍 Running type checking..."
-	uv run mypy --strict src/ tests/
+	uv run mypy --strict src/ tests/ execution-plane/src/ execution-plane/tests/
 	uv run mypy --config-file test-sdk/pyproject.toml test-sdk/src/
 	@echo "✅ Type checking completed"
 
@@ -774,7 +812,7 @@ check-api-paths: ## Check API endpoint paths use snake_case (no hyphens)
 .PHONY: check-dead-code
 check-dead-code: ## Check for dead code with vulture
 	@echo "🔍 Checking for dead code..."
-	uv run vulture src/syntara/
+	uv run vulture src/syntara/ execution-plane/src/execution_plane/
 	@echo "✅ No dead code detected"
 
 .PHONY: check-cycles
@@ -783,6 +821,10 @@ check-cycles: ## Check for new import cycles with pyan3
 	uv run pyan3 --module-level --cycles \
 		--exclude 'test_*.py' --exclude '*/tests/*' --exclude '*_test.py' \
 		--root src src/syntara/**/*.py 2>/dev/null | \
+		uv run python tools/ci/check_import_cycles.py
+	uv run pyan3 --module-level --cycles \
+		--exclude 'test_*.py' --exclude '*/tests/*' --exclude '*_test.py' \
+		--root execution-plane/src 'execution-plane/src/execution_plane/**/*.py' 2>/dev/null | \
 		uv run python tools/ci/check_import_cycles.py
 	@echo "✅ No new import cycles detected"
 

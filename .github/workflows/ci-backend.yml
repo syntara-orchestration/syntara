@@ -3,7 +3,7 @@ name: CI Backend
 
 on:
   pull_request:
-    branches: [devel, early-access]
+    branches: [devel, early-access, feat/ANSTRAT-1803]
   merge_group:
     branches: [devel, early-access]
   push:
@@ -942,7 +942,8 @@ jobs:
   konflux-backend-gate:
     name: (Backend) Konflux Gate
     # Tekton PAC only fires on pull_request events (not merge_group or push).
-    if: github.event_name == 'pull_request'
+    # Konflux gates are not required for the execution-plane feature branch.
+    if: github.event_name == 'pull_request' && github.base_ref != 'feat/ANSTRAT-1803'
     permissions:
       checks: read
     runs-on: ubuntu-latest
@@ -958,7 +959,8 @@ jobs:
   konflux-api-tests-gate:
     name: (Backend) Konflux API Tests Gate
     # Tekton PAC only fires on pull_request events (not merge_group or push).
-    if: github.event_name == 'pull_request'
+    # Konflux gates are not required for the execution-plane feature branch.
+    if: github.event_name == 'pull_request' && github.base_ref != 'feat/ANSTRAT-1803'
     permissions:
       checks: read
     runs-on: ubuntu-latest

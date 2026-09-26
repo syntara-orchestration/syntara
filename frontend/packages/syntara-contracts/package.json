@@ -32,6 +32,7 @@
     "gen:local:policies": "openapi-typescript ../../../backend/src/syntara/schemas/authz/policy.openapi.yaml --output ./src/policies-api.ts --default-non-nullable false",
     "gen:local:role-assignments": "openapi-typescript ../../../backend/src/syntara/schemas/authz/role_assignment.openapi.yaml --output ./src/role-assignments-api.ts --default-non-nullable false",
     "gen:local:service-accounts": "openapi-typescript ../../../backend/src/syntara/schemas/service_accounts/openapi.yaml --output ./src/service-accounts-api.ts --default-non-nullable false",
+    "gen:local:ep": "openapi-typescript ../../../backend/src/syntara/schemas/execution_plane/openapi.yaml --output ./src/execution-plane-api.ts --default-non-nullable false",
     "sync-examples": "cp -r ../../../backend/tests/integration/workflows/examples ../syntara-mock-api/src",
     "lint": "eslint src/"
   },

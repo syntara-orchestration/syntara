@@ -74,7 +74,7 @@ def check_orphaned_directories(
         (errors, warnings) tuple
 
     """
-    errors = []
+    errors: list[str] = []
     warnings = []
 
     if skip_validation:
@@ -101,7 +101,7 @@ def check_root_level_test_files(
         List of error messages (empty if no violations)
 
     """
-    errors = []
+    errors: list[str] = []
 
     # Skip if test directory doesn't exist
     if not test_path.exists():
@@ -179,7 +179,7 @@ def verify_test_structure(repo_root: Path) -> tuple[bool, list[str], list[str]]:
         (success, errors, warnings) tuple
 
     """
-    errors = []
+    errors: list[str] = []
     warnings = []
 
     src_dir = repo_root / "src" / "syntara"
@@ -254,6 +254,20 @@ def verify_test_structure(repo_root: Path) -> tuple[bool, list[str], list[str]]:
     if untested_domains:
         sanitized_domains = ", ".join(sanitize_for_terminal(d) for d in sorted(untested_domains))
         warnings.append(f"Source domains without tests: {sanitized_domains} (OK - not all domains require tests)")
+
+    # Execution-plane has its own flat unit-test tree, mirroring package modules.
+    ep_source = repo_root / "execution-plane" / "src" / "execution_plane"
+    ep_tests = repo_root / "execution-plane" / "tests"
+    ep_domains = get_domains(ep_source)
+    ep_errors, ep_warnings = check_orphaned_directories(
+        "execution-plane", get_domains(ep_tests), ep_domains, allowed_test_only, skip_validation=False
+    )
+    errors.extend(ep_errors)
+    warnings.extend(ep_warnings)
+    for test_file in sorted(ep_tests.glob("test_*.py")):
+        module_name = test_file.stem.removeprefix("test_")
+        if not (ep_source / f"{module_name}.py").is_file() and not (ep_source / module_name).is_dir():
+            errors.append(f"Execution-plane test has no matching source module: {test_file.name}")
 
     return len(errors) == 0, errors, warnings
 
