@@ -10,11 +10,11 @@ from typing import TYPE_CHECKING, Any, ClassVar
 from uuid import UUID
 
 from pydantic import ConfigDict, field_validator, model_validator
-from sqlalchemy import BigInteger, String, Text, exists, text
+from sqlalchemy import BigInteger, String, Text, text
 from sqlalchemy import select as sa_select
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import column_property
-from sqlmodel import CheckConstraint, Column, DateTime, Field, Index, Relationship, SQLModel
+from sqlmodel import CheckConstraint, Column, DateTime, Field, Index, Relationship, SQLModel, col
 
 from syntara.core.constants import FieldLimits
 from syntara.core.jsonb_limits import validate_jsonb_size
@@ -22,10 +22,10 @@ from syntara.core.models.base import UserOwnedResource
 from syntara.core.models.pagination import ResourcesResponse
 from syntara.core.models.user_reference import UserReference, UserReferenceFieldsMixin
 from syntara.core.utils.sqlmodel import postgres_enum_column
+from syntara.workflows.models.activity_execution import ActivityExecution
 from syntara.workflows.models.workflow_definition import WorkflowDefinition
 
 if TYPE_CHECKING:
-    from syntara.workflows.models.activity_execution import ActivityExecution
     from syntara.workflows.models.workflow import Workflow
     from syntara.workflows.models.workflow_version import WorkflowVersion
 
@@ -320,20 +320,17 @@ class Execution(UserOwnedResource, table=True):
         return f"<Execution(id={self.id}, workflow_id={self.workflow_id}, status={self.status.value})>"
 
 
-# Correlated EXISTS subquery for is_stalled (AAP-92824): the DB returns a boolean
-# directly and stops at the first stalled activity. Uses text() to avoid circular
-# import with ActivityExecution; the partial index ix_activity_execution_stalled
-# makes the no-stall case essentially free.
+# Correlated EXISTS subquery for is_stalled (AAP-92824): use the mapped columns
+# after both models have been defined so aliases and SQLAlchemy dialects can
+# compile the correlation correctly. The partial index
+# ix_activity_execution_stalled makes the no-stall case inexpensive.
 Execution.is_stalled = column_property(  # type: ignore[assignment]
-    sa_select(
-        exists(
-            text(
-                "SELECT 1 FROM activity_execution ae"
-                " WHERE ae.execution_id = executions.id"
-                " AND ae.stall_alert_at IS NOT NULL"
-            )
-        )
-    ).scalar_subquery(),
+    sa_select(1)
+    .where(
+        ActivityExecution.execution_id == Execution.id,
+        col(ActivityExecution.stall_alert_at).is_not(None),
+    )
+    .exists(),
     deferred=False,
 )
 
