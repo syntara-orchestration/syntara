@@ -203,6 +203,16 @@ class TestStaticOptionDefaults:
 
         assert form.fields[0].default == ["a", "b"]
 
+    @pytest.mark.parametrize("value", ["a", 5, 5.5, True])
+    def test_multi_select_defaults_accept_static_option_scalar_types(self, value: object) -> None:
+        """Multi-select defaults support each scalar type accepted by StaticOption."""
+        options = {"source": "static", "values": [{"display_label": str(value), "value": value}]}
+
+        form = _form(_text(type="multi_select", options=options, default=[value]))
+
+        assert isinstance(form.fields[0], MultiSelectField)
+        assert form.fields[0].default == [value]
+
     def test_invalid_multi_select_default_rejected(self) -> None:
         """One unknown entry in a multi-select default is enough to fail."""
         with pytest.raises(ValidationError, match=r"not in the option list"):

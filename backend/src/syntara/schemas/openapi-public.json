@@ -45045,7 +45045,22 @@
             "anyOf": [
               {
                 "type": "array",
-                "items": {}
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "boolean"
+                    }
+                  ]
+                }
               },
               {
                 "type": "null"

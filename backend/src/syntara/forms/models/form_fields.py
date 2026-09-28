@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Any, Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Discriminator, Field, model_validator
 
@@ -126,7 +126,7 @@ class MultiSelectField(FormFieldBase):
 
     type: Literal["multi_select"]
     options: OptionsSource
-    default: list[Any] | None = None
+    default: list[str | int | float | bool] | None = None
 
 
 FormField = Annotated[
@@ -143,26 +143,17 @@ FormField = Annotated[
 ]
 
 
-def _check_multi_select_defaults(value_name: str, defaults: list[Any], valid_values: set[Any]) -> None:
-    """Check multi-select defaults are scalars drawn from the option list.
+def _check_multi_select_defaults(
+    value_name: str,
+    defaults: list[str | int | float | bool],
+    valid_values: set[str | int | float | bool],
+) -> None:
+    """Check multi-select defaults are drawn from the option list.
 
     Raises:
-        SafeValueError: If any default is non-scalar or absent from the options
+        SafeValueError: If any default is absent from the options
 
     """
-    # default is list[Any], so entries may be unhashable. Testing membership
-    # against the option set would raise a bare TypeError out of the calling
-    # validator - a 500 on an API payload - rather than a clean
-    # ValidationError, so screen them first.
-    non_scalar = [v for v in defaults if not isinstance(v, (str, int, float, bool))]
-    if non_scalar:
-        types_found = sorted({type(v).__name__ for v in non_scalar})
-        msg = (
-            f"Field '{value_name}': default values must be scalars "
-            f"(str, int, float, or bool), got {', '.join(types_found)}"
-        )
-        raise SafeValueError(msg)
-
     invalid_defaults = [v for v in defaults if v not in valid_values]
     if invalid_defaults:
         msg = f"Field '{value_name}': default values {invalid_defaults} are not in the option list"

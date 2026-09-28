@@ -3,6 +3,7 @@
 from typing import Any
 
 import pytest
+from pydantic import ValidationError
 
 from syntara.forms.exceptions import FormDefinitionError
 from syntara.forms.models.form_fields import FormDefinition
@@ -136,17 +137,10 @@ class TestAuthorTimeMatchesSubmissionTime:
 
 
 class TestMultiSelectScalarDefaults:
-    """Non-scalar multi-select defaults are rejected by the model itself."""
+    """Non-scalar multi-select defaults are rejected by the field model."""
 
     @pytest.mark.parametrize("bad", [{"a": 1}, ["nested"]])
-    def test_unhashable_default_is_a_clean_validation_error(self, bad: Any) -> None:  # noqa: ANN401
-        """Regression: these raised a bare TypeError out of the model validator.
-
-        MultiSelectField.default is list[Any], so an unhashable entry reached the
-        option-membership set test and escaped as TypeError: unhashable type -
-        a 500 rather than a 422, reachable straight from an API payload.
-        """
-        with pytest.raises(ValueError, match="must be scalars") as exc_info:
+    def test_non_scalar_default_items_are_rejected(self, bad: Any) -> None:  # noqa: ANN401
+        """Unsupported values fail field validation before option membership checks."""
+        with pytest.raises(ValidationError):
             _form(_field("multi_select", "picks", options=_STATIC_OPTIONS, default=[bad]))
-
-        assert not isinstance(exc_info.value, TypeError)
