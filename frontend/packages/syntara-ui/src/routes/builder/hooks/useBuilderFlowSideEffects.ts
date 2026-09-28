@@ -7,7 +7,7 @@ import type { WorkflowDefinition } from '../../../stores/workflowStoreTypes'
 import type { NodeType } from '../../workflows/canvas/nodes/NodeType'
 import type { ActivityState } from '../../workflows/execution/types'
 import type { ValidationError } from '../builderReducer'
-import type { PendingEdge } from '../types'
+import type { OnAddNodeFromEdge, PendingEdge } from '../types'
 import type { EdgeConnection } from '../types/edge'
 import type { EdgeType } from '../utils/workflowToGraph'
 
@@ -62,13 +62,7 @@ export type BuilderFlowPanelState = {
 }
 
 export type BuilderFlowCallbacks = {
-  onAddNodeFromEdge?: (
-    sourceNodeId: string,
-    targetNodeId?: string,
-    edgeId?: string,
-    sourceHandle?: string,
-    desiredPosition?: { x: number; y: number }
-  ) => void
+  onAddNodeFromEdge?: OnAddNodeFromEdge
   onNodesDeleted?: (deletedNodeIds: string[]) => void
 }
 

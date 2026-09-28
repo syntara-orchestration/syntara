@@ -41,11 +41,11 @@ const KEBAB_CLICK_TIMEOUT = 5_000
  * to this pattern for exactly this reason.
  */
 async function createTwoNodeWorkflowViaApi(app: Page, workflowName: string): Promise<{ id: string }> {
-  const { id } = await createWorkflowViaApi(
+  const { id } = await createWorkflowViaApi({
     app,
-    workflowName,
-    [{ id: 'trigger_1', type: 'manual_trigger', name: 'Manual trigger', parameters: {} }],
-    [
+    name: workflowName,
+    triggers: [{ id: 'trigger_1', type: 'manual_trigger', name: 'Manual trigger', parameters: {} }],
+    nodes: [
       {
         id: 'action_1',
         type: 'script',
@@ -59,11 +59,11 @@ async function createTwoNodeWorkflowViaApi(app: Page, workflowName: string): Pro
         parameters: { language: 'python', code: 'print("second")' },
       },
     ],
-    [
+    edges: [
       { from: 'trigger_1', to: 'action_1' },
       { from: 'action_1', to: 'action_2' },
-    ]
-  )
+    ],
+  })
   await openWorkflowInBuilder(app, workflowName, id)
   await expect(
     app.locator('[role="group"][aria-roledescription="node"]').filter({ hasText: 'Second action' })

@@ -3,7 +3,7 @@ import type { ReactFlowInstance, Node } from '@xyflow/react'
 
 import { FlowNodeType } from '../../../constants'
 import { generateUUID } from '../../../utils/generateUUID'
-import type { FlowPosition } from '../types'
+import type { OnAddNodeFromEdge } from '../types'
 
 import { EdgeFactory } from './EdgeFactory'
 import { isSwitchCasePort, SWITCH_CASE_PORT_PREFIX } from './switchCaseHelpers'
@@ -44,13 +44,7 @@ export type EdgeConnectionParams = {
   targetNodeId?: string | null
   sourceHandle?: string
   targetHandle?: string
-  onAddNode: (
-    sourceId: string,
-    targetId?: string,
-    edgeId?: string,
-    handle?: string,
-    desiredPosition?: FlowPosition
-  ) => void
+  onAddNode: OnAddNodeFromEdge
 }
 
 /**
@@ -209,20 +203,15 @@ export function resetPollingConnectionCounter(): void {
  * Waits for target node to be measured before creating edges.
  *
  * SECURITY: Limited to 5 concurrent connections to prevent client-side resource exhaustion.
- *
- * @param result - Connection result from calculateEdgeConnection
- * @param params - Original connection parameters
- * @param targetId - ID of the target node
- * @param reactFlowInstance - React Flow instance
- * @param onComplete - Callback when connection is complete
  */
-export function applyEdgeConnection(
-  result: EdgeConnectionResult,
-  params: EdgeConnectionParams,
-  targetId: string,
-  reactFlowInstance: ReactFlowInstance,
+export function applyEdgeConnection(options: {
+  result: EdgeConnectionResult
+  params: EdgeConnectionParams
+  targetId: string
+  reactFlowInstance: ReactFlowInstance
   onComplete?: () => void
-): void {
+}): void {
+  const { result, params, targetId, reactFlowInstance, onComplete } = options
   // SECURITY: Prevent DoS - reject if too many concurrent connections
   if (activeConnections.size >= MAX_CONCURRENT_CONNECTIONS) {
     // eslint-disable-next-line no-console

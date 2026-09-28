@@ -1,5 +1,4 @@
-import { BulkApproveDialog } from './BulkApproveDialog'
-import { BulkRejectDialog } from './BulkRejectDialog'
+import { BulkApproveDialog, BulkRejectDialog } from './BulkDecisionDialog'
 
 type BulkActionDialogsProps = {
   bulkApproveDialogOpen: boolean

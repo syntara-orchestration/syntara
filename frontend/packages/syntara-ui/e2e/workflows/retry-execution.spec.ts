@@ -38,11 +38,11 @@ test.beforeAll(async ({ browser }) => {
     if (!token) throw new Error('Could not obtain auth token')
 
     const name = buildUniqueName('e2e-retry')
-    ;({ id: workflowId } = await createWorkflowViaApi(
-      page,
+    ;({ id: workflowId } = await createWorkflowViaApi({
+      app: page,
       name,
-      [{ id: 'trigger_manual', type: 'manual_trigger', name: 'Manual trigger', parameters: {} }],
-      [
+      triggers: [{ id: 'trigger_manual', type: 'manual_trigger', name: 'Manual trigger', parameters: {} }],
+      nodes: [
         {
           id: 'echo_node',
           type: 'script',
@@ -50,8 +50,8 @@ test.beforeAll(async ({ browser }) => {
           parameters: { language: 'bash', code: 'echo done' },
         },
       ],
-      [{ from: 'trigger_manual', to: 'echo_node' }]
-    ))
+      edges: [{ from: 'trigger_manual', to: 'echo_node' }],
+    }))
 
     const runResp = await apiRequest(page, 'post', '/executions', {
       token,

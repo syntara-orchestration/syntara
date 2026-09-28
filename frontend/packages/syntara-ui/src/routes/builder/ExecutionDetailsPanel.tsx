@@ -127,12 +127,16 @@ function ThreePanelLayout({
       >
         <FlexItem className={styles.activityList}>
           {showFilters && (
-            <section className={styles.filterBarWrapper} aria-label="Activity filter">
+            <section
+              className={`${styles.filterBarWrapper} ${styles.filterBarWrapperInActivityList}`}
+              aria-label="Activity filter"
+            >
               <FilterBar
                 fieldDefinitions={ACTIVITY_FILTER_DEFINITIONS}
                 filters={filters}
                 onFilterChange={onFilterChange}
                 isCompact
+                className={styles.filterBar}
               />
             </section>
           )}
@@ -262,6 +266,7 @@ function SinglePanelLayout({
                 filters={filters}
                 onFilterChange={onFilterChange}
                 isCompact
+                className={styles.filterBar}
               />
             </section>
           </StackItem>
