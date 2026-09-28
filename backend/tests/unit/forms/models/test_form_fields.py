@@ -209,9 +209,9 @@ class TestStaticOptionDefaults:
         options = {"source": "static", "values": [{"display_label": str(value), "value": value}]}
 
         if not isinstance(value, str):
-            text = _text(type="multi_select", options=options, default=[value]))
+            field_payload = _text(type="multi_select", options=options, default=[value])
             with pytest.raises(ValidationError):
-                _form(text)
+                _form(field_payload)
             return
 
         form = _form(_text(type="multi_select", options=options, default=[value]))
