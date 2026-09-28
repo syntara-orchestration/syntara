@@ -10,8 +10,10 @@ from typing import TYPE_CHECKING, Any, ClassVar
 from uuid import UUID
 
 from pydantic import ConfigDict, field_validator, model_validator
-from sqlalchemy import BigInteger, String, Text, text
+from sqlalchemy import BigInteger, String, Text, exists, text
+from sqlalchemy import select as sa_select
 from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.orm import column_property
 from sqlmodel import CheckConstraint, Column, DateTime, Field, Index, Relationship, SQLModel
 
 from syntara.core.constants import FieldLimits
@@ -313,6 +315,24 @@ class Execution(UserOwnedResource, table=True):
 
         """
         return f"<Execution(id={self.id}, workflow_id={self.workflow_id}, status={self.status.value})>"
+
+
+# Correlated EXISTS subquery for is_stalled (AAP-92824): the DB returns a boolean
+# directly and stops at the first stalled activity. Uses text() to avoid circular
+# import with ActivityExecution; the partial index ix_activity_execution_stalled
+# makes the no-stall case essentially free.
+Execution.is_stalled = column_property(  # type: ignore[assignment]
+    sa_select(
+        exists(
+            text(
+                "SELECT 1 FROM activity_execution ae"
+                " WHERE ae.execution_id = executions.id"
+                " AND ae.stall_alert_at IS NOT NULL"
+            )
+        )
+    ).scalar_subquery(),
+    deferred=False,
+)
 
 
 # ============================================================================
