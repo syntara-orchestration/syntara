@@ -9,9 +9,9 @@ import { ACTIVITY_STATUS } from '../../routes/builder/utils/executionState/execu
 import { StandardNodeHeader } from '../../routes/workflows/canvas/nodes/common/StandardNodeHeader'
 import { NODE_TYPE_COLORS } from '../../routes/workflows/canvas/nodeTypeColors'
 
-import { NodeBody } from './NodeBody'
-import { NodeComponent } from './NodeComponent'
-import styles from './NodeComponent.stories.module.css'
+import { SynStepBody } from './SynStepBody'
+import { SynStepComponent } from './SynStepComponent'
+import styles from './SynStepComponent.stories.module.css'
 
 /** Shared inert actions for stories that demonstrate a node header's action menu. */
 export const MENU_ACTIONS = [
@@ -26,7 +26,7 @@ export const EXECUTION_STATES = Object.values(ACTIVITY_STATUS).map((status) => (
   retry_count: status === ACTIVITY_STATUS.RETRYING ? 2 : undefined,
 }))
 
-/** Minimal workflow data used to render `NodeComponent` states outside a builder canvas. */
+/** Minimal workflow data used to render `SynStepComponent` states outside a builder canvas. */
 export type StoryNodeData = Record<string, unknown> & {
   id: string
   name: string
@@ -45,7 +45,7 @@ export type NodePropsOptions = {
   data?: Partial<StoryNodeData>
 }
 
-/** Creates the complete set of React Flow props required by `NodeComponent` in a Storybook story. */
+/** Creates the complete set of React Flow props required by `SynStepComponent` in a Storybook story. */
 export function createNodeProps(options: NodePropsOptions): NodeProps<Node<StoryNodeData>> {
   const nodeType = options.type ?? FlowNodeType.TASK
   const data: StoryNodeData = {
@@ -76,17 +76,17 @@ export function createNodeProps(options: NodePropsOptions): NodeProps<Node<Story
 /** Reusable full node used by the focused Default story and the state inventory. */
 export function FullNodeStoryComposition({ id, description }: Readonly<{ id: string; description: string }>) {
   return (
-    <NodeComponent nodeProps={createNodeProps({ id })} topBarColor={NODE_TYPE_COLORS.actionScript}>
+    <SynStepComponent nodeProps={createNodeProps({ id })} topBarColor={NODE_TYPE_COLORS.actionScript}>
       <StandardNodeHeader
         expandable
         menuActions={MENU_ACTIONS}
         subtitle="Script task"
         title="Run inventory synchronization"
       />
-      <NodeBody>
+      <SynStepBody>
         <Content component={ContentVariants.small}>{description}</Content>
-      </NodeBody>
-    </NodeComponent>
+      </SynStepBody>
+    </SynStepComponent>
   )
 }
 

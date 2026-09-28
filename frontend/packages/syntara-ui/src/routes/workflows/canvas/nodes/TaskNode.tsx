@@ -2,8 +2,8 @@ import { ExecutorTypeEnum, type TaskActivity } from '@syntara/contracts'
 import { type Node, type NodeProps } from '@xyflow/react'
 
 import { SynDetailList } from '../../../../components/details/SynDetailList'
-import { NodeBody } from '../../../../components/nodes/NodeBody'
-import { NodeComponent } from '../../../../components/nodes/NodeComponent'
+import { SynStepBody } from '../../../../components/steps/SynStepBody'
+import { SynStepComponent } from '../../../../components/steps/SynStepComponent'
 import { FlowNodeType } from '../../../../constants'
 import type { ActivityStatus } from '../../execution/types'
 import { getNodeTypeColor } from '../nodeTypeColors'
@@ -82,7 +82,7 @@ export function TaskNodeComponent(props: NodeProps<TaskNode>) {
     (props.data as { metadata?: { __showExecutionBadge?: boolean } }).metadata?.__showExecutionBadge === true
 
   return (
-    <NodeComponent
+    <SynStepComponent
       className={metadata.className}
       nodeProps={props}
       executionState={executionState}
@@ -95,7 +95,7 @@ export function TaskNodeComponent(props: NodeProps<TaskNode>) {
         menuActions={menuActions}
         iconColor={getNodeTypeColor(FlowNodeType.TASK, props.data)}
       />
-    </NodeComponent>
+    </SynStepComponent>
   )
 }
 
@@ -148,7 +148,7 @@ export function TaskActivityDetails(
         expandable
         menuActions={props.menuActions}
       />
-      <NodeBody>
+      <SynStepBody>
         <SynDetailList>
           {renderCondition(dataWithMetadata.condition)}
           {taskExecutor === ExecutorTypeEnum.SCRIPT && (
@@ -175,7 +175,7 @@ export function TaskActivityDetails(
           )}
           {taskExecutor !== ExecutorTypeEnum.SCRIPT && renderJson(props.data, props.showJson)}
         </SynDetailList>
-      </NodeBody>
+      </SynStepBody>
     </>
   )
 }

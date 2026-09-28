@@ -3,10 +3,10 @@ import { TriggerTypeEnum } from '@syntara/contracts'
 import { type Node, type NodeProps, useStore } from '@xyflow/react'
 import type { CSSProperties } from 'react'
 
-import { NodeBody } from '../../../../components/nodes/NodeBody'
-import { NodeComponent } from '../../../../components/nodes/NodeComponent'
-import { NodeHeader } from '../../../../components/nodes/NodeHeader'
-import { NodeMenu } from '../../../../components/nodes/NodeMenu'
+import { SynStepBody } from '../../../../components/steps/SynStepBody'
+import { SynStepComponent } from '../../../../components/steps/SynStepComponent'
+import { SynStepHeader } from '../../../../components/steps/SynStepHeader'
+import { SynStepMenu } from '../../../../components/steps/SynStepMenu'
 import { FlowNodeType } from '../../../../constants'
 import { parseTriggerIndex } from '../../../../utils/triggerNodeIds'
 import { useIsActiveExecution } from '../../../builder/ActiveExecutionContext'
@@ -88,7 +88,7 @@ export function TriggerNodeComponent(props: NodeProps<TriggerNode>) {
   }
 
   return (
-    <NodeComponent
+    <SynStepComponent
       disableTarget={metadata.disableTarget}
       className={metadata.className}
       nodeProps={props}
@@ -110,7 +110,7 @@ export function TriggerNodeComponent(props: NodeProps<TriggerNode>) {
         triggerDetails={triggerDetails}
         triggerKind={props.data.triggerType}
       />
-    </NodeComponent>
+    </SynStepComponent>
   )
 }
 
@@ -139,7 +139,7 @@ function TriggerNodeDetails(
   const normalizedDetails = props.triggerDetails ?? null
   return (
     <>
-      <NodeHeader>
+      <SynStepHeader>
         <FlexItem>{props.icon}</FlexItem>
         <FlexItem grow={{ default: 'grow' }} />
         {props.menuActions &&
@@ -149,11 +149,11 @@ function TriggerNodeDetails(
           !isVersionView &&
           nodesConnectable && (
             <FlexItem>
-              <NodeMenu menuActions={props.menuActions} />
+              <SynStepMenu menuActions={props.menuActions} />
             </FlexItem>
           )}
-      </NodeHeader>
-      <NodeBody>
+      </SynStepHeader>
+      <SynStepBody>
         <div>
           <Title headingLevel="h3" size={TitleSizes.md} style={{ overflowWrap: 'anywhere' }}>
             {props.triggerName}
@@ -174,7 +174,7 @@ function TriggerNodeDetails(
           )}
           {isManualTrigger && !normalizedDetails && <Content component={ContentVariants.small}>Manual trigger</Content>}
         </div>
-      </NodeBody>
+      </SynStepBody>
     </>
   )
 }

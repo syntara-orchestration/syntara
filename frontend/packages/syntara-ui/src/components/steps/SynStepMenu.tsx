@@ -6,7 +6,7 @@ import { isValidElement, useState } from 'react'
 import type { NodeMenuAction } from '../../routes/workflows/canvas/nodes/hooks/useNodeMenuActions'
 import { IconLabel } from '../IconLabel'
 
-type NodeMenuProps = {
+type SynStepMenuProps = {
   menuActions: NodeMenuAction[]
   className?: string
   style?: React.CSSProperties
@@ -25,7 +25,7 @@ type NodeMenuProps = {
  * Handles PatternFly Dropdown with proper event propagation prevention
  * to avoid triggering node click handlers.
  */
-export function NodeMenu(props: Readonly<NodeMenuProps>) {
+export function SynStepMenu(props: Readonly<SynStepMenuProps>) {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
 
   if (props.menuActions.length === 0) {

@@ -8,8 +8,8 @@ import { FlowNodeType } from '../../constants'
 import { StandardNodeHeader } from '../../routes/workflows/canvas/nodes/common/StandardNodeHeader'
 import { NODE_TYPE_COLORS } from '../../routes/workflows/canvas/nodeTypeColors'
 
-import { NodeBody } from './NodeBody'
-import { NodeComponent } from './NodeComponent'
+import { SynStepComponent } from './SynStepComponent'
+import { SynStepBody } from './SynStepBody'
 import {
   createNodeProps,
   EXECUTION_STATES,
@@ -18,11 +18,11 @@ import {
   NodeExample,
   NodeStoryCanvas,
   type StoryNodeData,
-} from './NodeComponent.stories.helpers'
-import styles from './NodeComponent.stories.module.css'
-import { NodeExpandToggle } from './NodeExpandToggle'
-import { NodeHeader } from './NodeHeader'
-import { NodeTitle } from './NodeTitle'
+} from './SynStepComponent.stories.helpers'
+import styles from './SynStepComponent.stories.module.css'
+import { SynStepExpandToggle } from './SynStepExpandToggle'
+import { SynStepHeader } from './SynStepHeader'
+import { SynStepTitle } from './SynStepTitle'
 
 type NodeStoryParameters = {
   storyCanvas?: { minimumHeight?: number }
@@ -33,7 +33,7 @@ type SemanticZoomFlowNode = Node<StoryNodeData, 'semanticZoom'>
 
 function SemanticZoomNode(props: NodeProps<SemanticZoomFlowNode>) {
   return (
-    <NodeComponent
+    <SynStepComponent
       nodeProps={props}
       topBarColor={NODE_TYPE_COLORS.logic}
       semanticZoomSummary={{ title: props.data.name, typeLabel: 'Condition' }}
@@ -43,19 +43,19 @@ function SemanticZoomNode(props: NodeProps<SemanticZoomFlowNode>) {
       ]}
       hasDashedBorder={props.data.settings?.disabled === true}
     >
-      <NodeHeader>
-        <NodeExpandToggle nodeLabel={props.data.name} />
-        <NodeTitle title={props.data.name} subTitle="Condition" />
-      </NodeHeader>
-      <NodeBody>Detailed content is visible above the semantic-zoom threshold.</NodeBody>
-    </NodeComponent>
+      <SynStepHeader>
+        <SynStepExpandToggle nodeLabel={props.data.name} />
+        <SynStepTitle title={props.data.name} subTitle="Condition" />
+      </SynStepHeader>
+      <SynStepBody>Detailed content is visible above the semantic-zoom threshold.</SynStepBody>
+    </SynStepComponent>
   )
 }
 
 const semanticNodeTypes = { semanticZoom: SemanticZoomNode }
 
-const meta: Meta<typeof NodeComponent> = {
-  component: NodeComponent,
+const meta: Meta<typeof SynStepComponent> = {
+  component: SynStepComponent,
   tags: ['autodocs'],
   decorators: [
     (Story, context) =>
@@ -71,11 +71,11 @@ const meta: Meta<typeof NodeComponent> = {
     docs: {
       description: {
         component:
-          'Global composition primitives for workflow canvas nodes. Compose `NodeComponent` with `NodeHeader`, ' +
-          '`NodeExpandToggle`, `NodeTitle`, `NodeMenu`, and `NodeBody` to build a complete node. ' +
+          'Shared composition primitives for workflow steps. Compose `SynStepComponent` with `SynStepHeader`, ' +
+          '`SynStepExpandToggle`, `SynStepTitle`, `SynStepMenu`, and `SynStepBody` to build a complete node. ' +
           'State owned by the workflow node belongs in `nodeProps.data` (for example `settings.disabled`, ' +
-          '`__validationError`, and `metadata.__mockDataPinned`); visual layout options belong on `NodeComponent`. ' +
-          'The Inventory story is the fixed visual inventory for supported global-node states.',
+          '`__validationError`, and `metadata.__mockDataPinned`); visual layout options belong on `SynStepComponent`. ' +
+          'The Inventory story is the fixed visual inventory for supported shared step states.',
       },
     },
   },
@@ -95,7 +95,7 @@ export const Default: Story = {
 /** Selection uses an outline without changing the node's box geometry. */
 export const Selected: Story = {
   render: () => (
-    <NodeComponent
+    <SynStepComponent
       nodeProps={createNodeProps({ id: 'selected', selected: true })}
       topBarColor={NODE_TYPE_COLORS.actionScript}
     >
@@ -105,12 +105,12 @@ export const Selected: Story = {
         subtitle="Script task"
         title="Run inventory synchronization"
       />
-      <NodeBody>
+      <SynStepBody>
         <Content component={ContentVariants.small}>
           The selected node keeps its normal type indicator and content.
         </Content>
-      </NodeBody>
-    </NodeComponent>
+      </SynStepBody>
+    </SynStepComponent>
   ),
 }
 
@@ -118,30 +118,30 @@ export const Selected: Story = {
 export const DisabledAndValidationError: Story = {
   render: () => (
     <div className={styles.comparisonGrid}>
-      <NodeComponent
+      <SynStepComponent
         nodeProps={createNodeProps({ id: 'disabled', data: { settings: { disabled: true } } })}
         topBarColor={NODE_TYPE_COLORS.actionScript}
       >
-        <NodeHeader>
-          <NodeExpandToggle nodeLabel="Disabled deployment" />
-          <NodeTitle title="Disabled deployment" subTitle="Script task" />
-        </NodeHeader>
-        <NodeBody>
+        <SynStepHeader>
+          <SynStepExpandToggle nodeLabel="Disabled deployment" />
+          <SynStepTitle title="Disabled deployment" subTitle="Script task" />
+        </SynStepHeader>
+        <SynStepBody>
           <Content component={ContentVariants.small}>This step will be skipped when the workflow runs.</Content>
-        </NodeBody>
-      </NodeComponent>
-      <NodeComponent
+        </SynStepBody>
+      </SynStepComponent>
+      <SynStepComponent
         nodeProps={createNodeProps({ id: 'validation', data: { __validationError: true } })}
         topBarColor={NODE_TYPE_COLORS.logic}
       >
-        <NodeHeader>
-          <NodeExpandToggle nodeLabel="Check deployment policy" />
-          <NodeTitle title="Check deployment policy" subTitle="Condition" />
-        </NodeHeader>
-        <NodeBody>
+        <SynStepHeader>
+          <SynStepExpandToggle nodeLabel="Check deployment policy" />
+          <SynStepTitle title="Check deployment policy" subTitle="Condition" />
+        </SynStepHeader>
+        <SynStepBody>
           <Content component={ContentVariants.small}>The condition needs a valid expression before it can run.</Content>
-        </NodeBody>
-      </NodeComponent>
+        </SynStepBody>
+      </SynStepComponent>
     </div>
   ),
 }
@@ -153,7 +153,7 @@ export const ExecutionStates: Story = {
     <div className={styles.gallery}>
       {EXECUTION_STATES.map((executionState) => (
         <NodeExample key={executionState.status} label={executionState.status}>
-          <NodeComponent
+          <SynStepComponent
             nodeProps={createNodeProps({
               id: `execution-${executionState.status}`,
               name: `${executionState.status} task`,
@@ -161,13 +161,13 @@ export const ExecutionStates: Story = {
             executionState={executionState}
             topBarColor={NODE_TYPE_COLORS.actionScript}
           >
-            <NodeHeader>
-              <NodeTitle title={`${executionState.status} task`} subTitle="Script task" />
-            </NodeHeader>
-            <NodeBody>
+            <SynStepHeader>
+              <SynStepTitle title={`${executionState.status} task`} subTitle="Script task" />
+            </SynStepHeader>
+            <SynStepBody>
               <Content component={ContentVariants.small}>Execution badge shown below the node.</Content>
-            </NodeBody>
-          </NodeComponent>
+            </SynStepBody>
+          </SynStepComponent>
         </NodeExample>
       ))}
     </div>
@@ -178,26 +178,26 @@ export const ExecutionStates: Story = {
 export const CollapsedAndExpanded: Story = {
   render: () => (
     <div className={styles.comparisonGrid}>
-      <NodeComponent nodeProps={createNodeProps({ id: 'expanded' })} topBarColor={NODE_TYPE_COLORS.actionScript}>
-        <NodeHeader>
-          <NodeExpandToggle nodeLabel="Expanded node" />
-          <NodeTitle title="Expanded node" subTitle="Script task" />
-        </NodeHeader>
-        <NodeBody>
+      <SynStepComponent nodeProps={createNodeProps({ id: 'expanded' })} topBarColor={NODE_TYPE_COLORS.actionScript}>
+        <SynStepHeader>
+          <SynStepExpandToggle nodeLabel="Expanded node" />
+          <SynStepTitle title="Expanded node" subTitle="Script task" />
+        </SynStepHeader>
+        <SynStepBody>
           <Content component={ContentVariants.small}>
             The body is visible initially and may be collapsed with the caret.
           </Content>
-        </NodeBody>
-      </NodeComponent>
-      <NodeComponent nodeProps={createNodeProps({ id: 'collapsed' })} topBarColor={NODE_TYPE_COLORS.actionScript}>
-        <NodeHeader>
-          <NodeExpandToggle nodeLabel="Collapsed node" />
-          <NodeTitle title="Collapsed node" subTitle="Script task" />
-        </NodeHeader>
-        <NodeBody>
+        </SynStepBody>
+      </SynStepComponent>
+      <SynStepComponent nodeProps={createNodeProps({ id: 'collapsed' })} topBarColor={NODE_TYPE_COLORS.actionScript}>
+        <SynStepHeader>
+          <SynStepExpandToggle nodeLabel="Collapsed node" />
+          <SynStepTitle title="Collapsed node" subTitle="Script task" />
+        </SynStepHeader>
+        <SynStepBody>
           <Content component={ContentVariants.small}>This body appears after expanding the node.</Content>
-        </NodeBody>
-      </NodeComponent>
+        </SynStepBody>
+      </SynStepComponent>
     </div>
   ),
   play: async ({ canvas }) => {
@@ -208,12 +208,12 @@ export const CollapsedAndExpanded: Story = {
 /** The menu begins closed; open it to inspect normal, icon, separated, and danger actions. */
 export const Menu: Story = {
   render: () => (
-    <NodeComponent nodeProps={createNodeProps({ id: 'menu' })} topBarColor={NODE_TYPE_COLORS.actionScript}>
+    <SynStepComponent nodeProps={createNodeProps({ id: 'menu' })} topBarColor={NODE_TYPE_COLORS.actionScript}>
       <StandardNodeHeader expandable menuActions={MENU_ACTIONS} subtitle="Script task" title="Node action menu" />
-      <NodeBody>
+      <SynStepBody>
         <Content component={ContentVariants.small}>Use the kebab button to open the node actions.</Content>
-      </NodeBody>
-    </NodeComponent>
+      </SynStepBody>
+    </SynStepComponent>
   ),
 }
 
@@ -277,35 +277,35 @@ export const WidthsAndTypes: Story = {
   render: () => (
     <div className={styles.comparisonGrid}>
       <NodeExample label="Default task (240 px)">
-        <NodeComponent nodeProps={createNodeProps({ id: 'default-width' })} topBarColor={NODE_TYPE_COLORS.actionScript}>
-          <NodeHeader>
-            <NodeTitle title="Default task" subTitle="Script" />
-          </NodeHeader>
-        </NodeComponent>
+        <SynStepComponent nodeProps={createNodeProps({ id: 'default-width' })} topBarColor={NODE_TYPE_COLORS.actionScript}>
+          <SynStepHeader>
+            <SynStepTitle title="Default task" subTitle="Script" />
+          </SynStepHeader>
+        </SynStepComponent>
       </NodeExample>
       <NodeExample label="Generic node (360 px)">
-        <NodeComponent
+        <SynStepComponent
           nodeProps={createNodeProps({ id: 'generic-width', type: FlowNodeType.GENERIC })}
           hasDashedBorder
           topBarColor={NODE_TYPE_COLORS.generic}
         >
-          <NodeHeader>
-            <NodeTitle title="Generic placeholder" subTitle="Add a step" />
-          </NodeHeader>
-        </NodeComponent>
+          <SynStepHeader>
+            <SynStepTitle title="Generic placeholder" subTitle="Add a step" />
+          </SynStepHeader>
+        </SynStepComponent>
       </NodeExample>
       <NodeExample label="Agentic task (360 px)">
-        <NodeComponent
+        <SynStepComponent
           nodeProps={createNodeProps({
             id: 'agentic-width',
             data: { type: ExecutorTypeEnum.AGENTIC, name: 'Agentic investigation' },
           })}
           topBarColor={NODE_TYPE_COLORS.actionAgentic}
         >
-          <NodeHeader>
-            <NodeTitle title="Agentic investigation" subTitle="Agentic task" />
-          </NodeHeader>
-        </NodeComponent>
+          <SynStepHeader>
+            <SynStepTitle title="Agentic investigation" subTitle="Agentic task" />
+          </SynStepHeader>
+        </SynStepComponent>
       </NodeExample>
     </div>
   ),
@@ -316,46 +316,46 @@ export const Handles: Story = {
   render: () => (
     <div className={styles.gallery}>
       <NodeExample label="Default source and target">
-        <NodeComponent nodeProps={createNodeProps({ id: 'handles-default' })} topBarColor={NODE_TYPE_COLORS.logic}>
-          <NodeHeader>
-            <NodeTitle title="Default handles" />
-          </NodeHeader>
-        </NodeComponent>
+        <SynStepComponent nodeProps={createNodeProps({ id: 'handles-default' })} topBarColor={NODE_TYPE_COLORS.logic}>
+          <SynStepHeader>
+            <SynStepTitle title="Default handles" />
+          </SynStepHeader>
+        </SynStepComponent>
       </NodeExample>
       <NodeExample label="Reversed handles">
-        <NodeComponent
+        <SynStepComponent
           nodeProps={createNodeProps({ id: 'handles-reversed' })}
           reverseHandles
           topBarColor={NODE_TYPE_COLORS.logic}
         >
-          <NodeHeader>
-            <NodeTitle title="Reversed handles" />
-          </NodeHeader>
-        </NodeComponent>
+          <SynStepHeader>
+            <SynStepTitle title="Reversed handles" />
+          </SynStepHeader>
+        </SynStepComponent>
       </NodeExample>
       <NodeExample label="Visible start handle; hidden loop-end target">
-        <NodeComponent
+        <SynStepComponent
           nodeProps={createNodeProps({ id: 'handles-start-end' })}
           enableStart
           enableEnd
           topBarColor={NODE_TYPE_COLORS.logic}
         >
-          <NodeHeader>
-            <NodeTitle title="Loop start and end target" />
-          </NodeHeader>
-        </NodeComponent>
+          <SynStepHeader>
+            <SynStepTitle title="Loop start and end target" />
+          </SynStepHeader>
+        </SynStepComponent>
       </NodeExample>
       <NodeExample label="Source and target disabled">
-        <NodeComponent
+        <SynStepComponent
           nodeProps={createNodeProps({ id: 'handles-disabled' })}
           disableSource
           disableTarget
           topBarColor={NODE_TYPE_COLORS.logic}
         >
-          <NodeHeader>
-            <NodeTitle title="No connection handles" />
-          </NodeHeader>
-        </NodeComponent>
+          <SynStepHeader>
+            <SynStepTitle title="No connection handles" />
+          </SynStepHeader>
+        </SynStepComponent>
       </NodeExample>
     </div>
   ),

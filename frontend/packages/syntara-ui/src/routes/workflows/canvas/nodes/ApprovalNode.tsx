@@ -3,8 +3,8 @@ import { ActivityTypeEnum, type ApprovalActivity as ApprovalNodeType } from '@sy
 import { type Node, type NodeProps } from '@xyflow/react'
 
 import { SynDetailList } from '../../../../components/details/SynDetailList'
-import { NodeBody } from '../../../../components/nodes/NodeBody'
-import { NodeComponent } from '../../../../components/nodes/NodeComponent'
+import { SynStepBody } from '../../../../components/steps/SynStepBody'
+import { SynStepComponent } from '../../../../components/steps/SynStepComponent'
 import type { ActivityStatus } from '../../execution/types'
 import { getNodeTypeColor } from '../nodeTypeColors'
 import { semanticZoomActivityTitle } from '../semanticZoom'
@@ -48,7 +48,7 @@ export function ApprovalNodeComponent(props: NodeProps<ApprovalNode>) {
   const approvalConfig = (props.data.parameters ?? {}) as { approver_timeout?: number }
 
   return (
-    <NodeComponent
+    <SynStepComponent
       className={metadata.className}
       nodeProps={props}
       disableSource
@@ -75,11 +75,11 @@ export function ApprovalNodeComponent(props: NodeProps<ApprovalNode>) {
         />
         <Flex justifyContent={{ default: 'justifyContentFlexEnd' }} gap={{ default: 'gapNone' }}>
           <FlexItem grow={{ default: 'grow' }} style={{ minWidth: 0 }}>
-            <NodeBody>
+            <SynStepBody>
               {approvalConfig.approver_timeout != null && (
                 <SynDetailList>{renderText('Timeout', `${approvalConfig.approver_timeout}s`)}</SynDetailList>
               )}
-            </NodeBody>
+            </SynStepBody>
           </FlexItem>
           <div style={{ paddingBottom: 'var(--pf-t--global--spacer--md)' }}>
             <BranchHandles>
@@ -93,6 +93,6 @@ export function ApprovalNodeComponent(props: NodeProps<ApprovalNode>) {
           </div>
         </Flex>
       </>
-    </NodeComponent>
+    </SynStepComponent>
   )
 }

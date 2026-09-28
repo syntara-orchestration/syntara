@@ -4,8 +4,8 @@ import { type Node, type NodeProps } from '@xyflow/react'
 import { useEffect, useRef, useState } from 'react'
 
 import { SynDetailList } from '../../../../components/details/SynDetailList'
-import { NodeBody } from '../../../../components/nodes/NodeBody'
-import { NodeComponent } from '../../../../components/nodes/NodeComponent'
+import { SynStepBody } from '../../../../components/steps/SynStepBody'
+import { SynStepComponent } from '../../../../components/steps/SynStepComponent'
 import { RegistryNodeId } from '../../../../constants'
 import { buildSwitchCasePort } from '../../../builder/utils/switchCaseHelpers'
 import type { ActivityStatus } from '../../execution/types'
@@ -81,7 +81,7 @@ export function SwitchNodeComponent(props: NodeProps<SwitchNode>) {
   ]
 
   return (
-    <NodeComponent
+    <SynStepComponent
       className={metadata.className}
       nodeProps={props}
       disableSource
@@ -110,7 +110,7 @@ export function SwitchNodeComponent(props: NodeProps<SwitchNode>) {
           </BranchHandle>
         </BranchHandles>
       </SwitchNodeDetails>
-    </NodeComponent>
+    </SynStepComponent>
   )
 }
 
@@ -133,12 +133,12 @@ function SwitchNodeDetails(props: {
       />
       <Flex justifyContent={{ default: 'justifyContentFlexEnd' }} gap={{ default: 'gapNone' }}>
         <FlexItem grow={{ default: 'grow' }} className={styles.nodeBodyWrapper}>
-          <NodeBody>
+          <SynStepBody>
             <SynDetailList>
               {renderOutputs(props.switchActivity.outputs)}
               {renderJson(props.switchActivity, props.showJson, 'Full Definition')}
             </SynDetailList>
-          </NodeBody>
+          </SynStepBody>
         </FlexItem>
         <div className={styles.branchHandlesWrapper}>{props.children}</div>
       </Flex>

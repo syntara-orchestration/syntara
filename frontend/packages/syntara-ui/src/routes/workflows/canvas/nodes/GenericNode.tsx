@@ -3,8 +3,8 @@ import { RhUiSettingsIcon } from '@patternfly/react-icons'
 import type { TaskActivity } from '@syntara/contracts'
 import { type Node, type NodeProps } from '@xyflow/react'
 
-import { NodeBody } from '../../../../components/nodes/NodeBody'
-import { NodeComponent } from '../../../../components/nodes/NodeComponent'
+import { SynStepBody } from '../../../../components/steps/SynStepBody'
+import { SynStepComponent } from '../../../../components/steps/SynStepComponent'
 import { FlowNodeType } from '../../../../constants'
 import { getActivityMetadata } from '../../../../stores/useWorkflowStore'
 import type { ActivityStatus } from '../../execution/types'
@@ -42,7 +42,7 @@ export function GenericNodeComponent(props: NodeProps<GenericNode>) {
     | undefined
 
   return (
-    <NodeComponent
+    <SynStepComponent
       nodeProps={props}
       reverseHandles={reverseHandles}
       hasDashedBorder
@@ -60,7 +60,7 @@ export function GenericNodeComponent(props: NodeProps<GenericNode>) {
         title={showTitle ? 'Click to configure' : undefined}
         expandable={false}
       />
-      <NodeBody>
+      <SynStepBody>
         <Flex alignItems={{ default: 'alignItemsCenter' }} justifyContent={{ default: 'justifyContentCenter' }}>
           <FlexItem>
             <Content component={ContentVariants.h4} style={{ overflowWrap: 'anywhere' }}>
@@ -68,7 +68,7 @@ export function GenericNodeComponent(props: NodeProps<GenericNode>) {
             </Content>
           </FlexItem>
         </Flex>
-      </NodeBody>
-    </NodeComponent>
+      </SynStepBody>
+    </SynStepComponent>
   )
 }

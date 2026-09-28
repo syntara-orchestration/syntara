@@ -3,8 +3,8 @@ import { type Node, type NodeProps } from '@xyflow/react'
 import { useShallow } from 'zustand/react/shallow'
 
 import { SynDetailList } from '../../../../components/details/SynDetailList'
-import { NodeBody } from '../../../../components/nodes/NodeBody'
-import { NodeComponent } from '../../../../components/nodes/NodeComponent'
+import { SynStepBody } from '../../../../components/steps/SynStepBody'
+import { SynStepComponent } from '../../../../components/steps/SynStepComponent'
 import { RegistryNodeId } from '../../../../constants'
 import { formatDurationLabel } from '../../../builder/utils/timeUtils'
 import type { ActivityStatus } from '../../execution/types'
@@ -54,7 +54,7 @@ export function WaitNodeComponent(props: NodeProps<WaitNode>) {
   const { isActive, remaining } = useWaitCountdown(countdownStatus, countdownStartedAt, totalSeconds)
 
   return (
-    <NodeComponent
+    <SynStepComponent
       className={metadata.className}
       nodeProps={props}
       executionState={executionState}
@@ -71,12 +71,12 @@ export function WaitNodeComponent(props: NodeProps<WaitNode>) {
         expandable={false}
         menuActions={menuActions}
       />
-      <NodeBody>
+      <SynStepBody>
         <SynDetailList>
           {renderText('Duration', durationLabel)}
           {isActive && renderText('⏱ Countdown', remaining ?? '')}
         </SynDetailList>
-      </NodeBody>
-    </NodeComponent>
+      </SynStepBody>
+    </SynStepComponent>
   )
 }

@@ -4,8 +4,8 @@ import { type Node, type NodeProps } from '@xyflow/react'
 
 import { SynDetail } from '../../../../components/details/SynDetail'
 import { SynDetailList } from '../../../../components/details/SynDetailList'
-import { NodeBody } from '../../../../components/nodes/NodeBody'
-import { NodeComponent } from '../../../../components/nodes/NodeComponent'
+import { SynStepBody } from '../../../../components/steps/SynStepBody'
+import { SynStepComponent } from '../../../../components/steps/SynStepComponent'
 import { RegistryNodeId } from '../../../../constants'
 import type { ActivityStatus } from '../../execution/types'
 import { getNodeTypeColor } from '../nodeTypeColors'
@@ -49,7 +49,7 @@ export function ConvergeNodeComponent(props: NodeProps<ConvergeNode>) {
     | undefined
 
   return (
-    <NodeComponent
+    <SynStepComponent
       className={metadata.className}
       nodeProps={props}
       executionState={executionState}
@@ -68,12 +68,12 @@ export function ConvergeNodeComponent(props: NodeProps<ConvergeNode>) {
         menuActions={menuActions}
       />
       <Flex justifyContent={{ default: 'justifyContentFlexStart' }} style={{ overflow: 'hidden' }}>
-        <NodeBody>
+        <SynStepBody>
           <SynDetailList data-testid="converge-node-details">
             <SynDetail label="Type">{strategyLabel}</SynDetail>
           </SynDetailList>
-        </NodeBody>
+        </SynStepBody>
       </Flex>
-    </NodeComponent>
+    </SynStepComponent>
   )
 }
