@@ -12,7 +12,6 @@ from sqlmodel import select
 from temporalio.api.enums.v1 import EventType
 from temporalio.api.history.v1 import HistoryEvent
 
-from syntara.audit.dispatcher import AuditEventDispatcher
 from syntara.core.exceptions import SafeValueError
 from syntara.telemetry.events.workflow_emitters import _map_execution_status_to_telemetry
 from syntara.telemetry.events.workflow_error import TimedOutComponent
@@ -34,6 +33,7 @@ class ActivityExecutionStateMixin:
     session_factory: Any
     _publish_activity_patches: Any
     _publish_snapshot: Any
+    _dispatch_audit_event: Any
 
     def _extract_execution_status_from_event(self, event: HistoryEvent) -> tuple[ExecutionStatus, datetime, str | None]:  # noqa: C901, PLR0912
         """Extract execution status, completion time, and error from workflow completion event.
@@ -282,7 +282,7 @@ class ActivityExecutionStateMixin:
                 error_type: str | None = "ActivityExecutionError" if error_details else None
                 trigger_type = next((a for a in ActivityName if a == execution.trigger_type), None)
 
-                AuditEventDispatcher.dispatch(
+                self._dispatch_audit_event(
                     WorkflowCompletedEvent(
                         execution_id=execution.id,
                         workflow_id=execution.workflow_id,
@@ -301,7 +301,7 @@ class ActivityExecutionStateMixin:
                 # Emit workflow error telemetry for engine-level workflow timeouts
                 if event.event_type == EventType.EVENT_TYPE_WORKFLOW_EXECUTION_TIMED_OUT:
                     elapsed_time_ms = int((completed_at - execution.created_at).total_seconds() * 1000)
-                    AuditEventDispatcher.dispatch(
+                    self._dispatch_audit_event(
                         WorkflowExecutionErrorEvent(
                             execution_id=metadata.execution_id,
                             workflow_id=metadata.workflow_id,

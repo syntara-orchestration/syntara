@@ -157,6 +157,11 @@ class ActivitySyncService(
         """
         self._lifecycle.cleanup(execution_id, task)
 
+    @staticmethod
+    def _dispatch_audit_event(event: object) -> None:
+        """Dispatch an audit event through the façade-owned integration seam."""
+        AuditEventDispatcher.dispatch(event)
+
     async def _publish_snapshot(
         self,
         execution_or_id: UUID | Execution,
