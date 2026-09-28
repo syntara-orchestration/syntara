@@ -1,8 +1,8 @@
-"""Pre-restart validation for restart-from-failure (AAP-92820).
+"""Pre-retry validation for retry-from-failure (AAP-92820).
 
-Shared by ``POST /executions/{id}/validate-restart-from-failure`` (pure verdict,
-no state mutation) and ``POST /executions/{id}/restart-from-failure`` (re-validates independently
-before doing any work, so the restart endpoint is safe to call directly).
+Shared by ``POST /executions/{id}/validate-retry-from-failure`` (pure verdict,
+no state mutation) and ``POST /executions/{id}/retry-from-failure`` (re-validates independently
+before doing any work, so the retry endpoint is safe to call directly).
 
 Validation is a chain of checks:
 
@@ -14,7 +14,7 @@ Validation is a chain of checks:
 3. **Converge-mootness guard** — failure points feeding an already-completed
    converge node are rejected (the workflow moved past those branches); a
    failed converge keeps its branch failures as candidates.
-4. **Retained-version guard** — restart always runs against the exact
+4. **Retained-version guard** — retry always runs against the exact
    workflow version captured when the original run started
    (``source.workflow_version_id``). There is no comparison against the
    currently saved definition and no diffing — later edits never affect a
@@ -22,18 +22,24 @@ Validation is a chain of checks:
    exists, or a selected id is not a node in it.
 5. **Sanitized-output guard** — persisted ``output_data`` is credential-scrubbed
    on write while the live run consumed raw values. Redacted *field paths*
-   reject, but only when actually referenced from the restart execution path
+   reject, but only when actually referenced from the retry execution path
    (selected failure points plus their downstream) — unreferenced markers are
    harmless. A whole-namespace ``${node}`` reference taints on any marker
    under that node. Loop iterations are evaluated per-iteration (any tainted
    iteration taints the node); iteration-suffixed selections are rejected
    with guidance to select base node ids. Truncated output is out of scope
-   for restart validation — it affects all executions equally and is not
-   restart-specific (SDP scope reduction, R9a).
+   for retry validation — it affects all executions equally and is not
+   retry-specific (SDP scope reduction, R9a).
+6. **Input-override guard** — supplied input parameter overrides (SDP AC-14/R10c)
+   may only name parameters that already exist on the target node in the
+   retained version, and may only target nodes that are actually starting
+   points of this retry. Overrides are validated here but never applied: the
+   engine applies them at dispatch (AAP-92821). An override replaces the value
+   the node would otherwise receive, after upstream outputs are injected.
 
     For an **explicit** selection, a sanitized dependency always rejects. For
     the **default** selection (empty input — see below), a sanitized
-    dependency instead expands the restart points to include the sanitized
+    dependency instead expands the retry points to include the sanitized
     node, repeated until no dependency remains, and reports what was added
     instead of rejecting (SDP AC-15/R9a). Either way, the response also
     reports ``sanitized_replacements`` — for *every* currently-failed node
@@ -42,10 +48,10 @@ Validation is a chain of checks:
     explicitly before the user even submits a request (per Bill Wei,
     2026-09-24: "so that the UI can disallow replaced nodes being selected").
 
-    The reported restart set is the **eligible** set: the expanded selection
+    The reported retry set is the **eligible** set: the expanded selection
     minus failed points superseded by auto-inclusion (a failed point strictly
     downstream of an auto-included sanitized node still re-executes, but the
-    restart initiates at the sanitized head). Step counts are keyed by
+    retry initiates at the sanitized head). Step counts are keyed by
     eligible point.
 
 
@@ -56,7 +62,7 @@ Design decisions (SDP ANSTRAT-1779, aligned 2026-09-24):
 - An empty failure-point selection means "all currently failed nodes"
   (SDP R11/AC-15) — not an error. A non-empty selection means exactly those
   nodes. Rejected only if there are no failed nodes at all to default to.
-- The response includes a re-run step count per eligible restart point and a
+- The response includes a re-run step count per eligible retry point and a
   deduplicated total across the whole selection (SDP R11a/AC-2).
 """
 
@@ -71,7 +77,7 @@ from syntara.workflows.exceptions import ExecutionNotFoundError
 from syntara.workflows.models.activity_execution import ActivityExecution, ActivityStatus
 from syntara.workflows.models.execution import Execution, ExecutionStatus
 from syntara.workflows.models.workflow_version import WorkflowVersion
-from syntara.workflows.utils.template_refs import find_template_refs, paths_overlap
+from syntara.workflows.utils.template_refs import FieldPath, find_template_refs, paths_overlap
 from syntara.workflows.workflow_engine.utils.credential_scrubber import REDACTED
 
 if TYPE_CHECKING:
@@ -79,9 +85,9 @@ if TYPE_CHECKING:
 
     from sqlmodel.ext.asyncio.session import AsyncSession
 
-#: Statuses a restart may start from. Mirrors the story scope; anything else is
+#: Statuses a retry may start from. Mirrors the story scope; anything else is
 #: rejected with a reason (never silently).
-RESTARTABLE_STATUSES = frozenset({ExecutionStatus.FAILED, ExecutionStatus.COMPLETED_WITH_ERRORS})
+RETRYABLE_FROM_FAILURE_STATUSES = frozenset({ExecutionStatus.FAILED, ExecutionStatus.COMPLETED_WITH_ERRORS})
 
 #: Separator for loop-iteration activity names (``<node>#iter-<n>``). Must match
 #: ``_COMPOSITE_ITER_SEP`` in activity_sync_service.py.
@@ -89,17 +95,15 @@ LOOP_ITERATION_SEP = "#iter-"
 
 
 @dataclass(frozen=True)
-class RestartValidation:
-    """Outcome of pre-restart validation (pure verdict, no side effects)."""
+class RetryValidation:
+    """Outcome of pre-retry validation (pure verdict, no side effects)."""
 
     eligible: bool
     reason: str | None = None
     failure_point_ids: list[str] = field(default_factory=list)
-    upstream_node_ids: list[str] = field(default_factory=list)
     sanitized_node_ids: list[str] = field(default_factory=list)
     auto_included_node_ids: list[str] = field(default_factory=list)
     sanitized_replacements: dict[str, list[str]] = field(default_factory=dict)
-    snapshot_version: int | None = None
     step_count_by_eligible_point: dict[str, int] = field(default_factory=dict)
     total_step_count: int = 0
 
@@ -120,35 +124,6 @@ def definition_nodes(definition: dict[str, Any]) -> list[dict[str, Any]]:
     triggers = definition.get("triggers", []) or []
     nodes = definition.get("nodes", []) or []
     return [entry for entry in [*triggers, *nodes] if isinstance(entry, dict)]
-
-
-def collect_upstream_node_ids(
-    definition: dict[str, Any],
-    failure_point_ids: list[str],
-) -> set[str]:
-    """Return failure points plus every ancestor back to the start (inclusive).
-
-    Built directly from the edge list (``from``/``to``) so validation does not
-    depend on the runtime graph backend. Unknown ids contribute only
-    themselves; membership against the retained version is checked separately.
-    """
-    nodes = definition_nodes(definition)
-    edges = definition.get("edges", []) or []
-    predecessors: dict[str, set[str]] = {node["id"]: set() for node in nodes if "id" in node}
-    for edge in edges:
-        src, dst = edge.get("from"), edge.get("to")
-        if src is not None and dst is not None:
-            predecessors.setdefault(dst, set()).add(src)
-
-    upstream: set[str] = set()
-    stack = list(failure_point_ids)
-    while stack:
-        node_id = stack.pop()
-        if node_id in upstream:
-            continue
-        upstream.add(node_id)
-        stack.extend(predecessors.get(node_id, ()))
-    return upstream
 
 
 def build_successors(definition: dict[str, Any]) -> dict[str, set[str]]:
@@ -174,7 +149,7 @@ def collect_downstream_node_ids(
 ) -> set[str]:
     """Return failure points plus every successor downstream (inclusive).
 
-    The restart re-executes exactly this set (for the selected points), so
+    The retry re-executes exactly this set (for the selected points), so
     only references originating here can consume injected outputs, and its
     size is the re-run step count (SDP R11a/AC-2).
     """
@@ -197,7 +172,7 @@ def _step_counts(
     failure_point_ids: list[str],
     successors: dict[str, set[str]] | None = None,
 ) -> tuple[dict[str, int], int]:
-    """Re-run step count per eligible restart point, plus the deduplicated total.
+    """Re-run step count per eligible retry point, plus the deduplicated total.
 
     Per-point counts are computed independently (a node reachable from two
     selected points is not double-counted within its own point's count); the
@@ -214,11 +189,11 @@ def _step_counts(
 
 
 def _state_reason(source: Execution) -> str | None:
-    """Rejection reason when the source state cannot restart, else None."""
-    if source.status not in RESTARTABLE_STATUSES:
+    """Rejection reason when the source state cannot retry, else None."""
+    if source.status not in RETRYABLE_FROM_FAILURE_STATUSES:
         return (
             f"execution is in {source.status.value} state; "
-            "restart is available for failed and completed_with_errors executions only"
+            "retry is available for failed and completed_with_errors executions only"
         )
     return None
 
@@ -231,14 +206,14 @@ def _selection_reason(normalized: list[str], failed_ids: set[str]) -> str | None
     here only happens when there are no failed nodes at all to default to.
     """
     if not normalized:
-        return "no failed nodes in this execution to restart from"
+        return "no failed nodes in this execution to retry from"
     unknown = [point for point in normalized if point not in failed_ids]
     if unknown:
         return f"not failed nodes in this execution: {', '.join(unknown)}"
     return None
 
 
-def _redacted_paths(value: Any, prefix: tuple = ()) -> set[tuple]:  # noqa: ANN401
+def _redacted_paths(value: Any, prefix: FieldPath = ()) -> set[FieldPath]:  # noqa: ANN401
     """Key paths in a persisted value carrying the credential-scrubber marker.
 
     Stored ``output_data`` is scrubbed on write (see ``get_activity_output``),
@@ -246,7 +221,7 @@ def _redacted_paths(value: Any, prefix: tuple = ()) -> set[tuple]:  # noqa: ANN4
     feed downstream nodes redacted data instead of the originals. List indices
     are path segments so ``items[0]`` references resolve precisely.
     """
-    found: set[tuple] = set()
+    found: set[FieldPath] = set()
     if isinstance(value, str):
         if REDACTED in value:
             found.add(prefix)
@@ -294,7 +269,7 @@ def _converge_reason(
     """Rejection reason when failure points feed an already-completed converge.
 
     A completed converge met its threshold without these branches, so the
-    workflow already moved past them — restarting them is moot. A FAILED
+    workflow already moved past them — retrying them is moot. A FAILED
     converge (threshold unmet) keeps its branch failures as valid candidates.
     """
     nodes = definition_nodes(snapshot_def)
@@ -317,12 +292,12 @@ def _converge_reason(
     return None
 
 
-def _restart_path_refs(definition: dict[str, Any], restart_path: set[str]) -> dict[str, set[tuple]]:
+def _retry_path_refs(definition: dict[str, Any], retry_path: set[str]) -> dict[str, set[FieldPath]]:
     """Template references by target, from nodes that will actually re-execute."""
-    referenced: dict[str, set[tuple]] = {}
+    referenced: dict[str, set[FieldPath]] = {}
     for node in definition_nodes(definition):
         node_id = node.get("id")
-        if node_id is None or node_id not in restart_path:
+        if node_id is None or node_id not in retry_path:
             continue
         for target_id, field_path in find_template_refs(node.get("parameters", {})):
             if target_id != node_id:
@@ -333,30 +308,30 @@ def _restart_path_refs(definition: dict[str, Any], restart_path: set[str]) -> di
 def _tainted_nodes(
     snapshot_def: dict[str, Any],
     normalized: list[str],
-    completed_outputs: dict[str, list],
+    completed_outputs: dict[str, list[Any]],
     successors: dict[str, set[str]] | None = None,
 ) -> list[str]:
-    """Sanitized node ids whose taint is referenced on the restart path.
+    """Sanitized node ids whose taint is referenced on the retry path.
 
     Collects template references from nodes that will actually re-execute,
     then intersects each completed node's redacted field paths against the
     referenced paths. Whole-namespace refs match any taint under that node.
 
-    Completed nodes *in* the restart path re-run fresh, so their stored
+    Completed nodes *in* the retry path re-run fresh, so their stored
     outputs are never injected — only nodes outside it (skipped upstream nodes
     and completed side branches) can feed tainted data into the rerun.
     """
-    restart_path = collect_downstream_node_ids(snapshot_def, normalized, successors)
-    referenced = _restart_path_refs(snapshot_def, restart_path)
+    retry_path = collect_downstream_node_ids(snapshot_def, normalized, successors)
+    referenced = _retry_path_refs(snapshot_def, retry_path)
 
     sanitized: list[str] = []
     for node_id, outputs in completed_outputs.items():
-        if node_id in restart_path:
+        if node_id in retry_path:
             continue
         refs = referenced.get(node_id, set())
         if not refs:
             continue
-        redacted: set[tuple] = set()
+        redacted: set[FieldPath] = set()
         for output in outputs:
             if output is None:
                 continue
@@ -369,7 +344,7 @@ def _tainted_nodes(
 def _expand_sanitized_chain(
     snapshot_def: dict[str, Any],
     seed: set[str],
-    completed_outputs: dict[str, list],
+    completed_outputs: dict[str, list[Any]],
 ) -> tuple[set[str], list[str]]:
     """Expand a starting selection to include every sanitized dependency, transitively.
 
@@ -395,10 +370,10 @@ def _eligible_points(
     expanded: set[str],
     auto_included: set[str],
 ) -> set[str]:
-    """Restart initiation points: the expanded selection minus superseded failed points.
+    """Retry initiation points: the expanded selection minus superseded failed points.
 
     A failed point strictly downstream of an auto-included sanitized node still
-    re-executes (as downstream of the sanitized head), but the restart no
+    re-executes (as downstream of the sanitized head), but the retry no
     longer *starts* there — the sanitized head supersedes it. Auto-included
     sanitized nodes themselves always stay eligible: each must re-execute
     fresh to regenerate raw outputs (its stored output can never be injected).
@@ -422,7 +397,7 @@ def _eligible_points(
 def _version_reason(
     normalized: list[str],
     snapshot: WorkflowVersion | None,
-    completed_outputs: dict[str, list],
+    completed_outputs: dict[str, list[Any]],
     *,
     is_default_selection: bool,
 ) -> tuple[str | None, list[str], list[str], list[str]]:
@@ -432,7 +407,7 @@ def _version_reason(
     resolved first. For an explicit selection, that chain rejects outright
     (``sanitized`` names every node in it, the selection is unchanged). For
     the default selection (SDP AC-15), the selection is instead expanded to
-    include the whole chain as additional restart points, and what was
+    include the whole chain as additional retry points, and what was
     auto-included is reported instead of rejecting.
     """
     if snapshot is None:
@@ -449,8 +424,8 @@ def _version_reason(
     if not is_default_selection:
         return (
             (
-                "upstream nodes have sanitized outputs referenced on the restart path "
-                f"({', '.join(added)}); restarting would inject redacted data"
+                "upstream nodes have sanitized outputs referenced on the retry path "
+                f"({', '.join(added)}); retrying would inject redacted data"
             ),
             added,
             [],
@@ -459,16 +434,69 @@ def _version_reason(
     return None, [], added, sorted(expanded)
 
 
+def _override_reason(
+    snapshot_def: dict[str, Any] | None,
+    reported_selection: list[str],
+    overrides: dict[str, dict[str, Any]],
+) -> str | None:
+    """Rejection reason for input-parameter overrides that cannot apply, else None.
+
+    SDP AC-14 constrains overrides twice: the input keys must not change, and
+    the workflow definition must not change. So an override may only name
+    parameters that already exist on the target node in the *retained* version,
+    and may only target nodes that are actually starting points of this retry.
+    Anything else would silently redefine the workflow for one run.
+
+    An empty override map is always valid — most retries change nothing.
+    """
+    if not overrides:
+        return None
+
+    if snapshot_def is None:
+        return "cannot apply input parameter overrides: original workflow version no longer exists"
+
+    by_id = {node["id"]: node for node in definition_nodes(snapshot_def) if "id" in node}
+    allowed_nodes = set(reported_selection)
+
+    unknown_nodes = sorted(node_id for node_id in overrides if node_id not in allowed_nodes)
+    if unknown_nodes:
+        return (
+            f"input parameter overrides target nodes that are not retry starting points: {', '.join(unknown_nodes)}; "
+            f"starting points are {', '.join(reported_selection) if reported_selection else 'none'}"
+        )
+
+    for node_id in sorted(overrides):
+        supplied = overrides[node_id]
+        if not supplied:
+            # No-op override: nothing to check, and it must not fail the retry.
+            continue
+        parameters = by_id.get(node_id, {}).get("parameters")
+        existing = set(parameters) if isinstance(parameters, dict) else set()
+        if not existing:
+            return (
+                f"node {node_id} has no input parameters in the executed workflow version; "
+                "overrides cannot add new ones"
+            )
+        unknown_params = sorted(key for key in supplied if key not in existing)
+        if unknown_params:
+            return (
+                f"input parameter overrides name keys that do not exist on node {node_id}: "
+                f"{', '.join(unknown_params)}; "
+                f"existing parameters are {', '.join(sorted(existing))}"
+            )
+    return None
+
+
 def _sanitized_replacements(
     snapshot_def: dict[str, Any],
     failed_ids: set[str],
-    completed_outputs: dict[str, list],
+    completed_outputs: dict[str, list[Any]],
 ) -> dict[str, list[str]]:
     """For every currently-failed node, the sanitized node(s) it must be replaced by.
 
     Computed per failed node in isolation (not against the request's actual
     selection) so the response always reflects every failed node's own
-    restart-path dependency — independent of what this particular request
+    retry-path dependency — independent of what this particular request
     asked for. Lets the UI disallow selecting a failed node explicitly
     before the user submits a request that would just be rejected.
     """
@@ -480,25 +508,31 @@ def _sanitized_replacements(
     return replacements
 
 
-async def validate_restart_from_failure(
+async def validate_retry_from_failure(
     session: AsyncSession,
     execution_id: UUID,
     failure_point_ids: list[str],
-) -> RestartValidation:
-    """Validate that an execution can be restarted from the given failure points.
+    input_parameter_overrides: dict[str, dict[str, Any]] | None = None,
+) -> RetryValidation:
+    """Validate that an execution can be retried from the given failure points.
 
     Pure read path: loads the source execution, its failed/completed
     activities, and the retained workflow version, then runs the guard chain
-    (state, selection, converge-mootness, retained-version, sanitized-taint).
-    Never mutates state.
+    (state, selection, converge-mootness, retained-version, sanitized-taint,
+    input-override). Never mutates state.
 
     An empty ``failure_point_ids`` means the default selection — all
     currently failed nodes (SDP R11/AC-15) — not an error.
+
+    ``input_parameter_overrides`` is validated, never applied: this layer only
+    decides whether the retry may proceed with them (SDP AC-14/R10c). The engine
+    applies them at dispatch (AAP-92821).
 
     Raises:
         ExecutionNotFoundError: If the source execution is gone.
 
     """
+    overrides = input_parameter_overrides or {}
     result = await session.exec(select(Execution).where(Execution.id == execution_id))
     source = result.one_or_none()
     if source is None:
@@ -506,7 +540,7 @@ async def validate_restart_from_failure(
 
     suffixed = sorted({point.strip() for point in failure_point_ids if point and LOOP_ITERATION_SEP in point.strip()})
     if suffixed:
-        return RestartValidation(
+        return RetryValidation(
             eligible=False,
             reason=(
                 "loop-iteration failure points are not selectable "
@@ -539,7 +573,7 @@ async def validate_restart_from_failure(
     # Per-iteration outputs keyed by base node id: any tainted iteration taints
     # the node (iteration-level classification is AAP-92821's job; validation
     # stays fail-closed at base-id granularity rather than last-write-wins).
-    completed_outputs: dict[str, list] = {}
+    completed_outputs: dict[str, list[Any]] = {}
     for activity in completed:
         completed_outputs.setdefault(strip_iteration_suffix(activity.activity_name), []).append(activity.output_data)
     completed_ids = set(completed_outputs)
@@ -560,35 +594,36 @@ async def validate_restart_from_failure(
         or version_reason
     )
 
-    snapshot_version = snapshot.version if snapshot is not None else None
     if reason is None:
         reported_selection = sorted(_eligible_points(snapshot_def, set(final_selection), set(auto_included)))
+        # Only meaningful once the starting points are known, and only when the
+        # rest of the chain already passed: overrides target starting points.
+        reason = _override_reason(
+            snapshot.workflow_definition if snapshot is not None else None,
+            reported_selection,
+            overrides,
+        )
     else:
         reported_selection = normalized
-    upstream = collect_upstream_node_ids(snapshot_def, reported_selection)
     step_counts, total_steps = _step_counts(snapshot_def, reported_selection) if snapshot is not None else ({}, 0)
     replacements = _sanitized_replacements(snapshot_def, failed_ids, completed_outputs) if snapshot is not None else {}
 
     if reason is not None:
-        return RestartValidation(
+        return RetryValidation(
             eligible=False,
             reason=reason,
             failure_point_ids=reported_selection,
-            upstream_node_ids=sorted(upstream),
             sanitized_node_ids=sanitized,
             sanitized_replacements=replacements,
-            snapshot_version=snapshot_version,
             step_count_by_eligible_point=step_counts,
             total_step_count=total_steps,
         )
 
-    return RestartValidation(
+    return RetryValidation(
         eligible=True,
         failure_point_ids=reported_selection,
-        upstream_node_ids=sorted(upstream),
         auto_included_node_ids=auto_included,
         sanitized_replacements=replacements,
-        snapshot_version=snapshot_version,
         step_count_by_eligible_point=step_counts,
         total_step_count=total_steps,
     )

@@ -88,7 +88,7 @@ export interface paths {
     patch?: never
     trace?: never
   }
-  '/executions/{execution_id}/validate-restart-from-failure': {
+  '/executions/{execution_id}/validate-retry-from-failure': {
     parameters: {
       query?: never
       header?: never
@@ -98,17 +98,17 @@ export interface paths {
     get?: never
     put?: never
     /**
-     * Validate restart from failure
-     * @description Validate that an execution can be restarted from the given failure points. Checks execution state, failure-point eligibility, converge-mootness, the retained-version guard, and the sanitized-output guard. Returns a pass/fail verdict without mutating any state.
+     * Validate retry from failure
+     * @description Validate that an execution can be retryed from the given failure points. Checks execution state, failure-point eligibility, converge-mootness, the retained-version guard, the sanitized-output guard, and any supplied input parameter overrides. Returns a pass/fail verdict without mutating any state.
      */
-    post: operations['validate_restart_from_failure']
+    post: operations['validate_retry_from_failure']
     delete?: never
     options?: never
     head?: never
     patch?: never
     trace?: never
   }
-  '/executions/{execution_id}/restart-from-failure': {
+  '/executions/{execution_id}/retry-from-failure': {
     parameters: {
       query?: never
       header?: never
@@ -118,10 +118,10 @@ export interface paths {
     get?: never
     put?: never
     /**
-     * Restart from failure
-     * @description Restart a failed execution from the given failure points. Independently repeats all validation checks, then creates a new execution linked to the source and triggers a Temporal run carrying restart context.
+     * Retry from failure
+     * @description Retry a failed execution from the given failure points, optionally overriding input parameters of the starting nodes for this run only. Independently repeats all validation checks, then creates a new execution linked to the source and triggers a Temporal run carrying retry context.
      */
-    post: operations['restart_from_failure']
+    post: operations['retry_from_failure']
     delete?: never
     options?: never
     head?: never
@@ -534,35 +534,53 @@ export interface components {
       use_published?: boolean
     }
     /**
-     * RestartValidateRequest
-     * @description Request body for POST /executions/{id}/validate-restart-from-failure.
+     * RetryFailureValidateRequest
+     * @description Request body for POST /executions/{id}/validate-retry-from-failure.
      */
-    RestartValidateRequest: {
+    RetryFailureValidateRequest: {
       /**
        * Failure Point Ids
-       * @description Failure points to restart from (node IDs from the source execution). Empty selects the default: all currently failed nodes.
+       * @description Failure points to retry from (node IDs from the source execution). Empty selects the default: all currently failed nodes.
        */
       failure_point_ids?: string[]
+      /**
+       * Input Parameter Overrides
+       * @description Input parameter overrides for the retry's starting nodes, keyed by node id then parameter name (SDP AC-14/R10c). Each override replaces the value the node would otherwise receive, after upstream outputs are injected, so the supplied value is what executes. Parameter names must already exist on that node in the retained workflow version, and node ids must be among the retry's starting points; anything else is rejected. Overrides apply to this retry run only — the workflow definition is never modified, and a permanent change requires editing, saving, and publishing the workflow.
+       */
+      input_parameter_overrides?: {
+        [key: string]: {
+          [key: string]: unknown
+        }
+      }
     }
     /**
-     * RestartRequest
-     * @description Request body for POST /executions/{id}/restart-from-failure.
+     * RetryFailureRequest
+     * @description Request body for POST /executions/{id}/retry-from-failure.
      */
-    RestartRequest: {
+    RetryFailureRequest: {
       /**
        * Failure Point Ids
-       * @description Failure points to restart from (node IDs from the source execution). A subset may be passed when multiple parallel branches failed; unselected branches are skipped. Empty selects the default: all currently failed nodes.
+       * @description Failure points to retry from (node IDs from the source execution). A subset may be passed when multiple parallel branches failed; unselected branches are skipped. Empty selects the default: all currently failed nodes.
        */
       failure_point_ids?: string[]
+      /**
+       * Input Parameter Overrides
+       * @description Input parameter overrides for the retry's starting nodes, keyed by node id then parameter name (SDP AC-14/R10c). Each override replaces the value the node would otherwise receive, after upstream outputs are injected, so the supplied value is what executes. Parameter names must already exist on that node in the retained workflow version, and node ids must be among the retry's starting points; anything else is rejected. Overrides apply to this retry run only — the workflow definition is never modified, and a permanent change requires editing, saving, and publishing the workflow.
+       */
+      input_parameter_overrides?: {
+        [key: string]: {
+          [key: string]: unknown
+        }
+      }
     }
     /**
-     * RestartValidationResponse
-     * @description Pre-restart validation verdict (POST /executions/{id}/validate-restart-from-failure).
+     * RetryFromFailureValidationResponse
+     * @description Pre-retry validation verdict (POST /executions/{id}/validate-retry-from-failure).
      */
-    RestartValidationResponse: {
+    RetryFromFailureValidationResponse: {
       /**
        * Eligible
-       * @description Whether the restart is allowed to proceed
+       * @description Whether the retry is allowed to proceed
        */
       eligible: boolean
       /**
@@ -572,17 +590,17 @@ export interface components {
       reason?: string | null
       /**
        * Failure Point Ids
-       * @description Restart points the verdict applies to, after cleanup (trimmed, deduped, sorted). Empty request means all currently failed nodes. On an eligible verdict this is the eligible set actually restarted, including auto-included sanitized nodes and excluding superseded failed points; on rejection it echoes the pre-expansion selection.
+       * @description Retry points the verdict applies to, after cleanup (trimmed, deduped, sorted). Empty request means all currently failed nodes. On an eligible verdict this is the eligible set actually retryed, including auto-included sanitized nodes and excluding superseded failed points; on rejection it echoes the pre-expansion selection.
        */
       failure_point_ids?: string[]
       /**
        * Sanitized Node Ids
-       * @description Upstream nodes with sanitized stored outputs referenced on the restart path. Populated when the verdict rejects; empty on eligible verdicts (see auto_included_node_ids).
+       * @description Upstream nodes with sanitized stored outputs referenced on the retry path. Populated when the verdict rejects; empty on eligible verdicts (see auto_included_node_ids).
        */
       sanitized_node_ids?: string[]
       /**
        * Auto Included Node Ids
-       * @description Sanitized nodes added as restart points on the default path. Empty on explicit selections, which reject instead.
+       * @description Sanitized nodes added as retry points on the default path. Empty on explicit selections, which reject instead.
        */
       auto_included_node_ids?: string[]
       /**
@@ -594,7 +612,7 @@ export interface components {
       }
       /**
        * Step Count By Eligible Point
-       * @description Re-run step count for each eligible restart point.
+       * @description Re-run step count for each eligible retry point.
        */
       step_count_by_eligible_point?: {
         [key: string]: number
@@ -2261,7 +2279,7 @@ export interface operations {
       500: components['responses']['InternalServerError']
     }
   }
-  validate_restart_from_failure: {
+  validate_retry_from_failure: {
     parameters: {
       query?: never
       header?: never
@@ -2272,17 +2290,17 @@ export interface operations {
     }
     requestBody: {
       content: {
-        'application/json': components['schemas']['RestartValidateRequest']
+        'application/json': components['schemas']['RetryFailureValidateRequest']
       }
     }
     responses: {
-      /** @description Restart validation verdict */
+      /** @description Retry validation verdict */
       200: {
         headers: {
           [name: string]: unknown
         }
         content: {
-          'application/json': components['schemas']['RestartValidationResponse']
+          'application/json': components['schemas']['RetryFromFailureValidationResponse']
         }
       }
       400: components['responses']['BadRequestError']
@@ -2295,7 +2313,7 @@ export interface operations {
       500: components['responses']['InternalServerError']
     }
   }
-  restart_from_failure: {
+  retry_from_failure: {
     parameters: {
       query?: never
       header?: never
@@ -2306,11 +2324,11 @@ export interface operations {
     }
     requestBody: {
       content: {
-        'application/json': components['schemas']['RestartRequest']
+        'application/json': components['schemas']['RetryFailureRequest']
       }
     }
     responses: {
-      /** @description New execution created from restart */
+      /** @description New execution created from retry */
       201: {
         headers: {
           [name: string]: unknown

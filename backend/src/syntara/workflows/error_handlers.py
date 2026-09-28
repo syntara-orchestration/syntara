@@ -22,8 +22,8 @@ if TYPE_CHECKING:
         BuiltinWorkflowModifyError,
         ExecutionInTerminalStateError,
         ExecutionNotFoundError,
-        ExecutionNotRestartableError,
         ExecutionNotRetryableError,
+        ExecutionNotRetryableFromFailureError,
         PayloadTooLargeError,
         ScheduledTriggerNotFoundError,
         ScheduledTriggerSyncError,
@@ -162,10 +162,12 @@ def execution_not_retryable_handler(request: Request, exc: "ExecutionNotRetryabl
     )
 
 
-def execution_not_restartable_handler(request: Request, exc: "ExecutionNotRestartableError") -> JSONResponse:
-    """Handle ExecutionNotRestartableError with RFC 9457 format."""
+def execution_not_retryable_from_failure_handler(
+    request: Request, exc: "ExecutionNotRetryableFromFailureError"
+) -> JSONResponse:
+    """Handle ExecutionNotRetryableFromFailureError with RFC 9457 format."""
     logger.error(
-        "Execution not restartable",
+        "Execution not retryable from failure",
         execution_id=str(exc.execution_id),
         reason=exc.reason,
         exc_info=exc,
@@ -173,9 +175,9 @@ def execution_not_restartable_handler(request: Request, exc: "ExecutionNotRestar
     return create_problem_details_response(
         status_code=status.HTTP_409_CONFLICT,
         problem_type=PROBLEM_TYPES["resource_conflict"],
-        title="Execution Not Restartable",
+        title="Execution Not Retryable From Failure",
         detail=str(exc),
-        code="EXECUTION_NOT_RESTARTABLE",
+        code="EXECUTION_NOT_RETRYABLE_FROM_FAILURE",
         retryable=False,
         instance=str(request.url),
     )

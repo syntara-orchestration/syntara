@@ -35,8 +35,9 @@ def build_workflow_metadata(
     created_by_user_id: str,
     created_at: str,
     workflow_version_id: UUID,
-    restart_from_execution_id: str | None = None,
-    restart_failure_point_ids: list[str] | None = None,
+    retry_from_execution_id: str | None = None,
+    retry_failure_point_ids: list[str] | None = None,
+    input_parameter_overrides: dict[str, dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Build the ``workflow_metadata`` dict consumed by ``DynamicWorkflow``.
 
@@ -44,10 +45,14 @@ def build_workflow_metadata(
     ``_init_state()`` to populate ``_project_id``, the expression
     resolver's ``workflow_context`` namespace, and audit fields.
 
-    When restarting from failure (AAP-92820), ``restart_from_execution_id``
-    carries the source execution id and ``restart_failure_point_ids`` the
-    selected failure points; the engine (AAP-92821) uses them for node
-    classification and output injection. Absent for normal runs.
+    When retrying from failure (AAP-92820), a ``retry`` block carries the
+    source execution id (``retry_from_execution_id``), the selected failure
+    points (``failure_point_ids``), and any validated input parameter
+    overrides keyed by starting node id (``input_parameter_overrides``, SDP
+    AC-14/R10c). The engine (AAP-92821) uses them for node classification,
+    output injection, and parameter application. The block is absent for
+    normal runs and for plain ``/retry`` reruns, which share only
+    ``retried_from_execution_id`` lineage.
     """
     metadata: dict[str, Any] = {
         "workflow_context": {
@@ -69,10 +74,11 @@ def build_workflow_metadata(
             },
         },
     }
-    if restart_from_execution_id is not None:
-        metadata["restart"] = {
-            "restart_from_execution_id": restart_from_execution_id,
-            "failure_point_ids": list(restart_failure_point_ids or []),
+    if retry_from_execution_id is not None:
+        metadata["retry"] = {
+            "retry_from_execution_id": retry_from_execution_id,
+            "failure_point_ids": list(retry_failure_point_ids or []),
+            "input_parameter_overrides": dict(input_parameter_overrides or {}),
         }
     return metadata
 

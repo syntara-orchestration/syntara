@@ -413,51 +413,71 @@ class TestExecutionCreate(SQLModel):
         return self
 
 
-class RestartValidateRequest(SQLModel):
-    """Request body for POST /executions/{id}/validate-restart-from-failure."""
+#: Shared description for the retry-from-failure input-override map. Kept as a
+#: constant so the validate and retry request bodies stay in lockstep.
+_INPUT_PARAMETER_OVERRIDES_DESCRIPTION = (
+    "Input parameter overrides for the retry's starting nodes, keyed by node id then parameter name "
+    "(SDP AC-14/R10c). Each override replaces the value the node would otherwise receive, after upstream "
+    "outputs are injected, so the supplied value is what executes. Parameter names must already exist on "
+    "that node in the retained workflow version, and node ids must be among the retry's starting points; "
+    "anything else is rejected. Overrides apply to this retry run only — the workflow definition is never "
+    "modified, and a permanent change requires editing, saving, and publishing the workflow."
+)
+
+
+class RetryFailureValidateRequest(SQLModel):
+    """Request body for POST /executions/{id}/validate-retry-from-failure."""
 
     __test__ = False  # Prevent pytest from collecting this as a test class
 
     failure_point_ids: list[str] = Field(
         default_factory=list,
-        description="Failure points to restart from (node IDs from the source execution). "
+        description="Failure points to retry from (node IDs from the source execution). "
         "Empty selects the default: all currently failed nodes.",
+    )
+    input_parameter_overrides: dict[str, dict[str, Any]] = Field(
+        default_factory=dict,
+        description=_INPUT_PARAMETER_OVERRIDES_DESCRIPTION,
     )
 
 
-class RestartRequest(SQLModel):
-    """Request body for POST /executions/{id}/restart-from-failure."""
+class RetryFailureRequest(SQLModel):
+    """Request body for POST /executions/{id}/retry-from-failure."""
 
     __test__ = False  # Prevent pytest from collecting this as a test class
 
     failure_point_ids: list[str] = Field(
         default_factory=list,
-        description="Failure points to restart from (node IDs from the source execution). "
+        description="Failure points to retry from (node IDs from the source execution). "
         "A subset may be passed when multiple parallel branches failed; unselected branches are skipped. "
         "Empty selects the default: all currently failed nodes.",
     )
+    input_parameter_overrides: dict[str, dict[str, Any]] = Field(
+        default_factory=dict,
+        description=_INPUT_PARAMETER_OVERRIDES_DESCRIPTION,
+    )
 
 
-class RestartValidationResponse(SQLModel):
-    """Pre-restart validation verdict (POST /executions/{id}/validate-restart-from-failure)."""
+class RetryFromFailureValidationResponse(SQLModel):
+    """Pre-retry validation verdict (POST /executions/{id}/validate-retry-from-failure)."""
 
-    eligible: bool = Field(description="Whether the restart is allowed to proceed")
+    eligible: bool = Field(description="Whether the retry is allowed to proceed")
     reason: str | None = Field(default=None, description="Rejection reason when eligible is false, null otherwise")
     failure_point_ids: list[str] = Field(
         default_factory=list,
-        description="Restart points the verdict applies to, after cleanup (trimmed, deduped, sorted). "
+        description="Retry points the verdict applies to, after cleanup (trimmed, deduped, sorted). "
         "Empty request means all currently failed nodes. On an eligible verdict this is the eligible "
-        "set actually restarted, including auto-included sanitized nodes and excluding superseded "
+        "set actually retryed, including auto-included sanitized nodes and excluding superseded "
         "failed points; on rejection it echoes the pre-expansion selection.",
     )
     sanitized_node_ids: list[str] = Field(
         default_factory=list,
-        description="Upstream nodes with sanitized stored outputs referenced on the restart path. "
+        description="Upstream nodes with sanitized stored outputs referenced on the retry path. "
         "Populated when the verdict rejects; empty on eligible verdicts (see auto_included_node_ids).",
     )
     auto_included_node_ids: list[str] = Field(
         default_factory=list,
-        description="Sanitized nodes added as restart points on the default path. "
+        description="Sanitized nodes added as retry points on the default path. "
         "Empty on explicit selections, which reject instead.",
     )
     sanitized_replacements: dict[str, list[str]] = Field(
@@ -466,7 +486,7 @@ class RestartValidationResponse(SQLModel):
     )
     step_count_by_eligible_point: dict[str, int] = Field(
         default_factory=dict,
-        description="Re-run step count for each eligible restart point.",
+        description="Re-run step count for each eligible retry point.",
     )
     total_step_count: int = Field(
         default=0,

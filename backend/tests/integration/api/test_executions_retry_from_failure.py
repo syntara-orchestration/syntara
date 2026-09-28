@@ -1,7 +1,8 @@
-"""Integration tests for restart-from-failure endpoints (AAP-92820)."""
+"""Integration tests for retry-from-failure endpoints (AAP-92820)."""
 
 import uuid
 from collections.abc import Generator
+from typing import Any
 from unittest.mock import AsyncMock, Mock
 
 import pytest
@@ -21,7 +22,7 @@ from syntara.workflows.workflow_engine.services.temporal_execution_service impor
 from tests.helpers.user_reference import assert_user_reference
 from tests.integration.helpers.error_data import assert_error_data
 
-GRAPH_NODES = [
+GRAPH_NODES: list[dict[str, Any]] = [
     {"id": "trigger_manual", "name": "Manual trigger", "type": "manual_trigger", "parameters": {}},
     {"id": "step_1", "name": "step-1", "type": "script", "parameters": {"code": "echo hi"}},
     {"id": "step_2", "name": "step-2", "type": "script", "parameters": {"code": "exit 1"}},
@@ -64,7 +65,10 @@ def mock_temporal_service(session_app) -> Generator[Mock, None, None]:
 
 
 async def _set_version_definition(
-    session: AsyncSession, workflow: Workflow, nodes: list[dict], edges: list[dict] | None = None
+    session: AsyncSession,
+    workflow: Workflow,
+    nodes: list[dict[str, Any]],
+    edges: list[dict[str, Any]] | None = None,
 ) -> WorkflowVersion:
     """Point the workflow's current version at a small graph definition."""
     result = await session.exec(
@@ -140,7 +144,7 @@ async def _add_completed_activity(
     session: AsyncSession,
     execution: Execution,
     node_id: str,
-    output: dict | None = None,
+    output: dict[str, Any] | None = None,
     node_type: NodeType = NodeType.SCRIPT,
 ) -> None:
     """Record a completed activity with stored output for a node."""
@@ -194,7 +198,11 @@ async def _converge_execution(
 
 
 async def _save_new_version(
-    session: AsyncSession, workflow: Workflow, user: User, nodes: list[dict], edges: list[dict] | None = None
+    session: AsyncSession,
+    workflow: Workflow,
+    user: User,
+    nodes: list[dict[str, Any]],
+    edges: list[dict[str, Any]] | None = None,
 ) -> None:
     """Save a new current version with the given nodes (snapshot stays behind)."""
     test_db_user_id = user.id
@@ -222,7 +230,7 @@ async def _save_new_version(
 
 
 async def _eligible_execution(session: AsyncSession, workflow: Workflow, user: User) -> Execution:
-    """Execution eligible for restart: FAILED + failed step_2 + matching definition."""
+    """Execution eligible for retry: FAILED + failed step_2 + matching definition."""
     await _set_version_definition(session, workflow, GRAPH_NODES)
     execution = await _create_execution(session, workflow, user)
     await _add_failed_activity(session, execution)
@@ -230,8 +238,8 @@ async def _eligible_execution(session: AsyncSession, workflow: Workflow, user: U
 
 
 @pytest.mark.asyncio
-class TestValidateRestart:
-    """Integration tests for POST /executions/{execution_id}/validate-restart-from-failure."""
+class TestValidateRetry:
+    """Integration tests for POST /executions/{execution_id}/validate-retry-from-failure."""
 
     async def test_validate_pass(
         self, auth_client: AsyncClient, test_db_session: AsyncSession, test_user: User, test_workflow: Workflow
@@ -239,7 +247,7 @@ class TestValidateRestart:
         execution = await _eligible_execution(test_db_session, test_workflow, test_user)
 
         response = await auth_client.post(
-            f"/api/v1/executions/{execution.id}/validate-restart-from-failure",
+            f"/api/v1/executions/{execution.id}/validate-retry-from-failure",
             json={"failure_point_ids": ["step_2"]},
         )
 
@@ -258,7 +266,7 @@ class TestValidateRestart:
         execution = await _eligible_execution(test_db_session, test_workflow, test_user)
 
         response = await auth_client.post(
-            f"/api/v1/executions/{execution.id}/validate-restart-from-failure",
+            f"/api/v1/executions/{execution.id}/validate-retry-from-failure",
             json={"failure_point_ids": []},
         )
 
@@ -269,7 +277,7 @@ class TestValidateRestart:
         assert data["auto_included_node_ids"] == []
         assert data["sanitized_replacements"] == {}
 
-    async def test_validate_rejects_non_restartable_state(
+    async def test_validate_rejects_non_retryable_state(
         self, auth_client: AsyncClient, test_db_session: AsyncSession, test_user: User, test_workflow: Workflow
     ) -> None:
         execution = await _eligible_execution(test_db_session, test_workflow, test_user)
@@ -278,7 +286,7 @@ class TestValidateRestart:
         await test_db_session.commit()
 
         response = await auth_client.post(
-            f"/api/v1/executions/{execution.id}/validate-restart-from-failure",
+            f"/api/v1/executions/{execution.id}/validate-retry-from-failure",
             json={"failure_point_ids": ["step_2"]},
         )
 
@@ -293,7 +301,7 @@ class TestValidateRestart:
         execution = await _eligible_execution(test_db_session, test_workflow, test_user)
 
         response = await auth_client.post(
-            f"/api/v1/executions/{execution.id}/validate-restart-from-failure",
+            f"/api/v1/executions/{execution.id}/validate-retry-from-failure",
             json={"failure_point_ids": ["step_3"]},
         )
 
@@ -320,7 +328,7 @@ class TestValidateRestart:
         await _save_new_version(test_db_session, test_workflow, test_user, [changed[0], gate, *changed[1:]], gate_edges)
 
         response = await auth_client.post(
-            f"/api/v1/executions/{execution.id}/validate-restart-from-failure",
+            f"/api/v1/executions/{execution.id}/validate-retry-from-failure",
             json={"failure_point_ids": ["step_2"]},
         )
 
@@ -353,7 +361,7 @@ class TestValidateRestart:
         await test_db_session.commit()
 
         response = await auth_client.post(
-            f"/api/v1/executions/{execution.id}/validate-restart-from-failure",
+            f"/api/v1/executions/{execution.id}/validate-retry-from-failure",
             json={"failure_point_ids": ["step_2"]},
         )
 
@@ -388,7 +396,7 @@ class TestValidateRestart:
         await test_db_session.commit()
 
         response = await auth_client.post(
-            f"/api/v1/executions/{execution.id}/validate-restart-from-failure",
+            f"/api/v1/executions/{execution.id}/validate-retry-from-failure",
             json={"failure_point_ids": []},
         )
 
@@ -407,7 +415,7 @@ class TestValidateRestart:
         execution = await _converge_execution(test_db_session, test_workflow, test_user, ActivityStatus.COMPLETED)
 
         response = await auth_client.post(
-            f"/api/v1/executions/{execution.id}/validate-restart-from-failure",
+            f"/api/v1/executions/{execution.id}/validate-retry-from-failure",
             json={"failure_point_ids": ["step_a"]},
         )
 
@@ -422,7 +430,7 @@ class TestValidateRestart:
         execution = await _converge_execution(test_db_session, test_workflow, test_user, ActivityStatus.FAILED)
 
         response = await auth_client.post(
-            f"/api/v1/executions/{execution.id}/validate-restart-from-failure",
+            f"/api/v1/executions/{execution.id}/validate-retry-from-failure",
             json={"failure_point_ids": ["step_a"]},
         )
 
@@ -446,7 +454,7 @@ class TestValidateRestart:
         )
 
         response = await auth_client.post(
-            f"/api/v1/executions/{execution.id}/validate-restart-from-failure",
+            f"/api/v1/executions/{execution.id}/validate-retry-from-failure",
             json={"failure_point_ids": ["step_2"]},
         )
 
@@ -457,7 +465,7 @@ class TestValidateRestart:
 
     async def test_validate_missing_execution_returns_404(self, auth_client: AsyncClient) -> None:
         response = await auth_client.post(
-            f"/api/v1/executions/{uuid.uuid4()}/validate-restart-from-failure",
+            f"/api/v1/executions/{uuid.uuid4()}/validate-retry-from-failure",
             json={"failure_point_ids": ["step_2"]},
         )
 
@@ -473,10 +481,10 @@ class TestValidateRestart:
 
 
 @pytest.mark.asyncio
-class TestRestartExecution:
-    """Integration tests for POST /executions/{execution_id}/restart-from-failure."""
+class TestRetryExecution:
+    """Integration tests for POST /executions/{execution_id}/retry-from-failure."""
 
-    async def test_restart_success(
+    async def test_retry_success(
         self,
         auth_client: AsyncClient,
         test_db_session: AsyncSession,
@@ -487,7 +495,7 @@ class TestRestartExecution:
         execution = await _eligible_execution(test_db_session, test_workflow, test_user)
 
         response = await auth_client.post(
-            f"/api/v1/executions/{execution.id}/restart-from-failure",
+            f"/api/v1/executions/{execution.id}/retry-from-failure",
             json={"failure_point_ids": ["step_2"]},
         )
 
@@ -506,10 +514,10 @@ class TestRestartExecution:
 
         mock_temporal_service.start_workflow.assert_called_once()
         _, kwargs = mock_temporal_service.start_workflow.call_args
-        assert kwargs["workflow_metadata"]["restart"]["restart_from_execution_id"] == str(execution.id)
-        assert kwargs["workflow_metadata"]["restart"]["failure_point_ids"] == ["step_2"]
+        assert kwargs["workflow_metadata"]["retry"]["retry_from_execution_id"] == str(execution.id)
+        assert kwargs["workflow_metadata"]["retry"]["failure_point_ids"] == ["step_2"]
 
-    async def test_restart_uses_retained_version_not_current(
+    async def test_retry_uses_retained_version_not_current(
         self,
         auth_client: AsyncClient,
         test_db_session: AsyncSession,
@@ -517,7 +525,7 @@ class TestRestartExecution:
         test_workflow: Workflow,
         mock_temporal_service: Mock,
     ) -> None:
-        """SDP R10: restart runs the version retained from the original run, never a later save."""
+        """SDP R10: retry runs the version retained from the original run, never a later save."""
         execution = await _eligible_execution(test_db_session, test_workflow, test_user)
         original_version_id = execution.workflow_version_id
         changed = [
@@ -526,7 +534,7 @@ class TestRestartExecution:
         await _save_new_version(test_db_session, test_workflow, test_user, changed)
 
         response = await auth_client.post(
-            f"/api/v1/executions/{execution.id}/restart-from-failure",
+            f"/api/v1/executions/{execution.id}/retry-from-failure",
             json={"failure_point_ids": ["step_2"]},
         )
 
@@ -536,10 +544,10 @@ class TestRestartExecution:
 
         mock_temporal_service.start_workflow.assert_called_once()
         _, kwargs = mock_temporal_service.start_workflow.call_args
-        restarted_step_1 = next(node for node in kwargs["workflow_def"]["nodes"] if node["id"] == "step_1")
-        assert restarted_step_1["parameters"]["code"] == "echo hi"
+        retryed_step_1 = next(node for node in kwargs["workflow_def"]["nodes"] if node["id"] == "step_1")
+        assert retryed_step_1["parameters"]["code"] == "echo hi"
 
-    async def test_restart_rejected_state_returns_409(
+    async def test_retry_rejected_state_returns_409(
         self, auth_client: AsyncClient, test_db_session: AsyncSession, test_user: User, test_workflow: Workflow
     ) -> None:
         execution = await _eligible_execution(test_db_session, test_workflow, test_user)
@@ -548,7 +556,7 @@ class TestRestartExecution:
         await test_db_session.commit()
 
         response = await auth_client.post(
-            f"/api/v1/executions/{execution.id}/restart-from-failure",
+            f"/api/v1/executions/{execution.id}/retry-from-failure",
             json={"failure_point_ids": ["step_2"]},
         )
 
@@ -557,16 +565,78 @@ class TestRestartExecution:
         assert_error_data(
             response,
             error_type="https://api.example.com/errors/resource-conflict",
-            title="Execution Not Restartable",
+            title="Execution Not Retryable From Failure",
             detail=data["detail"],
-            code="EXECUTION_NOT_RESTARTABLE",
+            code="EXECUTION_NOT_RETRYABLE_FROM_FAILURE",
             retryable=False,
         )
 
-    async def test_restart_missing_execution_returns_404(self, auth_client: AsyncClient) -> None:
+    async def test_retry_missing_execution_returns_404(self, auth_client: AsyncClient) -> None:
         response = await auth_client.post(
-            f"/api/v1/executions/{uuid.uuid4()}/restart-from-failure",
+            f"/api/v1/executions/{uuid.uuid4()}/retry-from-failure",
             json={"failure_point_ids": ["step_2"]},
         )
 
         assert response.status_code == status.HTTP_404_NOT_FOUND
+
+    async def test_retry_carries_input_parameter_overrides_to_temporal(
+        self,
+        auth_client: AsyncClient,
+        test_db_session: AsyncSession,
+        test_user: User,
+        test_workflow: Workflow,
+        mock_temporal_service: Mock,
+    ) -> None:
+        """SDP AC-14/R10c: validated overrides reach the engine; plain retries carry none."""
+        execution = await _eligible_execution(test_db_session, test_workflow, test_user)
+
+        response = await auth_client.post(
+            f"/api/v1/executions/{execution.id}/retry-from-failure",
+            json={"failure_point_ids": ["step_2"], "input_parameter_overrides": {"step_2": {"code": "echo fixed"}}},
+        )
+
+        assert response.status_code == status.HTTP_201_CREATED
+        mock_temporal_service.start_workflow.assert_called_once()
+        _, kwargs = mock_temporal_service.start_workflow.call_args
+        retry_ctx = kwargs["workflow_metadata"]["retry"]
+        assert retry_ctx["failure_point_ids"] == ["step_2"]
+        assert retry_ctx["input_parameter_overrides"] == {"step_2": {"code": "echo fixed"}}
+        # The definition itself is untouched: the retry still runs the retained nodes.
+        restarted_step_2 = next(n for n in kwargs["workflow_def"]["nodes"] if n["id"] == "step_2")
+        assert restarted_step_2["parameters"]["code"] == "exit 1"
+
+    async def test_retry_rejects_override_with_unknown_parameter_returns_409(
+        self, auth_client: AsyncClient, test_db_session: AsyncSession, test_user: User, test_workflow: Workflow
+    ) -> None:
+        """AC-14: input keys must not change, so an unknown key is rejected, not silently added."""
+        execution = await _eligible_execution(test_db_session, test_workflow, test_user)
+
+        response = await auth_client.post(
+            f"/api/v1/executions/{execution.id}/retry-from-failure",
+            json={"failure_point_ids": ["step_2"], "input_parameter_overrides": {"step_2": {"nope": "x"}}},
+        )
+
+        assert response.status_code == status.HTTP_409_CONFLICT
+        data = response.json()
+        assert data["code"] == "EXECUTION_NOT_RETRYABLE_FROM_FAILURE"
+        assert "nope" in data["detail"]
+
+    async def test_retry_without_overrides_sends_empty_override_map(
+        self,
+        auth_client: AsyncClient,
+        test_db_session: AsyncSession,
+        test_user: User,
+        test_workflow: Workflow,
+        mock_temporal_service: Mock,
+    ) -> None:
+        """The key is always present so the engine does not need a None branch."""
+        execution = await _eligible_execution(test_db_session, test_workflow, test_user)
+
+        response = await auth_client.post(
+            f"/api/v1/executions/{execution.id}/retry-from-failure",
+            json={"failure_point_ids": ["step_2"]},
+        )
+
+        assert response.status_code == status.HTTP_201_CREATED
+        _, kwargs = mock_temporal_service.start_workflow.call_args
+        assert kwargs["workflow_metadata"]["retry"]["input_parameter_overrides"] == {}

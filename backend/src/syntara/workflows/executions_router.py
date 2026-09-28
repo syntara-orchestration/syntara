@@ -24,9 +24,9 @@ from syntara.workflows.models.execution import (
     ExecutionCreate,
     ExecutionListResponse,
     ExecutionRead,
-    RestartRequest,
-    RestartValidateRequest,
-    RestartValidationResponse,
+    RetryFailureRequest,
+    RetryFailureValidateRequest,
+    RetryFromFailureValidationResponse,
 )
 from syntara.workflows.models.query_params import ActivityListParams, ExecutionIncludeParams
 from syntara.workflows.services import ExecutionService
@@ -305,47 +305,50 @@ async def retry_execution(
 
 
 @router.post(
-    "/{execution_id}/validate-restart-from-failure",
-    operation_id="validate_restart_from_failure",
-    summary="Validate restart from failure",
-    description="Validate that an execution can be restarted from the given failure points. "
+    "/{execution_id}/validate-retry-from-failure",
+    operation_id="validate_retry_from_failure",
+    summary="Validate retry from failure",
+    description="Validate that an execution can be retryed from the given failure points. "
     "Checks execution state, failure-point eligibility, converge-mootness, the retained-version guard, "
-    "and the sanitized-output guard. "
+    "the sanitized-output guard, and any supplied input parameter overrides. "
     "Returns a pass/fail verdict without mutating any state.",
-    response_model=RestartValidationResponse,
-    response_description="Restart validation verdict",
+    response_model=RetryFromFailureValidationResponse,
+    response_description="Retry validation verdict",
     dependencies=[Depends(_exec_perm_run)],
 )
-async def validate_restart_from_failure(
+async def validate_retry_from_failure(
     execution_id: UUID,
-    body: RestartValidateRequest,
+    body: RetryFailureValidateRequest,
     service: Annotated[ExecutionService, Depends(get_execution_service)],
-) -> RestartValidationResponse:
-    """Validate a restart from failure points without mutating state."""
-    logger.info("Validating restart", execution_id=execution_id)
-    return await service.validate_restart_from_failure(execution_id, body.failure_point_ids)
+) -> RetryFromFailureValidationResponse:
+    """Validate a retry from failure points without mutating state."""
+    logger.info("Validating retry from failure", execution_id=execution_id)
+    return await service.validate_retry_from_failure(
+        execution_id, body.failure_point_ids, body.input_parameter_overrides
+    )
 
 
 @router.post(
-    "/{execution_id}/restart-from-failure",
-    operation_id="restart_from_failure",
-    summary="Restart from failure",
-    description="Restart a failed execution from the given failure points. "
+    "/{execution_id}/retry-from-failure",
+    operation_id="retry_from_failure",
+    summary="Retry from failure",
+    description="Retry a failed execution from the given failure points, optionally overriding "
+    "input parameters of the starting nodes for this run only. "
     "Independently repeats all validation checks, then creates a new execution "
-    "linked to the source and triggers a Temporal run carrying restart context.",
+    "linked to the source and triggers a Temporal run carrying retry context.",
     status_code=status.HTTP_201_CREATED,
     response_model=ExecutionRead,
-    response_description="New execution created from restart",
+    response_description="New execution created from retry",
     dependencies=[Depends(_exec_perm_run)],
 )
-async def restart_from_failure(
+async def retry_from_failure(
     execution_id: UUID,
-    body: RestartRequest,
+    body: RetryFailureRequest,
     service: Annotated[ExecutionService, Depends(get_execution_service)],
 ) -> ExecutionRead:
-    """Restart a failed execution from failure points."""
-    logger.info("Restarting execution", execution_id=execution_id)
-    return await service.restart_from_failure(execution_id, body.failure_point_ids)
+    """Retry a failed execution from failure points."""
+    logger.info("Retrying execution from failure", execution_id=execution_id)
+    return await service.retry_from_failure(execution_id, body.failure_point_ids, body.input_parameter_overrides)
 
 
 @router.get(

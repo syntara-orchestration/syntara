@@ -1,5 +1,6 @@
-"""Unit tests for restart pre-validation (AAP-92820)."""
+"""Unit tests for retry pre-validation (AAP-92820)."""
 
+from typing import Any
 from unittest.mock import Mock
 from uuid import uuid4
 
@@ -9,27 +10,28 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from syntara.workflows.exceptions import ExecutionNotFoundError
 from syntara.workflows.models.activity_execution import ActivityStatus
 from syntara.workflows.models.execution import ExecutionStatus
-from syntara.workflows.services.restart_validation import (
+from syntara.workflows.services.retry_validation import (
     collect_downstream_node_ids,
-    collect_upstream_node_ids,
     strip_iteration_suffix,
-    validate_restart_from_failure,
+    validate_retry_from_failure,
 )
 
-TRIGGERS = [{"id": "trigger_1", "type": "manual_trigger", "parameters": {}}]
-NODES = [
+TRIGGERS: list[dict[str, Any]] = [{"id": "trigger_1", "type": "manual_trigger", "parameters": {}}]
+NODES: list[dict[str, Any]] = [
     {"id": "step_1", "type": "script", "parameters": {"code": "echo hi"}, "position": {"x": 0}},
     {"id": "step_2", "type": "script", "parameters": {"code": "exit 1"}, "position": {"x": 1}},
     {"id": "step_3", "type": "script", "parameters": {"code": "echo done"}, "position": {"x": 2}},
 ]
-EDGES = [
+EDGES: list[dict[str, Any]] = [
     {"from": "trigger_1", "to": "step_1"},
     {"from": "step_1", "to": "step_2"},
     {"from": "step_2", "to": "step_3"},
 ]
 
 
-def _definition(nodes: list | None = None, triggers: list | None = None) -> dict:
+def _definition(
+    nodes: list[dict[str, Any]] | None = None, triggers: list[dict[str, Any]] | None = None
+) -> dict[str, Any]:
     return {
         "triggers": triggers if triggers is not None else TRIGGERS,
         "nodes": nodes if nodes is not None else NODES,
@@ -42,17 +44,13 @@ def test_strip_iteration_suffix() -> None:
     assert strip_iteration_suffix("step_2") == "step_2"
 
 
-def test_collect_upstream_inclusive() -> None:
-    assert collect_upstream_node_ids(_definition(), ["step_2"]) == {"trigger_1", "step_1", "step_2"}
-
-
 def test_collect_downstream_inclusive() -> None:
     assert collect_downstream_node_ids(_definition(), ["step_2"]) == {"step_2", "step_3"}
 
 
-def _mock_session(*results: Mock) -> AsyncSession:
+def _mock_session(*results: tuple[Any, str]) -> AsyncSession:
     session = Mock(spec=AsyncSession)
-    exec_results = []
+    exec_results: list[Mock] = []
     for payload, method in results:
         result = Mock()
         if method == "one":
@@ -83,7 +81,7 @@ def _make_activity(name: str) -> Mock:
     return activity
 
 
-def _make_completed_activity(name: str, output: dict | None = None) -> Mock:
+def _make_completed_activity(name: str, output: dict[str, Any] | None = None) -> Mock:
     activity = Mock()
     activity.activity_name = name
     activity.status = ActivityStatus.COMPLETED
@@ -91,7 +89,7 @@ def _make_completed_activity(name: str, output: dict | None = None) -> Mock:
     return activity
 
 
-def _make_version(version: int, nodes: list | None = None) -> Mock:
+def _make_version(version: int, nodes: list[dict[str, Any]] | None = None) -> Mock:
     record = Mock()
     record.version = version
     record.workflow_definition = _definition(nodes=nodes)
@@ -99,14 +97,14 @@ def _make_version(version: int, nodes: list | None = None) -> Mock:
 
 
 @pytest.mark.asyncio
-async def test_validate_restart_missing_execution() -> None:
+async def test_validate_retry_missing_execution() -> None:
     session = _mock_session((None, "one"))
     with pytest.raises(ExecutionNotFoundError):
-        await validate_restart_from_failure(session, uuid4(), ["step_2"])
+        await validate_retry_from_failure(session, uuid4(), ["step_2"])
 
 
 @pytest.mark.asyncio
-async def test_validate_restart_rejects_non_restartable_state() -> None:
+async def test_validate_retry_rejects_non_retryable_state() -> None:
     execution = _make_execution(ExecutionStatus.COMPLETED)
     session = _mock_session(
         (execution, "one"),
@@ -114,13 +112,13 @@ async def test_validate_restart_rejects_non_restartable_state() -> None:
         ([], "all"),
         (_make_version(1), "one"),
     )
-    verdict = await validate_restart_from_failure(session, execution.id, ["step_2"])
+    verdict = await validate_retry_from_failure(session, execution.id, ["step_2"])
     assert verdict.eligible is False
     assert "completed" in (verdict.reason or "")
 
 
 @pytest.mark.asyncio
-async def test_validate_restart_rejects_unknown_failure_point() -> None:
+async def test_validate_retry_rejects_unknown_failure_point() -> None:
     execution = _make_execution(ExecutionStatus.FAILED)
     session = _mock_session(
         (execution, "one"),
@@ -128,13 +126,13 @@ async def test_validate_restart_rejects_unknown_failure_point() -> None:
         ([], "all"),
         (_make_version(1), "one"),
     )
-    verdict = await validate_restart_from_failure(session, execution.id, ["nope"])
+    verdict = await validate_retry_from_failure(session, execution.id, ["nope"])
     assert verdict.eligible is False
     assert "nope" in (verdict.reason or "")
 
 
 @pytest.mark.asyncio
-async def test_validate_restart_passes_clean_path() -> None:
+async def test_validate_retry_passes_clean_path() -> None:
     execution = _make_execution(ExecutionStatus.FAILED)
     session = _mock_session(
         (execution, "one"),
@@ -142,17 +140,16 @@ async def test_validate_restart_passes_clean_path() -> None:
         ([_make_completed_activity("step_1")], "all"),
         (_make_version(1), "one"),
     )
-    verdict = await validate_restart_from_failure(session, execution.id, ["step_2"])
+    verdict = await validate_retry_from_failure(session, execution.id, ["step_2"])
     assert verdict.eligible is True
     assert verdict.reason is None
     assert verdict.failure_point_ids == ["step_2"]
-    assert verdict.snapshot_version == 1
     assert verdict.step_count_by_eligible_point == {"step_2": 2}
     assert verdict.total_step_count == 2
 
 
 @pytest.mark.asyncio
-async def test_validate_restart_ignores_later_definition_changes() -> None:
+async def test_validate_retry_ignores_later_definition_changes() -> None:
     """Retry always uses the retained version — later saves never affect it (SDP R10)."""
     execution = _make_execution(ExecutionStatus.COMPLETED_WITH_ERRORS)
     session = _mock_session(
@@ -161,12 +158,12 @@ async def test_validate_restart_ignores_later_definition_changes() -> None:
         ([], "all"),
         (_make_version(1), "one"),
     )
-    verdict = await validate_restart_from_failure(session, execution.id, ["step_2"])
+    verdict = await validate_retry_from_failure(session, execution.id, ["step_2"])
     assert verdict.eligible is True
 
 
 @pytest.mark.asyncio
-async def test_validate_restart_rejects_sanitized_upstream_output() -> None:
+async def test_validate_retry_rejects_sanitized_upstream_output() -> None:
     """Persisted [REDACTED] output referenced downstream rejects; unreferenced markers pass."""
     execution = _make_execution(ExecutionStatus.FAILED)
     ref_nodes = [
@@ -174,7 +171,7 @@ async def test_validate_restart_rejects_sanitized_upstream_output() -> None:
         for n in NODES
     ]
 
-    def _session_for(outputs: list) -> Mock:
+    def _session_for(outputs: list[Mock]) -> AsyncSession:
         snapshot = _make_version(1, nodes=ref_nodes)
         return _mock_session(
             (execution, "one"),
@@ -183,7 +180,7 @@ async def test_validate_restart_rejects_sanitized_upstream_output() -> None:
             (snapshot, "one"),
         )
 
-    verdict = await validate_restart_from_failure(
+    verdict = await validate_retry_from_failure(
         _session_for(
             [
                 _make_completed_activity("step_1", {"token": "[REDACTED]"}),
@@ -198,7 +195,7 @@ async def test_validate_restart_rejects_sanitized_upstream_output() -> None:
     assert "step_1" in (verdict.reason or "")
     assert verdict.sanitized_replacements == {"step_2": ["step_1"]}
 
-    clean = await validate_restart_from_failure(
+    clean = await validate_retry_from_failure(
         _session_for([_make_completed_activity("step_1", {"token": "abc123"})]),
         execution.id,
         ["step_2"],
@@ -209,7 +206,7 @@ async def test_validate_restart_rejects_sanitized_upstream_output() -> None:
 
 
 @pytest.mark.asyncio
-async def test_validate_restart_default_selection_auto_includes_sanitized_dependency() -> None:
+async def test_validate_retry_default_selection_auto_includes_sanitized_dependency() -> None:
     """SDP AC-15/R9a Q4: default selection auto-moves the start point to the sanitized node."""
     execution = _make_execution(ExecutionStatus.FAILED)
     ref_nodes = [
@@ -223,7 +220,7 @@ async def test_validate_restart_default_selection_auto_includes_sanitized_depend
         ([_make_completed_activity("step_1", {"token": "[REDACTED]"})], "all"),
         (snapshot, "one"),
     )
-    verdict = await validate_restart_from_failure(session, execution.id, [])
+    verdict = await validate_retry_from_failure(session, execution.id, [])
     assert verdict.eligible is True
     assert verdict.failure_point_ids == ["step_1"]
     assert verdict.auto_included_node_ids == ["step_1"]
@@ -234,7 +231,7 @@ async def test_validate_restart_default_selection_auto_includes_sanitized_depend
 
 
 @pytest.mark.asyncio
-async def test_validate_restart_default_selection_cascades_through_chained_dependencies() -> None:
+async def test_validate_retry_default_selection_cascades_through_chained_dependencies() -> None:
     """Auto-inclusion repeats until no sanitized dependency remains (multi-level chain)."""
     execution = _make_execution(ExecutionStatus.FAILED)
     step_0 = {"id": "step_0", "type": "script", "parameters": {"code": "echo hi"}}
@@ -270,7 +267,7 @@ async def test_validate_restart_default_selection_cascades_through_chained_depen
         ),
         (snapshot, "one"),
     )
-    verdict = await validate_restart_from_failure(session, execution.id, [])
+    verdict = await validate_retry_from_failure(session, execution.id, [])
     assert verdict.eligible is True
     assert verdict.failure_point_ids == ["step_0", "step_1"]
     assert verdict.auto_included_node_ids == ["step_0", "step_1"]
@@ -282,7 +279,7 @@ async def test_validate_restart_default_selection_cascades_through_chained_depen
 @pytest.mark.asyncio
 async def test_eligible_points_excludes_failed_points_superseded_by_auto_inclusion() -> None:
     """Failed points downstream of an auto-included sanitized node are superseded; sanitized nodes stay."""
-    from syntara.workflows.services.restart_validation import _eligible_points
+    from syntara.workflows.services.retry_validation import _eligible_points
 
     definition = _definition()
     # No auto-inclusion: eligible set is the requested selection unchanged.
@@ -292,7 +289,7 @@ async def test_eligible_points_excludes_failed_points_superseded_by_auto_inclusi
 
 
 @pytest.mark.asyncio
-async def test_validate_restart_replacements_scoped_to_affected_failed_nodes() -> None:
+async def test_validate_retry_replacements_scoped_to_affected_failed_nodes() -> None:
     """sanitized_replacements only names failed nodes that actually depend on a sanitized node.
 
     Computed per failed node in isolation, independent of what was requested
@@ -317,7 +314,7 @@ async def test_validate_restart_replacements_scoped_to_affected_failed_nodes() -
         ([_make_completed_activity("step_x", {"token": "[REDACTED]"})], "all"),
         (snapshot, "one"),
     )
-    verdict = await validate_restart_from_failure(session, execution.id, [])
+    verdict = await validate_retry_from_failure(session, execution.id, [])
     assert verdict.eligible is True
     assert verdict.sanitized_replacements == {"step_a": ["step_x"]}
 
@@ -349,7 +346,7 @@ async def test_paths_overlap() -> None:
 
 
 @pytest.mark.asyncio
-async def test_validate_restart_ignores_sanitized_unread_on_restart_path() -> None:
+async def test_validate_retry_ignores_sanitized_unread_on_retry_path() -> None:
     """A redacted output referenced only by an already-completed node does not block."""
     execution = _make_execution(ExecutionStatus.FAILED)
     step_0 = {"id": "step_0", "type": "script", "parameters": {"input_ref": "${step_1.token}"}}
@@ -363,14 +360,14 @@ async def test_validate_restart_ignores_sanitized_unread_on_restart_path() -> No
         ([_make_completed_activity("step_0"), _make_completed_activity("step_1", {"token": "[REDACTED]"})], "all"),
         (version, "one"),
     )
-    verdict = await validate_restart_from_failure(session, execution.id, ["step_2"])
+    verdict = await validate_retry_from_failure(session, execution.id, ["step_2"])
     assert verdict.eligible is True
     assert verdict.sanitized_node_ids == []
 
 
-def _nodes_with_refs(refs: dict[str, str]) -> list:
+def _nodes_with_refs(refs: dict[str, str]) -> list[dict[str, Any]]:
     """NODES variant with template refs merged into step parameters."""
-    out = []
+    out: list[dict[str, Any]] = []
     for node in NODES:
         params = dict(node.get("parameters", {}))
         if node["id"] in refs:
@@ -379,7 +376,12 @@ def _nodes_with_refs(refs: dict[str, str]) -> list:
     return out
 
 
-def _field_session(execution: Mock, nodes: list, completed: list, edges: list | None = None) -> Mock:
+def _field_session(
+    execution: Mock,
+    nodes: list[dict[str, Any]],
+    completed: list[Mock],
+    edges: list[dict[str, Any]] | None = None,
+) -> AsyncSession:
     """Mock session with a single retained version and given completed outputs."""
     version = _make_version(1, nodes=nodes)
     if edges is not None:
@@ -393,29 +395,29 @@ def _field_session(execution: Mock, nodes: list, completed: list, edges: list | 
 
 
 @pytest.mark.asyncio
-async def test_validate_restart_allows_clean_field_despite_marker_elsewhere() -> None:
+async def test_validate_retry_allows_clean_field_despite_marker_elsewhere() -> None:
     """A marker on an unreferenced field does not block a clean-field reference."""
     execution = _make_execution(ExecutionStatus.FAILED)
     nodes = _nodes_with_refs({"step_2": "${step_1.status_code}"})
     outputs = [_make_completed_activity("step_1", {"status_code": 200, "password": "[REDACTED]"})]
     session = _field_session(execution, nodes, outputs)
-    verdict = await validate_restart_from_failure(session, execution.id, ["step_2"])
+    verdict = await validate_retry_from_failure(session, execution.id, ["step_2"])
     assert verdict.eligible is True
     assert verdict.sanitized_node_ids == []
 
 
 @pytest.mark.asyncio
-async def test_validate_restart_dotted_index_matches_taint() -> None:
+async def test_validate_retry_dotted_index_matches_taint() -> None:
     """Dotted list indices resolve like the runtime (regression: str/int mismatch)."""
     execution = _make_execution(ExecutionStatus.FAILED)
     nodes = _nodes_with_refs({"step_2": "${step_1.items.1}"})
     outputs = [_make_completed_activity("step_1", {"items": ["ok", "[REDACTED]"]})]
-    verdict = await validate_restart_from_failure(_field_session(execution, nodes, outputs), execution.id, ["step_2"])
+    verdict = await validate_retry_from_failure(_field_session(execution, nodes, outputs), execution.id, ["step_2"])
     assert verdict.eligible is False
     assert verdict.sanitized_node_ids == ["step_1"]
 
 
-def _converge_definition() -> dict:
+def _converge_definition() -> dict[str, Any]:
     branch_a = {"id": "step_a", "type": "script", "parameters": {"code": "exit 1"}}
     branch_b = {"id": "step_b", "type": "script", "parameters": {"code": "echo ok"}}
     conv = {"id": "conv_1", "type": "converge", "parameters": {}}
@@ -433,7 +435,7 @@ def _converge_definition() -> dict:
     }
 
 
-def _converge_session(execution: Mock, converge_status: str) -> Mock:
+def _converge_session(execution: Mock, converge_status: str) -> AsyncSession:
     snapshot = _make_version(1)
     snapshot.workflow_definition = _converge_definition()
     completed = [_make_completed_activity("step_b")]
@@ -451,29 +453,29 @@ def _converge_session(execution: Mock, converge_status: str) -> Mock:
 
 
 @pytest.mark.asyncio
-async def test_validate_restart_rejects_failure_under_completed_converge() -> None:
+async def test_validate_retry_rejects_failure_under_completed_converge() -> None:
     execution = _make_execution(ExecutionStatus.FAILED)
     session = _converge_session(execution, "completed")
-    verdict = await validate_restart_from_failure(session, execution.id, ["step_a"])
+    verdict = await validate_retry_from_failure(session, execution.id, ["step_a"])
     assert verdict.eligible is False
     assert "conv_1" in (verdict.reason or "")
 
 
 @pytest.mark.asyncio
-async def test_validate_restart_allows_failure_under_failed_converge() -> None:
+async def test_validate_retry_allows_failure_under_failed_converge() -> None:
     execution = _make_execution(ExecutionStatus.FAILED)
     session = _converge_session(execution, "failed")
-    verdict = await validate_restart_from_failure(session, execution.id, ["step_a"])
+    verdict = await validate_retry_from_failure(session, execution.id, ["step_a"])
     assert verdict.eligible is True
 
 
 def _run_session(
     execution: Mock,
-    definition: dict,
+    definition: dict[str, Any],
     *,
-    failed: list | None = None,
-    completed: list | None = None,
-) -> Mock:
+    failed: list[Mock] | None = None,
+    completed: list[Mock] | None = None,
+) -> AsyncSession:
     """Mock session serving one definition as the retained version."""
     snapshot = _make_version(1)
     snapshot.workflow_definition = definition
@@ -486,38 +488,36 @@ def _run_session(
 
 
 @pytest.mark.asyncio
-async def test_validate_restart_empty_selection_defaults_to_all_failed() -> None:
+async def test_validate_retry_empty_selection_defaults_to_all_failed() -> None:
     """SDP R11/AC-15: empty selection means 'all currently failed nodes', not an error."""
     execution = _make_execution(ExecutionStatus.FAILED)
-    verdict = await validate_restart_from_failure(_run_session(execution, _definition()), execution.id, [])
+    verdict = await validate_retry_from_failure(_run_session(execution, _definition()), execution.id, [])
     assert verdict.eligible is True
     assert verdict.failure_point_ids == ["step_2"]
     assert verdict.auto_included_node_ids == []
 
 
 @pytest.mark.asyncio
-async def test_validate_restart_rejects_empty_selection_with_no_failed_nodes() -> None:
+async def test_validate_retry_rejects_empty_selection_with_no_failed_nodes() -> None:
     """Defaulting still rejects when there are no failed nodes at all to default to."""
     execution = _make_execution(ExecutionStatus.FAILED)
-    verdict = await validate_restart_from_failure(_run_session(execution, _definition(), failed=[]), execution.id, [])
+    verdict = await validate_retry_from_failure(_run_session(execution, _definition(), failed=[]), execution.id, [])
     assert verdict.eligible is False
     assert "no failed nodes" in (verdict.reason or "")
 
 
 @pytest.mark.asyncio
-async def test_validate_restart_rejects_iteration_suffixed_selection() -> None:
+async def test_validate_retry_rejects_iteration_suffixed_selection() -> None:
     """Loop-iteration ids are rejected explicitly instead of a misleading unknown-node error."""
     execution = _make_execution(ExecutionStatus.FAILED)
-    verdict = await validate_restart_from_failure(
-        _run_session(execution, _definition()), execution.id, ["step_2#iter-1"]
-    )
+    verdict = await validate_retry_from_failure(_run_session(execution, _definition()), execution.id, ["step_2#iter-1"])
     assert verdict.eligible is False
     assert "base node" in (verdict.reason or "")
 
 
 @pytest.mark.asyncio
-async def test_validate_restart_flags_side_branch_taint() -> None:
-    """A completed side branch referenced from the restart path is flagged."""
+async def test_validate_retry_flags_side_branch_taint() -> None:
+    """A completed side branch referenced from the retry path is flagged."""
     execution = _make_execution(ExecutionStatus.FAILED)
     side = {"id": "side", "type": "script", "parameters": {"code": "echo side"}}
     step_3 = {"id": "step_3", "type": "script", "parameters": {"input_ref": "${side.token}"}}
@@ -529,7 +529,7 @@ async def test_validate_restart_flags_side_branch_taint() -> None:
         {"from": "step_2", "to": "step_3"},
     ]
     completed = [_make_completed_activity("side", {"token": "[REDACTED]"})]
-    verdict = await validate_restart_from_failure(
+    verdict = await validate_retry_from_failure(
         _field_session(execution, nodes, completed, edges), execution.id, ["step_2"]
     )
     assert verdict.eligible is False
@@ -537,35 +537,35 @@ async def test_validate_restart_flags_side_branch_taint() -> None:
 
 
 @pytest.mark.asyncio
-async def test_validate_restart_rejects_whole_namespace_taint() -> None:
+async def test_validate_retry_rejects_whole_namespace_taint() -> None:
     """A bare ${node} reference taints on any marker under that node."""
     execution = _make_execution(ExecutionStatus.FAILED)
     nodes = _nodes_with_refs({"step_2": "prefix ${step_1} suffix"})
     completed = [_make_completed_activity("step_1", {"nested": {"deep": "[REDACTED]"}})]
-    verdict = await validate_restart_from_failure(_field_session(execution, nodes, completed), execution.id, ["step_2"])
+    verdict = await validate_retry_from_failure(_field_session(execution, nodes, completed), execution.id, ["step_2"])
     assert verdict.eligible is False
     assert verdict.sanitized_node_ids == ["step_1"]
 
 
 @pytest.mark.asyncio
-async def test_validate_restart_indexed_reference_intersection() -> None:
+async def test_validate_retry_indexed_reference_intersection() -> None:
     """Indexed refs intersect indexed taint; sibling indices do not."""
     execution = _make_execution(ExecutionStatus.FAILED)
     nodes = _nodes_with_refs({"step_2": "${step_1.items[1]}"})
     outputs = [_make_completed_activity("step_1", {"items": ["ok", "[REDACTED]"]})]
-    verdict = await validate_restart_from_failure(_field_session(execution, nodes, outputs), execution.id, ["step_2"])
+    verdict = await validate_retry_from_failure(_field_session(execution, nodes, outputs), execution.id, ["step_2"])
     assert verdict.eligible is False
     assert verdict.sanitized_node_ids == ["step_1"]
 
     sibling_nodes = _nodes_with_refs({"step_2": "${step_1.items[0]}"})
-    clean = await validate_restart_from_failure(
+    clean = await validate_retry_from_failure(
         _field_session(execution, sibling_nodes, outputs), execution.id, ["step_2"]
     )
     assert clean.eligible is True
 
 
 @pytest.mark.asyncio
-async def test_validate_restart_rejects_missing_version() -> None:
+async def test_validate_retry_rejects_missing_version() -> None:
     """A gone retained version yields a reason, not a crash."""
     execution = _make_execution(ExecutionStatus.FAILED)
     session = _mock_session(
@@ -574,13 +574,13 @@ async def test_validate_restart_rejects_missing_version() -> None:
         ([], "all"),
         (None, "one"),
     )
-    verdict = await validate_restart_from_failure(session, execution.id, ["step_2"])
+    verdict = await validate_retry_from_failure(session, execution.id, ["step_2"])
     assert verdict.eligible is False
     assert "original workflow version" in (verdict.reason or "")
 
 
 @pytest.mark.asyncio
-async def test_validate_restart_mixed_converge_tier_allows() -> None:
+async def test_validate_retry_mixed_converge_tier_allows() -> None:
     """A failed converge at the nearest tier keeps candidates even with a completed one beside it."""
     execution = _make_execution(ExecutionStatus.FAILED)
     conv_ok = {"id": "conv_ok", "type": "converge", "parameters": {}}
@@ -607,12 +607,12 @@ async def test_validate_restart_mixed_converge_tier_allows() -> None:
     completed = [_make_completed_activity("conv_ok")]
     failed = [_make_activity("step_a"), _make_activity("conv_bad")]
     session = _mock_session((execution, "one"), (failed, "all"), (completed, "all"), (snapshot, "one"))
-    verdict = await validate_restart_from_failure(session, execution.id, ["step_a"])
+    verdict = await validate_retry_from_failure(session, execution.id, ["step_a"])
     assert verdict.eligible is True
 
 
 @pytest.mark.asyncio
-async def test_validate_restart_multi_iteration_taint_flags_node() -> None:
+async def test_validate_retry_multi_iteration_taint_flags_node() -> None:
     """Any tainted iteration taints the node (no last-write-wins)."""
     execution = _make_execution(ExecutionStatus.FAILED)
     iter_clean = _make_completed_activity("step_1#iter-0", {"token": "abc"})
@@ -625,26 +625,24 @@ async def test_validate_restart_multi_iteration_taint_flags_node() -> None:
         ([iter_clean, iter_tainted], "all"),
         (version, "one"),
     )
-    verdict = await validate_restart_from_failure(session, execution.id, ["step_2"])
+    verdict = await validate_retry_from_failure(session, execution.id, ["step_2"])
     assert verdict.eligible is False
     assert verdict.sanitized_node_ids == ["step_1"]
 
 
 @pytest.mark.asyncio
-async def test_validate_restart_ignores_none_output() -> None:
+async def test_validate_retry_ignores_none_output() -> None:
     """Completed activities with null outputs cannot carry taint."""
     execution = _make_execution(ExecutionStatus.FAILED)
     null_out = _make_completed_activity("step_1")
     null_out.output_data = None
     nodes = _nodes_with_refs({"step_2": "${step_1.token}"})
-    verdict = await validate_restart_from_failure(
-        _field_session(execution, nodes, [null_out]), execution.id, ["step_2"]
-    )
+    verdict = await validate_retry_from_failure(_field_session(execution, nodes, [null_out]), execution.id, ["step_2"])
     assert verdict.eligible is True
 
 
 @pytest.mark.asyncio
-async def test_validate_restart_normalizes_and_dedupes_selection() -> None:
+async def test_validate_retry_normalizes_and_dedupes_selection() -> None:
     """Selections dedupe and strip whitespace."""
     execution = _make_execution(ExecutionStatus.FAILED)
     session = _mock_session(
@@ -653,23 +651,23 @@ async def test_validate_restart_normalizes_and_dedupes_selection() -> None:
         ([], "all"),
         (_make_version(1), "one"),
     )
-    verdict = await validate_restart_from_failure(session, execution.id, [" step_2 ", "step_2"])
+    verdict = await validate_retry_from_failure(session, execution.id, [" step_2 ", "step_2"])
     assert verdict.eligible is True
     assert verdict.failure_point_ids == ["step_2"]
 
 
 @pytest.mark.asyncio
-async def test_validate_restart_ignores_self_reference() -> None:
+async def test_validate_retry_ignores_self_reference() -> None:
     """A node referencing only itself does not flag anything."""
     execution = _make_execution(ExecutionStatus.FAILED)
     nodes = _nodes_with_refs({"step_1": "${step_1.token}"})
     outputs = [_make_completed_activity("step_1", {"token": "[REDACTED]"})]
-    verdict = await validate_restart_from_failure(_field_session(execution, nodes, outputs), execution.id, ["step_2"])
+    verdict = await validate_retry_from_failure(_field_session(execution, nodes, outputs), execution.id, ["step_2"])
     assert verdict.eligible is True
     assert verdict.sanitized_node_ids == []
 
 
-def _parallel_definition() -> dict:
+def _parallel_definition() -> dict[str, Any]:
     """Two independent branches converging back into a shared tail."""
     branch_a = {"id": "step_a", "type": "script", "parameters": {"code": "exit 1"}}
     branch_b = {"id": "step_b", "type": "script", "parameters": {"code": "exit 1"}}
@@ -689,7 +687,7 @@ def _parallel_definition() -> dict:
 
 
 @pytest.mark.asyncio
-async def test_validate_restart_step_count_single_point() -> None:
+async def test_validate_retry_step_count_single_point() -> None:
     """SDP R11a: step count is the total steps that will execute, not just the failed one."""
     execution = _make_execution(ExecutionStatus.FAILED)
     session = _mock_session(
@@ -698,14 +696,14 @@ async def test_validate_restart_step_count_single_point() -> None:
         ([], "all"),
         (_make_version(1), "one"),
     )
-    verdict = await validate_restart_from_failure(session, execution.id, ["step_1"])
+    verdict = await validate_retry_from_failure(session, execution.id, ["step_1"])
     assert verdict.eligible is True
     assert verdict.step_count_by_eligible_point == {"step_1": 3}
     assert verdict.total_step_count == 3
 
 
 @pytest.mark.asyncio
-async def test_validate_restart_step_count_dedupes_shared_tail() -> None:
+async def test_validate_retry_step_count_dedupes_shared_tail() -> None:
     """Per-point counts are independent; the total dedupes the shared converge/tail (SDP R11a/AC-2)."""
     execution = _make_execution(ExecutionStatus.FAILED)
     snapshot = _make_version(1)
@@ -716,7 +714,120 @@ async def test_validate_restart_step_count_dedupes_shared_tail() -> None:
         ([], "all"),
         (snapshot, "one"),
     )
-    verdict = await validate_restart_from_failure(session, execution.id, ["step_a", "step_b"])
+    verdict = await validate_retry_from_failure(session, execution.id, ["step_a", "step_b"])
     assert verdict.eligible is True
     assert verdict.step_count_by_eligible_point == {"step_a": 3, "step_b": 3}
     assert verdict.total_step_count == 4
+
+
+# --- Input parameter overrides (SDP AC-14 / R10c) --------------------------------
+
+
+@pytest.mark.asyncio
+async def test_validate_retry_accepts_override_for_starting_node() -> None:
+    """An override naming an existing parameter of a starting node is valid."""
+    execution = _make_execution(ExecutionStatus.FAILED)
+    session = _mock_session(
+        (execution, "one"),
+        ([_make_activity("step_2")], "all"),
+        ([_make_completed_activity("step_1")], "all"),
+        (_make_version(1), "one"),
+    )
+    verdict = await validate_retry_from_failure(session, execution.id, ["step_2"], {"step_2": {"code": "echo fixed"}})
+    assert verdict.eligible is True
+    assert verdict.reason is None
+    assert verdict.failure_point_ids == ["step_2"]
+
+
+@pytest.mark.asyncio
+async def test_validate_retry_rejects_override_with_unknown_parameter_key() -> None:
+    """AC-14: input keys must not change, so an unknown key rejects."""
+    execution = _make_execution(ExecutionStatus.FAILED)
+    session = _mock_session(
+        (execution, "one"),
+        ([_make_activity("step_2")], "all"),
+        ([_make_completed_activity("step_1")], "all"),
+        (_make_version(1), "one"),
+    )
+    verdict = await validate_retry_from_failure(session, execution.id, ["step_2"], {"step_2": {"not_a_param": "x"}})
+    assert verdict.eligible is False
+    assert "not_a_param" in (verdict.reason or "")
+    assert "code" in (verdict.reason or "")
+
+
+@pytest.mark.asyncio
+async def test_validate_retry_rejects_override_for_non_starting_node() -> None:
+    """Only actual starting points may be overridden — step_3 is downstream and runs anyway."""
+    execution = _make_execution(ExecutionStatus.FAILED)
+    session = _mock_session(
+        (execution, "one"),
+        ([_make_activity("step_2")], "all"),
+        ([_make_completed_activity("step_1")], "all"),
+        (_make_version(1), "one"),
+    )
+    verdict = await validate_retry_from_failure(session, execution.id, ["step_2"], {"step_3": {"code": "x"}})
+    assert verdict.eligible is False
+    assert "step_3" in (verdict.reason or "")
+    assert "step_2" in (verdict.reason or "")
+
+
+@pytest.mark.asyncio
+async def test_validate_retry_rejects_override_when_version_missing() -> None:
+    """With the retained version gone there is no parameter list to check against."""
+    execution = _make_execution(ExecutionStatus.FAILED)
+    session = _mock_session(
+        (execution, "one"),
+        ([_make_activity("step_2")], "all"),
+        ([_make_completed_activity("step_1")], "all"),
+        (None, "one"),
+    )
+    verdict = await validate_retry_from_failure(session, execution.id, ["step_2"], {"step_2": {"code": "x"}})
+    assert verdict.eligible is False
+    assert "workflow version no longer exists" in (verdict.reason or "")
+
+
+@pytest.mark.asyncio
+async def test_validate_retry_empty_overrides_never_reject() -> None:
+    """Most retries change nothing, so an empty/absent override map must stay valid."""
+    execution = _make_execution(ExecutionStatus.FAILED)
+    no_overrides: tuple[dict[str, dict[str, Any]] | None, ...] = (None, {})
+    for overrides in no_overrides:
+        session = _mock_session(
+            (execution, "one"),
+            ([_make_activity("step_2")], "all"),
+            ([_make_completed_activity("step_1")], "all"),
+            (_make_version(1), "one"),
+        )
+        verdict = await validate_retry_from_failure(session, execution.id, ["step_2"], overrides)
+        assert verdict.eligible is True
+
+
+@pytest.mark.asyncio
+async def test_validate_retry_override_allowed_on_auto_included_sanitized_node() -> None:
+    """An auto-included sanitized head is a starting point, so it is a legal override target."""
+    execution = _make_execution(ExecutionStatus.FAILED)
+    ref_nodes = _nodes_with_refs({"step_2": "${step_1.token}"})
+    snapshot = _make_version(1, nodes=ref_nodes)
+    session = _mock_session(
+        (execution, "one"),
+        ([_make_activity("step_2")], "all"),
+        ([_make_completed_activity("step_1", {"token": "[REDACTED]"})], "all"),
+        (snapshot, "one"),
+    )
+    verdict = await validate_retry_from_failure(session, execution.id, [], {"step_1": {"code": "echo fresh"}})
+    assert verdict.eligible is True
+    assert verdict.failure_point_ids == ["step_1"]
+
+
+@pytest.mark.asyncio
+async def test_validate_retry_noop_override_is_accepted() -> None:
+    """An empty per-node override is a no-op and must not fail the retry."""
+    execution = _make_execution(ExecutionStatus.FAILED)
+    session = _mock_session(
+        (execution, "one"),
+        ([_make_activity("step_2")], "all"),
+        ([_make_completed_activity("step_1")], "all"),
+        (_make_version(1), "one"),
+    )
+    verdict = await validate_retry_from_failure(session, execution.id, ["step_2"], {"step_2": {}})
+    assert verdict.eligible is True

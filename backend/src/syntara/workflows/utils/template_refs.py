@@ -1,7 +1,7 @@
 """Template-reference path helpers.
 
 Single source of truth for interpreting ``${node.field...}`` references
-exactly as the runtime ``NamespaceResolver`` does, shared by restart
+exactly as the runtime ``NamespaceResolver`` does, shared by retry
 validation and activity code that must reason about which stored fields a
 reference consumes.
 
@@ -19,10 +19,16 @@ from typing import Any
 
 from syntara.workflows.utils.namespace_resolver import TEMPLATE_PATTERN
 
+#: A resolved path into a node's output: dict keys (``str``) and list indices (``int``).
+type FieldPath = tuple[str | int, ...]
 
-def parse_ref_segments(expression: str) -> tuple:
+#: A ``${node...}`` reference: the target node id and the path within its output.
+type TemplateRef = tuple[str, FieldPath]
+
+
+def parse_ref_segments(expression: str) -> FieldPath:
     """Split a template expression into path segments (names and indices)."""
-    segments: list = []
+    segments: list[str | int] = []
     for part in expression.strip().split("."):
         if part.isdigit():
             segments.append(int(part))
@@ -34,9 +40,9 @@ def parse_ref_segments(expression: str) -> tuple:
     return tuple(segments)
 
 
-def find_template_refs(value: Any) -> list[tuple[str, tuple]]:  # noqa: ANN401
+def find_template_refs(value: Any) -> list[TemplateRef]:  # noqa: ANN401
     """Every ``(target node id, field path)`` template reference in a value."""
-    found: list[tuple[str, tuple]] = []
+    found: list[TemplateRef] = []
     if isinstance(value, str):
         for match in TEMPLATE_PATTERN.finditer(value):
             segments = parse_ref_segments(match.group(1))
@@ -51,6 +57,6 @@ def find_template_refs(value: Any) -> list[tuple[str, tuple]]:  # noqa: ANN401
     return found
 
 
-def paths_overlap(first: tuple, second: tuple) -> bool:
+def paths_overlap(first: FieldPath, second: FieldPath) -> bool:
     """Whether two field paths overlap (one is a prefix of the other)."""
     return first[: len(second)] == second or second[: len(first)] == first

@@ -254,11 +254,11 @@ paths:
         '500':
           $ref: '../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError'
 
-  /executions/{execution_id}/validate-restart-from-failure:
+  /executions/{execution_id}/validate-retry-from-failure:
     post:
-      summary: Validate restart from failure
-      description: Validate that an execution can be restarted from the given failure points. Checks execution state, failure-point eligibility, converge-mootness, the retained-version guard, and the sanitized-output guard. Returns a pass/fail verdict without mutating any state.
-      operationId: validate_restart_from_failure
+      summary: Validate retry from failure
+      description: Validate that an execution can be retryed from the given failure points. Checks execution state, failure-point eligibility, converge-mootness, the retained-version guard, the sanitized-output guard, and any supplied input parameter overrides. Returns a pass/fail verdict without mutating any state.
+      operationId: validate_retry_from_failure
       tags:
         - Executions
       security:
@@ -279,14 +279,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/RestartValidateRequest'
+              $ref: '#/components/schemas/RetryFailureValidateRequest'
       responses:
         '200':
-          description: Restart validation verdict
+          description: Retry validation verdict
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/RestartValidationResponse'
+                $ref: '#/components/schemas/RetryFromFailureValidationResponse'
         '400':
           $ref: '../../base/shared-resources.openapi.yaml#/components/responses/BadRequestError'
         '401':
@@ -304,11 +304,11 @@ paths:
         '429':
           $ref: "../../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
 
-  /executions/{execution_id}/restart-from-failure:
+  /executions/{execution_id}/retry-from-failure:
     post:
-      summary: Restart from failure
-      description: Restart a failed execution from the given failure points. Independently repeats all validation checks, then creates a new execution linked to the source and triggers a Temporal run carrying restart context.
-      operationId: restart_from_failure
+      summary: Retry from failure
+      description: Retry a failed execution from the given failure points, optionally overriding input parameters of the starting nodes for this run only. Independently repeats all validation checks, then creates a new execution linked to the source and triggers a Temporal run carrying retry context.
+      operationId: retry_from_failure
       tags:
         - Executions
       security:
@@ -329,10 +329,10 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/RestartRequest'
+              $ref: '#/components/schemas/RetryFailureRequest'
       responses:
         '201':
-          description: New execution created from restart
+          description: New execution created from retry
           content:
             application/json:
               schema:
@@ -495,14 +495,14 @@ components:
     ExecutionCreate:
       $ref: ./shared-schemas.yaml#/components/schemas/ExecutionCreate
 
-    RestartValidateRequest:
-      $ref: ./shared-schemas.yaml#/components/schemas/RestartValidateRequest
+    RetryFailureValidateRequest:
+      $ref: ./shared-schemas.yaml#/components/schemas/RetryFailureValidateRequest
 
-    RestartRequest:
-      $ref: ./shared-schemas.yaml#/components/schemas/RestartRequest
+    RetryFailureRequest:
+      $ref: ./shared-schemas.yaml#/components/schemas/RetryFailureRequest
 
-    RestartValidationResponse:
-      $ref: ./shared-schemas.yaml#/components/schemas/RestartValidationResponse
+    RetryFromFailureValidationResponse:
+      $ref: ./shared-schemas.yaml#/components/schemas/RetryFromFailureValidationResponse
 
     TestExecutionCreate:
       $ref: ./shared-schemas.yaml#/components/schemas/TestExecutionCreate

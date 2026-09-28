@@ -35249,11 +35249,11 @@
         }
       }
     },
-    "/executions/{execution_id}/validate-restart-from-failure": {
+    "/executions/{execution_id}/validate-retry-from-failure": {
       "post": {
-        "summary": "Validate restart from failure",
-        "description": "Validate that an execution can be restarted from the given failure points. Checks execution state, failure-point eligibility, converge-mootness, the retained-version guard, and the sanitized-output guard. Returns a pass/fail verdict without mutating any state.",
-        "operationId": "validate_restart_from_failure",
+        "summary": "Validate retry from failure",
+        "description": "Validate that an execution can be retryed from the given failure points. Checks execution state, failure-point eligibility, converge-mootness, the retained-version guard, the sanitized-output guard, and any supplied input parameter overrides. Returns a pass/fail verdict without mutating any state.",
+        "operationId": "validate_retry_from_failure",
         "tags": [
           "Executions"
         ],
@@ -35283,18 +35283,18 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/RestartValidateRequest"
+                "$ref": "#/components/schemas/RetryFailureValidateRequest"
               }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "Restart validation verdict",
+            "description": "Retry validation verdict",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/RestartValidationResponse"
+                  "$ref": "#/components/schemas/RetryFromFailureValidationResponse"
                 }
               }
             }
@@ -35440,11 +35440,11 @@
         }
       }
     },
-    "/executions/{execution_id}/restart-from-failure": {
+    "/executions/{execution_id}/retry-from-failure": {
       "post": {
-        "summary": "Restart from failure",
-        "description": "Restart a failed execution from the given failure points. Independently repeats all validation checks, then creates a new execution linked to the source and triggers a Temporal run carrying restart context.",
-        "operationId": "restart_from_failure",
+        "summary": "Retry from failure",
+        "description": "Retry a failed execution from the given failure points, optionally overriding input parameters of the starting nodes for this run only. Independently repeats all validation checks, then creates a new execution linked to the source and triggers a Temporal run carrying retry context.",
+        "operationId": "retry_from_failure",
         "tags": [
           "Executions"
         ],
@@ -35474,14 +35474,14 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/RestartRequest"
+                "$ref": "#/components/schemas/RetryFailureRequest"
               }
             }
           }
         },
         "responses": {
           "201": {
-            "description": "New execution created from restart",
+            "description": "New execution created from retry",
             "content": {
               "application/json": {
                 "schema": {
@@ -50509,10 +50509,10 @@
           }
         }
       },
-      "RestartValidateRequest": {
+      "RetryFailureValidateRequest": {
         "type": "object",
-        "title": "RestartValidateRequest",
-        "description": "Request body for POST /executions/{id}/validate-restart-from-failure.",
+        "title": "RetryFailureValidateRequest",
+        "description": "Request body for POST /executions/{id}/validate-retry-from-failure.",
         "properties": {
           "failure_point_ids": {
             "type": "array",
@@ -50520,14 +50520,23 @@
               "type": "string"
             },
             "title": "Failure Point Ids",
-            "description": "Failure points to restart from (node IDs from the source execution). Empty selects the default: all currently failed nodes."
+            "description": "Failure points to retry from (node IDs from the source execution). Empty selects the default: all currently failed nodes."
+          },
+          "input_parameter_overrides": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "additionalProperties": true
+            },
+            "title": "Input Parameter Overrides",
+            "description": "Input parameter overrides for the retry's starting nodes, keyed by node id then parameter name (SDP AC-14/R10c). Each override replaces the value the node would otherwise receive, after upstream outputs are injected, so the supplied value is what executes. Parameter names must already exist on that node in the retained workflow version, and node ids must be among the retry's starting points; anything else is rejected. Overrides apply to this retry run only — the workflow definition is never modified, and a permanent change requires editing, saving, and publishing the workflow."
           }
         }
       },
-      "RestartRequest": {
+      "RetryFailureRequest": {
         "type": "object",
-        "title": "RestartRequest",
-        "description": "Request body for POST /executions/{id}/restart-from-failure.",
+        "title": "RetryFailureRequest",
+        "description": "Request body for POST /executions/{id}/retry-from-failure.",
         "properties": {
           "failure_point_ids": {
             "type": "array",
@@ -50535,14 +50544,23 @@
               "type": "string"
             },
             "title": "Failure Point Ids",
-            "description": "Failure points to restart from (node IDs from the source execution). A subset may be passed when multiple parallel branches failed; unselected branches are skipped. Empty selects the default: all currently failed nodes."
+            "description": "Failure points to retry from (node IDs from the source execution). A subset may be passed when multiple parallel branches failed; unselected branches are skipped. Empty selects the default: all currently failed nodes."
+          },
+          "input_parameter_overrides": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "additionalProperties": true
+            },
+            "title": "Input Parameter Overrides",
+            "description": "Input parameter overrides for the retry's starting nodes, keyed by node id then parameter name (SDP AC-14/R10c). Each override replaces the value the node would otherwise receive, after upstream outputs are injected, so the supplied value is what executes. Parameter names must already exist on that node in the retained workflow version, and node ids must be among the retry's starting points; anything else is rejected. Overrides apply to this retry run only — the workflow definition is never modified, and a permanent change requires editing, saving, and publishing the workflow."
           }
         }
       },
-      "RestartValidationResponse": {
+      "RetryFromFailureValidationResponse": {
         "type": "object",
-        "title": "RestartValidationResponse",
-        "description": "Pre-restart validation verdict (POST /executions/{id}/validate-restart-from-failure).",
+        "title": "RetryFromFailureValidationResponse",
+        "description": "Pre-retry validation verdict (POST /executions/{id}/validate-retry-from-failure).",
         "required": [
           "eligible"
         ],
@@ -50550,7 +50568,7 @@
           "eligible": {
             "type": "boolean",
             "title": "Eligible",
-            "description": "Whether the restart is allowed to proceed"
+            "description": "Whether the retry is allowed to proceed"
           },
           "reason": {
             "anyOf": [
@@ -50570,7 +50588,7 @@
               "type": "string"
             },
             "title": "Failure Point Ids",
-            "description": "Restart points the verdict applies to, after cleanup (trimmed, deduped, sorted). Empty request means all currently failed nodes. On an eligible verdict this is the eligible set actually restarted, including auto-included sanitized nodes and excluding superseded failed points; on rejection it echoes the pre-expansion selection."
+            "description": "Retry points the verdict applies to, after cleanup (trimmed, deduped, sorted). Empty request means all currently failed nodes. On an eligible verdict this is the eligible set actually retryed, including auto-included sanitized nodes and excluding superseded failed points; on rejection it echoes the pre-expansion selection."
           },
           "sanitized_node_ids": {
             "type": "array",
@@ -50578,7 +50596,7 @@
               "type": "string"
             },
             "title": "Sanitized Node Ids",
-            "description": "Upstream nodes with sanitized stored outputs referenced on the restart path. Populated when the verdict rejects; empty on eligible verdicts (see auto_included_node_ids)."
+            "description": "Upstream nodes with sanitized stored outputs referenced on the retry path. Populated when the verdict rejects; empty on eligible verdicts (see auto_included_node_ids)."
           },
           "auto_included_node_ids": {
             "type": "array",
@@ -50586,7 +50604,7 @@
               "type": "string"
             },
             "title": "Auto Included Node Ids",
-            "description": "Sanitized nodes added as restart points on the default path. Empty on explicit selections, which reject instead."
+            "description": "Sanitized nodes added as retry points on the default path. Empty on explicit selections, which reject instead."
           },
           "sanitized_replacements": {
             "type": "object",
@@ -50605,7 +50623,7 @@
               "type": "integer"
             },
             "title": "Step Count By Eligible Point",
-            "description": "Re-run step count for each eligible restart point."
+            "description": "Re-run step count for each eligible retry point."
           },
           "total_step_count": {
             "type": "integer",
