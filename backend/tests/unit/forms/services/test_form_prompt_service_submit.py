@@ -20,6 +20,7 @@ from syntara.forms.exceptions import (
 from syntara.forms.models.api_models import FormPromptStatus
 from syntara.forms.models.form_prompt import FormPrompt, FormPromptRead
 from syntara.forms.services.form_prompt_service import FormPromptService
+from syntara.workflows.models.execution import Execution
 
 # Minimal valid form definition for tests
 _MINIMAL_FORM_DEFINITION = {
@@ -72,7 +73,14 @@ def _make_service_with_user(
 
         prompt.model_dump = Mock(side_effect=dump_prompt)  # type: ignore[method-assign]
 
-    session.get = AsyncMock(return_value=prompt)
+    execution = Mock()
+    execution.workflow_id = uuid4()
+    execution.created_by = uuid4()
+
+    async def get_record(model: type[object], _record_id: object) -> object | None:
+        return execution if model is Execution else prompt
+
+    session.get = AsyncMock(side_effect=get_record)
     if prompt is not None and prompt.status == FormPromptStatus.PENDING:
         session.exec = AsyncMock(side_effect=[query_result, update_result])
     else:
@@ -238,6 +246,11 @@ class TestFormPromptServiceSubmit:
             assert event.wait_time_ms >= 45000  # At least 45 seconds
             assert event.field_count == 1
             assert event.outcome == "submitted"
+            assert event.workflow_id is not None
+            assert event.execution_id == prompt.execution_id
+            assert event.submitted_by == _user.id
+            assert event.submitted_at is not None
+            assert not hasattr(event, "response_data")
 
     @pytest.mark.asyncio
     async def test_submit_signal_failure_still_commits(self) -> None:
