@@ -7,7 +7,7 @@ import type {
   TaskActivity,
   WaitActivity,
 } from '@syntara/contracts'
-import { ActivityTypeEnum, ExecutorTypeEnum } from '@syntara/contracts'
+import { ActivityTypeEnum, ExecutorTypeEnum, TriggerTypeEnum } from '@syntara/contracts'
 import type { Node } from '@xyflow/react'
 import type { ReactNode } from 'react'
 import { useState } from 'react'
@@ -43,6 +43,7 @@ import {
   WaitNodeDetails,
 } from './node-details'
 import { NodeEditorLayout } from './NodeEditorLayout'
+import { NodeExecutionRestriction } from './NodeExecutionRestriction'
 import { NodeRawDataView } from './NodeRawDataView'
 import { NodeRegistry } from './registry/NodeRegistry'
 import type { WorkflowMetadata } from './types/workflowMetadata'
@@ -105,6 +106,53 @@ function getAddModeFormId(
   }
 
   return undefined
+}
+
+const REGISTRY_STEP_KINDS: Record<string, string> = {
+  [RegistryNodeId.ACTION]: ExecutorTypeEnum.SCRIPT,
+  [RegistryNodeId.ACTION_MCP_TOOL]: ExecutorTypeEnum.MCP_TOOL,
+  [RegistryNodeId.AGENT]: ExecutorTypeEnum.AGENTIC,
+  [RegistryNodeId.APPROVAL]: ActivityTypeEnum.APPROVAL,
+  [RegistryNodeId.AAP_EXECUTION]: ExecutorTypeEnum.AAP_JOB_TEMPLATE,
+  [RegistryNodeId.AAP_JOB_TEMPLATE]: ExecutorTypeEnum.AAP_JOB_TEMPLATE,
+  [RegistryNodeId.AAP_WORKFLOW_TEMPLATE]: ExecutorTypeEnum.AAP_WORKFLOW_JOB_TEMPLATE,
+  [RegistryNodeId.TRIGGER]: TriggerTypeEnum.MANUAL_TRIGGER,
+}
+
+function getExecutionKindFromInitialData(initialData: unknown): string | undefined {
+  if (typeof initialData !== 'object' || initialData === null) return undefined
+  const values = initialData as Record<string, unknown>
+  const kind = values.executor ?? values.logicType ?? values.triggerType
+  return typeof kind === 'string' ? kind : undefined
+}
+
+function getExecutionKindFromNode(node?: Node<NodeType['data']>): string | undefined {
+  if (!node) return undefined
+  const data = node.data
+  if ('triggerType' in data && typeof data.triggerType === 'string') return data.triggerType
+  if ('type' in data && typeof data.type === 'string' && data.type !== RegistryNodeId.GENERIC) return data.type
+  return undefined
+}
+
+function resolveNodeEditorStep(
+  mode: NodeDetailsPanelProps['mode'],
+  node: Node<NodeType['data']> | undefined,
+  nodeTypeId: string | null | undefined,
+  nodeSubtypeId: string | null | undefined
+) {
+  if (mode === 'edit') {
+    return { definition: undefined, subtype: undefined, executionKind: getExecutionKindFromNode(node) }
+  }
+  if (!nodeTypeId) return { definition: undefined, subtype: undefined, executionKind: undefined }
+
+  const definition = NodeRegistry.get(nodeTypeId)
+  const subtype = definition?.subtypes?.find((item) => item.id === nodeSubtypeId)
+  return {
+    definition,
+    subtype,
+    executionKind:
+      getExecutionKindFromInitialData(subtype?.initialData) ?? REGISTRY_STEP_KINDS[nodeSubtypeId ?? nodeTypeId],
+  }
 }
 
 /** Get formId for TASK nodes by checking executor type */
@@ -353,6 +401,7 @@ export function NodeDetailsPanel(props: NodeDetailsPanelProps) {
   })
   const panelMenuActions = buildPanelMenuActions(mode, node, menuActions, onClose)
   const headerActions = panelMenuActions.length > 0 ? <NodeMenu menuActions={panelMenuActions} /> : null
+  const editorStep = resolveNodeEditorStep(mode, node, nodeTypeId, nodeSubtypeId)
 
   const iconDescriptor =
     mode === 'edit' && node
@@ -362,8 +411,8 @@ export function NodeDetailsPanel(props: NodeDetailsPanelProps) {
 
   const renderContent = () => {
     if (mode === 'add') {
-      const selectedNode = nodeTypeId ? NodeRegistry.get(nodeTypeId) : null
-      const selectedSubtype = selectedNode?.subtypes?.find((subtype) => subtype.id === nodeSubtypeId) ?? null
+      const selectedNode = editorStep.definition
+      const selectedSubtype = editorStep.subtype ?? null
 
       if (!selectedNode) return null
 
@@ -497,6 +546,9 @@ export function NodeDetailsPanel(props: NodeDetailsPanelProps) {
     <NodeEditorLayout
       parametersContent={renderContent()}
       headerContent={headerContent}
+      headerRestriction={
+        editorStep.executionKind ? <NodeExecutionRestriction kind={editorStep.executionKind} /> : undefined
+      }
       headerIcon={headerIcon}
       headerActions={headerActions}
       docLink={props.docLink}

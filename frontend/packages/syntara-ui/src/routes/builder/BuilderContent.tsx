@@ -55,6 +55,7 @@ import { useRunStepDialog } from './hooks/useRunStepDialog'
 import { useUndoRedoKeyboard } from './hooks/useUndoRedoKeyboard'
 import { useWorkflowMetadata } from './hooks/useWorkflowMetadata'
 import { NodeActionsContext } from './NodeActionsContext'
+import { NodeExecutionPermissionProvider } from './NodeExecutionRestriction'
 import { SaveBeforeViewDialog } from './SaveBeforeViewDialog'
 import type { BuilderContentProps } from './types/builderContent'
 import { useBuilderPermissions } from './useBuilderPermissions'
@@ -660,25 +661,27 @@ export function BuilderContent(props: BuilderContentProps) {
                             publishedAt={versionPanel.viewedVersionPublishedAt}
                             unpublishedAt={versionPanel.viewedVersionUnpublishedAt}
                           />
-                          <BuilderFlow
-                            workflowId={workflowId}
-                            readOnly={versionPanel.isViewingVersion}
-                            canEdit={builderPermissions.canEdit}
-                            panelOpen={isAddNodePanelOpen || !!selectedNode}
-                            activeEdgeButtonNodeId={isAddNodePanelOpen ? sourceNodeId : null}
-                            activeEdgeButtonHandle={isAddNodePanelOpen ? sourceHandle : null}
-                            activeEdgeId={isAddNodePanelOpen ? edgeIdToReplace : null}
-                            executionStatus={canvasExecutionStatus}
-                            copiedRunActivityIds={copiedRunActivityIds}
-                            disableDeleteKey={isNodeEditorOpen}
-                            disableSpacePanning={isNodeEditorOpen || confirmDialogOpen}
-                            onNodeClick={wrappedHandleNodeClick}
-                            onAddNodeFromEdge={handleAddNodeFromEdge}
-                            onNodesDeleted={handleNodesDeleted}
-                            newNodeDesiredPosition={state.newNodeDesiredPosition}
-                            onClearDesiredPosition={handleClearDesiredPosition}
-                            validationErrors={state.validationErrors}
-                          />
+                          <NodeExecutionPermissionProvider resourceProject={builderProjectId}>
+                            <BuilderFlow
+                              workflowId={workflowId}
+                              readOnly={versionPanel.isViewingVersion}
+                              canEdit={builderPermissions.canEdit}
+                              panelOpen={isAddNodePanelOpen || !!selectedNode}
+                              activeEdgeButtonNodeId={isAddNodePanelOpen ? sourceNodeId : null}
+                              activeEdgeButtonHandle={isAddNodePanelOpen ? sourceHandle : null}
+                              activeEdgeId={isAddNodePanelOpen ? edgeIdToReplace : null}
+                              executionStatus={canvasExecutionStatus}
+                              copiedRunActivityIds={copiedRunActivityIds}
+                              disableDeleteKey={isNodeEditorOpen}
+                              disableSpacePanning={isNodeEditorOpen || confirmDialogOpen}
+                              onNodeClick={wrappedHandleNodeClick}
+                              onAddNodeFromEdge={handleAddNodeFromEdge}
+                              onNodesDeleted={handleNodesDeleted}
+                              newNodeDesiredPosition={state.newNodeDesiredPosition}
+                              onClearDesiredPosition={handleClearDesiredPosition}
+                              validationErrors={state.validationErrors}
+                            />
+                          </NodeExecutionPermissionProvider>
                         </SynPanel>
                       </SynPanelStackItem>
                       {showMostRecentRunPanelInEditor && mostRecentExecutionId && (
@@ -740,24 +743,26 @@ export function BuilderContent(props: BuilderContentProps) {
                   />
 
                   <NodeEditorAutoSubmitContext.Provider value={autoSubmitRef}>
-                    <NodeEditorOverlay
-                      isOpen={isNodeEditorOpen}
-                      mode={nodeEditorMode}
-                      selectedNode={selectedNode}
-                      nodeTypeId={nodeEditorNodeTypeId}
-                      nodeSubtypeId={nodeEditorNodeSubtypeId}
-                      sourceNodeId={sourceNodeId}
-                      replacementNodeId={replacementNodeId}
-                      executionId={mostRecentExecutionId}
-                      workflowId={workflowId}
-                      onConnect={handleConnectFromPanel}
-                      onClose={handleCloseNodeEditor}
-                      onNavigateToNode={handleNavigateToNode}
-                      onAddStep={handleAddStepFromPanel}
-                      projectId={builderProjectId}
-                      workflowMetadata={workflowMetadata}
-                      onRunStep={selectedNode ? () => detachPromise(handleRunStep(selectedNode.id)) : undefined}
-                    />
+                    <NodeExecutionPermissionProvider resourceProject={builderProjectId}>
+                      <NodeEditorOverlay
+                        isOpen={isNodeEditorOpen}
+                        mode={nodeEditorMode}
+                        selectedNode={selectedNode}
+                        nodeTypeId={nodeEditorNodeTypeId}
+                        nodeSubtypeId={nodeEditorNodeSubtypeId}
+                        sourceNodeId={sourceNodeId}
+                        replacementNodeId={replacementNodeId}
+                        executionId={mostRecentExecutionId}
+                        workflowId={workflowId}
+                        onConnect={handleConnectFromPanel}
+                        onClose={handleCloseNodeEditor}
+                        onNavigateToNode={handleNavigateToNode}
+                        onAddStep={handleAddStepFromPanel}
+                        projectId={builderProjectId}
+                        workflowMetadata={workflowMetadata}
+                        onRunStep={selectedNode ? () => detachPromise(handleRunStep(selectedNode.id)) : undefined}
+                      />
+                    </NodeExecutionPermissionProvider>
                   </NodeEditorAutoSubmitContext.Provider>
                 </Flex>
               </StackItem>

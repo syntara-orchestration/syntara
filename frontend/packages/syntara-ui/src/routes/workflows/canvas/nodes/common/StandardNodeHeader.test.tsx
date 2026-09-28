@@ -2,7 +2,17 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 
+import { useCanI } from '../../../../../hooks/useCanI'
+import { NodeExecutionPermissionProvider } from '../../../../builder/NodeExecutionRestriction'
+
+import { StandardNodeHeader } from './StandardNodeHeader'
+
 const mockNodesConnectable = vi.hoisted(() => ({ value: true }))
+const mockUseCanI = vi.hoisted(() => vi.fn())
+
+vi.mock('../../../../../hooks/useCanI', () => ({
+  useCanI: mockUseCanI,
+}))
 
 vi.mock('@xyflow/react', async () => {
   const actual = await vi.importActual('@xyflow/react')
@@ -12,8 +22,6 @@ vi.mock('@xyflow/react', async () => {
       selector({ nodesConnectable: mockNodesConnectable.value }),
   }
 })
-
-import { StandardNodeHeader } from './StandardNodeHeader'
 
 describe('StandardNodeHeader', () => {
   it('renders title and subtitle', () => {
@@ -28,6 +36,19 @@ describe('StandardNodeHeader', () => {
     render(<StandardNodeHeader title="Test Node" subtitle="Task" icon={icon} />)
 
     expect(screen.getByTestId('test-icon')).toBeInTheDocument()
+  })
+
+  it('shows the restriction lock beside the icon for a denied step kind', () => {
+    vi.mocked(useCanI).mockReturnValue({ allowed: false, isChecking: false, isError: false })
+
+    render(
+      <NodeExecutionPermissionProvider resourceProject="project-1">
+        <StandardNodeHeader icon={<svg data-testid="test-icon" />} executionKind="script" />
+      </NodeExecutionPermissionProvider>
+    )
+
+    expect(screen.getByTestId('test-icon')).toBeInTheDocument()
+    expect(screen.getByRole('img', { name: 'Execution restricted' })).toBeInTheDocument()
   })
 
   it('does not render menu when no menuActions provided', () => {

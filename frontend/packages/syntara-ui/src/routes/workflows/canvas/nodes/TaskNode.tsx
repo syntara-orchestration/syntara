@@ -142,6 +142,7 @@ export function TaskActivityDetails(
     <>
       <StandardNodeHeader
         icon={iconNode}
+        executionKind={props.data.type}
         badge={undefined}
         title={props.data.name}
         subtitle={taskExecutorLabel}

@@ -87,6 +87,7 @@ export function ConditionNodeDetails(props: {
     <>
       <StandardNodeHeader
         icon={props.icon}
+        executionKind={props.conditionActivity.type}
         title={props.conditionActivity.name ?? 'Untitled Condition'}
         subtitle={metadata.label}
         expandable={metadata.expandable}

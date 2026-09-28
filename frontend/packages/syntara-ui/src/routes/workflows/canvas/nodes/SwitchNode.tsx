@@ -127,6 +127,7 @@ function SwitchNodeDetails(props: {
     <>
       <StandardNodeHeader
         icon={props.icon}
+        executionKind={props.switchActivity.type}
         title={props.switchActivity.name ?? 'Untitled Switch'}
         subtitle={metadata.label}
         menuActions={props.menuActions}

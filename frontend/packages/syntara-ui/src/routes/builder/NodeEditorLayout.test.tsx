@@ -95,6 +95,21 @@ describe('NodeEditorLayout', () => {
     expect(screen.getByText('My Parameters Content')).toBeInTheDocument()
   })
 
+  it('renders the restriction after the form header content', () => {
+    render(
+      <NodeEditorLayout
+        parametersContent={<div>Parameters</div>}
+        headerContent={<span>Activity name</span>}
+        headerRestriction={<div role="img" aria-label="Execution restricted" />}
+        showInputPanel={false}
+      />
+    )
+
+    const headerContent = screen.getByText('Activity name')
+    const restriction = screen.getByRole('img', { name: 'Execution restricted' })
+    expect(headerContent.compareDocumentPosition(restriction) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0)
+  })
+
   it('renders OutputPanel in right column', () => {
     render(<NodeEditorLayout parametersContent={<div>Parameters</div>} showInputPanel={false} />)
 

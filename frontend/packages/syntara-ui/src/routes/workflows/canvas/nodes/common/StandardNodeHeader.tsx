@@ -7,6 +7,7 @@ import { NodeMenu } from '../../../../../components/nodes/NodeMenu'
 import { NodeTitle } from '../../../../../components/nodes/NodeTitle'
 import { useIsActiveExecution } from '../../../../builder/ActiveExecutionContext'
 import { useIsExecutionView } from '../../../../builder/ExecutionViewContext'
+import { NodeExecutionRestriction } from '../../../../builder/NodeExecutionRestriction'
 import { useIsVersionView } from '../../../../builder/VersionViewContext'
 import type { NodeMenuAction } from '../hooks/useNodeMenuActions'
 
@@ -18,6 +19,7 @@ type StandardNodeHeaderProps = {
   subtitle?: string
   expandable?: boolean
   menuActions?: NodeMenuAction[]
+  executionKind?: string
 }
 
 /**
@@ -61,7 +63,14 @@ export function StandardNodeHeader(props: Readonly<StandardNodeHeaderProps>) {
     <Stack>
       <StackItem>
         <NodeHeader>
-          {props.icon && <FlexItem>{props.icon}</FlexItem>}
+          {(props.icon || props.executionKind) && (
+            <FlexItem>
+              <Flex alignItems={{ default: 'alignItemsCenter' }} gap={{ default: 'gapSm' }}>
+                {props.icon}
+                <NodeExecutionRestriction kind={props.executionKind} />
+              </Flex>
+            </FlexItem>
+          )}
           <FlexItem>
             <Flex>
               {props.expandable && (

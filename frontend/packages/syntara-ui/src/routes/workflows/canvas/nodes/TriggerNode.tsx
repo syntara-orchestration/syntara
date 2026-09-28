@@ -1,4 +1,4 @@
-import { FlexItem, Content, ContentVariants, Title, TitleSizes } from '@patternfly/react-core'
+import { Flex, FlexItem, Content, ContentVariants, Title, TitleSizes } from '@patternfly/react-core'
 import { TriggerTypeEnum } from '@syntara/contracts'
 import { type Node, type NodeProps, useStore } from '@xyflow/react'
 import type { CSSProperties } from 'react'
@@ -11,6 +11,7 @@ import { FlowNodeType } from '../../../../constants'
 import { parseTriggerIndex } from '../../../../utils/triggerNodeIds'
 import { useIsActiveExecution } from '../../../builder/ActiveExecutionContext'
 import { useIsExecutionView } from '../../../builder/ExecutionViewContext'
+import { NodeExecutionRestriction } from '../../../builder/NodeExecutionRestriction'
 import { useIsVersionView } from '../../../builder/VersionViewContext'
 import type { ActivityStatus } from '../../execution/types'
 import { getNodeTypeColor } from '../nodeTypeColors'
@@ -140,7 +141,12 @@ function TriggerNodeDetails(
   return (
     <>
       <NodeHeader>
-        <FlexItem>{props.icon}</FlexItem>
+        <FlexItem>
+          <Flex alignItems={{ default: 'alignItemsCenter' }} gap={{ default: 'gapSm' }}>
+            {props.icon}
+            <NodeExecutionRestriction kind={props.triggerKind} />
+          </Flex>
+        </FlexItem>
         <FlexItem grow={{ default: 'grow' }} />
         {props.menuActions &&
           props.menuActions.length > 0 &&

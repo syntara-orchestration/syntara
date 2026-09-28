@@ -31,6 +31,7 @@ function DocumentationButton({ href }: Readonly<{ href: string }>) {
 type NodeEditorLayoutProps = {
   parametersContent: ReactNode
   headerContent?: ReactNode
+  headerRestriction?: ReactNode
   headerIcon?: ReactNode
   headerActions?: ReactNode
   docLink?: string
@@ -55,6 +56,7 @@ type NodeEditorLayoutProps = {
 export function NodeEditorLayout({
   parametersContent,
   headerContent,
+  headerRestriction,
   headerIcon,
   headerActions,
   docLink,
@@ -112,6 +114,7 @@ export function NodeEditorLayout({
                   </FlexItem>
                 )}
                 {headerContent && <FlexItem>{headerContent}</FlexItem>}
+                {headerRestriction && <FlexItem>{headerRestriction}</FlexItem>}
               </Flex>
             </FlexItem>
             <FlexItem>

@@ -57,6 +57,7 @@ export function LoopNodeComponent(props: NodeProps<LoopNode>) {
     >
       <StandardNodeHeader
         icon={iconNode}
+        executionKind={props.data.type}
         title={props.data.name ?? ''}
         subtitle={metadata.label}
         menuActions={menuActions}

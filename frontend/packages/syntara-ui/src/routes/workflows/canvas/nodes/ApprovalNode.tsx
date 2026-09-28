@@ -68,6 +68,7 @@ export function ApprovalNodeComponent(props: NodeProps<ApprovalNode>) {
       <>
         <StandardNodeHeader
           icon={iconNode}
+          executionKind={props.data.type}
           title={props.data.name ?? 'Untitled Approval'}
           subtitle={taskExecutor}
           expandable={metadata.expandable}
