@@ -155,5 +155,6 @@ class TestMultiSelectScalarDefaults:
         """Nested lists and dictionaries fail field parsing before definition validation."""
         options = {"source": "dynamic", "expression": "${upstream.output}"}
 
+        field = _field("multi_select", "picks", options=options, default=[bad])
         with pytest.raises(ValidationError):
-            _form(_field("multi_select", "picks", options=options, default=[bad]))
+            _form(field)
