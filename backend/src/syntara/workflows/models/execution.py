@@ -285,6 +285,9 @@ class Execution(UserOwnedResource, table=True):
         },
     )
 
+    # Stall detection (AAP-92824): correlated EXISTS subquery set via column_property below.
+    is_stalled: bool  # type: ignore[assignment]  # populated by column_property after class def
+
     # Note: creator and updater relationships inherited from UserOwnedResource
     # creator = User who started the execution (created_by)
     # updater = User who last modified the execution (updated_by)
