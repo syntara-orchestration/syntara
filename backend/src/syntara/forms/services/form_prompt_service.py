@@ -358,19 +358,20 @@ class FormPromptService(BaseService):
                 None,
             )
 
-        current_status = FormPromptStatus(prompt.status)
-        target_status = FormPromptStatus(update_request.status.value)
-        if current_status is target_status:
+        target_status_value = update_request.status.value
+        if prompt.status == target_status_value:
             return (
                 BatchUpdateResult(
                     prompt_id=str(update_request.prompt_id),
                     success=True,
-                    message=f"Already {target_status.value}",
+                    message=f"Already {target_status_value}",
                 ),
                 True,
                 None,
             )
 
+        current_status = FormPromptStatus(prompt.status)
+        target_status = FormPromptStatus(target_status_value)
         if not can_transition(current_status, target_status):
             return (
                 BatchUpdateResult(
