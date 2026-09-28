@@ -236,6 +236,7 @@ async function processSaveResult(
   ctx: {
     willPatchExisting: boolean
     isNew: boolean
+    expectedVersion: number | null | undefined
     nameToSave: string
     showError: (options: AlertMessage) => void
     showSuccess: (options: AlertMessage) => void
@@ -261,11 +262,13 @@ async function processSaveResult(
 
   const hasIssues = saveResult.data?.has_validation_issues === true
   const verb = ctx.isNew ? 'created' : 'saved'
+  const unchanged =
+    ctx.willPatchExisting && ctx.expectedVersion != null && saveResult.data?.current_version === ctx.expectedVersion
   if (hasIssues) {
     ctx.showWarning({ title: `Workflow ${verb} with warnings`, description: `${ctx.nameToSave} has been saved.` })
     reportSaveValidationIssues(saveResult.data, ctx.onValidationFindings, ctx.onSaveWithValidationIssues)
     syncToolSelectionsFromResponse(saveResult.data)
-  } else {
+  } else if (!unchanged) {
     ctx.showSuccess({ title: `Workflow ${verb}`, description: `${ctx.nameToSave} has been saved.` })
   }
 
@@ -358,6 +361,7 @@ export function useBuilderSaveWorkflow(
       return processSaveResult(saveResult, {
         willPatchExisting,
         isNew,
+        expectedVersion: effectiveExpectedVersion,
         nameToSave,
         showError,
         showSuccess,
