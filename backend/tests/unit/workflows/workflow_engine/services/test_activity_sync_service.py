@@ -4179,7 +4179,7 @@ class TestMonitorExecutionRetry:
     """Tests for _monitor_execution retry logic with exponential backoff."""
 
     _SLEEP_PATH = "syntara.workflows.workflow_engine.services.activity_sync_service.asyncio.sleep"
-    _RANDOM_PATH = "syntara.workflows.workflow_engine.services.activity_sync_service.random.random"
+    _RANDOM_PATH = "syntara.workflows.workflow_engine.services.activity_sync_monitor.random.random"
 
     def setup_method(self) -> None:
         """Set up test fixtures."""
@@ -5728,7 +5728,7 @@ class TestQueryActivityIoQueryFailure:
         )
         activity_data: dict[str, Any] = {"status": ActivityStatus.RUNNING}
 
-        with patch("syntara.workflows.workflow_engine.services.activity_sync_service.logger") as mock_logger:
+        with patch("syntara.workflows.workflow_engine.services.activity_execution_sync.logger") as mock_logger:
             with pytest.raises(RPCError):
                 await self.service._query_activity_io(mock_handle, "my-activity", activity_data, None)
 
