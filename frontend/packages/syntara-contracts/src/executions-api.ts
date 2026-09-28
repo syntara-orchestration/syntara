@@ -572,36 +572,36 @@ export interface components {
       reason?: string | null
       /**
        * Failure Point Ids
-       * @description Normalized failure points validated
+       * @description Restart points the verdict applies to, after cleanup (trimmed, deduped, sorted). Empty request means all currently failed nodes. On an eligible verdict this is the eligible set actually restarted, including auto-included sanitized nodes and excluding superseded failed points; on rejection it echoes the pre-expansion selection.
        */
       failure_point_ids?: string[]
       /**
        * Sanitized Node Ids
-       * @description Upstream nodes with sanitized stored outputs referenced on the restart path
+       * @description Upstream nodes with sanitized stored outputs referenced on the restart path. Populated when the verdict rejects; empty on eligible verdicts (see auto_included_node_ids).
        */
       sanitized_node_ids?: string[]
       /**
        * Auto Included Node Ids
-       * @description Sanitized nodes automatically added as restart points to resolve a dependency (default selection only; empty otherwise)
+       * @description Sanitized nodes added as restart points on the default path. Empty on explicit selections, which reject instead.
        */
       auto_included_node_ids?: string[]
       /**
        * Sanitized Replacements
-       * @description For every currently-failed node, the sanitized node(s) it must be replaced by if any (independent of the failure points actually requested) — lets the UI disallow selecting a failed node explicitly before submitting a request
+       * @description For each currently-failed node, the sanitized nodes it must be replaced by, if any.
        */
       sanitized_replacements?: {
         [key: string]: string[]
       }
       /**
-       * Step Count By Failure Point
-       * @description Re-run step count for each selected failure point, computed against the retained version
+       * Step Count By Eligible Point
+       * @description Re-run step count for each eligible restart point.
        */
-      step_count_by_failure_point?: {
+      step_count_by_eligible_point?: {
         [key: string]: number
       }
       /**
        * Total Step Count
-       * @description Deduplicated total step count across the whole selection, computed against the retained version
+       * @description Deduplicated total of steps that will re-run across the eligible points.
        * @default 0
        */
       total_step_count?: number

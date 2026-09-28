@@ -147,7 +147,7 @@ async def test_validate_restart_passes_clean_path() -> None:
     assert verdict.reason is None
     assert verdict.failure_point_ids == ["step_2"]
     assert verdict.snapshot_version == 1
-    assert verdict.step_count_by_failure_point == {"step_2": 2}
+    assert verdict.step_count_by_eligible_point == {"step_2": 2}
     assert verdict.total_step_count == 2
 
 
@@ -225,10 +225,11 @@ async def test_validate_restart_default_selection_auto_includes_sanitized_depend
     )
     verdict = await validate_restart_from_failure(session, execution.id, [])
     assert verdict.eligible is True
-    assert verdict.failure_point_ids == ["step_1", "step_2"]
+    assert verdict.failure_point_ids == ["step_1"]
     assert verdict.auto_included_node_ids == ["step_1"]
     assert verdict.sanitized_node_ids == []
     assert verdict.sanitized_replacements == {"step_2": ["step_1"]}
+    assert verdict.step_count_by_eligible_point == {"step_1": 3}
     assert verdict.total_step_count == 3
 
 
@@ -271,10 +272,23 @@ async def test_validate_restart_default_selection_cascades_through_chained_depen
     )
     verdict = await validate_restart_from_failure(session, execution.id, [])
     assert verdict.eligible is True
-    assert verdict.failure_point_ids == ["step_0", "step_1", "step_2"]
+    assert verdict.failure_point_ids == ["step_0", "step_1"]
     assert verdict.auto_included_node_ids == ["step_0", "step_1"]
     assert verdict.sanitized_replacements == {"step_2": ["step_0", "step_1"]}
+    assert verdict.step_count_by_eligible_point == {"step_0": 4, "step_1": 3}
     assert verdict.total_step_count == 4
+
+
+@pytest.mark.asyncio
+async def test_eligible_points_excludes_failed_points_superseded_by_auto_inclusion() -> None:
+    """Failed points downstream of an auto-included sanitized node are superseded; sanitized nodes stay."""
+    from syntara.workflows.services.restart_validation import _eligible_points
+
+    definition = _definition()
+    # No auto-inclusion: eligible set is the requested selection unchanged.
+    assert _eligible_points(definition, {"step_2"}, set()) == {"step_2"}
+    # step_2 is strictly downstream of auto-included step_1: superseded.
+    assert _eligible_points(definition, {"step_1", "step_2"}, {"step_1"}) == {"step_1"}
 
 
 @pytest.mark.asyncio
@@ -686,7 +700,7 @@ async def test_validate_restart_step_count_single_point() -> None:
     )
     verdict = await validate_restart_from_failure(session, execution.id, ["step_1"])
     assert verdict.eligible is True
-    assert verdict.step_count_by_failure_point == {"step_1": 3}
+    assert verdict.step_count_by_eligible_point == {"step_1": 3}
     assert verdict.total_step_count == 3
 
 
@@ -704,5 +718,5 @@ async def test_validate_restart_step_count_dedupes_shared_tail() -> None:
     )
     verdict = await validate_restart_from_failure(session, execution.id, ["step_a", "step_b"])
     assert verdict.eligible is True
-    assert verdict.step_count_by_failure_point == {"step_a": 3, "step_b": 3}
+    assert verdict.step_count_by_eligible_point == {"step_a": 3, "step_b": 3}
     assert verdict.total_step_count == 4

@@ -31,16 +31,23 @@ Validation is a chain of checks:
    for restart validation — it affects all executions equally and is not
    restart-specific (SDP scope reduction, R9a).
 
-   For an **explicit** selection, a sanitized dependency always rejects. For
-   the **default** selection (empty input — see below), a sanitized
-   dependency instead expands the restart points to include the sanitized
-   node, repeated until no dependency remains, and reports what was added
-   instead of rejecting (SDP AC-15/R9a). Either way, the response also
-   reports ``sanitized_replacements`` — for *every* currently-failed node
-   (not just the ones requested), which sanitized node(s) it would need to
-   be replaced by — so the UI can disallow selecting a failed node
-   explicitly before the user even submits a request (per Bill Wei,
-   2026-09-24: "so that the UI can disallow replaced nodes being selected").
+    For an **explicit** selection, a sanitized dependency always rejects. For
+    the **default** selection (empty input — see below), a sanitized
+    dependency instead expands the restart points to include the sanitized
+    node, repeated until no dependency remains, and reports what was added
+    instead of rejecting (SDP AC-15/R9a). Either way, the response also
+    reports ``sanitized_replacements`` — for *every* currently-failed node
+    (not just the ones requested), which sanitized node(s) it would need to
+    be replaced by — so the UI can disallow selecting a failed node
+    explicitly before the user even submits a request (per Bill Wei,
+    2026-09-24: "so that the UI can disallow replaced nodes being selected").
+
+    The reported restart set is the **eligible** set: the expanded selection
+    minus failed points superseded by auto-inclusion (a failed point strictly
+    downstream of an auto-included sanitized node still re-executes, but the
+    restart initiates at the sanitized head). Step counts are keyed by
+    eligible point.
+
 
 Design decisions (SDP ANSTRAT-1779, aligned 2026-09-24):
 
@@ -49,10 +56,8 @@ Design decisions (SDP ANSTRAT-1779, aligned 2026-09-24):
 - An empty failure-point selection means "all currently failed nodes"
   (SDP R11/AC-15) — not an error. A non-empty selection means exactly those
   nodes. Rejected only if there are no failed nodes at all to default to.
-- The response includes a re-run step count per failure point and a
-  deduplicated total across the whole selection (SDP R11a/AC-2), computed
-  against the retained version — and, for the default selection, against
-  whatever nodes were auto-included to resolve a sanitized dependency.
+- The response includes a re-run step count per eligible restart point and a
+  deduplicated total across the whole selection (SDP R11a/AC-2).
 """
 
 from __future__ import annotations
@@ -95,7 +100,7 @@ class RestartValidation:
     auto_included_node_ids: list[str] = field(default_factory=list)
     sanitized_replacements: dict[str, list[str]] = field(default_factory=dict)
     snapshot_version: int | None = None
-    step_count_by_failure_point: dict[str, int] = field(default_factory=dict)
+    step_count_by_eligible_point: dict[str, int] = field(default_factory=dict)
     total_step_count: int = 0
 
 
@@ -192,7 +197,7 @@ def _step_counts(
     failure_point_ids: list[str],
     successors: dict[str, set[str]] | None = None,
 ) -> tuple[dict[str, int], int]:
-    """Re-run step count per failure point, plus the deduplicated total.
+    """Re-run step count per eligible restart point, plus the deduplicated total.
 
     Per-point counts are computed independently (a node reachable from two
     selected points is not double-counted within its own point's count); the
@@ -385,6 +390,35 @@ def _expand_sanitized_chain(
         added |= newly_added
 
 
+def _eligible_points(
+    snapshot_def: dict[str, Any],
+    expanded: set[str],
+    auto_included: set[str],
+) -> set[str]:
+    """Restart initiation points: the expanded selection minus superseded failed points.
+
+    A failed point strictly downstream of an auto-included sanitized node still
+    re-executes (as downstream of the sanitized head), but the restart no
+    longer *starts* there — the sanitized head supersedes it. Auto-included
+    sanitized nodes themselves always stay eligible: each must re-execute
+    fresh to regenerate raw outputs (its stored output can never be injected).
+    With no auto-inclusion, the eligible set is the requested selection
+    unchanged.
+    """
+    if not auto_included:
+        return set(expanded)
+    successors = build_successors(snapshot_def)
+    seen = set(auto_included)
+    stack = list(auto_included)
+    while stack:
+        node_id = stack.pop()
+        for nxt in successors.get(node_id, ()):
+            if nxt not in seen:
+                seen.add(nxt)
+                stack.append(nxt)
+    return set(expanded) - (seen - set(auto_included))
+
+
 def _version_reason(
     normalized: list[str],
     snapshot: WorkflowVersion | None,
@@ -527,7 +561,10 @@ async def validate_restart_from_failure(
     )
 
     snapshot_version = snapshot.version if snapshot is not None else None
-    reported_selection = final_selection if reason is None else normalized
+    if reason is None:
+        reported_selection = sorted(_eligible_points(snapshot_def, set(final_selection), set(auto_included)))
+    else:
+        reported_selection = normalized
     upstream = collect_upstream_node_ids(snapshot_def, reported_selection)
     step_counts, total_steps = _step_counts(snapshot_def, reported_selection) if snapshot is not None else ({}, 0)
     replacements = _sanitized_replacements(snapshot_def, failed_ids, completed_outputs) if snapshot is not None else {}
@@ -541,7 +578,7 @@ async def validate_restart_from_failure(
             sanitized_node_ids=sanitized,
             sanitized_replacements=replacements,
             snapshot_version=snapshot_version,
-            step_count_by_failure_point=step_counts,
+            step_count_by_eligible_point=step_counts,
             total_step_count=total_steps,
         )
 
@@ -552,6 +589,6 @@ async def validate_restart_from_failure(
         auto_included_node_ids=auto_included,
         sanitized_replacements=replacements,
         snapshot_version=snapshot_version,
-        step_count_by_failure_point=step_counts,
+        step_count_by_eligible_point=step_counts,
         total_step_count=total_steps,
     )

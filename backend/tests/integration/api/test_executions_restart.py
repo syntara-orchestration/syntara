@@ -248,7 +248,7 @@ class TestValidateRestart:
         assert data["eligible"] is True
         assert data["reason"] is None
         assert data["failure_point_ids"] == ["step_2"]
-        assert data["step_count_by_failure_point"] == {"step_2": 2}
+        assert data["step_count_by_eligible_point"] == {"step_2": 2}
         assert data["total_step_count"] == 2
 
     async def test_validate_empty_selection_defaults_to_all_failed(
@@ -395,8 +395,9 @@ class TestValidateRestart:
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data["eligible"] is True
-        assert data["failure_point_ids"] == ["step_1", "step_2"]
+        assert data["failure_point_ids"] == ["step_1"]
         assert data["auto_included_node_ids"] == ["step_1"]
+        assert data["step_count_by_eligible_point"] == {"step_1": 3}
         assert data["sanitized_node_ids"] == []
         assert data["sanitized_replacements"] == {"step_2": ["step_1"]}
 

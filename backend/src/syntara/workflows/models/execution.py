@@ -443,29 +443,34 @@ class RestartValidationResponse(SQLModel):
 
     eligible: bool = Field(description="Whether the restart is allowed to proceed")
     reason: str | None = Field(default=None, description="Rejection reason when eligible is false, null otherwise")
-    failure_point_ids: list[str] = Field(default_factory=list, description="Normalized failure points validated")
+    failure_point_ids: list[str] = Field(
+        default_factory=list,
+        description="Restart points the verdict applies to, after cleanup (trimmed, deduped, sorted). "
+        "Empty request means all currently failed nodes. On an eligible verdict this is the eligible "
+        "set actually restarted, including auto-included sanitized nodes and excluding superseded "
+        "failed points; on rejection it echoes the pre-expansion selection.",
+    )
     sanitized_node_ids: list[str] = Field(
         default_factory=list,
-        description="Upstream nodes with sanitized stored outputs referenced on the restart path",
+        description="Upstream nodes with sanitized stored outputs referenced on the restart path. "
+        "Populated when the verdict rejects; empty on eligible verdicts (see auto_included_node_ids).",
     )
     auto_included_node_ids: list[str] = Field(
         default_factory=list,
-        description="Sanitized nodes automatically added as restart points to resolve a dependency "
-        "(default selection only; empty otherwise)",
+        description="Sanitized nodes added as restart points on the default path. "
+        "Empty on explicit selections, which reject instead.",
     )
     sanitized_replacements: dict[str, list[str]] = Field(
         default_factory=dict,
-        description="For every currently-failed node, the sanitized node(s) it must be replaced by "
-        "if any (independent of the failure points actually requested) — lets the UI disallow "
-        "selecting a failed node explicitly before submitting a request",
+        description="For each currently-failed node, the sanitized nodes it must be replaced by, if any.",
     )
-    step_count_by_failure_point: dict[str, int] = Field(
+    step_count_by_eligible_point: dict[str, int] = Field(
         default_factory=dict,
-        description="Re-run step count for each selected failure point, computed against the retained version",
+        description="Re-run step count for each eligible restart point.",
     )
     total_step_count: int = Field(
         default=0,
-        description="Deduplicated total step count across the whole selection, computed against the retained version",
+        description="Deduplicated total of steps that will re-run across the eligible points.",
     )
 
 
