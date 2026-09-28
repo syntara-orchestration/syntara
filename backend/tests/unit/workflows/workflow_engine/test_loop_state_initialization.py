@@ -10,6 +10,7 @@ from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
+from temporalio.exceptions import ApplicationError
 
 from syntara.workflows.utils.namespace_resolver import NamespaceResolver
 from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkflow
@@ -166,3 +167,68 @@ class TestPreResolvedLoopStateInit:
         wf = _make_workflow(pre_resolved_outputs={"script_1": {"output": {"result": "ok"}}})
         await wf._execute_node(node, MagicMock())
         assert "script_1" not in wf.loop_state
+
+    @pytest.mark.asyncio
+    async def test_pre_resolved_foreach_with_none_items_raises_clear_error(self) -> None:
+        """Pre-resolved forEach with None items surfaces the actionable error too."""
+        node = _make_loop_node(extra_config={"items": None})
+        wf = _make_workflow(pre_resolved_outputs={"loop_1": {"output": {"status": "completed"}}})
+        with pytest.raises(ApplicationError, match="resolved to None"):
+            await wf._execute_node(node, MagicMock())
+
+
+class TestValidateForEachItems:
+    """Tests for _validate_foreach_items guard on forEach loops."""
+
+    def test_list_items_pass(self) -> None:
+        node = _make_loop_node(extra_config={"items": ["a", "b"]})
+        # Should not raise for a valid list.
+        OrchestratorWorkflow._validate_foreach_items(node, ["a", "b"])
+
+    def test_empty_list_items_pass(self) -> None:
+        node = _make_loop_node(extra_config={"items": "${trigger.hosts}"})
+        # An empty list is a valid (zero-iteration) forEach, not an error.
+        OrchestratorWorkflow._validate_foreach_items(node, [])
+
+    def test_none_items_raise_application_error_naming_expression(self) -> None:
+        node = _make_loop_node(extra_config={"items": "${trigger.affected_hosts}"})
+        with pytest.raises(ApplicationError, match="resolved to None") as exc_info:
+            OrchestratorWorkflow._validate_foreach_items(node, None)
+        # Message names the failing expression and points to trigger/upstream data.
+        assert "${trigger.affected_hosts}" in str(exc_info.value)
+        assert "trigger" in str(exc_info.value)
+        assert exc_info.value.non_retryable is True
+
+    def test_non_list_items_raise_application_error_naming_expression(self) -> None:
+        node = _make_loop_node(extra_config={"items": "${trigger.data}"})
+        with pytest.raises(ApplicationError, match="must resolve to a list") as exc_info:
+            OrchestratorWorkflow._validate_foreach_items(node, {"not": "a list"})
+        assert "${trigger.data}" in str(exc_info.value)
+        assert "dict" in str(exc_info.value)
+        assert exc_info.value.non_retryable is True
+
+    def test_none_items_with_missing_expression_key(self) -> None:
+        """When node.parameters has no 'items' key, error message must not say 'None resolved to None'."""
+        node = _make_loop_node()  # no extra_config → no "items" key in parameters
+        with pytest.raises(ApplicationError, match="resolved to None") as exc_info:
+            OrchestratorWorkflow._validate_foreach_items(node, None)
+        # items_expression falls back to "" — message should not contain "None resolved"
+        assert "None resolved" not in str(exc_info.value)
+
+    @pytest.mark.asyncio
+    async def test_execute_loop_node_raises_on_none_items(self) -> None:
+        """_execute_loop_node fails fast (before running the loop activity) on None items."""
+        wf = _make_workflow()
+        wf._runtime_settings = {}
+        node = _make_loop_node(extra_config={"items": "${trigger.affected_hosts}"})
+        with pytest.raises(ApplicationError, match="resolved to None"):
+            await wf._execute_loop_node("loop_1", node, {"type": LoopType.FOR_EACH, "items": None})
+
+    @pytest.mark.asyncio
+    async def test_execute_loop_node_raises_on_non_list_items(self) -> None:
+        """_execute_loop_node fails fast on a non-list, non-None items value."""
+        wf = _make_workflow()
+        wf._runtime_settings = {}
+        node = _make_loop_node(extra_config={"items": "${trigger.data}"})
+        with pytest.raises(ApplicationError, match="must resolve to a list"):
+            await wf._execute_loop_node("loop_1", node, {"type": LoopType.FOR_EACH, "items": 42})

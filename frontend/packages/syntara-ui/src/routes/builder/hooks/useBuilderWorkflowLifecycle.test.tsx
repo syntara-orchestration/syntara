@@ -2,7 +2,6 @@ import type { WorkflowAPI } from '@syntara/contracts'
 import { renderHook, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 
-import type { WorkflowDefinition } from '../../../stores/workflowStoreTypes'
 import type { BuilderAction } from '../builderReducer'
 import type { EdgeConnection } from '../types/edge'
 import { DEFAULT_WORKFLOW_NAME } from '../utils/workflowNaming'
@@ -19,7 +18,7 @@ const processExistingWorkflowMock = vi.hoisted(() =>
       name: 'processed',
       description: '',
       workflow: { activities: [] },
-    } as WorkflowDefinition,
+    },
     generatedEdges: [] as EdgeConnection[],
     initPayload: { name: 'processed', description: 'd' },
   }))
@@ -169,7 +168,7 @@ describe('useBuilderWorkflowLifecycle', () => {
         name: wf.name,
         description: wf.description ?? '',
         workflow: { activities: [] },
-      } as WorkflowDefinition,
+      },
       generatedEdges: [] as EdgeConnection[],
       initPayload: {
         name: wf.name,

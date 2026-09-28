@@ -1,4 +1,3 @@
-import { zodResolver } from '@hookform/resolvers/zod'
 import {
   Alert,
   Button,
@@ -6,9 +5,6 @@ import {
   ClipboardCopy,
   Form,
   FormGroup,
-  FormHelperText,
-  HelperText,
-  HelperTextItem,
   MenuToggle,
   Modal,
   ModalBody,
@@ -16,17 +12,18 @@ import {
   ModalHeader,
   SelectList,
   SelectOption,
-  TextArea,
   TextInput,
 } from '@patternfly/react-core'
-import { RhUiAddIcon, RhUiErrorIcon } from '@patternfly/react-icons'
+import { RhUiAddIcon } from '@patternfly/react-icons'
 import { type FormEvent, type Ref, useCallback, useMemo, useState } from 'react'
-import { Controller, useForm } from 'react-hook-form'
 
 import { tanstackRouter } from '../../../app/tanstackRouter'
-import { FormFieldError } from '../../../components/FormFieldError'
+import { SynForm } from '../../../components/forms/SynForm'
+import { SynFormField } from '../../../components/forms/SynFormField'
+import { SynTextAreaField } from '../../../components/forms/SynTextAreaField'
+import { SynTextField } from '../../../components/forms/SynTextField'
 import { SynSelect } from '../../../components/SynSelect'
-import { useFormMutationErrorHandler } from '../../../hooks/useFormMutationErrorHandler'
+import { useSynForm } from '../../../hooks/useSynForm'
 import { useAlerts } from '../../../providers/alerts'
 import { formatExpirationDate } from '../../../utils/dateUtils'
 import { detachPromise } from '../../../utils/detachPromise'
@@ -36,7 +33,11 @@ import { getServiceAccountDetailPath } from '../accessManagementPaths'
 
 import { CredentialExpirationField } from './CredentialExpirationField'
 import { serviceAccountHelp } from './serviceAccountFieldHelp'
-import { createServiceAccountSchema, type CreateServiceAccountFormData } from './serviceAccountFormSchema'
+import {
+  createServiceAccountSchema,
+  SERVICE_ACCOUNT_NAME_HINT,
+  type CreateServiceAccountFormData,
+} from './serviceAccountFormSchema'
 import { useCredentialExpirationDate } from './useCredentialExpirationDate'
 
 type CreateServiceAccountModalProps = {
@@ -200,7 +201,7 @@ function useCreateServiceAccountSubmit({
   )
 
   const submit = useCallback(
-    (formData: CreateServiceAccountFormData, handleError: ReturnType<typeof useFormMutationErrorHandler>) => {
+    (formData: CreateServiceAccountFormData, handleError: ReturnType<typeof useSynForm>['handleError']) => {
       createServiceAccount(
         {
           body: {
@@ -287,12 +288,13 @@ function CreateServiceAccountFormPhase({
     [projects]
   )
 
-  const { control, handleSubmit, setError } = useForm<CreateServiceAccountFormData>({
-    resolver: zodResolver(createServiceAccountSchema, undefined, { mode: 'sync' }),
+  const form = useSynForm({
+    schema: createServiceAccountSchema,
     defaultValues: { name: '', description: '', project_id: '' },
+    onClose: onCancel,
   })
+  const { handleSubmit, handleError, handleClose } = form
 
-  const handleError = useFormMutationErrorHandler<CreateServiceAccountFormData>(setError)
   const onSubmit = useCallback(
     (formData: CreateServiceAccountFormData) => submit(formData, handleError),
     [submit, handleError]
@@ -312,70 +314,41 @@ function CreateServiceAccountFormPhase({
     <>
       <ModalBody>
         <Form id="create-service-account-form" onSubmit={handleFormSubmit}>
-          <Controller
-            name="project_id"
-            control={control}
-            render={({ field, fieldState }) => (
-              <FormGroup label="Project" fieldId="sa-project" isRequired labelHelp={serviceAccountHelp.project}>
+          <SynForm form={form}>
+            <SynFormField
+              name="project_id"
+              label="Project"
+              fieldId="sa-project"
+              isRequired
+              labelHelp={serviceAccountHelp.project}
+            >
+              {({ field }) => (
                 <ProjectSelect
-                  value={field.value}
+                  value={field.value as string}
                   onChange={field.onChange}
                   onBlur={field.onBlur}
                   projects={projectOptions}
                 />
-                <FormFieldError message={fieldState.error?.message} />
-              </FormGroup>
-            )}
-          />
-          <Controller
-            name="name"
-            control={control}
-            render={({ field, fieldState }) => (
-              <FormGroup label="Name" fieldId="sa-name" isRequired labelHelp={serviceAccountHelp.name}>
-                <TextInput
-                  id="sa-name"
-                  aria-label="Name"
-                  placeholder="my-service-account"
-                  validated={fieldState.error ? 'error' : 'default'}
-                  value={field.value ?? ''}
-                  onChange={field.onChange}
-                  onBlur={field.onBlur}
-                  name={field.name}
-                />
-                <FormHelperText>
-                  <HelperText>
-                    <HelperTextItem
-                      variant={fieldState.error ? 'error' : 'default'}
-                      icon={fieldState.error ? <RhUiErrorIcon /> : undefined}
-                    >
-                      {fieldState.error?.message ??
-                        'Lowercase letters, numbers, and hyphens. Must start and end with a letter or number.'}
-                    </HelperTextItem>
-                  </HelperText>
-                </FormHelperText>
-              </FormGroup>
-            )}
-          />
-          <Controller
-            name="description"
-            control={control}
-            render={({ field, fieldState }) => (
-              <FormGroup label="Description" fieldId="sa-description" labelHelp={serviceAccountHelp.description}>
-                <TextArea
-                  id="sa-description"
-                  aria-label="Description"
-                  placeholder="Describe the purpose of this service account"
-                  validated={fieldState.error ? 'error' : 'default'}
-                  value={field.value ?? ''}
-                  onChange={field.onChange}
-                  onBlur={field.onBlur}
-                  name={field.name}
-                  rows={3}
-                />
-                <FormFieldError message={fieldState.error?.message} />
-              </FormGroup>
-            )}
-          />
+              )}
+            </SynFormField>
+            <SynTextField
+              name="name"
+              label="Name"
+              fieldId="sa-name"
+              isRequired
+              placeholder="my-service-account"
+              hint={SERVICE_ACCOUNT_NAME_HINT}
+              labelHelp={serviceAccountHelp.name}
+            />
+            <SynTextAreaField
+              name="description"
+              label="Description"
+              fieldId="sa-description"
+              placeholder="Describe the purpose of this service account"
+              rows={3}
+              labelHelp={serviceAccountHelp.description}
+            />
+          </SynForm>
           <CredentialExpirationField
             selectedDate={expiresAt}
             onDateChange={handleDateChange}
@@ -399,7 +372,7 @@ function CreateServiceAccountFormPhase({
         >
           Create service account
         </Button>
-        <Button variant="link" onClick={onCancel} isDisabled={isPending}>
+        <Button variant="link" onClick={handleClose} isDisabled={isPending}>
           Cancel
         </Button>
       </ModalFooter>

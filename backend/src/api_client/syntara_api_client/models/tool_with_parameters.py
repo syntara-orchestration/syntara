@@ -14,6 +14,7 @@ from ..types import UNSET, Unset
 if TYPE_CHECKING:
     from ..models.tool_parameter import ToolParameter
     from ..models.tool_with_parameters_labels import ToolWithParametersLabels
+    from ..models.user_reference import UserReference
 
 
 T = TypeVar("T", bound="ToolWithParameters")
@@ -24,7 +25,6 @@ class ToolWithParameters:
     """Schema for Tool response with ToolParameter details.
 
     Attributes:
-        created_by (UUID): User (or automation) that created the resource Example: 770e8400-e29b-41d4-a716-446655440000.
         name (str): Human-readable name for the resource Example: Authentication Service.
         integration_id (UUID): UUID of the owning Integration (mcp_server)
         namespaced_name (str): Unique namespaced name for the tool
@@ -34,10 +34,10 @@ class ToolWithParameters:
         updated_at (datetime.datetime | Unset): Timestamp when resource was last updated Example: 2025-10-09T12:30:00Z.
         labels (ToolWithParametersLabels | Unset): Key-value pairs for resource labeling and filtering Example:
             {'environment': 'production', 'region': 'us-east-1', 'team': 'platform'}.
-        updated_by (None | Unset | UUID): User (or automation) that last updated the resource Example:
-            880e8400-e29b-41d4-a716-446655440000.
         description (None | str | Unset): Detailed description of the resource Example: Handles user authentication and
             authorization workflows.
+        created_by (None | Unset | UserReference): User who created the tool
+        updated_by (None | Unset | UserReference): User who last modified the tool
         enabled (bool | Unset): Whether the tool is enabled Default: True.
         status (ToolStatus | Unset): Status of a tool.
         last_executed_at (datetime.datetime | None | Unset): Timestamp of last execution
@@ -45,7 +45,6 @@ class ToolWithParameters:
         refresh_error (None | str | Unset): Error message from last refresh attempt
     """
 
-    created_by: UUID
     name: str
     integration_id: UUID
     namespaced_name: str
@@ -54,8 +53,9 @@ class ToolWithParameters:
     created_at: datetime.datetime | Unset = UNSET
     updated_at: datetime.datetime | Unset = UNSET
     labels: ToolWithParametersLabels | Unset = UNSET
-    updated_by: None | Unset | UUID = UNSET
     description: None | str | Unset = UNSET
+    created_by: None | Unset | UserReference = UNSET
+    updated_by: None | Unset | UserReference = UNSET
     enabled: bool | Unset = True
     status: ToolStatus | Unset = UNSET
     last_executed_at: datetime.datetime | None | Unset = UNSET
@@ -63,7 +63,7 @@ class ToolWithParameters:
     refresh_error: None | str | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
-        created_by = str(self.created_by)
+        from ..models.user_reference import UserReference
 
         name = self.name
 
@@ -92,19 +92,27 @@ class ToolWithParameters:
         if not isinstance(self.labels, Unset):
             labels = self.labels.to_dict()
 
-        updated_by: None | str | Unset
-        if isinstance(self.updated_by, Unset):
-            updated_by = UNSET
-        elif isinstance(self.updated_by, UUID):
-            updated_by = str(self.updated_by)
-        else:
-            updated_by = self.updated_by
-
         description: None | str | Unset
         if isinstance(self.description, Unset):
             description = UNSET
         else:
             description = self.description
+
+        created_by: dict[str, Any] | None | Unset
+        if isinstance(self.created_by, Unset):
+            created_by = UNSET
+        elif isinstance(self.created_by, UserReference):
+            created_by = self.created_by.to_dict()
+        else:
+            created_by = self.created_by
+
+        updated_by: dict[str, Any] | None | Unset
+        if isinstance(self.updated_by, Unset):
+            updated_by = UNSET
+        elif isinstance(self.updated_by, UserReference):
+            updated_by = self.updated_by.to_dict()
+        else:
+            updated_by = self.updated_by
 
         enabled = self.enabled
 
@@ -138,7 +146,6 @@ class ToolWithParameters:
 
         field_dict.update(
             {
-                "created_by": created_by,
                 "name": name,
                 "integration_id": integration_id,
                 "namespaced_name": namespaced_name,
@@ -153,10 +160,12 @@ class ToolWithParameters:
             field_dict["updated_at"] = updated_at
         if labels is not UNSET:
             field_dict["labels"] = labels
-        if updated_by is not UNSET:
-            field_dict["updated_by"] = updated_by
         if description is not UNSET:
             field_dict["description"] = description
+        if created_by is not UNSET:
+            field_dict["created_by"] = created_by
+        if updated_by is not UNSET:
+            field_dict["updated_by"] = updated_by
         if enabled is not UNSET:
             field_dict["enabled"] = enabled
         if status is not UNSET:
@@ -174,10 +183,9 @@ class ToolWithParameters:
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         from ..models.tool_parameter import ToolParameter
         from ..models.tool_with_parameters_labels import ToolWithParametersLabels
+        from ..models.user_reference import UserReference
 
         d = dict(src_dict)
-        created_by = UUID(d.pop("created_by"))
-
         name = d.pop("name")
 
         integration_id = UUID(d.pop("integration_id"))
@@ -219,23 +227,6 @@ class ToolWithParameters:
         else:
             labels = ToolWithParametersLabels.from_dict(_labels)
 
-        def _parse_updated_by(data: object) -> None | Unset | UUID:
-            if data is None:
-                return data
-            if isinstance(data, Unset):
-                return data
-            try:
-                if not isinstance(data, str):
-                    raise TypeError()
-                updated_by_type_0 = UUID(data)
-
-                return updated_by_type_0
-            except (TypeError, ValueError, AttributeError, KeyError):
-                pass
-            return cast(None | Unset | UUID, data)
-
-        updated_by = _parse_updated_by(d.pop("updated_by", UNSET))
-
         def _parse_description(data: object) -> None | str | Unset:
             if data is None:
                 return data
@@ -244,6 +235,40 @@ class ToolWithParameters:
             return cast(None | str | Unset, data)
 
         description = _parse_description(d.pop("description", UNSET))
+
+        def _parse_created_by(data: object) -> None | Unset | UserReference:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            try:
+                if not isinstance(data, dict):
+                    raise TypeError()
+                created_by_type_0 = UserReference.from_dict(data)
+
+                return created_by_type_0
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            return cast(None | Unset | UserReference, data)
+
+        created_by = _parse_created_by(d.pop("created_by", UNSET))
+
+        def _parse_updated_by(data: object) -> None | Unset | UserReference:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            try:
+                if not isinstance(data, dict):
+                    raise TypeError()
+                updated_by_type_0 = UserReference.from_dict(data)
+
+                return updated_by_type_0
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            return cast(None | Unset | UserReference, data)
+
+        updated_by = _parse_updated_by(d.pop("updated_by", UNSET))
 
         enabled = d.pop("enabled", UNSET)
 
@@ -298,7 +323,6 @@ class ToolWithParameters:
         refresh_error = _parse_refresh_error(d.pop("refresh_error", UNSET))
 
         tool_with_parameters = cls(
-            created_by=created_by,
             name=name,
             integration_id=integration_id,
             namespaced_name=namespaced_name,
@@ -307,8 +331,9 @@ class ToolWithParameters:
             created_at=created_at,
             updated_at=updated_at,
             labels=labels,
-            updated_by=updated_by,
             description=description,
+            created_by=created_by,
+            updated_by=updated_by,
             enabled=enabled,
             status=status,
             last_executed_at=last_executed_at,

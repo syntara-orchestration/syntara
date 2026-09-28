@@ -29,6 +29,7 @@ class ValidationCategory(StrEnum):
     orphaned_node = "orphaned_node"
     converge_configuration = "converge_configuration"
     approval_configuration = "approval_configuration"
+    definition_limits = "definition_limits"
 
 
 class ValidationFinding(SQLModel):

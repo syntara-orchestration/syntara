@@ -13,6 +13,7 @@ from ..types import UNSET, Unset
 if TYPE_CHECKING:
     from ..models.membership_source import MembershipSource
     from ..models.user_group_read_labels import UserGroupReadLabels
+    from ..models.user_reference import UserReference
 
 
 T = TypeVar("T", bound="UserGroupRead")
@@ -31,7 +32,7 @@ class UserGroupRead:
             {'environment': 'production', 'region': 'us-east-1', 'team': 'platform'}.
         description (None | str | Unset):
         is_builtin (bool | Unset):  Default: False.
-        created_by (None | Unset | UUID):
+        created_by (None | Unset | UserReference): User who created the group
         source (str | Unset):  Default: 'local'.
         member_count (int | Unset):  Default: 0.
         membership_sources (list[MembershipSource] | Unset): How this user was assigned to this group
@@ -44,12 +45,14 @@ class UserGroupRead:
     labels: UserGroupReadLabels | Unset = UNSET
     description: None | str | Unset = UNSET
     is_builtin: bool | Unset = False
-    created_by: None | Unset | UUID = UNSET
+    created_by: None | Unset | UserReference = UNSET
     source: str | Unset = "local"
     member_count: int | Unset = 0
     membership_sources: list[MembershipSource] | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
+        from ..models.user_reference import UserReference
+
         name = self.name
 
         id: str | Unset = UNSET
@@ -76,11 +79,11 @@ class UserGroupRead:
 
         is_builtin = self.is_builtin
 
-        created_by: None | str | Unset
+        created_by: dict[str, Any] | None | Unset
         if isinstance(self.created_by, Unset):
             created_by = UNSET
-        elif isinstance(self.created_by, UUID):
-            created_by = str(self.created_by)
+        elif isinstance(self.created_by, UserReference):
+            created_by = self.created_by.to_dict()
         else:
             created_by = self.created_by
 
@@ -129,6 +132,7 @@ class UserGroupRead:
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         from ..models.membership_source import MembershipSource
         from ..models.user_group_read_labels import UserGroupReadLabels
+        from ..models.user_reference import UserReference
 
         d = dict(src_dict)
         name = d.pop("name")
@@ -172,20 +176,20 @@ class UserGroupRead:
 
         is_builtin = d.pop("is_builtin", UNSET)
 
-        def _parse_created_by(data: object) -> None | Unset | UUID:
+        def _parse_created_by(data: object) -> None | Unset | UserReference:
             if data is None:
                 return data
             if isinstance(data, Unset):
                 return data
             try:
-                if not isinstance(data, str):
+                if not isinstance(data, dict):
                     raise TypeError()
-                created_by_type_0 = UUID(data)
+                created_by_type_0 = UserReference.from_dict(data)
 
                 return created_by_type_0
             except (TypeError, ValueError, AttributeError, KeyError):
                 pass
-            return cast(None | Unset | UUID, data)
+            return cast(None | Unset | UserReference, data)
 
         created_by = _parse_created_by(d.pop("created_by", UNSET))
 

@@ -1,6 +1,6 @@
 import { FormGroup, FormHelperText, HelperText, HelperTextItem, Switch } from '@patternfly/react-core'
 import { RhUiErrorIcon } from '@patternfly/react-icons'
-import { Controller, type Control, type FieldValues, type Path, type PathValue } from 'react-hook-form'
+import { Controller, type Control, type FieldValues, type Path } from 'react-hook-form'
 
 import { integrationHelp } from '../integrationFieldHelp'
 
@@ -38,7 +38,7 @@ export function ScopeFields<T extends FieldValues>({
               isChecked={field.value === 'global'}
               onChange={(_event, checked) => {
                 const newScope = checked ? 'global' : 'project'
-                field.onChange(newScope as PathValue<T, Path<T>>)
+                field.onChange(newScope)
                 onScopeChange?.(newScope)
               }}
             />
@@ -64,7 +64,7 @@ export function ScopeFields<T extends FieldValues>({
               <>
                 <ProjectMultiSelect
                   selectedIds={(field.value as string[]) ?? []}
-                  onChange={(ids) => field.onChange(ids as PathValue<T, Path<T>>)}
+                  onChange={(ids) => field.onChange(ids)}
                   validated={fieldState.error ? 'error' : 'default'}
                 />
                 {fieldState.error && (

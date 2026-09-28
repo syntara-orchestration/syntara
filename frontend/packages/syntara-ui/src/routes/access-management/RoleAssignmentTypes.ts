@@ -6,6 +6,20 @@ export const RolePrincipalType = {
 
 export type RolePrincipalType = (typeof RolePrincipalType)[keyof typeof RolePrincipalType]
 
+/** API scope values for role assignments (system-wide vs project-scoped). */
+export const RoleAssignmentScope = {
+  SYSTEM: 'system',
+  PROJECT: 'project',
+} as const
+
+export type RoleAssignmentScope = (typeof RoleAssignmentScope)[keyof typeof RoleAssignmentScope]
+
+/** Select options for assignment scope (API values with display labels). */
+export const roleAssignmentScopeOptions: { value: RoleAssignmentScope; label: string }[] = [
+  { value: RoleAssignmentScope.SYSTEM, label: 'System' },
+  { value: RoleAssignmentScope.PROJECT, label: 'Project' },
+]
+
 type PrincipalTypeLabelColor = 'teal' | 'orange' | 'purple'
 
 /** Display config for principal type labels in assignment tables (UX skill §11). */

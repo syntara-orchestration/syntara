@@ -13,6 +13,7 @@ from ..types import UNSET, Unset
 if TYPE_CHECKING:
     from ..models.identity_provider_read_labels import IdentityProviderReadLabels
     from ..models.oidc_configuration_response import OIDCConfigurationResponse
+    from ..models.user_reference import UserReference
 
 
 T = TypeVar("T", bound="IdentityProviderRead")
@@ -23,7 +24,6 @@ class IdentityProviderRead:
     """Schema for IdentityProvider response with configuration details (excludes secrets).
 
     Attributes:
-        created_by (UUID): User (or automation) that created the resource Example: 770e8400-e29b-41d4-a716-446655440000.
         name (str): Human-readable provider name Example: Authentication Service.
         configuration (OIDCConfigurationResponse): Response schema for OIDC configuration (excludes client_secret).
         id (UUID | Unset): Unique identifier for the resource Example: 550e8400-e29b-41d4-a716-446655440000.
@@ -31,26 +31,26 @@ class IdentityProviderRead:
         updated_at (datetime.datetime | Unset): Timestamp when resource was last updated Example: 2025-10-09T12:30:00Z.
         labels (IdentityProviderReadLabels | Unset): Key-value pairs for resource labeling and filtering Example:
             {'environment': 'production', 'region': 'us-east-1', 'team': 'platform'}.
-        updated_by (None | Unset | UUID): User (or automation) that last updated the resource Example:
-            880e8400-e29b-41d4-a716-446655440000.
         description (None | str | Unset): Detailed description of the resource Example: Handles user authentication and
             authorization workflows.
+        created_by (None | Unset | UserReference): User who created the identity provider
+        updated_by (None | Unset | UserReference): User who last modified the identity provider
         enabled (bool | Unset): Enable/disable the identity provider Default: True.
     """
 
-    created_by: UUID
     name: str
     configuration: OIDCConfigurationResponse
     id: UUID | Unset = UNSET
     created_at: datetime.datetime | Unset = UNSET
     updated_at: datetime.datetime | Unset = UNSET
     labels: IdentityProviderReadLabels | Unset = UNSET
-    updated_by: None | Unset | UUID = UNSET
     description: None | str | Unset = UNSET
+    created_by: None | Unset | UserReference = UNSET
+    updated_by: None | Unset | UserReference = UNSET
     enabled: bool | Unset = True
 
     def to_dict(self) -> dict[str, Any]:
-        created_by = str(self.created_by)
+        from ..models.user_reference import UserReference
 
         name = self.name
 
@@ -72,19 +72,27 @@ class IdentityProviderRead:
         if not isinstance(self.labels, Unset):
             labels = self.labels.to_dict()
 
-        updated_by: None | str | Unset
-        if isinstance(self.updated_by, Unset):
-            updated_by = UNSET
-        elif isinstance(self.updated_by, UUID):
-            updated_by = str(self.updated_by)
-        else:
-            updated_by = self.updated_by
-
         description: None | str | Unset
         if isinstance(self.description, Unset):
             description = UNSET
         else:
             description = self.description
+
+        created_by: dict[str, Any] | None | Unset
+        if isinstance(self.created_by, Unset):
+            created_by = UNSET
+        elif isinstance(self.created_by, UserReference):
+            created_by = self.created_by.to_dict()
+        else:
+            created_by = self.created_by
+
+        updated_by: dict[str, Any] | None | Unset
+        if isinstance(self.updated_by, Unset):
+            updated_by = UNSET
+        elif isinstance(self.updated_by, UserReference):
+            updated_by = self.updated_by.to_dict()
+        else:
+            updated_by = self.updated_by
 
         enabled = self.enabled
 
@@ -92,7 +100,6 @@ class IdentityProviderRead:
 
         field_dict.update(
             {
-                "created_by": created_by,
                 "name": name,
                 "configuration": configuration,
             }
@@ -105,10 +112,12 @@ class IdentityProviderRead:
             field_dict["updated_at"] = updated_at
         if labels is not UNSET:
             field_dict["labels"] = labels
-        if updated_by is not UNSET:
-            field_dict["updated_by"] = updated_by
         if description is not UNSET:
             field_dict["description"] = description
+        if created_by is not UNSET:
+            field_dict["created_by"] = created_by
+        if updated_by is not UNSET:
+            field_dict["updated_by"] = updated_by
         if enabled is not UNSET:
             field_dict["enabled"] = enabled
 
@@ -118,10 +127,9 @@ class IdentityProviderRead:
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         from ..models.identity_provider_read_labels import IdentityProviderReadLabels
         from ..models.oidc_configuration_response import OIDCConfigurationResponse
+        from ..models.user_reference import UserReference
 
         d = dict(src_dict)
-        created_by = UUID(d.pop("created_by"))
-
         name = d.pop("name")
 
         configuration = OIDCConfigurationResponse.from_dict(d.pop("configuration"))
@@ -154,23 +162,6 @@ class IdentityProviderRead:
         else:
             labels = IdentityProviderReadLabels.from_dict(_labels)
 
-        def _parse_updated_by(data: object) -> None | Unset | UUID:
-            if data is None:
-                return data
-            if isinstance(data, Unset):
-                return data
-            try:
-                if not isinstance(data, str):
-                    raise TypeError()
-                updated_by_type_0 = UUID(data)
-
-                return updated_by_type_0
-            except (TypeError, ValueError, AttributeError, KeyError):
-                pass
-            return cast(None | Unset | UUID, data)
-
-        updated_by = _parse_updated_by(d.pop("updated_by", UNSET))
-
         def _parse_description(data: object) -> None | str | Unset:
             if data is None:
                 return data
@@ -180,18 +171,52 @@ class IdentityProviderRead:
 
         description = _parse_description(d.pop("description", UNSET))
 
+        def _parse_created_by(data: object) -> None | Unset | UserReference:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            try:
+                if not isinstance(data, dict):
+                    raise TypeError()
+                created_by_type_0 = UserReference.from_dict(data)
+
+                return created_by_type_0
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            return cast(None | Unset | UserReference, data)
+
+        created_by = _parse_created_by(d.pop("created_by", UNSET))
+
+        def _parse_updated_by(data: object) -> None | Unset | UserReference:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            try:
+                if not isinstance(data, dict):
+                    raise TypeError()
+                updated_by_type_0 = UserReference.from_dict(data)
+
+                return updated_by_type_0
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            return cast(None | Unset | UserReference, data)
+
+        updated_by = _parse_updated_by(d.pop("updated_by", UNSET))
+
         enabled = d.pop("enabled", UNSET)
 
         identity_provider_read = cls(
-            created_by=created_by,
             name=name,
             configuration=configuration,
             id=id,
             created_at=created_at,
             updated_at=updated_at,
             labels=labels,
-            updated_by=updated_by,
             description=description,
+            created_by=created_by,
+            updated_by=updated_by,
             enabled=enabled,
         )
 

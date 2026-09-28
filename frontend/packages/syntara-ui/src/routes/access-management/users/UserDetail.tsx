@@ -195,13 +195,19 @@ function UserDetailsTab({
 
 type UserTab = 'details' | 'groups' | 'identities' | 'roles' | 'permissions' | 'check-access'
 
-function computeVisibleTabs(
-  canReadGroups: boolean,
-  canReadIdentities: boolean,
-  canReadAssignments: boolean,
-  isOwnProfile: boolean,
+function computeVisibleTabs({
+  canReadGroups,
+  canReadIdentities,
+  canReadAssignments,
+  isOwnProfile,
+  isLoading,
+}: {
+  canReadGroups: boolean
+  canReadIdentities: boolean
+  canReadAssignments: boolean
+  isOwnProfile: boolean
   isLoading: boolean
-): UserTab[] {
+}): UserTab[] {
   const tabs: UserTab[] = ['details']
   if (isLoading || canReadGroups) tabs.push('groups')
   if (isLoading || canReadIdentities) tabs.push('identities')
@@ -307,7 +313,12 @@ function UserDetailTabContent({
         />
       )}
       {activeTab === 'roles' && validTabs.includes('roles') && (
-        <RoleAssignmentsPanel principalType={RolePrincipalType.USER} principalId={userId} />
+        <RoleAssignmentsPanel
+          principalType={RolePrincipalType.USER}
+          principalId={userId}
+          tabKey="roles"
+          tabLabel="Assignments"
+        />
       )}
       {activeTab === 'permissions' && isOwnProfile && <MyPermissionsView />}
       {activeTab === 'check-access' && isOwnProfile && <UserCheckAccessTab />}
@@ -359,7 +370,14 @@ export function UserDetail({ isMyProfile }: Readonly<UserDetailProps> = {}) {
   const isOwnProfile = !!userId && !!currentUserId && userId === currentUserId
 
   const validTabs = useMemo(
-    () => computeVisibleTabs(canReadGroups, canReadIdentities, canReadAssignments, isOwnProfile, permissionsLoading),
+    () =>
+      computeVisibleTabs({
+        canReadGroups,
+        canReadIdentities,
+        canReadAssignments,
+        isOwnProfile,
+        isLoading: permissionsLoading,
+      }),
     [canReadGroups, canReadIdentities, canReadAssignments, isOwnProfile, permissionsLoading]
   )
 

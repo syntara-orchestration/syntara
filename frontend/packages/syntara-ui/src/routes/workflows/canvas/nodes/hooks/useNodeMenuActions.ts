@@ -51,7 +51,7 @@ function buildBuilderActions(
   handlers: BuilderActionHandlers
 ): NodeMenuAction[] {
   if (nodeType === MenuNodeType.CONTROL_FLOW) {
-    return [{ id: 'replace', label: 'Replace step', onClick: handlers.onReplace, icon: createElement(RhUiSyncIcon) }]
+    return [{ id: 'replace', label: 'Replace', onClick: handlers.onReplace, icon: createElement(RhUiSyncIcon) }]
   }
 
   const activityActions: NodeMenuAction[] =
@@ -60,17 +60,17 @@ function buildBuilderActions(
           { id: 'run-step', label: 'Run step', onClick: handlers.onRunStep, icon: createElement(RhUiPlayIcon) },
           {
             id: 'toggle-disabled',
-            label: disabled ? 'Enable step' : 'Disable step',
+            label: disabled ? 'Enable' : 'Disable',
             onClick: handlers.onToggleDisabled,
             icon: createElement(disabled ? RhUiCheckCircleIcon : RhUiBanIcon),
           },
           {
             id: 'duplicate',
-            label: 'Duplicate step',
+            label: 'Duplicate',
             onClick: handlers.onDuplicate,
             icon: createElement(RhUiDuplicateIcon),
           },
-          { id: 'replace', label: 'Replace step', onClick: handlers.onReplace, icon: createElement(RhUiSyncIcon) },
+          { id: 'replace', label: 'Replace', onClick: handlers.onReplace, icon: createElement(RhUiSyncIcon) },
         ]
       : []
 
@@ -176,7 +176,7 @@ export function useNodeMenuActions(options: UseNodeMenuActionsOptions): NodeMenu
 
   const deleteAction: NodeMenuAction = {
     id: 'delete',
-    label: 'Delete step',
+    label: 'Delete',
     onClick: handleDelete,
     variant: 'danger',
     icon: createElement(RhUiTrashIcon),

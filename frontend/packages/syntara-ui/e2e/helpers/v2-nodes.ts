@@ -28,6 +28,7 @@ import {
   closeNodeEditorPanel,
   fillCodeEditor,
   openNodeForEditing,
+  triggerLayout,
 } from './workflows'
 
 export { ensureLlmCredential, createLlmIntegration, deleteLlmIntegration, selectLlmCredential }
@@ -155,13 +156,18 @@ export async function addHttpRequestNode(page: Page, name: string, url = 'https:
  * Add a Task Agent node (v2 type: "agentic").
  * Caller must call `createLlmIntegration()` before using this helper
  * so the model dropdown has selectable options.
+ *
+ * Pass `integrationName` (the unique name from `createLlmIntegration`) so the
+ * model picker waits for that integration's options instead of racing a
+ * two-second timeout against a stale or empty dropdown.
  */
-export async function addAgenticNode(page: Page, name: string, prompt = 'Analyze the data') {
+export async function addAgenticNode(page: Page, name: string, prompt = 'Analyze the data', integrationName?: string) {
   const { name: credName } = await ensureLlmCredential(page)
   await openAddNodePanel(page)
   await selectDirectNodeType(page, 'Task Agent')
+  await expectAiAgentNodeFormReady(page)
   await page.getByRole('textbox', { name: 'Name', exact: true }).fill(name)
-  await selectLlmCredential(page, credName)
+  await selectLlmCredential(page, credName, integrationName)
   await page.getByRole('textbox', { name: 'Prompt', exact: true }).fill(prompt)
   await page.getByRole('button', { name: 'Create', exact: true }).click()
   await closeNodeEditorPanel(page)
@@ -262,45 +268,14 @@ export async function addApprovalNode(page: Page, name: string) {
  * Add an approval node with a script node on the "approved" branch.
  * This creates a valid workflow that can be saved.
  * The "rejected" branch is optional per validation rules.
+ *
+ * Uses `addScriptOnHandle` (layout + fit-view retries) instead of `getByText`
+ * on the canvas label — React Flow semantic zoom hides node text once the
+ * graph is large enough that fit-view drops below SEMANTIC_ZOOM_MAX_SCALE.
  */
 export async function addApprovalNodeWithBranch(page: Page, name: string) {
   await addApprovalNode(page, name)
-
-  // Add a node on the "approved" branch to satisfy validation
-  // The "rejected" branch is optional
-
-  // Wait for approval node to be fully rendered before interacting with its edges
-  await expect(page.getByText(name)).toBeVisible({ timeout: 5000 })
-
-  // Click layout to position nodes and make button edges visible
-  const layoutButton = page.getByRole('button', { name: 'Layout' })
-  if ((await layoutButton.count()) > 0) {
-    await layoutButton.click()
-  }
-
-  // The approval node creates TWO button edges (to placeholders):
-  // 1. One with data-testid="add-node-button-approved"
-  // 2. One with data-testid="add-node-button-rejected"
-  //
-  // We need to click the "approved" button to add a node on the approved branch.
-
-  const approvedButton = page.getByTestId('add-node-button-approved')
-  await expect(approvedButton).toBeVisible({ timeout: 5000 })
-  await approvedButton.click({ force: true })
-
-  await expect(addNodePanel(page)).toHaveCount(1)
-
-  await selectCategoryAndType(page, 'Action', 'Script')
-
-  // Wait for the form to be fully loaded before filling
-  const nameInput = page.getByRole('textbox', { name: 'Name', exact: true })
-  await expect(nameInput).toBeVisible({ timeout: 10000 })
-  await expect(nameInput).toBeEditable({ timeout: 5000 })
-
-  await nameInput.fill(`${name} - approved action`)
-  await fillCodeEditor(page, { value: 'print("approved")' })
-  await page.getByRole('button', { name: 'Create', exact: true }).click()
-  await closeNodeEditorPanel(page)
+  await addScriptOnHandle(page, 'approved', `${name} - approved action`, 'print("approved")')
 }
 
 // ---------------------------------------------------------------------------
@@ -405,7 +380,10 @@ export async function addConditionNodeWithBranch(page: Page, name: string, expre
 export async function addScriptOnHandle(page: Page, handle: string, name: string, code: string) {
   await openAddNodePanel(page, handle)
   await selectCategoryAndType(page, 'Action', 'Script')
-  await page.getByRole('textbox', { name: 'Name', exact: true }).fill(name)
+  const nameInput = page.getByRole('textbox', { name: 'Name', exact: true })
+  await expect(nameInput).toBeVisible({ timeout: 10_000 })
+  await expect(nameInput).toBeEditable({ timeout: 5_000 })
+  await nameInput.fill(name)
   await fillCodeEditor(page, { value: code })
   await page.getByRole('button', { name: 'Create', exact: true }).click()
   await closeNodeEditorPanel(page)
@@ -589,6 +567,32 @@ export async function addSwitchNodeWithCases(page: Page, name: string, cases: Sw
   await closeNodeEditorPanel(page)
 }
 
+/**
+ * Open a saved canvas node for editing and wait until a type-specific editor field is ready.
+ *
+ * Retries layout + click while the editor hydrates. Under CI load the click can
+ * land during a React Flow viewport transform and be lost, so callers must not
+ * use a bare `getByText(nodeName).click()`.
+ */
+async function openSavedNodeForEditing(page: Page, nodeName: string, editorReady: (p: Page) => Promise<void>) {
+  await triggerLayout(page)
+  const node = page.locator('[role="group"][aria-roledescription="node"]').filter({ hasText: nodeName })
+  const nameInput = page.getByRole('textbox', { name: 'Name', exact: true })
+  await expect(async () => {
+    await expect(node).toBeVisible({ timeout: 5_000 })
+    await node.click({ timeout: 5_000 })
+    await expect(nameInput).toHaveValue(nodeName, { timeout: 5_000 })
+    await editorReady(page)
+  }).toPass({ timeout: 30_000, intervals: [500, 1_000, 2_000] })
+}
+
+/** Open a saved switch node on the canvas for editing. */
+export async function openSwitchNodeForEditing(page: Page, nodeName: string) {
+  await openSavedNodeForEditing(page, nodeName, async (p) => {
+    await expect(p.getByLabel('Path 1 name')).toBeVisible({ timeout: 5_000 })
+  })
+}
+
 // ---------------------------------------------------------------------------
 // Schedule trigger
 // ---------------------------------------------------------------------------
@@ -659,4 +663,54 @@ export async function addScheduleTrigger(page: Page, name: string, config?: Sche
 
   await page.getByRole('button', { name: 'Create', exact: true }).click()
   await closeNodeEditorPanel(page)
+}
+
+/** Open a saved schedule trigger on the canvas for editing. */
+export async function openScheduleTriggerForEditing(page: Page, nodeName: string) {
+  await openSavedNodeForEditing(page, nodeName, async (p) => {
+    await expect(p.getByLabel('Schedule expression', { exact: true })).toBeVisible({ timeout: 5_000 })
+  })
+}
+
+/** Wait until the Task Agent create/edit form and model control have hydrated. */
+export async function expectAiAgentNodeFormReady(page: Page) {
+  await expect(page.getByTestId('ai-agent-node-form')).toBeVisible({ timeout: 15_000 })
+  await expect(page.getByRole('button', { name: 'Model', exact: true })).toBeEnabled({ timeout: 15_000 })
+}
+
+/** Open Task Agent from the add-node panel and wait for the form. */
+export async function openTaskAgentNodeCreateForm(page: Page) {
+  const panel = await clickAddConnectedStep(page)
+  await panel.getByRole('button', { name: 'Task Agent' }).click()
+  await expectAiAgentNodeFormReady(page)
+}
+
+/** Open a saved Task Agent node on the canvas for editing. */
+export async function openAiAgentNodeForEditing(page: Page, nodeName: string) {
+  await openSavedNodeForEditing(page, nodeName, async (p) => {
+    await expect(p.getByTestId('ai-agent-node-form')).toBeVisible({ timeout: 5_000 })
+    await expect(p.getByRole('button', { name: 'Model', exact: true })).toBeEnabled({ timeout: 5_000 })
+  })
+}
+
+/** Open the model picker (single click — do not toggle again while waiting for options). */
+export async function openAiAgentModelPicker(page: Page) {
+  const modelToggle = page.getByRole('button', { name: 'Model', exact: true })
+  await expect(modelToggle).toBeEnabled({ timeout: 15_000 })
+  await modelToggle.click()
+}
+
+/**
+ * Wait until each integration's group title and at least one model option are visible.
+ * Matches `selectLlmCredential` group scoping; polls without re-opening the picker.
+ */
+export async function expectAiAgentIntegrationGroupsVisible(page: Page, integrationNames: string[]) {
+  await expect(async () => {
+    for (const name of integrationNames) {
+      const groupTitle = page.getByText(name, { exact: true })
+      await expect(groupTitle).toBeVisible({ timeout: 5_000 })
+      const integrationGroup = groupTitle.locator('xpath=..')
+      await expect(integrationGroup.getByRole('option')).not.toHaveCount(0, { timeout: 5_000 })
+    }
+  }).toPass({ timeout: 60_000, intervals: [500, 1_000, 2_000] })
 }

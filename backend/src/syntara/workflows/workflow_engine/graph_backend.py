@@ -160,34 +160,42 @@ class InMemoryGraphBackend:
         return False
 
     def find_cycles(self) -> list[list[str]]:
-        """Detect cycles in the graph using DFS-based algorithm.
+        """Detect cycles in the graph using iterative DFS.
 
         Returns:
             List of cycles, where each cycle is a list of node IDs forming the cycle.
 
         """
         cycles: list[list[str]] = []
-        white = set(self._nodes.keys())  # unvisited
-        gray: set[str] = set()  # in current DFS path
+        white = set(self._nodes.keys())
+        gray: set[str] = set()
+        black: set[str] = set()
         path: list[str] = []
 
-        def _dfs(node: str) -> None:
-            white.discard(node)
-            gray.add(node)
-            path.append(node)
-
-            for successor in self.get_successors(node):
-                if successor in gray:
-                    cycle_start = path.index(successor)
-                    cycles.append(path[cycle_start:])
-                elif successor in white:
-                    _dfs(successor)
-
-            path.pop()
-            gray.discard(node)
-
         while white:
-            _dfs(next(iter(white)))
+            stack: list[tuple[str, int]] = [(next(iter(white)), 0)]
+            while stack:
+                node, child_idx = stack[-1]
+
+                if child_idx == 0:
+                    white.discard(node)
+                    gray.add(node)
+                    path.append(node)
+
+                successors = self.get_successors(node)
+                if child_idx < len(successors):
+                    stack[-1] = (node, child_idx + 1)
+                    successor = successors[child_idx]
+                    if successor in gray:
+                        cycle_start = path.index(successor)
+                        cycles.append(path[cycle_start:])
+                    elif successor not in black:
+                        stack.append((successor, 0))
+                else:
+                    stack.pop()
+                    path.pop()
+                    gray.discard(node)
+                    black.add(node)
 
         return cycles
 

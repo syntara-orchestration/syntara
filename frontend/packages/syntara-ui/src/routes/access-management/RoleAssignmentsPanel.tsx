@@ -1,4 +1,4 @@
-import { Alert, Button, Flex, FlexItem, LabelGroup, StackItem, Truncate } from '@patternfly/react-core'
+import { Alert, Button, LabelGroup, StackItem, Truncate } from '@patternfly/react-core'
 import { RhUiAddIcon, RhUiTrashIcon } from '@patternfly/react-icons'
 import { ExpandableRowContent, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
 import type { ThProps } from '@patternfly/react-table'
@@ -7,20 +7,16 @@ import { useCallback, useMemo, useState } from 'react'
 
 import { SynConfirmationDialog } from '../../components/dialogs/SynConfirmationDialog'
 import { DisabledWithTooltip } from '../../components/DisabledWithTooltip'
-import { FilterBar } from '../../components/filters'
 import { IconLabel } from '../../components/IconLabel'
 import { SynLabel } from '../../components/labels/SynLabel'
-import { SynPageBody } from '../../components/layout/SynPage'
-import { SynPanelContentStack } from '../../components/layout/SynPanelContentStack'
+import { SynListPanelTable, SynListPanelToolbar, SynListPanelView } from '../../components/panels/list/SynListPanel'
 import { SynEmptyStateFilter } from '../../components/states/SynEmptyStateFilter'
 import { SynEmptyStateNoData } from '../../components/states/SynEmptyStateNoData'
-import { SynErrorState } from '../../components/states/SynErrorState'
-import { SynLoadingState } from '../../components/states/SynLoadingState'
 import type { KebabAction } from '../../components/SynKebabMenu'
 import { SynKebabMenu } from '../../components/SynKebabMenu'
 import { LinkCell } from '../../components/table/LinkCell'
-import { SynScrollableTableContainer } from '../../components/table/SynScrollableTableContainer'
 import { invalidateAuthzCaches } from '../../hooks/invalidateAuthzCaches'
+import { useClientPagination } from '../../hooks/useClientPagination'
 import { useColumnSortState } from '../../hooks/useColumnSortState'
 import { useExpandableRowIds } from '../../hooks/useExpandableRowIds'
 import { useFilterState } from '../../hooks/useFilterState'
@@ -53,6 +49,10 @@ type RoleAssignmentsPanelProps = {
   principalType: RolePrincipalType
   principalId: string
   hiddenColumns?: RoleAssignmentColumnKey[]
+  /** When rendered inside `SynListPanelTabs`, pass the tab `eventKey` for tabpanel ARIA. */
+  tabKey?: string
+  /** Accessible name for the tab panel; required when `tabKey` is set. */
+  tabLabel?: string
 }
 
 function getAssignmentActions(
@@ -72,16 +72,10 @@ function getAssignmentActions(
   ]
 }
 
-function RoleAssignmentsTable({
+function RoleAssignmentsTableBody({
   paginatedRows,
-  sortedRows,
-  page,
-  perPage,
   getSortParams,
   onUnassign,
-  onPrev,
-  onNext,
-  onPerPageChange,
   permissions,
   visibleColumns,
   expandedRows,
@@ -90,14 +84,8 @@ function RoleAssignmentsTable({
   onCollapseAll,
 }: Readonly<{
   paginatedRows: RoleAssignmentRow[]
-  sortedRows: RoleAssignmentRow[]
-  page: number
-  perPage: number
   getSortParams: (columnIndex: number) => ThProps['sort']
   onUnassign: (row: RoleAssignmentRow) => void
-  onPrev: () => void
-  onNext: () => void
-  onPerPageChange: (perPage: number) => void
   permissions: ReturnType<typeof useAssignmentPermissions>
   visibleColumns: ColumnDefinition[]
   expandedRows: Set<string>
@@ -110,19 +98,7 @@ function RoleAssignmentsTable({
   const expandableColumnCount = visibleColumns.length + 2
 
   return (
-    <SynScrollableTableContainer
-      caption="Role assignments table"
-      isExpandable
-      footer={{
-        page,
-        perPage,
-        total: sortedRows.length,
-        hasNext: page * perPage < sortedRows.length,
-        onPrev,
-        onNext,
-        onPerPageChange,
-      }}
-    >
+    <>
       <Thead>
         <Tr>
           <Th
@@ -209,110 +185,7 @@ function RoleAssignmentsTable({
           </Tbody>
         )
       })}
-    </SynScrollableTableContainer>
-  )
-}
-
-function TableContent({
-  filteredRows,
-  rows,
-  principalType,
-  openAssignIfAllowed,
-  clearAllFilters,
-  resetPage,
-  paginatedRows,
-  sortedRows,
-  page,
-  perPage,
-  getSortParams,
-  onUnassign,
-  onPrev,
-  onNext,
-  onPerPageChange,
-  permissions,
-  visibleColumns,
-  expandedRows,
-  allRowsExpanded,
-  onToggleRow,
-  onCollapseAll,
-}: Readonly<{
-  filteredRows: RoleAssignmentRow[]
-  rows: RoleAssignmentRow[]
-  principalType: RolePrincipalType
-  openAssignIfAllowed: (() => void) | undefined
-  clearAllFilters: () => void
-  resetPage: () => void
-  paginatedRows: RoleAssignmentRow[]
-  sortedRows: RoleAssignmentRow[]
-  page: number
-  perPage: number
-  getSortParams: (columnIndex: number) => ThProps['sort']
-  onUnassign: (row: RoleAssignmentRow) => void
-  onPrev: () => void
-  onNext: () => void
-  onPerPageChange: (perPage: number) => void
-  permissions: ReturnType<typeof useAssignmentPermissions>
-  visibleColumns: ColumnDefinition[]
-  expandedRows: Set<string>
-  allRowsExpanded: boolean
-  onToggleRow: (rowId: string) => void
-  onCollapseAll: () => void
-}>) {
-  if (filteredRows.length === 0) {
-    if (rows.length === 0) {
-      return (
-        <SynPageBody isCentered>
-          <SynEmptyStateNoData
-            title="No role assignments yet"
-            description={`No project-scoped roles have been assigned to this ${principalTypeLabel[principalType]}.`}
-            buttonText="Assign role"
-            addData={openAssignIfAllowed}
-          />
-        </SynPageBody>
-      )
-    }
-    return (
-      <SynPageBody isCentered>
-        <SynEmptyStateFilter
-          clearAllFilters={() => {
-            clearAllFilters()
-            resetPage()
-          }}
-        />
-      </SynPageBody>
-    )
-  }
-
-  return (
-    <RoleAssignmentsTable
-      paginatedRows={paginatedRows}
-      sortedRows={sortedRows}
-      page={page}
-      perPage={perPage}
-      getSortParams={getSortParams}
-      onUnassign={onUnassign}
-      onPrev={onPrev}
-      onNext={onNext}
-      onPerPageChange={onPerPageChange}
-      permissions={permissions}
-      visibleColumns={visibleColumns}
-      expandedRows={expandedRows}
-      allRowsExpanded={allRowsExpanded}
-      onToggleRow={onToggleRow}
-      onCollapseAll={onCollapseAll}
-    />
-  )
-}
-
-function ForbiddenAlert({ visible }: Readonly<{ visible: boolean }>) {
-  if (!visible) return null
-  return (
-    <StackItem>
-      <Alert variant="info" isInline title="Showing project-scoped roles only" className={styles.forbiddenAlert}>
-        System-level role assignments require administrator access. Only roles within your accessible projects are
-        shown.
-      </Alert>
-    </StackItem>
+    </>
   )
 }
 
@@ -320,6 +193,8 @@ export function RoleAssignmentsPanel({
   principalType,
   principalId,
   hiddenColumns,
+  tabKey,
+  tabLabel,
 }: Readonly<RoleAssignmentsPanelProps>) {
   const queryClient = useQueryClient()
   const visibleColumns = useMemo(() => getVisibleColumns(hiddenColumns), [hiddenColumns])
@@ -334,9 +209,9 @@ export function RoleAssignmentsPanel({
   const openAssignIfAllowed = assignmentPermissions.canAssign ? () => setAssignModalOpen(true) : undefined
   const [rowToUnassign, setRowToUnassign] = useState<RoleAssignmentRow | null>(null)
   const { filters, setAllFilters, clearAllFilters } = useFilterState()
-  const { activeSortIndex, sortDirection, getSortParams } = useColumnSortState(sortMaps.sortFieldByColumn)
-  const [page, setPage] = useState(1)
-  const [perPage, setPerPage] = useState(20)
+  const hasActiveFilters = filters.length > 0
+  const { paginate, getFooterProps, resetPage } = useClientPagination()
+  const { activeSortIndex, sortDirection, getSortParams } = useColumnSortState(sortMaps.sortFieldByColumn, resetPage)
   const { showAlert } = useAlerts()
 
   const { rows, queryForbidden, activeQuery, isLoading, deleteAssignment, refetch } = useRoleAssignmentData(
@@ -352,13 +227,13 @@ export function RoleAssignmentsPanel({
 
   const handleFilterChange = (newFilters: FilterConfig[]) => {
     setAllFilters(newFilters)
-    setPage(1)
+    resetPage()
   }
 
-  const handlePerPageChange = (newPerPage: number) => {
-    setPerPage(newPerPage)
-    setPage(1)
-  }
+  const handleClearAllFiltersWithReset = useCallback(() => {
+    clearAllFilters()
+    resetPage()
+  }, [clearAllFilters, resetPage])
 
   const filteredRows = useMemo(() => applyRoleAssignmentFilters(rows, filters), [rows, filters])
 
@@ -367,10 +242,8 @@ export function RoleAssignmentsPanel({
     [filteredRows, activeSortIndex, sortDirection, sortMaps]
   )
 
-  const paginatedRows = useMemo(() => {
-    const start = (page - 1) * perPage
-    return sortedRows.slice(start, start + perPage)
-  }, [sortedRows, page, perPage])
+  const paginatedRows = useMemo(() => paginate(sortedRows), [sortedRows, paginate])
+  const tableFooter = useMemo(() => getFooterProps(sortedRows.length), [getFooterProps, sortedRows.length])
 
   const paginatedRowIds = useMemo(() => paginatedRows.map((row) => row.id), [paginatedRows])
   const { expandedRows, allRowsExpanded, handleToggleRow, handleCollapseAll } = useExpandableRowIds(paginatedRowIds)
@@ -399,92 +272,42 @@ export function RoleAssignmentsPanel({
     })
   }
 
-  // ── Loading / error states ──────────────────────────────────────────────
-  if (activeQuery.isError && !queryForbidden) {
-    return (
-      <SynErrorState
-        title="Error loading role assignments"
-        message={activeQuery.error}
-        onRetry={() => detachPromise(activeQuery.refetch())}
-      />
-    )
-  }
+  const showToolbar = rows.length > 0 || hasActiveFilters || queryForbidden
+  const isEmpty = rows.length === 0 && !queryForbidden
 
-  if (isLoading) return <SynLoadingState />
+  const emptyStateSharedProps = {
+    title: 'No role assignments yet',
+    buttonText: 'Assign role',
+    addData: openAssignIfAllowed,
+  } as const
+  const normalEmptyState = (
+    <SynEmptyStateNoData
+      {...emptyStateSharedProps}
+      description={`No roles have been assigned to this ${principalTypeLabel[principalType]}.`}
+    />
+  )
+  const forbiddenEmptyState = (
+    <SynEmptyStateNoData
+      {...emptyStateSharedProps}
+      description={`No project-scoped roles have been assigned to this ${principalTypeLabel[principalType]}.`}
+    />
+  )
 
-  if (rows.length === 0 && !queryForbidden) {
-    return (
-      <>
-        <SynEmptyStateNoData
-          title="No role assignments yet"
-          description={`No roles have been assigned to this ${principalTypeLabel[principalType]}.`}
-          buttonText="Assign role"
-          addData={openAssignIfAllowed}
-        />
-        <AssignRoleModal
-          principalType={principalType}
-          principalId={principalId}
-          isOpen={assignModalOpen}
-          onClose={() => setAssignModalOpen(false)}
-          onSuccess={refetchAndInvalidateAuthz}
-        />
-      </>
-    )
-  }
-
-  return (
-    <>
-      <SynPanelContentStack>
-        <ForbiddenAlert visible={queryForbidden} />
-
-        <StackItem>
-          <Flex alignItems={{ default: 'alignItemsCenter' }} gap={{ default: 'gapMd' }}>
-            <FlexItem grow={{ default: 'grow' }}>
-              <FilterBar
-                fieldDefinitions={activeFilterFieldDefinitions}
-                filters={filters}
-                onFilterChange={handleFilterChange}
-                showClearAll={true}
-                clearAllFilters={() => {
-                  clearAllFilters()
-                  setPage(1)
-                }}
-              />
-            </FlexItem>
-            <FlexItem>
-              <DisabledWithTooltip
-                isDisabled={!assignmentPermissions.canAssign}
-                content={assignmentPermissions.tooltips.assign}
-              >
-                <Button
-                  variant="primary"
-                  icon={<RhUiAddIcon />}
-                  isAriaDisabled={!assignmentPermissions.canAssign}
-                  onClick={assignmentPermissions.canAssign ? () => setAssignModalOpen(true) : undefined}
-                >
-                  Assign role
-                </Button>
-              </DisabledWithTooltip>
-            </FlexItem>
-          </Flex>
-        </StackItem>
-
-        <TableContent
-          filteredRows={filteredRows}
-          rows={rows}
-          principalType={principalType}
-          openAssignIfAllowed={openAssignIfAllowed}
-          clearAllFilters={clearAllFilters}
-          resetPage={() => setPage(1)}
+  const listBody =
+    filteredRows.length === 0 ? (
+      <StackItem isFilled>
+        {queryForbidden ? (
+          forbiddenEmptyState
+        ) : (
+          <SynEmptyStateFilter clearAllFilters={handleClearAllFiltersWithReset} />
+        )}
+      </StackItem>
+    ) : (
+      <SynListPanelTable caption="Role assignments table" footer={tableFooter} isExpandable>
+        <RoleAssignmentsTableBody
           paginatedRows={paginatedRows}
-          sortedRows={sortedRows}
-          page={page}
-          perPage={perPage}
           getSortParams={getSortParams}
           onUnassign={setRowToUnassign}
-          onPrev={() => setPage((p) => Math.max(1, p - 1))}
-          onNext={() => setPage((p) => p + 1)}
-          onPerPageChange={handlePerPageChange}
           permissions={assignmentPermissions}
           visibleColumns={visibleColumns}
           expandedRows={expandedRows}
@@ -492,7 +315,62 @@ export function RoleAssignmentsPanel({
           onToggleRow={handleToggleRow}
           onCollapseAll={handleCollapseAll}
         />
-      </SynPanelContentStack>
+      </SynListPanelTable>
+    )
+
+  return (
+    <>
+      <SynListPanelView
+        tabKey={tabKey}
+        tabLabel={tabLabel}
+        isPending={isLoading}
+        error={activeQuery.isError && !queryForbidden ? activeQuery.error : null}
+        onRetry={() => detachPromise(activeQuery.refetch())}
+        errorTitle="Error loading role assignments"
+        isEmpty={isEmpty}
+        hasActiveFilters={hasActiveFilters}
+        onClearAllFilters={handleClearAllFiltersWithReset}
+        noDataState={normalEmptyState}
+        toolbar={
+          showToolbar ? (
+            <>
+              {queryForbidden && (
+                <Alert
+                  variant="info"
+                  isInline
+                  title="Showing project-scoped roles only"
+                  className={styles.forbiddenAlert}
+                >
+                  System-level role assignments require administrator access. Only roles within your accessible projects
+                  are shown.
+                </Alert>
+              )}
+              <SynListPanelToolbar
+                filterDefinitions={activeFilterFieldDefinitions}
+                filters={filters}
+                onFilterChange={handleFilterChange}
+                clearAllFilters={handleClearAllFiltersWithReset}
+                actions={
+                  <DisabledWithTooltip
+                    isDisabled={!assignmentPermissions.canAssign}
+                    content={assignmentPermissions.tooltips.assign}
+                  >
+                    <Button
+                      variant="primary"
+                      icon={<RhUiAddIcon />}
+                      isAriaDisabled={!assignmentPermissions.canAssign}
+                      onClick={assignmentPermissions.canAssign ? () => setAssignModalOpen(true) : undefined}
+                    >
+                      Assign role
+                    </Button>
+                  </DisabledWithTooltip>
+                }
+              />
+            </>
+          ) : undefined
+        }
+        body={listBody}
+      />
 
       <AssignRoleModal
         principalType={principalType}
@@ -507,7 +385,7 @@ export function RoleAssignmentsPanel({
         onClose={() => setRowToUnassign(null)}
         onConfirm={handleUnassign}
         title="Unassign role?"
-        confirmLabel="Unassign"
+        confirmLabel="Unassign role"
         confirmVariant="danger"
         titleIconVariant="warning"
       >

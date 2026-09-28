@@ -161,7 +161,7 @@ test.describe('Version History Panel @pr-check', () => {
       const dialog = app.getByRole('dialog')
       await expect(dialog).toBeVisible()
 
-      await dialog.getByRole('button', { name: /^Publish$/i }).click()
+      await dialog.getByRole('button', { name: 'Publish workflow' }).click()
 
       await expect(app.getByRole('dialog')).not.toBeVisible({ timeout: 15_000 })
     } finally {

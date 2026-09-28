@@ -4,6 +4,7 @@ import { describe, expect, it, vi, beforeEach, type MockedFunction } from 'vites
 
 import { useWorkflowStore } from '../../../stores/useWorkflowStore'
 import type { WorkflowDefinition } from '../../../stores/workflowStoreTypes'
+import { expectStringContaining } from '../../../test/test-helpers'
 
 import type { UseBuilderToolbarHandlersOptions } from './useBuilderToolbarHandlers'
 import { useBuilderToolbarHandlers } from './useBuilderToolbarHandlers'
@@ -94,7 +95,7 @@ describe('useBuilderToolbarHandlers', () => {
   })
 
   it('handleRunWorkflow does not call executeWorkflow when workflow is missing', async () => {
-    const executeWorkflow = vi.fn() as MockedFunction<ExecuteWorkflow>
+    const executeWorkflow = vi.fn()
     const { result } = renderHook(() =>
       useBuilderToolbarHandlers(buildOptions({ workflow: undefined, executeWorkflow }))
     )
@@ -138,7 +139,7 @@ describe('useBuilderToolbarHandlers', () => {
     // Then validation error shown
     expect(showError).toHaveBeenCalledWith({
       title: 'Cannot run workflow',
-      description: expect.stringContaining('at least one trigger') as unknown as string,
+      description: expectStringContaining('at least one trigger'),
     })
     expect(dispatch).toHaveBeenCalledWith({ type: 'SET_CONFIRM_DIALOG', payload: false })
     // But execution should not happen
@@ -179,7 +180,7 @@ describe('useBuilderToolbarHandlers', () => {
     // Then validation error shown
     expect(showError).toHaveBeenCalledWith({
       title: 'Cannot run workflow',
-      description: expect.stringContaining('at least one step') as unknown as string,
+      description: expectStringContaining('at least one step'),
     })
     expect(dispatch).toHaveBeenCalledWith({ type: 'SET_CONFIRM_DIALOG', payload: false })
     // But execution should not happen
@@ -209,7 +210,7 @@ describe('useBuilderToolbarHandlers', () => {
     // Then validation error shown
     expect(showError).toHaveBeenCalledWith({
       title: 'Cannot run workflow',
-      description: expect.stringContaining('at least one connection') as unknown as string,
+      description: expectStringContaining('at least one connection'),
     })
     expect(dispatch).toHaveBeenCalledWith({ type: 'SET_CONFIRM_DIALOG', payload: false })
     // But execution should not happen
@@ -345,7 +346,7 @@ describe('useBuilderToolbarHandlers', () => {
   })
 
   it('handleDeleteWorkflow does not call deleteWorkflow when workflow is missing', () => {
-    const deleteWorkflow = vi.fn() as MockedFunction<DeleteWorkflow>
+    const deleteWorkflow = vi.fn()
     const { result } = renderHook(() =>
       useBuilderToolbarHandlers(buildOptions({ workflow: undefined, deleteWorkflow }))
     )
@@ -433,7 +434,7 @@ describe('useBuilderToolbarHandlers', () => {
 
   it('handleRunWorkflow dispatches SET_CONFIRM_DIALOG:false when save throws', async () => {
     const handleSaveWorkflow = vi.fn().mockRejectedValue(new Error('network'))
-    const executeWorkflow = vi.fn() as MockedFunction<ExecuteWorkflow>
+    const executeWorkflow = vi.fn()
     const dispatch = vi.fn()
 
     // Mock isDirty state with edges for validation
@@ -524,7 +525,7 @@ describe('useBuilderToolbarHandlers', () => {
   })
 
   it('handleRunWorkflow passes triggerNodeId in the execution body', async () => {
-    const executeWorkflow = vi.fn() as MockedFunction<ExecuteWorkflow>
+    const executeWorkflow: MockedFunction<ExecuteWorkflow> = vi.fn()
 
     const { result } = renderHook(() => useBuilderToolbarHandlers(buildOptions({ executeWorkflow })))
     await result.current.handleRunWorkflow({ key: 'val' }, 'trigger-node-1')
@@ -535,7 +536,7 @@ describe('useBuilderToolbarHandlers', () => {
   })
 
   it('handleRunWorkflow always sends trigger_node_id in body', async () => {
-    const executeWorkflow = vi.fn() as MockedFunction<ExecuteWorkflow>
+    const executeWorkflow: MockedFunction<ExecuteWorkflow> = vi.fn()
 
     const { result } = renderHook(() => useBuilderToolbarHandlers(buildOptions({ executeWorkflow })))
     await result.current.handleRunWorkflow()
@@ -546,7 +547,7 @@ describe('useBuilderToolbarHandlers', () => {
   })
 
   it('handleRunWorkflow shows error when currentWorkflow is null', async () => {
-    const executeWorkflow = vi.fn() as MockedFunction<ExecuteWorkflow>
+    const executeWorkflow = vi.fn()
     const showError = vi.fn()
     const dispatch = vi.fn()
 
@@ -565,7 +566,7 @@ describe('useBuilderToolbarHandlers', () => {
   })
 
   it('handleRunWorkflow handles wait node with no name (falls back to Untitled)', async () => {
-    const executeWorkflow = vi.fn() as MockedFunction<ExecuteWorkflow>
+    const executeWorkflow = vi.fn()
     const showError = vi.fn()
     const dispatch = vi.fn()
     const currentWorkflow = minimalWorkflow({
@@ -590,13 +591,13 @@ describe('useBuilderToolbarHandlers', () => {
 
     expect(showError).toHaveBeenCalledWith({
       title: 'Cannot run workflow',
-      description: expect.stringContaining('Untitled') as unknown as string,
+      description: expectStringContaining('Untitled'),
     })
     expect(executeWorkflow).not.toHaveBeenCalled()
   })
 
   it('handleRunWorkflow shows error when wait node exceeds max duration', async () => {
-    const executeWorkflow = vi.fn() as MockedFunction<ExecuteWorkflow>
+    const executeWorkflow = vi.fn()
     const showError = vi.fn()
     const dispatch = vi.fn()
     const currentWorkflow = minimalWorkflow({
@@ -626,7 +627,7 @@ describe('useBuilderToolbarHandlers', () => {
 
     expect(showError).toHaveBeenCalledWith({
       title: 'Cannot run workflow',
-      description: expect.stringContaining('exceeds maximum allowed') as unknown as string,
+      description: expectStringContaining('exceeds maximum allowed'),
     })
     expect(executeWorkflow).not.toHaveBeenCalled()
   })
@@ -682,7 +683,7 @@ describe('useBuilderToolbarHandlers', () => {
   describe('pre-flight version conflict check', () => {
     it('calls onRunConflict when server has a newer version', async () => {
       const onRunConflict = vi.fn()
-      const executeWorkflow = vi.fn() as MockedFunction<ExecuteWorkflow>
+      const executeWorkflow = vi.fn()
       const dispatch = vi.fn()
 
       mockWorkflowFetchClientGET.mockResolvedValue({

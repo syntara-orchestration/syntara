@@ -130,7 +130,7 @@ test.describe('User Detail — Local User Controls and Group Assignment (UI-27)'
     await expect(groupOption).toBeVisible({ timeout: 10_000 })
     await groupOption.click()
 
-    const addButton = dialog.getByRole('button', { name: 'Add', exact: true })
+    const addButton = dialog.getByRole('button', { name: 'Add to group' })
     await expect(addButton).toBeEnabled()
     await addButton.click()
 

@@ -251,7 +251,13 @@ export function RolesTab() {
     refetch()
   }, [queryClient, refetch])
 
-  useCursorReset(roles.length, hasActiveFilters, cursor, rolesQuery.isFetching, resetPagination)
+  useCursorReset({
+    itemCount: roles.length,
+    hasActiveFilters,
+    cursor,
+    isFetching: rolesQuery.isFetching,
+    resetPagination,
+  })
 
   const allRowsExpanded = roles.length > 0 && roles.every((r) => expandedRows.has(r.id))
 
@@ -355,7 +361,7 @@ export function RolesTab() {
         onClose={deleteDialog.close}
         onConfirm={() => handleDelete(deleteDialog.item)}
         title="Delete role?"
-        confirmLabel="Delete"
+        confirmLabel="Delete role"
         confirmVariant="danger"
         titleIconVariant="warning"
         destructiveAcknowledgement={{

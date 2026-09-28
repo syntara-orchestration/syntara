@@ -18,7 +18,9 @@ from syntara.core.exceptions import SafeValueError
 from syntara.core.models import User
 from syntara.core.queries.project_queries import assert_project_alive
 from syntara.core.services import BaseService
+from syntara.core.services.extensions import ConvertResourceMixin
 from syntara.core.services.secret_service import SecretService
+from syntara.core.services.user_reference_resolution import UserReferenceResolverMixin
 from syntara.credentials.exceptions import CredentialDisabledError
 from syntara.credentials.lib.injector_resolver import InjectorResolver
 from syntara.integrations.adapters.factory import create_health_check_adapter
@@ -93,7 +95,15 @@ _REFRESHABLE_TYPES: frozenset[IntegrationType] = frozenset(
 )
 
 
-class IntegrationService(BaseService):
+class IntegrationConvertResourceMixin(ConvertResourceMixin):
+    """Convert Integration ORM rows to IntegrationRead."""
+
+    def convert_resource(self, resource: Integration) -> IntegrationRead:  # type: ignore[override]
+        """Convert Integration to read schema."""
+        return IntegrationRead.model_validate(resource)
+
+
+class IntegrationService(UserReferenceResolverMixin, BaseService):
     """Service for Integration CRUD operations."""
 
     def __init__(
@@ -103,7 +113,7 @@ class IntegrationService(BaseService):
         secret_service: SecretService | None = None,
     ) -> None:
         """Initialize with database session, current user, and optional secret service."""
-        super().__init__(session, user)
+        super().__init__(session, user, convert_resource_mixin=IntegrationConvertResourceMixin())
         self._secret_service = secret_service
 
     def _is_duplicate_name_error(self, e: IntegrityError) -> bool:
@@ -227,7 +237,7 @@ class IntegrationService(BaseService):
         result.enabled_model_count = m_enabled
         project_ids_map = await self._get_assigned_project_ids([integration.id])
         result.project_ids = self._filter_project_ids(project_ids_map.get(integration.id, []), allowed_projects)
-        await self._resolve_user_fields([result])
+        await self.resolve_user_references([result])
         return result
 
     @staticmethod
@@ -544,8 +554,6 @@ class IntegrationService(BaseService):
             resource.total_model_count = m_total
             resource.enabled_model_count = m_enabled
             resource.project_ids = self._filter_project_ids(project_ids_map.get(resource.id, []), allowed_projects)
-
-        await self._resolve_user_fields(response.resources)
 
         return response
 

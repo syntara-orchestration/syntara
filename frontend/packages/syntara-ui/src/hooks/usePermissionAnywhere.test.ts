@@ -34,7 +34,7 @@ describe('usePermissionAnywhere', () => {
   })
 
   it('returns true when can_i with check_any_project allows', async () => {
-    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } } as never)
+    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } })
 
     const { result } = renderHook(() => usePermissionAnywhere('read', 'role-assignment'), {
       wrapper: createWrapper(),
@@ -49,7 +49,7 @@ describe('usePermissionAnywhere', () => {
   })
 
   it('returns false when can_i denies', async () => {
-    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: false } } as never)
+    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: false } })
 
     const { result } = renderHook(() => usePermissionAnywhere('read', 'role-assignment'), {
       wrapper: createWrapper(),

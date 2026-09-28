@@ -59,9 +59,9 @@ test.describe('Create Integration Wizard', () => {
         await expect(app.getByRole('button', { name: 'Next' })).toBeEnabled({ timeout: 30_000 })
         await app.getByRole('button', { name: 'Next' }).click()
 
-        await expect(app.getByRole('button', { name: 'Save' })).toBeVisible()
+        await expect(app.getByRole('button', { name: 'Save integration' })).toBeVisible()
         const responsePromise = app.waitForResponse('**/api/v1/integrations')
-        await app.getByRole('button', { name: 'Save' }).click()
+        await app.getByRole('button', { name: 'Save integration' }).click()
         const response = await responsePromise
         integrationId = ((await response.json()) as { id?: string }).id ?? null
 
@@ -119,9 +119,9 @@ test.describe('Create Integration Wizard', () => {
         await expect(app.getByRole('button', { name: 'Next' })).toBeEnabled({ timeout: 30_000 })
         await app.getByRole('button', { name: 'Next' }).click()
 
-        await expect(app.getByRole('button', { name: 'Save' })).toBeVisible()
+        await expect(app.getByRole('button', { name: 'Save integration' })).toBeVisible()
         const responsePromise = app.waitForResponse('**/api/v1/integrations')
-        await app.getByRole('button', { name: 'Save' }).click()
+        await app.getByRole('button', { name: 'Save integration' }).click()
         const response = await responsePromise
         integrationId = ((await response.json()) as { id?: string }).id ?? null
 
@@ -168,7 +168,7 @@ test.describe('Create Integration Wizard', () => {
 
         await app.getByRole('button', { name: 'Test connection' }).click()
 
-        const saveButton = app.getByRole('button', { name: 'Save' })
+        const saveButton = app.getByRole('button', { name: 'Save integration' })
         await expect(saveButton).toBeEnabled({ timeout: 30_000 })
         const responsePromise = app.waitForResponse('**/api/v1/integrations')
         await saveButton.click()
@@ -288,12 +288,6 @@ test.describe('HTTP URL Rejection and Allow HTTP Override', () => {
 })
 
 test('discovery failure shows error state, retry after correction succeeds', async ({ app }) => {
-  // Mock-only: after the injected discover failure is cleared, the "retry" step expects a real
-  // discover to succeed, which requires a reachable, live LLM endpoint. The real-backend E2E
-  // environment has none (and an unresolvable placeholder host is rejected by SSRF validation),
-  // so this UX flow cannot be exercised there.
-  test.skip(isRealBackend, 'Retry requires a live LLM endpoint not available on the real backend')
-
   const integrationName = buildUniqueName('e2e-wizard-retry')
   const credName = buildUniqueName('e2e-wizard-retry-cred')
   let credential: SeededCredential | null = null
@@ -342,9 +336,9 @@ test('discovery failure shows error state, retry after correction succeeds', asy
     await app.unroute('**/api/v1/integrations/discover')
 
     await app.getByRole('button', { name: 'Retry connection' }).click()
-    await expect(app.getByRole('button', { name: 'Save' })).toBeEnabled({ timeout: 30_000 })
+    await expect(app.getByRole('button', { name: 'Save integration' })).toBeEnabled({ timeout: 30_000 })
     const responsePromise = app.waitForResponse('**/api/v1/integrations')
-    await app.getByRole('button', { name: 'Save' }).click()
+    await app.getByRole('button', { name: 'Save integration' }).click()
     const response = await responsePromise
     integrationId = ((await response.json()) as { id?: string }).id ?? null
 

@@ -28,7 +28,7 @@ from pydantic import Field, HttpUrl, SecretStr, computed_field, field_validator,
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.engine import URL, make_url
 
-from syntara.core.constants import RetrieverServiceDefaults
+from syntara.core.constants import RequestLimits, RetrieverServiceDefaults
 from syntara.core.exceptions import SafeValueError
 
 # =============================================================================
@@ -71,11 +71,15 @@ class FileUploadSettings(BaseSettings):
 
     file_upload_max_size_mb: int = Field(
         default=10,
+        ge=1,
+        le=500,
         description="Maximum file size in MB per file",
     )
 
     file_upload_max_files: int = Field(
         default=10,
+        ge=1,
+        le=100,
         description="Maximum number of files per invocation",
     )
 
@@ -656,6 +660,13 @@ class ServerSettings(BaseSettings):
     cors_allow_headers: list[str] = Field(
         default=["Authorization", "Content-Type", "Accept"],
         description="Allowed headers for CORS",
+    )
+
+    api_max_request_body_mb: int = Field(
+        default=RequestLimits.DEFAULT_MAX_BODY_MB,
+        description="Maximum JSON/text request body size in MB (multipart uses file upload limits)",
+        ge=1,
+        le=120,
     )
 
     # OIDC security
@@ -2016,6 +2027,34 @@ class Settings(
                 "CORS: cors_allow_origins is empty while server_scheme is https (production mode). "
                 "Cross-origin requests with credentials will be blocked. "
                 "Set APP_CORS_ALLOW_ORIGINS to the frontend origin(s).",
+                UserWarning,
+                stacklevel=1,
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _warn_multipart_body_limit_clamped(self) -> "Settings":
+        """Warn when file-upload settings exceed the hard multipart body ceiling.
+
+        RequestBodySizeMiddleware clamps multipart allowances to
+        ``RequestLimits.MAX_MULTIPART_BODY_BYTES``. Operators who raise
+        ``file_upload_max_size_mb`` / ``file_upload_max_files`` expecting a
+        proportionally larger ingress limit will otherwise see uploads rejected
+        with no obvious configuration mismatch.
+        """
+        computed_bytes = (self.file_upload_max_size_mb * self.file_upload_max_files + 1) * 1024 * 1024
+        ceiling_bytes = RequestLimits.MAX_MULTIPART_BODY_BYTES
+        if computed_bytes > ceiling_bytes:
+            computed_mb = computed_bytes // (1024 * 1024)
+            ceiling_mb = ceiling_bytes // (1024 * 1024)
+            warnings.warn(
+                "Request body: file upload settings would allow a multipart body of "
+                f"{computed_mb} MB (file_upload_max_size_mb={self.file_upload_max_size_mb} x "
+                f"file_upload_max_files={self.file_upload_max_files} + 1 MB headroom), but "
+                f"RequestBodySizeMiddleware clamps multipart requests to {ceiling_mb} MB "
+                f"(RequestLimits.MAX_MULTIPART_BODY_BYTES). Lower APP_FILE_UPLOAD_MAX_SIZE_MB "
+                "or APP_FILE_UPLOAD_MAX_FILES, or raise MAX_MULTIPART_BODY_BYTES in code if "
+                "larger multipart ingress is required.",
                 UserWarning,
                 stacklevel=1,
             )

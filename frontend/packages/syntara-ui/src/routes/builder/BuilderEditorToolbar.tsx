@@ -289,15 +289,6 @@ export function BuilderEditorToolbar({
         </>
       )}
 
-      {isVerifying && (
-        <>
-          <Divider orientation={{ default: 'vertical' }} />
-          <Button variant="plain" isLoading isAriaDisabled>
-            Verifying...
-          </Button>
-        </>
-      )}
-
       <Divider orientation={{ default: 'vertical' }} />
       <WorkflowKebabMenu
         isBuiltin={isBuiltin}

@@ -352,6 +352,12 @@ PODMAN_PROJECT=syntara  # Project name for container orchestration (default: syn
 
 # API Configuration
 APP_API_PORT=8000
+APP_API_MAX_REQUEST_BODY_MB=10  # JSON/text POST/PUT/PATCH body limit in MiB (1-120)
+
+# File Upload Limits
+# Multipart body limit is (APP_FILE_UPLOAD_MAX_SIZE_MB x APP_FILE_UPLOAD_MAX_FILES) + 1 MiB, capped at 200 MiB.
+APP_FILE_UPLOAD_MAX_SIZE_MB=10   # Valid range: 1-500 MiB per file
+APP_FILE_UPLOAD_MAX_FILES=10     # Valid range: 1-100 files per request
 
 # UI Configuration
 APP_API_URL=http://localhost:8000

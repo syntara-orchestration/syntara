@@ -191,7 +191,7 @@ function mockQueryByPath(pathResults: Record<string, unknown>) {
   vi.mocked(accessClient.useMutation).mockReturnValue({
     mutate: vi.fn(),
     isPending: false,
-  } as never)
+  })
 }
 
 /** Default mock return for a successful user + groups + identities + role-assignments query set. */
@@ -237,7 +237,7 @@ function mockSuccessQueries(roleAssignments = mockRoleAssignmentsData) {
   vi.mocked(accessClient.useMutation).mockReturnValue({
     mutate: vi.fn(),
     isPending: false,
-  } as never)
+  })
 }
 
 // ---------------------------------------------------------------------------
@@ -269,7 +269,7 @@ describe('computeRoleAssignmentCount', () => {
 describe('UserDetail', () => {
   beforeEach(() => {
     mockAuthQuery.mockReturnValue({ data: { id: 'me-id' }, isPending: false, isError: false, error: null })
-    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } } as never)
+    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } })
     vi.mocked(useUserPermissions).mockReturnValue({
       canCreate: true,
       canUpdate: true,
@@ -380,7 +380,7 @@ describe('UserDetail', () => {
         isError: false,
         error: null,
         refetch: vi.fn(),
-      } as never)
+      })
 
       const { container } = render(<UserDetail />, { wrapper })
 
@@ -1499,7 +1499,7 @@ describe('UserDetail', () => {
         isError: false,
         error: null,
         refetch: vi.fn(),
-      } as never)
+      })
 
       render(<UserDetail isMyProfile />, { wrapper })
 

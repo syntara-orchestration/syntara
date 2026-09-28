@@ -71,8 +71,8 @@ async def test_list_versions_with_limit(jwt_client: AsyncClient, test_project_id
 
 
 @pytest.mark.asyncio
-async def test_list_versions_includes_status_and_username(jwt_client: AsyncClient, test_project_id: str) -> None:
-    """Version list includes computed status field and created_by_username."""
+async def test_list_versions_includes_status_and_creator(jwt_client: AsyncClient, test_project_id: str) -> None:
+    """Version list includes the computed status field and a resolved created_by."""
     defn = create_minimal_workflow_definition(name="status-test", description="v1", activity_id="task1")
     create_resp = await jwt_client.post(
         "/api/v1/workflows",
@@ -86,7 +86,9 @@ async def test_list_versions_includes_status_and_username(jwt_client: AsyncClien
 
     version = response.json()["resources"][0]
     assert version["status"] == "draft"
-    assert version["created_by_username"] is not None
+    assert isinstance(version["created_by"], dict)
+    assert version["created_by"]["id"]
+    assert version["created_by"]["name"]
 
 
 @pytest.mark.asyncio
