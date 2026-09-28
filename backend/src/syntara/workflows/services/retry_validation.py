@@ -127,10 +127,12 @@ def definition_nodes(definition: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def build_successors(definition: dict[str, Any]) -> dict[str, set[str]]:
-    """Successor adjacency (node id → downstream ids), built once per validation.
+    """Successor adjacency (node id → downstream ids).
 
-    Shared by downstream walks so repeated traversals don't rebuild the edge
-    map from scratch on every call.
+    Every downstream walk in this module takes the map as an optional argument
+    so a single validation builds it once and shares it, instead of each
+    traversal re-walking the edge list. Callers that omit it pay for their own
+    build, which keeps the pure helpers usable standalone in tests.
     """
     nodes = definition_nodes(definition)
     edges = definition.get("edges", []) or []
@@ -265,20 +267,18 @@ def _converge_reason(
     snapshot_def: dict[str, Any],
     normalized: list[str],
     completed_ids: set[str],
+    successors: dict[str, set[str]] | None = None,
 ) -> str | None:
     """Rejection reason when failure points feed an already-completed converge.
 
     A completed converge met its threshold without these branches, so the
-    workflow already moved past them — retrying them is moot. A FAILED
+    workflow already moved past them — restarting them is moot. A FAILED
     converge (threshold unmet) keeps its branch failures as valid candidates.
     """
     nodes = definition_nodes(snapshot_def)
     by_id = {node["id"]: node for node in nodes if "id" in node}
-    successors: dict[str, set[str]] = {node_id: set() for node_id in by_id}
-    for edge in snapshot_def.get("edges", []) or []:
-        src, dst = edge.get("from"), edge.get("to")
-        if src is not None and dst is not None:
-            successors.setdefault(src, set()).add(dst)
+    if successors is None:
+        successors = build_successors(snapshot_def)
     mooted: list[str] = []
     for point in normalized:
         nearest = _nearest_downstream_converges(successors, by_id, point)
@@ -345,6 +345,7 @@ def _expand_sanitized_chain(
     snapshot_def: dict[str, Any],
     seed: set[str],
     completed_outputs: dict[str, list[Any]],
+    successors: dict[str, set[str]] | None = None,
 ) -> tuple[set[str], list[str]]:
     """Expand a starting selection to include every sanitized dependency, transitively.
 
@@ -352,10 +353,14 @@ def _expand_sanitized_chain(
     nothing new outside it — so a sanitized node that itself depends on a
     further sanitized ancestor is followed to the end of the chain, not just
     one level. Returns the expanded selection and the sorted nodes added.
+
+    Callers that expand many seeds (see ``_sanitized_replacements``) pass a
+    shared ``successors`` map so the cost is one build, not one per seed.
     """
     selection = set(seed)
     added: set[str] = set()
-    successors = build_successors(snapshot_def)
+    if successors is None:
+        successors = build_successors(snapshot_def)
     while True:
         sanitized = _tainted_nodes(snapshot_def, sorted(selection), completed_outputs, successors)
         newly_added = set(sanitized) - selection
@@ -369,6 +374,7 @@ def _eligible_points(
     snapshot_def: dict[str, Any],
     expanded: set[str],
     auto_included: set[str],
+    successors: dict[str, set[str]] | None = None,
 ) -> set[str]:
     """Retry initiation points: the expanded selection minus superseded failed points.
 
@@ -382,7 +388,8 @@ def _eligible_points(
     """
     if not auto_included:
         return set(expanded)
-    successors = build_successors(snapshot_def)
+    if successors is None:
+        successors = build_successors(snapshot_def)
     seen = set(auto_included)
     stack = list(auto_included)
     while stack:
@@ -398,6 +405,7 @@ def _version_reason(
     normalized: list[str],
     snapshot: WorkflowVersion | None,
     completed_outputs: dict[str, list[Any]],
+    successors: dict[str, set[str]] | None = None,
     *,
     is_default_selection: bool,
 ) -> tuple[str | None, list[str], list[str], list[str]]:
@@ -418,7 +426,7 @@ def _version_reason(
     if missing:
         return f"not nodes in the executed workflow version: {', '.join(missing)}", [], [], normalized
 
-    expanded, added = _expand_sanitized_chain(snapshot_def, set(normalized), completed_outputs)
+    expanded, added = _expand_sanitized_chain(snapshot_def, set(normalized), completed_outputs, successors)
     if not added:
         return None, [], [], sorted(expanded)
     if not is_default_selection:
@@ -491,6 +499,7 @@ def _sanitized_replacements(
     snapshot_def: dict[str, Any],
     failed_ids: set[str],
     completed_outputs: dict[str, list[Any]],
+    successors: dict[str, set[str]] | None = None,
 ) -> dict[str, list[str]]:
     """For every currently-failed node, the sanitized node(s) it must be replaced by.
 
@@ -499,10 +508,15 @@ def _sanitized_replacements(
     retry-path dependency — independent of what this particular request
     asked for. Lets the UI disallow selecting a failed node explicitly
     before the user submits a request that would just be rejected.
+
+    One shared ``successors`` map is threaded through the per-node loop, so
+    this costs a single adjacency build regardless of how many nodes failed.
     """
     replacements: dict[str, list[str]] = {}
+    if successors is None:
+        successors = build_successors(snapshot_def)
     for node_id in sorted(failed_ids):
-        _, added = _expand_sanitized_chain(snapshot_def, {node_id}, completed_outputs)
+        _, added = _expand_sanitized_chain(snapshot_def, {node_id}, completed_outputs, successors)
         if added:
             replacements[node_id] = added
     return replacements
@@ -583,19 +597,30 @@ async def validate_retry_from_failure(
     )
     snapshot = snapshot_result.one_or_none()
 
-    version_reason, sanitized, auto_included, final_selection = _version_reason(
-        normalized, snapshot, completed_outputs, is_default_selection=is_default_selection
-    )
     snapshot_def = (snapshot.workflow_definition or {}) if snapshot is not None else {}
+    # One adjacency build for the whole validation, shared by every downstream
+    # walk below (converge-mootness, sanitized expansion, step counts, eligible
+    # points, and the per-failed-node replacement scan).
+    successors = build_successors(snapshot_def) if snapshot is not None else {}
+
+    version_reason, sanitized, auto_included, final_selection = _version_reason(
+        normalized,
+        snapshot,
+        completed_outputs,
+        successors,
+        is_default_selection=is_default_selection,
+    )
     reason = (
         _state_reason(source)
         or _selection_reason(normalized, failed_ids)
-        or _converge_reason(snapshot_def, normalized, completed_ids)
+        or _converge_reason(snapshot_def, normalized, completed_ids, successors)
         or version_reason
     )
 
     if reason is None:
-        reported_selection = sorted(_eligible_points(snapshot_def, set(final_selection), set(auto_included)))
+        reported_selection = sorted(
+            _eligible_points(snapshot_def, set(final_selection), set(auto_included), successors)
+        )
         # Only meaningful once the starting points are known, and only when the
         # rest of the chain already passed: overrides target starting points.
         reason = _override_reason(
@@ -605,8 +630,12 @@ async def validate_retry_from_failure(
         )
     else:
         reported_selection = normalized
-    step_counts, total_steps = _step_counts(snapshot_def, reported_selection) if snapshot is not None else ({}, 0)
-    replacements = _sanitized_replacements(snapshot_def, failed_ids, completed_outputs) if snapshot is not None else {}
+    step_counts, total_steps = (
+        _step_counts(snapshot_def, reported_selection, successors) if snapshot is not None else ({}, 0)
+    )
+    replacements = (
+        _sanitized_replacements(snapshot_def, failed_ids, completed_outputs, successors) if snapshot is not None else {}
+    )
 
     if reason is not None:
         return RetryValidation(

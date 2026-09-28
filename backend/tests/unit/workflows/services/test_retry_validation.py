@@ -831,3 +831,37 @@ async def test_validate_retry_noop_override_is_accepted() -> None:
     )
     verdict = await validate_retry_from_failure(session, execution.id, ["step_2"], {"step_2": {}})
     assert verdict.eligible is True
+
+
+@pytest.mark.asyncio
+async def test_validate_retry_builds_adjacency_once(monkeypatch: pytest.MonkeyPatch) -> None:
+    """One edge-list traversal per validation, however many walks consume it.
+
+    Guards against regressing to per-call rebuilds: the converge-mootness check,
+    the sanitized expansion loop, the per-failed-node replacement scan, the
+    eligible-point walk, and the step counts all share one successors map.
+    """
+    import syntara.workflows.services.retry_validation as rv
+
+    builds = 0
+    real_build = rv.build_successors
+
+    def counting_build(definition: dict[str, Any]) -> dict[str, set[str]]:
+        nonlocal builds
+        builds += 1
+        return real_build(definition)
+
+    monkeypatch.setattr(rv, "build_successors", counting_build)
+
+    execution = _make_execution(ExecutionStatus.FAILED)
+    # Two failed nodes forces the per-failed-node replacement scan to run twice.
+    session = _mock_session(
+        (execution, "one"),
+        ([_make_activity("step_a"), _make_activity("step_b")], "all"),
+        ([_make_completed_activity("trigger_1")], "all"),
+        (_make_version(1, nodes=_parallel_definition()["nodes"]), "one"),
+    )
+    verdict = await validate_retry_from_failure(session, execution.id, ["step_a", "step_b"])
+
+    assert verdict.eligible is True
+    assert builds == 1, f"adjacency rebuilt {builds} times; expected exactly 1"
