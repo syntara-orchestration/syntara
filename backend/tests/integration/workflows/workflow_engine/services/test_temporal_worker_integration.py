@@ -20,7 +20,6 @@ from temporalio.worker import Worker
 
 from syntara.workflows.worker import main
 from syntara.workflows.workflow_engine.activities.manual_trigger import manual_trigger
-from syntara.workflows.workflow_engine.activities.node_permissions_activity import NODE_PERMISSION_ACTIVITIES
 from syntara.workflows.workflow_engine.activities.runtime_settings_activity import fetch_workflow_runtime_settings
 from syntara.workflows.workflow_engine.activities.script_activity import execute_script_activity
 from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkflow
@@ -66,7 +65,6 @@ class MockWorkerService(TemporalWorkerService):
                 execute_script_activity,
                 manual_trigger,
                 fetch_workflow_runtime_settings,
-                *NODE_PERMISSION_ACTIVITIES,
             ],
         )
 
@@ -135,7 +133,7 @@ class TestTemporalWorkerServiceIntegration:
             temporal_env.client,
             task_queue="integration-test-queue",
             workflows=[OrchestratorWorkflow],
-            activities=[execute_script_activity, manual_trigger, *NODE_PERMISSION_ACTIVITIES],
+            activities=[execute_script_activity, manual_trigger],
         )
 
         # Start worker in background

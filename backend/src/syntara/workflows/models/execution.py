@@ -6,7 +6,7 @@ SQLModel Pattern 1 (separate models with table=False for API operations).
 
 from datetime import datetime
 from enum import Enum, StrEnum
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar, Literal
 from uuid import UUID
 
 from pydantic import ConfigDict, field_validator, model_validator
@@ -43,13 +43,30 @@ class ExecutionMode(StrEnum):
     DEBUG = "debug"
 
 
-class DeniedNodeRead(SQLModel):
-    """One workflow node refused by a launch-time authorization check."""
+class WorkflowLaunchRejectedStep(SQLModel):
+    """A saved workflow step that caused launch authorization to fail."""
 
     node_id: str
     kind: str
-    labels: dict[str, str]
     denied_by: str
+
+
+class WorkflowLaunchRejectedProblem(SQLModel):
+    """RFC 9457 response returned when launch authorization rejects a workflow."""
+
+    type: str
+    title: str
+    detail: str
+    code: Literal["WORKFLOW_LAUNCH_REJECTED"]
+    reason: Literal["principal_inactive", "execution_run_denied", "step_type_denied"]
+    retryable: bool
+    instance: str
+    principal_id: UUID
+    project_id: UUID
+    trigger_type: str | None
+    denied_steps: list[WorkflowLaunchRejectedStep]
+    denied_by: str | None = None
+    execution_id: UUID | None = None
 
 
 class ExecutionStatus(str, Enum):
@@ -274,12 +291,6 @@ class Execution(UserOwnedResource, table=True):
         description="Additional metadata for test/debug executions",
     )
 
-    denied_nodes: list[dict[str, Any]] | None = Field(
-        default=None,
-        sa_column=Column(JSONB, nullable=True),
-        description="Nodes the run principal was denied to execute: [{node_id, kind, labels, denied_by}]",
-    )
-
     # Relationships
     workflow: "Workflow" = Relationship(
         back_populates="executions",
@@ -498,14 +509,6 @@ class ExecutionRead(UserReferenceFieldsMixin, SQLModel):
         default=None,
         description="Originating interface (ui or api)",
     )
-    denied_nodes: list[DeniedNodeRead] | None = Field(
-        default=None,
-        description=(
-            "Nodes the run principal was not allowed to execute, as "
-            "[{node_id, kind, labels, denied_by}]. Null when nothing was denied."
-        ),
-    )
-
     # Optional: Only populated when ?include=workflow_definition
     workflow_definition: WorkflowDefinition | None = Field(
         default=None,

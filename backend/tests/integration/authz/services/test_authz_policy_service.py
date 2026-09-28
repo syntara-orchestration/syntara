@@ -109,6 +109,38 @@ async def test_list_policies(test_db_session: AsyncSession, test_user: User) -> 
 
 
 @pytest.mark.asyncio
+async def test_step_deny_builtin_is_visible_global_immutable_and_not_project_eligible(
+    test_db_session: AsyncSession, test_user: User
+) -> None:
+    from syntara.authz.exceptions import BuiltinProtectionError
+    from syntara.authz.role_conventions import builtin_policy_uuid
+
+    name = "workflow_node:execute:any:script"
+    svc = PolicyService(test_db_session, test_user)
+    visible = await svc.list_policies(limit=1000, query_params_items=[("name", name)])
+    assert len(visible.resources) == 1
+    policy = visible.resources[0]
+    assert policy.name == name
+    assert policy.is_builtin is True
+    assert policy.project_id is None
+    assert policy.scope == "any"
+    assert policy.statements == [
+        {
+            "effect": "deny",
+            "actions": ["workflow_node:execute"],
+            "scope": "any",
+            "conditions": {"resource_labels": {"kind": "script"}},
+        }
+    ]
+
+    project = await _make_project(test_db_session, "builtin-step-deny-project")
+    project_policies = await svc.list_project_policies(project.id, limit=1000, query_params_items=[("name", name)])
+    assert project_policies.resources == []
+    with pytest.raises(BuiltinProtectionError):
+        await svc.update_policy(builtin_policy_uuid(name), description="mutable")
+
+
+@pytest.mark.asyncio
 async def test_update_policy(test_db_session: AsyncSession, test_user: User) -> None:
     """Update name, description, statements, and labels of a custom policy."""
     svc = PolicyService(test_db_session, test_user)
@@ -526,7 +558,7 @@ async def test_update_policy_to_deny_rejected_for_ineligible_resource(
 
 @pytest.mark.asyncio
 async def test_update_policy_to_deny_accepted_for_workflow_node(test_db_session: AsyncSession, test_user: User) -> None:
-    """Updating a policy to a node deny is accepted."""
+    """Updating a policy to a step execute deny is accepted."""
     svc = PolicyService(test_db_session, test_user)
     policy = await svc.create_policy(
         name="allow-then-node-deny",
@@ -534,7 +566,14 @@ async def test_update_policy_to_deny_accepted_for_workflow_node(test_db_session:
     )
     updated = await svc.update_policy(
         policy_id=policy.id,
-        statements=[{"effect": "deny", "actions": ["workflow_node:write"], "scope": "any"}],
+        statements=[
+            {
+                "effect": "deny",
+                "actions": ["workflow_node:execute"],
+                "scope": "any",
+                "conditions": {"resource_labels": {"kind": "script"}},
+            }
+        ],
     )
     assert updated.statements[0]["effect"] == "deny"
 
@@ -560,20 +599,51 @@ async def test_node_deny_with_unknown_kind_rejected(test_db_session: AsyncSessio
 
 
 @pytest.mark.asyncio
-async def test_node_deny_execute_on_trigger_rejected(test_db_session: AsyncSession, test_user: User) -> None:
-    """Trigger kinds carry write only; execute cannot be denied for them."""
+async def test_node_policy_rejects_extra_resource_labels(test_db_session: AsyncSession, test_user: User) -> None:
+    """Step policies match only the kind label."""
     from syntara.authz.exceptions import InvalidNodeKindError
 
     svc = PolicyService(test_db_session, test_user)
-    with pytest.raises(InvalidNodeKindError, match="cannot be denied for node kind 'webhook_trigger'"):
+    with pytest.raises(InvalidNodeKindError, match=r"require only conditions.resource_labels.kind"):
         await svc.create_policy(
-            name="deny-trigger-execute",
+            name="deny-script-language",
             statements=[
                 {
                     "effect": "deny",
                     "actions": ["workflow_node:execute"],
                     "scope": "any",
-                    "conditions": {"resource_labels": {"kind": "webhook_trigger"}},
+                    "conditions": {"resource_labels": {"kind": "script", "language": "python"}},
+                }
+            ],
+        )
+
+
+@pytest.mark.asyncio
+async def test_node_policy_rejects_write_and_unknown_actions(test_db_session: AsyncSession, test_user: User) -> None:
+    from syntara.authz.exceptions import InvalidNodeKindError, InvalidResourceActionError
+
+    svc = PolicyService(test_db_session, test_user)
+    with pytest.raises(InvalidResourceActionError):
+        await svc.create_policy(
+            name="invalid-node-write-action",
+            statements=[
+                {
+                    "effect": "deny",
+                    "actions": ["workflow_node:write"],
+                    "scope": "any",
+                    "conditions": {"resource_labels": {"kind": "script"}},
+                }
+            ],
+        )
+    with pytest.raises(InvalidNodeKindError, match="supports only the execute action"):
+        await svc.create_policy(
+            name="invalid-node-wildcard-action",
+            statements=[
+                {
+                    "effect": "deny",
+                    "actions": ["workflow_node:*"],
+                    "scope": "any",
+                    "conditions": {"resource_labels": {"kind": "script"}},
                 }
             ],
         )

@@ -35,7 +35,6 @@ class ActivityStatus(str, Enum):
     RETRYING = "retrying"
     SKIPPED = "skipped"
     CANCELLED = "cancelled"
-    DENIED = "denied"
 
 
 TERMINAL_ACTIVITY_STATUSES = {
@@ -43,7 +42,6 @@ TERMINAL_ACTIVITY_STATUSES = {
     ActivityStatus.FAILED,
     ActivityStatus.SKIPPED,
     ActivityStatus.CANCELLED,
-    ActivityStatus.DENIED,
 }
 
 

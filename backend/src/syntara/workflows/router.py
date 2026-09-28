@@ -20,6 +20,7 @@ from syntara.authz.dependencies import PermissionChecker, VisibilityFilter
 from syntara.authz.engine import VisibilityResult
 from syntara.core.database.session import get_db
 from syntara.core.models import User
+from syntara.core.models.error import ErrorData
 from syntara.core.syntara_router import NO_PERMISSION, SyntaraRouter
 from syntara.workflows.error_handlers import build_validation_problem_response
 from syntara.workflows.exceptions import WorkflowDefinitionInvalidError
@@ -46,14 +47,10 @@ from syntara.workflows.models import (
     WorkflowVersionRead,
     WorkflowVersionUpdate,
 )
-from syntara.workflows.models.execution import ExecutionRead, TestExecutionCreate
+from syntara.workflows.models.execution import ExecutionRead, TestExecutionCreate, WorkflowLaunchRejectedProblem
 from syntara.workflows.models.workflow_definition import WorkflowDefinition
 from syntara.workflows.services import ExecutionService, WorkflowService
-from syntara.workflows.validators import (
-    get_disabled_node_kinds,
-    get_system_continue_on_failure,
-    workflow_validator,
-)
+from syntara.workflows.validators import get_system_continue_on_failure, workflow_validator
 from syntara.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
 
 
@@ -269,7 +266,6 @@ async def validate_workflow_definition(
     result = workflow_validator.collect_findings(
         request.workflow_definition,
         system_continue_on_failure=system_cof,
-        disabled_node_kinds=await get_disabled_node_kinds(),
     )
     if not result.is_valid:
         raise WorkflowDefinitionInvalidError(result)
@@ -416,6 +412,12 @@ async def delete_workflow(
     operation_id="test_workflow_node",
     summary="Test a single node in a workflow",
     response_description="Test execution created",
+    responses={
+        403: {
+            "model": ErrorData | WorkflowLaunchRejectedProblem,
+            "description": "Workflow update permission or launch authorization rejected",
+        }
+    },
 )
 async def test_workflow_node(
     workflow_id: UUID,

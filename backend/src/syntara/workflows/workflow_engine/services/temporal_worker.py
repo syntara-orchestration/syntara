@@ -21,7 +21,6 @@ from syntara.core.lib.encryption import key_from_string
 from syntara.core.tls.temporal import build_temporal_tls_config
 from syntara.telemetry.client import flush_telemetry, initialize_telemetry
 from syntara.workflows.services.activity_update_publisher import ActivityUpdatePublisher
-from syntara.workflows.workflow_engine.activities.node_permissions_activity import NODE_PERMISSION_ACTIVITIES
 from syntara.workflows.workflow_engine.activities.registry import ACTIVITY_REGISTRY
 from syntara.workflows.workflow_engine.client_interceptor import WorkflowAuthClientInterceptor
 from syntara.workflows.workflow_engine.codecs.credential_codec import CredentialPayloadCodec
@@ -159,14 +158,7 @@ class TemporalWorkerService:
                 session_factory=AsyncSessionLocal,
                 task_queue=self.task_queue,
             )
-            # Node-kind permission activities are registered outside ACTIVITY_REGISTRY
-            # (which is keyed by ActivityName) because they are internal helpers the
-            # engine calls by function reference, not node executors.
-            activities: list[Callable[..., Any]] = [
-                *self._activity_registry.values(),
-                scheduled_launcher.run,
-                *NODE_PERMISSION_ACTIVITIES,
-            ]
+            activities: list[Callable[..., Any]] = [*self._activity_registry.values(), scheduled_launcher.run]
 
             # Create worker with workflows, activities, and interceptors
             logger.debug("creating_temporal_worker", task_queue=self.task_queue)

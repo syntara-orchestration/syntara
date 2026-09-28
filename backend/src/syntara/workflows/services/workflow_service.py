@@ -43,9 +43,7 @@ from syntara.workflows.audit.workflow_version import (
 from syntara.workflows.exceptions import (
     BuiltinWorkflowDeleteError,
     BuiltinWorkflowModifyError,
-    NodeKindWriteDeniedError,
     ScheduledTriggerSyncError,
-    WorkflowDefinitionInvalidError,
     WorkflowHasActiveExecutionsError,
     WorkflowNameConflictError,
     WorkflowNotFoundError,
@@ -64,14 +62,10 @@ from syntara.workflows.models.validation_finding import (
 )
 from syntara.workflows.models.workflow_definition import WorkflowDefinition
 from syntara.workflows.models.workflow_publish_event import PublishAction, WorkflowPublishEvent
-from syntara.workflows.node_kinds import NODE_ACTION_WRITE
-from syntara.workflows.node_permissions import denied_node_labels, introduced_label_sets, resolve_project_name
 from syntara.workflows.services.scheduled_trigger_service import ScheduledTriggerService
 from syntara.workflows.services.webhook_trigger_service import WEBHOOK_TRIGGER_TYPES, WebhookTriggerService
 from syntara.workflows.services.workflow_diff import generate_change_summary
 from syntara.workflows.validators import (
-    disabled_kind_findings,
-    get_disabled_node_kinds,
     get_system_continue_on_failure,
     validate_workflow_references,
     workflow_validator,
@@ -119,22 +113,6 @@ def reset_workflow_creation_counters() -> None:
 def _has_validation_issues(result: ValidationResult) -> bool:
     """Return True when the validation result has errors or warnings."""
     return result.error_count > 0 or result.warning_count > 0
-
-
-def _is_disabled_kind_removal_warning(finding: ValidationFinding) -> bool:
-    """Return True for the WARNING recording that a save removed disabled nodes."""
-    return finding.severity == ValidationSeverity.warning and finding.category == ValidationCategory.node_kind_disabled
-
-
-def _blocking_publish_findings(result: ValidationResult) -> list[ValidationFinding]:
-    """Return the findings that block a publish.
-
-    Publishing is stricter than saving: any error or warning blocks it.  The
-    one exception is the disabled-node-kind removal warning, which exists to
-    record that this very save dropped nodes of a kind switched off
-    platform-wide -- blocking on it would make the removal impossible.
-    """
-    return [finding for finding in result.findings if not _is_disabled_kind_removal_warning(finding)]
 
 
 class WorkflowConvertResourceMixin(ConvertResourceMixin):
@@ -502,93 +480,6 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
                 msg = "Not authorized to use one or more credentials in this workflow"
                 raise AuthorizationDeniedError(msg)
 
-    @staticmethod
-    def _reject_disabled_node_kinds(result: ValidationResult) -> None:
-        """Refuse a save whose definition still contains a disabled node kind.
-
-        Ordinary validation errors are recorded on the version and do not block
-        a save -- drafts are allowed to be invalid.  A disabled node kind is a
-        platform-wide switch rather than a draft-quality problem, so the save
-        is refused outright (ANSTRAT-1750, F-17).
-
-        Raises:
-            WorkflowDefinitionInvalidError: If a ``node_kind_disabled`` error is present.
-
-        """
-        if any(
-            finding.category == ValidationCategory.node_kind_disabled and finding.severity == ValidationSeverity.error
-            for finding in result.findings
-        ):
-            raise WorkflowDefinitionInvalidError(result)
-
-    async def _baseline_definition(self, workflow: Workflow) -> dict[str, Any] | None:
-        """Return the latest saved definition of *workflow*, or None if it has none.
-
-        This is the node-kind baseline. ``workflow.current_version`` always
-        holds the highest saved version number — ``_create_version_record``
-        bumps it on every save — so that row is the newest saved version,
-        draft or published.
-        """
-        version = await self._get_version_or_none(workflow.id, workflow.current_version)
-        return version.workflow_definition if version else None
-
-    async def _check_node_kind_write_permission(
-        self,
-        workflow_definition: dict[str, Any],
-        baseline_definition: dict[str, Any] | None,
-        project_id: UUID | None,
-    ) -> None:
-        """Check ``workflow_node:write`` for every node kind the save introduces.
-
-        A kind is introduced when it is absent from *baseline_definition* (the
-        latest saved version of the same workflow).  A ``None`` baseline —
-        brand-new workflow, import, clone — makes every kind in the definition
-        introduced.  Node counts, configuration and positions are never
-        checked: presence in the baseline is the only test.
-
-        Flow-control kinds are never deniable, so they simply evaluate as
-        allowed and need no special-casing here.
-
-        Args:
-            workflow_definition: The definition being saved.
-            baseline_definition: Latest saved definition, or None for a new workflow.
-            project_id: The workflow's project, used to scope the evaluation.
-
-        Raises:
-            NodeKindWriteDeniedError: If any introduced kind is denied.
-
-        """
-        introduced = introduced_label_sets(workflow_definition, baseline_definition)
-        if not introduced:
-            return
-
-        if self.opa_client is None:
-            logger.warning(
-                "Authorization evaluator unavailable — skipping workflow_node:write check",
-                user_id=str(self.user.id),
-                label_sets=[dict(label_set) for label_set in sorted(introduced, key=lambda item: sorted(item))],
-            )
-            return
-
-        project_name = await resolve_project_name(self.session, project_id)
-        denials = await denied_node_labels(
-            self.session,
-            self.opa_client,
-            user_id=self.user.id,
-            action=NODE_ACTION_WRITE,
-            label_sets=introduced,
-            project_name=project_name,
-            user_labels=self.user.labels,
-            user_metadata=self.user.authz_metadata,
-        )
-        if denials:
-            logger.warning(
-                "Workflow save denied: node kinds not permitted",
-                user_id=str(self.user.id),
-                denied_label_sets=[denial.labels for denial in denials],
-            )
-            raise NodeKindWriteDeniedError(denials)
-
     async def _validate_no_secret_url_conflicts(
         self,
         workflow_definition: dict[str, Any],
@@ -666,7 +557,7 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
                 raise WorkflowNameConflictError(workflow_name) from e
             raise
 
-    async def create_workflow(  # noqa: PLR0915
+    async def create_workflow(
         self,
         name: str,
         description: str | None,
@@ -698,7 +589,6 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
         recorder = get_metrics_recorder()
         component = ComponentLabel.WORKFLOW_ENGINE
         system_cof = await get_system_continue_on_failure()
-        disabled_kinds = await get_disabled_node_kinds()
 
         with recorder.time(
             MetricType.WORKFLOW_VALIDATION_DURATION,
@@ -707,10 +597,7 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
             result = workflow_validator.collect_findings(
                 workflow_definition,
                 system_continue_on_failure=system_cof,
-                disabled_node_kinds=disabled_kinds,
-                previous_definition=None,
             )
-        self._reject_disabled_node_kinds(result)
 
         has_validation_issues = _has_validation_issues(result)
         if has_validation_issues:
@@ -741,10 +628,6 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
         if ref_findings:
             result = ValidationResult.from_findings([*result.findings, *ref_findings])
             has_validation_issues = True
-
-        # A new workflow has no baseline, so every kind in it is introduced.
-        # Import and "save as new workflow" land here too, by design.
-        await self._check_node_kind_write_permission(workflow_definition, None, project_id)
 
         schema_version = workflow_definition.get("schema_version")
         workflow_dict = workflow_definition
@@ -1284,8 +1167,6 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
         """
         recorder = get_metrics_recorder()
         system_cof = await get_system_continue_on_failure()
-        disabled_kinds = await get_disabled_node_kinds()
-        baseline = await self._baseline_definition(workflow)
 
         with recorder.time(
             MetricType.WORKFLOW_VALIDATION_DURATION,
@@ -1294,10 +1175,7 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
             result = workflow_validator.collect_findings(
                 workflow_definition,
                 system_continue_on_failure=system_cof,
-                disabled_node_kinds=disabled_kinds,
-                previous_definition=baseline,
             )
-        self._reject_disabled_node_kinds(result)
 
         workflow.has_validation_issues = _has_validation_issues(result)
         if workflow.has_validation_issues:
@@ -1322,8 +1200,6 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
             if ref_findings:
                 result = ValidationResult.from_findings([*result.findings, *ref_findings])
                 workflow.has_validation_issues = True
-
-        await self._check_node_kind_write_permission(workflow_definition, baseline, workflow.project_id)
 
         version = await self._create_version_record(workflow, workflow_definition, change_description)
         return version, result
@@ -1447,7 +1323,7 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
 
         return workflow, current_version, validation_result
 
-    async def publish_workflow_version(  # noqa: C901, PLR0912, PLR0915
+    async def publish_workflow_version(  # noqa: C901, PLR0915
         self,
         workflow_id: UUID,
         version: int,
@@ -1479,22 +1355,16 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
         if not target_version:
             raise WorkflowVersionNotFoundError(workflow_id, version)
 
-        # Captured before the inline save, which would otherwise become its own baseline.
-        node_kind_baseline: dict[str, Any] | None = None
         if workflow_definition is not None:
-            node_kind_baseline = await self._baseline_definition(workflow)
             target_version = await self._create_and_flush_version(
                 workflow, target_version, workflow_definition, change_description
             )
 
         definition = target_version.workflow_definition
         system_cof = await get_system_continue_on_failure()
-        disabled_kinds = await get_disabled_node_kinds()
         result = workflow_validator.collect_findings(
             definition,
             system_continue_on_failure=system_cof,
-            disabled_node_kinds=disabled_kinds,
-            previous_definition=node_kind_baseline,
         )
         if len(definition.get("nodes", [])) == 0:
             result = ValidationResult.from_findings(
@@ -1507,7 +1377,7 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
                     ),
                 ]
             )
-        if _blocking_publish_findings(result):
+        if (result.error_count + result.warning_count) > 0:
             raise WorkflowPublishValidationError(result)
 
         stale_tool_findings: list[ValidationFinding] = []
@@ -1524,9 +1394,6 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
             stale_tool_findings = await validate_workflow_references(
                 self.session, workflow_definition, workflow.project_id
             )
-
-        if workflow_definition is not None:
-            await self._check_node_kind_write_permission(workflow_definition, node_kind_baseline, workflow.project_id)
 
         if workflow.published_version_id is not None and workflow.published_version_id != target_version.id:
             unpublish_event = WorkflowPublishEvent(
@@ -1550,10 +1417,7 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
         if change_description is not None:
             target_version.change_description = change_description
 
-        # Triggered runs (schedule / webhook / EDA) evaluate node permissions as
-        # the publisher, so record who published this version.
         target_version.published_by = self.user.id
-
         workflow.published_version_id = target_version.id
         workflow.is_enabled = True
         workflow.updated_at = datetime.now(UTC)
@@ -1731,23 +1595,6 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
         # Capture current definition for audit change summary
         current_version_record = await self._get_version_or_none(workflow.id, workflow.current_version)
         old_definition = current_version_record.workflow_definition if current_version_record else None
-
-        # Restore deliberately skips re-validation (see above), but the node-kind
-        # kill switch is a platform-wide rule: a version that still contains a
-        # disabled kind cannot come back.
-        kill_switch_findings = disabled_kind_findings(
-            target_version.workflow_definition,
-            await get_disabled_node_kinds(),
-            previous_definition=old_definition,
-        )
-        if any(finding.severity == ValidationSeverity.error for finding in kill_switch_findings):
-            raise WorkflowDefinitionInvalidError(ValidationResult.from_findings(kill_switch_findings))
-
-        # The latest saved version is the baseline; a restore re-introduces any
-        # kind the current definition dropped.
-        await self._check_node_kind_write_permission(
-            target_version.workflow_definition, old_definition, workflow.project_id
-        )
 
         date_iso = target_version.created_at.isoformat() if target_version.created_at else None
         source_label = target_version.name or date_iso or f"version {version}"

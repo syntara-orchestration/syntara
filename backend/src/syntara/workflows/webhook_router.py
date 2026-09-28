@@ -26,14 +26,15 @@ from syntara.auth.exceptions import InvalidTokenError
 from syntara.core.constants import WebhookLimits
 from syntara.core.database.session import get_db
 from syntara.core.models import User
+from syntara.core.models.error import ErrorData
 from syntara.core.syntara_router import SyntaraRouter
 from syntara.workflows.audit.webhook_auth import WebhookAuthSuccessEvent
 from syntara.workflows.exceptions import (
     PayloadTooLargeError,
-    TemporalUnavailableError,
     TriggerValidationError,
     WebhookAuthenticationRequiredError,
 )
+from syntara.workflows.models.execution import WorkflowLaunchRejectedProblem
 from syntara.workflows.services.execution_service import ExecutionService
 from syntara.workflows.services.webhook_trigger_service import WebhookTriggerService
 from syntara.workflows.workflow_engine.models.workflow_definition import NodeType
@@ -179,9 +180,6 @@ async def _handle_webhook_request(
         )
     )
 
-    if temporal_service is None:
-        raise TemporalUnavailableError(f"{label} triggering")  # noqa: EM102, TRY003
-
     execution_service = ExecutionService(
         db,
         user,
@@ -195,6 +193,9 @@ async def _handle_webhook_request(
         input_data=trigger_input,
         trigger_node_id=trigger.trigger_node_id,
         use_published=True,
+        launch_principal_id=sa_id,
+        persist_rejection=True,
+        require_temporal=True,
     )
 
     logger.info(
@@ -235,8 +236,8 @@ async def _handle_webhook_request(
             "content": {"application/problem+json": {"schema": {"$ref": "#/components/schemas/ErrorData"}}},
         },
         403: {
-            "description": "Service account is not authorized for this trigger",
-            "content": {"application/problem+json": {"schema": {"$ref": "#/components/schemas/ErrorData"}}},
+            "description": "Trigger authorization or workflow launch authorization rejected",
+            "model": ErrorData | WorkflowLaunchRejectedProblem,
         },
         413: {
             "description": "Payload exceeds the 1 MB size limit",
@@ -283,8 +284,8 @@ async def receive_webhook(
             "content": {"application/problem+json": {"schema": {"$ref": "#/components/schemas/ErrorData"}}},
         },
         403: {
-            "description": "Service account is not authorized for this trigger",
-            "content": {"application/problem+json": {"schema": {"$ref": "#/components/schemas/ErrorData"}}},
+            "description": "Trigger authorization or workflow launch authorization rejected",
+            "model": ErrorData | WorkflowLaunchRejectedProblem,
         },
         413: {
             "description": "Payload exceeds the 1 MB size limit",

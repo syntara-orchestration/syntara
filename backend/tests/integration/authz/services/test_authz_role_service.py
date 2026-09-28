@@ -402,3 +402,31 @@ async def test_project_role_rejects_system_scoped_builtin(test_db_session: Async
     svc = RoleService(test_db_session, test_user)
     with pytest.raises(SafeValueError, match="Policies not available in project"):
         await svc.create_role(name="bad-proj-role", policies=["policy:update:any"], project_id=project.id)
+
+
+@pytest.mark.asyncio
+async def test_system_role_can_attach_unassigned_step_deny_builtin(
+    test_db_session: AsyncSession, test_user: User
+) -> None:
+    """A custom system role is the only default assignment path for step denies."""
+    svc = RoleService(test_db_session, test_user)
+    role = await svc.create_role(name="deny-script-step", policies=["workflow_node:execute:any:script"])
+    assert role.project_id is None
+    assert role.policy_names == ["workflow_node:execute:any:script"]
+
+
+@pytest.mark.asyncio
+async def test_project_role_cannot_attach_global_step_deny_builtin(
+    test_db_session: AsyncSession, test_user: User
+) -> None:
+    from syntara.authz.models.project import Project
+
+    project = Project(name="step-deny-role-project", labels={})
+    test_db_session.add(project)
+    await test_db_session.commit()
+
+    svc = RoleService(test_db_session, test_user)
+    with pytest.raises(SafeValueError, match="workflow_node:execute:any:script"):
+        await svc.create_role(
+            name="bad-project-step-deny", policies=["workflow_node:execute:any:script"], project_id=project.id
+        )

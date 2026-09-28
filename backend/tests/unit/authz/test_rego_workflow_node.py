@@ -46,16 +46,12 @@ def _http_deny(name: str = "deny-http-execute", scope: str = "any", project: str
 
 
 class TestDefaultAllow:
-    """F-22: every authenticated principal may use every kind unless denied."""
+    """Authenticated principals may execute every kind unless denied."""
 
     def test_authenticated_may_execute_any_kind(self, opa_evaluate):
         for kind in ("http_request", "script", "agentic", "aap_job_template"):
             result = opa_evaluate(_node_input("execute", kind, policies=policies_for_role("authenticated")))
             assert result["allow"] is True, kind
-
-    def test_authenticated_may_write_any_kind(self, opa_evaluate):
-        result = opa_evaluate(_node_input("write", "webhook_trigger", policies=policies_for_role("authenticated")))
-        assert result["allow"] is True
 
     def test_no_policies_means_no_access(self, opa_evaluate):
         result = opa_evaluate(_node_input("execute", "http_request", policies=[]))
@@ -79,25 +75,29 @@ class TestDenyByKind:
         result = opa_evaluate(_node_input("execute", "script", policies=policies))
         assert result["allow"] is True
 
-    def test_other_action_on_denied_kind_still_allowed(self, opa_evaluate):
-        policies = [*policies_for_role("authenticated"), _http_deny()]
-        result = opa_evaluate(_node_input("write", "http_request", policies=policies))
-        assert result["allow"] is True
-
     def test_deny_without_kind_condition_denies_every_kind(self, opa_evaluate):
         policies = [*policies_for_role("authenticated"), deny_policy("deny-all-execute", ["workflow_node:execute"])]
         for kind in ("http_request", "script"):
             result = opa_evaluate(_node_input("execute", kind, policies=policies))
             assert result["allow"] is False, kind
 
-    def test_wildcard_deny_covers_write_and_execute(self, opa_evaluate):
+    def test_builtin_deny_statement_matches_kind(self, opa_evaluate):
+        from syntara.authz.role_conventions import resolve_builtin_policy_statements
+
+        policy_name = "workflow_node:execute:any:http_request"
+        builtin = resolve_builtin_policy_statements(policy_name)
+        policies = [*policies_for_role("authenticated"), {**builtin[0], "name": policy_name}]
+        result = opa_evaluate(_node_input("execute", "http_request", policies=policies))
+        assert result["allow"] is False
+        assert result["denied_by"] == policy_name
+
+    def test_runtime_wildcard_deny_matches_execute(self, opa_evaluate):
         policies = [
             *policies_for_role("authenticated"),
             deny_policy("deny-http-all", ["workflow_node:*"], conditions={"resource_labels": {"kind": "http_request"}}),
         ]
-        for action in ("write", "execute"):
-            result = opa_evaluate(_node_input(action, "http_request", policies=policies))
-            assert result["allow"] is False, action
+        result = opa_evaluate(_node_input("execute", "http_request", policies=policies))
+        assert result["allow"] is False
 
 
 class TestProjectScopedDeny:

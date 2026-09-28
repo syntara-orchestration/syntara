@@ -21,7 +21,6 @@ from temporalio.worker import Worker
 
 import syntara.settings.cache.settings_cache as _settings_mod
 from syntara.workflows.workflow_engine.activities.manual_trigger import manual_trigger
-from syntara.workflows.workflow_engine.activities.node_permissions_activity import NODE_PERMISSION_ACTIVITIES
 from syntara.workflows.workflow_engine.activities.runtime_settings_activity import fetch_workflow_runtime_settings
 from syntara.workflows.workflow_engine.activities.wait_activity import complete_wait
 from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkflow
@@ -101,7 +100,6 @@ class TestWaitNodeIntegration:
                     _test_wait_activity,
                     complete_wait,
                     fetch_workflow_runtime_settings,
-                    *NODE_PERMISSION_ACTIVITIES,
                 ],
             ):
                 execution_service = TemporalExecutionService(
@@ -144,7 +142,6 @@ class TestWaitNodeIntegration:
                     _test_wait_activity,
                     complete_wait,
                     fetch_workflow_runtime_settings,
-                    *NODE_PERMISSION_ACTIVITIES,
                 ],
             ):
                 execution_service = TemporalExecutionService(
@@ -191,7 +188,6 @@ class TestWaitNodeIntegration:
                     _test_wait_activity,
                     complete_wait,
                     fetch_workflow_runtime_settings,
-                    *NODE_PERMISSION_ACTIVITIES,
                 ],
             ):
                 execution_service = TemporalExecutionService(

@@ -9,9 +9,9 @@ import { SynEmptyStateFilter } from '../../components/states/SynEmptyStateFilter
 import { useQueryState } from '../../components/states/useQueryState'
 import { useElapsedTime } from '../../hooks/useElapsedTime'
 import type { FilterConfig } from '../../types/filters'
+import { formatWorkflowLaunchRejection } from '../../utils/apiErrors'
 import { formatElapsedTime } from '../../utils/dateUtils'
 import { detachPromise } from '../../utils/detachPromise'
-import { DeniedNodesAlert } from '../executions/DeniedNodesAlert'
 import { NodeExecutionDetailsPanel } from '../executions/NodeExecutionDetailsPanel'
 import type { ActivityState } from '../workflows/execution/types'
 import {
@@ -174,7 +174,10 @@ function ThreePanelLayout({
 }
 
 function resolveErrorDetails(errorDetails: string | null | undefined, nameMap: Map<string, string>): string | null {
-  if (!errorDetails || nameMap.size === 0) return errorDetails ?? null
+  if (!errorDetails) return null
+  const launchRejection = formatWorkflowLaunchRejection(errorDetails)
+  if (launchRejection) return launchRejection
+  if (nameMap.size === 0) return errorDetails
   let resolved = errorDetails
   for (const [id, name] of nameMap) {
     resolved = resolved.replaceAll(`${id}: `, `${name}: `)
@@ -189,7 +192,6 @@ type SinglePanelLayoutProps = {
     completed_at?: string | null
     status?: ExecutionStatus | null
     error_details?: string | null
-    denied_nodes?: unknown
   }
   elapsedLabel?: string
   isRunning: boolean
@@ -268,10 +270,6 @@ function SinglePanelLayout({
             </section>
           </StackItem>
         )}
-
-        <StackItem style={{ flexShrink: 0 }}>
-          <DeniedNodesAlert deniedNodes={execution.denied_nodes} nameMap={nameMap} />
-        </StackItem>
 
         {execution.status === 'failed' && resolvedError && (
           <StackItem style={{ flexShrink: 0, paddingBottom: 'var(--pf-t--global--spacer--sm)' }}>

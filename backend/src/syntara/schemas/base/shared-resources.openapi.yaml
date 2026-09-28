@@ -191,6 +191,98 @@ components:
       title: Resource
       description: Composite resource combining named, soft-deletable, and user-owned capabilities
 
+    WorkflowLaunchRejectedStep:
+      description: A saved workflow step that caused launch authorization to fail.
+      properties:
+        denied_by:
+          title: Denied By
+          type: string
+        kind:
+          title: Kind
+          type: string
+        node_id:
+          title: Node Id
+          type: string
+      required:
+        - node_id
+        - kind
+        - denied_by
+      title: WorkflowLaunchRejectedStep
+      type: object
+
+    WorkflowLaunchRejectedProblem:
+      description: RFC 9457 response returned when launch authorization rejects a workflow.
+      properties:
+        code:
+          const: WORKFLOW_LAUNCH_REJECTED
+          title: Code
+          type: string
+        denied_by:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Denied By
+        denied_steps:
+          items:
+            $ref: '#/components/schemas/WorkflowLaunchRejectedStep'
+          title: Denied Steps
+          type: array
+        detail:
+          title: Detail
+          type: string
+        execution_id:
+          anyOf:
+            - format: uuid
+              type: string
+            - type: 'null'
+          title: Execution Id
+        instance:
+          title: Instance
+          type: string
+        principal_id:
+          format: uuid
+          title: Principal Id
+          type: string
+        project_id:
+          format: uuid
+          title: Project Id
+          type: string
+        reason:
+          enum:
+            - principal_inactive
+            - execution_run_denied
+            - step_type_denied
+          title: Reason
+          type: string
+        retryable:
+          title: Retryable
+          type: boolean
+        title:
+          title: Title
+          type: string
+        trigger_type:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Trigger Type
+        type:
+          title: Type
+          type: string
+      required:
+        - type
+        - title
+        - detail
+        - code
+        - reason
+        - retryable
+        - instance
+        - principal_id
+        - project_id
+        - trigger_type
+        - denied_steps
+      title: WorkflowLaunchRejectedProblem
+      type: object
+
     ErrorData:
       type: object
       title: ErrorData

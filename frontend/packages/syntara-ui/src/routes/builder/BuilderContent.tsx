@@ -19,7 +19,6 @@ import { useAlerts } from '../../providers/alerts'
 import { useWorkflowStore } from '../../stores/useWorkflowStore'
 import { getErrorMessage } from '../../utils/apiErrors'
 import { detachPromise } from '../../utils/detachPromise'
-import { nodeKindWriteDeniedAlert } from '../../utils/nodeKindDenials'
 import { ApprovalSidePanel } from '../executions/ApprovalSidePanel'
 import { transformExecutionStatusFilter } from '../executions/executionFilters'
 
@@ -432,8 +431,7 @@ export function BuilderContent(props: BuilderContentProps) {
             )
           },
           onError: (error: unknown) => {
-            const deniedAlert = nodeKindWriteDeniedAlert(error, 'duplicate')
-            showError(deniedAlert ?? { title: 'Failed to duplicate workflow', description: getErrorMessage(error) })
+            showError({ title: 'Failed to duplicate workflow', description: getErrorMessage(error) })
           },
         }
       )

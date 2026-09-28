@@ -13,7 +13,6 @@ from temporalio.service import RPCError
 from syntara.audit.dispatcher import AuditEventDispatcher
 from syntara.core.error_handlers import PROBLEM_TYPES, create_problem_details_response
 from syntara.workflows.audit.webhook_auth import WebhookAuthFailureEvent
-from syntara.workflows.node_kind_switch import NODE_KIND_DISABLED_ERROR_CODE
 from syntara.workflows.workflow_engine.models.workflow_definition import NodeType
 
 if TYPE_CHECKING:
@@ -24,10 +23,6 @@ if TYPE_CHECKING:
         ExecutionInTerminalStateError,
         ExecutionNotFoundError,
         ExecutionNotRetryableError,
-        NodeKindDisabledError,
-        NodeKindNotFoundError,
-        NodeKindNotSwitchableError,
-        NodeKindWriteDeniedError,
         PayloadTooLargeError,
         ScheduledTriggerNotFoundError,
         ScheduledTriggerSyncError,
@@ -40,6 +35,7 @@ if TYPE_CHECKING:
         WorkflowConcurrencyLimitError,
         WorkflowDefinitionInvalidError,
         WorkflowHasActiveExecutionsError,
+        WorkflowLaunchRejectedError,
         WorkflowNameConflictError,
         WorkflowNotFoundError,
         WorkflowNotPublishedError,
@@ -286,46 +282,21 @@ def builtin_workflow_modify_handler(request: Request, exc: "BuiltinWorkflowModif
     )
 
 
-def node_kind_write_denied_handler(request: Request, exc: "NodeKindWriteDeniedError") -> JSONResponse:
-    """Return RFC 9457 problem details listing the node kinds the caller may not add."""
-    logger.warning(
-        "Workflow save blocked by workflow_node:write denial",
-        denied_kinds=[denial.kind for denial in exc.denials],
-    )
+def workflow_launch_rejected_handler(request: Request, exc: "WorkflowLaunchRejectedError") -> JSONResponse:
+    """Return the launch rejection contract as RFC 9457 problem details."""
+    rejection = exc.rejection
     content = {
         "type": PROBLEM_TYPES["forbidden"],
-        "title": "Forbidden",
+        "title": "Workflow Launch Rejected",
         "detail": str(exc),
-        "code": "NODE_KIND_WRITE_DENIED",
         "retryable": False,
         "instance": str(request.url),
-        "denied_kinds": [denial.to_dict() for denial in exc.denials],
+        **rejection.to_dict(),
     }
+    if exc.execution_id is not None:
+        content["execution_id"] = str(exc.execution_id)
     return JSONResponse(
         status_code=status.HTTP_403_FORBIDDEN,
-        content=content,
-        media_type=_PROBLEM_JSON_MEDIA_TYPE,
-    )
-
-
-def node_kind_disabled_handler(request: Request, exc: "NodeKindDisabledError") -> JSONResponse:
-    """Return RFC 9457 problem details listing the nodes whose kind is disabled."""
-    logger.warning(
-        "Workflow launch blocked by the node-kind kill switch",
-        disabled_nodes=exc.disabled_nodes,
-    )
-    content = {
-        "type": PROBLEM_TYPES["validation_error"],
-        "title": "Unprocessable Entity",
-        "detail": str(exc),
-        "code": "NODE_KIND_DISABLED",
-        "error_code": NODE_KIND_DISABLED_ERROR_CODE,
-        "retryable": False,
-        "instance": str(request.url),
-        "disabled_nodes": exc.disabled_nodes,
-    }
-    return JSONResponse(
-        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         content=content,
         media_type=_PROBLEM_JSON_MEDIA_TYPE,
     )
@@ -542,33 +513,5 @@ def temporal_rpc_error_handler(request: Request, exc: RPCError) -> JSONResponse:
         detail="Temporal workflow operation failed",
         code="TEMPORAL_WORKFLOW_ERROR",
         retryable=True,
-        instance=str(request.url),
-    )
-
-
-def node_kind_not_found_handler(request: Request, exc: "NodeKindNotFoundError") -> JSONResponse:
-    """Handle NodeKindNotFoundError with RFC 9457 format."""
-    logger.warning("Unknown node kind", exc_info=exc)
-    return create_problem_details_response(
-        status_code=status.HTTP_404_NOT_FOUND,
-        problem_type=PROBLEM_TYPES["resource_not_found"],
-        title="Node Kind Not Found",
-        detail=exc.message,
-        code="NODE_KIND_NOT_FOUND",
-        retryable=False,
-        instance=str(request.url),
-    )
-
-
-def node_kind_not_switchable_handler(request: Request, exc: "NodeKindNotSwitchableError") -> JSONResponse:
-    """Handle NodeKindNotSwitchableError with RFC 9457 format."""
-    logger.warning("Node kind cannot be disabled", exc_info=exc)
-    return create_problem_details_response(
-        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-        problem_type=PROBLEM_TYPES["validation_error"],
-        title="Node Kind Not Switchable",
-        detail=exc.message,
-        code="NODE_KIND_NOT_SWITCHABLE",
-        retryable=False,
         instance=str(request.url),
     )

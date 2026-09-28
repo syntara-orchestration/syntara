@@ -65,7 +65,9 @@ class TestDenyEligibility:
 
     def test_deny_mixing_eligible_and_ineligible_is_rejected(self) -> None:
         with pytest.raises(ValidationError, match="workflow:update"):
-            PolicyStatementSchema(**_make_statement(effect="deny", actions=["workflow_node:write", "workflow:update"]))
+            PolicyStatementSchema(
+                **_make_statement(effect="deny", actions=["workflow_node:execute", "workflow:update"])
+            )
 
     def test_allow_on_any_resource_is_unaffected(self) -> None:
         stmt = PolicyStatementSchema(**_make_statement(effect="allow", actions=["policy:delete"]))

@@ -557,7 +557,7 @@ export interface components {
       readonly created_by?: components['schemas']['UserReference'] | null
       /**
        * Published By
-       * @description Principal that last published the version; triggered runs evaluate node permissions as them
+       * @description Principal that last published the version; scheduled runs evaluate authorization as them
        */
       readonly published_by?: components['schemas']['UserReference'] | null
       /**
@@ -949,11 +949,6 @@ export interface components {
        * @description Originating interface (ui or api)
        */
       interface?: string | null
-      /**
-       * Denied Nodes
-       * @description Nodes the run principal was not allowed to execute, as [{node_id, kind, labels, denied_by}]. Null when nothing was denied.
-       */
-      denied_nodes?: components['schemas']['DeniedNodeRead'][] | null
       /** Labels */
       labels?: {
         [key: string]: unknown
@@ -2198,7 +2193,6 @@ export interface components {
       | 'converge_configuration'
       | 'approval_configuration'
       | 'definition_limits'
-      | 'node_kind_disabled'
     /**
      * ValidationFinding
      * @description A single structured validation finding.
@@ -2366,22 +2360,6 @@ export interface components {
      */
     ExecutionStatus: 'pending' | 'running' | 'paused' | 'completed' | 'completed_with_errors' | 'failed' | 'cancelled'
     /**
-     * DeniedNodeRead
-     * @description One workflow node refused by a launch-time authorization check.
-     */
-    DeniedNodeRead: {
-      /** Node Id */
-      node_id: string
-      /** Kind */
-      kind: string
-      /** Labels */
-      labels: {
-        [key: string]: string
-      }
-      /** Denied By */
-      denied_by: string
-    }
-    /**
      * CurrentActivity
      * @description Currently executing activity information.
      */
@@ -2423,6 +2401,62 @@ export interface components {
       started_at?: string | null
       /** Completed At */
       completed_at?: string | null
+    }
+    /**
+     * WorkflowLaunchRejectedStep
+     * @description A saved workflow step that caused launch authorization to fail.
+     */
+    WorkflowLaunchRejectedStep: {
+      /** Denied By */
+      denied_by: string
+      /** Kind */
+      kind: string
+      /** Node Id */
+      node_id: string
+    }
+    /**
+     * WorkflowLaunchRejectedProblem
+     * @description RFC 9457 response returned when launch authorization rejects a workflow.
+     */
+    WorkflowLaunchRejectedProblem: {
+      /**
+       * Code
+       * @constant
+       */
+      code: 'WORKFLOW_LAUNCH_REJECTED'
+      /** Denied By */
+      denied_by?: string | null
+      /** Denied Steps */
+      denied_steps: components['schemas']['WorkflowLaunchRejectedStep'][]
+      /** Detail */
+      detail: string
+      /** Execution Id */
+      execution_id?: string | null
+      /** Instance */
+      instance: string
+      /**
+       * Principal Id
+       * Format: uuid
+       */
+      principal_id: string
+      /**
+       * Project Id
+       * Format: uuid
+       */
+      project_id: string
+      /**
+       * Reason
+       * @enum {string}
+       */
+      reason: 'principal_inactive' | 'execution_run_denied' | 'step_type_denied'
+      /** Retryable */
+      retryable: boolean
+      /** Title */
+      title: string
+      /** Trigger Type */
+      trigger_type: string | null
+      /** Type */
+      type: string
     }
   }
   responses: {
@@ -2816,7 +2850,17 @@ export interface operations {
       }
       400: components['responses']['BadRequestError']
       401: components['responses']['UnauthorizedError']
-      403: components['responses']['ForbiddenError']
+      /** @description Workflow update permission or launch authorization rejected */
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/problem+json':
+            | components['schemas']['ErrorData']
+            | components['schemas']['WorkflowLaunchRejectedProblem']
+        }
+      }
       404: components['responses']['NotFoundError']
       409: components['responses']['ConflictError']
       422: components['responses']['ValidationError']
@@ -3102,13 +3146,15 @@ export interface operations {
           'application/problem+json': components['schemas']['ErrorData']
         }
       }
-      /** @description Service account is not authorized for this trigger */
+      /** @description Trigger authorization or workflow launch authorization rejected */
       403: {
         headers: {
           [name: string]: unknown
         }
         content: {
-          'application/problem+json': components['schemas']['ErrorData']
+          'application/problem+json':
+            | components['schemas']['ErrorData']
+            | components['schemas']['WorkflowLaunchRejectedProblem']
         }
       }
       404: components['responses']['NotFoundError']
@@ -3161,13 +3207,15 @@ export interface operations {
           'application/problem+json': components['schemas']['ErrorData']
         }
       }
-      /** @description Service account is not authorized for this trigger */
+      /** @description Trigger authorization or workflow launch authorization rejected */
       403: {
         headers: {
           [name: string]: unknown
         }
         content: {
-          'application/problem+json': components['schemas']['ErrorData']
+          'application/problem+json':
+            | components['schemas']['ErrorData']
+            | components['schemas']['WorkflowLaunchRejectedProblem']
         }
       }
       404: components['responses']['NotFoundError']

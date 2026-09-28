@@ -1,7 +1,7 @@
-type ProjectTab = 'details' | 'workflows' | 'policies' | 'role-assignments'
+type ProjectTab = 'details' | 'workflows' | 'role-assignments'
 
-const ALL_PROJECT_TABS: ProjectTab[] = ['details', 'workflows', 'policies', 'role-assignments']
-const PERMISSION_GATED_TABS = new Set<ProjectTab>(['workflows', 'policies', 'role-assignments'])
+const ALL_PROJECT_TABS: ProjectTab[] = ['details', 'workflows', 'role-assignments']
+const PERMISSION_GATED_TABS = new Set<ProjectTab>(['workflows', 'role-assignments'])
 
 export type ProjectTabState = {
   visibleTabs: ProjectTab[]
@@ -12,8 +12,7 @@ export function computeProjectTabState(
   canReadWorkflows: boolean,
   canReadAssignments: boolean,
   permissionsLoading: boolean,
-  activeTab: ProjectTab,
-  canReadPolicies = false
+  activeTab: ProjectTab
 ): ProjectTabState {
   if (permissionsLoading) {
     const urlValidTabs: ProjectTab[] = ['details']
@@ -25,7 +24,6 @@ export function computeProjectTabState(
 
   const tabPermissions: Record<string, boolean> = {
     workflows: canReadWorkflows,
-    policies: canReadPolicies,
     'role-assignments': canReadAssignments,
   }
   const visibleTabs = ALL_PROJECT_TABS.filter((tab) => tabPermissions[tab] ?? true)

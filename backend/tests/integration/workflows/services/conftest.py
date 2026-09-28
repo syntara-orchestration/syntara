@@ -11,8 +11,7 @@ from tests.fixtures.settings import FakeSettingsCache
 def _ensure_runtime_settings() -> Generator[None, None, None]:
     """Install a fake SettingsCache when no process-wide one is registered.
 
-    The workflow service reads runtime settings (``workflow_engine.continue_on_failure``,
-    ``workflows.disabled_node_kinds``) on every save.  Tests that need specific
+    The workflow service reads runtime settings on save. Tests that need specific
     values install their own cache; everything else gets an empty fake so the
     save paths do not fail with "SettingsCache has not been initialised".
     """

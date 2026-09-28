@@ -7,6 +7,7 @@ Covers:
 - Setup activity returns child workflow data without calling TemporalExecutionService
 """
 
+import json
 from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
@@ -17,6 +18,8 @@ from temporalio.exceptions import ApplicationError
 from syntara.core.models.principal import service_principal_id
 from syntara.metrics.types import MetricType
 from syntara.workflows.exceptions import WorkflowNotPublishedError
+from syntara.workflows.models.execution import ExecutionStatus
+from syntara.workflows.node_launch_checks import WorkflowLaunchRejection
 from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName
 from syntara.workflows.workflow_engine.scheduled_launcher import ScheduledExecutionLauncher
 
@@ -70,6 +73,11 @@ class TestExecutionMetadata:
         with (
             patch.object(launcher, "_load_published_workflow", return_value=(mock_workflow, mock_version)),
             patch("syntara.workflows.workflow_engine.scheduled_launcher.get_settings") as mock_get_settings,
+            patch(
+                "syntara.workflows.node_launch_checks.check_workflow_launch",
+                new_callable=AsyncMock,
+                return_value=None,
+            ),
             patch(
                 "syntara.workflows.workflow_engine.scheduled_launcher.resolve_user_display_name",
                 return_value="Author Name",
@@ -259,6 +267,11 @@ class TestSetupActivityNoTemporalStart:
             patch.object(launcher, "_load_published_workflow", return_value=(mock_workflow, mock_version)),
             patch("syntara.workflows.workflow_engine.scheduled_launcher.get_settings") as mock_get_settings,
             patch(
+                "syntara.workflows.node_launch_checks.check_workflow_launch",
+                new_callable=AsyncMock,
+                return_value=None,
+            ),
+            patch(
                 "syntara.workflows.workflow_engine.scheduled_launcher.resolve_user_display_name",
                 return_value="Author Name",
             ),
@@ -310,6 +323,11 @@ class TestSetupActivityNoTemporalStart:
             patch.object(launcher, "_load_published_workflow", return_value=(mock_workflow, mock_version)),
             patch("syntara.workflows.workflow_engine.scheduled_launcher.get_settings") as mock_get_settings,
             patch(
+                "syntara.workflows.node_launch_checks.check_workflow_launch",
+                new_callable=AsyncMock,
+                return_value=None,
+            ),
+            patch(
                 "syntara.workflows.workflow_engine.scheduled_launcher.resolve_user_display_name",
                 return_value="Author Name",
             ),
@@ -327,6 +345,64 @@ class TestSetupActivityNoTemporalStart:
         execution_id = result["execution_id"]
         expected_temporal_id = f"my-workflow-{execution_id}"
         assert result["temporal_workflow_id"] == expected_temporal_id
+
+    async def test_rejected_schedule_creates_failed_record_without_temporal_workflow_data(self) -> None:
+        launcher = _make_launcher()
+        workflow_id = uuid4()
+        publisher_id = uuid4()
+        scheduled_at = datetime(2024, 1, 1, 9, 0, 0, tzinfo=UTC)
+        triggered_at = datetime(2024, 1, 1, 9, 0, 3, tzinfo=UTC)
+        workflow = MagicMock()
+        workflow.id = workflow_id
+        workflow.name = "wf"
+        workflow.project_id = uuid4()
+        workflow.created_by = uuid4()
+        version = MagicMock()
+        version.id = uuid4()
+        version.version = 3
+        version.published_by = publisher_id
+        version.workflow_definition = {"triggers": [], "nodes": []}
+        rejection = WorkflowLaunchRejection(
+            reason="step_type_denied",
+            principal_id=publisher_id,
+            project_id=workflow.project_id,
+            trigger_type="scheduled_trigger",
+            denied_steps=[{"node_id": "step", "kind": "script", "denied_by": "deny-script"}],
+        )
+        session = MagicMock()
+        session.add = MagicMock()
+        session.commit = AsyncMock()
+
+        with (
+            patch.object(launcher, "_load_published_workflow", return_value=(workflow, version)),
+            patch("syntara.workflows.workflow_engine.scheduled_launcher.get_settings") as get_settings,
+            patch(
+                "syntara.workflows.workflow_engine.scheduled_launcher.resolve_user_display_name",
+                return_value="Publisher",
+            ),
+            patch(
+                "syntara.workflows.node_launch_checks.check_workflow_launch",
+                new_callable=AsyncMock,
+                return_value=rejection,
+            ) as gate,
+        ):
+            get_settings.return_value.service_identity = "backend.ao.svc"
+            get_settings.return_value.max_concurrent_workflows = 0
+            launcher._session_factory = MagicMock()
+            launcher._session_factory.return_value.__aenter__ = AsyncMock(return_value=session)
+            launcher._session_factory.return_value.__aexit__ = AsyncMock(return_value=False)
+
+            result = await launcher._create_execution(workflow_id, "trigger", scheduled_at, triggered_at)
+
+        execution = session.add.call_args.args[0]
+        assert result["rejected"] is True
+        assert result["temporal_workflow_id"] == ""
+        assert execution.status == ExecutionStatus.FAILED
+        assert execution.created_by == service_principal_id("backend.ao.svc")
+        assert json.loads(execution.error_details) == rejection.to_dict()
+        assert gate.await_args is not None
+        assert gate.await_args.kwargs["principal_id"] == publisher_id
+        session.commit.assert_awaited_once()
 
 
 class TestScheduledLauncherConcurrencyLimit:
@@ -359,6 +435,11 @@ class TestScheduledLauncherConcurrencyLimit:
         with (
             patch.object(launcher, "_load_published_workflow", return_value=(mock_workflow, mock_version)),
             patch("syntara.workflows.workflow_engine.scheduled_launcher.get_settings") as mock_get_settings,
+            patch(
+                "syntara.workflows.node_launch_checks.check_workflow_launch",
+                new_callable=AsyncMock,
+                return_value=None,
+            ),
             patch(
                 "syntara.workflows.workflow_engine.scheduled_launcher.resolve_user_display_name",
                 return_value="Author Name",
@@ -409,6 +490,11 @@ class TestScheduledLauncherConcurrencyLimit:
         with (
             patch.object(launcher, "_load_published_workflow", return_value=(mock_workflow, mock_version)),
             patch("syntara.workflows.workflow_engine.scheduled_launcher.get_settings") as mock_get_settings,
+            patch(
+                "syntara.workflows.node_launch_checks.check_workflow_launch",
+                new_callable=AsyncMock,
+                return_value=None,
+            ),
             patch(
                 "syntara.workflows.workflow_engine.scheduled_launcher.resolve_user_display_name",
                 return_value="Author Name",
@@ -491,6 +577,20 @@ class TestLauncherWorkflow:
             await launcher.run("wf-id", "trigger_1")
 
         assert mock_child.call_args[1]["parent_close_policy"] == ParentClosePolicy.REQUEST_CANCEL
+
+    async def test_rejected_setup_never_starts_the_orchestrator_child(self) -> None:
+        from syntara.workflows.workflow_engine.scheduled_launcher import ScheduledWorkflowLauncher
+
+        launcher = ScheduledWorkflowLauncher()
+        setup = {"execution_id": "failed-exec", "temporal_workflow_id": "", "rejected": True}
+        with (
+            patch("temporalio.workflow.execute_activity", new_callable=AsyncMock, return_value=setup),
+            patch("temporalio.workflow.execute_child_workflow", new_callable=AsyncMock) as child,
+        ):
+            result = await launcher.run("wf-id", "trigger_1")
+
+        assert result == {"execution_id": "failed-exec", "temporal_workflow_id": ""}
+        child.assert_not_awaited()
 
 
 class TestActivityRegistration:

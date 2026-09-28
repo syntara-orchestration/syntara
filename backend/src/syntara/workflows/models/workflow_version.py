@@ -106,7 +106,7 @@ class WorkflowVersion(UserOwnedResource, table=True):
         default=None,
         foreign_key="principals.id",
         index=True,
-        description="Principal that last published this version; triggered runs evaluate node permissions as them",
+        description="Principal that last published this version; scheduled runs evaluate authorization as them",
     )
 
     # Relationships
@@ -172,7 +172,7 @@ class WorkflowVersionRead(UserReferenceFieldsMixin, SQLModel):
     created_by: UserReference | UUID | str | None = Field(default=None, description="User who created the version")
     published_by: UserReference | UUID | str | None = Field(
         default=None,
-        description="Principal that last published the version; triggered runs evaluate node permissions as them",
+        description="Principal that last published the version; scheduled runs evaluate authorization as them",
     )
     created_at: datetime
     updated_at: datetime

@@ -47,7 +47,7 @@ class TestFindIneligibleDenyActions:
         assert find_ineligible_deny_actions(stmts) == ["policy:delete", "role-assignment:revoke"]
 
     def test_mixed_actions_report_only_ineligible(self) -> None:
-        stmts = [{"effect": "deny", "actions": ["workflow_node:write", "workflow:update"]}]
+        stmts = [{"effect": "deny", "actions": ["workflow_node:execute", "workflow:update"]}]
         assert find_ineligible_deny_actions(stmts) == ["workflow:update"]
 
     def test_allow_statements_are_ignored(self) -> None:

@@ -61,8 +61,6 @@ tags:
     description: Lightweight group directory lookups
   - name: Executions
     description: Workflow execution lifecycle management
-  - name: Node Kinds
-    description: Workflow node kind registry and platform-wide kill switch
   - name: Workflows
     description: Workflow CRUD, versioning, and publishing
   - name: Webhooks
@@ -24444,17 +24442,11 @@ paths:
                 code: UNAUTHORIZED
                 retryable: false
         '403':
-          description: Forbidden
+          description: Workflow launch authorization rejected
           content:
             application/problem+json:
               schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/forbidden
-                title: Forbidden
-                detail: You do not have permission to access this resource
-                code: FORBIDDEN
-                retryable: false
+                $ref: '#/components/schemas/WorkflowLaunchRejectedProblem'
         '404':
           description: Not Found
           content:
@@ -24824,17 +24816,11 @@ paths:
                 code: UNAUTHORIZED
                 retryable: false
         '403':
-          description: Forbidden
+          description: Workflow launch authorization rejected
           content:
             application/problem+json:
               schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/forbidden
-                title: Forbidden
-                detail: You do not have permission to access this resource
-                code: FORBIDDEN
-                retryable: false
+                $ref: '#/components/schemas/WorkflowLaunchRejectedProblem'
         '404':
           description: Not Found
           content:
@@ -25199,258 +25185,6 @@ paths:
                 title: Too Many Requests
                 detail: Rate limit exceeded. Try again in 60 seconds.
                 code: RATE_LIMITED
-                retryable: true
-  /node_kinds:
-    get:
-      summary: List node kinds
-      description: |
-        List every registered workflow node kind.
-
-        Requires authentication but no specific permission: the response is scoped
-        to the caller and describes reference data plus the caller's own verdicts.
-      operationId: list_node_kinds
-      tags:
-        - Node Kinds
-      security:
-        - bearerAuth: []
-      responses:
-        '200':
-          description: Node kind registry with the caller's write verdicts
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/NodeKindsListResponse'
-        '400':
-          description: Bad Request
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/bad-request
-                title: Bad Request
-                detail: The request was malformed or contained invalid parameters
-                code: BAD_REQUEST
-                retryable: false
-        '401':
-          description: Unauthorized
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/unauthorized
-                title: Unauthorized
-                detail: Authentication is required to access this resource
-                code: UNAUTHORIZED
-                retryable: false
-        '403':
-          description: Forbidden
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/forbidden
-                title: Forbidden
-                detail: You do not have permission to access this resource
-                code: FORBIDDEN
-                retryable: false
-        '404':
-          description: Not Found
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/not-found
-                title: Resource Not Found
-                detail: No resource exists with the provided identifier
-                code: NOT_FOUND
-                retryable: false
-                instance: /api/v1/workflows
-        '409':
-          description: Conflict
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/conflict
-                title: Conflict
-                detail: The request conflicts with the current state of the resource
-                code: CONFLICT
-                retryable: false
-        '422':
-          description: Validation Error
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/validation-error
-                title: Validation Error
-                detail: Field 'name' must be between 1 and 255 characters
-                code: VALIDATION_ERROR
-                retryable: false
-                instance: /api/v1/workflows
-        '429':
-          description: Too Many Requests
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/rate-limited
-                title: Too Many Requests
-                detail: Rate limit exceeded. Try again in 60 seconds.
-                code: RATE_LIMITED
-                retryable: true
-        '500':
-          description: Internal Server Error
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/internal-error
-                title: Internal Server Error
-                detail: An unexpected error occurred
-                code: INTERNAL_ERROR
-                retryable: true
-  /node_kinds/{kind}/enabled:
-    put:
-      summary: Set node kind enabled
-      description: |
-        Switch one node kind on or off platform-wide.
-
-        Disabling is not a permission: it applies to every principal,
-        administrators included. Flow control kinds cannot be switched off.
-      operationId: set_node_kind_enabled
-      tags:
-        - Node Kinds
-      security:
-        - bearerAuth: []
-      x-app-permission:
-        resource: setting
-        action: write
-      parameters:
-        - name: kind
-          in: path
-          required: true
-          schema:
-            type: string
-            title: Kind
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/NodeKindEnabledUpdate'
-      responses:
-        '200':
-          description: The updated node kind
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/NodeKindRead'
-        '400':
-          description: Bad Request
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/bad-request
-                title: Bad Request
-                detail: The request was malformed or contained invalid parameters
-                code: BAD_REQUEST
-                retryable: false
-        '401':
-          description: Unauthorized
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/unauthorized
-                title: Unauthorized
-                detail: Authentication is required to access this resource
-                code: UNAUTHORIZED
-                retryable: false
-        '403':
-          description: Forbidden
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/forbidden
-                title: Forbidden
-                detail: You do not have permission to access this resource
-                code: FORBIDDEN
-                retryable: false
-        '404':
-          description: Not Found
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/not-found
-                title: Resource Not Found
-                detail: No resource exists with the provided identifier
-                code: NOT_FOUND
-                retryable: false
-                instance: /api/v1/workflows
-        '409':
-          description: Conflict
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/conflict
-                title: Conflict
-                detail: The request conflicts with the current state of the resource
-                code: CONFLICT
-                retryable: false
-        '422':
-          description: Validation Error
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/validation-error
-                title: Validation Error
-                detail: Field 'name' must be between 1 and 255 characters
-                code: VALIDATION_ERROR
-                retryable: false
-                instance: /api/v1/workflows
-        '429':
-          description: Too Many Requests
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/rate-limited
-                title: Too Many Requests
-                detail: Rate limit exceeded. Try again in 60 seconds.
-                code: RATE_LIMITED
-                retryable: true
-        '500':
-          description: Internal Server Error
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/internal-error
-                title: Internal Server Error
-                detail: An unexpected error occurred
-                code: INTERNAL_ERROR
                 retryable: true
   /workflows:
     get:
@@ -26301,17 +26035,14 @@ paths:
                 code: UNAUTHORIZED
                 retryable: false
         '403':
-          description: Forbidden
+          description: Workflow update permission or launch authorization rejected
           content:
             application/problem+json:
               schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/forbidden
-                title: Forbidden
-                detail: You do not have permission to access this resource
-                code: FORBIDDEN
-                retryable: false
+                anyOf:
+                  - $ref: '#/components/schemas/ErrorData'
+                  - $ref: '#/components/schemas/WorkflowLaunchRejectedProblem'
+                title: Response 403 Test Workflow Node
         '404':
           description: Not Found
           content:
@@ -27353,11 +27084,14 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorData'
         '403':
-          description: Service account is not authorized for this trigger
+          description: Trigger authorization or workflow launch authorization rejected
           content:
             application/problem+json:
               schema:
-                $ref: '#/components/schemas/ErrorData'
+                anyOf:
+                  - $ref: '#/components/schemas/ErrorData'
+                  - $ref: '#/components/schemas/WorkflowLaunchRejectedProblem'
+                title: Response 403 Receive Webhook
         '404':
           description: Not Found
           content:
@@ -27479,11 +27213,14 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorData'
         '403':
-          description: Service account is not authorized for this trigger
+          description: Trigger authorization or workflow launch authorization rejected
           content:
             application/problem+json:
               schema:
-                $ref: '#/components/schemas/ErrorData'
+                anyOf:
+                  - $ref: '#/components/schemas/ErrorData'
+                  - $ref: '#/components/schemas/WorkflowLaunchRejectedProblem'
+                title: Response 403 Receive Eda Webhook
         '404':
           description: Not Found
           content:
@@ -27593,6 +27330,96 @@ components:
         - system
         - deleted_user
         - deleted_service_account
+    WorkflowLaunchRejectedStep:
+      description: A saved workflow step that caused launch authorization to fail.
+      properties:
+        denied_by:
+          title: Denied By
+          type: string
+        kind:
+          title: Kind
+          type: string
+        node_id:
+          title: Node Id
+          type: string
+      required:
+        - node_id
+        - kind
+        - denied_by
+      title: WorkflowLaunchRejectedStep
+      type: object
+    WorkflowLaunchRejectedProblem:
+      description: RFC 9457 response returned when launch authorization rejects a workflow.
+      properties:
+        code:
+          const: WORKFLOW_LAUNCH_REJECTED
+          title: Code
+          type: string
+        denied_by:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Denied By
+        denied_steps:
+          items:
+            $ref: '#/components/schemas/WorkflowLaunchRejectedStep'
+          title: Denied Steps
+          type: array
+        detail:
+          title: Detail
+          type: string
+        execution_id:
+          anyOf:
+            - format: uuid
+              type: string
+            - type: 'null'
+          title: Execution Id
+        instance:
+          title: Instance
+          type: string
+        principal_id:
+          format: uuid
+          title: Principal Id
+          type: string
+        project_id:
+          format: uuid
+          title: Project Id
+          type: string
+        reason:
+          enum:
+            - principal_inactive
+            - execution_run_denied
+            - step_type_denied
+          title: Reason
+          type: string
+        retryable:
+          title: Retryable
+          type: boolean
+        title:
+          title: Title
+          type: string
+        trigger_type:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Trigger Type
+        type:
+          title: Type
+          type: string
+      required:
+        - type
+        - title
+        - detail
+        - code
+        - reason
+        - retryable
+        - instance
+        - principal_id
+        - project_id
+        - trigger_type
+        - denied_steps
+      title: WorkflowLaunchRejectedProblem
+      type: object
     ErrorData:
       type: object
       title: ErrorData
@@ -34859,30 +34686,6 @@ components:
           items:
             $ref: '#/components/schemas/GroupDirectoryEntry'
           maxItems: 100
-    DeniedNodeRead:
-      type: object
-      title: DeniedNodeRead
-      description: One workflow node refused by a launch-time authorization check.
-      properties:
-        node_id:
-          type: string
-          title: Node Id
-        kind:
-          type: string
-          title: Kind
-        labels:
-          type: object
-          title: Labels
-          additionalProperties:
-            type: string
-        denied_by:
-          type: string
-          title: Denied By
-      required:
-        - node_id
-        - kind
-        - labels
-        - denied_by
     ExecutionRead:
       type: object
       title: ExecutionRead
@@ -35020,14 +34823,6 @@ components:
             - type: 'null'
           description: Originating interface (ui or api)
           title: Interface
-        denied_nodes:
-          anyOf:
-            - type: array
-              items:
-                $ref: '#/components/schemas/DeniedNodeRead'
-            - type: 'null'
-          title: Denied Nodes
-          description: Nodes the run principal was not allowed to execute, as [{node_id, kind, labels, denied_by}]. Null when nothing was denied.
         labels:
           additionalProperties: true
           type: object
@@ -35233,7 +35028,6 @@ components:
         - retrying
         - skipped
         - cancelled
-        - denied
     NodeType:
       type: string
       title: NodeType
@@ -35471,116 +35265,6 @@ components:
               result:
                 value: 42
               status: completed
-    NodeKindCategory:
-      type: string
-      title: NodeKindCategory
-      description: Coarse grouping that decides which actions may be denied for a kind.
-      enum:
-        - trigger
-        - flow_control
-        - action
-    NodeKindRead:
-      type: object
-      title: NodeKindRead
-      description: |
-        One workflow node kind as the calling principal sees it.
-
-        Attributes:
-            kind: The node kind identifier (a `NodeType` value).
-            category: Registry grouping (trigger, flow_control or action).
-            enabled: False when the kind is switched off platform-wide.
-            switchable: Whether this kind may be switched off at all.
-            deniable_actions: Actions a deny-effect policy may target for this kind.
-            can_write: The caller's own `workflow_node:write` verdict for this
-                kind with no project in scope.
-      properties:
-        kind:
-          type: string
-          title: Kind
-        category:
-          $ref: '#/components/schemas/NodeKindCategory'
-        enabled:
-          type: boolean
-          title: Enabled
-        switchable:
-          type: boolean
-          title: Switchable
-        deniable_actions:
-          type: array
-          title: Deniable Actions
-          items:
-            type: string
-        can_write:
-          type: boolean
-          title: Can Write
-        attributes:
-          type: array
-          title: Attributes
-          items:
-            $ref: '#/components/schemas/NodeAttributeRead'
-      required:
-        - kind
-        - category
-        - enabled
-        - switchable
-        - deniable_actions
-        - can_write
-        - attributes
-    NodeAttributeRead:
-      type: object
-      title: NodeAttributeRead
-      description: One node parameter exposed as an authorization resource label.
-      properties:
-        name:
-          type: string
-          title: Name
-        allowed_values:
-          anyOf:
-            - type: array
-              items:
-                type: string
-            - type: 'null'
-          title: Allowed Values
-      required:
-        - name
-        - allowed_values
-    NodeKindsListResponse:
-      type: object
-      title: NodeKindsListResponse
-      description: |
-        Response schema for the node-kind registry listing.
-
-        Attributes:
-            resources: Every registered kind, in registry declaration order.
-            disabled_kinds: Echo of the `workflows.disabled_node_kinds` setting.
-      properties:
-        resources:
-          type: array
-          title: Resources
-          items:
-            $ref: '#/components/schemas/NodeKindRead'
-        disabled_kinds:
-          type: array
-          title: Disabled Kinds
-          items:
-            type: string
-      required:
-        - resources
-        - disabled_kinds
-    NodeKindEnabledUpdate:
-      type: object
-      title: NodeKindEnabledUpdate
-      description: |
-        Request body for `PUT /node_kinds/{kind}/enabled`.
-
-        Attributes:
-            enabled: True to switch the kind on, False to switch it off.
-      properties:
-        enabled:
-          type: boolean
-          title: Enabled
-      required:
-        - enabled
     WorkflowRead:
       type: object
       title: WorkflowRead
@@ -35948,7 +35632,7 @@ components:
           anyOf:
             - $ref: '#/components/schemas/UserReference'
             - type: 'null'
-          description: Principal that last published the version; triggered runs evaluate node permissions as them
+          description: Principal that last published the version; scheduled runs evaluate authorization as them
           readOnly: true
           title: Published By
         created_at:
@@ -37752,7 +37436,6 @@ components:
         - converge_configuration
         - approval_configuration
         - definition_limits
-        - node_kind_disabled
     ValidationFinding:
       type: object
       title: ValidationFinding

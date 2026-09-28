@@ -108,8 +108,6 @@ export const EdgeHandleEnum = {
   FALSE: 'false',
   APPROVED: 'approved',
   REJECTED: 'rejected',
-  ALLOWED: 'allowed',
-  DENIED: 'denied',
   DONE: 'done',
   DEFAULT: 'default',
   // Target handles
@@ -150,7 +148,6 @@ export const ActivityStatusEnum = {
   RETRYING: 'retrying',
   SKIPPED: 'skipped',
   CANCELLED: 'cancelled',
-  DENIED: 'denied',
 } as const
 
 /**

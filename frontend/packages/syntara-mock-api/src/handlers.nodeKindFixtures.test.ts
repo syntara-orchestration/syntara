@@ -47,31 +47,3 @@ describe('node-kind example workflows', () => {
     expect(node?.parameters?.arguments).toBeDefined()
   })
 })
-
-describe('denied execution fixture', () => {
-  it('exposes denied_nodes on the execution', async () => {
-    const execution = await fetch(`${baseUrl}/api/v1/executions/exec-denied?include=activities`).then((response) =>
-      response.json()
-    )
-
-    expect(execution.denied_nodes).toEqual([
-      {
-        node_id: 'restart_service',
-        kind: 'http_request',
-        labels: { kind: 'http_request', method: 'post' },
-        denied_by: 'no-restarts-in-production',
-      },
-    ])
-  })
-
-  it('includes an activity with the denied status', async () => {
-    const execution = await fetch(`${baseUrl}/api/v1/executions/exec-denied?include=activities`).then((response) =>
-      response.json()
-    )
-
-    const denied = (execution.activities as { activity_id: string; status: string }[]).find(
-      (activity) => activity.activity_id === 'restart_service'
-    )
-    expect(denied?.status).toBe('denied')
-  })
-})

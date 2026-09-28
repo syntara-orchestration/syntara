@@ -3,9 +3,7 @@ import { RhUiCloseIcon, RhUiArrowLeftIcon, RhUiAddSquareIcon } from '@patternfly
 import { useMemo, useState, type ReactNode } from 'react'
 
 import { SynPanel } from '../../components/layout/SynPanel'
-import { useNodeKindsQuery } from '../../hooks/useNodeKindsQuery'
 
-import { gatePaletteEntries } from './nodeKindPaletteGating'
 import { NodeTypeOptionsList } from './NodeTypeOptionsList'
 import { NodeRegistry } from './registry/NodeRegistry'
 
@@ -84,12 +82,11 @@ type AddNodePanelProps = {
 
 export function AddNodePanel(props: AddNodePanelProps) {
   const [selectedNodeType, setSelectedNodeType] = useState<string | null>(null)
-  const { nodeKindByKind } = useNodeKindsQuery()
 
   // Registered step types from NodeRegistry
   // Omit triggers when adding from an edge (sourceNodeId) or replacing a generic step (replacementNodeId)
   // because triggers cannot be connection targets
-  const registeredNodeTypes = useMemo(() => {
+  const nodeTypes = useMemo(() => {
     const allNodes = NodeRegistry.getAll()
     if (props.hasNoWorkflowNodes) {
       return allNodes.filter((node) => node.category === 'trigger')
@@ -99,13 +96,6 @@ export function AddNodePanel(props: AddNodePanelProps) {
     }
     return allNodes
   }, [props.replacementNodeId, props.hasNoWorkflowNodes, props.sourceNodeId])
-
-  // Kill-switched node kinds disappear; kinds the caller may not introduce stay
-  // listed but inert. Nodes already on the canvas are unaffected (F-7/F-8/F-13).
-  const nodeTypes = useMemo(
-    () => gatePaletteEntries(registeredNodeTypes, nodeKindByKind),
-    [registeredNodeTypes, nodeKindByKind]
-  )
 
   const handleNodeClick = (nodeId: string) => {
     const nodeDef = NodeRegistry.get(nodeId)
@@ -121,15 +111,6 @@ export function AddNodePanel(props: AddNodePanelProps) {
   const enforcedSelectedNodeType = props.hasNoWorkflowNodes ? 'trigger' : selectedNodeType
   const selectedNode = enforcedSelectedNodeType ? NodeRegistry.get(enforcedSelectedNodeType) : null
   const isShowingSubtypeList = !!selectedNode?.subtypes?.length
-  const gatedSubtypes = selectedNode?.subtypes?.length
-    ? gatePaletteEntries(
-        selectedNode.subtypes
-          .map((subtype, index) => ({ subtype, index }))
-          .sort((a, b) => (a.subtype.order ?? a.index) - (b.subtype.order ?? b.index))
-          .map(({ subtype }) => subtype),
-        nodeKindByKind
-      )
-    : []
 
   const panelTitle =
     isShowingSubtypeList && selectedNode ? (selectedNode.selectionTitle ?? 'Select a node') : 'Add step'
@@ -170,7 +151,10 @@ export function AddNodePanel(props: AddNodePanelProps) {
           <Stack hasGutter>
             {selectedNode?.subtypes?.length ? (
               <NodeTypeOptionsList
-                nodeTypes={gatedSubtypes}
+                nodeTypes={selectedNode.subtypes
+                  .map((subtype, index) => ({ subtype, index }))
+                  .sort((a, b) => (a.subtype.order ?? a.index) - (b.subtype.order ?? b.index))
+                  .map(({ subtype }) => subtype)}
                 onSelect={(subtypeId) => {
                   props.onSelectNode(selectedNode.id, subtypeId)
                   setSelectedNodeType(null)

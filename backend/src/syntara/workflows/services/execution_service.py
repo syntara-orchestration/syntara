@@ -37,6 +37,7 @@ from syntara.workflows.exceptions import (
     TemporalUnavailableError,
     TriggerValidationError,
     WorkflowConcurrencyLimitError,
+    WorkflowLaunchRejectedError,
     WorkflowNotFoundError,
     WorkflowNotPublishedError,
 )
@@ -57,19 +58,19 @@ from syntara.workflows.models.workflow import Workflow
 from syntara.workflows.models.workflow_definition import WorkflowDefinition
 from syntara.workflows.models.workflow_version import WorkflowVersion
 from syntara.workflows.node_launch_checks import (
-    check_node_kinds_enabled,
-    compute_denied_nodes,
+    check_workflow_launch,
     get_node_authz_evaluator,
-    resolve_run_principal,
+    rejection_error_details,
 )
 from syntara.workflows.utils.workflow_metadata import build_workflow_metadata, resolve_user_display_name
-from syntara.workflows.workflow_engine.models.workflow_definition import NodeType, resolve_trigger_node
+from syntara.workflows.workflow_engine.models.workflow_definition import resolve_trigger_node
 from syntara.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
 from syntara.workflows.workflow_engine.signals.processor import resolve_signal_failure_message
 
 if TYPE_CHECKING:
     from syntara.authz.evaluator import AuthzEvaluator
     from syntara.metrics.recorder import MetricsRecorder
+    from syntara.workflows.node_launch_checks import WorkflowLaunchRejection
 
 logger = structlog.stdlib.get_logger(__name__)
 
@@ -157,7 +158,6 @@ class ExecutionsConvertResourceMixin(ConvertResourceMixin):
             retried_from_execution_id=resource.retried_from_execution_id,
             trigger_type=resource.trigger_type,
             interface=resource.interface,
-            denied_nodes=resource.denied_nodes,
         )
 
         if self.include and len(self.include) > 0:
@@ -221,39 +221,6 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
     def _node_authz_evaluator(self) -> "AuthzEvaluator | None":
         """Return the evaluator to use for node-kind checks, if any is available."""
         return self.authz_evaluator or get_node_authz_evaluator()
-
-    async def _resolve_launch_node_permissions(
-        self,
-        *,
-        workflow: Workflow,
-        workflow_version: WorkflowVersion,
-        trigger_node: dict[str, Any],
-    ) -> tuple[list[dict[str, Any]], UUID]:
-        """Run both launch-time node-kind gates and return ``(denied_nodes, run_principal_id)``.
-
-        The kill switch is checked first and refuses the launch outright; node
-        denials never do — they are carried into the run so the engine can mark
-        those nodes ``denied`` (F-18).
-
-        Raises:
-            NodeKindDisabledError: If the definition contains a disabled kind.
-
-        """
-        definition = workflow_version.workflow_definition
-        await check_node_kinds_enabled(definition)
-        run_principal_id = resolve_run_principal(
-            workflow_version,
-            invoker_id=self.user.id,
-            trigger_type=trigger_node.get("type"),
-        )
-        denied_nodes = await compute_denied_nodes(
-            self.session,
-            self._node_authz_evaluator(),
-            definition=definition,
-            project_id=workflow.project_id,
-            principal_id=run_principal_id,
-        )
-        return denied_nodes, run_principal_id
 
     @staticmethod
     def _emit_lifecycle_event(
@@ -338,6 +305,9 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
         trigger_node_id: str,
         *,
         use_published: bool = False,
+        launch_principal_id: UUID | None = None,
+        persist_rejection: bool = False,
+        require_temporal: bool = False,
     ) -> ExecutionRead:
         """Create and start a new workflow execution.
 
@@ -352,6 +322,9 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
             input_data: Input parameters for the workflow
             trigger_node_id: Trigger node ID to start from
             use_published: If True, use the published version instead of current version
+            launch_principal_id: Optional principal override for bound webhook/EDA service accounts.
+            persist_rejection: Persist a FAILED record when a triggered launch is rejected.
+            require_temporal: Raise when Temporal is unavailable instead of creating a test stub.
 
         Returns:
             Created execution with status=PENDING
@@ -410,7 +383,44 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
             trigger_node_id=trigger_node_id,
             recorder=recorder,
             component=component,
+            launch_principal_id=launch_principal_id,
+            persist_rejection=persist_rejection,
+            require_temporal=require_temporal,
         )
+
+    async def _persist_rejected_execution(
+        self,
+        *,
+        workflow: Workflow,
+        workflow_version: WorkflowVersion,
+        input_data: dict[str, Any],
+        trigger_node_id: str,
+        trigger_type: str | None,
+        principal_id: UUID,
+        rejection: "WorkflowLaunchRejection",
+        completed_at: datetime,
+    ) -> UUID:
+        """Persist the FAILED record required for a rejected triggered launch."""
+        execution_id = uuid4()
+        self.session.add(
+            Execution(
+                id=execution_id,
+                workflow_id=workflow.id,
+                workflow_version_id=workflow_version.id,
+                project_id=workflow.project_id,
+                temporal_workflow_id=f"rejected-{execution_id}",
+                status=ExecutionStatus.FAILED,
+                completed_at=completed_at,
+                input_data=input_data,
+                trigger_node_id=trigger_node_id,
+                trigger_type=trigger_type,
+                error_details=rejection_error_details(rejection),
+                created_by=principal_id,
+                updated_by=principal_id,
+            )
+        )
+        await self.session.commit()
+        return execution_id
 
     async def _start_temporal_and_create_execution(
         self,
@@ -422,6 +432,9 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
         recorder: "MetricsRecorder",
         component: ComponentLabel,
         retried_from_execution_id: UUID | None = None,
+        launch_principal_id: UUID | None = None,
+        persist_rejection: bool = False,
+        require_temporal: bool = False,
     ) -> ExecutionRead:
         """Start a Temporal workflow and persist the execution record.
 
@@ -429,16 +442,6 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
         Starts Temporal first, then creates the DB record. On DB commit failure,
         attempts to cancel the orphaned Temporal workflow.
         """
-        # Enforce application-level concurrency cap before touching Temporal.
-        # Uses a DB count of non-terminal executions — accurate across API server
-        # restarts and cheaper than a Temporal round-trip.
-        settings = get_settings()
-        limit = settings.max_concurrent_workflows
-        if limit > 0:
-            active = await count_active_executions(self.session)
-            if active >= limit:
-                raise WorkflowConcurrencyLimitError(limit=limit, active=active)
-
         # Build workflow context for expression resolution.
         # Uses the reserved "workflow_context" namespace per the handbook proposal (P3).
         # "now" and "today" are NOT included here — they are resolved dynamically by the
@@ -462,15 +465,44 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
             workflow_version_id=workflow_version.id,
         )
 
-        # Node-kind gates (ANSTRAT-1750), evaluated fresh on every launch and
-        # always before Temporal is told to start anything: the kill switch
-        # refuses the launch, node denials ride along in the workflow input.
         _, preflight_trigger_node = resolve_trigger_node(workflow_version.workflow_definition, trigger_node_id)
-        denied_nodes, run_principal_id = await self._resolve_launch_node_permissions(
-            workflow=workflow,
-            workflow_version=workflow_version,
-            trigger_node=preflight_trigger_node,
+        principal_id = launch_principal_id or self.user.id
+        rejection = await check_workflow_launch(
+            self.session,
+            self._node_authz_evaluator(),
+            definition=workflow_version.workflow_definition,
+            principal_id=principal_id,
+            project_id=workflow.project_id,
+            trigger_type=preflight_trigger_node.get("type"),
         )
+        if rejection is not None:
+            rejected_execution_id = (
+                await self._persist_rejected_execution(
+                    workflow=workflow,
+                    workflow_version=workflow_version,
+                    input_data=input_data,
+                    trigger_node_id=trigger_node_id,
+                    trigger_type=preflight_trigger_node.get("type"),
+                    principal_id=principal_id,
+                    rejection=rejection,
+                    completed_at=now,
+                )
+                if persist_rejection
+                else None
+            )
+            raise WorkflowLaunchRejectedError(rejection, rejected_execution_id)
+
+        if require_temporal and self.temporal_service is None:
+            operation = "workflow triggering"
+            raise TemporalUnavailableError(operation)
+
+        # Enforce the concurrency cap after authorization and before Temporal.
+        settings = get_settings()
+        limit = settings.max_concurrent_workflows
+        if limit > 0:
+            active = await count_active_executions(self.session)
+            if active >= limit:
+                raise WorkflowConcurrencyLimitError(limit=limit, active=active)
 
         # Start Temporal workflow FIRST (if temporal_service is available)
         from syntara.audit.emitter import request_id_context_var  # noqa: PLC0415
@@ -491,8 +523,6 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
                     workflow_metadata=workflow_metadata,
                     execution_id=pre_generated_execution_id,
                     is_builtin=workflow.is_builtin,
-                    denied_nodes=denied_nodes or None,
-                    run_principal_id=str(run_principal_id),
                 )
             temporal_workflow_id = temporal_result.temporal_workflow_id
             execution_id = UUID(temporal_result.execution_id)
@@ -525,7 +555,6 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
             retried_from_execution_id=retried_from_execution_id,
             trigger_type=trigger_node.get("type"),
             interface=interface_context_var.get(),
-            denied_nodes=denied_nodes or None,
             created_by=self.user.id,
             updated_by=self.user.id,
         )
@@ -820,14 +849,17 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
             workflow_version_id=workflow_version.id,
         )
 
-        # Node-kind gates (ANSTRAT-1750): a test run is a run, so the kill switch
-        # refuses it and the invoking user's own execute denials apply (a test run
-        # never acts as the publisher, whichever trigger it starts from).
-        denied_nodes, run_principal_id = await self._resolve_launch_node_permissions(
-            workflow=workflow,
-            workflow_version=workflow_version,
-            trigger_node={},
+        _, test_trigger = resolve_trigger_node(workflow_def, trigger_node_id)
+        rejection = await check_workflow_launch(
+            self.session,
+            self._node_authz_evaluator(),
+            definition=workflow_def,
+            principal_id=self.user.id,
+            project_id=workflow.project_id,
+            trigger_type=test_trigger.get("type"),
         )
+        if rejection is not None:
+            raise WorkflowLaunchRejectedError(rejection)
 
         # Step 4: Start Temporal workflow with test parameters (if temporal_service is available)
         from syntara.audit.emitter import request_id_context_var  # noqa: PLC0415
@@ -850,8 +882,6 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
                     include_node_results=True,  # Include results in response for test executions
                     workflow_metadata=workflow_metadata,
                     execution_id=pre_generated_execution_id,
-                    denied_nodes=denied_nodes or None,
-                    run_principal_id=str(run_principal_id),
                 )
             temporal_workflow_id = temporal_result.temporal_workflow_id
             execution_id = UUID(temporal_result.execution_id)
@@ -870,11 +900,7 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
             )
 
         # Step 4: Create execution record in database with TEST mode
-        test_trigger_type: str | None = None
-        for trigger in workflow_def.get("triggers", []):
-            if trigger.get("type") in {t.value for t in NodeType if t.value.endswith("_trigger")}:
-                test_trigger_type = trigger.get("type")
-                break
+        test_trigger_type = test_trigger.get("type")
 
         execution = Execution(
             id=execution_id,
@@ -888,7 +914,6 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
             trigger_node_id=trigger_node_id,
             trigger_type=test_trigger_type,
             interface=interface_context_var.get(),
-            denied_nodes=denied_nodes or None,
             execution_metadata={
                 "target_node_id": target_node_id,
                 "pre_resolved_nodes": pre_resolved_dicts,

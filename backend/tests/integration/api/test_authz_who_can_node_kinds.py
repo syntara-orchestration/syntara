@@ -1,7 +1,7 @@
 """Integration tests for ``who_can`` on the ``workflow_node`` resource type.
 
 The node-kind permission model carries the kind as the ``kind`` resource
-label, so ``who_can`` must evaluate ``workflow_node:write`` / ``execute`` with
+label, so ``who_can`` must evaluate ``workflow_node:execute`` with
 ``resource_labels={"kind": ...}`` and honour a deny policy scoped to one kind
 without affecting the others (ANSTRAT-1750, AD-17).
 """
@@ -109,15 +109,15 @@ async def _who_can_usernames(client: AsyncClient, action: str, kind: str) -> lis
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_who_can_lists_authenticated_users_for_node_write(
+async def test_who_can_lists_authenticated_users_for_node_execute(
     admin_client: AsyncClient,
     test_db_session: AsyncSession,
     user_factory: Callable[..., Awaitable[User]],
 ) -> None:
-    """Every authenticated user holds the builtin workflow_node:write:any allow."""
+    """Every authenticated user holds the builtin workflow_node:execute:any allow."""
     member = await user_factory(username="wcnk-member", email="wcnk-member@test.com")
 
-    usernames = await _who_can_usernames(admin_client, "write", _DENIED_KIND)
+    usernames = await _who_can_usernames(admin_client, "execute", _DENIED_KIND)
 
     assert member.username in usernames
 
@@ -132,9 +132,9 @@ async def test_who_can_excludes_user_denied_for_that_kind(
     """A deny on one kind removes the user from that kind's who_can result."""
     denied = await user_factory(username="wcnk-denied", email="wcnk-denied@test.com")
     allowed = await user_factory(username="wcnk-allowed", email="wcnk-allowed@test.com")
-    await _deny_node_kind(test_db_session, denied, _DENIED_KIND, "write")
+    await _deny_node_kind(test_db_session, denied, _DENIED_KIND, "execute")
 
-    denied_kind_users = await _who_can_usernames(admin_client, "write", _DENIED_KIND)
+    denied_kind_users = await _who_can_usernames(admin_client, "execute", _DENIED_KIND)
 
     assert denied.username not in denied_kind_users
     assert allowed.username in denied_kind_users
@@ -149,29 +149,11 @@ async def test_who_can_other_kinds_unaffected(
 ) -> None:
     """The deny is label-scoped: other kinds still list the denied user."""
     denied = await user_factory(username="wcnk-scoped", email="wcnk-scoped@test.com")
-    await _deny_node_kind(test_db_session, denied, _DENIED_KIND, "write")
-
-    other_kind_users = await _who_can_usernames(admin_client, "write", _OTHER_KIND)
-
-    assert denied.username in other_kind_users
-
-
-@pytest.mark.integration
-@pytest.mark.asyncio
-async def test_who_can_execute_deny_is_action_scoped(
-    admin_client: AsyncClient,
-    test_db_session: AsyncSession,
-    user_factory: Callable[..., Awaitable[User]],
-) -> None:
-    """A deny on execute does not remove the user from the write result."""
-    denied = await user_factory(username="wcnk-exec", email="wcnk-exec@test.com")
     await _deny_node_kind(test_db_session, denied, _DENIED_KIND, "execute")
 
-    execute_users = await _who_can_usernames(admin_client, "execute", _DENIED_KIND)
-    write_users = await _who_can_usernames(admin_client, "write", _DENIED_KIND)
+    other_kind_users = await _who_can_usernames(admin_client, "execute", _OTHER_KIND)
 
-    assert denied.username not in execute_users
-    assert denied.username in write_users
+    assert denied.username in other_kind_users
 
 
 @pytest.mark.integration
@@ -189,7 +171,7 @@ async def test_who_can_node_kind_requires_admin(
     response = await base_client.post(
         "/api/v1/authz/who_can",
         json={
-            "action": "write",
+            "action": "execute",
             "resource_type": "workflow_node",
             "resource_labels": {"kind": _DENIED_KIND},
         },
@@ -216,7 +198,7 @@ async def test_who_can_node_kind_scoped_to_project(
     response = await admin_client.post(
         "/api/v1/authz/who_can",
         json={
-            "action": "write",
+            "action": "execute",
             "resource_type": "workflow_node",
             "resource_labels": {"kind": _DENIED_KIND},
             "resource_project": project_name,

@@ -51,7 +51,6 @@ from syntara.workflows.workflow_engine.activities.common import (
     HEARTBEAT_PARTIAL_OUTPUT_KEY,
     HEARTBEAT_STOP_MONITOR,
 )
-from syntara.workflows.workflow_engine.constants import NODE_EXECUTE_DENIED_ERROR_CODE
 from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName, NodeType
 from syntara.workflows.workflow_engine.utils.credential_scrubber import scrub_credentials
 from syntara.workflows.workflow_engine.utils.loop_iteration_ids import (
@@ -87,13 +86,6 @@ _MONITOR_RETRY_BASE_DELAY_S = 1.0
 _MONITOR_RETRY_MAX_DELAY_S = 30.0
 _MONITOR_RETRY_BACKOFF_FACTOR = 2.0
 _MONITOR_RETRY_JITTER_FACTOR = 0.5
-
-
-def _denied_node_error(info: dict[str, Any]) -> str:
-    """Render the error text stored on an activity that was denied (ANSTRAT-1750)."""
-    kind = info.get("kind", "") if isinstance(info, dict) else ""
-    denied_by = info.get("denied_by", "") if isinstance(info, dict) else ""
-    return f"{NODE_EXECUTE_DENIED_ERROR_CODE}: execute denied for node kind '{kind}' by policy '{denied_by}'"
 
 
 @dataclass
@@ -650,10 +642,6 @@ class ActivitySyncService:
                     activity_type in (NodeType.CONDITION, NodeType.APPROVAL, NodeType.CONVERGE, NodeType.SWITCH)
                     or activity_type in self._TRIGGER_ACTIVITY_TYPES
                 ):
-                    # Denied nodes are reached by the same branching decisions, and
-                    # they never produce a Temporal event of their own — sync them
-                    # here so the UI shows DENIED while the run is still going.
-                    await self._sync_denied_nodes(metadata, handle)
                     await self._sync_skipped_nodes(metadata, handle)
 
         if event.event_type in {
@@ -940,7 +928,6 @@ class ActivitySyncService:
             failed_node_map = await self._sync_failed_nodes(metadata, handle)
             if failed_node_map is None:
                 failed_node_map = self._extract_failed_activities_from_event(event)
-            await self._sync_denied_nodes(metadata, handle)
             await self._sync_skipped_nodes(metadata, handle)
             await self._sync_detached_nodes(metadata, handle)
             await self._update_execution_status_from_event(metadata, event, failed_node_map)
@@ -1446,11 +1433,6 @@ class ActivitySyncService:
         if isinstance(failed_activities, dict) and failed_activities:
             errors = [f"{node_id}: {error}" for node_id, error in failed_activities.items()]
             return "; ".join(errors)
-        # A run can end completed_with_errors with no failure at all when the only
-        # path was denied (ANSTRAT-1750, F-23) — report the denials instead.
-        denied_activities = result_data.get("denied_activities", {})
-        if isinstance(denied_activities, dict) and denied_activities:
-            return "; ".join(f"{node_id}: {error}" for node_id, error in denied_activities.items())
         return "One or more workflow activities failed"
 
     @staticmethod
@@ -2562,46 +2544,6 @@ class ActivitySyncService:
         except Exception:
             logger.exception(
                 "Error syncing skipped nodes to database",
-                execution_id=metadata.execution_id,
-            )
-
-    async def _sync_denied_nodes(
-        self,
-        metadata: ExecutionMonitorMetadata,
-        handle: WorkflowHandle[Any, Any],
-    ) -> None:
-        """Query the workflow for denied nodes and mark them DENIED in the database.
-
-        A denied node never starts a Temporal activity (ANSTRAT-1750, F-19), so
-        its record would otherwise stay PENDING until the safety net relabelled
-        it SKIPPED.  Writing DENIED first wins that race: the terminal-status
-        guard in ``_sync_nodes_to_terminal_status`` then leaves it alone.
-        """
-        try:
-            denied_nodes: dict[str, dict[str, Any]] = await handle.query("get_denied_nodes")
-        except Exception:
-            logger.exception(
-                "Error querying denied nodes",
-                execution_id=metadata.execution_id,
-            )
-            return
-
-        # A workflow started before this query existed answers with something
-        # other than a mapping; treat anything unexpected as "no denials".
-        if not isinstance(denied_nodes, dict) or not denied_nodes:
-            return
-
-        error_map = {node_id: _denied_node_error(info) for node_id, info in denied_nodes.items()}
-        try:
-            await self._sync_nodes_to_terminal_status(
-                metadata,
-                node_ids=list(denied_nodes),
-                target_status=ActivityStatus.DENIED,
-                error_map=error_map,
-            )
-        except Exception:
-            logger.exception(
-                "Error syncing denied nodes to database",
                 execution_id=metadata.execution_id,
             )
 
