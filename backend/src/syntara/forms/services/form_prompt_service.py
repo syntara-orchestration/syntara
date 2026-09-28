@@ -250,7 +250,8 @@ class FormPromptService(BaseService):
                     initiated_by=execution.created_by,
                     created_at=form_prompt.created_at,
                 ),
-                # AsyncSession.add() is synchronous, which is all the outbox writer uses.
+                # AuditEventDispatcher is typed for sync Session; the transactional outbox only calls
+                # add(), which AsyncSession also supports synchronously.
                 session=self.session,  # type: ignore[arg-type]
             )
 
