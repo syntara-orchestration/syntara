@@ -1964,6 +1964,7 @@ class TestLoopIterationSync:
         activity.updated_at = None
         activity.iteration = None
         activity.node_type = NodeType.SCRIPT
+        activity.expected_duration = None
         return activity
 
     def _mock_session_with_activities(self, activities: list[Mock]) -> Mock:
@@ -2368,6 +2369,7 @@ class TestGetOrCreateIterationRecord:
         activity.status = status
         activity.iteration = iteration
         activity.node_type = NodeType.SCRIPT
+        activity.expected_duration = None
         return activity
 
     def test_returns_none_when_original_not_found(self) -> None:

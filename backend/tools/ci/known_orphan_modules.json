@@ -25,7 +25,6 @@
     "syntara/files/validators.py": "Imported via package (from syntara.files import validators) in file_manager.py",
     "syntara/audit/models/audit_event_record.py": "Postgres audit event DB model — orphaned by AAP-78344 (export module removed); will be deleted with audit DB retirement in sibling tasks",
     "syntara/workflows/workflow_engine/activities/*_activity.py": "Temporal activities — discovered and registered at runtime by Temporal worker, not via direct imports",
-    "syntara/workflows/workflow_engine/activities/execution_tracker.py": "Stub implementation awaiting Phase 3 database integration — not yet wired into the workflow engine",
     "syntara/integrations/lib/credential_resolver.py": "Statically imported by integration_service.py and invocation_executor.py; pyan3 does not trace through session-factory closures into background tasks",
     "syntara/core/tls/protocol.py": "Loaded by uvicorn via --http string import at runtime, not via Python import",
     "syntara/core/tls/certs.py": "Imported by scripts/generate_local_certs.py and tests/helpers/tls.py — both outside src/",
