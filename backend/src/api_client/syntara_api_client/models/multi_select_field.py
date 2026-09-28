@@ -27,7 +27,7 @@ class MultiSelectField:
         placeholder (None | str | Unset):
         help_text (None | str | Unset):
         required (bool | Unset):  Default: False.
-        default (list[Any] | None | Unset):
+        default (list[bool | float | int | str] | None | Unset):
     """
 
     value_name: str
@@ -37,7 +37,7 @@ class MultiSelectField:
     placeholder: None | str | Unset = UNSET
     help_text: None | str | Unset = UNSET
     required: bool | Unset = False
-    default: list[Any] | None | Unset = UNSET
+    default: list[bool | float | int | str] | None | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         from ..models.static_options import StaticOptions
@@ -68,11 +68,15 @@ class MultiSelectField:
 
         required = self.required
 
-        default: list[Any] | None | Unset
+        default: list[bool | float | int | str] | None | Unset
         if isinstance(self.default, Unset):
             default = UNSET
         elif isinstance(self.default, list):
-            default = self.default
+            default = []
+            for default_type_0_item_data in self.default:
+                default_type_0_item: bool | float | int | str
+                default_type_0_item = default_type_0_item_data
+                default.append(default_type_0_item)
 
         else:
             default = self.default
@@ -149,7 +153,7 @@ class MultiSelectField:
 
         required = d.pop("required", UNSET)
 
-        def _parse_default(data: object) -> list[Any] | None | Unset:
+        def _parse_default(data: object) -> list[bool | float | int | str] | None | Unset:
             if data is None:
                 return data
             if isinstance(data, Unset):
@@ -157,12 +161,21 @@ class MultiSelectField:
             try:
                 if not isinstance(data, list):
                     raise TypeError()
-                default_type_0 = cast(list[Any], data)
+                default_type_0 = []
+                _default_type_0 = data
+                for default_type_0_item_data in _default_type_0:
+
+                    def _parse_default_type_0_item(data: object) -> bool | float | int | str:
+                        return cast(bool | float | int | str, data)
+
+                    default_type_0_item = _parse_default_type_0_item(default_type_0_item_data)
+
+                    default_type_0.append(default_type_0_item)
 
                 return default_type_0
             except (TypeError, ValueError, AttributeError, KeyError):
                 pass
-            return cast(list[Any] | None | Unset, data)
+            return cast(list[bool | float | int | str] | None | Unset, data)
 
         default = _parse_default(d.pop("default", UNSET))
 

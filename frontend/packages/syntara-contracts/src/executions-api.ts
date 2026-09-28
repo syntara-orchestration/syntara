@@ -1346,7 +1346,7 @@ export interface components {
       /** Display Label */
       display_label: string
       /** Value */
-      value: string | number | boolean
+      value: string
     }
     /**
      * StaticOptions
@@ -1432,7 +1432,7 @@ export interface components {
       /** Options */
       options: components['schemas']['StaticOptions'] | components['schemas']['DynamicOptions']
       /** Default */
-      default?: unknown[] | null
+      default?: (string | number | boolean)[] | null
     }
     /**
      * FormDefinition

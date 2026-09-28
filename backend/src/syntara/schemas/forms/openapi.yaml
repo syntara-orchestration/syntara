@@ -957,7 +957,12 @@ components:
         default:
           anyOf:
             - type: array
-              items: {}
+              items:
+                anyOf:
+                  - type: string
+                  - type: integer
+                  - type: number
+                  - type: boolean
             - type: 'null'
           title: Default
 
@@ -997,11 +1002,7 @@ components:
           minLength: 1
           maxLength: 200
         value:
-          anyOf:
-            - type: string
-            - type: integer
-            - type: number
-            - type: boolean
+          type: string
           title: Value
 
     DynamicOptions:
