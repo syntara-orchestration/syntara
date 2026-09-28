@@ -103,6 +103,13 @@ function getAddModeFormId(
     return aapFormMap[nodeSubtypeId]
   }
 
+  if (nodeTypeId === RegistryNodeId.HUMAN_TASKS && nodeSubtypeId) {
+    const humanTasksFormMap: Record<string, string> = {
+      [RegistryNodeId.APPROVAL]: 'approval-node-form',
+    }
+    return humanTasksFormMap[nodeSubtypeId]
+  }
+
   return undefined
 }
 

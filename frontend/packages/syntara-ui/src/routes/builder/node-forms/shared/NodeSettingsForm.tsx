@@ -11,7 +11,7 @@ import {
   Switch,
   TextInput,
 } from '@patternfly/react-core'
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import { Controller, useFormContext, useWatch } from 'react-hook-form'
 
 import { SynSelect } from '../../../../components/SynSelect'
@@ -112,6 +112,7 @@ function ContinueOnFailureSection({
   setValue,
   isDisabled,
 }: CofSectionProps) {
+  const cofFieldLabelId = useId()
   const [isOpen, setIsOpen] = useState(false)
   const selected = cofValueFromBool(continueOnFailure)
   const selectedLabel = COF_OPTIONS.find((o) => o.value === selected)?.label ?? 'System default'
@@ -130,8 +131,14 @@ function ContinueOnFailureSection({
             labelHelp={hideFieldLabel ? undefined : nodeHelp.onFailureBehavior}
             fieldId="node-settings-cof"
           >
+            {hideFieldLabel && (
+              <span id={cofFieldLabelId} className="pf-v6-u-screen-reader">
+                On failure behavior
+              </span>
+            )}
             <SynSelect
               id="node-settings-cof"
+              aria-labelledby={hideFieldLabel ? cofFieldLabelId : undefined}
               isOpen={isOpen}
               selected={selected}
               onSelect={handleSelect}
@@ -144,7 +151,8 @@ function ContinueOnFailureSection({
                   isExpanded={isOpen}
                   isFullWidth
                   isDisabled={isDisabled}
-                  aria-label="On failure behavior"
+                  aria-label={hideFieldLabel ? undefined : 'On failure behavior'}
+                  aria-labelledby={hideFieldLabel ? cofFieldLabelId : undefined}
                 >
                   {selectedLabel}
                 </MenuToggle>

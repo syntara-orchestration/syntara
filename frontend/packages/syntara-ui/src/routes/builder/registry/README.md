@@ -15,6 +15,7 @@ registry/
 │   ├── registerActionNode.ts
 │   ├── registerAIAgentNode.ts
 │   ├── registerApprovalNode.ts
+│   ├── registerHumanTasksNode.ts
 │   ├── registerGenericNode.ts
 │   ├── registerLogicNode.ts
 │   └── registerTriggerNode.ts
