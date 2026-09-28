@@ -70,6 +70,24 @@ function parseSyntaraOptionsExtension(property: JsonSchemaProperty): SyntaraForm
   }
 }
 
+function inferStringFieldType(property: JsonSchemaProperty): FormField['type'] {
+  if (property.format === 'date') {
+    return FormFieldTypeEnum.DATE
+  }
+  if (property.format === 'email') {
+    return FormFieldTypeEnum.EMAIL
+  }
+  return FormFieldTypeEnum.TEXT
+}
+
+function inferArrayFieldType(property: JsonSchemaProperty): FormField['type'] | null {
+  const items = isRecord(property.items) ? property.items : null
+  if (items && parseEnumValues(items.enum)) {
+    return FormFieldTypeEnum.MULTI_SELECT
+  }
+  return null
+}
+
 function inferFieldType(property: JsonSchemaProperty): FormField['type'] | null {
   if (parseSyntaraOptionsExtension(property)) {
     return property.type === 'array' ? FormFieldTypeEnum.MULTI_SELECT : FormFieldTypeEnum.DROPDOWN
@@ -78,11 +96,7 @@ function inferFieldType(property: JsonSchemaProperty): FormField['type'] | null 
     return FormFieldTypeEnum.DROPDOWN
   }
   if (property.type === 'array') {
-    const items = isRecord(property.items) ? property.items : null
-    if (items && parseEnumValues(items.enum)) {
-      return FormFieldTypeEnum.MULTI_SELECT
-    }
-    return null
+    return inferArrayFieldType(property)
   }
   if (property.type === 'boolean') {
     return FormFieldTypeEnum.CHECKBOX
@@ -91,13 +105,7 @@ function inferFieldType(property: JsonSchemaProperty): FormField['type'] | null 
     return FormFieldTypeEnum.NUMBER
   }
   if (property.type === 'string') {
-    if (property.format === 'date') {
-      return FormFieldTypeEnum.DATE
-    }
-    if (property.format === 'email') {
-      return FormFieldTypeEnum.EMAIL
-    }
-    return FormFieldTypeEnum.TEXT
+    return inferStringFieldType(property)
   }
   return null
 }

@@ -225,8 +225,8 @@ describe('SynFormFieldBuilder', () => {
     renderBuilder(<SynFormFieldBuilder value={definition} onChange={vi.fn()} />)
     await user.click(screen.getByRole('button', { name: 'Add option' }))
 
-    expect(screen.getByRole('button', { name: 'Remove option 1' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Remove option 2' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Remove option 1 for Choice' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Remove option 2 for Choice' })).toBeInTheDocument()
   })
 
   describe('field defaults and options', () => {
@@ -315,7 +315,7 @@ describe('SynFormFieldBuilder', () => {
       await user.clear(displayLabel)
       await user.type(displayLabel, 'First choice')
 
-      await user.click(screen.getByRole('button', { name: 'Remove option 2' }))
+      await user.click(screen.getByRole('button', { name: 'Remove option 2 for Choice' }))
       expect(screen.getAllByRole('textbox', { name: 'Display label' })).toHaveLength(1)
     })
 
