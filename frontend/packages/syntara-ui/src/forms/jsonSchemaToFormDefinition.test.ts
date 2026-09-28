@@ -133,6 +133,31 @@ describe('jsonSchemaToFormDefinition', () => {
     expect(result.success).toBe(false)
   })
 
+  it('round-trips email fields with format preserved', () => {
+    const original = parseFormDefinition({
+      fields: [{ type: FormFieldTypeEnum.EMAIL, value_name: 'contact', label: 'Contact', default: 'a@b.co' }],
+    })
+    const schema = formDefinitionToJsonSchema(original)
+    expect(schema.properties.contact?.format).toBe('email')
+    const imported = jsonSchemaToFormDefinition(schema)
+    expect(imported.success).toBe(true)
+    if (imported.success) {
+      expect(imported.data.fields[0]?.type).toBe(FormFieldTypeEnum.EMAIL)
+      expect(imported.data.fields[0]?.default).toBe('a@b.co')
+    }
+  })
+
+  it('round-trips __proto__ as a normal value_name key', () => {
+    const original = parseFormDefinition({
+      fields: [{ type: FormFieldTypeEnum.TEXT, value_name: '__proto__', label: 'Prototype key' }],
+    })
+    const imported = jsonSchemaToFormDefinition(formDefinitionToJsonSchema(original))
+    expect(imported.success).toBe(true)
+    if (imported.success) {
+      expect(imported.data.fields[0]?.value_name).toBe('__proto__')
+    }
+  })
+
   it('imports string field variants without enum', () => {
     const schema = {
       type: 'object',

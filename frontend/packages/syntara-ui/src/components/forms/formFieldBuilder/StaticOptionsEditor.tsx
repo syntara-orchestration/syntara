@@ -12,9 +12,9 @@ import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { Button, Stack, StackItem, Title } from '@patternfly/react-core'
 import { RhUiAddIcon } from '@patternfly/react-icons'
 import type { FormDefinition } from '@syntara/contracts'
-import { useFieldArray, useFormContext } from 'react-hook-form'
+import { useFieldArray, useFormContext, useWatch } from 'react-hook-form'
 
-import { FORM_STATIC_OPTIONS_MAX_LENGTH } from '../../../forms'
+import { FORM_STATIC_OPTIONS_MAX_LENGTH, FormFieldTypeEnum } from '../../../forms'
 
 import { createDefaultStaticOption } from './createDefaultField'
 import styles from './formFieldBuilder.module.css'
@@ -28,7 +28,8 @@ type StaticOptionsEditorProps = {
 
 export function StaticOptionsEditor({ fieldIndex, isDisabled }: Readonly<StaticOptionsEditorProps>) {
   const commit = useFormFieldBuilderCommit()
-  const { control, getValues } = useFormContext<FormDefinition>()
+  const { control, getValues, setValue } = useFormContext<FormDefinition>()
+  const fieldLabel = useWatch({ control, name: `fields.${fieldIndex}.label` }) ?? `Field ${fieldIndex + 1}`
   const { fields, append, move, remove } = useFieldArray({
     control,
     name: `fields.${fieldIndex}.options.values`,
@@ -66,12 +67,27 @@ export function StaticOptionsEditor({ fieldIndex, isDisabled }: Readonly<StaticO
               <StackItem key={option.id}>
                 <StaticOptionRow
                   fieldIndex={fieldIndex}
+                  fieldLabel={fieldLabel}
                   optionIndex={optionIndex}
                   optionArrayId={option.id}
                   isDisabled={isDisabled}
                   canRemove={fields.length > 1}
                   onRemove={() => {
+                    const values = getValues(`fields.${fieldIndex}.options.values`) ?? []
+                    const removedValue = values[optionIndex]?.value
                     remove(optionIndex)
+                    const field = getValues(`fields.${fieldIndex}`)
+                    if (removedValue !== undefined) {
+                      if (field.type === FormFieldTypeEnum.MULTI_SELECT && Array.isArray(field.default)) {
+                        setValue(
+                          `fields.${fieldIndex}.default`,
+                          field.default.filter((entry) => entry !== removedValue),
+                          { shouldValidate: true }
+                        )
+                      } else if (field.type === FormFieldTypeEnum.DROPDOWN && field.default === removedValue) {
+                        setValue(`fields.${fieldIndex}.default`, null, { shouldValidate: true })
+                      }
+                    }
                     commit()
                   }}
                 />

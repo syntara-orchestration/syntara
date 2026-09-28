@@ -7,6 +7,7 @@ import { formDefinitionSchema, safeParseFormDefinition, type FormDefinitionSchem
 import { zodResolver } from '../../routes/builder/node-forms/shared/formSchemaUtils'
 
 import { FormFieldBuilderCommitContext } from './formFieldBuilder/formFieldBuilderCommitContext'
+import styles from './formFieldBuilder/formFieldBuilder.module.css'
 import { FormFieldBuilderDesignTab } from './formFieldBuilder/FormFieldBuilderDesignTab'
 import { FormFieldBuilderJsonSchemaTab } from './formFieldBuilder/FormFieldBuilderJsonSchemaTab'
 import { FormFieldBuilderPreviewTab } from './formFieldBuilder/FormFieldBuilderPreviewTab'
@@ -63,13 +64,19 @@ export function SynFormFieldBuilder({ value, onChange, isDisabled }: Readonly<Sy
           aria-label="Form builder views"
         >
           <Tab eventKey="design" title={<TabTitleText>Design</TabTitleText>}>
-            <FormFieldBuilderDesignTab isDisabled={isDisabled} />
+            <div className={styles.tabPanelBody}>
+              <FormFieldBuilderDesignTab isDisabled={isDisabled} />
+            </div>
           </Tab>
           <Tab eventKey="preview" title={<TabTitleText>Preview</TabTitleText>}>
-            <FormFieldBuilderPreviewTab />
+            <div className={styles.tabPanelBody}>
+              <FormFieldBuilderPreviewTab />
+            </div>
           </Tab>
           <Tab eventKey="json" title={<TabTitleText>JSON Schema</TabTitleText>}>
-            <FormFieldBuilderJsonSchemaTab />
+            <div className={styles.tabPanelBody}>
+              <FormFieldBuilderJsonSchemaTab isDisabled={isDisabled} />
+            </div>
           </Tab>
         </Tabs>
       </FormFieldBuilderCommitContext>

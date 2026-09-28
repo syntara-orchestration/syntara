@@ -17,7 +17,7 @@ function enumValuesFromStaticOptions(values: ReadonlyArray<{ value: string | num
   return values.map((option) => option.value)
 }
 
-function jsonSchemaTypeForScalarValues(values: readonly OptionScalar[]): string {
+function jsonSchemaTypeForScalarValues(values: readonly OptionScalar[]): string | string[] {
   if (values.length === 0) {
     return 'string'
   }
@@ -25,7 +25,7 @@ function jsonSchemaTypeForScalarValues(values: readonly OptionScalar[]): string 
   if (values.every((value) => typeof value === typeof first)) {
     return typeof first
   }
-  return 'string'
+  return ['string', 'number', 'boolean']
 }
 
 function defaultForJsonSchema(field: FormField): unknown {
@@ -55,8 +55,9 @@ function propertySchemaForField(field: FormField): Record<string, unknown> {
     case FormFieldTypeEnum.TEXT:
     case FormFieldTypeEnum.TEXTAREA:
     case FormFieldTypeEnum.MASKED_TEXT:
-    case FormFieldTypeEnum.EMAIL:
       return { type: 'string' }
+    case FormFieldTypeEnum.EMAIL:
+      return { type: 'string', format: 'email' }
     case FormFieldTypeEnum.NUMBER:
       return { type: 'number' }
     case FormFieldTypeEnum.CHECKBOX:
@@ -94,7 +95,7 @@ function propertySchemaForField(field: FormField): Record<string, unknown> {
  * For export and preview only — workflow storage uses the typed FormDefinition model.
  */
 export function formDefinitionToJsonSchema(definition: FormDefinition): JsonSchemaObject {
-  const properties: Record<string, Record<string, unknown>> = {}
+  const properties = Object.create(null) as Record<string, Record<string, unknown>>
   const required: string[] = []
 
   for (const field of definition.fields) {
@@ -102,9 +103,8 @@ export function formDefinitionToJsonSchema(definition: FormDefinition): JsonSche
       ...propertySchemaForField(field),
       title: field.label,
     }
-    const defaultValue = defaultForJsonSchema(field)
-    if (defaultValue !== undefined) {
-      property.default = defaultValue
+    if (Object.hasOwn(field, 'default')) {
+      property.default = defaultForJsonSchema(field)
     }
     const optionsExtension = syntaraOptionsExtension(field)
     if (optionsExtension) {

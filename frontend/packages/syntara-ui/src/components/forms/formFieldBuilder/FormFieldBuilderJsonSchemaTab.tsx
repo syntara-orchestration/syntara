@@ -1,6 +1,16 @@
-import { Alert, Button, Content, ContentVariants, FormGroup, Stack, StackItem, TextArea } from '@patternfly/react-core'
+import {
+  Alert,
+  Button,
+  Content,
+  ContentVariants,
+  FormGroup,
+  Stack,
+  StackItem,
+  TextArea,
+  Title,
+} from '@patternfly/react-core'
 import type { FormDefinition } from '@syntara/contracts'
-import { useMemo, useState } from 'react'
+import { useId, useMemo, useState } from 'react'
 import { useFormContext, useWatch } from 'react-hook-form'
 
 import {
@@ -14,7 +24,12 @@ import { SynConfirmationDialog } from '../../dialogs/SynConfirmationDialog'
 import styles from './formFieldBuilder.module.css'
 import { useFormFieldBuilderCommit } from './formFieldBuilderCommitContext'
 
-export function FormFieldBuilderJsonSchemaTab() {
+type FormFieldBuilderJsonSchemaTabProps = {
+  isDisabled?: boolean
+}
+
+export function FormFieldBuilderJsonSchemaTab({ isDisabled }: Readonly<FormFieldBuilderJsonSchemaTabProps>) {
+  const generatedSchemaTitleId = useId()
   const commit = useFormFieldBuilderCommit()
   const { control, setValue } = useFormContext<FormDefinition>()
   const fields = useWatch({ control, name: 'fields' })
@@ -83,12 +98,14 @@ export function FormFieldBuilderJsonSchemaTab() {
             aria-label="Import JSON Schema"
             resizeOrientation="vertical"
             rows={8}
+            isDisabled={isDisabled}
+            readOnly={isDisabled}
           />
         </FormGroup>
         {importError && (
           <Alert variant="danger" title={importError} isInline className={styles.jsonSchemaImportError} />
         )}
-        <Button variant="secondary" onClick={handleLoadSchema} isDisabled={importText.trim() === ''}>
+        <Button variant="secondary" onClick={handleLoadSchema} isDisabled={isDisabled || importText.trim() === ''}>
           Load into builder
         </Button>
       </StackItem>
@@ -105,9 +122,14 @@ export function FormFieldBuilderJsonSchemaTab() {
             ))}
           </Stack>
         ) : (
-          <pre aria-label="Generated JSON Schema">
-            <code>{content.json}</code>
-          </pre>
+          <>
+            <Title headingLevel="h4" size="md" id={generatedSchemaTitleId}>
+              Generated JSON Schema
+            </Title>
+            <pre aria-labelledby={generatedSchemaTitleId}>
+              <code>{content.json}</code>
+            </pre>
+          </>
         )}
       </StackItem>
       <SynConfirmationDialog

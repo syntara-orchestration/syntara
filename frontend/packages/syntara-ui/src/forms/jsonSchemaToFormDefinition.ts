@@ -74,11 +74,15 @@ function inferFieldType(property: JsonSchemaProperty): FormField['type'] | null 
   if (parseSyntaraOptionsExtension(property)) {
     return property.type === 'array' ? FormFieldTypeEnum.MULTI_SELECT : FormFieldTypeEnum.DROPDOWN
   }
-  if (property.type === 'array') {
-    return FormFieldTypeEnum.MULTI_SELECT
-  }
   if (parseEnumValues(property.enum)) {
     return FormFieldTypeEnum.DROPDOWN
+  }
+  if (property.type === 'array') {
+    const items = isRecord(property.items) ? property.items : null
+    if (items && parseEnumValues(items.enum)) {
+      return FormFieldTypeEnum.MULTI_SELECT
+    }
+    return null
   }
   if (property.type === 'boolean') {
     return FormFieldTypeEnum.CHECKBOX
@@ -211,7 +215,11 @@ function fieldFromProperty(valueName: string, property: JsonSchemaProperty, requ
     case FormFieldTypeEnum.MASKED_TEXT:
       return { ...base, type: FormFieldTypeEnum.MASKED_TEXT }
     case FormFieldTypeEnum.EMAIL:
-      return { ...base, type: FormFieldTypeEnum.EMAIL }
+      return {
+        ...base,
+        type: FormFieldTypeEnum.EMAIL,
+        ...(typeof importedDefault === 'string' ? { default: importedDefault } : {}),
+      }
   }
 }
 
