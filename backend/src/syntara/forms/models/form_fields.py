@@ -87,7 +87,7 @@ class StaticOption(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     display_label: str = Field(min_length=1, max_length=200)
-    value: str | int | float | bool
+    value: str
 
 
 class StaticOptions(BaseModel):
@@ -146,7 +146,7 @@ FormField = Annotated[
 def _check_multi_select_defaults(
     value_name: str,
     defaults: list[str | int | float | bool],
-    valid_values: set[str | int | float | bool],
+    valid_values: set[str],
 ) -> None:
     """Check multi-select defaults are drawn from the option list.
 

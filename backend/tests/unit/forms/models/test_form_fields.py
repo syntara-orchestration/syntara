@@ -204,9 +204,23 @@ class TestStaticOptionDefaults:
         assert form.fields[0].default == ["a", "b"]
 
     @pytest.mark.parametrize("value", ["a", 5, 5.5, True])
-    def test_multi_select_defaults_accept_static_option_scalar_types(self, value: object) -> None:
-        """Multi-select defaults support each scalar type accepted by StaticOption."""
+    def test_static_multi_select_options_accept_only_string_values(self, value: object) -> None:
+        """Static option values are strings, even though dynamic options preserve scalar types."""
         options = {"source": "static", "values": [{"display_label": str(value), "value": value}]}
+
+        if not isinstance(value, str):
+            with pytest.raises(ValidationError):
+                _form(_text(type="multi_select", options=options, default=[value]))
+            return
+
+        form = _form(_text(type="multi_select", options=options, default=[value]))
+        assert isinstance(form.fields[0], MultiSelectField)
+        assert form.fields[0].default == [value]
+
+    @pytest.mark.parametrize("value", ["a", 5, 5.5, True])
+    def test_dynamic_multi_select_defaults_accept_scalar_types(self, value: object) -> None:
+        """Dynamic multi-select defaults retain each supported scalar type."""
+        options = {"source": "dynamic", "expression": "${upstream.output}"}
 
         form = _form(_text(type="multi_select", options=options, default=[value]))
 

@@ -14,7 +14,7 @@
 openapi: 3.1.0
 info:
   title: Orchestrator API
-  version: 1.3.0
+  version: 1.4.0
   description: A distributed multi-agent workflow orchestration system
 servers:
   - url: /api/v1
@@ -30972,11 +30972,7 @@ components:
           minLength: 1
           maxLength: 200
         value:
-          anyOf:
-            - type: string
-            - type: integer
-            - type: number
-            - type: boolean
+          type: string
           title: Value
     DynamicOptions:
       type: object

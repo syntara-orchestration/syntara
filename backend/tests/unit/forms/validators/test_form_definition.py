@@ -137,10 +137,23 @@ class TestAuthorTimeMatchesSubmissionTime:
 
 
 class TestMultiSelectScalarDefaults:
-    """Non-scalar multi-select defaults are rejected by the field model."""
+    """Dynamic scalar defaults survive parsing; non-scalar defaults fail in the field model."""
+
+    @pytest.mark.parametrize("value", ["a", 5, 5.5, True])
+    def test_dynamic_scalar_defaults_are_accepted(self, value: object) -> None:
+        """String, integer, float, and boolean defaults are valid for dynamic options."""
+        options = {"source": "dynamic", "expression": "${upstream.output}"}
+
+        form = _form(_field("multi_select", "picks", options=options, default=[value]))
+
+        validate_form_definition(form)
+
+        assert form.fields[0].default == [value]
 
     @pytest.mark.parametrize("bad", [{"a": 1}, ["nested"]])
     def test_non_scalar_default_items_are_rejected(self, bad: Any) -> None:  # noqa: ANN401
-        """Unsupported values fail field validation before option membership checks."""
+        """Nested lists and dictionaries fail field parsing before definition validation."""
+        options = {"source": "dynamic", "expression": "${upstream.output}"}
+
         with pytest.raises(ValidationError):
-            _form(_field("multi_select", "picks", options=_STATIC_OPTIONS, default=[bad]))
+            _form(_field("multi_select", "picks", options=options, default=[bad]))
