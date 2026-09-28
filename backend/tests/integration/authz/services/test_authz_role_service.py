@@ -386,8 +386,8 @@ async def test_update_role_rejects_cross_project_policy(test_db_session: AsyncSe
 async def test_system_role_rejects_project_scoped_builtin(test_db_session: AsyncSession, test_user: User) -> None:
     """A system-scoped role cannot reference a project-scoped builtin policy."""
     svc = RoleService(test_db_session, test_user)
-    with pytest.raises(SafeValueError, match="Policies not available in global scope"):
-        await svc.create_role(name="bad-sys-role", policies=["policy:update:project"])
+    with pytest.raises(SafeValueError, match="workflow_node:execute:project:script"):
+        await svc.create_role(name="bad-sys-role", policies=["workflow_node:execute:project:script"])
 
 
 @pytest.mark.asyncio
@@ -430,3 +430,21 @@ async def test_project_role_cannot_attach_global_step_deny_builtin(
         await svc.create_role(
             name="bad-project-step-deny", policies=["workflow_node:execute:any:script"], project_id=project.id
         )
+
+
+@pytest.mark.asyncio
+async def test_project_role_can_attach_project_step_deny_builtin(
+    test_db_session: AsyncSession, test_user: User
+) -> None:
+    from syntara.authz.models.project import Project
+
+    project = Project(name="project-step-deny-role-project", labels={})
+    test_db_session.add(project)
+    await test_db_session.commit()
+
+    policy_name = "workflow_node:execute:project:script"
+    role = await RoleService(test_db_session, test_user).create_role(
+        name="project-deny-script-step", policies=[policy_name], project_id=project.id
+    )
+    assert role.project_id == project.id
+    assert role.policy_names == [policy_name]

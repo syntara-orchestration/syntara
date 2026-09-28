@@ -244,12 +244,13 @@ BUILTIN_POLICIES: list[PolicyInfo] = [
     PolicyInfo("service_account", "enable", scope="project", roles=("project-admin",)),
 ]
 
-# A stable global deny for each registered step kind. These are intentionally
-# unassigned: administrators opt in by attaching one to a custom system role.
+# Stable system and project denies for each registered step kind. These are
+# unassigned so administrators opt in through a matching-scope custom role.
 from syntara.workflows.node_kinds import REGISTERED_STEP_KINDS  # noqa: E402
 
 BUILTIN_POLICIES.extend(
-    PolicyInfo("workflow_node", "execute", effect="deny", kind=kind)
+    PolicyInfo("workflow_node", "execute", scope=scope, effect="deny", kind=kind)
+    for scope in ("any", "project")
     for kind in REGISTERED_STEP_KINDS
     if kind != "mcp_tool"
 )

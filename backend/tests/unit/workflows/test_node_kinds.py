@@ -32,22 +32,23 @@ def test_builtins_are_unassigned_denies_for_every_registered_kind_except_mcp_too
     policies = {policy.name: policy for policy in BUILTIN_POLICIES}
     expected_kinds = set(REGISTERED_STEP_KINDS) - {"mcp_tool"}
     actual = {
-        name.removeprefix("workflow_node:execute:any:")
-        for name in policies
-        if name.startswith("workflow_node:execute:any:")
+        (policy.scope, policy.kind)
+        for policy in BUILTIN_POLICIES
+        if policy.name.startswith("workflow_node:execute:") and policy.effect == "deny"
     }
-    assert actual == expected_kinds
+    expected = {(scope, kind) for scope in ("any", "project") for kind in expected_kinds}
+    assert actual == expected
 
-    for kind in expected_kinds:
-        name = f"workflow_node:execute:any:{kind}"
+    for scope, kind in expected:
+        name = f"workflow_node:execute:{scope}:{kind}"
         policy = policies[name]
         assert policy.roles == ()
-        assert policy.scope == "any"
+        assert policy.scope == scope
         assert policy.statements == [
             {
                 "effect": "deny",
                 "actions": ["workflow_node:execute"],
-                "scope": "any",
+                "scope": scope,
                 "conditions": {"resource_labels": {"kind": kind}},
             }
         ]

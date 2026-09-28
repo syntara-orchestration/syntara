@@ -109,7 +109,7 @@ async def test_list_policies(test_db_session: AsyncSession, test_user: User) -> 
 
 
 @pytest.mark.asyncio
-async def test_step_deny_builtin_is_visible_global_immutable_and_not_project_eligible(
+async def test_step_deny_builtins_are_visible_at_matching_scopes_and_immutable(
     test_db_session: AsyncSession, test_user: User
 ) -> None:
     from syntara.authz.exceptions import BuiltinProtectionError
@@ -138,6 +138,15 @@ async def test_step_deny_builtin_is_visible_global_immutable_and_not_project_eli
     assert project_policies.resources == []
     with pytest.raises(BuiltinProtectionError):
         await svc.update_policy(builtin_policy_uuid(name), description="mutable")
+
+    project_name = "workflow_node:execute:project:script"
+    visible_project_policy = await svc.list_policies(limit=1000, query_params_items=[("name", project_name)])
+    assert len(visible_project_policy.resources) == 1
+    assert visible_project_policy.resources[0].scope == "project"
+    project_policies = await svc.list_project_policies(
+        project.id, limit=1000, query_params_items=[("name", project_name)]
+    )
+    assert [policy.name for policy in project_policies.resources] == [project_name]
 
 
 @pytest.mark.asyncio

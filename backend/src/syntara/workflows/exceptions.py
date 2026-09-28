@@ -45,7 +45,6 @@ class WorkflowPublishValidationError(WorkflowError):
         super().__init__("Cannot publish workflow with validation errors or warnings")
 
 
-@fastapi_exception(handler="syntara.workflows.error_handlers.node_kind_write_denied_handler")
 @fastapi_exception(handler="syntara.workflows.error_handlers.workflow_launch_rejected_handler")
 class WorkflowLaunchRejectedError(WorkflowError):
     """Raised when launch-time authorization rejects a workflow launch."""

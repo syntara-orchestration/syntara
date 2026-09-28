@@ -253,7 +253,10 @@ class TestRegistryIntegrity:  # noqa: D101
 
         accounted_for = e2e_covered | E2E_COVERAGE_EXEMPT
         accounted_for.update(
-            f"workflow_node:execute:any:{kind}" for kind in REGISTERED_STEP_KINDS if kind != "mcp_tool"
+            f"workflow_node:execute:{scope}:{kind}"
+            for scope in ("any", "project")
+            for kind in REGISTERED_STEP_KINDS
+            if kind != "mcp_tool"
         )
         all_builtin = {p.name for p in BUILTIN_POLICIES}
 
