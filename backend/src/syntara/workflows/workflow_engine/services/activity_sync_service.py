@@ -536,7 +536,7 @@ class ActivitySyncService(
         if not updated_activities or not execution:
             return None, None
 
-        new_status = await self._maybe_update_execution_paused_status(execution, existing_activities)
+        new_status = self._maybe_update_execution_paused_status(execution, existing_activities)
         approval_changed = self._update_approval_pending_flag(execution, existing_activities)
         return new_status, approval_changed
 

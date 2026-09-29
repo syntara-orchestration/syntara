@@ -391,6 +391,7 @@ class TestActivityEventProcessing:
         activity_id: str = "test-activity",
         attempt: int = 1,
         failure_message: str | None = None,
+        failure_type: str | None = None,
     ) -> Mock:
         """Create a mock Temporal history event."""
         event = Mock()
@@ -419,7 +420,14 @@ class TestActivityEventProcessing:
         elif event_type == EventType.EVENT_TYPE_ACTIVITY_TASK_FAILED:
             attrs = Mock()
             attrs.scheduled_event_id = scheduled_event_id
-            attrs.failure = Mock(message=failure_message) if failure_message else None
+            attrs.failure = (
+                Mock(
+                    message=failure_message,
+                    application_failure_info=Mock(type=failure_type) if failure_type else None,
+                )
+                if failure_message
+                else None
+            )
             event.activity_task_failed_event_attributes = attrs
 
         elif event_type == EventType.EVENT_TYPE_ACTIVITY_TASK_TIMED_OUT:
@@ -653,6 +661,26 @@ class TestActivityEventProcessing:
         assert self.metadata.pending_activity_updates[1]["status"] == ActivityStatus.FAILED
         assert self.metadata.pending_activity_updates[1]["completed_at"] is not None
         assert self.metadata.pending_activity_updates[1]["error_details"] == expected_error
+
+    def test_process_activity_failed_for_cancelled_invocation(self) -> None:
+        """Invocation cancellation is terminal but should not appear as an activity failure."""
+        self.metadata.pending_activity_updates[1] = {
+            "activity_id": "test-activity",
+            "status": ActivityStatus.RUNNING,
+            "completed_at": None,
+            "error_details": None,
+        }
+        event = self._create_mock_event(
+            EventType.EVENT_TYPE_ACTIVITY_TASK_FAILED,
+            event_id=3,
+            scheduled_event_id=1,
+            failure_message="Invocation cancelled",
+            failure_type="InvocationCancelledError",
+        )
+
+        self.service._process_activity_failed(event, self.metadata)
+
+        assert self.metadata.pending_activity_updates[1]["status"] == ActivityStatus.CANCELLED
 
     @pytest.mark.parametrize(
         ("event_type", "expected_status", "expected_error", "failure_message"),
@@ -4179,7 +4207,7 @@ class TestMonitorExecutionRetry:
     """Tests for _monitor_execution retry logic with exponential backoff."""
 
     _SLEEP_PATH = "syntara.workflows.workflow_engine.services.activity_sync_service.asyncio.sleep"
-    _RANDOM_PATH = "syntara.workflows.workflow_engine.services.activity_sync_monitor.random.random"
+    _RANDOM_PATH = "syntara.workflows.workflow_engine.services.activity_sync_monitor.secrets.SystemRandom.random"
 
     def setup_method(self) -> None:
         """Set up test fixtures."""

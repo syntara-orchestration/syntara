@@ -72,39 +72,40 @@ class ActivitySyncEventProcessorMixin:
         if scheduled_id in metadata.pending_activity_updates:
             attempt = attrs.attempt or 1
             update = metadata.pending_activity_updates[scheduled_id]
-            if attempt > 1:
-                update["status"] = ActivityStatus.RETRYING
-            else:
-                activity_id = update["activity_id"]
-                activity_def = metadata.activity_definitions_map.get(activity_id, {})
-                activity_type = activity_def.get("type")
-                update["status"] = (
-                    ActivityStatus.WAITING
-                    if activity_type in (NodeType.APPROVAL, NodeType.WAIT)
-                    else ActivityStatus.RUNNING
-                )
+            update["status"] = self._activity_status_for_attempt(update, metadata, attempt)
             update["started_at"] = ensure_timezone_aware(event.event_time)
             update["retry_count"] = attempt - 1
             metadata.pending_sync_event_ids.add(scheduled_id)
 
             if attempt > 1:
-                last_failure = attrs.last_failure
-                retry_reason = last_failure.message if last_failure else None
-                if retry_reason and len(retry_reason) > RETRY_REASON_MAX_LENGTH:
-                    retry_reason = retry_reason[: RETRY_REASON_MAX_LENGTH - 3] + "..."
-                # Extract failure type name from the Temporal failure chain
-                failure_type: str | None = None
-                if last_failure:
-                    cause = last_failure.cause
-                    if cause and cause.application_failure_info and cause.application_failure_info.type:
-                        failure_type = cause.application_failure_info.type
-                    elif last_failure.application_failure_info and last_failure.application_failure_info.type:
-                        failure_type = last_failure.application_failure_info.type
-                update["_retry_info"] = {
-                    "retry_count": attempt - 1,
-                    "retry_reason": retry_reason,
-                    "error_type": failure_type,
-                }
+                update["_retry_info"] = self._build_retry_info(attrs.last_failure, attempt)
+
+    @staticmethod
+    def _activity_status_for_attempt(
+        update: dict[str, Any], metadata: ExecutionMonitorMetadata, attempt: int
+    ) -> ActivityStatus:
+        if attempt > 1:
+            return ActivityStatus.RETRYING
+        activity_def = metadata.activity_definitions_map.get(update["activity_id"], {})
+        return (
+            ActivityStatus.WAITING
+            if activity_def.get("type") in (NodeType.APPROVAL, NodeType.WAIT)
+            else ActivityStatus.RUNNING
+        )
+
+    @staticmethod
+    def _build_retry_info(last_failure: Any, attempt: int) -> dict[str, Any]:  # noqa: ANN401
+        retry_reason = last_failure.message if last_failure else None
+        if retry_reason and len(retry_reason) > RETRY_REASON_MAX_LENGTH:
+            retry_reason = retry_reason[: RETRY_REASON_MAX_LENGTH - 3] + "..."
+        failure_type: str | None = None
+        if last_failure:
+            cause = last_failure.cause
+            if cause and cause.application_failure_info and cause.application_failure_info.type:
+                failure_type = cause.application_failure_info.type
+            elif last_failure.application_failure_info and last_failure.application_failure_info.type:
+                failure_type = last_failure.application_failure_info.type
+        return {"retry_count": attempt - 1, "retry_reason": retry_reason, "error_type": failure_type}
 
     @staticmethod
     def _is_agentic_activity(activity_def: dict[str, Any]) -> bool:
@@ -160,19 +161,16 @@ class ActivitySyncEventProcessorMixin:
 
     def _process_activity_failed(self, event: HistoryEvent, metadata: ExecutionMonitorMetadata) -> None:
         """Process ACTIVITY_TASK_FAILED event."""
-        # TODO(https://redhat.atlassian.net/browse/AAP-86855): InvocationCancelledError raises a
-        # non-retryable ApplicationError, which Temporal records as
-        # ACTIVITY_TASK_FAILED. This unconditionally sets ActivityStatus.FAILED.
-        # Once the activity row is terminal, _sync_nodes_to_terminal_status
-        # skips it, so the Execute Invocation step shows "Failed" even though
-        # the execution-level status is CANCELLED.  Inspect
-        # attrs.failure.application_failure_info.type for
-        # "InvocationCancelledError" and set ActivityStatus.CANCELLED instead.
         attrs = event.activity_task_failed_event_attributes
         scheduled_id = attrs.scheduled_event_id
         if scheduled_id in metadata.pending_activity_updates:
             update = metadata.pending_activity_updates[scheduled_id]
-            update["status"] = ActivityStatus.FAILED
+            is_cancelled = bool(
+                attrs.failure
+                and attrs.failure.application_failure_info
+                and attrs.failure.application_failure_info.type == "InvocationCancelledError"
+            )
+            update["status"] = ActivityStatus.CANCELLED if is_cancelled else ActivityStatus.FAILED
             update["completed_at"] = ensure_timezone_aware(event.event_time)
             if attrs.failure:
                 update["error_details"] = attrs.failure.message

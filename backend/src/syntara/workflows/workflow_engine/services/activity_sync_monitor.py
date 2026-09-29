@@ -1,7 +1,7 @@
 """Temporal history queue and retrying execution monitor."""
 
 import asyncio
-import random
+import secrets
 from typing import Any
 from uuid import UUID
 
@@ -147,13 +147,13 @@ class ActivitySyncMonitorMixin:
         Returns False if the monitor loop should stop (shutdown requested).
         """
         if event.event_id <= metadata.last_processed_event_id:
-            return True
+            return not self._shutdown
 
         # Handle workflow execution started event
         if event.event_type == EventType.EVENT_TYPE_WORKFLOW_EXECUTION_STARTED:
             await self._update_execution_to_running(metadata, event)
             metadata.last_processed_event_id = event.event_id
-            return True
+            return not self._shutdown
 
         # Handle workflow completion events
         if event.event_type in {
@@ -175,7 +175,7 @@ class ActivitySyncMonitorMixin:
             await self._sync_detached_nodes(metadata, handle)
             await self._update_execution_status_from_event(metadata, event, failed_node_map)
             metadata.last_processed_event_id = event.event_id
-            return True
+            return not self._shutdown
 
         # Process activity events
         self._process_activity_event(event, metadata)
@@ -208,7 +208,7 @@ class ActivitySyncMonitorMixin:
                         )
                     )
 
-        return True
+        return not self._shutdown
 
     async def _dispatch_queue_item(
         self,
@@ -332,7 +332,9 @@ class ActivitySyncMonitorMixin:
                     attempt=attempt,
                     delay_s=delay,
                 )
-                jitter = (1 - _MONITOR_RETRY_JITTER_FACTOR) + random.random() * _MONITOR_RETRY_JITTER_FACTOR  # noqa: S311
+                jitter = (1 - _MONITOR_RETRY_JITTER_FACTOR) + (
+                    secrets.SystemRandom().random() * _MONITOR_RETRY_JITTER_FACTOR
+                )
                 jittered_delay = delay * jitter
                 await asyncio.sleep(jittered_delay)
                 delay = min(delay * _MONITOR_RETRY_BACKOFF_FACTOR, _MONITOR_RETRY_MAX_DELAY_S)

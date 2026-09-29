@@ -35,7 +35,7 @@ class ActivityExecutionStateMixin:
     _publish_snapshot: Any
     _dispatch_audit_event: Any
 
-    def _extract_execution_status_from_event(self, event: HistoryEvent) -> tuple[ExecutionStatus, datetime, str | None]:  # noqa: C901, PLR0912
+    def _extract_execution_status_from_event(self, event: HistoryEvent) -> tuple[ExecutionStatus, datetime, str | None]:
         """Extract execution status, completion time, and error from workflow completion event.
 
         Args:
@@ -48,49 +48,49 @@ class ActivityExecutionStateMixin:
             ValueError: If event is not a workflow completion event
 
         """
+        status, error_details = self._extract_status_and_error(event)
+        return status, ensure_timezone_aware(event.event_time), error_details
+
+    @staticmethod
+    def _extract_status_and_error(event: HistoryEvent) -> tuple[ExecutionStatus, str | None]:
+        """Extract terminal status and error details from a Temporal event."""
         event_type = event.event_type
-        completed_at = ensure_timezone_aware(event.event_time)
-        error_details = None
-
         if event_type == EventType.EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED:
-            # Check workflow result for internal failure status (e.g., node failures
-            # that don't raise exceptions but return status: "failed" in the result)
-            status = ExecutionStatus.COMPLETED
-            completed_attrs = event.workflow_execution_completed_event_attributes
-            if completed_attrs and completed_attrs.result and completed_attrs.result.payloads:
-                try:
-                    payload = completed_attrs.result.payloads[0]
-                    result_data = json.loads(payload.data)
-                    if isinstance(result_data, dict):
-                        inner_status = result_data.get("status")
-                        if inner_status == "cancelled":
-                            status = ExecutionStatus.CANCELLED
-                        elif inner_status == "failed":
-                            status = ExecutionStatus.FAILED
-                            error_details = self._extract_failed_activity_errors(result_data)
-                        elif inner_status == "completed_with_errors":
-                            status = ExecutionStatus.COMPLETED_WITH_ERRORS
-                            error_details = self._extract_failed_activity_errors(result_data)
-                except Exception:  # noqa: BLE001
-                    logger.warning("Failed to parse workflow result for failure detection", exc_info=True)
-        elif event_type == EventType.EVENT_TYPE_WORKFLOW_EXECUTION_FAILED:
-            status = ExecutionStatus.FAILED
-            failed_attrs = event.workflow_execution_failed_event_attributes
-            if failed_attrs and failed_attrs.failure:
-                error_details = failed_attrs.failure.message
-        elif event_type == EventType.EVENT_TYPE_WORKFLOW_EXECUTION_CANCELED:
-            status = ExecutionStatus.CANCELLED
-        elif event_type == EventType.EVENT_TYPE_WORKFLOW_EXECUTION_TIMED_OUT:
-            status = ExecutionStatus.FAILED
-            error_details = "Workflow execution timed out"
-        elif event_type == EventType.EVENT_TYPE_WORKFLOW_EXECUTION_TERMINATED:
-            status = ExecutionStatus.CANCELLED
-            error_details = "Workflow was forcibly terminated"
-        else:
-            msg = f"Event type {event_type} is not a workflow completion event"
-            raise SafeValueError(msg)
+            return ActivityExecutionStateMixin._extract_completed_status_and_error(event)
+        if event_type == EventType.EVENT_TYPE_WORKFLOW_EXECUTION_FAILED:
+            attrs = event.workflow_execution_failed_event_attributes
+            return ExecutionStatus.FAILED, attrs.failure.message if attrs and attrs.failure else None
+        if event_type == EventType.EVENT_TYPE_WORKFLOW_EXECUTION_CANCELED:
+            return ExecutionStatus.CANCELLED, None
+        if event_type == EventType.EVENT_TYPE_WORKFLOW_EXECUTION_TIMED_OUT:
+            return ExecutionStatus.FAILED, "Workflow execution timed out"
+        if event_type == EventType.EVENT_TYPE_WORKFLOW_EXECUTION_TERMINATED:
+            return ExecutionStatus.CANCELLED, "Workflow was forcibly terminated"
+        msg = f"Event type {event_type} is not a workflow completion event"
+        raise SafeValueError(msg)
 
-        return status, completed_at, error_details
+    @staticmethod
+    def _extract_completed_status_and_error(event: HistoryEvent) -> tuple[ExecutionStatus, str | None]:
+        """Extract internal status from a successful workflow result payload."""
+        completed_attrs = event.workflow_execution_completed_event_attributes
+        if not completed_attrs or not completed_attrs.result or not completed_attrs.result.payloads:
+            return ExecutionStatus.COMPLETED, None
+        try:
+            result_data = json.loads(completed_attrs.result.payloads[0].data)
+        except Exception:  # noqa: BLE001
+            logger.warning("Failed to parse workflow result for failure detection", exc_info=True)
+            return ExecutionStatus.COMPLETED, None
+        if not isinstance(result_data, dict):
+            return ExecutionStatus.COMPLETED, None
+        status = {
+            "cancelled": ExecutionStatus.CANCELLED,
+            "failed": ExecutionStatus.FAILED,
+            "completed_with_errors": ExecutionStatus.COMPLETED_WITH_ERRORS,
+        }.get(result_data.get("status"), ExecutionStatus.COMPLETED)
+        error = ActivityExecutionStateMixin._extract_failed_activity_errors(result_data)
+        if status in (ExecutionStatus.FAILED, ExecutionStatus.COMPLETED_WITH_ERRORS):
+            return status, error
+        return status, None
 
     @staticmethod
     def _extract_failed_activity_errors(result_data: dict[str, Any]) -> str:
@@ -377,7 +377,7 @@ class ActivityExecutionStateMixin:
 
         return updated_activities
 
-    async def _maybe_update_execution_paused_status(
+    def _maybe_update_execution_paused_status(
         self,
         execution: Execution,
         activities: Sequence[ActivityExecution],

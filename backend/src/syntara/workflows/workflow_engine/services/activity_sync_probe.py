@@ -135,8 +135,9 @@ class ActivitySyncProbeMixin:
         elapsed = 0.0
         started = False
 
-        # NOSONAR: polling is intentional; history events arrive too late
-        while elapsed < _DESCRIBE_PROBE_MAX_TOTAL_S and not self._shutdown:
+        # Temporal history does not expose pending-activity STARTED state or
+        # heartbeat details, so describe() must be polled until the activity changes.
+        while elapsed < _DESCRIBE_PROBE_MAX_TOTAL_S and not self._shutdown:  # NOSONAR
             await asyncio.sleep(delay)
             elapsed += delay
 
