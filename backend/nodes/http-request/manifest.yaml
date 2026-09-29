@@ -1,0 +1,70 @@
+---
+apiVersion: syntara.io/v1alpha1
+kind: NodeType
+metadata:
+  name: http_request
+  displayName: Http Request
+  version: 0.1.0
+  description: SDK container preserving the Syntara http_request workflow contract.
+spec:
+  category: action
+  execution:
+    type: container
+    image: localhost/syntara-node-http-request:migration-test
+    entrypoint: python -m syntara_node_runtime.server
+  inputs:
+    description: Parameters for API executor (http_request activity).
+    properties:
+      method:
+        description: Supported HTTP methods for API requests.
+        enum:
+          - GET
+          - POST
+          - PUT
+          - PATCH
+          - DELETE
+          - HEAD
+          - OPTIONS
+          - CONNECT
+          - TRACE
+        type: string
+      url:
+        anyOf:
+          - type: string
+          - type: 'null'
+        default: null
+        description: Request URL (optional when a Secret URL credential provides it)
+      headers:
+        additionalProperties: true
+        type: object
+      body:
+        anyOf:
+          - additionalProperties: true
+            type: object
+          - type: string
+          - type: 'null'
+        default: null
+      query_params:
+        additionalProperties: true
+        type: object
+      credential_id:
+        anyOf:
+          - type: string
+          - type: 'null'
+        default: null
+        description: Orchestrator credential UUID for authentication or Secret URL.
+    required:
+      - method
+    type: object
+  outputs:
+    $ref: ../schemas/common-definitions.json#/definitions/StandardOutputWrapper
+  resourceRequirements:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: '1'
+      memory: 512Mi
+  executionTimeout: 300
+  credentialSpecification:
+    workloadClassification: action

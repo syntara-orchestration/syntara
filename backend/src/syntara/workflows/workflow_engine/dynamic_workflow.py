@@ -462,12 +462,17 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         """
         try:
             args: list[Any] = [self.execution_id, node_id, reason]
+            cancel_timeout = DEFAULT_ACTIVITY_TIMEOUT_SECONDS
+            route = getattr(self, "_runtime_settings", {}).get("_container_routes", {}).get("agentic")
+            if route and workflow.patched("sdk-node-containers-cancel-v1"):
+                args.append(route)
+                cancel_timeout = route["startup_seconds"] + route["grace_seconds"] + 40
             await asyncio.shield(
                 workflow.execute_activity(
                     ActivityName.CANCEL_AGENTIC,
                     args=args,
                     activity_id=f"__internal__cancel_agentic_{node_id or 'all'}",
-                    start_to_close_timeout=timedelta(seconds=DEFAULT_ACTIVITY_TIMEOUT_SECONDS),
+                    start_to_close_timeout=timedelta(seconds=cancel_timeout),
                     retry_policy=RetryPolicy(maximum_attempts=1),
                 )
             )
@@ -1102,6 +1107,15 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
             if node_type == NodeType.INTERNAL_ACTIVITY
             else None
         )
+        # Routing is recorded by fetch_workflow_runtime_settings; replay never reads env.
+        # A workflow parameter must never select an arbitrary image or execution target.
+        resolved_parameters.pop("_container_route", None)
+        route = self._runtime_settings.get("_container_routes", {}).get(node_type)
+        if route and workflow.patched("sdk-node-containers-v1"):
+            resolved_parameters["_container_route"] = route
+            timeout_seconds += route["startup_seconds"] + route["grace_seconds"]
+            if node_type != NodeType.AGENTIC:  # AO callback owns async agent completion.
+                heartbeat_timeout = timedelta(seconds=30)
         return cast(
             "dict[str, Any]",
             await workflow.execute_activity(

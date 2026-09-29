@@ -148,6 +148,11 @@ async def execute_http_request_activity(
         }
 
     """
+    if input_config.get("_container_route"):
+        from syntara.workflows.node_containers.dispatch import dispatch  # noqa: PLC0415
+
+        return await dispatch("http_request", input_config, output_config)
+
     activity.heartbeat({HEARTBEAT_STOP_MONITOR: True})
 
     # Validate config via Pydantic model

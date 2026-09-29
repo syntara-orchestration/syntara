@@ -5,6 +5,7 @@ from typing import Any
 
 from temporalio import activity
 
+from syntara.core.config.base import get_settings
 from syntara.settings.cache.settings_cache import get_runtime_settings
 from syntara.settings.catalog import SETTINGS_CATALOG
 from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName
@@ -26,4 +27,15 @@ async def fetch_workflow_runtime_settings() -> dict[str, Any]:
     """
     cache = get_runtime_settings()
     values = await asyncio.gather(*[cache.get(key) for key in _WORKFLOW_ENGINE_KEYS])
-    return {key: value for key, value in zip(_WORKFLOW_ENGINE_KEYS, values, strict=True) if value is not None}
+    result = {key: value for key, value in zip(_WORKFLOW_ENGINE_KEYS, values, strict=True) if value is not None}
+    settings = get_settings()
+    result["_container_routes"] = {
+        node_type: {
+            "integration_id": settings.node_container_integration_id,
+            "image": settings.node_container_images.get(node_type),
+            "startup_seconds": settings.node_container_startup_seconds,
+            "grace_seconds": settings.node_container_grace_seconds,
+        }
+        for node_type in settings.node_container_enabled_types
+    }
+    return result

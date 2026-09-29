@@ -1,0 +1,672 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://syntara.io/schemas/common-definitions.json",
+  "title": "Syntara Node SDK - Common Definitions",
+  "description": "Shared reusable definitions for Syntara Automation Orchestrator Node SDK. These components are referenced across all node types to ensure strict backwards compatibility and consistent runtime behavior.",
+
+  "definitions": {
+    "NodeTypeManifest": {
+      "type": "object",
+      "title": "Node Type Manifest (K8s CRD Structure)",
+      "description": "Top-level schema for node type manifests following Kubernetes Custom Resource Definition conventions. All manifests must declare apiVersion, kind, metadata, and spec sections.",
+      "properties": {
+        "apiVersion": {
+          "type": "string",
+          "description": "API version following Kubernetes conventions. Must be 'syntara.io/v1alpha1'.",
+          "const": "syntara.io/v1alpha1"
+        },
+        "kind": {
+          "type": "string",
+          "description": "Resource kind. Must be 'NodeType'.",
+          "const": "NodeType"
+        },
+        "metadata": {
+          "type": "object",
+          "description": "Node metadata for identification, versioning, and UI discovery.",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Internal node identifier (snake_case). Used as the primary key for lookups.",
+              "pattern": "^[a-z][a-z0-9_]*$",
+              "minLength": 1,
+              "maxLength": 64,
+              "examples": ["http_request", "script_executor", "subworkflow_call", "subworkflow_trigger"]
+            },
+            "displayName": {
+              "type": "string",
+              "description": "Human-readable node name displayed in the UI palette and canvas.",
+              "minLength": 1,
+              "maxLength": 128,
+              "examples": ["HTTP Request", "Script Executor", "Subworkflow Call", "Subworkflow Trigger"]
+            },
+            "version": {
+              "type": "string",
+              "description": "Semantic version of this node type.",
+              "pattern": "^\\d+\\.\\d+\\.\\d+(-[a-zA-Z0-9.-]+)?$",
+              "default": "1.0.0",
+              "examples": ["1.0.0", "2.1.3", "1.0.0-beta.1"]
+            },
+            "icon": {
+              "$ref": "#/definitions/NodePaletteIcon"
+            },
+            "description": {
+              "type": "string",
+              "description": "Multi-line description of the node's purpose and capabilities.",
+              "minLength": 1,
+              "maxLength": 2000
+            },
+            "tags": {
+              "type": "array",
+              "description": "User-defined tags for organization and filtering.",
+              "items": {
+                "type": "string",
+                "pattern": "^[a-z0-9-]+:[a-z0-9-]+$"
+              },
+              "uniqueItems": true,
+              "examples": [["integration:rest-api", "network:external", "category:action"]]
+            },
+            "author": {
+              "type": "string",
+              "description": "Node author or organization.",
+              "examples": ["Syntara Team", "Community"]
+            },
+            "license": {
+              "type": "string",
+              "description": "Software license identifier.",
+              "examples": ["MIT", "Apache-2.0", "GPL-3.0"]
+            },
+            "documentationUrl": {
+              "type": "string",
+              "format": "uri",
+              "description": "Optional link to the node's detailed documentation."
+            }
+          },
+          "required": ["name", "displayName", "version", "description"],
+          "additionalProperties": false
+        },
+        "spec": {
+          "type": "object",
+          "description": "Node specification defining category, execution, inputs, outputs, and requirements.",
+          "properties": {
+            "category": {
+              "$ref": "#/definitions/NodeCategory"
+            },
+            "execution": {
+              "type": "object",
+              "description": "Execution configuration specifying how the node runs.",
+              "properties": {
+                "type": {
+                  "$ref": "#/definitions/NodeExecutionType"
+                },
+                "image": {
+                  "type": ["string", "null"],
+                  "description": "Container image reference. It is null for in-process nodes and required for container nodes.",
+                  "pattern": "^(?:[a-zA-Z0-9][a-zA-Z0-9.-]*(?::[0-9]+)?/)?[a-zA-Z0-9][a-zA-Z0-9._/-]*:[a-zA-Z0-9._-]+$",
+                  "examples": ["registry.syntara.io/nodes/http-request:1.0.0", "quay.io/ahetheri/http-executor:dev", "localhost:5000/syntara/nodes/example:1.0.0"]
+                },
+                "entrypoint": {
+                  "type": ["string", "null"],
+                  "description": "Optional executable entrypoint used by container-backed nodes.",
+                  "minLength": 1
+                }
+              },
+              "required": ["type"],
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "type": { "const": "container" }
+                    }
+                  },
+                  "then": {
+                    "required": ["image"],
+                    "properties": {
+                      "image": {
+                        "type": "string",
+                        "minLength": 1,
+                        "pattern": "^(?:[a-zA-Z0-9][a-zA-Z0-9.-]*(?::[0-9]+)?/)?[a-zA-Z0-9][a-zA-Z0-9._/-]*:[a-zA-Z0-9._-]+$"
+                      }
+                    }
+                  }
+                },
+                {
+                  "if": {
+                    "properties": {
+                      "type": { "const": "in_process" }
+                    }
+                  },
+                  "then": {
+                    "properties": {
+                      "image": { "type": "null" }
+                    }
+                  }
+                }
+              ],
+              "additionalProperties": false
+            },
+            "declaredRequirements": {
+              "type": "object",
+              "description": "Declared capability, credential, and platform requirements.",
+              "properties": {
+                "capabilities": {
+                  "type": "array",
+                  "description": "Required security clearance tags and capabilities.",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "network-egress",
+                      "network-ingress",
+                      "script-execution",
+                      "file-write",
+                      "privileged-ports",
+                      "host-network",
+                      "kernel-modules",
+                      "readonly-root-filesystem",
+                      "tmpfs-mount"
+                    ]
+                  },
+                  "uniqueItems": true
+                },
+                "credentialTypes": {
+                  "type": "array",
+                  "description": "Types of credentials this node can consume.",
+                  "items": {
+                    "type": "string"
+                  },
+                  "examples": [["API Key", "Bearer Token", "SSH Key"]]
+                },
+                "platformVersion": {
+                  "type": "string",
+                  "description": "Minimum required platform version (SemVer range).",
+                  "pattern": "^(>=|\\^|~|\\*)?\\d+(\\.\\d+)?(\\.\\d+)?(-[a-zA-Z0-9.-]+)?(\\s*\\|\\|\\s*(>=|\\^|~|\\*)?\\d+(\\.\\d+)?(\\.\\d+)?(-[a-zA-Z0-9.-]+)?)*$",
+                  "examples": [">=3.0.0", "^3.1.0"]
+                }
+              },
+              "additionalProperties": false
+            },
+            "schedulingControls": {
+              "$ref": "#/definitions/SchedulingControls"
+            },
+            "inputs": {
+              "$ref": "#/definitions/NodeInputs"
+            },
+            "outputs": {
+              "type": "object",
+              "description": "Output schema defining what the node returns."
+            },
+            "credentialSpecification": {
+              "$ref": "#/definitions/CredentialSpecification"
+            },
+            "resourceRequirements": {
+              "$ref": "#/definitions/ResourceRequirements"
+            },
+            "executionTimeout": {
+              "$ref": "#/definitions/ExecutionTimeout"
+            },
+            "retryPolicy": {
+              "type": "object",
+              "description": "Automatic retry configuration for transient failures.",
+              "properties": {
+                "max_attempts": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 10,
+                  "default": 1
+                },
+                "initial_interval_seconds": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 300,
+                  "default": 5
+                },
+                "backoff_coefficient": {
+                  "type": "number",
+                  "minimum": 1.0,
+                  "maximum": 10.0,
+                  "default": 2.0
+                },
+                "retryable_status_codes": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "minimum": 100,
+                    "maximum": 599
+                  }
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "required": ["category", "execution", "inputs", "outputs"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["apiVersion", "kind", "metadata", "spec"],
+      "additionalProperties": false
+    },
+
+    "StandardOutputWrapper": {
+      "type": "object",
+      "title": "Standard Output Wrapper",
+      "description": "Mandatory, backwards-compatible output envelope for all task executions. This standardized structure enables workflow template expressions like ${fetch_data.Result.stdout} to remain stable across node versions. The backend scheduler and frontend canvas depend on this exact structure.",
+      "properties": {
+        "Result": {
+          "description": "Primary task return payload. Type varies by node implementation - may be an object (e.g., {stdout, stderr, exit_code}), string, array, or null. This is the data referenced in downstream workflow template expressions.",
+          "oneOf": [
+            { "type": "object" },
+            { "type": "string" },
+            { "type": "array" },
+            { "type": "null" }
+          ]
+        },
+        "StatusCode": {
+          "type": "integer",
+          "description": "Numeric execution status following POSIX exit code conventions. 0 indicates success. Non-zero values indicate failure states. The execution plane and workflow engine use this status for their respective execution and workflow decisions.",
+          "default": 0,
+          "minimum": 0,
+          "maximum": 255
+        },
+        "StatusMessage": {
+          "type": "string",
+          "description": "Human-readable execution summary displayed in the UI execution history timeline. Should be concise (recommended max 200 characters) and describe what the task accomplished or attempted.",
+          "default": "",
+          "maxLength": 500
+        },
+        "ErrorMessage": {
+          "type": "string",
+          "description": "Detailed error diagnostics populated only on failure (StatusCode > 0). Should include stack traces, validation errors, or API error responses to aid debugging. Credential redaction and persistence are execution-plane responsibilities.",
+          "default": "",
+          "maxLength": 10000
+        }
+      },
+      "required": ["Result", "StatusCode", "StatusMessage", "ErrorMessage"],
+      "additionalProperties": false
+    },
+
+    "DependencyDeclaration": {
+      "type": "object",
+      "title": "Dependency Declaration",
+      "description": "Declarative version constraints and capability requirements for node execution. The platform validates these at workflow deployment time (not runtime) to prevent dependency hell and version conflicts. Failure to satisfy dependencies blocks workflow execution.",
+      "properties": {
+        "platformVersion": {
+          "type": "string",
+          "description": "SemVer-compatible version range specifying the minimum required Syntara platform engine version. Examples: '>=3.0.0', '^3.1.0', '3.x'. The scheduler rejects nodes requiring newer platform capabilities than the deployed version.",
+          "pattern": "^(>=|\\^|~|\\*)?\\d+(\\.\\d+)?(\\.\\d+)?(-[a-zA-Z0-9.-]+)?(\\s*\\|\\|\\s*(>=|\\^|~|\\*)?\\d+(\\.\\d+)?(\\.\\d+)?(-[a-zA-Z0-9.-]+)?)*$",
+          "examples": [">=3.0.0", "^3.1.0", "3.x", ">=3.0.0 || >=4.0.0"]
+        },
+        "capabilities": {
+          "type": "array",
+          "description": "Standardized capability and security requirement tags used for administrative review and execution-plane policy matching. These declarations express what the node needs; they do not grant access or define the enforcement implementation. Filesystem-related tags include 'readonly-root-filesystem' and 'tmpfs-mount'.",
+          "items": {
+            "type": "string",
+            "enum": [
+              "network-egress",
+              "network-ingress",
+              "script-execution",
+              "file-write",
+              "privileged-ports",
+              "host-network",
+              "kernel-modules",
+              "readonly-root-filesystem",
+              "tmpfs-mount"
+            ]
+          },
+          "uniqueItems": true,
+          "default": []
+        },
+        "collections": {
+          "type": "array",
+          "description": "Version-bounded Ansible collection dependencies required by the node. The platform uses these declarations to validate and construct a compatible execution environment; the provisioning implementation is execution-plane-owned.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Fully-qualified Ansible Galaxy collection name in namespace.collection format.",
+                "pattern": "^[a-z0-9_]+\\.[a-z0-9_]+$",
+                "examples": ["community.general", "ansible.posix", "community.crypto"]
+              },
+              "version": {
+                "type": "string",
+                "description": "SemVer version constraint for the collection.",
+                "pattern": "^(>=|\\^|~|\\*)?\\d+(\\.\\d+)?(\\.\\d+)?(-[a-zA-Z0-9.-]+)?$",
+                "examples": [">=8.0.0", "^8.5.0"]
+              }
+            },
+            "required": ["name", "version"],
+            "additionalProperties": false
+          },
+          "default": []
+        },
+        "extensions": {
+          "type": "array",
+          "description": "Required peer extension dependencies (other Community Node Packages). The platform validates these are installed and version-compatible before allowing workflow deployment. Used when one node builds on another's functionality.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Package name of the required extension, following npm scoping conventions for Community Nodes.",
+                "pattern": "^(@[a-z0-9-]+/)?[a-z0-9-]+$",
+                "examples": ["@syntara-community/base-credential-resolver", "ssh-connector"]
+              },
+              "version": {
+                "type": "string",
+                "description": "SemVer version constraint for the extension.",
+                "pattern": "^(>=|\\^|~|\\*)?\\d+(\\.\\d+)?(\\.\\d+)?(-[a-zA-Z0-9.-]+)?$",
+                "examples": [">=1.2.0", "^1.0.0"]
+              }
+            },
+            "required": ["name", "version"],
+            "additionalProperties": false
+          },
+          "default": []
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "ResourceRequirements": {
+      "type": "object",
+      "title": "Resource Requirements",
+      "description": "CPU and memory allocation boundaries supplied to the execution plane for resource validation and enforcement. These constraints help prevent runaway tasks from starving platform resources and enable accurate cost accounting; the SDK does not select the worker or provisioning backend.",
+      "properties": {
+        "limits": {
+          "type": "object",
+          "description": "Maximum resource ceiling supplied to the execution plane. Setting limits too low can cause task failures; setting them too high can waste platform capacity.",
+          "properties": {
+            "cpu": {
+              "type": "string",
+              "description": "CPU limit in Kubernetes quantity format. Integer values = cores (e.g., '2' = 2 cores). Decimal/suffix = millicores (e.g., '500m' = 0.5 cores). Typical range: 100m-4.",
+              "pattern": "^\\d+(\\.\\d+)?m?$",
+              "default": "1",
+              "examples": ["100m", "0.5", "1", "2", "4"]
+            },
+            "memory": {
+              "type": "string",
+              "description": "Memory limit in Kubernetes quantity format. Supports Ki, Mi, Gi suffixes (binary, base-1024). Typical range: 128Mi-8Gi.",
+              "pattern": "^\\d+(Ki|Mi|Gi)?$",
+              "default": "512Mi",
+              "examples": ["128Mi", "256Mi", "512Mi", "1Gi", "2Gi"]
+            }
+          },
+          "required": ["cpu", "memory"],
+          "additionalProperties": false
+        },
+        "requests": {
+          "type": "object",
+          "description": "Minimum resource reservation supplied to the execution plane. Setting requests equal to limits expresses a predictable resource boundary; setting requests below limits permits platform-specific overcommitment.",
+          "properties": {
+            "cpu": {
+              "type": "string",
+              "description": "CPU request in Kubernetes quantity format. Should typically match limits for compute-intensive tasks to avoid throttling.",
+              "pattern": "^\\d+(\\.\\d+)?m?$",
+              "default": "100m",
+              "examples": ["100m", "0.5", "1", "2"]
+            },
+            "memory": {
+              "type": "string",
+              "description": "Memory request in Kubernetes quantity format. It should typically be 80–100% of the limit to balance predictable capacity with controlled bursting.",
+              "pattern": "^\\d+(Ki|Mi|Gi)?$",
+              "default": "256Mi",
+              "examples": ["128Mi", "256Mi", "512Mi", "1Gi"]
+            }
+          },
+          "required": ["cpu", "memory"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["limits", "requests"],
+      "additionalProperties": false
+    },
+
+    "ExecutionTimeout": {
+      "type": "integer",
+      "title": "Execution Timeout",
+      "description": "Maximum task execution duration in seconds, supplied to the execution plane for timeout enforcement. Prevents hung tasks from blocking workflow completion. Minimum 1 second, maximum 24 hours (86400 seconds).",
+      "minimum": 1,
+      "maximum": 86400,
+      "default": 300,
+      "examples": [60, 300, 600, 1800, 3600]
+    },
+
+    "SchedulingControls": {
+      "type": "object",
+      "title": "Scheduling Controls",
+      "description": "Developer-declared scheduling controls for placement and connectivity. These controls may be used for validation and review, but they are not the effective sandbox, egress, or worker-pool policy; Syntara registration settings are authoritative.",
+      "properties": {
+        "affinity_labels": {
+          "type": "array",
+          "description": "Developer-declared node-affinity controls. Each label is a key=value pair (or key-only). The administrative worker_pool_selector supplied during registration is authoritative for pool selection.",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9._-]+(/[a-zA-Z0-9._-]+)?(=[a-zA-Z0-9._-]+)?$",
+            "examples": ["gpu=true", "zone=us-east-1a", "workload=high-memory", "node.kubernetes.io/instance-type=m5.2xlarge"]
+          },
+          "default": []
+        },
+        "connectivity_requirements": {
+          "type": "array",
+          "description": "Developer-declared connectivity controls used for validation and administrative review. Each entry is either a bare destination string or an object pairing a destination with explicit port/protocol specifications. The effective egress mode is the administrative egress_policy from node registration, not a developer manifest value.",
+          "items": {
+            "oneOf": [
+              {
+                "type": "string",
+                "description": "Destination hostname, FQDN, IPv4 address, or IPv4 CIDR block. Egress is permitted on all ports unless narrowed via the object form.",
+                "pattern": "^(\\*\\.)?[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*(/\\d{1,2})?$",
+                "examples": ["api.github.com", "registry.npmjs.org", "192.168.1.100", "10.0.0.0/8"]
+              },
+              {
+                "type": "object",
+                "description": "A destination paired with explicit port/protocol specifications for administrative review and execution-plane connectivity policy matching.",
+                "properties": {
+                  "host": {
+                    "type": "string",
+                    "description": "Target hostname, FQDN, IPv4 address, or IPv4 CIDR block.",
+                    "minLength": 1,
+                    "examples": ["oauth2.googleapis.com", "10.0.0.0/8"]
+                  },
+                  "ports": {
+                    "type": "array",
+                    "description": "Permitted destination ports for this host. Each entry is a port number with an optional transport protocol (defaults to TCP).",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+                        "protocol": { "type": "string", "enum": ["TCP", "UDP"], "default": "TCP" }
+                      },
+                      "required": ["port"],
+                      "additionalProperties": false
+                    },
+                    "minItems": 1
+                  }
+                },
+                "required": ["host", "ports"],
+                "additionalProperties": false
+              }
+            ]
+          },
+          "default": []
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "NodeCategory": {
+      "type": "string",
+      "title": "Node Category",
+      "description": "Platform-wide node taxonomy classification. Categorizes nodes by their architectural role. Exactly four categories exist: 'action' (domain and API integrations), 'task' (atomic compute and script executors), 'workflow' (in-memory control-plane logic, including the parent-side subworkflow_call), and 'trigger' (event entry points, including the child-side subworkflow_trigger). Used for UI organization, routing decisions, and capability validation.",
+      "enum": ["action", "task", "workflow", "trigger"],
+      "examples": ["action", "task", "workflow", "trigger"]
+    },
+
+    "NodeExecutionType": {
+      "type": "string",
+      "title": "Node Execution Type",
+      "description": "Determines where the platform dispatches the node. 'in_process': executed inline as a built-in activity within the orchestrator process — used for control-plane 'workflow' logic (including the parent-side subworkflow_call) and 'trigger' nodes (including the child-side subworkflow_trigger) that require no isolated runtime. 'container': handed to the execution plane with the SDK descriptor and task-invocation contract. Worker lifecycle, provisioning, transport, and isolation implementation are outside this SDK schema.",
+      "enum": ["in_process", "container"],
+      "examples": ["in_process", "container"]
+    },
+
+    "WorkloadClassification": {
+      "type": "string",
+      "title": "Workload Classification",
+      "description": "Security classification determining the types of credentials the node may access. 'action' nodes (scripted, predictable execution) can use infrastructure credentials (SSH, API keys). 'agentic' nodes (LLM-driven, non-deterministic) are blocked from infrastructure credentials to prevent prompt injection attacks from escalating to infrastructure compromise. Supplied for static administrative permission inspection before execution-plane dispatch.",
+      "enum": ["action", "agentic"],
+      "default": "action"
+    },
+
+    "NodePaletteIcon": {
+      "type": "string",
+      "title": "Node Palette Icon",
+      "description": "Optional glyph shown beside the node in the React Flow visual builder's drag-and-drop palette drawer, interpreted as a PatternFly / Font Awesome icon name. Authored in the manifest and carried through compilation into the node-definition.json descriptor so the palette can render it without a frontend deployment. When omitted, the UI falls back to a per-category default icon.",
+      "pattern": "^[a-z0-9-]+$",
+      "examples": ["globe", "terminal", "bolt", "project-diagram"]
+    },
+
+    "CredentialSpecification": {
+      "type": "object",
+      "title": "Credential Specification",
+      "description": "Node-level credential access specification. Workload classification is evaluated before dispatch to establish which credential classes the node may request; credential references contain only UUIDs and presentation hints. The platform permission model exposes the classification as spec.credentials.classification; this SDK descriptor stores it as workloadClassification.",
+      "properties": {
+        "workloadClassification": {
+          "$ref": "#/definitions/WorkloadClassification"
+        },
+        "credential_references": {
+          "$ref": "#/definitions/CredentialReferenceList"
+        }
+      },
+      "required": ["workloadClassification"],
+      "additionalProperties": false
+    },
+
+    "CredentialReference": {
+      "type": "object",
+      "title": "Credential Reference",
+      "description": "Declarative, UUID-based reference to a platform-managed credential. Only the abstract credential_id is persisted in the manifest and compiled descriptor. The SDK includes credential references in the node contract so the execution plane can resolve them and provide decrypted values in the separate transient stdin credentials map; injection and persistence behavior are execution-plane-owned.",
+      "properties": {
+        "credential_id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "UUID of the credential stored in the platform's encrypted vault. This UUID is the sole secret abstraction: no plaintext secret, key, or token may appear in a node definition. Validated at workflow deployment time to ensure the credential exists and is accessible to the workflow owner.",
+          "examples": ["550e8400-e29b-41d4-a716-446655440000"]
+        },
+        "credential_mount_type": {
+          "type": "string",
+          "description": "Optional requested presentation hint for a resolved credential. 'env', 'file', 'tmpfs_file', and 'header' identify the form the node expects; the execution plane owns whether and how that hint is honored when constructing the runtime.",
+          "enum": ["env", "file", "tmpfs_file", "header"],
+          "default": "env"
+        },
+        "credential_mount_path": {
+          "type": "string",
+          "description": "Optional requested target path for 'file' and 'tmpfs_file' credential presentation. The execution plane owns whether and how this path is made available. Required in the manifest when 'tmpfs_file' is selected; ignored for 'env' and 'header' presentations.",
+          "pattern": "^/[a-zA-Z0-9/_.-]+$",
+          "examples": ["/tmp/id_rsa", "/run/secrets/vault-password", "/run/secrets/ssh-key"]
+        },
+        "credential_header_name": {
+          "type": "string",
+          "description": "HTTP header name requested when credential_mount_type='header' (e.g. 'Authorization', 'X-API-Key'). Ignored for all other presentation hints; the execution plane owns the runtime injection.",
+          "pattern": "^[A-Za-z0-9-]+$",
+          "examples": ["Authorization", "X-API-Key"]
+        },
+        "allowed_workload_classifications": {
+          "type": "array",
+          "description": "Authorization scope carried on the credential reference itself: the set of node workload_classification values permitted to request it. High-privilege infrastructure credentials should set ['action'] so that non-deterministic 'agentic' nodes cannot acquire them, preventing prompt-injection escalation to infrastructure. Defaults to permitting both classifications when omitted.",
+          "items": { "$ref": "#/definitions/WorkloadClassification" },
+          "uniqueItems": true,
+          "default": ["action", "agentic"]
+        }
+      },
+      "required": ["credential_id"],
+      "additionalProperties": false,
+      "dependencies": {
+        "credential_mount_path": ["credential_mount_type"],
+        "credential_header_name": ["credential_mount_type"]
+      }
+    },
+
+    "CredentialReferenceList": {
+      "type": "array",
+      "title": "Credential Reference List",
+      "description": "An ordered list of CredentialReference entries, allowing a single node to declare multiple simultaneous credentials (for example an SSH key, a cloud API token, and a vault password), each with its own mount type, mount path, and authorization scope.",
+      "items": { "$ref": "#/definitions/CredentialReference" },
+      "default": []
+    },
+
+    "InputParameter": {
+      "type": "object",
+      "title": "Input Parameter Definition",
+      "description": "A JSON Schema Draft-07 definition for one node input. Sensitive inputs must explicitly set secret: true; is_secret: true is accepted as a compatibility alias. The execution plane uses this declaration to separate plain inputs from the transient credentials map and to apply its logging and persistence guarantees.",
+      "properties": {
+        "secret": {
+          "type": "boolean",
+          "description": "Canonical sensitive-input flag. The dispatcher removes the value from plain inputs, resolves/decrypts it into the transient stdin credentials map before constructing the envelope, and the execution plane can reuse the same flag for credential separation and redaction before persistence.",
+          "default": false
+        },
+        "is_secret": {
+          "type": "boolean",
+          "description": "Compatibility alias for secret. New manifests should prefer secret.",
+          "default": false
+        }
+      },
+      "not": {
+        "required": ["secret", "is_secret"]
+      },
+      "additionalProperties": true
+    },
+
+    "NodeRegistrationPolicy": {
+      "type": "object",
+      "title": "Administrative Node Registration Policy",
+      "description": "Syntara-owned registration settings. This object is an API payload component and must not be embedded in developer-authored manifest.yaml metadata.",
+      "properties": {
+        "sandbox_required": {
+          "type": "boolean",
+          "description": "Whether the registered node must execute under the platform sandbox controls."
+        },
+        "egress_policy": {
+          "type": "string",
+          "enum": ["none", "restricted", "unrestricted"],
+          "description": "Administrative network egress mode applied to the selected worker pool."
+        },
+        "worker_pool_selector": {
+          "type": "object",
+          "description": "Affinity labels used to select an eligible worker pool. Pool provisioning may be automatic or assigned by operations.",
+          "additionalProperties": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "required": ["sandbox_required", "egress_policy", "worker_pool_selector"],
+      "additionalProperties": false
+    },
+
+    "NodeInputs": {
+      "type": "object",
+      "title": "Node Inputs",
+      "description": "Draft-07 sub-schema describing a node's typed input properties, rendered as canvas form fields. Supports flat primitives, dynamic nested JSON/YAML objects (such as arbitrary key/value maps or host lists), oneOf/anyOf unions, and typed arrays. Each sensitive input property must explicitly set secret: true (or is_secret: true). 'properties' maps each input name to its JSON Schema; 'required' lists the mandatory input names.",
+      "properties": {
+        "properties": {
+          "type": "object",
+          "description": "Map of input name to its JSON Schema definition. A value may itself be a nested object, a typed array, or a oneOf/anyOf union — not only a flat primitive.",
+          "additionalProperties": {
+            "$ref": "#/definitions/InputParameter"
+          }
+        },
+        "type": {
+          "type": "string",
+          "const": "object"
+        },
+        "required": {
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true,
+          "default": []
+        }
+      },
+      "required": ["properties"],
+      "additionalProperties": true
+    }
+  }
+}

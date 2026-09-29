@@ -1,0 +1,48 @@
+---
+apiVersion: syntara.io/v1alpha1
+kind: NodeType
+metadata:
+  name: script
+  displayName: Script
+  version: 0.1.0
+  description: SDK container preserving the Syntara script workflow contract.
+spec:
+  category: task
+  execution:
+    type: container
+    image: localhost/syntara-node-script:migration-test
+    entrypoint: python -m syntara_node_runtime.server
+  inputs:
+    description: Parameters for script executor.
+    properties:
+      language:
+        description: Supported script languages for script executor.
+        enum:
+          - bash
+          - python
+        type: string
+      code:
+        description: Script code to execute
+        minLength: 1
+        type: string
+      environment:
+        additionalProperties:
+          type: string
+        description: Environment variables
+        type: object
+    required:
+      - language
+      - code
+    type: object
+  outputs:
+    $ref: ../schemas/common-definitions.json#/definitions/StandardOutputWrapper
+  resourceRequirements:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: '1'
+      memory: 512Mi
+  executionTimeout: 300
+  credentialSpecification:
+    workloadClassification: action

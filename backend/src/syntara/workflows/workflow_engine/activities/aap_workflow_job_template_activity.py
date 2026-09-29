@@ -311,6 +311,16 @@ async def execute_aap_workflow_job_template_activity(  # noqa: PLR0915
         created_by_user_id: User ID who triggered the workflow (for audit actor attribution).
 
     """
+    if input_config.get("_container_route"):
+        from syntara.workflows.node_containers.dispatch import dispatch  # noqa: PLC0415
+
+        return await dispatch(
+            "aap_workflow_job_template",
+            input_config,
+            output_config,
+            context={"execution_id": execution_id, "created_by_user_id": created_by_user_id},
+        )
+
     logger.info("Starting AAP workflow job template activity")
     config = _validate_config(input_config)
 

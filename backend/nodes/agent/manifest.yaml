@@ -1,0 +1,100 @@
+---
+apiVersion: syntara.io/v1alpha1
+kind: NodeType
+metadata:
+  name: agentic
+  displayName: Agent
+  version: 0.1.0
+  description: SDK container preserving the Syntara agentic workflow contract.
+spec:
+  category: task
+  execution:
+    type: container
+    image: localhost/syntara-node-agent:migration-test
+    entrypoint: python -m syntara_node_runtime.server
+  inputs:
+    description: Parameters for agentic executor.
+    properties:
+      prompt:
+        description: Prompt template for the agent
+        type: string
+      agent:
+        anyOf:
+          - type: string
+          - type: 'null'
+        default: null
+      llm_model_id:
+        anyOf:
+          - type: string
+          - type: 'null'
+        default: null
+        description: UUID of the LLMModel record identifying the provider integration and model.
+      credential_id:
+        anyOf:
+          - type: string
+          - type: 'null'
+        default: null
+        description: Orchestrator credential UUID for LLM provider authentication
+      file_ids:
+        description: File IDs for agent context
+        items:
+          type: string
+        maxItems: 10
+        type: array
+      responseSchema:
+        anyOf:
+          - additionalProperties: true
+            type: object
+          - type: string
+          - type: 'null'
+        default: null
+        description: JSON Schema for structured output. When defined, agent output conforms to this schema.
+      integration_connections:
+        anyOf:
+          - items:
+              description: 'Execution credential override for one integration. #magic___^_^___line #magic___^_^___line When included in AgenticExecutorParameters.integration_connections, this credential #magic___^_^___line is used for calls against that integration instead of the integration''s #magic___^_^___line management credential.'
+              properties:
+                integration_id:
+                  description: UUID of the integration
+                  type: string
+                credential_id:
+                  description: Orchestrator credential UUID for execution calls (distinct from management credential)
+                  type: string
+              required:
+                - integration_id
+                - credential_id
+              type: object
+            type: array
+          - type: 'null'
+        default: null
+        description: Per-integration execution credentials. Each entry overrides the management credential for that integration. Integrations not listed fall back to their management credential.
+      tool_selection_strategy:
+        anyOf:
+          - enum:
+              - ALL
+              - NONE
+              - SELECTED
+            type: string
+          - type: 'null'
+        default: null
+        description: ALL (all enabled tools), NONE (no tools), or SELECTED (specific tools from tool_selections)
+      tool_selections:
+        description: Tool UUIDs to make available when tool_selection_strategy is SELECTED
+        items:
+          type: string
+        type: array
+    required:
+      - prompt
+    type: object
+  outputs:
+    $ref: ../schemas/common-definitions.json#/definitions/StandardOutputWrapper
+  resourceRequirements:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: '1'
+      memory: 512Mi
+  executionTimeout: 300
+  credentialSpecification:
+    workloadClassification: agentic

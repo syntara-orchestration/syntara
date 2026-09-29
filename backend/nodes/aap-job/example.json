@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "inputs": {
+    "job_template_id": 1
+  },
+  "credentials": {
+    "resolved": {
+      "extra_vars": {
+        "aap_oauth_token": "REPLACE-IN-PROTECTED-INPUT-FILE"
+      }
+    }
+  },
+  "workflow_context": {
+    "integration": {
+      "base_url": "https://aap.example",
+      "verify_ssl": true
+    }
+  },
+  "timeout_seconds": 300
+}

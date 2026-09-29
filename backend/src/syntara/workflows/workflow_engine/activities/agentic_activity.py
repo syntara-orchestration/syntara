@@ -120,7 +120,7 @@ def _build_agent_metadata(
 
 
 @activity.defn(name=ActivityName.AGENTIC)
-async def execute_agentic_activity(
+async def execute_agentic_activity(  # noqa: PLR0915
     input_config: dict[str, Any],
     output_config: dict[str, str] | None,  # noqa: ARG001  # must match Temporal dispatch signature; agentic completes async via callback, not via return value
     execution_id: str = "",
@@ -197,34 +197,54 @@ async def execute_agentic_activity(
             request_id=request_id,
         )
 
-        async with AgentOrchestratorClient(
-            base_url=constants.AGENT_ORCHESTRATOR_BASE_URL,
-            on_behalf_of_user_id=user_id,
-        ) as agent_client:
-            invocation_id = await agent_client.invoke_agent_async(
-                prompt=config.prompt,
-                user_id=user_id,
-                agent=config.agent,
-                input_data={},
-                file_ids=file_ids,
-                metadata=agent_metadata,
-                project_id=project_id,
-                timeout_seconds=input_config.get("timeout"),
-            )
+        if input_config.get("_container_route"):
+            from syntara.workflows.node_containers.dispatch import dispatch  # noqa: PLC0415
 
-            logger.info(
-                "Agent invocation created successfully",
-                invocation_id=invocation_id,
+            result = await dispatch(
+                "agentic",
+                input_config,
+                None,
+                context={
+                    "execution_id": execution_id,
+                    "project_id": project_id,
+                    "created_by_user_id": user_id,
+                    "agent_metadata": agent_metadata,
+                },
             )
-
+            invocation_id = result["output"]["invocation_id"]
             activity.heartbeat(
-                {
-                    HEARTBEAT_STOP_MONITOR: True,
-                    HEARTBEAT_PARTIAL_OUTPUT_KEY: {"invocation_id": str(invocation_id)},
-                }
+                {HEARTBEAT_STOP_MONITOR: True, HEARTBEAT_PARTIAL_OUTPUT_KEY: {"invocation_id": invocation_id}}
             )
-
             activity.raise_complete_async()
+        else:
+            async with AgentOrchestratorClient(
+                base_url=constants.AGENT_ORCHESTRATOR_BASE_URL,
+                on_behalf_of_user_id=user_id,
+            ) as agent_client:
+                invocation_id = await agent_client.invoke_agent_async(
+                    prompt=config.prompt,
+                    user_id=user_id,
+                    agent=config.agent,
+                    input_data={},
+                    file_ids=file_ids,
+                    metadata=agent_metadata,
+                    project_id=project_id,
+                    timeout_seconds=input_config.get("timeout"),
+                )
+
+                logger.info(
+                    "Agent invocation created successfully",
+                    invocation_id=invocation_id,
+                )
+
+                activity.heartbeat(
+                    {
+                        HEARTBEAT_STOP_MONITOR: True,
+                        HEARTBEAT_PARTIAL_OUTPUT_KEY: {"invocation_id": str(invocation_id)},
+                    }
+                )
+
+                activity.raise_complete_async()
 
     # All pre-invocation failures raise ApplicationError(non_retryable=True).
     # raise_complete_async() raises BaseException (not caught by Exception handlers below),
@@ -276,6 +296,7 @@ async def cancel_agentic_invocation_activity(
     execution_id: str,
     node_id: str | None = None,
     reason: str = "Workflow cancelled",
+    container_route: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Best-effort cancel running agentic invocations for an execution.
 
@@ -289,6 +310,7 @@ async def cancel_agentic_invocation_activity(
             agentic invocations for the execution are cancelled (workflow
             cancellation case).
         reason: Cancellation reason forwarded to the orchestrator.
+        container_route: Recorded route for cancelling through the SDK agent image.
 
     """
     from syntara.core.database.session import get_db  # noqa: PLC0415
@@ -313,6 +335,23 @@ async def cancel_agentic_invocation_activity(
     if not invocation_ids:
         logger.info("No running agentic invocations to cancel", execution_id=execution_id, node_id=node_id)
         return {"attempted_count": 0}
+
+    if container_route:
+        from syntara.workflows.node_containers.dispatch import dispatch  # noqa: PLC0415
+
+        await dispatch(
+            "agentic",
+            {
+                "_container_route": container_route,
+                "invocation_ids": invocation_ids,
+                "reason": reason,
+                "_engine_timeout_seconds": 35,
+            },
+            None,
+            context={"execution_id": execution_id},
+            operation="cancel",
+        )
+        return {"attempted_count": len(invocation_ids)}
 
     async with AgentOrchestratorClient(
         base_url=constants.AGENT_ORCHESTRATOR_BASE_URL,

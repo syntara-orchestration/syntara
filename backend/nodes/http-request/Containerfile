@@ -1,0 +1,23 @@
+ARG BUILDER_IMAGE=registry.access.redhat.com/ubi9/python-312@sha256:e6a10c3150624fbfd33dbd7721ef99ce7a1001b417d64427ad58515ab8044121
+FROM ${BUILDER_IMAGE} AS builder
+USER 0
+RUN dnf install -y git && dnf clean all && pip install --no-cache-dir uv==0.12.3
+WORKDIR /build
+COPY . .
+RUN uv sync --frozen --no-dev --no-editable --package syntara-node-http-request
+
+FROM ${BUILDER_IMAGE}
+USER 0
+WORKDIR /opt/nodes
+COPY --from=builder /build/.venv /opt/nodes/.venv
+COPY http-request/manifest.yaml /opt/nodes/http-request/manifest.yaml
+COPY schemas/ /opt/nodes/schemas/
+RUN chmod -R a+rX /opt/nodes
+ENV PATH="/opt/nodes/.venv/bin:$PATH" \
+    PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 \
+    SYNTARA_NODE_MODULE=syntara_node_http_request
+LABEL org.opencontainers.image.title="Syntara http-request node" \
+    org.opencontainers.image.source="https://github.com/syntara-orchestration/syntara"
+USER 1001
+EXPOSE 50051
+ENTRYPOINT ["python", "-m", "syntara_node_runtime.server"]

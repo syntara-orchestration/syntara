@@ -1498,6 +1498,22 @@ class WorkflowEngineSettings(BaseSettings):
     # to run arbitrary commands on the worker infrastructure, with access to all
     # environment variables.
     # Enabling Script Node is not recommended for production deployments.
+    node_container_enabled_types: list[str] = Field(
+        default_factory=list, description="Workflow node types routed to SDK containers"
+    )
+    node_container_integration_id: str | None = Field(
+        default=None, description="OpenShift integration for the temporary node adapter"
+    )
+    node_container_images: dict[str, str] = Field(
+        default_factory=dict, description="Node type to immutable container image reference"
+    )
+    node_container_startup_seconds: int = Field(default=120, ge=1)
+    node_container_grace_seconds: int = Field(default=30, ge=10)
+    node_container_agent_base_url: str = Field(default="https://backend.ao.svc:8000/api/v1")
+    node_container_agent_tls_secret: str | None = Field(
+        default=None, description="Target namespace secret with ca.pem, tls.crt, tls.key"
+    )
+
     script_nodes_enabled: bool = Field(
         default=False,
         description="Enable Script node execution in workflows (Developer Preview)",
