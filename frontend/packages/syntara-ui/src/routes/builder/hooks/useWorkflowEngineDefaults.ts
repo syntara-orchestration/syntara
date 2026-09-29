@@ -13,6 +13,7 @@ export type WorkflowEngineDefaults = {
     agentic: number | null
     aap: number | null
     approval: number | null
+    form_prompt: number | null
     http_request: number | null
   }
   convergeWaitDuration: number | null
@@ -56,6 +57,7 @@ async function fetchWorkflowEngineDefaults(): Promise<WorkflowEngineDefaults> {
       agentic: num('workflow_engine.agentic_timeout_seconds'),
       aap: num('workflow_engine.aap_timeout_seconds'),
       approval: num('workflow_engine.approval_decision_window_seconds'),
+      form_prompt: num('workflow_engine.form_prompt_response_window_seconds'),
       http_request: num('workflow_engine.http_request_timeout_seconds'),
     },
     convergeWaitDuration: num('workflow_engine.converge_wait_duration_seconds'),

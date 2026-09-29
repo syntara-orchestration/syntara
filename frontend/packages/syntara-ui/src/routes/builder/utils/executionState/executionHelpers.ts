@@ -20,6 +20,8 @@ export const BRANCH_HANDLES = [
   EdgeHandleEnum.FALSE,
   EdgeHandleEnum.APPROVED,
   EdgeHandleEnum.REJECTED,
+  EdgeHandleEnum.SUBMITTED,
+  EdgeHandleEnum.FALLBACK,
   EdgeHandleEnum.DONE,
   EdgeHandleEnum.LOOP,
   EdgeHandleEnum.DEFAULT,
