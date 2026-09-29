@@ -10,7 +10,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Annotated, Any, cast
+from typing import Annotated, Any
 
 import structlog
 import uvicorn
@@ -22,6 +22,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import ValidationError as PydanticValidationError
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import text
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from temporalio.service import RPCError
 
 import syntara.auth.exceptions  # Side-effect import to trigger exception handler registration
@@ -394,21 +395,10 @@ def swagger_ui_parameters(*, enable_try_it_out: bool) -> dict[str, Any]:
     }
 
 
-def _translate_product_name(value: Any, product_name: str) -> Any:  # noqa: ANN401
-    """Replace product-name references in OpenAPI string values."""
-    if isinstance(value, str):
-        return value.replace("Syntara", product_name)
-    if isinstance(value, dict):
-        return {key: _translate_product_name(item, product_name) for key, item in value.items()}
-    if isinstance(value, list):
-        return [_translate_product_name(item, product_name) for item in value]
-    return value
-
-
 # Create FastAPI application
 _settings = get_settings()
 app = FastAPI(
-    title=f"{_settings.product_name} API",
+    title="Orchestrator API",
     description="A distributed multi-agent workflow orchestration system",
     version=API_V1_VERSION,
     docs_url=None,
@@ -418,38 +408,6 @@ app = FastAPI(
     lifespan=lifespan,
     responses=problem_details_response_map(),
 )
-
-_default_openapi = app.openapi
-app.state.openapi_base_schema = None
-app.state.openapi_product_schema = None
-app.state.openapi_product_name = None
-
-
-def _custom_openapi() -> dict[str, Any]:
-    """Generate and cache an OpenAPI schema translated to the configured product name."""
-    product_name = _settings.product_name
-    if app.state.openapi_product_name != product_name:
-        app.title = f"{product_name} API"
-        app.openapi_schema = None
-        app.state.openapi_base_schema = None
-        app.state.openapi_product_schema = None
-
-    if app.state.openapi_base_schema is not None:
-        app.openapi_schema = app.state.openapi_base_schema
-    base_schema = _default_openapi()
-    if base_schema is not app.state.openapi_base_schema:
-        app.state.openapi_base_schema = base_schema
-        app.state.openapi_product_schema = None
-
-    if app.state.openapi_product_schema is None:
-        app.state.openapi_product_schema = _translate_product_name(base_schema, product_name)
-
-    app.state.openapi_product_name = product_name
-    app.openapi_schema = app.state.openapi_product_schema
-    return cast("dict[str, Any]", app.state.openapi_product_schema)
-
-
-app.openapi = _custom_openapi  # type: ignore[method-assign]
 
 # Configure CORS middleware using centralized settings
 app.add_middleware(
@@ -501,6 +459,10 @@ app.add_exception_handler(RequestValidationError, validation_error_handler)  # t
 app.add_exception_handler(IntegrityError, integrity_error_handler)  # type: ignore[arg-type]
 app.add_exception_handler(ValueError, value_error_handler)  # type: ignore[arg-type]
 app.add_exception_handler(HTTPException, core_http_exception_handler)  # type: ignore[arg-type]
+# Starlette's router raises its own HTTPException (a superclass of fastapi's) for
+# path/method-level errors (e.g. 404/405) before FastAPI's HTTPException handling
+# is reached, so it must be registered too for those responses to be RFC 9457.
+app.add_exception_handler(StarletteHTTPException, core_http_exception_handler)  # type: ignore[arg-type]
 app.add_exception_handler(BodyTooLargeError, body_too_large_exception_handler)  # type: ignore[arg-type]
 app.add_exception_handler(Exception, generic_exception_handler)
 
