@@ -1045,3 +1045,29 @@ class TestResolveAndInjectUniqueActivityIds:
         assert "__internal__resolve_credentials_aap_1" in activity_ids
         assert "__internal__resolve_credentials_aap_2" in activity_ids
         assert len(set(activity_ids)) == 2
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("wait", "wait_timeout", "engine_timeout", "expected"),
+    [(True, 3600, 30, 3610), (True, 120, 30, 130), (True, 120, 500, 500), (False, 3600, 30, 30)],
+)
+async def test_tfe_polling_temporal_timeout(
+    *, wait: bool, wait_timeout: int, engine_timeout: int, expected: int
+) -> None:
+    """Schedule the resolved wait duration with room to report its own deadline."""
+    wf = _make_workflow()
+    node = ActivityNode("status", NodeType.TFE_GET_RUN_STATUS, {})
+    params = {
+        "integration_id": "11111111-1111-1111-1111-111111111111",
+        "credential_id": "22222222-2222-2222-2222-222222222222",
+        "run_id": "run-1",
+        "wait_for_completion": wait,
+        "timeout_seconds": wait_timeout,
+    }
+    with patch(
+        "syntara.workflows.workflow_engine.dynamic_workflow.workflow.execute_activity", new_callable=AsyncMock
+    ) as execute:
+        await wf._execute_executor_node(node, node.type, params, None, engine_timeout)
+    assert execute.await_args is not None
+    assert execute.await_args.kwargs["start_to_close_timeout"] == timedelta(seconds=expected)

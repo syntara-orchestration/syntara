@@ -71,8 +71,8 @@ const SUBTYPE_FIELDS: Record<string, FieldPath<TerraformNodeFormData>[]> = {
   'tfe-fetch-state-outputs': ['workspace_id'],
   'tfe-add-variable': ['workspace_id', 'key', 'value', 'category', 'sensitive', 'hcl'],
   'tfe-list-variables': ['workspace_id', 'key'],
-  'tfe-update-variable': ['variable_id', 'value', 'hcl', 'category'],
-  'tfe-delete-variable': ['variable_id'],
+  'tfe-update-variable': ['workspace_id', 'variable_id', 'value', 'hcl', 'category'],
+  'tfe-delete-variable': ['workspace_id', 'variable_id'],
   'tfe-upload-configuration-version': ['workspace_id', 'artifact'],
   'tfe-trigger-run': [
     'workspace_id',

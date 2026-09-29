@@ -42,6 +42,15 @@ function splitCsv(value: string | undefined): string[] | undefined {
     .filter(Boolean)
 }
 
+/** Convert saved resource addresses back to the editor's CSV representation. */
+export function resourceAddressesToCsv(value: unknown): string | undefined {
+  if (typeof value === 'string') return value
+  if (Array.isArray(value) && value.every((item): item is string => typeof item === 'string')) {
+    return value.join(', ')
+  }
+  return undefined
+}
+
 const DIRECT_STRING_FIELDS = [
   'integration_id',
   'credential_id',

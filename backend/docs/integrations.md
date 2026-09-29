@@ -210,6 +210,16 @@ The AAP integration stores the API URL and TLS configuration. It does not discov
 
 ### Terraform Enterprise
 
+Workspace deletion uses Terraform's safe-delete endpoint by default, which refuses
+to delete a workspace managing resources. Enable **Force delete** only to bypass
+that protection. Update Variable and Delete Variable steps require both the
+workspace ID and the variable ID.
+
+For Get Run Status with **Wait for completion** enabled, `timeout_seconds`
+(default: 3600) bounds the polling activity, including HTTP requests. The engine
+allows that duration plus a short margin for reporting the deadline, even when
+the normal step timeout is shorter.
+
 The TFE integration stores `base_url`, `organization`, and TLS configuration. It requires an **HTTP Bearer Token** management credential (user or team API token). Validate pings `GET /api/v2/organizations/{org}`. There is no resource discovery/refresh — workspace, run, VCS, and project operations are modular workflow node types that call the TFE v2 API at execution time via `syntara.terraform.client.TFEClient`.
 
 **Design Decisions:**

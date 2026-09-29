@@ -51,8 +51,7 @@ def workspace_preset_parts(
     if preset == "agent":
         if not agent_pool_id:
             raise _validation(_AGENT_POOL_REQUIRED)
-        relationship = {"agent-pool": {"data": {"type": "agent-pools", "id": agent_pool_id}}}
-        return {"execution-mode": "agent"}, relationship
+        return {"execution-mode": "agent", "agent-pool-id": agent_pool_id}, {}
 
     if preset == "remote_oauth_vcs":
         if not repository or not oauth_token_id:

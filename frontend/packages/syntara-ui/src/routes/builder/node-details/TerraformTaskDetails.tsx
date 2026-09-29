@@ -4,7 +4,7 @@ import type { ReactNode } from 'react'
 import { useAlerts } from '../../../providers/alerts'
 import { useWorkflowStoreActions } from '../../../stores/useWorkflowStore'
 import { TerraformNodeForm, type TerraformNodeFormData } from '../node-forms/TerraformNodeForm'
-import { buildTFEParameters } from '../utils/tfeHelpers'
+import { buildTFEParameters, resourceAddressesToCsv } from '../utils/tfeHelpers'
 
 type TerraformTaskDetailsProps = Readonly<{
   executor: string
@@ -51,6 +51,8 @@ export function TerraformTaskDetails({
         ...(config as Partial<TerraformNodeFormData>),
         name: taskData.name ?? '',
         name_field: typeof config.name === 'string' ? config.name : undefined,
+        target_resources: resourceAddressesToCsv(config.target_resources),
+        replace_resources: resourceAddressesToCsv(config.replace_resources),
       }}
       onSubmit={handleSubmit}
       onHeaderContentChange={onHeaderContentChange}

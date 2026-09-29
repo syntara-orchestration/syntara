@@ -8,6 +8,7 @@
     "required": [
       "integration_id",
       "credential_id",
+      "workspace_id",
       "variable_id"
     ],
     "additionalProperties": false,
@@ -19,6 +20,9 @@
         "type": "string"
       },
       "variable_id": {
+        "type": "string"
+      },
+      "workspace_id": {
         "type": "string"
       }
     }

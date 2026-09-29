@@ -17,10 +17,10 @@ def test_remote_no_vcs_update_clears_vcs_repo() -> None:
     assert attrs["vcs-repo"] is None
 
 
-def test_agent_execution_requires_pool_and_sets_relationship() -> None:
+def test_agent_execution_requires_pool_and_sets_attribute() -> None:
     attrs, relationships = workspace_preset_parts("agent", agent_pool_id="apool-1")
-    assert attrs == {"execution-mode": "agent"}
-    assert relationships["agent-pool"]["data"]["id"] == "apool-1"
+    assert attrs == {"execution-mode": "agent", "agent-pool-id": "apool-1"}
+    assert relationships == {}
 
 
 def test_agent_execution_missing_pool_is_validation() -> None:

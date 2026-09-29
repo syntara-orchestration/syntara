@@ -352,7 +352,7 @@ async def execute_tfe_update_variable_activity(
             attrs["hcl"] = params.hcl
         if params.category is not None:
             attrs["category"] = params.category
-        await client.update_variable(params.variable_id, attrs)
+        await client.update_variable(params.workspace_id, params.variable_id, attrs)
         return TFEUpdateVariableOutput(variable_id=params.variable_id).dump(outputs)
     except TFEError as exc:
         raise_as_application_error(exc)
@@ -368,7 +368,7 @@ async def execute_tfe_delete_variable_activity(
     params = TFEDeleteVariableParameters.model_validate(input_config)
     try:
         client = _client_from_input(input_config, params.organization)
-        await client.delete_variable(params.variable_id)
+        await client.delete_variable(params.workspace_id, params.variable_id)
         return TFEDeleteVariableOutput(deleted=True).dump(outputs)
     except TFEError as exc:
         raise_as_application_error(exc)
@@ -468,55 +468,61 @@ async def execute_tfe_get_run_status_activity(
     """Get run status (optionally wait for completion)."""
     params = TFEGetRunStatusParameters.model_validate(input_config)
     try:
-        client = _client_from_input(input_config, params.organization)
-        deadline = time.monotonic() + params.timeout_seconds
-        run_payload = await client.get_run(params.run_id)
-
-        while params.wait_for_completion:
-            status = data_attrs(run_payload).get("status")
-            if status in _FINAL_RUN_STATUSES:
-                break
-            if time.monotonic() >= deadline:
-                msg = f"Timed out waiting for run {params.run_id}; last status={status}"
-                raise TFEError(
-                    msg,
-                    error_code=TFEErrorCode.TRANSIENT,
-                    details={"status": status},
-                )
-            await asyncio.sleep(max(1, params.poll_interval_seconds))
-            activity.heartbeat({"run_id": params.run_id, "status": status})
+        async with asyncio.timeout(params.timeout_seconds if params.wait_for_completion else None):
+            client = _client_from_input(input_config, params.organization)
+            deadline = time.monotonic() + params.timeout_seconds
             run_payload = await client.get_run(params.run_id)
 
-        attrs = data_attrs(run_payload)
-        status = attrs.get("status")
-        actions = attrs.get("actions") or {}
-        plan_exit_code = None
-        resource_changes = None
-        plan_rel = (run_payload.get("data") or {}).get("relationships", {}).get("plan", {}).get("data")
-        if isinstance(plan_rel, dict) and plan_rel.get("id"):
-            try:
-                plan = await client.get_plan(plan_rel["id"])
-                plan_attrs = data_attrs(plan)
-                plan_exit_code = plan_attrs.get("exit-code")
-                resource_changes = {
-                    "toAdd": plan_attrs.get("resource-additions"),
-                    "toChange": plan_attrs.get("resource-changes"),
-                    "toDestroy": plan_attrs.get("resource-destructions"),
-                }
-            except TFEError:
-                pass
+            while params.wait_for_completion:
+                status = data_attrs(run_payload).get("status")
+                if status in _FINAL_RUN_STATUSES:
+                    break
+                if time.monotonic() >= deadline:
+                    msg = f"Timed out waiting for run {params.run_id}; last status={status}"
+                    raise TFEError(
+                        msg,
+                        error_code=TFEErrorCode.TRANSIENT,
+                        details={"status": status},
+                    )
+                await asyncio.sleep(max(1, params.poll_interval_seconds))
+                activity.heartbeat({"run_id": params.run_id, "status": status})
+                run_payload = await client.get_run(params.run_id)
 
-        return TFEGetRunStatusOutput(
-            run_id=params.run_id,
-            status=status,
-            phase=map_run_phase(status),
-            plan_exit_code=plan_exit_code,
-            has_changes=attrs.get("has-changes"),
-            resource_changes=resource_changes,
-            is_confirmable=actions.get("is-confirmable"),
-            is_cancelable=actions.get("is-cancelable"),
-            is_force_cancelable=actions.get("is-force-cancelable"),
-        ).dump(outputs)
+            attrs = data_attrs(run_payload)
+            status = attrs.get("status")
+            actions = attrs.get("actions") or {}
+            plan_exit_code = None
+            resource_changes = None
+            plan_rel = (run_payload.get("data") or {}).get("relationships", {}).get("plan", {}).get("data")
+            if isinstance(plan_rel, dict) and plan_rel.get("id"):
+                try:
+                    plan = await client.get_plan(plan_rel["id"])
+                    plan_attrs = data_attrs(plan)
+                    plan_exit_code = plan_attrs.get("exit-code")
+                    resource_changes = {
+                        "toAdd": plan_attrs.get("resource-additions"),
+                        "toChange": plan_attrs.get("resource-changes"),
+                        "toDestroy": plan_attrs.get("resource-destructions"),
+                    }
+                except TFEError:
+                    pass
+
+            return TFEGetRunStatusOutput(
+                run_id=params.run_id,
+                status=status,
+                phase=map_run_phase(status),
+                plan_exit_code=plan_exit_code,
+                has_changes=attrs.get("has-changes"),
+                resource_changes=resource_changes,
+                is_confirmable=actions.get("is-confirmable"),
+                is_cancelable=actions.get("is-cancelable"),
+                is_force_cancelable=actions.get("is-force-cancelable"),
+            ).dump(outputs)
+    except TimeoutError:
+        raise_as_application_error(
+            TFEError(f"Timed out waiting for run {params.run_id}", error_code=TFEErrorCode.TRANSIENT)
+        )
+        raise
     except TFEError as exc:
         raise_as_application_error(exc)
         raise

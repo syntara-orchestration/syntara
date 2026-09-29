@@ -198,11 +198,12 @@ class TFEClient:
         return await self._json("PATCH", f"/workspaces/{quote(workspace_id, safe='')}", json_body=body, mutating=True)
 
     async def delete_workspace(self, workspace_id: str, *, force: bool = False) -> None:
-        """DELETE /workspaces/{ws}."""
+        """Safely delete a workspace unless force is explicitly requested."""
         path = f"/workspaces/{quote(workspace_id, safe='')}"
         if force:
-            path = f"/workspaces/{quote(workspace_id, safe='')}?force=true"
-        await self._request("DELETE", path, mutating=True)
+            await self._request("DELETE", path, mutating=True)
+        else:
+            await self._request("POST", f"{path}/actions/safe-delete", mutating=True)
 
     async def get_current_state_version(self, workspace_id: str) -> dict[str, Any] | None:
         """GET /workspaces/{ws}/current-state-version. Returns None on 404."""
@@ -233,14 +234,16 @@ class TFEClient:
         """GET /workspaces/{ws}/vars."""
         return await self._json("GET", f"/workspaces/{quote(workspace_id, safe='')}/vars")
 
-    async def update_variable(self, variable_id: str, attributes: dict[str, Any]) -> dict[str, Any]:
-        """PATCH /vars/{var}."""
+    async def update_variable(self, workspace_id: str, variable_id: str, attributes: dict[str, Any]) -> dict[str, Any]:
+        """PATCH /workspaces/{ws}/vars/{var}."""
         body = {"data": {"type": "vars", "id": variable_id, "attributes": attributes}}
-        return await self._json("PATCH", f"/vars/{quote(variable_id, safe='')}", json_body=body, mutating=True)
+        path = f"/workspaces/{quote(workspace_id, safe='')}/vars/{quote(variable_id, safe='')}"
+        return await self._json("PATCH", path, json_body=body, mutating=True)
 
-    async def delete_variable(self, variable_id: str) -> None:
-        """DELETE /vars/{var}."""
-        await self._request("DELETE", f"/vars/{quote(variable_id, safe='')}", mutating=True)
+    async def delete_variable(self, workspace_id: str, variable_id: str) -> None:
+        """DELETE /workspaces/{ws}/vars/{var}."""
+        path = f"/workspaces/{quote(workspace_id, safe='')}/vars/{quote(variable_id, safe='')}"
+        await self._request("DELETE", path, mutating=True)
 
     # ── Configuration versions ─────────────────────────────────────────────
 
@@ -360,12 +363,12 @@ class TFEClient:
     # ── VCS / GitHub App ───────────────────────────────────────────────────
 
     async def list_github_app_installations(self) -> dict[str, Any]:
-        """GET /github-app-installations."""
-        return await self._json("GET", "/github-app-installations")
+        """GET /github-app/installations."""
+        return await self._json("GET", "/github-app/installations")
 
     async def get_github_app_installation(self, installation_id: str) -> dict[str, Any]:
-        """GET /github-app-installations/{id}."""
-        return await self._json("GET", f"/github-app-installations/{quote(installation_id, safe='')}")
+        """GET /github-app/installation/{id}."""
+        return await self._json("GET", f"/github-app/installation/{quote(installation_id, safe='')}")
 
     async def link_vcs_to_workspace(
         self,

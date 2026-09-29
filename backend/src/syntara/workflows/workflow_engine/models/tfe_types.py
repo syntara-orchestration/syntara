@@ -159,6 +159,7 @@ class TFEListVariablesParameters(TFEIntegrationMixin):
 class TFEUpdateVariableParameters(TFEIntegrationMixin):
     """Parameters for Update Variable."""
 
+    workspace_id: str
     variable_id: str
     value: str | None = None
     hcl: bool | None = None
@@ -168,6 +169,7 @@ class TFEUpdateVariableParameters(TFEIntegrationMixin):
 class TFEDeleteVariableParameters(TFEIntegrationMixin):
     """Parameters for Delete Variable."""
 
+    workspace_id: str
     variable_id: str
 
 

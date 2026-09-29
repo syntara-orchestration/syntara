@@ -30,6 +30,7 @@ with workflow.unsafe.imports_passed_through():
         ENGINE_TIMEOUT_SECONDS_KEY,
         INTERNAL_ACTIVITY_HEARTBEAT_TIMEOUT_SECONDS,
     )
+    from syntara.workflows.workflow_engine.models.tfe_types import TFEGetRunStatusParameters
     from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName
     from syntara.workflows.workflow_engine.node_settings_resolver import (
         resolve_continue_on_failure,
@@ -1119,6 +1120,15 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
             args.extend(extra_args)
 
         retry_policy = resolve_retry_policy(node, self._runtime_settings)
+        if node_type == NodeType.TFE_GET_RUN_STATUS:
+            params = TFEGetRunStatusParameters.model_validate(resolved_parameters)
+            if params.wait_for_completion:
+                # Use resolved parameters so templated wait durations work too.
+                # Let the activity report its own polling deadline before Temporal times out.
+                timeout_seconds = max(
+                    timeout_seconds,
+                    params.timeout_seconds + self._TEMPORAL_MARGIN,
+                )
         # Temporal delivers cancellation to an activity only through its heartbeats,
         # and only when the schedule carries a heartbeat_timeout -- otherwise the
         # beats are dropped and cancelling the workflow leaves a long-running
