@@ -97,6 +97,12 @@ describe('NodeSettingsForm', () => {
       setup({ continueOnFailureHelp: 'Custom help text here' })
       expect(screen.getByText('Custom help text here')).toBeInTheDocument()
     })
+
+    it('exposes on failure behavior name when the inner field label is hidden', () => {
+      setup({ continueOnFailureHideFieldLabel: true })
+      expect(screen.getByRole('button', { name: 'On failure behavior' })).toBeInTheDocument()
+      expect(screen.queryByText('On failure behavior', { selector: 'label' })).not.toBeInTheDocument()
+    })
   })
 
   describe('timeout', () => {

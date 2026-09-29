@@ -9,3 +9,9 @@
   --pf-v6-c-alert--PaddingBlockEnd: var(--pf-t--global--spacer--sm);
   --pf-v6-c-alert__title--FontSize: var(--pf-t--global--font--size--body--default);
 }
+
+.previewFormLink {
+  text-decoration: underline;
+  text-decoration-style: dashed;
+  text-underline-offset: 0.2em;
+}

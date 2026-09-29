@@ -20,6 +20,7 @@ export const RegistryNodeId = {
   ACTION_SCRIPT: 'action-script',
   ACTION_API: 'action-api',
   APPROVAL: 'approval',
+  HUMAN_TASKS: 'human-tasks',
   LOGIC: 'logic',
   LOGIC_CONDITION: 'logic-condition',
   LOGIC_CONVERGE: 'logic-converge',

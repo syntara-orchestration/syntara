@@ -101,8 +101,9 @@ describe('getAddNodePanelColor', () => {
     expect(getAddNodePanelColor(RegistryNodeId.LOGIC_LOOP)).toBe(NODE_TYPE_COLORS.logic)
   })
 
-  it('returns approval color for approval', () => {
+  it('returns approval color for approval and human tasks category', () => {
     expect(getAddNodePanelColor(RegistryNodeId.APPROVAL)).toBe(NODE_TYPE_COLORS.approval)
+    expect(getAddNodePanelColor(RegistryNodeId.HUMAN_TASKS)).toBe(NODE_TYPE_COLORS.approval)
   })
 
   it('returns actionScript color for action and action subtypes', () => {
