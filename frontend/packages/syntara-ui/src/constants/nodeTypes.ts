@@ -17,6 +17,7 @@ export const FlowNodeType = {
   /** Loop-back path: same data as task, handles reversed for layout */
   TASK_REVERSED: 'task-reversed',
   APPROVAL: 'approval',
+  FORM_PROMPT: 'form_prompt',
   CONDITION: 'condition',
   CONVERGE: 'converge',
   LOOP: 'loop',
