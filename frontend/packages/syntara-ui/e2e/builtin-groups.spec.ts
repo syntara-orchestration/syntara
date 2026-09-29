@@ -23,7 +23,7 @@ test.describe('UI-31: Default Builtin Groups — Visibility', () => {
 
   test('builtin Auditors and Users groups are visible in the groups list', async ({ app }) => {
     const auditorsRow = groupsTable.getByRole('row', { name: /auditors/i })
-    const usersRow = groupsTable.getByRole('row').filter({ has: app.getByRole('button', { name: 'users' }) })
+    const usersRow = groupsTable.getByRole('row').filter({ has: app.getByRole('link', { name: 'users' }) })
 
     await expect(auditorsRow).toBeVisible()
     await expect(usersRow).toBeVisible()
@@ -57,7 +57,7 @@ test.describe('UI-31: Default Builtin Groups — Visibility', () => {
 
     try {
       const auditorsRow = groupsTable.getByRole('row', { name: /auditors/i })
-      const usersRow = groupsTable.getByRole('row').filter({ has: app.getByRole('button', { name: 'users' }) })
+      const usersRow = groupsTable.getByRole('row').filter({ has: app.getByRole('link', { name: 'users' }) })
 
       await expect(auditorsRow).toBeVisible()
       await expect(usersRow).toBeVisible()

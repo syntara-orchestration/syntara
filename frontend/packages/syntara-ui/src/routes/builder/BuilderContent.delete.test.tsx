@@ -249,7 +249,7 @@ describe('BuilderContent - Delete Workflow', () => {
         name: /I understand this workflow will be deleted and any in-progress runs will stop immediately/,
       })
     )
-    await user.click(screen.getByRole('button', { name: 'Delete' }))
+    await user.click(screen.getByRole('button', { name: 'Delete workflow' }))
 
     // Verify deletion and navigation
     await waitFor(() => {
@@ -295,7 +295,7 @@ describe('BuilderContent - Delete Workflow', () => {
         name: /I understand this workflow will be deleted and any in-progress runs will stop immediately/,
       })
     )
-    await user.click(screen.getByRole('button', { name: 'Delete' }))
+    await user.click(screen.getByRole('button', { name: 'Delete workflow' }))
 
     // Verify error alert
     await waitFor(() => {

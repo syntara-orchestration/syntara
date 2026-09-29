@@ -78,7 +78,7 @@ describe('useIntegrationActions', () => {
       variables: undefined,
       status: 'idle',
       isPaused: false,
-    } as never)
+    })
   })
 
   describe('validateDialog', () => {

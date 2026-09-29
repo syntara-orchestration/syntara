@@ -311,10 +311,7 @@ export default function ExecutionDetail() {
 
   useSyncActivityStore(execution, activities)
 
-  const activityNameMap = useActivityNamesForExecution(
-    execution?.workflow_definition as WorkflowDefShape | undefined,
-    activities
-  )
+  const activityNameMap = useActivityNamesForExecution(execution?.workflow_definition, activities)
 
   const nodeClick = useExecutionNodeClick(executionId)
   const { approvals, currentIndex, currentApproval, isApprovalLoading, handleNodeClick, navigateToIndex } = nodeClick
@@ -330,7 +327,7 @@ export default function ExecutionDetail() {
   const isCancellable = isExecutionCancellable(execution?.status)
 
   const { forkAsNewWorkflow, isForkLoading } = useForkWorkflow({
-    workflowDefinition: execution?.workflow_definition as Record<string, unknown> | undefined,
+    workflowDefinition: execution?.workflow_definition,
     workflowName: workflow?.name ?? 'Workflow',
     projectId: execution?.project_id,
   })

@@ -2119,6 +2119,7 @@ export interface components {
       | 'orphaned_node'
       | 'converge_configuration'
       | 'approval_configuration'
+      | 'definition_limits'
     /**
      * ValidationFinding
      * @description A single structured validation finding.

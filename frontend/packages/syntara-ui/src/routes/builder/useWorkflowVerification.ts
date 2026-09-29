@@ -175,7 +175,11 @@ export function useWorkflowVerification({ dispatch }: UseWorkflowVerificationOpt
 
       let definition: ReturnType<typeof buildWorkflowDefinition>
       try {
-        definition = buildWorkflowDefinition(name, description, activities, triggers, {
+        definition = buildWorkflowDefinition({
+          workflowName: name,
+          workflowDescription: description,
+          activities: activities,
+          triggers: triggers,
           edges,
           nodePositions,
         })
@@ -207,7 +211,7 @@ export function useWorkflowVerification({ dispatch }: UseWorkflowVerificationOpt
           },
         })
         .then((resp) => {
-          processValidateResponse(resp as ValidateResponse, dispatch, {
+          processValidateResponse(resp, dispatch, {
             frontendErrors: allFrontendErrors,
             onValid,
             silent,

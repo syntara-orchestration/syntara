@@ -14,7 +14,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Field, Index, Relationship, SQLModel
 
 from syntara.core.constants import FieldLimits
-from syntara.core.jsonb_limits import WorkflowDefinitionSizeValidator
+from syntara.core.jsonb_limits import WorkflowDefinitionValidator
 from syntara.core.models.base import UserOwnedResource
 from syntara.core.models.pagination import ResourcesResponse
 from syntara.core.models.user_reference import UserReference, UserReferenceFieldsMixin
@@ -182,7 +182,7 @@ class PublishVersionRequest(SQLModel):
 
     name: str | None = Field(None, max_length=255, description="Optional name for this version")
     change_description: str | None = Field(None, max_length=1024, description="Description of changes in this version")
-    workflow_definition: Annotated[WorkflowDefinition | dict[str, Any] | None, WorkflowDefinitionSizeValidator] = Field(
+    workflow_definition: Annotated[WorkflowDefinition | dict[str, Any] | None, WorkflowDefinitionValidator] = Field(
         None, description="Optional workflow definition to publish directly (skips separate save step)"
     )
     expected_version: int | None = Field(

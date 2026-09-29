@@ -15,9 +15,10 @@ context:
 arches:
   - x86_64
   - aarch64
-upgradePackages:
-  - name: libatomic
-    arches:
-      only:
-        - aarch64
+# NOTE: do not add libatomic (or anything else that is absent from the
+# ubi9/ubi-minimal base image) to `upgradePackages`. rpm-lockfile-prototype
+# resolves the context from the *last* stage of the Containerfile, and
+# `upgradePackages` maps to `dnf upgrade`, which raises
+# PackagesNotInstalledError for packages the base image does not already have.
+# The `packages:` entry above is enough to pin libatomic on both arches.
 installWeakDeps: false

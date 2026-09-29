@@ -71,8 +71,9 @@ const meta: Meta<typeof SynFormField> = {
         component:
           'Base field wrapper that binds a PatternFly `FormGroup` to a react-hook-form field via `useController`. ' +
           'Accepts a render prop that receives `field` and `fieldState` for binding the inner input. ' +
-          'Use the specialised wrappers (`SynTextField`, `SynTextAreaField`) for standard text inputs. ' +
-          'Use `SynFormField` directly for custom controls such as selects, date pickers, or checkboxes. ' +
+          'Use the specialised wrappers (`SynTextField`, `SynTextAreaField`, `SynSelectField`, ' +
+          '`SynMultiSelectField`, `SynSwitchField`, `SynFileField`, `SynExpressionField`) for standard controls. ' +
+          'Use `SynFormField` directly for bespoke inputs. ' +
           'Wrap fields in `SynForm` (from `useSynForm`) so `control` can be omitted.',
       },
     },

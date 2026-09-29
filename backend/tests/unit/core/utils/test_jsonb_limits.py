@@ -13,7 +13,7 @@ from syntara.core.jsonb_limits import (
     validate_labels_dict,
     validate_workflow_definition_json,
 )
-from syntara.workflows.models.workflow import WorkflowUpdate
+from syntara.workflows.models.workflow import WorkflowCreate, WorkflowUpdate
 
 
 class TestSerializedJsonSize:
@@ -66,6 +66,16 @@ class TestValidateLabelsDict:
             validate_labels_dict({"environment": "production", "region": "us-east-1"})
 
 
+def _minimal_workflow_definition() -> dict[str, Any]:
+    return {
+        "schema_version": "2.0.0",
+        "name": "test",
+        "triggers": [{"id": "t1", "type": "manual_trigger", "parameters": {}}],
+        "nodes": [{"id": "n1", "type": "script", "parameters": {"language": "python", "code": "pass"}}],
+        "edges": [{"from": "t1", "to": "n1"}],
+    }
+
+
 class TestValidateWorkflowDefinitionJson:
     """Tests for validate_workflow_definition_json."""
 
@@ -81,8 +91,69 @@ class TestValidateWorkflowDefinitionJson:
     def test_skips_non_dict_values(self) -> None:
         assert validate_workflow_definition_json(None) is None
 
+    def test_rejects_too_many_nodes(self) -> None:
+        defn = _minimal_workflow_definition()
+        defn["nodes"] = [
+            {"id": f"n{i}", "type": "script", "parameters": {}} for i in range(JsonbLimits.MAX_WORKFLOW_NODES + 1)
+        ]
+        with pytest.raises(SafeValueError, match="too many nodes"):
+            validate_workflow_definition_json(defn)
+
+    def test_accepts_node_count_at_limit(self) -> None:
+        defn = _minimal_workflow_definition()
+        defn["nodes"] = [
+            {"id": f"n{i}", "type": "script", "parameters": {}} for i in range(JsonbLimits.MAX_WORKFLOW_NODES)
+        ]
+        result = validate_workflow_definition_json(defn)
+        assert result is defn
+
+    def test_rejects_too_many_edges(self) -> None:
+        defn = _minimal_workflow_definition()
+        defn["edges"] = [{"from": "t1", "to": "n1"}] * (JsonbLimits.MAX_WORKFLOW_EDGES + 1)
+        with pytest.raises(SafeValueError, match="too many edges"):
+            validate_workflow_definition_json(defn)
+
+    def test_accepts_edge_count_at_limit(self) -> None:
+        defn = _minimal_workflow_definition()
+        defn["edges"] = [{"from": "t1", "to": "n1"}] * JsonbLimits.MAX_WORKFLOW_EDGES
+        result = validate_workflow_definition_json(defn)
+        assert result is defn
+
 
 def test_workflow_update_rejects_oversized_labels() -> None:
     """WorkflowUpdate.labels must enforce LabelsField validation at the model layer."""
     with pytest.raises(ValidationError):
         WorkflowUpdate(labels={f"k{i}": "v" * 100 for i in range(1000)})
+
+
+def test_workflow_create_rejects_oversized_definition() -> None:
+    """WorkflowCreate.workflow_definition enforces size cap at the model layer."""
+    huge_definition: dict[str, str] = {"blob": "x" * JsonbLimits.MAX_WORKFLOW_DEFINITION_BYTES}
+    with pytest.raises(ValidationError):
+        WorkflowCreate(name="test", workflow_definition=huge_definition)
+
+
+def test_workflow_create_rejects_too_many_nodes() -> None:
+    """WorkflowCreate.workflow_definition enforces node count cap at the model layer."""
+    defn = {
+        "schema_version": "2.0.0",
+        "name": "test",
+        "triggers": [],
+        "nodes": [{"id": f"n{i}"} for i in range(JsonbLimits.MAX_WORKFLOW_NODES + 1)],
+        "edges": [],
+    }
+    with pytest.raises(ValidationError):
+        WorkflowCreate(name="test", workflow_definition=defn)
+
+
+def test_workflow_create_rejects_too_many_edges() -> None:
+    """WorkflowCreate.workflow_definition enforces edge count cap at the model layer."""
+    defn = {
+        "schema_version": "2.0.0",
+        "name": "test",
+        "triggers": [],
+        "nodes": [],
+        "edges": [{"from": "a", "to": "b"}] * (JsonbLimits.MAX_WORKFLOW_EDGES + 1),
+    }
+    with pytest.raises(ValidationError):
+        WorkflowCreate(name="test", workflow_definition=defn)

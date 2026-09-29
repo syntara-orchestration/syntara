@@ -34,6 +34,8 @@ import {
   buildWorkflowExpressionModeActivity,
   hasExpressionValue,
   isJobTemplateInputVariablesMode,
+  isWorkflowTemplateInputVariablesMode,
+  resolveWorkflowUseInputVariables,
   validateJobTemplateId,
   validateWorkflowTemplateId,
 } from '../utils/aapHelpers'
@@ -226,13 +228,14 @@ function getStringField(config: Record<string, unknown>, ...keys: string[]): str
   return undefined
 }
 
-function resolveUseInputVariables(
-  c: StoredAAPConfig,
-  organizationName: string,
-  jobTemplateName: string,
-  inventoryName: string,
+function resolveUseInputVariables(params: {
+  c: StoredAAPConfig
+  organizationName: string
+  jobTemplateName: string
+  inventoryName: string
   extraVars: string
-): boolean {
+}): boolean {
+  const { c, organizationName, jobTemplateName, inventoryName, extraVars } = params
   return (
     c.use_input_variables === true ||
     c.useInputVariables === true ||
@@ -279,10 +282,16 @@ function buildAAPInitialData(taskName: string, config: Record<string, unknown>):
     job_slice_count: c.job_slice_count ?? c.jobSlicing,
     diff_mode: getField(c.diff_mode, c.diffMode, false),
     execution_environment: getField(c.execution_environment, c.executionEnvironment, ''),
-    instance_group: getField(c.instance_group_name, c.instanceGroupName, '') as string | undefined,
+    instance_group: getField(c.instance_group_name, c.instanceGroupName, ''),
     instance_group_id: c.instance_group_id ?? c.instanceGroupId,
     labels: c.labels ?? [],
-    use_input_variables: resolveUseInputVariables(c, organizationName, jobTemplateName, inventoryName, extraVars),
+    use_input_variables: resolveUseInputVariables({
+      c,
+      organizationName,
+      jobTemplateName,
+      inventoryName,
+      extraVars,
+    }),
   }
 }
 
@@ -294,24 +303,37 @@ function buildAAPWorkflowInitialData(
   config: Record<string, unknown>
 ): Partial<AAPWorkflowTemplateFormData> {
   const c = config
+  const organizationName = getField(c.organization_name, c.organization, '') as string
+  const workflowTemplateName = getField(c.workflow_job_template_name, c.workflowJobTemplateName, '') as string
+  const inventoryName = getField(c.inventory_name, c.inventoryName, '') as string
+  const extraVars = serializeExtraVars((c.extra_vars ?? c.extraVars) as Record<string, unknown> | undefined)
+
   return {
     name: taskName,
     credential_id: getStringField(c, 'credential_id', 'credentialId'),
     integration_id: getStringField(c, 'integration_id', 'integrationId'),
     organization_id: (c.organization_id ?? c.organizationId) as number | undefined,
-    organization_name: getField(c.organization_name, c.organization, '') as string | undefined,
-    workflow_job_template_name: getField(c.workflow_job_template_name, c.workflowJobTemplateName, '') as
-      | string
-      | undefined,
+    organization_name: organizationName,
+    workflow_job_template_name: workflowTemplateName,
     workflow_job_template_id: (c.workflow_job_template_id ?? c.workflowJobTemplateId) as number | undefined,
-    inventory_name: getField(c.inventory_name, c.inventoryName, '') as string | undefined,
+    inventory_name: inventoryName,
     inventory_id: (c.inventory_id ?? c.inventory) as number | undefined,
-    extra_vars: serializeExtraVars((c.extra_vars ?? c.extraVars) as Record<string, unknown> | undefined),
+    extra_vars: extraVars,
     limit: (c.limit ?? '') as string,
     scm_branch: (c.scm_branch ?? c.scmBranch ?? '') as string,
     tags: (c.tags ?? '') as string,
     skip_tags: (c.skip_tags ?? c.skipTags ?? '') as string,
     labels: (c.labels ?? []) as string[],
+    use_input_variables: resolveWorkflowUseInputVariables(c, {
+      organizationName,
+      workflowTemplateName,
+      inventoryName,
+      limit: (c.limit ?? '') as string,
+      scmBranch: (c.scm_branch ?? c.scmBranch ?? '') as string,
+      tags: (c.tags ?? '') as string,
+      skipTags: (c.skip_tags ?? c.skipTags ?? '') as string,
+      extraVars,
+    }),
   }
 }
 
@@ -358,20 +380,20 @@ function renderAAPTaskDetails({
 
     const handleWorkflowSubmit = (data: AAPWorkflowTemplateFormData) => {
       try {
-        if (hasExpressionValue(data.workflow_job_template_name, data.organization_name)) {
+        if (isWorkflowTemplateInputVariablesMode(data)) {
           updateActivity(nodeId, buildWorkflowExpressionModeActivity(nodeId, data.name, data))
         } else {
           const workflow_job_template_id = validateWorkflowTemplateId(data.workflow_job_template_id)
           const workflowConfig = buildAAPWorkflowTemplateConfig(data)
           updateActivity(
             nodeId,
-            createAAPWorkflowTemplateActivity(
-              nodeId,
-              data.name,
-              workflow_job_template_id,
-              workflowConfig,
-              data.settings
-            )
+            createAAPWorkflowTemplateActivity({
+              id: nodeId,
+              name: data.name,
+              workflowTemplateId: workflow_job_template_id,
+              config: workflowConfig,
+              settings: data.settings,
+            })
           )
         }
 
@@ -407,7 +429,13 @@ function renderAAPTaskDetails({
         const aapNodeConfig = buildAAPConfig(data)
         updateActivity(
           nodeId,
-          createAAPJobTemplateActivity(nodeId, data.name, job_template_id, aapNodeConfig, data.settings)
+          createAAPJobTemplateActivity({
+            id: nodeId,
+            name: data.name,
+            jobTemplateId: job_template_id,
+            config: aapNodeConfig,
+            settings: data.settings,
+          })
         )
       }
 

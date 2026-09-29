@@ -14,6 +14,7 @@ import { ActivityTypeEnum, type ExecutionsAPI } from '@syntara/contracts'
 import type React from 'react'
 
 import { SynLabel } from '../../components/labels/SynLabel'
+import { capitalize } from '../../utils/capitalize'
 
 import { activityStatusDisplayLabels, executionStatusDisplayLabels } from './executionStatusConstants'
 
@@ -83,7 +84,7 @@ export function ActivityStatusLabel({ status, nodeType }: Readonly<{ status: Act
 
   const IconComponent = activityStatusIcons[status] ?? RhUiEllipsisHorizontalFillIcon
   const variant = activityStatusVariant[status] ?? 'custom'
-  const displayLabel = activityStatusDisplayLabels[status] ?? status.charAt(0).toUpperCase() + status.slice(1)
+  const displayLabel = activityStatusDisplayLabels[status] ?? capitalize(status)
 
   return (
     <SynLabel variant="outline" status={variant} icon={<IconComponent />}>

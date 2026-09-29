@@ -11,6 +11,7 @@ import noOnlyTests from 'eslint-plugin-no-only-tests'
 import testingLibrary from 'eslint-plugin-testing-library'
 import sonarjs from 'eslint-plugin-sonarjs'
 import unicorn from 'eslint-plugin-unicorn'
+import barrelFiles from 'eslint-plugin-barrel-files'
 import vitest from '@vitest/eslint-plugin'
 import pluginQuery from '@tanstack/eslint-plugin-query'
 import reactUseEffect from 'eslint-plugin-react-you-might-not-need-an-effect'
@@ -233,6 +234,7 @@ export default tseslint.config(
       'no-only-tests': noOnlyTests,
       sonarjs,
       unicorn,
+      'barrel-files': barrelFiles,
       syntara: syntaraPlugin,
       reactYouMightNotNeedAnEffect: reactUseEffect,
     },
@@ -299,7 +301,9 @@ export default tseslint.config(
       // Aligns with Sonar typescript:S3358 (nested ternary). Matches SonarCloud carve-outs (e.g. separate JSX `{}` blocks).
       'sonarjs/no-nested-conditional': 'error',
       'max-depth': ['error', 4],
-      'max-params': ['error', 5],
+      // Lowered from `['error', 5]`. Functions with 5+ separate positional params must take one
+      // object parameter instead (named args at the call site; order does not matter).
+      'max-params': ['error', 4],
       // Limit nested functions/callbacks (e.g. hooks → timeout → setState updater). Complements max-depth
       // and aligns with Sonar-style “deeply nested functions” maintainability rules. Tests disable this.
       'max-nested-callbacks': ['error', 4],
@@ -342,8 +346,6 @@ export default tseslint.config(
             '**/components/table/DateCell.tsx',
             '**/components/table/ExecutionTimestamp.tsx',
             '**/components/table/UserTimestamp.tsx',
-            // Composes "Last saved <Timestamp>" inline inside a Tooltip's ReactNode content —
-            // no canonical wrapper fits a bare inline timestamp fragment like this.
             '**/routes/builder/SaveWorkflowButton.tsx',
           ],
         },
@@ -391,6 +393,30 @@ export default tseslint.config(
     rules: {
       'no-console': 'off',
       'no-restricted-exports': 'off',
+    },
+  },
+  {
+    // Scoped to src/ production code only — this is where the TkDodo concerns (bundle size,
+    // tree-shaking, circular deps) actually apply. Test-only helper directories (e.g. e2e/) are
+    // out of scope, since code there never ships to users and grouped re-exports can be a
+    // reasonable convenience. See https://tkdodo.eu/blog/please-stop-using-barrel-files
+    // `warn` (not `error`) so existing barrel files are not a hard build break; new ones in src/
+    // are blocked by the Zero New Warnings Policy in review.
+    files: ['src/**/*.{ts,tsx}'],
+    rules: {
+      'barrel-files/avoid-barrel-files': 'warn',
+    },
+  },
+  {
+    // `barrel-files/avoid-barrel-files` only counts a top-level declaration if it is NOT
+    // exported (e.g. `function foo() {}`, not `export function foo() {}`). These three files
+    // are substantial implementation files (a 1000+ line Zustand store, node-factory functions,
+    // expression defaults) that mostly use `export function`/`export const`, so the rule
+    // undercounts their real declarations and misreads a small re-export section as a barrel
+    // file. They are not barrel files.
+    files: ['src/stores/useWorkflowStore.ts', 'src/stores/workflowFactories.ts', 'src/utils/expressions/defaults.ts'],
+    rules: {
+      'barrel-files/avoid-barrel-files': 'off',
     },
   },
   {

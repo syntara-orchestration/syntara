@@ -100,9 +100,9 @@ describe('Trigger Node Kebab Menu Delete', () => {
     const menuButton = screen.getByRole('button', { name: /step actions menu/i })
     await user.click(menuButton)
 
-    // Verify the dropdown menu opens and shows the Delete step option
+    // Verify the dropdown menu opens and shows the Delete option
     await waitFor(() => {
-      expect(screen.getByRole('menuitem', { name: 'Delete step' })).toBeInTheDocument()
+      expect(screen.getByRole('menuitem', { name: 'Delete' })).toBeInTheDocument()
     })
   })
 
@@ -127,12 +127,12 @@ describe('Trigger Node Kebab Menu Delete', () => {
     const menuButton = screen.getByRole('button', { name: /step actions menu/i })
     await user.click(menuButton)
 
-    // Wait for menu to open and click Delete step
+    // Wait for menu to open and click Delete
     await waitFor(() => {
-      expect(screen.getByRole('menuitem', { name: 'Delete step' })).toBeInTheDocument()
+      expect(screen.getByRole('menuitem', { name: 'Delete' })).toBeInTheDocument()
     })
 
-    const deleteButton = screen.getByRole('menuitem', { name: 'Delete step' })
+    const deleteButton = screen.getByRole('menuitem', { name: 'Delete' })
     await user.click(deleteButton)
 
     // Verify deleteElements was called with correct trigger node id

@@ -58,7 +58,12 @@ class JsonbLimits:
     """Serialized size limits for free-form JSONB API fields."""
 
     MAX_FIELD_BYTES = 1_048_576  # 1MB — context_data, input_data, trigger_inputs, etc.
-    MAX_WORKFLOW_DEFINITION_BYTES = 5_242_880  # 5MB — workflow_definition graphs
+    # 1.5MB — aligns with Temporal's blobSize.warn threshold (development-sql.yaml) and
+    # stays well under the 2MB hard error limit, leaving headroom for the protobuf envelope
+    # and other start_workflow arguments serialized alongside the definition.
+    MAX_WORKFLOW_DEFINITION_BYTES = 1_572_864  # 1.5MB
+    MAX_WORKFLOW_NODES = 200
+    MAX_WORKFLOW_EDGES = 500
 
 
 class WebSocketConfig:

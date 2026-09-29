@@ -304,3 +304,131 @@ class TestInvocationServiceCancellation:
         assert result == CancellationResult.SUCCESS
         assert mock_retriever.delete_file.call_count == 2
         mock_retriever.delete_file.assert_any_call("orchestrator-bbb-good.txt")
+
+
+class TestCancelInvocationCancelsAgentExecution:
+    """Cancelling an invocation also stops the builtin workflow running it.
+
+    The execution is reached through ``Invocation.agent_execution_id``, the
+    server-written FK, not through a scan of caller-writable
+    ``executions.input_data``. Ref: AAP-88614.
+    """
+
+    @staticmethod
+    def _service(
+        mock_user: MagicMock,
+        *,
+        agent_execution_id: object,
+        execution: object,
+        temporal: AsyncMock | None,
+    ) -> tuple[InvocationService, AsyncMock]:
+        invocation = MagicMock()
+        invocation.created_by = mock_user.id
+        invocation.status = InvocationStatus.RUNNING
+        invocation.checkpoint_data = None
+        invocation.context_data = {"file_ids": []}
+        mock_session = _session_with_invocation(invocation)
+        mock_session.scalar = AsyncMock(return_value=agent_execution_id)
+        mock_session.get = AsyncMock(side_effect=[invocation, execution])
+        service = InvocationService(mock_session, mock_user, temporal_service=temporal)
+        return service, mock_session
+
+    @pytest.mark.asyncio
+    async def test_cancels_linked_agent_execution(self, mock_user) -> None:
+        """The FK'd execution's Temporal workflow is cancelled."""
+        from syntara.workflows.models.execution import ExecutionStatus
+
+        execution = MagicMock()
+        execution.status = ExecutionStatus.RUNNING
+        execution.temporal_workflow_id = "temporal-agent-1"
+        mock_temporal = AsyncMock()
+        service, _ = self._service(mock_user, agent_execution_id=uuid4(), execution=execution, temporal=mock_temporal)
+
+        result = await service.cancel_invocation(uuid4())
+
+        assert result == CancellationResult.SUCCESS
+        mock_temporal.cancel_workflow.assert_awaited_once_with(temporal_workflow_id="temporal-agent-1")
+
+    @pytest.mark.asyncio
+    async def test_null_link_still_succeeds(self, mock_user) -> None:
+        """An unlinked invocation cancels fine; only the tidy-up is skipped."""
+        mock_temporal = AsyncMock()
+        service, _ = self._service(mock_user, agent_execution_id=None, execution=None, temporal=mock_temporal)
+
+        result = await service.cancel_invocation(uuid4())
+
+        assert result == CancellationResult.SUCCESS
+        mock_temporal.cancel_workflow.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_no_temporal_service_skips_lookup_entirely(self, mock_user) -> None:
+        """Without a temporal service nothing is even looked up."""
+        service, mock_session = self._service(
+            mock_user, agent_execution_id=uuid4(), execution=MagicMock(), temporal=None
+        )
+
+        result = await service.cancel_invocation(uuid4())
+
+        assert result == CancellationResult.SUCCESS
+        mock_session.scalar.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_missing_execution_does_not_raise(self, mock_user) -> None:
+        """A link pointing at a deleted execution is tolerated."""
+        mock_temporal = AsyncMock()
+        service, _ = self._service(mock_user, agent_execution_id=uuid4(), execution=None, temporal=mock_temporal)
+
+        result = await service.cancel_invocation(uuid4())
+
+        assert result == CancellationResult.SUCCESS
+        mock_temporal.cancel_workflow.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_terminal_execution_is_not_cancelled(self, mock_user) -> None:
+        """An execution that already finished is left alone."""
+        from syntara.workflows.models.execution import ExecutionStatus
+
+        execution = MagicMock()
+        execution.status = ExecutionStatus.COMPLETED
+        execution.temporal_workflow_id = "temporal-agent-done"
+        mock_temporal = AsyncMock()
+        service, _ = self._service(mock_user, agent_execution_id=uuid4(), execution=execution, temporal=mock_temporal)
+
+        result = await service.cancel_invocation(uuid4())
+
+        assert result == CancellationResult.SUCCESS
+        mock_temporal.cancel_workflow.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_temporal_failure_still_returns_success(self, mock_user) -> None:
+        """A Temporal failure must not 500 a cancel that already committed.
+
+        The client would retry and get NOT_CANCELLABLE. This is the branch most
+        likely to be silently lost in a refactor.
+        """
+        from syntara.workflows.models.execution import ExecutionStatus
+
+        execution = MagicMock()
+        execution.status = ExecutionStatus.RUNNING
+        execution.temporal_workflow_id = "temporal-agent-1"
+        mock_temporal = AsyncMock()
+        mock_temporal.cancel_workflow = AsyncMock(side_effect=RuntimeError("temporal unreachable"))
+        service, _ = self._service(mock_user, agent_execution_id=uuid4(), execution=execution, temporal=mock_temporal)
+
+        result = await service.cancel_invocation(uuid4())
+
+        assert result == CancellationResult.SUCCESS
+
+    @pytest.mark.asyncio
+    async def test_lookup_failure_still_returns_success(self, mock_user) -> None:
+        """A failed FK re-read is swallowed too."""
+        mock_temporal = AsyncMock()
+        service, mock_session = self._service(
+            mock_user, agent_execution_id=uuid4(), execution=MagicMock(), temporal=mock_temporal
+        )
+        mock_session.scalar = AsyncMock(side_effect=RuntimeError("connection lost"))
+
+        result = await service.cancel_invocation(uuid4())
+
+        assert result == CancellationResult.SUCCESS
+        mock_temporal.cancel_workflow.assert_not_called()

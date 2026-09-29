@@ -27,6 +27,7 @@ import {
   clickAddConnectedStep,
   closeNodeEditorPanel,
   deleteWorkflow,
+  openNodeForEditing,
   openWorkflowInBuilder,
   saveWorkflow,
   startWorkflowWithTrigger,
@@ -41,6 +42,18 @@ async function selectCredential(app: Page, credLabel: string, credName: string) 
   await option.waitFor({ state: 'visible', timeout: 15_000 })
   await option.click()
   await expect(credToggle).toContainText(credName)
+}
+
+async function expectAuthenticationCredential(app: Page, credName: string) {
+  const credToggle = app.getByRole('button', { name: 'Authentication credential', exact: true })
+  await expect(credToggle).toBeEnabled({ timeout: 30_000 })
+  await expect(credToggle).toContainText(credName, { timeout: 30_000 })
+}
+
+async function openApiNodeAfterReload(app: Page, nodeName: string) {
+  const credentialsLoaded = app.waitForResponse(isCredentialsResponse)
+  await openNodeForEditing(app, nodeName)
+  await credentialsLoaded
 }
 
 test.describe('Credential Persistence', () => {
@@ -76,8 +89,7 @@ test.describe('Credential Persistence', () => {
       await saveWorkflow(app, workflowName)
 
       await openWorkflowInBuilder(app, workflowName)
-
-      await app.getByText('Test Task Agent').click()
+      await openNodeForEditing(app, 'Test Task Agent')
 
       // Wait for the form to render, then for the credential name to resolve
       const form = app.getByTestId('ai-agent-node-form')
@@ -119,11 +131,8 @@ test.describe('Credential Persistence', () => {
       await saveWorkflow(app, workflowName)
 
       await openWorkflowInBuilder(app, workflowName)
-
-      await app.getByText('Test REST API').click()
-
-      const credToggle = app.getByRole('button', { name: 'Authentication credential', exact: true })
-      await expect(credToggle).toContainText(credName, { timeout: 30_000 })
+      await openApiNodeAfterReload(app, 'Test REST API')
+      await expectAuthenticationCredential(app, credName)
     } finally {
       await deleteWorkflow(app, workflowName)
       await deleteCredentialByName(app, credName)
@@ -175,13 +184,8 @@ test.describe('Credential Persistence', () => {
       await saveWorkflow(app, workflowName)
 
       await openWorkflowInBuilder(app, workflowName)
-
-      const reloadedCredentialsLoaded = app.waitForResponse(isCredentialsResponse)
-      await app.getByText('Test AAP Job').click()
-      await reloadedCredentialsLoaded
-
-      const credToggle = app.getByRole('button', { name: 'Authentication credential', exact: true })
-      await expect(credToggle).toContainText(credName, { timeout: 10_000 })
+      await openApiNodeAfterReload(app, 'Test AAP Job')
+      await expectAuthenticationCredential(app, credName)
     } finally {
       await deleteWorkflow(app, workflowName)
       await deleteCredentialByName(app, credName)

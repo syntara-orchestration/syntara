@@ -100,4 +100,17 @@ describe('useSynForm', () => {
     expect(onValid).toHaveBeenCalledOnce()
     expect(onValid.mock.calls[0][0]).toMatchObject({ name: 'My Group', description: '' })
   })
+
+  it('syncs external values via the RHF values prop', () => {
+    const hydratedValues: FormData = { name: 'alice', description: 'admin' }
+    const { result } = renderHook(() =>
+      useSynForm({
+        schema,
+        defaultValues,
+        values: hydratedValues,
+      })
+    )
+
+    expect(result.current.getValues()).toMatchObject(hydratedValues)
+  })
 })

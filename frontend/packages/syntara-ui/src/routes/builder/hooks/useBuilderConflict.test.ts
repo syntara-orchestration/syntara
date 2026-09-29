@@ -412,7 +412,7 @@ describe('useBuilderConflict', () => {
       const reloadMock = vi.fn()
       const originalLocation = window.location
       Object.defineProperty(window, 'location', {
-        value: { ...originalLocation, reload: reloadMock } as Location,
+        value: { ...originalLocation, reload: reloadMock },
         writable: true,
       })
 

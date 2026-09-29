@@ -1113,9 +1113,9 @@ class TestValidateInputs:
     @pytest.mark.parametrize(
         "valid_host",
         [
-            "https://controller.example.com",
-            "https://controller.example.com:8443",
-            "https://controller.example.com/",
+            "https://gateway.aap.example.com",
+            "https://gateway.aap.example.com:8443",
+            "https://gateway.aap.example.com/",
             "https://192.168.1.1",
             "https://[::1]",
         ],
@@ -1131,7 +1131,7 @@ class TestValidateInputs:
             ("https://evil.com/foo/bar/?", "must not contain a path"),
             ("https://evil.com?x=1", "query string"),
             ("https://evil.com#frag", "fragment"),
-            ("http://controller.example.com", "scheme must be https"),
+            ("http://gateway.aap.example.com", "scheme must be https"),
         ],
     )
     def test_host_invalid_urls_rejected(self, invalid_host: str, expected_match: str) -> None:
@@ -1156,7 +1156,7 @@ class TestValidateInputs:
             override_settings(credential_allow_http_host=False),
             pytest.raises(CredentialValidationError, match="scheme must be https"),
         ):
-            _validate_inputs({"host": "http://controller.example.com"}, HOST_TYPE_INPUTS)
+            _validate_inputs({"host": "http://gateway.aap.example.com"}, HOST_TYPE_INPUTS)
 
     def test_host_sentinel_skipped(self) -> None:
         """Skip validation for $encrypted$ sentinel on PATCH."""

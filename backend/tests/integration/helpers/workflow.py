@@ -1,6 +1,7 @@
 """Integration-test-only factories for workflows and activity executions."""
 
 from datetime import UTC, datetime, timedelta
+from typing import Any
 from uuid import UUID, uuid4
 
 from sqlmodel import select
@@ -161,3 +162,60 @@ class ExecutionsFactory:
         self.session.add_all(executions)
         await self.session.commit()
         return executions
+
+
+async def get_or_create_builtin_agent_workflow(
+    session: AsyncSession,
+    user: User,
+    workflow_definition: dict[str, Any],
+) -> Workflow:
+    """Resolve the builtin "Agent Execution" workflow, seeding it if absent.
+
+    ``seed_builtin`` normally creates it along with the builtin project; this
+    looks it up so tests work either way.
+    """
+    from syntara.authz.models.project import Project
+    from syntara.workflows.constants import BUILTIN_PROJECT_NAME, BUILTIN_WORKFLOW_AGENT_EXECUTION
+
+    project_result = await session.exec(select(Project).where(Project.name == BUILTIN_PROJECT_NAME))
+    project = project_result.first()
+    if project is None:
+        project = Project(name=BUILTIN_PROJECT_NAME, description="Built-in", is_builtin=True)
+        session.add(project)
+        await session.commit()
+        await session.refresh(project)
+
+    workflow_result = await session.exec(
+        select(Workflow).where(
+            Workflow.name == BUILTIN_WORKFLOW_AGENT_EXECUTION,
+            Workflow.project_id == project.id,
+        )
+    )
+    existing = workflow_result.first()
+    if existing is not None:
+        return existing
+
+    workflow = Workflow(
+        name=BUILTIN_WORKFLOW_AGENT_EXECUTION,
+        description="Builtin agent execution",
+        created_by=user.id,
+        is_enabled=False,
+        is_builtin=True,
+        current_version=1,
+        project_id=project.id,
+    )
+    session.add(workflow)
+    version = WorkflowVersion(
+        workflow_id=workflow.id,
+        version=1,
+        schema_version="2.0.0",
+        workflow_definition=workflow_definition,
+        created_by=user.id,
+    )
+    session.add(version)
+    await session.flush()
+    workflow.published_version_id = version.id
+    workflow.is_enabled = True
+    await session.commit()
+    await session.refresh(workflow)
+    return workflow

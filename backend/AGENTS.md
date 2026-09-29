@@ -78,6 +78,7 @@ Consult these standards when making changes.
 **Core:**
 - [Decision Records](/decision-records.md) — technology choices and rationale
 - [Error Handling Strategy](/docs/error-handling-strategy.md) — RFC 9457 compliance, exception patterns
+- [The `/_internal/` Path Prefix](/docs/internal-path-prefix.md) — what the prefix disables (cert auth, audit, metrics, rate limiting), the unenforced network-isolation assumption, and when an endpoint may live there
 
 **Domain Standards:**
 - [Access Control](/docs/standards/access-control.md) — authentication, RBAC (PermissionChecker/VisibilityFilter), compliance tests, exclusion lists
