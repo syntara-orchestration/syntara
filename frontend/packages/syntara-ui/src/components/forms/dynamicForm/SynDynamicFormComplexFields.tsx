@@ -1,8 +1,10 @@
 import { Checkbox, DatePicker, NumberInput } from '@patternfly/react-core'
 import type { FormField } from '@syntara/contracts'
+import { useController } from 'react-hook-form'
 
 import type { FormSubmissionInput } from '../../../forms'
 import { formatDateYMD, parseDateYMD } from '../../../utils/dateUtils'
+import { FormFieldError } from '../../FormFieldError'
 import type { DynamicOptionsResolver } from '../SynDynamicForm.types'
 import { SynFormField } from '../SynFormField'
 
@@ -93,26 +95,24 @@ export function SynDynamicFormCheckboxField({
   isRequired: boolean
   isDisabled?: boolean
 }>) {
+  const { field: rhfField, fieldState } = useController<FormSubmissionInput>({ name: field.value_name })
+
   return (
-    <SynFormField<FormSubmissionInput>
-      name={field.value_name}
-      label={field.label}
-      fieldId={fieldId}
-      isRequired={isRequired}
-      hint={hint}
-    >
-      {({ field: rhfField, fieldState }) => (
-        <Checkbox
-          id={fieldId}
-          aria-label={field.label}
-          isChecked={Boolean(rhfField.value)}
-          isDisabled={isDisabled}
-          onChange={(_event, checked) => rhfField.onChange(checked)}
-          onBlur={rhfField.onBlur}
-          aria-invalid={fieldState.error ? true : undefined}
-        />
-      )}
-    </SynFormField>
+    <>
+      <Checkbox
+        id={fieldId}
+        name={rhfField.name}
+        label={field.label}
+        isRequired={isRequired}
+        description={fieldState.error ? undefined : hint}
+        isChecked={Boolean(rhfField.value)}
+        isDisabled={isDisabled}
+        isValid={fieldState.error ? false : undefined}
+        onChange={(_event, checked) => rhfField.onChange(checked)}
+        onBlur={rhfField.onBlur}
+      />
+      {fieldState.error ? <FormFieldError error={fieldState.error} /> : null}
+    </>
   )
 }
 

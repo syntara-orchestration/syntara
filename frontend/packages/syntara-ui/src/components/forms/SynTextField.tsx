@@ -42,6 +42,8 @@ export type SynTextFieldProps<
   autoComplete?: string
   /** Input type. Defaults to `'text'`. */
   type?: 'text' | 'email' | 'password' | 'search' | 'tel' | 'url' | 'number'
+  /** Called after the field value changes (user input). */
+  onValueChange?: () => void
 }
 
 /**
@@ -77,6 +79,7 @@ export function SynTextField<
   isDisabled,
   autoComplete,
   type = 'text',
+  onValueChange,
 }: Readonly<SynTextFieldProps<TFieldValues, TName>>) {
   const resolvedFieldId = fieldId ?? name
 
@@ -97,7 +100,10 @@ export function SynTextField<
           placeholder={placeholder}
           validated={fieldState.error ? 'error' : 'default'}
           value={field.value ?? ''}
-          onChange={field.onChange}
+          onChange={(_event, value) => {
+            field.onChange(value)
+            onValueChange?.()
+          }}
           onBlur={field.onBlur}
           name={field.name}
           isDisabled={isDisabled}
