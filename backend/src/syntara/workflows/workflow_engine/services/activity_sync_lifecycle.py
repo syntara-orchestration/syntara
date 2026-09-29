@@ -48,7 +48,7 @@ class ActivitySyncLifecycle:
         if task.cancelled():
             logger.debug("Monitoring task for execution was cancelled", execution_id=execution_id)
         elif task.exception():
-            logger.error("Monitoring task for execution failed", execution_id=execution_id, error=str(task.exception()))
+            logger.error("Monitoring task for execution failed", execution_id=execution_id)
         else:
             logger.info("Monitoring task for execution completed successfully", execution_id=execution_id)
 

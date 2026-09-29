@@ -340,11 +340,10 @@ class ActivitySyncMonitorMixin:
         except asyncio.CancelledError:
             logger.info("Activity monitoring cancelled for execution", execution_id=execution_id)
             raise
-        except TemporalError as e:
+        except TemporalError:
             logger.warning(
                 "Temporal error while monitoring execution, will not retry",
                 execution_id=execution_id,
-                error=str(e),
             )
         except Exception:
             logger.exception("Error monitoring execution", execution_id=execution_id)

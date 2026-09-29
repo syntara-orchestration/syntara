@@ -53,24 +53,21 @@ class ActivityExecutionSyncMixin:
                         "dict[str, Any] | None",
                         await handle.query("get_activity_output", activity_id),
                     )
-                except (TemporalError, ValueError) as query_err:
+                except (TemporalError, ValueError):
                     logger.warning(
                         "Could not query activity data",
                         activity_id=activity_id,
-                        error=str(query_err),
                     )
                     raise
             logger.warning(
                 "Workflow update for activity output failed",
                 activity_id=activity_id,
-                error=str(e),
             )
             return None
-        except ApplicationError as e:
+        except ApplicationError:
             logger.warning(
                 "Workflow update for activity output timed out",
                 activity_id=activity_id,
-                error=str(e),
             )
             return None
 
@@ -111,8 +108,8 @@ class ActivityExecutionSyncMixin:
         try:
             input_data = await handle.query("get_activity_input", activity_id) or {}
             queried_output = await handle.query("get_activity_output", activity_id)
-        except (TemporalError, ValueError) as e:
-            logger.warning("Could not query activity data", activity_id=activity_id, error=str(e))
+        except (TemporalError, ValueError):
+            logger.warning("Could not query activity data", activity_id=activity_id)
             raise
 
         if queried_output is None and activity_data["status"] == ActivityStatus.COMPLETED:
