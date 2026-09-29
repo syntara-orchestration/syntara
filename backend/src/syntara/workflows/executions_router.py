@@ -25,7 +25,6 @@ from syntara.workflows.models.execution import (
     ExecutionListResponse,
     ExecutionRead,
     RetryFailureRequest,
-    RetryFailureValidateRequest,
     RetryFromFailureValidationResponse,
 )
 from syntara.workflows.models.query_params import ActivityListParams, ExecutionIncludeParams
@@ -304,28 +303,26 @@ async def retry_execution(
     return await service.retry_execution(execution_id)
 
 
-@router.post(
-    "/{execution_id}/validate-retry-from-failure",
-    operation_id="validate_retry_from_failure",
-    summary="Validate retry from failure",
-    description="Validate that an execution can be retryed from the given failure points. "
-    "Checks execution state, failure-point eligibility, converge-mootness, the retained-version guard, "
-    "the sanitized-output guard, and any supplied input parameter overrides. "
-    "Returns a pass/fail verdict without mutating any state.",
+@router.get(
+    "/{execution_id}/retry-from-failure-preview",
+    operation_id="retry_from_failure_preview",
+    summary="Preview retry from failure",
+    description="Report whether an execution can be retried from its failure points, and what would re-run. "
+    "Returns the eligible retry points, the re-run step count for each of them, and the deduplicated total "
+    "across all of them. Purely informational: the failure-point selection and any input parameter overrides "
+    "are supplied to the retry endpoint, which re-validates them independently and rejects anything "
+    "unusable. Never mutates any state.",
     response_model=RetryFromFailureValidationResponse,
-    response_description="Retry validation verdict",
+    response_description="Retry preview",
     dependencies=[Depends(_exec_perm_run)],
 )
-async def validate_retry_from_failure(
+async def retry_from_failure_preview(
     execution_id: UUID,
-    body: RetryFailureValidateRequest,
     service: Annotated[ExecutionService, Depends(get_execution_service)],
 ) -> RetryFromFailureValidationResponse:
-    """Validate a retry from failure points without mutating state."""
-    logger.info("Validating retry from failure", execution_id=execution_id)
-    return await service.validate_retry_from_failure(
-        execution_id, body.failure_point_ids, body.input_parameter_overrides
-    )
+    """Preview what a retry from failure would do, without mutating state."""
+    logger.info("Previewing retry from failure", execution_id=execution_id)
+    return await service.preview_retry_from_failure(execution_id)
 
 
 @router.post(

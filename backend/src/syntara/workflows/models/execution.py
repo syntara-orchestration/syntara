@@ -413,8 +413,7 @@ class TestExecutionCreate(SQLModel):
         return self
 
 
-#: Shared description for the retry-from-failure input-override map. Kept as a
-#: constant so the validate and retry request bodies stay in lockstep.
+#: Description for the retry-from-failure input-override map (SDP AC-14/R10c).
 _INPUT_PARAMETER_OVERRIDES_DESCRIPTION = (
     "Input parameter overrides for the retry's starting nodes, keyed by node id then parameter name "
     "(SDP AC-14/R10c). Each override replaces the value the node would otherwise receive, after upstream "
@@ -423,22 +422,6 @@ _INPUT_PARAMETER_OVERRIDES_DESCRIPTION = (
     "anything else is rejected. Overrides apply to this retry run only — the workflow definition is never "
     "modified, and a permanent change requires editing, saving, and publishing the workflow."
 )
-
-
-class RetryFailureValidateRequest(SQLModel):
-    """Request body for POST /executions/{id}/validate-retry-from-failure."""
-
-    __test__ = False  # Prevent pytest from collecting this as a test class
-
-    failure_point_ids: list[str] = Field(
-        default_factory=list,
-        description="Failure points to retry from (node IDs from the source execution). "
-        "Empty selects the default: all currently failed nodes.",
-    )
-    input_parameter_overrides: dict[str, dict[str, Any]] = Field(
-        default_factory=dict,
-        description=_INPUT_PARAMETER_OVERRIDES_DESCRIPTION,
-    )
 
 
 class RetryFailureRequest(SQLModel):
@@ -459,7 +442,7 @@ class RetryFailureRequest(SQLModel):
 
 
 class RetryFromFailureValidationResponse(SQLModel):
-    """Pre-retry validation verdict (POST /executions/{id}/validate-retry-from-failure)."""
+    """Retry preview (GET /executions/{id}/retry-from-failure-preview)."""
 
     eligible: bool = Field(description="Whether the retry is allowed to proceed")
     reason: str | None = Field(default=None, description="Rejection reason when eligible is false, null otherwise")

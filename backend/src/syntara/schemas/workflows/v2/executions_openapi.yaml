@@ -254,11 +254,11 @@ paths:
         '500':
           $ref: '../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError'
 
-  /executions/{execution_id}/validate-retry-from-failure:
-    post:
-      summary: Validate retry from failure
-      description: Validate that an execution can be retryed from the given failure points. Checks execution state, failure-point eligibility, converge-mootness, the retained-version guard, the sanitized-output guard, and any supplied input parameter overrides. Returns a pass/fail verdict without mutating any state.
-      operationId: validate_retry_from_failure
+  /executions/{execution_id}/retry-from-failure-preview:
+    get:
+      summary: Preview retry from failure
+      description: "Report whether an execution can be retried from its failure points, and what would re-run. Returns the eligible retry points, the re-run step count for each of them, and the deduplicated total across all of them. Purely informational: the failure-point selection and any input parameter overrides are supplied to the retry endpoint, which re-validates them independently and rejects anything unusable. Never mutates any state."
+      operationId: retry_from_failure_preview
       tags:
         - Executions
       security:
@@ -274,15 +274,9 @@ paths:
             type: string
             format: uuid
             title: Execution Id
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/RetryFailureValidateRequest'
       responses:
         '200':
-          description: Retry validation verdict
+          description: Retry preview
           content:
             application/json:
               schema:
@@ -495,8 +489,6 @@ components:
     ExecutionCreate:
       $ref: ./shared-schemas.yaml#/components/schemas/ExecutionCreate
 
-    RetryFailureValidateRequest:
-      $ref: ./shared-schemas.yaml#/components/schemas/RetryFailureValidateRequest
 
     RetryFailureRequest:
       $ref: ./shared-schemas.yaml#/components/schemas/RetryFailureRequest

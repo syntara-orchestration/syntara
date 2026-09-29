@@ -58,7 +58,7 @@ from syntara.workflows.models.execution import (
 from syntara.workflows.models.workflow import Workflow
 from syntara.workflows.models.workflow_definition import WorkflowDefinition
 from syntara.workflows.models.workflow_version import WorkflowVersion
-from syntara.workflows.services.retry_validation import _state_reason, validate_retry_from_failure
+from syntara.workflows.services.retry_validation import RetryValidation, _state_reason, validate_retry_from_failure
 from syntara.workflows.utils.workflow_metadata import build_workflow_metadata, resolve_user_display_name
 from syntara.workflows.workflow_engine.models.workflow_definition import NodeType, resolve_trigger_node
 from syntara.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
@@ -1254,33 +1254,9 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
             retried_from_execution_id=original.id,
         )
 
-    async def validate_retry_from_failure(
-        self,
-        execution_id: UUID,
-        failure_point_ids: list[str],
-        input_parameter_overrides: dict[str, dict[str, Any]] | None = None,
-    ) -> RetryFromFailureValidationResponse:
-        """Validate a retry without mutating any state (AAP-92820).
-
-        Runs the shared pre-retry validation chain (state guard,
-        failure-point eligibility, converge-mootness, retained-version guard,
-        sanitized-output guard, input-override guard) and returns the verdict
-        for the UI to surface before the user commits.
-
-        Raises:
-            ExecutionNotFoundError: If the source execution is gone.
-
-        """
-        validation = await validate_retry_from_failure(
-            self.session, execution_id, failure_point_ids, input_parameter_overrides
-        )
-        logger.info(
-            "Retry validation",
-            execution_id=execution_id,
-            eligible=validation.eligible,
-            reason=validation.reason,
-            override_node_ids=sorted(input_parameter_overrides or {}),
-        )
+    @staticmethod
+    def _to_preview_response(validation: RetryValidation) -> RetryFromFailureValidationResponse:
+        """Map the internal validation verdict onto the preview response model."""
         return RetryFromFailureValidationResponse(
             eligible=validation.eligible,
             reason=validation.reason,
@@ -1291,6 +1267,35 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
             step_count_by_eligible_point=validation.step_count_by_eligible_point,
             total_step_count=validation.total_step_count,
         )
+
+    async def preview_retry_from_failure(self, execution_id: UUID) -> RetryFromFailureValidationResponse:
+        """Report whether this execution can be retried, and what would re-run (AAP-92820).
+
+        Backs ``GET /executions/{id}/retry-from-failure-preview``. Takes no
+        failure-point selection or overrides: the operator has not chosen any
+        yet, so this reports the default — every currently failed node. The
+        re-run counts for an explicit subset are not derivable from the
+        per-point counts when branches converge into a shared tail, so the UI
+        surfaces exactly what is returned here and lets the retry endpoint
+        reject an unusable selection.
+
+        Never mutates any state. The same validation chain runs again inside
+        :meth:`retry_from_failure` for the actual selection, so this preview
+        can never be the authority on whether a retry will succeed.
+
+        Raises:
+            ExecutionNotFoundError: If the source execution is gone.
+
+        """
+        validation = await validate_retry_from_failure(self.session, execution_id, [])
+        logger.info(
+            "Retry preview",
+            execution_id=execution_id,
+            eligible=validation.eligible,
+            reason=validation.reason,
+            eligible_point_count=len(validation.failure_point_ids),
+        )
+        return self._to_preview_response(validation)
 
     async def retry_from_failure(
         self,
@@ -1327,9 +1332,21 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
             ExecutionNotRetryableFromFailureError: If validation rejects the retry
 
         """
-        validation = await self.validate_retry_from_failure(execution_id, failure_point_ids, input_parameter_overrides)
+        # Re-validates the actual selection rather than trusting any earlier preview:
+        # the preview reports the default (all failed nodes) and cannot speak for a
+        # subset or for the supplied overrides.
+        validation = await validate_retry_from_failure(
+            self.session, execution_id, failure_point_ids, input_parameter_overrides
+        )
         if not validation.eligible:
             raise ExecutionNotRetryableFromFailureError(execution_id, validation.reason or "retry validation failed")
+        logger.info(
+            "Retry validation",
+            execution_id=execution_id,
+            eligible=validation.eligible,
+            failure_point_ids=validation.failure_point_ids,
+            override_node_ids=sorted(input_parameter_overrides or {}),
+        )
 
         result = await self.session.exec(select(Execution).where(Execution.id == execution_id))
         source = result.one_or_none()

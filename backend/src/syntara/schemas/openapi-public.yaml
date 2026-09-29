@@ -24250,11 +24250,11 @@ paths:
                 detail: An unexpected error occurred
                 code: INTERNAL_ERROR
                 retryable: true
-  /executions/{execution_id}/validate-retry-from-failure:
-    post:
-      summary: Validate retry from failure
-      description: Validate that an execution can be retryed from the given failure points. Checks execution state, failure-point eligibility, converge-mootness, the retained-version guard, the sanitized-output guard, and any supplied input parameter overrides. Returns a pass/fail verdict without mutating any state.
-      operationId: validate_retry_from_failure
+  /executions/{execution_id}/retry-from-failure-preview:
+    get:
+      summary: Preview retry from failure
+      description: 'Report whether an execution can be retried from its failure points, and what would re-run. Returns the eligible retry points, the re-run step count for each of them, and the deduplicated total across all of them. Purely informational: the failure-point selection and any input parameter overrides are supplied to the retry endpoint, which re-validates them independently and rejects anything unusable. Never mutates any state.'
+      operationId: retry_from_failure_preview
       tags:
         - Executions
       security:
@@ -24270,15 +24270,9 @@ paths:
             type: string
             format: uuid
             title: Execution Id
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/RetryFailureValidateRequest'
       responses:
         '200':
-          description: Retry validation verdict
+          description: Retry preview
           content:
             application/json:
               schema:
@@ -34447,24 +34441,6 @@ components:
           title: Use Published
           description: If true, run the published version instead of the current version
           default: false
-    RetryFailureValidateRequest:
-      type: object
-      title: RetryFailureValidateRequest
-      description: Request body for POST /executions/{id}/validate-retry-from-failure.
-      properties:
-        failure_point_ids:
-          type: array
-          items:
-            type: string
-          title: Failure Point Ids
-          description: 'Failure points to retry from (node IDs from the source execution). Empty selects the default: all currently failed nodes.'
-        input_parameter_overrides:
-          type: object
-          additionalProperties:
-            type: object
-            additionalProperties: true
-          title: Input Parameter Overrides
-          description: Input parameter overrides for the retry's starting nodes, keyed by node id then parameter name (SDP AC-14/R10c). Each override replaces the value the node would otherwise receive, after upstream outputs are injected, so the supplied value is what executes. Parameter names must already exist on that node in the retained workflow version, and node ids must be among the retry's starting points; anything else is rejected. Overrides apply to this retry run only — the workflow definition is never modified, and a permanent change requires editing, saving, and publishing the workflow.
     RetryFailureRequest:
       type: object
       title: RetryFailureRequest
@@ -34486,7 +34462,7 @@ components:
     RetryFromFailureValidationResponse:
       type: object
       title: RetryFromFailureValidationResponse
-      description: Pre-retry validation verdict (POST /executions/{id}/validate-retry-from-failure).
+      description: Retry preview (GET /executions/{id}/retry-from-failure-preview).
       required:
         - eligible
       properties:

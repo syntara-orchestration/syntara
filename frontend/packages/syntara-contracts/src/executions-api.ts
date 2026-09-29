@@ -88,20 +88,20 @@ export interface paths {
     patch?: never
     trace?: never
   }
-  '/executions/{execution_id}/validate-retry-from-failure': {
+  '/executions/{execution_id}/retry-from-failure-preview': {
     parameters: {
       query?: never
       header?: never
       path?: never
       cookie?: never
     }
-    get?: never
-    put?: never
     /**
-     * Validate retry from failure
-     * @description Validate that an execution can be retryed from the given failure points. Checks execution state, failure-point eligibility, converge-mootness, the retained-version guard, the sanitized-output guard, and any supplied input parameter overrides. Returns a pass/fail verdict without mutating any state.
+     * Preview retry from failure
+     * @description Report whether an execution can be retried from its failure points, and what would re-run. Returns the eligible retry points, the re-run step count for each of them, and the deduplicated total across all of them. Purely informational: the failure-point selection and any input parameter overrides are supplied to the retry endpoint, which re-validates them independently and rejects anything unusable. Never mutates any state.
      */
-    post: operations['validate_retry_from_failure']
+    get: operations['retry_from_failure_preview']
+    put?: never
+    post?: never
     delete?: never
     options?: never
     head?: never
@@ -534,26 +534,6 @@ export interface components {
       use_published?: boolean
     }
     /**
-     * RetryFailureValidateRequest
-     * @description Request body for POST /executions/{id}/validate-retry-from-failure.
-     */
-    RetryFailureValidateRequest: {
-      /**
-       * Failure Point Ids
-       * @description Failure points to retry from (node IDs from the source execution). Empty selects the default: all currently failed nodes.
-       */
-      failure_point_ids?: string[]
-      /**
-       * Input Parameter Overrides
-       * @description Input parameter overrides for the retry's starting nodes, keyed by node id then parameter name (SDP AC-14/R10c). Each override replaces the value the node would otherwise receive, after upstream outputs are injected, so the supplied value is what executes. Parameter names must already exist on that node in the retained workflow version, and node ids must be among the retry's starting points; anything else is rejected. Overrides apply to this retry run only — the workflow definition is never modified, and a permanent change requires editing, saving, and publishing the workflow.
-       */
-      input_parameter_overrides?: {
-        [key: string]: {
-          [key: string]: unknown
-        }
-      }
-    }
-    /**
      * RetryFailureRequest
      * @description Request body for POST /executions/{id}/retry-from-failure.
      */
@@ -575,7 +555,7 @@ export interface components {
     }
     /**
      * RetryFromFailureValidationResponse
-     * @description Pre-retry validation verdict (POST /executions/{id}/validate-retry-from-failure).
+     * @description Retry preview (GET /executions/{id}/retry-from-failure-preview).
      */
     RetryFromFailureValidationResponse: {
       /**
@@ -2279,7 +2259,7 @@ export interface operations {
       500: components['responses']['InternalServerError']
     }
   }
-  validate_retry_from_failure: {
+  retry_from_failure_preview: {
     parameters: {
       query?: never
       header?: never
@@ -2288,13 +2268,9 @@ export interface operations {
       }
       cookie?: never
     }
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['RetryFailureValidateRequest']
-      }
-    }
+    requestBody?: never
     responses: {
-      /** @description Retry validation verdict */
+      /** @description Retry preview */
       200: {
         headers: {
           [name: string]: unknown

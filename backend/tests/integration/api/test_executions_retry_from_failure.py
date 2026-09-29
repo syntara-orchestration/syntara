@@ -238,18 +238,21 @@ async def _eligible_execution(session: AsyncSession, workflow: Workflow, user: U
 
 
 @pytest.mark.asyncio
-class TestValidateRetry:
-    """Integration tests for POST /executions/{execution_id}/validate-retry-from-failure."""
+class TestPreviewRetryFromFailure:
+    """Integration tests for GET /executions/{execution_id}/retry-from-failure-preview.
 
-    async def test_validate_pass(
+    The preview takes no failure-point selection, so every case here exercises the default
+    (all currently failed nodes). Fixtures below each have a single failed node, which makes the
+    default equivalent to an explicit one-shot selection. Explicit-selection behaviour is covered
+    in TestRetryExecution, which is the only endpoint that accepts one.
+    """
+
+    async def test_preview_pass(
         self, auth_client: AsyncClient, test_db_session: AsyncSession, test_user: User, test_workflow: Workflow
     ) -> None:
         execution = await _eligible_execution(test_db_session, test_workflow, test_user)
 
-        response = await auth_client.post(
-            f"/api/v1/executions/{execution.id}/validate-retry-from-failure",
-            json={"failure_point_ids": ["step_2"]},
-        )
+        response = await auth_client.get(f"/api/v1/executions/{execution.id}/retry-from-failure-preview")
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
@@ -259,16 +262,13 @@ class TestValidateRetry:
         assert data["step_count_by_eligible_point"] == {"step_2": 2}
         assert data["total_step_count"] == 2
 
-    async def test_validate_empty_selection_defaults_to_all_failed(
+    async def test_preview_empty_selection_defaults_to_all_failed(
         self, auth_client: AsyncClient, test_db_session: AsyncSession, test_user: User, test_workflow: Workflow
     ) -> None:
         """SDP R11/AC-15: an empty selection is the default (all currently failed nodes), not an error."""
         execution = await _eligible_execution(test_db_session, test_workflow, test_user)
 
-        response = await auth_client.post(
-            f"/api/v1/executions/{execution.id}/validate-retry-from-failure",
-            json={"failure_point_ids": []},
-        )
+        response = await auth_client.get(f"/api/v1/executions/{execution.id}/retry-from-failure-preview")
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
@@ -277,7 +277,7 @@ class TestValidateRetry:
         assert data["auto_included_node_ids"] == []
         assert data["sanitized_replacements"] == {}
 
-    async def test_validate_rejects_non_retryable_state(
+    async def test_preview_rejects_non_retryable_state(
         self, auth_client: AsyncClient, test_db_session: AsyncSession, test_user: User, test_workflow: Workflow
     ) -> None:
         execution = await _eligible_execution(test_db_session, test_workflow, test_user)
@@ -285,30 +285,14 @@ class TestValidateRetry:
         test_db_session.add(execution)
         await test_db_session.commit()
 
-        response = await auth_client.post(
-            f"/api/v1/executions/{execution.id}/validate-retry-from-failure",
-            json={"failure_point_ids": ["step_2"]},
-        )
+        response = await auth_client.get(f"/api/v1/executions/{execution.id}/retry-from-failure-preview")
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data["eligible"] is False
         assert "completed" in data["reason"]
 
-    async def test_validate_rejects_unknown_failure_point(
-        self, auth_client: AsyncClient, test_db_session: AsyncSession, test_user: User, test_workflow: Workflow
-    ) -> None:
-        execution = await _eligible_execution(test_db_session, test_workflow, test_user)
-
-        response = await auth_client.post(
-            f"/api/v1/executions/{execution.id}/validate-retry-from-failure",
-            json={"failure_point_ids": ["step_3"]},
-        )
-
-        assert response.status_code == status.HTTP_200_OK
-        assert response.json()["eligible"] is False
-
-    async def test_validate_ignores_later_definition_changes(
+    async def test_preview_ignores_later_definition_changes(
         self, auth_client: AsyncClient, test_db_session: AsyncSession, test_user: User, test_workflow: Workflow
     ) -> None:
         """SDP R10: retry is pinned to the retained version; later saves never affect it."""
@@ -327,51 +311,13 @@ class TestValidateRetry:
         ]
         await _save_new_version(test_db_session, test_workflow, test_user, [changed[0], gate, *changed[1:]], gate_edges)
 
-        response = await auth_client.post(
-            f"/api/v1/executions/{execution.id}/validate-retry-from-failure",
-            json={"failure_point_ids": ["step_2"]},
-        )
+        response = await auth_client.get(f"/api/v1/executions/{execution.id}/retry-from-failure-preview")
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data["eligible"] is True
 
-    async def test_validate_rejects_sanitized_upstream_output(
-        self, auth_client: AsyncClient, test_db_session: AsyncSession, test_user: User, test_workflow: Workflow
-    ) -> None:
-        execution = await _eligible_execution(test_db_session, test_workflow, test_user)
-        await _add_completed_activity(test_db_session, execution, "step_1", {"token": "[REDACTED]", "stderr": ""})
-        # step_2 really consumed step_1's output: reference it in this version's parameters.
-        result = await test_db_session.exec(
-            select(WorkflowVersion).where(
-                WorkflowVersion.workflow_id == test_workflow.id,
-                WorkflowVersion.version == test_workflow.current_version,
-            )
-        )
-        version = result.one()
-        definition = dict(version.workflow_definition)
-        definition["nodes"] = [
-            dict(node, parameters={**node.get("parameters", {}), "input_ref": "${step_1.token}"})
-            if node.get("id") == "step_2"
-            else node
-            for node in definition.get("nodes", [])
-        ]
-        version.workflow_definition = definition
-        test_db_session.add(version)
-        await test_db_session.commit()
-
-        response = await auth_client.post(
-            f"/api/v1/executions/{execution.id}/validate-retry-from-failure",
-            json={"failure_point_ids": ["step_2"]},
-        )
-
-        assert response.status_code == status.HTTP_200_OK
-        data = response.json()
-        assert data["eligible"] is False
-        assert data["sanitized_node_ids"] == ["step_1"]
-        assert data["sanitized_replacements"] == {"step_2": ["step_1"]}
-
-    async def test_validate_default_selection_auto_includes_sanitized_dependency(
+    async def test_preview_default_selection_auto_includes_sanitized_dependency(
         self, auth_client: AsyncClient, test_db_session: AsyncSession, test_user: User, test_workflow: Workflow
     ) -> None:
         """SDP AC-15/R9a Q4: with the default selection, a sanitized dependency is auto-included, not rejected."""
@@ -395,10 +341,7 @@ class TestValidateRetry:
         test_db_session.add(version)
         await test_db_session.commit()
 
-        response = await auth_client.post(
-            f"/api/v1/executions/{execution.id}/validate-retry-from-failure",
-            json={"failure_point_ids": []},
-        )
+        response = await auth_client.get(f"/api/v1/executions/{execution.id}/retry-from-failure-preview")
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
@@ -409,35 +352,29 @@ class TestValidateRetry:
         assert data["sanitized_node_ids"] == []
         assert data["sanitized_replacements"] == {"step_2": ["step_1"]}
 
-    async def test_validate_rejects_failure_under_completed_converge(
+    async def test_preview_rejects_failure_under_completed_converge(
         self, auth_client: AsyncClient, test_db_session: AsyncSession, test_user: User, test_workflow: Workflow
     ) -> None:
         execution = await _converge_execution(test_db_session, test_workflow, test_user, ActivityStatus.COMPLETED)
 
-        response = await auth_client.post(
-            f"/api/v1/executions/{execution.id}/validate-retry-from-failure",
-            json={"failure_point_ids": ["step_a"]},
-        )
+        response = await auth_client.get(f"/api/v1/executions/{execution.id}/retry-from-failure-preview")
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data["eligible"] is False
         assert "conv_1" in data["reason"]
 
-    async def test_validate_allows_failure_under_failed_converge(
+    async def test_preview_allows_failure_under_failed_converge(
         self, auth_client: AsyncClient, test_db_session: AsyncSession, test_user: User, test_workflow: Workflow
     ) -> None:
         execution = await _converge_execution(test_db_session, test_workflow, test_user, ActivityStatus.FAILED)
 
-        response = await auth_client.post(
-            f"/api/v1/executions/{execution.id}/validate-retry-from-failure",
-            json={"failure_point_ids": ["step_a"]},
-        )
+        response = await auth_client.get(f"/api/v1/executions/{execution.id}/retry-from-failure-preview")
 
         assert response.status_code == status.HTTP_200_OK
         assert response.json()["eligible"] is True
 
-    async def test_validate_allows_clean_field_despite_marker_elsewhere(
+    async def test_preview_allows_clean_field_despite_marker_elsewhere(
         self, auth_client: AsyncClient, test_db_session: AsyncSession, test_user: User, test_workflow: Workflow
     ) -> None:
         nodes = [
@@ -453,21 +390,15 @@ class TestValidateRetry:
             test_db_session, execution, "step_1", {"status_code": 200, "password": "[REDACTED]", "stderr": ""}
         )
 
-        response = await auth_client.post(
-            f"/api/v1/executions/{execution.id}/validate-retry-from-failure",
-            json={"failure_point_ids": ["step_2"]},
-        )
+        response = await auth_client.get(f"/api/v1/executions/{execution.id}/retry-from-failure-preview")
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data["eligible"] is True
         assert data["sanitized_node_ids"] == []
 
-    async def test_validate_missing_execution_returns_404(self, auth_client: AsyncClient) -> None:
-        response = await auth_client.post(
-            f"/api/v1/executions/{uuid.uuid4()}/validate-retry-from-failure",
-            json={"failure_point_ids": ["step_2"]},
-        )
+    async def test_preview_missing_execution_returns_404(self, auth_client: AsyncClient) -> None:
+        response = await auth_client.get(f"/api/v1/executions/{uuid.uuid4()}/retry-from-failure-preview")
 
         assert response.status_code == status.HTTP_404_NOT_FOUND
         assert_error_data(
@@ -640,3 +571,84 @@ class TestRetryExecution:
         assert response.status_code == status.HTTP_201_CREATED
         _, kwargs = mock_temporal_service.start_workflow.call_args
         assert kwargs["workflow_metadata"]["retry"]["input_parameter_overrides"] == {}
+
+    async def test_retry_rejects_unknown_failure_point_returns_409(
+        self, auth_client: AsyncClient, test_db_session: AsyncSession, test_user: User, test_workflow: Workflow
+    ) -> None:
+        """Only the retry endpoint accepts a selection, so it owns selection validation.
+
+        The preview takes no selection and therefore cannot reject an unknown point; that
+        check lives here, where a caller can actually supply one.
+        """
+        execution = await _eligible_execution(test_db_session, test_workflow, test_user)
+
+        response = await auth_client.post(
+            f"/api/v1/executions/{execution.id}/retry-from-failure",
+            json={"failure_point_ids": ["step_3"]},
+        )
+
+        assert response.status_code == status.HTTP_409_CONFLICT
+        data = response.json()
+        assert data["code"] == "EXECUTION_NOT_RETRYABLE_FROM_FAILURE"
+        assert "step_3" in data["detail"]
+
+    async def test_retry_rejects_explicit_selection_downstream_of_sanitized_returns_409(
+        self, auth_client: AsyncClient, test_db_session: AsyncSession, test_user: User, test_workflow: Workflow
+    ) -> None:
+        """SDP AC-15/R9a explicit path: naming a point downstream of a sanitized step rejects.
+
+        The default selection auto-includes the sanitized step instead (covered by
+        test_preview_default_selection_auto_includes_sanitized_dependency), so this explicit
+        rejection can only be exercised through the retry endpoint.
+        """
+        execution = await _eligible_execution(test_db_session, test_workflow, test_user)
+        await _add_completed_activity(test_db_session, execution, "step_1", {"token": "[REDACTED]", "stderr": ""})
+        result = await test_db_session.exec(
+            select(WorkflowVersion).where(
+                WorkflowVersion.workflow_id == test_workflow.id,
+                WorkflowVersion.version == test_workflow.current_version,
+            )
+        )
+        version = result.one()
+        definition = dict(version.workflow_definition)
+        definition["nodes"] = [
+            dict(node, parameters={**node.get("parameters", {}), "input_ref": "${step_1.token}"})
+            if node.get("id") == "step_2"
+            else node
+            for node in definition.get("nodes", [])
+        ]
+        version.workflow_definition = definition
+        test_db_session.add(version)
+        await test_db_session.commit()
+
+        response = await auth_client.post(
+            f"/api/v1/executions/{execution.id}/retry-from-failure",
+            json={"failure_point_ids": ["step_2"]},
+        )
+
+        assert response.status_code == status.HTTP_409_CONFLICT
+        data = response.json()
+        assert data["code"] == "EXECUTION_NOT_RETRYABLE_FROM_FAILURE"
+        assert "step_1" in data["detail"]
+
+    async def test_preview_rejects_a_body(
+        self, auth_client: AsyncClient, test_db_session: AsyncSession, test_user: User, test_workflow: Workflow
+    ) -> None:
+        """The preview takes no selection: a supplied one is ignored, never honoured.
+
+        Locks in that a GET carries no failure-point input, so the endpoint can never be
+        coerced into validating a subset whose re-run count it did not compute.
+        """
+        execution = await _eligible_execution(test_db_session, test_workflow, test_user)
+
+        response = await auth_client.get(
+            f"/api/v1/executions/{execution.id}/retry-from-failure-preview",
+            params={"failure_point_ids": "step_3"},
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        # The unknown point in the query string is not a selection, so eligibility is unaffected
+        # and the reported set is still the default (all currently failed nodes).
+        assert data["eligible"] is True
+        assert data["failure_point_ids"] == ["step_2"]

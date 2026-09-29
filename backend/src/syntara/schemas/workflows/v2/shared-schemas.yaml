@@ -1014,36 +1014,6 @@ components:
           title: Trigger Node Id
           description: Trigger node ID to start from
 
-    RetryFailureValidateRequest:
-      type: object
-      title: RetryFailureValidateRequest
-      description: Request body for POST /executions/{id}/validate-retry-from-failure.
-      properties:
-        failure_point_ids:
-          type: array
-          items:
-            type: string
-          title: Failure Point Ids
-          description: >-
-            Failure points to retry from (node IDs from the source execution).
-            Empty selects the default: all currently failed nodes.
-        input_parameter_overrides:
-          type: object
-          additionalProperties:
-            type: object
-            additionalProperties: true
-          title: Input Parameter Overrides
-          description: >-
-            Input parameter overrides for the retry's starting nodes, keyed by
-            node id then parameter name (SDP AC-14/R10c). Each override replaces
-            the value the node would otherwise receive, after upstream outputs
-            are injected, so the supplied value is what executes. Parameter
-            names must already exist on that node in the retained workflow
-            version, and node ids must be among the retry's starting points;
-            anything else is rejected. Overrides apply to this retry run only —
-            the workflow definition is never modified, and a permanent change
-            requires editing, saving, and publishing the workflow.
-
     RetryFailureRequest:
       type: object
       title: RetryFailureRequest
@@ -1079,7 +1049,7 @@ components:
     RetryFromFailureValidationResponse:
       type: object
       title: RetryFromFailureValidationResponse
-      description: Pre-retry validation verdict (POST /executions/{id}/validate-retry-from-failure).
+      description: Retry preview (GET /executions/{id}/retry-from-failure-preview).
       required:
         - eligible
       properties:
