@@ -188,12 +188,6 @@ class ActivitySyncEventProcessorMixin:
             update["status"] = ActivityStatus.FAILED
             timed_out_at = ensure_timezone_aware(event.event_time)
             update["completed_at"] = timed_out_at
-            if attrs.failure:
-                logger.warning(
-                    "Activity timed out (raw Temporal message)",
-                    activity_id=update["activity_id"],
-                    raw_message=attrs.failure.message,
-                )
             activity_def = metadata.activity_definitions_map.get(update["activity_id"], {})
             update["error_details"] = build_timeout_error_message(
                 step_name=activity_def.get("name") or update["activity_id"],
