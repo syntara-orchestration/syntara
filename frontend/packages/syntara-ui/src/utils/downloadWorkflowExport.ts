@@ -61,11 +61,13 @@ export function downloadWorkflowDefinition(definition: Record<string, unknown>, 
   triggerDownload(blob, `${sanitizeFilename(workflowName)}.json`)
 }
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10 MB
+export const MAX_WORKFLOW_IMPORT_FILE_SIZE_BYTES = 10 * 1024 * 1024 // 10 MB
+
+export const WORKFLOW_IMPORT_FILE_TOO_LARGE_MESSAGE = 'File is too large. Maximum size is 10 MB.'
 
 export function validateFileSize(file: File): void {
-  if (file.size > MAX_FILE_SIZE) {
-    throw new Error('File is too large. Maximum size is 10 MB.')
+  if (file.size > MAX_WORKFLOW_IMPORT_FILE_SIZE_BYTES) {
+    throw new Error(WORKFLOW_IMPORT_FILE_TOO_LARGE_MESSAGE)
   }
 }
 

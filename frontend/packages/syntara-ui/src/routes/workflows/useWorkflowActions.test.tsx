@@ -22,7 +22,7 @@ function mockWorkflow(overrides: Partial<Workflow> = {}): Workflow {
     is_enabled: true,
     created_at: '2024-01-01T00:00:00Z',
     updated_at: '2024-01-01T00:00:00Z',
-    created_by: 'test-user',
+    created_by: { id: 'u-1', name: 'test-user', type: 'user' },
     project_id: 'proj-1',
     ...overrides,
   }
@@ -277,7 +277,7 @@ describe('useWorkflowActions', () => {
       vi.mocked(executionsFetchClient.POST).mockResolvedValue({
         data: { id: 'exec-1' },
         error: undefined,
-      } as never)
+      })
 
       const { result } = renderHook(
         () =>
@@ -318,11 +318,11 @@ describe('useWorkflowActions', () => {
         },
         error: undefined,
         response: new Response(),
-      } as never)
+      })
       vi.mocked(executionsFetchClient.POST).mockResolvedValue({
         data: { id: 'exec-2' },
         error: undefined,
-      } as never)
+      })
 
       const { result } = renderHook(
         () =>
@@ -357,7 +357,7 @@ describe('useWorkflowActions', () => {
         },
         error: undefined,
         response: new Response(),
-      } as never)
+      })
 
       const { result } = renderHook(
         () =>

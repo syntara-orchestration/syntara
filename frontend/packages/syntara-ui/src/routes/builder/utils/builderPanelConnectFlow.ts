@@ -3,7 +3,7 @@ import type { Node, ReactFlowInstance } from '@xyflow/react'
 
 import { FlowNodeType } from '../../../constants'
 import { useWorkflowStore } from '../../../stores/useWorkflowStore'
-import type { FlowPosition } from '../types'
+import type { OnAddNodeFromEdge } from '../types'
 
 import { EdgeFactory } from './EdgeFactory'
 import { isSwitchCasePort } from './switchCaseHelpers'
@@ -48,13 +48,14 @@ function removeButtonEdgeClass(nodes: Node[], sourceId: string): Node[] {
   })
 }
 
-function applyFirstEdgeAfterPanelConnect(
-  eds: EdgeType[],
-  sourceId: string,
-  capturedSourceHandle: string | undefined,
-  capturedEdgeIdToReplace: string | null | undefined,
+function applyFirstEdgeAfterPanelConnect(params: {
+  eds: EdgeType[]
+  sourceId: string
+  capturedSourceHandle: string | undefined
+  capturedEdgeIdToReplace: string | null | undefined
   newEdge: EdgeType
-): EdgeType[] {
+}): EdgeType[] {
+  const { eds, sourceId, capturedSourceHandle, capturedEdgeIdToReplace, newEdge } = params
   const filtered = EdgeFactory.removeButtonEdge(sourceId, eds, capturedSourceHandle)
   const withoutOldEdge = capturedEdgeIdToReplace ? filtered.filter((e) => e.id !== capturedEdgeIdToReplace) : filtered
   return EdgeFactory.addEdge(newEdge, withoutOldEdge)
@@ -91,13 +92,7 @@ export type PanelConnectCapturedState = {
   capturedTargetHandle: string | undefined | null
   capturedEdgeIdToReplace: string | null | undefined
   capturedTargetNodeId: string | null | undefined
-  onAddNodeFromEdge: (
-    sourceId: string,
-    targetId?: string,
-    edgeId?: string,
-    handle?: string,
-    desiredPosition?: FlowPosition
-  ) => void
+  onAddNodeFromEdge: OnAddNodeFromEdge
 }
 
 /**
@@ -152,7 +147,15 @@ export function applyConnectFromPanelWhenTargetMeasured(
     onAddNode: onAddNodeFromEdge,
   })
 
-  flow.setEdges((eds) => applyFirstEdgeAfterPanelConnect(eds, sourceId, sourceHandle, capturedEdgeIdToReplace, newEdge))
+  flow.setEdges((eds) =>
+    applyFirstEdgeAfterPanelConnect({
+      eds,
+      sourceId,
+      capturedSourceHandle: sourceHandle,
+      capturedEdgeIdToReplace,
+      newEdge,
+    })
+  )
 
   if (capturedEdgeIdToReplace && capturedTargetNodeId) {
     const secondEdge = EdgeFactory.createEdge({

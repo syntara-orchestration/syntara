@@ -35,7 +35,7 @@ const mockCredentials: ServiceAccountCredentialRead[] = [
     grace_period_seconds: 0,
     expires_at: null,
     last_used_at: '2024-06-15T10:00:00Z',
-    created_by: 'admin',
+    created_by: { id: 'u-004', name: 'admin', type: 'user' },
     updated_by: null,
     created_at: '2024-01-01T00:00:00Z',
     updated_at: '2024-01-01T00:00:00Z',
@@ -49,7 +49,7 @@ const mockCredentials: ServiceAccountCredentialRead[] = [
     grace_period_seconds: 0,
     expires_at: '2025-12-31T23:59:59Z',
     last_used_at: null,
-    created_by: 'admin',
+    created_by: { id: 'u-004', name: 'admin', type: 'user' },
     updated_by: null,
     created_at: '2024-02-01T00:00:00Z',
     updated_at: '2024-02-01T00:00:00Z',
@@ -128,7 +128,7 @@ describe('CredentialsTab', () => {
   beforeEach(() => {
     vi.clearAllMocks()
 
-    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } } as never)
+    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } })
 
     for (const action of ['create', 'update', 'delete', 'rotate_secret']) {
       queryClient.setQueryData(['authz', 'can_i', { action, resource_type: 'service_account' }], {
@@ -137,7 +137,7 @@ describe('CredentialsTab', () => {
     }
 
     vi.mocked(accessClient.useQuery).mockReturnValue(
-      buildQueryResult({ resources: mockCredentials, max_lifetime_days: 180 }) as never
+      buildQueryResult({ resources: mockCredentials, max_lifetime_days: 180 })
     )
 
     mockMutations = setupMutationMocks()
@@ -165,7 +165,7 @@ describe('CredentialsTab', () => {
   })
 
   it('shows empty state when there are no credentials', () => {
-    vi.mocked(accessClient.useQuery).mockReturnValue(buildQueryResult({ resources: [] }) as never)
+    vi.mocked(accessClient.useQuery).mockReturnValue(buildQueryResult({ resources: [] }))
 
     render(<CredentialsTab serviceAccountId="sa-1" serviceAccountName="deploy-bot" resourceProject="proj-1" />, {
       wrapper,
@@ -245,7 +245,7 @@ describe('CredentialsTab', () => {
 
       const ackCheckbox = screen.getByRole('checkbox', { name: /i understand/i })
       await user.click(ackCheckbox)
-      await user.click(screen.getByRole('button', { name: 'Delete' }))
+      await user.click(screen.getByRole('button', { name: 'Delete credential' }))
       expect(mockMutations.delete).toHaveBeenCalled()
     })
   })
@@ -350,7 +350,7 @@ describe('CredentialsTab', () => {
           grace_period_seconds: 3600,
         },
       ]
-      vi.mocked(accessClient.useQuery).mockReturnValue(buildQueryResult({ resources: credsWithGracePeriod }) as never)
+      vi.mocked(accessClient.useQuery).mockReturnValue(buildQueryResult({ resources: credsWithGracePeriod }))
 
       const user = userEvent.setup()
       render(<CredentialsTab serviceAccountId="sa-1" resourceProject="proj-1" />, { wrapper })
@@ -402,7 +402,7 @@ describe('CredentialsTab', () => {
         expect(screen.getByText('Disable credential?')).toBeInTheDocument()
       })
 
-      await user.click(screen.getByRole('button', { name: 'Disable' }))
+      await user.click(screen.getByRole('button', { name: 'Disable credential' }))
       expect(mockMutations.disable).toHaveBeenCalled()
     })
 
@@ -456,7 +456,7 @@ describe('CredentialsTab', () => {
         expect(screen.getByRole('heading', { name: 'Create credential' })).toBeInTheDocument()
       })
 
-      const createButton = screen.getByRole('button', { name: 'Create' })
+      const createButton = screen.getByRole('button', { name: 'Create credential' })
       await user.click(createButton)
 
       expect(mockMutations.create).toHaveBeenCalled()
@@ -474,7 +474,7 @@ describe('CredentialsTab', () => {
       }))
 
       vi.mocked(accessClient.useQuery).mockReturnValue(
-        buildQueryResult({ resources: maxCreds, max_credentials: 10, total_credentials: 10 }) as never
+        buildQueryResult({ resources: maxCreds, max_credentials: 10, total_credentials: 10 })
       )
 
       render(<CredentialsTab serviceAccountId="sa-1" serviceAccountName="deploy-bot" resourceProject="proj-1" />, {
@@ -493,7 +493,7 @@ describe('CredentialsTab', () => {
       }))
 
       vi.mocked(accessClient.useQuery).mockReturnValue(
-        buildQueryResult({ resources: maxCreds, max_credentials: 10, total_credentials: 10 }) as never
+        buildQueryResult({ resources: maxCreds, max_credentials: 10, total_credentials: 10 })
       )
 
       const user = userEvent.setup()
@@ -582,7 +582,7 @@ describe('CredentialsTab', () => {
           isSuccess: false,
           error: new Error('Network error'),
           data: undefined,
-        }) as never
+        })
       )
 
       render(<CredentialsTab serviceAccountId="sa-1" serviceAccountName="deploy-bot" resourceProject="proj-1" />, {
@@ -614,7 +614,7 @@ describe('CredentialsTab', () => {
       }))
 
       vi.mocked(accessClient.useQuery).mockReturnValue(
-        buildQueryResult({ resources: maxCreds, max_credentials: 10, total_credentials: 10 }) as never
+        buildQueryResult({ resources: maxCreds, max_credentials: 10, total_credentials: 10 })
       )
 
       const { container } = render(
@@ -629,7 +629,7 @@ describe('CredentialsTab', () => {
     })
 
     it('has no accessibility violations in empty state', async () => {
-      vi.mocked(accessClient.useQuery).mockReturnValue(buildQueryResult({ resources: [] }) as never)
+      vi.mocked(accessClient.useQuery).mockReturnValue(buildQueryResult({ resources: [] }))
 
       const { container } = render(
         <CredentialsTab serviceAccountId="sa-1" serviceAccountName="deploy-bot" resourceProject="proj-1" />,

@@ -1,5 +1,5 @@
 ---
-schema_version: "2.0.0"
+schema_version: '2.0.0'
 name: converge-timeout-fail-test
 description: Test converge with timeout that fails when timeout is reached
 

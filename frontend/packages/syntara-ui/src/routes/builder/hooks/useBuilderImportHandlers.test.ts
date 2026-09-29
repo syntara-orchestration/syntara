@@ -133,7 +133,7 @@ describe('useBuilderImportHandlers', () => {
 
       const createCall = vi.mocked(params.createWorkflow).mock.calls[0]
       const onSuccess = createCall[1]?.onSuccess as (data: { id: string }) => void
-      act(() => onSuccess({ id: 'new-wf-1' } as never))
+      act(() => onSuccess({ id: 'new-wf-1' }))
 
       expect(setPendingImport).toHaveBeenCalledWith(null)
       expect(params.showSuccess).toHaveBeenCalledWith({
@@ -160,7 +160,7 @@ describe('useBuilderImportHandlers', () => {
             warning_count: 1,
             findings: [{ severity: 'warning', category: 'invalid_reference', message: 'LLM model was removed' }],
           },
-        } as never)
+        })
       )
 
       expect(params.showAlert).toHaveBeenCalledWith({

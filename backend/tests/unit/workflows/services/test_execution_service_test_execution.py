@@ -64,7 +64,16 @@ def _make_service(
     session = Mock(spec=AsyncSession)
     mock_result = Mock()
     mock_result.first = Mock(return_value=query_result)
-    session.exec = AsyncMock(return_value=mock_result)
+
+    def _exec(statement: object = None, *_args: object, **_kwargs: object) -> object:
+        # ExecutionService resolves created_by/updated_by after building the
+        # response; that lookup is the only query against ``principals``. No rows
+        # means the fields resolve to None, which these tests do not assert on.
+        if statement is not None and "principals" in str(statement).lower():
+            return []
+        return mock_result
+
+    session.exec = AsyncMock(side_effect=_exec)
     session.add = Mock()
     session.commit = AsyncMock()
 

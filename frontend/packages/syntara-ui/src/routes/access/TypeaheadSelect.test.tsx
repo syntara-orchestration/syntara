@@ -31,6 +31,30 @@ function getInput() {
 
 describe('TypeaheadSelect', () => {
   describe('Accessibility', () => {
+    it('places id on the input element for label association', () => {
+      renderSelect({ id: 'can-i-resource-type' })
+      expect(getInput()).toHaveAttribute('id', 'can-i-resource-type')
+    })
+
+    it('focuses input when associated label is clicked', async () => {
+      const user = userEvent.setup()
+      render(
+        <>
+          <label htmlFor="test-select">Resource type</label>
+          <TypeaheadSelect
+            id="test-select"
+            ariaLabel="Resource type"
+            options={defaultOptions}
+            selected=""
+            onChange={vi.fn()}
+          />
+        </>
+      )
+
+      await user.click(screen.getByText('Resource type'))
+      expect(getInput()).toHaveFocus()
+    })
+
     it('has no accessibility violations in default state', async () => {
       const { container } = renderSelect()
       const results = await axe(container)

@@ -76,7 +76,7 @@ nodes:
         echo "  - No special precautions needed"
 
   - id: summary
-    name: "Generate Weather Summary Report (${trigger.temperature})"
+    name: 'Generate Weather Summary Report (${trigger.temperature})'
     type: script
     parameters:
       language: bash

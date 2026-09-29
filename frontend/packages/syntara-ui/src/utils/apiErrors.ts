@@ -156,18 +156,18 @@ export function getErrorStatus(error: unknown): number | undefined {
 
   const err = error as ApiError
 
-  const direct = extractNumericStatus(err as unknown as Record<string, unknown>)
+  const direct = extractNumericStatus(err)
   if (direct !== undefined) return direct
 
   // openapi-fetch/openapi-react-query stores status in response.status
   if (err.response && typeof err.response === 'object') {
-    const responseStatus = extractNumericStatus(err.response as Record<string, unknown>)
+    const responseStatus = extractNumericStatus(err.response)
     if (responseStatus !== undefined) return responseStatus
   }
 
   // openapi-fetch nested cause wrapper
   if (err.cause && typeof err.cause === 'object') {
-    const causeStatus = extractNumericStatus(err.cause as Record<string, unknown>)
+    const causeStatus = extractNumericStatus(err.cause)
     if (causeStatus !== undefined) return causeStatus
   }
 
@@ -583,7 +583,7 @@ function extractEmbeddedErrorTitle(err: ApiError): string | undefined {
 
 export function getErrorTitle(error: unknown): string {
   if (error && typeof error === 'object') {
-    const embedded = extractEmbeddedErrorTitle(error as ApiError)
+    const embedded = extractEmbeddedErrorTitle(error)
     if (embedded) {
       return embedded
     }

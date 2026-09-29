@@ -89,7 +89,7 @@ function setupMocks({
     mutateAsync: mockMutateAsync,
     mutate: vi.fn(),
     isPending: false,
-  } as never)
+  })
   vi.mocked(accessClient.useQuery).mockImplementation((...args: unknown[]) => {
     const endpoint = args[1] as string
     if (endpoint === '/groups') {

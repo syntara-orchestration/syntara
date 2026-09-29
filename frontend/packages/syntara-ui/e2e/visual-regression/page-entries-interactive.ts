@@ -72,7 +72,7 @@ async function enterBuilderVersionViewHeaderState(page: Page, workflowId: string
   await expect(page.getByText(/Viewing/i)).toBeVisible()
   // Collapse the panel first — version rows also render "Previously published" badges,
   // which makes an unscoped getByText hit multiple elements (strict mode violation).
-  await page.getByRole('button', { name: 'Collapse version history' }).click()
+  await page.getByRole('button', { name: 'Close version history' }).click()
   await expect(page.getByRole('heading', { name: 'Version history', level: 2 })).not.toBeVisible()
   await expect(page.getByText('Previously published', { exact: true })).toBeVisible()
 }
@@ -584,7 +584,7 @@ export const workflowDialogPages: CanvasPageEntry[] = [
           (res) =>
             /\/api\/v1\/workflows\/[^/]+\/versions\/\d+\/publish$/.test(res.url()) && res.request().method() === 'POST'
         )
-        await page.getByRole('button', { name: 'Publish' }).click()
+        await page.getByRole('button', { name: 'Publish workflow' }).click()
         publishedWorkflowId = new URL((await publishResponse).url()).pathname.split('/')[4] ?? null
         // not.toBeVisible() fires when dismiss animation starts — also wait for
         // a published status badge so the DOM is fully settled before re-clicking
@@ -634,7 +634,7 @@ export const workflowDialogPages: CanvasPageEntry[] = [
       )
       await page.getByRole('menuitem', { name: /Publish workflow/i }).click()
       await expect(page.getByRole('dialog')).toBeVisible()
-      await page.getByRole('button', { name: 'Publish' }).click()
+      await page.getByRole('button', { name: 'Publish workflow' }).click()
       const publishedWorkflowId = new URL((await publishResponse).url()).pathname.split('/')[4] ?? null
       await expect(page.getByRole('dialog')).not.toBeVisible()
       await expect(page.getByText('Workflow published', { exact: true })).not.toBeVisible({ timeout: 12_000 })
@@ -721,7 +721,7 @@ export const workflowDialogPages: CanvasPageEntry[] = [
       await page.getByRole('button', { name: /Import workflow/i }).click()
       const dialog = page.getByRole('dialog')
       await expect(dialog).toBeVisible()
-      await expect(dialog.getByRole('button', { name: /Import/i })).toBeVisible()
+      await expect(dialog.getByRole('button', { name: /Import workflow/i })).toBeVisible()
     },
   },
 ]

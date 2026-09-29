@@ -6,7 +6,7 @@
 import { expect, type Page } from '../fixtures'
 
 import { openAddNodePanel, selectCategoryAndType } from './v2-nodes'
-import { closeNodeEditorPanel, fillCodeEditor } from './workflows'
+import { addNodePanel, closeNodeEditorPanel, fillCodeEditor, openNodeForEditing } from './workflows'
 
 /**
  * Configure Loop node fields in an open form.
@@ -165,11 +165,15 @@ export async function addForEachLoopNode(
 }
 
 /**
- * Add a script node as a child to the currently open loop body.
- * Assumes the add-node panel is already open or will be opened.
+ * Add a script node as a child of an existing loop.
+ * Uses the editor "Add step… → In loop" path because the canvas loop-body stub
+ * (`add-node-button-loop`) is often missing next to unused loop `done` stubs.
  */
-export async function addChildScriptToLoop(page: Page, scriptName: string, code: string) {
-  await openAddNodePanel(page, 'loop')
+export async function addChildScriptToLoop(page: Page, scriptName: string, code: string, loopNodeName: string) {
+  await openNodeForEditing(page, loopNodeName)
+  await page.getByRole('button', { name: 'Add step…' }).click()
+  await page.getByRole('menuitem', { name: 'In loop' }).click()
+  await expect(addNodePanel(page)).toHaveCount(1)
   await selectCategoryAndType(page, 'Action', 'Script')
 
   const nameInput = page.getByRole('textbox', { name: 'Name', exact: true })
@@ -178,6 +182,7 @@ export async function addChildScriptToLoop(page: Page, scriptName: string, code:
 
   await fillCodeEditor(page, { value: code })
   await saveAndCloseNodeForm(page)
+  await closeNodeEditorPanel(page)
 }
 
 /**

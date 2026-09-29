@@ -13,7 +13,7 @@ export function getUserIdFromToken(token: string | null | undefined): string | n
     const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=')
     const payload: unknown = JSON.parse(atob(padded))
     if (typeof payload === 'object' && payload !== null && 'sub' in payload) {
-      const { sub } = payload as { sub: unknown }
+      const { sub } = payload
       return typeof sub === 'string' ? sub : null
     }
     return null

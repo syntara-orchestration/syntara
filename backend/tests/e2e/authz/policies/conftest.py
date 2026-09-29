@@ -428,6 +428,8 @@ E2E_COVERAGE_EXEMPT: set[str] = {
     "form_prompt:create:any",
     "form_prompt:read:any",
     "form_prompt:read:project",
+    "form_prompt:submit:any",
+    "form_prompt:submit:project",
     # Role & policy management (system-level) — CRUD mirrors project-scoped
     "role:create:any",
     "role:update:any",

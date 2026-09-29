@@ -69,7 +69,7 @@ describe('GroupMappingTab', () => {
       error: null,
       isFetching: false,
       refetch: vi.fn(),
-    } as never)
+    })
   })
 
   describe('Empty state', () => {

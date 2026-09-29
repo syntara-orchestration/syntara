@@ -31,7 +31,7 @@ const WORKFLOW_UUID = '11111111-2222-3333-4444-555555555555'
 const CREATE_HTML = `<!doctype html>
 <html lang="en">
   <body>
-    <button type="button" onclick="save()">Save</button>
+    <button type="button" onclick="save()">Save workflow</button>
     <script>
       function save() {
         void fetch('/api/v1/workflows/validate', { method: 'POST' })
@@ -52,7 +52,7 @@ const CREATE_HTML = `<!doctype html>
 const UPDATE_HTML = `<!doctype html>
 <html lang="en">
   <body>
-    <button type="button" onclick="save()">Save</button>
+    <button type="button" onclick="save()">Save workflow</button>
     <script>
       function save() {
         setTimeout(() => {
@@ -68,7 +68,7 @@ const UPDATE_HTML = `<!doctype html>
 </html>`
 
 /**
- * A Save button that stays `aria-disabled` forever and fires nothing.
+ * A Save workflow button that stays `aria-disabled` forever and fires nothing.
  *
  * PatternFly renders the real button this way whenever the workflow is clean or
  * the node editor is open, and Playwright honours `aria-disabled` in its
@@ -77,7 +77,7 @@ const UPDATE_HTML = `<!doctype html>
 const DISABLED_HTML = `<!doctype html>
 <html lang="en">
   <body>
-    <button type="button" aria-disabled="true">Save</button>
+    <button type="button" aria-disabled="true">Save workflow</button>
   </body>
 </html>`
 
@@ -85,7 +85,7 @@ const DISABLED_HTML = `<!doctype html>
 const FAILING_HTML = `<!doctype html>
 <html lang="en">
   <body>
-    <button type="button" onclick="void fetch('/api/v1/workflows', { method: 'POST' })">Save</button>
+    <button type="button" onclick="void fetch('/api/v1/workflows', { method: 'POST' })">Save workflow</button>
   </body>
 </html>`
 
@@ -136,7 +136,7 @@ test.describe('clickSaveAndWait helper', () => {
     expect(seen).toContain(`PATCH /api/v1/workflows/${WORKFLOW_UUID}`)
   })
 
-  test('gives up instead of hanging when Save stays aria-disabled', async ({ page }) => {
+  test('gives up instead of hanging when Save workflow stays aria-disabled', async ({ page }) => {
     test.setTimeout(60_000)
     await serveFixture(page, DISABLED_FIXTURE, DISABLED_HTML)
     await page.goto(toAppUrl(DISABLED_FIXTURE))
@@ -149,7 +149,7 @@ test.describe('clickSaveAndWait helper', () => {
       page.waitForTimeout(30_000).then(() => 'still-waiting' as const),
     ])
 
-    expect(settled, 'an aria-disabled Save must fail fast, not consume the test timeout').toBe('rejected')
+    expect(settled, 'an aria-disabled Save workflow must fail fast, not consume the test timeout').toBe('rejected')
   })
 
   test('surfaces a failed save instead of treating it as persisted', async ({ page }) => {

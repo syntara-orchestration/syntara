@@ -25,6 +25,7 @@ _ACTION_OPERATION_PREFIXES = (
     "restore_",
     "rotate_",
     "retry_",
+    "submit_",
 )
 
 # OpenAPI tag for AAP Controller BFF proxy endpoints (locked to upstream response shape).

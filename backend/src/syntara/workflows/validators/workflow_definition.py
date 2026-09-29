@@ -16,6 +16,7 @@ from pydantic import ValidationError
 from referencing import Registry, Resource
 from referencing.jsonschema import DRAFT202012
 
+from syntara.core.constants import JsonbLimits
 from syntara.core.exceptions import SafeValueError
 from syntara.schemas import SCHEMA_DIR
 from syntara.workflows.models.validation_finding import (
@@ -78,6 +79,40 @@ def _extract_node_ids(workflow_definition: dict[str, Any]) -> set[str]:
         if nid is not None:
             node_ids.add(nid)
     return node_ids
+
+
+def _check_definition_limits(workflow_definition: dict[str, Any]) -> list[ValidationFinding]:
+    """Return structured findings for node/edge count violations.
+
+    Size is enforced at the API layer (WorkflowDefinitionValidator on model fields),
+    so only structural complexity checks are needed here for UI-facing feedback.
+    """
+    findings: list[ValidationFinding] = []
+    nodes = workflow_definition.get("nodes", [])
+    node_count = len(nodes) if isinstance(nodes, list) else 0
+    if node_count > JsonbLimits.MAX_WORKFLOW_NODES:
+        findings.append(
+            ValidationFinding(
+                severity=ValidationSeverity.error,
+                category=ValidationCategory.definition_limits,
+                message=(
+                    f"Workflow has too many nodes: {node_count} exceeds maximum of {JsonbLimits.MAX_WORKFLOW_NODES}"
+                ),
+            )
+        )
+    edges = workflow_definition.get("edges", [])
+    edge_count = len(edges) if isinstance(edges, list) else 0
+    if edge_count > JsonbLimits.MAX_WORKFLOW_EDGES:
+        findings.append(
+            ValidationFinding(
+                severity=ValidationSeverity.error,
+                category=ValidationCategory.definition_limits,
+                message=(
+                    f"Workflow has too many edges: {edge_count} exceeds maximum of {JsonbLimits.MAX_WORKFLOW_EDGES}"
+                ),
+            )
+        )
+    return findings
 
 
 def _check_edge_references_findings(workflow_definition: dict[str, Any], node_ids: set[str]) -> list[ValidationFinding]:
@@ -592,6 +627,7 @@ class WorkflowValidator:
         """
         self._validate_schema_version(workflow_definition)
         self._validate_required_fields(workflow_definition)
+        self._validate_definition_limits(workflow_definition)
         self._validate_against_schema(workflow_definition)
         node_ids = _extract_node_ids(workflow_definition)
         self._validate_graph_structure(workflow_definition, node_ids)
@@ -653,6 +689,12 @@ class WorkflowValidator:
             msg = "V2 workflow must have 'edges' field"
             raise SafeValueError(msg)
 
+    def _validate_definition_limits(self, workflow_definition: dict[str, Any]) -> None:
+        """Raise on definitions that exceed size or complexity bounds."""
+        findings = _check_definition_limits(workflow_definition)
+        if findings:
+            raise SafeValueError(findings[0].message)
+
     def _validate_against_schema(self, workflow_definition: dict[str, Any]) -> None:
         errors = list(_get_validator().iter_errors(workflow_definition))
         if not errors:
@@ -710,7 +752,19 @@ class WorkflowValidator:
         if findings:
             return findings
 
+        limit_findings = _check_definition_limits(workflow_definition)
+        if limit_findings:
+            return limit_findings
+
         findings.extend(self._collect_schema_findings(workflow_definition))
+
+        # Skip graph traversal only when nodes/edges are structurally unusable
+        # (not lists), not merely because schema errors exist — both schema
+        # violations and structural issues (orphans, cycles) should accumulate.
+        if not isinstance(workflow_definition.get("nodes"), list) or not isinstance(
+            workflow_definition.get("edges"), list
+        ):
+            return findings
 
         node_ids = _extract_node_ids(workflow_definition)
         if node_ids:

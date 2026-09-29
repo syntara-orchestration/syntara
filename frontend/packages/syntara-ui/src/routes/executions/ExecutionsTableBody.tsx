@@ -116,6 +116,12 @@ function ExecutionRowActions({
       cancelActionTooltip = { content: cancelTooltip }
     }
 
+    if (kebabActions.length > 0) {
+      kebabActions.push({
+        key: 'sep-cancel',
+        isSeparator: true,
+      })
+    }
     kebabActions.push({
       key: 'cancel',
       title: <IconLabel icon={<RhUiBanIcon />}>Cancel run</IconLabel>,

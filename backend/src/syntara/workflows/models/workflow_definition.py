@@ -9,6 +9,7 @@ from typing import Annotated, Any, Literal
 from pydantic import Discriminator, Field, field_validator
 from sqlmodel import SQLModel
 
+from syntara.core.constants import JsonbLimits
 from syntara.workflows.workflow_engine.models.workflow_definition import (
     AAPJobTemplateExecutorParameters,
     AAPWorkflowJobTemplateExecutorParameters,
@@ -217,9 +218,11 @@ class WorkflowDefinition(SQLModel):
     )
     nodes: list[WorkflowNode] = Field(
         ...,
+        max_length=JsonbLimits.MAX_WORKFLOW_NODES,
         description="Execution and control nodes in the workflow graph",
     )
     edges: list[dict[str, Any]] = Field(
         ...,
+        max_length=JsonbLimits.MAX_WORKFLOW_EDGES,
         description="List of directed edges connecting triggers and nodes in the workflow graph",
     )

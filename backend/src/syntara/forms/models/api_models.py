@@ -6,7 +6,7 @@ components for type-safe API operations.
 
 from datetime import datetime
 from enum import Enum
-from typing import ClassVar, Final
+from typing import Any, ClassVar, Final
 from uuid import UUID
 
 from pydantic import ConfigDict, Field, field_validator
@@ -143,6 +143,17 @@ class FormPromptCreateRequest(SQLModel):
         return value
 
 
+class FormPromptSubmitRequest(SQLModel):
+    """Request payload for submitting a response to a form prompt."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(from_attributes=True)  # type: ignore[assignment]
+
+    response_data: dict[str, Any] = Field(
+        ...,
+        description="Submitted form field values, keyed by field name",
+    )
+
+
 class BatchFormPromptStatus(str, Enum):
     """Status values that can be submitted in batch form prompt updates.
 
@@ -182,8 +193,7 @@ class FormPromptSummary(SQLModel):
 
     Contains only the 8 documented fields used by expire/cancel activities
     and workflow lifecycle management. Does not expose user-submitted form data
-    or rendering configuration fields (those will appear in FormPromptRead for
-    user-facing endpoints in AAP-91889).
+    or rendering configuration fields.
     """
 
     model_config: ClassVar[ConfigDict] = ConfigDict(from_attributes=True)  # type: ignore[assignment]

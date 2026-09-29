@@ -280,12 +280,16 @@ jobs:
     needs: changes
     if: needs.changes.outputs.backend_schema == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           fetch-depth: 0
 
       - name: Fetch devel branch for OpenAPI comparison
+        if: github.event_name != 'merge_group'
         run: git fetch origin devel
 
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
@@ -298,13 +302,52 @@ jobs:
         run: make install
         working-directory: backend
 
+      - name: Resolve pull-request labels
+        if: github.event_name != 'merge_group'
+        id: pr-labels
+        env:
+          PR_LABELS_FROM_EVENT: ${{ github.event_name == 'pull_request' && toJSON(github.event.pull_request.labels.*.name) || '[]' }}
+        run: |
+          set -euo pipefail
+          labels="$(jq -c . <<< "$PR_LABELS_FROM_EVENT")"
+          printf 'labels=%s\n' "$labels" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve merge-group pull-request labels
+        if: github.event_name == 'merge_group'
+        id: merge-group-pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MERGE_GROUP_HEAD_REF: ${{ github.event.merge_group.head_ref }}
+          MERGE_GROUP_BASE_REF: ${{ github.event.merge_group.base_ref }}
+        run: ./scripts/openapi/resolve-merge-group-pr-labels.py
+        working-directory: backend
+
       - name: Check OpenAPI breaking changes against devel
         id: breaking-check
+        if: github.event_name != 'merge_group'
         continue-on-error: ${{ startsWith(github.base_ref, 'feature/') }}
         run: make check-openapi-breaking-pre-commit
         working-directory: backend
         env:
-          OPENAPI_PR_LABELS: ${{ github.event_name == 'pull_request' && toJSON(github.event.pull_request.labels.*.name) || '' }}
+          OPENAPI_PR_LABELS: ${{ steps.pr-labels.outputs.labels }}
+
+      - name: Install oasdiff
+        if: github.event_name == 'merge_group'
+        run: ./scripts/openapi/install-oasdiff.sh
+        working-directory: backend
+
+      - name: Check merge-group OpenAPI changes for current PR
+        if: github.event_name == 'merge_group'
+        env:
+          MERGE_GROUP_BASE_SHA: ${{ github.event.merge_group.base_sha || '' }}
+          MERGE_GROUP_HEAD_SHA: ${{ github.event.merge_group.head_sha || '' }}
+          OPENAPI_PR_LABELS: ${{ steps.merge-group-pr.outputs.labels }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$MERGE_GROUP_HEAD_SHA"
+          git cat-file -e "${MERGE_GROUP_BASE_SHA}^{commit}"
+          make check-openapi-breaking OPENAPI_BASE_REF="$MERGE_GROUP_BASE_SHA"
+        working-directory: backend
 
       - name: Warn on feature branch breaking changes
         if: steps.breaking-check.outcome == 'failure' && startsWith(github.base_ref, 'feature/')

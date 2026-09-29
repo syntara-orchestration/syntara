@@ -19,8 +19,7 @@ class FormPromptSummary:
 
     Contains only the 8 documented fields used by expire/cancel activities
     and workflow lifecycle management. Does not expose user-submitted form data
-    or rendering configuration fields (those will appear in FormPromptRead for
-    user-facing endpoints in AAP-91889).
+    or rendering configuration fields.
 
         Attributes:
             id (UUID): Form prompt unique identifier

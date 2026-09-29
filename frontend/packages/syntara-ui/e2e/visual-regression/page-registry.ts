@@ -2,7 +2,7 @@
  * Page registry for visual regression testing.
  *
  * Every implemented route in the app should have an entry here.
- * The baseline enforcement script (`scripts/check-visual-baselines.ts`)
+ * The baseline enforcement script (`scripts/visual-regression/check-visual-baselines.ts`)
  * validates that this registry stays in sync with `AppRoute.tsx`.
  *
  * Entries are organized by section (matching the route directory structure)
@@ -259,7 +259,7 @@ export const pages: PageEntry[] = [
     setup: async (page) => {
       const kebab = page.getByRole('button', { name: /Actions|Kebab toggle/i }).first()
       await kebab.click()
-      await page.getByRole('menuitem', { name: 'Delete' }).click()
+      await page.getByRole('menuitem', { name: 'Delete user' }).click()
       const dialog = page.getByRole('dialog')
       await expect(dialog).toBeVisible()
       await expect(dialog.getByRole('button', { name: /Delete/i })).toBeVisible()
@@ -349,7 +349,7 @@ export const pages: PageEntry[] = [
         .filter({ hasText: 'platform-admins' })
         .getByRole('button', { name: /Actions|Kebab toggle/i })
         .click()
-      await page.getByRole('menuitem', { name: 'Delete' }).click()
+      await page.getByRole('menuitem', { name: 'Delete group' }).click()
       const dialog = page.getByRole('dialog')
       await expect(dialog).toBeVisible()
       await expect(dialog.getByRole('button', { name: /Delete/i })).toBeVisible()
@@ -621,7 +621,7 @@ export const pages: PageEntry[] = [
     setup: async (page) => {
       const kebab = page.getByRole('button', { name: /Actions|Kebab toggle/i }).first()
       await kebab.click()
-      await page.getByRole('menuitem', { name: 'Delete' }).click()
+      await page.getByRole('menuitem', { name: 'Delete identity provider' }).click()
       const dialog = page.getByRole('dialog')
       await expect(dialog).toBeVisible()
       await expect(dialog.getByRole('button', { name: /Delete/i })).toBeVisible()

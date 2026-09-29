@@ -20,7 +20,7 @@ describe('deleteFileById', () => {
       data: undefined,
       error: undefined,
       response: new Response(null, { status: 204 }),
-    } as never)
+    })
 
     await deleteFileById('file-1')
 
@@ -54,7 +54,7 @@ describe('deleteFileById', () => {
       data: undefined,
       error: undefined,
       response: new Response(null, { status: 500 }),
-    } as never)
+    })
 
     await expect(deleteFileById('file-1')).rejects.toThrow('Failed to delete file. Please try again.')
   })

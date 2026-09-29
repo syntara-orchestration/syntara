@@ -16,6 +16,7 @@ import { SynKebabMenu } from '../../../components/SynKebabMenu'
 import type { KebabAction } from '../../../components/SynKebabMenu'
 import { LinkCell } from '../../../components/table/LinkCell'
 import { SynScrollableTableContainer } from '../../../components/table/SynScrollableTableContainer'
+import { useClientPagination } from '../../../hooks/useClientPagination'
 import { useFilterState } from '../../../hooks/useFilterState'
 import { useAlerts } from '../../../providers/alerts'
 import type { FilterFieldDefinition } from '../../../types/filters'
@@ -118,8 +119,7 @@ export function GroupMembersPanel({ groupId, onMembershipChange }: Readonly<Grou
   const [addModalOpen, setAddModalOpen] = useState(false)
   const [memberToRemove, setMemberToRemove] = useState<MemberInfo | null>(null)
   const { filters, setAllFilters, clearAllFilters } = useFilterState()
-  const [page, setPage] = useState(1)
-  const [perPage, setPerPage] = useState(20)
+  const { paginate, getFooterProps, resetPage } = useClientPagination()
   const { query, members, remove, handleMemberAdded } = useGroupMembersData(groupId, onMembershipChange)
 
   const filteredMembers = useMemo(() => {
@@ -129,10 +129,7 @@ export function GroupMembersPanel({ groupId, onMembershipChange }: Readonly<Grou
     return members.filter((m) => m.username.toLowerCase().includes(term))
   }, [members, filters])
 
-  const paginatedMembers = useMemo(() => {
-    const start = (page - 1) * perPage
-    return filteredMembers.slice(start, start + perPage)
-  }, [filteredMembers, page, perPage])
+  const paginatedMembers = useMemo(() => paginate(filteredMembers), [filteredMembers, paginate])
 
   const handleRemove = () => {
     if (!memberToRemove) return
@@ -176,12 +173,12 @@ export function GroupMembersPanel({ groupId, onMembershipChange }: Readonly<Grou
                 filters={filters}
                 onFilterChange={(f) => {
                   setAllFilters(f)
-                  setPage(1)
+                  resetPage()
                 }}
                 showClearAll={true}
                 clearAllFilters={() => {
                   clearAllFilters()
-                  setPage(1)
+                  resetPage()
                 }}
               />
             </FlexItem>
@@ -208,26 +205,12 @@ export function GroupMembersPanel({ groupId, onMembershipChange }: Readonly<Grou
             <SynEmptyStateFilter
               clearAllFilters={() => {
                 clearAllFilters()
-                setPage(1)
+                resetPage()
               }}
             />
           </SynPageBody>
         ) : (
-          <SynScrollableTableContainer
-            caption="Group members table"
-            footer={{
-              page,
-              perPage,
-              total: filteredMembers.length,
-              hasNext: page * perPage < filteredMembers.length,
-              onPrev: () => setPage((p) => Math.max(1, p - 1)),
-              onNext: () => setPage((p) => p + 1),
-              onPerPageChange: (n: number) => {
-                setPerPage(n)
-                setPage(1)
-              },
-            }}
-          >
+          <SynScrollableTableContainer caption="Group members table" footer={getFooterProps(filteredMembers.length)}>
             <Thead>
               <Tr>
                 <Th>Username</Th>
@@ -287,7 +270,7 @@ export function GroupMembersPanel({ groupId, onMembershipChange }: Readonly<Grou
         onClose={() => setMemberToRemove(null)}
         onConfirm={handleRemove}
         title="Remove member?"
-        confirmLabel="Remove"
+        confirmLabel="Remove member"
         confirmVariant="danger"
         titleIconVariant="warning"
       >

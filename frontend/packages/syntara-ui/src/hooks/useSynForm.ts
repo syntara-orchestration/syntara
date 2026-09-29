@@ -13,6 +13,11 @@ export type UseSynFormOptions<T extends FieldValues> = {
   schema: ZodType<T>
   /** Initial field values on first mount. */
   defaultValues: DefaultValues<T>
+  /**
+   * External values to keep the form in sync (RHF `values` prop). Use for edit
+   * forms that hydrate from a query so fields do not flash empty before reset.
+   */
+  values?: T
   /** Called after `reset()` when `handleClose` is invoked. */
   onClose?: () => void
 }
@@ -83,11 +88,13 @@ export type UseSynFormReturn<T extends FieldValues> = UseFormReturn<T> & {
 export function useSynForm<T extends FieldValues>({
   schema,
   defaultValues,
+  values,
   onClose,
 }: UseSynFormOptions<T>): UseSynFormReturn<T> {
   const form = useForm<T>({
     resolver: zodResolver(schema as ZodResolverSchema, undefined, { mode: 'sync' }) as Resolver<T>,
     defaultValues,
+    values,
   })
 
   const { reset, setError } = form

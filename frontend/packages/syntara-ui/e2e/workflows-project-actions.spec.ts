@@ -85,7 +85,7 @@ test.describe('Workflows Page - Project Actions in All Projects View', () => {
       const nameInput = editDialog.getByRole('textbox', { name: 'Project name' })
       await nameInput.clear()
       await nameInput.fill(updatedName)
-      await editDialog.getByRole('button', { name: 'Save' }).click()
+      await editDialog.getByRole('button', { name: 'Save project' }).click()
       await expect(editDialog).not.toBeVisible({ timeout: 15_000 })
 
       // Verify the updated name appears immediately without page refresh
@@ -132,7 +132,7 @@ test.describe('Workflows Page - Project Actions in All Projects View', () => {
       await expect(deleteDialog.getByText(/Role assignments, project roles, and policies/i)).toBeVisible()
 
       // Verify destructive acknowledgement checkbox is required
-      const confirmButton = deleteDialog.getByRole('button', { name: 'Delete' })
+      const confirmButton = deleteDialog.getByRole('button', { name: 'Delete project' })
       await expect(confirmButton).toBeDisabled()
 
       const ackCheckbox = deleteDialog.getByRole('checkbox', { name: /I understand/i })
@@ -203,7 +203,7 @@ test.describe('Workflows Page - Project Actions in Selected Project View', () =>
       const nameInput = editDialog.getByRole('textbox', { name: 'Project name' })
       await nameInput.clear()
       await nameInput.fill(updatedName)
-      await editDialog.getByRole('button', { name: 'Save' }).click()
+      await editDialog.getByRole('button', { name: 'Save project' }).click()
       await expect(editDialog).not.toBeVisible({ timeout: 15_000 })
 
       // Verify the project selector shows the updated name

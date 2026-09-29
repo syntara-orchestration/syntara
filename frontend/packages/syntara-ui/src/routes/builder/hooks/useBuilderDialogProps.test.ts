@@ -14,6 +14,7 @@ function makeParams(overrides: Partial<BuilderDialogPropsParams> = {}): BuilderD
     dispatch: vi.fn(),
     handleRunWorkflow: vi.fn(),
     handleDeleteWorkflow: vi.fn(),
+    isDeleting: false,
     runStepDialog: { isOpen: false, open: vi.fn(), close: vi.fn(), item: null },
     lastRunStepNodeIdRef: { current: null },
     pendingImport: null,
@@ -25,6 +26,14 @@ function makeParams(overrides: Partial<BuilderDialogPropsParams> = {}): BuilderD
     ...overrides,
   }
 }
+
+describe('useBuilderDialogProps — isDeleting', () => {
+  it('passes isDeleting through to dialog props', () => {
+    const result = useBuilderDialogProps(makeParams({ isDeleting: true }))
+
+    expect(result.isDeleting).toBe(true)
+  })
+})
 
 describe('useBuilderDialogProps — runStepTriggerNodeId', () => {
   it('maps trigger-0 predecessor to the first trigger definition ID', () => {

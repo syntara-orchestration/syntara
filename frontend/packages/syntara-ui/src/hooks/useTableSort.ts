@@ -27,7 +27,7 @@ export function useTableSort(options: UseTableSortOptions = {}) {
       },
       onSort: (_event, _index, direction) => {
         setActiveSortIndex(columnIndex)
-        setSortDirection(direction as SortDirection)
+        setSortDirection(direction)
         onSortChange?.()
       },
       columnIndex,

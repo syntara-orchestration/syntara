@@ -146,12 +146,12 @@ export function WorkflowDialogs({
         isOpen={runDialog.isOpen}
         onClose={runDialog.close}
         onConfirm={handleConfirmRun}
-        title={`Run ${runDialog.item?.name}?`}
+        title="Run workflow?"
         confirmLabel="Run now"
         confirmLoading={isResolvingRun}
       >
-        You are about to manually run this workflow. This action will start the workflow immediately, bypassing its
-        normal trigger conditions.
+        You are about to manually run the workflow <strong>{runDialog.item?.name}</strong>. This action will start the
+        workflow immediately, bypassing its normal trigger conditions.
       </SynConfirmationDialog>
 
       <RunWorkflowModal
@@ -206,7 +206,7 @@ export function WorkflowDialogs({
           // Dialog closes in onSettled callback passed to useWorkflowActions
         }}
         title="Unpublish workflow?"
-        confirmLabel="Unpublish"
+        confirmLabel="Unpublish workflow"
         confirmVariant="danger"
         titleIconVariant="warning"
       >

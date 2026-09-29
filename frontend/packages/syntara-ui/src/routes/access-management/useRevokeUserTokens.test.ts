@@ -29,7 +29,7 @@ function setupMocks() {
   vi.mocked(adminClient.useMutation).mockReturnValue({
     mutate: mockMutate,
     isPending: false,
-  } as never)
+  })
   vi.mocked(useMutationErrorHandler).mockReturnValue(mockErrorHandler)
 }
 

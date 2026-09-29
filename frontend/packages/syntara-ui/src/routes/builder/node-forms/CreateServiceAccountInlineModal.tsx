@@ -1,4 +1,3 @@
-import { zodResolver } from '@hookform/resolvers/zod'
 import {
   Alert,
   Button,
@@ -6,9 +5,6 @@ import {
   ClipboardCopy,
   Form,
   FormGroup,
-  FormHelperText,
-  HelperText,
-  HelperTextItem,
   MenuToggle,
   Modal,
   ModalBody,
@@ -16,21 +12,24 @@ import {
   ModalHeader,
   SelectList,
   SelectOption,
-  TextArea,
   TextInput,
 } from '@patternfly/react-core'
-import { RhUiAddIcon, RhUiErrorIcon } from '@patternfly/react-icons'
-import { useCallback, useMemo, useState } from 'react'
-import { Controller, useForm } from 'react-hook-form'
+import { RhUiAddIcon } from '@patternfly/react-icons'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
+import { SynForm } from '../../../components/forms/SynForm'
+import { SynFormField } from '../../../components/forms/SynFormField'
+import { SynTextAreaField } from '../../../components/forms/SynTextAreaField'
+import { SynTextField } from '../../../components/forms/SynTextField'
 import { SynSelect } from '../../../components/SynSelect'
-import { useFormMutationErrorHandler } from '../../../hooks/useFormMutationErrorHandler'
+import { useSynForm } from '../../../hooks/useSynForm'
 import { formatExpirationDate } from '../../../utils/dateUtils'
 import { detachPromise } from '../../../utils/detachPromise'
 import { useSelectableProjects } from '../../access/useAllProjects'
 import { CredentialExpirationField } from '../../access-management/service-accounts/CredentialExpirationField'
 import {
   createServiceAccountSchema,
+  SERVICE_ACCOUNT_NAME_HINT,
   type CreateServiceAccountFormData,
 } from '../../access-management/service-accounts/serviceAccountFormSchema'
 import { useCredentialExpirationDate } from '../../access-management/service-accounts/useCredentialExpirationDate'
@@ -87,15 +86,13 @@ export function ProjectSelectToggle({
   )
 }
 
-export function ProjectField({
+function InlineProjectSelect({
   value,
   onChange,
-  error,
   projectOptions,
 }: Readonly<{
   value: string
   onChange: (val: string) => void
-  error?: string
   projectOptions: ReadonlyArray<{ id: string; name: string }>
 }>) {
   const [isOpen, setIsOpen] = useState(false)
@@ -114,109 +111,60 @@ export function ProjectField({
   )
 
   return (
-    <FormGroup label="Project" fieldId="sa-inline-project" isRequired>
-      <SynSelect
-        id="sa-inline-project"
-        aria-label="Project"
-        isOpen={isOpen}
-        onOpenChange={setIsOpen}
-        onSelect={(_e, val) => {
-          onChange(String(val))
-          setIsOpen(false)
-        }}
-        selected={value}
-        popperProps={{ appendTo: 'inline' }}
-        toggle={renderToggle}
-      >
-        <SelectList>
-          {projectOptions.map((p) => (
-            <SelectOption key={p.id} value={p.id} isSelected={p.id === value}>
-              {p.name}
-            </SelectOption>
-          ))}
-        </SelectList>
-      </SynSelect>
-
-      {error && (
-        <FormHelperText>
-          <HelperText>
-            <HelperTextItem icon={<RhUiErrorIcon />} variant="error">
-              {error}
-            </HelperTextItem>
-          </HelperText>
-        </FormHelperText>
-      )}
-    </FormGroup>
+    <SynSelect
+      id="sa-inline-project"
+      aria-label="Project"
+      isOpen={isOpen}
+      onOpenChange={setIsOpen}
+      onSelect={(_e, val) => {
+        onChange(String(val))
+        setIsOpen(false)
+      }}
+      selected={value}
+      popperProps={{ appendTo: 'inline' }}
+      toggle={renderToggle}
+    >
+      <SelectList>
+        {projectOptions.map((p) => (
+          <SelectOption key={p.id} value={p.id} isSelected={p.id === value}>
+            {p.name}
+          </SelectOption>
+        ))}
+      </SelectList>
+    </SynSelect>
   )
 }
 
 type CreateFormBodyProps = Readonly<{
-  control: ReturnType<typeof useForm<CreateServiceAccountFormData>>['control']
   projectOptions: ReadonlyArray<{ id: string; name: string }>
 }>
 
-function CreateFormBody({ control, projectOptions }: CreateFormBodyProps) {
+function CreateFormBody({ projectOptions }: CreateFormBodyProps) {
   return (
     <>
-      <Controller
-        name="project_id"
-        control={control}
-        render={({ field, fieldState }) => (
-          <ProjectField
-            value={field.value}
+      <SynFormField name="project_id" label="Project" fieldId="sa-inline-project" isRequired>
+        {({ field }) => (
+          <InlineProjectSelect
+            value={field.value as string}
             onChange={field.onChange}
-            error={fieldState.error?.message}
             projectOptions={projectOptions}
           />
         )}
-      />
-      <Controller
+      </SynFormField>
+      <SynTextField
         name="name"
-        control={control}
-        render={({ field, fieldState }) => (
-          <FormGroup label="Name" fieldId="sa-inline-name" isRequired>
-            <TextInput
-              id="sa-inline-name"
-              aria-label="Name"
-              placeholder="my-service-account"
-              validated={fieldState.error ? 'error' : 'default'}
-              value={field.value ?? ''}
-              onChange={field.onChange}
-              onBlur={field.onBlur}
-              name={field.name}
-            />
-            <FormHelperText>
-              <HelperText>
-                <HelperTextItem
-                  variant={fieldState.error ? 'error' : 'default'}
-                  icon={fieldState.error ? <RhUiErrorIcon /> : undefined}
-                >
-                  {fieldState.error?.message ??
-                    'Lowercase letters, numbers, and hyphens. Must start and end with a letter or number.'}
-                </HelperTextItem>
-              </HelperText>
-            </FormHelperText>
-          </FormGroup>
-        )}
+        label="Name"
+        fieldId="sa-inline-name"
+        isRequired
+        placeholder="my-service-account"
+        hint={SERVICE_ACCOUNT_NAME_HINT}
       />
-      <Controller
+      <SynTextAreaField
         name="description"
-        control={control}
-        render={({ field, fieldState }) => (
-          <FormGroup label="Description" fieldId="sa-inline-description">
-            <TextArea
-              id="sa-inline-description"
-              aria-label="Description"
-              placeholder="Describe the purpose of this service account"
-              validated={fieldState.error ? 'error' : 'default'}
-              value={field.value ?? ''}
-              onChange={field.onChange}
-              onBlur={field.onBlur}
-              name={field.name}
-              rows={3}
-            />
-          </FormGroup>
-        )}
+        label="Description"
+        fieldId="sa-inline-description"
+        placeholder="Describe the purpose of this service account"
+        rows={3}
       />
     </>
   )
@@ -249,22 +197,28 @@ export function CreateServiceAccountInlineModal({ isOpen, onClose, onCreated, pr
     reset: resetExpirationDate,
   } = useCredentialExpirationDate()
 
-  const { control, handleSubmit, setError, reset } = useForm<CreateServiceAccountFormData>({
-    resolver: zodResolver(createServiceAccountSchema, undefined, { mode: 'sync' }),
+  const form = useSynForm({
+    schema: createServiceAccountSchema,
     defaultValues: { name: '', description: '', project_id: projectId ?? '' },
   })
+  const { handleSubmit, handleError, reset } = form
 
-  const handleError = useFormMutationErrorHandler<CreateServiceAccountFormData>(setError)
+  useEffect(() => {
+    if (isOpen) {
+      reset({ name: '', description: '', project_id: projectId ?? '' })
+    }
+  }, [isOpen, projectId, reset])
+
   const { credentials, savedAck, setSavedAck, isPending, submitForm, resetState, showCredentials } =
     useCreateServiceAccountInline(expiresAt)
 
   const handleClose = useCallback(() => {
     const saId = resetState()
-    reset()
+    reset({ name: '', description: '', project_id: projectId ?? '' })
     resetExpirationDate()
     onClose()
     if (saId) onCreated(saId)
-  }, [resetState, onClose, onCreated, reset, resetExpirationDate])
+  }, [resetState, onClose, onCreated, reset, resetExpirationDate, projectId])
 
   const onSubmit = useCallback(
     async (formData: CreateServiceAccountFormData) => {
@@ -297,7 +251,9 @@ export function CreateServiceAccountInlineModal({ isOpen, onClose, onCreated, pr
             </>
           ) : (
             <>
-              <CreateFormBody control={control} projectOptions={projectOptions} />
+              <SynForm form={form}>
+                <CreateFormBody projectOptions={projectOptions} />
+              </SynForm>
               <CredentialExpirationField
                 selectedDate={expiresAt}
                 onDateChange={handleExpirationChange}

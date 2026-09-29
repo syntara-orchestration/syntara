@@ -419,12 +419,11 @@ def _check_option_membership(field: FormField, coerced: Any) -> FormFieldError |
 
 
 def _coerce_option_value(raw: Any) -> str | int | float | bool:  # noqa: ANN401
-    """Coerce a single option value to the StaticOption.value types.
+    """Coerce an option value to the supported scalar types.
 
-    Values are accepted as-is, never converted between numeric types: an option
-    authored as ``5`` stays an int, so it reaches the workflow namespace as ``5``
-    rather than ``5.0``. Membership still matches across int and float, since
-    Python hashes ``5`` and ``5.0`` identically.
+    Values are accepted as-is, never converted between numeric types. This
+    preserves dynamic option values as they reach the workflow namespace. Static
+    option definitions are string-only and are checked for membership separately.
 
     Args:
         raw: Raw scalar value

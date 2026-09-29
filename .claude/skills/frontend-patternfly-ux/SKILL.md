@@ -705,7 +705,7 @@ Use when deleting a standalone resource with no downstream effects (e.g., role, 
 | ------------- | ------------------------------------------------------------- |
 | Component     | `SynConfirmationDialog` with `destructiveAcknowledgement` prop |
 | Modal variant | Small (default)                                               |
-| Action button | `confirmVariant="danger"`, `confirmLabel="Delete"`            |
+| Action button | `confirmVariant="danger"`, `confirmLabel="Delete user"`       |
 | Cancel button | `variant="link"` (handled by SynConfirmationDialog)            |
 
 For title, body copy, and checkbox label patterns → see Storybook `SynConfirmationDialog` → **DestructiveAcknowledgement** story.
@@ -722,7 +722,7 @@ Use when deleting the resource also permanently deletes other records (e.g., wor
 | Body          | `"The [resource] <strong>[name]</strong> will be deleted. This cannot be undone."`                                                                                                                       |
 | Body 2        | `"Resources that will be deleted"` as a header, then one row per resource type each with its own [Badge](https://www.patternfly.org/components/badge/#read) count — e.g., "Executions [12]", "Tools [3]" |
 | Checkbox      | `"I understand this [resource] and the resources shown above will be permanently deleted."` — Delete button stays disabled until checked                                                                 |
-| Action button | `confirmVariant="danger"`, `confirmLabel="Delete"`                                                                                                                                                       |
+| Action button | `confirmVariant="danger"`, `confirmLabel="Delete workflow"`                                                                                                                                        |
 | Cancel button | `variant="link"` (handled by SynConfirmationDialog)                                                                                                                                                       |
 
 #### Ripple Effect Delete
@@ -737,7 +737,7 @@ Use when deleting the resource leaves other resources in a broken or invalid sta
 | Body          | `"The [resource] <strong>[name]</strong> will be deleted. This cannot be undone."`                                                                                                                            |
 | Body 2        | `"Resources that will be affected"` as a header, then one row per resource type each with its own [Badge](https://www.patternfly.org/components/badge/#read) count — e.g., "Workflows [2]", "Credentials [5]" |
 | Checkbox      | `"I understand this [resource] and the resources shown above will be affected by this deletion."` — Delete button stays disabled until checked                                                                |
-| Action button | `confirmVariant="danger"`, `confirmLabel="Delete"`                                                                                                                                                            |
+| Action button | `confirmVariant="danger"`, `confirmLabel="Delete workflow"`                                                                                                                                           |
 | Cancel button | `variant="link"` (handled by SynConfirmationDialog)                                                                                                                                                            |
 
 **When badge counts are unavailable:** Use a `Stack` layout with an introductory sentence (e.g., "This will immediately:") followed by PatternFly `List` / `ListItem` bullet points enumerating the downstream consequences. **Never use raw `<ul>`, `<ol>`, or `<li>`** — always use PF `List` / `ListItem` components (enforced by the `prefer-pf-list-components` ESLint rule).
@@ -762,7 +762,7 @@ These are reversible actions. Use `SynConfirmationDialog` with warning icon but 
 | ------------- | ------------------------------------------------------------------ |
 | Component     | `SynConfirmationDialog` (no `destructiveAcknowledgement`)           |
 | Modal variant | Small (default)                                                    |
-| Action button | `confirmVariant="danger"`, `confirmLabel="[Remove/Unassign/etc.]"` |
+| Action button | `confirmVariant="danger"`, `confirmLabel="Remove member"` (include the resource noun) |
 | Cancel button | `variant="link"` (handled by SynConfirmationDialog)                 |
 
 For title and body copy patterns → see Storybook `SynConfirmationDialog` → **Danger** story.
@@ -1475,7 +1475,7 @@ These badges use `Label` with no icons — text and color only.
 
 **Unpublish confirmation:**
 
-- `SynConfirmationDialog` with warning icon, `confirmVariant="danger"`, label "Unpublish"
+- `SynConfirmationDialog` with warning icon, `confirmVariant="danger"`, label "Unpublish workflow"
 - Body explains workflow will no longer be executable until republished
 
 **Workflow list changes:**

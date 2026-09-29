@@ -15,8 +15,10 @@
  * - viewer:  read-only on workflow, execution, approval, credential
  * - auditor: read-only on all resources except user_identity
  * - user:    read on workflow, execution, approval, credential, user, group, role, policy, authz
+ * - project-admin: project-scoped create/update/delete/run on assigned project
  */
 
+import { loginAsUser } from './authorization/fixtures'
 import { type Page, test, expect, toAppUrl, appBaseUrl } from './fixtures'
 import { openRowKebab } from './helpers/patternfly'
 import { buildUniqueName } from './helpers/workflows'
@@ -38,7 +40,9 @@ import {
   findProjectIdByName,
   findWorkflowIdByName,
   getAuthToken,
+  publishWorkflowViaApi,
 } from './utils/api'
+import { generatePassword, type RoleSetupResult } from './utils/roleSetup'
 
 const AM_URL = '/system-administration/access-management'
 const AUTH_URL = '/system-administration/authentication'
@@ -69,6 +73,94 @@ async function createTestWorkflow(adminApp: Page): Promise<{ id: string; name: s
 
 async function deleteTestWorkflow(adminApp: Page, workflowId: string): Promise<void> {
   await apiRequest(adminApp, 'delete', `/workflows/${workflowId}`)
+}
+
+type ProjectAdminWorkflowSetup = {
+  id: string
+  name: string
+  projectId?: string
+  userId?: string
+  username?: string
+  password?: string
+}
+
+async function createPublishedWorkflowForProjectAdmin(
+  adminApp: Page,
+  roleSetup: RoleSetupResult | null
+): Promise<ProjectAdminWorkflowSetup> {
+  const name = buildUniqueName('e2e-padmin-wf')
+  let createdProjectId: string | undefined
+  let createdUserId: string | undefined
+  let projectId: string | undefined
+  let workflowId: string | undefined
+  let username: string | undefined
+  let password: string | undefined
+
+  try {
+    if (roleSetup) {
+      username = buildUniqueName('e2e-padmin-user')
+      password = generatePassword()
+      const user = await createUserViaApi(adminApp, { username, password })
+      if (!user) throw new Error('createPublishedWorkflowForProjectAdmin: user creation failed')
+      createdUserId = user.id
+
+      const projectName = buildUniqueName('e2e-padmin-proj')
+      const projectResp = await apiRequest(adminApp, 'post', '/projects', {
+        data: { name: projectName, description: 'E2E project-admin kebab test' },
+      })
+      if (!projectResp.ok()) throw new Error(`Project creation failed: ${projectResp.status()}`)
+      const project = (await projectResp.json()) as { id: string }
+      createdProjectId = project.id
+      const assignmentResp = await apiRequest(adminApp, 'post', `/projects/${project.id}/role_assignments`, {
+        data: { principal_id: user.id, role_name: 'project-admin' },
+      })
+      if (!assignmentResp.ok()) {
+        throw new Error(`Project-admin assignment failed: ${assignmentResp.status()}`)
+      }
+      projectId = project.id
+    } else {
+      projectId = (await ensureProject(adminApp))?.id
+    }
+    if (!projectId) throw new Error('createPublishedWorkflowForProjectAdmin: could not resolve project')
+
+    const resp = await apiRequest(adminApp, 'post', '/workflows', {
+      data: {
+        name,
+        project_id: projectId,
+        workflow_definition: {
+          schema_version: '2.0.0',
+          name,
+          triggers: [{ id: 'trigger_1', type: 'manual_trigger', name: 'Manual trigger', parameters: {} }],
+          nodes: [
+            {
+              id: 'node_1',
+              type: 'script',
+              name: 'E2E admin step',
+              parameters: { language: 'python', code: 'print("e2e")' },
+            },
+          ],
+          edges: [{ from: 'trigger_1', to: 'node_1' }],
+        },
+      },
+    })
+    if (!resp.ok()) throw new Error(`Workflow creation failed: ${resp.status()}`)
+    const body = (await resp.json()) as { id: string; current_version: number }
+    workflowId = body.id
+    await publishWorkflowViaApi(adminApp, body.id, body.current_version)
+    return {
+      id: body.id,
+      name,
+      projectId: createdProjectId,
+      userId: createdUserId,
+      username,
+      password,
+    }
+  } catch (error) {
+    if (workflowId) await deleteTestWorkflow(adminApp, workflowId)
+    if (createdProjectId) await apiRequest(adminApp, 'delete', `/projects/${createdProjectId}`)
+    if (createdUserId) await deleteUserViaApi(adminApp, createdUserId)
+    throw error
+  }
 }
 
 async function createTestCredential(adminApp: Page): Promise<{ id: string; name: string }> {
@@ -466,6 +558,72 @@ test.describe('Permission gating — Workflow actions', () => {
     }
   })
 
+  test('project-admin: All projects kebab edit/run/publish/unpublish/delete are enabled', async ({
+    app,
+    projectAdminApp,
+    roleSetup,
+  }) => {
+    let workflowId: string | undefined
+    let projectId: string | undefined
+    let userId: string | undefined
+    try {
+      const workflow = await createPublishedWorkflowForProjectAdmin(app, roleSetup)
+      workflowId = workflow.id
+      projectId = workflow.projectId
+      userId = workflow.userId
+
+      if (workflow.username && workflow.password) {
+        await loginAsUser(projectAdminApp, { username: workflow.username, password: workflow.password })
+      }
+
+      await projectAdminApp.goto(toAppUrl('/workflows'))
+      await expect(projectAdminApp.getByRole('heading', { level: 1, name: 'Workflows' })).toBeVisible()
+      await expect(projectAdminApp.getByPlaceholder('All projects')).toBeVisible()
+
+      const createButton = projectAdminApp.getByRole('button', { name: /Create workflow/i })
+      await expect(createButton).toBeVisible()
+      await expect(createButton).not.toHaveAttribute('aria-disabled', 'true')
+
+      await filterWorkflowsByName(projectAdminApp, workflow.name)
+
+      const workflowRow = projectAdminApp
+        .getByRole('grid', { name: 'Workflows table' })
+        .getByRole('row', { name: new RegExp(workflow.name) })
+      await expect(workflowRow).toBeVisible({ timeout: 15_000 })
+      // A forced click skips every actionability wait, so it lands even while the
+      // list query is replacing the row — the handler never runs, the menu stays
+      // shut, and each assertion below fails on a missing `menuitem`.
+      await openRowKebab(workflowRow, /Edit workflow/i)
+
+      await expect(projectAdminApp.getByRole('menuitem', { name: /Edit workflow/i })).not.toHaveAttribute(
+        'aria-disabled',
+        'true',
+        { timeout: 20_000 }
+      )
+      await expect(projectAdminApp.getByRole('menuitem', { name: /Run published version/i })).not.toHaveAttribute(
+        'aria-disabled',
+        'true',
+        { timeout: 20_000 }
+      )
+      await expect(projectAdminApp.getByRole('menuitem', { name: /^Publish workflow$/i })).not.toHaveAttribute(
+        'aria-disabled',
+        'true'
+      )
+      await expect(projectAdminApp.getByRole('menuitem', { name: /Unpublish workflow/i })).not.toHaveAttribute(
+        'aria-disabled',
+        'true'
+      )
+      await expect(projectAdminApp.getByRole('menuitem', { name: /Delete workflow/i })).not.toHaveAttribute(
+        'aria-disabled',
+        'true'
+      )
+    } finally {
+      if (workflowId) await deleteTestWorkflow(app, workflowId)
+      if (projectId) await apiRequest(app, 'delete', `/projects/${projectId}`)
+      if (userId) await deleteUserViaApi(app, userId)
+    }
+  })
+
   test('viewer: workflow row action tooltip explains the denial', async ({ app, viewerApp }) => {
     const workflow = await createTestWorkflow(app)
 
@@ -473,12 +631,13 @@ test.describe('Permission gating — Workflow actions', () => {
       await viewerApp.goto(toAppUrl('/workflows'))
       await expect(viewerApp.getByRole('heading', { level: 1, name: 'Workflows' })).toBeVisible()
 
+      await filterWorkflowsByName(viewerApp, workflow.name)
+
       const workflowRow = viewerApp
         .getByRole('grid', { name: 'Workflows table' })
         .getByRole('row', { name: new RegExp(workflow.name) })
       await expect(workflowRow).toBeVisible({ timeout: 15_000 })
-      const kebab = workflowRow.getByRole('button', { name: /Actions|Kebab toggle/i })
-      await kebab.click()
+      await openRowKebab(workflowRow, /Edit workflow/i)
 
       const editItem = viewerApp.getByRole('menuitem', { name: /Edit workflow/i })
       await expect(editItem).toBeVisible()

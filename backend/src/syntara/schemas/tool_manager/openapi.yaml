@@ -196,7 +196,6 @@ components:
 
     ToolWithParameters:
       allOf:
-        - $ref: '../base/shared-resources.openapi.yaml#/components/schemas/UserOwnedResource'
         - $ref: '../base/shared-resources.openapi.yaml#/components/schemas/NamedResource'
         - type: object
           title: ToolWithParameters
@@ -207,6 +206,20 @@ components:
             - namespaced_name
             - parameters
           properties:
+            created_by:
+              anyOf:
+                - $ref: '../base/shared-resources.openapi.yaml#/components/schemas/UserReference'
+                - type: 'null'
+              description: User who created the tool
+              readOnly: true
+              title: Created By
+            updated_by:
+              anyOf:
+                - $ref: '../base/shared-resources.openapi.yaml#/components/schemas/UserReference'
+                - type: 'null'
+              description: User who last modified the tool
+              readOnly: true
+              title: Updated By
             integration_id:
               type: string
               format: uuid

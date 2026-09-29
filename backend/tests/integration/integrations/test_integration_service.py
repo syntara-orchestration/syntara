@@ -10,6 +10,7 @@ from syntara.authz.engine import AllowedProjectsResult
 from syntara.authz.models import Project
 from syntara.core.exceptions import SafeValueError
 from syntara.core.models import User
+from syntara.core.models.user_reference import UserReference
 from syntara.integrations.exceptions import (
     IntegrationCredentialNotFoundError,
     IntegrationCredentialRequiredError,
@@ -66,7 +67,9 @@ class TestCreateIntegration:
         assert result.scope == IntegrationScope.GLOBAL
         assert result.enabled is True
         assert result.management_credential_id is None
-        assert result.created_by == test_user.username
+        assert isinstance(result.created_by, UserReference)
+        assert result.created_by.id == test_user.id
+        assert result.created_by.name == test_user.display_name
 
     @pytest.mark.asyncio
     async def test_create_llm_provider(

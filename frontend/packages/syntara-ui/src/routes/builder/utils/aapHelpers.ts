@@ -18,6 +18,45 @@ export function isJobTemplateInputVariablesMode(
   return Boolean(data.use_input_variables) || hasExpressionValue(data.organization_name, data.job_template_name)
 }
 
+/** True when the workflow template form is in input-variables (expression) mode. */
+export function isWorkflowTemplateInputVariablesMode(
+  data: Pick<AAPWorkflowTemplateFormData, 'use_input_variables' | 'organization_name' | 'workflow_job_template_name'>
+): boolean {
+  return (
+    Boolean(data.use_input_variables) || hasExpressionValue(data.organization_name, data.workflow_job_template_name)
+  )
+}
+
+/** Restore workflow expression-mode toggle state from stored activity config. */
+export function resolveWorkflowUseInputVariables(
+  config: Record<string, unknown>,
+  fields: {
+    organizationName: string
+    workflowTemplateName: string
+    inventoryName: string
+    limit: string
+    scmBranch: string
+    tags: string
+    skipTags: string
+    extraVars: string
+  }
+): boolean {
+  return (
+    config.use_input_variables === true ||
+    config.useInputVariables === true ||
+    hasExpressionValue(
+      fields.organizationName,
+      fields.workflowTemplateName,
+      fields.inventoryName,
+      fields.limit,
+      fields.scmBranch,
+      fields.tags,
+      fields.skipTags,
+      fields.extraVars
+    )
+  )
+}
+
 /**
  * Build an AAP activity in expression mode (template name/org provided as expressions
  * that resolve at runtime rather than a concrete job_template_id).
@@ -30,7 +69,7 @@ export function buildExpressionModeActivity(
   // job_template_id is set to 0 as a placeholder — expression-mode nodes resolve
   // the template by name at runtime, so the ID is removed from config below.
   const config = { ...buildAAPConfig(data), useInputVariables: true }
-  const activity = createAAPJobTemplateActivity(nodeId, name, 0, config)
+  const activity = createAAPJobTemplateActivity({ id: nodeId, name, jobTemplateId: 0, config })
   if (activity.parameters) {
     activity.parameters.job_template_name = data.job_template_name
     activity.parameters.organization_name = data.organization_name
@@ -226,8 +265,9 @@ export function buildWorkflowExpressionModeActivity(
   name: string,
   data: AAPWorkflowTemplateFormData
 ): ReturnType<typeof createAAPWorkflowTemplateActivity> {
-  const config = buildAAPWorkflowTemplateConfig(data)
-  const activity = createAAPWorkflowTemplateActivity(nodeId, name, 0, config)
+  const baseConfig = buildAAPWorkflowTemplateConfig(data)
+  const config = baseConfig ? { ...baseConfig, use_input_variables: true } : { use_input_variables: true }
+  const activity = createAAPWorkflowTemplateActivity({ id: nodeId, name, workflowTemplateId: 0, config })
   if (activity.parameters) {
     activity.parameters.workflow_job_template_name = data.workflow_job_template_name
     activity.parameters.organization_name = data.organization_name
