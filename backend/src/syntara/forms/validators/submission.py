@@ -9,11 +9,9 @@ from __future__ import annotations
 import math
 from collections.abc import Mapping
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, assert_never
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
-
     from syntara.forms.models.form_prompt import FormPrompt
 
 from pydantic import EmailStr, TypeAdapter, ValidationError
@@ -194,6 +192,10 @@ def _is_empty(value: Any) -> bool:  # noqa: ANN401
 def coerce_field(field: FormField, raw: Any) -> Any:  # noqa: ANN401
     """Coerce raw submitted value to the field's expected type.
 
+    FormField is a closed union, so every field type needs a case here. The
+    assert_never fallback turns a missing one into a mypy error - note that
+    pyrefly does not flag it, so `make typecheck` is what catches this.
+
     Args:
         field: Field definition
         raw: Raw submitted value
@@ -205,28 +207,28 @@ def coerce_field(field: FormField, raw: Any) -> Any:  # noqa: ANN401
         ValueError: If coercion fails
 
     """
-    coercer = _COERCERS.get(type(field))
+    coerced: Any
+    match field:
+        case TextField() | TextAreaField() | MaskedTextField():
+            coerced = _coerce_string(raw)
+        case EmailField():
+            coerced = _coerce_email(raw)
+        case NumberField():
+            coerced = _coerce_number(raw)
+        case CheckboxField():
+            coerced = _coerce_checkbox(raw)
+        case DateField():
+            # The only coercer that reads its own definition, to learn which
+            # date components the field collects.
+            coerced = _coerce_date(field, raw)
+        case DropdownField():
+            coerced = _coerce_dropdown(raw)
+        case MultiSelectField():
+            coerced = _coerce_multi_select(raw)
+        case _:
+            assert_never(field)
 
-    # Should never happen: FormField is a closed discriminated union, and the
-    # table below covers every member.
-    if coercer is None:
-        msg = f"Unknown field type: {type(field)}"
-        raise ValueError(msg)
-
-    return coercer(field, raw)
-
-
-def _value_only(coercer: Callable[[Any], Any]) -> Callable[[FormField, Any], Any]:
-    """Adapt a coercer that needs only the value to the field-aware signature.
-
-    Only DateField reads its own definition during coercion; keeping one table
-    lets the dispatch parity test below stay a simple key comparison.
-    """
-
-    def _adapted(_field: FormField, raw: Any) -> Any:  # noqa: ANN401
-        return coercer(raw)
-
-    return _adapted
+    return coerced
 
 
 def _coerce_string(raw: Any) -> str:  # noqa: ANN401
@@ -565,21 +567,3 @@ def _coerce_multi_select(raw: Any) -> list[str | int | float | bool]:  # noqa: A
 
     # Wrap single scalar into list (browser behavior)
     return [_coerce_option_value(raw)]
-
-
-# Dispatch for coerce_field, keyed on the exact field class. FormField is a
-# closed discriminated union whose members all derive from FormFieldBase
-# directly, so there are no subclass relationships to order around and an exact
-# type lookup is unambiguous. Every member must appear here; the parity test in
-# test_submission.py asserts that.
-_COERCERS: dict[type, Callable[[Any, Any], Any]] = {
-    TextField: _value_only(_coerce_string),
-    TextAreaField: _value_only(_coerce_string),
-    MaskedTextField: _value_only(_coerce_string),
-    EmailField: _value_only(_coerce_email),
-    NumberField: _value_only(_coerce_number),
-    CheckboxField: _value_only(_coerce_checkbox),
-    DateField: _coerce_date,
-    DropdownField: _value_only(_coerce_dropdown),
-    MultiSelectField: _value_only(_coerce_multi_select),
-}

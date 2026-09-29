@@ -6,7 +6,7 @@ import pytest
 
 from syntara.forms.exceptions import FormDataValidationError
 from syntara.forms.models.form_fields import FormDefinition, FormField
-from syntara.forms.validators.submission import _COERCERS, validate_form_submission
+from syntara.forms.validators.submission import validate_form_submission
 
 _STATIC_OPTIONS: dict[str, Any] = {
     "source": "static",
@@ -292,25 +292,26 @@ class TestCoercion:
 
 
 class TestCoercerDispatch:
-    """The dispatch table stays in sync with the FormField union."""
+    """coerce_field handles every field type in the FormField union.
 
-    def test_every_field_type_has_a_coercer(self) -> None:
-        """A new field type must be registered in _COERCERS.
+    A missing case is a mypy error via assert_never, but the pre-commit pyrefly
+    hook does not flag it, so this is the backstop for anyone who adds a field
+    type without running `make typecheck`.
+    """
 
-        Without this, adding a union member and forgetting the table entry
-        fails at runtime with "Unknown field type" instead of at CI time.
-        """
+    def test_every_field_type_is_routed(self) -> None:
         union, _discriminator = get_args(FormField)
-        members = set(get_args(union))
-
+        members = get_args(union)
         assert members, "FormField union introspection returned nothing - the test needs updating"
-        assert members - set(_COERCERS) == set()
 
-    def test_no_stale_coercer_entries(self) -> None:
-        """A removed field type must not linger in the table."""
-        union, _discriminator = get_args(FormField)
+        for member in members:
+            (type_name,) = get_args(member.model_fields["type"].annotation)
+            overrides = {"options": _STATIC_OPTIONS} if "options" in member.model_fields else {}
+            form = _form(_field(type_name, "probe", **overrides))
 
-        assert set(_COERCERS) - set(get_args(union)) == set()
+            # No coercer accepts a bare object, so every case must turn this
+            # into a field error rather than falling through to assert_never.
+            assert _errors(form, {"probe": object()}), f"{type_name} produced no error"
 
 
 class TestEmailField:

@@ -80,7 +80,7 @@ class CheckboxField(FormFieldBase):
 DATE_COMPONENTS = ("date", "time", "timezone")
 
 
-# Used both for a field's `default` and for the shape a responder submits.
+# Used both for a field's `default` and for the expected submitted response.
 # Which components must be present is decided by the owning DateField, not here:
 # every component is independently optional on this model.
 class DateValue(BaseModel):
@@ -199,13 +199,7 @@ class DateField(FormFieldBase):
 
     @model_validator(mode="after")
     def _check_default_covers_components(self) -> DateField:
-        """Require a default to supply exactly the components the field collects.
-
-        A default stands in for a whole skipped answer. A partial one would be
-        substituted wholesale at submission time and then fail the very coercion
-        it was meant to satisfy, so the mismatch is reported here at definition
-        time instead.
-        """
+        """Require a default to supply exactly the components the field collects."""
         if self.default is None:
             return self
 

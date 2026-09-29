@@ -14,18 +14,6 @@ type OptionScalar = string | number | boolean
 
 type CoercedValue = FormSubmissionData[string]
 
-type Coercer = (field: FormField, raw: unknown) => CoercedValue
-
-/**
- * Adapt a coercer that needs only the value to the field-aware signature.
- *
- * Only date fields read their own definition during coercion; keeping a single
- * table lets the dispatch stay exhaustive over `FormField['type']`.
- */
-function valueOnly(coercer: (raw: unknown) => CoercedValue): Coercer {
-  return (_field, raw) => coercer(raw)
-}
-
 function isEmptyValue(value: unknown): boolean {
   return value === '' || value === null || value === undefined || (Array.isArray(value) && value.length === 0)
 }
@@ -271,20 +259,37 @@ function coerceMultiSelect(raw: unknown): Array<OptionScalar> {
   return [coerceOptionScalar(raw)]
 }
 
-const COERCERS: Record<FormField['type'], Coercer> = {
-  [FormFieldTypeEnum.TEXT]: valueOnly(coerceString),
-  [FormFieldTypeEnum.TEXTAREA]: valueOnly(coerceString),
-  [FormFieldTypeEnum.MASKED_TEXT]: valueOnly(coerceString),
-  [FormFieldTypeEnum.EMAIL]: valueOnly(coerceEmail),
-  [FormFieldTypeEnum.NUMBER]: valueOnly(coerceNumber),
-  [FormFieldTypeEnum.CHECKBOX]: valueOnly(coerceCheckbox),
-  [FormFieldTypeEnum.DATE]: (field, raw) => coerceDate(field as DateFormField, raw),
-  [FormFieldTypeEnum.DROPDOWN]: valueOnly(coerceDropdown),
-  [FormFieldTypeEnum.MULTI_SELECT]: valueOnly(coerceMultiSelect),
-}
-
+/**
+ * Coerce a submitted value according to its field's type.
+ *
+ * `FormField` is a closed union, so every field type needs a `case` here. The
+ * `never` default makes a missing one a compile error.
+ */
 function coerceField(field: FormField, raw: unknown): CoercedValue {
-  return COERCERS[field.type](field, raw)
+  switch (field.type) {
+    case FormFieldTypeEnum.TEXT:
+    case FormFieldTypeEnum.TEXTAREA:
+    case FormFieldTypeEnum.MASKED_TEXT:
+      return coerceString(raw)
+    case FormFieldTypeEnum.EMAIL:
+      return coerceEmail(raw)
+    case FormFieldTypeEnum.NUMBER:
+      return coerceNumber(raw)
+    case FormFieldTypeEnum.CHECKBOX:
+      return coerceCheckbox(raw)
+    case FormFieldTypeEnum.DATE:
+      // The only coercer that reads its own definition, to learn which date
+      // components the field collects.
+      return coerceDate(field, raw)
+    case FormFieldTypeEnum.DROPDOWN:
+      return coerceDropdown(raw)
+    case FormFieldTypeEnum.MULTI_SELECT:
+      return coerceMultiSelect(raw)
+    default: {
+      const exhaustive: never = field
+      return exhaustive
+    }
+  }
 }
 
 type SelectFormField = Extract<FormField, { type: 'dropdown' }> | Extract<FormField, { type: 'multi_select' }>
