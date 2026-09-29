@@ -1,0 +1,74 @@
+---
+name: Sync devel → TFE
+
+# GitHub only runs scheduled workflows present on the default branch.
+on:
+  schedule:
+    - cron: '0 */6 * * *' # Every six hours at 00:00, 06:00, 12:00, and 18:00 UTC
+  workflow_dispatch:
+
+concurrency:
+  group: sync-devel-to-tfe
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: Rebase feat/ANSTRAT-2372-TFE onto devel
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout TFE branch
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          ref: feat/ANSTRAT-2372-TFE
+          fetch-depth: 0
+
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Record original branch tip
+        id: original
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Fetch devel
+        run: git fetch origin devel
+
+      - name: Rebase TFE branch onto devel
+        id: rebase
+        run: |
+          if git rebase origin/devel; then
+            exit 0
+          else
+            status=$?
+            if [ -n "$(git diff --name-only --diff-filter=U)" ]; then
+              echo "conflict=true" >> "$GITHUB_OUTPUT"
+            fi
+            exit "$status"
+          fi
+
+      - name: Push to TFE branch
+        env:
+          ORIGINAL_SHA: ${{ steps.original.outputs.sha }}
+        run: |
+          git push --force-with-lease="refs/heads/feat/ANSTRAT-2372-TFE:$ORIGINAL_SHA" \
+            origin HEAD:refs/heads/feat/ANSTRAT-2372-TFE
+
+      - name: Notify Slack on rebase conflict
+        if: failure() && steps.rebase.outputs.conflict == 'true'
+        env:
+          # Configure this incoming webhook for the channel that should receive alerts.
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_TFE_SYNC_WEBHOOK_URL }}
+        run: |
+          set -euo pipefail
+          jq -n \
+            --arg repo "$REPOSITORY" \
+            --arg url "$RUN_URL" \
+            '{text: (":warning: *Rebase conflict*: `feat/ANSTRAT-2372-TFE` could not be rebased onto `devel` in *" + $repo + "*.\nResolve the conflicts manually. The branch was not pushed. <" + $url + "|View failed run>")}' \
+          | curl --fail -sS -X POST "$SLACK_WEBHOOK_URL" \
+              -H "Content-Type: application/json" \
+              --data @-
