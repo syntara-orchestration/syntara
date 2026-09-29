@@ -332,8 +332,9 @@ class ActivitySyncMonitorMixin:
                     attempt=attempt,
                     delay_s=delay,
                 )
+                # Retry jitter only affects scheduling; it is not used for secrets or authorization.
                 jitter = (1 - _MONITOR_RETRY_JITTER_FACTOR) + (
-                    secrets.SystemRandom().random() * _MONITOR_RETRY_JITTER_FACTOR
+                    secrets.SystemRandom().random() * _MONITOR_RETRY_JITTER_FACTOR  # NOSONAR
                 )
                 jittered_delay = delay * jitter
                 await asyncio.sleep(jittered_delay)

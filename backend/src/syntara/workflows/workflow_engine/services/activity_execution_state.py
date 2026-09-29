@@ -82,11 +82,14 @@ class ActivityExecutionStateMixin:
             return ExecutionStatus.COMPLETED, None
         if not isinstance(result_data, dict):
             return ExecutionStatus.COMPLETED, None
+        inner_status = result_data.get("status")
+        if not isinstance(inner_status, str):
+            inner_status = ""
         status = {
             "cancelled": ExecutionStatus.CANCELLED,
             "failed": ExecutionStatus.FAILED,
             "completed_with_errors": ExecutionStatus.COMPLETED_WITH_ERRORS,
-        }.get(result_data.get("status"), ExecutionStatus.COMPLETED)
+        }.get(inner_status, ExecutionStatus.COMPLETED)
         error = ActivityExecutionStateMixin._extract_failed_activity_errors(result_data)
         if status in (ExecutionStatus.FAILED, ExecutionStatus.COMPLETED_WITH_ERRORS):
             return status, error
