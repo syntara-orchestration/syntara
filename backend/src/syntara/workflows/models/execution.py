@@ -413,6 +413,72 @@ class TestExecutionCreate(SQLModel):
         return self
 
 
+#: Description for the retry-from-failure input-override map (SDP AC-14/R10c).
+_INPUT_PARAMETER_OVERRIDES_DESCRIPTION = (
+    "Input parameter overrides for the retry's starting nodes, keyed by node id then parameter name "
+    "(SDP AC-14/R10c). Each override replaces the value the node would otherwise receive, after upstream "
+    "outputs are injected, so the supplied value is what executes. Parameter names must already exist on "
+    "that node in the retained workflow version, and node ids must be among the retry's starting points; "
+    "anything else is rejected. Overrides apply to this retry run only — the workflow definition is never "
+    "modified, and a permanent change requires editing, saving, and publishing the workflow."
+)
+
+
+class RetryFailureRequest(SQLModel):
+    """Request body for POST /executions/{id}/retry-from-failure."""
+
+    __test__ = False  # Prevent pytest from collecting this as a test class
+
+    retry_point_ids: list[str] = Field(
+        default_factory=list,
+        description="Retry points to resume from (node IDs from the source execution). "
+        "A subset may be passed when multiple parallel branches failed; unselected branches are skipped. "
+        "Empty selects the default: all currently failed nodes. "
+        "This is what the caller asks for; the points that will actually run come back as "
+        "eligible_point_ids on the response, which can differ.",
+    )
+    input_parameter_overrides: dict[str, dict[str, Any]] = Field(
+        default_factory=dict,
+        description=_INPUT_PARAMETER_OVERRIDES_DESCRIPTION,
+    )
+
+
+class RetryFromFailureValidationResponse(SQLModel):
+    """Retry preview (GET /executions/{id}/retry-from-failure-preview)."""
+
+    eligible: bool = Field(description="Whether the retry is allowed to proceed")
+    reason: str | None = Field(default=None, description="Rejection reason when eligible is false, null otherwise")
+    eligible_point_ids: list[str] = Field(
+        default_factory=list,
+        description="The retry points that will actually run, after cleanup (trimmed, deduped, sorted). "
+        "Equal to the requested retry_point_ids except where sanitized nodes are auto-included and "
+        "superseded failed points are dropped, so it is not always a verbatim echo of the request. "
+        "On a rejection it reports the pre-expansion selection that was assessed.",
+    )
+    sanitized_node_ids: list[str] = Field(
+        default_factory=list,
+        description="Upstream nodes with sanitized stored outputs referenced on the retry path. "
+        "Populated when the verdict rejects; empty on eligible verdicts (see auto_included_node_ids).",
+    )
+    auto_included_node_ids: list[str] = Field(
+        default_factory=list,
+        description="Sanitized nodes added as retry points on the default path. "
+        "Empty on explicit selections, which reject instead.",
+    )
+    sanitized_replacements: dict[str, list[str]] = Field(
+        default_factory=dict,
+        description="For each currently-failed node, the sanitized nodes it must be replaced by, if any.",
+    )
+    step_count_by_eligible_point: dict[str, int] = Field(
+        default_factory=dict,
+        description="Re-run step count for each eligible retry point.",
+    )
+    total_step_count: int = Field(
+        default=0,
+        description="Deduplicated total of steps that will re-run across the eligible points.",
+    )
+
+
 class CurrentActivity(SQLModel):
     """Currently executing activity information."""
 
