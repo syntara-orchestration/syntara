@@ -1,13 +1,23 @@
+import { ExecutorTypeEnum } from '@syntara/contracts'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { Node } from '@xyflow/react'
 import { useEffect } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { FlowNodeType, RegistryNodeId } from '../../constants'
+import { useCanI } from '../../hooks/useCanI'
 import { useNodeMenuActions } from '../workflows/canvas/nodes/hooks/useNodeMenuActions'
 import type { NodeType } from '../workflows/canvas/nodes/NodeType'
 
 import { NodeDetailsPanel } from './NodeDetailsPanel'
+import { NodeExecutionPermissionProvider } from './NodeExecutionRestriction'
+
+const mockUseCanI = vi.hoisted(() => vi.fn())
+
+vi.mock('../../hooks/useCanI', () => ({
+  useCanI: mockUseCanI,
+}))
 
 const mockMoveActivityAfter = vi.fn()
 const mockUpdateActivity = vi.fn()
@@ -367,7 +377,7 @@ describe('NodeDetailsPanel', () => {
   it('renders task details in edit mode', () => {
     const taskNode: Node<NodeType['data']> = {
       id: 'task-1',
-      type: 'task',
+      type: FlowNodeType.TASK,
       position: { x: 0, y: 0 },
       data: { id: 'task-1', type: 'task', name: 'Task', task: { executor: 'script', parameters: {} } },
     }
@@ -375,6 +385,69 @@ describe('NodeDetailsPanel', () => {
     render(<NodeDetailsPanel mode="edit" node={taskNode} onClose={mockOnClose} />)
 
     expect(screen.getByTestId('task-details')).toBeInTheDocument()
+  })
+
+  it('shows the denied kind in the existing node editor header', () => {
+    vi.mocked(useCanI).mockReturnValue({ allowed: false, isChecking: false, isError: false })
+    const taskNode: Node<NodeType['data']> = {
+      id: 'task-1',
+      type: 'task',
+      position: { x: 0, y: 0 },
+      data: {
+        id: 'task-1',
+        type: ExecutorTypeEnum.HTTP_REQUEST,
+        name: 'Request',
+        parameters: { method: 'GET' },
+      },
+    }
+
+    render(
+      <NodeExecutionPermissionProvider resourceProject="project-1">
+        <NodeDetailsPanel mode="edit" node={taskNode} onClose={mockOnClose} />
+      </NodeExecutionPermissionProvider>
+    )
+
+    expect(screen.getByRole('img', { name: 'Execution restricted' })).toBeInTheDocument()
+    expect(useCanI).toHaveBeenCalledWith('execute', 'workflow_node', {
+      resourceProject: 'project-1',
+      resourceLabels: { kind: ExecutorTypeEnum.HTTP_REQUEST },
+    })
+  })
+
+  it('uses the selected subtype kind in the add-step editor header', () => {
+    vi.mocked(useCanI).mockReturnValue({ allowed: false, isChecking: false, isError: false })
+    mockNodeRegistryGet.mockReturnValue({
+      id: RegistryNodeId.ACTION,
+      label: 'Action',
+      icon: () => null,
+      subtypes: [
+        {
+          id: RegistryNodeId.ACTION_API,
+          label: 'REST API',
+          icon: () => null,
+          initialData: { executor: ExecutorTypeEnum.HTTP_REQUEST },
+        },
+      ],
+      formComponent: () => null,
+      onSubmit: vi.fn(),
+    })
+
+    render(
+      <NodeExecutionPermissionProvider resourceProject="project-1">
+        <NodeDetailsPanel
+          mode="add"
+          nodeTypeId={RegistryNodeId.ACTION}
+          nodeSubtypeId={RegistryNodeId.ACTION_API}
+          onClose={mockOnClose}
+        />
+      </NodeExecutionPermissionProvider>
+    )
+
+    expect(screen.getByRole('img', { name: 'Execution restricted' })).toBeInTheDocument()
+    expect(useCanI).toHaveBeenCalledWith('execute', 'workflow_node', {
+      resourceProject: 'project-1',
+      resourceLabels: { kind: ExecutorTypeEnum.HTTP_REQUEST },
+    })
   })
 
   it('renders trigger details in edit mode when trigger exists', () => {

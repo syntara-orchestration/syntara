@@ -10,7 +10,7 @@
   "main": "./src/index.ts",
   "scripts": {
     "gen:ts": "concurrently npm:gen:local:* -c auto && cd ../.. && npm run format",
-    "gen:local": "npm run gen:ts && npm run sync-examples",
+    "gen:local": "npm run sync-examples && npm run gen:ts",
     "gen:local:admin": "openapi-typescript ../../../backend/src/syntara/schemas/admin/openapi.yaml --output ./src/admin-api.ts --default-non-nullable false",
     "gen:local:auth": "openapi-typescript ../../../backend/src/syntara/schemas/auth/openapi.yaml --output ./src/auth-api.ts --default-non-nullable false",
     "gen:local:users": "openapi-typescript ../../../backend/src/syntara/schemas/users/openapi.yaml --output ./src/users-api.ts --default-non-nullable false",

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  formatWorkflowLaunchRejection,
   getErrorCode,
   getErrorMessage,
   getErrorStatus,
@@ -16,6 +17,30 @@ import {
 } from './apiErrors'
 
 describe('apiErrors', () => {
+  describe('workflow launch rejections', () => {
+    it('lists every denied step in a launch error', () => {
+      expect(
+        formatWorkflowLaunchRejection({
+          code: 'WORKFLOW_LAUNCH_REJECTED',
+          reason: 'step_type_denied',
+          denied_steps: [
+            { kind: 'script', node_id: 'step-a', denied_by: 'deny-script' },
+            { kind: 'http_request', node_id: 'step-b', denied_by: 'deny-http' },
+          ],
+        })
+      ).toBe(
+        'This workflow contains denied step types: script (step-a, deny-script); http_request (step-b, deny-http).'
+      )
+    })
+
+    it('formats other rejection reasons inside API wrappers', () => {
+      expect(getErrorMessage({ data: { code: 'WORKFLOW_LAUNCH_REJECTED', reason: 'execution_run_denied' } })).toBe(
+        'You are not allowed to run this workflow.'
+      )
+      expect(formatWorkflowLaunchRejection('not json')).toBeNull()
+    })
+  })
+
   describe('sanitizeUserFacingErrorText', () => {
     it('strips angle-bracket segments resembling HTML tags', () => {
       expect(sanitizeUserFacingErrorText('<script></script>Safe text')).toBe('Safe text')

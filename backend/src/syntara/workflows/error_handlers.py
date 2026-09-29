@@ -35,6 +35,7 @@ if TYPE_CHECKING:
         WorkflowConcurrencyLimitError,
         WorkflowDefinitionInvalidError,
         WorkflowHasActiveExecutionsError,
+        WorkflowLaunchRejectedError,
         WorkflowNameConflictError,
         WorkflowNotFoundError,
         WorkflowNotPublishedError,
@@ -278,6 +279,26 @@ def builtin_workflow_modify_handler(request: Request, exc: "BuiltinWorkflowModif
         code="BUILTIN_WORKFLOW_MODIFY_FORBIDDEN",
         retryable=False,
         instance=str(request.url),
+    )
+
+
+def workflow_launch_rejected_handler(request: Request, exc: "WorkflowLaunchRejectedError") -> JSONResponse:
+    """Return the launch rejection contract as RFC 9457 problem details."""
+    rejection = exc.rejection
+    content = {
+        "type": PROBLEM_TYPES["forbidden"],
+        "title": "Workflow Launch Rejected",
+        "detail": str(exc),
+        "retryable": False,
+        "instance": str(request.url),
+        **rejection.to_dict(),
+    }
+    if exc.execution_id is not None:
+        content["execution_id"] = str(exc.execution_id)
+    return JSONResponse(
+        status_code=status.HTTP_403_FORBIDDEN,
+        content=content,
+        media_type=_PROBLEM_JSON_MEDIA_TYPE,
     )
 
 

@@ -432,6 +432,8 @@ E2E_COVERAGE_EXEMPT: set[str] = {
     "policy:read:any",
     "policy:update:any",
     "policy:delete:any",
+    # Workflow step policies are covered by registry and Rego unit tests.
+    "workflow_node:execute:any",
     # Role assignments (system-level)
     "role-assignment:read:any",
     "role-assignment:assign:any",

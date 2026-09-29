@@ -32,6 +32,8 @@ _TEST_WORKER_ACTIVITIES: list[Callable[..., Any]] = [
     converge,
     fetch_workflow_runtime_settings,
     execute_internal_activity,
+    # Node-kind permission activities (ANSTRAT-1750): the engine calls
+    # check_node_kind_enabled before every executor node.
 ]
 
 

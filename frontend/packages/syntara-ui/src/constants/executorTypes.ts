@@ -13,6 +13,7 @@ export const API_EXECUTOR_TYPES = new Set([
   ActivityTypeEnum.AGENTIC,
   ActivityTypeEnum.AAP_JOB_TEMPLATE,
   ActivityTypeEnum.APPROVAL,
+  ActivityTypeEnum.MCP_TOOL,
   ActivityTypeEnum.INTERNAL_ACTIVITY,
 ] as const)
 
@@ -25,4 +26,5 @@ export type ApiExecutorType =
   | 'agentic'
   | 'aap_job_template'
   | 'approval'
+  | 'mcp_tool'
   | 'internal_activity'

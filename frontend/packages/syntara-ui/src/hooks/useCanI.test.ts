@@ -134,6 +134,22 @@ describe('useCanI', () => {
     })
   })
 
+  it('passes resource_labels when resourceLabels are provided', async () => {
+    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: false } })
+
+    const { result } = renderHook(() => useCanI('execute', 'workflow_node', { resourceLabels: { kind: 'script' } }), {
+      wrapper: createWrapper(),
+    })
+
+    await waitFor(() => {
+      expect(result.current.isChecking).toBe(false)
+    })
+
+    expect(accessFetchClient.POST).toHaveBeenCalledWith('/authz/can_i', {
+      body: { action: 'execute', resource_type: 'workflow_node', resource_labels: { kind: 'script' } },
+    })
+  })
+
   it('passes check_any_project when checkAnyProject is true', async () => {
     vi.mocked(accessFetchClient.POST).mockResolvedValue({
       data: { allowed: true },

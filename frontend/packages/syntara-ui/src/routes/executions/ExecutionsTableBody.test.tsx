@@ -73,6 +73,25 @@ function renderTable(executions: Parameters<typeof FlatExecutionsTableBody>[0]['
 }
 
 describe('ExecutionsTableBody - Run ID column', () => {
+  it('shows the reason for a failed launch in the Runs list', () => {
+    renderTable([
+      {
+        id: 'rejected-run',
+        status: 'failed',
+        error_details: JSON.stringify({
+          code: 'WORKFLOW_LAUNCH_REJECTED',
+          reason: 'step_type_denied',
+          denied_steps: [{ node_id: 'step-a', kind: 'script', denied_by: 'deny-script' }],
+        }),
+        project_id: 'project-1',
+      },
+    ])
+
+    expect(
+      screen.getByText('This workflow contains denied step types: script (step-a, deny-script).')
+    ).toBeInTheDocument()
+  })
+
   it('renders Run ID as the first data cell with the execution id', () => {
     const executionId = '123e4567-e89b-12d3-a456-426614174000'
     renderTable([

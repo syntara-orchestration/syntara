@@ -17,10 +17,12 @@ import prometheus_client
 import structlog
 
 from syntara.audit.registration import discover_and_register_all_handlers
+from syntara.authz.evaluator import RegoEvaluator
 from syntara.core.config.base import get_settings
 from syntara.core.database.session import AsyncSessionLocal
 from syntara.core.logging.logging import apply_runtime_log_level
 from syntara.settings.cache.settings_cache import SettingsCache, get_runtime_settings, set_runtime_settings
+from syntara.workflows.node_launch_checks import set_node_authz_evaluator
 from syntara.workflows.workflow_engine.services.temporal_worker import (
     TemporalWorkerService,
     stop_worker,
@@ -29,6 +31,36 @@ from syntara.workflows.workflow_engine.services.temporal_worker import (
 logger = structlog.stdlib.get_logger(__name__)
 
 StartFn = Callable[[], Coroutine[Any, Any, TemporalWorkerService]]
+
+
+async def _start_authz_evaluator(worker_name: str) -> RegoEvaluator | None:
+    """Start the Rego evaluator this process uses for node-kind checks.
+
+    Worker activities evaluate ``workflow_node:execute`` (scheduled launches and
+    the resume re-check) but have no request to read the API's evaluator from.
+    The evaluator loads a native Rego runtime, so it is created once here at
+    process startup — never inside workflow code, where the Temporal sandbox
+    blocks the lazy imports and environment access it needs.
+
+    Returns the started evaluator, or ``None`` when startup failed: a worker must
+    still come up, and a missing evaluator is logged loudly and fails open rather
+    than denying every node.
+    """
+    evaluator = RegoEvaluator()
+    try:
+        evaluator.start()
+        if not await evaluator.health():
+            msg = "Authorization evaluator failed startup healthcheck"
+            raise RuntimeError(msg)  # noqa: TRY301
+    except Exception:
+        logger.exception(
+            "Authorization evaluator unavailable — node-kind execute checks will be skipped",
+            worker=worker_name,
+        )
+        return None
+    set_node_authz_evaluator(evaluator)
+    logger.info("Authorization evaluator ready", worker=worker_name)
+    return evaluator
 
 
 async def run_worker(start_fn: StartFn, *, worker_name: str) -> None:
@@ -41,6 +73,7 @@ async def run_worker(start_fn: StartFn, *, worker_name: str) -> None:
 
     """
     worker_service: TemporalWorkerService | None = None
+    authz_evaluator: RegoEvaluator | None = None
 
     shutdown_event = asyncio.Event()
     loop = asyncio.get_running_loop()
@@ -73,6 +106,7 @@ async def run_worker(start_fn: StartFn, *, worker_name: str) -> None:
 
     get_runtime_settings().start_watching()
     discover_and_register_all_handlers()
+    authz_evaluator = await _start_authz_evaluator(worker_name)
 
     try:
         logger.info("Starting Temporal worker", worker=worker_name)
@@ -87,6 +121,10 @@ async def run_worker(start_fn: StartFn, *, worker_name: str) -> None:
 
     finally:
         await get_runtime_settings().stop_watching()
+
+        if authz_evaluator is not None:
+            set_node_authz_evaluator(None)
+            await authz_evaluator.stop()
 
         if worker_service:
             logger.info("Stopping Temporal worker", worker=worker_name)

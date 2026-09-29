@@ -22,6 +22,7 @@ _NODE_SETTINGS_CLASS: dict[str, type[NodeSettingsBase]] = {
     NodeType.AAP_WORKFLOW_JOB_TEMPLATE: NodeSettingsFull,
     NodeType.INTERNAL_ACTIVITY: NodeSettingsFull,
     NodeType.SCRIPT: NodeSettingsNoRetry,
+    NodeType.MCP_TOOL: NodeSettingsNoRetry,
     NodeType.AGENTIC: NodeSettingsNoRetry,
     NodeType.APPROVAL: NodeSettingsNoRetry,
     NodeType.WAIT: NodeSettingsCofDisabled,

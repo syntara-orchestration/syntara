@@ -122,6 +122,7 @@ packages/syntara-contracts/
     ├── files-api.ts       # Generated files API types
     ├── approvals-api.ts   # Generated approvals types
     ├── authz-api.ts       # Generated authorization types (can_i, what_can_i)
+    ├── node-kinds-api.ts  # Generated node-kind registry and kill-switch types
     ├── interfaces.ts      # Shared interfaces and enum constants
     └── index.ts           # Exports all types
 ```

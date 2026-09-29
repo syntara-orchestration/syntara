@@ -59,6 +59,8 @@ _TEST_ACTIVITIES: list[Callable[..., object]] = [
     manual_trigger,
     execute_script_activity,
     fetch_workflow_runtime_settings,
+    # Node-kind permission activities (ANSTRAT-1750): the engine calls
+    # check_node_kind_enabled before every executor node.
 ]
 
 _SCHEDULE_TEST_ACTIVITIES: list[Callable[..., object]] = list(_TEST_ACTIVITIES)

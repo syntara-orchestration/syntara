@@ -5,11 +5,15 @@ following DRY principle by centralizing exception definitions.
 """
 
 from datetime import datetime
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 from syntara.core.exception_registry import fastapi_exception
 from syntara.core.exceptions import SyntaraError
 from syntara.workflows.models.validation_finding import ValidationResult
+
+if TYPE_CHECKING:
+    from syntara.workflows.node_launch_checks import WorkflowLaunchRejection
 
 
 class WorkflowError(SyntaraError):
@@ -39,6 +43,17 @@ class WorkflowPublishValidationError(WorkflowError):
         """Initialize with the validation result."""
         self.validation_result = validation_result
         super().__init__("Cannot publish workflow with validation errors or warnings")
+
+
+@fastapi_exception(handler="syntara.workflows.error_handlers.workflow_launch_rejected_handler")
+class WorkflowLaunchRejectedError(WorkflowError):
+    """Raised when launch-time authorization rejects a workflow launch."""
+
+    def __init__(self, rejection: "WorkflowLaunchRejection", execution_id: UUID | None = None) -> None:
+        """Keep the decision and optional triggered execution ID."""
+        self.rejection = rejection
+        self.execution_id = execution_id
+        super().__init__(f"Workflow launch rejected: {rejection.reason}")
 
 
 @fastapi_exception(handler="syntara.workflows.error_handlers.workflow_not_found_handler")

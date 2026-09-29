@@ -61,7 +61,11 @@ class MockWorkerService(TemporalWorkerService):
             self.client,
             task_queue=self.task_queue,
             workflows=[OrchestratorWorkflow],
-            activities=[execute_script_activity, manual_trigger, fetch_workflow_runtime_settings],
+            activities=[
+                execute_script_activity,
+                manual_trigger,
+                fetch_workflow_runtime_settings,
+            ],
         )
 
         self._worker_task = asyncio.create_task(self.worker.run())

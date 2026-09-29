@@ -32,6 +32,8 @@ export function getTaskIconDescriptor(taskData: TaskActivity): IconDescriptor {
     iconId = RegistryNodeId.AGENT
   } else if (actualExecutor === ExecutorTypeEnum.HTTP_REQUEST) {
     iconId = RegistryNodeId.ACTION_API
+  } else if (actualExecutor === ExecutorTypeEnum.MCP_TOOL) {
+    iconId = RegistryNodeId.ACTION_MCP_TOOL
   }
   return { icon: executorMeta?.icon, id: iconId }
 }

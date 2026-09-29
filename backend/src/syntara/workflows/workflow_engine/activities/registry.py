@@ -33,6 +33,7 @@ from syntara.workflows.workflow_engine.activities.internal import register_activ
 from syntara.workflows.workflow_engine.activities.internal_activity import execute_internal_activity
 from syntara.workflows.workflow_engine.activities.loop import loop
 from syntara.workflows.workflow_engine.activities.manual_trigger import manual_trigger
+from syntara.workflows.workflow_engine.activities.mcp_tool import execute_mcp_tool_activity
 from syntara.workflows.workflow_engine.activities.runtime_settings_activity import fetch_workflow_runtime_settings
 from syntara.workflows.workflow_engine.activities.scheduled_trigger import scheduled_trigger
 from syntara.workflows.workflow_engine.activities.script_activity import execute_script_activity
@@ -62,6 +63,7 @@ _TEMPORAL_ACTIVITIES: list[Callable[..., Any]] = [
     switch,
     execute_http_request_activity,
     execute_internal_activity,
+    execute_mcp_tool_activity,
     loop,
     manual_trigger,
     scheduled_trigger,

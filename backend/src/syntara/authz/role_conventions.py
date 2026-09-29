@@ -29,27 +29,33 @@ class PolicyInfo:
     action: str
     scope: str = "any"
     roles: tuple[str, ...] = field(default=(), compare=False, hash=False)
+    effect: str = "allow"
+    kind: str | None = None
 
     @property
     def name(self) -> str:
-        """Canonical 3-part policy name."""
+        """Canonical policy name."""
+        if self.kind is not None:
+            return f"{self.resource}:{self.action}:{self.scope}:{self.kind}"
         return f"{self.resource}:{self.action}:{self.scope}"
 
     @property
     def description(self) -> str:
         """Human-readable description."""
         scope_label = "own" if self.scope == "self" else self.scope
-        action_label = self.action.capitalize()
-        return f"{action_label} {scope_label} {self.resource}"
+        action_label = self.effect.capitalize() if self.effect == "deny" else self.action.capitalize()
+        suffix = f" {self.kind}" if self.kind is not None else ""
+        return f"{action_label} {scope_label} {self.resource}{suffix}"
 
     @property
     def statements(self) -> list[dict[str, object]]:
         """Rego policy statement list."""
         return [
             {
-                "effect": "allow",
+                "effect": self.effect,
                 "actions": [f"{self.resource}:{self.action}"],
                 "scope": self.scope,
+                **({"conditions": {"resource_labels": {"kind": self.kind}}} if self.kind else {}),
             }
         ]
 
@@ -178,6 +184,8 @@ BUILTIN_POLICIES: list[PolicyInfo] = [
     PolicyInfo("invocation", "create", roles=("admin",)),
     PolicyInfo("invocation", "read", roles=("admin",)),
     PolicyInfo("invocation", "cancel", roles=("admin",)),
+    # Every authenticated principal may execute every workflow step by default.
+    PolicyInfo("workflow_node", "execute", roles=("authenticated",)),
     # -- project-scoped --
     PolicyInfo("workflow", "create", scope="project", roles=("project-admin", "project-user")),
     PolicyInfo("workflow", "read", scope="project", roles=("project-admin", "project-user", "project-auditor")),
@@ -235,6 +243,17 @@ BUILTIN_POLICIES: list[PolicyInfo] = [
     PolicyInfo("service_account", "disable", scope="project", roles=("project-admin",)),
     PolicyInfo("service_account", "enable", scope="project", roles=("project-admin",)),
 ]
+
+# Stable system and project denies for each registered step kind. These are
+# unassigned so administrators opt in through a matching-scope custom role.
+from syntara.workflows.node_kinds import REGISTERED_STEP_KINDS  # noqa: E402
+
+BUILTIN_POLICIES.extend(
+    PolicyInfo("workflow_node", "execute", scope=scope, effect="deny", kind=kind)
+    for scope in ("any", "project")
+    for kind in REGISTERED_STEP_KINDS
+    if kind != "mcp_tool"
+)
 
 BUILTIN_ROLES: list[RoleInfo] = [
     RoleInfo("admin", "Full access to all resources"),

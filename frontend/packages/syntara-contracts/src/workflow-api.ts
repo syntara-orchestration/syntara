@@ -556,6 +556,11 @@ export interface components {
        */
       readonly created_by?: components['schemas']['UserReference'] | null
       /**
+       * Published By
+       * @description Principal that last published the version; scheduled runs evaluate authorization as them
+       */
+      readonly published_by?: components['schemas']['UserReference'] | null
+      /**
        * Created At
        * Format: date-time
        */
@@ -1010,6 +1015,7 @@ export interface components {
         | components['schemas']['AAPJobTemplateNode']
         | components['schemas']['AAPWorkflowJobTemplateNode']
         | components['schemas']['HTTPRequestNode']
+        | components['schemas']['MCPToolNode']
         | components['schemas']['AgenticNode']
         | components['schemas']['ScriptNode']
         | components['schemas']['ApprovalNode']
@@ -1141,6 +1147,45 @@ export interface components {
       type: 'http_request'
       parameters: components['schemas']['APIExecutorParameters']
       settings?: components['schemas']['NodeSettingsFull'] | null
+    } & {
+      [key: string]: unknown
+    }
+    /**
+     * MCPToolNode
+     * @description MCP tool executor node.
+     */
+    MCPToolNode: {
+      /**
+       * Id
+       * @description Unique identifier for the node within the workflow
+       */
+      id: string
+      /**
+       * Name
+       * @description Human-readable name for the node
+       */
+      name?: string | null
+      /**
+       * Description
+       * @description Human-readable description of the node purpose
+       */
+      description?: string | null
+      /**
+       * Outputs
+       * @description Output extraction mapping
+       */
+      outputs?: {
+        [key: string]: string
+      } | null
+      /** @description Optional UI position hint */
+      position?: components['schemas']['NodePosition'] | null
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'mcp_tool'
+      parameters: components['schemas']['MCPToolExecutorParameters']
+      settings?: components['schemas']['NodeSettingsNoRetry'] | null
     } & {
       [key: string]: unknown
     }
@@ -1693,6 +1738,34 @@ export interface components {
        * @description Orchestrator credential UUID for authentication or Secret URL.
        */
       credential_id?: string | null
+    }
+    /**
+     * MCPToolExecutorParameters
+     * @description Parameters for MCP tool executor (mcp_tool activity).
+     */
+    MCPToolExecutorParameters: {
+      /**
+       * Integration Id
+       * @description UUID of the mcp_server integration that provides the tool
+       */
+      integration_id: string
+      /**
+       * Tool Name
+       * @description Name of the MCP tool to invoke
+       */
+      tool_name: string
+      /**
+       * Arguments
+       * @description Arguments passed to the MCP tool (values support templating)
+       */
+      arguments?: {
+        [key: string]: unknown
+      }
+      /**
+       * Timeout Seconds
+       * @description Deadline for the tool call in seconds. Defaults to the node's resolved engine timeout and is capped at 600s.
+       */
+      timeout_seconds?: number | null
     }
     /**
      * AgenticExecutorParameters
@@ -2329,6 +2402,62 @@ export interface components {
       /** Completed At */
       completed_at?: string | null
     }
+    /**
+     * WorkflowLaunchRejectedStep
+     * @description A saved workflow step that caused launch authorization to fail.
+     */
+    WorkflowLaunchRejectedStep: {
+      /** Denied By */
+      denied_by: string
+      /** Kind */
+      kind: string
+      /** Node Id */
+      node_id: string
+    }
+    /**
+     * WorkflowLaunchRejectedProblem
+     * @description RFC 9457 response returned when launch authorization rejects a workflow.
+     */
+    WorkflowLaunchRejectedProblem: {
+      /**
+       * Code
+       * @constant
+       */
+      code: 'WORKFLOW_LAUNCH_REJECTED'
+      /** Denied By */
+      denied_by?: string | null
+      /** Denied Steps */
+      denied_steps: components['schemas']['WorkflowLaunchRejectedStep'][]
+      /** Detail */
+      detail: string
+      /** Execution Id */
+      execution_id?: string | null
+      /** Instance */
+      instance: string
+      /**
+       * Principal Id
+       * Format: uuid
+       */
+      principal_id: string
+      /**
+       * Project Id
+       * Format: uuid
+       */
+      project_id: string
+      /**
+       * Reason
+       * @enum {string}
+       */
+      reason: 'principal_inactive' | 'execution_run_denied' | 'step_type_denied'
+      /** Retryable */
+      retryable: boolean
+      /** Title */
+      title: string
+      /** Trigger Type */
+      trigger_type: string | null
+      /** Type */
+      type: string
+    }
   }
   responses: {
     /** @description Bad Request */
@@ -2721,7 +2850,17 @@ export interface operations {
       }
       400: components['responses']['BadRequestError']
       401: components['responses']['UnauthorizedError']
-      403: components['responses']['ForbiddenError']
+      /** @description Workflow update permission or launch authorization rejected */
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/problem+json':
+            | components['schemas']['ErrorData']
+            | components['schemas']['WorkflowLaunchRejectedProblem']
+        }
+      }
       404: components['responses']['NotFoundError']
       409: components['responses']['ConflictError']
       422: components['responses']['ValidationError']
@@ -3007,13 +3146,15 @@ export interface operations {
           'application/problem+json': components['schemas']['ErrorData']
         }
       }
-      /** @description Service account is not authorized for this trigger */
+      /** @description Trigger authorization or workflow launch authorization rejected */
       403: {
         headers: {
           [name: string]: unknown
         }
         content: {
-          'application/problem+json': components['schemas']['ErrorData']
+          'application/problem+json':
+            | components['schemas']['ErrorData']
+            | components['schemas']['WorkflowLaunchRejectedProblem']
         }
       }
       404: components['responses']['NotFoundError']
@@ -3066,13 +3207,15 @@ export interface operations {
           'application/problem+json': components['schemas']['ErrorData']
         }
       }
-      /** @description Service account is not authorized for this trigger */
+      /** @description Trigger authorization or workflow launch authorization rejected */
       403: {
         headers: {
           [name: string]: unknown
         }
         content: {
-          'application/problem+json': components['schemas']['ErrorData']
+          'application/problem+json':
+            | components['schemas']['ErrorData']
+            | components['schemas']['WorkflowLaunchRejectedProblem']
         }
       }
       404: components['responses']['NotFoundError']

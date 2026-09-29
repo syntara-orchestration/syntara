@@ -26,7 +26,16 @@ const YAML_PORT_TO_FROM_PORT: Record<string, V2Edge['from_port']> = {
   body: 'iterate',
 }
 
-const VALID_FROM_PORTS = new Set<string>(['true', 'false', 'iterate', 'complete', 'approved', 'rejected'])
+const VALID_FROM_PORTS = new Set<string>([
+  'true',
+  'false',
+  'iterate',
+  'complete',
+  'approved',
+  'rejected',
+  'allowed',
+  'denied',
+])
 const VALID_TO_PORTS = new Set<string>(['iterate'])
 
 function isRecord(value: unknown): value is Record<string, unknown> {

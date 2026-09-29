@@ -105,7 +105,11 @@ paths:
         '401':
           $ref: '../../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError'
         '403':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError'
+          description: Workflow launch authorization rejected
+          content:
+            application/problem+json:
+              schema:
+                $ref: ../../base/shared-resources.openapi.yaml#/components/schemas/WorkflowLaunchRejectedProblem
         '404':
           $ref: '../../base/shared-resources.openapi.yaml#/components/responses/NotFoundError'
         '409':
@@ -242,7 +246,11 @@ paths:
         '401':
           $ref: '../../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError'
         '403':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError'
+          description: Workflow launch authorization rejected
+          content:
+            application/problem+json:
+              schema:
+                $ref: ../../base/shared-resources.openapi.yaml#/components/schemas/WorkflowLaunchRejectedProblem
         '404':
           $ref: '../../base/shared-resources.openapi.yaml#/components/responses/NotFoundError'
         '409':

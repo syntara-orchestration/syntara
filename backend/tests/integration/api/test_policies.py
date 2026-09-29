@@ -325,6 +325,25 @@ async def test_list_builtin_policies_with_scope_in_operator(
     assert len(data["resources"]) >= 2
 
 
+@pytest.mark.asyncio
+async def test_step_type_deny_builtins_are_listed_for_both_scopes(
+    auth_client: AsyncClient,
+    test_db_session: AsyncSession,
+    test_user: User,
+) -> None:
+    await _make_admin(test_db_session, test_user)
+
+    for scope in ("any", "project"):
+        name = f"workflow_node:execute:{scope}:script"
+        response = await auth_client.get("/api/v1/policies", params={"is_builtin": "true", "name": name, "limit": 100})
+        assert response.status_code == 200
+        policies = response.json()["resources"]
+        assert len(policies) == 1
+        assert policies[0]["name"] == name
+        assert policies[0]["scope"] == scope
+        assert policies[0]["is_builtin"] is True
+
+
 # ============================================================================
 # Not Found
 # ============================================================================

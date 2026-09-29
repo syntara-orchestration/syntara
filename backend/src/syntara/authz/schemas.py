@@ -5,9 +5,10 @@ from typing import Annotated, Any
 from uuid import UUID
 
 from pydantic import Field as PydanticField
-from pydantic import computed_field, field_validator
+from pydantic import computed_field, field_validator, model_validator
 from sqlmodel import Field, SQLModel
 
+from syntara.authz.deny_eligibility import deny_not_allowed_message, find_ineligible_deny_actions
 from syntara.core.constants import NAME_PATTERN
 from syntara.core.exceptions import SafeValueError
 from syntara.core.models.base import BaseListParams
@@ -23,7 +24,7 @@ OptionalNameField = Annotated[
 # ---------------------------------------------------------------------------
 
 VALID_SCOPES = {"any", "self", "project", "own"}
-VALID_EFFECTS = {"allow"}
+VALID_EFFECTS = {"allow", "deny"}
 
 
 class PolicyStatementSchema(SQLModel):
@@ -39,9 +40,17 @@ class PolicyStatementSchema(SQLModel):
     def validate_effect(cls, v: str) -> str:
         """Validate that effect is one of the allowed values."""
         if v not in VALID_EFFECTS:
-            msg = f"Invalid effect '{v}'. Only 'allow' is currently supported."
+            msg = f"Invalid effect '{v}'. Must be one of {sorted(VALID_EFFECTS)}."
             raise SafeValueError(msg)
         return v
+
+    @model_validator(mode="after")
+    def validate_deny_eligibility(self) -> "PolicyStatementSchema":
+        """Reject deny-effect statements that target resource types outside the deny allowlist."""
+        ineligible = find_ineligible_deny_actions([{"effect": self.effect, "actions": self.actions}])
+        if ineligible:
+            raise SafeValueError(deny_not_allowed_message(ineligible))
+        return self
 
     @field_validator("scope")
     @classmethod

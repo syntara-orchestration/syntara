@@ -274,12 +274,57 @@ export function getErrorMessage(error: unknown): string {
     return finalizeUserFacingMessage(fallback)
   }
 
+  const launchRejection = formatWorkflowLaunchRejection(error)
+  if (launchRejection) return finalizeUserFacingMessage(launchRejection)
+
   // Handle native Error instances
   if (error instanceof Error && typeof error.message === 'string' && error.message) {
     return finalizeUserFacingMessage(error.message)
   }
 
   return finalizeUserFacingMessage(extractErrorMessage(error, fallback, new WeakSet<object>()))
+}
+
+/** Render the shared workflow-launch rejection contract for alerts and failed-run details. */
+export function formatWorkflowLaunchRejection(value: unknown): string | null {
+  const seen = new WeakSet<object>()
+  const find = (input: unknown): Record<string, unknown> | null => {
+    let candidate = input
+    if (typeof candidate === 'string') {
+      if (candidate.length > USER_ERROR_PROCESSING_MAX) return null
+      try {
+        candidate = JSON.parse(candidate) as unknown
+      } catch {
+        return null
+      }
+    }
+    if (!candidate || typeof candidate !== 'object' || seen.has(candidate)) return null
+    seen.add(candidate)
+    const record = candidate as Record<string, unknown>
+    if (record.code === 'WORKFLOW_LAUNCH_REJECTED') return record
+    return find(record.data) ?? find(record.cause)
+  }
+
+  const rejection = find(value)
+  if (!rejection) return null
+  if (rejection.reason === 'principal_inactive') return 'The workflow launch principal is disabled or no longer exists.'
+  if (rejection.reason === 'execution_run_denied') return 'You are not allowed to run this workflow.'
+  if (rejection.reason !== 'step_type_denied' || !Array.isArray(rejection.denied_steps)) {
+    return 'The workflow launch was rejected.'
+  }
+
+  const denied = rejection.denied_steps.flatMap((step) => {
+    if (!step || typeof step !== 'object') return []
+    const { kind, node_id: nodeId, denied_by: deniedBy } = step as Record<string, unknown>
+    if (typeof kind !== 'string') return []
+    const details = [typeof nodeId === 'string' ? nodeId : null, typeof deniedBy === 'string' ? deniedBy : null]
+      .filter((part): part is string => part !== null)
+      .join(', ')
+    return [details ? `${kind} (${details})` : kind]
+  })
+  return denied.length
+    ? `This workflow contains denied step types: ${denied.join('; ')}.`
+    : 'This workflow contains a step type you are not allowed to execute.'
 }
 
 /** Extracts the first non-empty string message from an object's msg/message/detail fields. */

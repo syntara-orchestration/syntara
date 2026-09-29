@@ -156,5 +156,13 @@ class InvalidResourceActionError(SyntaraError):
 
 
 @fastapi_exception(handler=_invalid_action_handler)
-class DenyEffectNotSupportedError(SyntaraError):
-    """Raised when a policy statement uses effect='deny', which is not yet supported."""
+class DenyEffectNotAllowedError(SyntaraError):
+    """Raised when a deny-effect statement targets a resource type that is not deny-eligible.
+
+    See ``syntara.authz.deny_eligibility`` for the allowlist and its rationale (AAP-74620).
+    """
+
+
+@fastapi_exception(handler=_invalid_action_handler)
+class InvalidNodeKindError(SyntaraError):
+    """Raised when a ``workflow_node`` statement names an unknown node kind or denies an undeniable action."""

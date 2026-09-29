@@ -249,7 +249,15 @@ class TestRegistryIntegrity:  # noqa: D101
         e2e_covered = {
             c.policy for c in PROJECT_SCOPED_CASES + SYSTEM_SCOPED_REPRESENTATIVE + SELF_SCOPED_CASES + OWN_SCOPED_CASES
         }
+        from syntara.workflows.node_kinds import REGISTERED_STEP_KINDS
+
         accounted_for = e2e_covered | E2E_COVERAGE_EXEMPT
+        accounted_for.update(
+            f"workflow_node:execute:{scope}:{kind}"
+            for scope in ("any", "project")
+            for kind in REGISTERED_STEP_KINDS
+            if kind != "mcp_tool"
+        )
         all_builtin = {p.name for p in BUILTIN_POLICIES}
 
         missing = sorted(all_builtin - accounted_for)
@@ -308,3 +316,26 @@ class TestRegistryIntegrity:  # noqa: D101
                 f"Policy '{policy.name}' has scope='own' but is not assigned to any "
                 f"project-scoped roles. Assigned to: {sorted(assigned_roles)}"
             )
+
+
+class TestWorkflowNodeDefaultAllow:
+    """Authenticated access is the only built-in step grant; denies are opt-in."""
+
+    def test_authenticated_has_execute_and_no_write_grant(self) -> None:
+        names = builtin_role_policy_names("authenticated")
+        assert "workflow_node:execute:any" in names
+        assert not any(name.startswith("workflow_node:write:") for name in names)
+
+    def test_step_denies_are_unassigned_to_all_builtin_roles(self) -> None:
+        deny_names = {
+            policy.name for policy in BUILTIN_POLICIES if policy.resource == "workflow_node" and policy.effect == "deny"
+        }
+        for role in BUILTIN_ROLES:
+            assert not deny_names.intersection(builtin_role_policy_names(role.name))
+
+    def test_step_deny_ids_are_deterministic_and_unique(self) -> None:
+        names = [
+            policy.name for policy in BUILTIN_POLICIES if policy.resource == "workflow_node" and policy.effect == "deny"
+        ]
+        ids = [builtin_policy_uuid(name) for name in names]
+        assert len(ids) == len(set(ids))

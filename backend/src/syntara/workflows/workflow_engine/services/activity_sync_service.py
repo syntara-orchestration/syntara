@@ -2740,8 +2740,8 @@ class ActivitySyncService:
                 }
                 activity.status = target_status
                 activity.completed_at = now
+                base_name = activity.activity_name.split(_COMPOSITE_ITER_SEP)[0]
                 if error_map is not None:
-                    base_name = activity.activity_name.split(_COMPOSITE_ITER_SEP)[0]
                     activity.error_details = error_map.get(base_name)
                 activity.updated_at = now
                 updated_activities.append((activity, old_values))

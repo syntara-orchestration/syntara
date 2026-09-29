@@ -18,6 +18,7 @@ from syntara.integrations.models.llm_model import LLMModel
 from syntara.service_accounts.models.service_account import ServiceAccount
 from syntara.tool_manager.models.tool import Tool
 from syntara.workflows.models.validation_finding import ValidationCategory, ValidationFinding, ValidationSeverity
+from syntara.workflows.validators.mcp_tool import collect_mcp_tool_findings
 from syntara.workflows.workflow_engine.models.workflow_definition import NodeType
 
 _AAP_NODE_TYPES: frozenset[str] = frozenset({NodeType.AAP_JOB_TEMPLATE, NodeType.AAP_WORKFLOW_JOB_TEMPLATE})
@@ -387,6 +388,8 @@ async def validate_workflow_references(
 
     Integrations produce hard errors (required for node execution).
     Unavailable tools are always auto-cleared with warnings.
+    ``mcp_tool`` nodes instead produce error/warning findings for their
+    integration and tool-name references (see ``validators.mcp_tool``).
 
     LLM model handling depends on context:
     - Normal save/publish (is_import=False): missing/disabled models raise hard errors.
@@ -397,6 +400,9 @@ async def validate_workflow_references(
 
     Returns warning findings for any resources that were auto-cleared.
     """
+    # mcp_tool references are reported as findings (not raised) so the Builder can
+    # point at the offending node/field; collected before the hard-error checks below.
+    mcp_tool_findings = await collect_mcp_tool_findings(session, workflow_definition)
     model_integration_ids, model_findings = await _validate_llm_model_references(
         session, workflow_definition, allow_cleanup=is_import
     )
@@ -409,4 +415,4 @@ async def validate_workflow_references(
     sa_findings: list[ValidationFinding] = []
     if is_import:
         sa_findings = await _sanitize_webhook_service_accounts(session, workflow_definition, project_id)
-    return model_findings + tool_findings + sa_findings
+    return mcp_tool_findings + model_findings + tool_findings + sa_findings

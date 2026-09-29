@@ -95,7 +95,12 @@ class TestWaitNodeIntegration:
                 temporal_env.client,
                 task_queue=task_queue,
                 workflows=[OrchestratorWorkflow],
-                activities=[manual_trigger, _test_wait_activity, complete_wait, fetch_workflow_runtime_settings],
+                activities=[
+                    manual_trigger,
+                    _test_wait_activity,
+                    complete_wait,
+                    fetch_workflow_runtime_settings,
+                ],
             ):
                 execution_service = TemporalExecutionService(
                     temporal_client=temporal_env.client,
@@ -132,7 +137,12 @@ class TestWaitNodeIntegration:
                 temporal_env.client,
                 task_queue=task_queue,
                 workflows=[OrchestratorWorkflow],
-                activities=[manual_trigger, _test_wait_activity, complete_wait, fetch_workflow_runtime_settings],
+                activities=[
+                    manual_trigger,
+                    _test_wait_activity,
+                    complete_wait,
+                    fetch_workflow_runtime_settings,
+                ],
             ):
                 execution_service = TemporalExecutionService(
                     temporal_client=temporal_env.client,
@@ -173,7 +183,12 @@ class TestWaitNodeIntegration:
                 temporal_env.client,
                 task_queue=task_queue,
                 workflows=[OrchestratorWorkflow],
-                activities=[manual_trigger, _test_wait_activity, complete_wait, fetch_workflow_runtime_settings],
+                activities=[
+                    manual_trigger,
+                    _test_wait_activity,
+                    complete_wait,
+                    fetch_workflow_runtime_settings,
+                ],
             ):
                 execution_service = TemporalExecutionService(
                     temporal_client=temporal_env.client,

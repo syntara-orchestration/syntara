@@ -62,6 +62,7 @@ export function ConvergeNodeComponent(props: NodeProps<ConvergeNode>) {
     >
       <StandardNodeHeader
         icon={iconNode}
+        executionKind={props.data.type}
         title={props.data.name}
         subtitle={metadata.label}
         expandable

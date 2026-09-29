@@ -5,15 +5,12 @@ from uuid import UUID
 
 import structlog
 from fastapi import Depends, Query, Request, Response, status
-from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 from temporalio.service import RPCError
 
 from syntara.auth import get_current_user
 from syntara.authz.dependencies import PermissionChecker, VisibilityFilter, get_authz_evaluator
-from syntara.authz.engine import AuthzRequest, VisibilityResult, authorize
-from syntara.authz.exceptions import AuthorizationDeniedError
-from syntara.authz.models.project import Project
+from syntara.authz.engine import VisibilityResult
 from syntara.core.database.session import get_db
 from syntara.core.models import User
 from syntara.core.syntara_router import NO_PERMISSION, SyntaraRouter
@@ -24,6 +21,7 @@ from syntara.workflows.models.execution import (
     ExecutionCreate,
     ExecutionListResponse,
     ExecutionRead,
+    WorkflowLaunchRejectedProblem,
 )
 from syntara.workflows.models.query_params import ActivityListParams, ExecutionIncludeParams
 from syntara.workflows.services import ExecutionService
@@ -73,6 +71,7 @@ async def get_temporal_execution_service() -> TemporalExecutionService | None:
 
 
 def get_execution_service(
+    request: Request,
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
     temporal_service: Annotated[
@@ -86,6 +85,7 @@ def get_execution_service(
     This centralizes ExecutionService creation across all endpoints.
 
     Args:
+        request: FastAPI request, source of the shared authorization evaluator
         db: Database session (injected by FastAPI)
         current_user: Current authenticated user
         temporal_service: Temporal service (injected by FastAPI, may be None)
@@ -94,7 +94,12 @@ def get_execution_service(
         ExecutionService configured with database and optional Temporal integration
 
     """
-    return ExecutionService(db, current_user, temporal_service=temporal_service)
+    return ExecutionService(
+        db,
+        current_user,
+        temporal_service=temporal_service,
+        authz_evaluator=get_authz_evaluator(request),
+    )
 
 
 @router.get(
@@ -148,13 +153,11 @@ async def list_executions(
     summary="Create execution",
     description="Start a new workflow execution.",
     dependencies=[NO_PERMISSION],
+    responses={403: {"model": WorkflowLaunchRejectedProblem, "description": "Workflow launch authorization rejected"}},
 )
 async def create_execution(
     request: ExecutionCreate,
-    http_request: Request,
     service: Annotated[ExecutionService, Depends(get_execution_service)],
-    current_user: Annotated[User, Depends(get_current_user)],
-    db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ExecutionRead:
     """Create and start a new workflow execution.
 
@@ -166,10 +169,7 @@ async def create_execution(
 
     Args:
         request: Execution creation request with workflow_id and input_data
-        http_request: FastAPI request for authz evaluator access
         service: Execution service (injected by FastAPI)
-        current_user: Current authenticated user
-        db: Database session for permission checks
 
     Returns:
         Created execution with status=PENDING
@@ -181,45 +181,9 @@ async def create_execution(
         HTTPException: 500 if Temporal workflow start fails
 
     """
-    # Check execution:run permission, using the workflow's project for scoping
-    from syntara.workflows.models.workflow import Workflow  # noqa: PLC0415
-
-    wf_result = await db.exec(select(Workflow.project_id).where(Workflow.id == request.workflow_id))
-    wf_project_id = wf_result.first()
-    resource_project = ""
-    if wf_project_id:
-        proj_result = await db.exec(select(Project.name).where(Project.id == wf_project_id))
-        resource_project = proj_result.first() or ""
-
-    evaluator = get_authz_evaluator(http_request)
-    authz_result = await authorize(
-        db,
-        evaluator,
-        AuthzRequest(
-            user_id=current_user.id,
-            action="run",
-            resource_type="execution",
-            resource_id="",
-            resource_project=resource_project,
-            user_labels=current_user.labels,
-            user_metadata=current_user.authz_metadata,
-        ),
-    )
-    if not authz_result.allowed:
-        logger.info(
-            "Authorization denied",
-            user_id=str(current_user.id),
-            resource_type="execution",
-            action="run",
-            denied_by=authz_result.denied_by,
-        )
-        msg = "Not authorized to perform run on execution"
-        raise AuthorizationDeniedError(msg)
-
     logger.info(
         "Creating execution for workflow",
         workflow_id=request.workflow_id,
-        user_id=current_user.id,
     )
 
     execution: ExecutionRead = await service.create_execution(
@@ -290,7 +254,7 @@ async def cancel_execution(
     status_code=status.HTTP_201_CREATED,
     response_model=ExecutionRead,
     response_description="New execution created from retry",
-    dependencies=[Depends(_exec_perm_run)],
+    responses={403: {"model": WorkflowLaunchRejectedProblem, "description": "Workflow launch authorization rejected"}},
 )
 async def retry_execution(
     execution_id: UUID,

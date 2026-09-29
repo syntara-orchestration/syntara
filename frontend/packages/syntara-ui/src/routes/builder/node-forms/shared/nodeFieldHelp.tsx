@@ -23,6 +23,12 @@ export const nodeHelp = {
   httpHeaders: createFieldHelp('Headers', T.HTTP_HEADERS_HELP),
   httpBody: createFieldHelp('Body', T.HTTP_BODY_HELP),
 
+  // MCP tool
+  mcpToolIntegration: createFieldHelp('MCP server integration', T.MCP_TOOL_INTEGRATION_HELP),
+  mcpToolName: createFieldHelp('Tool', T.MCP_TOOL_NAME_HELP),
+  mcpToolArguments: createFieldHelp('Arguments', T.MCP_TOOL_ARGUMENTS_HELP),
+  mcpToolTimeout: createFieldHelp('Timeout', T.MCP_TOOL_TIMEOUT_HELP),
+
   // AI agent
   aiModel: createFieldHelp('Model', T.AI_MODEL_HELP),
   aiCredential: createFieldHelp('Credential', T.AI_CREDENTIAL_HELP),

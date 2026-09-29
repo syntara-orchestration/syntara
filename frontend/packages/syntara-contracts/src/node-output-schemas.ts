@@ -63,6 +63,13 @@ export const NODE_OUTPUT_SCHEMAS: Record<string, OutputFieldDef[]> = {
     { name: 'headers', type: 'object', description: 'Response headers' },
     { name: 'elapsed', type: 'number', description: 'Request duration in seconds' },
   ],
+  mcp_tool: [
+    { name: 'status', type: 'string', description: 'Execution succeeded' },
+    { name: 'tool_name', type: 'string', description: 'Name of the tool that was invoked' },
+    { name: 'integration_id', type: 'string', description: 'UUID of the mcp_server integration that served the call' },
+    { name: 'result', type: 'unknown', description: 'Tool result content returned by the MCP server' },
+    { name: 'is_error', type: 'boolean', description: 'True when the MCP server flagged the tool result as an error' },
+  ],
   agentic: [
     { name: 'status', type: 'string', description: 'Execution succeeded' },
     {

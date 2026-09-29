@@ -17,6 +17,7 @@ import { ExecutionTimestamp } from '../../components/table/ExecutionTimestamp'
 import { LinkCell } from '../../components/table/LinkCell'
 import { permissionTooltip } from '../../hooks/permissionUtils'
 import { useCanI } from '../../hooks/useCanI'
+import { formatWorkflowLaunchRejection } from '../../utils/apiErrors'
 import { detachPromise } from '../../utils/detachPromise'
 import type { ProjectRead } from '../access/types'
 import { StatusLabel } from '../builder/ExecutionStatus'
@@ -41,6 +42,7 @@ type Execution = {
   workflow_version_name?: string | null
   workflow_version_created_at?: string | null
   status?: ExecutionStatus
+  error_details?: string | null
   approval_pending?: boolean
   mode?: string
   completed_at?: string | null
@@ -157,6 +159,7 @@ function ExecutionRow({ execution }: Readonly<ExecutionRowProps>) {
   const retryable = isExecutionRetryable(execution.status, execution.mode)
   const cancellable = isExecutionCancellable(execution.status)
   const hasActions = retryable || cancellable
+  const launchRejection = execution.status === 'failed' ? formatWorkflowLaunchRejection(execution.error_details) : null
 
   return (
     <Tr>
@@ -187,6 +190,11 @@ function ExecutionRow({ execution }: Readonly<ExecutionRowProps>) {
             </FlexItem>
           )}
         </Flex>
+        {launchRejection && (
+          <Content component={ContentVariants.small}>
+            <Truncate content={launchRejection} />
+          </Content>
+        )}
       </Td>
       <Td dataLabel="Version">
         {execution.workflow_version != null && execution.workflow_id ? (

@@ -20,6 +20,7 @@ from syntara.authz.exceptions import (
     PolicyNotFoundError,
 )
 from syntara.authz.models.policy import Policy
+from syntara.authz.models.project import Project
 from syntara.authz.models.role import Role
 from syntara.authz.services.policy_service import PolicyService
 from syntara.core.models import User
@@ -105,6 +106,47 @@ async def test_list_policies(test_db_session: AsyncSession, test_user: User) -> 
     names = [r.name for r in result.resources]
     assert "list-p1" in names
     assert "list-p2" in names
+
+
+@pytest.mark.asyncio
+async def test_step_deny_builtins_are_visible_at_matching_scopes_and_immutable(
+    test_db_session: AsyncSession, test_user: User
+) -> None:
+    from syntara.authz.exceptions import BuiltinProtectionError
+    from syntara.authz.role_conventions import builtin_policy_uuid
+
+    name = "workflow_node:execute:any:script"
+    svc = PolicyService(test_db_session, test_user)
+    visible = await svc.list_policies(limit=1000, query_params_items=[("name", name)])
+    assert len(visible.resources) == 1
+    policy = visible.resources[0]
+    assert policy.name == name
+    assert policy.is_builtin is True
+    assert policy.project_id is None
+    assert policy.scope == "any"
+    assert policy.statements == [
+        {
+            "effect": "deny",
+            "actions": ["workflow_node:execute"],
+            "scope": "any",
+            "conditions": {"resource_labels": {"kind": "script"}},
+        }
+    ]
+
+    project = await _make_project(test_db_session, "builtin-step-deny-project")
+    project_policies = await svc.list_project_policies(project.id, limit=1000, query_params_items=[("name", name)])
+    assert project_policies.resources == []
+    with pytest.raises(BuiltinProtectionError):
+        await svc.update_policy(builtin_policy_uuid(name), description="mutable")
+
+    project_name = "workflow_node:execute:project:script"
+    visible_project_policy = await svc.list_policies(limit=1000, query_params_items=[("name", project_name)])
+    assert len(visible_project_policy.resources) == 1
+    assert visible_project_policy.resources[0].scope == "project"
+    project_policies = await svc.list_project_policies(
+        project.id, limit=1000, query_params_items=[("name", project_name)]
+    )
+    assert [policy.name for policy in project_policies.resources] == [project_name]
 
 
 @pytest.mark.asyncio
@@ -415,17 +457,32 @@ async def test_create_project_policy_wildcard_eligible(test_db_session: AsyncSes
 
 
 # ---------------------------------------------------------------------------
-# Deny-effect rejection (AAP-74620)
+# Deny-effect policies (AAP-74620 / ANSTRAT-1750)
+#
+# Deny is allowed only for resource types in DENY_ELIGIBLE_RESOURCE_TYPES
+# (currently workflow_node).  A deny on anything else -- and in particular on
+# the recovery resources policy / role / role-assignment -- is rejected so a
+# deny can never become unrecoverable through the API.
 # ---------------------------------------------------------------------------
 
 
+async def _make_project(test_db_session: AsyncSession, name: str) -> Project:
+    project = Project(name=name, labels={})
+    test_db_session.add(project)
+    await test_db_session.commit()
+    await test_db_session.refresh(project)
+    return project
+
+
 @pytest.mark.asyncio
-async def test_create_deny_policy_rejected(test_db_session: AsyncSession, test_user: User) -> None:
-    """Deny-effect policies are not supported and must be rejected."""
-    from syntara.authz.exceptions import DenyEffectNotSupportedError
+async def test_create_deny_policy_rejected_for_ineligible_resource(
+    test_db_session: AsyncSession, test_user: User
+) -> None:
+    """A deny on a resource type outside the allowlist is rejected."""
+    from syntara.authz.exceptions import DenyEffectNotAllowedError
 
     svc = PolicyService(test_db_session, test_user)
-    with pytest.raises(DenyEffectNotSupportedError, match="not supported"):
+    with pytest.raises(DenyEffectNotAllowedError, match="may only target"):
         await svc.create_policy(
             name="deny-workflow-read",
             statements=[{"effect": "deny", "actions": ["workflow:read"], "scope": "any"}],
@@ -433,29 +490,67 @@ async def test_create_deny_policy_rejected(test_db_session: AsyncSession, test_u
 
 
 @pytest.mark.asyncio
-async def test_create_deny_policy_rejected_project_scoped(test_db_session: AsyncSession, test_user: User) -> None:
-    """Project-scoped deny-effect policies are also rejected."""
-    from syntara.authz.exceptions import DenyEffectNotSupportedError
-    from syntara.authz.models.project import Project
-
-    project = Project(name="deny-proj-1", labels={})
-    test_db_session.add(project)
-    await test_db_session.commit()
-    await test_db_session.refresh(project)
+@pytest.mark.parametrize("action", ["policy:delete", "role-assignment:revoke", "role:update"])
+async def test_lockout_chain_fails_at_policy_create(
+    test_db_session: AsyncSession, test_user: User, action: str
+) -> None:
+    """The recovery resources can never be denied, so the AAP-74620 lockout chain dies here."""
+    from syntara.authz.exceptions import DenyEffectNotAllowedError
 
     svc = PolicyService(test_db_session, test_user)
-    with pytest.raises(DenyEffectNotSupportedError, match="not supported"):
+    with pytest.raises(DenyEffectNotAllowedError, match=action):
         await svc.create_policy(
-            name="deny-wf-read-proj",
-            statements=[{"effect": "deny", "actions": ["workflow:read"], "scope": "project"}],
-            project_id=project.id,
+            name=f"lockout-{action.replace(':', '-')}",
+            statements=[{"effect": "deny", "actions": [action], "scope": "any"}],
         )
 
 
 @pytest.mark.asyncio
-async def test_update_policy_to_deny_rejected(test_db_session: AsyncSession, test_user: User) -> None:
-    """Updating a policy to add deny-effect statements is rejected."""
-    from syntara.authz.exceptions import DenyEffectNotSupportedError
+async def test_create_deny_policy_accepted_for_workflow_node(test_db_session: AsyncSession, test_user: User) -> None:
+    """A node deny is an ordinary policy row."""
+    svc = PolicyService(test_db_session, test_user)
+    policy = await svc.create_policy(
+        name="deny-http-node-execute",
+        statements=[
+            {
+                "effect": "deny",
+                "actions": ["workflow_node:execute"],
+                "scope": "any",
+                "conditions": {"resource_labels": {"kind": "http_request"}},
+            }
+        ],
+    )
+    assert policy.statements[0]["effect"] == "deny"
+    assert policy.scope == "any"
+
+
+@pytest.mark.asyncio
+async def test_create_deny_policy_accepted_project_scoped(test_db_session: AsyncSession, test_user: User) -> None:
+    """workflow_node is project-eligible, so a project admin can scope a node deny to their project."""
+    project = await _make_project(test_db_session, "deny-proj-1")
+
+    svc = PolicyService(test_db_session, test_user)
+    policy = await svc.create_policy(
+        name="deny-http-node-execute-proj",
+        statements=[
+            {
+                "effect": "deny",
+                "actions": ["workflow_node:execute"],
+                "scope": "project",
+                "conditions": {"resource_labels": {"kind": "http_request"}},
+            }
+        ],
+        project_id=project.id,
+    )
+    assert policy.project_id == project.id
+
+
+@pytest.mark.asyncio
+async def test_update_policy_to_deny_rejected_for_ineligible_resource(
+    test_db_session: AsyncSession, test_user: User
+) -> None:
+    """Updating a policy to deny an ineligible resource type is rejected."""
+    from syntara.authz.exceptions import DenyEffectNotAllowedError
 
     svc = PolicyService(test_db_session, test_user)
     policy = await svc.create_policy(
@@ -463,10 +558,103 @@ async def test_update_policy_to_deny_rejected(test_db_session: AsyncSession, tes
         statements=[{"effect": "allow", "actions": ["workflow:read"], "scope": "any"}],
     )
 
-    with pytest.raises(DenyEffectNotSupportedError, match="not supported"):
+    with pytest.raises(DenyEffectNotAllowedError, match="may only target"):
         await svc.update_policy(
             policy_id=policy.id,
             statements=[{"effect": "deny", "actions": ["workflow:read"], "scope": "any"}],
+        )
+
+
+@pytest.mark.asyncio
+async def test_update_policy_to_deny_accepted_for_workflow_node(test_db_session: AsyncSession, test_user: User) -> None:
+    """Updating a policy to a step execute deny is accepted."""
+    svc = PolicyService(test_db_session, test_user)
+    policy = await svc.create_policy(
+        name="allow-then-node-deny",
+        statements=[{"effect": "allow", "actions": ["workflow:read"], "scope": "any"}],
+    )
+    updated = await svc.update_policy(
+        policy_id=policy.id,
+        statements=[
+            {
+                "effect": "deny",
+                "actions": ["workflow_node:execute"],
+                "scope": "any",
+                "conditions": {"resource_labels": {"kind": "script"}},
+            }
+        ],
+    )
+    assert updated.statements[0]["effect"] == "deny"
+
+
+@pytest.mark.asyncio
+async def test_node_deny_with_unknown_kind_rejected(test_db_session: AsyncSession, test_user: User) -> None:
+    """The kind label is validated against the node-kind registry; a typo cannot silently match nothing."""
+    from syntara.authz.exceptions import InvalidNodeKindError
+
+    svc = PolicyService(test_db_session, test_user)
+    with pytest.raises(InvalidNodeKindError, match="Unknown node kind 'http_requst'"):
+        await svc.create_policy(
+            name="deny-typo-kind",
+            statements=[
+                {
+                    "effect": "deny",
+                    "actions": ["workflow_node:execute"],
+                    "scope": "any",
+                    "conditions": {"resource_labels": {"kind": "http_requst"}},
+                }
+            ],
+        )
+
+
+@pytest.mark.asyncio
+async def test_node_policy_rejects_extra_resource_labels(test_db_session: AsyncSession, test_user: User) -> None:
+    """Step policies match only the kind label."""
+    from syntara.authz.exceptions import InvalidNodeKindError
+
+    svc = PolicyService(test_db_session, test_user)
+    with pytest.raises(InvalidNodeKindError, match=r"require only conditions.resource_labels.kind"):
+        await svc.create_policy(
+            name="deny-script-language",
+            statements=[
+                {
+                    "effect": "deny",
+                    "actions": ["workflow_node:execute"],
+                    "scope": "any",
+                    "conditions": {"resource_labels": {"kind": "script", "language": "python"}},
+                }
+            ],
+        )
+
+
+@pytest.mark.asyncio
+async def test_node_policy_rejects_write_and_unknown_actions(test_db_session: AsyncSession, test_user: User) -> None:
+    from syntara.authz.exceptions import InvalidNodeKindError, InvalidResourceActionError
+
+    svc = PolicyService(test_db_session, test_user)
+    with pytest.raises(InvalidResourceActionError):
+        await svc.create_policy(
+            name="invalid-node-write-action",
+            statements=[
+                {
+                    "effect": "deny",
+                    "actions": ["workflow_node:write"],
+                    "scope": "any",
+                    "conditions": {"resource_labels": {"kind": "script"}},
+                }
+            ],
+        )
+    with pytest.raises(InvalidNodeKindError, match="supports only the execute action"):
+        await svc.create_policy(
+            name="invalid-node-wildcard-action",
+            statements=[
+                {
+                    "effect": "deny",
+                    "actions": ["workflow_node:*"],
+                    "scope": "any",
+                    "conditions": {"resource_labels": {"kind": "script"}},
+                }
+            ],
         )
 
 

@@ -40,6 +40,18 @@ export const HTTP_HEADERS_HELP =
 export const HTTP_BODY_HELP =
   'Enter the request body as JSON or text. Used with POST, PUT, and PATCH methods. You can include expressions to insert dynamic values from previous steps.'
 
+export const MCP_TOOL_INTEGRATION_HELP =
+  'Select the MCP server integration that provides the tool. Only enabled MCP server integrations available to this project are listed.'
+
+export const MCP_TOOL_NAME_HELP =
+  'Select one of the tools discovered on the chosen MCP server integration. Refresh the integration if the tool you need is missing.'
+
+export const MCP_TOOL_ARGUMENTS_HELP =
+  'Arguments passed to the tool, as a JSON object. Values can include expressions such as ${previous_step.result} to insert data from earlier steps.'
+
+export const MCP_TOOL_TIMEOUT_HELP =
+  "Deadline for the tool call, in seconds (1-600). Leave empty to use the step's resolved engine timeout."
+
 export const AI_MODEL_HELP =
   'Select the large language model (LLM) to use for this task agent step. Models are provided by integrations configured by your administrator.'
 

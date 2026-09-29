@@ -9,6 +9,7 @@ import { SynEmptyStateFilter } from '../../components/states/SynEmptyStateFilter
 import { useQueryState } from '../../components/states/useQueryState'
 import { useElapsedTime } from '../../hooks/useElapsedTime'
 import type { FilterConfig } from '../../types/filters'
+import { formatWorkflowLaunchRejection } from '../../utils/apiErrors'
 import { formatElapsedTime } from '../../utils/dateUtils'
 import { detachPromise } from '../../utils/detachPromise'
 import { NodeExecutionDetailsPanel } from '../executions/NodeExecutionDetailsPanel'
@@ -177,7 +178,10 @@ function ThreePanelLayout({
 }
 
 function resolveErrorDetails(errorDetails: string | null | undefined, nameMap: Map<string, string>): string | null {
-  if (!errorDetails || nameMap.size === 0) return errorDetails ?? null
+  if (!errorDetails) return null
+  const launchRejection = formatWorkflowLaunchRejection(errorDetails)
+  if (launchRejection) return launchRejection
+  if (nameMap.size === 0) return errorDetails
   let resolved = errorDetails
   for (const [id, name] of nameMap) {
     resolved = resolved.replaceAll(`${id}: `, `${name}: `)

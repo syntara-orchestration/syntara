@@ -77,6 +77,9 @@ class ScheduledWorkflowLauncher:
         execution_id = setup_result["execution_id"]
         temporal_workflow_id = setup_result["temporal_workflow_id"]
 
+        if setup_result.get("rejected"):
+            return {"execution_id": execution_id, "temporal_workflow_id": ""}
+
         await workflow.execute_child_workflow(
             "orchestrator_workflow",
             args=[
@@ -174,6 +177,10 @@ class ScheduledExecutionLauncher:
         try:
             result = await self._create_execution(workflow_id, trigger_node_id, scheduled_at, triggered_at)
 
+            if result.get("rejected"):
+                recorder.record(MetricType.SCHEDULED_TRIGGER_FIRES, value=1, labels={"status": "error"})
+                return result
+
             try:
                 recorder.record(
                     MetricType.SCHEDULED_TRIGGER_FIRES,
@@ -238,6 +245,46 @@ class ScheduledExecutionLauncher:
             workflow_def = wf_version.workflow_definition
 
             author_name = await resolve_user_display_name(session, wf_workflow.created_by)
+
+            from syntara.workflows.node_launch_checks import (  # noqa: PLC0415
+                check_workflow_launch,
+                get_node_authz_evaluator,
+                rejection_error_details,
+            )
+
+            launch_principal_id = wf_version.published_by or wf_version.created_by
+            rejection = await check_workflow_launch(
+                session,
+                get_node_authz_evaluator(),
+                definition=workflow_def,
+                principal_id=launch_principal_id,
+                project_id=wf_project_id,
+                trigger_type=ActivityName.SCHEDULED_TRIGGER.value,
+            )
+            if rejection is not None:
+                execution_id = uuid4()
+                rejected = Execution(
+                    id=execution_id,
+                    workflow_id=wf_id,
+                    workflow_version_id=wf_version_id,
+                    project_id=wf_project_id,
+                    temporal_workflow_id=f"rejected-{execution_id}",
+                    status=ExecutionStatus.FAILED,
+                    completed_at=triggered_at,
+                    input_data={"scheduled_at": scheduled_at.isoformat(), "triggered_at": triggered_at.isoformat()},
+                    trigger_node_id=trigger_node_id,
+                    trigger_type=ActivityName.SCHEDULED_TRIGGER.value,
+                    error_details=rejection_error_details(rejection),
+                    created_by=svc_principal_id,
+                    updated_by=svc_principal_id,
+                )
+                session.add(rejected)
+                await session.commit()
+                return {
+                    "execution_id": str(execution_id),
+                    "temporal_workflow_id": "",
+                    "rejected": True,
+                }
 
             limit = settings.max_concurrent_workflows
             if limit > 0:

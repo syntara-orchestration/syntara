@@ -1417,6 +1417,7 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
         if change_description is not None:
             target_version.change_description = change_description
 
+        target_version.published_by = self.user.id
         workflow.published_version_id = target_version.id
         workflow.is_enabled = True
         workflow.updated_at = datetime.now(UTC)

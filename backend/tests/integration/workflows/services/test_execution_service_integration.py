@@ -313,7 +313,11 @@ edges:
                 env.client,
                 task_queue="test-queue",
                 workflows=[OrchestratorWorkflow],
-                activities=[execute_script_activity, manual_trigger, fetch_workflow_runtime_settings],
+                activities=[
+                    execute_script_activity,
+                    manual_trigger,
+                    fetch_workflow_runtime_settings,
+                ],
             ):
                 workflow_def = yaml.safe_load(workflow_yaml)
                 result = await service.start_workflow(

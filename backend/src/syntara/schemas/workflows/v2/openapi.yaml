@@ -354,7 +354,14 @@ paths:
         '401':
           $ref: '../../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError'
         '403':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError'
+          description: Workflow update permission or launch authorization rejected
+          content:
+            application/problem+json:
+              schema:
+                anyOf:
+                  - $ref: '../../base/shared-resources.openapi.yaml#/components/schemas/ErrorData'
+                  - $ref: '../../base/shared-resources.openapi.yaml#/components/schemas/WorkflowLaunchRejectedProblem'
+                title: Response 403 Test Workflow Node
         '404':
           $ref: '../../base/shared-resources.openapi.yaml#/components/responses/NotFoundError'
         '409':
@@ -784,11 +791,14 @@ paths:
               schema:
                 $ref: '../../base/shared-resources.openapi.yaml#/components/schemas/ErrorData'
         '403':
-          description: Service account is not authorized for this trigger
+          description: Trigger authorization or workflow launch authorization rejected
           content:
             application/problem+json:
               schema:
-                $ref: '../../base/shared-resources.openapi.yaml#/components/schemas/ErrorData'
+                anyOf:
+                  - $ref: '../../base/shared-resources.openapi.yaml#/components/schemas/ErrorData'
+                  - $ref: '../../base/shared-resources.openapi.yaml#/components/schemas/WorkflowLaunchRejectedProblem'
+                title: Response 403 Receive Webhook
         '404':
           $ref: '../../base/shared-resources.openapi.yaml#/components/responses/NotFoundError'
         '409':
@@ -848,11 +858,14 @@ paths:
               schema:
                 $ref: '../../base/shared-resources.openapi.yaml#/components/schemas/ErrorData'
         '403':
-          description: Service account is not authorized for this trigger
+          description: Trigger authorization or workflow launch authorization rejected
           content:
             application/problem+json:
               schema:
-                $ref: '../../base/shared-resources.openapi.yaml#/components/schemas/ErrorData'
+                anyOf:
+                  - $ref: '../../base/shared-resources.openapi.yaml#/components/schemas/ErrorData'
+                  - $ref: '../../base/shared-resources.openapi.yaml#/components/schemas/WorkflowLaunchRejectedProblem'
+                title: Response 403 Receive Eda Webhook
         '404':
           $ref: '../../base/shared-resources.openapi.yaml#/components/responses/NotFoundError'
         '409':
@@ -1031,6 +1044,8 @@ components:
       $ref: ./shared-schemas.yaml#/components/schemas/AAPWorkflowJobTemplateNode
     HTTPRequestNode:
       $ref: ./shared-schemas.yaml#/components/schemas/HTTPRequestNode
+    MCPToolNode:
+      $ref: ./shared-schemas.yaml#/components/schemas/MCPToolNode
     AgenticNode:
       $ref: ./shared-schemas.yaml#/components/schemas/AgenticNode
     ScriptNode:
@@ -1054,6 +1069,8 @@ components:
       $ref: ./shared-schemas.yaml#/components/schemas/AAPWorkflowJobTemplateExecutorParameters
     APIExecutorParameters:
       $ref: ./shared-schemas.yaml#/components/schemas/APIExecutorParameters
+    MCPToolExecutorParameters:
+      $ref: ./shared-schemas.yaml#/components/schemas/MCPToolExecutorParameters
     AgenticExecutorParameters:
       $ref: ./shared-schemas.yaml#/components/schemas/AgenticExecutorParameters
     IntegrationConnectionConfig:

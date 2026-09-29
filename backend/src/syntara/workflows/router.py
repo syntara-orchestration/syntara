@@ -20,6 +20,7 @@ from syntara.authz.dependencies import PermissionChecker, VisibilityFilter
 from syntara.authz.engine import VisibilityResult
 from syntara.core.database.session import get_db
 from syntara.core.models import User
+from syntara.core.models.error import ErrorData
 from syntara.core.syntara_router import NO_PERMISSION, SyntaraRouter
 from syntara.workflows.error_handlers import build_validation_problem_response
 from syntara.workflows.exceptions import WorkflowDefinitionInvalidError
@@ -46,7 +47,7 @@ from syntara.workflows.models import (
     WorkflowVersionRead,
     WorkflowVersionUpdate,
 )
-from syntara.workflows.models.execution import ExecutionRead, TestExecutionCreate
+from syntara.workflows.models.execution import ExecutionRead, TestExecutionCreate, WorkflowLaunchRejectedProblem
 from syntara.workflows.models.workflow_definition import WorkflowDefinition
 from syntara.workflows.services import ExecutionService, WorkflowService
 from syntara.workflows.validators import get_system_continue_on_failure, workflow_validator
@@ -214,6 +215,7 @@ def get_workflow_service(
 
 
 def get_execution_service(
+    request: Request,
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
     temporal_service: Annotated[
@@ -225,7 +227,12 @@ def get_execution_service(
 
     FastAPI will call this function automatically, injecting all dependencies.
     """
-    return ExecutionService(db, current_user, temporal_service=temporal_service)
+    return ExecutionService(
+        db,
+        current_user,
+        temporal_service=temporal_service,
+        authz_evaluator=request.app.state.authz_evaluator,
+    )
 
 
 # ============================================================================
@@ -405,6 +412,12 @@ async def delete_workflow(
     operation_id="test_workflow_node",
     summary="Test a single node in a workflow",
     response_description="Test execution created",
+    responses={
+        403: {
+            "model": ErrorData | WorkflowLaunchRejectedProblem,
+            "description": "Workflow update permission or launch authorization rejected",
+        }
+    },
 )
 async def test_workflow_node(
     workflow_id: UUID,

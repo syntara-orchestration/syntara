@@ -14,6 +14,8 @@ from sqlalchemy import insert
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from syntara.authz.engine import AuthzRequest, authorize
+from syntara.authz.evaluator import evaluate_policy_input
 from syntara.authz.models.assignments import RoleAssignment
 from syntara.authz.models.policy import Policy
 from syntara.authz.models.project import Project
@@ -24,6 +26,7 @@ from syntara.authz.resolver import (
     resolve_effective_policies,
     resolve_user_groups,
 )
+from syntara.authz.role_conventions import BUILTIN_POLICIES
 from syntara.authz.seed import seed_authz_data
 from syntara.core.models import User
 from syntara.core.models.group import Group, user_groups
@@ -202,7 +205,14 @@ async def test_resolve_builtin_role_preserves_self_scope(seeded_db: AsyncSession
     assert len(result) >= 1
     self_stmts = [s for s in result if s.get("scope") == "self" and s.get("project") == "my-project"]
     assert len(self_stmts) >= 1
-    widened_stmts = [s for s in result if s.get("scope") == "project" and s.get("project") == "my-project"]
+    # Only policies declared with ``any`` scope may be narrowed to ``project``;
+    # a ``self``-scoped policy must never be widened.
+    any_scoped = {p.name for p in BUILTIN_POLICIES if p.scope == "any"}
+    widened_stmts = [
+        s
+        for s in result
+        if s.get("scope") == "project" and s.get("project") == "my-project" and s.get("name") not in any_scoped
+    ]
     assert len(widened_stmts) == 0
 
 
@@ -272,6 +282,47 @@ async def test_resolve_effective_policies_direct_user_role(seeded_db: AsyncSessi
     policies = await resolve_effective_policies(seeded_db, test_user.id)
     names = {p["name"] for p in policies}
     assert "direct:test:any" in names
+
+
+@pytest.mark.asyncio
+async def test_builtin_step_deny_takes_effect_on_assignment_and_revoke(
+    seeded_db: AsyncSession, test_user: User
+) -> None:
+    class RegoEvaluator:
+        def evaluate(self, value: dict[str, object]) -> dict[str, object]:
+            return evaluate_policy_input(value)
+
+    async def check() -> bool:
+        result = await authorize(
+            seeded_db,
+            RegoEvaluator(),  # type: ignore[arg-type]
+            AuthzRequest(
+                user_id=test_user.id,
+                action="execute",
+                resource_type="workflow_node",
+                resource_id="",
+                resource_labels={"kind": "script"},
+            ),
+        )
+        return result.allowed
+
+    assert await check()
+    role = Role(
+        name="resolver-deny-script",
+        is_builtin=False,
+        policy_names=["workflow_node:execute:any:script"],
+        labels={},
+    )
+    seeded_db.add(role)
+    await seeded_db.flush()
+    assignment = RoleAssignment(principal_id=test_user.id, role_name=role.name)
+    seeded_db.add(assignment)
+    await seeded_db.commit()
+
+    assert not await check()
+    await seeded_db.delete(assignment)
+    await seeded_db.commit()
+    assert await check()
 
 
 @pytest.mark.asyncio

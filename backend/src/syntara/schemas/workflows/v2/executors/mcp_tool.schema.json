@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://automation.example.com/schemas/workflows/v2/executors/mcp_tool",
+  "title": "MCP Tool Node",
+  "description": "Invoke a named tool on an MCP server integration",
+  "parameterSchema": {
+    "type": "object",
+    "required": [
+      "integration_id",
+      "tool_name"
+    ],
+    "properties": {
+      "integration_id": {
+        "type": "string",
+        "description": "UUID of the mcp_server integration that provides the tool (value supports templating)",
+        "minLength": 1
+      },
+      "tool_name": {
+        "type": "string",
+        "description": "Name of the MCP tool to invoke (value supports templating)",
+        "minLength": 1
+      },
+      "arguments": {
+        "type": "object",
+        "description": "Arguments passed to the MCP tool (values support templating)"
+      },
+      "timeout_seconds": {
+        "type": [
+          "integer",
+          "null"
+        ],
+        "description": "Deadline for the tool call in seconds. Defaults to the node's resolved engine timeout.",
+        "minimum": 1,
+        "maximum": 600
+      }
+    },
+    "additionalProperties": false
+  },
+  "settingSchema": {
+    "$ref": "../common-definitions.schema.json#/$defs/nodeSettingsNoRetry"
+  },
+  "resultSchema": {
+    "description": "Result structure available in result namespace (discriminated union)",
+    "oneOf": [
+      {
+        "title": "Completed Result",
+        "type": "object",
+        "required": [
+          "status",
+          "tool_name",
+          "integration_id",
+          "result",
+          "is_error"
+        ],
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "completed",
+            "description": "Execution succeeded"
+          },
+          "tool_name": {
+            "type": "string",
+            "description": "Name of the tool that was invoked"
+          },
+          "integration_id": {
+            "type": "string",
+            "description": "UUID of the mcp_server integration that served the call"
+          },
+          "result": {
+            "description": "Tool result content returned by the MCP server"
+          },
+          "is_error": {
+            "type": "boolean",
+            "description": "True when the MCP server flagged the tool result as an error"
+          }
+        },
+        "additionalProperties": false
+      },
+      {
+        "title": "Failed Result",
+        "type": "object",
+        "required": [
+          "status",
+          "error"
+        ],
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "failed"
+          },
+          "error": {
+            "type": "string"
+          },
+          "tool_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "integration_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "result": {},
+          "is_error": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "description": "All executor fields are present but nullable. A null value means the failure occurred before that field was available."
+      }
+    ],
+    "discriminator": {
+      "propertyName": "status"
+    }
+  }
+}

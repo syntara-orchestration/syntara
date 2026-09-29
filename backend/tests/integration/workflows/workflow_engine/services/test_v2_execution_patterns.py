@@ -37,6 +37,8 @@ _V2_ACTIVITIES: Sequence[Callable[..., Any]] = [
     loop,
     switch,
     fetch_workflow_runtime_settings,
+    # Node-kind permission activities (ANSTRAT-1750): the engine calls
+    # check_node_kind_enabled before every executor node.
 ]
 
 

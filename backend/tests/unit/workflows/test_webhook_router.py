@@ -5,7 +5,7 @@ the receive_webhook / receive_eda_webhook endpoints with mocked dependencies.
 """
 
 from collections.abc import AsyncIterator, Callable
-from typing import Any
+from typing import Any, cast
 from unittest.mock import AsyncMock, Mock, patch
 from uuid import UUID, uuid4
 
@@ -35,7 +35,17 @@ from syntara.workflows.webhook_router import (
 from syntara.workflows.workflow_engine.models.workflow_definition import NodeType
 from syntara.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
 
+
 # ============================================================================
+def _api_request() -> Request:
+    """Minimal Request stand-in carrying the app-state authorization evaluator."""
+    request: Any = Mock(spec=Request)
+    request.app = Mock()
+    request.app.state = Mock()
+    request.app.state.authz_evaluator = Mock()
+    return cast("Request", request)
+
+
 # _check_payload_size tests
 # ============================================================================
 
@@ -285,6 +295,7 @@ class TestReceiveWebhookEndpoints:
                 caller=caller,
                 temporal_service=AsyncMock(spec=TemporalExecutionService),
                 db=mock_db,
+                http_request=_api_request(),
                 _payload_size=None,
             )
 
@@ -293,6 +304,15 @@ class TestReceiveWebhookEndpoints:
             assert label in result.message
 
             mock_wts.verify_service_account_authorization.assert_awaited_once_with(trigger.id, caller[1])
+            mock_exec_svc.create_execution.assert_awaited_once_with(
+                workflow_id=trigger.workflow_id,
+                input_data={"event": "push"},
+                trigger_node_id=trigger.trigger_node_id,
+                use_published=True,
+                launch_principal_id=caller[1],
+                persist_rejection=True,
+                require_temporal=True,
+            )
 
     @pytest.mark.parametrize(("endpoint_fn", "trigger_type", "label", "default_path"), _ENDPOINT_PARAMS)
     async def test_temporal_unavailable_raises_error(
@@ -304,12 +324,17 @@ class TestReceiveWebhookEndpoints:
 
         with (
             patch("syntara.workflows.webhook_router.WebhookTriggerService") as mock_wts_cls,
+            patch("syntara.workflows.webhook_router.ExecutionService") as mock_exec_svc_cls,
             patch("syntara.workflows.webhook_router.AuditEventDispatcher"),
         ):
             mock_wts = AsyncMock()
             mock_wts.get_by_webhook_path = AsyncMock(return_value=_make_trigger(webhook_path=default_path))
             mock_wts.verify_service_account_authorization = AsyncMock()
             mock_wts_cls.return_value = mock_wts
+
+            mock_exec_svc = AsyncMock()
+            mock_exec_svc.create_execution = AsyncMock(side_effect=TemporalUnavailableError(f"{label} triggering"))
+            mock_exec_svc_cls.return_value = mock_exec_svc
 
             with pytest.raises(TemporalUnavailableError):
                 await endpoint_fn(
@@ -318,8 +343,10 @@ class TestReceiveWebhookEndpoints:
                     caller=caller,
                     temporal_service=None,
                     db=mock_db,
+                    http_request=_api_request(),
                     _payload_size=None,
                 )
+            mock_exec_svc.create_execution.assert_awaited_once()
 
     @pytest.mark.parametrize(("endpoint_fn", "trigger_type", "label", "default_path"), _ENDPOINT_PARAMS)
     async def test_unauthorized_sa_raises_403(
@@ -348,6 +375,7 @@ class TestReceiveWebhookEndpoints:
                     caller=caller,
                     temporal_service=mock_temporal,
                     db=mock_db,
+                    http_request=_api_request(),
                     _payload_size=None,
                 )
 
@@ -381,6 +409,7 @@ class TestReceiveWebhookEndpoints:
                 caller=caller,
                 temporal_service=AsyncMock(spec=TemporalExecutionService),
                 db=mock_db,
+                http_request=_api_request(),
                 _payload_size=None,
             )
 

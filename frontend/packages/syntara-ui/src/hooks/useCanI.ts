@@ -16,6 +16,8 @@ type UseCanIOptions = {
   resourceId?: string
   /** Concrete project name or UUID for project-scoped policy matching. */
   resourceProject?: string
+  /** Labels on the resource being checked (for example, a workflow node kind). */
+  resourceLabels?: Record<string, string>
   /**
    * When true, allow if the user has the permission in any project
    * (`check_any_project` on `POST /authz/can_i`). Prefer a concrete
@@ -50,6 +52,7 @@ export function useCanI(action: string, resourceType: string, options?: UseCanIO
     action,
     resource_type: resourceType,
     ...(options?.resourceId ? { resource_id: options.resourceId } : {}),
+    ...(options?.resourceLabels ? { resource_labels: options.resourceLabels } : {}),
     ...(options?.resourceProject ? { resource_project: options.resourceProject } : {}),
     ...(checkAnyProject ? { check_any_project: true } : {}),
   }

@@ -11,7 +11,7 @@
  * details with real-time updates via WebSocket or REST API fallback.
  */
 
-import type { ExecutionsAPI } from '@syntara/contracts'
+import { ActivityStatusEnum, type ExecutionsAPI } from '@syntara/contracts'
 import { create } from 'zustand'
 
 import type {
@@ -221,20 +221,11 @@ type ExecutionStore = ExecutionStoreState & ExecutionStoreActions
  * Falls back to 'pending' for invalid/unknown values.
  */
 function normalizeActivityStatus(status: unknown): ActivityStatus {
-  const validStatuses: ActivityStatus[] = [
-    'pending',
-    'running',
-    'waiting',
-    'completed',
-    'failed',
-    'retrying',
-    'skipped',
-    'cancelled',
-  ]
+  const validStatuses: ActivityStatus[] = Object.values(ActivityStatusEnum)
   if (typeof status === 'string' && validStatuses.includes(status as ActivityStatus)) {
     return status as ActivityStatus
   }
-  return 'pending'
+  return ActivityStatusEnum.PENDING
 }
 
 /**

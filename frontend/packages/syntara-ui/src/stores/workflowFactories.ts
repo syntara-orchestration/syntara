@@ -469,6 +469,37 @@ export function createSwitchActivity(
 /**
  * Create a wait node (v2).
  */
+export type CreateMcpToolActivityOptions = {
+  id: string
+  name: string
+  integrationId: string
+  toolName: string
+  /** Already-parsed JSON object of tool arguments. */
+  arguments?: Record<string, unknown>
+  timeoutSeconds?: number
+  settings?: NodeSettings
+}
+
+/**
+ * Create an MCP tool node (v2).
+ */
+export function createMcpToolActivity(options: CreateMcpToolActivityOptions): Activity {
+  const { id, name, integrationId, toolName, arguments: toolArguments, timeoutSeconds, settings } = options
+
+  return {
+    id,
+    type: ActivityTypeEnum.MCP_TOOL,
+    name,
+    parameters: {
+      integration_id: integrationId,
+      tool_name: toolName,
+      arguments: toolArguments ?? {},
+      ...(timeoutSeconds !== undefined && Number.isFinite(timeoutSeconds) && { timeout_seconds: timeoutSeconds }),
+    },
+    ...(settings && { settings }),
+  }
+}
+
 export function createWaitActivity(
   id: string,
   name: string,
