@@ -160,25 +160,27 @@ describe('useCursorPagination', () => {
 
       renderHook(() => useCursorPagination({ transformFilters }))
 
-      expect(mockCreateFilterChangeHandler).toHaveBeenCalledWith(
-        null,
-        expect.any(Function),
-        mockClearAllFilters,
-        mockSetAllFilters,
-        transformFilters
-      )
+      const [args] = mockCreateFilterChangeHandler.mock.calls[0] ?? []
+      expect(args).toMatchObject({
+        cursor: null,
+        clearAllFilters: mockClearAllFilters,
+        setAllFilters: mockSetAllFilters,
+        transformFilters,
+      })
+      expect(typeof args?.resetCursor).toBe('function')
     })
 
     it('passes transformExecutionStatusFilter to createFilterChangeHandler', () => {
       renderHook(() => useCursorPagination({ transformFilters: transformExecutionStatusFilter }))
 
-      expect(mockCreateFilterChangeHandler).toHaveBeenCalledWith(
-        null,
-        expect.any(Function),
-        mockClearAllFilters,
-        mockSetAllFilters,
-        transformExecutionStatusFilter
-      )
+      const [args] = mockCreateFilterChangeHandler.mock.calls[0] ?? []
+      expect(args).toMatchObject({
+        cursor: null,
+        clearAllFilters: mockClearAllFilters,
+        setAllFilters: mockSetAllFilters,
+        transformFilters: transformExecutionStatusFilter,
+      })
+      expect(typeof args?.resetCursor).toBe('function')
     })
 
     it('includes approval_pending in queryParams when that filter is active', () => {
@@ -468,13 +470,14 @@ describe('useCursorPagination', () => {
     it('creates handler with correct arguments', () => {
       renderHook(() => useCursorPagination())
 
-      expect(mockCreateFilterChangeHandler).toHaveBeenCalledWith(
-        null, // initial cursor
-        expect.any(Function), // resetCursor
-        mockClearAllFilters,
-        mockSetAllFilters,
-        undefined // no transformFilters
-      )
+      const [args] = mockCreateFilterChangeHandler.mock.calls[0] ?? []
+      expect(args).toMatchObject({
+        cursor: null, // initial cursor
+        clearAllFilters: mockClearAllFilters,
+        setAllFilters: mockSetAllFilters,
+        transformFilters: undefined, // no transformFilters
+      })
+      expect(typeof args?.resetCursor).toBe('function')
     })
   })
 
@@ -645,7 +648,15 @@ describe('useCursorReset', () => {
   it('resets pagination when all conditions are met', () => {
     const resetPagination = vi.fn()
 
-    renderHook(() => useCursorReset(0, false, 'some-cursor', false, resetPagination))
+    renderHook(() =>
+      useCursorReset({
+        itemCount: 0,
+        hasActiveFilters: false,
+        cursor: 'some-cursor',
+        isFetching: false,
+        resetPagination,
+      })
+    )
 
     expect(resetPagination).toHaveBeenCalled()
   })
@@ -653,7 +664,15 @@ describe('useCursorReset', () => {
   it('does not reset when itemCount is greater than 0', () => {
     const resetPagination = vi.fn()
 
-    renderHook(() => useCursorReset(5, false, 'some-cursor', false, resetPagination))
+    renderHook(() =>
+      useCursorReset({
+        itemCount: 5,
+        hasActiveFilters: false,
+        cursor: 'some-cursor',
+        isFetching: false,
+        resetPagination,
+      })
+    )
 
     expect(resetPagination).not.toHaveBeenCalled()
   })
@@ -661,7 +680,15 @@ describe('useCursorReset', () => {
   it('does not reset when filters are active', () => {
     const resetPagination = vi.fn()
 
-    renderHook(() => useCursorReset(0, true, 'some-cursor', false, resetPagination))
+    renderHook(() =>
+      useCursorReset({
+        itemCount: 0,
+        hasActiveFilters: true,
+        cursor: 'some-cursor',
+        isFetching: false,
+        resetPagination,
+      })
+    )
 
     expect(resetPagination).not.toHaveBeenCalled()
   })
@@ -669,7 +696,9 @@ describe('useCursorReset', () => {
   it('does not reset when cursor is null', () => {
     const resetPagination = vi.fn()
 
-    renderHook(() => useCursorReset(0, false, null, false, resetPagination))
+    renderHook(() =>
+      useCursorReset({ itemCount: 0, hasActiveFilters: false, cursor: null, isFetching: false, resetPagination })
+    )
 
     expect(resetPagination).not.toHaveBeenCalled()
   })
@@ -677,7 +706,15 @@ describe('useCursorReset', () => {
   it('does not reset when query is fetching', () => {
     const resetPagination = vi.fn()
 
-    renderHook(() => useCursorReset(0, false, 'some-cursor', true, resetPagination))
+    renderHook(() =>
+      useCursorReset({
+        itemCount: 0,
+        hasActiveFilters: false,
+        cursor: 'some-cursor',
+        isFetching: true,
+        resetPagination,
+      })
+    )
 
     expect(resetPagination).not.toHaveBeenCalled()
   })
@@ -686,7 +723,8 @@ describe('useCursorReset', () => {
     const resetPagination = vi.fn()
 
     const { rerender } = renderHook(
-      ({ itemCount, isFetching }) => useCursorReset(itemCount, false, 'cursor-val', isFetching, resetPagination),
+      ({ itemCount, isFetching }) =>
+        useCursorReset({ itemCount, hasActiveFilters: false, cursor: 'cursor-val', isFetching, resetPagination }),
       {
         initialProps: { itemCount: 5, isFetching: false },
       }
@@ -703,7 +741,8 @@ describe('useCursorReset', () => {
     const resetPagination = vi.fn()
 
     const { rerender } = renderHook(
-      ({ isFetching }) => useCursorReset(0, false, 'cursor-val', isFetching, resetPagination),
+      ({ isFetching }) =>
+        useCursorReset({ itemCount: 0, hasActiveFilters: false, cursor: 'cursor-val', isFetching, resetPagination }),
       {
         initialProps: { isFetching: false },
       }

@@ -320,7 +320,7 @@ export function ServiceAccountDetail() {
         onClose={deleteDialog.close}
         onConfirm={() => handleDelete(undefined)}
         title="Delete service account?"
-        confirmLabel="Delete"
+        confirmLabel="Delete service account"
         confirmVariant="danger"
         titleIconVariant="warning"
         destructiveAcknowledgement={{
@@ -336,7 +336,7 @@ export function ServiceAccountDetail() {
         onClose={disableDialog.close}
         onConfirm={handleDisable}
         title="Disable service account?"
-        confirmLabel="Disable"
+        confirmLabel="Disable service account"
         confirmVariant="primary"
       >
         You are about to disable the service account <strong>{serviceAccount.name}</strong>. You can re-enable the

@@ -42,7 +42,7 @@ function makeNode(id: string, position = { x: 0, y: 0 }, type = 'task'): NodeTyp
 }
 
 function makeEdge(id: string, source: string, target: string, sourceHandle: string): EdgeType {
-  return { id, source, target, sourceHandle } as unknown as EdgeType
+  return { id, source, target, sourceHandle }
 }
 
 describe('usePositionEventHandlers', () => {

@@ -72,7 +72,7 @@ function renderInTable(ui: ReactNode) {
 describe('WorkflowsTableBody', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } } as never)
+    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } })
   })
 
   describe('GroupedWorkflowsTableBody', () => {

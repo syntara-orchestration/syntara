@@ -12,6 +12,7 @@ import { COMPLIANT_TEST_PASSWORD } from '../passwordComplexity.testFixtures'
 import type { UserFormData } from '../userFormSchema'
 
 import {
+  EMAIL_CREATE_HELP,
   EMAIL_FEDERATED_EDIT_HELP,
   EMAIL_HELP,
   GROUPS_AUTHENTICATED_HINT,
@@ -223,12 +224,13 @@ describe('UserFormFields', () => {
       expect(screen.getByText(USERNAME_HELP)).toBeInTheDocument()
     })
 
-    it('shows generic email help on create', async () => {
+    it('shows unique email help on create', async () => {
       const user = userEvent.setup()
       render(<TestWrapper />)
 
       await user.click(screen.getByRole('button', { name: 'More info for Email' }))
-      expect(screen.getByText(EMAIL_HELP)).toBeInTheDocument()
+      expect(screen.getByText(EMAIL_CREATE_HELP)).toBeInTheDocument()
+      expect(screen.queryByText(EMAIL_HELP)).not.toBeInTheDocument()
     })
 
     it('shows generic email help when editing a local user', async () => {
@@ -248,12 +250,13 @@ describe('UserFormFields', () => {
       expect(screen.queryByText(EMAIL_HELP)).not.toBeInTheDocument()
     })
 
-    it('shows generic email help for federated users on create', async () => {
+    it('shows unique email help for federated users on create', async () => {
       const user = userEvent.setup()
       render(<TestWrapper isFederatedUser />)
 
       await user.click(screen.getByRole('button', { name: 'More info for Email' }))
-      expect(screen.getByText(EMAIL_HELP)).toBeInTheDocument()
+      expect(screen.getByText(EMAIL_CREATE_HELP)).toBeInTheDocument()
+      expect(screen.queryByText(EMAIL_HELP)).not.toBeInTheDocument()
       expect(screen.queryByText(EMAIL_FEDERATED_EDIT_HELP)).not.toBeInTheDocument()
       expect(screen.queryByLabelText('Password', { selector: 'input' })).not.toBeInTheDocument()
     })

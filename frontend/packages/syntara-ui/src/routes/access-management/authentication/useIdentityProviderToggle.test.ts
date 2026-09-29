@@ -49,7 +49,7 @@ describe('useIdentityProviderToggle', () => {
     vi.mocked(identityProvidersClient.useMutation).mockReturnValue({
       mutate: mockPatchMutate,
       isPending: false,
-    } as never)
+    })
     mockErrorHandler.mockReturnValue(vi.fn())
     vi.mocked(useMutationErrorHandler).mockReturnValue(mockErrorHandler)
     mockPatchMutate.mockClear()

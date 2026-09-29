@@ -70,7 +70,7 @@ export function SaveWorkflowButton({
       }
       iconPosition="start"
     >
-      {isPending ? 'Saving...' : 'Save'}
+      {isPending ? 'Saving...' : 'Save workflow'}
     </Button>
   )
 

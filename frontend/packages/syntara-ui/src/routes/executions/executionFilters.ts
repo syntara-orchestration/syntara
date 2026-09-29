@@ -1,4 +1,3 @@
-import type { WorkflowAPI } from '@syntara/contracts'
 import { ExecutionStatusEnum } from '@syntara/contracts'
 
 import { workflowFetchClient } from '../../client'
@@ -63,7 +62,7 @@ export const getExecutionWorkflowFilterDefinition = (projectId?: string | null):
 
     try {
       const response = await workflowFetchClient.GET('/workflows', {
-        params: { query: params as WorkflowAPI.paths['/workflows']['get']['parameters']['query'] },
+        params: { query: params },
       })
 
       const workflows = response.data?.resources ?? []

@@ -151,7 +151,7 @@ function mockUseQuery(
     credentials: (listData?.resources ?? []) as Credential[],
     isLoading: credentialsOverride.isPending ?? false,
     error: null,
-    refetch: vi.fn() as unknown as ReturnType<typeof useAllCredentials>['refetch'],
+    refetch: vi.fn(),
   })
 
   const typesResponse = {

@@ -1,8 +1,6 @@
-import { zodResolver } from '@hookform/resolvers/zod'
 import {
   Button,
   Form,
-  FormGroup,
   MenuToggle,
   Modal,
   ModalBody,
@@ -11,14 +9,17 @@ import {
   SelectList,
   SelectOption,
 } from '@patternfly/react-core'
+import { RhUiAddIcon } from '@patternfly/react-icons'
 import { useQueryClient } from '@tanstack/react-query'
-import { type Ref, useMemo, useState } from 'react'
-import { Controller, useForm, useWatch } from 'react-hook-form'
-import { z } from 'zod'
+import { type Ref, useCallback, useMemo, useState } from 'react'
+import { useWatch } from 'react-hook-form'
 
-import { FormFieldError, FormFieldWarning } from '../../components/FormFieldError'
+import { FormFieldWarning } from '../../components/FormFieldError'
+import { SynForm } from '../../components/forms/SynForm'
+import { SynFormField } from '../../components/forms/SynFormField'
 import { SynSelect } from '../../components/SynSelect'
 import { useDebouncedValue } from '../../hooks/useDebouncedValue'
+import { useSynForm } from '../../hooks/useSynForm'
 import { useAlerts } from '../../providers/alerts'
 import { getErrorMessage, isServiceUnavailableError } from '../../utils/apiErrors'
 import { batchedAllSettled } from '../../utils/batchedSettled'
@@ -27,24 +28,15 @@ import { accessClient } from '../access/accessClient'
 import { useSelectableProjects } from '../access/useAllProjects'
 import { roleAssignmentsQueryKey, useAlreadyAssignedRoles } from '../access/useAlreadyAssignedRoles'
 
+import { assignRoleFormSchema, type AssignRoleFormData } from './assignRoleFormSchema'
 import styles from './AssignRoleModal.module.css'
 import { MultiRoleSelect, type RoleOption } from './MultiRoleSelect'
-import { buildAssignmentBody, RolePrincipalType } from './RoleAssignmentTypes'
-
-const assignRoleSchema = z.discriminatedUnion('scope', [
-  z.object({
-    scope: z.literal('system'),
-    projectId: z.string().optional(),
-    roleIds: z.array(z.string()).min(1, 'Select at least one role'),
-  }),
-  z.object({
-    scope: z.literal('project'),
-    projectId: z.string().min(1, 'Project is required'),
-    roleIds: z.array(z.string()).min(1, 'Select at least one role'),
-  }),
-])
-
-type AssignRoleFormData = z.infer<typeof assignRoleSchema>
+import {
+  buildAssignmentBody,
+  RoleAssignmentScope,
+  roleAssignmentScopeOptions,
+  RolePrincipalType,
+} from './RoleAssignmentTypes'
 
 const ROLE_PAGE_SIZE = 20
 
@@ -153,22 +145,23 @@ export function AssignRoleModal({
 }: Readonly<AssignRoleModalProps>) {
   const queryClient = useQueryClient()
   const { showAlert } = useAlerts()
-  const defaultScope = principalType === RolePrincipalType.SERVICE_ACCOUNT ? 'project' : 'system'
+  const defaultScope =
+    principalType === RolePrincipalType.SERVICE_ACCOUNT ? RoleAssignmentScope.PROJECT : RoleAssignmentScope.SYSTEM
 
-  const { control, handleSubmit, setValue, reset } = useForm<AssignRoleFormData>({
-    resolver: zodResolver(assignRoleSchema, undefined, { mode: 'sync' }),
+  const form = useSynForm({
+    schema: assignRoleFormSchema,
     defaultValues: { scope: defaultScope, projectId: '', roleIds: [] },
   })
+  const { control, handleSubmit, reset, setValue } = form
 
   const scope = useWatch({ control, name: 'scope' })
+  const projectId = useWatch({ control, name: 'projectId' })
+  const roleIds = useWatch({ control, name: 'roleIds' }) ?? []
 
   const { projects: allProjects } = useSelectableProjects()
 
-  // ── Server-side role search ──────────────────────────────────────────────
   const [roleSearch, setRoleSearch] = useState('')
   const debouncedRoleSearch = useDebouncedValue(roleSearch)
-
-  const projectId = useWatch({ control, name: 'projectId' })
 
   const rolesQuery = accessClient.useQuery('get', '/roles', {
     params: {
@@ -176,7 +169,7 @@ export function AssignRoleModal({
         sort: 'name',
         limit: ROLE_PAGE_SIZE,
         ...(debouncedRoleSearch ? { 'name[contains]': debouncedRoleSearch } : {}),
-        scope: scope === 'system' ? 'system' : 'project',
+        scope: scope === RoleAssignmentScope.SYSTEM ? RoleAssignmentScope.SYSTEM : RoleAssignmentScope.PROJECT,
       },
     },
   })
@@ -185,7 +178,7 @@ export function AssignRoleModal({
     assigned: alreadyAssigned,
     isLoading: isAssignmentsLoading,
     isError: isAssignmentsError,
-  } = useAlreadyAssignedRoles(principalType, principalId, scope === 'project', projectId ?? '')
+  } = useAlreadyAssignedRoles(principalType, principalId, scope === RoleAssignmentScope.PROJECT, projectId ?? '')
 
   const roleOptions = useMemo((): RoleOption[] => {
     if (isAssignmentsLoading) return []
@@ -215,20 +208,20 @@ export function AssignRoleModal({
 
   const isPending = isSystemPending || isProjectPending
 
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     setRoleSearch('')
     reset({ scope: defaultScope, projectId: '', roleIds: [] })
     onClose()
-  }
+  }, [defaultScope, onClose, reset])
 
-  const onSubmit = handleSubmit(async (data) => {
+  const onSubmit = async (data: AssignRoleFormData) => {
     const results = await batchedAllSettled(data.roleIds, (roleKey) => {
       const body = buildAssignmentBody(principalType, principalId, roleKey)
-      if (data.scope === 'system') {
+      if (data.scope === RoleAssignmentScope.SYSTEM) {
         return createRoleAssignment({ body })
       }
       return createProjectRoleAssignment({
-        params: { path: { project_id: data.projectId } },
+        params: { path: { project_id: data.projectId ?? '' } },
         body,
       })
     })
@@ -238,21 +231,17 @@ export function AssignRoleModal({
       onSuccess()
       handleClose()
     }
-  })
-
-  const roleIds = useWatch({ control, name: 'roleIds' })
+  }
 
   return (
     <Modal isOpen={isOpen} onClose={handleClose} variant="medium">
       <ModalHeader title="Assign roles" />
       <ModalBody>
-        <Form id="assign-role-form" onSubmit={onSubmit}>
-          {principalType !== RolePrincipalType.SERVICE_ACCOUNT && (
-            <FormGroup label="Scope" fieldId="scope-select" isRequired>
-              <Controller
-                name="scope"
-                control={control}
-                render={({ field }) => (
+        <Form id="assign-role-form" onSubmit={handleSubmit(onSubmit)}>
+          <SynForm form={form}>
+            {principalType !== RolePrincipalType.SERVICE_ACCOUNT && (
+              <SynFormField<AssignRoleFormData, 'scope'> name="scope" label="Scope" fieldId="scope-select" isRequired>
+                {({ field }) => (
                   <SingleSelect
                     id="scope-select"
                     ariaLabel="Scope"
@@ -262,45 +251,41 @@ export function AssignRoleModal({
                       setValue('projectId', '', { shouldValidate: true })
                       setValue('roleIds', [], { shouldValidate: true })
                     }}
-                    options={[
-                      { value: 'system', label: 'System' },
-                      { value: 'project', label: 'Project' },
-                    ]}
+                    options={roleAssignmentScopeOptions}
                   />
                 )}
-              />
-            </FormGroup>
-          )}
-          {scope === 'project' && (
-            <FormGroup label="Project" fieldId="project-select" isRequired>
-              <Controller
+              </SynFormField>
+            )}
+            {scope === RoleAssignmentScope.PROJECT && (
+              <SynFormField<AssignRoleFormData, 'projectId'>
                 name="projectId"
-                control={control}
-                render={({ field, fieldState }) => (
-                  <>
-                    <SingleSelect
-                      id="project-select"
-                      ariaLabel="Project"
-                      value={field.value ?? ''}
-                      onChange={(value) => {
-                        field.onChange(value)
-                        setValue('roleIds', [], { shouldValidate: true })
-                      }}
-                      options={projectOptions}
-                      placeholder="Select a project..."
-                      hasError={!!fieldState.error}
-                    />
-                    <FormFieldError message={fieldState.error?.message} />
-                  </>
+                label="Project"
+                fieldId="project-select"
+                isRequired
+              >
+                {({ field, fieldState }) => (
+                  <SingleSelect
+                    id="project-select"
+                    ariaLabel="Project"
+                    value={field.value ?? ''}
+                    onChange={(value) => {
+                      field.onChange(value)
+                      setValue('roleIds', [], { shouldValidate: true })
+                    }}
+                    options={projectOptions}
+                    placeholder="Select a project..."
+                    hasError={!!fieldState.error}
+                  />
                 )}
-              />
-            </FormGroup>
-          )}
-          <FormGroup label="Roles" fieldId="multi-role-select" isRequired>
-            <Controller
+              </SynFormField>
+            )}
+            <SynFormField<AssignRoleFormData, 'roleIds'>
               name="roleIds"
-              control={control}
-              render={({ field, fieldState }) => (
+              label="Roles"
+              fieldId="multi-role-select"
+              isRequired
+            >
+              {({ field, fieldState }) => (
                 <>
                   <MultiRoleSelect
                     options={roleOptions}
@@ -311,17 +296,23 @@ export function AssignRoleModal({
                     isLoading={isRolesLoading}
                     hasError={!!fieldState.error}
                   />
-                  <FormFieldError message={fieldState.error?.message} />
                   <FormFieldWarning message={isAssignmentsError ? 'Unable to check existing assignments' : undefined} />
                 </>
               )}
-            />
-          </FormGroup>
+            </SynFormField>
+          </SynForm>
         </Form>
       </ModalBody>
       <ModalFooter>
-        <Button variant="primary" type="submit" form="assign-role-form" isDisabled={isPending} isLoading={isPending}>
-          Assign {roleIds.length > 0 ? `(${String(roleIds.length)})` : ''}
+        <Button
+          variant="primary"
+          type="submit"
+          form="assign-role-form"
+          isDisabled={isPending}
+          isLoading={isPending}
+          icon={<RhUiAddIcon />}
+        >
+          {roleIds.length > 1 ? `Assign roles (${String(roleIds.length)})` : 'Assign role'}
         </Button>
         <Button variant="link" onClick={handleClose} isDisabled={isPending}>
           Cancel

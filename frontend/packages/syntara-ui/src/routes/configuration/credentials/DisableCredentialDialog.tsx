@@ -46,7 +46,7 @@ export function DisableCredentialDialog({
       onClose={onClose}
       onConfirm={onConfirm}
       title="Disable credential?"
-      confirmLabel="Disable"
+      confirmLabel="Disable credential"
       confirmVariant="primary"
       confirmLoading={isLoadingChecks || isLoading}
     >

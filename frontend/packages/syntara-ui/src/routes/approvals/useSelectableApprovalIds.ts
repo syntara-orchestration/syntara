@@ -46,13 +46,13 @@ export function useSelectableApprovalIds(
       const canDecideBasedOnApproverList = computeCanDecideOnApproval(approval, currentUsername, userGroupsForCheck)
 
       if (
-        isApprovalSelectable(
+        isApprovalSelectable({
           approval,
           canDecideOnThisApproval,
           canDecideBasedOnApproverList,
-          isLoadingDecideProjects,
-          isLoadingUserGroups
-        )
+          isLoadingPermissions: isLoadingDecideProjects,
+          isCheckingApproverList: isLoadingUserGroups,
+        })
       ) {
         set.add(approval.id)
       }

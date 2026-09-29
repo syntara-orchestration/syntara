@@ -162,7 +162,7 @@ export function MyPermissionsView() {
       },
       onSort: (_event, index, direction) => {
         setActiveSortIndex(index)
-        setSortDirection(direction as SortDirection)
+        setSortDirection(direction)
         resetPage()
       },
       columnIndex,

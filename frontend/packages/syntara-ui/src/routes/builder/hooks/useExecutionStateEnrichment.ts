@@ -100,7 +100,7 @@ export function useExecutionStateEnrichment({
           const triggerRealId = triggers[Number.parseInt(node.id.split('-')[1], 10)]?.id
           const enriched = executionStateEnricher.enrichTriggerNode(
             triggerRealId,
-            node.data as Record<string, unknown>,
+            node.data,
             effectiveExecutionStatus,
             activityStates
           )
@@ -108,13 +108,13 @@ export function useExecutionStateEnrichment({
         }
         const activity = activitiesById.get(node.id)
         if (!activity) return node
-        const enriched = executionStateEnricher.enrichActivity(
+        const enriched = executionStateEnricher.enrichActivity({
           activity,
-          effectiveExecutionStatus,
+          executionStatus: effectiveExecutionStatus,
           activityStates,
-          edgeSnapshot,
-          { preResolvedNodes, skipInferenceActivityIds: copiedRunActivityIds ?? undefined }
-        )
+          edges: edgeSnapshot,
+          options: { preResolvedNodes, skipInferenceActivityIds: copiedRunActivityIds ?? undefined },
+        })
         return applyEnrichedDataStable(node, enriched, anyChangedRef)
       })
 

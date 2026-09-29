@@ -383,7 +383,7 @@ export function IntegrationDetailsStep({ control, setValue, onTypeChange }: Inte
               control={control}
               render={({ field }) => (
                 <ProviderHintSelect
-                  value={field.value as string | undefined}
+                  value={field.value}
                   isOpen={isProviderOpen}
                   onOpenChange={setIsProviderOpen}
                   onSelect={(value) => {

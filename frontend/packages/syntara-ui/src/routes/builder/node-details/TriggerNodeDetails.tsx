@@ -61,6 +61,13 @@ function triggersEqual(a: Trigger, b: Trigger): boolean {
  */
 const DATETIME_PATTERN = /^\d{4}-\d{2}-\d{2}T.+$/
 
+const ISO8601_DURATION_DIGITS = String.raw`\d+`
+const iso8601OptionalDurationUnit = (unit: string) => `(${ISO8601_DURATION_DIGITS}${unit})?`
+const ISO8601_DURATION_PATTERN = new RegExp(
+  `^P${iso8601OptionalDurationUnit('Y')}${iso8601OptionalDurationUnit('M')}${iso8601OptionalDurationUnit('W')}${iso8601OptionalDurationUnit('D')}` +
+    `(T${iso8601OptionalDurationUnit('H')}${iso8601OptionalDurationUnit('M')}(${ISO8601_DURATION_DIGITS}(\\.\\d+)?S)?)?$`
+)
+
 function hasReasonableValues(str: string): boolean {
   const numbers = str.match(/\d+/g) ?? []
   return numbers.every((n) => n.length <= 4)
@@ -83,21 +90,7 @@ function validateISO8601Interval(interval: string): boolean {
     return validateRecurringInterval(interval)
   }
 
-  // SECURITY: Strict structural validation - requires digits before designators
-  // Allows optional decimal only for seconds: (\d+(\.\d+)?S)
-  // Pattern breakdown:
-  // - P: Required prefix
-  // - (\d+Y)?: Optional years (digits required)
-  // - (\d+M)?: Optional months (digits required)
-  // - (\d+W)?: Optional weeks (digits required)
-  // - (\d+D)?: Optional days (digits required)
-  // - (T...)?: Optional time components (if present, T is required)
-  //   - (\d+H)?: Optional hours (digits required)
-  //   - (\d+M)?: Optional minutes (digits required)
-  //   - (\d+(\.\d+)?S)?: Optional seconds with optional decimal (digits required)
-  const durationPattern = /^P(\d+Y)?(\d+M)?(\d+W)?(\d+D)?(T(\d+H)?(\d+M)?(\d+(\.\d+)?S)?)?$/
-
-  if (!durationPattern.test(interval)) return false
+  if (!ISO8601_DURATION_PATTERN.test(interval)) return false
 
   // Must have at least one component (not just P or PT)
   if (interval === 'P' || interval === 'PT') return false

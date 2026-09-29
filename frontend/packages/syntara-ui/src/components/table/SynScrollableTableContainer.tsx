@@ -55,14 +55,14 @@ export function SynScrollableTableContainer({
   const { scrollRef, wrapperRef } = useScrollOverflow()
   const tableClassName = useFixed ? `${styles.table} ${styles.tableFixedLayout}` : styles.table
   const pinnedFooter = footer ? <PaginationFooter {...footer} /> : footerContent
+  const scrollWrapperClassName = pinnedFooter
+    ? `${styles.scrollWrapper} ${styles.scrollWrapperHasFooter}`
+    : styles.scrollWrapper
   return (
     <StackItem isFilled data-testid="scrollable-table-container-root" className={styles.root}>
       <SynPanel hasNoPadding isFullHeight isScrollable className={styles.panel}>
         <Stack className={styles.shellStack}>
-          <div
-            ref={wrapperRef}
-            className={`${styles.scrollWrapper}${pinnedFooter ? ` ${styles.scrollWrapperHasFooter}` : ''}`}
-          >
+          <div ref={wrapperRef} className={scrollWrapperClassName}>
             <div
               className={styles.scrollContainer}
               ref={scrollRef}

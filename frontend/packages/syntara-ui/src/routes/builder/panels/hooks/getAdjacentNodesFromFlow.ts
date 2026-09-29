@@ -1,7 +1,6 @@
 import type { Edge, Node } from '@xyflow/react'
 
 import { getCanvasNodeIconDescriptor } from '../../../workflows/canvas/nodes/nodeIconResolver'
-import type { NodeType } from '../../../workflows/canvas/nodes/NodeType'
 
 import type { UpstreamNodeInfo } from './useUpstreamNodes'
 
@@ -27,7 +26,7 @@ function toNodeInfo(node: Node): UpstreamNodeInfo {
   const { icon, id: iconId } = getCanvasNodeIconDescriptor({
     id: node.id,
     type: node.type,
-    data: node.data as NodeType['data'],
+    data: node.data,
   })
   return {
     id: node.id,

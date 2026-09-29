@@ -81,7 +81,7 @@ describe('useApprovalsData', () => {
       error: null,
       isFetching: false,
       refetch: vi.fn(),
-    } as never)
+    })
 
     vi.mocked(accessClient.useQuery).mockReturnValue({
       data: { resources: [] },
@@ -90,7 +90,7 @@ describe('useApprovalsData', () => {
       error: null,
       isFetching: false,
       refetch: vi.fn(),
-    } as never)
+    })
   })
 
   it('enriches approvals with approval name, workflow name, and workflow ID', async () => {
@@ -103,7 +103,7 @@ describe('useApprovalsData', () => {
       error: null,
       isFetching: false,
       refetch: vi.fn(),
-    } as never)
+    })
 
     const { result } = renderHook(
       () =>
@@ -150,7 +150,7 @@ describe('useApprovalsData', () => {
       error: null,
       isFetching: false,
       refetch: vi.fn(),
-    } as never)
+    })
 
     const { result } = renderHook(
       () =>
@@ -189,7 +189,7 @@ describe('useApprovalsData', () => {
       error: null,
       isFetching: false,
       refetch: vi.fn(),
-    } as never)
+    })
 
     const { result } = renderHook(
       () =>
@@ -221,7 +221,7 @@ describe('useApprovalsData', () => {
       error: null,
       isFetching: false,
       refetch: vi.fn(),
-    } as never)
+    })
 
     const { result } = renderHook(
       () =>
@@ -258,7 +258,7 @@ describe('useApprovalsData', () => {
       error: null,
       isFetching: false,
       refetch: vi.fn(),
-    } as never)
+    })
 
     const { result } = renderHook(
       () =>
@@ -294,7 +294,7 @@ describe('useApprovalsData', () => {
       error: null,
       isFetching: false,
       refetch: vi.fn(),
-    } as never)
+    })
 
     const { result } = renderHook(
       () =>
@@ -323,7 +323,7 @@ describe('useApprovalsData', () => {
       error: null,
       isFetching: false,
       refetch: vi.fn(),
-    } as never)
+    })
 
     const { result } = renderHook(
       () =>

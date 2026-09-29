@@ -1,4 +1,3 @@
-import type { WorkflowWithVersion } from '@syntara/contracts'
 import { useParams, useRouterState } from '@tanstack/react-router'
 import { ReactFlowProvider } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
@@ -107,7 +106,7 @@ export default function BuilderEdit() {
   return (
     <ReactFlowProvider key={workflowId}>
       <BuilderContent
-        workflow={workflowQuery.data as WorkflowWithVersion}
+        workflow={workflowQuery.data}
         isNew={false}
         workflowId={workflowId}
         executionCopy={executionCopy}

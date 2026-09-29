@@ -8,7 +8,7 @@
  *   4. A baseline PNG exists but has no matching entry in the page registry (orphan)
  *
  * Usage:
- *   npm exec tsx -- scripts/check-visual-baselines.ts
+ *   npm exec tsx -- scripts/visual-regression/check-visual-baselines.ts
  *
  * Exit codes:
  *   0 — all routes covered, all baselines present
@@ -20,7 +20,7 @@ import { resolve, dirname, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
-const pkgRoot = resolve(__dirname, '..')
+const pkgRoot = resolve(__dirname, '../..')
 
 // ---------------------------------------------------------------------------
 // 1. Extract all route paths from AppRoute.tsx
