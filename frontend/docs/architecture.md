@@ -720,10 +720,10 @@ Categories are defined in `registry/categories.ts` with full metadata:
 | ------------- | -------------------------------------- | ----- |
 | `trigger`     | Start workflow execution               | 1     |
 | `action`      | Execute tasks or API calls             | 2     |
-| `logic`        | Conditional branching and control flow | 3     |
-| `human_tasks`  | Human approval and form input steps    | 45    |
-| `integration`  | External service integrations          | 4     |
-| `other`        | Miscellaneous step types               | 99    |
+| `logic`       | Conditional branching and control flow | 3     |
+| `human_tasks` | Human approval and form input steps    | 45    |
+| `integration` | External service integrations          | 4     |
+| `other`       | Miscellaneous step types               | 99    |
 
 Access category metadata: `getCategoryMetadata('trigger')` or `CATEGORY_METADATA.trigger`
 

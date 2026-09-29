@@ -688,7 +688,7 @@ describe('NodeDetailsPanel', () => {
       ],
       formComponent: () => <div>Human tasks form</div>,
       onSubmit: mockOnSubmit,
-    } as never)
+    })
 
     render(<NodeDetailsPanel mode="add" nodeTypeId="human-tasks" nodeSubtypeId="approval" onClose={mockOnClose} />)
 
