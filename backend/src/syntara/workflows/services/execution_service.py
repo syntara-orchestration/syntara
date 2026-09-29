@@ -34,6 +34,7 @@ from syntara.workflows.exceptions import (
     ExecutionInTerminalStateError,
     ExecutionNotFoundError,
     ExecutionNotRetryableError,
+    ExecutionNotRetryableFromFailureError,
     TemporalUnavailableError,
     TriggerValidationError,
     WorkflowConcurrencyLimitError,
@@ -52,10 +53,12 @@ from syntara.workflows.models.execution import (
     ExecutionRead,
     ExecutionStatus,
     PreResolvedNodeOutput,
+    RetryFromFailureValidationResponse,
 )
 from syntara.workflows.models.workflow import Workflow
 from syntara.workflows.models.workflow_definition import WorkflowDefinition
 from syntara.workflows.models.workflow_version import WorkflowVersion
+from syntara.workflows.services.retry_validation import RetryValidation, validate_retry_from_failure
 from syntara.workflows.utils.workflow_metadata import build_workflow_metadata, resolve_user_display_name
 from syntara.workflows.workflow_engine.models.workflow_definition import NodeType, resolve_trigger_node
 from syntara.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
@@ -372,12 +375,14 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
         recorder: "MetricsRecorder",
         component: ComponentLabel,
         retried_from_execution_id: UUID | None = None,
+        eligible_point_ids: list[str] | None = None,
+        input_parameter_overrides: dict[str, dict[str, Any]] | None = None,
     ) -> ExecutionRead:
         """Start a Temporal workflow and persist the execution record.
 
-        Shared by create_execution and retry_execution to avoid duplication.
-        Starts Temporal first, then creates the DB record. On DB commit failure,
-        attempts to cancel the orphaned Temporal workflow.
+        Shared by create_execution, retry_execution, and retry_from_failure to
+        avoid duplication. Starts Temporal first, then creates the DB record.
+        On DB commit failure, attempts to cancel the orphaned Temporal workflow.
         """
         # Enforce application-level concurrency cap before touching Temporal.
         # Uses a DB count of non-terminal executions — accurate across API server
@@ -410,6 +415,11 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
             created_by_user_id=str(self.user.id),
             created_at=now.isoformat(),
             workflow_version_id=workflow_version.id,
+            retry_from_execution_id=(
+                str(retried_from_execution_id) if eligible_point_ids is not None and retried_from_execution_id else None
+            ),
+            eligible_point_ids=eligible_point_ids,
+            input_parameter_overrides=input_parameter_overrides,
         )
 
         # Start Temporal workflow FIRST (if temporal_service is available)
@@ -1240,4 +1250,154 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
             recorder=recorder,
             component=component,
             retried_from_execution_id=original.id,
+        )
+
+    @staticmethod
+    def _to_preview_response(validation: RetryValidation) -> RetryFromFailureValidationResponse:
+        """Map the internal validation verdict onto the preview response model."""
+        return RetryFromFailureValidationResponse(
+            eligible=validation.eligible,
+            reason=validation.reason,
+            eligible_point_ids=validation.eligible_point_ids,
+            sanitized_node_ids=validation.sanitized_node_ids,
+            auto_included_node_ids=validation.auto_included_node_ids,
+            sanitized_replacements=validation.sanitized_replacements,
+            step_count_by_eligible_point=validation.step_count_by_eligible_point,
+            total_step_count=validation.total_step_count,
+        )
+
+    async def preview_retry_from_failure(self, execution_id: UUID) -> RetryFromFailureValidationResponse:
+        """Report whether this execution can be retried, and what would re-run (AAP-92820).
+
+        Backs ``GET /executions/{id}/retry-from-failure-preview``. Takes no
+        failure-point selection or overrides: the operator has not chosen any
+        yet, so this reports the default — every currently failed node. The
+        re-run counts for an explicit subset are not derivable from the
+        per-point counts when branches converge into a shared tail, so the UI
+        surfaces exactly what is returned here and lets the retry endpoint
+        reject an unusable selection.
+
+        Never mutates any state. The same validation chain runs again inside
+        :meth:`retry_from_failure` for the actual selection, so this preview
+        can never be the authority on whether a retry will succeed.
+
+        Raises:
+            ExecutionNotFoundError: If the source execution is gone.
+
+        """
+        validation = await validate_retry_from_failure(self.session, execution_id, [])
+        logger.info(
+            "Retry preview",
+            execution_id=execution_id,
+            eligible=validation.eligible,
+            reason=validation.reason,
+            eligible_point_count=len(validation.eligible_point_ids),
+        )
+        return self._to_preview_response(validation)
+
+    async def retry_from_failure(
+        self,
+        execution_id: UUID,
+        retry_point_ids: list[str],
+        input_parameter_overrides: dict[str, dict[str, Any]] | None = None,
+    ) -> ExecutionRead:
+        """Retry an execution from failure points (AAP-92820).
+
+        Independently repeats the full validation chain before doing any work
+        — never assumes the validate endpoint was called first. On success,
+        creates a new execution linked to the source via
+        ``retried_from_execution_id`` (the same lineage field used by plain
+        retries) running the exact workflow version *retained from the
+        original run* — later edits to the definition never affect a retry
+        (SDP ANSTRAT-1779 R10) — and triggers a Temporal run carrying
+        ``retry_from_execution_id``, the eligible retry points, and any
+        validated input parameter overrides for the engine's node
+        classification and parameter application (AAP-92821).
+
+        Args:
+            execution_id: ID of the source (failed) execution
+            retry_point_ids: Retry points to resume from; a subset may be
+                passed when multiple parallel branches failed
+            input_parameter_overrides: Per-starting-node input parameter
+                overrides for this run only (SDP AC-14/R10c). Validated, never
+                persisted to the definition.
+
+        Returns:
+            The newly created execution with status=PENDING
+
+        Raises:
+            ExecutionNotFoundError: If the source execution is gone
+            ExecutionNotRetryableFromFailureError: If validation rejects the retry
+
+        """
+        # Re-validates the actual selection rather than trusting any earlier preview:
+        # the preview reports the default (all failed nodes) and cannot speak for a
+        # subset or for the supplied overrides.
+        validation = await validate_retry_from_failure(
+            self.session, execution_id, retry_point_ids, input_parameter_overrides
+        )
+        if not validation.eligible:
+            raise ExecutionNotRetryableFromFailureError(execution_id, validation.reason or "retry validation failed")
+        logger.info(
+            "Retry validation",
+            execution_id=execution_id,
+            eligible=validation.eligible,
+            eligible_point_ids=validation.eligible_point_ids,
+            override_node_ids=sorted(input_parameter_overrides or {}),
+        )
+
+        # Loaded again rather than returned by the validator, which keeps its
+        # own instance internal. The row is needed for the fields below, and the
+        # load doubles as the deletion check: deleting a project cascades to its
+        # executions, so the source can vanish between validation and here.
+        # The execution status is deliberately NOT re-checked. Validation already
+        # asserted it, and every status write in the codebase is guarded against
+        # leaving a terminal state, so a FAILED/COMPLETED_WITH_ERRORS row cannot
+        # transition before the retry is dispatched.
+        result = await self.session.exec(select(Execution).where(Execution.id == execution_id))
+        source = result.one_or_none()
+        if source is None:  # Deleted between validation and retry
+            raise ExecutionNotFoundError(execution_id)
+
+        workflow_result = await self.session.exec(select(Workflow).where(Workflow.id == source.workflow_id))
+        workflow = workflow_result.one_or_none()
+        if workflow is None:
+            raise ExecutionNotFoundError(execution_id)
+
+        snapshot_result = await self.session.exec(
+            select(WorkflowVersion).where(WorkflowVersion.id == source.workflow_version_id)
+        )
+        snapshot_version = snapshot_result.one_or_none()
+        if snapshot_version is None:
+            raise ExecutionNotRetryableFromFailureError(execution_id, "original workflow version no longer exists")
+
+        if source.trigger_node_id is None:
+            raise ExecutionNotRetryableFromFailureError(
+                execution_id, "source execution has no trigger_node_id recorded"
+            )
+        trigger_node_id, _ = resolve_trigger_node(snapshot_version.workflow_definition, source.trigger_node_id)
+
+        validated_overrides = input_parameter_overrides or {}
+        logger.info(
+            "Retrying execution from failure",
+            source_execution_id=execution_id,
+            workflow_id=source.workflow_id,
+            eligible_point_ids=validation.eligible_point_ids,
+            override_node_ids=sorted(validated_overrides),
+            created_by=str(self.user.id),
+        )
+
+        recorder = get_metrics_recorder()
+        component = ComponentLabel.EXECUTION_SERVICE
+
+        return await self._start_temporal_and_create_execution(
+            workflow=workflow,
+            workflow_version=snapshot_version,
+            input_data=source.input_data,
+            trigger_node_id=trigger_node_id,
+            recorder=recorder,
+            component=component,
+            retried_from_execution_id=source.id,
+            eligible_point_ids=validation.eligible_point_ids,
+            input_parameter_overrides=validated_overrides,
         )
