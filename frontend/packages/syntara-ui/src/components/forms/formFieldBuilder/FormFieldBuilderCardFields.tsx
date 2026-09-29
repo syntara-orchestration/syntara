@@ -11,7 +11,7 @@ import { getFormFieldBuilderExamplePlaceholders } from './formFieldBuilderExampl
 import { FormFieldBuilderFieldDefaultEditor } from './FormFieldBuilderFieldDefaultEditor'
 import { formFieldBuilderLabelHelp } from './formFieldBuilderFieldHelp'
 import { FormFieldBuilderFieldTypeSelect } from './FormFieldBuilderFieldTypeSelect'
-import { FormFieldBuilderOptionsSection } from './FormFieldBuilderOptionsSection'
+import { FormFieldBuilderOptionsSection, type AuthoredOptionsFormField } from './FormFieldBuilderOptionsSection'
 
 type FormFieldBuilderCardFieldsProps = {
   index: number
@@ -22,8 +22,11 @@ type FormFieldBuilderCardFieldsProps = {
   onTypeChange: (type: FormFieldType) => void
 }
 
-function isOptionsField(field: FormField): field is Extract<FormField, { type: 'dropdown' | 'multi_select' }> {
-  return field.type === FormFieldTypeEnum.DROPDOWN || field.type === FormFieldTypeEnum.MULTI_SELECT
+function isOptionsField(field: FormField): field is AuthoredOptionsFormField {
+  if (field.type !== FormFieldTypeEnum.DROPDOWN && field.type !== FormFieldTypeEnum.MULTI_SELECT) {
+    return false
+  }
+  return field.options.source === 'static' || field.options.source === 'dynamic'
 }
 
 export function FormFieldBuilderCardFields({

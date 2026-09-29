@@ -11,9 +11,18 @@ import { useFormFieldBuilderCommit } from './formFieldBuilderCommitContext'
 import { FORM_FIELD_BUILDER_LABEL_HELP, formFieldBuilderLabelHelp } from './formFieldBuilderFieldHelp'
 import { StaticOptionsEditor } from './StaticOptionsEditor'
 
+type OptionsFormField = Extract<
+  FormField,
+  { type: typeof FormFieldTypeEnum.DROPDOWN | typeof FormFieldTypeEnum.MULTI_SELECT }
+>
+
+export type AuthoredOptionsFormField = OptionsFormField & {
+  options: Extract<OptionsFormField['options'], { source: 'static' | 'dynamic' }>
+}
+
 type FormFieldBuilderOptionsSectionProps = {
   index: number
-  field: Extract<FormField, { type: typeof FormFieldTypeEnum.DROPDOWN | typeof FormFieldTypeEnum.MULTI_SELECT }>
+  field: AuthoredOptionsFormField
   isDisabled?: boolean
   idPrefix: string
 }
