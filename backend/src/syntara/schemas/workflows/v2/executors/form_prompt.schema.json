@@ -14,7 +14,27 @@
       },
       "form_definition": {
         "type": "object",
-        "description": "JSON Schema describing the form fields to collect."
+        "description": "Form fields to collect. Authored dropdown and multi-select options must use static or dynamic sources.",
+        "properties": {
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "if": {
+                "properties": {
+                  "type": { "enum": ["dropdown", "multi_select"] }
+                },
+                "required": ["type"]
+              },
+              "then": {
+                "required": ["options"],
+                "properties": {
+                  "options": { "$ref": "#/$defs/authoredOptions" }
+                }
+              }
+            }
+          }
+        }
       },
       "responder_users": {
         "type": "array",
@@ -64,6 +84,71 @@
       }
     },
     "additionalProperties": false
+  },
+  "$defs": {
+    "authoredOptions": {
+      "type": "object",
+      "required": ["source"],
+      "properties": {
+        "source": {
+          "type": "string",
+          "enum": ["static", "dynamic"],
+          "description": "Resolved options are produced by the workflow engine and cannot be authored."
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "source": { "const": "static" } },
+            "required": ["source"]
+          },
+          "then": {
+            "required": ["values"],
+            "properties": {
+              "source": {},
+              "values": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 500,
+                "items": {
+                  "type": "object",
+                  "required": ["display_label", "value"],
+                  "properties": {
+                    "display_label": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    },
+                    "value": { "type": "string" }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        {
+          "if": {
+            "properties": { "source": { "const": "dynamic" } },
+            "required": ["source"]
+          },
+          "then": {
+            "required": ["expression"],
+            "properties": {
+              "source": {},
+              "expression": {
+                "type": "string",
+                "description": "Expression resolving at runtime to a list of strings, integers, booleans, or finite numbers, or to records with option labels and values. Resolved option values preserve their scalar types."
+              },
+              "label_key": { "type": ["string", "null"] },
+              "value_key": { "type": ["string", "null"] }
+            },
+            "additionalProperties": false
+          }
+        }
+      ]
+    }
   },
   "settingSchema": {
     "$ref": "../common-definitions.schema.json#/$defs/nodeSettingsNoRetry"
