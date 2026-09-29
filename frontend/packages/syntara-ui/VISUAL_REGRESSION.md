@@ -114,6 +114,7 @@ If you add a new top-level route folder under `src/routes/`, consider whether it
    git bytes — decides which images belong in the weekly PR.
 3. If nothing meaningful changed, it writes a "no drift" job summary and stops — no PR, no noise.
 4. If something changed, it opens a PR (branch `visual-regression/weekly-refresh`, base `devel`) containing only the changed/new PNGs, requests review from `uxd-team`, and lists the added/modified counts in the PR body.
+5. When the PR is created or updated, it posts a concise review link to Slack if `SLACK_VISUAL_REGRESSION_WEBHOOK_URL` is configured.
 
 **Reviewing the weekly PR:** open the **Files changed** tab. GitHub renders a native diff view for each changed PNG (2-up, swipe, or onion skin). For anything that looks like an unintended regression, file a follow-up issue and either drop that file from the PR (its previous baseline stays authoritative until the fix lands) or leave it if the fix is expected before next Monday.
 
