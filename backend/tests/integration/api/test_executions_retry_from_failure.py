@@ -446,7 +446,7 @@ class TestRetryExecution:
         mock_temporal_service.start_workflow.assert_called_once()
         _, kwargs = mock_temporal_service.start_workflow.call_args
         assert kwargs["workflow_metadata"]["retry"]["retry_from_execution_id"] == str(execution.id)
-        assert kwargs["workflow_metadata"]["retry"]["failure_point_ids"] == ["step_2"]
+        assert kwargs["workflow_metadata"]["retry"]["eligible_point_ids"] == ["step_2"]
 
     async def test_retry_uses_retained_version_not_current(
         self,
@@ -530,7 +530,7 @@ class TestRetryExecution:
         mock_temporal_service.start_workflow.assert_called_once()
         _, kwargs = mock_temporal_service.start_workflow.call_args
         retry_ctx = kwargs["workflow_metadata"]["retry"]
-        assert retry_ctx["failure_point_ids"] == ["step_2"]
+        assert retry_ctx["eligible_point_ids"] == ["step_2"]
         assert retry_ctx["input_parameter_overrides"] == {"step_2": {"code": "echo fixed"}}
         # The definition itself is untouched: the retry still runs the retained nodes.
         restarted_step_2 = next(n for n in kwargs["workflow_def"]["nodes"] if n["id"] == "step_2")

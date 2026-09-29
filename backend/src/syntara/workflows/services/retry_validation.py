@@ -443,15 +443,25 @@ def _version_reason(
 def _override_reason(
     snapshot_def: dict[str, Any] | None,
     reported_selection: list[str],
+    failed_ids: set[str],
+    sanitized: set[str],
     overrides: dict[str, dict[str, Any]],
+    successors: dict[str, set[str]] | None = None,
 ) -> str | None:
     """Rejection reason for input-parameter overrides that cannot apply, else None.
 
-    SDP AC-14 constrains overrides twice: the input keys must not change, and
-    the workflow definition must not change. So an override may only name
-    parameters that already exist on the target node in the *retained* version,
-    and may only target nodes that are actually starting points of this retry.
-    Anything else would silently redefine the workflow for one run.
+    An override may only target a node that is both currently failed and going
+    to re-execute. Sanitized nodes are excluded even when they are starting
+    points: they are pulled in automatically to regenerate raw output, so the
+    caller never chose them and editing their inputs is rejected.
+
+    Requiring the node to re-execute as well as to be failed keeps an override
+    from being accepted on a failed branch the caller deselected, where it
+    would be silently discarded.
+
+    AC-14 separately constrains the keys: they must already exist on the target
+    node in the *retained* version, so an override may change a value but never
+    add a parameter or alter the definition for one run.
 
     An empty override map is always valid — most retries change nothing.
     """
@@ -462,13 +472,17 @@ def _override_reason(
         return "cannot apply input parameter overrides: original workflow version no longer exists"
 
     by_id = {node["id"]: node for node in definition_nodes(snapshot_def) if "id" in node}
-    allowed_nodes = set(reported_selection)
+    if successors is None:
+        successors = build_successors(snapshot_def)
+    will_re_execute = collect_downstream_node_ids(snapshot_def, reported_selection, successors)
+    allowed_nodes = {node_id for node_id in failed_ids if node_id in will_re_execute and node_id not in sanitized}
 
-    unknown_nodes = sorted(node_id for node_id in overrides if node_id not in allowed_nodes)
-    if unknown_nodes:
+    disallowed = sorted(node_id for node_id in overrides if node_id not in allowed_nodes)
+    if disallowed:
         return (
-            f"input parameter overrides target nodes that are not retry starting points: {', '.join(unknown_nodes)}; "
-            f"starting points are {', '.join(reported_selection) if reported_selection else 'none'}"
+            f"input parameter overrides may only target failed nodes that will re-execute: {', '.join(disallowed)}; "
+            f"eligible targets are {', '.join(sorted(allowed_nodes)) if allowed_nodes else 'none'}. "
+            "Nodes pulled in automatically to regenerate sanitized output are not editable."
         )
 
     for node_id in sorted(overrides):
@@ -619,12 +633,15 @@ async def validate_retry_from_failure(
         reported_selection = sorted(
             _eligible_points(snapshot_def, set(final_selection), set(auto_included), successors)
         )
-        # Only meaningful once the starting points are known, and only when the
-        # rest of the chain already passed: overrides target starting points.
+        # Only meaningful once the earlier guards have passed: overrides target
+        # failed nodes that re-execute, not starting points.
         reason = _override_reason(
             snapshot.workflow_definition if snapshot is not None else None,
             reported_selection,
+            failed_ids,
+            set(sanitized),
             overrides,
+            successors,
         )
     else:
         reported_selection = normalized

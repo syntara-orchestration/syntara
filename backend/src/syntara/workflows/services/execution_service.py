@@ -375,7 +375,7 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
         recorder: "MetricsRecorder",
         component: ComponentLabel,
         retried_from_execution_id: UUID | None = None,
-        retry_failure_point_ids: list[str] | None = None,
+        eligible_point_ids: list[str] | None = None,
         input_parameter_overrides: dict[str, dict[str, Any]] | None = None,
     ) -> ExecutionRead:
         """Start a Temporal workflow and persist the execution record.
@@ -416,11 +416,9 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
             created_at=now.isoformat(),
             workflow_version_id=workflow_version.id,
             retry_from_execution_id=(
-                str(retried_from_execution_id)
-                if retry_failure_point_ids is not None and retried_from_execution_id
-                else None
+                str(retried_from_execution_id) if eligible_point_ids is not None and retried_from_execution_id else None
             ),
-            retry_failure_point_ids=retry_failure_point_ids,
+            eligible_point_ids=eligible_point_ids,
             input_parameter_overrides=input_parameter_overrides,
         )
 
@@ -1400,6 +1398,6 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
             recorder=recorder,
             component=component,
             retried_from_execution_id=source.id,
-            retry_failure_point_ids=validation.eligible_point_ids,
+            eligible_point_ids=validation.eligible_point_ids,
             input_parameter_overrides=validated_overrides,
         )

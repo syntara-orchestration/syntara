@@ -206,6 +206,87 @@ async def test_validate_retry_rejects_sanitized_upstream_output() -> None:
 
 
 @pytest.mark.asyncio
+async def test_override_cannot_bypass_sanitized_guard() -> None:
+    """A fresh-value override must not suppress the sanitized-output rejection.
+
+    An override for the very parameter that would receive a redacted output is
+    a plausible way to try to "fix" the data, so the guard is checked with the
+    override supplied. It still rejects: taint detection runs before and
+    independently of the override guard, so supplying a clean value changes
+    nothing. The override is a legal target here (step_2 is a failed node that
+    re-executes), so this isolates the sanitized guard rather than the
+    override guard.
+    """
+    execution = _make_execution(ExecutionStatus.FAILED)
+    ref_nodes = [
+        dict(n, parameters={**n.get("parameters", {}), "input_ref": "${step_1.token}"}) if n["id"] == "step_2" else n
+        for n in NODES
+    ]
+    snapshot = _make_version(1, nodes=ref_nodes)
+
+    def _session() -> AsyncSession:
+        return _mock_session(
+            (execution, "one"),
+            ([_make_activity("step_2")], "all"),
+            ([_make_completed_activity("step_1", {"token": "[REDACTED]"})], "all"),
+            (snapshot, "one"),
+        )
+
+    # Explicit selection downstream of the sanitized node, with a valid override
+    # supplying a fresh value for exactly the parameter that reads it.
+    with_override = await validate_retry_from_failure(
+        _session(),
+        execution.id,
+        ["step_2"],
+        {"step_2": {"input_ref": "fresh-token"}},
+    )
+    without_override = await validate_retry_from_failure(_session(), execution.id, ["step_2"])
+
+    assert with_override.eligible is False
+    assert with_override.sanitized_node_ids == ["step_1"]
+    assert with_override.sanitized_replacements == {"step_2": ["step_1"]}
+    # The override must not change the verdict or its reason in any way.
+    assert with_override.reason == without_override.reason
+    assert with_override.eligible_point_ids == without_override.eligible_point_ids
+
+    # Default path: the sanitized node is auto-included so it re-runs and
+    # regenerates the raw output, and the failed downstream node remains an
+    # override target even though it is no longer a starting point.
+    default_with_override = await validate_retry_from_failure(
+        _session(),
+        execution.id,
+        [],
+        {"step_2": {"input_ref": "fresh-token"}},
+    )
+    assert default_with_override.eligible is True
+    assert default_with_override.eligible_point_ids == ["step_1"]
+    assert default_with_override.auto_included_node_ids == ["step_1"]
+
+
+@pytest.mark.asyncio
+async def test_override_rejected_for_failed_node_that_will_not_re_execute() -> None:
+    """A failed node outside the re-run set cannot be overridden.
+
+    Both steps failed but the caller retries only the last one, so overriding the
+    earlier failed step would be accepted and then silently discarded. It is
+    rejected instead.
+    """
+    execution = _make_execution(ExecutionStatus.FAILED)
+    snapshot = _make_version(1)
+    session = _mock_session(
+        (execution, "one"),
+        ([_make_activity("step_2"), _make_activity("step_3")], "all"),
+        ([_make_completed_activity("step_1")], "all"),
+        (snapshot, "one"),
+    )
+
+    verdict = await validate_retry_from_failure(session, execution.id, ["step_3"], {"step_2": {"code": "exit 2"}})
+
+    assert verdict.eligible is False
+    assert "step_2" in (verdict.reason or "")
+
+
+@pytest.mark.asyncio
 async def test_validate_retry_default_selection_auto_includes_sanitized_dependency() -> None:
     """SDP AC-15/R9a Q4: default selection auto-moves the start point to the sanitized node."""
     execution = _make_execution(ExecutionStatus.FAILED)
@@ -803,8 +884,13 @@ async def test_validate_retry_empty_overrides_never_reject() -> None:
 
 
 @pytest.mark.asyncio
-async def test_validate_retry_override_allowed_on_auto_included_sanitized_node() -> None:
-    """An auto-included sanitized head is a starting point, so it is a legal override target."""
+async def test_validate_retry_override_rejected_on_auto_included_sanitized_node() -> None:
+    """A sanitized node pulled in automatically is never an override target.
+
+    It is a starting point, so it re-executes to regenerate raw output, but the
+    caller never selected it and never targeted it, so its inputs are not
+    editable. Only failed nodes are.
+    """
     execution = _make_execution(ExecutionStatus.FAILED)
     ref_nodes = _nodes_with_refs({"step_2": "${step_1.token}"})
     snapshot = _make_version(1, nodes=ref_nodes)
@@ -815,8 +901,8 @@ async def test_validate_retry_override_allowed_on_auto_included_sanitized_node()
         (snapshot, "one"),
     )
     verdict = await validate_retry_from_failure(session, execution.id, [], {"step_1": {"code": "echo fresh"}})
-    assert verdict.eligible is True
-    assert verdict.eligible_point_ids == ["step_1"]
+    assert verdict.eligible is False
+    assert "step_1" in (verdict.reason or "")
 
 
 @pytest.mark.asyncio
