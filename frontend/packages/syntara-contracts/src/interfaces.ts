@@ -32,7 +32,6 @@ export const ActivityTypeEnum = {
   CONVERGE: 'converge',
   SWITCH: 'switch',
   WAIT: 'wait',
-  MCP_TOOL: 'mcp_tool',
   INTERNAL_ACTIVITY: 'internal_activity',
 } as const
 
@@ -93,7 +92,6 @@ export const ExecutorTypeEnum = {
   AAP_JOB_TEMPLATE: 'aap_job_template',
   AAP_WORKFLOW_JOB_TEMPLATE: 'aap_workflow_job_template',
   APPROVAL: 'approval',
-  MCP_TOOL: 'mcp_tool',
 } as const
 
 /**
@@ -263,7 +261,6 @@ export type LoopConfig =
 export type ConvergeConfig = WorkflowAPI.components['schemas']['ConvergeNodeParameters']
 export type SwitchConfig = WorkflowAPI.components['schemas']['SwitchNodeParameters']
 export type WaitConfig = WorkflowAPI.components['schemas']['WaitNodeParameters']
-export type MCPToolConfig = WorkflowAPI.components['schemas']['MCPToolExecutorParameters']
 
 // ============================================================================
 // Activity Base Interface
@@ -355,12 +352,6 @@ export interface WaitActivity extends ActivityBase {
   parameters: WaitConfig & { [key: string]: unknown }
 }
 
-/** MCP tool invocation node */
-export interface MCPToolActivity extends ActivityBase {
-  type: 'mcp_tool'
-  parameters: MCPToolConfig & { [key: string]: unknown }
-}
-
 // ============================================================================
 // Activity Discriminated Union (Typed - Opt-In)
 // ============================================================================
@@ -401,7 +392,6 @@ export type TypedActivity =
   | ConvergeActivity
   | SwitchActivity
   | WaitActivity
-  | MCPToolActivity
 
 // ============================================================================
 // Activity (Loose - Backward Compatible)
@@ -434,6 +424,5 @@ export type TaskActivity =
   | ScriptActivity
   | HttpRequestActivity
   | AgenticActivity
-  | MCPToolActivity
   | AAPJobTemplateActivity
   | AAPWorkflowJobTemplateActivity

@@ -39,7 +39,6 @@ import {
 } from '../utils/aapHelpers'
 
 import { AIAgentNodeDetails } from './AIAgentNodeDetails'
-import { MCPToolNodeDetails } from './MCPToolNodeDetails'
 
 /**
  * Stored AAP config supports both snake_case (API) and camelCase (legacy) field names.
@@ -516,18 +515,6 @@ export function TaskNodeDetails({
   if (executor === ExecutorTypeEnum.AGENTIC) {
     return (
       <AIAgentNodeDetails
-        taskData={taskData}
-        nodeId={nodeId}
-        onClose={onClose}
-        onHeaderContentChange={onHeaderContentChange}
-        projectId={projectId}
-      />
-    )
-  }
-
-  if (executor === ActivityTypeEnum.MCP_TOOL) {
-    return (
-      <MCPToolNodeDetails
         taskData={taskData}
         nodeId={nodeId}
         onClose={onClose}

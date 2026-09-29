@@ -252,7 +252,6 @@ BUILTIN_POLICIES.extend(
     PolicyInfo("workflow_node", "execute", scope=scope, effect="deny", kind=kind)
     for scope in ("any", "project")
     for kind in REGISTERED_STEP_KINDS
-    if kind != "mcp_tool"
 )
 
 BUILTIN_ROLES: list[RoleInfo] = [

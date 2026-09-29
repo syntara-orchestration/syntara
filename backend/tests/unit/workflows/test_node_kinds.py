@@ -3,8 +3,10 @@
 from typing import Any
 
 import pytest
+from pydantic import ValidationError
 
 from syntara.authz.role_conventions import BUILTIN_POLICIES, builtin_policy_uuid
+from syntara.workflows.models.workflow_definition import WorkflowDefinition
 from syntara.workflows.node_kinds import (
     NODE_KINDS,
     REGISTERED_STEP_KINDS,
@@ -28,9 +30,9 @@ def test_registry_tracks_node_types_and_only_exposes_execute() -> None:
     assert node_kind_action_pairs() == frozenset({("workflow_node", "execute")})
 
 
-def test_builtins_are_unassigned_denies_for_every_registered_kind_except_mcp_tool() -> None:
+def test_builtins_are_unassigned_denies_for_every_registered_kind() -> None:
     policies = {policy.name: policy for policy in BUILTIN_POLICIES}
-    expected_kinds = set(REGISTERED_STEP_KINDS) - {"mcp_tool"}
+    expected_kinds = set(REGISTERED_STEP_KINDS)
     actual = {
         (policy.scope, policy.kind)
         for policy in BUILTIN_POLICIES
@@ -53,6 +55,20 @@ def test_builtins_are_unassigned_denies_for_every_registered_kind_except_mcp_too
             }
         ]
     assert str(builtin_policy_uuid("workflow_node:execute:any:script")) == "fceb7564-e160-50d0-b83b-a9b0e61023f8"
+
+
+def test_mcp_tool_is_not_a_supported_workflow_step() -> None:
+    assert "mcp_tool" not in NODE_KINDS
+    with pytest.raises(ValidationError):
+        WorkflowDefinition.model_validate(
+            {
+                "schema_version": "2.0.0",
+                "name": "Unsupported MCP tool step",
+                "triggers": [{}],
+                "nodes": [{"id": "mcp", "type": "mcp_tool", "parameters": {}}],
+                "edges": [],
+            }
+        )
 
 
 @pytest.mark.parametrize("kind", REGISTERED_STEP_KINDS)

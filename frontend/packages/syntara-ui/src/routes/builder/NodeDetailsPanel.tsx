@@ -80,7 +80,6 @@ function getAddModeFormId(
     [RegistryNodeId.ACTION]: 'action-node-form',
     [RegistryNodeId.AGENT]: 'ai-agent-node-form',
     [RegistryNodeId.APPROVAL]: 'approval-node-form',
-    [RegistryNodeId.ACTION_MCP_TOOL]: 'mcp-tool-node-form',
   }
   if (nodeTypeId && nodeTypeId in simpleFormMap) return simpleFormMap[nodeTypeId]
 
@@ -110,7 +109,6 @@ function getAddModeFormId(
 
 const REGISTRY_STEP_KINDS: Record<string, string> = {
   [RegistryNodeId.ACTION]: ExecutorTypeEnum.SCRIPT,
-  [RegistryNodeId.ACTION_MCP_TOOL]: ExecutorTypeEnum.MCP_TOOL,
   [RegistryNodeId.AGENT]: ExecutorTypeEnum.AGENTIC,
   [RegistryNodeId.APPROVAL]: ActivityTypeEnum.APPROVAL,
   [RegistryNodeId.AAP_EXECUTION]: ExecutorTypeEnum.AAP_JOB_TEMPLATE,
@@ -172,11 +170,6 @@ function getTaskFormId(taskData: TaskActivity): string {
   // Check if it's an AI Agent task
   if (executor === ExecutorTypeEnum.AGENTIC) {
     return 'ai-agent-node-form'
-  }
-
-  // MCP tool task
-  if (executor === ActivityTypeEnum.MCP_TOOL) {
-    return 'mcp-tool-node-form'
   }
 
   // Script or HTTP request

@@ -11,7 +11,6 @@ import {
   RhUiUserCheckIcon,
   RhUiTreeViewIcon,
   RhUiClockIcon,
-  RhUiMcpServerIcon,
   RhUiSettingsIcon,
 } from '@patternfly/react-icons'
 import type { ComponentType } from 'react'
@@ -110,6 +109,5 @@ export const executorMetadata: Record<string, ExecutorDisplayMetadata> = {
   /** Internal key from detectTaskNodeType (agentic + ansible connector prompt), not an API executor string */
   aap: aapJobExecutorDisplay,
   approval: { icon: RhUiUserCheckIcon, label: 'Approval' },
-  mcp_tool: { icon: RhUiMcpServerIcon, label: 'MCP tool' },
   internal_activity: { icon: RhUiSettingsIcon, label: 'System' },
 }

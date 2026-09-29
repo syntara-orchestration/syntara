@@ -291,26 +291,6 @@
             {
               "properties": {
                 "type": {
-                  "const": "mcp_tool"
-                },
-                "parameters": {
-                  "$ref": "executors/mcp_tool.schema.json#/parameterSchema"
-                },
-                "settings": {
-                  "$ref": "common-definitions.schema.json#/$defs/nodeSettingsNoRetry"
-                }
-              }
-            }
-          ]
-        },
-        {
-          "allOf": [
-            {
-              "$ref": "#/$defs/node_base"
-            },
-            {
-              "properties": {
-                "type": {
                   "const": "agentic"
                 },
                 "parameters": {

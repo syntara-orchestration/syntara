@@ -17,7 +17,6 @@ const ACTIVITY_EXECUTOR_TYPES = [
   'aap_job_template',
   'aap_workflow_job_template',
   'approval',
-  'mcp_tool',
   'internal_activity',
 ] as const
 

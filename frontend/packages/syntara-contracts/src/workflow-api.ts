@@ -1015,7 +1015,6 @@ export interface components {
         | components['schemas']['AAPJobTemplateNode']
         | components['schemas']['AAPWorkflowJobTemplateNode']
         | components['schemas']['HTTPRequestNode']
-        | components['schemas']['MCPToolNode']
         | components['schemas']['AgenticNode']
         | components['schemas']['ScriptNode']
         | components['schemas']['ApprovalNode']
@@ -1147,45 +1146,6 @@ export interface components {
       type: 'http_request'
       parameters: components['schemas']['APIExecutorParameters']
       settings?: components['schemas']['NodeSettingsFull'] | null
-    } & {
-      [key: string]: unknown
-    }
-    /**
-     * MCPToolNode
-     * @description MCP tool executor node.
-     */
-    MCPToolNode: {
-      /**
-       * Id
-       * @description Unique identifier for the node within the workflow
-       */
-      id: string
-      /**
-       * Name
-       * @description Human-readable name for the node
-       */
-      name?: string | null
-      /**
-       * Description
-       * @description Human-readable description of the node purpose
-       */
-      description?: string | null
-      /**
-       * Outputs
-       * @description Output extraction mapping
-       */
-      outputs?: {
-        [key: string]: string
-      } | null
-      /** @description Optional UI position hint */
-      position?: components['schemas']['NodePosition'] | null
-      /**
-       * @description discriminator enum property added by openapi-typescript
-       * @enum {string}
-       */
-      type: 'mcp_tool'
-      parameters: components['schemas']['MCPToolExecutorParameters']
-      settings?: components['schemas']['NodeSettingsNoRetry'] | null
     } & {
       [key: string]: unknown
     }
@@ -1738,34 +1698,6 @@ export interface components {
        * @description Orchestrator credential UUID for authentication or Secret URL.
        */
       credential_id?: string | null
-    }
-    /**
-     * MCPToolExecutorParameters
-     * @description Parameters for MCP tool executor (mcp_tool activity).
-     */
-    MCPToolExecutorParameters: {
-      /**
-       * Integration Id
-       * @description UUID of the mcp_server integration that provides the tool
-       */
-      integration_id: string
-      /**
-       * Tool Name
-       * @description Name of the MCP tool to invoke
-       */
-      tool_name: string
-      /**
-       * Arguments
-       * @description Arguments passed to the MCP tool (values support templating)
-       */
-      arguments?: {
-        [key: string]: unknown
-      }
-      /**
-       * Timeout Seconds
-       * @description Deadline for the tool call in seconds. Defaults to the node's resolved engine timeout and is capped at 600s.
-       */
-      timeout_seconds?: number | null
     }
     /**
      * AgenticExecutorParameters
