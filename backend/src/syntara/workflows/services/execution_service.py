@@ -58,7 +58,7 @@ from syntara.workflows.models.execution import (
 from syntara.workflows.models.workflow import Workflow
 from syntara.workflows.models.workflow_definition import WorkflowDefinition
 from syntara.workflows.models.workflow_version import WorkflowVersion
-from syntara.workflows.services.retry_validation import RetryValidation, _state_reason, validate_retry_from_failure
+from syntara.workflows.services.retry_validation import RetryValidation, validate_retry_from_failure
 from syntara.workflows.utils.workflow_metadata import build_workflow_metadata, resolve_user_display_name
 from syntara.workflows.workflow_engine.models.workflow_definition import NodeType, resolve_trigger_node
 from syntara.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
@@ -1348,15 +1348,18 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
             override_node_ids=sorted(input_parameter_overrides or {}),
         )
 
+        # Loaded again rather than returned by the validator, which keeps its
+        # own instance internal. The row is needed for the fields below, and the
+        # load doubles as the deletion check: deleting a project cascades to its
+        # executions, so the source can vanish between validation and here.
+        # The execution status is deliberately NOT re-checked. Validation already
+        # asserted it, and every status write in the codebase is guarded against
+        # leaving a terminal state, so a FAILED/COMPLETED_WITH_ERRORS row cannot
+        # transition before the retry is dispatched.
         result = await self.session.exec(select(Execution).where(Execution.id == execution_id))
         source = result.one_or_none()
         if source is None:  # Deleted between validation and retry
             raise ExecutionNotFoundError(execution_id)
-        # Re-check terminal state: the execution may have transitioned (e.g. cancelled)
-        # between validation passing and this second load.
-        stale_reason = _state_reason(source)
-        if stale_reason is not None:
-            raise ExecutionNotRetryableFromFailureError(execution_id, stale_reason)
 
         workflow_result = await self.session.exec(select(Workflow).where(Workflow.id == source.workflow_id))
         workflow = workflow_result.one_or_none()
