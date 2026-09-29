@@ -90,7 +90,10 @@ nodes:
     name: Test Form
     response_window: {response_window}
     form_definition:
-      fields: []
+      fields:
+      - value_name: reason
+        type: text
+        label: Reason
   settings:
     continue_on_failure: false
 - id: next_step
@@ -125,7 +128,10 @@ nodes:
     name: Test Form
     response_window: {response_window}
     form_definition:
-      fields: []
+      fields:
+      - value_name: reason
+        type: text
+        label: Reason
   settings:
     continue_on_failure: true
 - id: submitted_step
