@@ -55,4 +55,10 @@ describe('convertYamlToWorkflow audit fields', () => {
 
     expect(workflow.version.created_by).toEqual(workflow.created_by)
   })
+
+  it('seeds workflow updated_by as a UserReference for table timestamp columns', () => {
+    const workflow = convertYamlToWorkflow(yamlPath, 'wf-red-green', 'system', baseDir)
+
+    expect(workflow.updated_by).toEqual(workflow.created_by)
+  })
 })

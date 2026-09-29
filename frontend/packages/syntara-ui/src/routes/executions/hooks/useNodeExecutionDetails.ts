@@ -61,7 +61,7 @@ export function useNodeExecutionDetails(
     // are arbitrary JSON objects, so we widen to Record<string, unknown>.
     // output_data is already typed as Record<string, unknown> | null in the contract.
     return {
-      inputData: (activity?.input_data as Record<string, unknown> | undefined) ?? null,
+      inputData: activity?.input_data ?? null,
       outputData: activity?.output_data ?? null,
       isLoading,
       error,

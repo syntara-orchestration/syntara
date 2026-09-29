@@ -1137,11 +1137,23 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
         # this execution.  Agentic activities use async-completion so the
         # Temporal cancel above does not reach the running agent process.
         try:
+            from syntara.agent_orchestrator.services.invocation_service import (  # noqa: PLC0415
+                InvocationService,
+            )
             from syntara.workflows.services.invocation_cancellation import (  # noqa: PLC0415
                 cancel_invocations_for_execution,
             )
 
-            await cancel_invocations_for_execution(self.session, self.user, execution_id)
+            # InvocationService owns the rest: it marks each invocation CANCELLED
+            # and cancels the builtin workflow running it.  It is constructed
+            # here rather than inside the bridge module so temporal_service --
+            # this service's dependency -- does not have to travel through a
+            # module that never uses it.
+            await cancel_invocations_for_execution(
+                self.session,
+                execution_id,
+                InvocationService(self.session, self.user, temporal_service=self.temporal_service),
+            )
         except Exception:
             logger.exception(
                 "Best-effort invocation cancellation failed",

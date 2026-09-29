@@ -40,7 +40,7 @@ const loadingResult: MockQueryResult = { data: undefined, isLoading: true, isErr
 const errorResult: MockQueryResult = { data: undefined, isLoading: false, isError: true }
 
 function mockResult(result: MockQueryResult) {
-  mockUseQuery.mockReturnValue(result as unknown as ReturnType<typeof filesClient.useQuery>)
+  mockUseQuery.mockReturnValue(result)
 }
 
 // ---------------------------------------------------------------------------

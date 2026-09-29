@@ -20,13 +20,21 @@ type WorkflowPermissions = {
 
 type UseWorkflowPermissionsOptions = {
   /**
-   * Concrete project when the workflows list has one selected. Create uses
-   * `check_any_project` when omitted (toolbar on "All projects"); update /
-   * delete / run fall back to system-scoped `can_i` so system admins keep row
-   * actions. Prefer per-row `resourceProject` when adding stricter All-projects
-   * gating later.
+   * Concrete project for `can_i`. Toolbar Create uses `check_any_project` when
+   * omitted (All projects). Row kebabs must pass the workflow's `project_id`
+   * so project-admin grants match on All projects.
    */
   resourceProject?: string
+  /**
+   * Skip update/delete/run checks. Use on the list page so the toolbar only
+   * fetches Create; row kebabs call this hook with `resourceProject` instead.
+   */
+  createOnly?: boolean
+  /**
+   * When false, skip all `can_i` calls (safe-false). Row kebabs pass false until
+   * the menu opens so All projects does not fire one request per visible row.
+   */
+  enabled?: boolean
 }
 
 /**
@@ -39,12 +47,22 @@ export function useWorkflowPermissions(options?: UseWorkflowPermissionsOptions):
   const resourceType = 'workflow' as const
   const resourceProject = options?.resourceProject
   const hasProject = Boolean(resourceProject)
+  const checksEnabled = options?.enabled !== false
+  const createEnabled = options?.createOnly === true || checksEnabled
+  const rowChecksEnabled = options?.createOnly !== true && checksEnabled
 
   // Create: any-project when the list has no selected project (project-admin can
-  // still open the builder). Update/delete/run: concrete project when selected,
-  // otherwise system-scoped (same as pre-AAP-83790 for admin row actions).
-  const createOptions = hasProject ? { resourceProject } : { checkAnyProject: true as const }
-  const scopedOptions = hasProject ? { resourceProject } : undefined
+  // still open the builder). Update/delete/run: always pass a concrete project
+  // for row kebabs; skip those queries when this hook is create-only (toolbar)
+  // or until the row kebab opens (`enabled: false`).
+  const createOptions = {
+    ...(hasProject ? { resourceProject } : { checkAnyProject: true as const }),
+    enabled: createEnabled,
+  }
+  const scopedOptions = {
+    ...(hasProject ? { resourceProject } : {}),
+    enabled: rowChecksEnabled,
+  }
 
   const { allowed: canCreate, isChecking: isCheckingCreate } = useCanI('create', resourceType, createOptions)
   const { allowed: canUpdate, isChecking: isCheckingUpdate } = useCanI('update', resourceType, scopedOptions)

@@ -28,6 +28,7 @@ import { SynPanelContentStack } from '../../../../components/layout/SynPanelCont
 import { SynEmptyStateFilter } from '../../../../components/states/SynEmptyStateFilter'
 import { SynEmptyStateNoData } from '../../../../components/states/SynEmptyStateNoData'
 import { SynScrollableTableContainer } from '../../../../components/table/SynScrollableTableContainer'
+import { useClientPagination } from '../../../../hooks/useClientPagination'
 import type { FilterConfig, FilterFieldDefinition } from '../../../../types/filters'
 import { FilterOperatorEnum, FilterTypeEnum } from '../../../../types/filters'
 import { APP_TITLE } from '../../../../utils/appTitle'
@@ -96,7 +97,7 @@ export function EmptyMappingState({ onTestSignIn, onAddManually }: Readonly<Empt
         <EmptyStateFooter>
           <EmptyStateActions>
             {onTestSignIn && (
-              <Button variant="primary" onClick={onTestSignIn}>
+              <Button variant="primary" icon={<RhUiSyncIcon />} onClick={onTestSignIn}>
                 Discover groups
               </Button>
             )}
@@ -369,23 +370,20 @@ export type ReadOnlyViewProps = {
 
 export function ReadOnlyView({ entries, mappedGroups, onEditMapping }: Readonly<ReadOnlyViewProps>) {
   const [filters, setFilters] = useState<FilterConfig[]>([])
-  const [page, setPage] = useState(1)
-  const [perPage, setPerPage] = useState(20)
+  const { paginate, getFooterProps, resetPage } = useClientPagination()
 
   const clearFiltersAndPage = useCallback(() => {
     setFilters([])
-    setPage(1)
-  }, [])
+    resetPage()
+  }, [resetPage])
 
-  const handleFilterChange = useCallback((next: FilterConfig[]) => {
-    setFilters(next)
-    setPage(1)
-  }, [])
-
-  const handlePerPageChange = useCallback((newPerPage: number) => {
-    setPerPage(newPerPage)
-    setPage(1)
-  }, [])
+  const handleFilterChange = useCallback(
+    (next: FilterConfig[]) => {
+      setFilters(next)
+      resetPage()
+    },
+    [resetPage]
+  )
 
   const filterTerm = useMemo(() => {
     const keywordFilter = filters.find((f) => f.key === 'keyword')
@@ -403,10 +401,7 @@ export function ReadOnlyView({ entries, mappedGroups, onEditMapping }: Readonly<
     })
   }, [entries, filterTerm, mappedGroups])
 
-  const paginatedEntries = useMemo(() => {
-    const start = (page - 1) * perPage
-    return filteredEntries.slice(start, start + perPage)
-  }, [filteredEntries, page, perPage])
+  const paginatedEntries = useMemo(() => paginate(filteredEntries), [filteredEntries, paginate])
 
   /** Defensive: parent normally switches to empty state before rendering read-only with zero rows */
   if (entries.length === 0) {
@@ -434,15 +429,7 @@ export function ReadOnlyView({ entries, mappedGroups, onEditMapping }: Readonly<
         <SynScrollableTableContainer
           caption="Group mappings"
           variant="compact"
-          footer={{
-            page,
-            perPage,
-            total: filteredEntries.length,
-            hasNext: page * perPage < filteredEntries.length,
-            onPrev: () => setPage((p) => Math.max(1, p - 1)),
-            onNext: () => setPage((p) => p + 1),
-            onPerPageChange: handlePerPageChange,
-          }}
+          footer={getFooterProps(filteredEntries.length)}
         >
           <GroupMappingTableHead showActionsColumn={false} />
           <Tbody>

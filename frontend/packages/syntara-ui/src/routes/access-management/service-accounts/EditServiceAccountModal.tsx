@@ -1,22 +1,10 @@
-import { zodResolver } from '@hookform/resolvers/zod'
-import {
-  Button,
-  Form,
-  FormGroup,
-  FormHelperText,
-  HelperText,
-  HelperTextItem,
-  Modal,
-  ModalBody,
-  ModalFooter,
-  ModalHeader,
-  TextArea,
-  TextInput,
-} from '@patternfly/react-core'
-import { RhUiErrorIcon } from '@patternfly/react-icons'
-import { Controller, useForm } from 'react-hook-form'
+import { Button, Form, Modal, ModalBody, ModalFooter, ModalHeader } from '@patternfly/react-core'
+import { useEffect } from 'react'
 
-import { useFormMutationErrorHandler } from '../../../hooks/useFormMutationErrorHandler'
+import { SynForm } from '../../../components/forms/SynForm'
+import { SynTextAreaField } from '../../../components/forms/SynTextAreaField'
+import { SynTextField } from '../../../components/forms/SynTextField'
+import { useSynForm } from '../../../hooks/useSynForm'
 import { useAlerts } from '../../../providers/alerts'
 import { accessClient } from '../../access/accessClient'
 
@@ -54,15 +42,22 @@ type EditServiceAccountFormProps = {
 function EditServiceAccountForm({ serviceAccount, onClose, onSuccess }: Readonly<EditServiceAccountFormProps>) {
   const { showSuccess } = useAlerts()
 
-  const { control, handleSubmit, setError } = useForm<EditServiceAccountFormData>({
-    resolver: zodResolver(editServiceAccountSchema, undefined, { mode: 'sync' }),
+  const form = useSynForm({
+    schema: editServiceAccountSchema,
     defaultValues: {
       name: serviceAccount.name,
       description: serviceAccount.description ?? '',
     },
+    onClose,
   })
+  const { handleSubmit, handleError, handleClose, reset } = form
 
-  const handleError = useFormMutationErrorHandler<EditServiceAccountFormData>(setError)
+  useEffect(() => {
+    reset({
+      name: serviceAccount.name,
+      description: serviceAccount.description ?? '',
+    })
+  }, [serviceAccount, reset])
 
   const { mutate: updateServiceAccount, isPending } = accessClient.useMutation(
     'patch',
@@ -84,7 +79,7 @@ function EditServiceAccountForm({ serviceAccount, onClose, onSuccess }: Readonly
             title: 'Service account updated',
             description: `Service account "${formData.name}" has been updated successfully.`,
           })
-          onClose()
+          handleClose()
           onSuccess()
         },
         onError: handleError({
@@ -99,61 +94,24 @@ function EditServiceAccountForm({ serviceAccount, onClose, onSuccess }: Readonly
     <>
       <ModalBody>
         <Form id="edit-service-account-form" onSubmit={handleSubmit(onSubmit)}>
-          <Controller
-            name="name"
-            control={control}
-            render={({ field, fieldState }) => (
-              <FormGroup label="Name" fieldId="edit-sa-name" isRequired labelHelp={serviceAccountHelp.name}>
-                <TextInput
-                  id="edit-sa-name"
-                  aria-label="Name"
-                  placeholder="my-service-account"
-                  validated={fieldState.error ? 'error' : 'default'}
-                  value={field.value ?? ''}
-                  onChange={field.onChange}
-                  onBlur={field.onBlur}
-                  name={field.name}
-                />
-                {fieldState.error && (
-                  <FormHelperText>
-                    <HelperText>
-                      <HelperTextItem icon={<RhUiErrorIcon />} variant="error">
-                        {fieldState.error.message}
-                      </HelperTextItem>
-                    </HelperText>
-                  </FormHelperText>
-                )}
-              </FormGroup>
-            )}
-          />
-          <Controller
-            name="description"
-            control={control}
-            render={({ field, fieldState }) => (
-              <FormGroup label="Description" fieldId="edit-sa-description" labelHelp={serviceAccountHelp.description}>
-                <TextArea
-                  id="edit-sa-description"
-                  aria-label="Description"
-                  placeholder="Describe the purpose of this service account"
-                  validated={fieldState.error ? 'error' : 'default'}
-                  value={field.value ?? ''}
-                  onChange={field.onChange}
-                  onBlur={field.onBlur}
-                  name={field.name}
-                  rows={3}
-                />
-                {fieldState.error && (
-                  <FormHelperText>
-                    <HelperText>
-                      <HelperTextItem icon={<RhUiErrorIcon />} variant="error">
-                        {fieldState.error.message}
-                      </HelperTextItem>
-                    </HelperText>
-                  </FormHelperText>
-                )}
-              </FormGroup>
-            )}
-          />
+          <SynForm form={form}>
+            <SynTextField
+              name="name"
+              label="Name"
+              fieldId="edit-sa-name"
+              isRequired
+              placeholder="my-service-account"
+              labelHelp={serviceAccountHelp.name}
+            />
+            <SynTextAreaField
+              name="description"
+              label="Description"
+              fieldId="edit-sa-description"
+              placeholder="Describe the purpose of this service account"
+              rows={3}
+              labelHelp={serviceAccountHelp.description}
+            />
+          </SynForm>
         </Form>
       </ModalBody>
       <ModalFooter>
@@ -164,9 +122,9 @@ function EditServiceAccountForm({ serviceAccount, onClose, onSuccess }: Readonly
           isDisabled={isPending}
           isLoading={isPending}
         >
-          Save
+          Save service account
         </Button>
-        <Button variant="link" onClick={onClose} isDisabled={isPending}>
+        <Button variant="link" onClick={handleClose} isDisabled={isPending}>
           Cancel
         </Button>
       </ModalFooter>

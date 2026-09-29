@@ -185,7 +185,7 @@ export function convertYamlToWorkflow(
   createdBy = 'system',
   allowedBaseDir: string
 ): WorkflowWithVersion {
-  // Both a workflow's and a version's created_by are UserReference ({ id, name }).
+  // Workflow audit fields are UserReference ({ id, name, type }).
   const createdByRef = { id: MOCK_SEED_USER_ID, name: createdBy, type: 'user' as const }
   const resolvedPath = assertPathWithinBase(yamlFilePath, allowedBaseDir)
   const yamlContent = readFileSync(resolvedPath, 'utf-8')
@@ -205,6 +205,7 @@ export function convertYamlToWorkflow(
     created_at: mockDate.daysAgo3,
     updated_at: mockDate.daysAgo1,
     created_by: createdByRef,
+    updated_by: createdByRef,
     labels: {},
     current_version: 1,
     published_version_id: null,

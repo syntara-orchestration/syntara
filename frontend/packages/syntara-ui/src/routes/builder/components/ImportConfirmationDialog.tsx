@@ -99,7 +99,7 @@ export function ImportConfirmationDialog({
       </ModalBody>
       <ModalFooter>
         <Button variant="primary" onClick={handleConfirm} isDisabled={isPending} isLoading={isPending}>
-          Import
+          Import workflow
         </Button>
         <Button variant="link" onClick={onClose} isDisabled={isPending}>
           Cancel

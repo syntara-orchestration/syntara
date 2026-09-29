@@ -12,10 +12,7 @@ export const POLICY_SCOPE_OPTIONS = [
 ]
 
 /** Scope options for the Roles tab (backend values: system, project) */
-export const ROLE_SCOPE_OPTIONS = [
-  { value: 'system', label: 'System' },
-  { value: 'project', label: 'Project' },
-]
+export { roleAssignmentScopeOptions as ROLE_SCOPE_OPTIONS } from '../access-management/RoleAssignmentTypes'
 
 /**
  * Builds scope filter field definitions with dynamic project options.

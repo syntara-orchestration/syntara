@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
-import { DRAG_TYPE_CONTEXT, DRAG_TYPE_FIELD, DROP_TARGET_OUTLINE } from '../utils/dragTypes'
+import { DRAG_TYPE_CONTEXT, DRAG_TYPE_FIELD } from '../utils/dragTypes'
 
 import { ExpressionFormField } from './ExpressionFormField'
 
@@ -121,12 +121,7 @@ describe('ExpressionFormField', () => {
       dataTransfer: { types: ['application/json'] },
     })
 
-    // Assert on the literal inline style rather than toHaveStyle(): getComputedStyle can't
-    // resolve var() (happy-dom does not perform real CSS cascade), so it isn't a
-    // meaningful check for DROP_TARGET_OUTLINE's outlineColor token.
-    expect(input.style.outlineWidth).toBe(DROP_TARGET_OUTLINE.outlineWidth)
-    expect(input.style.outlineStyle).toBe(DROP_TARGET_OUTLINE.outlineStyle)
-    expect(input.style.outlineColor).toBe(DROP_TARGET_OUTLINE.outlineColor)
+    expect(input).toHaveAttribute('data-drop-target', 'active')
   })
 
   it('removes highlight state on dragLeave', () => {
@@ -140,7 +135,7 @@ describe('ExpressionFormField', () => {
 
     fireEvent.dragLeave(input)
 
-    expect(input.style.outlineWidth).toBe('')
+    expect(input).toHaveAttribute('data-drop-target', 'inactive')
   })
 
   it('has no accessibility violations', async () => {

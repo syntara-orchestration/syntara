@@ -99,14 +99,14 @@ function setupProviders(providers: (typeof mockProvider)[] = [mockProvider]) {
     error: null,
     isPending: false,
     refetch: vi.fn(),
-  } as never)
+  })
   vi.mocked(identityProvidersClient.useMutation).mockReturnValue({
     mutate: vi.fn(),
-  } as never)
+  })
   vi.mocked(adminClient.useMutation).mockReturnValue({
     mutate: vi.fn(),
     isPending: false,
-  } as never)
+  })
 }
 
 function setupEmptyProviders() {

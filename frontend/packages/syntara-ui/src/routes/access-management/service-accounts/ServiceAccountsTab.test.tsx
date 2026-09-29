@@ -129,10 +129,10 @@ describe('ServiceAccountsTab', () => {
     })
 
     vi.mocked(accessClient.useQuery).mockReturnValue(
-      buildQueryResult({ resources: mockServiceAccounts, next_cursor: null }) as never
+      buildQueryResult({ resources: mockServiceAccounts, next_cursor: null })
     )
 
-    vi.mocked(accessClient.useMutation).mockReturnValue(buildMutationResult() as never)
+    vi.mocked(accessClient.useMutation).mockReturnValue(buildMutationResult())
   })
 
   it('renders service accounts in a table', () => {
@@ -165,7 +165,7 @@ describe('ServiceAccountsTab', () => {
       buildQueryResult({
         resources: [{ ...mockServiceAccounts[0], project_name: null }],
         next_cursor: null,
-      }) as never
+      })
     )
 
     render(<ServiceAccountsTab />, { wrapper })
@@ -181,7 +181,7 @@ describe('ServiceAccountsTab', () => {
   })
 
   it('renders empty state when no service accounts exist', () => {
-    vi.mocked(accessClient.useQuery).mockReturnValue(buildQueryResult({ resources: [], next_cursor: null }) as never)
+    vi.mocked(accessClient.useQuery).mockReturnValue(buildQueryResult({ resources: [], next_cursor: null }))
 
     render(<ServiceAccountsTab />, { wrapper })
 
@@ -267,7 +267,7 @@ describe('ServiceAccountsTab', () => {
       expect(screen.getByText('Disable service account?')).toBeInTheDocument()
     })
 
-    await user.click(screen.getByRole('button', { name: 'Disable' }))
+    await user.click(screen.getByRole('button', { name: 'Disable service account' }))
     expect(mockDisableMutate).toHaveBeenCalled()
   })
 
@@ -320,7 +320,7 @@ describe('ServiceAccountsTab', () => {
 
     const ackCheckbox = screen.getByRole('checkbox', { name: /i understand/i })
     await user.click(ackCheckbox)
-    await user.click(screen.getByRole('button', { name: 'Delete' }))
+    await user.click(screen.getByRole('button', { name: 'Delete service account' }))
     expect(mockDeleteMutate).toHaveBeenCalled()
   })
 
@@ -429,7 +429,7 @@ describe('ServiceAccountsTab', () => {
     })
 
     it('has no accessibility violations in empty state', async () => {
-      vi.mocked(accessClient.useQuery).mockReturnValue(buildQueryResult({ resources: [], next_cursor: null }) as never)
+      vi.mocked(accessClient.useQuery).mockReturnValue(buildQueryResult({ resources: [], next_cursor: null }))
 
       const { container } = render(<ServiceAccountsTab />, { wrapper })
 

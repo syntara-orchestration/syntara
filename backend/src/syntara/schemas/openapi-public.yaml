@@ -14,7 +14,7 @@
 openapi: 3.1.0
 info:
   title: Orchestrator API
-  version: 1.2.0
+  version: 1.3.0
   description: A distributed multi-agent workflow orchestration system
 servers:
   - url: /api/v1
@@ -34906,6 +34906,7 @@ components:
                 script: '#/components/schemas/ScriptNode'
                 switch: '#/components/schemas/SwitchNode'
                 wait: '#/components/schemas/WaitNode'
+          maxItems: 200
           type: array
           title: Nodes
           description: Execution and control nodes in the workflow graph
@@ -34913,6 +34914,7 @@ components:
           items:
             additionalProperties: true
             type: object
+          maxItems: 500
           type: array
           title: Edges
           description: List of directed edges connecting triggers and nodes in the workflow graph
@@ -36337,6 +36339,7 @@ components:
         - orphaned_node
         - converge_configuration
         - approval_configuration
+        - definition_limits
     ValidationFinding:
       type: object
       title: ValidationFinding

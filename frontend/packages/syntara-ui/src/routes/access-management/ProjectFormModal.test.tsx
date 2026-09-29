@@ -245,7 +245,7 @@ describe('ProjectFormModal', () => {
       })
 
       expect(screen.getByText('Edit Alpha')).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Save project' })).toBeInTheDocument()
     })
 
     it('pre-populates form fields with project data', () => {
@@ -276,7 +276,7 @@ describe('ProjectFormModal', () => {
       const nameInput = screen.getByPlaceholderText('project-name')
       await user.clear(nameInput)
       await user.type(nameInput, 'updated-alpha')
-      await user.click(screen.getByRole('button', { name: 'Save' }))
+      await user.click(screen.getByRole('button', { name: 'Save project' }))
 
       await waitFor(() => {
         expect(mockUpdateMutate).toHaveBeenCalled()
@@ -295,7 +295,7 @@ describe('ProjectFormModal', () => {
         wrapper,
       })
 
-      await user.click(screen.getByRole('button', { name: 'Save' }))
+      await user.click(screen.getByRole('button', { name: 'Save project' }))
 
       await waitFor(() => {
         expect(mockUpdateMutate).toHaveBeenCalled()

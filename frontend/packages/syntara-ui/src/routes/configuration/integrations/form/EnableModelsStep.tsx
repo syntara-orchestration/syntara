@@ -10,7 +10,7 @@ import {
   StackItem,
   Title,
 } from '@patternfly/react-core'
-import { WrenchIcon } from '@patternfly/react-icons'
+import { RhUiConnectedIcon, WrenchIcon } from '@patternfly/react-icons'
 import { Tbody, Th, Thead, Tr } from '@patternfly/react-table'
 import type { IntegrationsAPI } from '@syntara/contracts'
 import { useCallback, useMemo, useState } from 'react'
@@ -147,6 +147,7 @@ function EnableModelsStep({
             <EmptyStateActions>
               <Button
                 variant="primary"
+                icon={<RhUiConnectedIcon />}
                 onClick={isTestDisabled ? undefined : onTestConnection}
                 isAriaDisabled={isTestDisabled}
               >

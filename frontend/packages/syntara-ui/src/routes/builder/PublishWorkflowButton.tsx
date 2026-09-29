@@ -47,6 +47,7 @@ export function PublishWorkflowButton({
     <DisabledWithTooltip isDisabled={!canPublish} content={tooltipContent} position="bottom">
       <Button
         variant="primary"
+        isLoading={isVerifying}
         isAriaDisabled={!canPublish}
         onClick={canPublish ? () => handleVerify(() => onPublishClick()) : undefined}
         icon={

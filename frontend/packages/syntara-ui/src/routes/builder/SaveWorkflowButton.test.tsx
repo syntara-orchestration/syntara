@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
@@ -16,9 +16,11 @@ const defaultProps = {
 }
 
 describe('SaveWorkflowButton', () => {
-  it('renders Save text', () => {
+  it('renders Save workflow with a save icon', () => {
     render(<SaveWorkflowButton {...defaultProps} />)
-    expect(screen.getByRole('button', { name: /save/i })).toBeInTheDocument()
+    const button = screen.getByRole('button', { name: /save workflow/i })
+    expect(button).toBeInTheDocument()
+    expect(within(button).getByRole('img', { hidden: true })).toBeInTheDocument()
   })
 
   it('shows Saving... when isPending', () => {
@@ -92,6 +94,19 @@ describe('SaveWorkflowButton', () => {
     const user = userEvent.setup()
     await user.hover(screen.getByRole('button', { name: /save/i }))
     expect(await screen.findByText(/Finish editing the current step before saving/)).toBeInTheDocument()
+  })
+
+  it.each([
+    { isDirty: false, label: 'save is disabled' },
+    { isDirty: true, label: 'save is enabled' },
+  ])('shows last saved timestamp in tooltip when $label', async ({ isDirty }) => {
+    const lastSavedAt = '2026-01-15T14:30:00Z'
+    render(<SaveWorkflowButton {...defaultProps} isDirty={isDirty} lastSavedAt={lastSavedAt} />)
+    const user = userEvent.setup()
+    await user.hover(screen.getByRole('button', { name: /save/i }))
+    const tooltip = await screen.findByRole('tooltip')
+    expect(within(tooltip).getByText('Last saved:')).toBeInTheDocument()
+    expect(within(tooltip).getByText(/Jan.*15.*2026/i)).toHaveAttribute('datetime', '2026-01-15T14:30:00.000Z')
   })
 
   it('has no accessibility violations when disabled', async () => {

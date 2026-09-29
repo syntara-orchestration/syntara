@@ -93,6 +93,14 @@ describe('SynTextField', () => {
     expect(screen.getByRole('textbox', { name: 'Group name' })).toBeDisabled()
   })
 
+  it('forwards autoComplete to the input', () => {
+    renderWithForm<FormData>({ schema, defaultValues: { name: '', email: '' } }, ({ control }) => (
+      <SynTextField name="name" control={control} label="Group name" autoComplete="off" />
+    ))
+
+    expect(screen.getByRole('textbox', { name: 'Group name' })).toHaveAttribute('autocomplete', 'off')
+  })
+
   it('has no accessibility violations in default state', async () => {
     const { container } = renderWithForm<FormData>(
       { schema, defaultValues: { name: '', email: '' } },

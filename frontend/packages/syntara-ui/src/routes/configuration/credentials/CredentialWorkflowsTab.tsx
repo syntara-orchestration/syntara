@@ -1,7 +1,7 @@
 import { LabelGroup, Truncate } from '@patternfly/react-core'
 import { Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
 import type { ExecutionsAPI } from '@syntara/contracts'
-import { useCallback, useMemo, useState } from 'react'
+import { useMemo } from 'react'
 
 import { AppRoute } from '../../../app/AppRoute'
 import { credentialsClient } from '../../../client'
@@ -12,6 +12,7 @@ import { SynEmptyStateNoData } from '../../../components/states/SynEmptyStateNoD
 import { DateCell } from '../../../components/table/DateCell'
 import { LinkCell } from '../../../components/table/LinkCell'
 import { UserTimestamp } from '../../../components/table/UserTimestamp'
+import { useClientPagination } from '../../../hooks/useClientPagination'
 import { useExpandableRowIds } from '../../../hooks/useExpandableRowIds'
 import { detachPromise } from '../../../utils/detachPromise'
 import { StatusLabel } from '../../builder/ExecutionStatus'
@@ -134,19 +135,13 @@ function WorkflowsTable({
 }
 
 export function CredentialWorkflowsTab({ credentialId }: Readonly<CredentialWorkflowsTabProps>) {
-  const [page, setPage] = useState(1)
-  const [perPage, setPerPage] = useState(20)
-
-  const handlePerPageChange = useCallback((newPerPage: number) => {
-    setPerPage(newPerPage)
-    setPage(1)
-  }, [])
+  const { paginate, getFooterProps } = useClientPagination()
 
   const query = credentialsClient.useQuery('get', '/credentials/{credential_id}/workflows', {
     params: { path: { credential_id: credentialId } },
   })
   const workflows = query.data?.resources ?? []
-  const paginatedWorkflows = workflows.slice((page - 1) * perPage, page * perPage)
+  const paginatedWorkflows = paginate(workflows)
   const expandableIds = useMemo(() => expandableRowIds(paginatedWorkflows, 'workflow'), [paginatedWorkflows])
   const { expandedRows, allRowsExpanded, handleToggleRow, handleCollapseAll } = useExpandableRowIds(expandableIds)
 
@@ -170,15 +165,7 @@ export function CredentialWorkflowsTab({ credentialId }: Readonly<CredentialWork
           <SynListPanelTable
             caption="Workflows using this credential"
             isExpandable
-            footer={{
-              page,
-              perPage,
-              total: workflows.length,
-              hasNext: page * perPage < workflows.length,
-              onPrev: () => setPage((p) => Math.max(1, p - 1)),
-              onNext: () => setPage((p) => p + 1),
-              onPerPageChange: handlePerPageChange,
-            }}
+            footer={getFooterProps(workflows.length)}
           >
             <WorkflowsTable
               workflows={paginatedWorkflows}

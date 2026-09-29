@@ -45,20 +45,31 @@ A single full-span template preserves its original type. Multiple templates, or 
 
 ## Condition Evaluation
 
-Condition and Switch nodes evaluate boolean expressions with `safe_eval_with_namespace()` (`unified_eval.py`) — an AST-based evaluator, not `eval()`. `${...}` templates are resolved first, then the resulting expression is parsed and only allowlisted AST node types are evaluated.
+Condition and Switch nodes evaluate boolean expressions with `safe_eval_with_namespace()` (`unified_eval.py`) — an AST-based evaluator, not `eval()`. Evaluation proceeds in three stages: (1) visual-builder word operators are translated to Python equivalents, (2) `${...}` templates are resolved to bare names, (3) the resulting expression is parsed and only allowlisted AST node types are evaluated.
 
 | Category | Operators |
 |----------|-----------|
 | Comparison | `==`, `!=`, `>`, `<`, `>=`, `<=` |
 | Boolean | `and`, `or` |
 | Unary | `not`, `-` |
+| Membership | `in`, `not in` |
+| Visual builder | `exists`, `isEmpty`, `contains`, `startsWith`, `endsWith`, `matches`, `lengthEqualTo`, `lengthGreaterThan`, `lengthLessThan` |
 
 ```python
 "${trigger.status} == 'completed'"
 "${step_1.count} >= 10"
 "${trigger.priority} > 5 and ${trigger.environment} == 'production'"
 "not ${step_1.is_error}"
+"${node.status} exists"
+'${filename} endsWith ".txt"'
 ```
+
+The visual builder stores word operators (`exists`, `isEmpty`, `startsWith`, …) in the workflow definition. The evaluator rewrites them to Python before parsing.
+
+- `exists` is True when the path is present and not `None` (including subscript paths such as `${data[0].name}`). A missing path is False rather than a lookup error.
+- `isEmpty` is True for empty strings, lists, and dicts. Numbers, booleans, and `None` raise `TypeError`.
+- `startsWith`, `endsWith`, and `matches` require string values; other types raise `TypeError`.
+- `matches` patterns must be a quoted string literal (not `${...}`). Nested-quantifier regexes such as `(a+)+` are rejected. The subject string is capped at `MAX_REGEX_SUBJECT_LENGTH` (10,000). Matching runs in a subprocess with a `REGEX_MATCH_TIMEOUT_SECONDS` (1s) wall-clock cap.
 
 ## Output Mapping
 
@@ -82,7 +93,9 @@ Input arrives via the selected trigger — manual (`input_data` on the execution
 
 ## Security
 
-The evaluator enforces limits defined in `unified_eval.py`: `MAX_EXPRESSION_LENGTH` (10,000 chars), `MAX_VARIABLE_NAME_LENGTH` (500 chars), `MAX_AST_DEPTH` (50), `MAX_AST_NODES` (500). It also disallows function calls, imports/module access, and attribute access beyond namespace lookup — parsing is AST-based, and only allowlisted node types are ever evaluated.
+The evaluator enforces limits defined in `unified_eval.py`: `MAX_EXPRESSION_LENGTH` (10,000 chars), `MAX_VARIABLE_NAME_LENGTH` (500 chars), `MAX_AST_DEPTH` (50), `MAX_AST_NODES` (500), `MAX_REGEX_PATTERN_LENGTH` (500 chars), `MAX_REGEX_SUBJECT_LENGTH` (10,000 chars), `REGEX_MATCH_TIMEOUT_SECONDS` (1s). It disallows imports, module access, and arbitrary function/method calls — parsing is AST-based and only allowlisted node types are ever evaluated. The only permitted calls are a small gated set: `len`, `str.startswith`, `str.endswith`, and the internal helpers `__exists__`, `__is_empty__`, and `__re_search__` (injected by the word-operator translation step; never callable by user expressions directly).
+
+`matches` runs `re.search` on a workflow-author literal only, in a killable subprocess. The pattern cannot come from `${trigger.*}` or other namespace lookups. Nested quantifiers (`(a+)+`) are rejected with the same heuristic used for JSON Schema `pattern` validation. Remaining alternation ReDoS such as `(a|a)*` is bounded by the subprocess timeout (a thread timeout cannot interrupt CPython's C regex engine).
 
 ## Related Documentation
 

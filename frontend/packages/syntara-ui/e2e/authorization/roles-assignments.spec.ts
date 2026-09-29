@@ -44,7 +44,12 @@ test.describe('AAP-76528: Roles & Assignments', () => {
     const project = await ensureProject(app)
     if (!project) throw new Error('Could not ensure project for SA assignment')
 
-    const assignment = await assignProjectRoleApi(app, project.id, sa.id, 'project-user')
+    const assignment = await assignProjectRoleApi({
+      page: app,
+      projectId: project.id,
+      userId: sa.id,
+      roleName: 'project-user',
+    })
     try {
       await app.goto(toAppUrl(`${ACCESS_URL}/assignments`))
       await expect(app.getByRole('heading', { level: 1, name: 'Access Management' })).toBeVisible()

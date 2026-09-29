@@ -235,7 +235,7 @@ export function CheckAccessView({ resourceTypes, actionsByResource }: Readonly<R
             isDisabled={!resourceType.trim() || !action.trim()}
             isLoading={canIMutation.isPending}
           >
-            Check Access
+            Check access
           </Button>
         </Form>
       </FlexItem>
@@ -246,7 +246,7 @@ export function CheckAccessView({ resourceTypes, actionsByResource }: Readonly<R
             <StackItem>
               <SynEmptyStateNoData
                 title="Check access permissions"
-                description="Select a resource type and action, then click Check Access to verify your permissions."
+                description="Select a resource type and action, then click Check access to verify your permissions."
               />
             </StackItem>
           )}

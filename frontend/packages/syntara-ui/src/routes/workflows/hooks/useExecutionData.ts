@@ -126,7 +126,7 @@ export function useExecutionData(executionId: string, options: UseExecutionDataO
   useEffect(() => {
     if (autoLoad && isSuccess && data) {
       try {
-        setExecution(data as Execution)
+        setExecution(data)
         setError(null)
       } catch (err) {
         setError(err instanceof Error ? err : new Error(getErrorMessage(err)))
@@ -142,10 +142,10 @@ export function useExecutionData(executionId: string, options: UseExecutionDataO
   }, [error, setError])
 
   return {
-    data: data as Execution | undefined,
+    data: data,
     isLoading,
     isSuccess,
-    error: (error as ApiError | null) ?? null,
+    error: error ?? null,
     refetch,
   }
 }
@@ -194,7 +194,7 @@ export function useShouldStreamExecution(executionId: string): boolean {
     return false
   }
 
-  const execution = data as Execution
+  const execution = data
   const terminalStatuses = ['completed', 'completed_with_errors', 'failed', 'cancelled']
   return !terminalStatuses.includes(execution.status ?? '')
 }

@@ -360,7 +360,12 @@ describe('applyEdgeConnection', () => {
       activityReorderTarget: null,
     }
 
-    applyEdgeConnection(result, params, 'target', mockInstance)
+    applyEdgeConnection({
+      result,
+      params,
+      targetId: 'target',
+      reactFlowInstance: mockInstance,
+    })
 
     // Should not apply changes yet
     expect(setEdges).not.toHaveBeenCalled()
@@ -407,7 +412,13 @@ describe('applyEdgeConnection', () => {
       activityReorderTarget: null,
     }
 
-    applyEdgeConnection(result, params, 'target', mockInstance, onComplete)
+    applyEdgeConnection({
+      result,
+      params,
+      targetId: 'target',
+      reactFlowInstance: mockInstance,
+      onComplete: onComplete,
+    })
 
     expect(onComplete).toHaveBeenCalled()
   })
@@ -438,7 +449,12 @@ describe('applyEdgeConnection', () => {
       activityReorderTarget: null,
     }
 
-    applyEdgeConnection(result, params, 'target', mockInstance)
+    applyEdgeConnection({
+      result,
+      params,
+      targetId: 'target',
+      reactFlowInstance: mockInstance,
+    })
 
     // Fast-forward through all retry attempts
     vi.advanceTimersByTime(50 * 40)
@@ -475,7 +491,12 @@ describe('applyEdgeConnection', () => {
       activityReorderTarget: null,
     }
 
-    applyEdgeConnection(result, params, 'target', mockInstance)
+    applyEdgeConnection({
+      result,
+      params,
+      targetId: 'target',
+      reactFlowInstance: mockInstance,
+    })
 
     expect(setEdges).toHaveBeenCalled()
 
@@ -533,7 +554,12 @@ describe('applyEdgeConnection', () => {
       activityReorderTarget: null,
     }
 
-    applyEdgeConnection(result, params, 'target', mockInstance)
+    applyEdgeConnection({
+      result,
+      params,
+      targetId: 'target',
+      reactFlowInstance: mockInstance,
+    })
 
     expect(setNodes).toHaveBeenCalled()
 
@@ -592,7 +618,12 @@ describe('applyEdgeConnection', () => {
       activityReorderTarget: null,
     }
 
-    applyEdgeConnection(result, params, 'target', mockInstance)
+    applyEdgeConnection({
+      result,
+      params,
+      targetId: 'target',
+      reactFlowInstance: mockInstance,
+    })
 
     expect(setNodes).toHaveBeenCalled()
 
@@ -646,7 +677,12 @@ describe('applyEdgeConnection', () => {
       activityReorderTarget: null,
     }
 
-    applyEdgeConnection(result, params, 'target', mockInstance)
+    applyEdgeConnection({
+      result,
+      params,
+      targetId: 'target',
+      reactFlowInstance: mockInstance,
+    })
 
     expect(setNodes).toHaveBeenCalled()
 
@@ -691,7 +727,12 @@ describe('applyEdgeConnection', () => {
       activityReorderTarget: null,
     }
 
-    applyEdgeConnection(result, params, 'target', mockInstance)
+    applyEdgeConnection({
+      result,
+      params,
+      targetId: 'target',
+      reactFlowInstance: mockInstance,
+    })
 
     expect(setNodes).toHaveBeenCalled()
 
@@ -738,11 +779,21 @@ describe('applyEdgeConnection', () => {
 
       // Start 5 connections (max limit)
       for (let i = 0; i < 5; i++) {
-        applyEdgeConnection(result, params, `target-${i}`, mockInstance)
+        applyEdgeConnection({
+          result,
+          params,
+          targetId: `target-${i}`,
+          reactFlowInstance: mockInstance,
+        })
       }
 
       // 6th connection should be rejected
-      applyEdgeConnection(result, params, 'target-6', mockInstance)
+      applyEdgeConnection({
+        result,
+        params,
+        targetId: 'target-6',
+        reactFlowInstance: mockInstance,
+      })
 
       expect(consoleWarnSpy).toHaveBeenCalledWith(
         expect.stringContaining('Edge connection rejected: max concurrent limit (5) reached')
@@ -778,7 +829,12 @@ describe('applyEdgeConnection', () => {
           setNodes: vi.fn(),
         } as unknown as ReactFlowInstance
 
-        applyEdgeConnection(result, params, `target-${i}`, mockInstance)
+        applyEdgeConnection({
+          result,
+          params,
+          targetId: `target-${i}`,
+          reactFlowInstance: mockInstance,
+        })
       }
 
       // All 5 should have succeeded (counter incremented then immediately decremented)
@@ -792,7 +848,12 @@ describe('applyEdgeConnection', () => {
         setNodes: vi.fn(),
       } as unknown as ReactFlowInstance
 
-      applyEdgeConnection(result, params, 'target-6', mockInstance)
+      applyEdgeConnection({
+        result,
+        params,
+        targetId: 'target-6',
+        reactFlowInstance: mockInstance,
+      })
       expect(setEdges).toHaveBeenCalledTimes(6)
     })
 
@@ -823,7 +884,12 @@ describe('applyEdgeConnection', () => {
       }
 
       // Start connection that will timeout
-      applyEdgeConnection(result, params, 'target', mockInstance)
+      applyEdgeConnection({
+        result,
+        params,
+        targetId: 'target',
+        reactFlowInstance: mockInstance,
+      })
 
       // Fast-forward through all retry attempts (timeout)
       vi.advanceTimersByTime(50 * 40)
@@ -833,7 +899,12 @@ describe('applyEdgeConnection', () => {
       mockInstance.getNodes = vi.fn(() => [measuredNode as FlowNode])
 
       // This should succeed (counter was decremented after timeout)
-      applyEdgeConnection(result, params, 'target2', mockInstance)
+      applyEdgeConnection({
+        result,
+        params,
+        targetId: 'target2',
+        reactFlowInstance: mockInstance,
+      })
       expect(setEdges).toHaveBeenCalled()
 
       vi.useRealTimers()

@@ -12,6 +12,7 @@ from tests.integration.helpers.credential import CredentialFactory
 from tests.integration.helpers.execution import ExecutionFactory
 from tests.integration.helpers.identity_provider import IdentityProviderCreate
 from tests.integration.helpers.integration import IntegrationFactory
+from tests.integration.helpers.invocations import InvocationFactory
 from tests.integration.helpers.token_usage import TokenUsageFactory
 from tests.integration.helpers.workflow import ActivitiesFactory, WorkflowFactory
 
@@ -57,6 +58,12 @@ async def token_usage_factory(
 ) -> TokenUsageFactory:
     """Factory for creating invocations with linked token usage records."""
     return TokenUsageFactory(test_db_session, test_user, test_project_id)
+
+
+@pytest_asyncio.fixture
+async def invocation_factory(test_db_session: AsyncSession, test_user: User) -> InvocationFactory:
+    """Factory for creating invocations."""
+    return InvocationFactory(test_db_session, test_user)
 
 
 @pytest_asyncio.fixture

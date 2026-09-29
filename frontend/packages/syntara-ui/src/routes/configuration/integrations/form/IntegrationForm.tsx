@@ -111,7 +111,7 @@ function WizardNavFooter({
           <ActionListItem>
             {isLast ? (
               <Button variant="primary" onClick={isSaveDisabled ? undefined : onSubmit} isAriaDisabled={isSaveDisabled}>
-                Save
+                Save integration
               </Button>
             ) : (
               <Button

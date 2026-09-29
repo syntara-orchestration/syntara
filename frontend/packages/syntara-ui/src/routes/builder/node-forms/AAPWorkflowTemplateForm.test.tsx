@@ -191,7 +191,7 @@ describe('AAPWorkflowTemplateForm', () => {
       ],
       isLoading: false,
       error: null,
-      refetch: vi.fn() as unknown as ReturnType<typeof useAllCredentials>['refetch'],
+      refetch: vi.fn(),
     })
   })
 
@@ -599,6 +599,31 @@ describe('AAPWorkflowTemplateForm', () => {
 
       const expressionSwitch = screen.getByRole('switch', { name: 'Use input variables' })
       expect(expressionSwitch).not.toBeChecked()
+    })
+
+    it('persists use_input_variables when the toggle is on without expressions', async () => {
+      const user = userEvent.setup()
+      renderWithHeader(<AAPWorkflowTemplateForm onSubmit={mockOnSubmit} onCancel={vi.fn()} />)
+
+      await user.click(screen.getByRole('switch', { name: 'Use input variables' }))
+      await submitForm()
+
+      await waitFor(() => {
+        expect(mockOnSubmit).toHaveBeenCalledWith(expect.objectContaining({ use_input_variables: true }))
+      })
+    })
+
+    it('enables the toggle from persisted use_input_variables without expressions', () => {
+      renderWithHeader(
+        <AAPWorkflowTemplateForm
+          onSubmit={mockOnSubmit}
+          onCancel={vi.fn()}
+          initialData={{ use_input_variables: true }}
+        />
+      )
+
+      expect(screen.getByRole('switch', { name: 'Use input variables' })).toBeChecked()
+      expect(screen.getByPlaceholderText(/org name or drag expression/i)).toBeVisible()
     })
   })
 })

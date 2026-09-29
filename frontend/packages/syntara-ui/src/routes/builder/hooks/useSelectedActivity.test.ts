@@ -66,6 +66,23 @@ describe('useSelectedActivity', () => {
       expect(result.current.effectiveKey).toBe('task-1#iter-2')
     })
 
+    it('uses selectedActivityKey when selectedNodeId is null', () => {
+      const { result } = renderHook(() =>
+        useSelectedActivity(
+          makeDefaults({
+            activityOrder: [{ id: 'task-1', name: 'Task 1' }],
+          })
+        )
+      )
+
+      act(() => {
+        result.current.handleRowClick('task-1', 'Task 1')
+      })
+
+      expect(result.current.effectiveKey).toBe('task-1')
+      expect(result.current.resolvedNodeId).toBe('task-1')
+    })
+
     it('ignores composite key when base does not match selectedNodeId', () => {
       const onNodeSelect = vi.fn()
       const { result, rerender } = renderHook(
