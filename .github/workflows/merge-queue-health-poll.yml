@@ -35,7 +35,7 @@ jobs:
 
       - name: Check queue health and notify
         if: env.SLACK_CI_MONITORING_WEBHOOK_URL != ''
-        run: npm run check-queue-health
+        run: npm run notify:queue-health
         working-directory: .github/scripts
         env:
           GITHUB_TOKEN: ${{ github.token }}
