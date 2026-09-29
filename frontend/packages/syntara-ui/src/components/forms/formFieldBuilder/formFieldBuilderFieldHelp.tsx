@@ -6,6 +6,8 @@ import { FieldHelpPopover } from '../../FieldHelpPopover'
 export const FORM_FIELD_BUILDER_LABEL_HELP = {
   label:
     'Shown to the person filling out the form, above the field. This is different from the value name below, which downstream workflow steps use to reference the submitted value.',
+  checkboxLabel:
+    'Text shown beside the checkbox for the person filling out the form. This is different from the value name below, which downstream workflow steps use to reference the submitted value.',
   valueName: 'Downstream nodes reference this value as ${trigger.<name>}.',
   placeholder:
     'Example text shown inside the field before the person filling out the form enters a value. It disappears once they start typing and is never submitted as data.',

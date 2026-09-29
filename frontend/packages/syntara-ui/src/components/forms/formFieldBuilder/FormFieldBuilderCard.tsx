@@ -129,6 +129,7 @@ export function FormFieldBuilderCard({
                       <FormFieldBuilderCardHeaderLabel
                         index={index}
                         idPrefix={idPrefix}
+                        fieldType={field.type}
                         isDisabled={isDisabled}
                         onLabelChange={handleLabelChange}
                       />

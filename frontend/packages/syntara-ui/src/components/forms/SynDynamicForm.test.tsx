@@ -33,7 +33,9 @@ describe('SynDynamicForm', () => {
 
     expect(screen.getByRole('textbox', { name: 'Name' })).toBeInTheDocument()
     expect(screen.getByRole('textbox', { name: 'Email' })).toBeInTheDocument()
-    expect(screen.getByRole('checkbox', { name: 'Subscribe to updates' })).toBeInTheDocument()
+    const subscribe = screen.getByRole('checkbox', { name: 'Subscribe to updates' })
+    expect(subscribe).toBeInTheDocument()
+    expect(subscribe).toBeRequired()
   })
 
   it('shows SynErrorState for invalid definition defaults', () => {

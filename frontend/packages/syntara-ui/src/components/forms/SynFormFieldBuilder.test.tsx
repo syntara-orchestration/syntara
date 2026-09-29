@@ -247,10 +247,26 @@ describe('SynFormFieldBuilder', () => {
         fields: [{ type: FormFieldTypeEnum.CHECKBOX, value_name: 'agree', label: 'Agree', default: false }],
       })
       renderBuilder(<SynFormFieldBuilder value={definition} onChange={vi.fn()} />)
+      expect(screen.getByRole('textbox', { name: 'Checkbox label' })).toBeInTheDocument()
       const defaultChecked = screen.getByRole('checkbox', { name: /Default to checked/ })
       expect(defaultChecked).not.toBeChecked()
       await user.click(defaultChecked)
       expect(defaultChecked).toBeChecked()
+    })
+
+    it('shows checkbox preview with a single accessible name', async () => {
+      const user = userEvent.setup()
+      const definition = parseFormDefinition({
+        fields: [{ type: FormFieldTypeEnum.CHECKBOX, value_name: 'agree', label: 'Agree', required: true }],
+      })
+      renderBuilder(<SynFormFieldBuilder value={definition} onChange={vi.fn()} />)
+      await user.click(screen.getByRole('tab', { name: 'Preview' }))
+      const previewPanel = screen.getAllByRole('tabpanel').find((panel) => !panel.hasAttribute('hidden'))
+      if (!previewPanel) {
+        throw new Error('Expected visible preview tab panel')
+      }
+      const agree = within(previewPanel).getByRole('checkbox', { name: 'Agree' })
+      expect(agree).toBeRequired()
     })
 
     it('accepts number default input', async () => {
