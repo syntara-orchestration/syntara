@@ -44,8 +44,8 @@ describe('formDefinitionToJsonSchema', () => {
           options: {
             source: 'static',
             values: [
-              { display_label: 'One', value: 1 },
-              { display_label: 'Two', value: 2 },
+              { display_label: 'One', value: '1' },
+              { display_label: 'Two', value: '2' },
             ],
           },
         },
@@ -57,7 +57,7 @@ describe('formDefinitionToJsonSchema', () => {
     expect(schema.properties.qty).toMatchObject({ type: 'number' })
     expect(schema.properties.tags).toMatchObject({
       type: 'array',
-      items: { type: 'number', enum: [1, 2] },
+      items: { type: 'string', enum: ['1', '2'] },
     })
   })
 

@@ -31,7 +31,7 @@ const formFieldBaseSchema = z.object({
 
 const staticOptionSchema = z.object({
   display_label: z.string().min(1).max(FORM_STATIC_OPTION_LABEL_MAX_LENGTH),
-  value: z.union([z.string(), z.number(), z.boolean()]),
+  value: z.string(),
 })
 
 const staticOptionsSchema = z.object({
@@ -126,7 +126,7 @@ function findDuplicateFieldNames(fields: ReadonlyArray<{ value_name: string }>):
 
 function validateMultiSelectDefault(
   field: Extract<z.infer<typeof formFieldSchema>, { type: typeof FormFieldTypeEnum.MULTI_SELECT }>,
-  validValues: ReadonlySet<string | number | boolean>,
+  validValues: ReadonlySet<string>,
   index: number,
   ctx: z.RefinementCtx
 ): void {
@@ -135,7 +135,7 @@ function validateMultiSelectDefault(
   }
   const invalidDefaults: typeof field.default = []
   for (const value of field.default) {
-    if (!validValues.has(value)) {
+    if (typeof value !== 'string' || !validValues.has(value)) {
       invalidDefaults.push(value)
     }
   }
@@ -151,11 +151,11 @@ function validateMultiSelectDefault(
 
 function validateDropdownDefault(
   field: Extract<z.infer<typeof formFieldSchema>, { type: typeof FormFieldTypeEnum.DROPDOWN }>,
-  validValues: ReadonlySet<string | number | boolean>,
+  validValues: ReadonlySet<string>,
   index: number,
   ctx: z.RefinementCtx
 ): void {
-  if (field.default == null || validValues.has(field.default)) {
+  if (field.default == null || (typeof field.default === 'string' && validValues.has(field.default))) {
     return
   }
   ctx.addIssue({

@@ -87,7 +87,7 @@ class StaticOption(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     display_label: str = Field(min_length=1, max_length=200)
-    value: str | int | float | bool
+    value: str
 
 
 class StaticOptions(BaseModel):

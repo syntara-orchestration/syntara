@@ -575,7 +575,7 @@ export interface components {
       /** Display Label */
       display_label: string
       /** Value */
-      value: string | number | boolean
+      value: string
     }
     /**
      * DynamicOptions

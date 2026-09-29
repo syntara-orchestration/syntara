@@ -44,14 +44,46 @@ function parseEnumValues(raw: unknown): OptionScalar[] | null {
   return raw
 }
 
+function staticOptionValueFromScalar(value: OptionScalar): string {
+  return String(value)
+}
+
 function staticOptionsFromEnum(enumValues: readonly OptionScalar[]) {
   return {
     source: 'static' as const,
     values: enumValues.map((value) => ({
       display_label: String(value),
-      value,
+      value: staticOptionValueFromScalar(value),
     })),
   }
+}
+
+function staticOptionDefaultFromImported(importedDefault: unknown): string | null {
+  if (importedDefault === null || importedDefault === undefined) {
+    return null
+  }
+  if (typeof importedDefault === 'string') {
+    return importedDefault
+  }
+  if (typeof importedDefault === 'number' || typeof importedDefault === 'boolean') {
+    return String(importedDefault)
+  }
+  return null
+}
+
+function multiSelectStaticDefaultFromImported(importedDefault: unknown): string[] | null {
+  if (!Array.isArray(importedDefault)) {
+    return null
+  }
+  const values: string[] = []
+  for (const item of importedDefault) {
+    if (typeof item === 'string') {
+      values.push(item)
+    } else if (typeof item === 'number' || typeof item === 'boolean') {
+      values.push(String(item))
+    }
+  }
+  return values
 }
 
 type DropdownFieldOptions = Extract<FormField, { type: 'dropdown' }>['options']
@@ -143,11 +175,12 @@ function dropdownFieldFromProperty(base: FieldBase, property: JsonSchemaProperty
   if (!enumValues) {
     return null
   }
+  const importedDefault = defaultFromProperty(property)
   return {
     ...base,
     type: FormFieldTypeEnum.DROPDOWN,
     options: staticOptionsFromEnum(enumValues) as DropdownFieldOptions,
-    default: dropdownDefaultFromImported(defaultFromProperty(property)),
+    default: Object.hasOwn(property, 'default') ? staticOptionDefaultFromImported(importedDefault) : undefined,
   }
 }
 
@@ -171,7 +204,7 @@ function multiSelectFieldFromProperty(base: FieldBase, property: JsonSchemaPrope
     ...base,
     type: FormFieldTypeEnum.MULTI_SELECT,
     options: staticOptionsFromEnum(enumValues) as MultiSelectFieldOptions,
-    default: Array.isArray(importedDefault) ? importedDefault : null,
+    default: Object.hasOwn(property, 'default') ? multiSelectStaticDefaultFromImported(importedDefault) : undefined,
   }
 }
 
