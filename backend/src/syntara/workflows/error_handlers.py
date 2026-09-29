@@ -23,6 +23,7 @@ if TYPE_CHECKING:
         ExecutionInTerminalStateError,
         ExecutionNotFoundError,
         ExecutionNotRetryableError,
+        ExecutionNotRetryableFromFailureError,
         PayloadTooLargeError,
         ScheduledTriggerNotFoundError,
         ScheduledTriggerSyncError,
@@ -156,6 +157,27 @@ def execution_not_retryable_handler(request: Request, exc: "ExecutionNotRetryabl
         title="Execution Not Retryable",
         detail=str(exc),
         code="EXECUTION_NOT_RETRYABLE",
+        retryable=False,
+        instance=str(request.url),
+    )
+
+
+def execution_not_retryable_from_failure_handler(
+    request: Request, exc: "ExecutionNotRetryableFromFailureError"
+) -> JSONResponse:
+    """Handle ExecutionNotRetryableFromFailureError with RFC 9457 format."""
+    logger.error(
+        "Execution not retryable from failure",
+        execution_id=str(exc.execution_id),
+        reason=exc.reason,
+        exc_info=exc,
+    )
+    return create_problem_details_response(
+        status_code=status.HTTP_409_CONFLICT,
+        problem_type=PROBLEM_TYPES["resource_conflict"],
+        title="Execution Not Retryable From Failure",
+        detail=str(exc),
+        code="EXECUTION_NOT_RETRYABLE_FROM_FAILURE",
         retryable=False,
         instance=str(request.url),
     )

@@ -24,6 +24,8 @@ from syntara.workflows.models.execution import (
     ExecutionCreate,
     ExecutionListResponse,
     ExecutionRead,
+    RetryFailureRequest,
+    RetryFromFailureValidationResponse,
 )
 from syntara.workflows.models.query_params import ActivityListParams, ExecutionIncludeParams
 from syntara.workflows.services import ExecutionService
@@ -299,6 +301,51 @@ async def retry_execution(
     """Retry a completed workflow execution."""
     logger.info("Retrying execution", execution_id=execution_id)
     return await service.retry_execution(execution_id)
+
+
+@router.get(
+    "/{execution_id}/retry-from-failure-preview",
+    operation_id="retry_from_failure_preview",
+    summary="Preview retry from failure",
+    description="Report whether an execution can be retried from its failure points, and what would re-run. "
+    "Returns the eligible retry points, the re-run step count for each of them, and the deduplicated total "
+    "across all of them. Purely informational: the failure-point selection and any input parameter overrides "
+    "are supplied to the retry endpoint, which re-validates them independently and rejects anything "
+    "unusable. Never mutates any state.",
+    response_model=RetryFromFailureValidationResponse,
+    response_description="Retry preview",
+    dependencies=[Depends(_exec_perm_run)],
+)
+async def retry_from_failure_preview(
+    execution_id: UUID,
+    service: Annotated[ExecutionService, Depends(get_execution_service)],
+) -> RetryFromFailureValidationResponse:
+    """Preview what a retry from failure would do, without mutating state."""
+    logger.info("Previewing retry from failure", execution_id=execution_id)
+    return await service.preview_retry_from_failure(execution_id)
+
+
+@router.post(
+    "/{execution_id}/retry-from-failure",
+    operation_id="retry_from_failure",
+    summary="Retry from failure",
+    description="Retry a failed execution from the given failure points, optionally overriding "
+    "input parameters of the starting nodes for this run only. "
+    "Independently repeats all validation checks, then creates a new execution "
+    "linked to the source and triggers a Temporal run carrying retry context.",
+    status_code=status.HTTP_201_CREATED,
+    response_model=ExecutionRead,
+    response_description="New execution created from retry",
+    dependencies=[Depends(_exec_perm_run)],
+)
+async def retry_from_failure(
+    execution_id: UUID,
+    body: RetryFailureRequest,
+    service: Annotated[ExecutionService, Depends(get_execution_service)],
+) -> ExecutionRead:
+    """Retry a failed execution from failure points."""
+    logger.info("Retrying execution from failure", execution_id=execution_id)
+    return await service.retry_from_failure(execution_id, body.retry_point_ids, body.input_parameter_overrides)
 
 
 @router.get(
