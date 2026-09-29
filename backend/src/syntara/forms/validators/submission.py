@@ -7,11 +7,12 @@ and enforcing required fields and option membership constraints.
 from __future__ import annotations
 
 import math
-from datetime import UTC, date, datetime
+from collections.abc import Mapping
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Mapping
+    from collections.abc import Callable
 
     from syntara.forms.models.form_prompt import FormPrompt
 
@@ -28,6 +29,7 @@ from syntara.forms.models.form_errors import FormFieldError
 from syntara.forms.models.form_fields import (
     CheckboxField,
     DateField,
+    DateValue,
     DropdownField,
     EmailField,
     FormDefinition,
@@ -211,7 +213,20 @@ def coerce_field(field: FormField, raw: Any) -> Any:  # noqa: ANN401
         msg = f"Unknown field type: {type(field)}"
         raise ValueError(msg)
 
-    return coercer(raw)
+    return coercer(field, raw)
+
+
+def _value_only(coercer: Callable[[Any], Any]) -> Callable[[FormField, Any], Any]:
+    """Adapt a coercer that needs only the value to the field-aware signature.
+
+    Only DateField reads its own definition during coercion; keeping one table
+    lets the dispatch parity test below stay a simple key comparison.
+    """
+
+    def _adapted(_field: FormField, raw: Any) -> Any:  # noqa: ANN401
+        return coercer(raw)
+
+    return _adapted
 
 
 def _coerce_string(raw: Any) -> str:  # noqa: ANN401
@@ -340,33 +355,90 @@ def _coerce_checkbox(raw: Any) -> bool:  # noqa: ANN401
     return result
 
 
-def _coerce_date(raw: Any) -> str:  # noqa: ANN401
-    """Coerce to ISO 8601 date string.
+def _coerce_date(field: DateField, raw: Any) -> dict[str, str]:  # noqa: ANN401
+    """Coerce to a date value object holding exactly the field's components.
 
-    Accepts: ISO 8601 date string (YYYY-MM-DD).
-    Returns: Normalized ISO 8601 string (JSON-serializable for Temporal namespace).
+    Accepts: a mapping with any of the "date", "time", and "timezone" keys.
+    Returns: a plain dict (JSON-serializable for the Temporal namespace) whose
+    keys are exactly the components the field collects.
+
+    The shape is always an object, even for a date-only field. A bare string
+    would read more naturally today, but it would mean that enabling a timezone
+    toggle later silently changes the namespace shape and breaks every
+    downstream expression already reading the field.
 
     Args:
+        field: Date field definition, which decides the required components
         raw: Raw value
 
     Returns:
-        ISO 8601 date string
+        Component dict with exactly the included components
 
     Raises:
-        ValueError: If coercion fails
+        TypeError: If the value is not a mapping
+        ValueError: If a component is malformed, missing, or not collected
 
     """
-    if not isinstance(raw, str):
-        msg = f"Must be a date string, got {type(raw).__name__}"
+    # A field default arrives as an already-validated DateValue, both from the
+    # default substitution above and from validate_form_definition.
+    if isinstance(raw, DateValue):
+        raw = raw.model_dump(exclude_none=True)
+
+    if not isinstance(raw, Mapping):
+        expected = ", ".join(field.included_components())
+        msg = f"Must be an object with keys: {expected}; got {type(raw).__name__}"
         raise TypeError(msg)
 
+    # Drop blanks so an untouched input posting "" reads as absent, matching
+    # _is_empty at the top level.
+    present = {key: value for key, value in raw.items() if not _is_empty(value)}
+
     try:
-        # Parse and re-emit to normalize format
-        parsed = date.fromisoformat(raw)
-        return parsed.isoformat()
-    except ValueError:
-        msg = "Must be a valid ISO 8601 date (YYYY-MM-DD)"
-        raise ValueError(msg) from None
+        value = DateValue.model_validate(present)
+    except ValidationError as exc:
+        raise _FormatError(_format_date_errors(exc)) from None
+
+    included = set(field.included_components())
+    supplied = set(value.supplied_components())
+
+    if missing := sorted(included - supplied):
+        msg = f"Missing required {'component' if len(missing) == 1 else 'components'}: {', '.join(missing)}"
+        raise _FormatError(msg)
+
+    if extra := sorted(supplied - included):
+        msg = f"This field does not collect: {', '.join(extra)}"
+        raise _FormatError(msg)
+
+    return {name: getattr(value, name) for name in field.included_components()}
+
+
+# Pydantic reports a failed `pattern=` as the raw regex, which is noise to a
+# responder. Each component gets a plain-language equivalent instead.
+_DATE_FORMAT_HINTS = {
+    "date": "must be a date in YYYY-MM-DD format",
+    "time": "must be a 24-hour time in HH:MM format",
+    "timezone": "must be an IANA timezone name, such as America/New_York",
+}
+
+
+def _format_date_errors(exc: ValidationError) -> str:
+    """Render pydantic's component errors as one user-safe sentence."""
+    parts: list[str] = []
+    for error in exc.errors():
+        location = ".".join(str(part) for part in error["loc"]) or "value"
+
+        if error["type"] == "extra_forbidden":
+            parts.append(f"'{location}' is not a date component")
+            continue
+
+        hint = _DATE_FORMAT_HINTS.get(location)
+        if hint is not None and error["type"] == "string_pattern_mismatch":
+            parts.append(f"{location} {hint}")
+            continue
+
+        # Custom validators surface through pydantic as "Value error, <msg>".
+        parts.append(f"{location}: {error['msg'].removeprefix('Value error, ')}")
+    return "; ".join(parts)
 
 
 def _check_option_membership(field: FormField, coerced: Any) -> FormFieldError | None:  # noqa: ANN401
@@ -500,14 +572,14 @@ def _coerce_multi_select(raw: Any) -> list[str | int | float | bool]:  # noqa: A
 # directly, so there are no subclass relationships to order around and an exact
 # type lookup is unambiguous. Every member must appear here; the parity test in
 # test_submission.py asserts that.
-_COERCERS: dict[type, Callable[[Any], Any]] = {
-    TextField: _coerce_string,
-    TextAreaField: _coerce_string,
-    MaskedTextField: _coerce_string,
-    EmailField: _coerce_email,
-    NumberField: _coerce_number,
-    CheckboxField: _coerce_checkbox,
+_COERCERS: dict[type, Callable[[Any, Any], Any]] = {
+    TextField: _value_only(_coerce_string),
+    TextAreaField: _value_only(_coerce_string),
+    MaskedTextField: _value_only(_coerce_string),
+    EmailField: _value_only(_coerce_email),
+    NumberField: _value_only(_coerce_number),
+    CheckboxField: _value_only(_coerce_checkbox),
     DateField: _coerce_date,
-    DropdownField: _coerce_dropdown,
-    MultiSelectField: _coerce_multi_select,
+    DropdownField: _value_only(_coerce_dropdown),
+    MultiSelectField: _value_only(_coerce_multi_select),
 }

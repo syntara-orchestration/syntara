@@ -46,7 +46,6 @@ nodes:
       fallback_decision: fallback
       submit_label: Deploy
       success_message: Deployment request submitted successfully
-      timezone: America/New_York
       css_override: ".form { max-width: 600px; margin: 0 auto; }"
     settings:
       timeout: 3700

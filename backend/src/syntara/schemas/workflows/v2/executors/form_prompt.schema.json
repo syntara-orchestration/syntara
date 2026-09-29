@@ -72,11 +72,6 @@
         "maxLength": 500,
         "description": "Message shown after successful form submission."
       },
-      "timezone": {
-        "type": "string",
-        "maxLength": 64,
-        "description": "IANA timezone name for interpreting date/datetime field values in the form."
-      },
       "css_override": {
         "type": "string",
         "maxLength": 10000,

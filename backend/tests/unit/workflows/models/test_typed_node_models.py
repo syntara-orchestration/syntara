@@ -515,7 +515,6 @@ class TestFormPromptNodeParameters:
             fallback_decision="fallback",
             submit_label="Send",
             success_message="Thanks!",
-            timezone="America/New_York",
             css_override=".form { color: blue; }",
         )
         assert p.message == "Please fill out the form"
@@ -568,15 +567,13 @@ class TestFormPromptNodeParameters:
         p = FormPromptNodeParameters(form_definition=self.form_def, message="User: ${trigger.username}")
         assert p.message == "User: ${trigger.username}"
 
-    def test_invalid_timezone_rejected(self) -> None:
-        """Invalid timezone is rejected."""
-        with pytest.raises(ValidationError):
-            FormPromptNodeParameters(form_definition=self.form_def, timezone="Not/A/Timezone")
+    def test_timezone_parameter_removed(self) -> None:
+        """The form-level timezone parameter is gone, superseded by DateField components.
 
-    def test_valid_timezone_accepted(self) -> None:
-        """Valid IANA timezone is accepted."""
-        p = FormPromptNodeParameters(form_definition=self.form_def, timezone="America/New_York")
-        assert p.timezone == "America/New_York"
+        Even a well-formed IANA name is now an unknown key under extra='forbid'.
+        """
+        with pytest.raises(ValidationError, match="timezone"):
+            FormPromptNodeParameters(form_definition=self.form_def, timezone="America/New_York")  # type: ignore[call-arg]
 
     def test_discriminated_union(self) -> None:
         """form_prompt parses through WorkflowDefinition."""

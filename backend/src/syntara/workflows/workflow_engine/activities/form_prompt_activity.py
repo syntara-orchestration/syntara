@@ -56,7 +56,6 @@ async def create_form_prompt_activity(
     message: str | None = None,
     submit_label: str | None = None,
     success_message: str | None = None,
-    timezone: str | None = None,
     css_override: str | None = None,
 ) -> NoReturn:
     """Create a form prompt via the Forms API.
@@ -79,7 +78,6 @@ async def create_form_prompt_activity(
         message: Resolved message shown above the form, or None.
         submit_label: Submit button label, or None.
         success_message: Message shown after successful submission, or None.
-        timezone: IANA timezone for date field interpretation, or None.
         css_override: Custom CSS applied to the form, or None.
 
     Raises:
@@ -114,7 +112,6 @@ async def create_form_prompt_activity(
         "message": message,
         "submit_label": submit_label,
         "success_message": success_message,
-        "timezone": timezone,
         "css_override": css_override,
     }
 

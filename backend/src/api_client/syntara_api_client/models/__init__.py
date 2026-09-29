@@ -123,6 +123,7 @@ __all__ = (
     "CsrfTokenResponse",
     "CurrentActivity",
     "DateField",
+    "DateValue",
     "DetailedValidationProblemDetail",
     "DiscoveredLLMModel",
     "DiscoveredTool",

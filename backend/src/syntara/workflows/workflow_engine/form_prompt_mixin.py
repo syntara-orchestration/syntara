@@ -183,8 +183,7 @@ class WorkflowFormPromptMixin:
             [10] message:              str | None
             [11] submit_label:         str | None
             [12] success_message:      str | None
-            [13] timezone:             str | None
-            [14] css_override:         str | None
+            [13] css_override:         str | None
 
         """
         # Runtime backstop for the static save-time validator: a form prompt with
@@ -230,7 +229,6 @@ class WorkflowFormPromptMixin:
         # Get presentation fields
         submit_label = resolved_parameters.get("submit_label")
         success_message = resolved_parameters.get("success_message")
-        timezone = resolved_parameters.get("timezone")
         css_override = resolved_parameters.get("css_override")
 
         # Build positional args in the documented order
@@ -248,7 +246,6 @@ class WorkflowFormPromptMixin:
             message_text,
             submit_label,
             success_message,
-            timezone,
             css_override,
         ]
 

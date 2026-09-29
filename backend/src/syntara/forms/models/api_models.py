@@ -116,9 +116,6 @@ class FormPromptCreateRequest(SQLModel):
     success_message: str | None = Field(
         default=None, max_length=FieldLimits.FORM_SUCCESS_MESSAGE_MAX_LENGTH, description="Success message after submit"
     )
-    timezone: str | None = Field(
-        default=None, max_length=FieldLimits.FORM_TIMEZONE_MAX_LENGTH, description="IANA timezone for date fields"
-    )
     css_override: str | None = Field(
         default=None, max_length=FieldLimits.FORM_CSS_OVERRIDE_MAX_LENGTH, description="Custom CSS for form rendering"
     )
