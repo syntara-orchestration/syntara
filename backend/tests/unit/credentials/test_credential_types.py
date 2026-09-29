@@ -36,12 +36,13 @@ class TestCredentialTypeModel:
 class TestGACredentialTypes:
     """Tests for GA managed credential type definitions."""
 
-    def test_six_ga_types_defined(self) -> None:
-        assert len(GA_CREDENTIAL_TYPES) == 6
+    def test_ga_types_defined(self) -> None:
+        assert len(GA_CREDENTIAL_TYPES) == 7
 
     @pytest.mark.parametrize(
         "name",
         [
+            "Kafka-connection",
             "HTTP Bearer Token",
             "HTTP Basic Auth",
             "Ansible Automation Platform",
