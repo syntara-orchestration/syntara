@@ -228,11 +228,9 @@ def _enforce_payload_limit(
 
     Returns a new dict (does not mutate the input).
 
-    Truncation operates on raw UTF-8 bytes, not the JSON-escaped form. JSON
-    escaping can expand certain characters (e.g. newlines, quotes), so the
-    truncated payload may be slightly larger than ``max_bytes`` after
-    re-serialization. The 10% headroom in TEMPORAL_PAYLOAD_MAX_BYTES absorbs
-    this expansion.
+    Truncation operates on raw UTF-8 bytes, then verifies the complete
+    serialized result. Structured JSON output is omitted when it is the part
+    that keeps the result above the limit.
     """
     serialized = json.dumps(result_dict)
     payload_size = len(serialized.encode("utf-8"))
@@ -263,7 +261,30 @@ def _enforce_payload_limit(
         output["stderr"] = stderr_bytes[: max(0, len(stderr_bytes) - trim_needed)].decode("utf-8", errors="ignore")
 
     output["stderr"] = (output.get("stderr") or "") + notice
-    return {**result_dict, "output": output}
+    truncated_result = {**result_dict, "output": output}
+
+    # stdout_json can be much larger than stdout (for example, when stdout is
+    # a small JSON document containing a large nested value). It must be part
+    # of the final size check rather than bypassing the limiter.
+    if len(json.dumps(truncated_result).encode("utf-8")) > max_bytes and "stdout_json" in output:
+        output["stdout_json"] = None
+        truncated_result = {**result_dict, "output": output}
+
+    # Account for JSON escaping and the truncation notice itself. This fallback
+    # is only needed when the remaining textual fields still exceed the limit.
+    if len(json.dumps(truncated_result).encode("utf-8")) > max_bytes:
+        output["stdout"] = ""
+        truncated_result = {**result_dict, "output": output}
+
+    if len(json.dumps(truncated_result).encode("utf-8")) > max_bytes:
+        output["stderr"] = notice
+        truncated_result = {**result_dict, "output": output}
+
+    if len(json.dumps(truncated_result).encode("utf-8")) > max_bytes:
+        output["stderr"] = ""
+        truncated_result = {**result_dict, "output": output}
+
+    return truncated_result
 
 
 def _sanitize_env_value(value: object) -> str:
