@@ -36,7 +36,7 @@ class TestWorkflowVersionPublishedTelemetryHandler:
         assert isinstance(event, WorkflowVersionPublishedTelemetryEvent)
         assert event.workflow_id == workflow_id
         assert event.version == 3
-        assert event.workflow_name == "test-wf"
+        assert "workflow_name" not in event.model_dump()
         assert event.project_id == project_id
         assert event.error_type is None
         assert event.entitlement_id == "ent-test-789"
