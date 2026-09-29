@@ -35,14 +35,32 @@ def build_workflow_metadata(
     created_by_user_id: str,
     created_at: str,
     workflow_version_id: UUID,
+    retry_from_execution_id: str | None = None,
+    eligible_point_ids: list[str] | None = None,
+    input_parameter_overrides: dict[str, dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Build the ``workflow_metadata`` dict consumed by ``DynamicWorkflow``.
 
     Returns the nested structure that the workflow engine unpacks in
     ``_init_state()`` to populate ``_project_id``, the expression
     resolver's ``workflow_context`` namespace, and audit fields.
+
+    When retrying from failure (AAP-92820), a ``retry`` block carries the
+    source execution id (``retry_from_execution_id``), the retry points that
+    will actually run (``eligible_point_ids``), and any validated input
+    parameter overrides keyed by starting node id (``input_parameter_overrides``,
+    SDP AC-14/R10c). The engine (AAP-92821) uses them for node classification,
+    output injection, and parameter application. The block is absent for
+    normal runs and for plain ``/retry`` reruns, which share only
+    ``retried_from_execution_id`` lineage.
+
+    ``eligible_point_ids`` matches the preview response field of the same
+    name. It is the post-validation set, not the caller's original selection:
+    sanitized nodes may be auto-included and superseded failure points
+    dropped, so it is not always a verbatim echo of the requested
+    ``retry_point_ids``.
     """
-    return {
+    metadata: dict[str, Any] = {
         "workflow_context": {
             "workflow": {
                 "name": workflow_name,
@@ -62,6 +80,13 @@ def build_workflow_metadata(
             },
         },
     }
+    if retry_from_execution_id is not None:
+        metadata["retry"] = {
+            "retry_from_execution_id": retry_from_execution_id,
+            "eligible_point_ids": list(eligible_point_ids or []),
+            "input_parameter_overrides": dict(input_parameter_overrides or {}),
+        }
+    return metadata
 
 
 async def resolve_user_display_name(session: AsyncSession, user_id: UUID) -> str:
