@@ -7,13 +7,15 @@ from collections.abc import Callable
 
 import pytest
 from execution_plane.execution_target_reconciler.filters import default_filters
+from execution_plane.execution_target_reconciler.protocols import ExecutionTargetRegistry
 from execution_plane.execution_target_reconciler.reconciler import ExecutionTargetReconciler
 from execution_plane.execution_target_reconciler.types import (
     ACTIVE_LIFECYCLE,
     ClusterSnapshot,
-    ClusterType,
     ExecutionTargetSnapshot,
 )
+from execution_plane.models.cluster import ClusterType
+from execution_plane.models.execution_target import BackendType
 
 MakeCluster = Callable[..., ClusterSnapshot]
 MakeTarget = Callable[..., ExecutionTargetSnapshot]
@@ -42,7 +44,7 @@ def target_snapshot(
     *,
     name: str = "ep-default",
     namespace: str = "ao-execution",
-    backend_type: str = "k8s",
+    backend_type: BackendType = BackendType.VANILLA_K8S,
     labels: dict[str, str] | None = None,
     lifecycle: str = ACTIVE_LIFECYCLE,
     enabled: bool = True,
@@ -63,7 +65,7 @@ def target_snapshot(
     )
 
 
-class StaticTargetRegistry:
+class StaticTargetRegistry(ExecutionTargetRegistry):
     """In-memory ExecutionTargetRegistry Protocol implementation."""
 
     def __init__(self, targets: list[ExecutionTargetSnapshot]) -> None:

@@ -78,7 +78,7 @@ class _ExecutionTargetStore:
         api_key: str,
         is_default: bool,  # noqa: FBT001
         created_by: uuid.UUID,
-        labels: dict[str, object] | None = None,
+        labels: dict[str, str] | None = None,
         **_: object,
     ) -> ExecutionTarget:
         self.create_calls += 1

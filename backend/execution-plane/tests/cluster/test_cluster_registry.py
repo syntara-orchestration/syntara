@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 from typing import Self
 
 import pytest
-from execution_plane.models.cluster import Cluster, ClusterStatus
+from execution_plane.models.cluster import Cluster, ClusterStatus, ClusterType
 from execution_plane.models.execution_target import BackendType, ExecutionTarget, TargetStatus
 
 _DATABASE_UNAVAILABLE = "database unavailable"
@@ -125,11 +125,35 @@ async def test_store_creates_a_registering_cluster_and_owns_commit() -> None:
 
     assert cluster.status is ClusterStatus.REGISTERING
     assert cluster.enabled is True
+    assert cluster.cluster_type is ClusterType.OPENSHIFT
     assert cluster.api_key == ""
     assert session.added is not None
     assert session.added.api_key == "cluster-secret"
+    assert session.added.cluster_type is ClusterType.OPENSHIFT
     assert session.added.created_by == actor_id
     assert session.commits == 1
+    await store.close()
+
+
+@pytest.mark.asyncio
+async def test_store_persists_an_explicit_cluster_type() -> None:
+    from execution_plane.cluster.cluster_store import ClusterStore
+
+    store = ClusterStore("postgresql+asyncpg://localhost/syntara")
+    session = _Session()
+    store._session_factory = _SessionFactory(session)  # type: ignore[assignment]
+
+    cluster = await store.create(
+        "cluster-a",
+        "https://cluster.example",
+        "cluster-secret",
+        uuid.uuid4(),
+        cluster_type=ClusterType.RHEL,
+    )
+
+    assert cluster.cluster_type is ClusterType.RHEL
+    assert session.added is not None
+    assert session.added.cluster_type is ClusterType.RHEL
     await store.close()
 
 

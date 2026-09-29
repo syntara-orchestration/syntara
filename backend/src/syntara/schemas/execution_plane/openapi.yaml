@@ -123,10 +123,10 @@ components:
             - type: 'null'
           title: Status Message
         labels:
-          additionalProperties: true
+          additionalProperties:
+            type: string
           type: object
           title: Labels
-          default: {}
         created_by:
           type: string
           format: uuid

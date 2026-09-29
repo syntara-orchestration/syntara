@@ -9,14 +9,10 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     import uuid
 
+    from execution_plane.models.cluster import ClusterType
+    from execution_plane.models.execution_target import BackendType
+
 ACTIVE_LIFECYCLE = "active"
-
-
-class ClusterType(StrEnum):
-    """Host platform the Execution Plane connects to."""
-
-    OPENSHIFT = "openshift"
-    RHEL = "rhel"
 
 
 class ResolveOutcome(StrEnum):
@@ -71,7 +67,7 @@ class ExecutionTargetSnapshot:
     cluster: ClusterSnapshot
     name: str
     namespace: str
-    backend_type: str
+    backend_type: BackendType
     labels: dict[str, str]
     lifecycle: str
     enabled: bool

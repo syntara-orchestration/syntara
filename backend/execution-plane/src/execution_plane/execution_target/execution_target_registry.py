@@ -11,7 +11,6 @@ from execution_plane.execution_target.execution_target_store import (
 
 if TYPE_CHECKING:
     import uuid
-    from typing import Any
 
     from execution_plane.execution_target.execution_target_store import ExecutionTargetStore
     from execution_plane.models.execution_target import BackendType, ExecutionTarget, TargetStatus
@@ -33,7 +32,7 @@ class ExecutionTargetRegistry:
         api_key: str,
         is_default: bool,  # noqa: FBT001
         created_by: uuid.UUID,
-        labels: dict[str, Any] | None = None,
+        labels: dict[str, str] | None = None,
         namespace: str = "default",
     ) -> ExecutionTarget:
         """Create an execution target through the persistence boundary."""
@@ -80,7 +79,7 @@ class ExecutionTargetRegistry:
         name: str | None = None,
         endpoint: str | None = None,
         namespace: str | None = None,
-        labels: dict[str, Any] | None = None,
+        labels: dict[str, str] | None = None,
         status_message: str | None = None,
         api_key: str | None = None,
     ) -> ExecutionTarget:

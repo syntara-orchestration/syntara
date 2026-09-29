@@ -93,12 +93,9 @@ export interface components {
       is_default?: boolean
       /** Status Message */
       status_message?: string | null
-      /**
-       * Labels
-       * @default {}
-       */
+      /** Labels */
       labels?: {
-        [key: string]: unknown
+        [key: string]: string
       }
       /**
        * Created By

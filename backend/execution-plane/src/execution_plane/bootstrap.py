@@ -14,7 +14,7 @@ from execution_plane.cluster.cluster_registry import (
 from execution_plane.cluster.cluster_store import ClusterStore
 from execution_plane.execution_target.execution_target_registry import ExecutionTargetRegistry
 from execution_plane.execution_target.execution_target_store import ExecutionTargetStore
-from execution_plane.models.cluster import Cluster, ClusterStatus
+from execution_plane.models.cluster import Cluster, ClusterStatus, ClusterType
 from execution_plane.models.execution_target import BackendType, ExecutionTarget, TargetStatus
 
 LOCAL_CLUSTER_NAME = "local-execution-plane"
@@ -78,6 +78,7 @@ async def bootstrap_local_cluster(
                 LOCAL_CLUSTER_ENDPOINT,
                 LOCAL_API_KEY,
                 created_by,
+                cluster_type=ClusterType.OPENSHIFT,
             )
             targets = await target_registry.list(cluster_id=cluster.id)
             if _is_healthy(cluster, targets):

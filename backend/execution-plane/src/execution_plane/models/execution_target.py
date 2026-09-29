@@ -3,7 +3,7 @@
 import uuid
 from datetime import datetime
 from enum import StrEnum
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Column, Index, String, UniqueConstraint, text
 from sqlalchemy import Enum as SAEnum
@@ -79,7 +79,7 @@ class ExecutionTarget(SQLModel, table=True):
     is_default: bool = Field(default=False, nullable=False)
     api_key: str = Field(sa_column=Column(String, nullable=False), repr=False, exclude=True)
     status_message: str | None = Field(default=None, nullable=True)
-    labels: dict[str, Any] = Field(default={}, sa_column=Column(JSONB, nullable=False, server_default="{}"))
+    labels: dict[str, str] = Field(default_factory=dict, sa_column=Column(JSONB, nullable=False, server_default="{}"))
     created_by: uuid.UUID = Field(nullable=False)
     created_at: datetime = Field(sa_column=Column(DateTime(timezone=True), nullable=False))
     updated_by: uuid.UUID = Field(nullable=False)

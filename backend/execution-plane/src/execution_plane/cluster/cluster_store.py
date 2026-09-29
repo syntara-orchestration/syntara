@@ -8,13 +8,12 @@ from typing import TYPE_CHECKING
 from sqlalchemy import select
 from sqlmodel import col
 
-from execution_plane.models.cluster import Cluster, ClusterStatus
+from execution_plane.models.cluster import Cluster, ClusterStatus, ClusterType
 from execution_plane.models.execution_target import ExecutionTarget, TargetStatus
 from execution_plane.store_base import StoreBase
 
 if TYPE_CHECKING:
     import uuid
-    from typing import Any
 
 
 class ClusterNotFoundError(LookupError):
@@ -41,7 +40,9 @@ class ClusterStore(StoreBase):
         endpoint: str,
         api_key: str,
         created_by: uuid.UUID,
-        labels: dict[str, Any] | None = None,
+        labels: dict[str, str] | None = None,
+        *,
+        cluster_type: ClusterType = ClusterType.OPENSHIFT,
     ) -> Cluster:
         """Persist a new Cluster in REGISTERING state."""
         now = datetime.now(UTC)
@@ -49,6 +50,7 @@ class ClusterStore(StoreBase):
             name=name,
             endpoint=endpoint,
             api_key=api_key,
+            cluster_type=cluster_type,
             labels=labels or {},
             status=ClusterStatus.REGISTERING,
             created_by=created_by,
@@ -125,7 +127,7 @@ class ClusterStore(StoreBase):
         updated_by: uuid.UUID,
         endpoint: str | None = None,
         api_key: str | None = None,
-        labels: dict[str, Any] | None = None,
+        labels: dict[str, str] | None = None,
     ) -> Cluster:
         """Re-enable a DRAINING cluster and transition it back to ACTIVE."""
         async with self._session_context() as session:

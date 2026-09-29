@@ -22,6 +22,7 @@ from execution_plane.execution_target_reconciler.types import (
     ResolveOutcome,
     WorkRequirements,
 )
+from execution_plane.models.execution_target import BackendType
 
 MakeCluster = Callable[..., ClusterSnapshot]
 MakeTarget = Callable[..., ExecutionTargetSnapshot]
@@ -121,7 +122,7 @@ async def test_selectors_do_not_mix_in_non_matching_cluster_defaults(
     cluster = make_cluster(labels={"region": "us-east-1"})
     default = make_target(cluster, name="ep-default", is_default=True)
     openshell = make_target(
-        cluster, name="ep-openshell", backend_type="openshell", labels={"backend_type": "openshell"}
+        cluster, name="ep-openshell", backend_type=BackendType.OPENSHELL, labels={"backend_type": "openshell"}
     )
     resolver = make_reconciler([default, openshell])
 

@@ -18,6 +18,7 @@ from dev_cli import (
     EnvironmentSelectionError,
     LocalEnvironment,
     OpenShiftEnvironment,
+    _cluster_type_for_provider,
     _collect_local_details,
     _collect_openshift_details,
     _register_environment_and_integration,
@@ -29,7 +30,7 @@ from dev_cli import (
     select_provider,
 )
 from execution_plane.cluster.cluster_store import ClusterStore
-from execution_plane.models.cluster import ClusterStatus
+from execution_plane.models.cluster import ClusterStatus, ClusterType
 
 _DATABASE_UNAVAILABLE = "database unavailable"
 
@@ -120,14 +121,14 @@ def _store_factory(store: object) -> type[object]:
 class _ClusterRegistry:
     def __init__(self, existing: object | None = None) -> None:
         self.existing = existing
-        self.provision_calls: list[tuple[object, ...]] = []
+        self.provision_calls: list[tuple[tuple[object, ...], dict[str, object]]] = []
         self.sync_update_calls: list[dict[str, object]] = []
 
     async def get_by_name(self, _name: str) -> object | None:
         return self.existing
 
-    async def provision(self, *args: object) -> None:
-        self.provision_calls.append(args)
+    async def provision(self, *args: object, **kwargs: object) -> None:
+        self.provision_calls.append((args, kwargs))
 
     async def sync_update(self, cluster_id: object, **kwargs: object) -> None:
         self.sync_update_calls.append({"cluster_id": cluster_id, **kwargs})
@@ -190,6 +191,12 @@ def test_auto_explains_how_to_install_a_local_provider_when_none_is_available() 
 
 def test_explicit_openshift_selects_remote_environment() -> None:
     assert select_provider("openshift", []) is OpenShiftEnvironment
+
+
+def test_cluster_type_for_provider_maps_kubernetes_providers_to_openshift() -> None:
+    assert _cluster_type_for_provider(EnvironmentProvider.KIND) is ClusterType.OPENSHIFT
+    assert _cluster_type_for_provider(EnvironmentProvider.MINIKUBE) is ClusterType.OPENSHIFT
+    assert _cluster_type_for_provider(EnvironmentProvider.OPENSHIFT) is ClusterType.OPENSHIFT
 
 
 def test_remote_openshift_does_not_support_local_lifecycle_operations() -> None:
@@ -476,7 +483,10 @@ async def test_register_environment_record_provisions_a_new_cluster(monkeypatch:
     await _register_environment_record(details, "database")
 
     assert registry.provision_calls == [
-        (details.name, details.endpoint, details.api_key, details.namespace, dev_cli.CLI_ACTOR_ID, details.labels)
+        (
+            (details.name, details.endpoint, details.api_key, details.namespace, dev_cli.CLI_ACTOR_ID, details.labels),
+            {"cluster_type": ClusterType.OPENSHIFT},
+        )
     ]
     assert registry.sync_update_calls == []
 

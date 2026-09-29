@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from execution_plane.execution_target_reconciler.filters import default_filters
 from execution_plane.execution_target_reconciler.placement import PlacementResolver, WorkerManagerRegistry
+from execution_plane.execution_target_reconciler.protocols import ExecutionTargetRegistry
 from execution_plane.execution_target_reconciler.reconciler import ExecutionTargetReconciler
-from execution_plane.execution_target_reconciler.types import ClusterSnapshot, ClusterType, ExecutionTargetSnapshot
+from execution_plane.execution_target_reconciler.types import ClusterSnapshot, ExecutionTargetSnapshot
 from execution_plane.models.cluster import ClusterStatus
 
 if TYPE_CHECKING:
@@ -20,31 +21,13 @@ if TYPE_CHECKING:
     from execution_plane.models.execution_target import ExecutionTarget
 
 
-def string_labels(labels: dict[str, Any] | None) -> dict[str, str]:
-    """Keep only string keys and values from a persisted JSONB label map."""
-    if not labels:
-        return {}
-    return {key: value for key, value in labels.items() if isinstance(key, str) and isinstance(value, str)}
-
-
-def cluster_type_from_model(cluster: Cluster) -> ClusterType:
-    """Read a natural `cluster_type` label when valid; otherwise default to OpenShift."""
-    raw = cluster.labels.get("cluster_type") if cluster.labels else None
-    if isinstance(raw, str):
-        try:
-            return ClusterType(raw)
-        except ValueError:
-            pass
-    return ClusterType.OPENSHIFT
-
-
 def cluster_snapshot_from_model(cluster: Cluster) -> ClusterSnapshot:
     """Map a Cluster row to a reconciler snapshot. Non-ACTIVE clusters are ineligible."""
     return ClusterSnapshot(
         id=cluster.id,
         name=cluster.name,
-        labels=string_labels(cluster.labels),
-        cluster_type=cluster_type_from_model(cluster),
+        labels=dict(cluster.labels),
+        cluster_type=cluster.cluster_type,
         enabled=cluster.enabled and cluster.status is ClusterStatus.ACTIVE,
     )
 
@@ -59,15 +42,15 @@ def execution_target_snapshot_from_model(
         cluster=cluster,
         name=target.name,
         namespace=target.namespace,
-        backend_type=target.backend_type.value,
-        labels=string_labels(target.labels),
+        backend_type=target.backend_type,
+        labels=dict(target.labels),
         lifecycle=target.status.value,
         enabled=target.enabled,
         is_default=target.is_default,
     )
 
 
-class ExecutionTargetStoreAdapter:
+class ExecutionTargetStoreAdapter(ExecutionTargetRegistry):
     """`ExecutionTargetRegistry` Protocol backed by Cluster and ExecutionTarget stores."""
 
     def __init__(self, cluster_store: ClusterStore, target_store: ExecutionTargetStore) -> None:

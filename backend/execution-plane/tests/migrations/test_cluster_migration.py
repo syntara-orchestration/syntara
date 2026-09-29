@@ -29,6 +29,14 @@ def test_execution_target_namespace_migration_follows_cluster_migration() -> Non
     assert migration.down_revision == "b7c8d9e0f1a2"
 
 
+def test_cluster_type_migration_follows_namespace_migration() -> None:
+    """Cluster type is added after namespace exists."""
+    migration = importlib.import_module("execution_plane.migrations.versions.d9e0f1a2b3c4_add_cluster_type")
+
+    assert migration.revision == "d9e0f1a2b3c4"
+    assert migration.down_revision == "c8d9e0f1a2b3"
+
+
 def test_cluster_migration_requires_an_empty_target_table_and_adds_target_constraints() -> None:
     """The green-field migration rejects existing targets and adds new invariants."""
     migration = importlib.import_module(
@@ -65,6 +73,27 @@ def test_namespace_migration_adds_required_string_column() -> None:
     assert namespace_column.nullable is False
     assert isinstance(namespace_column.type, migration.sa.String)
     drop_column.assert_called_once_with("execution_targets", "namespace", schema="execution_plane")
+
+
+def test_cluster_type_migration_adds_required_string_column() -> None:
+    migration = importlib.import_module("execution_plane.migrations.versions.d9e0f1a2b3c4_add_cluster_type")
+
+    with (
+        patch.object(migration.op, "add_column") as add_column,
+        patch.object(migration.op, "alter_column") as alter_column,
+        patch.object(migration.op, "drop_column") as drop_column,
+    ):
+        migration.upgrade()
+        migration.downgrade()
+
+    add_column.assert_called_once()
+    assert add_column.call_args.args[0] == "clusters"
+    cluster_type_column = add_column.call_args.args[1]
+    assert cluster_type_column.name == "cluster_type"
+    assert cluster_type_column.nullable is False
+    assert isinstance(cluster_type_column.type, migration.sa.String)
+    alter_column.assert_called_once_with("clusters", "cluster_type", server_default=None, schema="execution_plane")
+    drop_column.assert_called_once_with("clusters", "cluster_type", schema="execution_plane")
 
 
 def test_cluster_migration_upgrade_records_required_schema_operations() -> None:

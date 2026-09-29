@@ -4,21 +4,22 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any, Self, cast
+from typing import TYPE_CHECKING, Self, cast
 
 import pytest
 from execution_plane.cluster.cluster_store import ClusterStore
 from execution_plane.execution_target.execution_target_store import ExecutionTargetStore
 from execution_plane.execution_target_reconciler.adapters import (
+    ExecutionTargetStoreAdapter,
     build_placement_resolver,
     cluster_snapshot_from_model,
     execution_target_snapshot_from_model,
     store_backed_target_registry,
-    string_labels,
 )
 from execution_plane.execution_target_reconciler.placement import PlacementResolver
-from execution_plane.execution_target_reconciler.types import ClusterType, WorkRequirements
-from execution_plane.models.cluster import Cluster, ClusterStatus
+from execution_plane.execution_target_reconciler.protocols import ExecutionTargetRegistry
+from execution_plane.execution_target_reconciler.types import WorkRequirements
+from execution_plane.models.cluster import Cluster, ClusterStatus, ClusterType
 from execution_plane.models.execution_target import BackendType, ExecutionTarget, TargetStatus
 
 if TYPE_CHECKING:
@@ -29,7 +30,8 @@ def _cluster(
     *,
     status: ClusterStatus = ClusterStatus.ACTIVE,
     enabled: bool = True,
-    labels: dict[str, Any] | None = None,
+    labels: dict[str, str] | None = None,
+    cluster_type: ClusterType = ClusterType.OPENSHIFT,
 ) -> Cluster:
     now = datetime.now(UTC)
     return Cluster(
@@ -39,7 +41,8 @@ def _cluster(
         api_key="secret",
         status=status,
         enabled=enabled,
-        labels=labels or {"region": "us-east-1", "count": 1},
+        cluster_type=cluster_type,
+        labels=labels or {"region": "us-east-1"},
         created_by=uuid.uuid4(),
         created_at=now,
         updated_by=uuid.uuid4(),
@@ -99,19 +102,15 @@ def _target_store(targets: list[ExecutionTarget]) -> ExecutionTargetStore:
     return ExecutionTargetStore.from_session(cast("AsyncSession", _Session(targets)))
 
 
-def test_string_labels_keep_only_string_pairs() -> None:
-    assert string_labels({"region": "us-east-1", "count": 1}) == {"region": "us-east-1"}
-    assert string_labels(None) == {}
-
-
 def test_cluster_snapshot_maps_non_active_to_disabled() -> None:
     snapshot = cluster_snapshot_from_model(_cluster(status=ClusterStatus.DRAINING, enabled=True))
     assert snapshot.enabled is False
     assert snapshot.cluster_type is ClusterType.OPENSHIFT
+    assert snapshot.labels == {"region": "us-east-1"}
 
 
-def test_cluster_type_label_is_used_when_valid() -> None:
-    snapshot = cluster_snapshot_from_model(_cluster(labels={"cluster_type": "rhel"}))
+def test_cluster_snapshot_uses_persisted_cluster_type() -> None:
+    snapshot = cluster_snapshot_from_model(_cluster(cluster_type=ClusterType.RHEL))
     assert snapshot.cluster_type is ClusterType.RHEL
 
 
@@ -120,10 +119,14 @@ def test_execution_target_snapshot_shares_cluster_and_maps_enums() -> None:
     snapshot = cluster_snapshot_from_model(cluster)
     target = execution_target_snapshot_from_model(_target(cluster), snapshot)
     assert target.cluster is snapshot
-    assert target.backend_type == BackendType.VANILLA_K8S.value
+    assert target.backend_type is BackendType.VANILLA_K8S
     assert target.lifecycle == TargetStatus.ACTIVE.value
     assert target.labels == {"env": "production"}
     assert target.is_default is True
+
+
+def test_store_adapter_inherits_target_registry_protocol() -> None:
+    assert ExecutionTargetRegistry in ExecutionTargetStoreAdapter.__mro__
 
 
 @pytest.mark.asyncio

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 
-from execution_plane.models.cluster import Cluster, ClusterStatus
+from execution_plane.models.cluster import Cluster, ClusterStatus, ClusterType
 from execution_plane.models.constants import EP_SCHEMA
 from execution_plane.models.execution_target import BackendType, ExecutionTarget, TargetStatus
 from sqlalchemy import Enum as SAEnum
@@ -24,6 +24,7 @@ def test_cluster_table_exposes_required_lifecycle_and_audit_contract() -> None:
         ClusterStatus.DRAINING,
         ClusterStatus.ERROR,
     }
+    assert set(ClusterType) == {ClusterType.OPENSHIFT, ClusterType.RHEL}
     assert any(
         constraint.name == "clusters_endpoint_key" and {column.name for column in constraint.columns} == {"endpoint"}
         for constraint in table.constraints
@@ -36,6 +37,9 @@ def test_cluster_table_exposes_required_lifecycle_and_audit_contract() -> None:
     assert {"created_by", "created_at", "updated_by", "updated_at"} <= set(table.c.keys())
     assert isinstance(table.c.status.type, SAEnum)
     assert table.c.status.type.native_enum is False
+    assert isinstance(table.c.cluster_type.type, SAEnum)
+    assert table.c.cluster_type.type.native_enum is False
+    assert Cluster(endpoint="https://cluster.example", api_key="secret").cluster_type is ClusterType.OPENSHIFT
     assert repr(Cluster(endpoint="https://cluster.example", api_key="secret"))
     assert "secret" not in repr(Cluster(endpoint="https://cluster.example", api_key="secret"))
     assert "api_key" not in Cluster(endpoint="https://cluster.example", api_key="secret").model_dump()

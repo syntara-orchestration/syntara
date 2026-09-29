@@ -22,7 +22,7 @@ from execution_plane.cluster.cluster_registry import (
 from execution_plane.cluster.cluster_store import ClusterStore
 from execution_plane.execution_target.execution_target_registry import ExecutionTargetRegistry
 from execution_plane.execution_target.execution_target_store import ExecutionTargetStore
-from execution_plane.models.cluster import ClusterStatus
+from execution_plane.models.cluster import ClusterStatus, ClusterType
 from execution_plane.models.work_item import WorkItem
 from execution_plane.work_store import WorkStore
 from sqlalchemy import delete
@@ -108,6 +108,19 @@ class EnvironmentDetails:
     namespace: str
     api_key: str
     labels: dict[str, str]
+
+
+_CLUSTER_TYPE_BY_PROVIDER = {
+    EnvironmentProvider.OPENSHIFT: ClusterType.OPENSHIFT,
+    EnvironmentProvider.KIND: ClusterType.OPENSHIFT,
+    EnvironmentProvider.MINIKUBE: ClusterType.OPENSHIFT,
+    EnvironmentProvider.AUTO: ClusterType.OPENSHIFT,
+}
+
+
+def _cluster_type_for_provider(provider: EnvironmentProvider) -> ClusterType:
+    """Map a CLI environment provider onto the persisted Cluster type."""
+    return _CLUSTER_TYPE_BY_PROVIDER[provider]
 
 
 async def _remove_target_work_items(work_store: WorkStore, target_id: uuid.UUID) -> None:
@@ -282,6 +295,7 @@ async def _register_environment_record(details: EnvironmentDetails, database_url
                 details.namespace,
                 CLI_ACTOR_ID,
                 details.labels,
+                cluster_type=_cluster_type_for_provider(details.provider),
             )
 
 

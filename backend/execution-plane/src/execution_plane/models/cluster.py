@@ -26,6 +26,13 @@ class ClusterStatus(StrEnum):
     ERROR = "error"
 
 
+class ClusterType(StrEnum):
+    """Host platform the Execution Plane connects to."""
+
+    OPENSHIFT = "openshift"
+    RHEL = "rhel"
+
+
 class Cluster(SQLModel, table=True):
     """A registered control-plane cluster."""
 
@@ -47,7 +54,16 @@ class Cluster(SQLModel, table=True):
     enabled: bool = Field(default=True, nullable=False)
     status_message: str | None = Field(default=None, nullable=True)
     api_key: str = Field(sa_column=Column(String, nullable=False), repr=False, exclude=True)
-    labels: dict[str, Any] = Field(
+    cluster_type: ClusterType = Field(
+        default=ClusterType.OPENSHIFT,
+        sa_column=Column(
+            SAEnum(
+                ClusterType, native_enum=False, values_callable=lambda members: [member.value for member in members]
+            ),
+            nullable=False,
+        ),
+    )
+    labels: dict[str, str] = Field(
         default_factory=dict,
         sa_column=Column(JSONB, nullable=False, server_default="{}"),
     )

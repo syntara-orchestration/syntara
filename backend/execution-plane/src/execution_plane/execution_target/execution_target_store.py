@@ -16,7 +16,6 @@ from execution_plane.store_base import StoreBase
 
 if TYPE_CHECKING:
     import uuid
-    from typing import Any
 
 
 class ExecutionTargetNotFoundError(LookupError):
@@ -60,7 +59,7 @@ class ExecutionTargetStore(StoreBase):
         api_key: str,
         is_default: bool,  # noqa: FBT001
         created_by: uuid.UUID,
-        labels: dict[str, Any] | None = None,
+        labels: dict[str, str] | None = None,
         namespace: str = "default",
     ) -> ExecutionTarget:
         """Create a target, rejecting a second default in the same cluster."""
@@ -185,7 +184,7 @@ class ExecutionTargetStore(StoreBase):
         name: str | None = None,
         endpoint: str | None = None,
         namespace: str | None = None,
-        labels: dict[str, Any] | None = None,
+        labels: dict[str, str] | None = None,
         status_message: str | None = None,
         api_key: str | None = None,
     ) -> ExecutionTarget:

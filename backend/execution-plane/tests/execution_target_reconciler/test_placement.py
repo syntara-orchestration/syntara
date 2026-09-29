@@ -15,6 +15,7 @@ from execution_plane.execution_target_reconciler.types import (
     ResolveOutcome,
     WorkRequirements,
 )
+from execution_plane.models.execution_target import BackendType
 
 if TYPE_CHECKING:
     from execution_plane.models.work_item import WorkItem
@@ -34,11 +35,11 @@ async def test_placement_resolver_delegates_resolve_and_looks_up_backend(
     make_cluster: MakeCluster, make_target: MakeTarget, make_reconciler: MakeReconciler
 ) -> None:
     cluster = make_cluster()
-    target = make_target(cluster, backend_type="openshell", labels={"backend_type": "openshell"})
+    target = make_target(cluster, backend_type=BackendType.OPENSHELL, labels={"backend_type": "openshell"})
     reconciler = make_reconciler([target])
     managers = WorkerManagerRegistry()
     manager = _Manager()
-    managers.register("openshell", manager)
+    managers.register(BackendType.OPENSHELL, manager)
     placement = PlacementResolver(reconciler, managers)
 
     result = await placement.resolve(WorkRequirements(selectors={"backend_type": "openshell"}))
@@ -49,10 +50,10 @@ async def test_placement_resolver_delegates_resolve_and_looks_up_backend(
 
 def test_worker_manager_registry_raises_for_unknown_backend(make_cluster: MakeCluster, make_target: MakeTarget) -> None:
     cluster = make_cluster()
-    target = make_target(cluster, backend_type="agent_sandbox")
+    target = make_target(cluster, backend_type=BackendType.OPENSHELL)
     placement = PlacementResolver(
         object(),  # type: ignore[arg-type]
         WorkerManagerRegistry(),
     )
-    with pytest.raises(UnknownBackendTypeError, match="agent_sandbox"):
+    with pytest.raises(UnknownBackendTypeError, match="openshell"):
         placement.worker_manager_for(target)

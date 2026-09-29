@@ -6,12 +6,11 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import TYPE_CHECKING, Protocol
 
-from execution_plane.models.cluster import Cluster, ClusterStatus
+from execution_plane.models.cluster import Cluster, ClusterStatus, ClusterType
 from execution_plane.models.execution_target import BackendType
 
 if TYPE_CHECKING:
     import uuid
-    from typing import Any
 
     from execution_plane.cluster.cluster_store import ClusterStore
     from execution_plane.execution_target.execution_target_registry import ExecutionTargetRegistry
@@ -25,7 +24,7 @@ class ClusterRegistration:
     name: str
     endpoint: str
     api_key: str = field(repr=False)
-    labels: dict[str, Any]
+    labels: dict[str, str]
 
 
 @dataclass(frozen=True)
@@ -102,11 +101,13 @@ class ClusterRegistry:
         endpoint: str,
         api_key: str,
         created_by: uuid.UUID,
-        labels: dict[str, Any] | None = None,
+        labels: dict[str, str] | None = None,
+        *,
+        cluster_type: ClusterType = ClusterType.OPENSHIFT,
     ) -> Cluster:
         """Persist first, discover second, and persist the resulting state."""
         registration = ClusterRegistration(name, endpoint, api_key, labels or {})
-        cluster = await self._store.create(name, endpoint, api_key, created_by, labels)
+        cluster = await self._store.create(name, endpoint, api_key, created_by, labels, cluster_type=cluster_type)
         try:
             result = self._discovery.discover(registration)
         except Exception:  # noqa: BLE001
@@ -154,7 +155,9 @@ class ClusterRegistry:
         api_key: str,
         namespace: str,
         created_by: uuid.UUID,
-        labels: dict[str, Any] | None = None,
+        labels: dict[str, str] | None = None,
+        *,
+        cluster_type: ClusterType = ClusterType.OPENSHIFT,
     ) -> Cluster:
         """Create a cluster and its sole default execution target from known values.
 
@@ -167,7 +170,7 @@ class ClusterRegistry:
         if existing is not None and existing.status is ClusterStatus.DRAINING:
             return await self._reactivate(existing, endpoint, api_key, namespace, created_by, labels)
 
-        cluster = await self._store.create(name, endpoint, api_key, created_by, labels)
+        cluster = await self._store.create(name, endpoint, api_key, created_by, labels, cluster_type=cluster_type)
         try:
             target = await self._execution_target_registry.create(
                 cluster_id=cluster.id,
@@ -194,7 +197,7 @@ class ClusterRegistry:
         api_key: str,
         namespace: str,
         updated_by: uuid.UUID,
-        labels: dict[str, Any] | None = None,
+        labels: dict[str, str] | None = None,
     ) -> Cluster:
         """Reactivate a DRAINING cluster and its default target with new parameters."""
         reactivated = await self._store.reactivate(

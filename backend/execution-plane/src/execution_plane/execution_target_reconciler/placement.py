@@ -13,6 +13,7 @@ if TYPE_CHECKING:
         ReconcileResult,
         WorkRequirements,
     )
+    from execution_plane.models.execution_target import BackendType
     from execution_plane.worker_manager.base import WorkerManager
 
 
@@ -21,13 +22,13 @@ class WorkerManagerRegistry:
 
     def __init__(self) -> None:
         """Start with no registered backends."""
-        self._managers: dict[str, WorkerManager] = {}
+        self._managers: dict[BackendType, WorkerManager] = {}
 
-    def register(self, backend_type: str, manager: WorkerManager) -> None:
+    def register(self, backend_type: BackendType, manager: WorkerManager) -> None:
         """Associate a WorkerManager with a backend type. Later registers overwrite."""
         self._managers[backend_type] = manager
 
-    def get(self, backend_type: str) -> WorkerManager:
+    def get(self, backend_type: BackendType) -> WorkerManager:
         """Return the WorkerManager for `backend_type`, or raise if none is registered."""
         try:
             return self._managers[backend_type]
