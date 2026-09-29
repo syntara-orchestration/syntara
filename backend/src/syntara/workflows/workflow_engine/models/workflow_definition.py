@@ -915,8 +915,8 @@ class FormPromptNodeParameters(BaseModel):
 
     @field_validator("form_definition", mode="after")
     @classmethod
-    def validate_form_defaults(cls, v: FormDefinition) -> FormDefinition:
-        """Validate defaults and reject engine-only option snapshots in authored workflows."""
+    def validate_authored_form_definition(cls, v: FormDefinition) -> FormDefinition:
+        """Reject engine-only options and validate defaults in authored workflows."""
         for field in v.fields:
             if isinstance(getattr(field, "options", None), ResolvedOptions):
                 msg = (
