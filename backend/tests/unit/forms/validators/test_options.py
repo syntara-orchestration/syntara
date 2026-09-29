@@ -1,87 +1,306 @@
-"""Unit tests for dynamic option resolution."""
+"""Unit tests for dynamic option resolution and form-definition materialization."""
 
+import copy
+import json
 from typing import Any
 
 import pytest
 
 from syntara.core.constants import FieldLimits
-from syntara.forms.validators.options import resolve_dynamic_options
+from syntara.core.exceptions import SafeValueError
+from syntara.forms.validators.options import materialize_dynamic_options, resolve_dynamic_options
 
 
-class TestResolveDynamicOptions:
-    """resolve_dynamic_options converts upstream output into static options."""
+class TestResolveDynamicOptionsScalars:
+    """Scalar upstream values retain type and stable order."""
 
-    def test_scalars_become_options(self) -> None:
-        """Each scalar becomes both label and value."""
+    def test_source_is_resolved(self) -> None:
         options = resolve_dynamic_options(["a", "b"], "region")
 
-        assert options.source == "static"
-        assert [(opt.display_label, opt.value) for opt in options.values] == [("a", "a"), ("b", "b")]
+        assert options.source == "resolved"
+        assert [(option.display_label, option.value) for option in options.values] == [("a", "a"), ("b", "b")]
 
-    def test_mixed_scalar_types(self) -> None:
-        """str/int/float/bool are all supported, each preserving its own type."""
+    def test_mixed_scalar_types_preserved(self) -> None:
         options = resolve_dynamic_options(["a", 1, 2.5, False], "region")
 
-        assert [opt.value for opt in options.values] == ["a", 1, 2.5, False]
-        assert [type(opt.value) for opt in options.values] == [str, int, float, bool]
-        assert [opt.display_label for opt in options.values] == ["a", "1", "2.5", "False"]
+        assert [option.value for option in options.values] == ["a", 1, 2.5, False]
+        assert [type(option.value) for option in options.values] == [str, int, float, bool]
+        assert [option.display_label for option in options.values] == ["a", "1", "2.5", "False"]
 
     def test_bool_collides_with_equal_int(self) -> None:
-        """De-duplication compares by equality, so True is dropped after 1 (and vice versa).
-
-        Documents current behavior: `1 == True` in Python, so the second value is
-        treated as a duplicate rather than a distinct option.
-        """
+        """Python set equality collapses 1/True and 0/False, keeping the first."""
         options = resolve_dynamic_options([1, True, 0, False], "region")
 
-        assert [opt.value for opt in options.values] == [1, 0]
+        assert [option.value for option in options.values] == [1, 0]
 
     def test_duplicates_removed_first_wins(self) -> None:
-        """Duplicate values are dropped, preserving first-occurrence order."""
         options = resolve_dynamic_options(["b", "a", "b"], "region")
 
-        assert [opt.value for opt in options.values] == ["b", "a"]
+        assert [option.value for option in options.values] == ["b", "a"]
 
     def test_max_options_allowed(self) -> None:
-        """A list exactly at the cap is accepted."""
         options = resolve_dynamic_options(list(range(FieldLimits.FORM_OPTIONS_MAX_LENGTH)), "region")
 
         assert len(options.values) == FieldLimits.FORM_OPTIONS_MAX_LENGTH
 
-    @pytest.mark.parametrize("resolved", ["abc", {"a": 1}, None, 42])
-    def test_non_list_rejected(self, resolved: Any) -> None:  # noqa: ANN401
-        """A non-list resolution is a bug in the upstream node, not a scalar to wrap."""
-        with pytest.raises(TypeError, match="region"):
-            resolve_dynamic_options(resolved, "region")
-
-    def test_empty_list_rejected(self) -> None:
-        """An empty option list is rejected."""
-        with pytest.raises(ValueError, match="empty list"):
-            resolve_dynamic_options([], "region")
+    @pytest.mark.parametrize("bad", [float("nan"), float("inf"), float("-inf")])
+    def test_non_finite_rejected(self, bad: float) -> None:
+        with pytest.raises(ValueError, match="NaN and Infinity"):
+            resolve_dynamic_options(["ok", bad], "region")
 
     def test_over_cap_rejected(self) -> None:
-        """Exceeding the option cap is rejected."""
         with pytest.raises(ValueError, match=str(FieldLimits.FORM_OPTIONS_MAX_LENGTH)):
             resolve_dynamic_options(list(range(FieldLimits.FORM_OPTIONS_MAX_LENGTH + 1)), "region")
 
-    @pytest.mark.parametrize(
-        ("resolved", "expected_type"),
-        [
-            ([{"a": 1}], "dict"),
-            ([["nested"]], "list"),
-            (["ok", None], "NoneType"),
-        ],
-    )
-    def test_non_scalar_elements_rejected(self, resolved: list[Any], expected_type: str) -> None:
-        """Non-scalar elements are rejected and named in the message."""
-        with pytest.raises(TypeError, match=expected_type):
+    @pytest.mark.parametrize("resolved", ["abc", {"a": 1}, None, 42])
+    def test_non_list_rejected(self, resolved: Any) -> None:  # noqa: ANN401
+        with pytest.raises(TypeError, match="region") as exc_info:
             resolve_dynamic_options(resolved, "region")
 
-    @pytest.mark.parametrize("bad", [float("nan"), float("inf"), float("-inf")])
-    def test_non_finite_numbers_rejected(self, bad: float) -> None:
-        """NaN/Infinity are rejected, matching _coerce_number's rule for submitted values.
+        assert "Do not coerce scalars into single-item lists" in str(exc_info.value)
 
-        They are not valid JSON, and nan != nan would silently defeat de-duplication.
-        """
-        with pytest.raises(ValueError, match="non-finite"):
-            resolve_dynamic_options(["ok", bad], "region")
+    def test_empty_list_rejected(self) -> None:
+        with pytest.raises(ValueError, match="empty list"):
+            resolve_dynamic_options([], "region")
+
+    def test_nested_list_rejected_with_index(self) -> None:
+        with pytest.raises(TypeError, match=r"index 0.*list"):
+            resolve_dynamic_options([["a"]], "region")
+
+    def test_none_element_rejected_with_index(self) -> None:
+        with pytest.raises(TypeError, match=r"index 1.*NoneType"):
+            resolve_dynamic_options(["a", None], "region")
+
+    def test_error_never_contains_raw_value(self) -> None:
+        with pytest.raises(TypeError) as exc_info:
+            resolve_dynamic_options(["ok", {"password": "hunter2"}], "region")
+
+        assert "hunter2" not in str(exc_info.value)
+
+
+class TestResolveDynamicOptionsRecords:
+    """Record upstream values honor configured keys and are validated safely."""
+
+    def test_default_keys(self) -> None:
+        options = resolve_dynamic_options([{"display_label": "US East", "value": "us-east-1"}], "region")
+
+        assert [(option.display_label, option.value) for option in options.values] == [("US East", "us-east-1")]
+
+    def test_configured_keys(self) -> None:
+        options = resolve_dynamic_options(
+            [{"name": "US East", "id": "us-east-1"}], "region", label_key="name", value_key="id"
+        )
+
+        assert [(option.display_label, option.value) for option in options.values] == [("US East", "us-east-1")]
+
+    def test_value_type_preserved_in_records(self) -> None:
+        options = resolve_dynamic_options([{"name": "One", "id": 1}], "region", label_key="name", value_key="id")
+
+        assert options.values[0].value == 1
+        assert type(options.values[0].value) is int
+
+    def test_missing_label_key_rejected(self) -> None:
+        with pytest.raises(TypeError, match=r"region.*index 0.*label key 'name'"):
+            resolve_dynamic_options([{"id": "us"}], "region", label_key="name", value_key="id")
+
+    def test_empty_label_rejected(self) -> None:
+        with pytest.raises(ValueError, match=r"region.*index 0.*empty label"):
+            resolve_dynamic_options([{"display_label": "", "value": ""}], "region")
+
+    def test_non_string_label_rejected(self) -> None:
+        with pytest.raises(TypeError, match=r"region.*index 0.*non-string label.*int"):
+            resolve_dynamic_options([{"display_label": 123, "value": "x"}], "region")
+
+    def test_label_over_max_length_rejected(self) -> None:
+        with pytest.raises(ValueError, match=r"region.*index 0.*longer than 200"):
+            resolve_dynamic_options([{"display_label": "x" * 201, "value": "x"}], "region")
+
+    def test_missing_value_key_rejected(self) -> None:
+        with pytest.raises(TypeError, match=r"region.*index 0.*value key 'value'"):
+            resolve_dynamic_options([{"display_label": "US"}], "region")
+
+    def test_nested_value_rejected(self) -> None:
+        with pytest.raises(TypeError, match=r"region.*index 0.*key 'value'.*dict"):
+            resolve_dynamic_options([{"display_label": "US", "value": {"a": 1}}], "region")
+
+    def test_extra_record_keys_ignored(self) -> None:
+        options = resolve_dynamic_options([{"display_label": "US", "value": "us", "metadata": {"x": 1}}], "region")
+
+        assert [(option.display_label, option.value) for option in options.values] == [("US", "us")]
+
+    def test_record_dedup_by_value_first_wins(self) -> None:
+        options = resolve_dynamic_options(
+            [
+                {"display_label": "First", "value": "us"},
+                {"display_label": "Second", "value": "us"},
+            ],
+            "region",
+        )
+
+        assert [(option.display_label, option.value) for option in options.values] == [("First", "us")]
+
+    def test_mixed_shapes_rejected(self) -> None:
+        with pytest.raises(TypeError, match=r"region.*shapes.*index 1"):
+            resolve_dynamic_options([{"display_label": "a", "value": "a"}, "b"], "region")
+
+    def test_record_list_over_cap_rejected(self) -> None:
+        records = [
+            {"display_label": str(index), "value": index} for index in range(FieldLimits.FORM_OPTIONS_MAX_LENGTH + 1)
+        ]
+
+        with pytest.raises(ValueError, match=str(FieldLimits.FORM_OPTIONS_MAX_LENGTH)):
+            resolve_dynamic_options(records, "region")
+
+
+class TestMaterializeDynamicOptions:
+    """The workflow boundary builds immutable JSON-safe option snapshots."""
+
+    @staticmethod
+    def _field(field_type: str, value_name: str, expression: Any, **option_keys: str) -> dict[str, Any]:  # noqa: ANN401
+        return {
+            "type": field_type,
+            "value_name": value_name,
+            "label": value_name.title(),
+            "options": {"source": "dynamic", "expression": expression, **option_keys},
+        }
+
+    def test_dropdown_dynamic_becomes_resolved(self) -> None:
+        definition = {"fields": [self._field("dropdown", "region", ["us", "eu"])]}
+
+        result = materialize_dynamic_options(definition)
+
+        assert result["fields"][0]["options"] == {
+            "source": "resolved",
+            "values": [
+                {"display_label": "us", "value": "us"},
+                {"display_label": "eu", "value": "eu"},
+            ],
+        }
+
+    def test_multi_select_dynamic_becomes_resolved(self) -> None:
+        definition = {"fields": [self._field("multi_select", "regions", ["us", "eu"])]}
+
+        result = materialize_dynamic_options(definition)
+
+        assert result["fields"][0]["options"]["source"] == "resolved"
+        assert len(result["fields"][0]["options"]["values"]) == 2
+
+    def test_static_field_untouched(self) -> None:
+        field = {
+            "type": "dropdown",
+            "value_name": "region",
+            "label": "Region",
+            "options": {"source": "static", "values": [{"display_label": "US", "value": "us"}]},
+        }
+
+        result = materialize_dynamic_options({"fields": [field]})
+
+        assert result["fields"][0] == field
+
+    def test_non_option_fields_untouched(self) -> None:
+        fields = [
+            {"type": "text", "value_name": "name", "label": "Name", "default": "A"},
+            {"type": "number", "value_name": "count", "label": "Count", "default": 2},
+            {"type": "checkbox", "value_name": "accepted", "label": "Accepted"},
+        ]
+
+        result = materialize_dynamic_options({"fields": fields})
+
+        assert result["fields"] == fields
+
+    def test_multiple_dynamic_fields_resolve_independently(self) -> None:
+        result = materialize_dynamic_options(
+            {
+                "fields": [
+                    self._field("dropdown", "region", ["us"]),
+                    self._field("multi_select", "team", [1, 2]),
+                ]
+            }
+        )
+
+        assert result["fields"][0]["options"]["values"][0]["value"] == "us"
+        assert [option["value"] for option in result["fields"][1]["options"]["values"]] == [1, 2]
+
+    def test_input_not_mutated(self) -> None:
+        definition = {"fields": [self._field("dropdown", "region", ["us"])]}
+        before = copy.deepcopy(definition)
+
+        materialize_dynamic_options(definition)
+
+        assert definition == before
+
+    def test_output_is_json_serializable(self) -> None:
+        result = materialize_dynamic_options({"fields": [self._field("dropdown", "region", [1, False])]})
+
+        assert json.loads(json.dumps(result)) == result
+
+    def test_record_keys_are_materialized(self) -> None:
+        result = materialize_dynamic_options(
+            {
+                "fields": [
+                    self._field(
+                        "dropdown",
+                        "region",
+                        [{"name": "US", "id": "us"}],
+                        label_key="name",
+                        value_key="id",
+                    )
+                ]
+            }
+        )
+
+        assert result["fields"][0]["options"] == {
+            "source": "resolved",
+            "values": [{"display_label": "US", "value": "us"}],
+        }
+
+    def test_field_error_names_the_field_and_hides_upstream_values(self) -> None:
+        definition = {"fields": [self._field("dropdown", "region", ["ok", {"password": "hunter2"}])]}
+
+        with pytest.raises(SafeValueError) as exc_info:
+            materialize_dynamic_options(definition)
+
+        assert "region" in str(exc_info.value)
+        assert "hunter2" not in str(exc_info.value)
+
+    @pytest.mark.parametrize("bad", ["not-a-list", [], [{"display_label": "US", "value": {"secret": "x"}}]])
+    def test_raises_safe_value_error(self, bad: Any) -> None:  # noqa: ANN401
+        with pytest.raises(SafeValueError):
+            materialize_dynamic_options({"fields": [self._field("dropdown", "region", bad)]})
+
+    @pytest.mark.parametrize("definition", [{}, {"fields": "nope"}])
+    def test_malformed_definition_passed_through(self, definition: dict[str, Any]) -> None:
+        assert materialize_dynamic_options(definition) is definition
+
+    def test_default_not_in_resolved_options_rejected(self) -> None:
+        definition = {
+            "fields": [
+                {
+                    **self._field("dropdown", "region", ["us", "apac"]),
+                    "default": "emea",
+                }
+            ]
+        }
+
+        with pytest.raises(SafeValueError, match=r"Field 'region'.*default value 'emea'"):
+            materialize_dynamic_options(definition)
+
+    def test_typed_default_matches_resolved_value(self) -> None:
+        definition = {"fields": [{**self._field("dropdown", "region", [1, 2, 3]), "default": 2}]}
+
+        result = materialize_dynamic_options(definition)
+
+        assert result["fields"][0]["default"] == 2
+        assert type(result["fields"][0]["options"]["values"][1]["value"]) is int
+
+    def test_already_resolved_options_passed_through(self) -> None:
+        field = {
+            "type": "dropdown",
+            "value_name": "region",
+            "label": "Region",
+            "options": {"source": "resolved", "values": [{"display_label": "US", "value": 1}]},
+        }
+
+        result = materialize_dynamic_options({"fields": [field]})
+
+        assert result["fields"][0] == field

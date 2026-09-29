@@ -110,7 +110,35 @@ class DynamicOptions(BaseModel):
     value_key: str | None = None
 
 
-OptionsSource = Annotated[StaticOptions | DynamicOptions, Discriminator("source")]
+class ResolvedOption(BaseModel):
+    """An option materialized from upstream output while preserving its scalar type.
+
+    Python set membership considers ``1``, ``1.0``, and ``True`` equal. That
+    behavior is used by the backend's de-duplication and membership checks.
+    Static options remain strings because they are authored by a user.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    display_label: str = Field(min_length=1, max_length=200)
+    value: str | int | float | bool
+
+
+class ResolvedOptions(BaseModel):
+    """Dynamic options materialized into a concrete list at prompt creation.
+
+    Produced only by the workflow engine, never authored. A form prompt is
+    persisted with this shape so the responder view and submission membership
+    validation operate on the same snapshot.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    source: Literal["resolved"]
+    values: list[ResolvedOption] = Field(min_length=1, max_length=FieldLimits.FORM_OPTIONS_MAX_LENGTH)
+
+
+OptionsSource = Annotated[StaticOptions | DynamicOptions | ResolvedOptions, Discriminator("source")]
 
 
 class DropdownField(FormFieldBase):
@@ -146,7 +174,7 @@ FormField = Annotated[
 def _check_multi_select_defaults(
     value_name: str,
     defaults: list[str | int | float | bool],
-    valid_values: set[str],
+    valid_values: set[str | int | float | bool],
 ) -> None:
     """Check multi-select defaults are drawn from the option list.
 
@@ -178,10 +206,16 @@ class FormDefinition(BaseModel):
         return self
 
     @model_validator(mode="after")
-    def _default_in_static_options(self) -> FormDefinition:
-        """Ensure static dropdown/multi-select defaults are in the option list."""
+    def _default_in_option_list(self) -> FormDefinition:
+        """Ensure defaults belong to static or runtime-resolved option lists.
+
+        Dynamic options have not been materialized yet, so their defaults are
+        checked by the workflow engine after it resolves the upstream value.
+        """
         for field in self.fields:
-            if not isinstance(field, (DropdownField, MultiSelectField)) or not isinstance(field.options, StaticOptions):
+            if not isinstance(field, (DropdownField, MultiSelectField)) or not isinstance(
+                field.options, (StaticOptions, ResolvedOptions)
+            ):
                 continue
 
             valid_values = {opt.value for opt in field.options.values}

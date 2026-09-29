@@ -12,6 +12,14 @@ const staticOptions = {
   ],
 }
 
+const resolvedOptions = {
+  source: 'resolved' as const,
+  values: [
+    { display_label: 'One', value: 1 },
+    { display_label: 'Two', value: 2 },
+  ],
+}
+
 describe('formDefinitionSchema', () => {
   it('parses a valid multi-field definition', () => {
     const data = parseFormDefinition({
@@ -76,6 +84,68 @@ describe('formDefinitionSchema', () => {
     expect(result.success).toBe(false)
     if (!result.success) {
       expect(result.errors[0]?.message).toContain('default values')
+    }
+  })
+
+  it('parses resolved options while preserving typed values', () => {
+    const data = parseFormDefinition({
+      fields: [
+        {
+          type: FormFieldTypeEnum.DROPDOWN,
+          value_name: 'count',
+          label: 'Count',
+          options: resolvedOptions,
+          default: 2,
+        },
+      ],
+    })
+
+    const field = data.fields[0]
+    expect(field?.type).toBe(FormFieldTypeEnum.DROPDOWN)
+    if (field?.type === FormFieldTypeEnum.DROPDOWN && field.options.source === 'resolved') {
+      expect(field.options.values.map((option) => option.value)).toEqual([1, 2])
+      expect(field.default).toBe(2)
+    }
+  })
+
+  it('rejects an empty resolved option list', () => {
+    const result = safeParseFormDefinition({
+      fields: [
+        {
+          type: FormFieldTypeEnum.DROPDOWN,
+          value_name: 'count',
+          label: 'Count',
+          options: { source: 'resolved', values: [] },
+        },
+      ],
+    })
+
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.errors[0]?.field).toBe('fields[0]')
+      expect(result.errors[0]?.message).toMatch(/>=1/)
+    }
+  })
+
+  it('rejects typed values on authored static options', () => {
+    const result = safeParseFormDefinition({
+      fields: [
+        {
+          type: FormFieldTypeEnum.DROPDOWN,
+          value_name: 'count',
+          label: 'Count',
+          options: {
+            source: 'static',
+            values: [{ display_label: 'One', value: 1 }],
+          },
+        },
+      ],
+    })
+
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.errors[0]?.field).toBe('fields[0]')
+      expect(result.errors[0]?.message).toMatch(/expected string/i)
     }
   })
 

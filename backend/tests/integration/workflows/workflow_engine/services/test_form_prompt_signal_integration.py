@@ -27,6 +27,7 @@ from syntara.workflows.workflow_engine.services.temporal_execution_service impor
 
 # Activity IDs of the form prompts the workflow has suspended on, in scheduling order.
 _pending_activity_ids: list[str] = []
+_captured_form_definitions: list[dict[str, Any]] = []
 
 _RESULT_TIMEOUT_S = 60
 
@@ -51,6 +52,7 @@ async def _test_form_prompt_activity(
 ) -> dict[str, Any]:
     """Stand-in for create_form_prompt_activity: suspends without calling the Forms API."""
     _pending_activity_ids.append(activity.info().activity_id)
+    _captured_form_definitions.append(form_definition)
     activity.raise_complete_async()
 
 
@@ -60,7 +62,8 @@ async def _test_script_activity(
     outputs: dict[str, str] | None = None,
     **kwargs: object,
 ) -> dict[str, Any]:
-    return {"output": {"status": "completed"}}
+    choices: list[str] | str = "not-a-list" if resolved_parameters.get("code") == "return-scalar" else ["us", "eu"]
+    return {"output": {"status": "completed", "output": {"choices": choices}}}
 
 
 async def _wait_for_pending_prompt(index: int = 0) -> str:
@@ -83,6 +86,11 @@ triggers:
 - id: trigger_manual
   type: manual_trigger
 nodes:
+- id: scan
+  type: script
+  parameters:
+    language: python
+    code: "return-options"
 - id: form1
   type: form_prompt
   parameters:
@@ -93,6 +101,12 @@ nodes:
       - value_name: email
         type: text
         label: Email
+      - value_name: region
+        type: dropdown
+        label: Region
+        options:
+          source: dynamic
+          expression: "${scan.output.choices}"
 - id: process_step
   type: script
   parameters:
@@ -100,6 +114,8 @@ nodes:
     code: "print('processing')"
 edges:
 - from: trigger_manual
+  to: scan
+- from: scan
   to: form1
 - from: form1
   to: process_step
@@ -120,9 +136,12 @@ class TestFormPromptSignalIntegration:
         task_queue: str,
         workflow_def: dict[str, Any],
         output: dict[str, Any],
+        *,
+        expect_prompt: bool = True,
     ) -> dict[str, Any]:
         """Start the workflow, resolve its form prompt with ``output``, return the result."""
         _pending_activity_ids.clear()
+        _captured_form_definitions.clear()
 
         async with Worker(
             temporal_env.client,
@@ -148,12 +167,13 @@ class TestFormPromptSignalIntegration:
                 include_node_results=True,
             )
 
-            activity_id = await _wait_for_pending_prompt()
-            await execution_service.complete_async_activity(
-                temporal_workflow_id=result.temporal_workflow_id,
-                activity_id=activity_id,
-                result={"output": output},
-            )
+            if expect_prompt:
+                activity_id = await _wait_for_pending_prompt()
+                await execution_service.complete_async_activity(
+                    temporal_workflow_id=result.temporal_workflow_id,
+                    activity_id=activity_id,
+                    result={"output": output},
+                )
 
             handle = temporal_env.client.get_workflow_handle(result.temporal_workflow_id, run_id=result.temporal_run_id)
             wf_result: dict[str, Any] = await asyncio.wait_for(handle.result(), timeout=_RESULT_TIMEOUT_S)
@@ -182,6 +202,34 @@ class TestFormPromptSignalIntegration:
 
         # The submitted port was taken
         assert "process_step" in wf_result["completed_activities"]
+        options = _captured_form_definitions[0]["fields"][1]["options"]
+        assert options == {
+            "source": "resolved",
+            "values": [
+                {"display_label": "us", "value": "us"},
+                {"display_label": "eu", "value": "eu"},
+            ],
+        }
+
+    async def test_scalar_upstream_output_fails_before_form_prompt_activity(
+        self, temporal_env: WorkflowEnvironment
+    ) -> None:
+        """An invalid upstream shape fails the node before a prompt activity can create a row."""
+        workflow_def = _create_form_prompt_workflow_yaml()
+        scan_node = next(node for node in workflow_def["nodes"] if node["id"] == "scan")
+        scan_node["parameters"]["code"] = "return-scalar"
+
+        wf_result = await self._run(
+            temporal_env,
+            task_queue="form-prompt-signal-invalid-options-queue",
+            workflow_def=workflow_def,
+            output={},
+            expect_prompt=False,
+        )
+
+        assert wf_result["status"] == "failed"
+        assert "region" in wf_result["failed_activities"]["form1"]
+        assert _captured_form_definitions == []
 
     async def test_expired_outcome_fails_the_node(self, temporal_env: WorkflowEnvironment) -> None:
         """Only 'submitted' may arrive via async completion; 'expired' fails the node.

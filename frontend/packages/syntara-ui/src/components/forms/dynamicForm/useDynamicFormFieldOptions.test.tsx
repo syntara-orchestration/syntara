@@ -39,6 +39,38 @@ describe('useDynamicFormFieldOptions', () => {
     expect(result.current.loadErrorMessage).toBeNull()
   })
 
+  it('returns resolved options synchronously without invoking the resolver', () => {
+    const field = parseFormDefinition({
+      fields: [
+        {
+          type: FormFieldTypeEnum.MULTI_SELECT,
+          value_name: 'regions',
+          label: 'Regions',
+          options: {
+            source: 'resolved',
+            values: [
+              { display_label: 'US East', value: 1 },
+              { display_label: 'EU West', value: 'eu-west-1' },
+            ],
+          },
+        },
+      ],
+    }).fields[0]
+    const resolveDynamicOptions = vi.fn()
+
+    const { result } = renderHook(() => useDynamicFormFieldOptions(field, resolveDynamicOptions), {
+      wrapper: createWrapper(),
+    })
+
+    expect(result.current.options).toEqual([
+      { label: 'US East', value: 1 },
+      { label: 'EU West', value: 'eu-west-1' },
+    ])
+    expect(result.current.isLoading).toBe(false)
+    expect(result.current.isError).toBe(false)
+    expect(resolveDynamicOptions).not.toHaveBeenCalled()
+  })
+
   it('fetches and normalizes dynamic records via resolver', async () => {
     const field = parseFormDefinition({
       fields: [

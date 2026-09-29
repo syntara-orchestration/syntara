@@ -46,7 +46,21 @@ const dynamicOptionsSchema = z.object({
   value_key: z.string().nullable().optional(),
 })
 
-const optionsSourceSchema = z.discriminatedUnion('source', [staticOptionsSchema, dynamicOptionsSchema])
+const resolvedOptionSchema = z.object({
+  display_label: z.string().min(1).max(FORM_STATIC_OPTION_LABEL_MAX_LENGTH),
+  value: z.union([z.string(), z.number(), z.boolean()]),
+})
+
+const resolvedOptionsSchema = z.object({
+  source: z.literal('resolved'),
+  values: z.array(resolvedOptionSchema).min(1).max(FORM_STATIC_OPTIONS_MAX_LENGTH),
+})
+
+const optionsSourceSchema = z.discriminatedUnion('source', [
+  staticOptionsSchema,
+  dynamicOptionsSchema,
+  resolvedOptionsSchema,
+])
 
 const textFieldSchema = formFieldBaseSchema.extend({
   type: z.literal(FormFieldTypeEnum.TEXT),
@@ -126,7 +140,7 @@ function findDuplicateFieldNames(fields: ReadonlyArray<{ value_name: string }>):
 
 function validateMultiSelectDefault(
   field: Extract<z.infer<typeof formFieldSchema>, { type: typeof FormFieldTypeEnum.MULTI_SELECT }>,
-  validValues: ReadonlySet<string>,
+  validValues: ReadonlySet<string | number | boolean>,
   index: number,
   ctx: z.RefinementCtx
 ): void {
@@ -135,7 +149,7 @@ function validateMultiSelectDefault(
   }
   const invalidDefaults: typeof field.default = []
   for (const value of field.default) {
-    if (typeof value !== 'string' || !validValues.has(value)) {
+    if (!validValues.has(value)) {
       invalidDefaults.push(value)
     }
   }
@@ -151,11 +165,11 @@ function validateMultiSelectDefault(
 
 function validateDropdownDefault(
   field: Extract<z.infer<typeof formFieldSchema>, { type: typeof FormFieldTypeEnum.DROPDOWN }>,
-  validValues: ReadonlySet<string>,
+  validValues: ReadonlySet<string | number | boolean>,
   index: number,
   ctx: z.RefinementCtx
 ): void {
-  if (field.default == null || (typeof field.default === 'string' && validValues.has(field.default))) {
+  if (field.default == null || validValues.has(field.default)) {
     return
   }
   ctx.addIssue({
@@ -165,14 +179,11 @@ function validateDropdownDefault(
   })
 }
 
-function validateStaticOptionDefaults(
-  fields: ReadonlyArray<z.infer<typeof formFieldSchema>>,
-  ctx: z.RefinementCtx
-): void {
+function validateOptionDefaults(fields: ReadonlyArray<z.infer<typeof formFieldSchema>>, ctx: z.RefinementCtx): void {
   for (const [index, field] of fields.entries()) {
     if (
       (field.type !== FormFieldTypeEnum.DROPDOWN && field.type !== FormFieldTypeEnum.MULTI_SELECT) ||
-      field.options.source !== 'static'
+      (field.options.source !== 'static' && field.options.source !== 'resolved')
     ) {
       continue
     }
@@ -201,7 +212,7 @@ export const formDefinitionSchema = z
       })
     }
 
-    validateStaticOptionDefaults(definition.fields, ctx)
+    validateOptionDefaults(definition.fields, ctx)
   })
 
 function zodPathToField(path: ReadonlyArray<PropertyKey>): string {

@@ -7,8 +7,11 @@ Tests cover:
 - _fail_detached_form_prompt_activity: Temporal activity resolution
 """
 
+import copy
+import json
 from collections.abc import Generator
 from datetime import UTC, datetime, timedelta
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 from uuid import uuid4
 
@@ -61,6 +64,7 @@ def _make_workflow(
     wf._project_id = "00000000-0000-0000-0000-000000000001"
     wf.skipped_nodes = set()
     wf.failed_nodes = {}
+    wf._cof_failed_nodes = set()
     wf.resolver = resolver if resolver is not None else NamespaceResolver()
     wf.node_inputs = {}
     wf.node_control_data = {}
@@ -228,10 +232,19 @@ class TestPrepareFormPromptArgs:
 
     @pytest.mark.asyncio
     async def test_form_definition_passed_through(self) -> None:
-        """form_definition from resolved_parameters is included in args."""
+        """A valid static form_definition from resolved parameters passes through unchanged."""
         wf = _make_workflow()
         graph = _build_form_prompt_graph()
-        form_def = {"fields": [{"name": "email", "type": "string"}]}
+        form_def = {
+            "fields": [
+                {
+                    "type": "dropdown",
+                    "value_name": "region",
+                    "label": "Region",
+                    "options": {"source": "static", "values": [{"display_label": "US", "value": "us"}]},
+                }
+            ]
+        }
         config = {"form_definition": form_def}
         node = ActivityNode("form1", "form_prompt", config, name="Form")
 
@@ -293,6 +306,282 @@ class TestPrepareFormPromptArgs:
             pytest.raises(SafeValueError, match="no submitted successor"),
         ):
             await wf._prepare_form_prompt_args(node, graph, node.parameters)
+
+
+class TestPrepareFormPromptArgsDynamicOptions:
+    """Dynamic options are resolved after interpolation and before any activity."""
+
+    @staticmethod
+    def _dynamic_field(
+        field_type: str,
+        value_name: str,
+        expression: str,
+        **option_keys: str,
+    ) -> dict[str, Any]:
+        return {
+            "type": field_type,
+            "value_name": value_name,
+            "label": value_name.title(),
+            "options": {"source": "dynamic", "expression": expression, **option_keys},
+        }
+
+    @staticmethod
+    def _node(form_definition: dict[str, Any]) -> ActivityNode:
+        return ActivityNode("form1", "form_prompt", {"form_definition": form_definition}, name="Form")
+
+    @pytest.mark.asyncio
+    async def test_dropdown_options_materialized_from_namespace(self) -> None:
+        resolver = NamespaceResolver()
+        resolver.set_namespace("scan", {"output": {"choices": ["a", "b"]}})
+        wf = _make_workflow(resolver=resolver)
+        graph = _build_form_prompt_graph()
+        node = self._node({"fields": [self._dynamic_field("dropdown", "choice", "${scan.output.choices}")]})
+        mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
+
+        with patch("syntara.workflows.workflow_engine.form_prompt_mixin.workflow.execute_activity", mock_execute):
+            resolved = wf._resolve_node_parameters(node)
+            args = await wf._prepare_form_prompt_args(node, graph, resolved)
+
+        assert args[_FORM_DEFINITION_ARG]["fields"][0]["options"] == {
+            "source": "resolved",
+            "values": [
+                {"display_label": "a", "value": "a"},
+                {"display_label": "b", "value": "b"},
+            ],
+        }
+
+    @pytest.mark.asyncio
+    async def test_multi_select_options_materialized(self) -> None:
+        resolver = NamespaceResolver()
+        resolver.set_namespace("scan", {"output": {"choices": ["a", "b"]}})
+        wf = _make_workflow(resolver=resolver)
+        graph = _build_form_prompt_graph()
+        node = self._node({"fields": [self._dynamic_field("multi_select", "choices", "${scan.output.choices}")]})
+
+        with patch(
+            "syntara.workflows.workflow_engine.form_prompt_mixin.workflow.execute_activity",
+            AsyncMock(return_value={"user_ids": [], "group_ids": []}),
+        ):
+            args = await wf._prepare_form_prompt_args(node, graph, wf._resolve_node_parameters(node))
+
+        assert args[_FORM_DEFINITION_ARG]["fields"][0]["options"]["source"] == "resolved"
+
+    @pytest.mark.asyncio
+    async def test_types_preserved_end_to_end(self) -> None:
+        resolver = NamespaceResolver()
+        resolver.set_namespace("scan", {"output": {"choices": [1, 2, 3]}})
+        wf = _make_workflow(resolver=resolver)
+        graph = _build_form_prompt_graph()
+        node = self._node({"fields": [self._dynamic_field("dropdown", "choice", "${scan.output.choices}")]})
+
+        with patch(
+            "syntara.workflows.workflow_engine.form_prompt_mixin.workflow.execute_activity",
+            AsyncMock(return_value={"user_ids": [], "group_ids": []}),
+        ):
+            args = await wf._prepare_form_prompt_args(node, graph, wf._resolve_node_parameters(node))
+
+        values = args[_FORM_DEFINITION_ARG]["fields"][0]["options"]["values"]
+        assert [value["value"] for value in values] == [1, 2, 3]
+        assert all(type(value["value"]) is int for value in values)
+        json.dumps(args[_FORM_DEFINITION_ARG])
+
+    @pytest.mark.asyncio
+    async def test_record_options_materialized_with_configured_keys(self) -> None:
+        resolver = NamespaceResolver()
+        resolver.set_namespace("scan", {"output": {"choices": [{"name": "US", "id": "us"}]}})
+        wf = _make_workflow(resolver=resolver)
+        graph = _build_form_prompt_graph()
+        node = self._node(
+            {
+                "fields": [
+                    self._dynamic_field(
+                        "dropdown",
+                        "region",
+                        "${scan.output.choices}",
+                        label_key="name",
+                        value_key="id",
+                    )
+                ]
+            }
+        )
+
+        with patch(
+            "syntara.workflows.workflow_engine.form_prompt_mixin.workflow.execute_activity",
+            AsyncMock(return_value={"user_ids": [], "group_ids": []}),
+        ):
+            args = await wf._prepare_form_prompt_args(node, graph, wf._resolve_node_parameters(node))
+
+        assert args[_FORM_DEFINITION_ARG]["fields"][0]["options"]["values"] == [{"display_label": "US", "value": "us"}]
+
+    @pytest.mark.asyncio
+    async def test_static_options_unchanged(self) -> None:
+        wf = _make_workflow()
+        graph = _build_form_prompt_graph()
+        form_definition = {
+            "fields": [
+                {
+                    "type": "dropdown",
+                    "value_name": "region",
+                    "label": "Region",
+                    "options": {"source": "static", "values": [{"display_label": "US", "value": "us"}]},
+                }
+            ]
+        }
+        node = self._node(form_definition)
+
+        with patch(
+            "syntara.workflows.workflow_engine.form_prompt_mixin.workflow.execute_activity",
+            AsyncMock(return_value={"user_ids": [], "group_ids": []}),
+        ):
+            args = await wf._prepare_form_prompt_args(node, graph, node.parameters)
+
+        assert args[_FORM_DEFINITION_ARG] == form_definition
+
+    @pytest.mark.asyncio
+    async def test_mixed_static_and_dynamic_fields(self) -> None:
+        resolver = NamespaceResolver()
+        resolver.set_namespace("scan", {"output": {"choices": ["us"]}})
+        wf = _make_workflow(resolver=resolver)
+        graph = _build_form_prompt_graph()
+        static_field = {
+            "type": "dropdown",
+            "value_name": "static_region",
+            "label": "Static region",
+            "options": {"source": "static", "values": [{"display_label": "EU", "value": "eu"}]},
+        }
+        node = self._node(
+            {
+                "fields": [
+                    static_field,
+                    self._dynamic_field("multi_select", "regions", "${scan.output.choices}"),
+                ]
+            }
+        )
+
+        with patch(
+            "syntara.workflows.workflow_engine.form_prompt_mixin.workflow.execute_activity",
+            AsyncMock(return_value={"user_ids": [], "group_ids": []}),
+        ):
+            args = await wf._prepare_form_prompt_args(node, graph, wf._resolve_node_parameters(node))
+
+        fields = args[_FORM_DEFINITION_ARG]["fields"]
+        assert fields[0] == static_field
+        assert fields[1]["options"]["source"] == "resolved"
+
+    @pytest.mark.asyncio
+    async def test_two_dynamic_fields_from_different_nodes(self) -> None:
+        resolver = NamespaceResolver()
+        resolver.set_namespace("scan", {"output": {"choices": ["us"]}})
+        resolver.set_namespace("teams", {"output": {"choices": ["platform"]}})
+        wf = _make_workflow(resolver=resolver)
+        graph = _build_form_prompt_graph()
+        node = self._node(
+            {
+                "fields": [
+                    self._dynamic_field("dropdown", "region", "${scan.output.choices}"),
+                    self._dynamic_field("multi_select", "team", "${teams.output.choices}"),
+                ]
+            }
+        )
+
+        with patch(
+            "syntara.workflows.workflow_engine.form_prompt_mixin.workflow.execute_activity",
+            AsyncMock(return_value={"user_ids": [], "group_ids": []}),
+        ):
+            args = await wf._prepare_form_prompt_args(node, graph, wf._resolve_node_parameters(node))
+
+        fields = args[_FORM_DEFINITION_ARG]["fields"]
+        assert fields[0]["options"]["values"][0]["value"] == "us"
+        assert fields[1]["options"]["values"][0]["value"] == "platform"
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("upstream", ["not-a-list", []])
+    async def test_malformed_upstream_fails_before_any_activity(self, upstream: object) -> None:
+        resolver = NamespaceResolver()
+        resolver.set_namespace("scan", {"output": {"choices": upstream}})
+        wf = _make_workflow(resolver=resolver)
+        graph = _build_form_prompt_graph()
+        node = self._node({"fields": [self._dynamic_field("dropdown", "region", "${scan.output.choices}")]})
+        mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
+
+        with (
+            patch("syntara.workflows.workflow_engine.form_prompt_mixin.workflow.execute_activity", mock_execute),
+            pytest.raises(SafeValueError, match="region"),
+        ):
+            await wf._prepare_form_prompt_args(node, graph, wf._resolve_node_parameters(node))
+
+        mock_execute.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_default_not_in_resolved_list_fails_before_activity(self) -> None:
+        resolver = NamespaceResolver()
+        resolver.set_namespace("scan", {"output": {"choices": ["us"]}})
+        wf = _make_workflow(resolver=resolver)
+        graph = _build_form_prompt_graph()
+        node = self._node(
+            {
+                "fields": [
+                    {
+                        **self._dynamic_field("dropdown", "region", "${scan.output.choices}"),
+                        "default": "emea",
+                    }
+                ]
+            }
+        )
+        mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
+
+        with (
+            patch("syntara.workflows.workflow_engine.form_prompt_mixin.workflow.execute_activity", mock_execute),
+            pytest.raises(SafeValueError, match="default value 'emea'"),
+        ):
+            await wf._prepare_form_prompt_args(node, graph, wf._resolve_node_parameters(node))
+
+        mock_execute.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_node_parameters_not_mutated(self) -> None:
+        resolver = NamespaceResolver()
+        resolver.set_namespace("scan", {"output": {"choices": ["us"]}})
+        wf = _make_workflow(resolver=resolver)
+        graph = _build_form_prompt_graph()
+        node = self._node({"fields": [self._dynamic_field("dropdown", "region", "${scan.output.choices}")]})
+        before = copy.deepcopy(node.parameters)
+
+        with patch(
+            "syntara.workflows.workflow_engine.form_prompt_mixin.workflow.execute_activity",
+            AsyncMock(return_value={"user_ids": [], "group_ids": []}),
+        ):
+            await wf._prepare_form_prompt_args(node, graph, wf._resolve_node_parameters(node))
+
+        assert node.parameters == before
+
+    @pytest.mark.asyncio
+    async def test_missing_namespace_fails_at_resolution(self) -> None:
+        wf = _make_workflow()
+        node = self._node({"fields": [self._dynamic_field("dropdown", "region", "${nope.output.choices}")]})
+
+        with pytest.raises(KeyError, match='Step "nope" was not found'):
+            wf._resolve_node_parameters(node)
+
+
+class TestMalformedOptionsContinueOnFailure:
+    """Malformed options use the existing form-prompt fallback failure path."""
+
+    @pytest.mark.asyncio
+    async def test_malformed_options_with_cof_routes_to_fallback(self) -> None:
+        wf = _make_workflow()
+        graph = _build_form_prompt_graph()
+        node = ActivityNode("form1", "form_prompt", {"fallback_decision": "fallback"}, name="Form")
+        error = SafeValueError("Dynamic options for field 'region' expected a list")
+        wf.node_inputs[node.id] = node.parameters
+
+        wf._handle_node_failure(node.id, error, graph, continue_on_failure=True)
+        with patch.object(wf, "_schedule_successors", AsyncMock()):
+            await wf._handle_continued_failure(node.id, node, graph, {})
+
+        assert wf.node_control_data[node.id] == {"next_port": "fallback"}
+        assert "region" in wf.failed_nodes[node.id]
+        assert "region" in wf.resolver.get_namespace(node.id)["error"]
 
 
 class TestExecuteFormPromptNode:

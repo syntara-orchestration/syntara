@@ -187,22 +187,22 @@ function coerceField(field: FormField, raw: unknown): OptionScalar | Array<Optio
 
 type SelectFormField = Extract<FormField, { type: 'dropdown' }> | Extract<FormField, { type: 'multi_select' }>
 
-type SelectFormFieldWithStaticOptions = SelectFormField & {
-  options: Extract<SelectFormField['options'], { source: 'static' }>
+type SelectFormFieldWithOptionList = SelectFormField & {
+  options: Extract<SelectFormField['options'], { source: 'static' | 'resolved' }>
 }
 
-function isStaticOptions(field: FormField): field is SelectFormFieldWithStaticOptions {
+function hasOptionList(field: FormField): field is SelectFormFieldWithOptionList {
   if (field.type !== FormFieldTypeEnum.DROPDOWN && field.type !== FormFieldTypeEnum.MULTI_SELECT) {
     return false
   }
-  return field.options.source === 'static'
+  return field.options.source === 'static' || field.options.source === 'resolved'
 }
 
-function checkStaticOptionMembership(
-  field: SelectFormFieldWithStaticOptions,
+function checkOptionMembership(
+  field: SelectFormFieldWithOptionList,
   coerced: FormSubmissionData[string]
 ): FormFieldValidationError | null {
-  const validValues = new Set<string>(field.options.values.map((option) => option.value))
+  const validValues = new Set<OptionScalar>(field.options.values.map((option) => option.value))
 
   if (field.type === FormFieldTypeEnum.MULTI_SELECT) {
     if (!Array.isArray(coerced)) {
@@ -210,7 +210,7 @@ function checkStaticOptionMembership(
     }
     let invalidCount = 0
     for (const value of coerced) {
-      if (typeof value !== 'string' || !validValues.has(value)) {
+      if (!validValues.has(value)) {
         invalidCount += 1
       }
     }
@@ -225,7 +225,7 @@ function checkStaticOptionMembership(
     return null
   }
 
-  if (Array.isArray(coerced) || typeof coerced !== 'string' || !validValues.has(coerced)) {
+  if (Array.isArray(coerced) || !validValues.has(coerced)) {
     if (Array.isArray(coerced)) {
       return fieldError(field, 'type', 'Dropdown expects a single value, not a list')
     }
@@ -293,7 +293,7 @@ function validateFieldSubmission(field: FormField, submitted: FormSubmissionInpu
     return { status: 'invalid', error: fieldError(field, 'must_be_checked', 'This checkbox must be checked') }
   }
 
-  const optionError = isStaticOptions(field) ? checkStaticOptionMembership(field, coerced) : null
+  const optionError = hasOptionList(field) ? checkOptionMembership(field, coerced) : null
   if (optionError) {
     return { status: 'invalid', error: optionError }
   }

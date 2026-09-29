@@ -20,7 +20,7 @@ from syntara.aap.models.responses import AAPJobType as AAPJobType  # noqa: PLC04
 from syntara.core.constants import FieldLimits, WebhookLimits
 from syntara.core.exceptions import SafeValueError
 from syntara.core.utils.security import validate_css_security
-from syntara.forms.models.form_fields import FormDefinition
+from syntara.forms.models.form_fields import FormDefinition, ResolvedOptions
 from syntara.forms.validators.form_definition import validate_form_definition
 from syntara.workflows.json_schema_validation import validate_json_schema_definition
 from syntara.workflows.utils.iso8601_interval import parse_iso8601_repeating_interval
@@ -916,7 +916,14 @@ class FormPromptNodeParameters(BaseModel):
     @field_validator("form_definition", mode="after")
     @classmethod
     def validate_form_defaults(cls, v: FormDefinition) -> FormDefinition:
-        """Validate that field defaults are valid for their field types."""
+        """Validate defaults and reject engine-only option snapshots in authored workflows."""
+        for field in v.fields:
+            if isinstance(getattr(field, "options", None), ResolvedOptions):
+                msg = (
+                    f"Field '{field.value_name}': options source 'resolved' is produced by the "
+                    "workflow engine at run time and cannot be authored. Use 'static' or 'dynamic'."
+                )
+                raise SafeValueError(msg)
         validate_form_definition(v, form_id=None)
         return v
 

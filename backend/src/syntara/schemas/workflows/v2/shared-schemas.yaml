@@ -3077,11 +3077,13 @@ components:
           oneOf:
             - $ref: '#/components/schemas/StaticOptions'
             - $ref: '#/components/schemas/DynamicOptions'
+            - $ref: '#/components/schemas/ResolvedOptions'
           discriminator:
             propertyName: source
             mapping:
               static: '#/components/schemas/StaticOptions'
               dynamic: '#/components/schemas/DynamicOptions'
+              resolved: '#/components/schemas/ResolvedOptions'
         default:
           anyOf:
             - type: string
@@ -3135,11 +3137,13 @@ components:
           oneOf:
             - $ref: '#/components/schemas/StaticOptions'
             - $ref: '#/components/schemas/DynamicOptions'
+            - $ref: '#/components/schemas/ResolvedOptions'
           discriminator:
             propertyName: source
             mapping:
               static: '#/components/schemas/StaticOptions'
               dynamic: '#/components/schemas/DynamicOptions'
+              resolved: '#/components/schemas/ResolvedOptions'
         default:
           anyOf:
             - type: array
@@ -3217,3 +3221,56 @@ components:
             - type: string
             - type: 'null'
           title: Label Key
+
+    ResolvedOptions:
+      type: object
+      title: ResolvedOptions
+      description: |-
+        Dynamic options materialized into a concrete list at prompt creation.
+
+        Produced only by the workflow engine, never authored. A form prompt is
+        persisted with this shape so the responder view and submission membership
+        validation operate on the same snapshot.
+      additionalProperties: false
+      required:
+        - source
+        - values
+      properties:
+        source:
+          type: string
+          const: resolved
+          title: Source
+        values:
+          type: array
+          title: Values
+          minItems: 1
+          maxItems: 500
+          items:
+            $ref: '#/components/schemas/ResolvedOption'
+
+    ResolvedOption:
+      type: object
+      title: ResolvedOption
+      description: |-
+        An option materialized from upstream output while preserving its scalar type.
+
+        Python set membership considers ``1``, ``1.0``, and ``True`` equal. That
+        behavior is used by the backend's de-duplication and membership checks.
+        Static options remain strings because they are authored by a user.
+      additionalProperties: false
+      required:
+        - display_label
+        - value
+      properties:
+        display_label:
+          type: string
+          title: Display Label
+          minLength: 1
+          maxLength: 200
+        value:
+          anyOf:
+            - type: string
+            - type: integer
+            - type: number
+            - type: boolean
+          title: Value

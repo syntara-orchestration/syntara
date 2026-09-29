@@ -25,6 +25,14 @@ _DYNAMIC_OPTIONS: dict[str, Any] = {
     "expression": "${upstream.output}",
 }
 
+_RESOLVED_NUMERIC_OPTIONS: dict[str, Any] = {
+    "source": "resolved",
+    "values": [
+        {"display_label": "Five", "value": 5},
+        {"display_label": "Six", "value": 6},
+    ],
+}
+
 
 def _field(type_name: str, value_name: str, **overrides: Any) -> dict[str, Any]:  # noqa: ANN401
     """Build a field payload."""
@@ -351,7 +359,7 @@ class TestEmailField:
 
 
 class TestOptionMembership:
-    """Static option membership is enforced on dropdowns and multi-selects."""
+    """Static and resolved option membership is enforced on dropdowns and multi-selects."""
 
     def test_valid_dropdown_value(self) -> None:
         """A value from the option list passes."""
@@ -382,7 +390,7 @@ class TestOptionMembership:
         assert [(e.field, e.code) for e in errors] == [("picks", "not_in_options")]
 
     def test_dynamic_options_skip_membership_check(self) -> None:
-        """Membership is not enforced against unresolved dynamic options."""
+        """Membership is not enforced against an unresolved authoring definition."""
         form = _form(
             _field(
                 "dropdown",
@@ -392,3 +400,18 @@ class TestOptionMembership:
         )
 
         assert validate_form_submission(form, {"pick": "anything"}) == {"pick": "anything"}
+
+    @pytest.mark.parametrize("field_type", ["dropdown", "multi_select"])
+    def test_resolved_options_enforce_typed_membership(self, field_type: str) -> None:
+        """Resolved options preserve typed values and reject their string form."""
+        form = _form(_field(field_type, "pick", options=_RESOLVED_NUMERIC_OPTIONS))
+
+        accepted = validate_form_submission(form, {"pick": 5})
+        assert accepted["pick"] == ([5] if field_type == "multi_select" else 5)
+        if field_type == "multi_select":
+            assert isinstance(accepted["pick"][0], int)
+        else:
+            assert isinstance(accepted["pick"], int)
+
+        errors = _errors(form, {"pick": "5"})
+        assert [(error.field, error.code) for error in errors] == [("pick", "not_in_options")]

@@ -522,7 +522,10 @@ export interface components {
        */
       type: 'dropdown'
       /** Options */
-      options: components['schemas']['StaticOptions'] | components['schemas']['DynamicOptions']
+      options:
+        | components['schemas']['StaticOptions']
+        | components['schemas']['DynamicOptions']
+        | components['schemas']['ResolvedOptions']
       /** Default */
       default?: string | number | boolean | null
     }
@@ -550,7 +553,10 @@ export interface components {
        */
       type: 'multi_select'
       /** Options */
-      options: components['schemas']['StaticOptions'] | components['schemas']['DynamicOptions']
+      options:
+        | components['schemas']['StaticOptions']
+        | components['schemas']['DynamicOptions']
+        | components['schemas']['ResolvedOptions']
       /** Default */
       default?: (string | number | boolean)[] | null
     }
@@ -593,6 +599,37 @@ export interface components {
       value_key?: string | null
       /** Label Key */
       label_key?: string | null
+    }
+    /**
+     * ResolvedOptions
+     * @description Dynamic options materialized into a concrete list at prompt creation.
+     *
+     *     Produced only by the workflow engine, never authored. A form prompt is
+     *     persisted with this shape so the responder view and submission membership
+     *     validation operate on the same snapshot.
+     */
+    ResolvedOptions: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      source: 'resolved'
+      /** Values */
+      values: components['schemas']['ResolvedOption'][]
+    }
+    /**
+     * ResolvedOption
+     * @description An option materialized from upstream output while preserving its scalar type.
+     *
+     *     Python set membership considers ``1``, ``1.0``, and ``True`` equal. That
+     *     behavior is used by the backend's de-duplication and membership checks.
+     *     Static options remain strings because they are authored by a user.
+     */
+    ResolvedOption: {
+      /** Display Label */
+      display_label: string
+      /** Value */
+      value: string | number | boolean
     }
     /**
      * FormPromptSummary

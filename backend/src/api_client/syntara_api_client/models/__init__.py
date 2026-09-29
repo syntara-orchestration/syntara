@@ -283,6 +283,8 @@ __all__ = (
     "PublishWorkflowVersionResponseLabels",
     "RefreshResult",
     "ResetInternalMetricsStoreResponseResetInternalMetricsStore",
+    "ResolvedOption",
+    "ResolvedOptions",
     "ResourceActionsResponse",
     "ResourceActionsResponseResourceActions",
     "ResourcesResponseGroupDirectoryEntry",

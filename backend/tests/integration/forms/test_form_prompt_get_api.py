@@ -1,5 +1,6 @@
 """Integration tests for fetching one form prompt."""
 
+from collections.abc import Mapping
 from uuid import UUID, uuid4
 
 import pytest
@@ -22,6 +23,7 @@ async def _create_prompt(
     project_id: UUID,
     *,
     name: str = "Test form",
+    form_definition: dict[str, object] | None = None,
 ) -> FormPrompt:
     """Persist a form prompt for endpoint tests."""
     prompt = FormPrompt(
@@ -30,12 +32,21 @@ async def _create_prompt(
         prompt_node_id=f"form-{uuid4().hex[:8]}",
         temporal_activity_id="form-activity",
         name=name,
-        form_definition=_FORM_DEFINITION,
+        form_definition=form_definition or _FORM_DEFINITION,
     )
     session.add(prompt)
     await session.commit()
     await session.refresh(prompt)
     return prompt
+
+
+def _contains_key(value: object, key: str) -> bool:
+    """Return whether a nested JSON-like value contains a key."""
+    if isinstance(value, Mapping):
+        return key in value or any(_contains_key(child, key) for child in value.values())
+    if isinstance(value, list):
+        return any(_contains_key(child, key) for child in value)
+    return False
 
 
 def _controlled_authorizer(monkeypatch: pytest.MonkeyPatch, allowed_projects: set[str]) -> None:
@@ -85,6 +96,35 @@ class TestFormPromptGetAPI:
         }
         assert data["responder_users"] == []
         assert data["responder_groups"] == []
+
+    async def test_get_returns_resolved_options_without_authoring_expression(
+        self,
+        auth_client: AsyncClient,
+        test_db_session: AsyncSession,
+        test_project_id: UUID,
+    ) -> None:
+        prompt = await _create_prompt(
+            test_db_session,
+            test_project_id,
+            form_definition={
+                "fields": [
+                    {
+                        "value_name": "region_id",
+                        "type": "dropdown",
+                        "label": "Region",
+                        "options": {"source": "resolved", "values": [{"display_label": "US", "value": 1}]},
+                    }
+                ]
+            },
+        )
+
+        response = await auth_client.get(f"{FORM_PROMPTS_URL}/{prompt.id}")
+
+        assert response.status_code == 200
+        data = response.json()
+        options = data["form_definition"]["fields"][0]["options"]
+        assert options == {"source": "resolved", "values": [{"display_label": "US", "value": 1}]}
+        assert not _contains_key(data, "expression")
 
     async def test_get_form_prompt_not_found(self, auth_client: AsyncClient) -> None:
         response = await auth_client.get(f"{FORM_PROMPTS_URL}/{uuid4()}")

@@ -15,6 +15,8 @@ from syntara.forms.models.api_models import FormPromptStatus
 from syntara.forms.models.form_fields import (
     DropdownField,
     FormDefinition,
+    ResolvedOption,
+    ResolvedOptions,
     StaticOption,
     StaticOptions,
     TextField,
@@ -81,6 +83,32 @@ class TestFormPromptPersistence:
         # Deserialize back
         restored = FormPrompt.model_validate(data)
         assert restored.form_definition == form_definition
+
+    def test_resolved_typed_option_survives_jsonb_round_trip(self) -> None:
+        """A resolved option's scalar type survives JSON serialization and model loading."""
+        form_definition = FormDefinition(
+            fields=[
+                DropdownField(
+                    type="dropdown",
+                    value_name="region_id",
+                    label="Region",
+                    options=ResolvedOptions(
+                        source="resolved",
+                        values=[ResolvedOption(display_label="US", value=1)],
+                    ),
+                    default=1,
+                )
+            ]
+        )
+        prompt = create_test_form_prompt(form_definition=form_definition)
+
+        restored = FormPrompt.model_validate_json(prompt.model_dump_json())
+
+        field = restored.form_definition.fields[0]
+        assert isinstance(field, DropdownField)
+        assert isinstance(field.options, ResolvedOptions)
+        assert field.options.values[0].value == 1
+        assert type(field.options.values[0].value) is int
 
     def test_default_values_on_instantiation(self) -> None:
         """Test that default values are correctly applied on model instantiation."""
