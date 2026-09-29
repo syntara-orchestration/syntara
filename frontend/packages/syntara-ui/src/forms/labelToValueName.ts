@@ -21,7 +21,7 @@ function isAsciiLetterOrDigit(code: number): boolean {
 /**
  * Converts a human-readable label into a `value_name`-safe identifier (snake_case).
  */
-export function slugifyLabelToValueNameBase(label: string): string {
+export function slugifyLabelToValueNameBase(label: string, maxLength = FORM_FIELD_VALUE_NAME_MAX_LENGTH): string {
   const trimmed = label.trim().toLowerCase()
   if (trimmed.length === 0) {
     return 'field'
@@ -60,15 +60,19 @@ export function slugifyLabelToValueNameBase(label: string): string {
     result = `field_${result}`
   }
 
-  return result.slice(0, FORM_FIELD_VALUE_NAME_MAX_LENGTH)
+  return result.slice(0, maxLength)
 }
+
+/** Room for `_` plus a four-digit suffix when deduplicating value names. */
+const VALUE_NAME_SUFFIX_RESERVE = 5
 
 /**
  * Generates a unique `value_name` from a label, avoiding collisions with `takenNames`.
  */
 export function labelToValueName(label: string, takenNames: ReadonlyArray<string>): string {
   const taken = new Set(takenNames)
-  const base = slugifyLabelToValueNameBase(label)
+  const baseMax = FORM_FIELD_VALUE_NAME_MAX_LENGTH - VALUE_NAME_SUFFIX_RESERVE
+  const base = slugifyLabelToValueNameBase(label, baseMax)
   const candidate = isValidFormFieldValueName(base) ? base : 'field'
 
   if (!taken.has(candidate)) {
@@ -76,8 +80,12 @@ export function labelToValueName(label: string, takenNames: ReadonlyArray<string
   }
 
   for (let suffix = 2; suffix < 10_000; suffix += 1) {
-    const withSuffix = `${candidate}_${suffix}`.slice(0, FORM_FIELD_VALUE_NAME_MAX_LENGTH)
-    if (isValidFormFieldValueName(withSuffix) && !taken.has(withSuffix)) {
+    const withSuffix = `${candidate}_${suffix}`
+    if (
+      withSuffix.length <= FORM_FIELD_VALUE_NAME_MAX_LENGTH &&
+      isValidFormFieldValueName(withSuffix) &&
+      !taken.has(withSuffix)
+    ) {
       return withSuffix
     }
   }

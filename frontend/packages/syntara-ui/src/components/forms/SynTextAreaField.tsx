@@ -38,6 +38,10 @@ export type SynTextAreaFieldProps<
   placeholder?: string
   /** Number of visible text rows. */
   rows?: number
+  /** Controls which directions the textarea can be resized. Passed to PatternFly `TextArea`. */
+  resizeOrientation?: 'vertical' | 'horizontal' | 'both' | 'none'
+  /** Maximum number of characters the user may enter. */
+  maxLength?: number
   /** Disables the textarea. */
   isDisabled?: boolean
   /** Called after the field value changes (user input). */
@@ -74,6 +78,8 @@ export function SynTextAreaField<
   hint,
   placeholder,
   rows,
+  resizeOrientation,
+  maxLength,
   isDisabled,
   onValueChange,
 }: Readonly<SynTextAreaFieldProps<TFieldValues, TName>>) {
@@ -102,6 +108,8 @@ export function SynTextAreaField<
           onBlur={field.onBlur}
           name={field.name}
           rows={rows}
+          resizeOrientation={resizeOrientation}
+          maxLength={maxLength}
           isDisabled={isDisabled}
         />
       )}

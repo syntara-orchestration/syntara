@@ -28,6 +28,7 @@ with workflow.unsafe.imports_passed_through():
         DEFAULT_ACTIVITY_TIMEOUT_SECONDS,
         ENGINE_MAX_OUTPUT_BYTES_KEY,
         ENGINE_TIMEOUT_SECONDS_KEY,
+        INTERNAL_ACTIVITY_HEARTBEAT_TIMEOUT_SECONDS,
     )
     from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName
     from syntara.workflows.workflow_engine.node_settings_resolver import (
@@ -485,9 +486,14 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin, Workflo
                 )
             )
         except Exception:  # noqa: BLE001
+            # workflow.logger is a stdlib Logger, so structured fields must go
+            # through extra={}. A bare kwarg raises TypeError here, and because
+            # this runs inside the workflow, that failure fails the workflow task
+            # itself -- Temporal then retries the activation forever and the
+            # execution never leaves RUNNING. Ref: AAP-88614.
             workflow.logger.warning(
                 "Failed to cancel agentic invocations (best-effort)",
-                node_id=node_id,
+                extra={"node_id": node_id},
             )
 
     @staticmethod
@@ -1123,6 +1129,17 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin, Workflo
             args.extend(extra_args)
 
         retry_policy = resolve_retry_policy(node, self._runtime_settings)
+        # Temporal delivers cancellation to an activity only through its heartbeats,
+        # and only when the schedule carries a heartbeat_timeout -- otherwise the
+        # beats are dropped and cancelling the workflow leaves a long-running
+        # activity (the agent run) executing until start_to_close_timeout. Only
+        # internal activities heartbeat; giving the others a heartbeat timeout would
+        # fail them spuriously. Ref: AAP-88614.
+        heartbeat_timeout = (
+            timedelta(seconds=INTERNAL_ACTIVITY_HEARTBEAT_TIMEOUT_SECONDS)
+            if node_type == NodeType.INTERNAL_ACTIVITY
+            else None
+        )
         return cast(
             "dict[str, Any]",
             await workflow.execute_activity(
@@ -1130,6 +1147,7 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin, Workflo
                 args=args,
                 activity_id=node.id,
                 start_to_close_timeout=timedelta(seconds=timeout_seconds),
+                heartbeat_timeout=heartbeat_timeout,
                 retry_policy=retry_policy,
             ),
         )
@@ -1324,11 +1342,51 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin, Workflo
 
         if loop_type == LoopType.FOR_EACH:
             items = _parse_items(loop_parameters.get("items", []))
+            # Fail fast with an actionable message before ForEachLoopState's own
+            # (opaque) list validation, so a forEach whose items expression resolved
+            # to None or a non-list surfaces a clean, self-explanatory failure
+            # instead of a bare Pydantic ValidationError.
+            self._validate_foreach_items(node, items)
             return ForEachLoopState(items=items)
 
         condition = loop_parameters.get("condition")
         max_iterations = loop_parameters.get("max_iterations")
         return DoWhileLoopState(condition=condition, max_iterations=max_iterations)
+
+    @staticmethod
+    def _validate_foreach_items(node: ActivityNode, items: Any) -> None:  # noqa: ANN401
+        """Validate a forEach loop's resolved ``items`` before iterating.
+
+        Args:
+            node: The loop node being executed.
+            items: The resolved ``items`` value for the forEach loop.
+
+        Raises:
+            ApplicationError: If ``items`` resolved to ``None`` or a non-list value.
+                Always non-retryable — retrying will not change the resolved value; fix the
+                expression or the data it references.
+
+        """
+        if isinstance(items, list):
+            return
+
+        items_expression = node.parameters.get("items") or ""
+        if items is None:
+            msg = (
+                f"forEach loop items expression {items_expression!r} resolved to None. "
+                "Ensure the referenced trigger field or step output exists and resolves "
+                "to a list (empty lists are allowed). "
+                "Check the trigger payload or the output of the upstream step the expression references."
+            )
+        else:
+            max_repr = 300
+            raw = repr(items)
+            truncated = raw[:max_repr] + "…" if len(raw) > max_repr else raw
+            msg = (
+                f"forEach loop items expression {items_expression!r} must resolve to a list, "
+                f"got {type(items).__name__}: {truncated}"
+            )
+        raise ApplicationError(msg, type="ForEachItemsError", non_retryable=True)
 
     async def _execute_node(
         self,
@@ -1661,6 +1719,26 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin, Workflo
         if data is None:
             return None
         return self._scrub_data(data)
+
+    @workflow.update
+    async def get_activity_output_when_ready(self, activity_id: str) -> dict[str, Any]:
+        """Wait until activity output is stored in the resolver, then return it.
+
+        Unlike the ``get_activity_output`` query, this update handler blocks
+        inside the workflow until the resolver namespace is populated — eliminating
+        the race where Temporal emits ACTIVITY_TASK_COMPLETED before the workflow
+        loop stores the result.
+
+        If the namespace is not populated within 30 seconds (e.g. the workflow
+        errored without storing a result), ``wait_condition`` raises a Temporal
+        exception. The caller in ``_query_activity_io`` catches this via
+        ``except TemporalError`` and falls back to a sleep + query retry.
+        """
+        await workflow.wait_condition(
+            lambda: self.resolver.has_namespace(activity_id),
+            timeout=timedelta(seconds=30),
+        )
+        return self._scrub_data(self.resolver.get_namespace(activity_id))
 
     @workflow.query
     def get_skipped_nodes(self) -> list[str]:

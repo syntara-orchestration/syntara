@@ -98,7 +98,7 @@ async def create_credential(
         grace_period_seconds=request.grace_period_seconds,
         expires_at=request.expires_at,
     )
-    return service.to_create_response(credential, plaintext_secret)
+    return await service.to_create_response(credential, plaintext_secret)
 
 
 @router.get(
@@ -139,7 +139,7 @@ async def get_credential(
 ) -> ServiceAccountCredentialRead:
     """Get a credential by ID (secret is never included)."""
     credential = await service.get_credential(credential_id, service_account_id=service_account_id)
-    return service.to_read(credential)
+    return await service.to_read(credential)
 
 
 @router.delete(
@@ -180,7 +180,7 @@ async def rotate_credential(
         service_account_id=service_account_id,
         grace_period_seconds=request.grace_period_seconds,
     )
-    return service.to_rotate_response(credential, plaintext_secret)
+    return await service.to_rotate_response(credential, plaintext_secret)
 
 
 @router.post(
@@ -198,7 +198,7 @@ async def disable_credential(
 ) -> ServiceAccountCredentialRead:
     """Set a credential's status to disabled."""
     credential = await service.disable_credential(credential_id, service_account_id=service_account_id)
-    return service.to_read(credential)
+    return await service.to_read(credential)
 
 
 @router.post(
@@ -216,4 +216,4 @@ async def enable_credential(
 ) -> ServiceAccountCredentialRead:
     """Set a credential's status to active."""
     credential = await service.enable_credential(credential_id, service_account_id=service_account_id)
-    return service.to_read(credential)
+    return await service.to_read(credential)

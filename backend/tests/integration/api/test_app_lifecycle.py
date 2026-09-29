@@ -37,6 +37,8 @@ async def _test_lifespan_context(test_db_engine: AsyncEngine) -> AsyncGenerator[
         patch("syntara.core.database.session.AsyncSessionLocal", test_session_factory),
         patch("syntara.api.main.engine", test_db_engine),
         patch("syntara.api.main.AsyncSessionLocal", test_session_factory),
+        # The cached outbox worker must persist events to the test database for later API test drains.
+        patch("syntara.audit.outbox.worker.AsyncSessionLocal", test_session_factory),
         patch("syntara.audit.outbox.worker.AuditWorkerAsyncSessionLocal", test_session_factory),
         patch("syntara.api.main.RegoEvaluator", return_value=mock_evaluator),
     ):

@@ -225,8 +225,8 @@ describe('SynFormFieldBuilder', () => {
     renderBuilder(<SynFormFieldBuilder value={definition} onChange={vi.fn()} />)
     await user.click(screen.getByRole('button', { name: 'Add option' }))
 
-    expect(screen.getByRole('button', { name: 'Remove option 1' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Remove option 2' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Remove option 1 for Choice' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Remove option 2 for Choice' })).toBeInTheDocument()
   })
 
   describe('field defaults and options', () => {
@@ -247,10 +247,26 @@ describe('SynFormFieldBuilder', () => {
         fields: [{ type: FormFieldTypeEnum.CHECKBOX, value_name: 'agree', label: 'Agree', default: false }],
       })
       renderBuilder(<SynFormFieldBuilder value={definition} onChange={vi.fn()} />)
+      expect(screen.getByRole('textbox', { name: 'Checkbox label' })).toBeInTheDocument()
       const defaultChecked = screen.getByRole('checkbox', { name: /Default to checked/ })
       expect(defaultChecked).not.toBeChecked()
       await user.click(defaultChecked)
       expect(defaultChecked).toBeChecked()
+    })
+
+    it('shows checkbox preview with a single accessible name', async () => {
+      const user = userEvent.setup()
+      const definition = parseFormDefinition({
+        fields: [{ type: FormFieldTypeEnum.CHECKBOX, value_name: 'agree', label: 'Agree', required: true }],
+      })
+      renderBuilder(<SynFormFieldBuilder value={definition} onChange={vi.fn()} />)
+      await user.click(screen.getByRole('tab', { name: 'Preview' }))
+      const previewPanel = screen.getAllByRole('tabpanel').find((panel) => !panel.hasAttribute('hidden'))
+      if (!previewPanel) {
+        throw new Error('Expected visible preview tab panel')
+      }
+      const agree = within(previewPanel).getByRole('checkbox', { name: 'Agree' })
+      expect(agree).toBeRequired()
     })
 
     it('accepts number default input', async () => {
@@ -315,7 +331,7 @@ describe('SynFormFieldBuilder', () => {
       await user.clear(displayLabel)
       await user.type(displayLabel, 'First choice')
 
-      await user.click(screen.getByRole('button', { name: 'Remove option 2' }))
+      await user.click(screen.getByRole('button', { name: 'Remove option 2 for Choice' }))
       expect(screen.getAllByRole('textbox', { name: 'Display label' })).toHaveLength(1)
     })
 
@@ -339,9 +355,7 @@ describe('SynFormFieldBuilder', () => {
     await user.clear(valueNameInput)
     await user.type(valueNameInput, '1bad')
 
-    expect(
-      screen.getByText('Fix validation errors before changes are saved to the parent form.')
-    ).toBeInTheDocument()
+    expect(screen.getByText('Fix validation errors before changes are saved to the parent form.')).toBeInTheDocument()
     expect(onChange).not.toHaveBeenCalled()
   })
 

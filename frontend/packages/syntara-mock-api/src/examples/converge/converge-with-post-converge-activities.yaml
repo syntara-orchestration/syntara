@@ -1,5 +1,5 @@
 ---
-schema_version: "2.0.0"
+schema_version: '2.0.0'
 name: converge-post-activities-test
 description: Test converge with activities that execute after converge completes
 

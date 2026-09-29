@@ -16,7 +16,7 @@ from syntara.core.constants import FieldLimits
 
 # revision identifiers, used by Alembic.
 revision: str = "2a78b3c49c72"
-down_revision: str | Sequence[str] | None = "c4a7e1f93d21"
+down_revision: str | Sequence[str] | None = "d5b8c2f04e71"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

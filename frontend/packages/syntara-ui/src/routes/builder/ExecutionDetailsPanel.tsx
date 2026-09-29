@@ -1,6 +1,6 @@
 import { Alert, Divider, Flex, FlexItem, Stack, StackItem } from '@patternfly/react-core'
 import type { ExecutionsAPI } from '@syntara/contracts'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { executionsClient } from '../../client'
 import { FilterBar } from '../../components/filters/FilterBar'
@@ -127,12 +127,16 @@ function ThreePanelLayout({
       >
         <FlexItem className={styles.activityList}>
           {showFilters && (
-            <section className={styles.filterBarWrapper} aria-label="Activity filter">
+            <section
+              className={`${styles.filterBarWrapper} ${styles.filterBarWrapperInActivityList}`}
+              aria-label="Activity filter"
+            >
               <FilterBar
                 fieldDefinitions={ACTIVITY_FILTER_DEFINITIONS}
                 filters={filters}
                 onFilterChange={onFilterChange}
                 isCompact
+                className={styles.filterBar}
               />
             </section>
           )}
@@ -262,6 +266,7 @@ function SinglePanelLayout({
                 filters={filters}
                 onFilterChange={onFilterChange}
                 isCompact
+                className={styles.filterBar}
               />
             </section>
           </StackItem>
@@ -363,6 +368,17 @@ export function ExecutionDetailsPanel({
       onNodeSelect,
     })
 
+  const handleViewModeChange = useCallback(
+    (mode: ViewMode) => {
+      setViewMode(mode)
+      if (mode === 'details' && effectiveKey === null && filteredActivityOrder.length > 0) {
+        const first = filteredActivityOrder[0]
+        handleRowClick(first.id, first.name ?? first.id)
+      }
+    },
+    [effectiveKey, filteredActivityOrder, handleRowClick]
+  )
+
   const queryState = useQueryState(executionQuery, {
     title: 'Error loading execution',
     onRetry: () => detachPromise(executionQuery.refetch()),
@@ -391,7 +407,7 @@ export function ExecutionDetailsPanel({
         selectedNodeState={selectedNodeState}
         selectedNodeType={selectedNodeType}
         viewMode={viewMode}
-        onViewModeChange={setViewMode}
+        onViewModeChange={handleViewModeChange}
         onRowClick={handleRowClick}
         headerLabel={headerLabel}
         onClosePanel={onClosePanel}
@@ -413,7 +429,7 @@ export function ExecutionDetailsPanel({
       onFilterChange={handleFilterChange}
       now={now}
       viewMode={viewMode}
-      onViewModeChange={setViewMode}
+      onViewModeChange={handleViewModeChange}
       onRowClick={handleRowClick}
       selectedNodeId={resolvedNodeId}
       headerLabel={headerLabel}

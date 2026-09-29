@@ -98,7 +98,7 @@ jobs:
           # not skip screenshot generation entirely. Handle that explicitly
           # rather than relying on an empty $SCOPE_LINE producing an empty
           # --grep pattern that happens to match everything.
-          if ! SCOPE_LINE=$(printf '%s\n' "$CHANGED" | npm exec tsx -- scripts/scope-visual-regression.ts); then
+          if ! SCOPE_LINE=$(printf '%s\n' "$CHANGED" | npm exec tsx -- scripts/visual-regression/scope-visual-regression.ts); then
             echo "::warning::scope-visual-regression.ts failed; falling back to a full run"
             echo "result=FULL" >> "$GITHUB_OUTPUT"
             exit 0
@@ -147,7 +147,7 @@ jobs:
         id: filter-noise
         if: always() && steps.checkout.outcome != 'failure' && steps.screenshots.outcome != 'skipped'
         working-directory: frontend/packages/syntara-ui
-        run: npm exec tsx -- scripts/filter-noisy-baseline-diffs.ts
+        run: npm exec tsx -- scripts/visual-regression/filter-noisy-baseline-diffs.ts
 
       - name: Detect changed baselines
         id: detect

@@ -19,13 +19,19 @@ type DraggableTreeLeafProps = {
    * highlighting, similar to `label`.
    */
   secondaryText?: ReactNode
-  onDragStart: (e: React.DragEvent) => void
+  onDragStart?: (e: React.DragEvent) => void
+  draggable?: boolean
 }
 
-export function DraggableTreeLeaf({ label, secondaryText, onDragStart }: Readonly<DraggableTreeLeafProps>) {
+export function DraggableTreeLeaf({
+  label,
+  secondaryText,
+  onDragStart,
+  draggable = true,
+}: Readonly<DraggableTreeLeafProps>) {
   return (
     // eslint-disable-next-line jsx-a11y/no-static-element-interactions -- drag source; keyboard copy via CopyExpressionAction
-    <div draggable="true" onDragStart={onDragStart} className={styles.dragContainer}>
+    <div draggable={draggable} onDragStart={onDragStart} className={styles.dragContainer}>
       <Label isCompact color="grey">
         {label}
       </Label>

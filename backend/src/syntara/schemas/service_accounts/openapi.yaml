@@ -871,14 +871,18 @@ components:
             - type: 'null'
           title: Last Authenticated At
         created_by:
-          type: string
-          format: uuid
+          anyOf:
+            - $ref: "../base/shared-resources.openapi.yaml#/components/schemas/UserReference"
+            - type: "null"
+          description: User who created the service account
+          readOnly: true
           title: Created By
         updated_by:
           anyOf:
-            - type: string
-              format: uuid
-            - type: 'null'
+            - $ref: "../base/shared-resources.openapi.yaml#/components/schemas/UserReference"
+            - type: "null"
+          description: User who last modified the service account
+          readOnly: true
           title: Updated By
         created_at:
           type: string
@@ -899,7 +903,6 @@ components:
         - name
         - status
         - project_id
-        - created_by
         - created_at
         - updated_at
       title: ServiceAccountRead
@@ -1014,14 +1017,18 @@ components:
             - type: 'null'
           title: Old Secret Valid Until
         created_by:
-          type: string
-          format: uuid
+          anyOf:
+            - $ref: "../base/shared-resources.openapi.yaml#/components/schemas/UserReference"
+            - type: "null"
+          description: User who created the credential
+          readOnly: true
           title: Created By
         updated_by:
           anyOf:
-            - type: string
-              format: uuid
-            - type: 'null'
+            - $ref: "../base/shared-resources.openapi.yaml#/components/schemas/UserReference"
+            - type: "null"
+          description: User who last modified the credential
+          readOnly: true
           title: Updated By
         created_at:
           type: string
@@ -1039,7 +1046,6 @@ components:
         - identifier
         - status
         - grace_period_seconds
-        - created_by
         - created_at
         - updated_at
       title: ServiceAccountCredentialRead
@@ -1083,14 +1089,18 @@ components:
             - type: 'null'
           title: Old Secret Valid Until
         created_by:
-          type: string
-          format: uuid
+          anyOf:
+            - $ref: "../base/shared-resources.openapi.yaml#/components/schemas/UserReference"
+            - type: "null"
+          description: User who created the credential
+          readOnly: true
           title: Created By
         updated_by:
           anyOf:
-            - type: string
-              format: uuid
-            - type: 'null'
+            - $ref: "../base/shared-resources.openapi.yaml#/components/schemas/UserReference"
+            - type: "null"
+          description: User who last modified the credential
+          readOnly: true
           title: Updated By
         created_at:
           type: string
@@ -1114,7 +1124,6 @@ components:
         - identifier
         - status
         - grace_period_seconds
-        - created_by
         - created_at
         - updated_at
       title: ServiceAccountCredentialCreateResponse
@@ -1171,14 +1180,18 @@ components:
             - type: 'null'
           title: Old Secret Valid Until
         created_by:
-          type: string
-          format: uuid
+          anyOf:
+            - $ref: "../base/shared-resources.openapi.yaml#/components/schemas/UserReference"
+            - type: "null"
+          description: User who created the credential
+          readOnly: true
           title: Created By
         updated_by:
           anyOf:
-            - type: string
-              format: uuid
-            - type: 'null'
+            - $ref: "../base/shared-resources.openapi.yaml#/components/schemas/UserReference"
+            - type: "null"
+          description: User who last modified the credential
+          readOnly: true
           title: Updated By
         created_at:
           type: string
@@ -1202,7 +1215,6 @@ components:
         - identifier
         - status
         - grace_period_seconds
-        - created_by
         - created_at
         - updated_at
       title: ServiceAccountCredentialRotateResponse

@@ -20,12 +20,9 @@ _STATIC_OPTIONS: dict[str, Any] = {
 # "email" is excluded: it adds a format check on top (see TestEmailField).
 _STRING_FIELD_TYPES = ["text", "textarea", "masked_text"]
 
-_NUMERIC_OPTIONS: dict[str, Any] = {
-    "source": "static",
-    "values": [
-        {"display_label": "Five", "value": 5},
-        {"display_label": "Six", "value": 6},
-    ],
+_DYNAMIC_OPTIONS: dict[str, Any] = {
+    "source": "dynamic",
+    "expression": "${upstream.output}",
 }
 
 
@@ -252,9 +249,9 @@ class TestCoercion:
         assert [e.code for e in errors] == ["type"]
 
     @pytest.mark.parametrize("field_type", ["dropdown", "multi_select"])
-    def test_int_accepted_and_not_normalized(self, field_type: str) -> None:
-        """Both option field types accept a bare int and preserve it as an int."""
-        form = _form(_field(field_type, "pick", options=_NUMERIC_OPTIONS))
+    def test_dynamic_int_accepted_and_not_normalized(self, field_type: str) -> None:
+        """Both dynamic option field types preserve submitted ints."""
+        form = _form(_field(field_type, "pick", options=_DYNAMIC_OPTIONS))
 
         cleaned = validate_form_submission(form, {"pick": 5})
 
@@ -263,9 +260,9 @@ class TestCoercion:
         assert isinstance(value, int)
 
     @pytest.mark.parametrize("field_type", ["dropdown", "multi_select"])
-    def test_float_matches_int_option(self, field_type: str) -> None:
-        """A float submission matches an int option, since 5.0 == 5."""
-        form = _form(_field(field_type, "pick", options=_NUMERIC_OPTIONS))
+    def test_dynamic_float_preserves_type(self, field_type: str) -> None:
+        """Both dynamic option field types preserve submitted floats."""
+        form = _form(_field(field_type, "pick", options=_DYNAMIC_OPTIONS))
 
         cleaned = validate_form_submission(form, {"pick": 5.0})
 

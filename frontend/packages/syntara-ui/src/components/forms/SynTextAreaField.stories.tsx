@@ -24,6 +24,7 @@ function TextAreaFieldDemo({
   placeholder,
   rows,
   showError,
+  resizeOrientation,
 }: {
   name: keyof StoryFormData
   label: string
@@ -33,6 +34,7 @@ function TextAreaFieldDemo({
   placeholder?: string
   rows?: number
   showError?: boolean
+  resizeOrientation?: 'vertical' | 'horizontal' | 'both' | 'none'
 }) {
   const form = useSynForm({
     schema,
@@ -53,6 +55,7 @@ function TextAreaFieldDemo({
           hint={hint}
           rows={rows}
           isDisabled={isDisabled}
+          resizeOrientation={resizeOrientation}
         />
       </SynForm>
       {showError && (
@@ -111,5 +114,18 @@ export const WithHint: Story = {
 export const Disabled: Story = {
   render: () => (
     <TextAreaFieldDemo name="description" label="Description" isDisabled placeholder="Enter description" rows={3} />
+  ),
+}
+
+/** Vertically resizable textarea — drag the bottom edge to resize. */
+export const VerticallyResizable: Story = {
+  render: () => (
+    <TextAreaFieldDemo
+      name="description"
+      label="Description"
+      placeholder="Enter description"
+      rows={10}
+      resizeOrientation="vertical"
+    />
   ),
 }

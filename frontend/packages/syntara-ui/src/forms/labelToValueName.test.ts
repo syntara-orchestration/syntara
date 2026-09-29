@@ -37,4 +37,12 @@ describe('labelToValueName', () => {
   it('allocates higher suffixes when lower ones are taken', () => {
     expect(labelToValueName('Tier', ['tier', 'tier_2'])).toBe('tier_3')
   })
+
+  it('reserves room for numeric suffixes when the base is near max length', () => {
+    const nearMax = 'a'.repeat(59)
+    const unique = labelToValueName(nearMax, [nearMax])
+    expect(unique).toBe(`${nearMax}_2`)
+    expect(unique.length).toBeLessThanOrEqual(64)
+    expect(unique).not.toBe(nearMax)
+  })
 })

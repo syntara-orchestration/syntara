@@ -665,5 +665,5 @@ export function useExecutionWithLiveStatus<T extends ExecutionRead | undefined>(
     ...data,
     status: liveStatus,
     approval_pending: liveApprovalPending ?? data.approval_pending,
-  } as T
+  }
 }

@@ -6,7 +6,7 @@ import { FormFieldTypeEnum } from './formFieldTypeEnum'
 import { jsonSchemaStringToFormDefinition, jsonSchemaToFormDefinition } from './jsonSchemaToFormDefinition'
 
 describe('jsonSchemaToFormDefinition', () => {
-  it('round-trips field defaults and numeric dropdown enums', () => {
+  it('round-trips field defaults and string static dropdown options', () => {
     const original = parseFormDefinition({
       fields: [
         { type: FormFieldTypeEnum.TEXT, value_name: 'title', label: 'Title', default: 'preset' },
@@ -17,12 +17,12 @@ describe('jsonSchemaToFormDefinition', () => {
           type: FormFieldTypeEnum.DROPDOWN,
           value_name: 'tier',
           label: 'Tier',
-          default: 2,
+          default: '2',
           options: {
             source: 'static',
             values: [
-              { display_label: 'One', value: 1 },
-              { display_label: 'Two', value: 2 },
+              { display_label: 'One', value: '1' },
+              { display_label: 'Two', value: '2' },
             ],
           },
         },
@@ -43,10 +43,34 @@ describe('jsonSchemaToFormDefinition', () => {
     const tier = fields[4]
     expect(tier?.type).toBe(FormFieldTypeEnum.DROPDOWN)
     if (tier?.type === FormFieldTypeEnum.DROPDOWN) {
-      expect(tier.default).toBe(2)
+      expect(tier.default).toBe('2')
       if (tier.options.source === 'static') {
-        expect(tier.options.values.map((option) => option.value)).toEqual([1, 2])
+        expect(tier.options.values.map((option) => option.value)).toEqual(['1', '2'])
       }
+    }
+  })
+
+  it('coerces numeric JSON Schema enums to string static option values on import', () => {
+    const imported = jsonSchemaToFormDefinition({
+      type: 'object',
+      properties: {
+        tier: { type: 'integer', enum: [1, 2], default: 2, title: 'Tier' },
+      },
+      required: [],
+      additionalProperties: false,
+    })
+    expect(imported.success).toBe(true)
+    if (!imported.success) {
+      return
+    }
+    const tier = imported.data.fields[0]
+    expect(tier?.type).toBe(FormFieldTypeEnum.DROPDOWN)
+    if (tier?.type === FormFieldTypeEnum.DROPDOWN && tier.options.source === 'static') {
+      expect(tier.options.values).toEqual([
+        { display_label: '1', value: '1' },
+        { display_label: '2', value: '2' },
+      ])
+      expect(tier.default).toBe('2')
     }
   })
 
@@ -131,6 +155,31 @@ describe('jsonSchemaToFormDefinition', () => {
   it('rejects schemas without properties', () => {
     const result = jsonSchemaToFormDefinition({ type: 'object' })
     expect(result.success).toBe(false)
+  })
+
+  it('round-trips email fields with format preserved', () => {
+    const original = parseFormDefinition({
+      fields: [{ type: FormFieldTypeEnum.EMAIL, value_name: 'contact', label: 'Contact', default: 'a@b.co' }],
+    })
+    const schema = formDefinitionToJsonSchema(original)
+    expect(schema.properties.contact?.format).toBe('email')
+    const imported = jsonSchemaToFormDefinition(schema)
+    expect(imported.success).toBe(true)
+    if (imported.success) {
+      expect(imported.data.fields[0]?.type).toBe(FormFieldTypeEnum.EMAIL)
+      expect(imported.data.fields[0]?.default).toBe('a@b.co')
+    }
+  })
+
+  it('round-trips __proto__ as a normal value_name key', () => {
+    const original = parseFormDefinition({
+      fields: [{ type: FormFieldTypeEnum.TEXT, value_name: '__proto__', label: 'Prototype key' }],
+    })
+    const imported = jsonSchemaToFormDefinition(formDefinitionToJsonSchema(original))
+    expect(imported.success).toBe(true)
+    if (imported.success) {
+      expect(imported.data.fields[0]?.value_name).toBe('__proto__')
+    }
   })
 
   it('imports string field variants without enum', () => {

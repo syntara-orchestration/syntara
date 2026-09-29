@@ -7,7 +7,7 @@ function assertAssignmentId(data: unknown): string {
     data !== null &&
     typeof data === 'object' &&
     'id' in data &&
-    typeof (data as { id: unknown }).id === 'string' &&
+    typeof data.id === 'string' &&
     (data as { id: string }).id.length > 0
   ) {
     return (data as { id: string }).id

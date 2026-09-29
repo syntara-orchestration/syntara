@@ -48,8 +48,8 @@ test.describe('Credential Detail Edge Cases', () => {
       await expect(dialog.getByText('Disable credential?')).toBeVisible()
       await expect(dialog.getByText(/Unable to check which workflows use this credential/)).toBeVisible()
 
-      await expect(dialog.getByRole('button', { name: 'Disable' })).toBeVisible()
-      await expect(dialog.getByRole('button', { name: 'Disable' })).toBeEnabled()
+      await expect(dialog.getByRole('button', { name: 'Disable credential' })).toBeVisible()
+      await expect(dialog.getByRole('button', { name: 'Disable credential' })).toBeEnabled()
     } finally {
       await app.unroute('**/api/v1/credentials/*/workflows')
       await deleteCredentialByName(app, name)
@@ -80,8 +80,8 @@ test('integration fetch error in disable dialog shows warning', async ({ app }) 
     await expect(dialog.getByText('Disable credential?')).toBeVisible()
     await expect(dialog.getByText(/Unable to check which integrations use this credential/)).toBeVisible()
 
-    await expect(dialog.getByRole('button', { name: 'Disable' })).toBeVisible()
-    await expect(dialog.getByRole('button', { name: 'Disable' })).toBeEnabled()
+    await expect(dialog.getByRole('button', { name: 'Disable credential' })).toBeVisible()
+    await expect(dialog.getByRole('button', { name: 'Disable credential' })).toBeEnabled()
   } finally {
     await app.unroute('**/api/v1/integrations*')
     await deleteCredentialByName(app, name)

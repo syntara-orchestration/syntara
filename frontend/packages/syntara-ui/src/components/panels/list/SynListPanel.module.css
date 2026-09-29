@@ -12,7 +12,6 @@
 }
 
 .toolbarDisabled {
-  opacity: var(--syntara-disabled-opacity);
   cursor: not-allowed;
 }
 

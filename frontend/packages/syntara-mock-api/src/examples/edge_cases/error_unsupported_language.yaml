@@ -1,5 +1,5 @@
 ---
-schema_version: "2.0.0"
+schema_version: '2.0.0'
 name: error-unsupported-language
 description: Test error when task uses unsupported script language
 

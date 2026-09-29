@@ -1,8 +1,20 @@
 import { describe, expect, it } from 'vitest'
 
-import { buildAssignmentBody, principalTypeDisplay, principalTypeLabel, RolePrincipalType } from './RoleAssignmentTypes'
+import {
+  buildAssignmentBody,
+  principalTypeDisplay,
+  principalTypeLabel,
+  RoleAssignmentScope,
+  RolePrincipalType,
+} from './RoleAssignmentTypes'
 
 describe('RoleAssignmentTypes', () => {
+  describe('RoleAssignmentScope', () => {
+    it('defines system and project API scope values', () => {
+      expect(RoleAssignmentScope).toEqual({ SYSTEM: 'system', PROJECT: 'project' })
+    })
+  })
+
   describe('principalTypeDisplay', () => {
     it('maps user principal type to teal User label', () => {
       expect(principalTypeDisplay[RolePrincipalType.USER]).toEqual({ text: 'User', color: 'teal' })

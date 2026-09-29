@@ -21,17 +21,24 @@ if TYPE_CHECKING:
     from syntara.core.models import User
 
 from syntara.audit.dispatcher import AuditEventDispatcher
-from syntara.core.models.user_reference import UserReference
-from syntara.core.services.base import BaseService
-from syntara.forms.audit.form_prompt import FormPromptSubmittedEvent
+from syntara.core.models.user_reference import UserReference, UserReferenceType
+from syntara.core.services import BaseService, GroupMembershipService
+from syntara.core.services.user_reference_resolution import DELETED_USER_NAME
+from syntara.forms.audit.form_prompt import (
+    FormPromptCreatedEvent,
+    FormPromptExpiredEvent,
+    FormPromptSubmittedEvent,
+)
 from syntara.forms.exceptions import (
     FormPromptAlreadyRequestedError,
     FormPromptAlreadyRespondedError,
+    FormPromptNotAuthorizedError,
     FormPromptNotFoundError,
     InvalidResponderReferenceError,
 )
 from syntara.forms.models.api_models import (
     BatchFormPromptRequest,
+    BatchFormPromptUpdate,
     BatchUpdateResponse,
     BatchUpdateResult,
     FormPromptCreateRequest,
@@ -74,6 +81,70 @@ class FormPromptService(BaseService):
         """
         super().__init__(session=session, user=user)
 
+    async def _get_form_prompt_record(self, prompt_id: UUID) -> FormPrompt | None:
+        """Fetch a prompt with relationships required by ``FormPromptRead`` eagerly loaded."""
+        query = (
+            select(FormPrompt)
+            .where(FormPrompt.id == prompt_id)
+            .options(
+                selectinload(FormPrompt.responder),  # type: ignore[arg-type]
+                selectinload(FormPrompt.responder_user_records),  # type: ignore[arg-type]
+                selectinload(FormPrompt.responder_group_records),  # type: ignore[arg-type]
+            )
+        )
+        result = await self.session.exec(query)
+        return result.one_or_none()
+
+    async def _validate_responder(self, prompt: FormPrompt) -> None:
+        """Ensure the current user is configured to respond to this prompt."""
+        responder_users = prompt.responder_user_records
+        responder_groups = prompt.responder_group_records
+
+        # Empty responder lists preserve the permission-based fallback.
+        if not responder_users and not responder_groups:
+            return
+
+        if self.user.id in {responder.id for responder in responder_users}:
+            return
+
+        if responder_groups and await GroupMembershipService(self.session).is_user_in_any_group_by_ids(
+            user_id=self.user.id,
+            group_ids=[group.id for group in responder_groups],
+        ):
+            return
+
+        raise FormPromptNotAuthorizedError(prompt.id, self.user.id)
+
+    @staticmethod
+    def _to_read_model(prompt: FormPrompt, *, signal_delivery_error: str | None = None) -> FormPromptRead:
+        """Convert a prompt with loaded relationships to its API response model."""
+        read = FormPromptRead.model_validate(
+            prompt.model_dump(
+                exclude={
+                    "responded_by",
+                    "responder_user_records",
+                    "responder_group_records",
+                    "responder",
+                    "temporal_activity_id",
+                }
+            )
+        )
+        read.responder_users = [
+            ResponderUserSummary(id=user.id, username=user.username) for user in prompt.responder_user_records
+        ]
+        read.responder_groups = [
+            ResponderGroupSummary(id=group.id, name=group.name) for group in prompt.responder_group_records
+        ]
+        if prompt.responded_by is not None:
+            responder = prompt.responder
+            read.responded_by = (
+                UserReference(id=prompt.responded_by, name=responder.display_name, type=UserReferenceType.USER)
+                if responder is not None
+                else UserReference(id=prompt.responded_by, name=DELETED_USER_NAME, type=UserReferenceType.DELETED_USER)
+            )
+        read.signal_delivery_error = signal_delivery_error
+        return read
+
     def _map_fk_error_to_domain_exception(
         self,
         error_str: str,
@@ -106,13 +177,14 @@ class FormPromptService(BaseService):
 
         return None
 
-    async def _validate_execution_project(self, request: FormPromptCreateRequest) -> None:
+    async def _validate_execution_project(self, request: FormPromptCreateRequest) -> Execution:
         execution = await self.session.get(Execution, request.execution_id)
         if execution is None:
             raise ExecutionNotFoundError(request.execution_id)
         if execution.project_id != request.project_id:
             msg = f"project_id {request.project_id} does not match execution's project {execution.project_id}"
             raise ValueError(msg)
+        return execution
 
     async def create(self, request: FormPromptCreateRequest) -> FormPromptSummary:
         """Create a new form prompt.
@@ -127,7 +199,7 @@ class FormPromptService(BaseService):
             FormPromptAlreadyRequestedError: If a prompt for this already exists
 
         """
-        await self._validate_execution_project(request)
+        execution = await self._validate_execution_project(request)
 
         try:
             # Create the prompt
@@ -166,6 +238,22 @@ class FormPromptService(BaseService):
                         group_id=group_id,
                     )
                     self.session.add(responder_group)
+
+            # Stage the business audit record in this transaction so the prompt
+            # and its lifecycle event commit or roll back together.
+            AuditEventDispatcher.dispatch(
+                FormPromptCreatedEvent(
+                    prompt_id=form_prompt.id,
+                    workflow_id=execution.workflow_id,
+                    execution_id=request.execution_id,
+                    prompt_node_id=request.prompt_node_id,
+                    initiated_by=execution.created_by,
+                    created_at=form_prompt.created_at,
+                ),
+                # AuditEventDispatcher is typed for sync Session; the transactional outbox only calls
+                # add(), which AsyncSession also supports synchronously.
+                session=self.session,  # type: ignore[arg-type]
+            )
 
             await self.session.commit()
 
@@ -250,39 +338,87 @@ class FormPromptService(BaseService):
             FormPromptNotFoundError: If the form prompt does not exist
 
         """
-        query = (
-            select(FormPrompt)
-            .where(FormPrompt.id == prompt_id)
-            .options(
-                selectinload(FormPrompt.responder),  # type: ignore[arg-type]
-                selectinload(FormPrompt.responder_user_records),  # type: ignore[arg-type]
-                selectinload(FormPrompt.responder_group_records),  # type: ignore[arg-type]
-            )
-        )
-        result = await self.session.exec(query)
-        form_prompt = result.one_or_none()
+        form_prompt = await self._get_form_prompt_record(prompt_id)
         if form_prompt is None:
             raise FormPromptNotFoundError(prompt_id)
+        return self._to_read_model(form_prompt)
 
-        read = FormPromptRead.model_validate(
-            form_prompt.model_dump(
-                exclude={"responded_by", "responder_user_records", "responder_group_records", "responder"}
+    async def _apply_prompt_status_update(
+        self,
+        update_request: BatchFormPromptUpdate,
+        prompt: FormPrompt | None,
+        execution: Execution | None,
+    ) -> tuple[BatchUpdateResult, bool, FormPromptExpiredEvent | None]:
+        """Apply one guarded status transition and build its expiry event if changed."""
+        if prompt is None:
+            return (
+                BatchUpdateResult(
+                    prompt_id=str(update_request.prompt_id), success=False, error="Form prompt not found"
+                ),
+                False,
+                None,
             )
+
+        target_status_value = update_request.status.value
+        if prompt.status == target_status_value:
+            return (
+                BatchUpdateResult(
+                    prompt_id=str(update_request.prompt_id),
+                    success=True,
+                    message=f"Already {target_status_value}",
+                ),
+                True,
+                None,
+            )
+
+        current_status = FormPromptStatus(prompt.status)
+        target_status = FormPromptStatus(target_status_value)
+        if not can_transition(current_status, target_status):
+            return (
+                BatchUpdateResult(
+                    prompt_id=str(update_request.prompt_id),
+                    success=False,
+                    error=f"Cannot transition from {current_status.value} to {target_status.value}",
+                ),
+                False,
+                None,
+            )
+
+        update_values: dict[str, Any] = {"status": target_status}
+        if update_request.notes is not None:
+            update_values["notes"] = update_request.notes
+        stmt = (
+            update(FormPrompt)
+            .where(FormPrompt.id == update_request.prompt_id)  # type: ignore[arg-type]
+            .where(FormPrompt.status == current_status)  # type: ignore[arg-type]
+            .values(**update_values)
         )
-        read.responder_users = [
-            ResponderUserSummary(id=user.id, username=user.username) for user in form_prompt.responder_user_records
-        ]
-        read.responder_groups = [
-            ResponderGroupSummary(id=group.id, name=group.name) for group in form_prompt.responder_group_records
-        ]
-        if form_prompt.responded_by is not None:
-            responder = form_prompt.responder
-            read.responded_by = UserReference(
-                id=form_prompt.responded_by,
-                name=responder.display_name if responder is not None else "",
+        update_result = await self.session.exec(stmt)
+        if update_result.rowcount == 0:
+            return (
+                BatchUpdateResult(
+                    prompt_id=str(update_request.prompt_id),
+                    success=False,
+                    error=f"Status changed (was {current_status.value}, concurrent update detected)",
+                ),
+                False,
+                None,
             )
 
-        return read
+        expired_event = None
+        if target_status == FormPromptStatus.EXPIRED:
+            # execution_id is a soft reference; if its execution was hard-deleted,
+            # expiry still succeeds but the audit event has no workflow/user context.
+            expired_event = FormPromptExpiredEvent(
+                prompt_id=prompt.id,
+                workflow_id=execution.workflow_id if execution is not None else None,
+                execution_id=prompt.execution_id,
+                prompt_node_id=prompt.prompt_node_id,
+                initiated_by=execution.created_by if execution is not None else None,
+                expired_at=datetime.now(UTC),
+                timeout_at=prompt.timeout_at,
+            )
+        return BatchUpdateResult(prompt_id=str(update_request.prompt_id), success=True), True, expired_event
 
     async def batch_update_status(self, request: BatchFormPromptRequest) -> BatchUpdateResponse:
         """Batch update form prompt statuses with concurrency safety and project scoping.
@@ -297,96 +433,53 @@ class FormPromptService(BaseService):
             Typed batch update response with results and counts
 
         """
-        results: list[BatchUpdateResult] = []
-        success_count = 0
-        failed_count = 0
-
-        # Load all prompts to check existence and current status
         prompt_ids = [update_request.prompt_id for update_request in request.updates]
         query = select(FormPrompt).where(FormPrompt.id.in_(prompt_ids))  # type: ignore[attr-defined]
         result = await self.session.exec(query)
         prompts_by_id = {p.id: p for p in result.all()}
+        expiring_prompt_ids = {
+            item.prompt_id for item in request.updates if item.status.value == FormPromptStatus.EXPIRED.value
+        }
+        execution_ids = {
+            prompts_by_id[prompt_id].execution_id for prompt_id in expiring_prompt_ids if prompt_id in prompts_by_id
+        }
+        executions_by_id: dict[UUID, Execution] = {}
+        if execution_ids:
+            execution_result = await self.session.exec(
+                select(Execution).where(Execution.id.in_(execution_ids))  # type: ignore[attr-defined]
+            )
+            executions_by_id = {execution.id: execution for execution in execution_result.all()}
 
+        results: list[BatchUpdateResult] = []
+        expired_events: list[FormPromptExpiredEvent] = []
+        success_count = 0
+        failed_count = 0
         for update_request in request.updates:
             prompt = prompts_by_id.get(update_request.prompt_id)
-            if prompt is None:
-                results.append(
-                    BatchUpdateResult(
-                        prompt_id=str(update_request.prompt_id),
-                        success=False,
-                        error="Form prompt not found",
-                    )
-                )
-                failed_count += 1
-                continue
-
-            # Check current status and transition validity
-            current_status = FormPromptStatus(prompt.status)
-            target_status = FormPromptStatus(update_request.status.value)
-
-            if not can_transition(current_status, target_status):
-                # Idempotent: if already at target status, treat as success
-                if current_status == target_status:
-                    results.append(
-                        BatchUpdateResult(
-                            prompt_id=str(update_request.prompt_id),
-                            success=True,
-                            message=f"Already {target_status.value}",
-                        )
-                    )
-                    success_count += 1
-                else:
-                    results.append(
-                        BatchUpdateResult(
-                            prompt_id=str(update_request.prompt_id),
-                            success=False,
-                            error=f"Cannot transition from {current_status.value} to {target_status.value}",
-                        )
-                    )
-                    failed_count += 1
-                continue
-
-            # SECURITY: Conditional UPDATE prevents race conditions.
-            # Only updates prompts still in the expected current status.
-            # If status changed between check and update, rowcount will be 0.
-            update_values: dict[str, Any] = {"status": target_status}
-            if update_request.notes is not None:
-                update_values["notes"] = update_request.notes
-
-            stmt = (
-                update(FormPrompt)
-                .where(FormPrompt.id == update_request.prompt_id)  # type: ignore[arg-type]
-                .where(FormPrompt.status == current_status)  # type: ignore[arg-type]
-                .values(**update_values)
+            execution = executions_by_id.get(prompt.execution_id) if prompt is not None else None
+            update_result, succeeded, expired_event = await self._apply_prompt_status_update(
+                update_request,
+                prompt,
+                execution,
             )
-
-            update_result = await self.session.exec(stmt)
-            affected_rows = update_result.rowcount
-
-            if affected_rows == 0:
-                # Status changed between check and update (race condition)
-                results.append(
-                    BatchUpdateResult(
-                        prompt_id=str(update_request.prompt_id),
-                        success=False,
-                        error=f"Status changed (was {current_status.value}, concurrent update detected)",
-                    )
-                )
-                failed_count += 1
-            else:
-                results.append(
-                    BatchUpdateResult(
-                        prompt_id=str(update_request.prompt_id),
-                        success=True,
-                    )
-                )
+            results.append(update_result)
+            if succeeded:
                 success_count += 1
+            else:
+                failed_count += 1
+            if expired_event is not None:
+                expired_events.append(expired_event)
 
         try:
             await self.session.commit()
         except Exception:
             await self.session.rollback()
             raise
+
+        # Emit from the state-transition path after commit: the workflow activity only
+        # has a pre-update snapshot, while this path can exclude retries and failed updates.
+        for expired_event in expired_events:
+            AuditEventDispatcher.dispatch(expired_event)
 
         logger.info(
             "Batch updated form prompt statuses",
@@ -405,7 +498,7 @@ class FormPromptService(BaseService):
         self,
         prompt_id: UUID,
         submitted_data: dict[str, Any],
-    ) -> FormPrompt:
+    ) -> FormPromptRead:
         """Submit a response to a form prompt.
 
         Validates the submission, persists it to the database, and sends a signal
@@ -416,10 +509,11 @@ class FormPromptService(BaseService):
             submitted_data: Raw submitted form data
 
         Returns:
-            Updated form prompt with response data
+            Updated form prompt read model with response data and signal status
 
         Raises:
             FormPromptNotFoundError: If prompt does not exist
+            FormPromptNotAuthorizedError: If the current user is not a configured responder
             FormPromptExpiredError: If prompt has expired
             FormPromptCancelledError: If prompt has been cancelled
             FormPromptAlreadyRespondedError: If prompt already has a response
@@ -427,10 +521,11 @@ class FormPromptService(BaseService):
 
         """
         # Load the prompt, validate its state, then validate the submitted fields.
-        prompt = await self.session.get(FormPrompt, prompt_id)
+        prompt = await self._get_form_prompt_record(prompt_id)
         if prompt is None:
             raise FormPromptNotFoundError(prompt_id)
 
+        await self._validate_responder(prompt)
         validate_prompt_submission_state(prompt)
         cleaned_data = validate_form_submission(prompt.form_definition, submitted_data)
 
@@ -474,10 +569,18 @@ class FormPromptService(BaseService):
                 raise FormPromptAlreadyRespondedError(prompt_id, prompt.status)
             raise FormPromptNotFoundError(prompt_id)
 
+        execution = await self.session.get(Execution, prompt.execution_id)
         await self.session.commit()
 
         # Refresh to get the updated state
-        await self.session.refresh(prompt)
+        await self.session.refresh(
+            prompt,
+            attribute_names=["status", "response_data", "responded_by", "responded_at"],
+        )
+        prompt.status = FormPromptStatus.SUBMITTED
+        prompt.response_data = cleaned_data
+        prompt.responded_by = self.user.id
+        prompt.responded_at = responded_at
 
         # Calculate wait time for telemetry
         submitted = responded_at.replace(tzinfo=None)
@@ -521,10 +624,11 @@ class FormPromptService(BaseService):
                 exc_info=True,
             )
 
-        # Emit audit event with telemetry data
+        # Emit the lifecycle event with metadata only
         AuditEventDispatcher.dispatch(
             FormPromptSubmittedEvent(
                 prompt_id=prompt_id,
+                workflow_id=execution.workflow_id if execution is not None else None,
                 execution_id=prompt.execution_id,
                 prompt_node_id=prompt.prompt_node_id,
                 submitted_by=self.user.id,
@@ -536,9 +640,11 @@ class FormPromptService(BaseService):
             )
         )
 
-        # Store the error as transient response metadata (not persisted to DB).
+        # Return the eagerly-loaded read model, keeping transient signal status
+        # only on this response.
         if signal_error:
-            prompt.signal_delivery_error = signal_error
             logger.error("Signal delivery failed", prompt_id=prompt_id, error=signal_error)
 
-        return prompt
+        read = self._to_read_model(prompt, signal_delivery_error=signal_error)
+        read.responded_by = UserReference(id=self.user.id, name=self.user.display_name, type=UserReferenceType.USER)
+        return read

@@ -78,13 +78,17 @@ function claimMappingHandleOpenChange(
   claimMappingOnOpenChange(setFilterValue, open)
 }
 
-function claimMappingTypeaheadChange(
-  setFilterValue: (value: string) => void,
-  setIsOpen: (value: boolean) => void,
-  isOpen: boolean,
-  _event: unknown,
+function claimMappingTypeaheadChange({
+  setFilterValue,
+  setIsOpen,
+  isOpen,
+  val,
+}: {
+  setFilterValue: (value: string) => void
+  setIsOpen: (value: boolean) => void
+  isOpen: boolean
   val: string
-): void {
+}): void {
   setFilterValue(val)
   if (!isOpen) setIsOpen(true)
 }
@@ -118,8 +122,8 @@ function ClaimMappingTypeaheadToggle({
     toggleClaimMenuExpanded(setIsOpen)
   }
 
-  function handleMainChange(event: unknown, val: string): void {
-    claimMappingTypeaheadChange(setFilterValue, setIsOpen, isOpen, event, val)
+  function handleMainChange(_event: unknown, val: string): void {
+    claimMappingTypeaheadChange({ setFilterValue, setIsOpen, isOpen, val })
   }
 
   function handleMainClick(): void {

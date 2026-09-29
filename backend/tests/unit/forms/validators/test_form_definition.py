@@ -3,6 +3,7 @@
 from typing import Any
 
 import pytest
+from pydantic import ValidationError
 
 from syntara.forms.exceptions import FormDefinitionError
 from syntara.forms.models.form_fields import FormDefinition
@@ -136,17 +137,24 @@ class TestAuthorTimeMatchesSubmissionTime:
 
 
 class TestMultiSelectScalarDefaults:
-    """Non-scalar multi-select defaults are rejected by the model itself."""
+    """Dynamic scalar defaults survive parsing; non-scalar defaults fail in the field model."""
+
+    @pytest.mark.parametrize("value", ["a", 5, 5.5, True])
+    def test_dynamic_scalar_defaults_are_accepted(self, value: object) -> None:
+        """String, integer, float, and boolean defaults are valid for dynamic options."""
+        options = {"source": "dynamic", "expression": "${upstream.output}"}
+
+        form = _form(_field("multi_select", "picks", options=options, default=[value]))
+
+        validate_form_definition(form)
+
+        assert form.fields[0].default == [value]
 
     @pytest.mark.parametrize("bad", [{"a": 1}, ["nested"]])
-    def test_unhashable_default_is_a_clean_validation_error(self, bad: Any) -> None:  # noqa: ANN401
-        """Regression: these raised a bare TypeError out of the model validator.
+    def test_non_scalar_default_items_are_rejected(self, bad: Any) -> None:  # noqa: ANN401
+        """Nested lists and dictionaries fail field parsing before definition validation."""
+        options = {"source": "dynamic", "expression": "${upstream.output}"}
 
-        MultiSelectField.default is list[Any], so an unhashable entry reached the
-        option-membership set test and escaped as TypeError: unhashable type -
-        a 500 rather than a 422, reachable straight from an API payload.
-        """
-        with pytest.raises(ValueError, match="must be scalars") as exc_info:
-            _form(_field("multi_select", "picks", options=_STATIC_OPTIONS, default=[bad]))
-
-        assert not isinstance(exc_info.value, TypeError)
+        field = _field("multi_select", "picks", options=options, default=[bad])
+        with pytest.raises(ValidationError):
+            _form(field)

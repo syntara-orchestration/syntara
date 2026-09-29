@@ -8,7 +8,7 @@
  * - Set a model as default via kebab menu
  * - Remove default model via kebab menu
  * - Filter models by name
- * - Save model changes and verify persistence on revisit
+ * - Save models and verify persistence on revisit
  * - Allow-list changes propagate to the Agent node model selector (Test 15)
  *
  * Edge cases:
@@ -115,7 +115,7 @@ test.describe('LLM Provider Models Tab', () => {
 
       const modelsTable = app.locator('[aria-label="Integration models"]')
       await expect(modelsTable).toBeVisible()
-      await expect(app.getByRole('button', { name: 'Save model changes' })).toBeVisible()
+      await expect(app.getByRole('button', { name: 'Save models' })).toBeVisible()
       const checkboxes = modelsTable.getByRole('checkbox')
       const count = await checkboxes.count()
       expect(count).toBeGreaterThan(0)
@@ -242,7 +242,7 @@ test.describe('LLM Provider Models Tab', () => {
       await gammaCheckbox.click()
       await expect(gammaCheckbox).toBeChecked()
 
-      await app.getByRole('button', { name: 'Save model changes' }).click()
+      await app.getByRole('button', { name: 'Save models' }).click()
       await expect(app.getByText('Models updated')).toBeVisible()
 
       await navigateToModelsTab(app, name)
@@ -380,7 +380,7 @@ test.describe('LLM Provider Models Tab', () => {
       await expect(gammaRow.getByText('Default')).toBeVisible()
 
       // Save
-      await app.getByRole('button', { name: 'Save model changes' }).click()
+      await app.getByRole('button', { name: 'Save models' }).click()
       await expect(app.getByText('Models updated')).toBeVisible()
 
       // 3. Return to the workflow builder and verify allow-list changes are reflected
@@ -437,7 +437,7 @@ test.describe('LLM Provider Models Tab', () => {
         })
       )
 
-      await app.getByRole('button', { name: 'Save model changes' }).click()
+      await app.getByRole('button', { name: 'Save models' }).click()
       await expect(app.getByText('Failed to update models')).toBeVisible()
     } finally {
       await deleteIntegrationViaApi(app, integration.id)

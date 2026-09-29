@@ -18,6 +18,7 @@ if TYPE_CHECKING:
         FormPromptAlreadyRespondedError,
         FormPromptCancelledError,
         FormPromptExpiredError,
+        FormPromptNotAuthorizedError,
         FormPromptNotFoundError,
         InvalidResponderReferenceError,
     )
@@ -34,6 +35,20 @@ def form_prompt_not_found_handler(request: Request, exc: "FormPromptNotFoundErro
         title="Form Prompt Not Found",
         detail="The requested form prompt was not found",
         code="FORM_NOT_FOUND",
+        retryable=False,
+        instance=str(request.url),
+    )
+
+
+def form_prompt_not_authorized_handler(request: Request, exc: "FormPromptNotAuthorizedError") -> JSONResponse:
+    """Handle FormPromptNotAuthorizedError."""
+    logger.error("Form prompt authorization failed", exc_info=exc)
+    return create_problem_details_response(
+        status_code=status.HTTP_403_FORBIDDEN,
+        problem_type=PROBLEM_TYPES["forbidden"],
+        title="Not Authorized",
+        detail="You are not authorized to respond to this form prompt",
+        code="FORM_PROMPT_NOT_AUTHORIZED",
         retryable=False,
         instance=str(request.url),
     )
@@ -101,8 +116,8 @@ def form_prompt_already_requested_handler(request: Request, exc: "FormPromptAlre
 def form_data_validation_error_handler(request: Request, exc: "FormDataValidationError") -> JSONResponse:
     """Handle FormDataValidationError.
 
-    Returns HTTP 422 with the per-field errors flattened into the detail string,
-    matching the framework's validation_error_handler format.
+    Returns HTTP 422 with all per-field failures concatenated in the standard
+    Problem Details ``detail`` field.
     """
     logger.warning(
         "Form validation failed",
@@ -111,7 +126,6 @@ def form_data_validation_error_handler(request: Request, exc: "FormDataValidatio
     )
 
     detail = "Form validation failed: " + "; ".join(f"{err.field}: {err.message}" for err in exc.errors)
-
     return create_problem_details_response(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         problem_type=PROBLEM_TYPES["validation_error"],

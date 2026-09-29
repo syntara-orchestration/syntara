@@ -16,6 +16,7 @@ import { formFieldBuilderLabelHelp } from './formFieldBuilderFieldHelp'
 
 type StaticOptionRowProps = {
   fieldIndex: number
+  fieldLabel: string
   optionIndex: number
   optionArrayId: string
   isDisabled?: boolean
@@ -31,6 +32,7 @@ function otherOptionValues(values: ReadonlyArray<{ value: string | number | bool
 
 export function StaticOptionRow({
   fieldIndex,
+  fieldLabel,
   optionIndex,
   optionArrayId,
   isDisabled,
@@ -88,7 +90,7 @@ export function StaticOptionRow({
               <div className={styles.staticOptionRemove}>
                 <Button
                   variant="plain"
-                  aria-label={`Remove option ${optionIndex + 1}`}
+                  aria-label={`Remove option ${optionIndex + 1} for ${fieldLabel}`}
                   isDisabled={isDisabled}
                   onClick={onRemove}
                 >

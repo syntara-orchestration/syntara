@@ -114,11 +114,15 @@ export function useWorkflowImportExport({
       const triggers = currentWorkflow.triggers ?? []
       const name = workflowName || 'workflow'
       const description = workflowDescription
-      const definition = buildWorkflowDefinition(name, description, activities, triggers, {
+      const definition = buildWorkflowDefinition({
+        workflowName: name,
+        workflowDescription: description,
+        activities: activities,
+        triggers: triggers,
         edges,
         nodePositions,
       })
-      downloadWorkflowDefinition(definition as Record<string, unknown>, name)
+      downloadWorkflowDefinition(definition, name)
     } catch (err: unknown) {
       showError({ title: 'Failed to export workflow', description: getErrorMessage(err) })
     }

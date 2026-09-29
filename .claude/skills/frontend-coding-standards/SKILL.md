@@ -338,7 +338,7 @@ export function MyListPage() {
         onClose={deleteDialog.close}
         onConfirm={() => handleDelete(deleteDialog.item)}
         title="Delete item"
-        confirmLabel="Delete"
+        confirmLabel="Delete item"
         confirmVariant="danger"
       >
         Are you sure?
@@ -798,7 +798,7 @@ Requires `titleIconVariant="warning"` + `destructiveAcknowledgement` checkbox. T
   onClose={onClose}
   onConfirm={handleDelete}
   title="Delete workflow?"
-  confirmLabel="Delete"
+  confirmLabel="Delete workflow"
   confirmVariant="danger"
   titleIconVariant="warning"
   destructiveAcknowledgement={{
@@ -883,6 +883,19 @@ const {
   defaultSort, // optional — URL-synced sort merged into queryParams
   columns, // optional — PatternFly getSortParams / handleSort
 })
+```
+
+### Client-side (in-memory) pagination
+
+For tables that load a full dataset then filter/sort locally, use `useClientPagination` — not `useCursorPagination` and not hand-rolled `page` / `perPage` / `slice` state.
+
+```typescript
+const { paginate, getFooterProps, resetPage } = useClientPagination()
+
+const pageRows = useMemo(() => paginate(sortedRows), [sortedRows, paginate])
+
+// resetPage() when filters or sort change
+<SynScrollableTableContainer footer={getFooterProps(sortedRows.length)} />
 ```
 
 ---
@@ -1961,3 +1974,36 @@ Reference implementation: `useOptimisticCredentialEnabled` (credentials list ena
 ## 42. Use `ReactNode` Lists for Multi-Item Toast/Alert Content — Not `join('\n')`
 
 **When displaying multiple items in an alert or toast body, render a `ReactNode` list, not `array.join('\n')`.** Browsers collapse `\n` in HTML, so joined warnings appear on one line. `showAlert` / `showWarning` `description` already accepts `ReactNode`. Use a **module-scoped** helper (not nested in the caller) that renders PatternFly `List` / `ListItem` — not a raw `<ul>` or inline `style`.
+
+---
+
+## 43. Do Not Write Barrel Files
+
+**A barrel file is a file that only re-exports things from other files.** Example:
+
+```ts
+// index.ts — this is a barrel file
+export { foo } from './foo'
+export { bar } from './bar'
+export { baz } from './baz'
+```
+
+**Do not create new barrel files in `src/`** — production code that ships to users. Barrel files cause two problems there:
+
+1. They load many modules that the browser may not need. This slows down page loads.
+2. They hide where a value actually comes from. It is harder to find the real source file.
+
+Import directly from the file that defines the value:
+
+```ts
+// Do this
+import { foo } from './foo'
+import { bar } from './bar'
+
+// Not this
+import { foo, bar } from './index'
+```
+
+**Enforcement:** `barrel-files/avoid-barrel-files` is set to `warn` in `eslint.config.js`, scoped to `src/**/*.{ts,tsx}` only. It fires when a file has more than 3 re-exports and few or no local declarations of its own. This is a warning, not an error, so existing barrel files are not a hard build break. New or changed `src/` code must not add a new warning — see the Zero New Warnings Policy in section 8.
+
+**This rule does not apply to `e2e/` or other non-production directories.** The tree-shaking, bundle-size, and circular-dependency concerns that motivate this rule are about code shipped to users; they don't apply to test-only helpers, where a grouped re-export can be a reasonable convenience. If you need to group many related helpers for import convenience in `src/`, don't use a barrel file there — ask the reviewer for the best pattern for that specific case first.

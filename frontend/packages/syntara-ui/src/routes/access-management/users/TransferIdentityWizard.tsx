@@ -27,7 +27,6 @@ import { DocLinkButton, SynPageHeader } from '../../../components/layout/SynPage
 import { SynPanel } from '../../../components/layout/SynPanel'
 import { SynLoadingState } from '../../../components/states/SynLoadingState'
 import { useQueryState } from '../../../components/states/useQueryState'
-import { SynLink } from '../../../components/SynLink'
 import { SynPageTitle } from '../../../components/SynPageTitle'
 import { useMutationErrorHandler } from '../../../hooks/useMutationErrorHandler'
 import { useAlerts } from '../../../providers/alerts'
@@ -47,8 +46,8 @@ function getNavigateBackPath(userId: string) {
   return `${AppRoute.AccessManagement.UserDetail.replace(':userId', userId)}/identities`
 }
 
-/** Step 1 footer with disabled Back, conditional Next, and a Cancel link. */
-function WizardFooterStep1({ isNextDisabled, cancelHref }: Readonly<{ isNextDisabled: boolean; cancelHref: string }>) {
+/** Step 1 footer with disabled Back, conditional Next, and a Cancel button. */
+function WizardFooterStep1({ isNextDisabled, onCancel }: Readonly<{ isNextDisabled: boolean; onCancel: () => void }>) {
   const { goToNextStep } = useWizardContext()
   return (
     <WizardFooterWrapper>
@@ -64,8 +63,12 @@ function WizardFooterStep1({ isNextDisabled, cancelHref }: Readonly<{ isNextDisa
               Next
             </Button>
           </ActionListItem>
+        </ActionListGroup>
+        <ActionListGroup>
           <ActionListItem>
-            <SynLink to={cancelHref}>Cancel</SynLink>
+            <Button variant="link" onClick={onCancel}>
+              Cancel
+            </Button>
           </ActionListItem>
         </ActionListGroup>
       </ActionList>
@@ -73,17 +76,17 @@ function WizardFooterStep1({ isNextDisabled, cancelHref }: Readonly<{ isNextDisa
   )
 }
 
-/** Step 2 footer with Back, conditional Attach, and a Cancel link. */
+/** Step 2 footer with Back, conditional Attach, and a Cancel button. */
 function WizardFooterStep2({
   isAttachDisabled,
   isAttaching,
   onAttach,
-  cancelHref,
+  onCancel,
 }: Readonly<{
   isAttachDisabled: boolean
   isAttaching: boolean
   onAttach: () => void
-  cancelHref: string
+  onCancel: () => void
 }>) {
   const { goToPrevStep } = useWizardContext()
   return (
@@ -100,8 +103,12 @@ function WizardFooterStep2({
               {isAttaching ? 'Transferring...' : 'Transfer identity'}
             </Button>
           </ActionListItem>
+        </ActionListGroup>
+        <ActionListGroup>
           <ActionListItem>
-            <SynLink to={cancelHref}>Cancel</SynLink>
+            <Button variant="link" onClick={onCancel}>
+              Cancel
+            </Button>
           </ActionListItem>
         </ActionListGroup>
       </ActionList>
@@ -255,7 +262,7 @@ export function TransferIdentityWizard() {
             <WizardStep
               name="Select a user"
               id="select-user"
-              footer={<WizardFooterStep1 isNextDisabled={!selectedUser} cancelHref={getNavigateBackPath(safeUserId)} />}
+              footer={<WizardFooterStep1 isNextDisabled={!selectedUser} onCancel={navigateBack} />}
             >
               {usersQueryState ?? (
                 <SelectUserStep
@@ -279,7 +286,7 @@ export function TransferIdentityWizard() {
                   isAttachDisabled={!selectedIdentityId}
                   isAttaching={isAttaching}
                   onAttach={handleAttach}
-                  cancelHref={getNavigateBackPath(safeUserId)}
+                  onCancel={navigateBack}
                 />
               }
             >

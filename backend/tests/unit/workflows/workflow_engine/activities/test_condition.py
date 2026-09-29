@@ -1,5 +1,8 @@
 """Tests for condition activity."""
 
+import asyncio
+import time
+from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -245,3 +248,114 @@ class TestConditionWithNamespace:
             await condition({"condition": "${unknown} == 'value'", "namespace": namespace}, None)
         assert exc_info.value.type == "ConditionEvaluationError"
         assert "unknown" in str(exc_info.value)
+
+
+class TestConditionVisualBuilderOperators:
+    """Word operators from the visual builder must evaluate (AAP-91413)."""
+
+    @pytest.mark.asyncio
+    async def test_exists_true_routes_true_port(self) -> None:
+        result = await condition(
+            {"condition": "${node.status} exists", "namespace": {"node": {"status": "ok"}}},
+            None,
+        )
+        assert result["control"]["next_port"] == "true"
+        assert result["output"]["evaluated_result"] is True
+
+    @pytest.mark.asyncio
+    async def test_exists_false_when_path_missing(self) -> None:
+        result = await condition(
+            {"condition": "${node.status} exists", "namespace": {"node": {}}},
+            None,
+        )
+        assert result["control"]["next_port"] == "false"
+        assert result["output"]["evaluated_result"] is False
+
+    @pytest.mark.asyncio
+    async def test_negated_exists_saved_backend_form(self) -> None:
+        result = await condition(
+            {"condition": "not (${data.optional} exists)", "namespace": {"data": {}}},
+            None,
+        )
+        assert result["control"]["next_port"] == "true"
+
+    @pytest.mark.asyncio
+    async def test_starts_with(self) -> None:
+        result = await condition(
+            {"condition": '${username} startsWith "user_"', "namespace": {"username": "user_abc"}},
+            None,
+        )
+        assert result["control"]["next_port"] == "true"
+
+    @pytest.mark.asyncio
+    async def test_is_empty(self) -> None:
+        result = await condition({"condition": "${text} isEmpty", "namespace": {"text": ""}}, None)
+        assert result["control"]["next_port"] == "true"
+
+
+class TestConditionDoesNotBlockEventLoop:
+    """Evaluation is offloaded to a thread so the worker event loop stays responsive.
+
+    The ``matches`` operator runs a bounded subprocess synchronously; if that ran
+    inline in this async activity it would block the shared event loop and every
+    other concurrently executing activity (jewzaam review, PR #506). These tests
+    assert the blocking work happens off the loop thread.
+    """
+
+    @pytest.mark.asyncio
+    async def test_slow_evaluation_does_not_block_concurrent_coroutine(self) -> None:
+        """A blocking evaluation must not stall other coroutines on the loop."""
+        import contextlib
+
+        block_seconds = 0.3
+        ticks = 0
+
+        async def _ticker() -> None:
+            nonlocal ticks
+            # Advances only while the event loop is free to schedule it.
+            while True:
+                await asyncio.sleep(0.01)
+                ticks += 1
+
+        def _blocking_eval(_expr: str, _ns: dict[str, Any]) -> bool:
+            time.sleep(block_seconds)  # simulates the synchronous subprocess in `matches`
+            return True
+
+        with patch(
+            "syntara.workflows.workflow_engine.activities.condition.safe_eval_with_namespace",
+            side_effect=_blocking_eval,
+        ):
+            ticker_task = asyncio.create_task(_ticker())
+            result = await condition({"condition": "${x} matches 'y'", "namespace": {"x": "y"}}, None)
+            # Capture progress made *during* the evaluation, before draining the task.
+            ticks_during_eval = ticks
+            ticker_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await ticker_task
+
+        assert result["control"]["next_port"] == "true"
+        # With the fix, the ~0.3s evaluation runs off-loop and the ticker advances
+        # many times meanwhile. If it ran inline, the loop would be blocked and the
+        # ticker would still be at 0 when the evaluation returned.
+        assert ticks_during_eval > 0
+
+    @pytest.mark.asyncio
+    async def test_evaluation_runs_off_the_event_loop_thread(self) -> None:
+        """The evaluator executes on a worker thread, not the loop thread."""
+        import threading
+
+        loop_thread_id = threading.get_ident()  # the test coroutine runs on the loop thread
+        seen_thread_ids: list[int] = []
+
+        def _record_thread(_expr: str, _ns: dict[str, Any]) -> bool:
+            seen_thread_ids.append(threading.get_ident())
+            return True
+
+        with patch(
+            "syntara.workflows.workflow_engine.activities.condition.safe_eval_with_namespace",
+            side_effect=_record_thread,
+        ):
+            await condition({"condition": "True", "namespace": {}}, None)
+
+        assert seen_thread_ids
+        assert seen_thread_ids[0] != loop_thread_id

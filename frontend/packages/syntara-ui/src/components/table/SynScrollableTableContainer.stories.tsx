@@ -13,6 +13,7 @@ import type { Decorator, Meta, StoryObj } from '@storybook/tanstack-react'
 import type React from 'react'
 import { Fragment, useState } from 'react'
 
+import { useClientPagination } from '../../hooks/useClientPagination'
 import { FilterOperatorEnum, FilterTypeEnum } from '../../types/filters'
 import { FilterBar } from '../filters/FilterBar'
 import { SynPanel } from '../layout/SynPanel'
@@ -65,7 +66,8 @@ function StatusLabel({ status }: Readonly<{ status: StatusValue }>) {
 
 const ROW_ACTIONS = [
   { title: 'Edit', onClick: () => {} },
-  { title: 'Delete', onClick: () => {} },
+  { isSeparator: true },
+  { title: 'Delete', onClick: () => {}, isDanger: true },
 ]
 
 const STORY_FILTER_FIELDS = [
@@ -203,29 +205,11 @@ export const FewRows: Story = {
 /** Table with interactive cursor-style pagination. */
 export const WithPagination: Story = {
   render: function WithPaginationStory() {
-    const [page, setPage] = useState(1)
-    const [perPage, setPerPage] = useState(10)
-
-    const start = (page - 1) * perPage
-    const pageRows = SAMPLE_ROWS.slice(start, start + perPage)
-    const hasNext = start + perPage < SAMPLE_ROWS.length
+    const { paginate, getFooterProps } = useClientPagination({ defaultPerPage: 10 })
+    const pageRows = paginate(SAMPLE_ROWS)
 
     return (
-      <SynScrollableTableContainer
-        caption="Paginated resources table"
-        footer={{
-          page,
-          perPage,
-          total: SAMPLE_ROWS.length,
-          hasNext,
-          onPrev: () => setPage((p) => Math.max(1, p - 1)),
-          onNext: () => setPage((p) => p + 1),
-          onPerPageChange: (newPerPage) => {
-            setPerPage(newPerPage)
-            setPage(1)
-          },
-        }}
-      >
+      <SynScrollableTableContainer caption="Paginated resources table" footer={getFooterProps(SAMPLE_ROWS.length)}>
         <Thead>
           <Tr>
             <Th>Name</Th>
@@ -258,13 +242,10 @@ export const WithPagination: Story = {
 /** Expandable table with detail lists in expanded rows and interactive pagination. */
 export const Expandable: Story = {
   render: function ExpandableStory() {
-    const [page, setPage] = useState(1)
-    const [perPage, setPerPage] = useState(10)
+    const { paginate, getFooterProps } = useClientPagination({ defaultPerPage: 10 })
     const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
 
-    const start = (page - 1) * perPage
-    const pageRows = SAMPLE_ROWS.slice(start, start + perPage)
-    const hasNext = start + perPage < SAMPLE_ROWS.length
+    const pageRows = paginate(SAMPLE_ROWS)
 
     const isAllExpanded = pageRows.length > 0 && pageRows.every((row) => expandedRows.has(row.name))
 
@@ -294,18 +275,7 @@ export const Expandable: Story = {
       <SynScrollableTableContainer
         caption="Expandable resources table"
         isExpandable
-        footer={{
-          page,
-          perPage,
-          total: SAMPLE_ROWS.length,
-          hasNext,
-          onPrev: () => setPage((p) => Math.max(1, p - 1)),
-          onNext: () => setPage((p) => p + 1),
-          onPerPageChange: (newPerPage) => {
-            setPerPage(newPerPage)
-            setPage(1)
-          },
-        }}
+        footer={getFooterProps(SAMPLE_ROWS.length)}
       >
         <Thead>
           <Tr>

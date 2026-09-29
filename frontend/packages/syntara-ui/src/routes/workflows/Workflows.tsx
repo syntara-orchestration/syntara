@@ -32,7 +32,7 @@ import { useWorkflowsPageToolbar } from './useWorkflowsPageToolbar'
 import { useWorkflowsQuery } from './useWorkflowsQuery'
 import { WorkflowDialogs } from './WorkflowDialogs'
 import { transformIsEnabledFilter, workflowFilterDefinitions } from './workflowFilterDefinitions'
-import { buildWorkflowRowActions } from './workflowRowActions'
+import type { WorkflowRowActionCallbacks } from './workflowRowActions'
 import { WorkflowsListView } from './WorkflowsListView'
 import { workflowDefaultSort, workflowTableColumns } from './workflowTableColumns'
 
@@ -46,6 +46,47 @@ type WorkflowsPageToolbarProps = {
   showImportWorkflow: boolean
   onImportClick: () => void
   onCreateClick: () => void
+}
+
+type WorkflowsRowActionDeps = {
+  navigate: ReturnType<typeof useNavigate>
+  runDialog: ReturnType<typeof useDialogState<Workflow>>
+  publishDialog: ReturnType<typeof useDialogState<Workflow>>
+  unpublishDialog: ReturnType<typeof useDialogState<Workflow>>
+  deleteDialog: ReturnType<typeof useDialogState<Workflow>>
+  duplicateWorkflow: (wf: Workflow) => Promise<void>
+  showError: ReturnType<typeof useAlerts>['showError']
+  isDuplicating: boolean
+}
+
+function buildWorkflowsRowActionCallbacks({
+  navigate,
+  runDialog,
+  publishDialog,
+  unpublishDialog,
+  deleteDialog,
+  duplicateWorkflow,
+  showError,
+  isDuplicating,
+}: WorkflowsRowActionDeps): WorkflowRowActionCallbacks {
+  return {
+    navigate,
+    onRun: (wf) => runDialog.open(wf),
+    onDuplicate: (wf) => detachPromise(duplicateWorkflow(wf)),
+    onExport: (wf) => {
+      if (wf.id) {
+        detachPromise(
+          downloadWorkflowExportById(wf.id).catch((err: unknown) => {
+            showError({ title: 'Export failed', description: getErrorMessage(err) })
+          })
+        )
+      }
+    },
+    onPublish: (wf) => publishDialog.open(wf),
+    onUnpublish: (wf) => unpublishDialog.open(wf),
+    onDelete: (wf) => deleteDialog.open(wf),
+    isDuplicating,
+  }
 }
 
 function WorkflowsPageToolbar({
@@ -95,8 +136,10 @@ export default function Workflows() {
   const projectsForGrouping = useProjectsForGrouping(projects, isAllProjects)
   const projectsById = useMemo(() => new Map(projectsForGrouping.map((p) => [p.id, p])), [projectsForGrouping])
   // UUID — same as builder `resourceProject` so useCanI cache keys stay aligned.
+  // createOnly: toolbar Create/Import only; row kebabs check per workflow.project_id.
   const permissions = useWorkflowPermissions({
     resourceProject: selectedProjectId ?? undefined,
+    createOnly: true,
   })
   const { projectPermissions, projectEditDialog, projectDeleteDialog, projectActionCallbacks } =
     useWorkflowProjectControls(projects, selectedProjectId)
@@ -162,7 +205,13 @@ export default function Workflows() {
     isAllProjects
   )
 
-  useCursorReset(sortedWorkflows.length, hasActiveFilters, cursor, workflowsQuery.isFetching, resetPagination)
+  useCursorReset({
+    itemCount: sortedWorkflows.length,
+    hasActiveFilters,
+    cursor,
+    isFetching: workflowsQuery.isFetching,
+    resetPagination,
+  })
 
   const { handleDeleteProject: handleDeleteProjectBase, isDeletingProject } = useProjectActions({
     showSuccess,
@@ -192,29 +241,8 @@ export default function Workflows() {
     projectPermissions,
   })
 
-  const getRowActions = (workflow: Workflow) => {
-    const isBuiltinProject = !!selectedProject?.is_builtin || !!projectsById.get(workflow.project_id)?.is_builtin
-    return buildWorkflowRowActions(workflow, permissions, isBuiltinProject, {
-      navigate,
-      onRun: (wf) => runDialog.open(wf),
-      onDuplicate: (wf) => detachPromise(duplicateWorkflow(wf)),
-      onExport: (wf) => {
-        if (wf.id) {
-          detachPromise(
-            downloadWorkflowExportById(wf.id).catch((err: unknown) => {
-              showError({ title: 'Export failed', description: getErrorMessage(err) })
-            })
-          )
-        }
-      },
-      onPublish: (wf) => publishDialog.open(wf),
-      onUnpublish: (wf) => unpublishDialog.open(wf),
-      onDelete: (wf) => deleteDialog.open(wf),
-      isDuplicating,
-    })
-  }
-
-  const hasQueryState = workflowsQuery.isPending || !!workflowsQuery.error
+  const hasQueryError = !!workflowsQuery.error
+  const isInitialWorkflowsLoad = workflowsQuery.isLoading
   return (
     <>
       <SynPage>
@@ -222,9 +250,9 @@ export default function Workflows() {
         <SynPageHeader
           title="Workflows"
           docLink={workflowsDocLink}
-          projectSelector={hasQueryState ? undefined : ProjectSelector}
+          projectSelector={hasQueryError ? undefined : ProjectSelector}
           toolbar={
-            !hasQueryState && showToolbar ? (
+            !hasQueryError && showToolbar ? (
               <WorkflowsPageToolbar
                 headerProjectActions={headerProjectActions}
                 canCreate={permissions.canCreate && !selectedProject?.is_builtin}
@@ -243,7 +271,7 @@ export default function Workflows() {
         <SynPageBody>
           <SynListPanel>
             <WorkflowsListView
-              isPending={workflowsQuery.isPending}
+              isPending={isInitialWorkflowsLoad}
               error={workflowsQuery.error}
               onRetry={() => detachPromise(workflowsQuery.refetch())}
               isFetching={workflowsQuery.isFetching}
@@ -264,7 +292,19 @@ export default function Workflows() {
               groupedWorkflows={groupedWorkflows}
               collapsedProjects={collapsedProjects}
               onToggleProject={toggleProjectCollapsed}
-              getRowActions={getRowActions}
+              isWorkflowProjectBuiltin={(workflow) =>
+                !!selectedProject?.is_builtin || !!projectsById.get(workflow.project_id)?.is_builtin
+              }
+              rowActionCallbacks={buildWorkflowsRowActionCallbacks({
+                navigate,
+                runDialog,
+                publishDialog,
+                unpublishDialog,
+                deleteDialog,
+                duplicateWorkflow,
+                showError,
+                isDuplicating,
+              })}
               projectActionCallbacks={projectActionCallbacks}
             />
           </SynListPanel>

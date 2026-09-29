@@ -17,6 +17,7 @@ import pytest_asyncio
 from syntara.workflows.models.workflow import Workflow
 from syntara.workflows.models.workflow_publish_event import PublishAction, WorkflowPublishEvent
 from syntara.workflows.models.workflow_version import WorkflowVersion
+from tests.helpers.user_reference import assert_user_reference
 
 if TYPE_CHECKING:
     from httpx import AsyncClient
@@ -113,7 +114,7 @@ async def test_test_workflow_node_success(
     assert data["workflow_id"] == str(test_workflow.id)
     assert data["status"] == "pending"
     assert data["mode"] == "test"
-    assert data["created_by"] == str(test_user.id)
+    assert_user_reference(data["created_by"], test_user)
     assert data["execution_metadata"] is not None
     assert data["execution_metadata"]["target_node_id"] == "test_activity"
     assert data["temporal_workflow_id"] is not None

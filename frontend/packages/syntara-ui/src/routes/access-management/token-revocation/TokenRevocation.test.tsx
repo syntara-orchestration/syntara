@@ -55,7 +55,7 @@ describe('TokenRevocationTab', () => {
       mutate: mockMutate,
       isPending: false,
     } as ReturnType<typeof adminClient.useMutation>)
-    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } } as never)
+    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } })
   })
 
   function renderWithQuery(data: { revoked_before: string | null; updated_at: string | null }) {
@@ -65,7 +65,7 @@ describe('TokenRevocationTab', () => {
       isError: false,
       error: null,
       refetch: vi.fn(),
-    } as unknown as ReturnType<typeof adminClient.useQuery>)
+    })
     return render(<TokenRevocationTab />, { wrapper })
   }
 
@@ -166,7 +166,7 @@ describe('TokenRevocationTab', () => {
   })
 
   it('disables revoke button when user lacks revoke permission', async () => {
-    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: false } } as never)
+    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: false } })
     renderWithQuery({ revoked_before: null, updated_at: null })
 
     await waitFor(() => {
@@ -192,7 +192,7 @@ describe('TokenRevocationTab', () => {
   })
 
   it('should have no accessibility violations when button is disabled', async () => {
-    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: false } } as never)
+    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: false } })
     const { container } = renderWithQuery({ revoked_before: null, updated_at: null })
     let results: Awaited<ReturnType<typeof axe>>
     await act(async () => {

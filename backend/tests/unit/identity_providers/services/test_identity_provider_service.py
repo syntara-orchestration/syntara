@@ -120,6 +120,23 @@ def _make_service(
 
 
 @pytest.mark.asyncio
+def _exec_results(*results: object, users: object = ()) -> object:
+    """Build a ``session.exec`` side effect for IdentityProviderService tests.
+
+    ``_finalize_read`` resolves created_by/updated_by, which issues an extra
+    query. That query is the only one selecting from ``principals``, so it is
+    answered with *users* rather than by padding every side_effect list.
+    """
+    queue = list(results)
+
+    def _next(statement: object = None, *_args: object, **_kwargs: object) -> object:
+        if statement is not None and "principals" in str(statement).lower():
+            return list(users)  # type: ignore[call-overload]
+        return queue.pop(0) if queue else []
+
+    return _next
+
+
 async def test_create_provider_calls_store_config_and_flush() -> None:
     """Create stores secrets, adds to session, and flushes."""
     mock_session = _make_mock_session()
@@ -187,7 +204,7 @@ async def test_get_provider_success() -> None:
     # Second call for group mapping entries
     mock_result_entries = MagicMock()
     mock_result_entries.all.return_value = []
-    mock_session.exec = AsyncMock(side_effect=[mock_result, mock_result_entries])
+    mock_session.exec = AsyncMock(side_effect=_exec_results(mock_result, mock_result_entries))
 
     service = _make_service(mock_session)
     response = await service.get_provider(provider.id)
@@ -231,7 +248,7 @@ async def test_update_provider_name() -> None:
     mock_result_entries = MagicMock()
     mock_result_entries.all.return_value = []
 
-    mock_session.exec = AsyncMock(side_effect=[mock_result_find, mock_result_get, mock_result_entries])
+    mock_session.exec = AsyncMock(side_effect=_exec_results(mock_result_find, mock_result_get, mock_result_entries))
 
     service = _make_service(mock_session)
     response = await service.update_provider(
@@ -276,7 +293,7 @@ async def test_update_provider_configuration_preserves_claim_mapping() -> None:
     mock_result_get.one_or_none.return_value = provider
     mock_result_entries = MagicMock()
     mock_result_entries.all.return_value = []
-    mock_session.exec = AsyncMock(side_effect=[mock_result_find, mock_result_get, mock_result_entries])
+    mock_session.exec = AsyncMock(side_effect=_exec_results(mock_result_find, mock_result_get, mock_result_entries))
 
     service = _make_service(mock_session)
     patch_config = OIDCConfigurationUpdate(
@@ -313,7 +330,7 @@ async def test_update_provider_configuration_preserves_jmespath() -> None:
     mock_result_get.one_or_none.return_value = provider
     mock_result_entries = MagicMock()
     mock_result_entries.all.return_value = []
-    mock_session.exec = AsyncMock(side_effect=[mock_result_find, mock_result_get, mock_result_entries])
+    mock_session.exec = AsyncMock(side_effect=_exec_results(mock_result_find, mock_result_get, mock_result_entries))
 
     service = _make_service(mock_session)
     patch_config = OIDCConfigurationUpdate(

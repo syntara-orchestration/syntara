@@ -1,6 +1,7 @@
 """Test fixtures and helpers for execution factory."""
 
 from datetime import datetime
+from typing import Any
 from uuid import uuid4
 
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -27,16 +28,18 @@ class ExecutionFactory:
         completed_at: datetime | None = None,
         trigger_type: str | None = None,
         interface: str | None = None,
+        input_data: dict[str, Any] | None = None,
+        temporal_workflow_id: str | None = None,
     ) -> Execution:
         """Create a single execution."""
         execution = Execution(
             workflow_id=workflow.id,
             workflow_version_id=version.id,
-            temporal_workflow_id=f"t-{uuid4()}",
+            temporal_workflow_id=temporal_workflow_id or f"t-{uuid4()}",
             status=status,
             created_by=self.user.id,
             completed_at=completed_at,
-            input_data={},
+            input_data=input_data or {},
             project_id=workflow.project_id,
             trigger_type=trigger_type,
             interface=interface,

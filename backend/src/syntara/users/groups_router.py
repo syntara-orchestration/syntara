@@ -26,7 +26,6 @@ from syntara.core.database.session import get_db
 from syntara.core.models import User
 from syntara.core.models.base.query_params import BaseListParams
 from syntara.core.models.group import (
-    Group,
     GroupCreate,
     GroupListParams,
     GroupListResponse,
@@ -95,12 +94,13 @@ def _get_role_assignment_service(
 async def create_group(
     request: GroupCreate,
     service: Annotated[GroupsService, Depends(get_group_service)],
-) -> Group:
+) -> GroupRead:
     """Create a new group for organizing users."""
-    return await service.create_group(
+    group = await service.create_group(
         name=request.name,
         description=request.description,
     )
+    return await service.to_group_read(group)
 
 
 @router.get(
@@ -145,7 +145,7 @@ async def get_group(
     """Retrieve a group by its UUID."""
     group = await service.get_group_by_id(group_id)
     count = await service.get_member_count(group)
-    return service.enrich_group_read(group, count)
+    return await service.to_group_read(group, count)
 
 
 @router.patch(
@@ -168,7 +168,7 @@ async def update_group(
         description=request.description,
     )
     count = await service.get_member_count(group)
-    return service.enrich_group_read(group, count)
+    return await service.to_group_read(group, count)
 
 
 @router.delete(

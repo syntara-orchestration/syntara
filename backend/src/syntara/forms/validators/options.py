@@ -7,20 +7,38 @@ converts them into a static option list.
 from __future__ import annotations
 
 import math
-from typing import Any
+from typing import Any, Literal
 
 import structlog
+from pydantic import BaseModel, ConfigDict, Field
 
 from syntara.core.constants import FieldLimits
-from syntara.forms.models.form_fields import StaticOption, StaticOptions
 
 logger = structlog.stdlib.get_logger(__name__)
+
+
+class _ResolvedOption(BaseModel):
+    """An option produced from dynamic upstream data."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    display_label: str = Field(min_length=1, max_length=200)
+    value: str | int | float | bool
+
+
+class _ResolvedOptions(BaseModel):
+    """Dynamic options materialized as a static-looking list for display."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    source: Literal["static"]
+    values: list[_ResolvedOption] = Field(min_length=1, max_length=FieldLimits.FORM_OPTIONS_MAX_LENGTH)
 
 
 def resolve_dynamic_options(
     resolved_list: Any,  # noqa: ANN401
     field_name: str,
-) -> StaticOptions:
+) -> _ResolvedOptions:
     """Resolve dynamic options into a static option list.
 
     Args:
@@ -28,7 +46,7 @@ def resolve_dynamic_options(
         field_name: Field name for error messages
 
     Returns:
-        StaticOptions with resolved values
+        A static-looking option list with resolved scalar values
 
     Raises:
         TypeError: If resolved_list is not a list or contains non-scalar types
@@ -82,14 +100,14 @@ def resolve_dynamic_options(
     return _convert_scalars_to_options(resolved_list)
 
 
-def _convert_scalars_to_options(items: list[str | int | float | bool]) -> StaticOptions:
+def _convert_scalars_to_options(items: list[str | int | float | bool]) -> _ResolvedOptions:
     """Convert a list of scalars to static options.
 
     Each scalar becomes both label and value: {label: str(v), value: v}.
     Duplicates are de-duplicated, first occurrence wins.
     """
     seen: set[str | int | float | bool] = set()
-    options: list[StaticOption] = []
+    options: list[_ResolvedOption] = []
 
     for item in items:
         if item in seen:
@@ -97,6 +115,6 @@ def _convert_scalars_to_options(items: list[str | int | float | bool]) -> Static
             continue
 
         seen.add(item)
-        options.append(StaticOption(display_label=str(item), value=item))
+        options.append(_ResolvedOption(display_label=str(item), value=item))
 
-    return StaticOptions(source="static", values=options)
+    return _ResolvedOptions(source="static", values=options)

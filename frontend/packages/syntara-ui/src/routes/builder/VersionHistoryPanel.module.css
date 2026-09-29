@@ -1,5 +1,21 @@
+/* Row content sits above the overlay select button; clicks fall through to it. */
 .versionRowStack {
   gap: var(--pf-t--global--spacer--sm);
+  position: relative;
+  z-index: 1;
+  pointer-events: none;
+  padding: var(--pf-t--global--spacer--md);
+  padding-right: calc(var(--pf-t--global--spacer--md) + 2.5rem);
+}
+
+/* Overlay click target for the whole row, a sibling of the content (see VersionRow). */
+.versionRowSelect {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
 .versionTimestamp {
@@ -25,6 +41,8 @@
   position: absolute;
   top: var(--pf-t--global--spacer--md);
   right: var(--pf-t--global--spacer--md);
+  z-index: 2;
+  pointer-events: auto;
 }
 
 .labelsRow {
@@ -94,6 +112,9 @@
   display: inline-block;
   width: fit-content;
   font-size: var(--pf-t--global--font--size--sm);
+  pointer-events: auto;
+  position: relative;
+  z-index: 2;
 }
 
 .scrollableBody {

@@ -55,10 +55,245 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/form_prompts/{form_prompt_id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Get form prompt request
+     * @description Get a form prompt by ID, including its form definition and responder configuration.
+     */
+    get: operations['get_form_prompt']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/form_prompts/{form_prompt_id}/submit': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Submit a response to a form prompt
+     * @description Submit a response to a pending form prompt and resume its workflow.
+     */
+    post: operations['submit_form_prompt']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
 }
 export type webhooks = Record<string, never>
 export interface components {
   schemas: {
+    /**
+     * FormPromptRead
+     * @description FormPrompt API response model with typed nested fields.
+     *
+     *     Overrides the JSONB dict fields from BaseFormPrompt with typed models
+     *     so API consumers get proper validation and type safety. Pydantic coerces
+     *     the raw dicts from the database into these typed models during serialization.
+     */
+    FormPromptRead: {
+      /**
+       * Resource ID
+       * Format: uuid
+       * @description Unique identifier for the resource
+       * @example 550e8400-e29b-41d4-a716-446655440000
+       */
+      readonly id?: string
+      /**
+       * Created At
+       * Format: date-time
+       * @description Timestamp when resource was created
+       * @example 2025-10-09T12:00:00Z
+       */
+      readonly created_at?: string
+      /**
+       * Updated At
+       * Format: date-time
+       * @description Timestamp when resource was last updated
+       * @example 2025-10-09T12:30:00Z
+       */
+      readonly updated_at?: string
+      /**
+       * Labels
+       * @description Key-value pairs for resource labeling and filtering
+       * @default {}
+       * @example {
+       *       "environment": "production",
+       *       "region": "us-east-1",
+       *       "team": "platform"
+       *     }
+       */
+      labels?: {
+        [key: string]: string
+      }
+      /**
+       * Project Id
+       * Format: uuid
+       * @description Project this form prompt belongs to
+       */
+      project_id: string
+      /**
+       * Name
+       * @description Human-readable name for the form prompt
+       */
+      name: string
+      /**
+       * Message
+       * @description Resolved guidance message shown to responders
+       */
+      message?: string | null
+      /**
+       * Execution Id
+       * Format: uuid
+       * @description Parent execution ID
+       */
+      execution_id: string
+      /**
+       * Prompt Node Id
+       * @description Canvas node ID from the workflow definition
+       */
+      prompt_node_id: string
+      /**
+       * Loop Iteration Path
+       * @description Enclosing-loop indices, outermost first (empty when not inside a loop)
+       */
+      loop_iteration_path?: number[]
+      /**
+       * @description Current form prompt status
+       * @default pending
+       */
+      status?: components['schemas']['FormPromptStatus']
+      /**
+       * Notes
+       * @description Optional notes explaining the last status change (e.g., reason for cancellation)
+       */
+      notes?: string | null
+      /**
+       * Timeout At
+       * @description When this prompt expires
+       */
+      timeout_at?: string | null
+      /** @description Form definition describing the fields shown to responders */
+      form_definition: components['schemas']['FormDefinition']
+      /**
+       * Submit Label
+       * @description Submit button label shown to the responder
+       */
+      submit_label?: string | null
+      /**
+       * Success Message
+       * @description Message shown after successful form submission
+       */
+      success_message?: string | null
+      /**
+       * Timezone
+       * @description IANA timezone name for interpreting date/datetime field values
+       */
+      timezone?: string | null
+      /**
+       * Css Override
+       * @description Custom CSS applied to the form view
+       */
+      css_override?: string | null
+      /**
+       * Response Data
+       * @description Submitted form values
+       */
+      response_data?: {
+        [key: string]: unknown
+      } | null
+      /**
+       * Responded At
+       * @description When response was submitted
+       */
+      responded_at?: string | null
+      /**
+       * Responder Users
+       * @description Users who can respond to this prompt (empty = any user with permission)
+       */
+      responder_users?: components['schemas']['ResponderUserSummary'][]
+      /**
+       * Responder Groups
+       * @description Groups whose members can respond to this prompt
+       */
+      responder_groups?: components['schemas']['ResponderGroupSummary'][]
+      /** @description User who submitted the response */
+      readonly responded_by?: components['schemas']['UserReference'] | null
+      /**
+       * Signal Delivery Error
+       * @description Error if the workflow signal failed after a response. Only present in the respond response; null on subsequent reads.
+       */
+      signal_delivery_error?: string | null
+    }
+    /**
+     * FormPromptSubmitRequest
+     * @description Request payload for submitting a response to a form prompt.
+     */
+    FormPromptSubmitRequest: {
+      /**
+       * Response Data
+       * @description Submitted form field values, keyed by field name
+       */
+      response_data: {
+        [key: string]: unknown
+      }
+    }
+    /**
+     * ResponderUserSummary
+     * @description Summary of a user authorized to respond to a form prompt.
+     *
+     *     Similar to UserReference but represents a responder rather than the person
+     *     who actually responded. Used in API responses to show who can respond.
+     */
+    ResponderUserSummary: {
+      /**
+       * Id
+       * Format: uuid
+       * @description User's unique identifier
+       */
+      id: string
+      /**
+       * Username
+       * @description User's username
+       */
+      username: string
+    }
+    /**
+     * ResponderGroupSummary
+     * @description Summary of a group whose members are authorized to respond to a form prompt.
+     *
+     *     Represents a group of users who can collectively respond to a prompt.
+     *     Used in API responses to show which groups have response authority.
+     */
+    ResponderGroupSummary: {
+      /**
+       * Id
+       * Format: uuid
+       * @description Group's unique identifier
+       */
+      id: string
+      /**
+       * Name
+       * @description Group's name
+       */
+      name: string
+    }
     /**
      * FormDefinition
      * @description Complete form definition with fields and metadata.
@@ -317,7 +552,7 @@ export interface components {
       /** Options */
       options: components['schemas']['StaticOptions'] | components['schemas']['DynamicOptions']
       /** Default */
-      default?: unknown[] | null
+      default?: (string | number | boolean)[] | null
     }
     /**
      * StaticOptions
@@ -340,7 +575,7 @@ export interface components {
       /** Display Label */
       display_label: string
       /** Value */
-      value: string | number | boolean
+      value: string
     }
     /**
      * DynamicOptions
@@ -365,8 +600,7 @@ export interface components {
      *
      *     Contains only the 8 documented fields used by expire/cancel activities
      *     and workflow lifecycle management. Does not expose user-submitted form data
-     *     or rendering configuration fields (those will appear in FormPromptRead for
-     *     user-facing endpoints in AAP-91889).
+     *     or rendering configuration fields.
      */
     FormPromptSummary: {
       /**
@@ -686,6 +920,34 @@ export interface components {
        */
       instance?: string | null
     }
+    /**
+     * UserReferenceType
+     * @description Kind of principal a UserReference points at.
+     *
+     *     Only ``user`` references have a user detail page. ``deleted_user`` and
+     *     ``deleted_service_account`` mark principals that were hard-deleted but are
+     *     still recorded as the actor.
+     * @enum {string}
+     */
+    UserReferenceType: 'user' | 'service_account' | 'service' | 'system' | 'deleted_user' | 'deleted_service_account'
+    /**
+     * UserReference
+     * @description Minimal user identification for embedding in other resources.
+     *     The name is resolved from the database when the response is built, not
+     *     stored alongside the id, so it always reflects the principal's current
+     *     name. Renaming a user therefore changes the name shown for their past actions.
+     */
+    UserReference: {
+      /**
+       * Format: uuid
+       * @description User's unique identifier
+       */
+      id: string
+      /** @description Principal's current display name, resolved when the response is built. Not a username: for a user this is their first and last name, falling back to the username when both are blank; for a service account it is the account name; for an internal service it is derived from the certificate CN. */
+      name: string
+      /** @description Kind of principal this reference points at. Only `user` references have a user detail page; `deleted_user` / `deleted_service_account` are hard-deleted principals that are still recorded as the actor. */
+      type: components['schemas']['UserReferenceType']
+    }
   }
   responses: {
     /** @description Bad Request */
@@ -927,6 +1189,70 @@ export interface operations {
         }
         content: {
           'application/json': components['schemas']['BatchUpdateResponse']
+        }
+      }
+      400: components['responses']['BadRequestError']
+      401: components['responses']['UnauthorizedError']
+      403: components['responses']['ForbiddenError']
+      404: components['responses']['NotFoundError']
+      409: components['responses']['ConflictError']
+      422: components['responses']['ValidationError']
+      429: components['responses']['RateLimitError']
+      500: components['responses']['InternalServerError']
+    }
+  }
+  get_form_prompt: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        form_prompt_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Form prompt request details */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['FormPromptRead']
+        }
+      }
+      400: components['responses']['BadRequestError']
+      401: components['responses']['UnauthorizedError']
+      403: components['responses']['ForbiddenError']
+      404: components['responses']['NotFoundError']
+      409: components['responses']['ConflictError']
+      422: components['responses']['ValidationError']
+      429: components['responses']['RateLimitError']
+      500: components['responses']['InternalServerError']
+    }
+  }
+  submit_form_prompt: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        form_prompt_id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['FormPromptSubmitRequest']
+      }
+    }
+    responses: {
+      /** @description Updated form prompt with the submitted response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['FormPromptRead']
         }
       }
       400: components['responses']['BadRequestError']

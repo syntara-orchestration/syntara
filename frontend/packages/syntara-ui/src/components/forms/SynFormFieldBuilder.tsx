@@ -6,6 +6,7 @@ import { FormProvider, useForm } from 'react-hook-form'
 import { formDefinitionSchema, safeParseFormDefinition, type FormDefinitionSchemaInput } from '../../forms'
 import { zodResolver } from '../../routes/builder/node-forms/shared/formSchemaUtils'
 
+import styles from './formFieldBuilder/formFieldBuilder.module.css'
 import { FormFieldBuilderCommitContext } from './formFieldBuilder/formFieldBuilderCommitContext'
 import { FormFieldBuilderDesignTab } from './formFieldBuilder/FormFieldBuilderDesignTab'
 import { FormFieldBuilderJsonSchemaTab } from './formFieldBuilder/FormFieldBuilderJsonSchemaTab'
@@ -29,11 +30,13 @@ export function SynFormFieldBuilder({ value, onChange, isDisabled }: Readonly<Sy
   const [activeTab, setActiveTab] = useState<BuilderTab>('design')
   const lastEmittedRef = useRef(JSON.stringify(value))
 
+  const defaultValues: FormDefinitionSchemaInput = { fields: value.fields }
+
   const methods = useForm<FormDefinitionSchemaInput, unknown, FormDefinition>({
     resolver: zodResolver(formDefinitionSchema),
     mode: 'onTouched',
     reValidateMode: 'onChange',
-    defaultValues: value as FormDefinitionSchemaInput,
+    defaultValues,
   })
 
   const valueKey = JSON.stringify(value)
@@ -63,13 +66,19 @@ export function SynFormFieldBuilder({ value, onChange, isDisabled }: Readonly<Sy
           aria-label="Form builder views"
         >
           <Tab eventKey="design" title={<TabTitleText>Design</TabTitleText>}>
-            <FormFieldBuilderDesignTab isDisabled={isDisabled} />
+            <div className={styles.tabPanelBody}>
+              <FormFieldBuilderDesignTab isDisabled={isDisabled} />
+            </div>
           </Tab>
           <Tab eventKey="preview" title={<TabTitleText>Preview</TabTitleText>}>
-            <FormFieldBuilderPreviewTab />
+            <div className={styles.tabPanelBody}>
+              <FormFieldBuilderPreviewTab />
+            </div>
           </Tab>
           <Tab eventKey="json" title={<TabTitleText>JSON Schema</TabTitleText>}>
-            <FormFieldBuilderJsonSchemaTab />
+            <div className={styles.tabPanelBody}>
+              <FormFieldBuilderJsonSchemaTab isDisabled={isDisabled} />
+            </div>
           </Tab>
         </Tabs>
       </FormFieldBuilderCommitContext>

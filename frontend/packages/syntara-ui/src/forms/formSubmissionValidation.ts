@@ -202,7 +202,7 @@ function checkStaticOptionMembership(
   field: SelectFormFieldWithStaticOptions,
   coerced: FormSubmissionData[string]
 ): FormFieldValidationError | null {
-  const validValues = new Set(field.options.values.map((option) => option.value))
+  const validValues = new Set<string>(field.options.values.map((option) => option.value))
 
   if (field.type === FormFieldTypeEnum.MULTI_SELECT) {
     if (!Array.isArray(coerced)) {
@@ -210,7 +210,7 @@ function checkStaticOptionMembership(
     }
     let invalidCount = 0
     for (const value of coerced) {
-      if (!validValues.has(value)) {
+      if (typeof value !== 'string' || !validValues.has(value)) {
         invalidCount += 1
       }
     }
@@ -225,7 +225,7 @@ function checkStaticOptionMembership(
     return null
   }
 
-  if (Array.isArray(coerced) || !validValues.has(coerced)) {
+  if (Array.isArray(coerced) || typeof coerced !== 'string' || !validValues.has(coerced)) {
     if (Array.isArray(coerced)) {
       return fieldError(field, 'type', 'Dropdown expects a single value, not a list')
     }

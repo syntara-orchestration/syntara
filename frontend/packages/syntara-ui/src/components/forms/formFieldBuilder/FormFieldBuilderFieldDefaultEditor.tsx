@@ -72,6 +72,7 @@ export function FormFieldBuilderFieldDefaultEditor({
               onChange={(_event, value) => {
                 if (value === '') {
                   rhfField.onChange(null)
+                  commit()
                   return
                 }
                 const parsed = Number.parseFloat(value)

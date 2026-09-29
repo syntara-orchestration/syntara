@@ -192,7 +192,7 @@ describe('nodeIconResolver', () => {
         {
           id: 'task-1',
           type: 'task',
-          data: { type: ExecutorTypeEnum.SCRIPT, id: 'task-1', name: 'Script' } as TaskActivity,
+          data: { type: ExecutorTypeEnum.SCRIPT, id: 'task-1', name: 'Script' },
         },
         null
       )
