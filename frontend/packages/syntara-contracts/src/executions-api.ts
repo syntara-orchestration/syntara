@@ -539,10 +539,10 @@ export interface components {
      */
     RetryFailureRequest: {
       /**
-       * Failure Point Ids
-       * @description Failure points to retry from (node IDs from the source execution). A subset may be passed when multiple parallel branches failed; unselected branches are skipped. Empty selects the default: all currently failed nodes.
+       * Retry Point Ids
+       * @description Retry points to resume from (node IDs from the source execution). A subset may be passed when multiple parallel branches failed; unselected branches are skipped. Empty selects the default: all currently failed nodes. This is what the caller asks for; the points that will actually run come back as eligible_point_ids on the response, which can differ.
        */
-      failure_point_ids?: string[]
+      retry_point_ids?: string[]
       /**
        * Input Parameter Overrides
        * @description Input parameter overrides for the retry's starting nodes, keyed by node id then parameter name (SDP AC-14/R10c). Each override replaces the value the node would otherwise receive, after upstream outputs are injected, so the supplied value is what executes. Parameter names must already exist on that node in the retained workflow version, and node ids must be among the retry's starting points; anything else is rejected. Overrides apply to this retry run only — the workflow definition is never modified, and a permanent change requires editing, saving, and publishing the workflow.
@@ -569,10 +569,10 @@ export interface components {
        */
       reason?: string | null
       /**
-       * Failure Point Ids
-       * @description Retry points the verdict applies to, after cleanup (trimmed, deduped, sorted). Empty request means all currently failed nodes. On an eligible verdict this is the eligible set actually retryed, including auto-included sanitized nodes and excluding superseded failed points; on rejection it echoes the pre-expansion selection.
+       * Eligible Point Ids
+       * @description The retry points that will actually run, after cleanup (trimmed, deduped, sorted). Equal to the requested retry_point_ids except where sanitized nodes are auto-included and superseded failed points are dropped, so it is not always a verbatim echo of the request. On a rejection it reports the pre-expansion selection that was assessed.
        */
-      failure_point_ids?: string[]
+      eligible_point_ids?: string[]
       /**
        * Sanitized Node Ids
        * @description Upstream nodes with sanitized stored outputs referenced on the retry path. Populated when the verdict rejects; empty on eligible verdicts (see auto_included_node_ids).

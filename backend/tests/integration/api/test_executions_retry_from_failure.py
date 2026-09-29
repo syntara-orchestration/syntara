@@ -258,7 +258,7 @@ class TestPreviewRetryFromFailure:
         data = response.json()
         assert data["eligible"] is True
         assert data["reason"] is None
-        assert data["failure_point_ids"] == ["step_2"]
+        assert data["eligible_point_ids"] == ["step_2"]
         assert data["step_count_by_eligible_point"] == {"step_2": 2}
         assert data["total_step_count"] == 2
 
@@ -273,7 +273,7 @@ class TestPreviewRetryFromFailure:
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data["eligible"] is True
-        assert data["failure_point_ids"] == ["step_2"]
+        assert data["eligible_point_ids"] == ["step_2"]
         assert data["auto_included_node_ids"] == []
         assert data["sanitized_replacements"] == {}
 
@@ -346,7 +346,7 @@ class TestPreviewRetryFromFailure:
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data["eligible"] is True
-        assert data["failure_point_ids"] == ["step_1"]
+        assert data["eligible_point_ids"] == ["step_1"]
         assert data["auto_included_node_ids"] == ["step_1"]
         assert data["step_count_by_eligible_point"] == {"step_1": 3}
         assert data["sanitized_node_ids"] == []
@@ -427,7 +427,7 @@ class TestRetryExecution:
 
         response = await auth_client.post(
             f"/api/v1/executions/{execution.id}/retry-from-failure",
-            json={"failure_point_ids": ["step_2"]},
+            json={"retry_point_ids": ["step_2"]},
         )
 
         assert response.status_code == status.HTTP_201_CREATED
@@ -466,7 +466,7 @@ class TestRetryExecution:
 
         response = await auth_client.post(
             f"/api/v1/executions/{execution.id}/retry-from-failure",
-            json={"failure_point_ids": ["step_2"]},
+            json={"retry_point_ids": ["step_2"]},
         )
 
         assert response.status_code == status.HTTP_201_CREATED
@@ -488,7 +488,7 @@ class TestRetryExecution:
 
         response = await auth_client.post(
             f"/api/v1/executions/{execution.id}/retry-from-failure",
-            json={"failure_point_ids": ["step_2"]},
+            json={"retry_point_ids": ["step_2"]},
         )
 
         assert response.status_code == status.HTTP_409_CONFLICT
@@ -505,7 +505,7 @@ class TestRetryExecution:
     async def test_retry_missing_execution_returns_404(self, auth_client: AsyncClient) -> None:
         response = await auth_client.post(
             f"/api/v1/executions/{uuid.uuid4()}/retry-from-failure",
-            json={"failure_point_ids": ["step_2"]},
+            json={"retry_point_ids": ["step_2"]},
         )
 
         assert response.status_code == status.HTTP_404_NOT_FOUND
@@ -523,7 +523,7 @@ class TestRetryExecution:
 
         response = await auth_client.post(
             f"/api/v1/executions/{execution.id}/retry-from-failure",
-            json={"failure_point_ids": ["step_2"], "input_parameter_overrides": {"step_2": {"code": "echo fixed"}}},
+            json={"retry_point_ids": ["step_2"], "input_parameter_overrides": {"step_2": {"code": "echo fixed"}}},
         )
 
         assert response.status_code == status.HTTP_201_CREATED
@@ -544,7 +544,7 @@ class TestRetryExecution:
 
         response = await auth_client.post(
             f"/api/v1/executions/{execution.id}/retry-from-failure",
-            json={"failure_point_ids": ["step_2"], "input_parameter_overrides": {"step_2": {"nope": "x"}}},
+            json={"retry_point_ids": ["step_2"], "input_parameter_overrides": {"step_2": {"nope": "x"}}},
         )
 
         assert response.status_code == status.HTTP_409_CONFLICT
@@ -565,7 +565,7 @@ class TestRetryExecution:
 
         response = await auth_client.post(
             f"/api/v1/executions/{execution.id}/retry-from-failure",
-            json={"failure_point_ids": ["step_2"]},
+            json={"retry_point_ids": ["step_2"]},
         )
 
         assert response.status_code == status.HTTP_201_CREATED
@@ -584,7 +584,7 @@ class TestRetryExecution:
 
         response = await auth_client.post(
             f"/api/v1/executions/{execution.id}/retry-from-failure",
-            json={"failure_point_ids": ["step_3"]},
+            json={"retry_point_ids": ["step_3"]},
         )
 
         assert response.status_code == status.HTTP_409_CONFLICT
@@ -623,7 +623,7 @@ class TestRetryExecution:
 
         response = await auth_client.post(
             f"/api/v1/executions/{execution.id}/retry-from-failure",
-            json={"failure_point_ids": ["step_2"]},
+            json={"retry_point_ids": ["step_2"]},
         )
 
         assert response.status_code == status.HTTP_409_CONFLICT
@@ -643,7 +643,7 @@ class TestRetryExecution:
 
         response = await auth_client.get(
             f"/api/v1/executions/{execution.id}/retry-from-failure-preview",
-            params={"failure_point_ids": "step_3"},
+            params={"retry_point_ids": "step_3"},
         )
 
         assert response.status_code == status.HTTP_200_OK
@@ -651,4 +651,4 @@ class TestRetryExecution:
         # The unknown point in the query string is not a selection, so eligibility is unaffected
         # and the reported set is still the default (all currently failed nodes).
         assert data["eligible"] is True
-        assert data["failure_point_ids"] == ["step_2"]
+        assert data["eligible_point_ids"] == ["step_2"]

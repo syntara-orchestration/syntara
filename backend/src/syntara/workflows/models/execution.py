@@ -429,11 +429,13 @@ class RetryFailureRequest(SQLModel):
 
     __test__ = False  # Prevent pytest from collecting this as a test class
 
-    failure_point_ids: list[str] = Field(
+    retry_point_ids: list[str] = Field(
         default_factory=list,
-        description="Failure points to retry from (node IDs from the source execution). "
+        description="Retry points to resume from (node IDs from the source execution). "
         "A subset may be passed when multiple parallel branches failed; unselected branches are skipped. "
-        "Empty selects the default: all currently failed nodes.",
+        "Empty selects the default: all currently failed nodes. "
+        "This is what the caller asks for; the points that will actually run come back as "
+        "eligible_point_ids on the response, which can differ.",
     )
     input_parameter_overrides: dict[str, dict[str, Any]] = Field(
         default_factory=dict,
@@ -446,12 +448,12 @@ class RetryFromFailureValidationResponse(SQLModel):
 
     eligible: bool = Field(description="Whether the retry is allowed to proceed")
     reason: str | None = Field(default=None, description="Rejection reason when eligible is false, null otherwise")
-    failure_point_ids: list[str] = Field(
+    eligible_point_ids: list[str] = Field(
         default_factory=list,
-        description="Retry points the verdict applies to, after cleanup (trimmed, deduped, sorted). "
-        "Empty request means all currently failed nodes. On an eligible verdict this is the eligible "
-        "set actually retryed, including auto-included sanitized nodes and excluding superseded "
-        "failed points; on rejection it echoes the pre-expansion selection.",
+        description="The retry points that will actually run, after cleanup (trimmed, deduped, sorted). "
+        "Equal to the requested retry_point_ids except where sanitized nodes are auto-included and "
+        "superseded failed points are dropped, so it is not always a verbatim echo of the request. "
+        "On a rejection it reports the pre-expansion selection that was assessed.",
     )
     sanitized_node_ids: list[str] = Field(
         default_factory=list,

@@ -345,7 +345,7 @@ async def retry_from_failure(
 ) -> ExecutionRead:
     """Retry a failed execution from failure points."""
     logger.info("Retrying execution from failure", execution_id=execution_id)
-    return await service.retry_from_failure(execution_id, body.failure_point_ids, body.input_parameter_overrides)
+    return await service.retry_from_failure(execution_id, body.retry_point_ids, body.input_parameter_overrides)
 
 
 @router.get(

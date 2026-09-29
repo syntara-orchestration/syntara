@@ -1260,7 +1260,7 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
         return RetryFromFailureValidationResponse(
             eligible=validation.eligible,
             reason=validation.reason,
-            failure_point_ids=validation.failure_point_ids,
+            eligible_point_ids=validation.eligible_point_ids,
             sanitized_node_ids=validation.sanitized_node_ids,
             auto_included_node_ids=validation.auto_included_node_ids,
             sanitized_replacements=validation.sanitized_replacements,
@@ -1293,14 +1293,14 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
             execution_id=execution_id,
             eligible=validation.eligible,
             reason=validation.reason,
-            eligible_point_count=len(validation.failure_point_ids),
+            eligible_point_count=len(validation.eligible_point_ids),
         )
         return self._to_preview_response(validation)
 
     async def retry_from_failure(
         self,
         execution_id: UUID,
-        failure_point_ids: list[str],
+        retry_point_ids: list[str],
         input_parameter_overrides: dict[str, dict[str, Any]] | None = None,
     ) -> ExecutionRead:
         """Retry an execution from failure points (AAP-92820).
@@ -1312,13 +1312,13 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
         retries) running the exact workflow version *retained from the
         original run* — later edits to the definition never affect a retry
         (SDP ANSTRAT-1779 R10) — and triggers a Temporal run carrying
-        ``retry_from_execution_id``, the selected failure points, and any
+        ``retry_from_execution_id``, the eligible retry points, and any
         validated input parameter overrides for the engine's node
         classification and parameter application (AAP-92821).
 
         Args:
             execution_id: ID of the source (failed) execution
-            failure_point_ids: Failure points to retry from; a subset may be
+            retry_point_ids: Retry points to resume from; a subset may be
                 passed when multiple parallel branches failed
             input_parameter_overrides: Per-starting-node input parameter
                 overrides for this run only (SDP AC-14/R10c). Validated, never
@@ -1336,7 +1336,7 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
         # the preview reports the default (all failed nodes) and cannot speak for a
         # subset or for the supplied overrides.
         validation = await validate_retry_from_failure(
-            self.session, execution_id, failure_point_ids, input_parameter_overrides
+            self.session, execution_id, retry_point_ids, input_parameter_overrides
         )
         if not validation.eligible:
             raise ExecutionNotRetryableFromFailureError(execution_id, validation.reason or "retry validation failed")
@@ -1344,7 +1344,7 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
             "Retry validation",
             execution_id=execution_id,
             eligible=validation.eligible,
-            failure_point_ids=validation.failure_point_ids,
+            eligible_point_ids=validation.eligible_point_ids,
             override_node_ids=sorted(input_parameter_overrides or {}),
         )
 
@@ -1381,7 +1381,7 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
             "Retrying execution from failure",
             source_execution_id=execution_id,
             workflow_id=source.workflow_id,
-            failure_point_ids=validation.failure_point_ids,
+            eligible_point_ids=validation.eligible_point_ids,
             override_node_ids=sorted(validated_overrides),
             created_by=str(self.user.id),
         )
@@ -1397,6 +1397,6 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
             recorder=recorder,
             component=component,
             retried_from_execution_id=source.id,
-            retry_failure_point_ids=validation.failure_point_ids,
+            retry_failure_point_ids=validation.eligible_point_ids,
             input_parameter_overrides=validated_overrides,
         )

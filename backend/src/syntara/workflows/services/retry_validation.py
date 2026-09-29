@@ -100,7 +100,7 @@ class RetryValidation:
 
     eligible: bool
     reason: str | None = None
-    failure_point_ids: list[str] = field(default_factory=list)
+    eligible_point_ids: list[str] = field(default_factory=list)
     sanitized_node_ids: list[str] = field(default_factory=list)
     auto_included_node_ids: list[str] = field(default_factory=list)
     sanitized_replacements: dict[str, list[str]] = field(default_factory=dict)
@@ -146,7 +146,7 @@ def build_successors(definition: dict[str, Any]) -> dict[str, set[str]]:
 
 def collect_downstream_node_ids(
     definition: dict[str, Any],
-    failure_point_ids: list[str],
+    retry_point_ids: list[str],
     successors: dict[str, set[str]] | None = None,
 ) -> set[str]:
     """Return failure points plus every successor downstream (inclusive).
@@ -159,7 +159,7 @@ def collect_downstream_node_ids(
         successors = build_successors(definition)
 
     downstream: set[str] = set()
-    stack = list(failure_point_ids)
+    stack = list(retry_point_ids)
     while stack:
         node_id = stack.pop()
         if node_id in downstream:
@@ -171,7 +171,7 @@ def collect_downstream_node_ids(
 
 def _step_counts(
     definition: dict[str, Any],
-    failure_point_ids: list[str],
+    retry_point_ids: list[str],
     successors: dict[str, set[str]] | None = None,
 ) -> tuple[dict[str, int], int]:
     """Re-run step count per eligible retry point, plus the deduplicated total.
@@ -183,10 +183,8 @@ def _step_counts(
     """
     if successors is None:
         successors = build_successors(definition)
-    per_point = {
-        point: len(collect_downstream_node_ids(definition, [point], successors)) for point in failure_point_ids
-    }
-    total = len(collect_downstream_node_ids(definition, failure_point_ids, successors))
+    per_point = {point: len(collect_downstream_node_ids(definition, [point], successors)) for point in retry_point_ids}
+    total = len(collect_downstream_node_ids(definition, retry_point_ids, successors))
     return per_point, total
 
 
@@ -525,7 +523,7 @@ def _sanitized_replacements(
 async def validate_retry_from_failure(
     session: AsyncSession,
     execution_id: UUID,
-    failure_point_ids: list[str],
+    retry_point_ids: list[str],
     input_parameter_overrides: dict[str, dict[str, Any]] | None = None,
 ) -> RetryValidation:
     """Validate that an execution can be retried from the given failure points.
@@ -535,7 +533,7 @@ async def validate_retry_from_failure(
     (state, selection, converge-mootness, retained-version, sanitized-taint,
     input-override). Never mutates state.
 
-    An empty ``failure_point_ids`` means the default selection — all
+    An empty ``retry_point_ids`` means the default selection — all
     currently failed nodes (SDP R11/AC-15) — not an error.
 
     ``input_parameter_overrides`` is validated, never applied: this layer only
@@ -552,7 +550,7 @@ async def validate_retry_from_failure(
     if source is None:
         raise ExecutionNotFoundError(execution_id)
 
-    suffixed = sorted({point.strip() for point in failure_point_ids if point and LOOP_ITERATION_SEP in point.strip()})
+    suffixed = sorted({point.strip() for point in retry_point_ids if point and LOOP_ITERATION_SEP in point.strip()})
     if suffixed:
         return RetryValidation(
             eligible=False,
@@ -560,9 +558,9 @@ async def validate_retry_from_failure(
                 "loop-iteration failure points are not selectable "
                 f"({', '.join(suffixed)}); select base node ids instead"
             ),
-            failure_point_ids=sorted({point.strip() for point in failure_point_ids if point and point.strip()}),
+            eligible_point_ids=sorted({point.strip() for point in retry_point_ids if point and point.strip()}),
         )
-    normalized_input = sorted({point.strip() for point in failure_point_ids if point and point.strip()})
+    normalized_input = sorted({point.strip() for point in retry_point_ids if point and point.strip()})
     is_default_selection = not normalized_input
 
     activities = (
@@ -641,7 +639,7 @@ async def validate_retry_from_failure(
         return RetryValidation(
             eligible=False,
             reason=reason,
-            failure_point_ids=reported_selection,
+            eligible_point_ids=reported_selection,
             sanitized_node_ids=sanitized,
             sanitized_replacements=replacements,
             step_count_by_eligible_point=step_counts,
@@ -650,7 +648,7 @@ async def validate_retry_from_failure(
 
     return RetryValidation(
         eligible=True,
-        failure_point_ids=reported_selection,
+        eligible_point_ids=reported_selection,
         auto_included_node_ids=auto_included,
         sanitized_replacements=replacements,
         step_count_by_eligible_point=step_counts,

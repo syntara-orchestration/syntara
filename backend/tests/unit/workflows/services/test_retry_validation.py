@@ -143,7 +143,7 @@ async def test_validate_retry_passes_clean_path() -> None:
     verdict = await validate_retry_from_failure(session, execution.id, ["step_2"])
     assert verdict.eligible is True
     assert verdict.reason is None
-    assert verdict.failure_point_ids == ["step_2"]
+    assert verdict.eligible_point_ids == ["step_2"]
     assert verdict.step_count_by_eligible_point == {"step_2": 2}
     assert verdict.total_step_count == 2
 
@@ -222,7 +222,7 @@ async def test_validate_retry_default_selection_auto_includes_sanitized_dependen
     )
     verdict = await validate_retry_from_failure(session, execution.id, [])
     assert verdict.eligible is True
-    assert verdict.failure_point_ids == ["step_1"]
+    assert verdict.eligible_point_ids == ["step_1"]
     assert verdict.auto_included_node_ids == ["step_1"]
     assert verdict.sanitized_node_ids == []
     assert verdict.sanitized_replacements == {"step_2": ["step_1"]}
@@ -269,7 +269,7 @@ async def test_validate_retry_default_selection_cascades_through_chained_depende
     )
     verdict = await validate_retry_from_failure(session, execution.id, [])
     assert verdict.eligible is True
-    assert verdict.failure_point_ids == ["step_0", "step_1"]
+    assert verdict.eligible_point_ids == ["step_0", "step_1"]
     assert verdict.auto_included_node_ids == ["step_0", "step_1"]
     assert verdict.sanitized_replacements == {"step_2": ["step_0", "step_1"]}
     assert verdict.step_count_by_eligible_point == {"step_0": 4, "step_1": 3}
@@ -493,7 +493,7 @@ async def test_validate_retry_empty_selection_defaults_to_all_failed() -> None:
     execution = _make_execution(ExecutionStatus.FAILED)
     verdict = await validate_retry_from_failure(_run_session(execution, _definition()), execution.id, [])
     assert verdict.eligible is True
-    assert verdict.failure_point_ids == ["step_2"]
+    assert verdict.eligible_point_ids == ["step_2"]
     assert verdict.auto_included_node_ids == []
 
 
@@ -653,7 +653,7 @@ async def test_validate_retry_normalizes_and_dedupes_selection() -> None:
     )
     verdict = await validate_retry_from_failure(session, execution.id, [" step_2 ", "step_2"])
     assert verdict.eligible is True
-    assert verdict.failure_point_ids == ["step_2"]
+    assert verdict.eligible_point_ids == ["step_2"]
 
 
 @pytest.mark.asyncio
@@ -736,7 +736,7 @@ async def test_validate_retry_accepts_override_for_starting_node() -> None:
     verdict = await validate_retry_from_failure(session, execution.id, ["step_2"], {"step_2": {"code": "echo fixed"}})
     assert verdict.eligible is True
     assert verdict.reason is None
-    assert verdict.failure_point_ids == ["step_2"]
+    assert verdict.eligible_point_ids == ["step_2"]
 
 
 @pytest.mark.asyncio
@@ -816,7 +816,7 @@ async def test_validate_retry_override_allowed_on_auto_included_sanitized_node()
     )
     verdict = await validate_retry_from_failure(session, execution.id, [], {"step_1": {"code": "echo fresh"}})
     assert verdict.eligible is True
-    assert verdict.failure_point_ids == ["step_1"]
+    assert verdict.eligible_point_ids == ["step_1"]
 
 
 @pytest.mark.asyncio
