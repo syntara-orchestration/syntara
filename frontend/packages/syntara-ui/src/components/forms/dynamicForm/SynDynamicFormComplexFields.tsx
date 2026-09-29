@@ -1,6 +1,5 @@
 import { Checkbox, DatePicker, NumberInput } from '@patternfly/react-core'
 import type { FormField } from '@syntara/contracts'
-
 import { useController } from 'react-hook-form'
 
 import type { FormSubmissionInput } from '../../../forms'

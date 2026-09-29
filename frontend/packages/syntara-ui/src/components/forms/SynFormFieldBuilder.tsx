@@ -30,11 +30,13 @@ export function SynFormFieldBuilder({ value, onChange, isDisabled }: Readonly<Sy
   const [activeTab, setActiveTab] = useState<BuilderTab>('design')
   const lastEmittedRef = useRef(JSON.stringify(value))
 
+  const defaultValues: FormDefinitionSchemaInput = { fields: value.fields }
+
   const methods = useForm<FormDefinitionSchemaInput, unknown, FormDefinition>({
     resolver: zodResolver(formDefinitionSchema),
     mode: 'onTouched',
     reValidateMode: 'onChange',
-    defaultValues: value as FormDefinitionSchemaInput,
+    defaultValues,
   })
 
   const valueKey = JSON.stringify(value)

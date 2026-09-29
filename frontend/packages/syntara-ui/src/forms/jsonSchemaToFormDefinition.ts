@@ -54,6 +54,9 @@ function staticOptionsFromEnum(enumValues: readonly OptionScalar[]) {
   }
 }
 
+type DropdownFieldOptions = Extract<FormField, { type: 'dropdown' }>['options']
+type MultiSelectFieldOptions = Extract<FormField, { type: 'multi_select' }>['options']
+
 function parseSyntaraOptionsExtension(property: JsonSchemaProperty): SyntaraFormOptionsExtension | null {
   const raw = property[SYNTARA_FORM_OPTIONS_EXTENSION]
   if (!isRecord(raw) || raw.source !== 'dynamic') {
@@ -143,7 +146,7 @@ function dropdownFieldFromProperty(base: FieldBase, property: JsonSchemaProperty
   return {
     ...base,
     type: FormFieldTypeEnum.DROPDOWN,
-    options: staticOptionsFromEnum(enumValues),
+    options: staticOptionsFromEnum(enumValues) as DropdownFieldOptions,
     default: dropdownDefaultFromImported(defaultFromProperty(property)),
   }
 }
@@ -167,7 +170,7 @@ function multiSelectFieldFromProperty(base: FieldBase, property: JsonSchemaPrope
   return {
     ...base,
     type: FormFieldTypeEnum.MULTI_SELECT,
-    options: staticOptionsFromEnum(enumValues),
+    options: staticOptionsFromEnum(enumValues) as MultiSelectFieldOptions,
     default: Array.isArray(importedDefault) ? importedDefault : null,
   }
 }
