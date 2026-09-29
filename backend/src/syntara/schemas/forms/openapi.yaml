@@ -1002,7 +1002,11 @@ components:
           minLength: 1
           maxLength: 200
         value:
-          type: string
+          anyOf:
+            - type: string
+            - type: integer
+            - type: number
+            - type: boolean
           title: Value
 
     DynamicOptions:
