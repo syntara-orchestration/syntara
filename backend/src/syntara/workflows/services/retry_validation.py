@@ -1,8 +1,10 @@
 """Pre-retry validation for retry-from-failure (AAP-92820).
 
-Shared by ``POST /executions/{id}/validate-retry-from-failure`` (pure verdict,
-no state mutation) and ``POST /executions/{id}/retry-from-failure`` (re-validates independently
-before doing any work, so the retry endpoint is safe to call directly).
+  Shared by ``GET /executions/{id}/retry-from-failure-preview`` (pure verdict,
+  no state mutation, reports the default selection) and
+  ``POST /executions/{id}/retry-from-failure`` (re-validates the caller's
+  selection independently before doing any work, so the retry endpoint is safe
+  to call directly).
 
 Validation is a chain of checks:
 
@@ -32,10 +34,14 @@ Validation is a chain of checks:
    retry-specific (SDP scope reduction, R9a).
 6. **Input-override guard** — supplied input parameter overrides (SDP AC-14/R10c)
    may only name parameters that already exist on the target node in the
-   retained version, and may only target nodes that are actually starting
-   points of this retry. Overrides are validated here but never applied: the
-   engine applies them at dispatch (AAP-92821). An override replaces the value
-   the node would otherwise receive, after upstream outputs are injected.
+   retained version, and may only target nodes that are both currently failed
+   and inside the re-run closure. A sanitized node is never a target even when
+   it is an auto-included starting point: it was pulled in to regenerate raw
+   output, not chosen by the caller. A failed node that the caller excluded from
+   this retry is rejected too, since the override would be silently discarded.
+   Overrides are validated here but never applied: the engine applies them at
+   dispatch (AAP-92821). An override replaces the value the node would
+   otherwise receive, after upstream outputs are injected.
 
     For an **explicit** selection, a sanitized dependency always rejects. For
     the **default** selection (empty input — see below), a sanitized

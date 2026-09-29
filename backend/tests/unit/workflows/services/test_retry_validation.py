@@ -868,6 +868,28 @@ async def test_validate_retry_rejects_override_when_version_missing() -> None:
 
 
 @pytest.mark.asyncio
+async def test_validate_retry_rejects_override_for_node_without_parameters() -> None:
+    """A node with no inputs in the retained version cannot take an override.
+
+    Overrides may change a value, never introduce a parameter, so a node whose
+    retained definition declares no inputs rejects rather than having one added
+    for a single run.
+    """
+    execution = _make_execution(ExecutionStatus.FAILED)
+    bare_nodes = [dict(n, parameters={}) if n["id"] == "step_2" else n for n in NODES]
+    snapshot = _make_version(1, nodes=bare_nodes)
+    session = _mock_session(
+        (execution, "one"),
+        ([_make_activity("step_2")], "all"),
+        ([_make_completed_activity("step_1")], "all"),
+        (snapshot, "one"),
+    )
+    verdict = await validate_retry_from_failure(session, execution.id, ["step_2"], {"step_2": {"code": "x"}})
+    assert verdict.eligible is False
+    assert "step_2" in (verdict.reason or "")
+
+
+@pytest.mark.asyncio
 async def test_validate_retry_empty_overrides_never_reject() -> None:
     """Most retries change nothing, so an empty/absent override map must stay valid."""
     execution = _make_execution(ExecutionStatus.FAILED)
