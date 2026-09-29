@@ -119,6 +119,17 @@ class ExecutionNotRetryableError(WorkflowError):
         super().__init__(f"Cannot retry execution {execution_id}: {reason}")
 
 
+@fastapi_exception(handler="syntara.workflows.error_handlers.execution_not_retryable_from_failure_handler")
+class ExecutionNotRetryableFromFailureError(WorkflowError):
+    """Raised when an execution cannot be retried from its failure point."""
+
+    def __init__(self, execution_id: UUID, reason: str) -> None:
+        """Initialize exception with execution ID and reason."""
+        self.execution_id = execution_id
+        self.reason = reason
+        super().__init__(f"Cannot retry from failure for execution {execution_id}: {reason}")
+
+
 @fastapi_exception(handler="syntara.workflows.error_handlers.temporal_unavailable_handler")
 class TemporalUnavailableError(WorkflowError):
     """Raised when Temporal service is unavailable."""
