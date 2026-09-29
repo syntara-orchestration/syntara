@@ -1,8 +1,8 @@
 """Preseed GA managed credential types.
 
-Creates 5 managed credential types if they don't exist, updates them
-in place if they do. Uses INSERT ... ON CONFLICT DO UPDATE for atomicity —
-safe under concurrent execution.
+Creates the managed credential types in ``GA_CREDENTIAL_TYPES`` if they don't
+exist, and updates them in place if they do. Uses INSERT ... ON CONFLICT DO
+UPDATE for atomicity — safe under concurrent execution.
 
 Registered in the unified seeder (``syntara.core.seed``) and invoked via
 ``uv run python -m syntara.seed``.
@@ -16,6 +16,7 @@ import structlog
 from sqlalchemy.dialects.postgresql import insert
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from syntara.credentials.lib.auth_types import AUTH_TYPE_KAFKA_CONNECTION
 from syntara.credentials.models.credential_type import CredentialType
 
 logger = structlog.stdlib.get_logger(__name__)
@@ -29,6 +30,40 @@ _UPSERT_UPDATE_FIELDS = (
 )
 
 GA_CREDENTIAL_TYPES: list[dict[str, Any]] = [
+    {
+        "name": "Kafka-connection",
+        "description": "Username and password for a Kafka connection",
+        "inputs": {
+            "fields": [
+                {
+                    "id": "username",
+                    "label": "Username",
+                    "type": "string",
+                    "secret": False,
+                    "help_text": "Kafka SASL username.",
+                    "placeholder": "Enter username",
+                },
+                {
+                    "id": "password",
+                    "label": "Password",
+                    "type": "string",
+                    "secret": True,
+                    "help_text": "Kafka SASL password. Encrypted at rest.",
+                    "placeholder": "Enter password",
+                },
+            ],
+            "required": ["username", "password"],
+        },
+        "injectors": {
+            "extra_vars": {
+                "auth_type": AUTH_TYPE_KAFKA_CONNECTION,
+                "kafka_username": "{{username}}",
+                "kafka_password": "{{password}}",
+            },
+            "env": {},
+            "file": {},
+        },
+    },
     {
         "name": "HTTP Bearer Token",
         "description": "Bearer token authentication for HTTP APIs",
