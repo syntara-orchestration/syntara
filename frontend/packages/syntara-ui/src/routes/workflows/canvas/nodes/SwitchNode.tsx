@@ -6,18 +6,18 @@ import { useEffect, useRef, useState } from 'react'
 import { SynDetailList } from '../../../../components/details/SynDetailList'
 import { SynStep } from '../../../../components/steps/SynStep'
 import { SynStepBody } from '../../../../components/steps/SynStepBody'
-import { RegistryNodeId } from '../../../../constants'
+import { RegistryStepId } from '../../../../constants'
 import { buildSwitchCasePort } from '../../../builder/utils/switchCaseHelpers'
 import type { ActivityStatus } from '../../execution/types'
-import { getNodeTypeColor } from '../nodeTypeColors'
 import { semanticZoomActivityTitle } from '../semanticZoom'
+import { getStepTypeColor } from '../stepTypeColors'
 
 import { BranchHandle, BranchHandles } from './common/BranchHandle'
 import { renderJson, renderOutputs } from './common/detailRenderers'
-import { StandardNodeHeader } from './common/StandardNodeHeader'
-import { MenuNodeType, useNodeMenuActions } from './hooks/useNodeMenuActions'
-import { nodeMetadata } from './nodeMetadata'
-import { renderNodeIcon } from './renderNodeIcon'
+import { StandardStepHeader } from './common/StandardStepHeader'
+import { StepMenuCategory, useStepMenuActions } from './hooks/useStepMenuActions'
+import { renderStepIcon } from './renderStepIcon'
+import { stepMetadata } from './stepMetadata'
 import styles from './SwitchNode.module.css'
 
 function TruncatedPathLabel({ label }: Readonly<{ label: string }>) {
@@ -51,12 +51,12 @@ function TruncatedPathLabel({ label }: Readonly<{ label: string }>) {
 
 export type SwitchNode = { type: 'switch' } & Node<SwitchActivity>
 
-export function SwitchNodeComponent(props: NodeProps<SwitchNode>) {
-  const metadata = nodeMetadata.switch
-  const iconNode = renderNodeIcon(metadata.icon, RegistryNodeId.LOGIC_SWITCH, 'canvas', getNodeTypeColor('switch'))
-  const menuActions = useNodeMenuActions({
+export function SwitchStepComponent(props: NodeProps<SwitchNode>) {
+  const metadata = stepMetadata.switch
+  const iconNode = renderStepIcon(metadata.icon, RegistryStepId.LOGIC_SWITCH, 'canvas', getStepTypeColor('switch'))
+  const menuActions = useStepMenuActions({
     nodeId: props.data.id,
-    nodeType: MenuNodeType.CONTROL_FLOW,
+    stepCategory: StepMenuCategory.CONTROL_FLOW,
   })
 
   const executionState = (props.data as Record<string, unknown>).__executionState as
@@ -86,14 +86,14 @@ export function SwitchNodeComponent(props: NodeProps<SwitchNode>) {
       nodeProps={props}
       disableSource
       executionState={executionState}
-      topBarColor={getNodeTypeColor('switch')}
+      topBarColor={getStepTypeColor('switch')}
       semanticZoomSummary={{
         title: semanticZoomActivityTitle(props.data.name, `Untitled ${metadata.label}`),
         typeLabel: metadata.label,
       }}
       semanticZoomBranchSources={branchSources}
     >
-      <SwitchNodeDetails switchActivity={props.data} icon={iconNode} menuActions={menuActions}>
+      <SwitchStepDetails switchActivity={props.data} icon={iconNode} menuActions={menuActions}>
         <BranchHandles>
           {cases.map((c, i) => (
             <BranchHandle
@@ -109,23 +109,23 @@ export function SwitchNodeComponent(props: NodeProps<SwitchNode>) {
             Fallback
           </BranchHandle>
         </BranchHandles>
-      </SwitchNodeDetails>
+      </SwitchStepDetails>
     </SynStep>
   )
 }
 
-function SwitchNodeDetails(props: {
+function SwitchStepDetails(props: {
   switchActivity: SwitchActivity
   children?: React.ReactNode
   showJson?: boolean
   icon?: React.ReactNode
-  menuActions?: ReturnType<typeof useNodeMenuActions>
+  menuActions?: ReturnType<typeof useStepMenuActions>
 }) {
-  const metadata = nodeMetadata.switch
+  const metadata = stepMetadata.switch
 
   return (
     <>
-      <StandardNodeHeader
+      <StandardStepHeader
         icon={props.icon}
         title={props.switchActivity.name ?? 'Untitled Switch'}
         subtitle={metadata.label}
