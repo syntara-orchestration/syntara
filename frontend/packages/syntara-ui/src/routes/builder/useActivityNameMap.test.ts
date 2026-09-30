@@ -5,7 +5,7 @@ import type { ActivityState } from '../workflows/execution/types'
 
 import type { ActivityOrderItem } from './ExecutionActivityTable'
 import {
-  resolveNodeName,
+  resolveStepName,
   sortActivityOrder,
   useActivityNameMap,
   type WorkflowDefEdge,
@@ -20,22 +20,22 @@ vi.mock('../../stores/workflowStoreSelectors', () => ({
 // Re-import after mock setup so we can control return values
 const { useActivities, useTriggers } = await import('../../stores/workflowStoreSelectors')
 
-describe('resolveNodeName', () => {
+describe('resolveStepName', () => {
   it('returns undefined for null nodeId', () => {
-    expect(resolveNodeName(new Map(), null)).toBeUndefined()
+    expect(resolveStepName(new Map(), null)).toBeUndefined()
   })
 
   it('returns undefined for undefined nodeId', () => {
-    expect(resolveNodeName(new Map())).toBeUndefined()
+    expect(resolveStepName(new Map())).toBeUndefined()
   })
 
   it('returns name from map if present', () => {
     const map = new Map([['step-1', 'Fetch Data']])
-    expect(resolveNodeName(map, 'step-1')).toBe('Fetch Data')
+    expect(resolveStepName(map, 'step-1')).toBe('Fetch Data')
   })
 
   it('falls back to nodeId when not in map', () => {
-    expect(resolveNodeName(new Map(), 'step-1')).toBe('step-1')
+    expect(resolveStepName(new Map(), 'step-1')).toBe('step-1')
   })
 })
 
