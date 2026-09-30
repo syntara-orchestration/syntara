@@ -17,5 +17,15 @@ def init_workflow_runtime(wf: OrchestratorWorkflow) -> None:
     """
     wf._runtime_settings = make_workflow_runtime_settings()
     wf._has_unhandled_failure = False
+    # Retry-from-failure state. Set in __init__ for a real run; defaulted here so
+    # a workflow built for a non-retry test behaves as one.
+    wf.retry_context = {}
+    wf._retry_restorable_cache = None
+    wf._restored_nodes = set()
+    # Set in __init__ for a real run. Guarded because some tests build the workflow
+    # by hand, and a converge reads it to tell whether a loop predecessor is still
+    # iterating, so it must exist even on a workflow with nothing to do with retries.
+    if not hasattr(wf, "node_control_data"):
+        wf.node_control_data = {}
     if not hasattr(wf, "_cof_failed_nodes"):
         wf._cof_failed_nodes = set()
