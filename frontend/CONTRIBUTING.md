@@ -144,7 +144,7 @@ These thresholds are based on industry standards (Code Complete, SonarQube, Biom
 | `max-lines-per-function` | 200 lines/function | Extract helpers instead of writing monoliths                 |
 | `complexity`             | 20 (cyclomatic)    | Break complex branching into smaller functions               |
 | `max-depth`              | 4 levels           | Use early returns instead of deep nesting                    |
-| `max-params`             | 5 parameters       | Use an options object for functions with many inputs         |
+| `max-params`             | 4 parameters       | Use an options object for functions with many inputs         |
 | `max-nested-callbacks`   | 4 levels           | Flatten nested callbacks with named functions or async/await |
 
 We also enforce modern TypeScript, React, and import hygiene rules as CI-blocking `error`s:

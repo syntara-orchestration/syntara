@@ -21,7 +21,7 @@ class AAPBaseQuery(BaseModel):
     page_size: int = Field(default=50, ge=1, le=200, description="Max results to return")
     credential_id: UUID | None = Field(
         default=None,
-        description="Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication. "
+        description="Optional Syntara credential ID for AAP Controller authentication. "
         "If omitted, the selected integration's management credential is used. "
         'Credential must be of type "Ansible Automation Platform". '
         "Must be a valid UUID format.",

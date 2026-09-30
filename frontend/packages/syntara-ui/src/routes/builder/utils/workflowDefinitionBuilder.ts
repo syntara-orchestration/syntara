@@ -230,21 +230,17 @@ export function transformNodeParameters(type: string, parameters: Record<string,
  * - Converts React Flow handles to V2 port names (loop→iterate, done→complete)
  * - Extracts optional activity inputs using type-safe guards
  *
- * @param workflowName - Workflow name
- * @param workflowDescription - Optional workflow description
- * @param activities - Array of workflow activities (nodes)
- * @param triggers - Array of workflow triggers
- * @param edges - Array of workflow edges (connections)
  * @returns V2 workflow definition ready for API submission
  */
-export function buildWorkflowDefinition(
-  workflowName: string,
-  workflowDescription: string,
-  activities: Activity[],
-  triggers: Activity[],
-  graph: { edges: EdgeConnection[]; nodePositions?: Record<string, { x: number; y: number }> }
-) {
-  const { edges, nodePositions = {} } = graph
+export function buildWorkflowDefinition(params: {
+  workflowName: string
+  workflowDescription: string
+  activities: Activity[]
+  triggers: Activity[]
+  edges: EdgeConnection[]
+  nodePositions?: Record<string, { x: number; y: number }>
+}) {
+  const { workflowName, workflowDescription, activities, triggers, edges, nodePositions = {} } = params
   // SECURITY: Validate and sanitize workflow name and description
   if (!workflowName || workflowName.length > 255) {
     throw new Error('Workflow name is required and must be 255 characters or fewer.')

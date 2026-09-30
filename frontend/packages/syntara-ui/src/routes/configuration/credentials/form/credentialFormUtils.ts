@@ -49,13 +49,19 @@ export function getDefaultInputs(credType: CredentialType | undefined): Record<s
 }
 
 /** Validate a required dynamic field in edit mode — skips untouched secret fields to preserve existing encrypted values. */
-export function validateEditModeRequiredDynamicField(
-  requiredId: string,
-  val: unknown,
-  field: FieldDefinition | undefined,
-  touchedSecrets: Set<string>,
+export function validateEditModeRequiredDynamicField({
+  requiredId,
+  val,
+  field,
+  touchedSecrets,
+  setError,
+}: {
+  requiredId: string
+  val: unknown
+  field: FieldDefinition | undefined
+  touchedSecrets: Set<string>
   setError: UseFormSetError<CredentialFormData>
-): boolean {
+}): boolean {
   const isSecret = field?.secret === true
   if (isSecret) {
     if (touchedSecrets.has(requiredId) && (val == null || val === '')) {
@@ -195,7 +201,13 @@ function validateRequiredField(
   const field = typeInputs?.fields.find((f) => f.id === fieldId)
 
   if (isEditMode) {
-    return validateEditModeRequiredDynamicField(fieldId, val, field, touchedSecrets, setError)
+    return validateEditModeRequiredDynamicField({
+      requiredId: fieldId,
+      val,
+      field,
+      touchedSecrets,
+      setError,
+    })
   }
   return validateCreateModeRequiredDynamicField(fieldId, val, field, setError)
 }

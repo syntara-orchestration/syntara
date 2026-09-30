@@ -1895,7 +1895,7 @@ components:
             - type: string
             - type: 'null'
           title: Credential Id
-          description: Orchestrator credential UUID for Ansible Automation Platform API authentication. Separate from legacy credentials list.
+          description: Syntara credential UUID for Ansible Automation Platform API authentication. Separate from legacy credentials list.
         integration_id:
           anyOf:
             - type: string
@@ -2050,7 +2050,7 @@ components:
             - type: string
             - type: 'null'
           title: Credential Id
-          description: Orchestrator credential UUID for Ansible Automation Platform API authentication. Separate from legacy credentials list.
+          description: Syntara credential UUID for Ansible Automation Platform API authentication. Separate from legacy credentials list.
         integration_id:
           anyOf:
             - type: string
@@ -2171,7 +2171,7 @@ components:
             - type: string
             - type: 'null'
           title: Credential Id
-          description: Orchestrator credential UUID for authentication or Secret URL.
+          description: Syntara credential UUID for authentication or Secret URL.
       type: object
       required:
         - method
@@ -2199,7 +2199,7 @@ components:
             - type: string
             - type: 'null'
           title: Credential Id
-          description: Orchestrator credential UUID for LLM provider authentication
+          description: Syntara credential UUID for LLM provider authentication
         file_ids:
           items:
             type: string
@@ -2253,7 +2253,7 @@ components:
         credential_id:
           type: string
           title: Credential Id
-          description: Orchestrator credential UUID for execution calls (distinct from management credential)
+          description: Syntara credential UUID for execution calls (distinct from management credential)
       type: object
       required:
         - integration_id
@@ -2296,7 +2296,7 @@ components:
             - type: string
             - type: 'null'
           title: Credential Id
-          description: Orchestrator credential UUID
+          description: Syntara credential UUID
         approver_users:
           anyOf:
             - items:

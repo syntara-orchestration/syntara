@@ -49,13 +49,19 @@ function tooltipWhenDenied(allowed: boolean, text: string) {
   return allowed ? undefined : { content: text }
 }
 
-function getRowActions(
-  provider: IdentityProvider,
-  onDelete: (provider: IdentityProvider) => void,
-  onRevoke: (provider: IdentityProvider) => void,
-  permissions: ReturnType<typeof useIdentityProviderPermissions>,
+function getRowActions({
+  provider,
+  onDelete,
+  onRevoke,
+  permissions,
+  onNavigate,
+}: {
+  provider: IdentityProvider
+  onDelete: (provider: IdentityProvider) => void
+  onRevoke: (provider: IdentityProvider) => void
+  permissions: ReturnType<typeof useIdentityProviderPermissions>
   onNavigate: (path: string) => void
-): KebabAction[] {
+}): KebabAction[] {
   const { id } = provider
   const canEdit = permissions.canUpdate && !!id
   const canDel = permissions.canDelete && !!id
@@ -192,9 +198,13 @@ function ProviderRow({
       </Td>
       <Td isActionCell>
         <SynKebabMenu
-          actions={getRowActions(provider, onDelete, onRevoke, permissions, (path) =>
-            detachPromise(navigate({ to: path }))
-          )}
+          actions={getRowActions({
+            provider,
+            onDelete,
+            onRevoke,
+            permissions,
+            onNavigate: (path) => detachPromise(navigate({ to: path })),
+          })}
           aria-label={`Actions for ${provider.name}`}
         />
       </Td>

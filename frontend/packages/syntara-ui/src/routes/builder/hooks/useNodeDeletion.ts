@@ -6,6 +6,7 @@ import { FlowNodeType } from '../../../constants'
 import { useWorkflowStore, useWorkflowStoreActions } from '../../../stores/useWorkflowStore'
 import { parseTriggerIndex } from '../../../utils/triggerNodeIds'
 import type { NodeType } from '../../workflows/canvas/nodes/NodeType'
+import type { OnAddNodeFromEdge } from '../types'
 import type { EdgeConnection } from '../types/edge'
 import { EdgeFactory } from '../utils/EdgeFactory'
 import { buildTriggerIndexRemappping, remapTriggerIdsInEdges } from '../utils/triggerIndexRemapping'
@@ -147,7 +148,7 @@ type UseNodeDeletionParams = {
   setNodes: Dispatch<SetStateAction<NodeType[]>>
   setEdges: Dispatch<SetStateAction<EdgeType[]>>
   isDeletingRef: MutableRefObject<boolean>
-  onAddNodeFromEdge?: (sourceNodeId: string, nodeType?: string, activityId?: string, sourceHandle?: string) => void
+  onAddNodeFromEdge?: OnAddNodeFromEdge
   onNodesDeleted?: (nodeIds: string[]) => void
   onError?: (message: string) => void
 }
