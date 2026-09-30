@@ -4,7 +4,7 @@ import { executionsClient } from '../../../client'
 import { detachPromise } from '../../../utils/detachPromise'
 import type { ActivityStatus } from '../../workflows/execution/types'
 
-type NodeExecutionDetails = {
+type StepExecutionDetails = {
   /** Resolved config values passed to the activity at runtime */
   inputData: Record<string, unknown> | null
   /** Activity results after output mapping */
@@ -23,11 +23,11 @@ type NodeExecutionDetails = {
  * When `activityStatus` changes (e.g. from WebSocket updates), the query
  * refetches so the Parameters/Output panes stay current.
  */
-export function useNodeExecutionDetails(
+export function useStepExecutionDetails(
   nodeId: string,
   executionId: string | null | undefined,
   activityStatus?: ActivityStatus
-): NodeExecutionDetails {
+): StepExecutionDetails {
   const queryResult = executionsClient.useQuery(
     'get',
     '/executions/{execution_id}/activities',
