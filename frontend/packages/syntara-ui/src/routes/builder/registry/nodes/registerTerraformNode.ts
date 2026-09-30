@@ -1,5 +1,4 @@
-import { RhUiInfrastructureIcon } from '@patternfly/react-icons'
-
+import TerraformIcon from '../../../../assets/terraform.svg?react'
 import { RegistryNodeId } from '../../../../constants'
 import { useWorkflowStore } from '../../../../stores/useWorkflowStore'
 import { TerraformNodeForm, type TerraformNodeFormData } from '../../node-forms/TerraformNodeForm'
@@ -72,10 +71,10 @@ export default function registerTerraformNode() {
     createCustomNode<TerraformNodeFormData>(
       {
         id: RegistryNodeId.TERRAFORM,
-        label: 'Terraform',
-        icon: RhUiInfrastructureIcon,
+        label: 'Terraform Enterprise',
+        icon: TerraformIcon,
         category: 'action',
-        description: 'Manage Terraform Enterprise workspaces, runs, VCS, and projects',
+        description: 'Manage Terraform Enterprise workspaces, runs, GitHub App installs, and projects',
         keywords: ['terraform', 'tfe', 'hcp', 'workspace', 'plan', 'apply', 'iac'],
         order: 45,
         selectionTitle: 'Select a Terraform step',
@@ -83,7 +82,7 @@ export default function registerTerraformNode() {
         subtypes: SUBTYPES.map((subtype) => ({
           id: subtype.id,
           label: subtype.label,
-          icon: RhUiInfrastructureIcon,
+          icon: TerraformIcon,
           description: subtype.description,
           formTitle: subtype.label,
           formComponent: TerraformNodeForm,

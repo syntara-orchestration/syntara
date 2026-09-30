@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import TerraformIcon from '../../../../assets/terraform.svg?react'
 import { RegistryNodeId } from '../../../../constants'
 import { NodeRegistry } from '../NodeRegistry'
 
@@ -22,7 +23,9 @@ describe('registerTerraformNode', () => {
   it('registers the Terraform category with workspace subtypes', () => {
     const node = NodeRegistry.get(RegistryNodeId.TERRAFORM)
     expect(node).toBeDefined()
-    expect(node?.label).toBe('Terraform')
+    expect(node?.label).toBe('Terraform Enterprise')
+    expect(node?.icon).toBe(TerraformIcon)
+    expect(node?.subtypes?.every((subtype) => subtype.icon === TerraformIcon)).toBe(true)
     expect(node?.subtypes?.length).toBeGreaterThanOrEqual(5)
     const createWs = node?.subtypes?.find((s) => s.id === RegistryNodeId.TFE_CREATE_WORKSPACE)
     expect(createWs?.label).toBe('Create Workspace')

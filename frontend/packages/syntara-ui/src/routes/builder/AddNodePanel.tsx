@@ -1,9 +1,11 @@
-import { Button, Flex, FlexItem, Icon, Stack, StackItem, Title, TitleSizes } from '@patternfly/react-core'
+import { Button, Flex, FlexItem, Icon, SearchInput, Stack, StackItem, Title, TitleSizes } from '@patternfly/react-core'
 import { RhUiCloseIcon, RhUiArrowLeftIcon, RhUiAddSquareIcon } from '@patternfly/react-icons'
 import { useMemo, useState, type ReactNode } from 'react'
 
 import { SynPanel } from '../../components/layout/SynPanel'
+import { RegistryNodeId } from '../../constants'
 
+import { collectCatalogMatches, filterNodeOptions } from './filterNodeOptions'
 import { NodeTypeOptionsList } from './NodeTypeOptionsList'
 import { NodeRegistry } from './registry/NodeRegistry'
 
@@ -82,6 +84,7 @@ type AddNodePanelProps = {
 
 export function AddNodePanel(props: AddNodePanelProps) {
   const [selectedNodeType, setSelectedNodeType] = useState<string | null>(null)
+  const [searchQuery, setSearchQuery] = useState('')
 
   // Registered step types from NodeRegistry
   // Omit triggers when adding from an edge (sourceNodeId) or replacing a generic step (replacementNodeId)
@@ -100,10 +103,16 @@ export function AddNodePanel(props: AddNodePanelProps) {
   const handleNodeClick = (nodeId: string) => {
     const nodeDef = NodeRegistry.get(nodeId)
     if (nodeDef?.subtypes?.length) {
+      setSearchQuery('')
       setSelectedNodeType(nodeId)
       return
     }
     props.onSelectNode(nodeId, null)
+    setSelectedNodeType(null)
+  }
+
+  const handleBack = () => {
+    setSearchQuery('')
     setSelectedNodeType(null)
   }
 
@@ -114,6 +123,61 @@ export function AddNodePanel(props: AddNodePanelProps) {
 
   const panelTitle =
     isShowingSubtypeList && selectedNode ? (selectedNode.selectionTitle ?? 'Select a node') : 'Add step'
+
+  const subtypeOptions = useMemo(() => {
+    if (!selectedNode?.subtypes?.length) return []
+    return [...selectedNode.subtypes]
+      .map((subtype, index) => ({ subtype, index }))
+      .sort((a, b) => (a.subtype.order ?? a.index) - (b.subtype.order ?? b.index))
+      .map(({ subtype }) => subtype)
+  }, [selectedNode])
+
+  const catalogMatches = useMemo(
+    () => (isShowingSubtypeList ? [] : collectCatalogMatches(nodeTypes, searchQuery)),
+    [isShowingSubtypeList, nodeTypes, searchQuery]
+  )
+  const visibleSubtypeOptions = useMemo(
+    () => (isShowingSubtypeList ? filterNodeOptions(subtypeOptions, searchQuery) : []),
+    [isShowingSubtypeList, searchQuery, subtypeOptions]
+  )
+  const hasResults = isShowingSubtypeList ? visibleSubtypeOptions.length > 0 : catalogMatches.length > 0
+  const showSearch = !props.hasNoWorkflowNodes
+
+  const searchPlaceholder = selectedNode?.id === RegistryNodeId.TERRAFORM ? 'Search actions...' : 'Search...'
+
+  const handleCatalogSelect = (nodeId: string) => {
+    const match = catalogMatches.find((item) => item.option.id === nodeId)
+    if (match?.subtypeId) {
+      props.onSelectNode(match.parentId, match.subtypeId)
+      setSearchQuery('')
+      setSelectedNodeType(null)
+      return
+    }
+    handleNodeClick(nodeId)
+  }
+
+  let optionsList: ReactNode = (
+    <NodeTypeOptionsList nodeTypes={catalogMatches.map((match) => match.option)} onSelect={handleCatalogSelect} />
+  )
+  if (!hasResults) {
+    optionsList = (
+      <StackItem>
+        <Title headingLevel="h3" size={TitleSizes.md}>
+          No results found
+        </Title>
+      </StackItem>
+    )
+  } else if (selectedNode?.subtypes?.length) {
+    optionsList = (
+      <NodeTypeOptionsList
+        nodeTypes={visibleSubtypeOptions}
+        onSelect={(subtypeId) => {
+          props.onSelectNode(selectedNode.id, subtypeId)
+          setSelectedNodeType(null)
+        }}
+      />
+    )
+  }
 
   return (
     <SynPanel
@@ -134,9 +198,26 @@ export function AddNodePanel(props: AddNodePanelProps) {
           panelTitle={panelTitle}
           isShowingSubtypeList={isShowingSubtypeList}
           hasNoWorkflowNodes={props.hasNoWorkflowNodes}
-          onBack={() => setSelectedNodeType(null)}
+          onBack={handleBack}
           onClose={props.onClose}
         />
+        {showSearch && (
+          <StackItem
+            style={{
+              paddingLeft: 'var(--pf-t--global--spacer--md)',
+              paddingRight: 'var(--pf-t--global--spacer--md)',
+              paddingBottom: 'var(--pf-t--global--spacer--sm)',
+            }}
+          >
+            <SearchInput
+              aria-label={searchPlaceholder}
+              placeholder={searchPlaceholder}
+              value={searchQuery}
+              onChange={(_event, value) => setSearchQuery(value)}
+              onClear={() => setSearchQuery('')}
+            />
+          </StackItem>
+        )}
         <StackItem
           isFilled
           style={{
@@ -148,22 +229,7 @@ export function AddNodePanel(props: AddNodePanelProps) {
             paddingBottom: 'var(--pf-t--global--spacer--md)',
           }}
         >
-          <Stack hasGutter>
-            {selectedNode?.subtypes?.length ? (
-              <NodeTypeOptionsList
-                nodeTypes={selectedNode.subtypes
-                  .map((subtype, index) => ({ subtype, index }))
-                  .sort((a, b) => (a.subtype.order ?? a.index) - (b.subtype.order ?? b.index))
-                  .map(({ subtype }) => subtype)}
-                onSelect={(subtypeId) => {
-                  props.onSelectNode(selectedNode.id, subtypeId)
-                  setSelectedNodeType(null)
-                }}
-              />
-            ) : (
-              <NodeTypeOptionsList nodeTypes={nodeTypes} onSelect={handleNodeClick} />
-            )}
-          </Stack>
+          <Stack hasGutter>{optionsList}</Stack>
         </StackItem>
       </Stack>
     </SynPanel>
