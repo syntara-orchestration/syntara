@@ -53,7 +53,7 @@ export async function configureLoopNode(
     await page.getByRole('option', { name: config.type === 'while' ? 'While' : 'For each' }).click()
     // Wait for the type-specific field to appear, confirming the form re-rendered
     if (config.type === 'while') {
-      await expect(page.getByLabel(/Condition type/i)).toBeVisible()
+      await expect(page.getByRole('button', { name: 'Condition type', exact: true })).toBeVisible()
     } else {
       await expect(page.getByRole('textbox', { name: 'Items expression', exact: true })).toBeVisible()
     }
@@ -61,7 +61,7 @@ export async function configureLoopNode(
 
   // While-specific fields
   if (config.type === 'while' && config.condition !== undefined) {
-    const editorModeToggle = page.getByLabel(/Condition type/i)
+    const editorModeToggle = page.getByRole('button', { name: 'Condition type', exact: true })
     await expect(editorModeToggle).toBeVisible()
     await editorModeToggle.click()
     await page.getByRole('option', { name: 'Freeform text', exact: true }).click()
