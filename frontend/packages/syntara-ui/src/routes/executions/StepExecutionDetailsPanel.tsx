@@ -43,11 +43,11 @@ import { extractApprovalAudit, type ApprovalAudit } from '../workflows/execution
 
 import { extractAgentTrace } from './agentTraceTypes'
 import { AgentTraceView } from './AgentTraceView'
-import { useNodeExecutionDetails } from './hooks/useNodeExecutionDetails'
-import styles from './NodeExecutionDetailsPanel.module.css'
+import { useStepExecutionDetails } from './hooks/useStepExecutionDetails'
+import styles from './StepExecutionDetailsPanel.module.css'
 import { extractUsedTools, type UsedTool } from './utils/extractUsedTools'
 
-type NodeExecutionDetailsPanelProps = {
+type StepExecutionDetailsPanelProps = {
   nodeId: string
   nodeName: string
   executionId: string
@@ -244,7 +244,7 @@ function UsedToolsSection({ tools }: Readonly<{ tools: UsedTool[] }>) {
   )
 }
 
-function NodeDetailsHeader({
+function StepDetailsHeader({
   nodeName,
   nodeStarted,
   nodeCompleted,
@@ -301,7 +301,7 @@ function NodeDetailsHeader({
   )
 }
 
-type NodeContentAreaProps = Readonly<{
+type StepContentAreaProps = Readonly<{
   nodeId: string
   inputData: Record<string, unknown> | null
   outputData: Record<string, unknown> | null
@@ -313,7 +313,7 @@ type NodeContentAreaProps = Readonly<{
   activeTab: 'io' | 'agent-steps'
 }>
 
-function NodeContentArea({
+function StepContentArea({
   nodeId,
   inputData,
   outputData,
@@ -323,7 +323,7 @@ function NodeContentArea({
   nodeIsFailed,
   isAgenticNode,
   activeTab,
-}: NodeContentAreaProps) {
+}: StepContentAreaProps) {
   const [inputView, setInputView] = useState<PanelView>('json')
   const [outputView, setOutputView] = useState<PanelView>('json')
 
@@ -361,16 +361,16 @@ function NodeContentArea({
   )
 }
 
-export function NodeExecutionDetailsPanel({
+export function StepExecutionDetailsPanel({
   nodeId,
   nodeName,
   executionId,
   nodeState,
   nodeType,
-}: Readonly<NodeExecutionDetailsPanelProps>) {
+}: Readonly<StepExecutionDetailsPanelProps>) {
   const [activeTab, setActiveTab] = useState<'io' | 'agent-steps'>('io')
   const isAgenticNode = nodeType === ActivityTypeEnum.AGENTIC
-  const { inputData, outputData, isLoading, error, refetch } = useNodeExecutionDetails(
+  const { inputData, outputData, isLoading, error, refetch } = useStepExecutionDetails(
     nodeId,
     executionId,
     nodeState?.status
@@ -388,7 +388,7 @@ export function NodeExecutionDetailsPanel({
 
   return (
     <Stack className={styles.contentContainer}>
-      <NodeDetailsHeader
+      <StepDetailsHeader
         nodeName={nodeName}
         nodeStarted={nodeStarted}
         nodeCompleted={nodeCompleted}
@@ -422,7 +422,7 @@ export function NodeExecutionDetailsPanel({
       )}
 
       <StackItem isFilled style={{ minHeight: 0, overflow: 'hidden' }}>
-        <NodeContentArea
+        <StepContentArea
           nodeId={nodeId}
           inputData={inputData}
           outputData={outputData}

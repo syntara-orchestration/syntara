@@ -10,7 +10,7 @@ import { capitalize } from '../../utils/capitalize'
 import { useExecutionStore } from '../workflows/stores/useExecutionStore'
 
 import ExecutionDetail from './ExecutionDetail'
-import { useExecutionNodeClick } from './hooks/useExecutionNodeClick'
+import { useExecutionStepClick } from './hooks/useExecutionStepClick'
 
 // Create mock functions
 const mockNavigate = vi.fn()
@@ -267,7 +267,7 @@ vi.mock('../../providers/alerts', () => ({
   })),
 }))
 
-// Mock useExecutionNodeClick hook
+// Mock useExecutionStepClick hook
 const mockHandleNodeClick = vi.fn()
 const mockSelectNode = vi.fn()
 const mockDeselectNode = vi.fn()
@@ -282,10 +282,10 @@ const mockPendingApproval = {
 
 const mockClearPendingApproval = vi.fn()
 const mockSetPendingApproval = vi.fn()
-const mockFetchForNode = vi.fn()
+const mockFetchForStep = vi.fn()
 
-vi.mock('./hooks/useExecutionNodeClick', () => ({
-  useExecutionNodeClick: vi.fn(() => ({
+vi.mock('./hooks/useExecutionStepClick', () => ({
+  useExecutionStepClick: vi.fn(() => ({
     approvals: [],
     currentIndex: 0,
     currentApproval: null,
@@ -293,7 +293,7 @@ vi.mock('./hooks/useExecutionNodeClick', () => ({
     navigateToIndex: vi.fn(),
     clearApprovals: mockClearPendingApproval,
     setApprovalsAndIndex: mockSetPendingApproval,
-    fetchApprovals: mockFetchForNode,
+    fetchApprovals: mockFetchForStep,
     selectedNodeId: null,
     selectedNodeName: null,
     selectNode: mockSelectNode,
@@ -738,7 +738,7 @@ describe('ExecutionDetail', () => {
 
   describe('Approval Review Side Panel', () => {
     it('opens approval side panel when Review approval is clicked', async () => {
-      vi.mocked(useExecutionNodeClick).mockReturnValue({
+      vi.mocked(useExecutionStepClick).mockReturnValue({
         approvals: [mockPendingApproval] as never,
         currentIndex: 0,
         currentApproval: mockPendingApproval as never,
@@ -746,7 +746,7 @@ describe('ExecutionDetail', () => {
         navigateToIndex: vi.fn(),
         clearApprovals: mockClearPendingApproval,
         setApprovalsAndIndex: mockSetPendingApproval,
-        fetchApprovals: mockFetchForNode,
+        fetchApprovals: mockFetchForStep,
         selectedNodeId: null,
         selectedNodeName: null,
         selectNode: mockSelectNode,
@@ -769,7 +769,7 @@ describe('ExecutionDetail', () => {
     })
 
     it('closes approval side panel when Close is clicked', async () => {
-      vi.mocked(useExecutionNodeClick).mockReturnValue({
+      vi.mocked(useExecutionStepClick).mockReturnValue({
         approvals: [mockPendingApproval] as never,
         currentIndex: 0,
         currentApproval: mockPendingApproval as never,
@@ -777,7 +777,7 @@ describe('ExecutionDetail', () => {
         navigateToIndex: vi.fn(),
         clearApprovals: mockClearPendingApproval,
         setApprovalsAndIndex: mockSetPendingApproval,
-        fetchApprovals: mockFetchForNode,
+        fetchApprovals: mockFetchForStep,
         selectedNodeId: null,
         selectedNodeName: null,
         selectNode: mockSelectNode,
@@ -1207,7 +1207,7 @@ describe('ExecutionDetail', () => {
     })
 
     it('renders approval side panel when approval is open with current approval', async () => {
-      vi.mocked(useExecutionNodeClick).mockReturnValue({
+      vi.mocked(useExecutionStepClick).mockReturnValue({
         approvals: [mockPendingApproval] as never,
         currentIndex: 0,
         currentApproval: mockPendingApproval as never,
@@ -1215,7 +1215,7 @@ describe('ExecutionDetail', () => {
         navigateToIndex: vi.fn(),
         clearApprovals: mockClearPendingApproval,
         setApprovalsAndIndex: mockSetPendingApproval,
-        fetchApprovals: mockFetchForNode,
+        fetchApprovals: mockFetchForStep,
         selectedNodeId: null,
         selectedNodeName: null,
         selectNode: mockSelectNode,

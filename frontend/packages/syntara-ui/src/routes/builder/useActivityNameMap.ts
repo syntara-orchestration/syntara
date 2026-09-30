@@ -296,7 +296,7 @@ export function useActivityNameMap(
   return { nameMap, activityOrder }
 }
 
-export function resolveNodeName(nameMap: Map<string, string>, nodeId?: string | null): string | undefined {
+export function resolveStepName(nameMap: Map<string, string>, nodeId?: string | null): string | undefined {
   if (!nodeId) return undefined
   return nameMap.get(nodeId) ?? nodeId
 }
