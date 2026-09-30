@@ -1,9 +1,8 @@
-"""Per-iteration loop resume for retry-from-failure (AAP-92821, SDP R6b).
+"""Per-iteration loop resume for retry-from-failure .
 
 A retry that re-enters a loop must resume at the failed iteration rather than
 restarting from zero. Restarting repeats the side effects of every iteration that
-already succeeded, which the restart design names as its highest-severity
-correctness risk.
+already succeeded, which the restart design treats as a correctness risk.
 """
 
 from collections.abc import Generator
@@ -119,7 +118,7 @@ def mock_wf() -> Generator[MagicMock, None, None]:
 
 @pytest.mark.asyncio
 async def test_loop_is_resumed_at_the_failed_iteration(mock_wf: MagicMock) -> None:
-    """TC0034: the loop counter starts at the failed iteration, not zero."""
+    """The loop counter starts at the failed iteration, not zero."""
     wf = _make_workflow(_retry("body_a"))
     node = _loop_node()
     mock_wf.execute_activity = AsyncMock(
@@ -251,7 +250,7 @@ def _source_rows(*, failed_at: list[int], completed_upto: int) -> list[tuple[int
 
 
 def test_failed_iteration_is_the_last_one_resumes_there_only() -> None:
-    """TC0036: when the failed iteration is the last, only it re-runs."""
+    """When the failed iteration is the last, only it re-runs."""
     # Iterations 0-2 completed, iteration 3 failed and stopped the loop.
     completed = _source_rows(failed_at=[], completed_upto=2)
     resume_iteration = 3
@@ -264,7 +263,7 @@ def test_failed_iteration_is_the_last_one_resumes_there_only() -> None:
 
 
 def test_iteration_zero_failed_resumes_from_zero() -> None:
-    """TC0037: a failure on iteration 0 leaves nothing to skip, so the loop re-runs whole."""
+    """A failure on iteration 0 leaves nothing to skip, so the loop re-runs whole."""
     completed: list[tuple[int, str, dict[str, Any]]] = []
     resume_iteration = 0
 
@@ -280,8 +279,8 @@ def test_continue_on_failure_earlier_failure_does_not_drag_resume_back() -> None
     A ``continue_on_failure`` body node can fail on an early iteration while the
     loop carries on, leaving several FAILED rows for one loop. Only the last one
     stopped the workflow. Resuming from the earliest would re-run iterations that
-    already completed and repeat their side effects, which is the highest-severity
-    risk in the restart design.
+    already completed and repeat their side effects, which is the worst outcome
+    this design can produce.
     """
     completed: list[tuple[int, str, dict[str, Any]]] = [
         (0, "body_a", {"receipt": "r0"}),  # completed

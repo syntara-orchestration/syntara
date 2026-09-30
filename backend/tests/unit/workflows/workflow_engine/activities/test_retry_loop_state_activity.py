@@ -1,7 +1,7 @@
-"""Resume-point selection for retry loop state (AAP-92821).
+"""Resume-point selection for retry loop state .
 
 The resume iteration decides which iterations are skipped. Choosing it wrong is
-the project's highest-severity correctness risk in either direction: too early
+the main correctness risk here in either direction: too early
 replays side effects that already happened, too late skips the iteration that
 actually failed.
 """

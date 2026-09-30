@@ -1,6 +1,6 @@
-"""Retry-from-failure classification and override application in the engine (AAP-92821).
+"""Retry-from-failure classification and override application in the engine .
 
-The control plane (AAP-92820) validates a retry and hands the engine
+The control plane  validates a retry and hands the engine
 ``workflow_metadata.retry``. These tests cover the engine half: overrides
 replacing resolved inputs, and completed upstream nodes being skipped with their
 outputs restored.
@@ -62,7 +62,7 @@ def _node(node_id: str = "step_2", parameters: dict[str, Any] | None = None) -> 
 
 
 # ---------------------------------------------------------------------------
-# Input parameter overrides (SDP R10c)
+# Input parameter overrides
 # ---------------------------------------------------------------------------
 
 
@@ -299,7 +299,7 @@ def test_retry_starting_points_are_never_restored() -> None:
 
 
 def test_downstream_of_failed_continue_on_failure_step_is_forced_to_rerun() -> None:
-    """SDP R6a: a node downstream of the *failed* CoF step must re-run.
+    """A node downstream of the *failed* continue_on_failure step must re-run.
 
     Its inputs may depend on the failed step's output, which no longer exists, so
     restoring the old output would replay it against inputs that no longer
