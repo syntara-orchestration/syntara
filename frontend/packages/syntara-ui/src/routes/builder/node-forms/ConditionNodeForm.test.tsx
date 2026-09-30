@@ -94,7 +94,7 @@ describe('ConditionNodeForm', () => {
       await user.paste('Test Condition')
 
       // Switch to raw mode and enter expression
-      await user.click(screen.getByRole('button', { name: 'Condition type', exact: true }))
+      await user.click(screen.getByRole('button', { name: /^Condition type$/ }))
       await user.click(await screen.findByRole('option', { name: 'Freeform text' }))
       const rawInput = screen.getByLabelText(/Raw expression/i)
       await user.click(rawInput)
@@ -119,7 +119,7 @@ describe('ConditionNodeForm', () => {
       const nameInput = screen.getByPlaceholderText(/Enter activity name/i)
       await user.click(nameInput)
       await user.paste('Another Condition')
-      await user.click(screen.getByRole('button', { name: 'Condition type', exact: true }))
+      await user.click(screen.getByRole('button', { name: /^Condition type$/ }))
       await user.click(await screen.findByRole('option', { name: 'Freeform text' }))
       const rawInput = screen.getByLabelText(/Raw expression/i)
       await user.click(rawInput)

@@ -83,7 +83,7 @@ describe('LoopNodeForm', () => {
       renderWithHeader(<LoopNodeForm onSubmit={mockOnSubmit} initialData={{ type: 'while' }} />)
 
       await user.type(screen.getByPlaceholderText(/Enter activity name/i), 'Invalid Max Loop')
-      await user.click(screen.getByRole('button', { name: 'Condition type', exact: true }))
+      await user.click(screen.getByRole('button', { name: /^Condition type$/ }))
       await user.click(await screen.findByRole('option', { name: 'Freeform text' }))
       const rawInput = screen.getByLabelText(/Raw expression/i)
       await user.click(rawInput)
@@ -302,7 +302,7 @@ describe('LoopNodeForm', () => {
 
       await user.type(screen.getByRole('spinbutton', { name: /Max iterations/i }), '500')
 
-      await user.click(screen.getByRole('button', { name: 'Condition type', exact: true }))
+      await user.click(screen.getByRole('button', { name: /^Condition type$/ }))
       await user.click(await screen.findByRole('option', { name: 'Freeform text' }))
       const rawInput = screen.getByLabelText(/Raw expression/i)
       await user.click(rawInput)
@@ -328,7 +328,7 @@ describe('LoopNodeForm', () => {
 
       await user.type(screen.getByPlaceholderText(/Enter activity name/i), 'Simple While')
 
-      await user.click(screen.getByRole('button', { name: 'Condition type', exact: true }))
+      await user.click(screen.getByRole('button', { name: /^Condition type$/ }))
       await user.click(await screen.findByRole('option', { name: 'Freeform text' }))
       const rawInput = screen.getByLabelText(/Raw expression/i)
       await user.click(rawInput)
@@ -349,7 +349,7 @@ describe('LoopNodeForm', () => {
       renderWithHeader(<LoopNodeForm onSubmit={mockOnSubmit} initialData={{ type: 'while' }} />)
 
       await user.type(screen.getByPlaceholderText(/Enter activity name/i), 'Clean While')
-      await user.click(screen.getByRole('button', { name: 'Condition type', exact: true }))
+      await user.click(screen.getByRole('button', { name: /^Condition type$/ }))
       await user.click(await screen.findByRole('option', { name: 'Freeform text' }))
       const rawInput = screen.getByLabelText(/Raw expression/i)
       await user.click(rawInput)

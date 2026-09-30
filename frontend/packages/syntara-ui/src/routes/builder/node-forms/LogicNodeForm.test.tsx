@@ -172,7 +172,7 @@ describe('LogicNodeForm', () => {
       await user.clear(nameInput)
       await user.type(nameInput, 'Updated Condition')
 
-      await user.click(screen.getByRole('button', { name: 'Condition type', exact: true }))
+      await user.click(screen.getByRole('button', { name: /^Condition type$/ }))
       await user.click(await screen.findByRole('option', { name: 'Freeform text' }))
       const rawInput = screen.getByLabelText(/Raw expression/i)
       await user.clear(rawInput)
