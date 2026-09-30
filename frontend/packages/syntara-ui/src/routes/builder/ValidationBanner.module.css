@@ -1,0 +1,20 @@
+/* Horizontal DescriptionList: keep term column bounded so long step ids do not overlap the message. */
+.term {
+  min-width: 0;
+  max-width: 14rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.termLink {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+
+.description {
+  min-width: 0;
+}

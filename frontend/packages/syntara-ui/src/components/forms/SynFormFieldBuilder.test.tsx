@@ -3,17 +3,37 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ReactElement } from 'react'
+import { useState } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
 import { FormFieldTypeEnum, formDefinitionToJsonSchemaString, parseFormDefinition } from '../../forms'
 
 import { createEmptyFormDefinition } from './formFieldBuilder/createDefaultField'
-import { SynFormFieldBuilder } from './SynFormFieldBuilder'
+import { SynFormFieldBuilder, type SynFormFieldBuilderProps } from './SynFormFieldBuilder'
 
 function renderBuilder(ui: ReactElement) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>)
+}
+
+function ControlledSynFormFieldBuilder({
+  onChange,
+  ...rest
+}: Omit<SynFormFieldBuilderProps, 'value' | 'onChange'> & {
+  onChange?: (definition: FormDefinition) => void
+}) {
+  const [definition, setDefinition] = useState(createEmptyFormDefinition())
+  return (
+    <SynFormFieldBuilder
+      {...rest}
+      value={definition}
+      onChange={(next) => {
+        setDefinition(next)
+        onChange?.(next)
+      }}
+    />
+  )
 }
 
 function dropdownFieldDefinition() {
@@ -58,9 +78,8 @@ describe('SynFormFieldBuilder', () => {
   it('renders design tab and adds a field', async () => {
     const user = userEvent.setup()
     const onChange = vi.fn()
-    const initial = createEmptyFormDefinition()
 
-    renderBuilder(<SynFormFieldBuilder value={initial} onChange={onChange} />)
+    renderBuilder(<ControlledSynFormFieldBuilder onChange={onChange} />)
 
     expect(screen.getByRole('tab', { name: 'Design' })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: 'Preview' })).toBeInTheDocument()
@@ -69,12 +88,36 @@ describe('SynFormFieldBuilder', () => {
 
     const labelInputs = screen.getAllByRole('textbox', { name: 'Field label' })
     expect(labelInputs).toHaveLength(2)
+    await user.clear(labelInputs[0])
     await user.type(labelInputs[0], 'First')
+    await user.clear(labelInputs[1])
     await user.type(labelInputs[1], 'Second')
     expect(onChange).toHaveBeenCalled()
     const lastCall = onChange.mock.calls.at(-1)?.[0] as FormDefinition
     expect(lastCall.fields).toHaveLength(2)
     expect(lastCall.fields[1]?.label).toBe('Second')
+  })
+
+  it('keeps focus when parent controls value from onChange (form prompt node form)', async () => {
+    const user = userEvent.setup()
+
+    function ControlledBuilder() {
+      const [definition, setDefinition] = useState(createEmptyFormDefinition())
+      return <SynFormFieldBuilder designOnly value={definition} onChange={setDefinition} />
+    }
+
+    renderBuilder(<ControlledBuilder />)
+
+    await user.click(screen.getByRole('button', { name: 'Add field' }))
+    const labelInputs = screen.getAllByRole('textbox', { name: 'Field label' })
+    const labelInput = labelInputs.at(-1)!
+    await waitFor(() => expect(labelInput).toBeInTheDocument())
+    await user.click(labelInput)
+    await user.clear(labelInput)
+    await user.type(labelInput, 'Hello')
+
+    expect(labelInput).toHaveValue('Hello')
+    expect(labelInput).toHaveFocus()
   })
 
   it('shows preview when definition is valid', async () => {

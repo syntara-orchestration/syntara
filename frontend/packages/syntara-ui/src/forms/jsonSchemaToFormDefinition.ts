@@ -123,6 +123,7 @@ function inferArrayFieldType(property: JsonSchemaProperty): FormField['type'] | 
   return null
 }
 
+// eslint-disable-next-line complexity, sonarjs/cognitive-complexity -- maps JSON Schema types to form field types
 function inferFieldType(property: JsonSchemaProperty): FormField['type'] | null {
   if (parseSyntaraOptionsExtension(property)) {
     return property.type === 'array' ? FormFieldTypeEnum.MULTI_SELECT : FormFieldTypeEnum.DROPDOWN
@@ -208,6 +209,7 @@ function multiSelectFieldFromProperty(base: FieldBase, property: JsonSchemaPrope
   }
 }
 
+// eslint-disable-next-line complexity, sonarjs/cognitive-complexity -- builds typed FormField from JSON Schema property
 function fieldFromProperty(valueName: string, property: JsonSchemaProperty, required: boolean): FormField | null {
   const fieldType = inferFieldType(property)
   if (fieldType === null || !isValidFormFieldValueName(valueName)) {

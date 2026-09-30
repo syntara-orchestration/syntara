@@ -137,6 +137,16 @@ Every time edges change:
 - `sourceHandle: 'approved'` — Approved branch
 - `sourceHandle: 'rejected'` — Rejected branch
 
+### Form prompt step handles
+
+- `sourceHandle: 'submitted'` — Successful form submission branch (at least one successor required)
+- `sourceHandle: 'fallback'` — Timeout / fallback routing when fallback behavior routes to the fallback port
+
+| V2 API Port (`from_port`) | React Flow Handle (`sourceHandle`) |
+| ------------------------- | ---------------------------------- |
+| `submitted`               | `submitted`                        |
+| `fallback`                | `fallback`                         |
+
 ### Standard Handles
 
 - `sourceHandle: 'source'` — Default outgoing connection
