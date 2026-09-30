@@ -51,7 +51,7 @@ env:
 jobs:
   changes:
     name: (Frontend) Detect Changes
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       code: ${{ steps.check.outputs.code }}
       backend: ${{ steps.check.outputs.backend }}
@@ -111,7 +111,7 @@ jobs:
     name: (Frontend) Generate Contracts
     needs: changes
     if: needs.changes.outputs.contracts == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
@@ -141,7 +141,7 @@ jobs:
     name: (Frontend) Checks
     needs: changes
     if: needs.changes.outputs.code == 'true' || needs.changes.outputs.contracts == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
@@ -176,7 +176,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.code == 'true' || needs.changes.outputs.contracts == 'true'
     continue-on-error: true
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
@@ -218,7 +218,7 @@ jobs:
     name: (Frontend) Unit Tests
     needs: changes
     if: needs.changes.outputs.code == 'true' || needs.changes.outputs.contracts == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
@@ -258,7 +258,7 @@ jobs:
     name: (Frontend) Coverage Report
     needs: [changes, unit-tests]
     if: needs.changes.outputs.code == 'true' || needs.changes.outputs.contracts == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
@@ -309,7 +309,7 @@ jobs:
     name: (Scripts) Checks
     needs: changes
     if: needs.changes.outputs.scripts == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
@@ -343,7 +343,7 @@ jobs:
     if: >-
       needs.changes.outputs.code == 'true'
       && github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout Code
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
@@ -377,7 +377,7 @@ jobs:
     if: >-
       needs.changes.outputs.code == 'true'
       && github.event_name == 'push'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout Code
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
@@ -405,7 +405,7 @@ jobs:
     name: (Frontend) Storybook Build
     needs: changes
     if: needs.changes.outputs.code == 'true' || needs.changes.outputs.contracts == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
@@ -428,7 +428,7 @@ jobs:
     name: (Frontend) Test Container Build
     needs: changes
     if: needs.changes.outputs.code == 'true' || needs.changes.outputs.contracts == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout code
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
@@ -461,7 +461,7 @@ jobs:
     if: github.event_name != 'push'
     permissions:
       checks: read
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: Wait for shared checks
@@ -519,7 +519,7 @@ jobs:
   # fast checks pass, avoiding wasted resources when basic validation fails.
   frontend-checks-gate:
     name: (Frontend) Checks Gate
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: [changes, checks, unit-tests]
     if: needs.changes.outputs.code == 'true' || needs.changes.outputs.contracts == 'true'
     steps:
@@ -786,7 +786,7 @@ jobs:
     if: github.event_name == 'pull_request'
     permissions:
       checks: read
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
@@ -805,7 +805,7 @@ jobs:
     if: github.event_name == 'pull_request'
     permissions:
       checks: read
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
@@ -824,7 +824,7 @@ jobs:
   # and this gate passes because `skipped` is accepted alongside `success`.
   required-checks:
     name: (Frontend) Required Checks
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     if: ${{ always() }}
     needs:
       - changes
