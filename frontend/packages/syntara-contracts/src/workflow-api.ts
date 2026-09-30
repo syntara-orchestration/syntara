@@ -944,6 +944,12 @@ export interface components {
        * @description Originating interface (ui or api)
        */
       interface?: string | null
+      /**
+       * Is Stalled
+       * @description Whether any activity in this execution has been flagged as stalled.
+       * @default false
+       */
+      is_stalled?: boolean
       /** Labels */
       labels?: {
         [key: string]: unknown
@@ -1979,13 +1985,18 @@ export interface components {
     }
     /**
      * NodeSettingsNoRetry
-     * @description Settings with disabled, continue_on_failure, and timeout (script, agentic, approval).
+     * @description Settings with disabled, continue_on_failure, timeout, and expected_duration (script, agentic, approval).
      */
     NodeSettingsNoRetry: {
       /** Continue On Failure */
       continue_on_failure?: boolean | null
       /** Disabled */
       disabled?: boolean | null
+      /**
+       * Expected Duration
+       * @description Expected duration in seconds. Nodes running longer are flagged as stalled.
+       */
+      expected_duration?: number | null
       /** Timeout */
       timeout?: number | null
     }
@@ -1998,6 +2009,11 @@ export interface components {
       continue_on_failure?: boolean | null
       /** Disabled */
       disabled?: boolean | null
+      /**
+       * Expected Duration
+       * @description Expected duration in seconds. Nodes running longer are flagged as stalled.
+       */
+      expected_duration?: number | null
       /** Timeout */
       timeout?: number | null
       retry_policy?: components['schemas']['RetryPolicyParameters'] | null

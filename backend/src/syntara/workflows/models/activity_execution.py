@@ -176,6 +176,18 @@ class ActivityExecution(BaseResource, table=True):
     # Loop tracking
     iteration: int | None = Field(None, description="Iteration number if activity is within a loop (0-indexed)")
 
+    # Stall detection (AAP-92824)
+    expected_duration: int | None = Field(
+        None,
+        ge=1,
+        description="Resolved expected duration in seconds, copied from node settings at dispatch time.",
+    )
+    stall_alert_at: datetime | None = Field(
+        None,
+        description="Timestamp when stall was first detected by PeriodicWorker. Written once, never cleared.",
+        sa_type=DateTime(timezone=True),  # type: ignore[call-overload]
+    )
+
 
 class ActivityExecutionListResponse(ResourcesResponse[ActivityExecution]):
     """Paginated list response for activity executions."""

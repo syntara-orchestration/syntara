@@ -99,8 +99,10 @@ class ExecutionsEnrichQueryMixin(EnrichQueryMixin):
         """Add selectinload for workflow and workflow_version to the query.
 
         Only applies when the root entity is Execution (skips ActivityExecution queries).
+        Note: is_stalled is computed via Execution.is_stalled column_property (correlated
+        EXISTS subquery evaluated by the DB), not via eager-loading activities.
         """
-        if any(col.get("entity") is Execution for col in query.column_descriptions):
+        if any(c.get("entity") is Execution for c in query.column_descriptions):
             return query.options(
                 selectinload(Execution.workflow_version),  # type: ignore[arg-type]
                 selectinload(Execution.workflow),  # type: ignore[arg-type]
@@ -145,6 +147,7 @@ class ExecutionsConvertResourceMixin(ConvertResourceMixin):
             error_details=resource.error_details,
             labels=resource.labels,
             approval_pending=resource.approval_pending,
+            is_stalled=resource.is_stalled,
             mode=resource.mode,
             execution_metadata=resource.execution_metadata,
             retried_from_execution_id=resource.retried_from_execution_id,
