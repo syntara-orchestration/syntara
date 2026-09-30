@@ -9,9 +9,9 @@ import { ACTIVITY_STATUS } from '../../routes/builder/utils/executionState/execu
 import { StandardNodeHeader } from '../../routes/workflows/canvas/nodes/common/StandardNodeHeader'
 import { NODE_TYPE_COLORS } from '../../routes/workflows/canvas/nodeTypeColors'
 
+import { SynStep } from './SynStep'
+import styles from './SynStep.stories.module.css'
 import { SynStepBody } from './SynStepBody'
-import { SynStepComponent } from './SynStepComponent'
-import styles from './SynStepComponent.stories.module.css'
 
 /** Shared inert actions for stories that demonstrate a node header's action menu. */
 export const MENU_ACTIONS = [
@@ -26,7 +26,7 @@ export const EXECUTION_STATES = Object.values(ACTIVITY_STATUS).map((status) => (
   retry_count: status === ACTIVITY_STATUS.RETRYING ? 2 : undefined,
 }))
 
-/** Minimal workflow data used to render `SynStepComponent` states outside a builder canvas. */
+/** Minimal workflow data used to render `SynStep` states outside a builder canvas. */
 export type StoryNodeData = Record<string, unknown> & {
   id: string
   name: string
@@ -45,7 +45,7 @@ export type NodePropsOptions = {
   data?: Partial<StoryNodeData>
 }
 
-/** Creates the complete set of React Flow props required by `SynStepComponent` in a Storybook story. */
+/** Creates the complete set of React Flow props required by `SynStep` in a Storybook story. */
 export function createNodeProps(options: NodePropsOptions): NodeProps<Node<StoryNodeData>> {
   const nodeType = options.type ?? FlowNodeType.TASK
   const data: StoryNodeData = {
@@ -76,7 +76,7 @@ export function createNodeProps(options: NodePropsOptions): NodeProps<Node<Story
 /** Reusable full node used by the focused Default story and the state inventory. */
 export function FullNodeStoryComposition({ id, description }: Readonly<{ id: string; description: string }>) {
   return (
-    <SynStepComponent nodeProps={createNodeProps({ id })} topBarColor={NODE_TYPE_COLORS.actionScript}>
+    <SynStep nodeProps={createNodeProps({ id })} topBarColor={NODE_TYPE_COLORS.actionScript}>
       <StandardNodeHeader
         expandable
         menuActions={MENU_ACTIONS}
@@ -86,7 +86,7 @@ export function FullNodeStoryComposition({ id, description }: Readonly<{ id: str
       <SynStepBody>
         <Content component={ContentVariants.small}>{description}</Content>
       </SynStepBody>
-    </SynStepComponent>
+    </SynStep>
   )
 }
 

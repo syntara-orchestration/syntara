@@ -3,8 +3,8 @@ import type { ConditionActivity } from '@syntara/contracts'
 import { type Node, type NodeProps } from '@xyflow/react'
 
 import { SynDetailList } from '../../../../components/details/SynDetailList'
+import { SynStep } from '../../../../components/steps/SynStep'
 import { SynStepBody } from '../../../../components/steps/SynStepBody'
-import { SynStepComponent } from '../../../../components/steps/SynStepComponent'
 import { RegistryNodeId } from '../../../../constants'
 import type { ActivityStatus } from '../../execution/types'
 import { getNodeTypeColor } from '../nodeTypeColors'
@@ -44,7 +44,7 @@ export function ConditionNodeComponent(props: NodeProps<ConditionNode>) {
     | undefined
 
   return (
-    <SynStepComponent
+    <SynStep
       className={metadata.className}
       nodeProps={props}
       disableSource
@@ -70,7 +70,7 @@ export function ConditionNodeComponent(props: NodeProps<ConditionNode>) {
           </BranchHandle>
         </BranchHandles>
       </ConditionNodeDetails>
-    </SynStepComponent>
+    </SynStep>
   )
 }
 

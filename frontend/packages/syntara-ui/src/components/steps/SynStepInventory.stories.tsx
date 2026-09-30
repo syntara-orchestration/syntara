@@ -8,16 +8,16 @@ import { FlowNodeType } from '../../constants'
 import { StandardNodeHeader } from '../../routes/workflows/canvas/nodes/common/StandardNodeHeader'
 import { NODE_TYPE_COLORS } from '../../routes/workflows/canvas/nodeTypeColors'
 
-import { SynStepComponent } from './SynStepComponent'
-import { SynStepBody } from './SynStepBody'
+import { SynStep } from './SynStep'
 import {
   createNodeProps,
   EXECUTION_STATES,
   FullNodeStoryComposition,
   NodeExample,
   NodeStoryCanvas,
-} from './SynStepComponent.stories.helpers'
-import styles from './SynStepComponent.stories.module.css'
+} from './SynStep.stories.helpers'
+import styles from './SynStep.stories.module.css'
+import { SynStepBody } from './SynStepBody'
 
 function SynStepInventory() {
   return (
@@ -36,15 +36,15 @@ function SynStepInventory() {
             />
           </NodeExample>
           <NodeExample label="Selected dashed placeholder">
-            <SynStepComponent
+            <SynStep
               nodeProps={createNodeProps({ id: 'inventory-selected', selected: true, type: FlowNodeType.GENERIC })}
               hasDashedBorder
             >
               <StandardNodeHeader title="Selected placeholder" />
-            </SynStepComponent>
+            </SynStep>
           </NodeExample>
           <NodeExample label="Disabled validation error with mock data pinned">
-            <SynStepComponent
+            <SynStep
               nodeProps={createNodeProps({
                 id: 'inventory-disabled-invalid',
                 data: { settings: { disabled: true }, __validationError: true, metadata: { __mockDataPinned: true } },
@@ -52,10 +52,10 @@ function SynStepInventory() {
               topBarColor={NODE_TYPE_COLORS.logic}
             >
               <StandardNodeHeader title="Invalid pinned condition" />
-            </SynStepComponent>
+            </SynStep>
           </NodeExample>
           <NodeExample label="Collapsed content" testId="collapsed-content-example">
-            <SynStepComponent
+            <SynStep
               nodeProps={createNodeProps({ id: 'inventory-collapsed' })}
               topBarColor={NODE_TYPE_COLORS.actionScript}
             >
@@ -63,26 +63,26 @@ function SynStepInventory() {
               <SynStepBody>
                 <Content component={ContentVariants.small}>Hidden until expanded.</Content>
               </SynStepBody>
-            </SynStepComponent>
+            </SynStep>
           </NodeExample>
           <NodeExample label="Generic wide node">
-            <SynStepComponent
+            <SynStep
               nodeProps={createNodeProps({ id: 'inventory-generic', type: FlowNodeType.GENERIC })}
               hasDashedBorder
             >
               <StandardNodeHeader title="Generic placeholder" />
-            </SynStepComponent>
+            </SynStep>
           </NodeExample>
           <NodeExample label="Agentic wide task">
-            <SynStepComponent
+            <SynStep
               nodeProps={createNodeProps({ id: 'inventory-agentic', data: { type: ExecutorTypeEnum.AGENTIC } })}
               topBarColor={NODE_TYPE_COLORS.actionAgentic}
             >
               <StandardNodeHeader title="Agentic task" />
-            </SynStepComponent>
+            </SynStep>
           </NodeExample>
           <NodeExample label="Reversed source/target; visible start and hidden end">
-            <SynStepComponent
+            <SynStep
               nodeProps={createNodeProps({ id: 'inventory-handles' })}
               enableEnd
               enableStart
@@ -90,29 +90,26 @@ function SynStepInventory() {
               topBarColor={NODE_TYPE_COLORS.logic}
             >
               <StandardNodeHeader title="Branch handles" />
-            </SynStepComponent>
+            </SynStep>
           </NodeExample>
           <NodeExample label="No source or target handle">
-            <SynStepComponent
+            <SynStep
               disableSource
               disableTarget
               nodeProps={createNodeProps({ id: 'inventory-no-handles' })}
               topBarColor={NODE_TYPE_COLORS.logic}
             >
               <StandardNodeHeader title="No handles" />
-            </SynStepComponent>
+            </SynStep>
           </NodeExample>
           <NodeExample label="Subtitle-only title">
-            <SynStepComponent
-              nodeProps={createNodeProps({ id: 'inventory-subtitle' })}
-              topBarColor={NODE_TYPE_COLORS.logic}
-            >
+            <SynStep nodeProps={createNodeProps({ id: 'inventory-subtitle' })} topBarColor={NODE_TYPE_COLORS.logic}>
               <StandardNodeHeader subtitle="Fallback title from subtitle" />
-            </SynStepComponent>
+            </SynStep>
           </NodeExample>
           {EXECUTION_STATES.map((executionState) => (
             <NodeExample key={executionState.status} label={`${executionState.status} execution state`}>
-              <SynStepComponent
+              <SynStep
                 executionState={executionState}
                 nodeProps={createNodeProps({
                   id: `inventory-${executionState.status}`,
@@ -121,7 +118,7 @@ function SynStepInventory() {
                 topBarColor={NODE_TYPE_COLORS.actionScript}
               >
                 <StandardNodeHeader title={`${executionState.status} task`} />
-              </SynStepComponent>
+              </SynStep>
             </NodeExample>
           ))}
         </div>
@@ -141,7 +138,7 @@ function SynStepInventory() {
 }
 
 const meta: Meta = {
-  title: 'components/nodes/SynStepComponent',
+  title: 'components/steps/SynStep',
   decorators: [
     (Story) => (
       <NodeStoryCanvas minimumHeight={1280}>

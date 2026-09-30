@@ -3,8 +3,8 @@ import { TriggerTypeEnum } from '@syntara/contracts'
 import { type Node, type NodeProps, useStore } from '@xyflow/react'
 import type { CSSProperties } from 'react'
 
+import { SynStep } from '../../../../components/steps/SynStep'
 import { SynStepBody } from '../../../../components/steps/SynStepBody'
-import { SynStepComponent } from '../../../../components/steps/SynStepComponent'
 import { SynStepHeader } from '../../../../components/steps/SynStepHeader'
 import { SynStepMenu } from '../../../../components/steps/SynStepMenu'
 import { FlowNodeType } from '../../../../constants'
@@ -88,7 +88,7 @@ export function TriggerNodeComponent(props: NodeProps<TriggerNode>) {
   }
 
   return (
-    <SynStepComponent
+    <SynStep
       disableTarget={metadata.disableTarget}
       className={metadata.className}
       nodeProps={props}
@@ -110,7 +110,7 @@ export function TriggerNodeComponent(props: NodeProps<TriggerNode>) {
         triggerDetails={triggerDetails}
         triggerKind={props.data.triggerType}
       />
-    </SynStepComponent>
+    </SynStep>
   )
 }
 

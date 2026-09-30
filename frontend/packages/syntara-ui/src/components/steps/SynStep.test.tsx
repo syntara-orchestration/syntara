@@ -21,13 +21,13 @@ vi.mock('@xyflow/react', async (importOriginal) => {
   }
 })
 
-import { SynStepComponent } from './SynStepComponent'
+import { SynStep } from './SynStep'
 
 function renderWithFlow(ui: ReactElement) {
   return render(<ReactFlowProvider>{ui}</ReactFlowProvider>)
 }
 
-describe('SynStepComponent semantic zoom', () => {
+describe('SynStep semantic zoom', () => {
   afterEach(() => {
     viewportState.zoom = 1
     vi.clearAllMocks()
@@ -50,13 +50,13 @@ describe('SynStepComponent semantic zoom', () => {
   it('renders detailed children when zoom is above threshold', () => {
     viewportState.zoom = 0.75
     renderWithFlow(
-      <SynStepComponent
+      <SynStep
         nodeProps={baseNodeProps}
         topBarColor="var(--pf-t--global--color--nonstatus--blue--200)"
         semanticZoomSummary={{ title: 'T', typeLabel: 'Task Agent' }}
       >
         <span>Detailed body</span>
-      </SynStepComponent>
+      </SynStep>
     )
 
     expect(screen.getByText('Detailed body')).toBeInTheDocument()
@@ -66,13 +66,13 @@ describe('SynStepComponent semantic zoom', () => {
   it('renders semantic color block when zoom is at threshold', () => {
     viewportState.zoom = 0.5
     renderWithFlow(
-      <SynStepComponent
+      <SynStep
         nodeProps={baseNodeProps}
         topBarColor="var(--pf-t--global--color--nonstatus--blue--200)"
         semanticZoomSummary={{ title: 'Analyze', typeLabel: 'Task Agent' }}
       >
         <span>Detailed body</span>
-      </SynStepComponent>
+      </SynStep>
     )
 
     expect(screen.queryByText('Detailed body')).not.toBeInTheDocument()
@@ -82,20 +82,20 @@ describe('SynStepComponent semantic zoom', () => {
   it('semantic zoom layout has no accessibility violations', async () => {
     viewportState.zoom = 0.5
     const { container } = renderWithFlow(
-      <SynStepComponent
+      <SynStep
         nodeProps={baseNodeProps}
         topBarColor="var(--pf-t--global--color--nonstatus--blue--200)"
         semanticZoomSummary={{ title: 'Analyze', typeLabel: 'Task Agent' }}
       >
         <span>Detailed body</span>
-      </SynStepComponent>
+      </SynStep>
     )
 
     expect(await axe(container)).toHaveNoViolations()
   })
 })
 
-describe('SynStepComponent validation and interaction', () => {
+describe('SynStep validation and interaction', () => {
   afterEach(() => {
     viewportState.zoom = 1
     vi.clearAllMocks()
@@ -122,9 +122,9 @@ describe('SynStepComponent validation and interaction', () => {
     } as unknown as NodeProps
 
     renderWithFlow(
-      <SynStepComponent nodeProps={nodeProps}>
+      <SynStep nodeProps={nodeProps}>
         <span>Content</span>
-      </SynStepComponent>
+      </SynStep>
     )
 
     expect(screen.getByTestId('validation-error-badge')).toBeInTheDocument()
@@ -133,9 +133,9 @@ describe('SynStepComponent validation and interaction', () => {
 
   it('does not render ValidationErrorBadge when __validationError is false', () => {
     renderWithFlow(
-      <SynStepComponent nodeProps={baseNodeProps}>
+      <SynStep nodeProps={baseNodeProps}>
         <span>Content</span>
-      </SynStepComponent>
+      </SynStep>
     )
 
     expect(screen.queryByTestId('validation-error-badge')).not.toBeInTheDocument()
@@ -145,9 +145,9 @@ describe('SynStepComponent validation and interaction', () => {
     const user = userEvent.setup()
     const onClick = vi.fn()
     renderWithFlow(
-      <SynStepComponent nodeProps={baseNodeProps} onClick={onClick}>
+      <SynStep nodeProps={baseNodeProps} onClick={onClick}>
         <span>Content</span>
-      </SynStepComponent>
+      </SynStep>
     )
 
     screen.getByRole('button').focus()
@@ -160,9 +160,9 @@ describe('SynStepComponent validation and interaction', () => {
     const user = userEvent.setup()
     const onClick = vi.fn()
     renderWithFlow(
-      <SynStepComponent nodeProps={baseNodeProps} onClick={onClick}>
+      <SynStep nodeProps={baseNodeProps} onClick={onClick}>
         <span>Content</span>
-      </SynStepComponent>
+      </SynStep>
     )
 
     screen.getByRole('button').focus()
@@ -175,9 +175,9 @@ describe('SynStepComponent validation and interaction', () => {
     const user = userEvent.setup()
     const onClick = vi.fn()
     renderWithFlow(
-      <SynStepComponent nodeProps={baseNodeProps} onClick={onClick}>
+      <SynStep nodeProps={baseNodeProps} onClick={onClick}>
         <span>Content</span>
-      </SynStepComponent>
+      </SynStep>
     )
 
     screen.getByRole('button').focus()
@@ -193,9 +193,9 @@ describe('SynStepComponent validation and interaction', () => {
     } as unknown as NodeProps
 
     renderWithFlow(
-      <SynStepComponent nodeProps={nodeProps} rootTestId="node-panel">
+      <SynStep nodeProps={nodeProps} rootTestId="node-panel">
         <span>Content</span>
-      </SynStepComponent>
+      </SynStep>
     )
 
     expect(screen.getByTestId('node-panel')).toHaveStyle({ width: '360px' })
@@ -209,9 +209,9 @@ describe('SynStepComponent validation and interaction', () => {
     } as unknown as NodeProps
 
     renderWithFlow(
-      <SynStepComponent nodeProps={nodeProps} rootTestId="node-panel">
+      <SynStep nodeProps={nodeProps} rootTestId="node-panel">
         <span>Content</span>
-      </SynStepComponent>
+      </SynStep>
     )
 
     expect(screen.getByTestId('node-panel')).toHaveStyle({ width: '360px' })
@@ -219,9 +219,9 @@ describe('SynStepComponent validation and interaction', () => {
 
   it('responds to expandAll and collapseAll events', () => {
     renderWithFlow(
-      <SynStepComponent nodeProps={baseNodeProps} collapsible>
+      <SynStep nodeProps={baseNodeProps} collapsible>
         <span>Content</span>
-      </SynStepComponent>
+      </SynStep>
     )
 
     expect(screen.getByText('Content')).toBeInTheDocument()
@@ -229,9 +229,9 @@ describe('SynStepComponent validation and interaction', () => {
 
   it('renders with dashed border style when hasDashedBorder is true', () => {
     renderWithFlow(
-      <SynStepComponent nodeProps={baseNodeProps} hasDashedBorder rootTestId="node-panel" style={{ opacity: 1 }}>
+      <SynStep nodeProps={baseNodeProps} hasDashedBorder rootTestId="node-panel" style={{ opacity: 1 }}>
         <span>Content</span>
-      </SynStepComponent>
+      </SynStep>
     )
 
     expect(screen.getByTestId('node-panel')).toBeInTheDocument()
@@ -244,9 +244,9 @@ describe('SynStepComponent validation and interaction', () => {
     } as unknown as NodeProps
 
     renderWithFlow(
-      <SynStepComponent nodeProps={selectedProps} topBarColor="blue" rootTestId="node-panel">
+      <SynStep nodeProps={selectedProps} topBarColor="blue" rootTestId="node-panel">
         <span>Content</span>
-      </SynStepComponent>
+      </SynStep>
     )
 
     expect(screen.getByTestId('node-panel')).toBeInTheDocument()
@@ -259,9 +259,9 @@ describe('SynStepComponent validation and interaction', () => {
     } as unknown as NodeProps
 
     renderWithFlow(
-      <SynStepComponent nodeProps={disabledProps} rootTestId="node-panel">
+      <SynStep nodeProps={disabledProps} rootTestId="node-panel">
         <span>Content</span>
-      </SynStepComponent>
+      </SynStep>
     )
 
     expect(screen.getByTestId('node-panel')).toHaveStyle({ opacity: '0.5' })
@@ -269,15 +269,15 @@ describe('SynStepComponent validation and interaction', () => {
 
   it('handles re-render with unchanged props', () => {
     const { rerender } = renderWithFlow(
-      <SynStepComponent nodeProps={baseNodeProps} rootTestId="node-panel">
+      <SynStep nodeProps={baseNodeProps} rootTestId="node-panel">
         <span>Content</span>
-      </SynStepComponent>
+      </SynStep>
     )
     rerender(
       <ReactFlowProvider>
-        <SynStepComponent nodeProps={baseNodeProps} rootTestId="node-panel">
+        <SynStep nodeProps={baseNodeProps} rootTestId="node-panel">
           <span>Content</span>
-        </SynStepComponent>
+        </SynStep>
       </ReactFlowProvider>
     )
     expect(screen.getByTestId('node-panel')).toBeInTheDocument()

@@ -2,7 +2,7 @@ import { Badge, Flex } from '@patternfly/react-core'
 import type { LoopActivity } from '@syntara/contracts'
 import { type Node, type NodeProps } from '@xyflow/react'
 
-import { SynStepComponent } from '../../../../components/steps/SynStepComponent'
+import { SynStep } from '../../../../components/steps/SynStep'
 import type { ActivityStatus } from '../../execution/types'
 import { getNodeTypeColor } from '../nodeTypeColors'
 import { semanticZoomActivityTitle } from '../semanticZoom'
@@ -38,7 +38,7 @@ export function LoopNodeComponent(props: NodeProps<LoopNode>) {
     | undefined
 
   return (
-    <SynStepComponent
+    <SynStep
       className={metadata.className}
       disableSource // Disable default source handle since we use BranchHandles instead
       enableEnd={metadata.enableEnd}
@@ -85,6 +85,6 @@ export function LoopNodeComponent(props: NodeProps<LoopNode>) {
           </BranchHandle>
         </BranchHandles>
       </Flex>
-    </SynStepComponent>
+    </SynStep>
   )
 }

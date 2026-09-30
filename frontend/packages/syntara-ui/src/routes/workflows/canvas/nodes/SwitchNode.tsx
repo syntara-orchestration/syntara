@@ -4,8 +4,8 @@ import { type Node, type NodeProps } from '@xyflow/react'
 import { useEffect, useRef, useState } from 'react'
 
 import { SynDetailList } from '../../../../components/details/SynDetailList'
+import { SynStep } from '../../../../components/steps/SynStep'
 import { SynStepBody } from '../../../../components/steps/SynStepBody'
-import { SynStepComponent } from '../../../../components/steps/SynStepComponent'
 import { RegistryNodeId } from '../../../../constants'
 import { buildSwitchCasePort } from '../../../builder/utils/switchCaseHelpers'
 import type { ActivityStatus } from '../../execution/types'
@@ -81,7 +81,7 @@ export function SwitchNodeComponent(props: NodeProps<SwitchNode>) {
   ]
 
   return (
-    <SynStepComponent
+    <SynStep
       className={metadata.className}
       nodeProps={props}
       disableSource
@@ -110,7 +110,7 @@ export function SwitchNodeComponent(props: NodeProps<SwitchNode>) {
           </BranchHandle>
         </BranchHandles>
       </SwitchNodeDetails>
-    </SynStepComponent>
+    </SynStep>
   )
 }
 

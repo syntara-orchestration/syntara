@@ -98,7 +98,7 @@ const isWideTaskNode = (nodeProps: NodeProps) => {
 }
 
 // eslint-disable-next-line complexity
-export function SynStepComponent(props: {
+export function SynStep(props: {
   children: React.ReactNode
   disableSource?: boolean
   disableTarget?: boolean

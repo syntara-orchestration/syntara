@@ -3,8 +3,8 @@ import { RhUiSettingsIcon } from '@patternfly/react-icons'
 import type { TaskActivity } from '@syntara/contracts'
 import { type Node, type NodeProps } from '@xyflow/react'
 
+import { SynStep } from '../../../../components/steps/SynStep'
 import { SynStepBody } from '../../../../components/steps/SynStepBody'
-import { SynStepComponent } from '../../../../components/steps/SynStepComponent'
 import { FlowNodeType } from '../../../../constants'
 import { getActivityMetadata } from '../../../../stores/useWorkflowStore'
 import type { ActivityStatus } from '../../execution/types'
@@ -42,7 +42,7 @@ export function GenericNodeComponent(props: NodeProps<GenericNode>) {
     | undefined
 
   return (
-    <SynStepComponent
+    <SynStep
       nodeProps={props}
       reverseHandles={reverseHandles}
       hasDashedBorder
@@ -69,6 +69,6 @@ export function GenericNodeComponent(props: NodeProps<GenericNode>) {
           </FlexItem>
         </Flex>
       </SynStepBody>
-    </SynStepComponent>
+    </SynStep>
   )
 }

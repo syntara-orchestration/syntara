@@ -4,8 +4,8 @@ import { type Node, type NodeProps } from '@xyflow/react'
 
 import { SynDetail } from '../../../../components/details/SynDetail'
 import { SynDetailList } from '../../../../components/details/SynDetailList'
+import { SynStep } from '../../../../components/steps/SynStep'
 import { SynStepBody } from '../../../../components/steps/SynStepBody'
-import { SynStepComponent } from '../../../../components/steps/SynStepComponent'
 import { RegistryNodeId } from '../../../../constants'
 import type { ActivityStatus } from '../../execution/types'
 import { getNodeTypeColor } from '../nodeTypeColors'
@@ -49,7 +49,7 @@ export function ConvergeNodeComponent(props: NodeProps<ConvergeNode>) {
     | undefined
 
   return (
-    <SynStepComponent
+    <SynStep
       className={metadata.className}
       nodeProps={props}
       executionState={executionState}
@@ -74,6 +74,6 @@ export function ConvergeNodeComponent(props: NodeProps<ConvergeNode>) {
           </SynDetailList>
         </SynStepBody>
       </Flex>
-    </SynStepComponent>
+    </SynStep>
   )
 }
