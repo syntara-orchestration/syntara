@@ -45,6 +45,15 @@ describe('renderNodeIcon', () => {
     })
   })
 
+  it('renders the Terraform mark as a custom icon', () => {
+    const view = buildNodeIconView(MockStyledIcon, RegistryNodeId.TERRAFORM, 'header')
+    render(<>{view}</>)
+
+    const icon = screen.getByTestId('styled-icon')
+    expect(icon).toBeInTheDocument()
+    expect(icon.style.transform).toContain('scale(1)')
+  })
+
   it('renders custom icon with styling for eda trigger node (smaller scale than aap)', () => {
     const view = buildNodeIconView(MockStyledIcon, RegistryNodeId.TRIGGER_EDA)
     render(<>{view}</>)

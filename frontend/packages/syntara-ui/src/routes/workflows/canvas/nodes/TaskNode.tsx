@@ -4,7 +4,7 @@ import { type Node, type NodeProps } from '@xyflow/react'
 import { SynDetailList } from '../../../../components/details/SynDetailList'
 import { NodeBody } from '../../../../components/nodes/NodeBody'
 import { NodeComponent } from '../../../../components/nodes/NodeComponent'
-import { FlowNodeType } from '../../../../constants'
+import { FlowNodeType, isTerraformNodeId } from '../../../../constants'
 import type { ActivityStatus } from '../../execution/types'
 import { getNodeTypeColor } from '../nodeTypeColors'
 
@@ -113,12 +113,17 @@ export function TaskActivityDetails(
   const { actualExecutor } = detectTaskNodeType(props.data)
   const dataWithMetadata = props.data as TaskActivityWithMetadata
 
+  const { icon: taskIcon, id: iconId } = getTaskIconDescriptor(props.data)
   const executorMeta =
     executorMetadata[actualExecutor] ??
-    (actualExecutor.startsWith('tfe_') ? { label: 'Terraform' } : undefined) ??
+    (actualExecutor.startsWith('tfe_') ? { label: 'Terraform', icon: taskIcon } : undefined) ??
     executorMetadata[props.data.type ?? '']
-  const { id: iconId } = getTaskIconDescriptor(props.data)
-  const iconNode = renderNodeIcon(executorMeta?.icon, iconId, 'canvas', props.iconColor)
+  const iconNode = renderNodeIcon(
+    taskIcon ?? executorMeta?.icon,
+    iconId,
+    'canvas',
+    isTerraformNodeId(iconId) ? undefined : props.iconColor
+  )
   const taskExecutorLabel = executorMeta?.label ?? 'Task'
   const taskExecutor = actualExecutor || (props.data.type ?? '')
   const config = props.data.parameters ?? {}

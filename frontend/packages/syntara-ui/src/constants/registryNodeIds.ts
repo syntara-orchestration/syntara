@@ -79,3 +79,8 @@ export const AAP_NODE_IDS = new Set<RegistryNodeIdUnion>([
   RegistryNodeId.AAP_JOB_TEMPLATE,
   RegistryNodeId.AAP_WORKFLOW_TEMPLATE,
 ])
+
+/** Category id and every Terraform Enterprise action subtype (`tfe-*`). */
+export function isTerraformNodeId(nodeId: string | undefined): boolean {
+  return nodeId === RegistryNodeId.TERRAFORM || (nodeId?.startsWith('tfe-') ?? false)
+}
