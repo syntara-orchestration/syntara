@@ -1,6 +1,6 @@
 """Loop-iteration activity id helpers for retry-from-failure.
 
-Shared by the control plane (AAP-92820) and the engine (AAP-92821) so both
+Shared by the control plane and the engine so both
 resolve ``<node>#iter-<n>`` activity names the same way. The engine needs this to
 decide which activity a canvas node id refers to; the validator needs it to
 normalize a selection back to base node ids.

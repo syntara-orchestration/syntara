@@ -1540,7 +1540,7 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
     def _retry_restorable_nodes(self, graph: WorkflowGraph) -> set[str]:
         """Return the base node ids whose stored output this retry can restore.
 
-        The control plane (AAP-92820) already validated the selection, so this
+        The control plane already validated the selection, so this
         only re-derives *which upstream nodes may be skipped* — a node qualifies
         when it is not a retry starting point and nothing downstream of it forced
         it to re-run.
@@ -1738,7 +1738,7 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         """Replace a node's resolved inputs with the retry's user-supplied overrides.
 
         Applied after ``_resolve_node_parameters`` so the override wins over the
-        value the node would otherwise receive, which per AAP-92820 is the value
+        value the node would otherwise receive, which is the value
         *after* upstream outputs were injected. Mutates in place so the caller's
         copy and ``self.node_inputs`` stay consistent.
 

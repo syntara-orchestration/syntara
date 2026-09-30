@@ -1,4 +1,4 @@
-"""Stored-output resolution for retry-from-failure (AAP-92821).
+"""Stored-output resolution for retry-from-failure .
 
 These outputs are injected into a run in place of the nodes it skipped, so a
 wrong one is a silently wrong result rather than a failure.

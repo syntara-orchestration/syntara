@@ -13,9 +13,9 @@ linger in workflow state. Two reasons:
 
 * **Payload size.** ``DEFAULT_MAX_OUTPUT_BYTES`` is 1 MiB per activity against
   Temporal's 2 MiB blob limit, so a retry skipping two large nodes would overflow
-  the arguments blob. Per commit 5959f5b79 the SDK does not mark a size rejection
-  non-retryable, so the overflow surfaces as futile retries until activity
-  timeout with a misleading "Activity task timed out" error.
+  the arguments blob. The SDK does not mark a size rejection non-retryable, so
+  the overflow surfaces as futile retries until activity timeout with a
+  misleading "Activity task timed out" error.
 * **History growth.** Workflow state is persisted in history, so leaving every
   restored output resident inflates every later history entry.
 
@@ -193,9 +193,8 @@ async def fetch_retry_loop_state_activity(
         # hold several FAILED rows for one loop. Only the last one stopped the
         # workflow; every earlier failure was tolerated and its side effects
         # already happened. Resuming from the earliest of them would re-run those
-        # iterations and repeat their side effects, which is the
-        # highest-severity correctness risk in the restart design. Resuming from
-        # the last one cannot skip it, because that is the iteration being retried.
+        # iterations and repeat their side effects. Resuming from the last one
+        # cannot skip it, because that is the iteration being retried.
         resume_iteration = max(index for index, _base, _output in failed_rows)
         result[loop_id] = {
             "resume_iteration": resume_iteration,
