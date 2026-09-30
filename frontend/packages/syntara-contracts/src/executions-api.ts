@@ -460,7 +460,15 @@ export interface components {
      * @description Current state of a workflow execution lifecycle.
      * @enum {string}
      */
-    ExecutionStatus: 'pending' | 'running' | 'paused' | 'completed' | 'completed_with_errors' | 'failed' | 'cancelled'
+    ExecutionStatus:
+      | 'pending'
+      | 'running'
+      | 'paused'
+      | 'completed'
+      | 'completed_with_errors'
+      | 'failed'
+      | 'cancelled'
+      | 'denied'
     /**
      * ExecutionCreate
      * @description Schema for creating a new execution (POST /executions).

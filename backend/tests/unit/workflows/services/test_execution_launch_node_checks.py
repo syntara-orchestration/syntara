@@ -2,7 +2,7 @@
 
 import json
 from types import SimpleNamespace
-from typing import Any, cast
+from typing import Any, Literal, cast
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import UUID, uuid4
 
@@ -66,10 +66,17 @@ def _rejection() -> WorkflowLaunchRejection:
 
 
 @pytest.mark.asyncio
-async def test_interactive_rejection_returns_403_without_temporal_or_execution_record() -> None:
+async def test_run_permission_rejection_returns_403_without_execution_record() -> None:
     service = _service()
     workflow = _workflow()
-    rejection = _rejection()
+    rejection = WorkflowLaunchRejection(
+        reason="execution_run_denied",
+        principal_id=CALLER_ID,
+        project_id=workflow.project_id,
+        trigger_type="manual_trigger",
+        denied_steps=[],
+        denied_by="deny-run",
+    )
     with (
         patch(f"{_MODULE}.get_settings", return_value=SimpleNamespace(max_concurrent_workflows=0)),
         patch(f"{_MODULE}.resolve_user_display_name", AsyncMock(return_value="author")),
@@ -91,6 +98,38 @@ async def test_interactive_rejection_returns_403_without_temporal_or_execution_r
     gate.assert_awaited_once()
     service.temporal_service.start_workflow.assert_not_awaited()
     service.session.add.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_step_permission_rejection_records_denied_run_without_temporal() -> None:
+    service = _service()
+    workflow = _workflow()
+    rejection = _rejection()
+    with (
+        patch(f"{_MODULE}.get_settings", return_value=SimpleNamespace(max_concurrent_workflows=0)),
+        patch(f"{_MODULE}.resolve_user_display_name", AsyncMock(return_value="author")),
+        patch(f"{_MODULE}.build_workflow_metadata", return_value={}),
+        patch(f"{_MODULE}.check_workflow_launch", AsyncMock(return_value=rejection)),
+        pytest.raises(WorkflowLaunchRejectedError) as exc_info,
+    ):
+        await service._start_temporal_and_create_execution(
+            workflow=workflow,
+            workflow_version=_version(),
+            input_data={"source": "manual"},
+            trigger_node_id="trigger",
+            recorder=MagicMock(),
+            component=ComponentLabel.EXECUTION_SERVICE,
+        )
+
+    denied_run = service.session.add.call_args.args[0]
+    assert denied_run.status == ExecutionStatus.DENIED
+    assert denied_run.completed_at > denied_run.created_at
+    assert denied_run.error_details == json.dumps(rejection.to_dict(), sort_keys=True)
+    assert denied_run.created_by == CALLER_ID
+    assert exc_info.value.execution_id == denied_run.id
+    assert exc_info.value.rejection is rejection
+    service.session.commit.assert_awaited_once()
+    service.temporal_service.start_workflow.assert_not_awaited()
 
 
 @pytest.mark.asyncio
@@ -121,17 +160,29 @@ async def test_authorized_webhook_with_temporal_unavailable_is_checked_then_retu
 
 
 @pytest.mark.asyncio
-async def test_webhook_rejection_persists_failed_execution_for_bound_service_account() -> None:
+@pytest.mark.parametrize(
+    ("reason", "expected_status"),
+    [
+        ("execution_run_denied", ExecutionStatus.FAILED),
+        ("step_type_denied", ExecutionStatus.DENIED),
+    ],
+)
+async def test_webhook_rejection_persists_expected_status_for_bound_service_account(
+    reason: Literal["execution_run_denied", "step_type_denied"],
+    expected_status: ExecutionStatus,
+) -> None:
     service = _service()
     service.temporal_service = None
     workflow = _workflow()
     rejection = WorkflowLaunchRejection(
-        reason="execution_run_denied",
+        reason=reason,
         principal_id=WEBHOOK_SA_ID,
         project_id=workflow.project_id,
         trigger_type="webhook_trigger",
-        denied_steps=[],
-        denied_by="no-run",
+        denied_steps=(
+            [{"node_id": "step", "kind": "script", "denied_by": "deny-script"}] if reason == "step_type_denied" else []
+        ),
+        denied_by="no-run" if reason == "execution_run_denied" else None,
     )
     with (
         patch(f"{_MODULE}.get_settings", return_value=SimpleNamespace(max_concurrent_workflows=0)),
@@ -153,7 +204,8 @@ async def test_webhook_rejection_persists_failed_execution_for_bound_service_acc
 
     rejected_execution = service.session.add.call_args.args[0]
     assert exc_info.value.execution_id == rejected_execution.id
-    assert rejected_execution.status == ExecutionStatus.FAILED
+    assert rejected_execution.status == expected_status
+    assert rejected_execution.completed_at > rejected_execution.created_at
     assert rejected_execution.completed_at is not None
     assert rejected_execution.created_by == WEBHOOK_SA_ID
     assert json.loads(rejected_execution.error_details) == rejection.to_dict()
@@ -164,15 +216,16 @@ async def test_webhook_rejection_persists_failed_execution_for_bound_service_acc
 
 
 @pytest.mark.asyncio
-async def test_api_retry_uses_current_caller_even_for_a_webhook_trigger() -> None:
+async def test_api_retry_records_denied_run_and_uses_current_caller_even_for_webhook_trigger() -> None:
     service = _service()
     workflow = _workflow()
+    original_execution_id = uuid4()
     with (
         patch(f"{_MODULE}.get_settings", return_value=SimpleNamespace(max_concurrent_workflows=0)),
         patch(f"{_MODULE}.resolve_user_display_name", AsyncMock(return_value="author")),
         patch(f"{_MODULE}.build_workflow_metadata", return_value={}),
         patch(f"{_MODULE}.check_workflow_launch", AsyncMock(return_value=_rejection())) as gate,
-        pytest.raises(WorkflowLaunchRejectedError),
+        pytest.raises(WorkflowLaunchRejectedError) as exc_info,
     ):
         await service._start_temporal_and_create_execution(
             workflow=workflow,
@@ -181,11 +234,18 @@ async def test_api_retry_uses_current_caller_even_for_a_webhook_trigger() -> Non
             trigger_node_id="trigger",
             recorder=MagicMock(),
             component=ComponentLabel.EXECUTION_SERVICE,
-            retried_from_execution_id=uuid4(),
+            retried_from_execution_id=original_execution_id,
         )
 
     assert gate.await_args is not None
     assert gate.await_args.kwargs["principal_id"] == CALLER_ID
+    denied_run = service.session.add.call_args.args[0]
+    assert denied_run.status == ExecutionStatus.DENIED
+    assert denied_run.completed_at > denied_run.created_at
+    assert denied_run.retried_from_execution_id == original_execution_id
+    assert exc_info.value.execution_id == denied_run.id
+    service.session.commit.assert_awaited_once()
+    service.temporal_service.start_workflow.assert_not_awaited()
 
 
 @pytest.mark.asyncio

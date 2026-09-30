@@ -9,6 +9,7 @@ Covers:
 
 import json
 from datetime import UTC, datetime, timedelta
+from typing import Literal
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
@@ -346,7 +347,18 @@ class TestSetupActivityNoTemporalStart:
         expected_temporal_id = f"my-workflow-{execution_id}"
         assert result["temporal_workflow_id"] == expected_temporal_id
 
-    async def test_rejected_schedule_creates_failed_record_without_temporal_workflow_data(self) -> None:
+    @pytest.mark.parametrize(
+        ("reason", "expected_status"),
+        [
+            ("step_type_denied", ExecutionStatus.DENIED),
+            ("execution_run_denied", ExecutionStatus.FAILED),
+        ],
+    )
+    async def test_rejected_schedule_records_status_without_temporal_workflow_data(
+        self,
+        reason: Literal["execution_run_denied", "step_type_denied"],
+        expected_status: ExecutionStatus,
+    ) -> None:
         launcher = _make_launcher()
         workflow_id = uuid4()
         publisher_id = uuid4()
@@ -363,11 +375,16 @@ class TestSetupActivityNoTemporalStart:
         version.published_by = publisher_id
         version.workflow_definition = {"triggers": [], "nodes": []}
         rejection = WorkflowLaunchRejection(
-            reason="step_type_denied",
+            reason=reason,
             principal_id=publisher_id,
             project_id=workflow.project_id,
             trigger_type="scheduled_trigger",
-            denied_steps=[{"node_id": "step", "kind": "script", "denied_by": "deny-script"}],
+            denied_steps=(
+                [{"node_id": "step", "kind": "script", "denied_by": "deny-script"}]
+                if reason == "step_type_denied"
+                else []
+            ),
+            denied_by="deny-run" if reason == "execution_run_denied" else None,
         )
         session = MagicMock()
         session.add = MagicMock()
@@ -397,7 +414,8 @@ class TestSetupActivityNoTemporalStart:
         execution = session.add.call_args.args[0]
         assert result["rejected"] is True
         assert result["temporal_workflow_id"] == ""
-        assert execution.status == ExecutionStatus.FAILED
+        assert execution.status == expected_status
+        assert execution.completed_at > execution.created_at
         assert execution.created_by == service_principal_id("backend.ao.svc")
         assert json.loads(execution.error_details) == rejection.to_dict()
         assert gate.await_args is not None

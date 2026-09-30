@@ -271,9 +271,14 @@ function SinglePanelLayout({
           </StackItem>
         )}
 
-        {execution.status === 'failed' && resolvedError && (
+        {(execution.status === 'failed' || execution.status === 'denied') && resolvedError && (
           <StackItem style={{ flexShrink: 0, paddingBottom: 'var(--pf-t--global--spacer--sm)' }}>
-            <Alert variant="danger" isInline isPlain title="Execution failed">
+            <Alert
+              variant="danger"
+              isInline
+              isPlain
+              title={execution.status === 'denied' ? 'Execution denied' : 'Execution failed'}
+            >
               {resolvedError}
             </Alert>
           </StackItem>

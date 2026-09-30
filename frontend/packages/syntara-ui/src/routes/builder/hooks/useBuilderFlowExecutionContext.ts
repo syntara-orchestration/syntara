@@ -4,7 +4,7 @@ import { useExecutionStore } from '../../workflows/stores/useExecutionStore'
 import { resolveExecutionStatus } from '../builderFlowConfig'
 import { useIsExecutionView } from '../ExecutionViewContext'
 
-const TERMINAL_EXECUTION_STATUSES = new Set(['completed', 'completed_with_errors', 'failed', 'cancelled'])
+const TERMINAL_EXECUTION_STATUSES = new Set(['completed', 'completed_with_errors', 'failed', 'cancelled', 'denied'])
 
 type UseBuilderFlowExecutionContextParams = {
   executionStatus?: string | null

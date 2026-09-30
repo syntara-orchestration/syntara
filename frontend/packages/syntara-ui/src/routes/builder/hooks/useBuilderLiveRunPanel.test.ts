@@ -73,6 +73,22 @@ beforeEach(() => {
 // ---------------------------------------------------------------------------
 
 describe('useBuilderLiveRunPanel', () => {
+  it('does not treat a denied execution as a live run', () => {
+    const { result } = renderHook(
+      () =>
+        useBuilderLiveRunPanel(
+          defaultParams({
+            mostRecentRunPanelOpen: true,
+            mostRecentExecutionId: 'exec-denied',
+            executionStatus: 'denied',
+          })
+        ),
+      { wrapper: makeWrapper(queryClient) }
+    )
+
+    expect(result.current.isLiveRunActive).toBe(false)
+  })
+
   describe('showMostRecentRunPanelInEditor', () => {
     it('is false when isViewingExecution is true even if panel is active', () => {
       const { result } = renderHook(

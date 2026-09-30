@@ -9,6 +9,7 @@ from ...client import AuthenticatedClient, Client
 from ...models.error_data import ErrorData
 from ...models.execution_read import ExecutionRead
 from ...models.test_execution_create import TestExecutionCreate
+from ...models.workflow_launch_rejected_problem import WorkflowLaunchRejectedProblem
 from ...types import Response
 
 
@@ -34,7 +35,7 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> ErrorData | ExecutionRead | None:
+) -> ErrorData | ErrorData | WorkflowLaunchRejectedProblem | ExecutionRead | None:
     if response.status_code == 201:
         response_201 = ExecutionRead.from_dict(response.json())
 
@@ -51,7 +52,23 @@ def _parse_response(
         return response_401
 
     if response.status_code == 403:
-        response_403 = ErrorData.from_dict(response.json())
+
+        def _parse_response_403(data: object) -> ErrorData | WorkflowLaunchRejectedProblem:
+            try:
+                if not isinstance(data, dict):
+                    raise TypeError()
+                response_403_type_0 = ErrorData.from_dict(data)
+
+                return response_403_type_0
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            if not isinstance(data, dict):
+                raise TypeError()
+            response_403_type_1 = WorkflowLaunchRejectedProblem.from_dict(data)
+
+            return response_403_type_1
+
+        response_403 = _parse_response_403(response.json())
 
         return response_403
 
@@ -88,7 +105,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[ErrorData | ExecutionRead]:
+) -> Response[ErrorData | ErrorData | WorkflowLaunchRejectedProblem | ExecutionRead]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -104,7 +121,7 @@ def sync_detailed(
     *,
     client: AuthenticatedClient,
     body: TestExecutionCreate,
-) -> Response[ErrorData | ExecutionRead]:
+) -> Response[ErrorData | ErrorData | WorkflowLaunchRejectedProblem | ExecutionRead]:
     """Test a single node in a workflow
 
      Test a single node in a workflow with mocked predecessor outputs.
@@ -118,7 +135,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ErrorData | ExecutionRead]
+        Response[ErrorData | ErrorData | WorkflowLaunchRejectedProblem | ExecutionRead]
     """
 
     kwargs = _get_kwargs(
@@ -138,7 +155,7 @@ def sync(
     *,
     client: AuthenticatedClient,
     body: TestExecutionCreate,
-) -> ErrorData | ExecutionRead | None:
+) -> ErrorData | ErrorData | WorkflowLaunchRejectedProblem | ExecutionRead | None:
     """Test a single node in a workflow
 
      Test a single node in a workflow with mocked predecessor outputs.
@@ -152,7 +169,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        ErrorData | ExecutionRead
+        ErrorData | ErrorData | WorkflowLaunchRejectedProblem | ExecutionRead
     """
 
     return sync_detailed(
@@ -167,7 +184,7 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
     body: TestExecutionCreate,
-) -> Response[ErrorData | ExecutionRead]:
+) -> Response[ErrorData | ErrorData | WorkflowLaunchRejectedProblem | ExecutionRead]:
     """Test a single node in a workflow
 
      Test a single node in a workflow with mocked predecessor outputs.
@@ -181,7 +198,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ErrorData | ExecutionRead]
+        Response[ErrorData | ErrorData | WorkflowLaunchRejectedProblem | ExecutionRead]
     """
 
     kwargs = _get_kwargs(
@@ -199,7 +216,7 @@ async def asyncio(
     *,
     client: AuthenticatedClient,
     body: TestExecutionCreate,
-) -> ErrorData | ExecutionRead | None:
+) -> ErrorData | ErrorData | WorkflowLaunchRejectedProblem | ExecutionRead | None:
     """Test a single node in a workflow
 
      Test a single node in a workflow with mocked predecessor outputs.
@@ -213,7 +230,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        ErrorData | ExecutionRead
+        ErrorData | ErrorData | WorkflowLaunchRejectedProblem | ExecutionRead
     """
 
     return (

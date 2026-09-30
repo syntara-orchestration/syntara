@@ -92,6 +92,26 @@ describe('ExecutionsTableBody - Run ID column', () => {
     ).toBeInTheDocument()
   })
 
+  it('shows the reason for a denied launch in the Runs list', () => {
+    renderTable([
+      {
+        id: 'denied-run',
+        status: 'denied',
+        error_details: JSON.stringify({
+          code: 'WORKFLOW_LAUNCH_REJECTED',
+          reason: 'step_type_denied',
+          denied_steps: [{ node_id: 'step-a', kind: 'script', denied_by: 'deny-script' }],
+        }),
+        project_id: 'project-1',
+      },
+    ])
+
+    expect(screen.getByText('Denied')).toBeInTheDocument()
+    expect(
+      screen.getByText('This workflow contains denied step types: script (step-a, deny-script).')
+    ).toBeInTheDocument()
+  })
+
   it('renders Run ID as the first data cell with the execution id', () => {
     const executionId = '123e4567-e89b-12d3-a456-426614174000'
     renderTable([

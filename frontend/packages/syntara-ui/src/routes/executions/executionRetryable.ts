@@ -6,6 +6,7 @@ const RETRYABLE_STATUSES = new Set<ExecutionStatus>([
   ExecutionStatusEnum.COMPLETED_WITH_ERRORS,
   ExecutionStatusEnum.FAILED,
   ExecutionStatusEnum.CANCELLED,
+  ExecutionStatusEnum.DENIED,
 ])
 
 export function isExecutionRetryable(status: ExecutionStatus | null | undefined, mode?: string | null): boolean {

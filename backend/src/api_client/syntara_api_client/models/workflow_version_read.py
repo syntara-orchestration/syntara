@@ -38,6 +38,8 @@ class WorkflowVersionRead:
         last_unpublished_at (datetime.datetime | None | Unset):
         name (None | str | Unset):
         created_by (None | Unset | UserReference): User who created the version
+        published_by (None | Unset | UserReference): Principal that last published the version; scheduled runs evaluate
+            authorization as them
     """
 
     id: UUID
@@ -53,6 +55,7 @@ class WorkflowVersionRead:
     last_unpublished_at: datetime.datetime | None | Unset = UNSET
     name: None | str | Unset = UNSET
     created_by: None | Unset | UserReference = UNSET
+    published_by: None | Unset | UserReference = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -112,6 +115,14 @@ class WorkflowVersionRead:
         else:
             created_by = self.created_by
 
+        published_by: dict[str, Any] | None | Unset
+        if isinstance(self.published_by, Unset):
+            published_by = UNSET
+        elif isinstance(self.published_by, UserReference):
+            published_by = self.published_by.to_dict()
+        else:
+            published_by = self.published_by
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -137,6 +148,8 @@ class WorkflowVersionRead:
             field_dict["name"] = name
         if created_by is not UNSET:
             field_dict["created_by"] = created_by
+        if published_by is not UNSET:
+            field_dict["published_by"] = published_by
 
         return field_dict
 
@@ -236,6 +249,23 @@ class WorkflowVersionRead:
 
         created_by = _parse_created_by(d.pop("created_by", UNSET))
 
+        def _parse_published_by(data: object) -> None | Unset | UserReference:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            try:
+                if not isinstance(data, dict):
+                    raise TypeError()
+                published_by_type_0 = UserReference.from_dict(data)
+
+                return published_by_type_0
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            return cast(None | Unset | UserReference, data)
+
+        published_by = _parse_published_by(d.pop("published_by", UNSET))
+
         workflow_version_read = cls(
             id=id,
             workflow_id=workflow_id,
@@ -250,6 +280,7 @@ class WorkflowVersionRead:
             last_unpublished_at=last_unpublished_at,
             name=name,
             created_by=created_by,
+            published_by=published_by,
         )
 
         workflow_version_read.additional_properties = d

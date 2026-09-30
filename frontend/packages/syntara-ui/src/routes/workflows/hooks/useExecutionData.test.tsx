@@ -460,4 +460,20 @@ describe('useShouldStreamExecution', () => {
 
     expect(result.current).toBe(false)
   })
+
+  it('returns false for denied execution', () => {
+    const mockExecution = createMockExecution({ status: 'denied' })
+
+    vi.mocked(executionsClient.useQuery).mockReturnValue({
+      data: mockExecution,
+      isLoading: false,
+      isSuccess: true,
+      error: null,
+      refetch: vi.fn(),
+    })
+
+    const { result } = renderHook(() => useShouldStreamExecution('exec-123'), { wrapper })
+
+    expect(result.current).toBe(false)
+  })
 })

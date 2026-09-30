@@ -5,7 +5,7 @@ HTTP/API concerns in the FastAPI endpoints.
 """
 
 from collections.abc import Iterable
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any
 from uuid import UUID, uuid4
 
@@ -398,9 +398,11 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
         trigger_type: str | None,
         principal_id: UUID,
         rejection: "WorkflowLaunchRejection",
+        created_at: datetime,
         completed_at: datetime,
+        retried_from_execution_id: UUID | None = None,
     ) -> UUID:
-        """Persist the FAILED record required for a rejected triggered launch."""
+        """Persist a terminal record for a workflow launch rejection."""
         execution_id = uuid4()
         self.session.add(
             Execution(
@@ -409,12 +411,14 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
                 workflow_version_id=workflow_version.id,
                 project_id=workflow.project_id,
                 temporal_workflow_id=f"rejected-{execution_id}",
-                status=ExecutionStatus.FAILED,
+                status=(ExecutionStatus.DENIED if rejection.reason == "step_type_denied" else ExecutionStatus.FAILED),
+                created_at=created_at,
                 completed_at=completed_at,
                 input_data=input_data,
                 trigger_node_id=trigger_node_id,
                 trigger_type=trigger_type,
                 error_details=rejection_error_details(rejection),
+                retried_from_execution_id=retried_from_execution_id,
                 created_by=principal_id,
                 updated_by=principal_id,
             )
@@ -485,9 +489,11 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
                     trigger_type=preflight_trigger_node.get("type"),
                     principal_id=principal_id,
                     rejection=rejection,
-                    completed_at=now,
+                    created_at=now,
+                    completed_at=max(datetime.now(UTC), now + timedelta(microseconds=1)),
+                    retried_from_execution_id=retried_from_execution_id,
                 )
-                if persist_rejection
+                if persist_rejection or rejection.reason == "step_type_denied"
                 else None
             )
             raise WorkflowLaunchRejectedError(rejection, rejected_execution_id)

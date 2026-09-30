@@ -57,7 +57,8 @@ export function useBuilderLiveRunPanel({
   const isTerminalStatus =
     executionStatus === ExecutionStatusEnum.COMPLETED ||
     executionStatus === ExecutionStatusEnum.FAILED ||
-    executionStatus === ExecutionStatusEnum.CANCELLED
+    executionStatus === ExecutionStatusEnum.CANCELLED ||
+    executionStatus === ExecutionStatusEnum.DENIED
   // Preserve undefined (status still loading) vs null (explicitly no execution).
   // resolveExecutionStatus uses null as the "edit mode" sentinel; undefined lets
   // the WebSocket store's visualization status take over while REST is in-flight.

@@ -50222,7 +50222,8 @@
           "completed",
           "completed_with_errors",
           "failed",
-          "cancelled"
+          "cancelled",
+          "denied"
         ]
       },
       "ExecutionCreate": {

@@ -35,6 +35,7 @@ import { permissionTooltip } from '../../hooks/permissionUtils'
 import { useCanI } from '../../hooks/useCanI'
 import { useElapsedTime } from '../../hooks/useElapsedTime'
 import type { FilterConfig, FilterFieldDefinition } from '../../types/filters'
+import { formatWorkflowLaunchRejection } from '../../utils/apiErrors'
 import { formatElapsedTime } from '../../utils/dateUtils'
 import { detachPromise } from '../../utils/detachPromise'
 import {
@@ -136,6 +137,7 @@ export function ExecutionHistoryRow({ execution, onSelect, isSelected }: Executi
   const truncatedId = execution.id ? execution.id.slice(0, TRUNCATED_ID_LENGTH) : null
   const isTestRun = (execution as { execution_metadata?: ExecutionMetadata }).execution_metadata?.mode === 'test'
   const retryable = isExecutionRetryable(execution.status, execution.mode)
+  const launchRejection = formatWorkflowLaunchRejection(execution.error_details)
   const executionHref = executionDetailHref(execution.id)
   const runIdLabel = truncatedId ? `Run ID: ${truncatedId}` : null
   const versionHref =
@@ -200,6 +202,11 @@ export function ExecutionHistoryRow({ execution, onSelect, isSelected }: Executi
           <ApprovalPendingBadge approvalPending={execution.approval_pending} />
           {isTestRun && <SynLabel color="purple">Test run</SynLabel>}
         </Flex>
+        {launchRejection && (
+          <Content component={ContentVariants.small} className={styles.historyRowMeta}>
+            {launchRejection}
+          </Content>
+        )}
       </Stack>
       {retryable && (
         <div className={styles.historyRowKebab}>

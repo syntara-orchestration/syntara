@@ -9,7 +9,7 @@ to the actual work, not just the setup phase.
 """
 
 from collections.abc import Callable
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -269,8 +269,11 @@ class ScheduledExecutionLauncher:
                     workflow_version_id=wf_version_id,
                     project_id=wf_project_id,
                     temporal_workflow_id=f"rejected-{execution_id}",
-                    status=ExecutionStatus.FAILED,
-                    completed_at=triggered_at,
+                    status=(
+                        ExecutionStatus.DENIED if rejection.reason == "step_type_denied" else ExecutionStatus.FAILED
+                    ),
+                    created_at=triggered_at,
+                    completed_at=max(datetime.now(UTC), triggered_at + timedelta(microseconds=1)),
                     input_data={"scheduled_at": scheduled_at.isoformat(), "triggered_at": triggered_at.isoformat()},
                     trigger_node_id=trigger_node_id,
                     trigger_type=ActivityName.SCHEDULED_TRIGGER.value,

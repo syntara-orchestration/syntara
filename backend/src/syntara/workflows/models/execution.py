@@ -79,6 +79,7 @@ class ExecutionStatus(str, Enum):
     COMPLETED_WITH_ERRORS = "completed_with_errors"
     FAILED = "failed"
     CANCELLED = "cancelled"
+    DENIED = "denied"
 
 
 # Terminal execution statuses (execution has finished)
@@ -88,6 +89,7 @@ TERMINAL_EXECUTION_STATUSES = frozenset(
         ExecutionStatus.COMPLETED_WITH_ERRORS,
         ExecutionStatus.FAILED,
         ExecutionStatus.CANCELLED,
+        ExecutionStatus.DENIED,
     }
 )
 

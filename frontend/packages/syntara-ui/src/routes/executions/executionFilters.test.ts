@@ -166,6 +166,7 @@ describe('executionFilters', () => {
         'completed_with_errors',
         'failed',
         'cancelled',
+        'denied',
         EXECUTION_STATUS_APPROVAL_PENDING,
       ])
     })
@@ -183,6 +184,7 @@ describe('executionFilters', () => {
         'Completed with errors',
         'Failed',
         'Cancelled',
+        'Denied',
         'Pending approval',
       ])
     })

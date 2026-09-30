@@ -128,6 +128,7 @@ export const ExecutionStatusEnum = {
   COMPLETED_WITH_ERRORS: 'completed_with_errors',
   FAILED: 'failed',
   CANCELLED: 'cancelled',
+  DENIED: 'denied',
 } as const
 
 /**

@@ -257,6 +257,26 @@ describe('useBuilderToolbarHandlers', () => {
     })
   })
 
+  it('refreshes run history when a launch is denied', async () => {
+    const refetch = vi.fn().mockResolvedValue({})
+    const executeWorkflow = vi.fn((...args: Parameters<ExecuteWorkflow>) => {
+      args[1]?.onError?.({
+        data: {
+          code: 'WORKFLOW_LAUNCH_REJECTED',
+          reason: 'step_type_denied',
+          denied_steps: [{ node_id: 'step-1', kind: 'script', denied_by: 'deny-script' }],
+        },
+      })
+    }) as MockedFunction<ExecuteWorkflow>
+    const { result } = renderHook(() =>
+      useBuilderToolbarHandlers(buildOptions({ executeWorkflow, executionsQuery: { refetch } }))
+    )
+
+    await result.current.handleRunWorkflow()
+
+    expect(refetch).toHaveBeenCalledOnce()
+  })
+
   it('handleRunWorkflow passes blockOnWarnings: true to handleSaveWorkflow', async () => {
     const handleSaveWorkflow = vi.fn().mockResolvedValue(true)
     const executeWorkflow = vi.fn((...args: Parameters<ExecuteWorkflow>) => {

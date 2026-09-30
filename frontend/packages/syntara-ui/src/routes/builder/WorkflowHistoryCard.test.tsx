@@ -396,6 +396,23 @@ describe('ExecutionHistoryRow', () => {
     expect(screen.getByTestId('status-label')).toHaveTextContent('running')
   })
 
+  it('shows denied launch details in run history', () => {
+    renderRow({
+      ...baseExecution,
+      status: 'denied',
+      error_details: JSON.stringify({
+        code: 'WORKFLOW_LAUNCH_REJECTED',
+        reason: 'step_type_denied',
+        denied_steps: [{ node_id: 'step-a', kind: 'script', denied_by: 'deny-script' }],
+      }),
+    })
+
+    expect(screen.getByTestId('status-label')).toHaveTextContent('denied')
+    expect(
+      screen.getByText('This workflow contains denied step types: script (step-a, deny-script).')
+    ).toBeInTheDocument()
+  })
+
   it('does not render status label when status is undefined', () => {
     const execution = { ...baseExecution, status: undefined } as unknown as Execution
     renderRow(execution)

@@ -24,12 +24,14 @@ describe('isExecutionRetryable', () => {
     expect(isExecutionRetryable(status)).toBe(false)
   })
 
-  it.each([ExecutionStatusEnum.COMPLETED, ExecutionStatusEnum.FAILED, ExecutionStatusEnum.CANCELLED])(
-    'returns false for test mode even with terminal status %s',
-    (status) => {
-      expect(isExecutionRetryable(status, 'test')).toBe(false)
-    }
-  )
+  it.each([
+    ExecutionStatusEnum.COMPLETED,
+    ExecutionStatusEnum.FAILED,
+    ExecutionStatusEnum.CANCELLED,
+    ExecutionStatusEnum.DENIED,
+  ])('returns false for test mode even with terminal status %s', (status) => {
+    expect(isExecutionRetryable(status, 'test')).toBe(false)
+  })
 
   it('returns true for standard mode with terminal status', () => {
     expect(isExecutionRetryable(ExecutionStatusEnum.FAILED, 'standard')).toBe(true)

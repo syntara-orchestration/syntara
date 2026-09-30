@@ -88,6 +88,24 @@ describe('useRetryExecution', () => {
     })
   })
 
+  it('refreshes execution history when a retry is denied', () => {
+    mockMutate.mockImplementation((_params: unknown, callbacks: { onError: (err: unknown) => void }) => {
+      callbacks.onError({
+        data: {
+          code: 'WORKFLOW_LAUNCH_REJECTED',
+          reason: 'step_type_denied',
+          denied_steps: [{ node_id: 'step-1', kind: 'script', denied_by: 'deny-script' }],
+        },
+      })
+    })
+    const { Wrapper, mockInvalidateQueries } = createWrapper()
+    const { result } = renderHook(() => useRetryExecution('exec-abc'), { wrapper: Wrapper })
+
+    act(() => result.current.handleRetry())
+
+    expect(mockInvalidateQueries).toHaveBeenCalledWith({ queryKey: ['get', '/executions'] })
+  })
+
   it('returns isPending true when mutation is in progress', () => {
     vi.mocked(executionsClient.useMutation).mockReturnValue({
       mutate: mockMutate,

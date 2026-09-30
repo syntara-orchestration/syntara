@@ -35159,6 +35159,7 @@ components:
         - completed_with_errors
         - failed
         - cancelled
+        - denied
     ExecutionCreate:
       type: object
       title: ExecutionCreate

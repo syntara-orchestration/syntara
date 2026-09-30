@@ -15,6 +15,7 @@ describe('StatusLabel', () => {
     ['completed_with_errors', 'Completed with errors'],
     ['failed', 'Failed'],
     ['cancelled', 'Cancelled'],
+    ['denied', 'Denied'],
   ] as const)('renders "%s" as "%s"', (status, label) => {
     render(<StatusLabel status={status} />)
     expect(screen.getByText(label)).toBeInTheDocument()

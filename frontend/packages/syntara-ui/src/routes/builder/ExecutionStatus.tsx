@@ -1,4 +1,5 @@
 import {
+  RhUiBanIcon,
   RhUiCheckCircleIcon,
   RhUiClockIcon,
   RhUiCloseCircleIcon,
@@ -29,6 +30,7 @@ const statusMap: Record<ExecutionStatus, 'success' | 'danger' | 'warning' | 'inf
   completed_with_errors: 'warning',
   failed: 'danger',
   cancelled: 'custom',
+  denied: 'danger',
 }
 
 const statusIcons: Record<ExecutionStatus, React.ComponentType<{ className?: string }>> = {
@@ -39,6 +41,7 @@ const statusIcons: Record<ExecutionStatus, React.ComponentType<{ className?: str
   completed_with_errors: RhUiWarningFillIcon,
   failed: RhUiCloseCircleIcon,
   cancelled: RhUiStopCircleFillIcon,
+  denied: RhUiBanIcon,
 }
 
 export function StatusLabel({ status }: Readonly<{ status: ExecutionStatus }>) {

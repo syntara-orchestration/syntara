@@ -12,6 +12,7 @@ export const executionStatusDisplayLabels: Record<ExecutionStatus, string> = {
   completed_with_errors: 'Completed with errors',
   failed: 'Failed',
   cancelled: 'Cancelled',
+  denied: 'Denied',
 }
 
 const statusColors: Record<ExecutionStatus, string> = {
@@ -22,6 +23,7 @@ const statusColors: Record<ExecutionStatus, string> = {
   completed_with_errors: 'var(--pf-t--global--color--status--warning--default)',
   failed: 'var(--pf-t--global--color--status--danger--default)',
   cancelled: 'var(--pf-t--global--color--nonstatus--gray--300)',
+  denied: 'var(--pf-t--global--color--status--danger--default)',
 }
 
 export const activityStatusDisplayLabels: Record<ActivityStatus, string> = {

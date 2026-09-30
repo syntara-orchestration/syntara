@@ -159,7 +159,10 @@ function ExecutionRow({ execution }: Readonly<ExecutionRowProps>) {
   const retryable = isExecutionRetryable(execution.status, execution.mode)
   const cancellable = isExecutionCancellable(execution.status)
   const hasActions = retryable || cancellable
-  const launchRejection = execution.status === 'failed' ? formatWorkflowLaunchRejection(execution.error_details) : null
+  const launchRejection =
+    execution.status === 'failed' || execution.status === 'denied'
+      ? formatWorkflowLaunchRejection(execution.error_details)
+      : null
 
   return (
     <Tr>

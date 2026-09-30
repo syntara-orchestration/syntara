@@ -195,6 +195,6 @@ export function useShouldStreamExecution(executionId: string): boolean {
   }
 
   const execution = data
-  const terminalStatuses = ['completed', 'completed_with_errors', 'failed', 'cancelled']
+  const terminalStatuses = ['completed', 'completed_with_errors', 'failed', 'cancelled', 'denied']
   return !terminalStatuses.includes(execution.status ?? '')
 }

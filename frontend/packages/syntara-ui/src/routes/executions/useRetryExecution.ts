@@ -2,7 +2,7 @@ import { useQueryClient } from '@tanstack/react-query'
 
 import { executionsClient } from '../../client'
 import { useAlerts } from '../../providers/alerts/AlertContext'
-import { getErrorMessage } from '../../utils/apiErrors'
+import { formatWorkflowLaunchRejection, getErrorMessage } from '../../utils/apiErrors'
 import { detachPromise } from '../../utils/detachPromise'
 
 function invalidateExecutionQueries(queryClient: ReturnType<typeof useQueryClient>) {
@@ -34,6 +34,7 @@ export function useRetryExecution(executionId: string, onSuccess?: (newExecution
           }
         },
         onError(error: unknown) {
+          if (formatWorkflowLaunchRejection(error)) invalidateExecutionQueries(queryClient)
           showError({ title: 'Failed to retry execution', description: getErrorMessage(error) })
         },
       }

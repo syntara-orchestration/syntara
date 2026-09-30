@@ -6,7 +6,7 @@ import { workflowFetchClient } from '../../../client'
 import type { AlertMessage } from '../../../providers/alerts'
 import { useWorkflowStore } from '../../../stores/useWorkflowStore'
 import type { WorkflowDefinition } from '../../../stores/workflowStoreTypes'
-import { getErrorMessage } from '../../../utils/apiErrors'
+import { formatWorkflowLaunchRejection, getErrorMessage } from '../../../utils/apiErrors'
 import { formatDateTime } from '../../../utils/dateUtils'
 import { detachPromise } from '../../../utils/detachPromise'
 import type { BuilderAction } from '../builderReducer'
@@ -103,6 +103,8 @@ export function useBuilderToolbarHandlers({
   loadedVersionCreatedAt,
   onRunConflict,
 }: UseBuilderToolbarHandlersOptions) {
+  const refetchExecutions = executionsQuery.refetch
+
   const handleRunWorkflow = useCallback(
     async (
       inputData?: Record<string, unknown>,
@@ -191,6 +193,7 @@ export function useBuilderToolbarHandlers({
             }
           },
           onError: (error) => {
+            if (formatWorkflowLaunchRejection(error)) detachPromise(refetchExecutions())
             showError({
               title: 'Failed to run workflow',
               description: `Failed to start workflow "${workflowName}": ${getErrorMessage(error)}`,
@@ -213,6 +216,7 @@ export function useBuilderToolbarHandlers({
       loadedVersionName,
       loadedVersionCreatedAt,
       onRunConflict,
+      refetchExecutions,
     ]
   )
 
@@ -248,9 +252,9 @@ export function useBuilderToolbarHandlers({
   const handleToggleHistory = useCallback(() => {
     dispatch({ type: 'TOGGLE_HISTORY' })
     if (!historyCardOpen) {
-      detachPromise(executionsQuery.refetch())
+      detachPromise(refetchExecutions())
     }
-  }, [historyCardOpen, executionsQuery, dispatch])
+  }, [historyCardOpen, refetchExecutions, dispatch])
 
   const handleToggleVersionHistory = useCallback(() => {
     dispatch({ type: 'TOGGLE_VERSION_HISTORY' })

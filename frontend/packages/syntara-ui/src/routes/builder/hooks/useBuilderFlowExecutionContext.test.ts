@@ -70,4 +70,13 @@ describe('useBuilderFlowExecutionContext', () => {
     expect(result.current.isActiveExecution).toBe(false)
     expect(result.current.buttonEdgeExecutionStatus).toBeNull()
   })
+
+  it('treats denied executions as terminal', () => {
+    executionStoreState.visualization = { status: 'denied' }
+
+    const { result } = renderHook(() => useBuilderFlowExecutionContext({ executionStatus: 'denied', canEdit: true }))
+
+    expect(result.current.isActiveExecution).toBe(false)
+    expect(result.current.buttonEdgeExecutionStatus).toBeNull()
+  })
 })
