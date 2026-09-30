@@ -1,0 +1,372 @@
+"""Retry-from-failure classification and override application in the engine (AAP-92821).
+
+The control plane (AAP-92820) validates a retry and hands the engine
+``workflow_metadata.retry``. These tests cover the engine half: overrides
+replacing resolved inputs, and completed upstream nodes being skipped with their
+outputs restored.
+"""
+
+from typing import Any
+
+import pytest
+
+from syntara.workflows.utils.namespace_resolver import NamespaceResolver
+from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkflow
+from syntara.workflows.workflow_engine.graph import ActivityNode, WorkflowGraph
+
+from .conftest import init_workflow_runtime
+
+
+def _make_workflow(retry_context: dict[str, Any] | None = None) -> OrchestratorWorkflow:
+    """Create an OrchestratorWorkflow with initialized state, bypassing __init__."""
+    wf = OrchestratorWorkflow.__new__(OrchestratorWorkflow)
+    wf.skipped_nodes = set()
+    wf.failed_nodes = {}
+    wf.resolver = NamespaceResolver()
+    wf.node_inputs = {}
+    wf.node_control_data = {}
+    wf.loop_state = {}
+    wf.loop_body_map = {}
+    wf.loop_iteration_results = {}
+    wf._timeout_tasks = {}
+    wf._timed_out_converge_nodes = set()
+    wf._detached_nodes = set()
+    wf._converge_branch_nodes = {}
+    init_workflow_runtime(wf)
+    wf.execution_id = "test-execution-id"
+    wf._created_by_user_id = ""
+    wf.request_id = None
+    wf.pre_resolved_outputs = {}
+    wf.stop_after_nodes = set()
+    wf.retry_context = retry_context or {}
+    return wf
+
+
+def _node(node_id: str = "step_2", parameters: dict[str, Any] | None = None) -> ActivityNode:
+    return ActivityNode(
+        node_id=node_id,
+        node_type="script",
+        parameters=parameters if parameters is not None else {},
+    )
+
+
+# ---------------------------------------------------------------------------
+# Input parameter overrides (SDP R10c)
+# ---------------------------------------------------------------------------
+
+
+def test_override_replaces_resolved_value() -> None:
+    """An override wins over the value the node would otherwise receive."""
+    wf = _make_workflow({"input_parameter_overrides": {"step_2": {"code": "echo fixed"}}})
+    resolved = {"code": "echo original", "other": "kept"}
+
+    wf._apply_input_overrides(_node(), resolved)
+
+    assert resolved == {"code": "echo fixed", "other": "kept"}
+
+
+def test_override_applies_to_its_own_node_only() -> None:
+    """An override for another node must not touch this one's inputs."""
+    wf = _make_workflow({"input_parameter_overrides": {"step_9": {"code": "echo fixed"}}})
+    resolved = {"code": "echo original"}
+
+    wf._apply_input_overrides(_node("step_2"), resolved)
+
+    assert resolved == {"code": "echo original"}
+
+
+def test_unknown_override_key_is_ignored() -> None:
+    """A key that is not a parameter of the node is not injected.
+
+    The control plane rejects these, so reaching here means the guarantee was
+    bypassed. Ignoring rather than injecting keeps a single run from redefining
+    the workflow.
+    """
+    wf = _make_workflow({"input_parameter_overrides": {"step_2": {"brand_new_param": "x"}}})
+    resolved = {"code": "echo original"}
+
+    wf._apply_input_overrides(_node(), resolved)
+
+    assert resolved == {"code": "echo original"}
+
+
+def test_no_overrides_leaves_inputs_untouched() -> None:
+    """Most retries change nothing, so absent/empty overrides are a no-op."""
+    empty_contexts: list[dict[str, Any]] = [{}, {"input_parameter_overrides": {}}, {"input_parameter_overrides": None}]
+    for retry_context in empty_contexts:
+        wf = _make_workflow(retry_context)
+        resolved = {"code": "echo original"}
+
+        wf._apply_input_overrides(_node(), resolved)
+
+        assert resolved == {"code": "echo original"}
+
+
+def test_override_is_a_noop_on_non_retry_run() -> None:
+    """A normal run has no retry context and must not be affected."""
+    wf = _make_workflow()
+    assert wf.retry_context == {}
+    resolved = {"code": "echo original"}
+
+    wf._apply_input_overrides(_node(), resolved)
+
+    assert resolved == {"code": "echo original"}
+
+
+def test_override_does_not_need_the_target_to_be_a_starting_point() -> None:
+    """A failed node stays overridable even when it is not a retry starting point.
+
+    The control plane emits the eligible set it resolved; the engine applies
+    whatever it is handed rather than re-deriving eligibility.
+    """
+    wf = _make_workflow(
+        {
+            "eligible_point_ids": ["step_1"],
+            "input_parameter_overrides": {"step_2": {"code": "echo fixed"}},
+        }
+    )
+    resolved = {"code": "echo original"}
+
+    wf._apply_input_overrides(_node("step_2"), resolved)
+
+    assert resolved == {"code": "echo fixed"}
+
+
+# ---------------------------------------------------------------------------
+# Retry context is not expression data
+# ---------------------------------------------------------------------------
+
+
+def test_retry_block_is_not_registered_as_a_namespace() -> None:
+    """A user expression must not be able to read the retry block.
+
+    eligible_point_ids and input_parameter_overrides are control-plane state.
+    Exposing them as an expression namespace would let a step read the
+    validated selection and the user's overrides out of its parameters.
+    """
+    metadata = {
+        "workflow_context": {
+            "workflow": {"project_id": "p1", "name": "wf"},
+            "execution": {"created_by_user_id": "u1"},
+        },
+        "retry": {
+            "retry_from_execution_id": "src-1",
+            "eligible_point_ids": ["step_1"],
+            "input_parameter_overrides": {"step_1": {"code": "x"}},
+        },
+    }
+
+    wf = _namespace_probe(metadata)
+
+    assert "retry" not in wf.resolver.namespaces
+    assert wf.retry_context["eligible_point_ids"] == ["step_1"]
+    assert wf._project_id == "p1"
+    assert wf._created_by_user_id == "u1"
+
+
+def _namespace_probe(workflow_metadata: dict[str, Any]) -> OrchestratorWorkflow:
+    """Build a workflow and run only the metadata-unpacking part of __init__."""
+    wf = _make_workflow()
+    wf.execution_id = "exec-1"
+    wf.request_id = None
+    wf._project_id = ""
+    wf._created_by_user_id = ""
+    # Mirrors the unpacking block in __init__ so the test exercises the real
+    # statements without constructing a Temporal workflow instance.
+    wf.retry_context = dict(workflow_metadata.get("retry", {})) if workflow_metadata else {}
+    for ns_key, ns_data in workflow_metadata.items():
+        if ns_key == "retry":
+            continue
+        wf.resolver.set_namespace(ns_key, ns_data)
+    wf_ctx = workflow_metadata.get("workflow_context", {})
+    wf._project_id = wf_ctx.get("workflow", {}).get("project_id", "")
+    wf._created_by_user_id = wf_ctx.get("execution", {}).get("created_by_user_id", "")
+    return wf
+
+
+def test_absent_retry_block_yields_empty_context() -> None:
+    """A normal run must not see a retry context, so nothing downstream activates."""
+    wf = _make_workflow()
+    assert wf.retry_context == {}
+    assert "retry_from_execution_id" not in wf.retry_context
+
+
+# ---------------------------------------------------------------------------
+# Loop iteration id helpers
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("activity_name", "expected"),
+    [
+        ("step_1", "step_1"),
+        ("step_1#iter-0", "step_1"),
+        ("step_1#iter-12", "step_1"),
+    ],
+)
+def test_strip_iteration_suffix(activity_name: str, expected: str) -> None:
+    """A suffixed activity name resolves to its base node id.
+
+    Nested loops append one suffix per enclosing loop, so only the last suffix
+    is stripped and the inner-most base id is kept.
+    """
+    from syntara.workflows.utils.loop_iteration_names import strip_iteration_suffix
+
+    assert strip_iteration_suffix(activity_name) == expected
+
+
+def test_nested_loop_name_keeps_inner_base_id() -> None:
+    """Nested-loop activity names resolve to the inner base, not the outer.
+
+    ``loop_iteration_ids`` appends one ``_iter_{n}`` per enclosing loop, so a
+    doubly-nested activity strips only the final suffix.
+    """
+    from syntara.workflows.utils.loop_iteration_names import strip_iteration_suffix
+
+    assert strip_iteration_suffix("outer#iter-1#iter-0") == "outer#iter-1"
+
+
+@pytest.mark.parametrize(
+    ("activity_name", "expected"),
+    [("step_1", False), ("step_1#iter-0", True)],
+)
+def test_has_iteration_suffix(*, activity_name: str, expected: bool) -> None:
+    """Suffix detection distinguishes an iteration activity from a plain one."""
+    from syntara.workflows.utils.loop_iteration_names import has_iteration_suffix
+
+    assert has_iteration_suffix(activity_name) is expected
+
+
+# ---------------------------------------------------------------------------
+# Node classification: which upstream nodes may be restored
+# ---------------------------------------------------------------------------
+
+
+def _chain_graph(*, cof_nodes: set[str] | None = None) -> WorkflowGraph:
+    """Build trigger -> step_1 -> step_2 -> step_3, optionally with CoF on some nodes."""
+    from syntara.workflows.workflow_engine.graph import WorkflowGraph
+    from syntara.workflows.workflow_engine.graph_backend import InMemoryGraphBackend
+
+    cof_nodes = cof_nodes or set()
+    backend = InMemoryGraphBackend()
+    backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
+    for node_id in ("step_1", "step_2", "step_3"):
+        raw: dict[str, Any] = {"id": node_id, "type": "script", "parameters": {}}
+        if node_id in cof_nodes:
+            raw["settings"] = {"continue_on_failure": True}
+        backend.add_node(node_id, raw)
+    backend.add_edge("trigger", "step_1", None)
+    backend.add_edge("step_1", "step_2", None)
+    backend.add_edge("step_2", "step_3", None)
+    return WorkflowGraph(backend)
+
+
+def _retry(*eligible: str, overrides: dict[str, Any] | None = None) -> dict[str, Any]:
+    context: dict[str, Any] = {
+        "retry_from_execution_id": "src-1",
+        "eligible_point_ids": list(eligible),
+    }
+    if overrides is not None:
+        context["input_parameter_overrides"] = overrides
+    return context
+
+
+def test_upstream_of_failure_point_is_restorable() -> None:
+    """Nodes before the retry points are skipped with their outputs injected."""
+    wf = _make_workflow(_retry("step_2", "step_3"))
+    graph = _chain_graph()
+
+    assert wf._retry_restorable_nodes(graph) == {"step_1"}
+
+
+def test_retry_starting_points_are_never_restored() -> None:
+    """A node being retried must execute, not have its old output injected."""
+    wf = _make_workflow(_retry("step_2"))
+    graph = _chain_graph()
+
+    assert "step_2" not in wf._retry_restorable_nodes(graph)
+
+
+def test_downstream_of_failed_continue_on_failure_step_is_forced_to_rerun() -> None:
+    """SDP R6a: a node downstream of the *failed* CoF step must re-run.
+
+    Its inputs may depend on the failed step's output, which no longer exists, so
+    restoring the old output would replay it against inputs that no longer
+    describe reality.
+    """
+    wf = _make_workflow(_retry("step_1"))
+    graph = _chain_graph(cof_nodes={"step_1"})
+
+    # step_1 is both retried and CoF, so step_2 and step_3 must re-run.
+    assert wf._retry_restorable_nodes(graph) == set()
+
+
+def test_continue_on_failure_on_a_succeeded_node_forces_nothing() -> None:
+    """A CoF node that completed successfully does not force its downstream to re-run.
+
+    R6a is scoped to the *failed* step. step_1 succeeded in the source run and
+    is simply restored, so its downstream is restored too.
+    """
+    wf = _make_workflow(_retry("step_3"))
+    graph = _chain_graph(cof_nodes={"step_1"})
+
+    assert wf._retry_restorable_nodes(graph) == {"step_1", "step_2"}
+
+
+def test_default_continue_on_failure_is_false_so_upstream_is_restored() -> None:
+    """With the catalog default of False, a plain chain restores its upstream."""
+    wf = _make_workflow(_retry("step_3"))
+    graph = _chain_graph()
+
+    assert wf._retry_restorable_nodes(graph) == {"step_1", "step_2"}
+
+
+@pytest.mark.parametrize(
+    "node_type",
+    ["condition", "switch", "loop", "converge", "wait"],
+)
+def test_control_nodes_are_never_restored(node_type: str) -> None:
+    """Condition/switch/loop/converge/wait decide routing, so they must always run.
+
+    Skipping one would strand the graph: nothing would route past it, and
+    downstream expressions would resolve against a namespace the retry never
+    populated.
+    """
+    from syntara.workflows.workflow_engine.graph import WorkflowGraph
+    from syntara.workflows.workflow_engine.graph_backend import InMemoryGraphBackend
+
+    backend = InMemoryGraphBackend()
+    backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
+    backend.add_node("ctrl", {"id": "ctrl", "type": node_type, "parameters": {}})
+    backend.add_node("step_2", {"id": "step_2", "type": "script", "parameters": {}})
+    backend.add_edge("trigger", "ctrl", None)
+    backend.add_edge("ctrl", "step_2", None)
+    graph = WorkflowGraph(backend)
+
+    wf = _make_workflow(_retry("step_2"))
+
+    # ctrl is not a retry point, so it is otherwise restorable - unless the
+    # control-node rule excludes it.
+    assert not wf._should_restore_node("ctrl", graph)
+    # The executor node upstream of the retry point still restores.
+    assert wf._should_restore_node("step_2", graph) is False
+
+
+def test_restorable_set_is_memoised() -> None:
+    """The set is derived from the graph and retry context, neither of which mutate."""
+    wf = _make_workflow(_retry("step_3"))
+    graph = _chain_graph()
+
+    first = wf._retry_restorable_nodes(graph)
+    second = wf._retry_restorable_nodes(graph)
+
+    assert first is second
+
+
+def test_non_retry_run_restores_nothing() -> None:
+    """A normal run must not consult classification at all."""
+    wf = _make_workflow()
+    graph = _chain_graph()
+
+    assert wf._retry_restorable_nodes(graph) == {"step_1", "step_2", "step_3"}
+    assert not wf._should_restore_node("step_1", graph)

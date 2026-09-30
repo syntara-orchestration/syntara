@@ -41,6 +41,7 @@ with workflow.unsafe.imports_passed_through():
     from syntara.workflows.workflow_engine.utils.credential_scrubber import scrub_credential_values, scrub_credentials
     from syntara.workflows.workflow_engine.utils.timeout_messages import build_timeout_error_message
 
+from syntara.workflows.utils.loop_iteration_names import strip_iteration_suffix
 from syntara.workflows.utils.namespace_resolver import NamespaceResolver
 from syntara.workflows.workflow_engine.approval_mixin import WorkflowApprovalMixin
 from syntara.workflows.workflow_engine.converge_mixin import WorkflowConvergeMixin
@@ -68,6 +69,19 @@ ALLOWED_TRIGGER_TYPES: set[str] = {
 
 # Marker value for pre-resolved node inputs in test executions
 PRE_RESOLVED_MARKER = "__pre_resolved"
+
+#: Node types that decide routing rather than producing an output. A retry never
+#: restores these from a source run: skipping one would strand the graph, so
+#: they always execute.
+_CONTROL_NODE_TYPES = frozenset(
+    {
+        NodeType.CONDITION,
+        NodeType.SWITCH,
+        NodeType.LOOP,
+        NodeType.CONVERGE,
+        NodeType.WAIT,
+    }
+)
 
 
 def _parse_items(items: Any) -> Any:  # noqa: ANN401
@@ -175,8 +189,19 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
 
         self._project_id: str = ""
         self._created_by_user_id: str = ""
+        # The retry block is control-plane state, not expression data: a user
+        # expression must not be able to read eligible_point_ids or the input
+        # overrides. Pulled out before the namespace loop so it is never
+        # registered, rather than popped afterwards.
+        self.retry_context: dict[str, Any] = dict(workflow_metadata.get("retry", {})) if workflow_metadata else {}
+        # Memoised restorable set: derived from the graph and the retry context,
+        # neither of which changes during a run.
+        self._retry_restorable_cache: set[str] | None = None
+        self._restored_nodes: set[str] = set()
         if workflow_metadata:
             for ns_key, ns_data in workflow_metadata.items():
+                if ns_key == "retry":
+                    continue
                 self.resolver.set_namespace(ns_key, ns_data)
             wf_ctx = workflow_metadata.get("workflow_context", {})
             self._project_id = wf_ctx.get("workflow", {}).get("project_id", "")
@@ -1377,6 +1402,13 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
 
             return self._process_node_result(node, self.pre_resolved_outputs[node.id])
 
+        # Retry-from-failure: a node that completed upstream of the failure
+        # point is skipped and its stored output injected. Checked after
+        # pre_resolved_outputs so an explicit mock still wins.
+        restored = await self._maybe_restore_retry_output(node, graph)
+        if restored is not None:
+            return self._process_node_result(node, restored)
+
         node_id = node.id
         node_type = node.type
 
@@ -1410,12 +1442,138 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         else:
             # For all other nodes: standard resolution (Tier 1)
             resolved_parameters = self._resolve_node_parameters(node)
+            if self.retry_context:
+                self._apply_input_overrides(node, resolved_parameters)
 
         timeout_seconds = resolve_timeout(node, self._runtime_settings)
         self.node_inputs[node.id] = copy.deepcopy(resolved_parameters)
 
         result = await self._dispatch_node(node, resolved_parameters, graph, timeout_seconds)
         return self._process_node_result(node, result)
+
+    def _retry_restorable_nodes(self, graph: WorkflowGraph) -> set[str]:
+        """Return the base node ids whose stored output this retry can restore.
+
+        The control plane (AAP-92820) already validated the selection, so this
+        only re-derives *which upstream nodes may be skipped* — a node qualifies
+        when it is not a retry starting point and nothing downstream of it forced
+        it to re-run.
+
+        A node that ran downstream of a ``continue_on_failure`` step is excluded:
+        its inputs may depend on the failed node's output, which no longer exists,
+        so restoring it would replay it against stale inputs. The global default
+        for ``workflow_engine.continue_on_failure`` is False, so this set is
+        empty unless an operator opted in per node.
+        """
+        cached = self._retry_restorable_cache
+        if cached is not None:
+            return cached
+
+        eligible = {strip_iteration_suffix(point) for point in self.retry_context.get("eligible_point_ids", [])}
+        starting = {strip_iteration_suffix(point) for point in self.retry_context.get("retry_point_ids", [])}
+        # A default-selection retry expands to all failed nodes; the control
+        # plane already resolved that set, so eligible_point_ids is the
+        # authority. retry_point_ids is absent from the payload, so fall back to
+        # eligible when no explicit selection was recorded.
+        must_run = eligible or starting
+
+        # Nodes forced to re-run: everything downstream of a continue_on_failure
+        # step that is itself inside the retried region. Walking from each CoF
+        # node in the region, rather than the whole graph, keeps the walk bounded
+        # to what this retry can actually affect.
+        forced: set[str] = set()
+        for node in graph.get_all_nodes():
+            if node.id in must_run and resolve_continue_on_failure(node, self._runtime_settings):
+                forced |= self._walk_downstream(node.id, graph)
+
+        # Trigger nodes are excluded: the retry re-enters the graph at its first
+        # eligible point, and the control plane already re-resolved the trigger
+        # input, so there is no source output to restore for one.
+        triggers = {node.id for node in graph.get_trigger_nodes()}
+        restorable = {node.id for node in graph.get_all_nodes()} - must_run - forced - triggers
+        self._retry_restorable_cache = restorable
+        return restorable
+
+    @staticmethod
+    def _walk_downstream(start_node_id: str, graph: WorkflowGraph) -> set[str]:
+        """Every node reachable from ``start_node_id``, inclusive."""
+        seen: set[str] = set()
+        queue = collections.deque([start_node_id])
+        while queue:
+            node_id = queue.popleft()
+            if node_id in seen:
+                continue
+            seen.add(node_id)
+            queue.extend(graph.get_successors(node_id))
+        return seen
+
+    async def _maybe_restore_retry_output(self, node: ActivityNode, graph: WorkflowGraph) -> dict[str, Any] | None:
+        """Restore this node's source-run output instead of executing it.
+
+        Returns the synthetic completion for a node that qualified, or None to
+        fall through to normal execution — either because this is not a retry,
+        the node may not be skipped, or the source run has no output for it.
+        """
+        if not self.retry_context or not self._should_restore_node(node.id, graph):
+            return None
+        return await self._restore_node_output(node)
+
+    def _should_restore_node(self, node_id: str, graph: WorkflowGraph) -> bool:
+        """Whether this node's stored output may be injected instead of running it."""
+        if not self.retry_context:
+            return False
+        node = graph.get_node(node_id)
+        if node is not None and node.type in _CONTROL_NODE_TYPES:
+            return False
+        return strip_iteration_suffix(node_id) in self._retry_restorable_nodes(graph)
+
+    async def _restore_node_output(self, node: ActivityNode) -> dict[str, Any] | None:
+        """Fetch and inject this node's stored output, or None if unavailable.
+
+        Returns None when the source run has no completed output for the node, so
+        the caller falls through to normal execution. A node that never completed
+        cannot be skipped, because there would be nothing to inject.
+        """
+        fetched = await workflow.execute_activity(
+            ActivityName.RETRY_OUTPUTS,
+            args=[self.retry_context.get("retry_from_execution_id"), [node.id]],
+            activity_id=f"__internal__fetch_retry_output_{node.id}",
+            start_to_close_timeout=timedelta(seconds=DEFAULT_ACTIVITY_TIMEOUT_SECONDS),
+        )
+        output = (fetched or {}).get(node.id)
+        if output is None:
+            return None
+
+        self.node_inputs[node.id] = {PRE_RESOLVED_MARKER: True}
+        # Publish to the namespace exactly as a normal completion does, so
+        # downstream expressions resolve the way they did in the source run.
+        self.resolver.set_namespace(node.id, {**output, "status": "completed"})
+        self.skipped_nodes.add(node.id)
+        self._restored_nodes.add(node.id)
+        workflow.logger.info("Restored retry output", node_id=node.id, output_keys=sorted(output))
+        return {"output": output, "control": None}
+
+    def _apply_input_overrides(self, node: ActivityNode, resolved_parameters: dict[str, Any]) -> None:
+        """Replace a node's resolved inputs with the retry's user-supplied overrides.
+
+        Applied after ``_resolve_node_parameters`` so the override wins over the
+        value the node would otherwise receive, which per AAP-92820 is the value
+        *after* upstream outputs were injected. Mutates in place so the caller's
+        copy and ``self.node_inputs`` stay consistent.
+
+        Overrides were already validated fail-closed by the control plane, so
+        anything reaching here for this node is a legitimate target. Keys that
+        are not parameters of this node are ignored rather than injected: the
+        validator guarantees they cannot occur, and treating an unexpected key as
+        a new parameter would redefine the workflow for one run.
+        """
+        overrides = self.retry_context.get("input_parameter_overrides") or {}
+        supplied = overrides.get(node.id)
+        if not supplied:
+            return
+        for param_name, value in supplied.items():
+            if param_name in resolved_parameters:
+                resolved_parameters[param_name] = value
 
     def _resolve_node_parameters(self, node: ActivityNode) -> dict[str, Any]:
         """Resolve template expressions in a node's parameters.

@@ -17,3 +17,8 @@ def init_workflow_runtime(wf: OrchestratorWorkflow) -> None:
     """
     wf._runtime_settings = make_workflow_runtime_settings()
     wf._has_unhandled_failure = False
+    # Retry-from-failure state. Set in __init__ for a real run; defaulted here so
+    # a workflow built for a non-retry test behaves as one.
+    wf.retry_context = {}
+    wf._retry_restorable_cache = None
+    wf._restored_nodes = set()
