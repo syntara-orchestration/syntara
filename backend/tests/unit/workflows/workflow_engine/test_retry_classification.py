@@ -370,3 +370,70 @@ def test_non_retry_run_restores_nothing() -> None:
 
     assert wf._retry_restorable_nodes(graph) == {"step_1", "step_2", "step_3"}
     assert not wf._should_restore_node("step_1", graph)
+
+
+# ---------------------------------------------------------------------------
+# Loop bodies must not be restored as scalar outputs
+# ---------------------------------------------------------------------------
+
+
+def _loop_graph() -> WorkflowGraph:
+    """Build trigger -> loop_1 (body_a -> body_b) -> step_2.
+
+    ``body_a``/``body_b`` are the loop body: reached from the loop node via its
+    ``iterate`` port, with the feedback edges stripped at graph build time. The
+    loop itself exits to ``step_2`` via its ``complete`` port.
+    """
+    from syntara.workflows.workflow_engine.graph import WorkflowGraph
+    from syntara.workflows.workflow_engine.graph_backend import InMemoryGraphBackend
+
+    backend = InMemoryGraphBackend()
+    backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
+    backend.add_node("loop_1", {"id": "loop_1", "type": "loop", "parameters": {}})
+    backend.add_node("body_a", {"id": "body_a", "type": "script", "parameters": {}})
+    backend.add_node("body_b", {"id": "body_b", "type": "script", "parameters": {}})
+    backend.add_node("step_2", {"id": "step_2", "type": "script", "parameters": {}})
+    backend.add_edge("trigger", "loop_1", None)
+    backend.add_edge("loop_1", "body_a", {"from_port": "iterate"})
+    backend.add_edge("loop_1", "step_2", {"from_port": "complete"})
+    # ``get_outgoing_edges`` only needs ``to``; ``from_port`` is the port that
+    # matters for body membership.
+    backend.add_edge("body_a", "body_b", {"from_port": "iterate"})
+    return WorkflowGraph(backend)
+
+
+def test_loop_body_nodes_are_not_restored() -> None:
+    """A loop body cannot be restored as a single stored output.
+
+    The body is not one node: it runs once per iteration, and the loop aggregates
+    a list of results across them. Injecting the last stored body output and
+    skipping the body would hand the loop a scalar where it expects a list, and
+    would leave every body-node reference downstream unresolved.
+    """
+    wf = _make_workflow(_retry("step_2"))
+
+    restorable = wf._retry_restorable_nodes(_loop_graph())
+
+    assert "body_a" not in restorable
+    assert "body_b" not in restorable
+
+
+def test_loop_node_itself_is_not_restored() -> None:
+    """The loop control node always runs: it has to iterate to completion."""
+    wf = _make_workflow(_retry("step_2"))
+
+    restorable = wf._retry_restorable_nodes(_loop_graph())
+
+    assert "loop_1" not in restorable
+
+
+def test_non_loop_successors_of_a_loop_stay_restorable() -> None:
+    """Excluding the body must not over-reach past the loop's ``complete`` port."""
+    # Retrying from inside the body: body_b is the starting point, body_a is
+    # loop-body so it never restores, but step_2 is an ordinary node downstream
+    # of the loop and is still eligible for restoration.
+    downstream = _make_workflow(_retry("body_b"))
+    graph = _loop_graph()
+    restorable = downstream._retry_restorable_nodes(graph)
+
+    assert restorable == {"step_2"}

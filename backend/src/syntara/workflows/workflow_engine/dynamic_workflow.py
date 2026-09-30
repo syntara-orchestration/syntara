@@ -1566,9 +1566,39 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         # eligible point, and the control plane already re-resolved the trigger
         # input, so there is no source output to restore for one.
         triggers = {node.id for node in graph.get_trigger_nodes()}
-        restorable = {node.id for node in graph.get_all_nodes()} - must_run - forced - triggers
+
+        # Control nodes decide routing rather than producing a value to inject,
+        # and a loop body is not one node but one execution per iteration. Both
+        # are excluded here so the set means what it says, instead of relying on
+        # _should_restore_node to filter them again at the point of use.
+        control = {node.id for node in graph.get_all_nodes() if node.type in _CONTROL_NODE_TYPES}
+        loop_bodies = self._loop_body_node_ids(graph)
+
+        restorable = {node.id for node in graph.get_all_nodes()} - must_run - forced - triggers - control - loop_bodies
         self._retry_restorable_cache = restorable
         return restorable
+
+    @staticmethod
+    def _loop_body_node_ids(graph: WorkflowGraph) -> set[str]:
+        """Return every node that runs inside some loop body.
+
+        A loop node's body is reached through its ``iterate`` port. Feedback
+        edges (``to_port="iterate"``) are stripped when the graph is built, so
+        walking ``iterate`` edges terminates at the end of the body and never
+        escapes via the loop's ``complete`` port.
+        """
+        body: set[str] = set()
+        for node in graph.get_all_nodes():
+            if node.type != NodeType.LOOP:
+                continue
+            pending = [successor.id for successor in graph.get_next_activities_by_port(node.id, "iterate")]
+            while pending:
+                node_id = pending.pop()
+                if node_id in body:
+                    continue
+                body.add(node_id)
+                pending.extend(successor.id for successor in graph.get_next_activities_by_port(node_id, "iterate"))
+        return body
 
     @staticmethod
     def _walk_downstream(start_node_id: str, graph: WorkflowGraph) -> set[str]:
