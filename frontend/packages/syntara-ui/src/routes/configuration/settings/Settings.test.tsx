@@ -8,6 +8,8 @@ import { useFileStorageStatus } from '../../../hooks/useFileStorageStatus'
 import { WORKFLOW_ENGINE_DEFAULTS_QUERY_KEY } from '../../builder/hooks/useWorkflowEngineDefaults'
 
 import Settings from './Settings'
+import { SettingsCategoryTab } from './SettingsCategoryTab'
+import { useSettingsCategoryTabContext } from './SettingsCategoryTabContext'
 import { useAllSettings } from './useAllSettings'
 import { useSettingsPermissions } from './useSettingsPermissions'
 
@@ -22,6 +24,24 @@ const mockShowSuccess = vi.fn()
 const mockShowError = vi.fn()
 const mockShowWarning = vi.fn()
 
+function SettingsCategoryTestOutlet() {
+  const context = useSettingsCategoryTabContext()
+  const category = mockLocation.value.split('/').at(-1)
+
+  if (!context || !category) return null
+
+  return (
+    <SettingsCategoryTab
+      settings={context.settingsByCategory.get(category) ?? []}
+      edits={context.edits}
+      onChange={context.onChange}
+      onResetField={context.onResetField}
+      onValidationChange={context.onValidationChange}
+      readOnly={context.readOnly}
+    />
+  )
+}
+
 vi.mock('@tanstack/react-query', async () => {
   const actual = await vi.importActual('@tanstack/react-query')
   return {
@@ -35,6 +55,7 @@ vi.mock('@tanstack/react-router', async () => {
   return {
     ...actual,
     Link: MockLink,
+    Outlet: SettingsCategoryTestOutlet,
     useNavigate: () => mockSetLocation,
     useRouterState: vi.fn((opts?: { select?: (s: { location: { pathname: string } }) => unknown }) => {
       const state = { location: { pathname: mockLocation.value } }
