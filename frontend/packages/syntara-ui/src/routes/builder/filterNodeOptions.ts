@@ -6,11 +6,12 @@ export type SearchableNodeOption = {
   subtypes?: SearchableNodeOption[]
 }
 
-export type CatalogMatch<T extends SearchableNodeOption = SearchableNodeOption> = {
-  option: T
+export type CatalogMatch = {
+  /** Display fields for a category card or a nested action row. */
+  option: SearchableNodeOption
   /** Registry id of the catalog entry that owns this card. */
   parentId: string
-  /** Set when the card is a matching action inside a catalog category. */
+  /** Set when `option` is a nested action, not the category itself. */
   subtypeId?: string
 }
 
@@ -31,9 +32,9 @@ export function filterNodeOptions<T extends SearchableNodeOption>(options: T[], 
  * A query returns every category whose own text matches, plus each nested action that matches,
  * so a search on the Add step list can surface Terraform actions without opening the category.
  */
-export function collectCatalogMatches<T extends SearchableNodeOption>(options: T[], query: string): CatalogMatch<T>[] {
+export function collectCatalogMatches(options: readonly SearchableNodeOption[], query: string): CatalogMatch[] {
   const normalized = query.trim().toLowerCase()
-  const matches: CatalogMatch<T>[] = []
+  const matches: CatalogMatch[] = []
 
   for (const option of options) {
     const parentId = option.id ?? option.label
@@ -48,7 +49,7 @@ export function collectCatalogMatches<T extends SearchableNodeOption>(options: T
 
     for (const subtype of option.subtypes ?? []) {
       if (!optionTextMatches(subtype, normalized)) continue
-      matches.push({ option: subtype as T, parentId, subtypeId: subtype.id })
+      matches.push({ option: subtype, parentId, subtypeId: subtype.id })
     }
   }
 

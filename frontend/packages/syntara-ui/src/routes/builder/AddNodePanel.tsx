@@ -6,8 +6,9 @@ import { SynPanel } from '../../components/layout/SynPanel'
 import { RegistryNodeId } from '../../constants'
 
 import { collectCatalogMatches, filterNodeOptions } from './filterNodeOptions'
-import { NodeTypeOptionsList } from './NodeTypeOptionsList'
+import { NodeTypeOptionsList, type NodeTypeOption } from './NodeTypeOptionsList'
 import { NodeRegistry } from './registry/NodeRegistry'
+import { resolveIconForType } from './utils/nodeIcons'
 
 type AddNodePanelHeaderProps = {
   panelTitle: string
@@ -136,6 +137,18 @@ export function AddNodePanel(props: AddNodePanelProps) {
     () => (isShowingSubtypeList ? [] : collectCatalogMatches(nodeTypes, searchQuery)),
     [isShowingSubtypeList, nodeTypes, searchQuery]
   )
+  const catalogListOptions = useMemo((): NodeTypeOption[] => {
+    return catalogMatches.map((match) => {
+      const nodeTypeId = match.option.id ?? match.parentId
+      const { icon } = resolveIconForType({ nodeTypeId })
+      return {
+        id: nodeTypeId,
+        label: match.option.label,
+        description: match.option.description,
+        icon: icon ?? RhUiAddSquareIcon,
+      }
+    })
+  }, [catalogMatches])
   const visibleSubtypeOptions = useMemo(
     () => (isShowingSubtypeList ? filterNodeOptions(subtypeOptions, searchQuery) : []),
     [isShowingSubtypeList, searchQuery, subtypeOptions]
@@ -146,7 +159,7 @@ export function AddNodePanel(props: AddNodePanelProps) {
   const searchPlaceholder = selectedNode?.id === RegistryNodeId.TERRAFORM ? 'Search actions...' : 'Search...'
 
   const handleCatalogSelect = (nodeId: string) => {
-    const match = catalogMatches.find((item) => item.option.id === nodeId)
+    const match = catalogMatches.find((item) => (item.option.id ?? item.parentId) === nodeId)
     if (match?.subtypeId) {
       props.onSelectNode(match.parentId, match.subtypeId)
       setSearchQuery('')
@@ -156,9 +169,7 @@ export function AddNodePanel(props: AddNodePanelProps) {
     handleNodeClick(nodeId)
   }
 
-  let optionsList: ReactNode = (
-    <NodeTypeOptionsList nodeTypes={catalogMatches.map((match) => match.option)} onSelect={handleCatalogSelect} />
-  )
+  let optionsList: ReactNode = <NodeTypeOptionsList nodeTypes={catalogListOptions} onSelect={handleCatalogSelect} />
   if (!hasResults) {
     optionsList = (
       <StackItem>
