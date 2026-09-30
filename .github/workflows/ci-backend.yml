@@ -3,11 +3,11 @@ name: CI Backend
 
 on:
   pull_request:
-    branches: [devel, early-access]
+    branches: [devel, early-access, feat/ANSTRAT-2372-TFE]
   merge_group:
     branches: [devel, early-access]
   push:
-    branches: [devel, early-access]
+    branches: [devel, early-access, feat/ANSTRAT-2372-TFE]
 
 concurrency:
   group: ci-backend-${{ github.head_ref || github.run_id }}
