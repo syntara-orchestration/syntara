@@ -16,7 +16,9 @@ from urllib.parse import quote
 import httpx
 import structlog
 
+from syntara.core.config.base import get_settings
 from syntara.core.lib.tls_utils import build_integration_httpx_verify
+from syntara.core.lib.url_validation import validate_url_no_ssrf
 from syntara.terraform.errors import TFEError, TFEErrorCode, map_http_status_to_error
 
 logger = structlog.stdlib.get_logger(__name__)
@@ -272,14 +274,42 @@ class TFEClient:
         )
 
     async def upload_configuration_version(self, upload_url: str, content: bytes) -> None:
-        """PUT artifact bytes to the TFE-provided upload URL."""
-        await self._request(
-            "PUT",
-            upload_url,
-            content=content,
-            content_type="application/octet-stream",
-            mutating=True,
-        )
+        """PUT artifact bytes to the TFE-provided upload URL.
+
+        The upload destination is an arbitrary absolute URL from the TFE API
+        (often object storage). Validate it against the outbound URL policy and
+        never attach the Terraform Bearer token — signed upload URLs authenticate
+        via query parameters, and sending the API credential would leak it to a
+        third-party or attacker-controlled host.
+        """
+        try:
+            validate_url_no_ssrf(
+                upload_url,
+                allowed_hosts=get_settings().integration_url_allowed_hosts,
+                allow_http=False,
+            )
+        except ValueError as exc:
+            msg = f"TFE upload URL failed outbound URL policy: {exc}"
+            raise TFEError(msg, error_code=TFEErrorCode.VALIDATION, retryable=False) from exc
+
+        headers = {"Content-Type": "application/octet-stream"}
+        try:
+            async with httpx.AsyncClient(verify=self._verify, timeout=self._timeout) as client:
+                response = await client.request(
+                    "PUT",
+                    upload_url,
+                    headers=headers,
+                    content=content,
+                )
+        except (httpx.TimeoutException, httpx.NetworkError, OSError) as exc:
+            msg = "Network error during TFE configuration upload; verify outcome in TFE before retrying"
+            raise TFEError(msg, error_code=TFEErrorCode.OUTCOME_UNKNOWN, retryable=False) from exc
+
+        if response.status_code == _HTTP_NO_CONTENT or response.is_success:
+            return
+
+        detail = _extract_error_detail(response)
+        raise map_http_status_to_error(response.status_code, detail, mutating=True)
 
     # ── Runs ───────────────────────────────────────────────────────────────
 

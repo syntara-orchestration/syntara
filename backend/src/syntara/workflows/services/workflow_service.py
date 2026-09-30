@@ -377,12 +377,15 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
 
         Extracts from:
         - node.parameters.credential_id (HTTP request, AAP, etc.)
+        - node.parameters.value_credential_id (secret-backed TFE variable values)
         - node.parameters.integration_connections[].credential_id (Task Agent)
         """
         cred_ids: set[str] = set()
         for node in workflow_definition.get("nodes", []):
             params = node.get("parameters", {})
             if cred_id := params.get("credential_id"):
+                cred_ids.add(cred_id)
+            if cred_id := params.get("value_credential_id"):
                 cred_ids.add(cred_id)
             for conn in params.get("integration_connections") or []:
                 if cred_id := conn.get("credential_id"):
@@ -518,6 +521,36 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
                 )
                 raise SafeValueError(msg)
 
+    def _validate_no_sensitive_tfe_variable_plaintext(
+        self,
+        workflow_definition: dict[str, Any],
+    ) -> None:
+        """Reject TFE variable nodes that store sensitive values as plaintext.
+
+        Sensitive values must use ``value_credential_id`` (Secret String) so they
+        are never persisted in the workflow definition.
+        """
+        sensitive_types = {"tfe_add_variable", "tfe_update_variable"}
+        for node in workflow_definition.get("nodes", []):
+            if node.get("type") not in sensitive_types:
+                continue
+            params = node.get("parameters", {})
+            if not params.get("sensitive"):
+                continue
+            node_name = node.get("name") or node.get("id", "unknown")
+            if params.get("value"):
+                msg = (
+                    f"Node '{node_name}' has sensitive=true with a plaintext value. "
+                    "Use value_credential_id (Secret String credential) instead."
+                )
+                raise SafeValueError(msg)
+            if not params.get("value_credential_id"):
+                msg = (
+                    f"Node '{node_name}' has sensitive=true but no value_credential_id. "
+                    "Select a Secret String credential for the variable value."
+                )
+                raise SafeValueError(msg)
+
     def _is_duplicate_name_error(self, e: IntegrityError) -> bool:
         """Check if IntegrityError is due to duplicate workflow name.
 
@@ -622,6 +655,7 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
 
         await self._validate_credential_project_scope(workflow_definition, project_id)
         await self._validate_no_secret_url_conflicts(workflow_definition)
+        self._validate_no_sensitive_tfe_variable_plaintext(workflow_definition)
         ref_findings = await validate_workflow_references(
             self.session, workflow_definition, project_id, is_import=is_import
         )
@@ -1196,6 +1230,7 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
                     previous_cred_ids = self._extract_credential_ids(prev_version.workflow_definition)
             await self._validate_credential_project_scope(workflow_definition, workflow.project_id, previous_cred_ids)
             await self._validate_no_secret_url_conflicts(workflow_definition)
+            self._validate_no_sensitive_tfe_variable_plaintext(workflow_definition)
             ref_findings = await validate_workflow_references(self.session, workflow_definition, workflow.project_id)
             if ref_findings:
                 result = ValidationResult.from_findings([*result.findings, *ref_findings])
@@ -1391,6 +1426,7 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
                 workflow_definition, workflow.project_id, previous_credential_ids=None
             )
             await self._validate_no_secret_url_conflicts(workflow_definition)
+            self._validate_no_sensitive_tfe_variable_plaintext(workflow_definition)
             stale_tool_findings = await validate_workflow_references(
                 self.session, workflow_definition, workflow.project_id
             )

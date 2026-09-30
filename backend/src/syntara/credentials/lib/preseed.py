@@ -1,6 +1,6 @@
 """Preseed GA managed credential types.
 
-Creates 5 managed credential types if they don't exist, updates them
+Creates managed credential types if they don't exist, updates them
 in place if they do. Uses INSERT ... ON CONFLICT DO UPDATE for atomicity —
 safe under concurrent execution.
 
@@ -237,6 +237,37 @@ GA_CREDENTIAL_TYPES: list[dict[str, Any]] = [
         # extra_vars keys are auto-collected by credential_scrubber._build_credential_keys()
         "injectors": {
             "extra_vars": {"auth_type": "url", "secret_url": "{{url}}"},
+            "env": {},
+            "file": {},
+        },
+    },
+    {
+        "name": "Secret String",
+        "description": (
+            "Stores an arbitrary string as an encrypted secret. Use for sensitive"
+            " workflow inputs such as Terraform Enterprise variable values that"
+            " must not appear in saved workflow definitions."
+        ),
+        "inputs": {
+            "fields": [
+                {
+                    "id": "value",
+                    "label": "Secret value",
+                    "type": "string",
+                    "secret": True,
+                    "help_text": (
+                        "The secret string to keep encrypted at rest. It is resolved"
+                        " at runtime and masked in workflow outputs. Prefer this over"
+                        " plaintext sensitive fields on workflow steps."
+                    ),
+                    "placeholder": "Enter secret value",
+                },
+            ],
+            "required": ["value"],
+        },
+        # extra_vars keys are auto-collected by credential_scrubber._build_credential_keys()
+        "injectors": {
+            "extra_vars": {"auth_type": "secret", "secret_value": "{{value}}"},
             "env": {},
             "file": {},
         },

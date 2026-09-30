@@ -54,6 +54,7 @@ export function resourceAddressesToCsv(value: unknown): string | undefined {
 const DIRECT_STRING_FIELDS = [
   'integration_id',
   'credential_id',
+  'value_credential_id',
   'organization',
   'workspace_id',
   'variable_id',
@@ -120,6 +121,10 @@ export function buildTFEParameters(data: TerraformNodeFormData): Record<string, 
   const params: Record<string, unknown> = {}
   copyPresentStrings(params, data, DIRECT_STRING_FIELDS)
   copyDefinedBooleans(params, data, BOOLEAN_FIELDS)
+  // Sensitive values must never be persisted as plaintext in the workflow definition.
+  if (params.sensitive) {
+    delete params.value
+  }
   if (data.name_field) params.name = data.name_field
   if (data.comment) {
     params.comment = data.comment

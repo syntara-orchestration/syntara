@@ -1,12 +1,14 @@
 """Terraform HTTP request contracts, including safe deletion defaults."""
 
 import json
+from unittest.mock import patch
 
 import httpx
 import pytest
 import respx
 
 from syntara.terraform.client import TFEClient
+from syntara.terraform.errors import TFEError, TFEErrorCode
 from syntara.terraform.presets import workspace_preset_parts
 
 BASE_URL = "https://terraform.example.com/api/v2"
@@ -72,3 +74,34 @@ async def test_agent_pool_is_sent_as_workspace_attribute(client: TFEClient) -> N
     data = json.loads(route.calls[0].request.content)["data"]
     assert data["attributes"]["agent-pool-id"] == "apool-1"
     assert "relationships" not in data
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_upload_configuration_version_omits_authorization(client: TFEClient) -> None:
+    upload_url = "https://uploads.example.com/config?X-Amz-Signature=abc"
+    route = respx.put(upload_url).mock(return_value=httpx.Response(200))
+    with patch(
+        "syntara.terraform.client.validate_url_no_ssrf",
+    ) as mock_validate:
+        await client.upload_configuration_version(upload_url, b"archive-bytes")
+    mock_validate.assert_called_once()
+    assert route.called
+    request = route.calls[0].request
+    assert "Authorization" not in request.headers
+    assert request.headers["Content-Type"] == "application/octet-stream"
+    assert request.content == b"archive-bytes"
+
+
+@pytest.mark.asyncio
+async def test_upload_configuration_version_rejects_unsafe_url(client: TFEClient) -> None:
+    with (
+        patch(
+            "syntara.terraform.client.validate_url_no_ssrf",
+            side_effect=ValueError("URL resolves to a private IP address"),
+        ),
+        pytest.raises(TFEError) as exc_info,
+    ):
+        await client.upload_configuration_version("http://169.254.169.254/latest/meta-data/", b"x")
+    assert exc_info.value.error_code == TFEErrorCode.VALIDATION
+    assert exc_info.value.retryable is False

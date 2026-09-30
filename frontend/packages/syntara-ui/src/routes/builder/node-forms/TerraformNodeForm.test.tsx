@@ -8,7 +8,11 @@ import { NodeRegistry } from '../registry/NodeRegistry'
 import registerTerraformNode from '../registry/nodes/registerTerraformNode'
 
 vi.mock('../components/TFEIntegrationSelector', () => ({ TFEIntegrationSelector: () => null }))
-vi.mock('../components/CredentialSelector', () => ({ CredentialSelector: () => null }))
+vi.mock('../components/CredentialSelector', () => ({
+  CredentialSelector: ({ label, fieldId }: { label?: string; fieldId?: string }) => (
+    <div data-testid={fieldId ?? 'credential-selector'}>{label ?? 'Credential'}</div>
+  ),
+}))
 
 const WORKSPACE_ID = 'Workspace ID'
 const VARIABLE_ID = 'Variable ID'
@@ -47,6 +51,22 @@ describe('Terraform variable step forms', () => {
     expect(workspace).toHaveValue('ws-example')
     expect(variable).toHaveValue('var-example')
     expect(value).toHaveValue('new value')
+    expect(await axe(container)).toHaveNoViolations()
+  })
+
+  it('locks plaintext value and shows Secret String selector when Sensitive is enabled', async () => {
+    const user = userEvent.setup()
+    const { container } = renderVariableStep(RegistryNodeId.TFE_ADD_VARIABLE)
+    const value = screen.getByRole('textbox', { name: VARIABLE_VALUE })
+    await user.type(value, 'plaintext-secret')
+    expect(value).toHaveValue('plaintext-secret')
+
+    await user.click(screen.getByRole('switch', { name: 'Sensitive' }))
+
+    const lockedValue = screen.getByRole('textbox', { name: VARIABLE_VALUE })
+    expect(lockedValue).toBeDisabled()
+    expect(lockedValue).toHaveValue('')
+    expect(screen.getByTestId('tfe-value-credential')).toHaveTextContent('Value credential')
     expect(await axe(container)).toHaveNoViolations()
   })
 })

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import Field, ValidationInfo, field_validator
+from pydantic import Field, ValidationInfo, field_validator, model_validator
 
 from syntara.workflows.workflow_engine.models.workflow_definition import (
     NodeOutput,
@@ -128,7 +128,11 @@ class TFEDeleteWorkspaceOutput(NodeOutput):
 
 
 class TFEFetchStateOutputsOutput(NodeOutput):
-    """Output for Fetch State and Outputs."""
+    """Output for Fetch State and Outputs.
+
+    Sensitive Terraform output values are redacted (``[REDACTED]``) and never
+    returned as plaintext.
+    """
 
     has_state: bool | None = None
     state_version_id: str | None = None
@@ -139,14 +143,50 @@ class TFEFetchStateOutputsOutput(NodeOutput):
 
 
 class TFEAddVariableParameters(TFEIntegrationMixin):
-    """Parameters for Add Variable."""
+    """Parameters for Add Variable.
+
+    When ``sensitive=true``, the value must come from a Secret String credential
+    via ``value_credential_id`` — plaintext ``value`` is rejected so secrets are
+    never stored in the workflow definition.
+    """
 
     workspace_id: str
     key: str
-    value: str
+    value: str | None = None
+    value_credential_id: str | None = Field(
+        default=None,
+        description="UUID of a Secret String credential providing the variable value",
+    )
     category: Literal["terraform", "env"] = "terraform"
     sensitive: bool = False
     hcl: bool = False
+
+    @field_validator("value_credential_id")
+    @classmethod
+    def validate_value_credential_id(cls, v: str | None, info: ValidationInfo) -> str | None:
+        """Validate UUID or template expression when set."""
+        if v is None or v == "":
+            return None
+        validate_uuid_or_template(v, info.field_name or "value_credential_id")
+        return v
+
+    @model_validator(mode="after")
+    def validate_sensitive_value_source(self) -> TFEAddVariableParameters:
+        """Require secret-backed values for sensitive variables."""
+        if self.sensitive:
+            if self.value is not None and self.value != "":
+                msg = "Sensitive variable values must use value_credential_id, not plaintext value"
+                raise ValueError(msg)
+            if not self.value_credential_id:
+                msg = "value_credential_id is required when sensitive=true"
+                raise ValueError(msg)
+        elif not self.value and not self.value_credential_id:
+            msg = "value is required when sensitive=false"
+            raise ValueError(msg)
+        elif self.value and self.value_credential_id:
+            msg = "Provide either value or value_credential_id, not both"
+            raise ValueError(msg)
+        return self
 
 
 class TFEListVariablesParameters(TFEIntegrationMixin):
@@ -157,13 +197,45 @@ class TFEListVariablesParameters(TFEIntegrationMixin):
 
 
 class TFEUpdateVariableParameters(TFEIntegrationMixin):
-    """Parameters for Update Variable."""
+    """Parameters for Update Variable.
+
+    When ``sensitive=true``, the new value must come from ``value_credential_id``.
+    """
 
     workspace_id: str
     variable_id: str
     value: str | None = None
+    value_credential_id: str | None = Field(
+        default=None,
+        description="UUID of a Secret String credential providing the variable value",
+    )
+    sensitive: bool = False
     hcl: bool | None = None
     category: Literal["terraform", "env"] | None = None
+
+    @field_validator("value_credential_id")
+    @classmethod
+    def validate_value_credential_id(cls, v: str | None, info: ValidationInfo) -> str | None:
+        """Validate UUID or template expression when set."""
+        if v is None or v == "":
+            return None
+        validate_uuid_or_template(v, info.field_name or "value_credential_id")
+        return v
+
+    @model_validator(mode="after")
+    def validate_sensitive_value_source(self) -> TFEUpdateVariableParameters:
+        """Require secret-backed values when marking an update as sensitive."""
+        if self.sensitive:
+            if self.value is not None and self.value != "":
+                msg = "Sensitive variable values must use value_credential_id, not plaintext value"
+                raise ValueError(msg)
+            if not self.value_credential_id:
+                msg = "value_credential_id is required when sensitive=true"
+                raise ValueError(msg)
+        elif self.value and self.value_credential_id:
+            msg = "Provide either value or value_credential_id, not both"
+            raise ValueError(msg)
+        return self
 
 
 class TFEDeleteVariableParameters(TFEIntegrationMixin):

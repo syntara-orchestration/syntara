@@ -19,11 +19,22 @@
       "credential_id": {
         "type": "string"
       },
+      "organization": {
+        "type": ["string", "null"]
+      },
       "variable_id": {
         "type": "string"
       },
       "value": {
-        "type": "string"
+        "type": ["string", "null"],
+        "description": "Plaintext value (non-sensitive only). Use value_credential_id when sensitive=true."
+      },
+      "value_credential_id": {
+        "type": ["string", "null"],
+        "description": "UUID of a Secret String credential providing the variable value"
+      },
+      "sensitive": {
+        "type": "boolean"
       },
       "hcl": {
         "type": "boolean"

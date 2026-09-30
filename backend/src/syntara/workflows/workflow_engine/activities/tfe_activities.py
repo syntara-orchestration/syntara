@@ -31,6 +31,7 @@ from syntara.workflows.workflow_engine.activities.tfe_common import (
     data_attrs,
     data_id,
     extract_bearer_token,
+    extract_secret_string_value,
     list_resources,
     map_run_phase,
     raise_as_application_error,
@@ -88,6 +89,7 @@ from syntara.workflows.workflow_engine.models.tfe_types import (
     TFEUploadConfigurationVersionParameters,
 )
 from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName
+from syntara.workflows.workflow_engine.utils.credential_scrubber import REDACTED
 
 logger = structlog.stdlib.get_logger(__name__)
 
@@ -254,7 +256,11 @@ async def execute_tfe_fetch_state_outputs_activity(
     input_config: dict[str, Any],
     outputs: dict[str, str] | None = None,
 ) -> dict[str, Any]:
-    """Fetch current state version outputs for a workspace."""
+    """Fetch current state version outputs for a workspace.
+
+    Sensitive Terraform outputs are redacted before they are returned so
+    plaintext secrets never persist in workflow execution data.
+    """
     params = TFEFetchStateOutputsParameters.model_validate(input_config)
     try:
         client = _client_from_input(input_config, params.organization)
@@ -266,7 +272,11 @@ async def execute_tfe_fetch_state_outputs_activity(
         output_map: dict[str, Any] = {}
         for item in list_resources(outputs_payload):
             key = item.get("name")
-            if key:
+            if not key:
+                continue
+            if item.get("sensitive"):
+                output_map[key] = REDACTED
+            else:
                 output_map[key] = item.get("value")
         return TFEFetchStateOutputsOutput(
             has_state=True,
@@ -281,6 +291,17 @@ async def execute_tfe_fetch_state_outputs_activity(
 # ── Variables ──────────────────────────────────────────────────────────────
 
 
+def _variable_value_from_input(
+    input_config: dict[str, Any],
+    *,
+    plaintext_value: str | None,
+) -> str | None:
+    """Resolve variable value from Secret String credential or plaintext parameter."""
+    if input_config.get("_resolved_value_credentials") is not None:
+        return extract_secret_string_value(input_config.get("_resolved_value_credentials"))
+    return plaintext_value
+
+
 @activity.defn(name=ActivityName.TFE_ADD_VARIABLE)
 async def execute_tfe_add_variable_activity(
     input_config: dict[str, Any],
@@ -290,12 +311,16 @@ async def execute_tfe_add_variable_activity(
     params = TFEAddVariableParameters.model_validate(input_config)
     try:
         client = _client_from_input(input_config, params.organization)
-        # Do not log params.value
+        value = _variable_value_from_input(input_config, plaintext_value=params.value)
+        if value is None:
+            msg = "Variable value is required"
+            raise TFEError(msg, error_code=TFEErrorCode.CONFIG_MISSING)
+        # Do not log value
         payload = await client.create_variable(
             params.workspace_id,
             {
                 "key": params.key,
-                "value": params.value,
+                "value": value,
                 "category": params.category,
                 "sensitive": params.sensitive,
                 "hcl": params.hcl,
@@ -346,8 +371,9 @@ async def execute_tfe_update_variable_activity(
     try:
         client = _client_from_input(input_config, params.organization)
         attrs: dict[str, Any] = {}
-        if params.value is not None:
-            attrs["value"] = params.value
+        value = _variable_value_from_input(input_config, plaintext_value=params.value)
+        if value is not None:
+            attrs["value"] = value
         if params.hcl is not None:
             attrs["hcl"] = params.hcl
         if params.category is not None:

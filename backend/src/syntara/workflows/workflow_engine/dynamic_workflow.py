@@ -1484,14 +1484,21 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
     ) -> None:
         """Resolve and inject Syntara credentials for a task node.
 
-        If the node's parameters has a credential_id, calls the credential resolution
-        activity to decrypt and inject resolved credentials into the parameters.
+        Resolves ``credential_id`` (auth) and optional ``value_credential_id``
+        (secret-backed parameter values such as sensitive TFE variables).
         """
         credential_id = resolved_parameters.get("credential_id")
-        if not credential_id:
+        value_credential_id = resolved_parameters.get("value_credential_id")
+        if not credential_id and not value_credential_id:
             return
 
-        credential_map = {node.id: credential_id}
+        credential_map: dict[str, str] = {}
+        if credential_id:
+            credential_map[node.id] = credential_id
+        value_map_key = f"{node.id}__value"
+        if value_credential_id:
+            credential_map[value_map_key] = value_credential_id
+
         resolved_creds = await workflow.execute_activity(
             resolve_workflow_credentials,
             args=[credential_map, self._project_id],
@@ -1503,6 +1510,13 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
             cred_data = resolved_creds[node.id]
             resolved_parameters["_resolved_credentials"] = cred_data
             for val in cred_data.get("_secret_values", []):
+                if isinstance(val, str):
+                    self._secret_values.add(val)
+
+        if value_map_key in resolved_creds:
+            value_cred_data = resolved_creds[value_map_key]
+            resolved_parameters["_resolved_value_credentials"] = value_cred_data
+            for val in value_cred_data.get("_secret_values", []):
                 if isinstance(val, str):
                     self._secret_values.add(val)
 
@@ -1603,6 +1617,7 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
     def _scrub_activity_credentials(resolved_parameters: dict[str, Any]) -> None:
         """Remove resolved credentials and integration data from parameters after execution."""
         resolved_parameters.pop("_resolved_credentials", None)
+        resolved_parameters.pop("_resolved_value_credentials", None)
         resolved_parameters.pop("_resolved_integration", None)
         scrubbed = scrub_credentials(resolved_parameters)
         resolved_parameters.clear()

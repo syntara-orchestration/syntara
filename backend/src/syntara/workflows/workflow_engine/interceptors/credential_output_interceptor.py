@@ -19,7 +19,9 @@ from temporalio.worker import (
 
 def _input_has_credentials(args: Sequence[Any]) -> bool:
     """Check if activity args contain resolved credentials."""
-    return bool(args) and isinstance(args[0], dict) and "_resolved_credentials" in args[0]
+    if not args or not isinstance(args[0], dict):
+        return False
+    return "_resolved_credentials" in args[0] or "_resolved_value_credentials" in args[0]
 
 
 def _mark_error_details(exc: ApplicationError) -> None:

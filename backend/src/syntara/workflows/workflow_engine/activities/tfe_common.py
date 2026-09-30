@@ -41,6 +41,20 @@ def extract_bearer_token(resolved_credentials: dict[str, Any] | None, _credentia
     return token
 
 
+_SECRET_VALUE_KEY = "secret_value"  # noqa: S105
+
+
+def extract_secret_string_value(resolved_value_credentials: dict[str, Any] | None) -> str:
+    """Extract a Secret String credential value from resolved injectors."""
+    creds = ensure_resolved_credentials_dict(resolved_value_credentials)
+    extra_vars = creds.get("extra_vars") or {}
+    value = extra_vars.get(_SECRET_VALUE_KEY)
+    if not isinstance(value, str) or not value:
+        msg = "Missing or empty secret_value from value credential"
+        raise TFEError(msg, error_code=TFEErrorCode.CONFIG_MISSING)
+    return value
+
+
 def build_client_from_resolution(
     integration: dict[str, Any],
     token: str,

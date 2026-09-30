@@ -9,8 +9,7 @@
       "integration_id",
       "credential_id",
       "workspace_id",
-      "key",
-      "value"
+      "key"
     ],
     "additionalProperties": false,
     "properties": {
@@ -20,6 +19,9 @@
       "credential_id": {
         "type": "string"
       },
+      "organization": {
+        "type": ["string", "null"]
+      },
       "workspace_id": {
         "type": "string"
       },
@@ -27,7 +29,12 @@
         "type": "string"
       },
       "value": {
-        "type": "string"
+        "type": ["string", "null"],
+        "description": "Plaintext value (non-sensitive only). Use value_credential_id when sensitive=true."
+      },
+      "value_credential_id": {
+        "type": ["string", "null"],
+        "description": "UUID of a Secret String credential providing the variable value"
       },
       "category": {
         "type": "string",

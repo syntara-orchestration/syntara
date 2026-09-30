@@ -7,10 +7,13 @@ import pytest
 from temporalio.exceptions import ApplicationError
 
 from syntara.workflows.workflow_engine.activities.tfe_activities import (
+    execute_tfe_add_variable_activity,
     execute_tfe_delete_variable_activity,
+    execute_tfe_fetch_state_outputs_activity,
     execute_tfe_get_run_status_activity,
     execute_tfe_update_variable_activity,
 )
+from syntara.workflows.workflow_engine.utils.credential_scrubber import REDACTED
 
 INPUT = {
     "integration_id": "11111111-1111-1111-1111-111111111111",
@@ -28,6 +31,62 @@ async def test_variable_activities_pass_workspace_id() -> None:
         await execute_tfe_delete_variable_activity(params)
     client.update_variable.assert_awaited_once_with("ws-1", "var-1", {"value": "updated"})
     client.delete_variable.assert_awaited_once_with("ws-1", "var-1")
+
+
+@pytest.mark.asyncio
+async def test_add_sensitive_variable_uses_value_credential() -> None:
+    client = MagicMock(create_variable=AsyncMock(return_value={"data": {"id": "var-9"}}))
+    params = {
+        **INPUT,
+        "workspace_id": "ws-1",
+        "key": "DB_PASSWORD",
+        "sensitive": True,
+        "value_credential_id": "33333333-3333-3333-3333-333333333333",
+        "_resolved_value_credentials": {
+            "extra_vars": {"auth_type": "secret", "secret_value": "from-credential"},
+        },
+    }
+    with patch(CLIENT_PATH, return_value=client):
+        result = await execute_tfe_add_variable_activity(params)
+    client.create_variable.assert_awaited_once_with(
+        "ws-1",
+        {
+            "key": "DB_PASSWORD",
+            "value": "from-credential",
+            "category": "terraform",
+            "sensitive": True,
+            "hcl": False,
+        },
+    )
+    assert result["variable_id"] == "var-9"
+
+
+@pytest.mark.asyncio
+async def test_fetch_state_outputs_redacts_sensitive_values() -> None:
+    client = MagicMock(
+        get_current_state_version=AsyncMock(
+            return_value={"data": {"id": "sv-1", "attributes": {}}},
+        ),
+        get_state_version_outputs=AsyncMock(
+            return_value={
+                "data": [
+                    {
+                        "id": "wsout-1",
+                        "attributes": {"name": "public_ip", "value": "1.2.3.4", "sensitive": False},
+                    },
+                    {
+                        "id": "wsout-2",
+                        "attributes": {"name": "db_password", "value": "super-secret", "sensitive": True},
+                    },
+                ]
+            }
+        ),
+    )
+    with patch(CLIENT_PATH, return_value=client):
+        result = await execute_tfe_fetch_state_outputs_activity({**INPUT, "workspace_id": "ws-1"})
+    assert result["outputs"]["public_ip"] == "1.2.3.4"
+    assert result["outputs"]["db_password"] == REDACTED
+    assert "super-secret" not in str(result)
 
 
 @pytest.mark.asyncio

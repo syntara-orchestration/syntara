@@ -1,7 +1,7 @@
-import { Alert } from '@patternfly/react-core'
+import { Alert, FormGroup, Switch } from '@patternfly/react-core'
 import type { ReactNode } from 'react'
 import { use, useEffect, useMemo, useState } from 'react'
-import { FormProvider, useForm, useWatch, type FieldPath } from 'react-hook-form'
+import { Controller, FormProvider, useForm, useWatch, type FieldPath } from 'react-hook-form'
 
 import { SynSelectField } from '../../../components/forms/SynSelectField'
 import { SynSwitchField } from '../../../components/forms/SynSwitchField'
@@ -18,6 +18,7 @@ export type TerraformNodeFormData = {
   name: string
   integration_id?: string
   credential_id?: string
+  value_credential_id?: string
   organization?: string
   name_field?: string
   workspace_id?: string
@@ -63,15 +64,17 @@ type TerraformNodeFormProps = {
   subtypeId?: string
 }
 
+const SECRET_STRING_CREDENTIAL_TYPE = 'Secret String'
+
 const SUBTYPE_FIELDS: Record<string, FieldPath<TerraformNodeFormData>[]> = {
   'tfe-create-workspace': ['name_field', 'organization', 'preset', 'auto_apply', 'terraform_version', 'description'],
   'tfe-list-workspaces': ['organization', 'search', 'project_id'],
   'tfe-update-workspace': ['workspace_id', 'preset', 'auto_apply', 'description', 'terraform_version'],
   'tfe-delete-workspace': ['workspace_id', 'force'],
   'tfe-fetch-state-outputs': ['workspace_id'],
-  'tfe-add-variable': ['workspace_id', 'key', 'value', 'category', 'sensitive', 'hcl'],
+  'tfe-add-variable': ['workspace_id', 'key', 'category', 'sensitive', 'value', 'hcl'],
   'tfe-list-variables': ['workspace_id', 'key'],
-  'tfe-update-variable': ['workspace_id', 'variable_id', 'value', 'hcl', 'category'],
+  'tfe-update-variable': ['workspace_id', 'variable_id', 'category', 'sensitive', 'value', 'hcl'],
   'tfe-delete-variable': ['workspace_id', 'variable_id'],
   'tfe-upload-configuration-version': ['workspace_id', 'artifact'],
   'tfe-trigger-run': [
@@ -152,13 +155,7 @@ const PRESET_EXTRA_FIELDS: Partial<
   remote_github: ['repository', 'branch', 'github_app_installation_id'],
 }
 
-const BOOLEAN_FIELDS = new Set<FieldPath<TerraformNodeFormData>>([
-  'sensitive',
-  'hcl',
-  'force',
-  'wait_for_completion',
-  'auto_apply',
-])
+const BOOLEAN_FIELDS = new Set<FieldPath<TerraformNodeFormData>>(['hcl', 'force', 'wait_for_completion', 'auto_apply'])
 
 export function TerraformNodeForm({
   onSubmit,
@@ -186,6 +183,8 @@ export function TerraformNodeForm({
   const { control, register, handleSubmit, setValue } = methods
   const integrationId = useWatch({ control, name: 'integration_id' })
   const credentialId = useWatch({ control, name: 'credential_id' })
+  const valueCredentialId = useWatch({ control, name: 'value_credential_id' })
+  const sensitive = useWatch({ control, name: 'sensitive' })
   const preset = useWatch({ control, name: 'preset' })
   const [staleWarning, setStaleWarning] = useState('')
 
@@ -253,6 +252,60 @@ export function TerraformNodeForm({
                 isDisabled={isVersionView}
                 isRequired
               />
+            )
+          }
+          if (field === 'sensitive') {
+            return (
+              <FormGroup key={field} fieldId={fieldId}>
+                <Controller
+                  name="sensitive"
+                  control={control}
+                  render={({ field: switchField }) => (
+                    <Switch
+                      id={fieldId}
+                      label={label}
+                      hasCheckIcon
+                      isChecked={Boolean(switchField.value)}
+                      isDisabled={isVersionView}
+                      onChange={(_event, checked) => {
+                        switchField.onChange(checked)
+                        if (checked) {
+                          setValue('value', '', { shouldDirty: true })
+                        } else {
+                          setValue('value_credential_id', undefined, { shouldDirty: true })
+                        }
+                      }}
+                    />
+                  )}
+                />
+              </FormGroup>
+            )
+          }
+          if (field === 'value' && sensitive) {
+            return (
+              <div key={field}>
+                <SynTextField
+                  name="value"
+                  control={control}
+                  label={label}
+                  fieldId={fieldId}
+                  isDisabled
+                  placeholder="Provided by Secret String credential"
+                  hint="Sensitive values are stored in a Secret String credential and injected at runtime."
+                />
+                <CredentialSelector
+                  value={valueCredentialId}
+                  onChange={(id) => setValue('value_credential_id', id, { shouldDirty: true })}
+                  compatibleTypeNames={[SECRET_STRING_CREDENTIAL_TYPE]}
+                  label="Value credential"
+                  fieldId="tfe-value-credential"
+                  placeholder="Select Secret String credential"
+                  isDisabled={isVersionView}
+                  isRequired
+                  projectId={projectId}
+                  helpText="Select a Secret String credential that holds the sensitive variable value. The plaintext value is never saved in the workflow."
+                />
+              </div>
             )
           }
           if (BOOLEAN_FIELDS.has(field)) {
