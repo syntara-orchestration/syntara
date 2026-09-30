@@ -5,10 +5,7 @@ import { axe } from 'vitest-axe'
 
 import { createDefaultCondition, createDefaultGroup } from '../../utils/expressions/defaults'
 
-import {
-  EXPRESSION_EDITOR_MODE_ARIA_LABEL,
-  EXPRESSION_MODE_LABELS,
-} from './expressionBuilderLabels'
+import { EXPRESSION_EDITOR_MODE_ARIA_LABEL, EXPRESSION_MODE_LABELS } from './expressionBuilderLabels'
 import { ExpressionBuilderCore } from './ExpressionBuilderCore'
 import { prepareRootNode } from './prepareRootNode'
 
