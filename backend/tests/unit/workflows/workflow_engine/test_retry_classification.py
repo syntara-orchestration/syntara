@@ -476,8 +476,10 @@ async def test_restored_output_is_injected_into_the_namespace(mock_wf: MagicMock
 
     assert result == {"output": {"result": "from-source"}, "control": None}
     assert wf.resolver.get_namespace("step_1") == {"result": "from-source", "status": "completed"}
-    assert "step_1" in wf.skipped_nodes
+    # Tracked as restored, not as skipped: it did not get skipped, it ran in an
+    # earlier execution. The converge predicates read skipped_nodes as "never ran".
     assert "step_1" in wf._restored_nodes
+    assert "step_1" not in wf.skipped_nodes
 
 
 @pytest.mark.asyncio
@@ -547,7 +549,8 @@ async def test_maybe_restore_delegates_and_returns_the_synthetic_completion(mock
     result = await wf._maybe_restore_retry_output(node, _chain_graph())
 
     assert result == {"output": {"result": "from-source"}, "control": None}
-    assert "step_1" in wf.skipped_nodes
+    assert "step_1" in wf._restored_nodes
+    assert "step_1" not in wf.skipped_nodes
 
 
 @pytest.mark.asyncio
