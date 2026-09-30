@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { buildSwitchCasePort } from '../../../builder/utils/switchCaseHelpers'
 
-import { SwitchNodeComponent } from './SwitchNode'
+import { SwitchStepComponent } from './SwitchNode'
 
 vi.mock('@xyflow/react', () => ({
   useReactFlow: () => ({
@@ -24,7 +24,7 @@ vi.mock('@xyflow/react', () => ({
   },
 }))
 
-describe('SwitchNodeComponent', () => {
+describe('SwitchStepComponent', () => {
   const baseSwitchData = {
     id: 'switch-1',
     type: 'switch',
@@ -56,20 +56,20 @@ describe('SwitchNodeComponent', () => {
 
   describe('Rendering', () => {
     it('renders switch node with name', () => {
-      render(<SwitchNodeComponent {...createNodeProps(baseSwitchData)} />)
+      render(<SwitchStepComponent {...createNodeProps(baseSwitchData)} />)
 
       expect(screen.getByText('Route by status')).toBeInTheDocument()
     })
 
     it('renders case labels from config', () => {
-      render(<SwitchNodeComponent {...createNodeProps(baseSwitchData)} />)
+      render(<SwitchStepComponent {...createNodeProps(baseSwitchData)} />)
 
       expect(screen.getByText('Path 1')).toBeInTheDocument()
       expect(screen.getByText('Path 2')).toBeInTheDocument()
     })
 
     it('renders fallback handle', () => {
-      render(<SwitchNodeComponent {...createNodeProps(baseSwitchData)} />)
+      render(<SwitchStepComponent {...createNodeProps(baseSwitchData)} />)
 
       expect(screen.getByText('Fallback')).toBeInTheDocument()
     })
@@ -80,7 +80,7 @@ describe('SwitchNodeComponent', () => {
         parameters: { cases: [], default_port: EdgeHandleEnum.DEFAULT },
       } as SwitchActivity
 
-      render(<SwitchNodeComponent {...createNodeProps(emptyData)} />)
+      render(<SwitchStepComponent {...createNodeProps(emptyData)} />)
 
       expect(screen.getByText('Fallback')).toBeInTheDocument()
     })
@@ -88,7 +88,7 @@ describe('SwitchNodeComponent', () => {
     it('renders with default name when name is not set', () => {
       const noNameData = { ...baseSwitchData, name: undefined } as unknown as SwitchActivity
 
-      render(<SwitchNodeComponent {...createNodeProps(noNameData)} />)
+      render(<SwitchStepComponent {...createNodeProps(noNameData)} />)
 
       expect(screen.getByText('Untitled Switch')).toBeInTheDocument()
     })
@@ -96,7 +96,7 @@ describe('SwitchNodeComponent', () => {
 
   describe('Subtitle', () => {
     it('renders Switch subtitle', () => {
-      render(<SwitchNodeComponent {...createNodeProps(baseSwitchData)} />)
+      render(<SwitchStepComponent {...createNodeProps(baseSwitchData)} />)
 
       expect(screen.getByText('Switch')).toBeInTheDocument()
     })
@@ -106,7 +106,7 @@ describe('SwitchNodeComponent', () => {
     it('renders with missing config', () => {
       const noConfigData = { ...baseSwitchData, parameters: undefined } as unknown as SwitchActivity
 
-      render(<SwitchNodeComponent {...createNodeProps(noConfigData)} />)
+      render(<SwitchStepComponent {...createNodeProps(noConfigData)} />)
 
       expect(screen.getByText('Fallback')).toBeInTheDocument()
     })
@@ -117,7 +117,7 @@ describe('SwitchNodeComponent', () => {
         parameters: { default_port: EdgeHandleEnum.DEFAULT },
       } as unknown as SwitchActivity
 
-      render(<SwitchNodeComponent {...createNodeProps(noCasesData)} />)
+      render(<SwitchStepComponent {...createNodeProps(noCasesData)} />)
 
       expect(screen.getByText('Fallback')).toBeInTheDocument()
     })
@@ -131,7 +131,7 @@ describe('SwitchNodeComponent', () => {
         },
       } as SwitchActivity
 
-      render(<SwitchNodeComponent {...createNodeProps(noPortData)} />)
+      render(<SwitchStepComponent {...createNodeProps(noPortData)} />)
 
       expect(screen.getByText('No Port Case')).toBeInTheDocument()
     })
@@ -148,7 +148,7 @@ describe('SwitchNodeComponent', () => {
         },
       } as SwitchActivity
 
-      render(<SwitchNodeComponent {...createNodeProps(noLabelData)} />)
+      render(<SwitchStepComponent {...createNodeProps(noLabelData)} />)
 
       expect(screen.getByText('Path 1')).toBeInTheDocument()
       expect(screen.getByText('Path 2')).toBeInTheDocument()
@@ -164,7 +164,7 @@ describe('SwitchNodeComponent', () => {
         },
       } as unknown as SwitchActivity
 
-      render(<SwitchNodeComponent {...createNodeProps(withExecState)} />)
+      render(<SwitchStepComponent {...createNodeProps(withExecState)} />)
 
       expect(screen.getByText('Route by status')).toBeInTheDocument()
     })
@@ -209,7 +209,7 @@ describe('SwitchNodeComponent', () => {
         },
       } as SwitchActivity
 
-      render(<SwitchNodeComponent {...createNodeProps(truncatedData)} />)
+      render(<SwitchStepComponent {...createNodeProps(truncatedData)} />)
 
       await screen.findByText('A very long label that should be truncated in the UI')
       expect(mockObserve).toHaveBeenCalled()
@@ -219,7 +219,7 @@ describe('SwitchNodeComponent', () => {
       vi.spyOn(HTMLElement.prototype, 'scrollHeight', 'get').mockReturnValue(20)
       vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(40)
 
-      render(<SwitchNodeComponent {...createNodeProps(baseSwitchData)} />)
+      render(<SwitchStepComponent {...createNodeProps(baseSwitchData)} />)
 
       await screen.findByText('Path 1')
       expect(mockObserve).toHaveBeenCalled()

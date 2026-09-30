@@ -23,11 +23,11 @@ import { type ComponentType, type CSSProperties } from 'react'
 
 import AnsibleIcon from '../../../assets/ansible-automation-platform.svg?react'
 import { SynPanel } from '../../../components/layout/SynPanel'
-import { AAP_NODE_IDS, RegistryNodeId } from '../../../constants'
+import { AAP_STEP_IDS, RegistryStepId } from '../../../constants'
 
 import { APPROVAL_BRANCH_TOKENS } from './nodes/common/approvalBranchTokens'
-import { renderNodeIcon } from './nodes/renderNodeIcon'
-import { getAddNodePanelColor } from './nodeTypeColors'
+import { renderStepIcon } from './nodes/renderStepIcon'
+import { getAddStepPanelColor } from './stepTypeColors'
 
 /** Subsection titles: lighter than legend row labels (mock: standard weight). */
 const LEGEND_SECTION_HEADING_STYLE: CSSProperties = {
@@ -41,7 +41,7 @@ const LEGEND_ROW_LABEL_STYLE: CSSProperties = {
   fontWeight: 'var(--pf-t--global--font--weight--heading--default)',
 }
 
-/** Matches `renderNodeIcon` `legend` variant (`Icon` `md` = global icon size md). */
+/** Matches `renderStepIcon` `legend` variant (`Icon` `md` = global icon size md). */
 const LEGEND_ROW_GLYPH_SIZE = 'var(--pf-t--global--icon--size--md)'
 
 /** Fixed column so legend labels share a common start edge (icons/swatches centered in column). */
@@ -55,10 +55,10 @@ const LEGEND_GLYPH_COLUMN_STYLE: CSSProperties = {
 }
 
 function legendIconColor(registryNodeId: string): string | undefined {
-  if (AAP_NODE_IDS.has(registryNodeId as (typeof RegistryNodeId)[keyof typeof RegistryNodeId])) {
+  if (AAP_STEP_IDS.has(registryNodeId as (typeof RegistryStepId)[keyof typeof RegistryStepId])) {
     return undefined
   }
-  return getAddNodePanelColor(registryNodeId)
+  return getAddStepPanelColor(registryNodeId)
 }
 
 const LEGEND_ROWS: ReadonlyArray<{
@@ -69,32 +69,32 @@ const LEGEND_ROWS: ReadonlyArray<{
   {
     label: 'Task Agent',
     icon: RhUiRobotIcon,
-    registryId: RegistryNodeId.AGENT,
+    registryId: RegistryStepId.AGENT,
   },
   {
     label: 'Action',
     icon: RhUiElectricityFillIcon,
-    registryId: RegistryNodeId.ACTION,
+    registryId: RegistryStepId.ACTION,
   },
   {
     label: 'AAP execution',
     icon: AnsibleIcon as ComponentType<{ className?: string }>,
-    registryId: RegistryNodeId.AAP_EXECUTION,
+    registryId: RegistryStepId.AAP_EXECUTION,
   },
   {
     label: 'Logic',
     icon: RhUiBranchFillIcon,
-    registryId: RegistryNodeId.LOGIC,
+    registryId: RegistryStepId.LOGIC,
   },
   {
     label: 'Approval',
     icon: RhUiUserCheckIcon,
-    registryId: RegistryNodeId.APPROVAL,
+    registryId: RegistryStepId.APPROVAL,
   },
   {
     label: 'Trigger',
     icon: RhUiPlayIcon,
-    registryId: RegistryNodeId.TRIGGER,
+    registryId: RegistryStepId.TRIGGER,
   },
 ]
 
@@ -192,7 +192,7 @@ export function CanvasLegend(props: CanvasLegendProps) {
             <StackItem key={row.registryId}>
               <Flex gap={{ default: 'gapSm' }} alignItems={{ default: 'alignItemsCenter' }}>
                 <FlexItem style={LEGEND_GLYPH_COLUMN_STYLE}>
-                  {renderNodeIcon(row.icon, row.registryId, 'legend', legendIconColor(row.registryId))}
+                  {renderStepIcon(row.icon, row.registryId, 'legend', legendIconColor(row.registryId))}
                 </FlexItem>
                 <Content component={ContentVariants.small} style={LEGEND_ROW_LABEL_STYLE}>
                   {row.label}
