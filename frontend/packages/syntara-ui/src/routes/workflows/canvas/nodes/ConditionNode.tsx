@@ -5,31 +5,31 @@ import { type Node, type NodeProps } from '@xyflow/react'
 import { SynDetailList } from '../../../../components/details/SynDetailList'
 import { SynStep } from '../../../../components/steps/SynStep'
 import { SynStepBody } from '../../../../components/steps/SynStepBody'
-import { RegistryNodeId } from '../../../../constants'
+import { RegistryStepId } from '../../../../constants'
 import type { ActivityStatus } from '../../execution/types'
-import { getNodeTypeColor } from '../nodeTypeColors'
 import { semanticZoomActivityTitle } from '../semanticZoom'
+import { getStepTypeColor } from '../stepTypeColors'
 
 import { BranchHandle, BranchHandles } from './common/BranchHandle'
 import { renderJson, renderOutputs } from './common/detailRenderers'
-import { StandardNodeHeader } from './common/StandardNodeHeader'
-import { MenuNodeType, useNodeMenuActions } from './hooks/useNodeMenuActions'
-import { nodeMetadata } from './nodeMetadata'
-import { renderNodeIcon } from './renderNodeIcon'
+import { StandardStepHeader } from './common/StandardStepHeader'
+import { StepMenuCategory, useStepMenuActions } from './hooks/useStepMenuActions'
+import { renderStepIcon } from './renderStepIcon'
+import { stepMetadata } from './stepMetadata'
 
 export type ConditionNode = { type: 'condition' } & Node<ConditionActivity>
 
-export function ConditionNodeComponent(props: NodeProps<ConditionNode>) {
-  const metadata = nodeMetadata.condition
-  const iconNode = renderNodeIcon(
+export function ConditionStepComponent(props: NodeProps<ConditionNode>) {
+  const metadata = stepMetadata.condition
+  const iconNode = renderStepIcon(
     metadata.icon,
-    RegistryNodeId.LOGIC_CONDITION,
+    RegistryStepId.LOGIC_CONDITION,
     'canvas',
-    getNodeTypeColor('condition')
+    getStepTypeColor('condition')
   )
-  const menuActions = useNodeMenuActions({
+  const menuActions = useStepMenuActions({
     nodeId: props.data.id,
-    nodeType: MenuNodeType.CONTROL_FLOW,
+    stepCategory: StepMenuCategory.CONTROL_FLOW,
   })
 
   // Extract execution state if present
@@ -50,7 +50,7 @@ export function ConditionNodeComponent(props: NodeProps<ConditionNode>) {
       disableSource
       collapsible={false}
       executionState={executionState}
-      topBarColor={getNodeTypeColor('condition')}
+      topBarColor={getStepTypeColor('condition')}
       semanticZoomSummary={{
         title: semanticZoomActivityTitle(props.data.name, `Untitled ${metadata.label}`),
         typeLabel: metadata.label,
@@ -60,7 +60,7 @@ export function ConditionNodeComponent(props: NodeProps<ConditionNode>) {
         { id: 'false', ariaLabel: 'False branch output' },
       ]}
     >
-      <ConditionNodeDetails conditionActivity={props.data} icon={iconNode} menuActions={menuActions}>
+      <ConditionStepDetails conditionActivity={props.data} icon={iconNode} menuActions={menuActions}>
         <BranchHandles>
           <BranchHandle id="true" nodeId={props.data.id} ariaLabel="True branch output">
             True
@@ -69,23 +69,23 @@ export function ConditionNodeComponent(props: NodeProps<ConditionNode>) {
             False
           </BranchHandle>
         </BranchHandles>
-      </ConditionNodeDetails>
+      </ConditionStepDetails>
     </SynStep>
   )
 }
 
-export function ConditionNodeDetails(props: {
+export function ConditionStepDetails(props: {
   conditionActivity: ConditionActivity
   children?: React.ReactNode
   showJson?: boolean
   icon?: React.ReactNode
-  menuActions?: ReturnType<typeof useNodeMenuActions>
+  menuActions?: ReturnType<typeof useStepMenuActions>
 }) {
-  const metadata = nodeMetadata.condition
+  const metadata = stepMetadata.condition
 
   return (
     <>
-      <StandardNodeHeader
+      <StandardStepHeader
         icon={props.icon}
         title={props.conditionActivity.name ?? 'Untitled Condition'}
         subtitle={metadata.label}
