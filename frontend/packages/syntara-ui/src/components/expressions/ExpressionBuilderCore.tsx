@@ -12,6 +12,12 @@ import { serializeExpression } from '../../utils/expressions/serializer'
 import type { Expression, ExpressionNode, ExpressionGroup as ExpressionGroupType } from '../../utils/expressions/types'
 import { SynSelect } from '../SynSelect'
 
+import {
+  DEFAULT_BUILDER_GROUP_LABEL,
+  EXPRESSION_EDITOR_MODE_ARIA_LABEL,
+  EXPRESSION_MODE_LABELS,
+  type ExpressionEditorMode,
+} from './expressionBuilderLabels'
 import { ExpressionGroup } from './ExpressionGroup'
 import { ExpressionRawEditor } from './ExpressionRawEditor'
 import { prepareRootNode } from './prepareRootNode'
@@ -70,7 +76,7 @@ type ExpressionBuilderCoreProps = {
   'aria-labelledby'?: string
 }
 
-type EditorMode = 'visual' | 'raw'
+type EditorMode = ExpressionEditorMode
 
 type BuilderState = {
   expression: Expression
@@ -230,9 +236,9 @@ export function ExpressionBuilderCore(props: ExpressionBuilderCoreProps) {
         onClick={() => setIsModeOpen((prev) => !prev)}
         isExpanded={isModeOpen}
         isFullWidth
-        aria-label="Expression editor mode"
+        aria-label={EXPRESSION_EDITOR_MODE_ARIA_LABEL}
       >
-        {state.mode === 'visual' ? 'Visual expression builder' : 'Custom expression'}
+        {EXPRESSION_MODE_LABELS[state.mode]}
       </MenuToggle>
     ),
     [isModeOpen, state.mode]
@@ -248,7 +254,7 @@ export function ExpressionBuilderCore(props: ExpressionBuilderCoreProps) {
     <Stack
       hasGutter
       id={id}
-      aria-label={ariaLabelledBy ? undefined : 'Expression builder'}
+      aria-label={ariaLabelledBy ? undefined : DEFAULT_BUILDER_GROUP_LABEL}
       aria-labelledby={ariaLabelledBy}
       role="group"
     >
@@ -260,9 +266,9 @@ export function ExpressionBuilderCore(props: ExpressionBuilderCoreProps) {
           toggle={modeToggleRef}
           selected={state.mode}
         >
-          <SelectList aria-label="Expression editor mode">
-            <SelectOption value="visual">Visual expression builder</SelectOption>
-            <SelectOption value="raw">Custom expression</SelectOption>
+          <SelectList aria-label={EXPRESSION_EDITOR_MODE_ARIA_LABEL}>
+            <SelectOption value="visual">{EXPRESSION_MODE_LABELS.visual}</SelectOption>
+            <SelectOption value="raw">{EXPRESSION_MODE_LABELS.raw}</SelectOption>
           </SelectList>
         </SynSelect>
       </StackItem>

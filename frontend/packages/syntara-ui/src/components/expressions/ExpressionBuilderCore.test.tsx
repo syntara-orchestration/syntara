@@ -5,23 +5,24 @@ import { axe } from 'vitest-axe'
 
 import { createDefaultCondition, createDefaultGroup } from '../../utils/expressions/defaults'
 
+import {
+  EXPRESSION_EDITOR_MODE_ARIA_LABEL,
+  EXPRESSION_MODE_LABELS,
+} from './expressionBuilderLabels'
 import { ExpressionBuilderCore } from './ExpressionBuilderCore'
 import { prepareRootNode } from './prepareRootNode'
 
-const MODE_LABELS: Record<string, string> = {
-  visual: 'Visual expression builder',
-  raw: 'Custom expression',
-}
+const MODE_LABELS = EXPRESSION_MODE_LABELS
 
 async function selectMode(user: ReturnType<typeof userEvent.setup>, mode: 'visual' | 'raw') {
-  const toggle = screen.getByRole('button', { name: 'Expression editor mode' })
+  const toggle = screen.getByRole('button', { name: EXPRESSION_EDITOR_MODE_ARIA_LABEL })
   await user.click(toggle)
   const option = await screen.findByRole('option', { name: MODE_LABELS[mode] })
   await user.click(option)
 }
 
 function expectModeValue(mode: 'visual' | 'raw') {
-  const toggle = screen.getByRole('button', { name: 'Expression editor mode' })
+  const toggle = screen.getByRole('button', { name: EXPRESSION_EDITOR_MODE_ARIA_LABEL })
   expect(toggle).toHaveTextContent(MODE_LABELS[mode])
 }
 
@@ -71,7 +72,7 @@ describe('ExpressionBuilderCore', () => {
     const onChange = vi.fn()
     render(<ExpressionBuilderCore value="" onChange={onChange} />)
 
-    expect(screen.getByRole('button', { name: 'Expression editor mode' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: EXPRESSION_EDITOR_MODE_ARIA_LABEL })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Add condition' })).toBeInTheDocument()
   })
 
@@ -82,11 +83,11 @@ describe('ExpressionBuilderCore', () => {
 
     expectModeValue('visual')
 
-    const toggle = screen.getByRole('button', { name: 'Expression editor mode' })
+    const toggle = screen.getByRole('button', { name: EXPRESSION_EDITOR_MODE_ARIA_LABEL })
     await user.click(toggle)
 
-    expect(screen.getByRole('option', { name: 'Visual expression builder' })).toBeInTheDocument()
-    expect(screen.getByRole('option', { name: 'Custom expression' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: EXPRESSION_MODE_LABELS.visual })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: EXPRESSION_MODE_LABELS.raw })).toBeInTheDocument()
   })
 
   it('parses valid expression and renders in visual mode', () => {
@@ -211,7 +212,7 @@ describe('ExpressionBuilderCore', () => {
     const onChange = vi.fn()
     render(<ExpressionBuilderCore value="" onChange={onChange} id="custom-builder-id" />)
 
-    expect(screen.getByRole('group', { name: 'Expression builder' })).toHaveAttribute('id', 'custom-builder-id')
+    expect(screen.getByRole('group', { name: 'Condition' })).toHaveAttribute('id', 'custom-builder-id')
   })
 
   it('renders with aria-labelledby', () => {
@@ -229,7 +230,7 @@ describe('ExpressionBuilderCore', () => {
     const onChange = vi.fn()
     render(<ExpressionBuilderCore value="" onChange={onChange} />)
 
-    expect(screen.getByRole('group', { name: 'Expression builder' })).toBeInTheDocument()
+    expect(screen.getByRole('group', { name: 'Condition' })).toBeInTheDocument()
   })
 
   it('adds condition in visual mode', async () => {

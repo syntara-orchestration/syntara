@@ -308,7 +308,7 @@ export async function addConditionalNode(
   await expect(nameInput).toBeVisible({ timeout: 10_000 })
   await nameInput.fill(name)
 
-  // Fill in Visual expression builder fields
+  // Fill in form builder fields
   const fieldInput = page.getByRole('textbox', { name: 'Field', exact: true })
   await expect(fieldInput).toBeVisible({ timeout: 10_000 })
   await fieldInput.fill(config.field)
@@ -343,12 +343,12 @@ export async function addConditionNode(page: Page, name: string, expression = 't
   await expect(page.getByRole('textbox', { name: 'Name', exact: true })).toBeVisible()
   await page.getByRole('textbox', { name: 'Name', exact: true }).fill(name)
 
-  // Expression builder has two modes: visual builder or raw expression
-  // Switch to raw mode to fill the expression directly
-  const editorModeToggle = page.getByRole('button', { name: /Expression editor mode/i })
+  // Condition type dropdown: form builder or freeform text
+  // Switch to freeform text to fill the expression directly
+  const editorModeToggle = page.getByRole('button', { name: 'Condition type', exact: true })
   await expect(editorModeToggle).toBeVisible()
   await editorModeToggle.click()
-  await page.getByRole('option', { name: 'Custom expression' }).click()
+  await page.getByRole('option', { name: 'Freeform text' }).click()
 
   // Wait for raw expression input to appear
   const rawExpressionInput = page.getByLabel(/Raw expression/i)
@@ -531,10 +531,10 @@ export async function addSwitchNodeWithCases(page: Page, name: string, cases: Sw
   const fillCase = async (i: number) => {
     // ExpressionBuilder uses a PatternFly MenuToggle — click to open, then select option
     await page
-      .getByLabel(/Expression editor mode/i)
+      .getByLabel(/Condition type/i)
       .nth(i)
       .click()
-    await page.getByRole('option', { name: 'Custom expression', exact: true }).click()
+    await page.getByRole('option', { name: 'Freeform text', exact: true }).click()
 
     const rawExpression = page.getByLabel(/Raw expression/i).nth(i)
     await rawExpression.fill(cases[i].condition)

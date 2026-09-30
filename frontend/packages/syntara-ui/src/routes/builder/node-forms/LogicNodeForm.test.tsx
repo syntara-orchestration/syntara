@@ -32,7 +32,7 @@ describe('LogicNodeForm', () => {
       )
 
       // Verify ConditionNodeForm is rendered by checking for its unique elements
-      expect(screen.getByRole('group', { name: /Expression builder/i })).toBeInTheDocument()
+      expect(screen.getByRole('group', { name: /Condition/i })).toBeInTheDocument()
       expect(screen.getByPlaceholderText(/Enter activity name/i)).toHaveValue('Test Condition')
     })
 
@@ -172,8 +172,8 @@ describe('LogicNodeForm', () => {
       await user.clear(nameInput)
       await user.type(nameInput, 'Updated Condition')
 
-      await user.click(screen.getByRole('button', { name: /Expression editor mode/i }))
-      await user.click(await screen.findByRole('option', { name: 'Custom expression' }))
+      await user.click(screen.getByRole('button', { name: 'Condition type', exact: true }))
+      await user.click(await screen.findByRole('option', { name: 'Freeform text' }))
       const rawInput = screen.getByLabelText(/Raw expression/i)
       await user.clear(rawInput)
       await user.paste('${x > 5}')
