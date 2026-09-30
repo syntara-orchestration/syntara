@@ -1528,8 +1528,13 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         else:
             # For all other nodes: standard resolution (Tier 1)
             resolved_parameters = self._resolve_node_parameters(node)
-            if self.retry_context:
-                self._apply_input_overrides(node, resolved_parameters)
+
+        # Applied for every node type, not just the standard-resolution branch.
+        # condition and switch build their parameters from raw templates, and the
+        # control plane accepts an override on any failed node, so restricting
+        # this to the else branch dropped a validated override with no warning.
+        if self.retry_context:
+            self._apply_input_overrides(node, resolved_parameters)
 
         timeout_seconds = resolve_timeout(node, self._runtime_settings)
         self.node_inputs[node.id] = copy.deepcopy(resolved_parameters)
@@ -1555,13 +1560,12 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         if cached is not None:
             return cached
 
-        eligible = {strip_iteration_suffix(point) for point in self.retry_context.get("eligible_point_ids", [])}
-        starting = {strip_iteration_suffix(point) for point in self.retry_context.get("retry_point_ids", [])}
-        # A default-selection retry expands to all failed nodes; the control
-        # plane already resolved that set, so eligible_point_ids is the
-        # authority. retry_point_ids is absent from the payload, so fall back to
-        # eligible when no explicit selection was recorded.
-        must_run = eligible or starting
+        # The control plane resolves the selection to the set of failure points
+        # that will actually run, and that set is the authority. There is no
+        # separate record of what the caller originally picked: a default
+        # selection is already expanded to every failed node by the time it gets
+        # here, so reading one would either be absent or a stale duplicate.
+        must_run = {strip_iteration_suffix(point) for point in self.retry_context.get("eligible_point_ids", [])}
 
         # Nodes forced to re-run: everything downstream of a continue_on_failure
         # step that is itself inside the retried region. Walking from each CoF
@@ -1584,30 +1588,60 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         control = {node.id for node in graph.get_all_nodes() if node.type in _CONTROL_NODE_TYPES}
         loop_bodies = self._loop_body_node_ids(graph)
 
-        restorable = {node.id for node in graph.get_all_nodes()} - must_run - forced - triggers - control - loop_bodies
+        # Everything downstream of a failure point re-executes, so it cannot be
+        # restored: a restored downstream node would never re-run to consume the
+        # failure point's fresh output, silently discarding the result of the very
+        # retry that was asked for.
+        downstream: set[str] = set()
+        for node_id in must_run:
+            downstream |= self._walk_downstream(node_id, graph)
+
+        restorable = (
+            {node.id for node in graph.get_all_nodes()}
+            - must_run
+            - forced
+            - triggers
+            - control
+            - loop_bodies
+            - downstream
+        )
         self._retry_restorable_cache = restorable
         return restorable
 
     @staticmethod
-    def _loop_body_node_ids(graph: WorkflowGraph) -> set[str]:
-        """Return every node that runs inside some loop body.
+    def _loop_body_node_ids(graph: WorkflowGraph, loop_id: str | None = None) -> set[str]:
+        """Return the nodes that run inside a loop body.
 
-        A loop node's body is reached through its ``iterate`` port. Feedback
-        edges (``to_port="iterate"``) are stripped when the graph is built, so
-        walking ``iterate`` edges terminates at the end of the body and never
-        escapes via the loop's ``complete`` port.
+        Seeds from the loop node's ``iterate`` successors, then follows plain
+        adjacency. Only a multi-output node's edges carry ``from_port``, so the
+        walk may filter on it for the seed and must not for the rest of the body:
+        doing so stops after the first node and leaves the remainder of the body
+        looking like ordinary nodes. Feedback edges (``to_port="iterate"``) are
+        stripped when the graph is built, so the walk terminates at the end of the
+        body and cannot escape via the loop's ``complete`` port.
+
+        Args:
+            graph: Workflow graph.
+            loop_id: Restrict the result to this loop's body. Required when the
+                result is attributed to a specific loop, since with several loops
+                in one definition the union would let one loop adopt another's
+                body. Omit only to exclude bodies wholesale.
+
         """
+        if loop_id is not None:
+            loop_ids = [loop_id]
+        else:
+            loop_ids = [node.id for node in graph.get_all_nodes() if node.type == NodeType.LOOP]
+
         body: set[str] = set()
-        for node in graph.get_all_nodes():
-            if node.type != NodeType.LOOP:
-                continue
-            pending = [successor.id for successor in graph.get_next_activities_by_port(node.id, "iterate")]
+        for current_loop_id in loop_ids:
+            pending = [successor.id for successor in graph.get_next_activities_by_port(current_loop_id, "iterate")]
             while pending:
                 node_id = pending.pop()
-                if node_id in body:
+                if node_id in body or node_id == current_loop_id:
                     continue
                 body.add(node_id)
-                pending.extend(successor.id for successor in graph.get_next_activities_by_port(node_id, "iterate"))
+                pending.extend(graph.get_successors(node_id))
         return body
 
     @staticmethod
@@ -1664,7 +1698,13 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         # Publish to the namespace exactly as a normal completion does, so
         # downstream expressions resolve the way they did in the source run.
         self.resolver.set_namespace(node.id, {**output, "status": "completed"})
-        self.skipped_nodes.add(node.id)
+        # Deliberately not added to skipped_nodes. That set means "this node did
+        # not run and has no output", and the convergence predicates read it that
+        # way: a predecessor listed there is not counted toward a gate, and a
+        # converge whose gate is unmet while every branch is terminal is skipped
+        # along with everything after it. A restored node did run and its output
+        # is in the namespace, so the namespace is what should satisfy those
+        # checks, and it already stops the node being scheduled again.
         self._restored_nodes.add(node.id)
         workflow.logger.info("Restored retry output", node_id=node.id, output_keys=sorted(output))
         return {"output": output, "control": None}
@@ -1695,8 +1735,13 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
             )
             return
         eligible = {strip_iteration_suffix(point) for point in self.retry_context.get("eligible_point_ids", [])}
+        # Scoped to this loop: with several loops in one definition the union of
+        # all bodies would let this loop adopt another's body nodes, resume at an
+        # index that belongs to a different loop, and aggregate the wrong results.
         body_ids = [
-            body_id for body_id in self._loop_body_node_ids(graph) if strip_iteration_suffix(body_id) in eligible
+            body_id
+            for body_id in self._loop_body_node_ids(graph, node.id)
+            if strip_iteration_suffix(body_id) in eligible
         ]
         if not body_ids:
             return

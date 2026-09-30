@@ -19,10 +19,11 @@ linger in workflow state. Two reasons:
 * **History growth.** Workflow state is persisted in history, so leaving every
   restored output resident inflates every later history entry.
 
-The workflow scrubs each node's output from state immediately after dispatching
-or skipping that node, mirroring ``DynamicWorkflow._scrub_activity_credentials``.
+A restored output stays in the execution namespace until the nodes downstream of
+it have been scheduled, which is the same lifetime a live completion has.
 """
 
+import json
 from typing import TYPE_CHECKING, Any
 
 import structlog
@@ -93,7 +94,10 @@ async def fetch_retry_outputs_activity(
             if base_id in wanted:
                 outputs[base_id] = activity_row.output_data or {}
 
-    serialized_bytes = sum(len(str(output)) for output in outputs.values())
+    # Measure the JSON that will actually cross the result blob. ``len(str(...))``
+    # would measure Python's repr, which is a different and only accidentally
+    # similar number.
+    serialized_bytes = sum(len(json.dumps(output, default=str)) for output in outputs.values())
     if serialized_bytes > JsonbLimits.MAX_FIELD_BYTES:
         msg = (
             f"restored retry outputs total {serialized_bytes} bytes across {len(outputs)} node(s), "
