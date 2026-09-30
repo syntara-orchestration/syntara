@@ -13,7 +13,7 @@ jobs:
   # Resolve the PR branch and validate the commenter has write access before
   # triggering the build. Outputs are passed to the reusable build workflow.
   prepare:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     if: |
       github.event.issue.pull_request != null &&
       github.event.comment.body == '/build-pr-image' &&
@@ -64,7 +64,7 @@ jobs:
 
   notify:
     needs: [prepare, build]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     if: always() && needs.prepare.result == 'success'
     permissions:
       pull-requests: write

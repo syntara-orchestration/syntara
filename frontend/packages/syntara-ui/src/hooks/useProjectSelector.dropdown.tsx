@@ -268,7 +268,13 @@ export function ProjectSelectorDropdown(props: Readonly<ProjectSelectorDropdownP
                   aria-label="Project"
                   aria-invalid={menuToggleStatus === 'danger'}
                   onChange={(_e, val) =>
-                    handleTypeaheadChange(val, suppressFilterUpdateOnCloseRef, isOpen, updateFilter, setIsOpen)
+                    handleTypeaheadChange({
+                      val,
+                      suppressRef: suppressFilterUpdateOnCloseRef,
+                      isOpen,
+                      updateFilter,
+                      setIsOpen,
+                    })
                   }
                   onClick={() => {
                     if (!isOpen) {

@@ -113,7 +113,7 @@ def _validate_field_value(field_id: str, value: Any, field_def: dict[str, Any]) 
         try:
             validate_host_url(value, allow_http=get_settings().credential_allow_http_host)
         except ValueError as e:
-            msg = f"Invalid host URL: {e} Provide only scheme and hostname, e.g., https://controller.example.com"
+            msg = f"Invalid host URL: {e} Provide only scheme and hostname, e.g., https://gateway.aap.example.com"
             raise CredentialValidationError(msg) from None
 
     if isinstance(value, str):

@@ -26,7 +26,7 @@ permissions:
 jobs:
   preflight:
     name: Snyk SAST (Preflight)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       has_snyk_token: ${{ steps.token.outputs.has_snyk_token }}
     steps:
@@ -44,7 +44,7 @@ jobs:
 
   snyk-sast:
     name: Snyk SAST (Code Analysis)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: preflight
     if: needs.preflight.outputs.has_snyk_token == 'true'
     steps:

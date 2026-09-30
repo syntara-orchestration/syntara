@@ -44,13 +44,19 @@ type TypeaheadSelectProps = {
   isLoading?: boolean
 }
 
-function renderOptions(
-  options: TypeaheadOption[],
-  filterValue: string,
-  selected: string,
-  hasMore?: boolean,
+function renderOptions({
+  options,
+  filterValue,
+  selected,
+  hasMore,
+  isLoading,
+}: {
+  options: TypeaheadOption[]
+  filterValue: string
+  selected: string
+  hasMore?: boolean
   isLoading?: boolean
-) {
+}) {
   if (isLoading) {
     return <SelectOption isDisabled>Loading...</SelectOption>
   }
@@ -203,7 +209,7 @@ export function TypeaheadSelect({
       toggle={toggle}
     >
       <SelectList style={{ maxHeight: '200px', overflow: 'auto' }}>
-        {renderOptions(filteredOptions, filterValue, selected, hasMore, isLoading)}
+        {renderOptions({ options: filteredOptions, filterValue, selected, hasMore, isLoading })}
       </SelectList>
     </SynSelect>
   )

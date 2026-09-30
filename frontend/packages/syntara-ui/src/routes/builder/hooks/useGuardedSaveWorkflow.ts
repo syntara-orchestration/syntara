@@ -4,13 +4,21 @@ import type { BuilderAction } from '../builderReducer'
 
 type AutoSubmitFn = () => Promise<boolean>
 
-export function useGuardedSaveWorkflow(
-  handleSaveWorkflow: (options?: { expectedVersionOverride?: number }) => Promise<boolean>,
-  isNodeEditorOpen: boolean,
-  nodeEditorMode: 'add' | 'edit' | null,
-  autoSubmitRef: MutableRefObject<AutoSubmitFn | null>,
+type UseGuardedSaveWorkflowOptions = {
+  handleSaveWorkflow: (options?: { expectedVersionOverride?: number }) => Promise<boolean>
+  isNodeEditorOpen: boolean
+  nodeEditorMode: 'add' | 'edit' | null
+  autoSubmitRef: MutableRefObject<AutoSubmitFn | null>
   dispatch: Dispatch<BuilderAction>
-) {
+}
+
+export function useGuardedSaveWorkflow({
+  handleSaveWorkflow,
+  isNodeEditorOpen,
+  nodeEditorMode,
+  autoSubmitRef,
+  dispatch,
+}: UseGuardedSaveWorkflowOptions) {
   return useCallback(
     async (options?: { expectedVersionOverride?: number }): Promise<boolean> => {
       if (isNodeEditorOpen) {

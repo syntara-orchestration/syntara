@@ -132,6 +132,19 @@ describe('GroupsTab Component', () => {
       expect(screen.getByText('Viewers')).toBeInTheDocument()
     })
 
+    it('renders group names as links to group detail pages', () => {
+      render(<GroupsTab />, { wrapper })
+
+      expect(screen.getByRole('link', { name: 'Admins' })).toHaveAttribute(
+        'href',
+        '/system-administration/access-management/groups/g1'
+      )
+      expect(screen.getByRole('link', { name: 'Developers' })).toHaveAttribute(
+        'href',
+        '/system-administration/access-management/groups/g2'
+      )
+    })
+
     it('renders table columns', () => {
       render(<GroupsTab />, { wrapper })
 

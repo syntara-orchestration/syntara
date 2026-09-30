@@ -3,6 +3,7 @@ import { MarkerType } from '@xyflow/react'
 
 import { formatScheduleSummary } from '../../../utils/triggerFormatting'
 import { BUTTON_EDGE_DEFAULT_STROKE } from '../edges/buttonEdgeStrokeColor'
+import type { OnAddNodeFromEdge } from '../types'
 
 /**
  * In v2, triggers are { id, type, name, parameters } nodes.
@@ -33,7 +34,7 @@ export type EdgeType = {
   targetHandle?: string
   selectable?: boolean
   data?: {
-    onAddNode?: (sourceNodeId: string, targetNodeId: string, edgeId: string) => void
+    onAddNode?: OnAddNodeFromEdge
     onButtonClick?: () => void
     isActive?: boolean
     isPending?: boolean

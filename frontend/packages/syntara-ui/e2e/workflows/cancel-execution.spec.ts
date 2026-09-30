@@ -39,11 +39,11 @@ test.beforeAll(async ({ browser }) => {
     if (!token) throw new Error('Could not obtain auth token')
 
     const sleepName = buildUniqueName('e2e-cancel-sleep')
-    ;({ id: sleepWorkflowId } = await createWorkflowViaApi(
-      page,
-      sleepName,
-      [{ id: 'trigger_manual', type: 'manual_trigger', name: 'Manual trigger', parameters: {} }],
-      [
+    ;({ id: sleepWorkflowId } = await createWorkflowViaApi({
+      app: page,
+      name: sleepName,
+      triggers: [{ id: 'trigger_manual', type: 'manual_trigger', name: 'Manual trigger', parameters: {} }],
+      nodes: [
         {
           id: 'long_wait',
           type: 'wait',
@@ -51,8 +51,8 @@ test.beforeAll(async ({ browser }) => {
           parameters: { duration: 300 },
         },
       ],
-      [{ from: 'trigger_manual', to: 'long_wait' }]
-    ))
+      edges: [{ from: 'trigger_manual', to: 'long_wait' }],
+    }))
 
     const runResp = await apiRequest(page, 'post', '/executions', {
       token,
@@ -65,11 +65,11 @@ test.beforeAll(async ({ browser }) => {
     }
 
     const echoName = buildUniqueName('e2e-cancel-echo')
-    ;({ id: echoWorkflowId } = await createWorkflowViaApi(
-      page,
-      echoName,
-      [{ id: 'trigger_manual', type: 'manual_trigger', name: 'Manual trigger', parameters: {} }],
-      [
+    ;({ id: echoWorkflowId } = await createWorkflowViaApi({
+      app: page,
+      name: echoName,
+      triggers: [{ id: 'trigger_manual', type: 'manual_trigger', name: 'Manual trigger', parameters: {} }],
+      nodes: [
         {
           id: 'quick_wait',
           type: 'wait',
@@ -77,8 +77,8 @@ test.beforeAll(async ({ browser }) => {
           parameters: { duration: 1 },
         },
       ],
-      [{ from: 'trigger_manual', to: 'quick_wait' }]
-    ))
+      edges: [{ from: 'trigger_manual', to: 'quick_wait' }],
+    }))
 
     const echoRunResp = await apiRequest(page, 'post', '/executions', {
       token,

@@ -185,7 +185,13 @@ export function ServiceAccountsTab() {
   const serviceAccounts = query.data?.resources ?? []
   const refetch = useCallback(() => detachPromise(query.refetch()), [query])
 
-  useCursorReset(serviceAccounts.length, hasActiveFilters, cursor, query.isFetching, resetPagination)
+  useCursorReset({
+    itemCount: serviceAccounts.length,
+    hasActiveFilters,
+    cursor,
+    isFetching: query.isFetching,
+    resetPagination,
+  })
 
   const createDialog = useDialogState()
   const deleteDialog = useDialogState<ServiceAccountRead>()

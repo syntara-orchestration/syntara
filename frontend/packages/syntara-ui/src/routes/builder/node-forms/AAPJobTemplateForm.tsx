@@ -1,8 +1,9 @@
-import { FormGroup, Stack, StackItem, Switch } from '@patternfly/react-core'
+import { Stack, StackItem, Switch } from '@patternfly/react-core'
 import type { ReactNode } from 'react'
 import { use, useEffect, useMemo, useRef, useState } from 'react'
 import { FormProvider, useForm, useFormContext, useWatch } from 'react-hook-form'
 
+import { SynFormField } from '../../../components/forms/SynFormField'
 import { useAAPBrowser } from '../../../hooks/useAAPBrowser'
 import { detachPromise } from '../../../utils/detachPromise'
 import { AAPIntegrationSection } from '../components/AAPIntegrationSection'
@@ -50,7 +51,7 @@ function AAPFormFields({
   projectId?: string
 }>) {
   const isVersionView = useIsVersionView()
-  const { register, setValue, getValues } = useFormContext<AAPJobTemplateFormData>()
+  const { register, getValues, setValue } = useFormContext<AAPJobTemplateFormData>()
 
   const expressionMode = Boolean(useWatch({ name: 'use_input_variables' }))
 
@@ -99,17 +100,23 @@ function AAPFormFields({
   const parametersContent = (
     <Stack hasGutter>
       <StackItem>
-        <FormGroup label="Use input variables" labelHelp={nodeHelp.aapUseExpressions} fieldId="aap-expression-mode">
-          <Switch
-            id="aap-expression-mode"
-            aria-label="Use input variables"
-            isChecked={expressionMode}
-            onChange={(_e, checked) =>
-              setValue('use_input_variables', checked, { shouldDirty: true, shouldValidate: true })
-            }
-            isDisabled={isVersionView}
-          />
-        </FormGroup>
+        <SynFormField<AAPJobTemplateFormData, 'use_input_variables'>
+          name="use_input_variables"
+          label="Use input variables"
+          labelHelp={nodeHelp.aapUseExpressions}
+          fieldId="aap-expression-mode"
+          hideFooter
+        >
+          {({ field }) => (
+            <Switch
+              id="aap-expression-mode"
+              aria-label="Use input variables"
+              isChecked={Boolean(field.value)}
+              onChange={(_e, checked) => field.onChange(checked)}
+              isDisabled={isVersionView}
+            />
+          )}
+        </SynFormField>
       </StackItem>
 
       <StackItem>
@@ -235,13 +242,10 @@ export function AAPJobTemplateForm(props: Readonly<AAPNodeFormProps>) {
   const extraVarsEditorRef = useRef<ExpandableCodeEditorHandle | null>(null)
   const [, setSubmitValidationTick] = useState(0)
 
-  // Sanitize initialData to handle legacy data with invalid types
-  const sanitizedInitialData = props.initialData
+  const initialData = props.initialData
     ? {
         ...props.initialData,
-        // Ensure job_credentials is always an array
         job_credentials: sanitizeArrayField(props.initialData.job_credentials),
-        // Ensure labels is always an array
         labels: Array.isArray(props.initialData.labels) ? props.initialData.labels : [],
       }
     : undefined
@@ -264,17 +268,17 @@ export function AAPJobTemplateForm(props: Readonly<AAPNodeFormProps>) {
     job_type: '',
     diff_mode: false,
     settings: {},
-    ...sanitizedInitialData,
+    ...initialData,
     use_input_variables:
-      sanitizedInitialData?.use_input_variables === true ||
+      initialData?.use_input_variables === true ||
       hasExpressionValue(
-        sanitizedInitialData?.organization_name,
-        sanitizedInitialData?.job_template_name,
-        sanitizedInitialData?.inventory_name,
-        sanitizedInitialData?.limit,
-        sanitizedInitialData?.tags,
-        sanitizedInitialData?.skip_tags,
-        sanitizedInitialData?.extra_vars
+        initialData?.organization_name,
+        initialData?.job_template_name,
+        initialData?.inventory_name,
+        initialData?.limit,
+        initialData?.tags,
+        initialData?.skip_tags,
+        initialData?.extra_vars
       ),
   }
 

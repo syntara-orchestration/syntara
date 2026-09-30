@@ -53,7 +53,12 @@ export function useEdgeHandlers(props: UseEdgeHandlersProps) {
   const handleAddNode = useCallback(
     (event: React.MouseEvent) => {
       event.stopPropagation()
-      data?.onAddNode?.(source, target, edgeId, actualSourceHandle ?? undefined)
+      data?.onAddNode?.({
+        sourceNodeId: source,
+        targetNodeId: target,
+        edgeId,
+        sourceHandle: actualSourceHandle ?? undefined,
+      })
     },
     [data, source, target, edgeId, actualSourceHandle]
   )
