@@ -1,4 +1,4 @@
-"""Integration test for retry loop-state resolution (AAP-92821, SDP R6b).
+"""Integration test for retry loop-state resolution .
 
 The unit tests mock the database session. This one runs the activity against a
 real PostgreSQL schema, which is the only way to confirm that:
@@ -10,9 +10,9 @@ real PostgreSQL schema, which is the only way to confirm that:
 * ``output_data`` comes back as the same nested structure the engine's namespace
   held, so the rebuilt aggregation is byte-for-byte what a live run produced.
 
-The resume decision is the highest-severity correctness risk in the restart
-design in either direction: resuming too early replays side effects that already
-happened, resuming too late skips the iteration that failed.
+The resume decision is the main correctness risk in either direction:
+resuming too early replays side effects that already happened, resuming too late
+skips the iteration that failed.
 """
 
 import uuid
@@ -157,7 +157,7 @@ async def test_tolerated_early_failure_is_not_replayed(
 async def test_iteration_zero_failure_restores_nothing(
     test_db_session: AsyncSession, source_execution: Execution
 ) -> None:
-    """TC0037: a failure on iteration 0 leaves nothing to skip, so the loop re-runs whole."""
+    """A failure on iteration 0 leaves nothing to skip, so the loop re-runs whole."""
     test_db_session.add(_activity(source_execution, "body_a", ActivityStatus.FAILED, iteration=0, output=None))
     await test_db_session.commit()
 
