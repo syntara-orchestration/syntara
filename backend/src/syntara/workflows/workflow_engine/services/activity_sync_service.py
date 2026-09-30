@@ -516,7 +516,7 @@ class ActivitySyncService(
             )
             return set(result.all())
 
-    async def _update_execution_flags(
+    def _update_execution_flags(
         self,
         execution: Execution | None,
         updated_activities: list[tuple[ActivityExecution, dict[str, Any]]],

@@ -78,7 +78,7 @@ class ActivityExecutionSynchronizer:
                 if execution:
                     execution.last_processed_event_id = metadata.last_processed_event_id
 
-                new_execution_status, approval_pending_changed = await self.host._update_execution_flags(
+                new_execution_status, approval_pending_changed = self.host._update_execution_flags(
                     execution, updated_activities, list(existing_activities.values())
                 )
 
