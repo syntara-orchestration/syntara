@@ -1,4 +1,4 @@
-import { RhUiDislikeFillIcon, RhUiLikeFillIcon, RhUiWarningFillIcon } from '@patternfly/react-icons'
+import { RhUiBanFillIcon, RhUiDislikeFillIcon, RhUiLikeFillIcon, RhUiWarningFillIcon } from '@patternfly/react-icons'
 import type { ApprovalStatus } from '@syntara/contracts'
 
 import { SynLabel } from '../../components/labels/SynLabel'
@@ -17,7 +17,7 @@ const statusIcons: Record<ApprovalStatus, React.ComponentType<{ className?: stri
   approved: RhUiLikeFillIcon,
   rejected: RhUiDislikeFillIcon,
   expired: RhUiWarningFillIcon,
-  cancelled: RhUiWarningFillIcon,
+  cancelled: RhUiBanFillIcon,
 }
 
 export function ApprovalStatusBadges(props: Readonly<{ status?: ApprovalStatus | null }>) {
