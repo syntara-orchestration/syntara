@@ -214,6 +214,7 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         self.loop_state: dict[str, LoopState] = {}
         self.loop_body_map: dict[str, str] = {}
         self.loop_iteration_results: dict[str, dict[str, list[Any]]] = {}
+        self._resumed_loops: set[str] = set()
         self._timeout_tasks: dict[str, asyncio.Task[Any]] = {}
         self._timed_out_converge_nodes: set[str] = set()
         self._detached_nodes: set[str] = set()
@@ -1302,6 +1303,7 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         node_id: str,
         node: ActivityNode,
         resolved_parameters: dict[str, Any],
+        graph: WorkflowGraph | None = None,
         timeout_seconds: int = DEFAULT_ACTIVITY_TIMEOUT_SECONDS,
     ) -> dict[str, Any]:
         """Execute a loop node.
@@ -1310,6 +1312,9 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
             node_id: Node ID
             node: Activity node
             resolved_parameters: Resolved configuration
+            graph: Workflow graph, used to resolve this loop's body when a retry
+                resumes it mid-run. Optional so loop unit tests need not build
+                one; a retry without a graph cannot resume and logs a warning.
             timeout_seconds: Activity timeout in seconds (default: DEFAULT_ACTIVITY_TIMEOUT_SECONDS)
 
         Returns:
@@ -1317,6 +1322,11 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
 
         """
         loop_type = resolved_parameters.get("type", LoopType.FOR_EACH)
+
+        # A retry re-entering this loop resumes at the failed iteration rather
+        # than restarting from zero. Runs before state is (re)created below so the
+        # seeded counter is not overwritten.
+        await self._maybe_resume_loop(node, graph)
 
         # Get or initialize loop state
         if node_id not in self.loop_state:
@@ -1659,6 +1669,71 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         workflow.logger.info("Restored retry output", node_id=node.id, output_keys=sorted(output))
         return {"output": output, "control": None}
 
+    async def _maybe_resume_loop(self, node: ActivityNode, graph: WorkflowGraph | None) -> None:
+        """Seed a loop's iteration state when a retry re-enters it mid-run.
+
+        A loop that already completed iterations in the source run must not
+        restart from zero: its iterations may have external side effects, and the
+        loop's aggregated output is assembled from every iteration it has done.
+        This fetches the source run's per-iteration state and seeds
+        ``loop_state`` and ``loop_iteration_results`` so the loop resumes at the
+        failed iteration with the finished iterations already accounted for.
+
+        No-op unless this retry actually re-enters the loop, so a loop running for
+        the first time in this run is untouched.
+        """
+        if not self.retry_context or node.id in self._resumed_loops:
+            return
+        if graph is None:
+            # Only reachable from a caller that omitted the graph; the dispatcher
+            # always supplies one. Warn rather than silently restarting the loop
+            # from iteration 0, which would repeat the skipped iterations'
+            # side effects.
+            workflow.logger.warning(
+                "Retry cannot resume loop without a graph; restarting from the first iteration",
+                loop_id=node.id,
+            )
+            return
+        eligible = {strip_iteration_suffix(point) for point in self.retry_context.get("eligible_point_ids", [])}
+        body_ids = [
+            body_id for body_id in self._loop_body_node_ids(graph) if strip_iteration_suffix(body_id) in eligible
+        ]
+        if not body_ids:
+            return
+        self._resumed_loops.add(node.id)
+
+        state = await workflow.execute_activity(
+            ActivityName.RETRY_LOOP_STATE,
+            args=[self.retry_context.get("retry_from_execution_id"), {node.id: body_ids}],
+            activity_id=f"__internal__fetch_retry_loop_state_{node.id}",
+            start_to_close_timeout=timedelta(seconds=DEFAULT_ACTIVITY_TIMEOUT_SECONDS),
+        )
+        resume = (state or {}).get(node.id)
+        if not resume:
+            return
+
+        resume_iteration = int(resume.get("resume_iteration", 0))
+        iteration_results = resume.get("iteration_results") or {}
+
+        # The loop node has not been dispatched yet on this path, so its state is
+        # created from its own parameters first; only the counter and the
+        # accumulated results are seeded from the source run.
+        if node.id not in self.loop_state:
+            loop_type = node.parameters.get("type", LoopType.FOR_EACH)
+            self.loop_state[node.id] = self._create_loop_state_for_type(loop_type, node)
+        self.loop_state[node.id].current_index = resume_iteration
+
+        seeded = self.loop_iteration_results.setdefault(node.id, {})
+        for key, values in iteration_results.items():
+            seeded.setdefault(key, []).extend(values)
+
+        workflow.logger.info(
+            "Resumed loop from source run",
+            loop_id=node.id,
+            resume_iteration=resume_iteration,
+            restored_fields=len(iteration_results),
+        )
+
     def _apply_input_overrides(self, node: ActivityNode, resolved_parameters: dict[str, Any]) -> None:
         """Replace a node's resolved inputs with the retry's user-supplied overrides.
 
@@ -1867,7 +1942,9 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
                 node_id, resolved_parameters, node.outputs, graph, timeout_seconds=timeout_seconds
             )
         if node_type == NodeType.LOOP:
-            return await self._execute_loop_node(node_id, node, resolved_parameters, timeout_seconds=timeout_seconds)
+            return await self._execute_loop_node(
+                node_id, node, resolved_parameters, graph, timeout_seconds=timeout_seconds
+            )
 
         return {"output": {"status": "skipped", "reason": f"Unsupported node type: {node_type}"}}
 
