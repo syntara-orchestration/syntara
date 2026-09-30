@@ -1,8 +1,6 @@
 import type { WorkflowAPI } from '@syntara/contracts'
 import { describe, expect, it, vi } from 'vitest'
 
-import { builtinProjectTooltip } from '../../hooks/permissionUtils'
-
 import type { useWorkflowPermissions } from './useWorkflowPermissions'
 import { buildWorkflowRowActions } from './workflowRowActions'
 
@@ -76,28 +74,36 @@ describe('buildWorkflowRowActions', () => {
       const actions = buildWorkflowRowActions(baseWorkflow, basePermissions, true, baseCallbacks)
       const edit = actions.find((a) => a.key === 'edit')
       expect(edit?.isAriaDisabled).toBe(true)
-      expect(edit?.tooltipProps?.content).toBe(builtinProjectTooltip('edit this workflow'))
+      expect(edit?.tooltipProps?.content).toBe(
+        'Cannot edit this workflow in the built-in project. Select a different project first.'
+      )
     })
 
     it('disables duplicate with builtin tooltip', () => {
       const actions = buildWorkflowRowActions(baseWorkflow, basePermissions, true, baseCallbacks)
       const dup = actions.find((a) => a.key === 'duplicate')
       expect(dup?.isAriaDisabled).toBe(true)
-      expect(dup?.tooltipProps?.content).toBe(builtinProjectTooltip('duplicate this workflow'))
+      expect(dup?.tooltipProps?.content).toBe(
+        'Cannot duplicate this workflow in the built-in project. Select a different project first.'
+      )
     })
 
     it('disables publish with builtin tooltip', () => {
       const actions = buildWorkflowRowActions(baseWorkflow, basePermissions, true, baseCallbacks)
       const publish = actions.find((a) => a.key === 'publish')
       expect(publish?.isAriaDisabled).toBe(true)
-      expect(publish?.tooltipProps?.content).toBe(builtinProjectTooltip('publish this workflow'))
+      expect(publish?.tooltipProps?.content).toBe(
+        'Cannot publish this workflow in the built-in project. Select a different project first.'
+      )
     })
 
     it('disables delete with builtin tooltip', () => {
       const actions = buildWorkflowRowActions(baseWorkflow, basePermissions, true, baseCallbacks)
       const del = actions.find((a) => a.key === 'delete')
       expect(del?.isAriaDisabled).toBe(true)
-      expect(del?.tooltipProps?.content).toBe(builtinProjectTooltip('delete this workflow'))
+      expect(del?.tooltipProps?.content).toBe(
+        'Cannot delete this workflow in the built-in project. Select a different project first.'
+      )
     })
 
     it('includes unpublish disabled with builtin tooltip when workflow is published', () => {
@@ -109,7 +115,9 @@ describe('buildWorkflowRowActions', () => {
       )
       const unpublish = actions.find((a) => a.key === 'unpublish')
       expect(unpublish?.isAriaDisabled).toBe(true)
-      expect(unpublish?.tooltipProps?.content).toBe(builtinProjectTooltip('unpublish this workflow'))
+      expect(unpublish?.tooltipProps?.content).toBe(
+        'Cannot unpublish this workflow in the built-in project. Select a different project first.'
+      )
     })
 
     it('does not disable run based on isBuiltinProject', () => {

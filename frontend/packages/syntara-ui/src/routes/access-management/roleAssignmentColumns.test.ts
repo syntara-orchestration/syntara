@@ -177,7 +177,7 @@ describe('getVisibleColumns', () => {
   })
 
   it('returns all columns for empty array', () => {
-    expect(getVisibleColumns([])).toEqual(getVisibleColumns())
+    expect(getVisibleColumns([]).map((column) => column.key)).toEqual(['roleName', 'description', 'scope', 'project'])
   })
 
   it('hides specified columns', () => {

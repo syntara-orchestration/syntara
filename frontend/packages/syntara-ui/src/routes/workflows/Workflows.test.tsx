@@ -267,7 +267,7 @@ describe('Workflows Component', () => {
 
     it('sets the browser tab title', () => {
       render(<Workflows />, { wrapper })
-      expectPageTitle(['Workflows'])
+      expectPageTitle('Workflows | Syntara')
     })
 
     it('renders Import workflow button before Create workflow in toolbar', () => {

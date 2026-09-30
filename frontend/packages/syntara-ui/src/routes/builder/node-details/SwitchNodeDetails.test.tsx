@@ -4,7 +4,6 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { renderWithHeader } from '../node-forms/test-utils/renderWithHeader'
-import { buildSwitchCasePort } from '../utils/switchCaseHelpers'
 
 import { SwitchNodeDetails } from './SwitchNodeDetails'
 
@@ -42,8 +41,8 @@ describe('SwitchNodeDetails', () => {
     name: 'Route Request',
     parameters: {
       cases: [
-        { port: buildSwitchCasePort(0), label: 'Path 1', condition: '${trigger.priority} > 7' },
-        { port: buildSwitchCasePort(1), label: 'Path 2', condition: '${trigger.status} == "rejected"' },
+        { port: 'case_0', label: 'Path 1', condition: '${trigger.priority} > 7' },
+        { port: 'case_1', label: 'Path 2', condition: '${trigger.status} == "rejected"' },
       ],
       default_port: EdgeHandleEnum.DEFAULT,
     },
@@ -106,7 +105,7 @@ describe('SwitchNodeDetails', () => {
         type: 'switch',
         name: 'Equality Check',
         parameters: {
-          cases: [{ port: buildSwitchCasePort(0), label: 'Path 1', condition: '${status} == "active"' }],
+          cases: [{ port: 'case_0', label: 'Path 1', condition: '${status} == "active"' }],
           default_port: EdgeHandleEnum.DEFAULT,
         },
       }
@@ -122,7 +121,7 @@ describe('SwitchNodeDetails', () => {
         type: 'switch',
         name: 'Complex',
         parameters: {
-          cases: [{ port: buildSwitchCasePort(0), label: 'Path 1', condition: 'some_complex && expression || thing' }],
+          cases: [{ port: 'case_0', label: 'Path 1', condition: 'some_complex && expression || thing' }],
           default_port: EdgeHandleEnum.DEFAULT,
         },
       }
@@ -140,7 +139,7 @@ describe('SwitchNodeDetails', () => {
         type: 'switch',
         name: 'Negated',
         parameters: {
-          cases: [{ port: buildSwitchCasePort(0), label: 'Path 1', condition: 'not (${status} == "active")' }],
+          cases: [{ port: 'case_0', label: 'Path 1', condition: 'not (${status} == "active")' }],
           default_port: EdgeHandleEnum.DEFAULT,
         },
       }
@@ -175,9 +174,9 @@ describe('SwitchNodeDetails', () => {
         name: 'Three Cases',
         parameters: {
           cases: [
-            { port: buildSwitchCasePort(0), label: 'Path A', condition: '${trigger.a} == "1"' },
-            { port: buildSwitchCasePort(1), label: 'Path B', condition: '${trigger.b} == "2"' },
-            { port: buildSwitchCasePort(2), label: 'Path C', condition: '${trigger.c} == "3"' },
+            { port: 'case_0', label: 'Path A', condition: '${trigger.a} == "1"' },
+            { port: 'case_1', label: 'Path B', condition: '${trigger.b} == "2"' },
+            { port: 'case_2', label: 'Path C', condition: '${trigger.c} == "3"' },
           ],
           default_port: EdgeHandleEnum.DEFAULT,
         },
@@ -202,9 +201,9 @@ describe('SwitchNodeDetails', () => {
       ]
       expect(nodeId).toBe('switch-1')
       expect(activity.parameters.cases).toHaveLength(2)
-      expect(portMapping.get(buildSwitchCasePort(0))).toBe(buildSwitchCasePort(0))
-      expect(portMapping.get(buildSwitchCasePort(2))).toBe(buildSwitchCasePort(1))
-      expect(portMapping.has(buildSwitchCasePort(1))).toBe(false)
+      expect(portMapping.get('case_0')).toBe('case_0')
+      expect(portMapping.get('case_2')).toBe('case_1')
+      expect(portMapping.has('case_1')).toBe(false)
     })
 
     it('calls updateSwitchActivity with correct port mapping on submit', async () => {
@@ -223,8 +222,8 @@ describe('SwitchNodeDetails', () => {
       ]
       expect(nodeId).toBe('switch-1')
       expect(activity.parameters.cases).toHaveLength(2)
-      expect(portMapping.get(buildSwitchCasePort(0))).toBe(buildSwitchCasePort(0))
-      expect(portMapping.get(buildSwitchCasePort(1))).toBe(buildSwitchCasePort(1))
+      expect(portMapping.get('case_0')).toBe('case_0')
+      expect(portMapping.get('case_1')).toBe('case_1')
     })
 
     it('closes the panel after successful submit', async () => {

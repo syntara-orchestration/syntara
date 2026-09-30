@@ -39,7 +39,7 @@ describe('BuilderEdit', () => {
     render(<BuilderEdit />)
 
     expect(screen.getByText('Loading workflow')).toBeInTheDocument()
-    expectPageTitle(['Loading workflow', 'Workflows'])
+    expectPageTitle('Loading workflow | Workflows | Syntara')
   })
 
   it('renders error state when query fails', async () => {
@@ -48,7 +48,7 @@ describe('BuilderEdit', () => {
     render(<BuilderEdit />)
 
     expect(screen.getByRole('heading', { level: 1, name: 'Error loading workflow' })).toBeInTheDocument()
-    expectPageTitle(['Error loading workflow', 'Workflows'])
+    expectPageTitle('Error loading workflow | Workflows | Syntara')
   })
 
   it('renders BuilderContent with valid version param', async () => {

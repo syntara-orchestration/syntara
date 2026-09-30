@@ -15,6 +15,22 @@ Write tests that verify **what** your code does, not **how** it does it. Tests s
 
 ---
 
+## Test Integrity: Use Independent Expected Values
+
+A test is useful only if it can fail when the application has a bug.
+
+- The test must execute production code. Import the real function, hook, or component. Do not copy its logic into the test.
+- The assertion must compare the application result with an independent expected value. Use a literal, a separate fixture, or a value from the written requirement.
+- Do not calculate both sides of an assertion with the same function or helper. Do not compare a value with itself or with a field that the test assigned immediately before the assertion.
+- Do not apply the same transformation to both sides of an assertion. Examples include sorting, mapping, filtering, or formatting both values before comparison.
+- Do not write a runtime test for a type-only declaration. A test-created object does not prove that a type declaration works.
+- Component tests must render the real component, perform a user action when relevant, and assert an observable result such as visible text, a changed control, a callback, or a network request.
+- If a test cannot exercise application behavior, remove it. Do not keep it only to increase coverage.
+
+Before adding or changing a test, identify the production subject and the regression that the test must prevent. Then verify that the test would fail if that behavior were removed or changed. During review, check the test body for copied production logic and for expected values derived from the same implementation.
+
+---
+
 ## Coverage Requirements
 
 **CI (blocks merge):** merged Vitest coverage must meet **85% statements**. That is
@@ -636,14 +652,14 @@ Example: a test spies on `document.querySelector` to check a dialog opens. A ref
 
 ## Browser Tab Title Tests
 
-Use `expectPageTitle` from `src/test/pageTitle.ts` — takes the same segments array as `toPageTitle`:
+Use `expectPageTitle` from `src/test/pageTitle.ts` with the complete expected title:
 
 ```typescript
 import { expectPageTitle } from '../../test/pageTitle'
 
 it('sets the browser tab title', () => {
   render(<Workflows />, { wrapper })
-  expectPageTitle(['Workflows'])
+  expectPageTitle('Workflows | Syntara')
 })
 ```
 
@@ -652,9 +668,11 @@ At least one unit test per page component should call `expectPageTitle`. For pag
 ```typescript
 it('shows a fallback title while loading', () => {
   render(<BuilderEdit />) // isLoading = true in mock
-  expectPageTitle(['Loading workflow', 'Workflows'])
+  expectPageTitle('Loading workflow | Workflows | Syntara')
 })
 ```
+
+Do not call the production `toPageTitle` helper to build the expected value. The page component uses that helper, so doing this would allow the same formatting bug to affect both sides of the assertion.
 
 **E2E:** Static page titles are covered by `e2e/page-titles.spec.ts`. Add `expect(page).toHaveTitle(...)` to feature specs that already navigate to a page as part of their setup.
 
