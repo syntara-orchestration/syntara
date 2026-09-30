@@ -968,7 +968,7 @@ export interface components {
     }
     /**
      * WorkflowDefinition
-     * @description JSON Schema for graph-based workflow definitions in the Syntara Workflow Engine v2.
+     * @description JSON Schema for graph-based workflow definitions in the Orchestrator Workflow Engine v2.
      *
      *     Attributes:
      *         schema_version: Schema version that this workflow definition conforms to
