@@ -23,10 +23,10 @@ The workflow scrubs each node's output from state immediately after dispatching
 or skipping that node, mirroring ``DynamicWorkflow._scrub_activity_credentials``.
 """
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import structlog
-from sqlmodel import select
+from sqlmodel import col, select
 from temporalio import activity, workflow
 
 with workflow.unsafe.imports_passed_through():
@@ -35,6 +35,9 @@ with workflow.unsafe.imports_passed_through():
     from syntara.core.exceptions import SafeValueError
     from syntara.workflows.models.activity_execution import ActivityExecution, ActivityStatus
     from syntara.workflows.utils.loop_iteration_names import strip_iteration_suffix
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 logger = structlog.stdlib.get_logger(__name__)
 
@@ -106,3 +109,131 @@ async def fetch_retry_outputs_activity(
         serialized_bytes=serialized_bytes,
     )
     return outputs
+
+
+@activity.defn(name="fetch_retry_loop_state")
+async def fetch_retry_loop_state_activity(
+    source_execution_id: str,
+    loops: dict[str, list[str]],
+) -> dict[str, dict[str, Any]]:
+    """Fetch the per-iteration state a retry needs to resume a loop mid-run.
+
+    The control plane selects failure points by base node id, so the iteration a
+    loop stopped on is not in the payload. It is recovered here from the
+    ``ActivityExecution`` rows the source run already wrote: the sync service
+    creates one row per iteration (``iteration`` column, ``#iter-<n>`` suffix),
+    including the failed one because FAILED is a terminal status.
+
+    Args:
+        source_execution_id: Execution whose rows hold the loop's iteration state.
+        loops: Map of loop node id to the body node ids inside it. Only these
+            nodes are considered, so an identically-named node elsewhere in the
+            workflow cannot contribute to the resume point.
+
+    Returns:
+        Map of loop node id to its resume state::
+
+            {"loop_1": {"resume_iteration": 2,
+                        "iteration_results": {"body_a.receipt": ["r0"], ...}}}
+
+        ``resume_iteration`` is the iteration the retry restarts *at*, so
+        iterations below it are treated as already done. ``iteration_results``
+        mirrors the engine's own ``loop_iteration_results`` accumulation for
+        those skipped iterations, and is absent when the loop needs no resume.
+
+    """
+    if not loops:
+        return {}
+
+    body_to_loop: dict[str, str] = {}
+    for loop_id, body_ids in loops.items():
+        for body_id in body_ids:
+            body_to_loop[body_id] = loop_id
+
+    rows: Sequence[ActivityExecution] = ()
+    async for session in get_db():
+        rows = (
+            await session.exec(
+                select(ActivityExecution).where(
+                    ActivityExecution.execution_id == source_execution_id,
+                    col(ActivityExecution.status).in_([ActivityStatus.COMPLETED, ActivityStatus.FAILED]),
+                )
+            )
+        ).all()
+
+    # Per loop: the failed iterations and the completed ones, each as
+    # (iteration, base node id, output).
+    per_loop: dict[str, dict[str, list[tuple[int, str, dict[str, Any]]]]] = {}
+    for row in rows:
+        # activity_name is nullable in the schema, though never null in practice
+        # for a row this query selects.
+        if not row.activity_name:
+            continue
+        base_id = strip_iteration_suffix(row.activity_name)
+        owner = body_to_loop.get(base_id)
+        if owner is None:
+            continue
+        # ``iteration`` is set to 0 on the original row and N on each per-iteration
+        # row, so it is the authoritative index rather than the name suffix.
+        index = row.iteration if row.iteration is not None else 0
+        bucket = "failed" if row.status == ActivityStatus.FAILED else "completed"
+        per_loop.setdefault(owner, {"failed": [], "completed": []})[bucket].append(
+            (index, base_id, row.output_data or {})
+        )
+
+    result: dict[str, dict[str, Any]] = {}
+    for loop_id, buckets in per_loop.items():
+        failed_rows = buckets["failed"]
+        if not failed_rows:
+            continue
+        # Resume at the *last* failed iteration, not the first.
+        #
+        # A loop body node with continue_on_failure may fail on an early
+        # iteration and the loop carries on to later ones, so the source run can
+        # hold several FAILED rows for one loop. Only the last one stopped the
+        # workflow; every earlier failure was tolerated and its side effects
+        # already happened. Resuming from the earliest of them would re-run those
+        # iterations and repeat their side effects, which is the
+        # highest-severity correctness risk in the restart design. Resuming from
+        # the last one cannot skip it, because that is the iteration being retried.
+        resume_iteration = max(index for index, _base, _output in failed_rows)
+        result[loop_id] = {
+            "resume_iteration": resume_iteration,
+            "iteration_results": _rebuild_iteration_results(buckets["completed"], resume_iteration),
+        }
+
+    logger.info(
+        "Fetched retry loop state",
+        source_execution_id=source_execution_id,
+        loop_count=len(result),
+        resume_points={loop_id: state["resume_iteration"] for loop_id, state in result.items()},
+    )
+    return result
+
+
+def _rebuild_iteration_results(
+    completed: list[tuple[int, str, dict[str, Any]]],
+    resume_iteration: int,
+) -> dict[str, list[Any]]:
+    """Rebuild ``loop_iteration_results`` for the iterations a retry skips.
+
+    Mirrors ``DynamicWorkflow._clear_loop_body``, which appends each field of a
+    body node's resolver namespace under ``"{node}.{field}"`` as the iteration
+    finishes. Two details matter for fidelity:
+
+    * The engine's namespace entry is ``{**output, "status": "completed"}``, but
+      ``output_data`` in the database is the bare activity output and never
+      carries that synthetic key. It is re-added here, or the rebuilt aggregation
+      silently lacks ``"{node}.status"`` compared with the original run.
+    * Fields are appended only when the iteration actually produced them, so the
+      lists are ragged and are built per node in iteration order rather than
+      zipped against a fixed range. A node that returns different fields on
+      different iterations stays aligned with the original run's ragged shape.
+    """
+    results: dict[str, list[Any]] = {}
+    for index, base_id, output in sorted(completed, key=lambda item: (item[1], item[0])):
+        if index >= resume_iteration:
+            continue
+        for field, value in {**output, "status": "completed"}.items():
+            results.setdefault(f"{base_id}.{field}", []).append(value)
+    return results

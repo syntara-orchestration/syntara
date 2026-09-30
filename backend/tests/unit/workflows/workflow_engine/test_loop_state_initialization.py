@@ -52,6 +52,12 @@ def _make_workflow(
     wf.stop_after_nodes = set()
     wf.execution_id = "test-exec-id"
     wf.request_id = None
+    # Retry-from-failure state. Set in __init__ for a real run; defaulted here so
+    # a workflow built for a non-retry test behaves as one.
+    wf.retry_context = {}
+    wf._retry_restorable_cache = None
+    wf._restored_nodes = set()
+    wf._resumed_loops = set()
     return wf
 
 
