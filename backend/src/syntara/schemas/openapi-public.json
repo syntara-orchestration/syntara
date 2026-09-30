@@ -44222,7 +44222,8 @@
         "enum": [
           "mcp_server",
           "llm_provider",
-          "ansible_automation_platform"
+          "ansible_automation_platform",
+          "terraform_enterprise"
         ],
         "title": "IntegrationType",
         "description": "Type of external integration."
@@ -44443,6 +44444,9 @@
               },
               {
                 "$ref": "#/components/schemas/AAPConfiguration"
+              },
+              {
+                "$ref": "#/components/schemas/TFEConfiguration"
               }
             ],
             "title": "Configuration",
@@ -44452,7 +44456,8 @@
               "mapping": {
                 "ansible_automation_platform": "#/components/schemas/AAPConfiguration",
                 "llm_provider": "#/components/schemas/LLMProviderConfiguration",
-                "mcp_server": "#/components/schemas/MCPServerConfigurationInput"
+                "mcp_server": "#/components/schemas/MCPServerConfigurationInput",
+                "terraform_enterprise": "#/components/schemas/TFEConfiguration"
               }
             }
           },
@@ -44674,6 +44679,9 @@
                   },
                   {
                     "$ref": "#/components/schemas/AAPConfiguration"
+                  },
+                  {
+                    "$ref": "#/components/schemas/TFEConfiguration"
                   }
                 ],
                 "discriminator": {
@@ -44681,7 +44689,8 @@
                   "mapping": {
                     "ansible_automation_platform": "#/components/schemas/AAPConfiguration",
                     "llm_provider": "#/components/schemas/LLMProviderConfiguration",
-                    "mcp_server": "#/components/schemas/MCPServerConfigurationInput"
+                    "mcp_server": "#/components/schemas/MCPServerConfigurationInput",
+                    "terraform_enterprise": "#/components/schemas/TFEConfiguration"
                   }
                 }
               },
@@ -44762,7 +44771,8 @@
               "mapping": {
                 "mcp_server": "#/components/schemas/MCPServerConfigurationInput",
                 "llm_provider": "#/components/schemas/LLMProviderConfiguration",
-                "ansible_automation_platform": "#/components/schemas/AAPConfiguration"
+                "ansible_automation_platform": "#/components/schemas/AAPConfiguration",
+                "terraform_enterprise": "#/components/schemas/TFEConfiguration"
               }
             },
             "oneOf": [
@@ -44774,6 +44784,9 @@
               },
               {
                 "$ref": "#/components/schemas/AAPConfiguration"
+              },
+              {
+                "$ref": "#/components/schemas/TFEConfiguration"
               }
             ],
             "title": "Configuration"
@@ -44915,6 +44928,9 @@
               },
               {
                 "$ref": "#/components/schemas/AAPConfiguration"
+              },
+              {
+                "$ref": "#/components/schemas/TFEConfiguration"
               }
             ],
             "title": "Configuration",
@@ -44924,7 +44940,8 @@
               "mapping": {
                 "ansible_automation_platform": "#/components/schemas/AAPConfiguration",
                 "llm_provider": "#/components/schemas/LLMProviderConfiguration",
-                "mcp_server": "#/components/schemas/MCPServerConfigurationInput"
+                "mcp_server": "#/components/schemas/MCPServerConfigurationInput",
+                "terraform_enterprise": "#/components/schemas/TFEConfiguration"
               }
             }
           },
@@ -45212,6 +45229,61 @@
           "base_url"
         ],
         "title": "AAPConfiguration",
+        "type": "object"
+      },
+      "TFEConfiguration": {
+        "description": "Configuration for Terraform Enterprise / HCP Terraform integrations.",
+        "additionalProperties": false,
+        "properties": {
+          "integration_type": {
+            "type": "string",
+            "const": "terraform_enterprise",
+            "default": "terraform_enterprise",
+            "title": "Integration Type"
+          },
+          "base_url": {
+            "type": "string",
+            "format": "uri",
+            "title": "TFE URL",
+            "description": "Base URL for Terraform Enterprise or HCP Terraform (e.g. https://app.terraform.io)"
+          },
+          "organization": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "title": "Organization",
+            "description": "Default Terraform Enterprise organization name used as the scope for workflow steps"
+          },
+          "allow_http": {
+            "type": "boolean",
+            "title": "Allow Http",
+            "description": "Allow HTTP (unencrypted) connections. Loopback addresses are always permitted over HTTP.",
+            "default": false
+          },
+          "insecure_skip_tls_verify": {
+            "type": "boolean",
+            "title": "Insecure Skip Tls Verify",
+            "description": "Disable TLS certificate verification for connections to this integration.",
+            "default": false
+          },
+          "ca_certificate": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ca Certificate",
+            "description": "PEM-encoded CA certificate to trust for this integration's TLS connections."
+          }
+        },
+        "required": [
+          "base_url",
+          "organization"
+        ],
+        "title": "TFEConfiguration",
         "type": "object"
       },
       "DiscoveredLLMModel": {
@@ -49911,7 +49983,35 @@
           "approval",
           "http_request",
           "internal_activity",
-          "script"
+          "script",
+          "tfe_create_workspace",
+          "tfe_list_workspaces",
+          "tfe_update_workspace",
+          "tfe_delete_workspace",
+          "tfe_fetch_state_outputs",
+          "tfe_add_variable",
+          "tfe_list_variables",
+          "tfe_update_variable",
+          "tfe_delete_variable",
+          "tfe_upload_configuration_version",
+          "tfe_trigger_run",
+          "tfe_get_run_status",
+          "tfe_apply_run",
+          "tfe_discard_run",
+          "tfe_cancel_run",
+          "tfe_force_cancel_run",
+          "tfe_list_runs",
+          "tfe_add_run_comment",
+          "tfe_list_github_installations",
+          "tfe_get_github_installation",
+          "tfe_link_vcs",
+          "tfe_create_project",
+          "tfe_list_projects",
+          "tfe_get_project",
+          "tfe_update_project",
+          "tfe_delete_project",
+          "tfe_move_workspace_to_project",
+          "tfe_assign_team_permissions"
         ]
       },
       "CurrentActivity": {
@@ -51218,6 +51318,90 @@
                 },
                 {
                   "$ref": "#/components/schemas/WaitNode"
+                },
+                {
+                  "$ref": "#/components/schemas/TFECreateWorkspaceNode"
+                },
+                {
+                  "$ref": "#/components/schemas/TFEListWorkspacesNode"
+                },
+                {
+                  "$ref": "#/components/schemas/TFEUpdateWorkspaceNode"
+                },
+                {
+                  "$ref": "#/components/schemas/TFEDeleteWorkspaceNode"
+                },
+                {
+                  "$ref": "#/components/schemas/TFEFetchStateOutputsNode"
+                },
+                {
+                  "$ref": "#/components/schemas/TFEAddVariableNode"
+                },
+                {
+                  "$ref": "#/components/schemas/TFEListVariablesNode"
+                },
+                {
+                  "$ref": "#/components/schemas/TFEUpdateVariableNode"
+                },
+                {
+                  "$ref": "#/components/schemas/TFEDeleteVariableNode"
+                },
+                {
+                  "$ref": "#/components/schemas/TFEUploadConfigurationVersionNode"
+                },
+                {
+                  "$ref": "#/components/schemas/TFETriggerRunNode"
+                },
+                {
+                  "$ref": "#/components/schemas/TFEGetRunStatusNode"
+                },
+                {
+                  "$ref": "#/components/schemas/TFEApplyRunNode"
+                },
+                {
+                  "$ref": "#/components/schemas/TFEDiscardRunNode"
+                },
+                {
+                  "$ref": "#/components/schemas/TFECancelRunNode"
+                },
+                {
+                  "$ref": "#/components/schemas/TFEForceCancelRunNode"
+                },
+                {
+                  "$ref": "#/components/schemas/TFEListRunsNode"
+                },
+                {
+                  "$ref": "#/components/schemas/TFEAddRunCommentNode"
+                },
+                {
+                  "$ref": "#/components/schemas/TFEListGitHubInstallationsNode"
+                },
+                {
+                  "$ref": "#/components/schemas/TFEGetGitHubInstallationNode"
+                },
+                {
+                  "$ref": "#/components/schemas/TFELinkVCSNode"
+                },
+                {
+                  "$ref": "#/components/schemas/TFECreateProjectNode"
+                },
+                {
+                  "$ref": "#/components/schemas/TFEListProjectsNode"
+                },
+                {
+                  "$ref": "#/components/schemas/TFEGetProjectNode"
+                },
+                {
+                  "$ref": "#/components/schemas/TFEUpdateProjectNode"
+                },
+                {
+                  "$ref": "#/components/schemas/TFEDeleteProjectNode"
+                },
+                {
+                  "$ref": "#/components/schemas/TFEMoveWorkspaceToProjectNode"
+                },
+                {
+                  "$ref": "#/components/schemas/TFEAssignTeamPermissionsNode"
                 }
               ],
               "discriminator": {
@@ -51233,6 +51417,34 @@
                   "loop": "#/components/schemas/LoopNode",
                   "script": "#/components/schemas/ScriptNode",
                   "switch": "#/components/schemas/SwitchNode",
+                  "tfe_add_run_comment": "#/components/schemas/TFEAddRunCommentNode",
+                  "tfe_add_variable": "#/components/schemas/TFEAddVariableNode",
+                  "tfe_apply_run": "#/components/schemas/TFEApplyRunNode",
+                  "tfe_assign_team_permissions": "#/components/schemas/TFEAssignTeamPermissionsNode",
+                  "tfe_cancel_run": "#/components/schemas/TFECancelRunNode",
+                  "tfe_create_project": "#/components/schemas/TFECreateProjectNode",
+                  "tfe_create_workspace": "#/components/schemas/TFECreateWorkspaceNode",
+                  "tfe_delete_project": "#/components/schemas/TFEDeleteProjectNode",
+                  "tfe_delete_variable": "#/components/schemas/TFEDeleteVariableNode",
+                  "tfe_delete_workspace": "#/components/schemas/TFEDeleteWorkspaceNode",
+                  "tfe_discard_run": "#/components/schemas/TFEDiscardRunNode",
+                  "tfe_fetch_state_outputs": "#/components/schemas/TFEFetchStateOutputsNode",
+                  "tfe_force_cancel_run": "#/components/schemas/TFEForceCancelRunNode",
+                  "tfe_get_github_installation": "#/components/schemas/TFEGetGitHubInstallationNode",
+                  "tfe_get_project": "#/components/schemas/TFEGetProjectNode",
+                  "tfe_get_run_status": "#/components/schemas/TFEGetRunStatusNode",
+                  "tfe_link_vcs": "#/components/schemas/TFELinkVCSNode",
+                  "tfe_list_github_installations": "#/components/schemas/TFEListGitHubInstallationsNode",
+                  "tfe_list_projects": "#/components/schemas/TFEListProjectsNode",
+                  "tfe_list_runs": "#/components/schemas/TFEListRunsNode",
+                  "tfe_list_variables": "#/components/schemas/TFEListVariablesNode",
+                  "tfe_list_workspaces": "#/components/schemas/TFEListWorkspacesNode",
+                  "tfe_move_workspace_to_project": "#/components/schemas/TFEMoveWorkspaceToProjectNode",
+                  "tfe_trigger_run": "#/components/schemas/TFETriggerRunNode",
+                  "tfe_update_project": "#/components/schemas/TFEUpdateProjectNode",
+                  "tfe_update_variable": "#/components/schemas/TFEUpdateVariableNode",
+                  "tfe_update_workspace": "#/components/schemas/TFEUpdateWorkspaceNode",
+                  "tfe_upload_configuration_version": "#/components/schemas/TFEUploadConfigurationVersionNode",
                   "wait": "#/components/schemas/WaitNode"
                 }
               }
@@ -53704,6 +53916,4067 @@
             "$ref": "#/components/schemas/ValidationResult"
           }
         }
+      },
+      "TFEAddRunCommentNode": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+            "title": "Id",
+            "description": "Unique identifier for the node within the workflow"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "Human-readable name for the node"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Human-readable description of the node purpose"
+          },
+          "outputs": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outputs",
+            "description": "Output extraction mapping"
+          },
+          "position": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodePosition"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional UI position hint"
+          },
+          "type": {
+            "type": "string",
+            "const": "tfe_add_run_comment",
+            "title": "Type"
+          },
+          "parameters": {
+            "$ref": "#/components/schemas/TFEAddRunCommentParameters"
+          },
+          "settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodeSettingsNoRetry"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "parameters"
+        ],
+        "title": "TFEAddRunCommentNode",
+        "description": "TFE Add Run Comment executor node."
+      },
+      "TFEAddRunCommentParameters": {
+        "properties": {
+          "integration_id": {
+            "type": "string",
+            "title": "Integration Id",
+            "description": "UUID of the Terraform Enterprise integration"
+          },
+          "credential_id": {
+            "type": "string",
+            "title": "Credential Id",
+            "description": "UUID of the HTTP Bearer Token credential"
+          },
+          "organization": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Organization",
+            "description": "Optional organization override; defaults to the integration organization"
+          },
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          },
+          "comment": {
+            "type": "string",
+            "title": "Comment"
+          }
+        },
+        "type": "object",
+        "required": [
+          "integration_id",
+          "credential_id",
+          "run_id",
+          "comment"
+        ],
+        "title": "TFEAddRunCommentParameters",
+        "description": "Parameters for Add Run Comment."
+      },
+      "TFEAddVariableNode": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+            "title": "Id",
+            "description": "Unique identifier for the node within the workflow"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "Human-readable name for the node"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Human-readable description of the node purpose"
+          },
+          "outputs": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outputs",
+            "description": "Output extraction mapping"
+          },
+          "position": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodePosition"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional UI position hint"
+          },
+          "type": {
+            "type": "string",
+            "const": "tfe_add_variable",
+            "title": "Type"
+          },
+          "parameters": {
+            "$ref": "#/components/schemas/TFEAddVariableParameters"
+          },
+          "settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodeSettingsNoRetry"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "parameters"
+        ],
+        "title": "TFEAddVariableNode",
+        "description": "TFE Add Variable executor node."
+      },
+      "TFEAddVariableParameters": {
+        "properties": {
+          "integration_id": {
+            "type": "string",
+            "title": "Integration Id",
+            "description": "UUID of the Terraform Enterprise integration"
+          },
+          "credential_id": {
+            "type": "string",
+            "title": "Credential Id",
+            "description": "UUID of the HTTP Bearer Token credential"
+          },
+          "organization": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Organization",
+            "description": "Optional organization override; defaults to the integration organization"
+          },
+          "workspace_id": {
+            "type": "string",
+            "title": "Workspace Id"
+          },
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "value_credential_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value Credential Id",
+            "description": "UUID of a Secret String credential providing the variable value"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "terraform",
+              "env"
+            ],
+            "title": "Category",
+            "default": "terraform"
+          },
+          "sensitive": {
+            "type": "boolean",
+            "title": "Sensitive",
+            "default": false
+          },
+          "hcl": {
+            "type": "boolean",
+            "title": "Hcl",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "integration_id",
+          "credential_id",
+          "workspace_id",
+          "key"
+        ],
+        "title": "TFEAddVariableParameters",
+        "description": "Parameters for Add Variable.\n\nWhen ``sensitive=true``, the value must come from a Secret String credential\nvia ``value_credential_id`` — plaintext ``value`` is rejected so secrets are\nnever stored in the workflow definition."
+      },
+      "TFEApplyRunNode": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+            "title": "Id",
+            "description": "Unique identifier for the node within the workflow"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "Human-readable name for the node"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Human-readable description of the node purpose"
+          },
+          "outputs": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outputs",
+            "description": "Output extraction mapping"
+          },
+          "position": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodePosition"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional UI position hint"
+          },
+          "type": {
+            "type": "string",
+            "const": "tfe_apply_run",
+            "title": "Type"
+          },
+          "parameters": {
+            "$ref": "#/components/schemas/TFERunActionParameters"
+          },
+          "settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodeSettingsNoRetry"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "parameters"
+        ],
+        "title": "TFEApplyRunNode",
+        "description": "TFE Apply Run executor node."
+      },
+      "TFEAssignTeamPermissionsNode": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+            "title": "Id",
+            "description": "Unique identifier for the node within the workflow"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "Human-readable name for the node"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Human-readable description of the node purpose"
+          },
+          "outputs": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outputs",
+            "description": "Output extraction mapping"
+          },
+          "position": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodePosition"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional UI position hint"
+          },
+          "type": {
+            "type": "string",
+            "const": "tfe_assign_team_permissions",
+            "title": "Type"
+          },
+          "parameters": {
+            "$ref": "#/components/schemas/TFEAssignTeamPermissionsParameters"
+          },
+          "settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodeSettingsNoRetry"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "parameters"
+        ],
+        "title": "TFEAssignTeamPermissionsNode",
+        "description": "TFE Assign Team Permissions executor node."
+      },
+      "TFEAssignTeamPermissionsParameters": {
+        "properties": {
+          "integration_id": {
+            "type": "string",
+            "title": "Integration Id",
+            "description": "UUID of the Terraform Enterprise integration"
+          },
+          "credential_id": {
+            "type": "string",
+            "title": "Credential Id",
+            "description": "UUID of the HTTP Bearer Token credential"
+          },
+          "organization": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Organization",
+            "description": "Optional organization override; defaults to the integration organization"
+          },
+          "project_id": {
+            "type": "string",
+            "title": "Project Id"
+          },
+          "team_id": {
+            "type": "string",
+            "title": "Team Id"
+          },
+          "access": {
+            "type": "string",
+            "enum": [
+              "read",
+              "write",
+              "maintain",
+              "admin",
+              "custom"
+            ],
+            "title": "Access",
+            "default": "read"
+          }
+        },
+        "type": "object",
+        "required": [
+          "integration_id",
+          "credential_id",
+          "project_id",
+          "team_id"
+        ],
+        "title": "TFEAssignTeamPermissionsParameters",
+        "description": "Parameters for Assign Team Permissions."
+      },
+      "TFECancelRunNode": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+            "title": "Id",
+            "description": "Unique identifier for the node within the workflow"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "Human-readable name for the node"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Human-readable description of the node purpose"
+          },
+          "outputs": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outputs",
+            "description": "Output extraction mapping"
+          },
+          "position": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodePosition"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional UI position hint"
+          },
+          "type": {
+            "type": "string",
+            "const": "tfe_cancel_run",
+            "title": "Type"
+          },
+          "parameters": {
+            "$ref": "#/components/schemas/TFERunActionParameters"
+          },
+          "settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodeSettingsNoRetry"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "parameters"
+        ],
+        "title": "TFECancelRunNode",
+        "description": "TFE Cancel Run executor node."
+      },
+      "TFECreateProjectNode": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+            "title": "Id",
+            "description": "Unique identifier for the node within the workflow"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "Human-readable name for the node"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Human-readable description of the node purpose"
+          },
+          "outputs": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outputs",
+            "description": "Output extraction mapping"
+          },
+          "position": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodePosition"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional UI position hint"
+          },
+          "type": {
+            "type": "string",
+            "const": "tfe_create_project",
+            "title": "Type"
+          },
+          "parameters": {
+            "$ref": "#/components/schemas/TFECreateProjectParameters"
+          },
+          "settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodeSettingsNoRetry"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "parameters"
+        ],
+        "title": "TFECreateProjectNode",
+        "description": "TFE Create Project executor node."
+      },
+      "TFECreateProjectParameters": {
+        "properties": {
+          "integration_id": {
+            "type": "string",
+            "title": "Integration Id",
+            "description": "UUID of the Terraform Enterprise integration"
+          },
+          "credential_id": {
+            "type": "string",
+            "title": "Credential Id",
+            "description": "UUID of the HTTP Bearer Token credential"
+          },
+          "organization": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Organization",
+            "description": "Optional organization override; defaults to the integration organization"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          }
+        },
+        "type": "object",
+        "required": [
+          "integration_id",
+          "credential_id",
+          "name"
+        ],
+        "title": "TFECreateProjectParameters",
+        "description": "Parameters for Create Project."
+      },
+      "TFECreateWorkspaceNode": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+            "title": "Id",
+            "description": "Unique identifier for the node within the workflow"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "Human-readable name for the node"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Human-readable description of the node purpose"
+          },
+          "outputs": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outputs",
+            "description": "Output extraction mapping"
+          },
+          "position": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodePosition"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional UI position hint"
+          },
+          "type": {
+            "type": "string",
+            "const": "tfe_create_workspace",
+            "title": "Type"
+          },
+          "parameters": {
+            "$ref": "#/components/schemas/TFECreateWorkspaceParameters"
+          },
+          "settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodeSettingsNoRetry"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "parameters"
+        ],
+        "title": "TFECreateWorkspaceNode",
+        "description": "TFE Create Workspace executor node."
+      },
+      "TFECreateWorkspaceParameters": {
+        "properties": {
+          "preset": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "remote_no_vcs",
+                  "agent",
+                  "remote_oauth_vcs",
+                  "remote_github"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preset",
+            "description": "Workspace preset: remote_no_vcs, agent, remote_oauth_vcs, or remote_github"
+          },
+          "agent_pool_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Pool Id",
+            "description": "Agent pool ID for agent execution"
+          },
+          "repository": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repository",
+            "description": "VCS repository identifier (org/name)"
+          },
+          "branch": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Branch",
+            "description": "VCS branch"
+          },
+          "oauth_token_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Oauth Token Id",
+            "description": "OAuth token ID for remote OAuth VCS"
+          },
+          "github_app_installation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Github App Installation Id",
+            "description": "GitHub App installation ID for remote GitHub VCS"
+          },
+          "integration_id": {
+            "type": "string",
+            "title": "Integration Id",
+            "description": "UUID of the Terraform Enterprise integration"
+          },
+          "credential_id": {
+            "type": "string",
+            "title": "Credential Id",
+            "description": "UUID of the HTTP Bearer Token credential"
+          },
+          "organization": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Organization",
+            "description": "Optional organization override; defaults to the integration organization"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Workspace name"
+          },
+          "auto_apply": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Auto Apply",
+            "description": "Enable auto-apply"
+          },
+          "execution_mode": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "remote",
+                  "local",
+                  "agent"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Execution Mode",
+            "description": "Execution mode pass-through when no preset is set (local is HCP-only)"
+          },
+          "terraform_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Terraform Version",
+            "description": "Terraform version"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Workspace description"
+          },
+          "working_directory": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Working Directory",
+            "description": "Working directory"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id",
+            "description": "Project ID to place the workspace in"
+          }
+        },
+        "type": "object",
+        "required": [
+          "integration_id",
+          "credential_id",
+          "name"
+        ],
+        "title": "TFECreateWorkspaceParameters",
+        "description": "Parameters for Create Workspace."
+      },
+      "TFEDeleteProjectNode": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+            "title": "Id",
+            "description": "Unique identifier for the node within the workflow"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "Human-readable name for the node"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Human-readable description of the node purpose"
+          },
+          "outputs": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outputs",
+            "description": "Output extraction mapping"
+          },
+          "position": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodePosition"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional UI position hint"
+          },
+          "type": {
+            "type": "string",
+            "const": "tfe_delete_project",
+            "title": "Type"
+          },
+          "parameters": {
+            "$ref": "#/components/schemas/TFEDeleteProjectParameters"
+          },
+          "settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodeSettingsNoRetry"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "parameters"
+        ],
+        "title": "TFEDeleteProjectNode",
+        "description": "TFE Delete Project executor node."
+      },
+      "TFEDeleteProjectParameters": {
+        "properties": {
+          "integration_id": {
+            "type": "string",
+            "title": "Integration Id",
+            "description": "UUID of the Terraform Enterprise integration"
+          },
+          "credential_id": {
+            "type": "string",
+            "title": "Credential Id",
+            "description": "UUID of the HTTP Bearer Token credential"
+          },
+          "organization": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Organization",
+            "description": "Optional organization override; defaults to the integration organization"
+          },
+          "project_id": {
+            "type": "string",
+            "title": "Project Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "integration_id",
+          "credential_id",
+          "project_id"
+        ],
+        "title": "TFEDeleteProjectParameters",
+        "description": "Parameters for Delete Project."
+      },
+      "TFEDeleteVariableNode": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+            "title": "Id",
+            "description": "Unique identifier for the node within the workflow"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "Human-readable name for the node"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Human-readable description of the node purpose"
+          },
+          "outputs": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outputs",
+            "description": "Output extraction mapping"
+          },
+          "position": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodePosition"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional UI position hint"
+          },
+          "type": {
+            "type": "string",
+            "const": "tfe_delete_variable",
+            "title": "Type"
+          },
+          "parameters": {
+            "$ref": "#/components/schemas/TFEDeleteVariableParameters"
+          },
+          "settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodeSettingsNoRetry"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "parameters"
+        ],
+        "title": "TFEDeleteVariableNode",
+        "description": "TFE Delete Variable executor node."
+      },
+      "TFEDeleteVariableParameters": {
+        "properties": {
+          "integration_id": {
+            "type": "string",
+            "title": "Integration Id",
+            "description": "UUID of the Terraform Enterprise integration"
+          },
+          "credential_id": {
+            "type": "string",
+            "title": "Credential Id",
+            "description": "UUID of the HTTP Bearer Token credential"
+          },
+          "organization": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Organization",
+            "description": "Optional organization override; defaults to the integration organization"
+          },
+          "workspace_id": {
+            "type": "string",
+            "title": "Workspace Id"
+          },
+          "variable_id": {
+            "type": "string",
+            "title": "Variable Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "integration_id",
+          "credential_id",
+          "workspace_id",
+          "variable_id"
+        ],
+        "title": "TFEDeleteVariableParameters",
+        "description": "Parameters for Delete Variable."
+      },
+      "TFEDeleteWorkspaceNode": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+            "title": "Id",
+            "description": "Unique identifier for the node within the workflow"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "Human-readable name for the node"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Human-readable description of the node purpose"
+          },
+          "outputs": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outputs",
+            "description": "Output extraction mapping"
+          },
+          "position": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodePosition"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional UI position hint"
+          },
+          "type": {
+            "type": "string",
+            "const": "tfe_delete_workspace",
+            "title": "Type"
+          },
+          "parameters": {
+            "$ref": "#/components/schemas/TFEDeleteWorkspaceParameters"
+          },
+          "settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodeSettingsNoRetry"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "parameters"
+        ],
+        "title": "TFEDeleteWorkspaceNode",
+        "description": "TFE Delete Workspace executor node."
+      },
+      "TFEDeleteWorkspaceParameters": {
+        "properties": {
+          "integration_id": {
+            "type": "string",
+            "title": "Integration Id",
+            "description": "UUID of the Terraform Enterprise integration"
+          },
+          "credential_id": {
+            "type": "string",
+            "title": "Credential Id",
+            "description": "UUID of the HTTP Bearer Token credential"
+          },
+          "organization": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Organization",
+            "description": "Optional organization override; defaults to the integration organization"
+          },
+          "workspace_id": {
+            "type": "string",
+            "title": "Workspace Id",
+            "description": "Workspace ID (ws-...)"
+          },
+          "force": {
+            "type": "boolean",
+            "title": "Force",
+            "description": "Force delete even when workspace has state",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "integration_id",
+          "credential_id",
+          "workspace_id"
+        ],
+        "title": "TFEDeleteWorkspaceParameters",
+        "description": "Parameters for Delete Workspace."
+      },
+      "TFEDiscardRunNode": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+            "title": "Id",
+            "description": "Unique identifier for the node within the workflow"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "Human-readable name for the node"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Human-readable description of the node purpose"
+          },
+          "outputs": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outputs",
+            "description": "Output extraction mapping"
+          },
+          "position": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodePosition"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional UI position hint"
+          },
+          "type": {
+            "type": "string",
+            "const": "tfe_discard_run",
+            "title": "Type"
+          },
+          "parameters": {
+            "$ref": "#/components/schemas/TFERunActionParameters"
+          },
+          "settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodeSettingsNoRetry"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "parameters"
+        ],
+        "title": "TFEDiscardRunNode",
+        "description": "TFE Discard Run executor node."
+      },
+      "TFEFetchStateOutputsNode": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+            "title": "Id",
+            "description": "Unique identifier for the node within the workflow"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "Human-readable name for the node"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Human-readable description of the node purpose"
+          },
+          "outputs": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outputs",
+            "description": "Output extraction mapping"
+          },
+          "position": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodePosition"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional UI position hint"
+          },
+          "type": {
+            "type": "string",
+            "const": "tfe_fetch_state_outputs",
+            "title": "Type"
+          },
+          "parameters": {
+            "$ref": "#/components/schemas/TFEFetchStateOutputsParameters"
+          },
+          "settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodeSettingsFull"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "parameters"
+        ],
+        "title": "TFEFetchStateOutputsNode",
+        "description": "TFE Fetch State Outputs executor node."
+      },
+      "TFEFetchStateOutputsParameters": {
+        "properties": {
+          "integration_id": {
+            "type": "string",
+            "title": "Integration Id",
+            "description": "UUID of the Terraform Enterprise integration"
+          },
+          "credential_id": {
+            "type": "string",
+            "title": "Credential Id",
+            "description": "UUID of the HTTP Bearer Token credential"
+          },
+          "organization": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Organization",
+            "description": "Optional organization override; defaults to the integration organization"
+          },
+          "workspace_id": {
+            "type": "string",
+            "title": "Workspace Id",
+            "description": "Workspace ID (ws-...)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "integration_id",
+          "credential_id",
+          "workspace_id"
+        ],
+        "title": "TFEFetchStateOutputsParameters",
+        "description": "Parameters for Fetch State and Outputs."
+      },
+      "TFEForceCancelRunNode": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+            "title": "Id",
+            "description": "Unique identifier for the node within the workflow"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "Human-readable name for the node"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Human-readable description of the node purpose"
+          },
+          "outputs": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outputs",
+            "description": "Output extraction mapping"
+          },
+          "position": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodePosition"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional UI position hint"
+          },
+          "type": {
+            "type": "string",
+            "const": "tfe_force_cancel_run",
+            "title": "Type"
+          },
+          "parameters": {
+            "$ref": "#/components/schemas/TFERunActionParameters"
+          },
+          "settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodeSettingsNoRetry"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "parameters"
+        ],
+        "title": "TFEForceCancelRunNode",
+        "description": "TFE Force Cancel Run executor node."
+      },
+      "TFEGetGitHubInstallationNode": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+            "title": "Id",
+            "description": "Unique identifier for the node within the workflow"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "Human-readable name for the node"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Human-readable description of the node purpose"
+          },
+          "outputs": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outputs",
+            "description": "Output extraction mapping"
+          },
+          "position": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodePosition"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional UI position hint"
+          },
+          "type": {
+            "type": "string",
+            "const": "tfe_get_github_installation",
+            "title": "Type"
+          },
+          "parameters": {
+            "$ref": "#/components/schemas/TFEGetGitHubInstallationParameters"
+          },
+          "settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodeSettingsFull"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "parameters"
+        ],
+        "title": "TFEGetGitHubInstallationNode",
+        "description": "TFE Get Git Hub Installation executor node."
+      },
+      "TFEGetGitHubInstallationParameters": {
+        "properties": {
+          "integration_id": {
+            "type": "string",
+            "title": "Integration Id",
+            "description": "UUID of the Terraform Enterprise integration"
+          },
+          "credential_id": {
+            "type": "string",
+            "title": "Credential Id",
+            "description": "UUID of the HTTP Bearer Token credential"
+          },
+          "organization": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Organization",
+            "description": "Optional organization override; defaults to the integration organization"
+          },
+          "installation_id": {
+            "type": "string",
+            "title": "Installation Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "integration_id",
+          "credential_id",
+          "installation_id"
+        ],
+        "title": "TFEGetGitHubInstallationParameters",
+        "description": "Parameters for Get Installation Details."
+      },
+      "TFEGetProjectNode": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+            "title": "Id",
+            "description": "Unique identifier for the node within the workflow"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "Human-readable name for the node"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Human-readable description of the node purpose"
+          },
+          "outputs": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outputs",
+            "description": "Output extraction mapping"
+          },
+          "position": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodePosition"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional UI position hint"
+          },
+          "type": {
+            "type": "string",
+            "const": "tfe_get_project",
+            "title": "Type"
+          },
+          "parameters": {
+            "$ref": "#/components/schemas/TFEGetProjectParameters"
+          },
+          "settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodeSettingsFull"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "parameters"
+        ],
+        "title": "TFEGetProjectNode",
+        "description": "TFE Get Project executor node."
+      },
+      "TFEGetProjectParameters": {
+        "properties": {
+          "integration_id": {
+            "type": "string",
+            "title": "Integration Id",
+            "description": "UUID of the Terraform Enterprise integration"
+          },
+          "credential_id": {
+            "type": "string",
+            "title": "Credential Id",
+            "description": "UUID of the HTTP Bearer Token credential"
+          },
+          "organization": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Organization",
+            "description": "Optional organization override; defaults to the integration organization"
+          },
+          "project_id": {
+            "type": "string",
+            "title": "Project Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "integration_id",
+          "credential_id",
+          "project_id"
+        ],
+        "title": "TFEGetProjectParameters",
+        "description": "Parameters for Get Project Details."
+      },
+      "TFEGetRunStatusNode": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+            "title": "Id",
+            "description": "Unique identifier for the node within the workflow"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "Human-readable name for the node"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Human-readable description of the node purpose"
+          },
+          "outputs": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outputs",
+            "description": "Output extraction mapping"
+          },
+          "position": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodePosition"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional UI position hint"
+          },
+          "type": {
+            "type": "string",
+            "const": "tfe_get_run_status",
+            "title": "Type"
+          },
+          "parameters": {
+            "$ref": "#/components/schemas/TFEGetRunStatusParameters"
+          },
+          "settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodeSettingsFull"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "parameters"
+        ],
+        "title": "TFEGetRunStatusNode",
+        "description": "TFE Get Run Status executor node."
+      },
+      "TFEGetRunStatusParameters": {
+        "properties": {
+          "integration_id": {
+            "type": "string",
+            "title": "Integration Id",
+            "description": "UUID of the Terraform Enterprise integration"
+          },
+          "credential_id": {
+            "type": "string",
+            "title": "Credential Id",
+            "description": "UUID of the HTTP Bearer Token credential"
+          },
+          "organization": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Organization",
+            "description": "Optional organization override; defaults to the integration organization"
+          },
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          },
+          "wait_for_completion": {
+            "type": "boolean",
+            "title": "Wait For Completion",
+            "default": false
+          },
+          "poll_interval_seconds": {
+            "type": "integer",
+            "title": "Poll Interval Seconds",
+            "default": 15
+          },
+          "timeout_seconds": {
+            "type": "integer",
+            "title": "Timeout Seconds",
+            "default": 3600
+          }
+        },
+        "type": "object",
+        "required": [
+          "integration_id",
+          "credential_id",
+          "run_id"
+        ],
+        "title": "TFEGetRunStatusParameters",
+        "description": "Parameters for Get Run Status."
+      },
+      "TFELinkVCSNode": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+            "title": "Id",
+            "description": "Unique identifier for the node within the workflow"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "Human-readable name for the node"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Human-readable description of the node purpose"
+          },
+          "outputs": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outputs",
+            "description": "Output extraction mapping"
+          },
+          "position": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodePosition"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional UI position hint"
+          },
+          "type": {
+            "type": "string",
+            "const": "tfe_link_vcs",
+            "title": "Type"
+          },
+          "parameters": {
+            "$ref": "#/components/schemas/TFELinkVCSParameters"
+          },
+          "settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodeSettingsNoRetry"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "parameters"
+        ],
+        "title": "TFELinkVCSNode",
+        "description": "TFE Link V C S executor node."
+      },
+      "TFELinkVCSParameters": {
+        "properties": {
+          "integration_id": {
+            "type": "string",
+            "title": "Integration Id",
+            "description": "UUID of the Terraform Enterprise integration"
+          },
+          "credential_id": {
+            "type": "string",
+            "title": "Credential Id",
+            "description": "UUID of the HTTP Bearer Token credential"
+          },
+          "organization": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Organization",
+            "description": "Optional organization override; defaults to the integration organization"
+          },
+          "workspace_id": {
+            "type": "string",
+            "title": "Workspace Id"
+          },
+          "installation_id": {
+            "type": "string",
+            "title": "Installation Id"
+          },
+          "repository": {
+            "type": "string",
+            "title": "Repository"
+          },
+          "branch": {
+            "type": "string",
+            "title": "Branch"
+          }
+        },
+        "type": "object",
+        "required": [
+          "integration_id",
+          "credential_id",
+          "workspace_id",
+          "installation_id",
+          "repository",
+          "branch"
+        ],
+        "title": "TFELinkVCSParameters",
+        "description": "Parameters for Link VCS to Workspace."
+      },
+      "TFEListGitHubInstallationsNode": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+            "title": "Id",
+            "description": "Unique identifier for the node within the workflow"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "Human-readable name for the node"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Human-readable description of the node purpose"
+          },
+          "outputs": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outputs",
+            "description": "Output extraction mapping"
+          },
+          "position": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodePosition"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional UI position hint"
+          },
+          "type": {
+            "type": "string",
+            "const": "tfe_list_github_installations",
+            "title": "Type"
+          },
+          "parameters": {
+            "$ref": "#/components/schemas/TFEListGitHubInstallationsParameters"
+          },
+          "settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodeSettingsFull"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "parameters"
+        ],
+        "title": "TFEListGitHubInstallationsNode",
+        "description": "TFE List Git Hub Installations executor node."
+      },
+      "TFEListGitHubInstallationsParameters": {
+        "properties": {
+          "integration_id": {
+            "type": "string",
+            "title": "Integration Id",
+            "description": "UUID of the Terraform Enterprise integration"
+          },
+          "credential_id": {
+            "type": "string",
+            "title": "Credential Id",
+            "description": "UUID of the HTTP Bearer Token credential"
+          },
+          "organization": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Organization",
+            "description": "Optional organization override; defaults to the integration organization"
+          }
+        },
+        "type": "object",
+        "required": [
+          "integration_id",
+          "credential_id"
+        ],
+        "title": "TFEListGitHubInstallationsParameters",
+        "description": "Parameters for List GitHub Installations."
+      },
+      "TFEListProjectsNode": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+            "title": "Id",
+            "description": "Unique identifier for the node within the workflow"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "Human-readable name for the node"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Human-readable description of the node purpose"
+          },
+          "outputs": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outputs",
+            "description": "Output extraction mapping"
+          },
+          "position": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodePosition"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional UI position hint"
+          },
+          "type": {
+            "type": "string",
+            "const": "tfe_list_projects",
+            "title": "Type"
+          },
+          "parameters": {
+            "$ref": "#/components/schemas/TFEListProjectsParameters"
+          },
+          "settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodeSettingsFull"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "parameters"
+        ],
+        "title": "TFEListProjectsNode",
+        "description": "TFE List Projects executor node."
+      },
+      "TFEListProjectsParameters": {
+        "properties": {
+          "integration_id": {
+            "type": "string",
+            "title": "Integration Id",
+            "description": "UUID of the Terraform Enterprise integration"
+          },
+          "credential_id": {
+            "type": "string",
+            "title": "Credential Id",
+            "description": "UUID of the HTTP Bearer Token credential"
+          },
+          "organization": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Organization",
+            "description": "Optional organization override; defaults to the integration organization"
+          }
+        },
+        "type": "object",
+        "required": [
+          "integration_id",
+          "credential_id"
+        ],
+        "title": "TFEListProjectsParameters",
+        "description": "Parameters for List Projects."
+      },
+      "TFEListRunsNode": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+            "title": "Id",
+            "description": "Unique identifier for the node within the workflow"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "Human-readable name for the node"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Human-readable description of the node purpose"
+          },
+          "outputs": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outputs",
+            "description": "Output extraction mapping"
+          },
+          "position": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodePosition"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional UI position hint"
+          },
+          "type": {
+            "type": "string",
+            "const": "tfe_list_runs",
+            "title": "Type"
+          },
+          "parameters": {
+            "$ref": "#/components/schemas/TFEListRunsParameters"
+          },
+          "settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodeSettingsFull"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "parameters"
+        ],
+        "title": "TFEListRunsNode",
+        "description": "TFE List Runs executor node."
+      },
+      "TFEListRunsParameters": {
+        "properties": {
+          "integration_id": {
+            "type": "string",
+            "title": "Integration Id",
+            "description": "UUID of the Terraform Enterprise integration"
+          },
+          "credential_id": {
+            "type": "string",
+            "title": "Credential Id",
+            "description": "UUID of the HTTP Bearer Token credential"
+          },
+          "organization": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Organization",
+            "description": "Optional organization override; defaults to the integration organization"
+          },
+          "workspace_id": {
+            "type": "string",
+            "title": "Workspace Id"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "integration_id",
+          "credential_id",
+          "workspace_id"
+        ],
+        "title": "TFEListRunsParameters",
+        "description": "Parameters for List Runs."
+      },
+      "TFEListVariablesNode": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+            "title": "Id",
+            "description": "Unique identifier for the node within the workflow"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "Human-readable name for the node"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Human-readable description of the node purpose"
+          },
+          "outputs": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outputs",
+            "description": "Output extraction mapping"
+          },
+          "position": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodePosition"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional UI position hint"
+          },
+          "type": {
+            "type": "string",
+            "const": "tfe_list_variables",
+            "title": "Type"
+          },
+          "parameters": {
+            "$ref": "#/components/schemas/TFEListVariablesParameters"
+          },
+          "settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodeSettingsFull"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "parameters"
+        ],
+        "title": "TFEListVariablesNode",
+        "description": "TFE List Variables executor node."
+      },
+      "TFEListVariablesParameters": {
+        "properties": {
+          "integration_id": {
+            "type": "string",
+            "title": "Integration Id",
+            "description": "UUID of the Terraform Enterprise integration"
+          },
+          "credential_id": {
+            "type": "string",
+            "title": "Credential Id",
+            "description": "UUID of the HTTP Bearer Token credential"
+          },
+          "organization": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Organization",
+            "description": "Optional organization override; defaults to the integration organization"
+          },
+          "workspace_id": {
+            "type": "string",
+            "title": "Workspace Id"
+          },
+          "key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Key"
+          }
+        },
+        "type": "object",
+        "required": [
+          "integration_id",
+          "credential_id",
+          "workspace_id"
+        ],
+        "title": "TFEListVariablesParameters",
+        "description": "Parameters for List Variables."
+      },
+      "TFEListWorkspacesNode": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+            "title": "Id",
+            "description": "Unique identifier for the node within the workflow"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "Human-readable name for the node"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Human-readable description of the node purpose"
+          },
+          "outputs": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outputs",
+            "description": "Output extraction mapping"
+          },
+          "position": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodePosition"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional UI position hint"
+          },
+          "type": {
+            "type": "string",
+            "const": "tfe_list_workspaces",
+            "title": "Type"
+          },
+          "parameters": {
+            "$ref": "#/components/schemas/TFEListWorkspacesParameters"
+          },
+          "settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodeSettingsFull"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "parameters"
+        ],
+        "title": "TFEListWorkspacesNode",
+        "description": "TFE List Workspaces executor node."
+      },
+      "TFEListWorkspacesParameters": {
+        "properties": {
+          "integration_id": {
+            "type": "string",
+            "title": "Integration Id",
+            "description": "UUID of the Terraform Enterprise integration"
+          },
+          "credential_id": {
+            "type": "string",
+            "title": "Credential Id",
+            "description": "UUID of the HTTP Bearer Token credential"
+          },
+          "organization": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Organization",
+            "description": "Optional organization override; defaults to the integration organization"
+          },
+          "search": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Search",
+            "description": "Optional name search filter"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id",
+            "description": "Optional project filter"
+          }
+        },
+        "type": "object",
+        "required": [
+          "integration_id",
+          "credential_id"
+        ],
+        "title": "TFEListWorkspacesParameters",
+        "description": "Parameters for List Workspaces."
+      },
+      "TFEMoveWorkspaceToProjectNode": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+            "title": "Id",
+            "description": "Unique identifier for the node within the workflow"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "Human-readable name for the node"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Human-readable description of the node purpose"
+          },
+          "outputs": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outputs",
+            "description": "Output extraction mapping"
+          },
+          "position": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodePosition"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional UI position hint"
+          },
+          "type": {
+            "type": "string",
+            "const": "tfe_move_workspace_to_project",
+            "title": "Type"
+          },
+          "parameters": {
+            "$ref": "#/components/schemas/TFEMoveWorkspaceToProjectParameters"
+          },
+          "settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodeSettingsNoRetry"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "parameters"
+        ],
+        "title": "TFEMoveWorkspaceToProjectNode",
+        "description": "TFE Move Workspace To Project executor node."
+      },
+      "TFEMoveWorkspaceToProjectParameters": {
+        "properties": {
+          "integration_id": {
+            "type": "string",
+            "title": "Integration Id",
+            "description": "UUID of the Terraform Enterprise integration"
+          },
+          "credential_id": {
+            "type": "string",
+            "title": "Credential Id",
+            "description": "UUID of the HTTP Bearer Token credential"
+          },
+          "organization": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Organization",
+            "description": "Optional organization override; defaults to the integration organization"
+          },
+          "workspace_id": {
+            "type": "string",
+            "title": "Workspace Id"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "integration_id",
+          "credential_id",
+          "workspace_id"
+        ],
+        "title": "TFEMoveWorkspaceToProjectParameters",
+        "description": "Parameters for Move Workspace to Project."
+      },
+      "TFERunActionParameters": {
+        "properties": {
+          "integration_id": {
+            "type": "string",
+            "title": "Integration Id",
+            "description": "UUID of the Terraform Enterprise integration"
+          },
+          "credential_id": {
+            "type": "string",
+            "title": "Credential Id",
+            "description": "UUID of the HTTP Bearer Token credential"
+          },
+          "organization": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Organization",
+            "description": "Optional organization override; defaults to the integration organization"
+          },
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comment"
+          }
+        },
+        "type": "object",
+        "required": [
+          "integration_id",
+          "credential_id",
+          "run_id"
+        ],
+        "title": "TFERunActionParameters",
+        "description": "Parameters for Apply / Discard / Cancel / Force Cancel."
+      },
+      "TFETriggerRunNode": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+            "title": "Id",
+            "description": "Unique identifier for the node within the workflow"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "Human-readable name for the node"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Human-readable description of the node purpose"
+          },
+          "outputs": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outputs",
+            "description": "Output extraction mapping"
+          },
+          "position": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodePosition"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional UI position hint"
+          },
+          "type": {
+            "type": "string",
+            "const": "tfe_trigger_run",
+            "title": "Type"
+          },
+          "parameters": {
+            "$ref": "#/components/schemas/TFETriggerRunParameters"
+          },
+          "settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodeSettingsNoRetry"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "parameters"
+        ],
+        "title": "TFETriggerRunNode",
+        "description": "TFE Trigger Run executor node."
+      },
+      "TFETriggerRunParameters": {
+        "properties": {
+          "integration_id": {
+            "type": "string",
+            "title": "Integration Id",
+            "description": "UUID of the Terraform Enterprise integration"
+          },
+          "credential_id": {
+            "type": "string",
+            "title": "Credential Id",
+            "description": "UUID of the HTTP Bearer Token credential"
+          },
+          "organization": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Organization",
+            "description": "Optional organization override; defaults to the integration organization"
+          },
+          "workspace_id": {
+            "type": "string",
+            "title": "Workspace Id"
+          },
+          "mode": {
+            "type": "string",
+            "title": "Mode",
+            "description": "Run mode (plan-and-apply, plan-only, destroy, ...)"
+          },
+          "configuration_version_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Configuration Version Id"
+          },
+          "target_resources": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Resources"
+          },
+          "replace_resources": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Replace Resources"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "integration_id",
+          "credential_id",
+          "workspace_id",
+          "mode"
+        ],
+        "title": "TFETriggerRunParameters",
+        "description": "Parameters for Trigger Run."
+      },
+      "TFEUpdateProjectNode": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+            "title": "Id",
+            "description": "Unique identifier for the node within the workflow"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "Human-readable name for the node"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Human-readable description of the node purpose"
+          },
+          "outputs": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outputs",
+            "description": "Output extraction mapping"
+          },
+          "position": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodePosition"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional UI position hint"
+          },
+          "type": {
+            "type": "string",
+            "const": "tfe_update_project",
+            "title": "Type"
+          },
+          "parameters": {
+            "$ref": "#/components/schemas/TFEUpdateProjectParameters"
+          },
+          "settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodeSettingsNoRetry"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "parameters"
+        ],
+        "title": "TFEUpdateProjectNode",
+        "description": "TFE Update Project executor node."
+      },
+      "TFEUpdateProjectParameters": {
+        "properties": {
+          "integration_id": {
+            "type": "string",
+            "title": "Integration Id",
+            "description": "UUID of the Terraform Enterprise integration"
+          },
+          "credential_id": {
+            "type": "string",
+            "title": "Credential Id",
+            "description": "UUID of the HTTP Bearer Token credential"
+          },
+          "organization": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Organization",
+            "description": "Optional organization override; defaults to the integration organization"
+          },
+          "project_id": {
+            "type": "string",
+            "title": "Project Id"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          }
+        },
+        "type": "object",
+        "required": [
+          "integration_id",
+          "credential_id",
+          "project_id"
+        ],
+        "title": "TFEUpdateProjectParameters",
+        "description": "Parameters for Update Project Settings."
+      },
+      "TFEUpdateVariableNode": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+            "title": "Id",
+            "description": "Unique identifier for the node within the workflow"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "Human-readable name for the node"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Human-readable description of the node purpose"
+          },
+          "outputs": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outputs",
+            "description": "Output extraction mapping"
+          },
+          "position": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodePosition"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional UI position hint"
+          },
+          "type": {
+            "type": "string",
+            "const": "tfe_update_variable",
+            "title": "Type"
+          },
+          "parameters": {
+            "$ref": "#/components/schemas/TFEUpdateVariableParameters"
+          },
+          "settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodeSettingsNoRetry"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "parameters"
+        ],
+        "title": "TFEUpdateVariableNode",
+        "description": "TFE Update Variable executor node."
+      },
+      "TFEUpdateVariableParameters": {
+        "properties": {
+          "integration_id": {
+            "type": "string",
+            "title": "Integration Id",
+            "description": "UUID of the Terraform Enterprise integration"
+          },
+          "credential_id": {
+            "type": "string",
+            "title": "Credential Id",
+            "description": "UUID of the HTTP Bearer Token credential"
+          },
+          "organization": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Organization",
+            "description": "Optional organization override; defaults to the integration organization"
+          },
+          "workspace_id": {
+            "type": "string",
+            "title": "Workspace Id"
+          },
+          "variable_id": {
+            "type": "string",
+            "title": "Variable Id"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "value_credential_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value Credential Id",
+            "description": "UUID of a Secret String credential providing the variable value"
+          },
+          "sensitive": {
+            "type": "boolean",
+            "title": "Sensitive",
+            "default": false
+          },
+          "hcl": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hcl"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "terraform",
+                  "env"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          }
+        },
+        "type": "object",
+        "required": [
+          "integration_id",
+          "credential_id",
+          "workspace_id",
+          "variable_id"
+        ],
+        "title": "TFEUpdateVariableParameters",
+        "description": "Parameters for Update Variable.\n\nWhen ``sensitive=true``, the new value must come from ``value_credential_id``."
+      },
+      "TFEUpdateWorkspaceNode": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+            "title": "Id",
+            "description": "Unique identifier for the node within the workflow"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "Human-readable name for the node"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Human-readable description of the node purpose"
+          },
+          "outputs": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outputs",
+            "description": "Output extraction mapping"
+          },
+          "position": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodePosition"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional UI position hint"
+          },
+          "type": {
+            "type": "string",
+            "const": "tfe_update_workspace",
+            "title": "Type"
+          },
+          "parameters": {
+            "$ref": "#/components/schemas/TFEUpdateWorkspaceParameters"
+          },
+          "settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodeSettingsNoRetry"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "parameters"
+        ],
+        "title": "TFEUpdateWorkspaceNode",
+        "description": "TFE Update Workspace executor node."
+      },
+      "TFEUpdateWorkspaceParameters": {
+        "properties": {
+          "preset": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "remote_no_vcs",
+                  "agent",
+                  "remote_oauth_vcs",
+                  "remote_github"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preset",
+            "description": "Workspace preset: remote_no_vcs, agent, remote_oauth_vcs, or remote_github"
+          },
+          "agent_pool_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Pool Id",
+            "description": "Agent pool ID for agent execution"
+          },
+          "repository": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repository",
+            "description": "VCS repository identifier (org/name)"
+          },
+          "branch": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Branch",
+            "description": "VCS branch"
+          },
+          "oauth_token_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Oauth Token Id",
+            "description": "OAuth token ID for remote OAuth VCS"
+          },
+          "github_app_installation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Github App Installation Id",
+            "description": "GitHub App installation ID for remote GitHub VCS"
+          },
+          "integration_id": {
+            "type": "string",
+            "title": "Integration Id",
+            "description": "UUID of the Terraform Enterprise integration"
+          },
+          "credential_id": {
+            "type": "string",
+            "title": "Credential Id",
+            "description": "UUID of the HTTP Bearer Token credential"
+          },
+          "organization": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Organization",
+            "description": "Optional organization override; defaults to the integration organization"
+          },
+          "workspace_id": {
+            "type": "string",
+            "title": "Workspace Id",
+            "description": "Workspace ID (ws-...)"
+          },
+          "auto_apply": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Auto Apply"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "working_directory": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Working Directory"
+          },
+          "terraform_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Terraform Version"
+          },
+          "execution_mode": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "remote",
+                  "local",
+                  "agent"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Execution Mode"
+          }
+        },
+        "type": "object",
+        "required": [
+          "integration_id",
+          "credential_id",
+          "workspace_id"
+        ],
+        "title": "TFEUpdateWorkspaceParameters",
+        "description": "Parameters for Update Workspace Settings."
+      },
+      "TFEUploadConfigurationVersionNode": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+            "title": "Id",
+            "description": "Unique identifier for the node within the workflow"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "Human-readable name for the node"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Human-readable description of the node purpose"
+          },
+          "outputs": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outputs",
+            "description": "Output extraction mapping"
+          },
+          "position": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodePosition"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional UI position hint"
+          },
+          "type": {
+            "type": "string",
+            "const": "tfe_upload_configuration_version",
+            "title": "Type"
+          },
+          "parameters": {
+            "$ref": "#/components/schemas/TFEUploadConfigurationVersionParameters"
+          },
+          "settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodeSettingsNoRetry"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "parameters"
+        ],
+        "title": "TFEUploadConfigurationVersionNode",
+        "description": "TFE Upload Configuration Version executor node."
+      },
+      "TFEUploadConfigurationVersionParameters": {
+        "properties": {
+          "integration_id": {
+            "type": "string",
+            "title": "Integration Id",
+            "description": "UUID of the Terraform Enterprise integration"
+          },
+          "credential_id": {
+            "type": "string",
+            "title": "Credential Id",
+            "description": "UUID of the HTTP Bearer Token credential"
+          },
+          "organization": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Organization",
+            "description": "Optional organization override; defaults to the integration organization"
+          },
+          "workspace_id": {
+            "type": "string",
+            "title": "Workspace Id"
+          },
+          "artifact": {
+            "type": "string",
+            "title": "Artifact",
+            "description": "Base64-encoded .tar.gz of the Terraform directory, or artifact reference"
+          },
+          "auto_queue_runs": {
+            "type": "boolean",
+            "title": "Auto Queue Runs",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "integration_id",
+          "credential_id",
+          "workspace_id",
+          "artifact"
+        ],
+        "title": "TFEUploadConfigurationVersionParameters",
+        "description": "Parameters for Upload Configuration Version."
       }
     },
     "securitySchemes": {

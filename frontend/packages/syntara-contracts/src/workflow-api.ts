@@ -1018,6 +1018,34 @@ export interface components {
         | components['schemas']['LoopNode']
         | components['schemas']['ConvergeNode']
         | components['schemas']['WaitNode']
+        | components['schemas']['TFECreateWorkspaceNode']
+        | components['schemas']['TFEListWorkspacesNode']
+        | components['schemas']['TFEUpdateWorkspaceNode']
+        | components['schemas']['TFEDeleteWorkspaceNode']
+        | components['schemas']['TFEFetchStateOutputsNode']
+        | components['schemas']['TFEAddVariableNode']
+        | components['schemas']['TFEListVariablesNode']
+        | components['schemas']['TFEUpdateVariableNode']
+        | components['schemas']['TFEDeleteVariableNode']
+        | components['schemas']['TFEUploadConfigurationVersionNode']
+        | components['schemas']['TFETriggerRunNode']
+        | components['schemas']['TFEGetRunStatusNode']
+        | components['schemas']['TFEApplyRunNode']
+        | components['schemas']['TFEDiscardRunNode']
+        | components['schemas']['TFECancelRunNode']
+        | components['schemas']['TFEForceCancelRunNode']
+        | components['schemas']['TFEListRunsNode']
+        | components['schemas']['TFEAddRunCommentNode']
+        | components['schemas']['TFEListGitHubInstallationsNode']
+        | components['schemas']['TFEGetGitHubInstallationNode']
+        | components['schemas']['TFELinkVCSNode']
+        | components['schemas']['TFECreateProjectNode']
+        | components['schemas']['TFEListProjectsNode']
+        | components['schemas']['TFEGetProjectNode']
+        | components['schemas']['TFEUpdateProjectNode']
+        | components['schemas']['TFEDeleteProjectNode']
+        | components['schemas']['TFEMoveWorkspaceToProjectNode']
+        | components['schemas']['TFEAssignTeamPermissionsNode']
       )[]
       /**
        * Edges
@@ -2185,6 +2213,1914 @@ export interface components {
       /** Instance */
       instance?: string | null
       validation_result: components['schemas']['ValidationResult']
+    }
+    /**
+     * TFEAddRunCommentNode
+     * @description TFE Add Run Comment executor node.
+     */
+    TFEAddRunCommentNode: {
+      /**
+       * Id
+       * @description Unique identifier for the node within the workflow
+       */
+      id: string
+      /**
+       * Name
+       * @description Human-readable name for the node
+       */
+      name?: string | null
+      /**
+       * Description
+       * @description Human-readable description of the node purpose
+       */
+      description?: string | null
+      /**
+       * Outputs
+       * @description Output extraction mapping
+       */
+      outputs?: {
+        [key: string]: string
+      } | null
+      /** @description Optional UI position hint */
+      position?: components['schemas']['NodePosition'] | null
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'tfe_add_run_comment'
+      parameters: components['schemas']['TFEAddRunCommentParameters']
+      settings?: components['schemas']['NodeSettingsNoRetry'] | null
+    } & {
+      [key: string]: unknown
+    }
+    /**
+     * TFEAddRunCommentParameters
+     * @description Parameters for Add Run Comment.
+     */
+    TFEAddRunCommentParameters: {
+      /**
+       * Integration Id
+       * @description UUID of the Terraform Enterprise integration
+       */
+      integration_id: string
+      /**
+       * Credential Id
+       * @description UUID of the HTTP Bearer Token credential
+       */
+      credential_id: string
+      /**
+       * Organization
+       * @description Optional organization override; defaults to the integration organization
+       */
+      organization?: string | null
+      /** Run Id */
+      run_id: string
+      /** Comment */
+      comment: string
+    }
+    /**
+     * TFEAddVariableNode
+     * @description TFE Add Variable executor node.
+     */
+    TFEAddVariableNode: {
+      /**
+       * Id
+       * @description Unique identifier for the node within the workflow
+       */
+      id: string
+      /**
+       * Name
+       * @description Human-readable name for the node
+       */
+      name?: string | null
+      /**
+       * Description
+       * @description Human-readable description of the node purpose
+       */
+      description?: string | null
+      /**
+       * Outputs
+       * @description Output extraction mapping
+       */
+      outputs?: {
+        [key: string]: string
+      } | null
+      /** @description Optional UI position hint */
+      position?: components['schemas']['NodePosition'] | null
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'tfe_add_variable'
+      parameters: components['schemas']['TFEAddVariableParameters']
+      settings?: components['schemas']['NodeSettingsNoRetry'] | null
+    } & {
+      [key: string]: unknown
+    }
+    /**
+     * TFEAddVariableParameters
+     * @description Parameters for Add Variable.
+     *
+     *     When ``sensitive=true``, the value must come from a Secret String credential
+     *     via ``value_credential_id`` — plaintext ``value`` is rejected so secrets are
+     *     never stored in the workflow definition.
+     */
+    TFEAddVariableParameters: {
+      /**
+       * Integration Id
+       * @description UUID of the Terraform Enterprise integration
+       */
+      integration_id: string
+      /**
+       * Credential Id
+       * @description UUID of the HTTP Bearer Token credential
+       */
+      credential_id: string
+      /**
+       * Organization
+       * @description Optional organization override; defaults to the integration organization
+       */
+      organization?: string | null
+      /** Workspace Id */
+      workspace_id: string
+      /** Key */
+      key: string
+      /** Value */
+      value?: string | null
+      /**
+       * Value Credential Id
+       * @description UUID of a Secret String credential providing the variable value
+       */
+      value_credential_id?: string | null
+      /**
+       * Category
+       * @default terraform
+       * @enum {string}
+       */
+      category?: 'terraform' | 'env'
+      /**
+       * Sensitive
+       * @default false
+       */
+      sensitive?: boolean
+      /**
+       * Hcl
+       * @default false
+       */
+      hcl?: boolean
+    }
+    /**
+     * TFEApplyRunNode
+     * @description TFE Apply Run executor node.
+     */
+    TFEApplyRunNode: {
+      /**
+       * Id
+       * @description Unique identifier for the node within the workflow
+       */
+      id: string
+      /**
+       * Name
+       * @description Human-readable name for the node
+       */
+      name?: string | null
+      /**
+       * Description
+       * @description Human-readable description of the node purpose
+       */
+      description?: string | null
+      /**
+       * Outputs
+       * @description Output extraction mapping
+       */
+      outputs?: {
+        [key: string]: string
+      } | null
+      /** @description Optional UI position hint */
+      position?: components['schemas']['NodePosition'] | null
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'tfe_apply_run'
+      parameters: components['schemas']['TFERunActionParameters']
+      settings?: components['schemas']['NodeSettingsNoRetry'] | null
+    } & {
+      [key: string]: unknown
+    }
+    /**
+     * TFEAssignTeamPermissionsNode
+     * @description TFE Assign Team Permissions executor node.
+     */
+    TFEAssignTeamPermissionsNode: {
+      /**
+       * Id
+       * @description Unique identifier for the node within the workflow
+       */
+      id: string
+      /**
+       * Name
+       * @description Human-readable name for the node
+       */
+      name?: string | null
+      /**
+       * Description
+       * @description Human-readable description of the node purpose
+       */
+      description?: string | null
+      /**
+       * Outputs
+       * @description Output extraction mapping
+       */
+      outputs?: {
+        [key: string]: string
+      } | null
+      /** @description Optional UI position hint */
+      position?: components['schemas']['NodePosition'] | null
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'tfe_assign_team_permissions'
+      parameters: components['schemas']['TFEAssignTeamPermissionsParameters']
+      settings?: components['schemas']['NodeSettingsNoRetry'] | null
+    } & {
+      [key: string]: unknown
+    }
+    /**
+     * TFEAssignTeamPermissionsParameters
+     * @description Parameters for Assign Team Permissions.
+     */
+    TFEAssignTeamPermissionsParameters: {
+      /**
+       * Integration Id
+       * @description UUID of the Terraform Enterprise integration
+       */
+      integration_id: string
+      /**
+       * Credential Id
+       * @description UUID of the HTTP Bearer Token credential
+       */
+      credential_id: string
+      /**
+       * Organization
+       * @description Optional organization override; defaults to the integration organization
+       */
+      organization?: string | null
+      /** Project Id */
+      project_id: string
+      /** Team Id */
+      team_id: string
+      /**
+       * Access
+       * @default read
+       * @enum {string}
+       */
+      access?: 'read' | 'write' | 'maintain' | 'admin' | 'custom'
+    }
+    /**
+     * TFECancelRunNode
+     * @description TFE Cancel Run executor node.
+     */
+    TFECancelRunNode: {
+      /**
+       * Id
+       * @description Unique identifier for the node within the workflow
+       */
+      id: string
+      /**
+       * Name
+       * @description Human-readable name for the node
+       */
+      name?: string | null
+      /**
+       * Description
+       * @description Human-readable description of the node purpose
+       */
+      description?: string | null
+      /**
+       * Outputs
+       * @description Output extraction mapping
+       */
+      outputs?: {
+        [key: string]: string
+      } | null
+      /** @description Optional UI position hint */
+      position?: components['schemas']['NodePosition'] | null
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'tfe_cancel_run'
+      parameters: components['schemas']['TFERunActionParameters']
+      settings?: components['schemas']['NodeSettingsNoRetry'] | null
+    } & {
+      [key: string]: unknown
+    }
+    /**
+     * TFECreateProjectNode
+     * @description TFE Create Project executor node.
+     */
+    TFECreateProjectNode: {
+      /**
+       * Id
+       * @description Unique identifier for the node within the workflow
+       */
+      id: string
+      /**
+       * Name
+       * @description Human-readable name for the node
+       */
+      name?: string | null
+      /**
+       * Description
+       * @description Human-readable description of the node purpose
+       */
+      description?: string | null
+      /**
+       * Outputs
+       * @description Output extraction mapping
+       */
+      outputs?: {
+        [key: string]: string
+      } | null
+      /** @description Optional UI position hint */
+      position?: components['schemas']['NodePosition'] | null
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'tfe_create_project'
+      parameters: components['schemas']['TFECreateProjectParameters']
+      settings?: components['schemas']['NodeSettingsNoRetry'] | null
+    } & {
+      [key: string]: unknown
+    }
+    /**
+     * TFECreateProjectParameters
+     * @description Parameters for Create Project.
+     */
+    TFECreateProjectParameters: {
+      /**
+       * Integration Id
+       * @description UUID of the Terraform Enterprise integration
+       */
+      integration_id: string
+      /**
+       * Credential Id
+       * @description UUID of the HTTP Bearer Token credential
+       */
+      credential_id: string
+      /**
+       * Organization
+       * @description Optional organization override; defaults to the integration organization
+       */
+      organization?: string | null
+      /** Name */
+      name: string
+      /** Description */
+      description?: string | null
+    }
+    /**
+     * TFECreateWorkspaceNode
+     * @description TFE Create Workspace executor node.
+     */
+    TFECreateWorkspaceNode: {
+      /**
+       * Id
+       * @description Unique identifier for the node within the workflow
+       */
+      id: string
+      /**
+       * Name
+       * @description Human-readable name for the node
+       */
+      name?: string | null
+      /**
+       * Description
+       * @description Human-readable description of the node purpose
+       */
+      description?: string | null
+      /**
+       * Outputs
+       * @description Output extraction mapping
+       */
+      outputs?: {
+        [key: string]: string
+      } | null
+      /** @description Optional UI position hint */
+      position?: components['schemas']['NodePosition'] | null
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'tfe_create_workspace'
+      parameters: components['schemas']['TFECreateWorkspaceParameters']
+      settings?: components['schemas']['NodeSettingsNoRetry'] | null
+    } & {
+      [key: string]: unknown
+    }
+    /**
+     * TFECreateWorkspaceParameters
+     * @description Parameters for Create Workspace.
+     */
+    TFECreateWorkspaceParameters: {
+      /**
+       * Preset
+       * @description Workspace preset: remote_no_vcs, agent, remote_oauth_vcs, or remote_github
+       */
+      preset?: ('remote_no_vcs' | 'agent' | 'remote_oauth_vcs' | 'remote_github') | null
+      /**
+       * Agent Pool Id
+       * @description Agent pool ID for agent execution
+       */
+      agent_pool_id?: string | null
+      /**
+       * Repository
+       * @description VCS repository identifier (org/name)
+       */
+      repository?: string | null
+      /**
+       * Branch
+       * @description VCS branch
+       */
+      branch?: string | null
+      /**
+       * Oauth Token Id
+       * @description OAuth token ID for remote OAuth VCS
+       */
+      oauth_token_id?: string | null
+      /**
+       * Github App Installation Id
+       * @description GitHub App installation ID for remote GitHub VCS
+       */
+      github_app_installation_id?: string | null
+      /**
+       * Integration Id
+       * @description UUID of the Terraform Enterprise integration
+       */
+      integration_id: string
+      /**
+       * Credential Id
+       * @description UUID of the HTTP Bearer Token credential
+       */
+      credential_id: string
+      /**
+       * Organization
+       * @description Optional organization override; defaults to the integration organization
+       */
+      organization?: string | null
+      /**
+       * Name
+       * @description Workspace name
+       */
+      name: string
+      /**
+       * Auto Apply
+       * @description Enable auto-apply
+       */
+      auto_apply?: boolean | null
+      /**
+       * Execution Mode
+       * @description Execution mode pass-through when no preset is set (local is HCP-only)
+       */
+      execution_mode?: ('remote' | 'local' | 'agent') | null
+      /**
+       * Terraform Version
+       * @description Terraform version
+       */
+      terraform_version?: string | null
+      /**
+       * Description
+       * @description Workspace description
+       */
+      description?: string | null
+      /**
+       * Working Directory
+       * @description Working directory
+       */
+      working_directory?: string | null
+      /**
+       * Project Id
+       * @description Project ID to place the workspace in
+       */
+      project_id?: string | null
+    }
+    /**
+     * TFEDeleteProjectNode
+     * @description TFE Delete Project executor node.
+     */
+    TFEDeleteProjectNode: {
+      /**
+       * Id
+       * @description Unique identifier for the node within the workflow
+       */
+      id: string
+      /**
+       * Name
+       * @description Human-readable name for the node
+       */
+      name?: string | null
+      /**
+       * Description
+       * @description Human-readable description of the node purpose
+       */
+      description?: string | null
+      /**
+       * Outputs
+       * @description Output extraction mapping
+       */
+      outputs?: {
+        [key: string]: string
+      } | null
+      /** @description Optional UI position hint */
+      position?: components['schemas']['NodePosition'] | null
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'tfe_delete_project'
+      parameters: components['schemas']['TFEDeleteProjectParameters']
+      settings?: components['schemas']['NodeSettingsNoRetry'] | null
+    } & {
+      [key: string]: unknown
+    }
+    /**
+     * TFEDeleteProjectParameters
+     * @description Parameters for Delete Project.
+     */
+    TFEDeleteProjectParameters: {
+      /**
+       * Integration Id
+       * @description UUID of the Terraform Enterprise integration
+       */
+      integration_id: string
+      /**
+       * Credential Id
+       * @description UUID of the HTTP Bearer Token credential
+       */
+      credential_id: string
+      /**
+       * Organization
+       * @description Optional organization override; defaults to the integration organization
+       */
+      organization?: string | null
+      /** Project Id */
+      project_id: string
+    }
+    /**
+     * TFEDeleteVariableNode
+     * @description TFE Delete Variable executor node.
+     */
+    TFEDeleteVariableNode: {
+      /**
+       * Id
+       * @description Unique identifier for the node within the workflow
+       */
+      id: string
+      /**
+       * Name
+       * @description Human-readable name for the node
+       */
+      name?: string | null
+      /**
+       * Description
+       * @description Human-readable description of the node purpose
+       */
+      description?: string | null
+      /**
+       * Outputs
+       * @description Output extraction mapping
+       */
+      outputs?: {
+        [key: string]: string
+      } | null
+      /** @description Optional UI position hint */
+      position?: components['schemas']['NodePosition'] | null
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'tfe_delete_variable'
+      parameters: components['schemas']['TFEDeleteVariableParameters']
+      settings?: components['schemas']['NodeSettingsNoRetry'] | null
+    } & {
+      [key: string]: unknown
+    }
+    /**
+     * TFEDeleteVariableParameters
+     * @description Parameters for Delete Variable.
+     */
+    TFEDeleteVariableParameters: {
+      /**
+       * Integration Id
+       * @description UUID of the Terraform Enterprise integration
+       */
+      integration_id: string
+      /**
+       * Credential Id
+       * @description UUID of the HTTP Bearer Token credential
+       */
+      credential_id: string
+      /**
+       * Organization
+       * @description Optional organization override; defaults to the integration organization
+       */
+      organization?: string | null
+      /** Workspace Id */
+      workspace_id: string
+      /** Variable Id */
+      variable_id: string
+    }
+    /**
+     * TFEDeleteWorkspaceNode
+     * @description TFE Delete Workspace executor node.
+     */
+    TFEDeleteWorkspaceNode: {
+      /**
+       * Id
+       * @description Unique identifier for the node within the workflow
+       */
+      id: string
+      /**
+       * Name
+       * @description Human-readable name for the node
+       */
+      name?: string | null
+      /**
+       * Description
+       * @description Human-readable description of the node purpose
+       */
+      description?: string | null
+      /**
+       * Outputs
+       * @description Output extraction mapping
+       */
+      outputs?: {
+        [key: string]: string
+      } | null
+      /** @description Optional UI position hint */
+      position?: components['schemas']['NodePosition'] | null
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'tfe_delete_workspace'
+      parameters: components['schemas']['TFEDeleteWorkspaceParameters']
+      settings?: components['schemas']['NodeSettingsNoRetry'] | null
+    } & {
+      [key: string]: unknown
+    }
+    /**
+     * TFEDeleteWorkspaceParameters
+     * @description Parameters for Delete Workspace.
+     */
+    TFEDeleteWorkspaceParameters: {
+      /**
+       * Integration Id
+       * @description UUID of the Terraform Enterprise integration
+       */
+      integration_id: string
+      /**
+       * Credential Id
+       * @description UUID of the HTTP Bearer Token credential
+       */
+      credential_id: string
+      /**
+       * Organization
+       * @description Optional organization override; defaults to the integration organization
+       */
+      organization?: string | null
+      /**
+       * Workspace Id
+       * @description Workspace ID (ws-...)
+       */
+      workspace_id: string
+      /**
+       * Force
+       * @description Force delete even when workspace has state
+       * @default false
+       */
+      force?: boolean
+    }
+    /**
+     * TFEDiscardRunNode
+     * @description TFE Discard Run executor node.
+     */
+    TFEDiscardRunNode: {
+      /**
+       * Id
+       * @description Unique identifier for the node within the workflow
+       */
+      id: string
+      /**
+       * Name
+       * @description Human-readable name for the node
+       */
+      name?: string | null
+      /**
+       * Description
+       * @description Human-readable description of the node purpose
+       */
+      description?: string | null
+      /**
+       * Outputs
+       * @description Output extraction mapping
+       */
+      outputs?: {
+        [key: string]: string
+      } | null
+      /** @description Optional UI position hint */
+      position?: components['schemas']['NodePosition'] | null
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'tfe_discard_run'
+      parameters: components['schemas']['TFERunActionParameters']
+      settings?: components['schemas']['NodeSettingsNoRetry'] | null
+    } & {
+      [key: string]: unknown
+    }
+    /**
+     * TFEFetchStateOutputsNode
+     * @description TFE Fetch State Outputs executor node.
+     */
+    TFEFetchStateOutputsNode: {
+      /**
+       * Id
+       * @description Unique identifier for the node within the workflow
+       */
+      id: string
+      /**
+       * Name
+       * @description Human-readable name for the node
+       */
+      name?: string | null
+      /**
+       * Description
+       * @description Human-readable description of the node purpose
+       */
+      description?: string | null
+      /**
+       * Outputs
+       * @description Output extraction mapping
+       */
+      outputs?: {
+        [key: string]: string
+      } | null
+      /** @description Optional UI position hint */
+      position?: components['schemas']['NodePosition'] | null
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'tfe_fetch_state_outputs'
+      parameters: components['schemas']['TFEFetchStateOutputsParameters']
+      settings?: components['schemas']['NodeSettingsFull'] | null
+    } & {
+      [key: string]: unknown
+    }
+    /**
+     * TFEFetchStateOutputsParameters
+     * @description Parameters for Fetch State and Outputs.
+     */
+    TFEFetchStateOutputsParameters: {
+      /**
+       * Integration Id
+       * @description UUID of the Terraform Enterprise integration
+       */
+      integration_id: string
+      /**
+       * Credential Id
+       * @description UUID of the HTTP Bearer Token credential
+       */
+      credential_id: string
+      /**
+       * Organization
+       * @description Optional organization override; defaults to the integration organization
+       */
+      organization?: string | null
+      /**
+       * Workspace Id
+       * @description Workspace ID (ws-...)
+       */
+      workspace_id: string
+    }
+    /**
+     * TFEForceCancelRunNode
+     * @description TFE Force Cancel Run executor node.
+     */
+    TFEForceCancelRunNode: {
+      /**
+       * Id
+       * @description Unique identifier for the node within the workflow
+       */
+      id: string
+      /**
+       * Name
+       * @description Human-readable name for the node
+       */
+      name?: string | null
+      /**
+       * Description
+       * @description Human-readable description of the node purpose
+       */
+      description?: string | null
+      /**
+       * Outputs
+       * @description Output extraction mapping
+       */
+      outputs?: {
+        [key: string]: string
+      } | null
+      /** @description Optional UI position hint */
+      position?: components['schemas']['NodePosition'] | null
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'tfe_force_cancel_run'
+      parameters: components['schemas']['TFERunActionParameters']
+      settings?: components['schemas']['NodeSettingsNoRetry'] | null
+    } & {
+      [key: string]: unknown
+    }
+    /**
+     * TFEGetGitHubInstallationNode
+     * @description TFE Get Git Hub Installation executor node.
+     */
+    TFEGetGitHubInstallationNode: {
+      /**
+       * Id
+       * @description Unique identifier for the node within the workflow
+       */
+      id: string
+      /**
+       * Name
+       * @description Human-readable name for the node
+       */
+      name?: string | null
+      /**
+       * Description
+       * @description Human-readable description of the node purpose
+       */
+      description?: string | null
+      /**
+       * Outputs
+       * @description Output extraction mapping
+       */
+      outputs?: {
+        [key: string]: string
+      } | null
+      /** @description Optional UI position hint */
+      position?: components['schemas']['NodePosition'] | null
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'tfe_get_github_installation'
+      parameters: components['schemas']['TFEGetGitHubInstallationParameters']
+      settings?: components['schemas']['NodeSettingsFull'] | null
+    } & {
+      [key: string]: unknown
+    }
+    /**
+     * TFEGetGitHubInstallationParameters
+     * @description Parameters for Get Installation Details.
+     */
+    TFEGetGitHubInstallationParameters: {
+      /**
+       * Integration Id
+       * @description UUID of the Terraform Enterprise integration
+       */
+      integration_id: string
+      /**
+       * Credential Id
+       * @description UUID of the HTTP Bearer Token credential
+       */
+      credential_id: string
+      /**
+       * Organization
+       * @description Optional organization override; defaults to the integration organization
+       */
+      organization?: string | null
+      /** Installation Id */
+      installation_id: string
+    }
+    /**
+     * TFEGetProjectNode
+     * @description TFE Get Project executor node.
+     */
+    TFEGetProjectNode: {
+      /**
+       * Id
+       * @description Unique identifier for the node within the workflow
+       */
+      id: string
+      /**
+       * Name
+       * @description Human-readable name for the node
+       */
+      name?: string | null
+      /**
+       * Description
+       * @description Human-readable description of the node purpose
+       */
+      description?: string | null
+      /**
+       * Outputs
+       * @description Output extraction mapping
+       */
+      outputs?: {
+        [key: string]: string
+      } | null
+      /** @description Optional UI position hint */
+      position?: components['schemas']['NodePosition'] | null
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'tfe_get_project'
+      parameters: components['schemas']['TFEGetProjectParameters']
+      settings?: components['schemas']['NodeSettingsFull'] | null
+    } & {
+      [key: string]: unknown
+    }
+    /**
+     * TFEGetProjectParameters
+     * @description Parameters for Get Project Details.
+     */
+    TFEGetProjectParameters: {
+      /**
+       * Integration Id
+       * @description UUID of the Terraform Enterprise integration
+       */
+      integration_id: string
+      /**
+       * Credential Id
+       * @description UUID of the HTTP Bearer Token credential
+       */
+      credential_id: string
+      /**
+       * Organization
+       * @description Optional organization override; defaults to the integration organization
+       */
+      organization?: string | null
+      /** Project Id */
+      project_id: string
+    }
+    /**
+     * TFEGetRunStatusNode
+     * @description TFE Get Run Status executor node.
+     */
+    TFEGetRunStatusNode: {
+      /**
+       * Id
+       * @description Unique identifier for the node within the workflow
+       */
+      id: string
+      /**
+       * Name
+       * @description Human-readable name for the node
+       */
+      name?: string | null
+      /**
+       * Description
+       * @description Human-readable description of the node purpose
+       */
+      description?: string | null
+      /**
+       * Outputs
+       * @description Output extraction mapping
+       */
+      outputs?: {
+        [key: string]: string
+      } | null
+      /** @description Optional UI position hint */
+      position?: components['schemas']['NodePosition'] | null
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'tfe_get_run_status'
+      parameters: components['schemas']['TFEGetRunStatusParameters']
+      settings?: components['schemas']['NodeSettingsFull'] | null
+    } & {
+      [key: string]: unknown
+    }
+    /**
+     * TFEGetRunStatusParameters
+     * @description Parameters for Get Run Status.
+     */
+    TFEGetRunStatusParameters: {
+      /**
+       * Integration Id
+       * @description UUID of the Terraform Enterprise integration
+       */
+      integration_id: string
+      /**
+       * Credential Id
+       * @description UUID of the HTTP Bearer Token credential
+       */
+      credential_id: string
+      /**
+       * Organization
+       * @description Optional organization override; defaults to the integration organization
+       */
+      organization?: string | null
+      /** Run Id */
+      run_id: string
+      /**
+       * Wait For Completion
+       * @default false
+       */
+      wait_for_completion?: boolean
+      /**
+       * Poll Interval Seconds
+       * @default 15
+       */
+      poll_interval_seconds?: number
+      /**
+       * Timeout Seconds
+       * @default 3600
+       */
+      timeout_seconds?: number
+    }
+    /**
+     * TFELinkVCSNode
+     * @description TFE Link V C S executor node.
+     */
+    TFELinkVCSNode: {
+      /**
+       * Id
+       * @description Unique identifier for the node within the workflow
+       */
+      id: string
+      /**
+       * Name
+       * @description Human-readable name for the node
+       */
+      name?: string | null
+      /**
+       * Description
+       * @description Human-readable description of the node purpose
+       */
+      description?: string | null
+      /**
+       * Outputs
+       * @description Output extraction mapping
+       */
+      outputs?: {
+        [key: string]: string
+      } | null
+      /** @description Optional UI position hint */
+      position?: components['schemas']['NodePosition'] | null
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'tfe_link_vcs'
+      parameters: components['schemas']['TFELinkVCSParameters']
+      settings?: components['schemas']['NodeSettingsNoRetry'] | null
+    } & {
+      [key: string]: unknown
+    }
+    /**
+     * TFELinkVCSParameters
+     * @description Parameters for Link VCS to Workspace.
+     */
+    TFELinkVCSParameters: {
+      /**
+       * Integration Id
+       * @description UUID of the Terraform Enterprise integration
+       */
+      integration_id: string
+      /**
+       * Credential Id
+       * @description UUID of the HTTP Bearer Token credential
+       */
+      credential_id: string
+      /**
+       * Organization
+       * @description Optional organization override; defaults to the integration organization
+       */
+      organization?: string | null
+      /** Workspace Id */
+      workspace_id: string
+      /** Installation Id */
+      installation_id: string
+      /** Repository */
+      repository: string
+      /** Branch */
+      branch: string
+    }
+    /**
+     * TFEListGitHubInstallationsNode
+     * @description TFE List Git Hub Installations executor node.
+     */
+    TFEListGitHubInstallationsNode: {
+      /**
+       * Id
+       * @description Unique identifier for the node within the workflow
+       */
+      id: string
+      /**
+       * Name
+       * @description Human-readable name for the node
+       */
+      name?: string | null
+      /**
+       * Description
+       * @description Human-readable description of the node purpose
+       */
+      description?: string | null
+      /**
+       * Outputs
+       * @description Output extraction mapping
+       */
+      outputs?: {
+        [key: string]: string
+      } | null
+      /** @description Optional UI position hint */
+      position?: components['schemas']['NodePosition'] | null
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'tfe_list_github_installations'
+      parameters: components['schemas']['TFEListGitHubInstallationsParameters']
+      settings?: components['schemas']['NodeSettingsFull'] | null
+    } & {
+      [key: string]: unknown
+    }
+    /**
+     * TFEListGitHubInstallationsParameters
+     * @description Parameters for List GitHub Installations.
+     */
+    TFEListGitHubInstallationsParameters: {
+      /**
+       * Integration Id
+       * @description UUID of the Terraform Enterprise integration
+       */
+      integration_id: string
+      /**
+       * Credential Id
+       * @description UUID of the HTTP Bearer Token credential
+       */
+      credential_id: string
+      /**
+       * Organization
+       * @description Optional organization override; defaults to the integration organization
+       */
+      organization?: string | null
+    }
+    /**
+     * TFEListProjectsNode
+     * @description TFE List Projects executor node.
+     */
+    TFEListProjectsNode: {
+      /**
+       * Id
+       * @description Unique identifier for the node within the workflow
+       */
+      id: string
+      /**
+       * Name
+       * @description Human-readable name for the node
+       */
+      name?: string | null
+      /**
+       * Description
+       * @description Human-readable description of the node purpose
+       */
+      description?: string | null
+      /**
+       * Outputs
+       * @description Output extraction mapping
+       */
+      outputs?: {
+        [key: string]: string
+      } | null
+      /** @description Optional UI position hint */
+      position?: components['schemas']['NodePosition'] | null
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'tfe_list_projects'
+      parameters: components['schemas']['TFEListProjectsParameters']
+      settings?: components['schemas']['NodeSettingsFull'] | null
+    } & {
+      [key: string]: unknown
+    }
+    /**
+     * TFEListProjectsParameters
+     * @description Parameters for List Projects.
+     */
+    TFEListProjectsParameters: {
+      /**
+       * Integration Id
+       * @description UUID of the Terraform Enterprise integration
+       */
+      integration_id: string
+      /**
+       * Credential Id
+       * @description UUID of the HTTP Bearer Token credential
+       */
+      credential_id: string
+      /**
+       * Organization
+       * @description Optional organization override; defaults to the integration organization
+       */
+      organization?: string | null
+    }
+    /**
+     * TFEListRunsNode
+     * @description TFE List Runs executor node.
+     */
+    TFEListRunsNode: {
+      /**
+       * Id
+       * @description Unique identifier for the node within the workflow
+       */
+      id: string
+      /**
+       * Name
+       * @description Human-readable name for the node
+       */
+      name?: string | null
+      /**
+       * Description
+       * @description Human-readable description of the node purpose
+       */
+      description?: string | null
+      /**
+       * Outputs
+       * @description Output extraction mapping
+       */
+      outputs?: {
+        [key: string]: string
+      } | null
+      /** @description Optional UI position hint */
+      position?: components['schemas']['NodePosition'] | null
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'tfe_list_runs'
+      parameters: components['schemas']['TFEListRunsParameters']
+      settings?: components['schemas']['NodeSettingsFull'] | null
+    } & {
+      [key: string]: unknown
+    }
+    /**
+     * TFEListRunsParameters
+     * @description Parameters for List Runs.
+     */
+    TFEListRunsParameters: {
+      /**
+       * Integration Id
+       * @description UUID of the Terraform Enterprise integration
+       */
+      integration_id: string
+      /**
+       * Credential Id
+       * @description UUID of the HTTP Bearer Token credential
+       */
+      credential_id: string
+      /**
+       * Organization
+       * @description Optional organization override; defaults to the integration organization
+       */
+      organization?: string | null
+      /** Workspace Id */
+      workspace_id: string
+      /** Status */
+      status?: string | null
+    }
+    /**
+     * TFEListVariablesNode
+     * @description TFE List Variables executor node.
+     */
+    TFEListVariablesNode: {
+      /**
+       * Id
+       * @description Unique identifier for the node within the workflow
+       */
+      id: string
+      /**
+       * Name
+       * @description Human-readable name for the node
+       */
+      name?: string | null
+      /**
+       * Description
+       * @description Human-readable description of the node purpose
+       */
+      description?: string | null
+      /**
+       * Outputs
+       * @description Output extraction mapping
+       */
+      outputs?: {
+        [key: string]: string
+      } | null
+      /** @description Optional UI position hint */
+      position?: components['schemas']['NodePosition'] | null
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'tfe_list_variables'
+      parameters: components['schemas']['TFEListVariablesParameters']
+      settings?: components['schemas']['NodeSettingsFull'] | null
+    } & {
+      [key: string]: unknown
+    }
+    /**
+     * TFEListVariablesParameters
+     * @description Parameters for List Variables.
+     */
+    TFEListVariablesParameters: {
+      /**
+       * Integration Id
+       * @description UUID of the Terraform Enterprise integration
+       */
+      integration_id: string
+      /**
+       * Credential Id
+       * @description UUID of the HTTP Bearer Token credential
+       */
+      credential_id: string
+      /**
+       * Organization
+       * @description Optional organization override; defaults to the integration organization
+       */
+      organization?: string | null
+      /** Workspace Id */
+      workspace_id: string
+      /** Key */
+      key?: string | null
+    }
+    /**
+     * TFEListWorkspacesNode
+     * @description TFE List Workspaces executor node.
+     */
+    TFEListWorkspacesNode: {
+      /**
+       * Id
+       * @description Unique identifier for the node within the workflow
+       */
+      id: string
+      /**
+       * Name
+       * @description Human-readable name for the node
+       */
+      name?: string | null
+      /**
+       * Description
+       * @description Human-readable description of the node purpose
+       */
+      description?: string | null
+      /**
+       * Outputs
+       * @description Output extraction mapping
+       */
+      outputs?: {
+        [key: string]: string
+      } | null
+      /** @description Optional UI position hint */
+      position?: components['schemas']['NodePosition'] | null
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'tfe_list_workspaces'
+      parameters: components['schemas']['TFEListWorkspacesParameters']
+      settings?: components['schemas']['NodeSettingsFull'] | null
+    } & {
+      [key: string]: unknown
+    }
+    /**
+     * TFEListWorkspacesParameters
+     * @description Parameters for List Workspaces.
+     */
+    TFEListWorkspacesParameters: {
+      /**
+       * Integration Id
+       * @description UUID of the Terraform Enterprise integration
+       */
+      integration_id: string
+      /**
+       * Credential Id
+       * @description UUID of the HTTP Bearer Token credential
+       */
+      credential_id: string
+      /**
+       * Organization
+       * @description Optional organization override; defaults to the integration organization
+       */
+      organization?: string | null
+      /**
+       * Search
+       * @description Optional name search filter
+       */
+      search?: string | null
+      /**
+       * Project Id
+       * @description Optional project filter
+       */
+      project_id?: string | null
+    }
+    /**
+     * TFEMoveWorkspaceToProjectNode
+     * @description TFE Move Workspace To Project executor node.
+     */
+    TFEMoveWorkspaceToProjectNode: {
+      /**
+       * Id
+       * @description Unique identifier for the node within the workflow
+       */
+      id: string
+      /**
+       * Name
+       * @description Human-readable name for the node
+       */
+      name?: string | null
+      /**
+       * Description
+       * @description Human-readable description of the node purpose
+       */
+      description?: string | null
+      /**
+       * Outputs
+       * @description Output extraction mapping
+       */
+      outputs?: {
+        [key: string]: string
+      } | null
+      /** @description Optional UI position hint */
+      position?: components['schemas']['NodePosition'] | null
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'tfe_move_workspace_to_project'
+      parameters: components['schemas']['TFEMoveWorkspaceToProjectParameters']
+      settings?: components['schemas']['NodeSettingsNoRetry'] | null
+    } & {
+      [key: string]: unknown
+    }
+    /**
+     * TFEMoveWorkspaceToProjectParameters
+     * @description Parameters for Move Workspace to Project.
+     */
+    TFEMoveWorkspaceToProjectParameters: {
+      /**
+       * Integration Id
+       * @description UUID of the Terraform Enterprise integration
+       */
+      integration_id: string
+      /**
+       * Credential Id
+       * @description UUID of the HTTP Bearer Token credential
+       */
+      credential_id: string
+      /**
+       * Organization
+       * @description Optional organization override; defaults to the integration organization
+       */
+      organization?: string | null
+      /** Workspace Id */
+      workspace_id: string
+      /** Project Id */
+      project_id?: string | null
+    }
+    /**
+     * TFERunActionParameters
+     * @description Parameters for Apply / Discard / Cancel / Force Cancel.
+     */
+    TFERunActionParameters: {
+      /**
+       * Integration Id
+       * @description UUID of the Terraform Enterprise integration
+       */
+      integration_id: string
+      /**
+       * Credential Id
+       * @description UUID of the HTTP Bearer Token credential
+       */
+      credential_id: string
+      /**
+       * Organization
+       * @description Optional organization override; defaults to the integration organization
+       */
+      organization?: string | null
+      /** Run Id */
+      run_id: string
+      /** Comment */
+      comment?: string | null
+    }
+    /**
+     * TFETriggerRunNode
+     * @description TFE Trigger Run executor node.
+     */
+    TFETriggerRunNode: {
+      /**
+       * Id
+       * @description Unique identifier for the node within the workflow
+       */
+      id: string
+      /**
+       * Name
+       * @description Human-readable name for the node
+       */
+      name?: string | null
+      /**
+       * Description
+       * @description Human-readable description of the node purpose
+       */
+      description?: string | null
+      /**
+       * Outputs
+       * @description Output extraction mapping
+       */
+      outputs?: {
+        [key: string]: string
+      } | null
+      /** @description Optional UI position hint */
+      position?: components['schemas']['NodePosition'] | null
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'tfe_trigger_run'
+      parameters: components['schemas']['TFETriggerRunParameters']
+      settings?: components['schemas']['NodeSettingsNoRetry'] | null
+    } & {
+      [key: string]: unknown
+    }
+    /**
+     * TFETriggerRunParameters
+     * @description Parameters for Trigger Run.
+     */
+    TFETriggerRunParameters: {
+      /**
+       * Integration Id
+       * @description UUID of the Terraform Enterprise integration
+       */
+      integration_id: string
+      /**
+       * Credential Id
+       * @description UUID of the HTTP Bearer Token credential
+       */
+      credential_id: string
+      /**
+       * Organization
+       * @description Optional organization override; defaults to the integration organization
+       */
+      organization?: string | null
+      /** Workspace Id */
+      workspace_id: string
+      /**
+       * Mode
+       * @description Run mode (plan-and-apply, plan-only, destroy, ...)
+       */
+      mode: string
+      /** Configuration Version Id */
+      configuration_version_id?: string | null
+      /** Target Resources */
+      target_resources?: string[] | null
+      /** Replace Resources */
+      replace_resources?: string[] | null
+      /** Message */
+      message?: string | null
+    }
+    /**
+     * TFEUpdateProjectNode
+     * @description TFE Update Project executor node.
+     */
+    TFEUpdateProjectNode: {
+      /**
+       * Id
+       * @description Unique identifier for the node within the workflow
+       */
+      id: string
+      /**
+       * Name
+       * @description Human-readable name for the node
+       */
+      name?: string | null
+      /**
+       * Description
+       * @description Human-readable description of the node purpose
+       */
+      description?: string | null
+      /**
+       * Outputs
+       * @description Output extraction mapping
+       */
+      outputs?: {
+        [key: string]: string
+      } | null
+      /** @description Optional UI position hint */
+      position?: components['schemas']['NodePosition'] | null
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'tfe_update_project'
+      parameters: components['schemas']['TFEUpdateProjectParameters']
+      settings?: components['schemas']['NodeSettingsNoRetry'] | null
+    } & {
+      [key: string]: unknown
+    }
+    /**
+     * TFEUpdateProjectParameters
+     * @description Parameters for Update Project Settings.
+     */
+    TFEUpdateProjectParameters: {
+      /**
+       * Integration Id
+       * @description UUID of the Terraform Enterprise integration
+       */
+      integration_id: string
+      /**
+       * Credential Id
+       * @description UUID of the HTTP Bearer Token credential
+       */
+      credential_id: string
+      /**
+       * Organization
+       * @description Optional organization override; defaults to the integration organization
+       */
+      organization?: string | null
+      /** Project Id */
+      project_id: string
+      /** Name */
+      name?: string | null
+      /** Description */
+      description?: string | null
+    }
+    /**
+     * TFEUpdateVariableNode
+     * @description TFE Update Variable executor node.
+     */
+    TFEUpdateVariableNode: {
+      /**
+       * Id
+       * @description Unique identifier for the node within the workflow
+       */
+      id: string
+      /**
+       * Name
+       * @description Human-readable name for the node
+       */
+      name?: string | null
+      /**
+       * Description
+       * @description Human-readable description of the node purpose
+       */
+      description?: string | null
+      /**
+       * Outputs
+       * @description Output extraction mapping
+       */
+      outputs?: {
+        [key: string]: string
+      } | null
+      /** @description Optional UI position hint */
+      position?: components['schemas']['NodePosition'] | null
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'tfe_update_variable'
+      parameters: components['schemas']['TFEUpdateVariableParameters']
+      settings?: components['schemas']['NodeSettingsNoRetry'] | null
+    } & {
+      [key: string]: unknown
+    }
+    /**
+     * TFEUpdateVariableParameters
+     * @description Parameters for Update Variable.
+     *
+     *     When ``sensitive=true``, the new value must come from ``value_credential_id``.
+     */
+    TFEUpdateVariableParameters: {
+      /**
+       * Integration Id
+       * @description UUID of the Terraform Enterprise integration
+       */
+      integration_id: string
+      /**
+       * Credential Id
+       * @description UUID of the HTTP Bearer Token credential
+       */
+      credential_id: string
+      /**
+       * Organization
+       * @description Optional organization override; defaults to the integration organization
+       */
+      organization?: string | null
+      /** Workspace Id */
+      workspace_id: string
+      /** Variable Id */
+      variable_id: string
+      /** Value */
+      value?: string | null
+      /**
+       * Value Credential Id
+       * @description UUID of a Secret String credential providing the variable value
+       */
+      value_credential_id?: string | null
+      /**
+       * Sensitive
+       * @default false
+       */
+      sensitive?: boolean
+      /** Hcl */
+      hcl?: boolean | null
+      /** Category */
+      category?: ('terraform' | 'env') | null
+    }
+    /**
+     * TFEUpdateWorkspaceNode
+     * @description TFE Update Workspace executor node.
+     */
+    TFEUpdateWorkspaceNode: {
+      /**
+       * Id
+       * @description Unique identifier for the node within the workflow
+       */
+      id: string
+      /**
+       * Name
+       * @description Human-readable name for the node
+       */
+      name?: string | null
+      /**
+       * Description
+       * @description Human-readable description of the node purpose
+       */
+      description?: string | null
+      /**
+       * Outputs
+       * @description Output extraction mapping
+       */
+      outputs?: {
+        [key: string]: string
+      } | null
+      /** @description Optional UI position hint */
+      position?: components['schemas']['NodePosition'] | null
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'tfe_update_workspace'
+      parameters: components['schemas']['TFEUpdateWorkspaceParameters']
+      settings?: components['schemas']['NodeSettingsNoRetry'] | null
+    } & {
+      [key: string]: unknown
+    }
+    /**
+     * TFEUpdateWorkspaceParameters
+     * @description Parameters for Update Workspace Settings.
+     */
+    TFEUpdateWorkspaceParameters: {
+      /**
+       * Preset
+       * @description Workspace preset: remote_no_vcs, agent, remote_oauth_vcs, or remote_github
+       */
+      preset?: ('remote_no_vcs' | 'agent' | 'remote_oauth_vcs' | 'remote_github') | null
+      /**
+       * Agent Pool Id
+       * @description Agent pool ID for agent execution
+       */
+      agent_pool_id?: string | null
+      /**
+       * Repository
+       * @description VCS repository identifier (org/name)
+       */
+      repository?: string | null
+      /**
+       * Branch
+       * @description VCS branch
+       */
+      branch?: string | null
+      /**
+       * Oauth Token Id
+       * @description OAuth token ID for remote OAuth VCS
+       */
+      oauth_token_id?: string | null
+      /**
+       * Github App Installation Id
+       * @description GitHub App installation ID for remote GitHub VCS
+       */
+      github_app_installation_id?: string | null
+      /**
+       * Integration Id
+       * @description UUID of the Terraform Enterprise integration
+       */
+      integration_id: string
+      /**
+       * Credential Id
+       * @description UUID of the HTTP Bearer Token credential
+       */
+      credential_id: string
+      /**
+       * Organization
+       * @description Optional organization override; defaults to the integration organization
+       */
+      organization?: string | null
+      /**
+       * Workspace Id
+       * @description Workspace ID (ws-...)
+       */
+      workspace_id: string
+      /** Auto Apply */
+      auto_apply?: boolean | null
+      /** Description */
+      description?: string | null
+      /** Working Directory */
+      working_directory?: string | null
+      /** Terraform Version */
+      terraform_version?: string | null
+      /** Execution Mode */
+      execution_mode?: ('remote' | 'local' | 'agent') | null
+    }
+    /**
+     * TFEUploadConfigurationVersionNode
+     * @description TFE Upload Configuration Version executor node.
+     */
+    TFEUploadConfigurationVersionNode: {
+      /**
+       * Id
+       * @description Unique identifier for the node within the workflow
+       */
+      id: string
+      /**
+       * Name
+       * @description Human-readable name for the node
+       */
+      name?: string | null
+      /**
+       * Description
+       * @description Human-readable description of the node purpose
+       */
+      description?: string | null
+      /**
+       * Outputs
+       * @description Output extraction mapping
+       */
+      outputs?: {
+        [key: string]: string
+      } | null
+      /** @description Optional UI position hint */
+      position?: components['schemas']['NodePosition'] | null
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'tfe_upload_configuration_version'
+      parameters: components['schemas']['TFEUploadConfigurationVersionParameters']
+      settings?: components['schemas']['NodeSettingsNoRetry'] | null
+    } & {
+      [key: string]: unknown
+    }
+    /**
+     * TFEUploadConfigurationVersionParameters
+     * @description Parameters for Upload Configuration Version.
+     */
+    TFEUploadConfigurationVersionParameters: {
+      /**
+       * Integration Id
+       * @description UUID of the Terraform Enterprise integration
+       */
+      integration_id: string
+      /**
+       * Credential Id
+       * @description UUID of the HTTP Bearer Token credential
+       */
+      credential_id: string
+      /**
+       * Organization
+       * @description Optional organization override; defaults to the integration organization
+       */
+      organization?: string | null
+      /** Workspace Id */
+      workspace_id: string
+      /**
+       * Artifact
+       * @description Base64-encoded .tar.gz of the Terraform directory, or artifact reference
+       */
+      artifact: string
+      /**
+       * Auto Queue Runs
+       * @default false
+       */
+      auto_queue_runs?: boolean
     }
     /**
      * UserReferenceType
