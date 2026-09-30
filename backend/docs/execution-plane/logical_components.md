@@ -41,7 +41,7 @@ graph LR
     PR -->|"read pools + health"| REG
 
     RM -->|"probe health"| WP
-    RM -->|"write health / capacity"| REG
+    RM -->|"write health"| REG
 
     PA -->|"scale replicas"| WP
 
@@ -83,12 +83,12 @@ graph LR
   - Out: ranked `ExecutionTarget`s (`ReconcileResult`). Pure query — no writes, no side effects.
 
 - **ExecutionTarget Store**
-  - In: pool registrations from Registration Provider; health and capacity updates from Resource Monitor
+  - In: pool registrations from Registration Provider; health updates from Resource Monitor
   - Out: pool snapshots to `ExecutionTarget` Reconciler. Currently the `ExecutionTarget` table in Postgres.
 
-- **Resource Monitor**
+- **[Resource Monitor](resource-monitor.md)**
   - In: health probes from Worker Pool
-  - Out: health and capacity written to `ExecutionTargetStore`. No state of its own.
+  - Out: health written to `ExecutionTargetStore` (Kubernetes MVP; capacity is deferred). No state of its own.
 
 - **Pool Autoscaler**
   - In: demand signal from Work Scheduler or Worker Manager
