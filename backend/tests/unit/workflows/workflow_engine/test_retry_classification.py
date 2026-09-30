@@ -6,15 +6,26 @@ replacing resolved inputs, and completed upstream nodes being skipped with their
 outputs restored.
 """
 
+from collections.abc import Generator
 from typing import Any
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from syntara.workflows.utils.namespace_resolver import NamespaceResolver
-from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkflow
+from syntara.workflows.workflow_engine.dynamic_workflow import PRE_RESOLVED_MARKER, OrchestratorWorkflow
 from syntara.workflows.workflow_engine.graph import ActivityNode, WorkflowGraph
+from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName
 
 from .conftest import init_workflow_runtime
+
+
+@pytest.fixture
+def mock_wf() -> Generator[MagicMock, None, None]:
+    """Patch the Temporal workflow module so execute_activity is awaitable."""
+    with patch("syntara.workflows.workflow_engine.dynamic_workflow.workflow") as patched:
+        patched.logger = MagicMock()
+        yield patched
 
 
 def _make_workflow(retry_context: dict[str, Any] | None = None) -> OrchestratorWorkflow:
@@ -437,3 +448,146 @@ def test_non_loop_successors_of_a_loop_stay_restorable() -> None:
     restorable = downstream._retry_restorable_nodes(graph)
 
     assert restorable == {"step_2"}
+
+
+# ---------------------------------------------------------------------------
+# Restoring a node: fetch, inject, and the fall-through cases
+# ---------------------------------------------------------------------------
+
+
+def _injectable_workflow() -> OrchestratorWorkflow:
+    """A workflow wired for the restore path, with no retry set by default."""
+    return _make_workflow()
+
+
+@pytest.mark.asyncio
+async def test_restored_output_is_injected_into_the_namespace(mock_wf: MagicMock) -> None:
+    """The skipped node publishes its source output as a completion would.
+
+    Downstream expressions read the namespace, so the entry has to match what a
+    live completion writes - including the synthetic ``status`` key.
+    """
+    wf = _injectable_workflow()
+    wf.retry_context = _retry("step_2")
+    node = ActivityNode(node_id="step_1", node_type="script", parameters={})
+    mock_wf.execute_activity = AsyncMock(return_value={"step_1": {"result": "from-source"}})
+
+    result = await wf._restore_node_output(node)
+
+    assert result == {"output": {"result": "from-source"}, "control": None}
+    assert wf.resolver.get_namespace("step_1") == {"result": "from-source", "status": "completed"}
+    assert "step_1" in wf.skipped_nodes
+    assert "step_1" in wf._restored_nodes
+
+
+@pytest.mark.asyncio
+async def test_restored_node_is_marked_as_skipped_in_node_inputs(mock_wf: MagicMock) -> None:
+    """node_inputs records the node as pre-resolved so it is not re-dispatched."""
+    wf = _injectable_workflow()
+    wf.retry_context = _retry("step_2")
+    node = ActivityNode(node_id="step_1", node_type="script", parameters={})
+    mock_wf.execute_activity = AsyncMock(return_value={"step_1": {"result": "ok"}})
+
+    await wf._restore_node_output(node)
+
+    assert wf.node_inputs["step_1"] == {PRE_RESOLVED_MARKER: True}
+
+
+@pytest.mark.asyncio
+async def test_missing_output_falls_through_to_execution(mock_wf: MagicMock) -> None:
+    """A node with no stored output must run rather than be skipped.
+
+    There would be nothing to inject, so skipping it would leave downstream
+    expressions resolving against a namespace the retry never populated.
+    """
+    wf = _injectable_workflow()
+    wf.retry_context = _retry("step_2")
+    node = ActivityNode(node_id="step_1", node_type="script", parameters={})
+    mock_wf.execute_activity = AsyncMock(return_value={})
+
+    assert await wf._restore_node_output(node) is None
+    assert "step_1" not in wf.skipped_nodes
+    assert not wf.resolver.has_namespace("step_1")
+
+
+@pytest.mark.asyncio
+async def test_empty_activity_result_falls_through(mock_wf: MagicMock) -> None:
+    """A null activity result is treated as no output, not a crash."""
+    wf = _injectable_workflow()
+    wf.retry_context = _retry("step_2")
+    node = ActivityNode(node_id="step_1", node_type="script", parameters={})
+    mock_wf.execute_activity = AsyncMock(return_value=None)
+
+    assert await wf._restore_node_output(node) is None
+
+
+@pytest.mark.asyncio
+async def test_restore_dispatches_the_retry_outputs_activity(mock_wf: MagicMock) -> None:
+    """The fetch carries the source execution id, not the output inline."""
+    wf = _injectable_workflow()
+    wf.retry_context = _retry("step_2")
+    node = ActivityNode(node_id="step_1", node_type="script", parameters={})
+    mock_wf.execute_activity = AsyncMock(return_value={"step_1": {"result": "ok"}})
+
+    await wf._restore_node_output(node)
+
+    name, args = mock_wf.execute_activity.call_args[0][0], mock_wf.execute_activity.call_args.kwargs["args"]
+    assert name == ActivityName.RETRY_OUTPUTS
+    assert args == ["src-1", ["step_1"]]
+
+
+@pytest.mark.asyncio
+async def test_maybe_restore_delegates_and_returns_the_synthetic_completion(mock_wf: MagicMock) -> None:
+    """The full path: a restorable node resolves to a completion without dispatching."""
+    wf = _injectable_workflow()
+    wf.retry_context = _retry("step_2")
+    node = ActivityNode(node_id="step_1", node_type="script", parameters={})
+    mock_wf.execute_activity = AsyncMock(return_value={"step_1": {"result": "from-source"}})
+
+    result = await wf._maybe_restore_retry_output(node, _chain_graph())
+
+    assert result == {"output": {"result": "from-source"}, "control": None}
+    assert "step_1" in wf.skipped_nodes
+
+
+@pytest.mark.asyncio
+async def test_non_restorable_node_is_never_restored(mock_wf: MagicMock) -> None:
+    """A retry starting point is executed, not replaced by its old output."""
+    wf = _injectable_workflow()
+    wf.retry_context = _retry("step_2")
+    node = ActivityNode(node_id="step_2", node_type="script", parameters={})
+    mock_wf.execute_activity = AsyncMock(side_effect=AssertionError("must not be called"))
+
+    assert await wf._maybe_restore_retry_output(node, _chain_graph()) is None
+
+
+@pytest.mark.asyncio
+async def test_maybe_restore_returns_none_outside_a_retry(mock_wf: MagicMock) -> None:
+    """A normal run never consults the restore path."""
+    wf = _injectable_workflow()
+    node = ActivityNode(node_id="step_1", node_type="script", parameters={})
+    mock_wf.execute_activity = AsyncMock(side_effect=AssertionError("must not be called"))
+
+    assert await wf._maybe_restore_retry_output(node, _chain_graph()) is None
+
+
+def test_loop_body_walk_survives_a_repeated_node() -> None:
+    """A body reachable twice is visited once, so the walk cannot spin.
+
+    A nested or re-entrant body makes the same node reachable on more than one
+    path; the visited check is what keeps the traversal terminating.
+    """
+    from syntara.workflows.workflow_engine.graph import WorkflowGraph
+    from syntara.workflows.workflow_engine.graph_backend import InMemoryGraphBackend
+
+    backend = InMemoryGraphBackend()
+    backend.add_node("loop_1", {"id": "loop_1", "type": "loop", "parameters": {}})
+    backend.add_node("body_a", {"id": "body_a", "type": "script", "parameters": {}})
+    backend.add_node("body_b", {"id": "body_b", "type": "script", "parameters": {}})
+    # Two iterate paths converge on body_b.
+    backend.add_edge("loop_1", "body_a", {"from_port": "iterate"})
+    backend.add_edge("loop_1", "body_b", {"from_port": "iterate"})
+    backend.add_edge("body_a", "body_b", {"from_port": "iterate"})
+    graph = WorkflowGraph(backend)
+
+    assert OrchestratorWorkflow._loop_body_node_ids(graph) == {"body_a", "body_b"}
