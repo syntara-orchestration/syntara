@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { BrandProvider } from '../providers/brand'
 
@@ -9,6 +9,14 @@ import type { DockState } from './useDockState'
 
 const mockOnMobileToggle = vi.fn()
 const mockUseDockState = vi.fn<() => DockState>()
+
+vi.mock('../components/command-palette/CommandPaletteNavButton', () => ({
+  CommandPaletteNavButton: () => (
+    <button type="button" aria-label="Search (Ctrl+K)">
+      Search
+    </button>
+  ),
+}))
 
 vi.mock('./useDockState', () => ({
   useDockState: (): DockState => mockUseDockState(),
@@ -26,6 +34,15 @@ describe('AppMobileMasthead', () => {
       onToggleDock: vi.fn(),
       onMobileToggle: mockOnMobileToggle,
     })
+  })
+
+  it('renders a persistent Search action', () => {
+    render(
+      <BrandProvider>
+        <AppMobileMasthead />
+      </BrandProvider>
+    )
+    expect(screen.getByRole('button', { name: 'Search (Ctrl+K)' })).toBeInTheDocument()
   })
 
   it('renders the hamburger toggle button', () => {
@@ -55,6 +72,7 @@ describe('AppMobileMasthead', () => {
       </BrandProvider>
     )
     expect(screen.getByRole('img', { name: 'Syntara' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Search/ })).toBeInTheDocument()
   })
 
   it('calls onMobileToggle when hamburger is clicked', async () => {

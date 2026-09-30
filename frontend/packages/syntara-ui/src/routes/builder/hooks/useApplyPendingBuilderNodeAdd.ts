@@ -1,4 +1,4 @@
-import { type Dispatch, useEffect } from 'react'
+import { type Dispatch, useLayoutEffect } from 'react'
 
 import type { BuilderAction } from '../builderReducer'
 import { usePendingBuilderNodeAddStore } from '../pendingBuilderNodeAddStore'
@@ -10,30 +10,35 @@ type UseApplyPendingBuilderNodeAddOptions = {
 }
 
 /**
- * Opens the add-step editor when the command palette queued a builder step.
- * Ignores the request while permissions are loading; drops it on read-only
- * or historical version views so a later editable session is not surprised.
- *
- * The command palette lives outside BuilderContent, so this effect is the
- * event bridge — not derived render state.
+ * Registers the open builder as the command-palette step target and publishes
+ * whether that canvas can accept an add.
  */
 export function useApplyPendingBuilderNodeAdd(
   dispatch: Dispatch<BuilderAction>,
   { canEdit, isLoading, viewingVersion }: UseApplyPendingBuilderNodeAddOptions
 ): void {
-  const pending = usePendingBuilderNodeAddStore((state) => state.pending)
-  const take = usePendingBuilderNodeAddStore((state) => state.take)
+  const canAccept = !isLoading && canEdit && viewingVersion == null
 
-  // The pending store is an external event (palette selection), not a prop to sync.
-  /* eslint-disable reactYouMightNotNeedAnEffect/no-event-handler, reactYouMightNotNeedAnEffect/no-pass-data-to-parent -- cross-tree command-palette bridge */
-  useEffect(() => {
-    if (!pending || isLoading) return
-    if (!canEdit || viewingVersion != null) {
-      take()
+  useLayoutEffect(() => {
+    usePendingBuilderNodeAddStore.getState().setCanAcceptStepAdd(isLoading ? null : canAccept)
+    return () => {
+      usePendingBuilderNodeAddStore.getState().setCanAcceptStepAdd(null)
+    }
+  }, [canAccept, isLoading])
+
+  useLayoutEffect(() => {
+    if (isLoading) {
+      usePendingBuilderNodeAddStore.getState().registerApply(null)
       return
     }
-    dispatch({ type: 'OPEN_NODE_EDITOR_ADD', payload: pending })
-    take()
-  }, [pending, isLoading, canEdit, viewingVersion, dispatch, take])
-  /* eslint-enable reactYouMightNotNeedAnEffect/no-event-handler, reactYouMightNotNeedAnEffect/no-pass-data-to-parent */
+    const apply = (request: { nodeTypeId: string; nodeSubtypeId: string | null }) => {
+      if (!canAccept) return false
+      dispatch({ type: 'OPEN_NODE_EDITOR_ADD', payload: request })
+      return true
+    }
+    usePendingBuilderNodeAddStore.getState().registerApply(apply)
+    return () => {
+      usePendingBuilderNodeAddStore.getState().registerApply(null)
+    }
+  }, [canAccept, dispatch, isLoading])
 }

@@ -37,6 +37,7 @@ describe('useAllSettings', () => {
     const { result } = renderHook(() => useAllSettings({ enabled: false }), { wrapper })
 
     expect(result.current.settings).toEqual([])
+    expect(result.current.isLoading).toBe(false)
     expect(vi.mocked(settingsFetchClient.GET)).not.toHaveBeenCalled()
   })
 

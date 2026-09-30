@@ -17,6 +17,13 @@ describe('isCommandPaletteToggleEvent', () => {
     expect(isCommandPaletteToggleEvent(keyEvent({ key: 'k', ctrlKey: true, shiftKey: true }))).toBe(false)
     expect(isCommandPaletteToggleEvent(keyEvent({ key: 'k', ctrlKey: true, altKey: true }))).toBe(false)
   })
+
+  it('rejects Ctrl+K from an editable field', () => {
+    const input = document.createElement('input')
+    const event = keyEvent({ key: 'k', ctrlKey: true })
+    Object.defineProperty(event, 'target', { value: input })
+    expect(isCommandPaletteToggleEvent(event)).toBe(false)
+  })
 })
 
 describe('commandPaletteShortcutLabel', () => {

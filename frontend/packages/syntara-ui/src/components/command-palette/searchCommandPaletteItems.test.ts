@@ -6,7 +6,7 @@ import { searchCommandPaletteItems } from './searchCommandPaletteItems'
 function item(overrides: Partial<CommandPaletteItem> & Pick<CommandPaletteItem, 'id' | 'title'>): CommandPaletteItem {
   return {
     category: COMMAND_PALETTE_CATEGORY.PAGE,
-    categoryLabel: 'Pages',
+    categoryLabel: 'Page',
     to: `/${overrides.id}`,
     ...overrides,
   }
@@ -18,7 +18,7 @@ const catalog: CommandPaletteItem[] = [
     id: 'node-http',
     title: 'REST API',
     category: COMMAND_PALETTE_CATEGORY.NODE,
-    categoryLabel: 'Steps',
+    categoryLabel: 'Step',
     keywords: ['http', 'api'],
     showWhenEmpty: true,
   }),
@@ -26,20 +26,20 @@ const catalog: CommandPaletteItem[] = [
     id: 'wf-deploy',
     title: 'Deploy production',
     category: COMMAND_PALETTE_CATEGORY.WORKFLOW,
-    categoryLabel: 'Workflows',
+    categoryLabel: 'Workflow',
     subtitle: 'Roll out the app',
   }),
   item({
     id: 'project-platform',
     title: 'Platform',
     category: COMMAND_PALETTE_CATEGORY.PROJECT,
-    categoryLabel: 'Projects',
+    categoryLabel: 'Project',
   }),
   item({
     id: 'setting-depth',
     title: 'Max depth',
     category: COMMAND_PALETTE_CATEGORY.SETTING,
-    categoryLabel: 'Settings',
+    categoryLabel: 'Setting',
     keywords: ['workflow_engine.max_depth'],
   }),
 ]

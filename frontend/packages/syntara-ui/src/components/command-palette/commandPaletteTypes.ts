@@ -10,7 +10,7 @@ export type CommandPaletteItem = {
   id: string
   /** Source kind, e.g. `page`, `workflow`, or a future `credential`. */
   category: string
-  /** User-visible group label, e.g. `Pages` or `Workflows`. */
+  /** User-visible type chip, e.g. `Page` or `Workflow`. */
   categoryLabel: string
   /** Primary searchable / displayed name. */
   title: string
@@ -52,11 +52,11 @@ export const COMMAND_PALETTE_CATEGORY_LABEL: Record<
   (typeof COMMAND_PALETTE_CATEGORY)[keyof typeof COMMAND_PALETTE_CATEGORY],
   string
 > = {
-  [COMMAND_PALETTE_CATEGORY.PAGE]: 'Pages',
-  [COMMAND_PALETTE_CATEGORY.PROJECT]: 'Projects',
-  [COMMAND_PALETTE_CATEGORY.WORKFLOW]: 'Workflows',
-  [COMMAND_PALETTE_CATEGORY.SETTING]: 'Settings',
-  [COMMAND_PALETTE_CATEGORY.NODE]: 'Steps',
+  [COMMAND_PALETTE_CATEGORY.PAGE]: 'Page',
+  [COMMAND_PALETTE_CATEGORY.PROJECT]: 'Project',
+  [COMMAND_PALETTE_CATEGORY.WORKFLOW]: 'Workflow',
+  [COMMAND_PALETTE_CATEGORY.SETTING]: 'Setting',
+  [COMMAND_PALETTE_CATEGORY.NODE]: 'Step',
 }
 
 /** Max ranked hits shown after a query. Keeps the menu cheap to render. */

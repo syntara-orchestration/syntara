@@ -40,6 +40,18 @@ describe('useCommandPaletteShortcut', () => {
     expect(onToggle).not.toHaveBeenCalled()
   })
 
+  it('does not steal Ctrl+K from text fields', () => {
+    const onToggle = vi.fn()
+    renderHook(() => useCommandPaletteShortcut({ onToggle }))
+
+    const input = document.createElement('input')
+    document.body.appendChild(input)
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true }))
+
+    expect(onToggle).not.toHaveBeenCalled()
+    input.remove()
+  })
+
   it('removes the listener on unmount', () => {
     const onToggle = vi.fn()
     const { unmount } = renderHook(() => useCommandPaletteShortcut({ onToggle }))

@@ -9,7 +9,8 @@ type UseCommandPaletteShortcutOptions = {
 
 /**
  * Global Ctrl/Cmd+K listener. Capture phase so the in-app finder wins over
- * browser search (Chrome Ctrl/Cmd+K) and still works while an input is focused.
+ * browser search (Chrome Ctrl/Cmd+K) on page chrome. The shortcut is skipped
+ * when focus is already in a text field, so editors keep their own bindings.
  */
 export function useCommandPaletteShortcut({ onToggle }: UseCommandPaletteShortcutOptions): void {
   useEffect(() => {

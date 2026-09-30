@@ -18,8 +18,19 @@ function isConcretePath(path: string): boolean {
   return !path.includes(':')
 }
 
+function visibleSearchableChildren(item: TNavigationItem): TNavigationItem[] {
+  return (item.children ?? []).filter((child) => !child.hidden && isConcretePath(child.path))
+}
+
+/** Section hubs (2+ destinations, or a path that only duplicates a child) are not palette pages. */
+function isNavigationHub(item: TNavigationItem): boolean {
+  const searchableChildren = visibleSearchableChildren(item)
+  if (searchableChildren.length >= 2) return true
+  return searchableChildren.some((child) => child.path === item.path)
+}
+
 function mapNavigationItem(item: TNavigationItem, ancestors: readonly string[]): CommandPaletteItem | undefined {
-  if (!isConcretePath(item.path)) return undefined
+  if (item.hidden || !isConcretePath(item.path) || isNavigationHub(item)) return undefined
 
   return {
     id: `page:${item.path}:${item.label}`,
@@ -35,8 +46,7 @@ function mapNavigationItem(item: TNavigationItem, ancestors: readonly string[]):
 
 /**
  * Flattens the permission-filtered nav tree into searchable page items.
- * Parameterized routes (`:id`) are skipped because they are not navigable
- * without a concrete resource.
+ * Hidden items, parameterized routes (`:id`), and section hubs are skipped.
  */
 export function mapNavigationToCommandPaletteItems(
   items: readonly TNavigationItem[],

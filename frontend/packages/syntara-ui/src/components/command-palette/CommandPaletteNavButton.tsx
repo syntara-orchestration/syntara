@@ -10,6 +10,8 @@ export type CommandPaletteNavButtonProps = {
   className?: string
   /** Show a hover tooltip (icon-only collapsed dock). */
   showTooltip?: boolean
+  /** Docked chrome on the side nav; unset for the mobile masthead. */
+  isDocked?: boolean
 }
 
 /**
@@ -19,6 +21,7 @@ export type CommandPaletteNavButtonProps = {
 export function CommandPaletteNavButton({
   className,
   showTooltip = false,
+  isDocked = true,
 }: Readonly<CommandPaletteNavButtonProps>) {
   const { open } = useCommandPalette()
   const searchRef = useRef<HTMLButtonElement>(null)
@@ -28,7 +31,7 @@ export function CommandPaletteNavButton({
     <>
       <Button
         variant="plain"
-        isDocked
+        isDocked={isDocked}
         className={className}
         icon={<RhUiSearchIcon />}
         aria-label={searchButtonLabel}

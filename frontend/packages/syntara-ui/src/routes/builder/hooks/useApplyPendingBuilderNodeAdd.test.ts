@@ -13,9 +13,7 @@ describe('useApplyPendingBuilderNodeAdd', () => {
     const dispatch = vi.fn()
     usePendingBuilderNodeAddStore.getState().queue({ nodeTypeId: 'trigger', nodeSubtypeId: 'trigger-manual' })
 
-    renderHook(() =>
-      useApplyPendingBuilderNodeAdd(dispatch, { canEdit: true, isLoading: false, viewingVersion: null })
-    )
+    renderHook(() => useApplyPendingBuilderNodeAdd(dispatch, { canEdit: true, isLoading: false, viewingVersion: null }))
 
     expect(dispatch).toHaveBeenCalledWith({
       type: 'OPEN_NODE_EDITOR_ADD',

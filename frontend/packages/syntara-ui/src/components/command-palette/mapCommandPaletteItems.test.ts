@@ -68,6 +68,7 @@ describe('mapNavigationToCommandPaletteItems', () => {
         }),
       ])
     )
+    expect(items.some((item) => item.title === 'Configuration')).toBe(false)
   })
 
   it('skips parameterized routes', () => {
@@ -75,6 +76,31 @@ describe('mapNavigationToCommandPaletteItems', () => {
     expect(items.some((item) => item.to.includes(':'))).toBe(false)
     expect(items.some((item) => item.title === 'Edit Workflow')).toBe(false)
     expect(items.some((item) => item.title === 'Edit Integration')).toBe(false)
+  })
+
+  it('skips hidden items and section hubs with multiple destinations', () => {
+    const items = mapNavigationToCommandPaletteItems([
+      {
+        label: 'System Administration',
+        path: '/system-administration',
+        children: [
+          { label: 'Settings', path: '/system-administration/settings' },
+          { label: 'Users', path: '/system-administration/users' },
+        ],
+      },
+      {
+        label: 'Create User',
+        path: '/system-administration/access-management/users/create',
+        hidden: true,
+      },
+      {
+        label: 'My Profile',
+        path: '/profile',
+        hidden: true,
+      },
+    ])
+
+    expect(items.map((item) => item.title)).toEqual(['Settings', 'Users'])
   })
 })
 

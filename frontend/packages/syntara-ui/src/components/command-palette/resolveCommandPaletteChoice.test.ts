@@ -8,7 +8,7 @@ import { isWorkflowBuilderPath, resolveCommandPaletteChoice } from './resolveCom
 const pageItem: CommandPaletteItem = {
   id: 'page:workflows',
   category: COMMAND_PALETTE_CATEGORY.PAGE,
-  categoryLabel: 'Pages',
+  categoryLabel: 'Page',
   title: 'Workflows',
   to: '/workflows',
 }
@@ -16,7 +16,7 @@ const pageItem: CommandPaletteItem = {
 const stepItem: CommandPaletteItem = {
   id: 'node:trigger:trigger-manual',
   category: COMMAND_PALETTE_CATEGORY.NODE,
-  categoryLabel: 'Steps',
+  categoryLabel: 'Step',
   title: 'Manual trigger',
   to: AppRoute.WorkflowBuilder.New,
   builderAdd: { nodeTypeId: 'trigger', nodeSubtypeId: 'trigger-manual' },

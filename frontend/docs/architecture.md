@@ -1133,9 +1133,9 @@ Global search (Ctrl/Cmd+K) lives in `packages/syntara-ui/src/components/command-
 2. Fetch the full list with `fetchAllPages` + a `useAllX({ enabled })` hook (same pattern as `useAllProjects`)
 3. Concatenate the mapped items in `useCommandPaletteItems`
 
-Empty-query results only include items with `showWhenEmpty: true` (pages and builder steps). Remote catalogs appear once the user types.
+Empty-query results only include items with `showWhenEmpty: true` (pages and builder steps). Remote catalogs appear once the user types. Hidden nav items and section hubs are omitted; type chips use singular nouns (`Page`, `Step`, …).
 
-Choosing a **step** while `/workflow-builder/...` is open queues `OPEN_NODE_EDITOR_ADD` on the current canvas (no navigation). Off the builder, the same hit still opens `/workflow-builder/new` and then the add-step editor.
+Choosing a **step** while `/workflow-builder/...` is open queues `OPEN_NODE_EDITOR_ADD` on the current canvas (no navigation) when that canvas can be edited. Off the builder, the same hit still opens `/workflow-builder/new` and then the add-step editor. Read-only or historical views explain that a step cannot be added.
 
 ### Add filters to a list page
 

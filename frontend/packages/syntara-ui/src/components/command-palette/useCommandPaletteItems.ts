@@ -6,6 +6,7 @@ import { useAllProjects } from '../../routes/access/useAllProjects'
 import { NodeRegistry } from '../../routes/builder/registry/NodeRegistry'
 import { useAllSettings } from '../../routes/configuration/settings/useAllSettings'
 import { useAllWorkflows } from '../../routes/workflows/useAllWorkflows'
+import { detachPromise } from '../../utils/detachPromise'
 
 import type { CommandPaletteItem } from './commandPaletteTypes'
 import {
@@ -19,6 +20,8 @@ import {
 export type CommandPaletteCatalog = {
   items: CommandPaletteItem[]
   isLoading: boolean
+  error: unknown
+  refetch: () => void
 }
 
 /**
@@ -35,10 +38,25 @@ export type CommandPaletteCatalog = {
  */
 export function useCommandPaletteItems(enabled: boolean): CommandPaletteCatalog {
   const navItems = useFilteredNavigationItems()
-  const { projects, isLoading: projectsLoading } = useAllProjects({ enabled })
-  const { workflows, isLoading: workflowsLoading } = useAllWorkflows({ enabled })
+  const {
+    projects,
+    isLoading: projectsLoading,
+    error: projectsError,
+    refetch: refetchProjects,
+  } = useAllProjects({ enabled })
+  const {
+    workflows,
+    isLoading: workflowsLoading,
+    error: workflowsError,
+    refetch: refetchWorkflows,
+  } = useAllWorkflows({ enabled })
   const { allowed: canReadSettings } = useCanI('read', 'setting', { enabled })
-  const { settings, isLoading: settingsLoading } = useAllSettings({ enabled: enabled && canReadSettings })
+  const {
+    settings,
+    isLoading: settingsLoading,
+    error: settingsError,
+    refetch: refetchSettings,
+  } = useAllSettings({ enabled: enabled && canReadSettings })
 
   const pageItems = useMemo(() => mapNavigationToCommandPaletteItems(navItems), [navItems])
   const projectItems = useMemo(() => mapProjectsToCommandPaletteItems(projects), [projects])
@@ -52,6 +70,12 @@ export function useCommandPaletteItems(enabled: boolean): CommandPaletteCatalog 
   )
 
   const isLoading = projectsLoading || workflowsLoading || settingsLoading
+  const error = projectsError ?? workflowsError ?? settingsError
+  const refetch = () => {
+    detachPromise(refetchProjects())
+    detachPromise(refetchWorkflows())
+    detachPromise(refetchSettings())
+  }
 
-  return { items, isLoading }
+  return { items, isLoading, error, refetch }
 }
