@@ -1,13 +1,13 @@
 import type { ComponentType } from 'react'
 
-export type NodeCategory = 'trigger' | 'action' | 'logic' | 'integration' | 'approval' | 'other'
+export type StepCategory = 'trigger' | 'action' | 'logic' | 'integration' | 'approval' | 'other'
 
 /**
  * Metadata for a node category
  */
 export type CategoryMetadata = {
   /** Unique category identifier */
-  id: NodeCategory
+  id: StepCategory
   /** Display label for the category */
   label: string
   /** Icon component for the category */

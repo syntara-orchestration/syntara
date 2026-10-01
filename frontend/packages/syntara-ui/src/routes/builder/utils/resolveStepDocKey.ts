@@ -1,7 +1,7 @@
 import { ExecutorTypeEnum, TriggerTypeEnum } from '@syntara/contracts'
 import type { Node } from '@xyflow/react'
 
-import { FlowNodeType, RegistryNodeId } from '../../../constants'
+import { FlowNodeType, RegistryStepId } from '../../../constants'
 import { docsUrls } from '../../../utils/docs/loadDocsConfig'
 import type { DocKey } from '../../../utils/docs/types'
 import type { NodeType } from '../../workflows/canvas/nodes/NodeType'
@@ -9,24 +9,24 @@ import type { NodeType } from '../../workflows/canvas/nodes/NodeType'
 const FALLBACK_DOC_KEY: DocKey = 'builder'
 
 /** Registry / executor ids that intentionally have no step documentation link. */
-const STEPS_WITHOUT_DOCUMENTATION = new Set<string>([RegistryNodeId.ACTION_SCRIPT, ExecutorTypeEnum.SCRIPT])
+const STEPS_WITHOUT_DOCUMENTATION = new Set<string>([RegistryStepId.ACTION_SCRIPT, ExecutorTypeEnum.SCRIPT])
 
 /** Registry subtype / leaf ids → step-type documentation keys (must match docsUrls.json / overlay). */
 const REGISTRY_SUBTYPE_DOC_KEYS: Readonly<Record<string, string>> = {
-  [RegistryNodeId.TRIGGER_MANUAL]: 'manualTrigger',
-  [RegistryNodeId.TRIGGER_SCHEDULED]: 'scheduleTrigger',
-  [RegistryNodeId.TRIGGER_WEBHOOK]: 'webhookTrigger',
-  [RegistryNodeId.TRIGGER_EDA]: 'eventDrivenAnsibleTrigger',
-  [RegistryNodeId.ACTION_API]: 'restApi',
-  [RegistryNodeId.AGENT]: 'taskAgent',
-  [RegistryNodeId.APPROVAL]: 'approval',
-  [RegistryNodeId.LOGIC_CONDITION]: 'conditional',
-  [RegistryNodeId.LOGIC_CONVERGE]: 'converge',
-  [RegistryNodeId.LOGIC_LOOP]: 'loop',
-  [RegistryNodeId.LOGIC_SWITCH]: 'switch',
-  [RegistryNodeId.LOGIC_WAIT]: 'wait',
-  [RegistryNodeId.AAP_JOB_TEMPLATE]: 'launchAapJobTemplate',
-  [RegistryNodeId.AAP_WORKFLOW_TEMPLATE]: 'launchAapWorkflowTemplate',
+  [RegistryStepId.TRIGGER_MANUAL]: 'manualTrigger',
+  [RegistryStepId.TRIGGER_SCHEDULED]: 'scheduleTrigger',
+  [RegistryStepId.TRIGGER_WEBHOOK]: 'webhookTrigger',
+  [RegistryStepId.TRIGGER_EDA]: 'eventDrivenAnsibleTrigger',
+  [RegistryStepId.ACTION_API]: 'restApi',
+  [RegistryStepId.AGENT]: 'taskAgent',
+  [RegistryStepId.APPROVAL]: 'approval',
+  [RegistryStepId.LOGIC_CONDITION]: 'conditional',
+  [RegistryStepId.LOGIC_CONVERGE]: 'converge',
+  [RegistryStepId.LOGIC_LOOP]: 'loop',
+  [RegistryStepId.LOGIC_SWITCH]: 'switch',
+  [RegistryStepId.LOGIC_WAIT]: 'wait',
+  [RegistryStepId.AAP_JOB_TEMPLATE]: 'launchAapJobTemplate',
+  [RegistryStepId.AAP_WORKFLOW_TEMPLATE]: 'launchAapWorkflowTemplate',
 }
 
 const TRIGGER_TYPE_DOC_KEYS: Readonly<Record<string, string>> = {
@@ -55,8 +55,8 @@ const FLOW_TYPE_DOC_KEYS: Readonly<Record<string, string>> = {
 
 export type ResolveStepDocKeyInput = {
   mode: 'add' | 'edit' | null
-  nodeTypeId: string | null
-  nodeSubtypeId: string | null
+  stepTypeId: string | null
+  stepSubtypeId: string | null
   selectedNode: Node<NodeType['data']> | null
 }
 
@@ -78,8 +78,8 @@ function isWithoutDocumentation(...ids: Array<string | null | undefined>): boole
   return ids.some((id) => id != null && STEPS_WITHOUT_DOCUMENTATION.has(id))
 }
 
-function resolveFromRegistryIds(nodeTypeId: string | null, nodeSubtypeId: string | null): DocKey | undefined {
-  return lookup(REGISTRY_SUBTYPE_DOC_KEYS, nodeSubtypeId) ?? lookup(REGISTRY_SUBTYPE_DOC_KEYS, nodeTypeId)
+function resolveFromRegistryIds(stepTypeId: string | null, stepSubtypeId: string | null): DocKey | undefined {
+  return lookup(REGISTRY_SUBTYPE_DOC_KEYS, stepSubtypeId) ?? lookup(REGISTRY_SUBTYPE_DOC_KEYS, stepTypeId)
 }
 
 function resolveFromSelectedNode(node: Node<NodeType['data']>): DocKey | undefined {
@@ -104,13 +104,13 @@ function resolveFromSelectedNode(node: Node<NodeType['data']>): DocKey | undefin
  * Falls back to `builder` when the step type is unknown or only a category is selected.
  */
 export function resolveStepDocKey(input: ResolveStepDocKeyInput): DocKey | null {
-  const { mode, nodeTypeId, nodeSubtypeId, selectedNode } = input
+  const { mode, stepTypeId, stepSubtypeId, selectedNode } = input
 
   if (mode === 'add') {
-    if (isWithoutDocumentation(nodeSubtypeId, nodeTypeId)) {
+    if (isWithoutDocumentation(stepSubtypeId, stepTypeId)) {
       return null
     }
-    return resolveFromRegistryIds(nodeTypeId, nodeSubtypeId) ?? FALLBACK_DOC_KEY
+    return resolveFromRegistryIds(stepTypeId, stepSubtypeId) ?? FALLBACK_DOC_KEY
   }
 
   if (mode === 'edit' && selectedNode) {
