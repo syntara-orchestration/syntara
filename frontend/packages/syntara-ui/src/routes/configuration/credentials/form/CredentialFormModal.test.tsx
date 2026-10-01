@@ -632,10 +632,9 @@ describe('CredentialFormModal', () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } as any)
 
-      const { rerender } = render(
-        <CredentialFormModal isOpen onClose={vi.fn()} credentialToEdit={aapCredential} />,
-        { wrapper }
-      )
+      const { rerender } = render(<CredentialFormModal isOpen onClose={vi.fn()} credentialToEdit={aapCredential} />, {
+        wrapper,
+      })
 
       vi.mocked(credentialsClient.useQuery).mockReturnValue({
         data: { resources: mockTypes },

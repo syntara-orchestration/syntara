@@ -62,6 +62,21 @@ export function useCredentialFormModal({
   const [activeGroupIndex, setActiveGroupIndex] = useState(0)
 
   const resetKey = isOpen ? (credentialToEdit?.id ?? preSelectedTypeId ?? 'create') : 'closed'
+  const [prevResetKey, setPrevResetKey] = useState<string | null>(null)
+  const [typesSyncKey, setTypesSyncKey] = useState('')
+
+  if (resetKey !== prevResetKey) {
+    setPrevResetKey(resetKey)
+    setTouchedSecrets(new Set())
+    setActiveGroupIndex(credentialToEdit && types.length > 0 ? computeInitialGroupIndex(credentialToEdit, types) : 0)
+    setTypesSyncKey('')
+  }
+
+  const loadedTypesKey = types.map((t) => t.id).join(',')
+  if (isOpen && credentialToEdit && types.length > 0 && loadedTypesKey !== typesSyncKey) {
+    setTypesSyncKey(loadedTypesKey)
+    setActiveGroupIndex(computeInitialGroupIndex(credentialToEdit, types))
+  }
 
   const { mutate: createCredential, isPending: isCreating } = credentialsClient.useMutation('post', '/credentials')
   const { mutate: patchCredential, isPending: isPatching } = credentialsClient.useMutation(
@@ -102,8 +117,6 @@ export function useCredentialFormModal({
   useEffect(() => {
     if (!isOpen) return
 
-    setTouchedSecrets(new Set())
-
     if (credentialToEdit) {
       reset({
         name: credentialToEdit.name,
@@ -112,9 +125,6 @@ export function useCredentialFormModal({
         credential_type_id: credentialToEdit.credential_type_id,
         inputs: credentialToEdit.inputs as Record<string, unknown>,
       })
-      if (types.length > 0) {
-        setActiveGroupIndex(computeInitialGroupIndex(credentialToEdit, types))
-      }
       return
     }
 
@@ -126,7 +136,6 @@ export function useCredentialFormModal({
       credential_type_id: preSelectedTypeId ?? '',
       inputs: preSelectedType ? getDefaultInputs(preSelectedType) : {},
     })
-    setActiveGroupIndex(0)
   }, [isOpen, resetKey, reset, credentialToEdit, preSelectedTypeId, defaultProjectId, types])
 
   useEffect(() => {
