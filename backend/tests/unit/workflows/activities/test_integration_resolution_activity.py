@@ -48,7 +48,12 @@ class TestResolveIntegration:
 
         result = await _resolve_integration(session, "int-123")
 
-        assert result == {"base_url": "https://aap.example.com", "verify_ssl": True, "ca_certificate": None}
+        assert result == {
+            "base_url": "https://aap.example.com",
+            "verify_ssl": True,
+            "ca_certificate": None,
+            "integration_type": IntegrationType.ANSIBLE_AUTOMATION_PLATFORM.value,
+        }
 
     @pytest.mark.anyio
     async def test_strips_trailing_slash_from_url(self) -> None:
