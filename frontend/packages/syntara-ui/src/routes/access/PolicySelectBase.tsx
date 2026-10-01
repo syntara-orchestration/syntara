@@ -81,12 +81,12 @@ export function PolicySelectBase({
       onFilterChange={(value: string) => {
         field.setFilterValue(value)
         onFilterValueChange?.(value)
-        field.openDropdown()
+        handleOpenChange(true)
       }}
-      onFilterFocus={field.openDropdown}
+      onFilterFocus={() => handleOpenChange(true)}
       onRemovePolicy={field.removePolicy}
       onClearAll={field.clearAll}
-      onToggle={() => field.handleOpenChange(!field.isOpen)}
+      onToggle={() => handleOpenChange(!field.isOpen)}
     />
   )
 }

@@ -93,7 +93,14 @@ export function PolicySelect({
       isLoading={isLoading}
       fetchAllMatchingPolicies={fetchAllMatchingPolicies}
       apiFilterTerm={debouncedFilter}
-      onDropdownOpenChange={setIsOpen}
+      onDropdownOpenChange={(open) => {
+        setIsOpen(open)
+        if (!open) {
+          clearTimeout(debounceRef.current)
+          filterValueRef.current = ''
+          setDebouncedFilter('')
+        }
+      }}
       onFilterValueChange={handleFilterValueChange}
     />
   )

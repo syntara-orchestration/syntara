@@ -53,7 +53,12 @@ export function ProjectPolicySelect({ projectId, selected, onChange, hasError }:
       fetchAllMatchingPolicies={fetchAllMatchingPolicies}
       clientSideFilterOnly
       toggleTestId="policy-select-toggle"
-      onDropdownOpenChange={setIsOpen}
+      onDropdownOpenChange={(open) => {
+        setIsOpen(open)
+        if (!open) {
+          filterValueRef.current = ''
+        }
+      }}
       onFilterValueChange={handleFilterValueChange}
     />
   )
