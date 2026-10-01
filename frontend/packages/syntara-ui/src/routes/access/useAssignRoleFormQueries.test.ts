@@ -9,9 +9,9 @@ import { RolePrincipalType } from '../access-management/RoleAssignmentTypes'
 
 import { accessClient } from './accessClient'
 import { assignRoleSchema, type AssignRoleFormData } from './assignRoleSchema'
+import { useSelectableProjects } from './useAllProjects'
 import { useAlreadyAssignedRoles } from './useAlreadyAssignedRoles'
 import { useAssignRoleFormQueries } from './useAssignRoleFormQueries'
-import { useSelectableProjects } from './useAllProjects'
 
 vi.mock('./accessClient', () => ({
   accessClient: {
