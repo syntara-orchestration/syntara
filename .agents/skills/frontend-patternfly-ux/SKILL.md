@@ -1,17 +1,18 @@
 ---
+name: frontend-patternfly-ux
 description: "PatternFly 6 UX design system guide — component selection, layout patterns, accessibility, project conventions."
 user-invocable: false
 ---
 
 <!--
-  SYNC NOTE: A condensed version of this file exists at .cursor/rules/patternfly-ux-design-system.mdc
+  SYNC NOTE: A condensed version of this file exists at frontend/.cursor/rules/patternfly-ux-design-system.mdc
   (the Cursor rule). Both files must stay in sync — when updating one, update the other.
   This file is the comprehensive source of truth. The Cursor rule is the lightweight version.
 -->
 
-# Claude Skill: PatternFly UX Design System — Opinionated Implementation
+# PatternFly UX Design System — Opinionated Implementation
 
-> **Before writing React, Zod, Zustand, or other library code**, fetch current docs from [`.claude/skills/frontend-library-references/SKILL.md`](../frontend-library-references/SKILL.md).
+> **Before writing React, Zod, Zustand, or other library code**, fetch current docs from [`.agents/skills/frontend-library-references/SKILL.md`](../frontend-library-references/SKILL.md).
 
 Your goal is to build frontend UI that adheres to PatternFly standards **and** the UX team's opinionated component usage. This skill codifies specific "PatternFly-first" patterns to ensure consistency across all feature teams and reduce cognitive load for users.
 
@@ -40,7 +41,7 @@ For engagement questions, reach out to the UX team in the project's contributor 
 
 | Category            | Tools                                     |
 | ------------------- | ----------------------------------------- |
-| IDE and Agent Tools | Cursor, Claude Code, Gemini               |
+| IDE and Agent Tools | Codex, Cursor, Claude Code, Gemini        |
 | Design Library      | [PatternFly](https://www.patternfly.org/) |
 | Design Tooling      | Figma, Miro                               |
 
@@ -378,7 +379,7 @@ Filter bar is visible when data exists or when filters are active; hidden only w
   - Selecting/filling the required field clears the danger styling immediately
   - **Human-readable validation copy:** Never expose raw regex patterns or API validation strings to users. Use plain-language error messages (e.g., "Project name can only contain letters, numbers, hyphens, underscores, or colons. It must start and end with a letter or number."). Provide proactive field guidance via inline hint text (using `HintOrError` or `HelperText`) that displays before the user triggers an error; the hint is replaced by the error message on validation failure. Use example-style placeholders (e.g., `'my-project-name'`) instead of generic `"Enter project name"`.
 - **Read-only system values:** Never use a disabled `TextInput` to display system-provided, non-editable values. Disabled inputs imply the field could be editable in another context. Instead use `DescriptionList isCompact` (term + description), `ClipboardCopy` (when copying is the primary action), or plain text to make clear the value is informational.
-- **Cascading field resets:** When one field change should clear or reset dependent fields (e.g., changing "Resource type" resets "Action"), put the reset logic in the field's `onChange` handler -- not in a `useEffect` watching the field value. See [.claude/skills/frontend-coding-standards/SKILL.md §23](../frontend-coding-standards/SKILL.md) and [React docs](https://react.dev/learn/you-might-not-need-an-effect).
+- **Cascading field resets:** When one field change should clear or reset dependent fields (e.g., changing "Resource type" resets "Action"), put the reset logic in the field's `onChange` handler -- not in a `useEffect` watching the field value. See [.agents/skills/frontend-coding-standards/SKILL.md §23](../frontend-coding-standards/SKILL.md) and [React docs](https://react.dev/learn/you-might-not-need-an-effect).
 - **Credential-managed field locking:** When a credential selection controls a field's value at runtime (e.g., a "Secret URL" credential manages the URL), disable the field, change its placeholder to explain the override (e.g., "URL managed by credential"), add helper text ("This value will be injected at execution time and is never stored in the workflow definition."), clear any user-entered value, and remove the `required` attribute. When the credential is deselected, restore the field to its normal editable state. See `httpCredentialSection.tsx` for the pattern.
 - **Auto-save before dependent actions:** When a user action depends on the current form state being persisted (e.g., "Run Step" depends on saved step configuration), programmatically submit any open editor form before proceeding. Use a `data-step-editor-form` attribute on forms and `requestSubmit()` to trigger save, then continue with the dependent action. See `useRunStepDialog.ts` for the pattern.
 - **FormSection for complex forms:** When a single form step has 10+ fields spanning logical domains, group them with PatternFly `FormSection`:
@@ -1352,7 +1353,7 @@ For create/edit forms accessible via direct URL:
 
 **Note:** List/detail pages use in-page empty states or tab filtering -- not route guards. Route guards target mutation form routes only.
 
-See [`frontend/docs/permissions-rbac.md`](frontend/docs/permissions-rbac.md) for the full permission gating architecture.
+See [`frontend/docs/permissions-rbac.md`](../../../frontend/docs/permissions-rbac.md) for the full permission gating architecture.
 
 ### Empty-State Actions Must Be Permission-Gated
 

@@ -1,4 +1,5 @@
 ---
+name: frontend-build-ui-feature
 description: "Walk through building a frontend UI feature step by step — gathers requirements, implements, and validates."
 user-invocable: true
 ---
@@ -31,8 +32,8 @@ Ask these questions one at a time. Do not move on until you get an answer.
 Before writing any code:
 
 1. **Find the most similar page or component that already exists in the codebase.** This is the starting point — always follow existing patterns and conventions rather than inventing new ones.
-2. Read `.claude/skills/frontend-coding-standards/SKILL.md`, `.claude/skills/frontend-patternfly-ux/SKILL.md`, and `.claude/skills/frontend-testing-guidelines/SKILL.md`. These are the authoritative guidelines for code quality, UX, and unit/a11y tests. Do not skip the testing skill — Phase 3 always writes unit tests.
-3. Write a short plan: which files you'll create or change, which PatternFly components you'll use, and how you'll handle each state. The plan must align with existing codebase patterns. **New routes** must include an entry in `frontend/packages/syntara-ui/e2e/visual-regression/page-registry.ts` (see `VISUAL_REGRESSION.md`).
+2. Read `.agents/skills/frontend-coding-standards/SKILL.md`, `.agents/skills/frontend-patternfly-ux/SKILL.md`, and `.agents/skills/frontend-testing-guidelines/SKILL.md`. These are the authoritative guidelines for code quality, UX, and unit/a11y tests. Do not skip the testing skill — Phase 3 always writes unit tests.
+3. Write a short plan: which files you'll create or change, which PatternFly components you'll use, and how you'll handle each state. The plan must align with existing codebase patterns. **New routes** must include an entry in `frontend/packages/syntara-ui/e2e/visual-regression/page-registry.ts` (see `frontend/packages/syntara-ui/VISUAL_REGRESSION.md`).
 4. Show the plan and wait for approval. Do not write code until the user says go.
 
 ## Phase 3: Build it
@@ -43,7 +44,7 @@ Follow the project skills for implementation. **Always match existing codebase p
 - Use typed API clients from `frontend/packages/syntara-ui/src/client.tsx`. No raw `fetch()`.
 - Use Zod + react-hook-form for any forms. Use manual `useState`/controlled form controls as a last resort.
 - Handle all states: data loaded, no data yet, no filter results, API error with retry.
-- Write unit tests alongside the code: happy path, empty states, error state, and at least one `toHaveNoViolations()` accessibility test. Follow `.claude/skills/frontend-testing-guidelines/SKILL.md` (query order, `userEvent.setup()`, happy-dom Vitest environment, dedicated `use*.test.ts(x)` for new hooks).
+- Write unit tests alongside the code: happy path, empty states, error state, and at least one `toHaveNoViolations()` accessibility test. Follow `.agents/skills/frontend-testing-guidelines/SKILL.md` (query order, `userEvent.setup()`, happy-dom Vitest environment, dedicated `use*.test.ts(x)` for new hooks).
 
 After the code is written, check it against the UX design system:
 
@@ -55,11 +56,11 @@ After the code is written, check it against the UX design system:
 
 If the user asked for E2E tests:
 
-1. Read `.claude/skills/frontend-playwright-e2e/SKILL.md` for the project's E2E patterns.
+1. Read `.agents/skills/frontend-playwright-e2e/SKILL.md` for the project's E2E patterns.
 2. Write Playwright tests for the main user flows from Phase 1.
 3. Wrap test actions in `try/finally` so test data always gets cleaned up.
 4. Use the same accessible selectors as unit tests (`getByRole`, `getByLabel`).
-5. To **run** the suite, follow `.claude/skills/frontend-run-e2e/SKILL.md`. Never print the admin password.
+5. To **run** the suite, follow `.agents/skills/frontend-run-e2e/SKILL.md`. Never print the admin password.
 
 ## Phase 5: Validate in the browser and capture final screenshot
 
@@ -81,7 +82,7 @@ Check the browser console for errors or warnings. Tab through the page to verify
 
 ## Phase 6: Code review
 
-1. Run `/frontend-review-pr` to check against the quality checklist.
+1. Invoke the `frontend-review-pr` skill to check against the quality checklist.
 2. Fix any Blocking issues it finds.
 3. Show a summary: what files were created or changed, what the PR does.
 4. Remind the user to include screenshots of each state in the PR description. If you added a route, confirm the visual-regression registry row exists.
