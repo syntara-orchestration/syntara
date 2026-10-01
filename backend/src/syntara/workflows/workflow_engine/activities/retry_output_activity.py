@@ -5,25 +5,13 @@ point are skipped and the workflow needs their stored ``output_data`` injected
 into the execution namespace so downstream nodes read them as if those nodes had
 just run.
 
-The outputs are not carried in ``start_workflow`` arguments. They reach the
-workflow through this activity instead, following the same rule the credential
-and integration resolution activities already use: the definition carries an
-identifier, the data is fetched at the point of use, and it is never allowed to
-linger in workflow state. Two reasons:
-
-* **Payload size.** ``DEFAULT_MAX_OUTPUT_BYTES`` is 1 MiB per activity against
-  Temporal's 2 MiB blob limit, so a retry skipping two large nodes would overflow
-  the arguments blob. The SDK does not mark a size rejection non-retryable, so
-  the overflow surfaces as futile retries until activity timeout with a
-  misleading "Activity task timed out" error.
-* **History growth.** Workflow state is persisted in history, so leaving every
-  restored output resident inflates every later history entry.
-
-A restored output stays in the execution namespace until the nodes downstream of
-it have been scheduled, which is the same lifetime a live completion has.
+Outputs are fetched per node to bound activity-result payloads. Temporal records
+activity results in history; restoring them through an activity does not remove
+that history cost. Namespace publication uses the ordinary completion path.
 """
 
 import json
+import time
 from typing import TYPE_CHECKING, Any
 
 import structlog
@@ -34,6 +22,8 @@ with workflow.unsafe.imports_passed_through():
     from syntara.core.constants import JsonbLimits
     from syntara.core.database.session import get_db
     from syntara.core.exceptions import SafeValueError
+    from syntara.metrics.dependencies import get_metrics_recorder
+    from syntara.metrics.types import MetricType
     from syntara.workflows.models.activity_execution import ActivityExecution, ActivityStatus
     from syntara.workflows.utils.loop_iteration_names import strip_iteration_suffix
 
@@ -69,6 +59,7 @@ async def fetch_retry_outputs_activity(
             truncated output is worse than a refused retry.
 
     """
+    started = time.monotonic()
     if not node_ids:
         return {}
 
@@ -80,9 +71,13 @@ async def fetch_retry_outputs_activity(
     async for session in get_db():
         activities = (
             await session.exec(
-                select(ActivityExecution).where(
+                select(ActivityExecution)
+                .where(
                     ActivityExecution.execution_id == source_execution_id,
                     ActivityExecution.status == ActivityStatus.COMPLETED,
+                )
+                .order_by(
+                    col(ActivityExecution.iteration), col(ActivityExecution.created_at), col(ActivityExecution.id)
                 )
             )
         ).all()
@@ -97,7 +92,7 @@ async def fetch_retry_outputs_activity(
     # Measure the JSON that will actually cross the result blob. ``len(str(...))``
     # would measure Python's repr, which is a different and only accidentally
     # similar number.
-    serialized_bytes = sum(len(json.dumps(output, default=str)) for output in outputs.values())
+    serialized_bytes = len(json.dumps(outputs, default=str).encode("utf-8"))
     if serialized_bytes > JsonbLimits.MAX_FIELD_BYTES:
         msg = (
             f"restored retry outputs total {serialized_bytes} bytes across {len(outputs)} node(s), "
@@ -112,6 +107,20 @@ async def fetch_retry_outputs_activity(
         node_count=len(outputs),
         serialized_bytes=serialized_bytes,
     )
+    try:
+        get_metrics_recorder().record(
+            MetricType.RETRY_RESTORATION_DURATION,
+            (time.monotonic() - started) * 1000,
+            unit="ms",
+            labels={
+                "component": "execution_service",
+                "execution_mode": "retry",
+                "node_count": str(len(wanted)),
+                "restored_node_count": str(len(outputs)),
+            },
+        )
+    except Exception:  # noqa: BLE001 -- telemetry must never prevent restoration
+        logger.warning("Unable to record retry restoration metrics", exc_info=True)
     return outputs
 
 
@@ -201,6 +210,14 @@ async def fetch_retry_loop_state_activity(
         # cannot skip it, because that is the iteration being retried.
         resume_iteration = max(index for index, _base, _output in failed_rows)
         result[loop_id] = {
+            "restored_activity_names": [
+                row.activity_name
+                for row in rows
+                if row.activity_name
+                and body_to_loop.get(strip_iteration_suffix(row.activity_name)) == loop_id
+                and row.status == ActivityStatus.COMPLETED
+                and (row.iteration or 0) < resume_iteration
+            ],
             "resume_iteration": resume_iteration,
             "iteration_results": _rebuild_iteration_results(buckets["completed"], resume_iteration),
         }
@@ -240,3 +257,23 @@ def _rebuild_iteration_results(
         for field, value in {**output, "status": "completed"}.items():
             results.setdefault(f"{base_id}.{field}", []).append(value)
     return results
+
+
+@activity.defn(name="fetch_retry_source_state")
+async def fetch_retry_source_state_activity(source_execution_id: str) -> dict[str, str]:
+    """Return source statuses without carrying output payloads into the plan."""
+    states: dict[str, str] = {}
+    async for session in get_db():
+        rows = (
+            await session.exec(
+                select(ActivityExecution)
+                .where(ActivityExecution.execution_id == source_execution_id)
+                .order_by(
+                    col(ActivityExecution.iteration), col(ActivityExecution.created_at), col(ActivityExecution.id)
+                )
+            )
+        ).all()
+        for row in rows:
+            if row.activity_name:
+                states[strip_iteration_suffix(row.activity_name)] = row.status.value
+    return states

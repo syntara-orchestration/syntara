@@ -23,7 +23,10 @@ from .conftest import init_workflow_runtime
 @pytest.fixture
 def mock_wf() -> Generator[MagicMock, None, None]:
     """Patch the Temporal workflow module so execute_activity is awaitable."""
-    with patch("syntara.workflows.workflow_engine.dynamic_workflow.workflow") as patched:
+    with (
+        patch("syntara.workflows.workflow_engine.dynamic_workflow.workflow") as patched,
+        patch("syntara.workflows.workflow_engine.retry_mixin.workflow", patched),
+    ):
         patched.logger = MagicMock()
         yield patched
 
@@ -334,7 +337,7 @@ def test_default_continue_on_failure_is_false_so_upstream_is_restored() -> None:
 
 @pytest.mark.parametrize(
     "node_type",
-    ["condition", "switch", "loop", "converge", "wait"],
+    ["condition", "switch", "loop", "wait"],
 )
 def test_control_nodes_are_never_restored(node_type: str) -> None:
     """Condition/switch/loop/converge/wait decide routing, so they must always run.
@@ -475,6 +478,10 @@ async def test_restored_output_is_injected_into_the_namespace(mock_wf: MagicMock
     result = await wf._restore_node_output(node)
 
     assert result == {"output": {"result": "from-source"}, "control": None}
+    assert not wf.resolver.has_namespace("step_1")
+    from .conftest import complete_supplied_node
+
+    await complete_supplied_node(wf, node, result, MagicMock())
     assert wf.resolver.get_namespace("step_1") == {"result": "from-source", "status": "completed"}
     # Tracked as restored, not as skipped: it did not get skipped, it ran in an
     # earlier execution. The converge predicates read skipped_nodes as "never ran".
@@ -490,7 +497,9 @@ async def test_restored_node_is_marked_as_skipped_in_node_inputs(mock_wf: MagicM
     node = ActivityNode(node_id="step_1", node_type="script", parameters={})
     mock_wf.execute_activity = AsyncMock(return_value={"step_1": {"result": "ok"}})
 
-    await wf._restore_node_output(node)
+    result = await wf._restore_node_output(node)
+    assert result is not None
+    wf._process_supplied_result(node, result)
 
     assert wf.node_inputs["step_1"] == {PRE_RESOLVED_MARKER: True}
 

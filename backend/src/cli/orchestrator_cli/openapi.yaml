@@ -32710,6 +32710,7 @@ components:
         - temporal_queue_depth
         - active_workflows
         - activity_execution_success_rate
+        - retry_restoration_ms
         - workflow_start_latency_ms
         - workflow_completion_rate
         - temporal_execution_service_duration_ms
@@ -35059,6 +35060,12 @@ components:
             environment: production
             region: us-east-1
             team: platform
+        replayed:
+          anyOf:
+            - type: boolean
+            - type: 'null'
+          description: True when output was reused from the source run; null for older records
+          title: Replayed
         execution_id:
           type: string
           format: uuid
@@ -35156,6 +35163,11 @@ components:
         - activity_id
         - status
       properties:
+        replayed:
+          anyOf:
+            - type: boolean
+            - type: 'null'
+          title: Replayed
         activity_id:
           type: string
           title: Activity Id

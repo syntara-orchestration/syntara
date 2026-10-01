@@ -54,3 +54,11 @@ class WorkflowExecutionCompletedEvent(BaseTelemetryEvent):
     )
     trigger_type: ActivityName | None = Field(default=None, description="Type of trigger that started the workflow")
     interface: str | None = Field(default=None, description="Originating interface (ui or api)")
+
+
+class WorkflowRetryRequestedEvent(BaseTelemetryEvent):
+    """Anonymized retry invocation, without node IDs, user IDs or output data."""
+
+    execution_mode: str = "retry"
+    node_count: int = Field(ge=0)
+    failed_step_types: list[str]

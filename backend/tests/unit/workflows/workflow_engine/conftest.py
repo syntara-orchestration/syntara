@@ -1,7 +1,10 @@
 """Shared test helpers for workflow engine unit tests."""
 
+from typing import Any
+
 from syntara.settings.catalog import SETTINGS_CATALOG
 from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkflow
+from syntara.workflows.workflow_engine.graph import ActivityNode, WorkflowGraph
 
 
 def make_workflow_runtime_settings() -> dict[str, object]:
@@ -22,3 +25,22 @@ def init_workflow_runtime(wf: OrchestratorWorkflow) -> None:
     wf.retry_context = {}
     wf._retry_restorable_cache = None
     wf._restored_nodes = set()
+    wf._retry_source_statuses = {}
+
+
+async def complete_supplied_node(
+    wf: OrchestratorWorkflow, node: ActivityNode, result: dict[str, Any], graph: WorkflowGraph
+) -> None:
+    """Drive supplied output through the same completion boundary as a live task."""
+    import asyncio
+    from unittest.mock import AsyncMock, patch
+
+    async def supplied() -> dict[str, Any]:
+        return wf._process_supplied_result(node, result)
+
+    task = asyncio.create_task(supplied())
+    with (
+        patch.object(wf, "_schedule_successors", new_callable=AsyncMock),
+        patch.object(wf, "_cancel_skipped_pending_tasks"),
+    ):
+        await wf._process_completed_task(task, {node.id: task}, graph)
