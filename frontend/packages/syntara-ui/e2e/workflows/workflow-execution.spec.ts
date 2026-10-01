@@ -16,11 +16,11 @@ import {
   openWorkflowInBuilder,
   deleteWorkflow,
   openBuilderById,
-  runSingleWorkflowNode,
+  runSingleWorkflowStep,
 } from '../helpers/workflows'
 import { createWorkflowViaApi, deleteWorkflowViaApi } from '../utils/api'
 
-// Skipped: runSingleWorkflowNode times out waiting for execution results in CI — requires backend execution engine
+// Skipped: runSingleWorkflowStep times out waiting for execution results in CI — requires backend execution engine
 test.describe.skip('Test Single Step from Canvas', () => {
   let workflowId: string
 
@@ -59,7 +59,7 @@ test.describe.skip('Test Single Step from Canvas', () => {
   test('single workflow node can be tested from the canvas using prior node data', async ({ app }) => {
     await openBuilderById(app, workflowId)
 
-    await runSingleWorkflowNode(app, 'Say Goodbye')
+    await runSingleWorkflowStep(app, 'Say Goodbye')
     await expect(app.getByRole('row', { name: /Manual Trigger/i })).toBeVisible({ timeout: 15_000 })
     await expect(app.getByRole('row', { name: /Say Hello/i })).toBeVisible({ timeout: 15_000 })
     await expect(app.getByRole('row', { name: /Say Goodbye/i })).toBeVisible({ timeout: 15_000 })
@@ -78,7 +78,7 @@ test.describe.skip('Test Single Step from Canvas', () => {
   test('single workflow node can be tested from the canvas using pinned data', async ({ app }) => {
     await openBuilderById(app, workflowId)
 
-    await runSingleWorkflowNode(app, 'Say Goodbye', '{"hello_node":{"stdout":"mocked"}}')
+    await runSingleWorkflowStep(app, 'Say Goodbye', '{"hello_node":{"stdout":"mocked"}}')
     await expect(app.getByRole('row', { name: /Manual Trigger/i })).toBeVisible({ timeout: 15_000 })
     await expect(app.getByRole('row', { name: /Say Hello/i })).toBeVisible({ timeout: 15_000 })
     await expect(app.getByRole('row', { name: /Say Goodbye/i })).toBeVisible({ timeout: 15_000 })

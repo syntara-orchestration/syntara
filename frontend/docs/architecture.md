@@ -112,15 +112,16 @@ Nice to have (but we'll explain the basics):
 
 ```mermaid
 flowchart TD
-  A[main.tsx] --> B[registerAllNodes]
-  A --> C[Render App]
-  C --> D[App.tsx providers]
-  D --> E[RouterProvider]
-  E --> F[tanstackRouter.ts]
-  F --> G[tanstackRouteTree.tsx]
-  G --> H[Root route and route modules]
-  H --> I[Matched screen component]
-  H --> J[RootLayout: AppShell and Outlet]
+  A[main.tsx] --> B[registerAllSteps]
+  A --> C[Lazy load App]
+  C --> D[App.tsx]
+  D --> E[QueryClientProvider and app providers]
+  E --> F[RouterProvider]
+  F --> G[tanstackRouter.ts]
+  G --> H[tanstackRouteTree.tsx]
+  H --> I[Root route and route modules]
+  I --> J[Matched screen component]
+  I --> K[RootLayout: AppShell and Outlet]
 ```
 
 ### Backend request flow (typical screen)
@@ -288,36 +289,36 @@ Within `packages/syntara-ui/src/`:
 
 ```tsx
 // Simplified view of main.tsx
-registerAllNodes() // Auto-discovers and registers workflow step types (NodeRegistry)
+registerAllSteps() // Auto-discovers and registers workflow step types (StepRegistry)
 const App = lazy(() => import('./app/App'))
 createRoot(document.getElementById('root')!).render(<App />)
 ```
 
-### How `registerAllNodes()` auto-discovers step types
+### How `registerAllSteps()` auto-discovers step types
 
-`registerAllNodes()` is implemented in `packages/syntara-ui/src/routes/builder/registry/nodes/index.ts`.
+`registerAllSteps()` is implemented in `packages/syntara-ui/src/routes/builder/registry/steps/index.ts`.
 It uses Vite's `import.meta.glob` to synchronously import all registration modules at startup:
 
 ```mermaid
 flowchart LR
   subgraph Startup["App Startup (main.tsx)"]
-    A[registerAllNodes]
+    A[registerAllSteps]
   end
 
   subgraph Vite["Vite import.meta.glob"]
-    B["Scan registry/nodes/"]
+    B["Scan registry/steps/"]
     C["Find register*.ts files"]
   end
 
   subgraph Files["Registration Files"]
-    D[registerActionNode.ts]
-    E[registerLogicNode.ts]
-    F[registerTriggerNode.ts]
-    G[registerApprovalNode.ts]
-    H["registerAIAgentNode.ts<br/>registerAAPNode.ts<br/>registerGenericNode.ts"]
+    D[registerActionStep.ts]
+    E[registerLogicStep.ts]
+    F[registerTriggerStep.ts]
+    G[registerApprovalStep.ts]
+    H["registerAIAgentStep.ts<br/>registerAAPStep.ts<br/>registerGenericStep.ts"]
   end
 
-  subgraph Registry["NodeRegistry (singleton)"]
+  subgraph Registry["StepRegistry (singleton)"]
     I["Map<id, NodeDefinition>"]
   end
 
@@ -327,12 +328,12 @@ flowchart LR
   D & E & F & G & H -->|"export default"| I
 ```
 
-- **Directory**: `packages/syntara-ui/src/routes/builder/registry/nodes/`
+- **Directory**: `packages/syntara-ui/src/routes/builder/registry/steps/`
 - **Filename pattern**: `register*.ts`
 - **Export contract**: each `register*.ts` file must `export default function registerXxx() { ... }`
-- **When it runs**: `packages/syntara-ui/src/main.tsx` calls `registerAllNodes()` before rendering the app
+- **When it runs**: `packages/syntara-ui/src/main.tsx` calls `registerAllSteps()` before rendering the app
 
-This is why adding a new canvas step type is usually just "create a new `registerMyNode.ts` file with a default export"
+This is why adding a new canvas step type is usually just "create a new `registerMyStep.ts` file with a default export"
 —no central list to edit.
 
 **App root**: `packages/syntara-ui/src/app/App.tsx`
@@ -649,40 +650,40 @@ Floating canvas surfaces (controls, step legend, steps on the canvas, undo/redo)
 
 This section is the “how it really works” view of the builder. It’s here so newcomers can debug issues without spelunking `BuilderFlow.tsx` immediately.
 
-#### Step registry — `NodeRegistry` (the "Add step" panel)
+#### Step registry — `StepRegistry` (the "Add step" panel)
 
 - **Goal**: decouple the "available step types + forms" list from the UI so new steps can be added without editing a central switch statement.
-- **Core types**: `routes/builder/registry/NodeRegistry.ts` + helpers in `routes/builder/registry/helpers/`.
+- **Core types**: `routes/builder/registry/StepRegistry.ts` + helpers in `routes/builder/registry/helpers/`.
 - **Registration flow**:
-  - Registration modules live in `routes/builder/registry/nodes/`.
-  - Any file matching **`register*.ts`** is loaded at startup (see "How `registerAllNodes()` auto-discovers step types" above).
-  - Each registration module must export a **default** function that calls `NodeRegistry.register(...)`.
+  - Registration modules live in `routes/builder/registry/steps/`.
+  - Any file matching **`register*.ts`** is loaded at startup (see "How `registerAllSteps()` auto-discovers step types" above).
+  - Each registration module must export a **default** function that calls `StepRegistry.register(...)`.
 - **Templates**:
-  - `createCustomNode(...)`: use this helper when you want shared registration ergonomics plus custom submit logic.
-  - Or call `NodeRegistry.register(...)` directly for simple registrations without helper wrappers.
+  - `createCustomStep(...)`: use this helper when you want shared registration ergonomics plus custom submit logic.
+  - Or call `StepRegistry.register(...)` directly for simple registrations without helper wrappers.
 - **Categories**:
   - Categories are type-safe and provide UI metadata (ordering/grouping/search). See `routes/builder/registry/categories.ts`.
 
 **Step registration system (code examples):**
 
 ```typescript
-// Each canvas step type has its own registration file (e.g., registerTriggerNode.ts)
+// Each canvas step type has its own registration file (e.g., registerTriggerStep.ts)
 // Files matching register*.ts are automatically discovered and registered
 // MUST export the registration function as default
 
-// Simple registrations can call NodeRegistry.register() directly:
-import { NodeRegistry } from '../NodeRegistry'
+// Simple registrations can call StepRegistry.register() directly:
+import { StepRegistry } from '../StepRegistry'
 
-export default function registerApprovalNode() {
-  NodeRegistry.register({
+export default function registerApprovalStep() {
+  StepRegistry.register({
     id: 'approval',
     label: 'Approval',
     icon: RhUiUserCheckIcon,
-    category: 'logic', // Type-safe - must be a valid NodeCategory
+    category: 'logic', // Type-safe - must be a valid StepCategory
     description: 'Require human approval before continuing workflow',
     keywords: ['approve', 'approval', 'review', 'manual'],
     order: 50,
-    formComponent: ApprovalNodeForm,
+    formComponent: ApprovalStepForm,
     onSubmit: (_data, onSuccess) => {
       onSuccess()
     },
@@ -690,11 +691,11 @@ export default function registerApprovalNode() {
 }
 
 // Complex registrations (workflow store integration):
-import { createCustomNode } from '../helpers/nodeTemplates'
+import { createCustomStep } from '../helpers/stepTemplates'
 
-export default function registerTriggerNode() {
-  NodeRegistry.register(
-    createCustomNode<TriggerFormData>(
+export default function registerTriggerStep() {
+  StepRegistry.register(
+    createCustomStep<TriggerFormData>(
       {
         id: 'trigger',
         label: 'Triggers',
@@ -703,7 +704,7 @@ export default function registerTriggerNode() {
         description: 'Start workflow execution',
         keywords: ['start', 'begin', 'manual', 'schedule'],
         order: 10,
-        formComponent: TriggerNodeForm,
+        formComponent: TriggerStepForm,
       },
       (data, onSuccess, onError) => {
         // Custom submission logic
@@ -715,20 +716,20 @@ export default function registerTriggerNode() {
   )
 }
 
-// AUTO-REGISTRATION: registerAllNodes() automatically discovers and calls
+// AUTO-REGISTRATION: registerAllSteps() automatically discovers and calls
 // all registration functions - no manual imports needed!
 ```
 
 **Adding new step types:**
 
-1. Create a file matching `register*.ts` in `registry/nodes/`
+1. Create a file matching `register*.ts` in `registry/steps/`
 2. Export your registration function as **default**
 3. That's it! Auto-discovery handles the rest
 
 **Available registration patterns:**
 
-- `NodeRegistry.register({ ... })` - Good for direct/simple registrations
-- `createCustomNode(config, onSubmit)` - Good for step types with shared helper behavior and custom submission logic
+- `StepRegistry.register({ ... })` - Good for direct/simple registrations
+- `createCustomStep(config, onSubmit)` - Good for step types with shared helper behavior and custom submission logic
 
 **Step categories (type-safe):**
 
@@ -748,11 +749,11 @@ Access category metadata: `getCategoryMetadata('trigger')` or `CATEGORY_METADATA
 **Registry API:**
 
 ```typescript
-NodeRegistry.register(definition) // Register a step type for the Add panel
-NodeRegistry.get(id) // Get definition by registry id
-NodeRegistry.getAll() // Get all enabled step types
-NodeRegistry.search(query) // Search step types by label/keywords
-NodeRegistry.getByCategory(cat) // Get step types by category
+StepRegistry.register(definition) // Register a step type for the Add panel
+StepRegistry.get(id) // Get definition by registry id
+StepRegistry.getAll() // Get all enabled step types
+StepRegistry.search(query) // Search step types by label/keywords
+StepRegistry.getByCategory(cat) // Get step types by category
 ```
 
 #### "Flat nodes + edges" is the canonical model (v2)
@@ -1012,9 +1013,9 @@ Builder adds extra types like `placeholder` for drop targets.
 
 **Visual coding (builder canvas):**
 
-- **Type-colored top bar + icon**: `routes/workflows/canvas/nodeTypeColors.ts` (`getNodeTypeColor`, `NODE_TYPE_COLORS`) maps node / executor types to PatternFly non-status tokens. `SynStep` accepts optional `topBarColor` for a 4px top border; when a node is **selected**, the full brand border replaces the top bar (same as nodes without a type bar). Icons use the same token via `renderNodeIcon(..., color)`.
-- **Semantic zoom (Topology-style LOD)**: When the React Flow viewport `zoom` is at or below `SEMANTIC_ZOOM_MAX_SCALE` (defined in `semanticZoom.ts`), `SynStep` renders a **224px** square **icon tile** (type accent on top border, same icon as the detailed header) with **no on-canvas text**. **Title** and **type** come from **`semanticZoomSummary`** and show in a PatternFly **tooltip** on the tile trigger (`SynStepSemanticZoomBody`). Canvas nodes pass **`semanticZoomIcon`** and **`semanticZoomMenuActions`** so **Edit** (view-details) and the kebab menu appear on hover, focus, or selection. For performance, LOD logic lives in **`useSemanticZoom`** (`nodes/hooks/useSemanticZoom.ts`): a **`useStore`** selector typed with **`ReactFlowState`** reads `transform[2]` (zoom) and returns a boolean so nodes re-render only when crossing the threshold—not on every pan/zoom frame like **`useViewport`** would (see [React Flow `useStore`](https://reactflow.dev/api-reference/hooks/use-store)). The primary title uses **`semanticZoomActivityTitle`** (trimmed name, else a stable fallback): structural nodes use **`Untitled ${metadata.label}`**; task-shaped nodes use **`Untitled task`** with the executor label on the second line. Tooltip copy uses **`--pf-t--global--text--color--inverse`** for both lines so it stays readable on PatternFly’s inverse tooltip surface. Connection handles anchor to the **tile** vertical center (`SEMANTIC_ZOOM_TILE_HANDLE_TOP_PX`). Branching nodes pass **`semanticZoomBranchSources`** so multiple source handles stack on the **tile** right edge with **no branch labels** (`SemanticZoomBranchSourceHandles.tsx`). `BuilderFlowCanvas` batches **`updateNodeInternals`** for all workflow step IDs when the threshold changes or a step is added during semantic zoom; its store selector compares only the semantic-zoom state and ordered IDs, so measured dimension updates do not retrigger measurement. New semantic-zoom UI should include **`vitest-axe`** coverage per the **Accessibility Testing** section in `AGENTS.md`.
-- **Add step panel**: `getAddNodePanelColor` uses registry ids; builder registry ids are centralized in `src/constants/registryNodeIds.ts` (`RegistryNodeId`, `RegistryNodeIdUnion`).
+- **Type-colored top bar + icon**: `routes/workflows/canvas/stepTypeColors.ts` (`getStepTypeColor`, `STEP_TYPE_COLORS`) maps step / executor types to PatternFly non-status tokens. `SynStep` accepts optional `topBarColor` for a 4px top border; when a step is **selected**, the full brand border replaces the top bar (same as steps without a type bar). Icons use the same token via `renderStepIcon(..., color)`.
+- **Semantic zoom (Topology-style LOD)**: When the React Flow viewport `zoom` is at or below `SEMANTIC_ZOOM_MAX_SCALE` (defined in `semanticZoom.ts`), `SynStep` renders a **224px** square **icon tile** (type accent on top border, same icon as the detailed header) with **no on-canvas text**. **Title** and **type** come from **`semanticZoomSummary`** and show in a PatternFly **tooltip** on the tile trigger (`SynStepSemanticZoomBody`). Canvas steps pass **`semanticZoomIcon`** and **`semanticZoomMenuActions`** so **Edit** (view-details) and the kebab menu appear on hover, focus, or selection. For performance, LOD logic lives in **`useSemanticZoom`** (`nodes/hooks/useSemanticZoom.ts`): a **`useStore`** selector typed with **`ReactFlowState`** reads `transform[2]` (zoom) and returns a boolean so steps re-render only when crossing the threshold—not on every pan/zoom frame like **`useViewport`** would (see [React Flow `useStore`](https://reactflow.dev/api-reference/hooks/use-store)). The primary title uses **`semanticZoomActivityTitle`** (trimmed name, else a stable fallback): structural steps use **`Untitled ${metadata.label}`**; task-shaped steps use **`Untitled task`** with the executor label on the second line. Tooltip copy uses **`--pf-t--global--text--color--inverse`** for both lines so it stays readable on PatternFly’s inverse tooltip surface. Connection handles anchor to the **tile** vertical center (`SEMANTIC_ZOOM_TILE_HANDLE_TOP_PX`). Branching steps pass **`semanticZoomBranchSources`** so multiple source handles stack on the **tile** right edge with **no branch labels** (`SemanticZoomBranchSourceHandles.tsx`). `BuilderFlowCanvas` batches **`updateNodeInternals`** for all workflow step IDs when the threshold changes or a step is added during semantic zoom; its store selector compares only the semantic-zoom state and ordered IDs, so measured dimension updates do not retrigger measurement. New semantic-zoom UI should include **`vitest-axe`** coverage per the **Accessibility Testing** section in `AGENTS.md`.
+- **Add step panel**: `getAddStepPanelColor` uses registry ids; builder registry ids are centralized in `src/constants/registryStepIds.ts` (`RegistryStepId`, `RegistryStepIdUnion`).
 - **Approval branches**: `BranchHandle` and `EdgePath` / `DefaultEdge` / `ButtonEdge` color approved vs rejected handles and edges using success/danger tokens.
 
 ### Edge types
@@ -1140,8 +1141,8 @@ queryClient.invalidateQueries({ queryKey: ['get', '/workflows'] })
 
 ### Add a new workflow step type
 
-1. Create `register*.ts` in `routes/builder/registry/nodes/`
-2. `NodeRegistry` auto-discovers it at startup
+1. Create `register*.ts` in `routes/builder/registry/steps/`
+2. `StepRegistry` auto-discovers it at startup
 3. Add/extend the React Flow node component in `routes/workflows/canvas/nodes/` (maps activities to canvas steps)
 
 ### Add filters to a list page

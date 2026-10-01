@@ -15,16 +15,16 @@
  */
 
 import { test, expect } from '../fixtures'
-import { addConditionalNode } from '../helpers/v2-nodes'
+import { addConditionalStep } from '../helpers/v2-steps'
 import {
   buildUniqueName,
   clickAddConnectedStep,
-  closeNodeEditorPanel,
+  closeStepEditorPanel,
   deleteWorkflow,
-  openNodeForEditing,
+  openStepForEditing,
   saveWorkflow,
   startWorkflowWithTrigger,
-  verifyNodeVisible,
+  verifyStepVisible,
   waitForUIReady,
 } from '../helpers/workflows'
 
@@ -36,13 +36,13 @@ test('user adds Conditional node and saves workflow', async ({ app }) => {
     await startWorkflowWithTrigger(app)
 
     // Act - Add Conditional node
-    await addConditionalNode(app, 'Check status', {
+    await addConditionalStep(app, 'Check status', {
       field: 'status',
       value: 'success',
     })
 
     // Assert - Verify the Conditional node appears on canvas
-    await verifyNodeVisible(app, 'Check status')
+    await verifyStepVisible(app, 'Check status')
 
     // Save the workflow
     await saveWorkflow(app, workflowName)
@@ -51,7 +51,7 @@ test('user adds Conditional node and saves workflow', async ({ app }) => {
     await expect(app.getByPlaceholder('Workflow name')).toHaveValue(workflowName)
 
     // Verify the node is still visible after save
-    await verifyNodeVisible(app, 'Check status')
+    await verifyStepVisible(app, 'Check status')
   } finally {
     await deleteWorkflow(app, workflowName)
   }
@@ -66,7 +66,7 @@ test('user reopens Conditional node to verify configuration persists', async ({ 
 
     // Add Conditional node with custom operator — use expression syntax
     // since the field input normalizes bare words to ${...}
-    await addConditionalNode(app, 'Initial condition', {
+    await addConditionalStep(app, 'Initial condition', {
       field: '${input.score}',
       operator: 'is greater than',
       value: '100',
@@ -76,8 +76,8 @@ test('user reopens Conditional node to verify configuration persists', async ({ 
     await saveWorkflow(app, workflowName)
 
     // Act - Reopen the Conditional node to verify configuration persists
-    await verifyNodeVisible(app, 'Initial condition')
-    await openNodeForEditing(app, 'Initial condition')
+    await verifyStepVisible(app, 'Initial condition')
+    await openStepForEditing(app, 'Initial condition')
 
     // Assert - Verify all configuration fields persisted
     await expect(app.getByRole('textbox', { name: 'Name', exact: true })).toHaveValue('Initial condition')
@@ -86,7 +86,7 @@ test('user reopens Conditional node to verify configuration persists', async ({ 
     await expect(app.getByRole('textbox', { name: 'Value', exact: true })).toHaveValue('100')
 
     // Close the panel to verify workflow state
-    // When editing (vs creating), the node details panel must close before the editor drawer
+    // When editing (vs creating), the step details panel must close before the editor drawer
     // There may be multiple nested panels, so close them all until only the drawer remains
     const closeButtons = app.getByRole('button', { name: 'Close' })
     while ((await closeButtons.count()) > 1) {
@@ -97,10 +97,10 @@ test('user reopens Conditional node to verify configuration persists', async ({ 
     }
     // Wait for UI to stabilize after closing nested panels
     await waitForUIReady(app)
-    await closeNodeEditorPanel(app)
+    await closeStepEditorPanel(app)
 
     // Verify the node is still on the canvas after reopening and closing
-    await verifyNodeVisible(app, 'Initial condition')
+    await verifyStepVisible(app, 'Initial condition')
   } finally {
     await deleteWorkflow(app, workflowName)
   }
@@ -170,7 +170,7 @@ test('user configures Conditional node with if/else-if/else branches', async ({ 
     await waitForUIReady(app)
 
     // Assert - Verify the Conditional node appears on canvas
-    await verifyNodeVisible(app, 'Multi-branch conditional')
+    await verifyStepVisible(app, 'Multi-branch conditional')
 
     // Save the workflow
     await saveWorkflow(app, workflowName)
@@ -187,14 +187,14 @@ test('user configures Conditional node with if/else-if/else branches', async ({ 
     await expect(app.getByPlaceholder('Workflow name')).toHaveValue(workflowName)
 
     // Reopen the node to verify branches persisted
-    await openNodeForEditing(app, 'Multi-branch conditional')
+    await openStepForEditing(app, 'Multi-branch conditional')
 
     // Verify both conditions (if + else-if) are still present
     const reopenedFieldInputs = app.getByRole('textbox', { name: 'Field', exact: true })
     await expect(reopenedFieldInputs).toHaveCount(2)
 
     // Close the panel to verify workflow state
-    // When editing (vs creating), the node details panel must close before the editor drawer
+    // When editing (vs creating), the step details panel must close before the editor drawer
     // There may be multiple nested panels, so close them all until only the drawer remains
     const closeButtons = app.getByRole('button', { name: 'Close' })
     while ((await closeButtons.count()) > 1) {
@@ -205,7 +205,7 @@ test('user configures Conditional node with if/else-if/else branches', async ({ 
     }
     // Wait for UI to stabilize after closing nested panels
     await waitForUIReady(app)
-    await closeNodeEditorPanel(app)
+    await closeStepEditorPanel(app)
   } finally {
     await deleteWorkflow(app, workflowName)
   }
@@ -266,7 +266,7 @@ test('user adds condition group to create complex conditional logic', async ({ a
     await waitForUIReady(app)
 
     // Assert - Verify the Conditional node appears on canvas
-    await verifyNodeVisible(app, 'Complex conditional')
+    await verifyStepVisible(app, 'Complex conditional')
 
     // Save the workflow
     await saveWorkflow(app, workflowName)

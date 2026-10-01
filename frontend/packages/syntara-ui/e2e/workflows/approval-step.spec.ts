@@ -15,27 +15,27 @@
  */
 
 import { type Page, test, expect } from '../fixtures'
-import { openAddNodePanel } from '../helpers/v2-nodes'
+import { openAddStepPanel } from '../helpers/v2-steps'
 import {
-  addNodePanel,
+  addStepPanel,
   buildUniqueName,
-  closeNodeEditorPanel,
+  closeStepEditorPanel,
   deleteWorkflow,
-  openNodeForEditing,
-  saveAndCloseNodeForm,
+  openStepForEditing,
+  saveAndCloseStepForm,
   saveWorkflow,
   startWorkflowWithTrigger,
-  verifyNodeVisible,
+  verifyStepVisible,
 } from '../helpers/workflows'
 
 /**
- * Helper to open the Approval node form from the add-node panel.
+ * Helper to open the Approval step form from the add-step panel.
  * Returns after the form is visible and ready for input.
  */
-async function openApprovalNodeForm(page: Page) {
-  await openAddNodePanel(page)
+async function openApprovalStepForm(page: Page) {
+  await openAddStepPanel(page)
 
-  const panel = addNodePanel(page)
+  const panel = addStepPanel(page)
   const approvalBtn = panel.getByRole('button', { name: 'Approval', exact: true })
   await expect(approvalBtn).toBeVisible()
   await approvalBtn.click()
@@ -110,7 +110,7 @@ async function configureApprovalNode(
 /**
  * Composite helper: Add an Approval node with full configuration in one step.
  */
-async function addApprovalNodeWithConfig(
+async function addApprovalStepWithConfig(
   page: Page,
   config: {
     name: string
@@ -119,9 +119,9 @@ async function addApprovalNodeWithConfig(
     fallbackDecision?: 'approve' | 'reject'
   }
 ) {
-  await openApprovalNodeForm(page)
+  await openApprovalStepForm(page)
   await configureApprovalNode(page, config)
-  await saveAndCloseNodeForm(page, false, config.name)
+  await saveAndCloseStepForm(page, false, config.name)
 }
 
 test.describe('Approval Node Configuration', () => {
@@ -134,7 +134,7 @@ test.describe('Approval Node Configuration', () => {
       await startWorkflowWithTrigger(app)
 
       // Act - Add Approval node with full configuration
-      await addApprovalNodeWithConfig(app, {
+      await addApprovalStepWithConfig(app, {
         name: 'Approval step',
         message: 'Please approve this deployment to production',
         decisionWindowSeconds: 3600,
@@ -142,7 +142,7 @@ test.describe('Approval Node Configuration', () => {
       })
 
       // Assert - Verify the Approval node appears on canvas
-      await verifyNodeVisible(app, 'Approval step')
+      await verifyStepVisible(app, 'Approval step')
 
       // Save the workflow
       await saveWorkflow(app, workflowName)
@@ -151,7 +151,7 @@ test.describe('Approval Node Configuration', () => {
       await expect(app.getByPlaceholder('Workflow name')).toHaveValue(workflowName)
 
       // Verify the node is still visible after save
-      await verifyNodeVisible(app, 'Approval step')
+      await verifyStepVisible(app, 'Approval step')
     } finally {
       // Cleanup
       await deleteWorkflow(app, workflowName)
@@ -167,7 +167,7 @@ test.describe('Approval Node Configuration', () => {
       await startWorkflowWithTrigger(app)
 
       // Add Approval node with initial configuration
-      await addApprovalNodeWithConfig(app, {
+      await addApprovalStepWithConfig(app, {
         name: 'Initial approval',
         message: 'Please review this change',
         decisionWindowSeconds: 7200,
@@ -178,8 +178,8 @@ test.describe('Approval Node Configuration', () => {
       await saveWorkflow(app, workflowName)
 
       // Act - Reopen the Approval node to verify configuration persists
-      await verifyNodeVisible(app, 'Initial approval')
-      await openNodeForEditing(app, 'Initial approval')
+      await verifyStepVisible(app, 'Initial approval')
+      await openStepForEditing(app, 'Initial approval')
 
       // Assert - Verify the editor panel opened and shows the persisted values
       await expect(app.getByRole('textbox', { name: 'Name', exact: true })).toHaveValue('Initial approval')
@@ -188,17 +188,17 @@ test.describe('Approval Node Configuration', () => {
       await expect(app.getByRole('button', { name: 'Fallback decision', exact: true })).toContainText('Approve')
 
       // Close the panel to verify workflow state
-      // When editing (vs creating), the node details panel must close before the editor drawer
+      // When editing (vs creating), the step details panel must close before the editor drawer
       const closeButtons = app.getByRole('button', { name: 'Close' })
       if ((await closeButtons.count()) > 1) {
         // Multiple Close buttons - close the inner panel first (node details)
         await closeButtons.last().click()
         await expect(closeButtons).toHaveCount(1, { timeout: 5000 })
       }
-      await closeNodeEditorPanel(app)
+      await closeStepEditorPanel(app)
 
       // Verify the node is still on the canvas after reopening and closing
-      await verifyNodeVisible(app, 'Initial approval')
+      await verifyStepVisible(app, 'Initial approval')
     } finally {
       // Cleanup
       await deleteWorkflow(app, workflowName)
@@ -212,7 +212,7 @@ test.describe('Approval Node Configuration', () => {
 
     try {
       // Test each fallback decision option in a separate workflow to avoid
-      // non-deterministic openAddNodePanel().first() with multiple Approval nodes
+      // non-deterministic openAddStepPanel().first() with multiple Approval nodes
       for (const decision of fallbackDecisions) {
         const workflowName = buildUniqueName(`e2e-approval-fallback-${decision}`)
         workflowNames.push(workflowName)
@@ -221,7 +221,7 @@ test.describe('Approval Node Configuration', () => {
         await startWorkflowWithTrigger(app)
 
         // Add Approval node with specific fallback decision
-        await addApprovalNodeWithConfig(app, {
+        await addApprovalStepWithConfig(app, {
           name: `Approval fallback ${decision}`,
           message: `Test ${decision} fallback`,
           decisionWindowSeconds: 600,
@@ -229,13 +229,13 @@ test.describe('Approval Node Configuration', () => {
         })
 
         // Verify the node appears on canvas
-        await verifyNodeVisible(app, `Approval fallback ${decision}`)
+        await verifyStepVisible(app, `Approval fallback ${decision}`)
 
         // Save the workflow
         await saveWorkflow(app, workflowName)
 
         // Assert - Verify workflow is persisted
-        await verifyNodeVisible(app, `Approval fallback ${decision}`)
+        await verifyStepVisible(app, `Approval fallback ${decision}`)
       }
     } finally {
       // Cleanup all created workflows
@@ -254,12 +254,12 @@ test.describe('Approval Node Configuration', () => {
       await startWorkflowWithTrigger(app)
 
       // Step 1: Add an Approval node to the canvas with minimal configuration
-      await openApprovalNodeForm(app)
+      await openApprovalStepForm(app)
       await configureApprovalNode(app, { name: 'Approval node' })
-      await saveAndCloseNodeForm(app, false, 'Approval node')
+      await saveAndCloseStepForm(app, false, 'Approval node')
 
       // Step 2: Click the node to open the details panel
-      await openNodeForEditing(app, 'Approval node')
+      await openStepForEditing(app, 'Approval node')
 
       // Step 3: Configure message, decision window, and fallback decision
       await configureApprovalNode(app, {
@@ -269,10 +269,10 @@ test.describe('Approval Node Configuration', () => {
       })
 
       // Step 4: Save the configuration (using Update button since we're editing)
-      await saveAndCloseNodeForm(app, true, 'Approval node')
+      await saveAndCloseStepForm(app, true, 'Approval node')
 
       // Verify the configuration saved by reopening the node
-      await openNodeForEditing(app, 'Approval node')
+      await openStepForEditing(app, 'Approval node')
 
       // Assert - Verify all configured values are present
       await expect(app.getByRole('textbox', { name: 'Message' })).toHaveValue('Please approve this deployment')
@@ -280,7 +280,7 @@ test.describe('Approval Node Configuration', () => {
       await expect(app.getByRole('button', { name: 'Fallback decision', exact: true })).toContainText('Approve')
 
       // Close the panel
-      await closeNodeEditorPanel(app)
+      await closeStepEditorPanel(app)
 
       // Save the workflow
       await saveWorkflow(app, workflowName)
@@ -295,8 +295,8 @@ test.describe('Approval Node Configuration', () => {
     // Arrange - Create a workflow with manual trigger
     await startWorkflowWithTrigger(app)
 
-    // Act - Open the Approval node form
-    await openApprovalNodeForm(app)
+    // Act - Open the Approval step form
+    await openApprovalStepForm(app)
 
     // Assert - Verify all required fields are present in the Parameters panel
     await expect(app.getByRole('textbox', { name: 'Name', exact: true })).toBeVisible()

@@ -1,13 +1,13 @@
 /**
  * Advanced loop and wait node helpers for v2 workflow E2E tests.
- * Extracted from v2-nodes.ts to keep file sizes within lint limits.
+ * Extracted from v2-steps.ts to keep file sizes within lint limits.
  */
 
 import { EXPRESSION_MODE_LABELS } from '../../src/components/expressions/expressionBuilderLabels'
 import { expect, type Page } from '../fixtures'
 
-import { openAddNodePanel, selectCategoryAndType } from './v2-nodes'
-import { addNodePanel, closeNodeEditorPanel, fillCodeEditor, openNodeForEditing } from './workflows'
+import { openAddStepPanel, selectCategoryAndStepType } from './v2-steps'
+import { addStepPanel, closeStepEditorPanel, fillCodeEditor, openStepForEditing } from './workflows'
 
 /**
  * Configure Loop node fields in an open form.
@@ -29,7 +29,7 @@ import { addNodePanel, closeNodeEditorPanel, fillCodeEditor, openNodeForEditing 
  * - Setting `items`, `itemVariable`, or `indexVariable` requires the form to already be in forEach mode
  *   or `type: 'forEach'` to be set in the same call
  */
-export async function configureLoopNode(
+export async function configureLoopStep(
   page: Page,
   config: {
     name?: string
@@ -115,7 +115,7 @@ export async function configureLoopNode(
  * Save and close a node editor form.
  * Automatically detects "Create" (new nodes) or "Update" (editing) button.
  */
-export async function saveAndCloseNodeForm(page: Page) {
+export async function saveAndCloseStepForm(page: Page) {
   const createButton = page.getByRole('button', { name: 'Create', exact: true })
   const updateButton = page.getByRole('button', { name: 'Update', exact: true })
 
@@ -132,7 +132,7 @@ export async function saveAndCloseNodeForm(page: Page) {
 /**
  * Add a Loop (While) node with full configuration.
  */
-export async function addWhileLoopNode(
+export async function addWhileLoopStep(
   page: Page,
   config: {
     name: string
@@ -140,21 +140,21 @@ export async function addWhileLoopNode(
     maxIterations?: number
   }
 ) {
-  await openAddNodePanel(page)
-  await selectCategoryAndType(page, 'Logic', 'Loop')
+  await openAddStepPanel(page)
+  await selectCategoryAndStepType(page, 'Logic', 'Loop')
 
-  await configureLoopNode(page, {
+  await configureLoopStep(page, {
     type: 'while',
     ...config,
   })
 
-  await saveAndCloseNodeForm(page)
+  await saveAndCloseStepForm(page)
 }
 
 /**
  * Add a Loop (For Each) node with full configuration.
  */
-export async function addForEachLoopNode(
+export async function addForEachLoopStep(
   page: Page,
   config: {
     name: string
@@ -164,15 +164,15 @@ export async function addForEachLoopNode(
     maxIterations?: number
   }
 ) {
-  await openAddNodePanel(page)
-  await selectCategoryAndType(page, 'Logic', 'Loop')
+  await openAddStepPanel(page)
+  await selectCategoryAndStepType(page, 'Logic', 'Loop')
 
-  await configureLoopNode(page, {
+  await configureLoopStep(page, {
     type: 'forEach',
     ...config,
   })
 
-  await saveAndCloseNodeForm(page)
+  await saveAndCloseStepForm(page)
 }
 
 /**
@@ -180,27 +180,27 @@ export async function addForEachLoopNode(
  * Uses the editor "Add step… → In loop" path because the canvas loop-body stub
  * (`add-node-button-loop`) is often missing next to unused loop `done` stubs.
  */
-export async function addChildScriptToLoop(page: Page, scriptName: string, code: string, loopNodeName: string) {
-  await openNodeForEditing(page, loopNodeName)
+export async function addChildScriptToLoopStep(page: Page, scriptName: string, code: string, loopNodeName: string) {
+  await openStepForEditing(page, loopNodeName)
   await page.getByRole('button', { name: 'Add step…' }).click()
   await page.getByRole('menuitem', { name: 'In loop' }).click()
-  await expect(addNodePanel(page)).toHaveCount(1)
-  await selectCategoryAndType(page, 'Action', 'Script')
+  await expect(addStepPanel(page)).toHaveCount(1)
+  await selectCategoryAndStepType(page, 'Action', 'Script')
 
   const nameInput = page.getByRole('textbox', { name: 'Name', exact: true })
   await expect(nameInput).toBeVisible({ timeout: 10_000 })
   await nameInput.fill(scriptName)
 
   await fillCodeEditor(page, { value: code })
-  await saveAndCloseNodeForm(page)
-  await closeNodeEditorPanel(page)
+  await saveAndCloseStepForm(page)
+  await closeStepEditorPanel(page)
 }
 
 /**
  * Add a wait node (v2 type: "wait") with duration configuration.
  * Uses exact label strings ('Days', 'Hours', 'Minutes', 'Seconds') per UI-17.
  */
-export async function addWaitNode(
+export async function addWaitStep(
   page: Page,
   name: string,
   durationConfig?: {
@@ -210,8 +210,8 @@ export async function addWaitNode(
     days?: number
   }
 ) {
-  await openAddNodePanel(page)
-  await selectCategoryAndType(page, 'Logic', 'Wait')
+  await openAddStepPanel(page)
+  await selectCategoryAndStepType(page, 'Logic', 'Wait')
 
   const nameInput = page.getByRole('textbox', { name: 'Name', exact: true })
   await expect(nameInput).toBeVisible({ timeout: 10_000 })
@@ -234,5 +234,5 @@ export async function addWaitNode(
 
   await page.getByRole('button', { name: 'Create', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Create', exact: true })).not.toBeAttached({ timeout: 15_000 })
-  await closeNodeEditorPanel(page)
+  await closeStepEditorPanel(page)
 }

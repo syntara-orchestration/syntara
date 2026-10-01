@@ -10,11 +10,11 @@
 import { test, expect } from './fixtures'
 import {
   buildUniqueName,
-  closeNodeEditorPanel,
+  closeStepEditorPanel,
   createBasicWorkflowViaApi,
   openWorkflowInBuilder,
   deleteWorkflow,
-  openNodeForEditing,
+  openStepForEditing,
 } from './helpers/workflows'
 
 test.describe('builder toolbar disabled while editing', () => {
@@ -32,7 +32,7 @@ test.describe('builder toolbar disabled while editing', () => {
       const saveBtn = app.getByRole('button', { name: 'Save workflow' })
       await expect(saveBtn).not.toHaveAttribute('aria-disabled', 'true')
 
-      await openNodeForEditing(app, 'Toolbar test action')
+      await openStepForEditing(app, 'Toolbar test action')
 
       // Wait for the node editor to fully open (cancel button appears inside the panel)
       const cancelBtn = app.getByRole('button', { name: 'Cancel without saving' })
@@ -50,7 +50,7 @@ test.describe('builder toolbar disabled while editing', () => {
       await expect(publishBtn).toHaveAttribute('aria-disabled', 'true')
 
       // Close the node editor
-      await closeNodeEditorPanel(app)
+      await closeStepEditorPanel(app)
 
       // Buttons should re-enable
       await expect(saveBtn).not.toHaveAttribute('aria-disabled', 'true', { timeout: 5_000 })
@@ -66,7 +66,7 @@ test.describe('builder toolbar disabled while editing', () => {
     try {
       await openWorkflowInBuilder(app, workflowName, id)
 
-      await openNodeForEditing(app, 'Tooltip test action')
+      await openStepForEditing(app, 'Tooltip test action')
       const cancelBtn = app.getByRole('button', { name: 'Cancel without saving' })
       await expect(cancelBtn).toBeVisible({ timeout: 10_000 })
 

@@ -5,15 +5,15 @@
  * to force the LLM to produce structured output matching the schema.
  *
  * Critical paths covered:
- * - Schema editor renders on Task Agent node form
+ * - Schema editor renders on Task Agent step form
  * - Schema accepts valid JSON without errors
  * - Schema persists after save and reopen
  * - Empty schema is valid (optional field)
  */
 import { test, expect, toAppUrl } from './fixtures'
 import { type SeededLlmIntegration, deleteLlmIntegration, createLlmIntegration } from './helpers/llm-helpers'
-import { addManualTrigger, ensureLlmCredential, selectLlmCredential } from './helpers/v2-nodes'
-import { addNodePanel, buildUniqueName, fillCodeEditor } from './helpers/workflows'
+import { addManualTrigger, ensureLlmCredential, selectLlmCredential } from './helpers/v2-steps'
+import { addStepPanel, buildUniqueName, fillCodeEditor } from './helpers/workflows'
 
 test.describe('Task Agent Structured Output', () => {
   test('schema editor renders on Task Agent node', async ({ app }) => {
@@ -29,7 +29,7 @@ test.describe('Task Agent Structured Output', () => {
     await expect(addBtn).toBeVisible()
     await addBtn.click({ force: true })
 
-    const panel = addNodePanel(app)
+    const panel = addStepPanel(app)
     await panel.getByRole('button', { name: 'Task Agent' }).click()
 
     // Verify Response schema section is visible
@@ -60,7 +60,7 @@ test.describe('Task Agent Structured Output', () => {
       const addBtn = app.getByRole('button', { name: 'Add connected step' })
       await addBtn.click({ force: true })
 
-      const panel = addNodePanel(app)
+      const panel = addStepPanel(app)
       await panel.getByRole('button', { name: 'Task Agent' }).click()
 
       // Fill required fields
@@ -114,7 +114,7 @@ test.describe('Task Agent Structured Output', () => {
       const addBtn = app.getByRole('button', { name: 'Add connected step' })
       await addBtn.click({ force: true })
 
-      const panel = addNodePanel(app)
+      const panel = addStepPanel(app)
       await panel.getByRole('button', { name: 'Task Agent' }).click()
 
       // Fill required fields but leave schema empty

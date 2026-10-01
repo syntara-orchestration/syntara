@@ -1,18 +1,18 @@
 import { type Page } from '../fixtures'
 import { test, expect, toAppUrl } from '../fixtures'
-import { addApprovalNode, addManualTrigger } from '../helpers/v2-nodes'
+import { addApprovalStep, addManualTrigger } from '../helpers/v2-steps'
 import {
-  addNodePanel,
+  addStepPanel,
   waitForUIReady,
   buildUniqueName,
   fillCodeEditor,
-  closeNodeEditorPanel,
+  closeStepEditorPanel,
 } from '../helpers/workflows'
 import { apiRequest } from '../utils/api'
 
-/** Select a category then a subtype within the add-node panel. */
-async function selectCategoryAndType(page: Page, category: string, subtype: string) {
-  const panel = addNodePanel(page)
+/** Select a category then a subtype within the add-step panel. */
+async function selectCategoryAndStepType(page: Page, category: string, subtype: string) {
+  const panel = addStepPanel(page)
   await panel.getByRole('button', { name: category, exact: true }).click()
   const subtypeBtn = panel.getByRole('button', { name: subtype, exact: true })
   await expect(subtypeBtn).toBeVisible({ timeout: 5_000 })
@@ -47,7 +47,7 @@ test.describe('Approval Workflow Creation', () => {
       await expect(app.getByText('Manual Start')).toBeVisible({ timeout: 10_000 })
 
       // Step 3: Add Approval node
-      await addApprovalNode(app, 'Deployment Approval')
+      await addApprovalStep(app, 'Deployment Approval')
 
       // Wait for approval node to appear on canvas
       await expect(app.getByText('Deployment Approval')).toBeVisible({ timeout: 10_000 })
@@ -68,8 +68,8 @@ test.describe('Approval Workflow Creation', () => {
       await approvedButton.click()
 
       // Panel opens on the approved branch — use it directly without re-opening
-      await expect(addNodePanel(app)).toHaveCount(1)
-      await selectCategoryAndType(app, 'Action', 'Script')
+      await expect(addStepPanel(app)).toHaveCount(1)
+      await selectCategoryAndStepType(app, 'Action', 'Script')
 
       const nameInput = app.getByRole('textbox', { name: 'Name', exact: true })
       await expect(nameInput).toBeVisible({ timeout: 10_000 })
@@ -77,7 +77,7 @@ test.describe('Approval Workflow Creation', () => {
       await nameInput.fill('Deploy to Production')
       await fillCodeEditor(app, { value: 'print("Deploying to production...")' })
       await app.getByRole('button', { name: 'Create', exact: true }).click()
-      await closeNodeEditorPanel(app)
+      await closeStepEditorPanel(app)
 
       // Wait for script node to appear
       await expect(app.getByText('Deploy to Production')).toBeVisible({ timeout: 10_000 })
@@ -93,8 +93,8 @@ test.describe('Approval Workflow Creation', () => {
         await rejectedButton.click()
 
         // Panel opens on the rejected branch — use it directly
-        await expect(addNodePanel(app)).toHaveCount(1)
-        await selectCategoryAndType(app, 'Action', 'Script')
+        await expect(addStepPanel(app)).toHaveCount(1)
+        await selectCategoryAndStepType(app, 'Action', 'Script')
 
         const rollbackNameInput = app.getByRole('textbox', { name: 'Name', exact: true })
         await expect(rollbackNameInput).toBeVisible({ timeout: 10_000 })
@@ -102,7 +102,7 @@ test.describe('Approval Workflow Creation', () => {
         await rollbackNameInput.fill('Rollback Changes')
         await fillCodeEditor(app, { value: 'print("Rolling back changes...")' })
         await app.getByRole('button', { name: 'Create', exact: true }).click()
-        await closeNodeEditorPanel(app)
+        await closeStepEditorPanel(app)
 
         await expect(app.getByText('Rollback Changes')).toBeVisible({ timeout: 10_000 })
       }

@@ -17,8 +17,8 @@ import { test, expect } from './fixtures'
 import { WCAG_TAGS } from './fixtures/accessibility'
 import { triggerVerifyWorkflow, VALIDATE_ROUTE } from './helpers/workflow-verify'
 import {
-  addScriptNode,
-  addScriptNodeUnconnected,
+  addScriptStep,
+  addScriptStepUnconnected,
   buildUniqueName,
   clickSaveAndWait,
   createBasicWorkflowViaApi,
@@ -339,7 +339,7 @@ test.describe('Variable reference validation', () => {
     const workflowId = getWorkflowIdFromUrl(app)
 
     try {
-      await addScriptNode(app, 'Ref step', 'echo ${nonexistent_node.result}')
+      await addScriptStep(app, 'Ref step', 'echo ${nonexistent_node.result}')
 
       await clickSaveAndWait(app)
 
@@ -362,14 +362,14 @@ test.describe('Variable reference validation', () => {
     const workflowId = getWorkflowIdFromUrl(app)
 
     try {
-      await addScriptNode(app, 'Upstream step', 'echo hello')
+      await addScriptStep(app, 'Upstream step', 'echo hello')
 
       const upstreamNode = app
         .locator('[role="group"][aria-roledescription="node"]')
         .filter({ hasText: 'Upstream step' })
       const upstreamNodeId = await upstreamNode.getAttribute('data-id')
 
-      await addScriptNodeUnconnected(app, 'Isolated step', `echo \${${upstreamNodeId}.result}`)
+      await addScriptStepUnconnected(app, 'Isolated step', `echo \${${upstreamNodeId}.result}`)
 
       await clickSaveAndWait(app)
 
@@ -392,7 +392,7 @@ test.describe('Variable reference validation', () => {
     const workflowId = getWorkflowIdFromUrl(app)
 
     try {
-      await addScriptNode(app, 'Field ref step', 'echo ${trigger.missing_field}')
+      await addScriptStep(app, 'Field ref step', 'echo ${trigger.missing_field}')
 
       await clickSaveAndWait(app)
 

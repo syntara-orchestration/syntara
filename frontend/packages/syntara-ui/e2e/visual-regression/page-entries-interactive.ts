@@ -348,10 +348,10 @@ export const builderInteractivePages: CanvasPageEntry[] = [
   },
   {
     section: 'workflows',
-    name: 'builder-edit-script-node-form',
+    name: 'builder-edit-script-step-form',
     path: AppRoute.WorkflowBuilder.Edit.replace(':workflowId', MOCK_CONDITION_WORKFLOW_ID),
     perceptual: true,
-    // NodeEditorOverlay covers the canvas box — masking .react-flow would erase the form.
+    // StepEditorOverlay covers the canvas box — masking .react-flow would erase the form.
     maskCanvas: false,
     waitFor: async (page) => {
       await expect(page.locator('.react-flow')).toBeVisible({ timeout: 30_000 })
@@ -362,7 +362,7 @@ export const builderInteractivePages: CanvasPageEntry[] = [
   },
   {
     section: 'workflows',
-    name: 'builder-edit-condition-node-form',
+    name: 'builder-edit-condition-step-form',
     path: AppRoute.WorkflowBuilder.Edit.replace(':workflowId', MOCK_CONDITION_WORKFLOW_ID),
     perceptual: true,
     maskCanvas: false,
@@ -375,7 +375,7 @@ export const builderInteractivePages: CanvasPageEntry[] = [
   },
   {
     section: 'workflows',
-    name: 'builder-edit-loop-node-form',
+    name: 'builder-edit-loop-step-form',
     path: AppRoute.WorkflowBuilder.Edit.replace(':workflowId', MOCK_LOOP_WORKFLOW_ID),
     perceptual: true,
     maskCanvas: false,
@@ -392,7 +392,7 @@ export const builderInteractivePages: CanvasPageEntry[] = [
   },
   {
     section: 'workflows',
-    name: 'builder-edit-agentic-node-form',
+    name: 'builder-edit-agentic-step-form',
     path: AppRoute.WorkflowBuilder.Edit.replace(':workflowId', MOCK_AGENTIC_WORKFLOW_ID),
     perceptual: true,
     maskCanvas: false,
@@ -406,7 +406,7 @@ export const builderInteractivePages: CanvasPageEntry[] = [
   },
   {
     section: 'workflows',
-    name: 'builder-edit-http-node-form',
+    name: 'builder-edit-http-step-form',
     path: AppRoute.WorkflowBuilder.Edit.replace(':workflowId', MOCK_HTTP_WORKFLOW_ID),
     perceptual: true,
     maskCanvas: false,
@@ -420,7 +420,7 @@ export const builderInteractivePages: CanvasPageEntry[] = [
   },
   {
     section: 'workflows',
-    name: 'builder-edit-converge-node-form',
+    name: 'builder-edit-converge-step-form',
     path: AppRoute.WorkflowBuilder.Edit.replace(':workflowId', MOCK_CONVERGE_WORKFLOW_ID),
     perceptual: true,
     maskCanvas: false,
@@ -433,7 +433,7 @@ export const builderInteractivePages: CanvasPageEntry[] = [
   },
   {
     section: 'workflows',
-    name: 'builder-edit-approval-node-form',
+    name: 'builder-edit-approval-step-form',
     path: AppRoute.WorkflowBuilder.Edit.replace(':workflowId', MOCK_APPROVAL_WORKFLOW_ID),
     perceptual: true,
     maskCanvas: false,

@@ -8,7 +8,7 @@
  */
 import { test, expect, toAppUrl } from '../fixtures'
 import { APP_TITLE } from '../helpers/appTitle'
-import { addNodePanel } from '../helpers/workflows'
+import { addStepPanel } from '../helpers/workflows'
 
 // Allow 0.01 (1%) pixel diff to tolerate sub-pixel text rendering / anti-aliasing noise
 const screenshotOptions = { maxDiffPixelRatio: 0.01 } as const
@@ -61,7 +61,7 @@ test.describe('Visual regression — PF6 token migration', { tag: '@local-only' 
     const addStepBtn = app.getByRole('button', { name: 'Add connected step' })
     await addStepBtn.waitFor({ state: 'visible' })
     await addStepBtn.click()
-    const panel = addNodePanel(app)
+    const panel = addStepPanel(app)
     await expect(panel).toHaveCount(1)
     await panel.getByRole('button', { name: 'Logic', exact: true }).click()
 

@@ -24,7 +24,7 @@ export async function layoutCanvas(page: Page) {
 /**
  * Click a React Flow node by its visible text label and wait for its editor to open.
  *
- * Retrying the open matches {@link openNodeForEditing} in `workflows.ts`: under CI load
+ * Retrying the open matches {@link openStepForEditing} in `workflows.ts`: under CI load
  * the click can land while the viewport is still transforming. The success condition is
  * the editor showing this node — the Name field carries the clicked node's name.
  */
