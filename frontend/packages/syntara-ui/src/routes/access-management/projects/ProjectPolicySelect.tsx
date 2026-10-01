@@ -1,9 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 
 import { accessClient } from '../../access/accessClient'
 import { fetchAllProjectPoliciesForSelect } from '../../access/fetchAllPoliciesForSelect'
-import { PolicySelectField } from '../../access/PolicySelectDropdown'
-import { buildPolicyOptionList, filterPolicyOptionsByTerm, usePolicySelectField } from '../../access/policySelectShared'
+import { PolicySelectBase } from '../../access/PolicySelectBase'
 
 type ProjectPolicySelectProps = {
   projectId: string
@@ -16,21 +15,16 @@ const PAGE_SIZE = 50
 
 export function ProjectPolicySelect({ projectId, selected, onChange, hasError }: Readonly<ProjectPolicySelectProps>) {
   const filterValueRef = useRef('')
+  const [isOpen, setIsOpen] = useState(false)
 
   const fetchAllMatchingPolicies = useCallback(
     () => fetchAllProjectPoliciesForSelect(projectId, filterValueRef.current || undefined),
     [projectId]
   )
 
-  const field = usePolicySelectField({
-    selected,
-    onChange,
-    fetchPolicies: fetchAllMatchingPolicies,
-  })
-
-  useEffect(() => {
-    filterValueRef.current = field.filterValue
-  }, [field.filterValue])
+  const handleFilterValueChange = useCallback((value: string) => {
+    filterValueRef.current = value
+  }, [])
 
   const policiesQuery = accessClient.useQuery(
     'get',
@@ -41,43 +35,26 @@ export function ProjectPolicySelect({ projectId, selected, onChange, hasError }:
         query: { sort: 'name', limit: PAGE_SIZE },
       },
     },
-    { enabled: field.isOpen }
+    { enabled: isOpen }
   )
 
-  const policyOptions = useMemo(
-    () => buildPolicyOptionList(policiesQuery.data?.resources ?? [], selected),
-    [policiesQuery.data?.resources, selected]
-  )
-
-  const filteredOptions = useMemo(
-    () => filterPolicyOptionsByTerm(policyOptions, field.filterValue),
-    [policyOptions, field.filterValue]
-  )
+  const policyResources = useMemo(() => policiesQuery.data?.resources ?? [], [policiesQuery.data?.resources])
 
   const isLoading = policiesQuery.isLoading || policiesQuery.isFetching
 
   return (
-    <PolicySelectField
+    <PolicySelectBase
       id="project-role-policies"
       selected={selected}
-      filteredOptions={filteredOptions}
-      filterValue={field.filterValue}
-      isOpen={field.isOpen}
-      isLoading={isLoading}
-      isSelectingAll={field.isSelectingAll}
+      onChange={onChange}
       hasError={hasError}
-      inputRef={field.inputRef}
+      policyResources={policyResources}
+      isLoading={isLoading}
+      fetchAllMatchingPolicies={fetchAllMatchingPolicies}
+      clientSideFilterOnly
       toggleTestId="policy-select-toggle"
-      onOpenChange={field.handleOpenChange}
-      onSelect={field.onSelect}
-      onFilterChange={(value: string) => {
-        field.setFilterValue(value)
-        field.openDropdown()
-      }}
-      onFilterFocus={field.openDropdown}
-      onRemovePolicy={field.removePolicy}
-      onClearAll={field.clearAll}
-      onToggle={() => field.handleOpenChange(!field.isOpen)}
+      onDropdownOpenChange={setIsOpen}
+      onFilterValueChange={handleFilterValueChange}
     />
   )
 }

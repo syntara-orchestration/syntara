@@ -3,8 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { accessClient } from './accessClient'
 import { fetchAllPoliciesForSelect } from './fetchAllPoliciesForSelect'
 import { filterPoliciesForRoleSelect } from './policySelectConstants'
-import { PolicySelectField } from './PolicySelectDropdown'
-import { buildPolicyOptionList, filterPolicyOptionsByTerm, usePolicySelectField } from './policySelectShared'
+import { PolicySelectBase } from './PolicySelectBase'
 
 type PolicySelectProps = {
   selected: string[]
@@ -30,6 +29,7 @@ export function PolicySelect({
   isDisabled,
 }: Readonly<PolicySelectProps>) {
   const [debouncedFilter, setDebouncedFilter] = useState('')
+  const [isOpen, setIsOpen] = useState(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined)
   const filterValueRef = useRef('')
   const debouncedFilterRef = useRef('')
@@ -44,26 +44,19 @@ export function PolicySelect({
     [scopeProjectId, projectEligible]
   )
 
-  const field = usePolicySelectField({
-    selected,
-    onChange,
-    fetchPolicies: fetchAllMatchingPolicies,
-  })
-
-  useEffect(() => {
-    filterValueRef.current = field.filterValue
-  }, [field.filterValue])
-
   useEffect(() => {
     debouncedFilterRef.current = debouncedFilter
   }, [debouncedFilter])
 
-  useEffect(() => {
+  const handleFilterValueChange = useCallback((value: string) => {
+    filterValueRef.current = value
+    clearTimeout(debounceRef.current)
     debounceRef.current = setTimeout(() => {
-      setDebouncedFilter(field.filterValue)
+      setDebouncedFilter(value)
     }, DEBOUNCE_MS)
-    return () => clearTimeout(debounceRef.current)
-  }, [field.filterValue])
+  }, [])
+
+  useEffect(() => () => clearTimeout(debounceRef.current), [])
 
   const policiesQuery = accessClient.useQuery(
     'get',
@@ -79,7 +72,7 @@ export function PolicySelect({
         },
       },
     },
-    { enabled: field.isOpen }
+    { enabled: isOpen }
   )
 
   const scopedPolicies = useMemo(
@@ -87,39 +80,21 @@ export function PolicySelect({
     [policiesQuery.data?.resources, scopeProjectId, projectEligible]
   )
 
-  const policyOptions = useMemo(() => buildPolicyOptionList(scopedPolicies, selected), [scopedPolicies, selected])
-
-  const filteredOptions = useMemo(() => {
-    if (field.filterValue && field.filterValue !== debouncedFilter) {
-      return filterPolicyOptionsByTerm(policyOptions, field.filterValue)
-    }
-    return policyOptions
-  }, [policyOptions, field.filterValue, debouncedFilter])
-
   const isLoading = policiesQuery.isLoading || policiesQuery.isFetching
 
   return (
-    <PolicySelectField
+    <PolicySelectBase
       id="role-policies"
       selected={selected}
-      filteredOptions={filteredOptions}
-      filterValue={field.filterValue}
-      isOpen={field.isOpen}
-      isLoading={isLoading}
-      isSelectingAll={field.isSelectingAll}
+      onChange={onChange}
       hasError={hasError}
       isDisabled={isDisabled}
-      inputRef={field.inputRef}
-      onOpenChange={field.handleOpenChange}
-      onSelect={field.onSelect}
-      onFilterChange={(value: string) => {
-        field.setFilterValue(value)
-        field.openDropdown()
-      }}
-      onFilterFocus={field.openDropdown}
-      onRemovePolicy={field.removePolicy}
-      onClearAll={field.clearAll}
-      onToggle={() => field.handleOpenChange(!field.isOpen)}
+      policyResources={scopedPolicies}
+      isLoading={isLoading}
+      fetchAllMatchingPolicies={fetchAllMatchingPolicies}
+      apiFilterTerm={debouncedFilter}
+      onDropdownOpenChange={setIsOpen}
+      onFilterValueChange={handleFilterValueChange}
     />
   )
 }
