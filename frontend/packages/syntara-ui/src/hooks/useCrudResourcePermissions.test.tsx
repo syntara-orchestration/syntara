@@ -4,8 +4,8 @@ import { createElement } from 'react'
 import type { ReactNode } from 'react'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 
-import { useCrudResourcePermissions } from './useCrudResourcePermissions'
 import { useCanI } from './useCanI'
+import { useCrudResourcePermissions } from './useCrudResourcePermissions'
 
 vi.mock('./useCanI', () => ({
   useCanI: vi.fn(),

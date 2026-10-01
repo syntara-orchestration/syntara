@@ -5,11 +5,11 @@ import { Controller } from 'react-hook-form'
 
 import { SynFormField } from '../../components/forms/SynFormField'
 import { SynTextField } from '../../components/forms/SynTextField'
+import type { AddProjectRoleFormData } from '../access-management/projects/addProjectRoleSchema'
+import { ProjectPolicySelect } from '../access-management/projects/ProjectPolicySelect'
 
 import { accessControlHelp } from './accessControlFieldHelp'
 import { ROLE_NAME_HINT } from './roleFieldHelp'
-import type { AddProjectRoleFormData } from '../access-management/projects/addProjectRoleSchema'
-import { ProjectPolicySelect } from '../access-management/projects/ProjectPolicySelect'
 
 export type RoleFormFieldIds = {
   name: string
@@ -97,13 +97,15 @@ export function RoleFormFields<T extends FieldValues>({
         <Controller
           name={policiesField}
           control={control}
-          render={({ field }) =>
-            renderPolicySelect({
-              selected: field.value as string[],
-              onChange: field.onChange,
-              hasError: Boolean(policiesError),
-            })
-          }
+          render={({ field }) => (
+            <>
+              {renderPolicySelect({
+                selected: field.value as string[],
+                onChange: field.onChange,
+                hasError: Boolean(policiesError),
+              })}
+            </>
+          )}
         />
         {policiesHelper ??
           (policiesError && (

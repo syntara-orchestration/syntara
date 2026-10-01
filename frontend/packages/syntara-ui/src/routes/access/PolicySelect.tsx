@@ -2,8 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { accessClient } from './accessClient'
 import { fetchAllPoliciesForSelect } from './fetchAllPoliciesForSelect'
-import { filterPoliciesForRoleSelect } from './policySelectConstants'
 import { PolicySelectBase } from './PolicySelectBase'
+import { filterPoliciesForRoleSelect } from './policySelectConstants'
 
 type PolicySelectProps = {
   selected: string[]
