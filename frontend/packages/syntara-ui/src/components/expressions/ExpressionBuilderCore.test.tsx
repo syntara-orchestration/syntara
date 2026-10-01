@@ -6,20 +6,22 @@ import { axe } from 'vitest-axe'
 import { createDefaultCondition, createDefaultGroup } from '../../utils/expressions/defaults'
 
 import { ExpressionBuilderCore } from './ExpressionBuilderCore'
-import { EXPRESSION_EDITOR_MODE_ARIA_LABEL, EXPRESSION_MODE_LABELS } from './expressionBuilderLabels'
+import { EXPRESSION_MODE_LABELS } from './expressionBuilderLabels'
 import { prepareRootNode } from './prepareRootNode'
 
 const MODE_LABELS = EXPRESSION_MODE_LABELS
 
+const MODE_TOGGLE_NAME = new RegExp(`${MODE_LABELS.visual}|${MODE_LABELS.raw}`)
+
 async function selectMode(user: ReturnType<typeof userEvent.setup>, mode: 'visual' | 'raw') {
-  const toggle = screen.getByRole('button', { name: EXPRESSION_EDITOR_MODE_ARIA_LABEL })
+  const toggle = screen.getByRole('button', { name: MODE_TOGGLE_NAME })
   await user.click(toggle)
   const option = await screen.findByRole('option', { name: MODE_LABELS[mode] })
   await user.click(option)
 }
 
 function expectModeValue(mode: 'visual' | 'raw') {
-  const toggle = screen.getByRole('button', { name: EXPRESSION_EDITOR_MODE_ARIA_LABEL })
+  const toggle = screen.getByRole('button', { name: MODE_LABELS[mode] })
   expect(toggle).toHaveTextContent(MODE_LABELS[mode])
 }
 
@@ -69,7 +71,7 @@ describe('ExpressionBuilderCore', () => {
     const onChange = vi.fn()
     render(<ExpressionBuilderCore value="" onChange={onChange} />)
 
-    expect(screen.getByRole('button', { name: EXPRESSION_EDITOR_MODE_ARIA_LABEL })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: MODE_LABELS.visual })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Add condition' })).toBeInTheDocument()
   })
 
@@ -80,7 +82,7 @@ describe('ExpressionBuilderCore', () => {
 
     expectModeValue('visual')
 
-    const toggle = screen.getByRole('button', { name: EXPRESSION_EDITOR_MODE_ARIA_LABEL })
+    const toggle = screen.getByRole('button', { name: MODE_TOGGLE_NAME })
     await user.click(toggle)
 
     expect(screen.getByRole('option', { name: EXPRESSION_MODE_LABELS.visual })).toBeInTheDocument()

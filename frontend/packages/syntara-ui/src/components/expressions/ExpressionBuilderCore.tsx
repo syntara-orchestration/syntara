@@ -236,7 +236,7 @@ export function ExpressionBuilderCore(props: ExpressionBuilderCoreProps) {
         onClick={() => setIsModeOpen((prev) => !prev)}
         isExpanded={isModeOpen}
         isFullWidth
-        aria-label={EXPRESSION_EDITOR_MODE_ARIA_LABEL}
+        aria-label={EXPRESSION_MODE_LABELS[state.mode]}
       >
         {EXPRESSION_MODE_LABELS[state.mode]}
       </MenuToggle>

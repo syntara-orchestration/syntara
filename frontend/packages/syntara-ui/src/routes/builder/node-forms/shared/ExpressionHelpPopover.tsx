@@ -1,6 +1,7 @@
 import { Stack, StackItem } from '@patternfly/react-core'
 
 import { FieldHelpPopover } from '../../../../components/FieldHelpPopover'
+import { EXPRESSION_MODE_LABELS } from '../../../../components/expressions/expressionBuilderLabels'
 
 type ExpressionHelpPopoverProps = {
   headerContent: string
@@ -15,11 +16,12 @@ export function ExpressionHelpPopover({ headerContent, description }: Expression
         <Stack hasGutter>
           <StackItem>{description}</StackItem>
           <StackItem>
-            <strong>Form builder:</strong> Build conditions visually using a form interface with dropdowns and inputs.
+            <strong>{EXPRESSION_MODE_LABELS.visual}:</strong> Build conditions visually using a form interface with
+            dropdowns and inputs.
           </StackItem>
           <StackItem>
-            <strong>Freeform text:</strong> Write conditions directly as template expressions in the format{' '}
-            <code>{'${variable operator value}'}</code>
+            <strong>{EXPRESSION_MODE_LABELS.raw}:</strong> Write conditions directly as template expressions in the
+            format <code>{'${variable operator value}'}</code>
           </StackItem>
         </Stack>
       }
