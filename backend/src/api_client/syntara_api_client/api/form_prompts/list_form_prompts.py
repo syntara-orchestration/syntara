@@ -1,5 +1,6 @@
 from http import HTTPStatus
 from typing import Any
+from uuid import UUID
 
 import httpx
 
@@ -7,6 +8,7 @@ from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.error_data import ErrorData
 from ...models.form_prompt_list_response import FormPromptListResponse
+from ...models.form_prompt_status import FormPromptStatus
 from ...types import UNSET, Response, Unset
 
 
@@ -16,6 +18,8 @@ def _get_kwargs(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
+    status: FormPromptStatus | None | Unset = UNSET,
+    execution_id: None | Unset | UUID = UNSET,
     additional_params: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     params: dict[str, Any] = {}
@@ -39,6 +43,24 @@ def _get_kwargs(
     params["sort"] = json_sort
 
     params["include_total"] = include_total
+
+    json_status: None | str | Unset
+    if isinstance(status, Unset):
+        json_status = UNSET
+    elif isinstance(status, FormPromptStatus):
+        json_status = status.value
+    else:
+        json_status = status
+    params["status"] = json_status
+
+    json_execution_id: None | str | Unset
+    if isinstance(execution_id, Unset):
+        json_execution_id = UNSET
+    elif isinstance(execution_id, UUID):
+        json_execution_id = str(execution_id)
+    else:
+        json_execution_id = execution_id
+    params["execution_id"] = json_execution_id
 
     params = {k: v for k, v in params.items() if v is not UNSET and v is not None}
 
@@ -125,6 +147,8 @@ def sync_detailed(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
+    status: FormPromptStatus | None | Unset = UNSET,
+    execution_id: None | Unset | UUID = UNSET,
     additional_params: dict[str, Any] | None = None,
 ) -> Response[ErrorData | FormPromptListResponse]:
     """List form prompts
@@ -139,10 +163,12 @@ def sync_detailed(
     Uses cursor-based pagination for scalability and consistency.
 
     Args:
-        limit (int | Unset):  Default: 20.
-        cursor (None | str | Unset):
-        sort (None | str | Unset):
-        include_total (bool | Unset):  Default: False.
+        limit (int | Unset): Maximum number of results per page Default: 20.
+        cursor (None | str | Unset): Pagination cursor from previous response
+        sort (None | str | Unset): Sort parameter (e.g., 'name', '-created_at')
+        include_total (bool | Unset): Include total count in response (expensive) Default: False.
+        status (FormPromptStatus | None | Unset):
+        execution_id (None | Unset | UUID):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -153,7 +179,13 @@ def sync_detailed(
     """
 
     kwargs = _get_kwargs(
-        limit=limit, cursor=cursor, sort=sort, include_total=include_total, additional_params=additional_params
+        limit=limit,
+        cursor=cursor,
+        sort=sort,
+        include_total=include_total,
+        status=status,
+        execution_id=execution_id,
+        additional_params=additional_params,
     )
 
     response = client.get_httpx_client().request(
@@ -170,6 +202,8 @@ def sync(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
+    status: FormPromptStatus | None | Unset = UNSET,
+    execution_id: None | Unset | UUID = UNSET,
 ) -> ErrorData | FormPromptListResponse | None:
     """List form prompts
 
@@ -183,10 +217,12 @@ def sync(
     Uses cursor-based pagination for scalability and consistency.
 
     Args:
-        limit (int | Unset):  Default: 20.
-        cursor (None | str | Unset):
-        sort (None | str | Unset):
-        include_total (bool | Unset):  Default: False.
+        limit (int | Unset): Maximum number of results per page Default: 20.
+        cursor (None | str | Unset): Pagination cursor from previous response
+        sort (None | str | Unset): Sort parameter (e.g., 'name', '-created_at')
+        include_total (bool | Unset): Include total count in response (expensive) Default: False.
+        status (FormPromptStatus | None | Unset):
+        execution_id (None | Unset | UUID):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -202,6 +238,8 @@ def sync(
         cursor=cursor,
         sort=sort,
         include_total=include_total,
+        status=status,
+        execution_id=execution_id,
     ).parsed
 
 
@@ -212,6 +250,8 @@ async def asyncio_detailed(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
+    status: FormPromptStatus | None | Unset = UNSET,
+    execution_id: None | Unset | UUID = UNSET,
 ) -> Response[ErrorData | FormPromptListResponse]:
     """List form prompts
 
@@ -225,10 +265,12 @@ async def asyncio_detailed(
     Uses cursor-based pagination for scalability and consistency.
 
     Args:
-        limit (int | Unset):  Default: 20.
-        cursor (None | str | Unset):
-        sort (None | str | Unset):
-        include_total (bool | Unset):  Default: False.
+        limit (int | Unset): Maximum number of results per page Default: 20.
+        cursor (None | str | Unset): Pagination cursor from previous response
+        sort (None | str | Unset): Sort parameter (e.g., 'name', '-created_at')
+        include_total (bool | Unset): Include total count in response (expensive) Default: False.
+        status (FormPromptStatus | None | Unset):
+        execution_id (None | Unset | UUID):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -243,6 +285,8 @@ async def asyncio_detailed(
         cursor=cursor,
         sort=sort,
         include_total=include_total,
+        status=status,
+        execution_id=execution_id,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -257,6 +301,8 @@ async def asyncio(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
+    status: FormPromptStatus | None | Unset = UNSET,
+    execution_id: None | Unset | UUID = UNSET,
 ) -> ErrorData | FormPromptListResponse | None:
     """List form prompts
 
@@ -270,10 +316,12 @@ async def asyncio(
     Uses cursor-based pagination for scalability and consistency.
 
     Args:
-        limit (int | Unset):  Default: 20.
-        cursor (None | str | Unset):
-        sort (None | str | Unset):
-        include_total (bool | Unset):  Default: False.
+        limit (int | Unset): Maximum number of results per page Default: 20.
+        cursor (None | str | Unset): Pagination cursor from previous response
+        sort (None | str | Unset): Sort parameter (e.g., 'name', '-created_at')
+        include_total (bool | Unset): Include total count in response (expensive) Default: False.
+        status (FormPromptStatus | None | Unset):
+        execution_id (None | Unset | UUID):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -290,5 +338,7 @@ async def asyncio(
             cursor=cursor,
             sort=sort,
             include_total=include_total,
+            status=status,
+            execution_id=execution_id,
         )
     ).parsed

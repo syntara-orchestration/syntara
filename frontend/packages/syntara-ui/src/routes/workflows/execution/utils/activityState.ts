@@ -384,7 +384,7 @@ export function parseCompositeKey(activityId: string): { baseId: string; iterati
  * use `{canvasId}#iter-{n}` with a monotonic counter, not `loop_iteration_path`.
  */
 export function latestActivityStateForCanvasNode(
-  activityStates: Map<string, ActivityState>,
+  activityStates: ReadonlyMap<string, ActivityState>,
   canvasId: string
 ): ActivityState | undefined {
   let latestIter = -1

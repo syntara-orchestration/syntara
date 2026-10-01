@@ -8967,10 +8967,12 @@ paths:
           required: false
           schema:
             type: integer
-            maximum: 100
             exclusiveMinimum: 0
+            maximum: 100
             default: 20
+            description: Maximum number of results per page
             title: Limit
+          description: Maximum number of results per page
         - name: cursor
           in: query
           required: false
@@ -8978,7 +8980,9 @@ paths:
             anyOf:
               - type: string
               - type: 'null'
+            description: Pagination cursor from previous response
             title: Cursor
+          description: Pagination cursor from previous response
         - name: sort
           in: query
           required: false
@@ -8987,14 +8991,35 @@ paths:
               - type: string
                 pattern: ^-?[a-z][a-z0-9_]*$
               - type: 'null'
+            description: Sort parameter (e.g., 'name', '-created_at')
             title: Sort
+          description: Sort parameter (e.g., 'name', '-created_at')
         - name: include_total
           in: query
           required: false
           schema:
             type: boolean
             default: false
+            description: Include total count in response (expensive)
             title: Include Total
+          description: Include total count in response (expensive)
+        - name: status
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - $ref: '#/components/schemas/FormPromptStatus'
+              - type: 'null'
+            title: Status
+        - name: execution_id
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+                format: uuid
+              - type: 'null'
+            title: Execution Id
       responses:
         '200':
           description: List of form prompts

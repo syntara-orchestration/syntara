@@ -25,9 +25,20 @@ export function getExecutionDetail(executionId: string): Execution | undefined {
   if (!execution) return undefined
 
   const workflow = workflows.find((item) => item.id === execution.workflow_id)
-  return {
+  const base = {
     ...execution,
     activities: (activityExecutions[execution.id] ?? []).map(toActivityData),
     workflow_definition: workflow?.version?.workflow_definition,
   }
+
+  if (execution.id === 'exec-form-prompt') {
+    return {
+      ...base,
+      workflow_definition: {
+        nodes: [{ id: 'collect_input', type: 'form_prompt', name: 'Collect operator input' }],
+      },
+    }
+  }
+
+  return base
 }

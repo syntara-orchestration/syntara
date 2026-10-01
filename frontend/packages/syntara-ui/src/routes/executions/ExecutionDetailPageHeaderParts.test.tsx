@@ -101,6 +101,9 @@ describe('ExecutionDetailPageHeaderParts', () => {
           showApprovalActionStrip={false}
           isApprovalLoading={false}
           onReviewClick={() => {}}
+          showFormPromptActionStrip={false}
+          isFormPromptLoading={false}
+          onRespondClick={() => {}}
           historyCardOpen={false}
           onToggleHistory={() => {}}
           onBackToEditor={() => {}}
@@ -129,6 +132,9 @@ describe('ExecutionDetailPageHeaderParts', () => {
           showApprovalActionStrip={false}
           isApprovalLoading={false}
           onReviewClick={() => {}}
+          showFormPromptActionStrip={false}
+          isFormPromptLoading={false}
+          onRespondClick={() => {}}
           historyCardOpen={false}
           onToggleHistory={() => {}}
           onBackToEditor={() => {}}
@@ -150,6 +156,9 @@ describe('ExecutionDetailPageHeaderParts', () => {
           showApprovalActionStrip={false}
           isApprovalLoading={false}
           onReviewClick={() => {}}
+          showFormPromptActionStrip={false}
+          isFormPromptLoading={false}
+          onRespondClick={() => {}}
           historyCardOpen={false}
           onToggleHistory={() => {}}
           onBackToEditor={() => {}}
@@ -171,6 +180,9 @@ describe('ExecutionDetailPageHeaderParts', () => {
           showApprovalActionStrip={false}
           isApprovalLoading={false}
           onReviewClick={() => {}}
+          showFormPromptActionStrip={false}
+          isFormPromptLoading={false}
+          onRespondClick={() => {}}
           historyCardOpen={false}
           onToggleHistory={() => {}}
           onBackToEditor={() => {}}
@@ -208,6 +220,9 @@ describe('ExecutionDetailPageHeaderParts', () => {
           showApprovalActionStrip={true}
           isApprovalLoading={false}
           onReviewClick={() => {}}
+          showFormPromptActionStrip={false}
+          isFormPromptLoading={false}
+          onRespondClick={() => {}}
           historyCardOpen={false}
           onToggleHistory={() => {}}
           onBackToEditor={() => {}}
@@ -236,6 +251,9 @@ describe('ExecutionDetailPageHeaderParts', () => {
           showApprovalActionStrip={true}
           isApprovalLoading={false}
           onReviewClick={() => {}}
+          showFormPromptActionStrip={false}
+          isFormPromptLoading={false}
+          onRespondClick={() => {}}
           historyCardOpen={true}
           onToggleHistory={() => {}}
           onBackToEditor={() => {}}
@@ -259,6 +277,9 @@ describe('ExecutionDetailPageHeaderParts', () => {
           showApprovalActionStrip={false}
           isApprovalLoading={false}
           onReviewClick={() => {}}
+          showFormPromptActionStrip={false}
+          isFormPromptLoading={false}
+          onRespondClick={() => {}}
           historyCardOpen={false}
           onToggleHistory={() => {}}
           onBackToEditor={() => {}}
@@ -282,6 +303,9 @@ describe('ExecutionDetailPageHeaderParts', () => {
           showApprovalActionStrip={false}
           isApprovalLoading={false}
           onReviewClick={() => {}}
+          showFormPromptActionStrip={false}
+          isFormPromptLoading={false}
+          onRespondClick={() => {}}
           historyCardOpen={false}
           onToggleHistory={() => {}}
           onBackToEditor={() => {}}
@@ -312,6 +336,9 @@ describe('ExecutionDetailPageHeaderParts', () => {
           showApprovalActionStrip={false}
           isApprovalLoading={false}
           onReviewClick={() => {}}
+          showFormPromptActionStrip={false}
+          isFormPromptLoading={false}
+          onRespondClick={() => {}}
           historyCardOpen={false}
           onToggleHistory={() => {}}
           onBackToEditor={() => {}}
@@ -342,6 +369,9 @@ describe('ExecutionDetailPageHeaderParts', () => {
           showApprovalActionStrip={false}
           isApprovalLoading={false}
           onReviewClick={() => {}}
+          showFormPromptActionStrip={false}
+          isFormPromptLoading={false}
+          onRespondClick={() => {}}
           historyCardOpen={false}
           onToggleHistory={() => {}}
           onBackToEditor={() => {}}
@@ -371,6 +401,9 @@ describe('ExecutionDetailPageHeaderParts', () => {
           showApprovalActionStrip={false}
           isApprovalLoading={false}
           onReviewClick={() => {}}
+          showFormPromptActionStrip={false}
+          isFormPromptLoading={false}
+          onRespondClick={() => {}}
           historyCardOpen={false}
           onToggleHistory={() => {}}
           onBackToEditor={() => {}}
