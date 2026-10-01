@@ -106,6 +106,9 @@ class MetricType(StrEnum):
     AUTHZ_DURATION = "authz_duration_ms"
     OPA_REQUEST_DURATION = "opa_request_duration_ms"
 
+    # Stall Detection Metrics (AAP-92825)
+    STALLS_DETECTED = "stalls_detected_total"
+
 
 class MetricsCategoryType(StrEnum):
     """Metric category names used to group :class:`MetricType` members."""

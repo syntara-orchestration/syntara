@@ -283,6 +283,13 @@ async def _lifespan_startup(app: FastAPI) -> dict[str, Any]:  # noqa: PLR0915
     schedule_reconciliation_worker = get_schedule_reconciliation_worker()
     schedule_reconciliation_worker.start()
 
+    from syntara.workflows.workers.stall_detection import (  # noqa: PLC0415
+        get_stall_detection_worker,
+    )
+
+    stall_detection_worker = get_stall_detection_worker()
+    stall_detection_worker.start()
+
     periodic_collector.start()
     logger.info("Periodic analytics collector started")
 
@@ -298,6 +305,7 @@ async def _lifespan_startup(app: FastAPI) -> dict[str, Any]:  # noqa: PLR0915
         "session_cleanup_worker": session_cleanup_worker,
         "multipart_cleanup_worker": multipart_cleanup_worker,
         "schedule_reconciliation_worker": schedule_reconciliation_worker,
+        "stall_detection_worker": stall_detection_worker,
         "runtime_settings": runtime_settings,
         "rate_limit_redis": rate_limit_redis,
     }
@@ -305,6 +313,7 @@ async def _lifespan_startup(app: FastAPI) -> dict[str, Any]:  # noqa: PLR0915
 
 async def _lifespan_shutdown(resources: dict[str, Any]) -> None:
     """Clean up application resources during shutdown."""
+    await resources["stall_detection_worker"].stop()
     await resources["schedule_reconciliation_worker"].stop()
     await resources["multipart_cleanup_worker"].stop()
     await resources["queue_depth_poller"].stop()

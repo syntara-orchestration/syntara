@@ -1295,6 +1295,12 @@ class TemporalSettings(BaseSettings):
         gt=0,
     )
 
+    stall_detection_interval_seconds: float = Field(
+        default=30.0,
+        gt=0,
+        description="Seconds between stall-detection worker cycles",
+    )
+
 
 @lru_cache(maxsize=4)
 def _read_cert_cn(cert_path: str) -> str:
