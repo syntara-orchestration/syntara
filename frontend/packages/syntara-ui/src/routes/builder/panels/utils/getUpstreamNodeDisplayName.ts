@@ -20,7 +20,7 @@ export function getActivityTypeLabel(type: string): string | undefined {
 }
 
 /**
- * Display name for Input panel / navigation surfaces — matches canvas NodeTitle fallback:
+ * Display name for Input panel / navigation surfaces — matches canvas SynStepTitle fallback:
  * trimmed custom name, else type label (Converge, Script, …), else id.
  */
 export function getUpstreamNodeDisplayName(node: Pick<UpstreamNodeInfo, 'id' | 'name' | 'type'>): string {

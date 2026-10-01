@@ -2,10 +2,10 @@ import { Icon } from '@patternfly/react-core'
 import { RhUiCaretDownIcon } from '@patternfly/react-icons'
 import { use } from 'react'
 
-import { NodeExpandedContext } from './NodeExpandedContext'
+import { SynStepExpandedContext } from './SynStepExpandedContext'
 
-export function NodeExpandToggle({ nodeLabel }: Readonly<{ nodeLabel?: string }>) {
-  const expandedState = use(NodeExpandedContext)
+export function SynStepExpandToggle({ nodeLabel }: Readonly<{ nodeLabel?: string }>) {
+  const expandedState = use(SynStepExpandedContext)
   const expanded = expandedState === null ? true : expandedState[0]
   const setExpanded = expandedState ? expandedState[1] : () => {}
   if (!expandedState) return null

@@ -1,6 +1,6 @@
 import { Flex } from '@patternfly/react-core'
 
-export function NodeHeader(props: Readonly<{ children: React.ReactNode }>) {
+export function SynStepHeader(props: Readonly<{ children: React.ReactNode }>) {
   return (
     <div
       data-testid="node-header"
