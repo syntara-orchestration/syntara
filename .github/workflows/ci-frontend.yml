@@ -517,7 +517,7 @@ jobs:
   frontend-checks-gate:
     name: (Frontend) Checks Gate
     runs-on: ubuntu-24.04
-    needs: [changes, checks, unit-tests]
+    needs: [changes, checks, unit-tests, route-baseline]
     if: needs.changes.outputs.code == 'true' || needs.changes.outputs.contracts == 'true'
     steps:
       - run: echo "Frontend checks passed"
@@ -529,10 +529,10 @@ jobs:
   # See docs/ci/workflows.md for complete behavior table and debugging guide.
   test-compose-e2e:
     name: (Frontend) Test Podman Compose E2E
-    needs: [changes, frontend-checks-gate]
-    # always() + gate != failure|cancelled lets workflow_dispatch still run when the
-    # checks gate is skipped (e.g. docs-only PR), while preserving fast-fail when
-    # lint/unit actually failed.
+    needs: [changes, frontend-checks-gate, route-baseline]
+    # always() lets workflow_dispatch still run when checks are skipped for a
+    # docs-only PR. Scheduled E2E stays unconditional; merge-queue/manual runs
+    # require a passing route baseline unless change detection skips it.
     if: |
       always() &&
       (
@@ -541,6 +541,10 @@ jobs:
           needs.changes.result == 'success' &&
           needs.frontend-checks-gate.result != 'failure' &&
           needs.frontend-checks-gate.result != 'cancelled' &&
+          (
+            needs.route-baseline.result == 'success' ||
+            needs.route-baseline.result == 'skipped'
+          ) &&
           (
             github.event_name == 'merge_group' ||
             github.event_name == 'workflow_dispatch'
