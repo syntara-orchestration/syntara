@@ -30,7 +30,6 @@ from syntara.metrics.emission import emit_completion_metrics
 from syntara.metrics.interface_tag import interface_context_var
 from syntara.metrics.types import ComponentLabel, MetricType
 from syntara.workflows.audit.execution_lifecycle import ExecutionAction, ExecutionLifecycleEvent
-from syntara.workflows.audit.retry_requested import RetryRequestedEvent
 from syntara.workflows.exceptions import (
     ExecutionInTerminalStateError,
     ExecutionNotFoundError,
@@ -1391,7 +1390,7 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
         recorder = get_metrics_recorder()
         component = ComponentLabel.EXECUTION_SERVICE
 
-        retried = await self._start_temporal_and_create_execution(
+        return await self._start_temporal_and_create_execution(
             workflow=workflow,
             workflow_version=snapshot_version,
             input_data=source.input_data,
@@ -1402,19 +1401,3 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
             eligible_point_ids=validation.eligible_point_ids,
             input_parameter_overrides=validated_overrides,
         )
-
-        node_types = {
-            node["id"]: node.get("type", "unknown") for node in snapshot_version.workflow_definition.get("nodes", [])
-        }
-        AuditEventDispatcher.dispatch(
-            RetryRequestedEvent(
-                execution_id=retried.id,
-                source_execution_id=source.id,
-                workflow_id=source.workflow_id,
-                triggered_by=self.user.id,
-                selected_point_ids=validation.eligible_point_ids,
-                node_count=validation.total_step_count,
-                failed_step_types=sorted({node_types.get(point, "unknown") for point in validation.eligible_point_ids}),
-            )
-        )
-        return retried
