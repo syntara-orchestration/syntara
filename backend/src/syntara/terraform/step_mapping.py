@@ -51,7 +51,7 @@ def _inputs_create_workspace(result: dict[str, Any], values: dict[str, Any], ope
 
 
 def _inputs_update_variable(result: dict[str, Any], _values: dict[str, Any], _operation: str) -> None:
-    result["attributes"] = {key: result.pop(key) for key in ("value", "hcl", "category") if key in result}
+    result["attributes"] = {key: result.pop(key) for key in ("value", "hcl", "category", "sensitive") if key in result}
 
 
 def _inputs_list_variables(result: dict[str, Any], _values: dict[str, Any], _operation: str) -> None:

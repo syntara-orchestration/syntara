@@ -382,6 +382,8 @@ async def execute_tfe_update_variable_activity(
         value = _variable_value_from_input(input_config, plaintext_value=params.value)
         if value is not None:
             attrs["value"] = value
+        if "sensitive" in params.model_fields_set:
+            attrs["sensitive"] = params.sensitive
         if params.hcl is not None:
             attrs["hcl"] = params.hcl
         if params.category is not None:

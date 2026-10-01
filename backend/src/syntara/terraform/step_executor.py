@@ -112,6 +112,10 @@ class SDKTFEStepExecutor:
             raise TFEError(message, error_code=TFEErrorCode.CONFIG_MISSING)
         token = extract_bearer_token(input_config.get("_resolved_credentials"))
         values = parameters.model_dump()
+        if "sensitive" not in parameters.model_fields_set:
+            # Preserve the PATCH semantics: an omitted flag must leave the
+            # existing TFE variable setting unchanged.
+            values.pop("sensitive", None)
         inputs = sdk_inputs(binding.operation, values, integration)
 
         if binding.operation in _CONTROL_FLAGS:

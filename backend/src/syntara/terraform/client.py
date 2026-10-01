@@ -28,6 +28,7 @@ _API_PREFIX = "/api/v2"
 _MAX_READ_ATTEMPTS = 3
 _BACKOFF_BASE_SECONDS = 0.5
 _HTTP_NO_CONTENT = 204
+_TFE_PAGE_SIZE = 100
 # Leave headroom under the activity budget for decode/telemetry before Temporal
 # cancels the attempt. Must stay ≤ OrchestratorWorkflow._TEMPORAL_MARGIN.
 _CLIENT_TIMEOUT_MARGIN_SECONDS = 10.0
@@ -172,6 +173,73 @@ class TFEClient:
         data: dict[str, Any] = response.json()
         return data
 
+    @staticmethod
+    def _next_page(response: dict[str, Any], page: int) -> int | None:
+        metadata = response.get("meta")
+        pagination = metadata.get("pagination") if isinstance(metadata, dict) else None
+        next_page = pagination.get("next-page") if isinstance(pagination, dict) else None
+        if isinstance(next_page, int) and not isinstance(next_page, bool):
+            return next_page if next_page > 0 else None
+
+        total_pages = pagination.get("total-pages") if isinstance(pagination, dict) else None
+        if isinstance(total_pages, int) and not isinstance(total_pages, bool):
+            return page + 1 if page < total_pages else None
+
+        links = response.get("links")
+        return page + 1 if isinstance(links, dict) and links.get("next") else None
+
+    @staticmethod
+    def _merge_pages(first_response: dict[str, Any], items: list[Any]) -> dict[str, Any]:
+        result = dict(first_response)
+        result["data"] = items
+        # These describe the first page and would be stale after aggregation.
+        result.pop("links", None)
+        metadata = result.get("meta")
+        if isinstance(metadata, dict) and "pagination" in metadata:
+            metadata = dict(metadata)
+            metadata.pop("pagination", None)
+            if metadata:
+                result["meta"] = metadata
+            else:
+                result.pop("meta", None)
+        return result
+
+    async def _json_all_pages(self, path: str, *, params: dict[str, Any] | None = None) -> dict[str, Any]:
+        """Fetch all pages from a TFE JSON:API list endpoint.
+
+        TFE defaults list responses to 20 records, so explicitly request the
+        maximum page size and follow the pagination metadata until exhausted.
+        Only relative page numbers are constructed locally; response-provided
+        pagination URLs are never used as request destinations.
+        """
+        page = 1
+        seen_pages: set[int] = set()
+        items: list[Any] = []
+        first_response: dict[str, Any] | None = None
+
+        while page not in seen_pages:
+            seen_pages.add(page)
+            page_params = {
+                **(params or {}),
+                "page[number]": page,
+                "page[size]": _TFE_PAGE_SIZE,
+            }
+            response = await self._json("GET", path, params=page_params)
+            if first_response is None:
+                first_response = response
+
+            data = response.get("data")
+            if not isinstance(data, list):
+                return response if response is first_response else self._merge_pages(first_response, items)
+            items.extend(data)
+
+            next_page = self._next_page(response, page)
+            if next_page is None:
+                break
+            page = next_page
+
+        return self._merge_pages(first_response or {}, items)
+
     # ── Workspace ──────────────────────────────────────────────────────────
 
     async def create_workspace(
@@ -212,7 +280,7 @@ class TFEClient:
             params["search[name]"] = search
         if project_id:
             params["filter[project][id]"] = project_id
-        return await self._json("GET", f"/organizations/{org}/workspaces", params=params or None)
+        return await self._json_all_pages(f"/organizations/{org}/workspaces", params=params or None)
 
     async def update_workspace(
         self,
@@ -247,7 +315,7 @@ class TFEClient:
 
     async def get_state_version_outputs(self, state_version_id: str) -> dict[str, Any]:
         """GET /state-versions/{id}/outputs."""
-        return await self._json("GET", f"/state-versions/{quote(state_version_id, safe='')}/outputs")
+        return await self._json_all_pages(f"/state-versions/{quote(state_version_id, safe='')}/outputs")
 
     # ── Variables ──────────────────────────────────────────────────────────
 
@@ -263,7 +331,7 @@ class TFEClient:
 
     async def list_variables(self, workspace_id: str) -> dict[str, Any]:
         """GET /workspaces/{ws}/vars."""
-        return await self._json("GET", f"/workspaces/{quote(workspace_id, safe='')}/vars")
+        return await self._json_all_pages(f"/workspaces/{quote(workspace_id, safe='')}/vars")
 
     async def update_variable(self, workspace_id: str, variable_id: str, attributes: dict[str, Any]) -> dict[str, Any]:
         """PATCH /workspaces/{ws}/vars/{var}."""
@@ -403,11 +471,7 @@ class TFEClient:
         params: dict[str, Any] = {}
         if status:
             params["filter[status]"] = status
-        return await self._json(
-            "GET",
-            f"/workspaces/{quote(workspace_id, safe='')}/runs",
-            params=params or None,
-        )
+        return await self._json_all_pages(f"/workspaces/{quote(workspace_id, safe='')}/runs", params=params or None)
 
     async def add_run_comment(self, run_id: str, comment: str) -> dict[str, Any]:
         """POST /runs/{run}/comments."""
@@ -423,7 +487,7 @@ class TFEClient:
 
     async def list_github_app_installations(self) -> dict[str, Any]:
         """GET /github-app/installations."""
-        return await self._json("GET", "/github-app/installations")
+        return await self._json_all_pages("/github-app/installations")
 
     async def get_github_app_installation(self, installation_id: str) -> dict[str, Any]:
         """GET /github-app/installation/{id}."""
@@ -463,7 +527,7 @@ class TFEClient:
     async def list_projects(self, *, organization: str | None = None) -> dict[str, Any]:
         """GET /organizations/{org}/projects."""
         org = quote(organization or self.organization, safe="")
-        return await self._json("GET", f"/organizations/{org}/projects")
+        return await self._json_all_pages(f"/organizations/{org}/projects")
 
     async def get_project(self, project_id: str) -> dict[str, Any]:
         """GET /projects/{prj}."""
@@ -471,7 +535,7 @@ class TFEClient:
 
     async def list_project_teams(self, project_id: str) -> dict[str, Any]:
         """GET /projects/{prj}/relationships/teams (team-projects)."""
-        return await self._json("GET", "/team-projects", params={"filter[project][id]": project_id})
+        return await self._json_all_pages("/team-projects", params={"filter[project][id]": project_id})
 
     async def update_project(self, project_id: str, attributes: dict[str, Any]) -> dict[str, Any]:
         """PATCH /projects/{prj}."""
