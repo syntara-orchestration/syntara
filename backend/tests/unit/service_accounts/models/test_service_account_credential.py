@@ -6,6 +6,8 @@ import pytest
 from pydantic import ValidationError
 
 from syntara.core.models.base.base_resource import AuditLevel
+from syntara.core.utils.cursor import SortDirection
+from syntara.core.utils.sorting import parse_sort
 from syntara.service_accounts.models.service_account_credential import (
     ServiceAccountCredential,
     ServiceAccountCredentialStatus,
@@ -144,6 +146,27 @@ class TestServiceAccountCredentialModel:
         assert cred.expires_at is None
         assert cred.last_used_at is None
         assert cred.updated_by is None
+
+
+class TestServiceAccountCredentialSortableFields:
+    """AAP-87782: credential list sorting fails for Client ID and State columns.
+
+    CredentialsTab.tsx lets users sort by the "Client ID" (`identifier`) and
+    "State" (`status`) columns, but the backend's sortable-field allow-list
+    never included them, so the API rejects those sort requests.
+    """
+
+    @pytest.mark.parametrize("field", ["identifier", "status"])
+    def test_column_is_sortable_ascending(self, field: str) -> None:
+        parsed_field, direction = parse_sort(field, ServiceAccountCredential.__sortable_fields__)
+        assert parsed_field == field
+        assert direction == SortDirection.ASC
+
+    @pytest.mark.parametrize("field", ["identifier", "status"])
+    def test_column_is_sortable_descending(self, field: str) -> None:
+        parsed_field, direction = parse_sort(f"-{field}", ServiceAccountCredential.__sortable_fields__)
+        assert parsed_field == field
+        assert direction == SortDirection.DESC
 
 
 class TestServiceAccountCredentialAuditConfig:
