@@ -150,8 +150,8 @@ describe('CredentialFormModal', () => {
 
   it('renders name and description fields', () => {
     render(<CredentialFormModal isOpen onClose={vi.fn()} />, { wrapper })
-    expect(screen.getByPlaceholderText('Enter credential name')).toBeInTheDocument()
-    expect(screen.getByPlaceholderText('Enter description (optional)')).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'Credential name' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Credential description')).toBeInTheDocument()
   })
 
   it('renders credential type dropdown with types', async () => {
@@ -608,6 +608,46 @@ describe('CredentialFormModal', () => {
       expect(screen.getByLabelText('Auth method')).toHaveTextContent('Basic Auth')
       expect(screen.getByLabelText('Username', { selector: 'input' })).toBeInTheDocument()
       expect(screen.queryByLabelText('OAuth Token', { selector: 'input' })).not.toBeInTheDocument()
+    })
+
+    it('pre-selects correct auth method when credential types load after the dialog opens', async () => {
+      const aapCredential = {
+        id: 'cred-aap',
+        name: 'My AAP',
+        description: '',
+        credential_type_id: 'type-aap',
+        inputs: { username: 'admin', password: '$encrypted$' },
+        enabled: true,
+        labels: {},
+        created_by: { id: '550e8400-e29b-41d4-a716-446655440001', name: 'user-1', type: 'user' },
+        project_id: 'proj-1',
+        created_at: '2026-03-01T00:00:00Z',
+        updated_at: '2026-03-01T00:00:00Z',
+      } as const
+
+      vi.mocked(credentialsClient.useQuery).mockReturnValue({
+        data: undefined,
+        isLoading: true,
+        error: null,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any)
+
+      const { rerender } = render(
+        <CredentialFormModal isOpen onClose={vi.fn()} credentialToEdit={aapCredential} />,
+        { wrapper }
+      )
+
+      vi.mocked(credentialsClient.useQuery).mockReturnValue({
+        data: { resources: mockTypes },
+        isLoading: false,
+        error: null,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any)
+
+      rerender(<CredentialFormModal isOpen onClose={vi.fn()} credentialToEdit={aapCredential} />)
+
+      expect(await screen.findByLabelText('Auth method')).toHaveTextContent('Basic Auth')
+      expect(screen.getByLabelText('Username', { selector: 'input' })).toBeInTheDocument()
     })
 
     it('validates required_together — shows error when username is filled but password is not', async () => {
