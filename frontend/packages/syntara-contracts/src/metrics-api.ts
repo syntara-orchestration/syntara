@@ -224,7 +224,6 @@ export interface components {
       | 'temporal_queue_depth'
       | 'active_workflows'
       | 'activity_execution_success_rate'
-      | 'retry_restoration_ms'
       | 'workflow_start_latency_ms'
       | 'workflow_completion_rate'
       | 'temporal_execution_service_duration_ms'

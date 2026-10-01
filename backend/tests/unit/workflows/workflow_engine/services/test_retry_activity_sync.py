@@ -44,12 +44,10 @@ async def test_restore_pending_and_create_iteration_then_resync_is_idempotent() 
     updated, created = await sync_restored_activities(session, target.execution_id, ["body", "body#iter-1"])
     assert [item[0] for item in updated] == [target]
     assert len(created) == 1
-    assert target.replayed is True
     assert target.status == ActivityStatus.COMPLETED
     assert target.output_data == source.output_data
     assert target.input_data == {"current": "input"}
     assert created[0].iteration == 1
-    assert created[0].replayed is True
     assert created[0].output_data == iteration.output_data
     session.commit.assert_not_awaited()
 
@@ -59,14 +57,15 @@ async def test_restore_pending_and_create_iteration_then_resync_is_idempotent() 
 
 
 @pytest.mark.asyncio
-async def test_retry_chain_can_reuse_an_already_replayed_source() -> None:
-    """Provenance is copied from the direct source even when it was itself a retry."""
+async def test_retry_chain_can_reuse_an_already_restored_source() -> None:
+    """A restored row can become the source for a subsequent retry."""
     source = row("upstream")
-    source.replayed = True
     session = session_for([source], [])
-    _, created = await sync_restored_activities(session, uuid4(), ["upstream"])
-    assert created[0].output_data == {"receipt": "source"}
-    assert created[0].replayed is True
+    _, first_retry = await sync_restored_activities(session, uuid4(), ["upstream"])
+    session = session_for(first_retry, [])
+    _, next_retry = await sync_restored_activities(session, uuid4(), ["upstream"])
+    assert next_retry[0].status == ActivityStatus.COMPLETED
+    assert next_retry[0].output_data == {"receipt": "source"}
 
 
 @pytest.mark.asyncio
@@ -143,4 +142,3 @@ async def test_monitor_seeds_iteration_counters_before_resumed_scheduling() -> N
     assert created
     assert new_row is not None
     assert new_row.activity_name == "body#iter-2"
-    assert new_row.replayed is False

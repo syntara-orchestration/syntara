@@ -33,7 +33,6 @@ class ActivitySyncPublisherMixin:
             ("error_details", activity.error_details),
             ("output_data", activity.output_data),
             ("iteration", activity.iteration),
-            ("replayed", activity.replayed),
         ]
 
         for field_name, new_value in fields_to_check:
@@ -70,7 +69,6 @@ class ActivitySyncPublisherMixin:
                 error_details=activity.error_details,
                 output_data=activity.output_data,
                 iteration=activity.iteration,
-                replayed=activity.replayed,
             )
             ops.append({"op": "add", "path": "/activities/-", "value": data.model_dump(mode="json")})
 

@@ -283,7 +283,6 @@ async def test_retained_outputs_persist_for_the_next_retry(
     assert created == []
     await test_db_session.commit()
     await test_db_session.refresh(pending)
-    assert pending.replayed is True
     assert pending.status == ActivityStatus.COMPLETED
     assert pending.output_data == {"receipt": "retained"}
     assert await sync_restored_activities(test_db_session, retry.id, ["upstream"]) == ([], [])

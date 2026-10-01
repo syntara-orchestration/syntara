@@ -171,9 +171,6 @@ class ActivityExecution(BaseResource, table=True):
     )
 
     # Retry tracking
-    replayed: bool | None = Field(
-        default=None, description="True when output was reused from the source run; null for older records"
-    )
     retry_count: int = Field(0, sa_column_kwargs={"server_default": text("0")}, description="Number of retry attempts")
 
     # Loop tracking

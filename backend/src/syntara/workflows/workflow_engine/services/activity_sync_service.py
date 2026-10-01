@@ -675,7 +675,6 @@ class ActivitySyncService(
                         node_type=node_type,
                         temporal_activity_id=activity_id,  # Set to activity_name initially
                         status=ActivityStatus.PENDING,
-                        replayed=False,
                         started_at=None,
                         completed_at=None,
                         input_data={},
