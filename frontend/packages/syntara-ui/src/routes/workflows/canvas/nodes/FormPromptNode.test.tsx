@@ -22,6 +22,17 @@ vi.mock('@xyflow/react', () => ({
   },
 }))
 
+vi.mock('../../stores/useExecutionStore', () => ({
+  useExecutionStore: (
+    selector: (state: {
+      activityStates: Map<string, { status: string; startedAt?: string; started_at?: string }>
+    }) => unknown
+  ) =>
+    selector({
+      activityStates: new Map([['form-1', { status: 'waiting', startedAt: '2026-10-01T10:00:00.000Z' }]]),
+    }),
+}))
+
 describe('FormPromptNodeComponent', () => {
   const baseFormPromptNode = {
     type: 'form_prompt',
@@ -77,11 +88,23 @@ describe('FormPromptNodeComponent', () => {
     }
     const data = {
       ...node,
-      __executionState: { status: 'running' as const },
+      __executionState: { status: 'running' as const, started_at: '2026-01-01T00:00:00Z' },
     } as Activity
 
     render(<FormPromptNodeComponent {...createNodeProps(data)} />)
 
     expect(screen.getByText('Untitled Form')).toBeInTheDocument()
+  })
+
+  it('merges live execution store status into badge state', () => {
+    const data = {
+      ...baseFormPromptNode,
+      metadata: { __showExecutionBadge: true },
+      __executionState: { status: 'running' as const, started_at: '2026-01-01T00:00:00Z' },
+    } as Activity
+
+    render(<FormPromptNodeComponent {...createNodeProps(data)} />)
+
+    expect(screen.getByText('Customer survey')).toBeInTheDocument()
   })
 })

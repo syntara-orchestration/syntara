@@ -1,6 +1,7 @@
 import type { Approval } from '@syntara/contracts'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
+import { FlowNodeType } from '../../../constants'
 import { useAlerts } from '../../../providers/alerts'
 import {
   canvasNodeIdFromApprovalNodeId,
@@ -11,8 +12,9 @@ import { getApprovalPromptFromNode, getApprovalPromptFromRecord } from '../../ap
 import { ACTIVITY_STATUS, isTerminalState } from '../../builder/utils/executionState/executionHelpers'
 import { latestActivityStateForCanvasNode } from '../../workflows/execution/utils/activityState'
 import { useExecutionStore } from '../../workflows/stores/useExecutionStore'
+import { resolveCanvasNodeType } from '../formPrompt/resolveCanvasNodeType'
 
-import { useAutoApprovalDetection } from './useAutoApprovalDetection'
+import { useAutoWaitingNodeDetection } from './useAutoWaitingNodeDetection'
 import type { useExecutionNodeClick } from './useExecutionNodeClick'
 import { useFetchApprovalForUrlParam } from './useFetchApprovalForUrlParam'
 
@@ -130,13 +132,14 @@ export function useExecutionApprovalPanel(
     [fetchApprovals, setApprovalsAndIndex, showError]
   )
 
-  useAutoApprovalDetection({
+  useAutoWaitingNodeDetection({
     executionId,
+    shouldDetectNode: (nodeId) => resolveCanvasNodeType(nodeId, workflowDefinition) === FlowNodeType.APPROVAL,
     fetchForNode: async (nodeId: string) => {
       const fetchedApprovals = await fetchApprovals()
       return findApprovalForCanvasNode(fetchedApprovals, nodeId) ?? null
     },
-    onApprovalDetected: handleDetected,
+    onDetected: handleDetected,
   })
 
   // Auto-close panel when all approvals are resolved externally (e.g., via WebSocket)

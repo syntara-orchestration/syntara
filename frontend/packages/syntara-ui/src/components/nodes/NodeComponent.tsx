@@ -266,6 +266,7 @@ export function NodeComponent(props: {
             status={props.executionState?.status ?? 'pending'}
             retryCount={props.executionState?.retry_count}
             nodeType={props.nodeProps.type}
+            startedAt={props.executionState.started_at}
           />
         )}
         {!isSemanticZoom && mockDataPinned && (

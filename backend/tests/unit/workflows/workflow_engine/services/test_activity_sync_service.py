@@ -14,6 +14,7 @@ from temporalio.client import WorkflowExecutionStatus, WorkflowQueryRejectedErro
 from temporalio.service import RPCError, RPCStatusCode
 
 from syntara.core.exceptions import SafeValueError
+from syntara.telemetry.events.workflow_error import RETRY_REASON_MAX_LENGTH
 from syntara.workflows.models.activity_execution import ActivityExecution, ActivityStatus
 from syntara.workflows.models.execution import Execution, ExecutionStatus
 from syntara.workflows.workflow_engine.activities.internal import register_activity_monitoring
@@ -391,6 +392,7 @@ class TestActivityEventProcessing:
         activity_id: str = "test-activity",
         attempt: int = 1,
         failure_message: str | None = None,
+        last_failure: Mock | None = None,
     ) -> Mock:
         """Create a mock Temporal history event."""
         event = Mock()
@@ -408,7 +410,7 @@ class TestActivityEventProcessing:
             attrs = Mock()
             attrs.scheduled_event_id = scheduled_event_id
             attrs.attempt = attempt
-            attrs.last_failure = None
+            attrs.last_failure = last_failure
             event.activity_task_started_event_attributes = attrs
 
         elif event_type == EventType.EVENT_TYPE_ACTIVITY_TASK_COMPLETED:
@@ -624,6 +626,108 @@ class TestActivityEventProcessing:
         assert self.metadata.pending_activity_updates[1]["status"] == expected_status
         assert self.metadata.pending_activity_updates[1]["started_at"] is not None
         assert self.metadata.pending_activity_updates[1]["retry_count"] == expected_retry_count
+
+    @pytest.mark.parametrize(
+        "node_type",
+        [NodeType.APPROVAL, NodeType.FORM_PROMPT],
+    )
+    def test_process_activity_started_human_task_is_waiting(self, node_type: NodeType) -> None:
+        """Approval and form prompt activities enter WAITING when the task starts."""
+        activity_id = "human-task-node"
+        self.metadata.activity_definitions_map[activity_id] = {"id": activity_id, "type": node_type}
+        self.metadata.pending_activity_updates[1] = {
+            "activity_id": activity_id,
+            "status": ActivityStatus.PENDING,
+            "started_at": None,
+            "retry_count": 0,
+        }
+
+        event = self._create_mock_event(
+            EventType.EVENT_TYPE_ACTIVITY_TASK_STARTED,
+            event_id=2,
+            scheduled_event_id=1,
+            attempt=1,
+        )
+
+        self.service._process_activity_started(event, self.metadata)
+
+        assert self.metadata.pending_activity_updates[1]["status"] == ActivityStatus.WAITING
+        assert self.metadata.pending_activity_updates[1]["started_at"] is not None
+
+    def test_process_activity_started_skips_when_scheduled_update_missing(self) -> None:
+        """No-op when STARTED references a scheduled_event_id that was not tracked."""
+        event = self._create_mock_event(
+            EventType.EVENT_TYPE_ACTIVITY_TASK_STARTED,
+            event_id=2,
+            scheduled_event_id=99,
+            attempt=1,
+        )
+
+        self.service._process_activity_started(event, self.metadata)
+
+        assert 99 not in self.metadata.pending_activity_updates
+        assert 99 not in self.metadata.pending_sync_event_ids
+
+    def test_process_activity_started_retry_attempt_records_retry_info(self) -> None:
+        """Retries attach truncated reason and failure type from the last failure."""
+        long_reason = "x" * (RETRY_REASON_MAX_LENGTH + 10)
+        last_failure = Mock()
+        last_failure.message = long_reason
+        last_failure.cause = Mock()
+        last_failure.cause.application_failure_info = Mock(type="UpstreamFailure")
+        last_failure.application_failure_info = None
+
+        self.metadata.pending_activity_updates[1] = {
+            "activity_id": "test-activity",
+            "status": ActivityStatus.PENDING,
+            "started_at": None,
+            "retry_count": 0,
+        }
+
+        event = self._create_mock_event(
+            EventType.EVENT_TYPE_ACTIVITY_TASK_STARTED,
+            event_id=2,
+            scheduled_event_id=1,
+            attempt=2,
+            last_failure=last_failure,
+        )
+
+        self.service._process_activity_started(event, self.metadata)
+
+        retry_info = self.metadata.pending_activity_updates[1]["_retry_info"]
+        assert retry_info["retry_count"] == 1
+        assert retry_info["error_type"] == "UpstreamFailure"
+        assert retry_info["retry_reason"] == ("x" * (RETRY_REASON_MAX_LENGTH - 3)) + "..."
+
+    def test_failure_type_from_last_failure_uses_application_failure_info(self) -> None:
+        last_failure = Mock()
+        last_failure.cause = None
+        last_failure.application_failure_info = Mock(type="DirectAppFailure")
+
+        assert ActivitySyncService._failure_type_from_last_failure(last_failure) == "DirectAppFailure"
+
+    def test_failure_type_from_last_failure_returns_none_without_payload(self) -> None:
+        assert ActivitySyncService._failure_type_from_last_failure(None) is None
+
+    def test_truncate_retry_reason_returns_none_for_empty_message(self) -> None:
+        assert ActivitySyncService._truncate_retry_reason(None) is None
+
+    def test_truncate_retry_reason_returns_short_messages_unchanged(self) -> None:
+        message = "transient network blip"
+        assert ActivitySyncService._truncate_retry_reason(message) == message
+
+    def test_failure_type_from_last_failure_returns_none_when_types_missing(self) -> None:
+        last_failure = Mock()
+        last_failure.cause = Mock()
+        last_failure.cause.application_failure_info = None
+        last_failure.application_failure_info = None
+
+        assert ActivitySyncService._failure_type_from_last_failure(last_failure) is None
+
+    def test_status_for_activity_task_started_wait_node_is_waiting(self) -> None:
+        activity_definitions = {"wait-node": {"type": NodeType.WAIT}}
+        status = ActivitySyncService._status_for_activity_task_started("wait-node", activity_definitions, 1)
+        assert status == ActivityStatus.WAITING
 
     @pytest.mark.parametrize(
         ("failure_message", "expected_error"),
@@ -3058,6 +3162,33 @@ class TestSyntheticActivityStarted:
         )
 
         event = SyntheticActivityStarted(activity_id="approval-node", scheduled_event_id=5)
+
+        with patch.object(self.service, "_sync_activities_to_db", new_callable=AsyncMock):
+            await self.service._process_synthetic_activity_started(event, metadata, Mock())
+
+        assert metadata.pending_activity_updates[5]["status"] == ActivityStatus.WAITING
+        assert metadata.pending_activity_updates[5]["started_at"] is not None
+
+    @pytest.mark.asyncio
+    async def test_updates_form_prompt_activity_to_waiting(self) -> None:
+        """Synthetic STARTED transitions form prompt nodes to WAITING."""
+        metadata = create_test_metadata(
+            execution_id=self.execution_id,
+            activity_definitions_map={"form-node": {"type": "form_prompt"}},
+            pending_activity_updates={
+                5: {
+                    "activity_id": "form-node",
+                    "activity_name": "form-node",
+                    "status": ActivityStatus.PENDING,
+                    "started_at": None,
+                    "completed_at": None,
+                    "error_details": None,
+                    "retry_count": 0,
+                },
+            },
+        )
+
+        event = SyntheticActivityStarted(activity_id="form-node", scheduled_event_id=5)
 
         with patch.object(self.service, "_sync_activities_to_db", new_callable=AsyncMock):
             await self.service._process_synthetic_activity_started(event, metadata, Mock())

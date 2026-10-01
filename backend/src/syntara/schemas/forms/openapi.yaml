@@ -34,39 +34,27 @@ paths:
         resource: form_prompt
         action: read
       parameters:
-        - name: limit
+        - $ref: "../base/shared-resources.openapi.yaml#/components/parameters/limitParam"
+        - $ref: "../base/shared-resources.openapi.yaml#/components/parameters/cursorParam"
+        - $ref: "../base/shared-resources.openapi.yaml#/components/parameters/sortParam"
+        - $ref: "../base/shared-resources.openapi.yaml#/components/parameters/includeTotalParam"
+        - name: status
           in: query
           required: false
           schema:
-            type: integer
-            maximum: 100
-            exclusiveMinimum: 0
-            default: 20
-            title: Limit
-        - name: cursor
+            anyOf:
+              - $ref: "#/components/schemas/FormPromptStatus"
+              - type: 'null'
+            title: Status
+        - name: execution_id
           in: query
           required: false
           schema:
             anyOf:
               - type: string
+                format: uuid
               - type: 'null'
-            title: Cursor
-        - name: sort
-          in: query
-          required: false
-          schema:
-            anyOf:
-              - type: string
-                pattern: ^-?[a-z][a-z0-9_]*$
-              - type: 'null'
-            title: Sort
-        - name: include_total
-          in: query
-          required: false
-          schema:
-            type: boolean
-            default: false
-            title: Include Total
+            title: Execution Id
       responses:
         "200":
           description: List of form prompts

@@ -127,6 +127,20 @@ vi.mock('../../client', () => ({
       refetch: vi.fn(),
     })),
   },
+  formsClient: {
+    useQuery: vi.fn(() => ({
+      data: null,
+      isPending: false,
+      error: null,
+      isError: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    })),
+    useMutation: vi.fn(() => ({
+      mutateAsync: vi.fn(),
+      isPending: false,
+    })),
+  },
   usersClient: {
     useQuery: vi.fn(() => ({
       data: undefined,
@@ -232,7 +246,6 @@ vi.mock('../workflows/hooks/useExecutionWebSocket', () => ({
   useExecutionWebSocket: vi.fn(),
 }))
 
-// Mock ApprovalSidePanel component
 vi.mock('./ApprovalSidePanel', () => ({
   ApprovalSidePanel: ({ approval, onClose }: { approval: { id: string; name: string }; onClose: () => void }) => (
     <div data-testid="approval-side-panel">
@@ -244,6 +257,10 @@ vi.mock('./ApprovalSidePanel', () => ({
 
 vi.mock('./hooks/useAutoApprovalDetection', () => ({
   useAutoApprovalDetection: vi.fn(),
+}))
+
+vi.mock('./hooks/useAutoWaitingNodeDetection', () => ({
+  useAutoWaitingNodeDetection: vi.fn(),
 }))
 
 const mockForkAsNewWorkflow = vi.fn()
@@ -267,10 +284,36 @@ vi.mock('../../providers/alerts', () => ({
   })),
 }))
 
+const {
+  mockHandleNodeClick,
+  mockSelectNode,
+  mockDeselectNode,
+  mockClearPendingApproval,
+  mockSetPendingApproval,
+  mockFetchForNode,
+  mockFormPromptNodeClickFields,
+} = vi.hoisted(() => ({
+  mockHandleNodeClick: vi.fn(),
+  mockSelectNode: vi.fn(),
+  mockDeselectNode: vi.fn(),
+  mockClearPendingApproval: vi.fn(),
+  mockSetPendingApproval: vi.fn(),
+  mockFetchForNode: vi.fn(),
+  mockFormPromptNodeClickFields: {
+    formPrompts: [],
+    formPromptIndex: 0,
+    currentFormPrompt: null,
+    isFormPromptLoading: false,
+    navigateToFormPromptIndex: vi.fn(),
+    clearFormPrompts: vi.fn(),
+    setFormPromptsAndIndex: vi.fn(),
+    fetchFormPrompts: vi.fn(),
+    fetchPendingFormPrompts: vi.fn(),
+    handleActivityRowClick: vi.fn(),
+  },
+}))
+
 // Mock useExecutionNodeClick hook
-const mockHandleNodeClick = vi.fn()
-const mockSelectNode = vi.fn()
-const mockDeselectNode = vi.fn()
 const mockPendingApproval = {
   id: 'approval-1',
   name: 'Test Approval',
@@ -279,10 +322,6 @@ const mockPendingApproval = {
   execution_id: 'exec-123',
   workflow_context: { workflow_name: 'Test Workflow' },
 }
-
-const mockClearPendingApproval = vi.fn()
-const mockSetPendingApproval = vi.fn()
-const mockFetchForNode = vi.fn()
 
 vi.mock('./hooks/useExecutionNodeClick', () => ({
   useExecutionNodeClick: vi.fn(() => ({
@@ -294,6 +333,7 @@ vi.mock('./hooks/useExecutionNodeClick', () => ({
     clearApprovals: mockClearPendingApproval,
     setApprovalsAndIndex: mockSetPendingApproval,
     fetchApprovals: mockFetchForNode,
+    ...mockFormPromptNodeClickFields,
     selectedNodeId: null,
     selectedNodeName: null,
     selectNode: mockSelectNode,
@@ -747,6 +787,7 @@ describe('ExecutionDetail', () => {
         clearApprovals: mockClearPendingApproval,
         setApprovalsAndIndex: mockSetPendingApproval,
         fetchApprovals: mockFetchForNode,
+        ...mockFormPromptNodeClickFields,
         selectedNodeId: null,
         selectedNodeName: null,
         selectNode: mockSelectNode,
@@ -778,6 +819,7 @@ describe('ExecutionDetail', () => {
         clearApprovals: mockClearPendingApproval,
         setApprovalsAndIndex: mockSetPendingApproval,
         fetchApprovals: mockFetchForNode,
+        ...mockFormPromptNodeClickFields,
         selectedNodeId: null,
         selectedNodeName: null,
         selectNode: mockSelectNode,
@@ -1216,6 +1258,7 @@ describe('ExecutionDetail', () => {
         clearApprovals: mockClearPendingApproval,
         setApprovalsAndIndex: mockSetPendingApproval,
         fetchApprovals: mockFetchForNode,
+        ...mockFormPromptNodeClickFields,
         selectedNodeId: null,
         selectedNodeName: null,
         selectNode: mockSelectNode,
