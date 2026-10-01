@@ -139,6 +139,7 @@ export function SynTextField<
             id={resolvedFieldId}
             type={type}
             aria-label={ariaLabel}
+            aria-required={isRequired ? true : undefined}
             placeholder={placeholder}
             validated={fieldState.error ? 'error' : 'default'}
             value={displayValue}
@@ -167,6 +168,7 @@ export function SynTextField<
               field.onBlur()
             }}
             name={field.name}
+            isRequired={isRequired}
             isDisabled={isDisabled}
             autoComplete={autoComplete}
             min={isNumberInput ? min : undefined}
