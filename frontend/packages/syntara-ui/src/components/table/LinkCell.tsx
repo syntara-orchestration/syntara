@@ -1,5 +1,5 @@
 import { Truncate } from '@patternfly/react-core'
-import { Children, cloneElement, isValidElement, useRef, type ReactNode, type RefObject } from 'react'
+import { cloneElement, isValidElement, useRef, type ReactNode, type RefObject } from 'react'
 
 import { SynLink } from '../SynLink'
 
@@ -13,13 +13,12 @@ type TruncateElementProps = { tooltipProps?: { triggerRef?: RefObject<HTMLElemen
  * tab into Truncate's inner span). Truncate still owns when the tooltip shows.
  */
 function wireTruncateChild(children: ReactNode, linkRef: RefObject<HTMLAnchorElement | null>): ReactNode {
-  const child = Children.only(children)
-  if (!isValidElement<TruncateElementProps>(child) || child.type !== Truncate) {
+  if (!isValidElement<TruncateElementProps>(children) || children.type !== Truncate) {
     return children
   }
 
-  const existingTooltipProps = child.props.tooltipProps ?? {}
-  return cloneElement(child, {
+  const existingTooltipProps = children.props.tooltipProps ?? {}
+  return cloneElement(children, {
     tooltipProps: { ...existingTooltipProps, triggerRef: linkRef },
   })
 }

@@ -23,7 +23,6 @@ import { SynKebabMenu } from '../../../components/SynKebabMenu'
 import { SynPageTitle } from '../../../components/SynPageTitle'
 import { DateCell } from '../../../components/table/DateCell'
 import { LinkCell } from '../../../components/table/LinkCell'
-import { columnWidths } from '../../../components/table/tableColumnWidths'
 import { useCursorPagination, useCursorReset } from '../../../hooks/useCursorPagination'
 import type { FilterFieldDefinition } from '../../../types/filters'
 import { detachPromise } from '../../../utils/detachPromise'
@@ -90,22 +89,24 @@ function IntegrationsTableContent({
     <>
       <Thead>
         <Tr>
-          <Th sort={getSortParams('name')}>Server name / ID</Th>
-          <Th width={columnWidths.status} sort={getSortParams('validation_status')}>
+          <Th width={20} sort={getSortParams('name')}>
+            Server name / ID
+          </Th>
+          <Th width={10} sort={getSortParams('validation_status')}>
             Status
           </Th>
-          <Th width={columnWidths.type} sort={getSortParams('integration_type')}>
+          <Th width={10} sort={getSortParams('integration_type')}>
             Integration type
           </Th>
-          <Th>API URL</Th>
-          <Th width={columnWidths.count}>Enabled resources</Th>
-          <Th width={columnWidths.dateTimeCompact} sort={getSortParams('last_validated_at')}>
+          <Th width={15}>API URL</Th>
+          <Th width={10}>Enabled resources</Th>
+          <Th width={15} sort={getSortParams('last_validated_at')}>
             Last checked
           </Th>
-          <Th width={columnWidths.switch} sort={getSortParams('enabled')}>
+          <Th width={10} sort={getSortParams('enabled')}>
             State
           </Th>
-          <Th width={columnWidths.actions} screenReaderText="Actions" />
+          <Th width={10} screenReaderText="Actions" />
         </Tr>
       </Thead>
       <Tbody>
@@ -276,7 +277,7 @@ export default function Integrations() {
               ) : undefined
             }
             body={
-              <SynListPanelTable caption="Integrations" footer={getFooterProps(query.data)}>
+              <SynListPanelTable caption="Integrations" footer={getFooterProps(query.data)} useFixedLayout={false}>
                 <IntegrationsTableContent
                   results={results}
                   getSortParams={getSortParams}

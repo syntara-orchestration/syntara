@@ -4,7 +4,6 @@ import type { WorkflowAPI } from '@syntara/contracts'
 import { SynListPanelTable, SynListPanelToolbar, SynListPanelView } from '../../components/panels/list/SynListPanel'
 import { SynEmptyStateNoData } from '../../components/states/SynEmptyStateNoData'
 import type { TableFooterProps } from '../../components/table/SynScrollableTableContainer'
-import { columnWidths } from '../../components/table/tableColumnWidths'
 import type { FilterConfig, FilterFieldDefinition } from '../../types/filters'
 import type { ProjectRead } from '../access/types'
 
@@ -104,17 +103,19 @@ export function WorkflowsListView({
         <SynListPanelTable caption="Workflows table" footer={footer}>
           <Thead>
             <Tr>
-              <Th sort={getSortParams('name')}>Name</Th>
-              <Th width={columnWidths.dateTime} sort={getSortParams('created_at')}>
+              <Th width={35} sort={getSortParams('name')}>
+                Name
+              </Th>
+              <Th width={20} sort={getSortParams('created_at')}>
                 Created at
               </Th>
-              <Th width={columnWidths.dateTime} sort={getSortParams('updated_at')}>
+              <Th width={20} sort={getSortParams('updated_at')}>
                 Updated at
               </Th>
-              <Th width={columnWidths.status} sort={getSortParams('is_enabled')} info={workflowStateColumnInfo}>
+              <Th width={15} sort={getSortParams('is_enabled')} info={workflowStateColumnInfo}>
                 State
               </Th>
-              {showRowActions && <Th width={columnWidths.actions} screenReaderText="Actions" />}
+              {showRowActions && <Th width={10} screenReaderText="Actions" />}
             </Tr>
           </Thead>
           {isAllProjects && groupedWorkflows ? (

@@ -15,7 +15,6 @@ import { SynEmptyStateNoData } from '../../components/states/SynEmptyStateNoData
 import { useQueryState } from '../../components/states/useQueryState'
 import { SynPageTitle } from '../../components/SynPageTitle'
 import { SynScrollableTableContainer } from '../../components/table/SynScrollableTableContainer'
-import { columnWidths } from '../../components/table/tableColumnWidths'
 import { useCursorPagination, useCursorReset } from '../../hooks/useCursorPagination'
 import { useProjectSelector } from '../../hooks/useProjectSelector'
 import { useProjectsForGrouping } from '../../hooks/useProjectsForGrouping'
@@ -191,23 +190,25 @@ export default function Executions() {
                 <SynScrollableTableContainer caption="Executions table" footer={getFooterProps(executionsQuery.data)}>
                   <Thead>
                     <Tr>
-                      <Th modifier="nowrap">Run ID</Th>
-                      <Th modifier="nowrap" sort={getSortParams('workflow_id')}>
+                      <Th width={20} modifier="nowrap">
+                        Run ID
+                      </Th>
+                      <Th width={20} modifier="nowrap" sort={getSortParams('workflow_id')}>
                         Workflow name
                       </Th>
-                      <Th width={columnWidths.status} sort={getSortParams('status')}>
+                      <Th width={15} sort={getSortParams('status')}>
                         Status
                       </Th>
-                      <Th width={columnWidths.version} modifier="nowrap">
+                      <Th width={15} modifier="nowrap">
                         Version
                       </Th>
-                      <Th width={columnWidths.dateTimeCompact} sort={getSortParams('created_at')}>
+                      <Th width={15} sort={getSortParams('created_at')}>
                         Created at
                       </Th>
-                      <Th width={columnWidths.dateTimeCompact} sort={getSortParams('completed_at')}>
+                      <Th width={15} sort={getSortParams('completed_at')}>
                         Completed at
                       </Th>
-                      <Th width={columnWidths.actions} screenReaderText="Actions" />
+                      <Th width={10} screenReaderText="Actions" />
                     </Tr>
                   </Thead>
                   {isAllProjects && groupedExecutions ? (
