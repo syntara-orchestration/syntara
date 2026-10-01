@@ -11,14 +11,14 @@ import styles from './VersionHistorySidePanel.module.css'
 
 type VersionHistorySidePanelProps = Readonly<{
   sidePanel: VersionSidePanelState
-  isNodeEditorOpen: boolean
+  isStepEditorOpen: boolean
   editPermission?: { canEdit: boolean; tooltip: string }
 }>
 
-export function VersionHistorySidePanel({ sidePanel, isNodeEditorOpen, editPermission }: VersionHistorySidePanelProps) {
+export function VersionHistorySidePanel({ sidePanel, isStepEditorOpen, editPermission }: VersionHistorySidePanelProps) {
   return (
     <>
-      {!isNodeEditorOpen && sidePanel.show && (
+      {!isStepEditorOpen && sidePanel.show && (
         <FlexItem className={styles.sidePanelItem}>
           <VersionHistoryPanel
             versions={sidePanel.filteredVersions}

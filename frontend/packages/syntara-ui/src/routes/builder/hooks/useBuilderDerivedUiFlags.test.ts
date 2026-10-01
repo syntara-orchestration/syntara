@@ -19,20 +19,20 @@ describe('useBuilderDerivedUiFlags', () => {
   it('treats add step panel as open when workflow has no triggers or steps', () => {
     const { result } = renderHook(() => useBuilderDerivedUiFlags(emptyWorkflow, false, null))
 
-    expect(result.current.hasNoWorkflowNodes).toBe(true)
-    expect(result.current.isAddNodePanelOpen).toBe(true)
+    expect(result.current.hasNoWorkflowSteps).toBe(true)
+    expect(result.current.isAddStepPanelOpen).toBe(true)
   })
 
-  it('reflects addNodePanelOpen when workflow has nodes', () => {
+  it('reflects addStepPanelOpen when workflow has nodes', () => {
     const { result } = renderHook(() => useBuilderDerivedUiFlags(workflowWithTrigger, true, null))
 
-    expect(result.current.hasNoWorkflowNodes).toBe(false)
-    expect(result.current.isAddNodePanelOpen).toBe(true)
+    expect(result.current.hasNoWorkflowSteps).toBe(false)
+    expect(result.current.isAddStepPanelOpen).toBe(true)
   })
 
-  it('reports panel closed when addNodePanelOpen is false and workflow has content', () => {
+  it('reports panel closed when addStepPanelOpen is false and workflow has content', () => {
     const { result } = renderHook(() => useBuilderDerivedUiFlags(workflowWithTrigger, false, null))
 
-    expect(result.current.isAddNodePanelOpen).toBe(false)
+    expect(result.current.isAddStepPanelOpen).toBe(false)
   })
 })

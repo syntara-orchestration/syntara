@@ -1,7 +1,7 @@
 import { createAAPJobTemplateActivity, createAAPWorkflowTemplateActivity } from '../../../stores/useWorkflowStore'
 import type { AAPJobTemplateConfig, AAPWorkflowTemplateConfig } from '../../../stores/workflowFactories'
-import type { AAPJobTemplateFormData } from '../node-forms/aapJobTemplateSchema'
-import type { AAPWorkflowTemplateFormData } from '../node-forms/aapWorkflowTemplateSchema'
+import type { AAPJobTemplateFormData } from '../step-forms/aapJobTemplateSchema'
+import type { AAPWorkflowTemplateFormData } from '../step-forms/aapWorkflowTemplateSchema'
 
 /**
  * Check whether any of the given values contain a ${...} expression placeholder.
