@@ -5,9 +5,9 @@ import { SemanticZoomBranchSourceHandles } from '../../routes/workflows/canvas/n
 import { SEMANTIC_ZOOM_BAR_HEIGHT_PX } from '../../routes/workflows/canvas/semanticZoom'
 import type { SemanticZoomBranchSource } from '../../routes/workflows/canvas/semanticZoomTypes'
 
-import styles from './NodeSemanticZoomBody.module.css'
+import styles from './SynStepSemanticZoomBody.module.css'
 
-export function NodeSemanticZoomBody(props: {
+export function SynStepSemanticZoomBody(props: {
   title: string
   typeLabel: string
   backgroundColor: string
