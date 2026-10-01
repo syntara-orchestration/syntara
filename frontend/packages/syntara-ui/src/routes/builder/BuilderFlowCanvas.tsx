@@ -12,10 +12,16 @@ import {
   type OnConnectStart,
   type OnNodeDrag,
   type OnNodesDelete,
+  type ReactFlowState,
+  useStore,
+  useUpdateNodeInternals,
 } from '@xyflow/react'
+import { useLayoutEffect, useRef } from 'react'
 
+import { FlowNodeType } from '../../constants'
 import { CanvasControls } from '../workflows/canvas/CanvasControls'
 import { type NodeType } from '../workflows/canvas/nodes/NodeType'
+import { SEMANTIC_ZOOM_MAX_SCALE } from '../workflows/canvas/semanticZoom'
 import { UndoRedoControls } from '../workflows/canvas/UndoRedoControls'
 
 import styles from './BuilderFlow.module.css'
@@ -46,6 +52,57 @@ type BuilderFlowCanvasProps = {
   disableDeleteKey?: boolean
   disableSpacePanning?: boolean
   onLayout: () => void
+}
+
+type SemanticZoomStoreState = {
+  isSemanticZoom: boolean
+  nodeIds: string[]
+}
+
+/** Reads whether the canvas is at or below the semantic-zoom scale, and the IDs of its non-placeholder nodes. */
+function selectSemanticZoomStoreState(state: ReactFlowState): SemanticZoomStoreState {
+  return {
+    isSemanticZoom: state.transform[2] <= SEMANTIC_ZOOM_MAX_SCALE,
+    nodeIds: state.nodes.filter((node) => node.type !== FlowNodeType.PLACEHOLDER).map((node) => node.id),
+  }
+}
+
+/** Equality check for the selector above, so the store only notifies on a real threshold or node-set change. */
+function semanticZoomStoreStateEqual(previous: SemanticZoomStoreState, next: SemanticZoomStoreState): boolean {
+  // Dimension updates replace node objects; only IDs and threshold transitions require another measurement.
+  return (
+    previous.isSemanticZoom === next.isSemanticZoom &&
+    previous.nodeIds.length === next.nodeIds.length &&
+    previous.nodeIds.every((nodeId, index) => nodeId === next.nodeIds[index])
+  )
+}
+
+/**
+ * Batches `updateNodeInternals` for all visible nodes in one call when semantic zoom is entered, exited, or
+ * when the node set changes while semantic zoom is active, instead of recomputing internals per node per render.
+ */
+function SemanticZoomNodeInternalsUpdater() {
+  const { isSemanticZoom, nodeIds } = useStore(selectSemanticZoomStoreState, semanticZoomStoreStateEqual)
+  const updateNodeInternals = useUpdateNodeInternals()
+  const previousSemanticZoomRef = useRef<boolean | undefined>(undefined)
+
+  useLayoutEffect(() => {
+    const previousSemanticZoom = previousSemanticZoomRef.current
+    previousSemanticZoomRef.current = isSemanticZoom
+
+    const mountedInSemanticZoom = previousSemanticZoom === undefined && isSemanticZoom
+    const crossedSemanticZoomThreshold = previousSemanticZoom !== undefined && previousSemanticZoom !== isSemanticZoom
+    const nodeIdsChangedDuringSemanticZoom = previousSemanticZoom === isSemanticZoom && isSemanticZoom
+
+    if (
+      (mountedInSemanticZoom || crossedSemanticZoomThreshold || nodeIdsChangedDuringSemanticZoom) &&
+      nodeIds.length > 0
+    ) {
+      updateNodeInternals(nodeIds)
+    }
+  }, [isSemanticZoom, nodeIds, updateNodeInternals])
+
+  return null
 }
 
 export function BuilderFlowCanvas({
@@ -112,6 +169,7 @@ export function BuilderFlowCanvas({
         nodesDraggable={!isReadOnly}
         nodesConnectable={!isReadOnly}
       >
+        <SemanticZoomNodeInternalsUpdater />
         <EdgeMarkers />
         {!isReadOnly && <Background variant={BackgroundVariant.Dots} gap={20} size={1} />}
         <CanvasControls onLayout={onLayout} hideLayout={isReadOnly} />

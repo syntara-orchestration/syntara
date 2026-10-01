@@ -1,19 +1,19 @@
 /**
- * E2E regression coverage for AAP-93586.
- *
  * A large imported workflow must remain usable when adding a step and crossing
  * the semantic-zoom threshold.
  */
+import type { V2WorkflowDefinition } from '@syntara/contracts'
+
 import { test, expect } from './fixtures'
 import { buildUniqueName, clickAddConnectedStep, fillCodeEditor, startWorkflowWithTrigger } from './helpers/workflows'
 
 const IMPORTED_STEP_COUNT = 60
 
-function createLargeWorkflowDefinition(name: string) {
+function createLargeWorkflowDefinition(name: string): V2WorkflowDefinition {
   return {
     schema_version: '2.0.0',
     name,
-    description: 'Large workflow for AAP-93586 regression coverage',
+    description: 'Large workflow for semantic-zoom regression coverage',
     triggers: [{ id: 'trigger_1', type: 'manual_trigger', name: 'Manual trigger', parameters: {} }],
     nodes: Array.from({ length: IMPORTED_STEP_COUNT }, (_, index) => ({
       id: `node_${index + 1}`,
@@ -36,7 +36,7 @@ test('large workflow remains usable across semantic zoom after adding a step', a
 
   await startWorkflowWithTrigger(app)
 
-  const workflowName = buildUniqueName('aap-93586-semantic-zoom')
+  const workflowName = buildUniqueName('e2e-semantic-zoom')
   const fileChooserPromise = app.waitForEvent('filechooser')
   await app.getByRole('button', { name: 'Workflow actions' }).click()
   await app.getByRole('menuitem', { name: 'Import workflow' }).click()
