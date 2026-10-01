@@ -531,10 +531,7 @@ export async function addSwitchNodeWithCases(page: Page, name: string, cases: Sw
    */
   const fillCase = async (i: number) => {
     // ExpressionBuilder uses a PatternFly MenuToggle — click to open, then select option
-    await page
-      .getByRole('button', { name: EXPRESSION_MODE_LABELS.visual, exact: true })
-      .nth(i)
-      .click()
+    await page.getByRole('button', { name: EXPRESSION_MODE_LABELS.visual, exact: true }).nth(i).click()
     await page.getByRole('option', { name: EXPRESSION_MODE_LABELS.raw, exact: true }).click()
 
     const rawExpression = page.getByLabel(/Raw expression/i).nth(i)
