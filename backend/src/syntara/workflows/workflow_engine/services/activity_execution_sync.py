@@ -504,7 +504,6 @@ class ActivityExecutionSyncMixin:
             error_details=None,
             retry_count=0,
             iteration=iteration_num,
-            replayed=False,
         )
         session.add(new_activity)
         existing_activities[composite_key] = new_activity

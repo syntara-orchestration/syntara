@@ -11,7 +11,6 @@ that history cost. Namespace publication uses the ordinary completion path.
 """
 
 import json
-import time
 from typing import TYPE_CHECKING, Any
 
 import structlog
@@ -22,8 +21,6 @@ with workflow.unsafe.imports_passed_through():
     from syntara.core.constants import JsonbLimits
     from syntara.core.database.session import get_db
     from syntara.core.exceptions import SafeValueError
-    from syntara.metrics.dependencies import get_metrics_recorder
-    from syntara.metrics.types import MetricType
     from syntara.workflows.models.activity_execution import ActivityExecution, ActivityStatus
     from syntara.workflows.utils.loop_iteration_names import strip_iteration_suffix
 
@@ -59,7 +56,6 @@ async def fetch_retry_outputs_activity(
             truncated output is worse than a refused retry.
 
     """
-    started = time.monotonic()
     if not node_ids:
         return {}
 
@@ -107,20 +103,6 @@ async def fetch_retry_outputs_activity(
         node_count=len(outputs),
         serialized_bytes=serialized_bytes,
     )
-    try:
-        get_metrics_recorder().record(
-            MetricType.RETRY_RESTORATION_DURATION,
-            (time.monotonic() - started) * 1000,
-            unit="ms",
-            labels={
-                "component": "execution_service",
-                "execution_mode": "retry",
-                "node_count": str(len(wanted)),
-                "restored_node_count": str(len(outputs)),
-            },
-        )
-    except Exception:  # noqa: BLE001 -- telemetry must never prevent restoration
-        logger.warning("Unable to record retry restoration metrics", exc_info=True)
     return outputs
 
 

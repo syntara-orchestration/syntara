@@ -388,11 +388,6 @@ components:
         - activity_id
         - status
       properties:
-        replayed:
-          anyOf:
-            - type: boolean
-            - type: 'null'
-          title: Replayed
         activity_id:
           type: string
           title: Activity Id
@@ -620,12 +615,6 @@ components:
             - temporal_activity_id
             - status
           properties:
-            replayed:
-              anyOf:
-                - type: boolean
-                - type: 'null'
-              description: True when output was reused from the source run; null for older records
-              title: Replayed
             execution_id:
               type: string
               format: uuid

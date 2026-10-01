@@ -16,7 +16,7 @@ async def sync_restored_activities(
     execution_id: UUID,
     names: list[str],
 ) -> tuple[list[tuple[ActivityExecution, dict[str, Any]]], list[ActivityExecution]]:
-    """Idempotently copy retained outputs and provenance from the linked source.
+    """Idempotently copy retained outputs from the linked source.
 
     Historical inputs are left untouched pending the input-display contract.
     Stored output is necessary for subsequent retries after this run fails.
@@ -50,7 +50,8 @@ async def sync_restored_activities(
     now = datetime.now(UTC)
     for source in sources:
         target = existing.get(source.activity_name)
-        if target is not None and (target.replayed or target.status != ActivityStatus.PENDING):
+        # Completed status also marks previously restored rows, making resync a no-op.
+        if target is not None and target.status != ActivityStatus.PENDING:
             continue
         if target is None:
             target = ActivityExecution(
@@ -71,7 +72,6 @@ async def sync_restored_activities(
                         "status": target.status,
                         "output_data": target.output_data,
                         "iteration": target.iteration,
-                        "replayed": target.replayed,
                         "started_at": target.started_at,
                         "completed_at": target.completed_at,
                         "error_details": target.error_details,
@@ -79,7 +79,6 @@ async def sync_restored_activities(
                 )
             )
         target.status = ActivityStatus.COMPLETED
-        target.replayed = True
         target.output_data = source.output_data
         target.iteration = source.iteration
         target.completed_at = now

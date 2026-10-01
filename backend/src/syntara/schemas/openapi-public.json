@@ -50055,18 +50055,6 @@
               "team": "platform"
             }
           },
-          "replayed": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "True when output was reused from the source run; null for older records",
-            "title": "Replayed"
-          },
           "execution_id": {
             "type": "string",
             "format": "uuid",
@@ -50192,17 +50180,6 @@
           "status"
         ],
         "properties": {
-          "replayed": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Replayed"
-          },
           "activity_id": {
             "type": "string",
             "title": "Activity Id"
