@@ -142,7 +142,7 @@ describe('ImportWorkflowDialog', () => {
     const user = userEvent.setup()
     mockSelectedProjectId = null
 
-    const { rerender } = render(<ImportWorkflowDialog isOpen onClose={vi.fn()} onSuccess={vi.fn()} />)
+    render(<ImportWorkflowDialog isOpen onClose={vi.fn()} onSuccess={vi.fn()} />)
 
     const file = new File(['{}'], 'test.json', { type: 'application/json' })
     await user.upload(getFileUploadInput(), file)
