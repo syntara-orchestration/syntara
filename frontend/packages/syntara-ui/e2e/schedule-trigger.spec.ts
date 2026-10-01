@@ -21,10 +21,10 @@
  */
 
 import { test, expect, toAppUrl } from './fixtures'
-import { addScheduleTrigger, openScheduleTriggerForEditing } from './helpers/v2-nodes'
+import { addScheduleTrigger, openScheduleTriggerForEditing } from './helpers/v2-steps'
 import {
   buildUniqueName,
-  closeNodeEditorPanel,
+  closeStepEditorPanel,
   deleteWorkflow,
   openWorkflowInBuilder,
   selectProjectIfRequired,
@@ -165,7 +165,7 @@ test.describe('Schedule Trigger — UI-19', () => {
         await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Scheduled action')
         await fillCodeEditor(app, { value: 'print("running")' })
         await app.getByRole('button', { name: 'Create', exact: true }).click()
-        await closeNodeEditorPanel(app)
+        await closeStepEditorPanel(app)
 
         await selectProjectIfRequired(app)
         await app.getByPlaceholder('Workflow name').fill(wfName)
@@ -197,7 +197,7 @@ test.describe('Schedule Trigger — UI-19', () => {
         await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Report action')
         await fillCodeEditor(app, { value: 'print("report")' })
         await app.getByRole('button', { name: 'Create', exact: true }).click()
-        await closeNodeEditorPanel(app)
+        await closeStepEditorPanel(app)
 
         await selectProjectIfRequired(app)
         await app.getByPlaceholder('Workflow name').fill(wfName)
@@ -225,7 +225,7 @@ test.describe('Schedule Trigger — UI-19', () => {
         await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Continuous action')
         await fillCodeEditor(app, { value: 'print("running")' })
         await app.getByRole('button', { name: 'Create', exact: true }).click()
-        await closeNodeEditorPanel(app)
+        await closeStepEditorPanel(app)
 
         await selectProjectIfRequired(app)
         await app.getByPlaceholder('Workflow name').fill(wfName)
@@ -262,7 +262,7 @@ test.describe('Schedule Trigger — UI-19', () => {
         await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Action')
         await fillCodeEditor(app, { value: 'print("ok")' })
         await app.getByRole('button', { name: 'Create', exact: true }).click()
-        await closeNodeEditorPanel(app)
+        await closeStepEditorPanel(app)
 
         await selectProjectIfRequired(app)
         await app.getByPlaceholder('Workflow name').fill(wfName)
@@ -303,7 +303,7 @@ test.describe('Schedule Trigger — UI-19', () => {
         await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Action')
         await fillCodeEditor(app, { value: 'print("ok")' })
         await app.getByRole('button', { name: 'Create', exact: true }).click()
-        await closeNodeEditorPanel(app)
+        await closeStepEditorPanel(app)
 
         await selectProjectIfRequired(app)
         await app.getByPlaceholder('Workflow name').fill(wfName)

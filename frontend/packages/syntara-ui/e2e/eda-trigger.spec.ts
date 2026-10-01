@@ -14,12 +14,12 @@
  */
 
 import { test, expect, toAppUrl } from './fixtures'
-import { addEdaTrigger } from './helpers/v2-nodes'
+import { addEdaTrigger } from './helpers/v2-steps'
 import {
   buildUniqueName,
   clickAddConnectedStep,
   clickSaveAndWait,
-  closeNodeEditorPanel,
+  closeStepEditorPanel,
   deleteWorkflow,
   fillCodeEditor,
   selectProjectIfRequired,
@@ -46,7 +46,7 @@ test.describe('EDA Trigger', () => {
       await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Process event')
       await fillCodeEditor(app, { value: 'print("processing EDA event")' })
       await app.getByRole('button', { name: 'Create', exact: true }).click()
-      await closeNodeEditorPanel(app)
+      await closeStepEditorPanel(app)
 
       // Save workflow (select project right before save)
       // Pin the workflow to the service account's own project. `ensureProject`

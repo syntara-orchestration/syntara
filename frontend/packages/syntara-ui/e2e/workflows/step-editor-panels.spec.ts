@@ -1,11 +1,11 @@
 import { type Page } from '../fixtures'
 import { test, expect, toAppUrl } from '../fixtures'
-import { addAgenticNode, addManualTrigger, addScriptNode } from '../helpers/v2-nodes'
+import { addAgenticStep, addManualTrigger, addScriptStep } from '../helpers/v2-steps'
 import {
   buildUniqueName,
   clickAddConnectedStep,
   clickNode,
-  closeNodeEditorPanel,
+  closeStepEditorPanel,
   createBasicWorkflowViaApi,
   openWorkflowInBuilder,
   fillCodeEditor,
@@ -46,7 +46,7 @@ test.describe('Node editor panels', () => {
     await expect(app.getByText('Run the workflow or test this step to see output data here.')).toBeVisible()
 
     // Verify the close button works
-    await closeNodeEditorPanel(app)
+    await closeStepEditorPanel(app)
     await expect(app.getByRole('heading', { name: 'Input', exact: true })).not.toBeVisible()
   })
 
@@ -63,7 +63,7 @@ test.describe('Node editor panels', () => {
     await expect(app.getByRole('heading', { name: 'Output', exact: true })).toBeVisible()
 
     // Close the editor
-    await closeNodeEditorPanel(app)
+    await closeStepEditorPanel(app)
     await expect(app.getByRole('heading', { name: 'Input', exact: true })).not.toBeVisible()
 
     // Click the trigger node — triggers do NOT show the Input panel
@@ -71,7 +71,7 @@ test.describe('Node editor panels', () => {
     await expect(app.getByRole('heading', { name: 'Output', exact: true })).toBeVisible({ timeout: 10_000 })
 
     // Close and reopen the script node
-    await closeNodeEditorPanel(app)
+    await closeStepEditorPanel(app)
     await clickNode(app, 'My action')
     await expect(app.getByRole('heading', { name: 'Input', exact: true })).toBeVisible({ timeout: 10_000 })
     await expect(app.getByRole('heading', { name: 'Output', exact: true })).toBeVisible()
@@ -156,17 +156,17 @@ test.describe('Node editor panels', () => {
     // Build: Trigger → Gather Info → Process Data → Send Alert
     await app.goto(toAppUrl('/workflow-builder/new'))
     await addManualTrigger(app, 'Trigger')
-    await addScriptNode(
+    await addScriptStep(
       app,
       'Gather Info',
       'import json; print(json.dumps({"server": "web-01", "status": "degraded", "cpu": 92, "errors": 15}))'
     )
-    await addScriptNode(
+    await addScriptStep(
       app,
       'Process Data',
       'import json, sys; print(json.dumps({"alert_level": "warning", "affected_server": data["server"]}))'
     )
-    await addScriptNode(
+    await addScriptStep(
       app,
       'Send Alert',
       'import json; print(json.dumps({"notification_sent": True, "channel": "#ops-alerts"}))'
@@ -304,7 +304,7 @@ test.describe('Node editor panels', () => {
     await expect(outputPanel.getByText('"degraded"')).toBeVisible()
 
     // Node 2: Process Data — output has alert analysis (different from node 1)
-    await closeNodeEditorPanel(app)
+    await closeStepEditorPanel(app)
     await clickNode(app, 'Process Data')
     await expect(app.getByLabel('Search json output')).toBeVisible({ timeout: 10_000 })
     await expect(outputPanel.getByText('"alert_level"')).toBeVisible()
@@ -312,7 +312,7 @@ test.describe('Node editor panels', () => {
     await expect(outputPanel.getByText('"affected_server"')).toBeVisible()
 
     // Node 3: Send Alert — output has notification result (different from nodes 1 and 2)
-    await closeNodeEditorPanel(app)
+    await closeStepEditorPanel(app)
     await clickNode(app, 'Send Alert')
     await expect(app.getByLabel('Search json output')).toBeVisible({ timeout: 10_000 })
     await expect(outputPanel.getByText('"notification_sent"')).toBeVisible()
@@ -328,8 +328,8 @@ test.describe('Node editor panels', () => {
     await app.goto(toAppUrl('/workflow-builder/new'))
     await selectProjectIfRequired(app)
     await addManualTrigger(app, 'Trigger')
-    await addScriptNode(app, 'Fetch Data', 'print("fetching")')
-    await addScriptNode(app, 'Analyze', 'print("analyzing")')
+    await addScriptStep(app, 'Fetch Data', 'print("fetching")')
+    await addScriptStep(app, 'Analyze', 'print("analyzing")')
 
     // Click the last node in the chain — its upstream is a script node
     await clickNode(app, 'Analyze')
@@ -360,8 +360,8 @@ test.describe('Node editor panels', () => {
     await app.goto(toAppUrl('/workflow-builder/new'))
     await selectProjectIfRequired(app)
     await addManualTrigger(app, 'Trigger')
-    await addScriptNode(app, 'Fetch Data', 'print("fetching")')
-    await addScriptNode(app, 'Analyze', 'print("analyzing")')
+    await addScriptStep(app, 'Fetch Data', 'print("fetching")')
+    await addScriptStep(app, 'Analyze', 'print("analyzing")')
 
     // Extract node IDs while edges are in the store
     await layoutCanvas(app)
@@ -378,7 +378,7 @@ test.describe('Node editor panels', () => {
     await expect(app.getByText('T stdout', { exact: true })).toBeVisible()
     await expect(app.getByText('# return_code', { exact: true })).toBeVisible()
     await expect(app.getByRole('group', { name: 'Input view selection' })).not.toBeVisible()
-    await closeNodeEditorPanel(app)
+    await closeStepEditorPanel(app)
 
     // --- Phase 2: Save and run the workflow ---
     await selectProjectIfRequired(app)
@@ -521,8 +521,8 @@ test.describe('Node editor panels', () => {
     await app.goto(toAppUrl('/workflow-builder/new'))
     await selectProjectIfRequired(app)
     await addManualTrigger(app, 'Trigger')
-    await addScriptNode(app, 'Script A', 'print("hello")')
-    await addScriptNode(app, 'Script B', 'print("world")')
+    await addScriptStep(app, 'Script A', 'print("hello")')
+    await addScriptStep(app, 'Script B', 'print("world")')
 
     await clickNode(app, 'Script B')
     await expect(app.getByRole('heading', { name: 'Input', exact: true })).toBeVisible({ timeout: 10_000 })
@@ -564,8 +564,8 @@ test.describe('Node editor panels', () => {
     await app.goto(toAppUrl('/workflow-builder/new'))
     await selectProjectIfRequired(app)
     await addManualTrigger(app, 'Trigger')
-    await addScriptNode(app, 'Fetch', 'print("data")')
-    await addScriptNode(app, 'Analyze', 'print("result")')
+    await addScriptStep(app, 'Fetch', 'print("data")')
+    await addScriptStep(app, 'Analyze', 'print("result")')
     await app.getByPlaceholder('Workflow name').fill(workflowName)
     await app.getByRole('button', { name: 'Save workflow' }).click()
     await expect(app).toHaveURL(/workflow-builder\/(?!new)/, { timeout: 15_000 })
@@ -681,9 +681,9 @@ test.describe('Node editor panels', () => {
     await app.goto(toAppUrl('/workflow-builder/new'))
     await selectProjectIfRequired(app)
     await addManualTrigger(app, 'Trigger')
-    await addScriptNode(app, 'Step A', 'print("alpha")')
-    await addScriptNode(app, 'Step B', 'print("beta")')
-    await addScriptNode(app, 'Step C', 'print("gamma")')
+    await addScriptStep(app, 'Step A', 'print("alpha")')
+    await addScriptStep(app, 'Step B', 'print("beta")')
+    await addScriptStep(app, 'Step C', 'print("gamma")')
     await app.getByPlaceholder('Workflow name').fill(workflowName)
     await app.getByRole('button', { name: 'Save workflow' }).click()
     await expect(app).toHaveURL(/workflow-builder\/(?!new)/, { timeout: 15_000 })
@@ -943,7 +943,7 @@ test.describe('Node editor panels', () => {
     await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Script B')
     await fillCodeEditor(app, { value: 'print("beta")' })
     await app.getByRole('button', { name: 'Create' }).click()
-    await closeNodeEditorPanel(app)
+    await closeStepEditorPanel(app)
 
     await selectProjectIfRequired(app)
     await app.getByPlaceholder('Workflow name').fill(workflowName)
@@ -1000,7 +1000,7 @@ test.describe('Node editor panels', () => {
     await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Script B')
     await fillCodeEditor(app, { value: 'print("beta")' })
     await app.getByRole('button', { name: 'Create' }).click()
-    await closeNodeEditorPanel(app)
+    await closeStepEditorPanel(app)
 
     await selectProjectIfRequired(app)
     await app.getByPlaceholder('Workflow name').fill(workflowName)
@@ -1053,7 +1053,7 @@ test.describe('Node editor panels', () => {
     await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Script B')
     await fillCodeEditor(app, { value: 'print("beta")' })
     await app.getByRole('button', { name: 'Create' }).click()
-    await closeNodeEditorPanel(app)
+    await closeStepEditorPanel(app)
 
     await selectProjectIfRequired(app)
     await app.getByPlaceholder('Workflow name').fill(workflowName)
@@ -1102,7 +1102,7 @@ test.describe('Node editor panels', () => {
     await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Script B')
     await fillCodeEditor(app, { value: 'print("test2")' })
     await app.getByRole('button', { name: 'Create' }).click()
-    await closeNodeEditorPanel(app)
+    await closeStepEditorPanel(app)
 
     await selectProjectIfRequired(app)
     await app.getByPlaceholder('Workflow name').fill(workflowName)
@@ -1160,7 +1160,7 @@ test.describe('Node editor panels', () => {
     await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Script B')
     await fillCodeEditor(app, { value: 'print("beta")' })
     await app.getByRole('button', { name: 'Create' }).click()
-    await closeNodeEditorPanel(app)
+    await closeStepEditorPanel(app)
 
     await selectProjectIfRequired(app)
     await app.getByPlaceholder('Workflow name').fill(workflowName)
@@ -1182,7 +1182,7 @@ test.describe('Node editor panels', () => {
     await app.getByRole('button', { name: 'Pin data', exact: true }).click()
     await expect(inputPanel.getByText('Mock data pinned (1)')).toBeVisible()
 
-    await closeNodeEditorPanel(app)
+    await closeStepEditorPanel(app)
     await expect(app.getByRole('heading', { name: 'Input', exact: true })).not.toBeVisible()
     // Nav arrows unmount with the editor; wait so the next canvas click cannot hit them.
     await expect(app.getByRole('button', { name: /Go to previous step:/ })).toHaveCount(0)
@@ -1202,8 +1202,8 @@ test.describe('Node editor panels', () => {
     await app.goto(toAppUrl('/workflow-builder/new'))
     await selectProjectIfRequired(app)
     await addManualTrigger(app, 'Trigger')
-    await addScriptNode(app, 'Script A', 'print("hello")')
-    await addScriptNode(app, 'Script B', 'print("world")')
+    await addScriptStep(app, 'Script A', 'print("hello")')
+    await addScriptStep(app, 'Script B', 'print("world")')
 
     await clickNode(app, 'Script B')
     await expect(app.getByRole('heading', { name: 'Input', exact: true })).toBeVisible({ timeout: 10_000 })
@@ -1232,10 +1232,10 @@ test.describe('Node editor panels', () => {
     await app.goto(toAppUrl('/workflow-builder/new'))
     await selectProjectIfRequired(app)
     await addManualTrigger(app, 'Trigger')
-    await addScriptNode(app, 'Script A', 'print("hello")')
-    await addAgenticNode(app, 'Agent B', 'initial-prompt')
+    await addScriptStep(app, 'Script A', 'print("hello")')
+    await addAgenticStep(app, 'Agent B', 'initial-prompt')
 
-    // clickNode reopens the editor after addAgenticNode closes it
+    // clickNode reopens the editor after addAgenticStep closes it
     await clickNode(app, 'Agent B')
     await expect(app.getByRole('heading', { name: 'Input', exact: true })).toBeVisible({ timeout: 10_000 })
     await expect(app.getByText('Expected output fields')).toBeVisible({ timeout: 10_000 })

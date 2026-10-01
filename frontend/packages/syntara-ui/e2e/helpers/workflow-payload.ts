@@ -2,7 +2,7 @@ import { type Request } from '@playwright/test'
 
 import { type Page } from '../fixtures'
 
-import { closeNodeEditorPanel } from './workflows'
+import { closeStepEditorPanel } from './workflows'
 
 export type WorkflowNode = {
   id: string
@@ -29,5 +29,5 @@ export async function cancelAndCloseEditor(app: Page) {
       return
     }
   }
-  await closeNodeEditorPanel(app)
+  await closeStepEditorPanel(app)
 }

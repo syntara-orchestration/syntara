@@ -12,10 +12,10 @@ import { test, expect } from '../fixtures'
 import {
   buildUniqueName,
   deleteWorkflow,
-  closeNodeEditorPanel,
+  closeStepEditorPanel,
   createWorkflowWithTrigger,
-  addScriptNode,
-  verifyNodeVisible,
+  addScriptStep,
+  verifyStepVisible,
   triggerLayout,
 } from '../helpers/workflows'
 
@@ -24,22 +24,22 @@ test('delete a middle node removes the node and its connected edges', async ({ a
   await createWorkflowWithTrigger(app, workflowName)
 
   try {
-    await closeNodeEditorPanel(app)
+    await closeStepEditorPanel(app)
     await expect(app.getByText('Manual trigger')).toBeVisible()
 
     // Add three connected nodes: Manual trigger → Node A → Node B → Node C
-    await addScriptNode(app, 'Node A', 'print("A")')
-    await addScriptNode(app, 'Node B', 'print("B")')
-    await addScriptNode(app, 'Node C', 'print("C")')
+    await addScriptStep(app, 'Node A', 'print("A")')
+    await addScriptStep(app, 'Node B', 'print("B")')
+    await addScriptStep(app, 'Node C', 'print("C")')
 
     // Layout to position nodes
     await triggerLayout(app)
 
     // Verify all nodes are visible
-    await verifyNodeVisible(app, 'Manual trigger')
-    await verifyNodeVisible(app, 'Node A')
-    await verifyNodeVisible(app, 'Node B')
-    await verifyNodeVisible(app, 'Node C')
+    await verifyStepVisible(app, 'Manual trigger')
+    await verifyStepVisible(app, 'Node A')
+    await verifyStepVisible(app, 'Node B')
+    await verifyStepVisible(app, 'Node C')
 
     // ReactFlow edges have no ARIA role — CSS is the only way to count them.
     // count() is a snapshot so wrap in toPass() to retry until the DOM settles.
@@ -75,9 +75,9 @@ test('delete a middle node removes the node and its connected edges', async ({ a
     }).toPass()
 
     // Verify Node A and Node C remain on the canvas
-    await verifyNodeVisible(app, 'Manual trigger')
-    await verifyNodeVisible(app, 'Node A')
-    await verifyNodeVisible(app, 'Node C')
+    await verifyStepVisible(app, 'Manual trigger')
+    await verifyStepVisible(app, 'Node A')
+    await verifyStepVisible(app, 'Node C')
   } finally {
     await deleteWorkflow(app, workflowName)
   }
@@ -104,19 +104,19 @@ for (const { position, nodes, deleteNode, remainingNodes } of deletePositionCase
     await createWorkflowWithTrigger(app, workflowName)
 
     try {
-      await closeNodeEditorPanel(app)
+      await closeStepEditorPanel(app)
       await expect(app.getByText('Manual trigger')).toBeVisible()
 
       // Add nodes
       for (const nodeName of nodes) {
-        await addScriptNode(app, nodeName, `print("${nodeName}")`)
+        await addScriptStep(app, nodeName, `print("${nodeName}")`)
       }
 
       await triggerLayout(app)
 
       // Verify all nodes visible
       for (const nodeName of nodes) {
-        await verifyNodeVisible(app, nodeName)
+        await verifyStepVisible(app, nodeName)
       }
 
       // Delete the specified node using kebab menu
@@ -135,9 +135,9 @@ for (const { position, nodes, deleteNode, remainingNodes } of deletePositionCase
       await expect(targetNode).not.toBeAttached({ timeout: 10000 })
 
       // Verify remaining nodes are still visible
-      await verifyNodeVisible(app, 'Manual trigger')
+      await verifyStepVisible(app, 'Manual trigger')
       for (const nodeName of remainingNodes) {
-        await verifyNodeVisible(app, nodeName)
+        await verifyStepVisible(app, nodeName)
       }
     } finally {
       await deleteWorkflow(app, workflowName)

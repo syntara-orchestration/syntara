@@ -169,7 +169,7 @@ Pages that render a ReactFlow canvas (workflow builder, execution visualizer) us
 
 - Set `perceptual: true` on any entry that renders `.react-flow` — this signals the test runner to mask the ReactFlow canvas with a solid rectangle (`#e8e8e8`) before comparison.
 - Masking replaces the canvas area entirely, so node positions, edge routing, and `fitView()` floating-point output no longer affect the diff. The surrounding UI chrome (toolbar, side panels, breadcrumbs) is still pixel-compared and will catch real regressions.
-- Set `maskCanvas: false` for step/trigger form entries that open `NodeEditorOverlay`. That overlay is `position: absolute; inset: 0` over the same box as `.react-flow`, so a canvas mask would paint solid grey over the form and `--update-snapshots` would commit empty baselines.
+- Set `maskCanvas: false` for step/trigger form entries that open `StepEditorOverlay`. That overlay is `position: absolute; inset: 0` over the same box as `.react-flow`, so a canvas mask would paint solid grey over the form and `--update-snapshots` would commit empty baselines.
 - The `CanvasPageEntry` type enforces `perceptual: true` for dedicated arrays (`builderInteractivePages`, etc.). A runtime check throws if any `workflows/` entry is missing it.
 - `stabilizeReactFlowViewport` still runs before the screenshot — it ensures the canvas has finished rendering (and the surrounding UI has settled) before we capture, even though the canvas itself is usually masked.
 - No `maxDiffPixelRatio` overrides are needed on canvas entries: since the canvas is masked (or covered by the node editor overlay), the only pixel differences are in the non-canvas chrome, which should be fully deterministic.

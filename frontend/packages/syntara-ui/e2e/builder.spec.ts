@@ -4,7 +4,7 @@ import {
   buildUniqueName,
   clickAddConnectedStep,
   clickSaveAndWait,
-  closeNodeEditorPanel,
+  closeStepEditorPanel,
   createBasicWorkflowViaApi,
   fillCodeEditor,
   selectProjectIfRequired,
@@ -29,7 +29,7 @@ test('user creates and saves a multi-node workflow', async ({ app }) => {
     await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Send email')
     await fillCodeEditor(app, { value: 'print("hello from Playwright")' })
     await app.getByRole('button', { name: 'Create' }).click()
-    await closeNodeEditorPanel(app)
+    await closeStepEditorPanel(app)
 
     // Act - Add another connected action node
     const secondPanel = await clickAddConnectedStep(app)

@@ -11,24 +11,24 @@
  */
 
 import { test, expect } from '../fixtures'
-import { openAddNodePanel, selectCategoryAndType } from '../helpers/v2-nodes'
+import { openAddStepPanel, selectCategoryAndStepType } from '../helpers/v2-steps'
 import {
-  addChildScriptToLoop,
-  addForEachLoopNode,
-  addWhileLoopNode,
-  configureLoopNode,
-  saveAndCloseNodeForm,
-} from '../helpers/v2-nodes-loop'
+  addChildScriptToLoopStep,
+  addForEachLoopStep,
+  addWhileLoopStep,
+  configureLoopStep,
+  saveAndCloseStepForm,
+} from '../helpers/v2-steps-loop'
 import {
   buildUniqueName,
-  closeNodeEditorPanel,
+  closeStepEditorPanel,
   deleteWorkflow,
-  openNodeForEditing,
+  openStepForEditing,
   openWorkflowInBuilder,
   saveWorkflow,
   startWorkflowWithTrigger,
   triggerLayout,
-  verifyNodeVisible,
+  verifyStepVisible,
   waitForUIReady,
 } from '../helpers/workflows'
 
@@ -39,16 +39,16 @@ test.describe('Loop Node Configuration [UI-16]', () => {
     try {
       await startWorkflowWithTrigger(app)
 
-      await addWhileLoopNode(app, {
+      await addWhileLoopStep(app, {
         name: 'While loop',
         condition: '${counter} < 10',
       })
 
-      await verifyNodeVisible(app, 'While loop')
+      await verifyStepVisible(app, 'While loop')
       await saveWorkflow(app, workflowName)
 
       await expect(app.getByPlaceholder('Workflow name')).toHaveValue(workflowName)
-      await verifyNodeVisible(app, 'While loop')
+      await verifyStepVisible(app, 'While loop')
     } finally {
       await deleteWorkflow(app, workflowName)
     }
@@ -60,16 +60,16 @@ test.describe('Loop Node Configuration [UI-16]', () => {
     try {
       await startWorkflowWithTrigger(app)
 
-      await addForEachLoopNode(app, {
+      await addForEachLoopStep(app, {
         name: 'For each loop',
         items: '${trigger.items}',
       })
 
-      await verifyNodeVisible(app, 'For each loop')
+      await verifyStepVisible(app, 'For each loop')
       await saveWorkflow(app, workflowName)
 
       await expect(app.getByPlaceholder('Workflow name')).toHaveValue(workflowName)
-      await verifyNodeVisible(app, 'For each loop')
+      await verifyStepVisible(app, 'For each loop')
     } finally {
       await deleteWorkflow(app, workflowName)
     }
@@ -81,17 +81,17 @@ test.describe('Loop Node Configuration [UI-16]', () => {
     try {
       await startWorkflowWithTrigger(app)
 
-      await addForEachLoopNode(app, {
+      await addForEachLoopStep(app, {
         name: 'Process items',
         items: '${input.records}',
         itemVariable: 'record',
         indexVariable: 'recordIndex',
       })
 
-      await verifyNodeVisible(app, 'Process items')
+      await verifyStepVisible(app, 'Process items')
       await saveWorkflow(app, workflowName)
 
-      await openNodeForEditing(app, 'Process items')
+      await openStepForEditing(app, 'Process items')
 
       await expect(app.getByRole('textbox', { name: 'Name', exact: true })).toHaveValue('Process items')
       await expect(app.getByRole('button', { name: 'Type', exact: true })).toContainText('For each')
@@ -99,7 +99,7 @@ test.describe('Loop Node Configuration [UI-16]', () => {
       await expect(app.getByRole('textbox', { name: 'Item variable', exact: true })).toHaveValue('record')
       await expect(app.getByRole('textbox', { name: 'Index variable', exact: true })).toHaveValue('recordIndex')
 
-      await closeNodeEditorPanel(app)
+      await closeStepEditorPanel(app)
     } finally {
       await deleteWorkflow(app, workflowName)
     }
@@ -111,23 +111,23 @@ test.describe('Loop Node Configuration [UI-16]', () => {
     try {
       await startWorkflowWithTrigger(app)
 
-      await addWhileLoopNode(app, {
+      await addWhileLoopStep(app, {
         name: 'Limited while loop',
         condition: 'true',
         maxIterations: 100,
       })
 
-      await verifyNodeVisible(app, 'Limited while loop')
+      await verifyStepVisible(app, 'Limited while loop')
       await saveWorkflow(app, workflowName)
 
-      await openNodeForEditing(app, 'Limited while loop')
+      await openStepForEditing(app, 'Limited while loop')
 
       await expect(app.getByRole('textbox', { name: 'Name', exact: true })).toHaveValue('Limited while loop')
       await expect(app.getByRole('button', { name: 'Type', exact: true })).toContainText('While')
       await expect(app.getByLabel(/Raw expression/i)).toHaveValue('true')
       await expect(app.getByRole('spinbutton', { name: /Max iterations/i })).toHaveValue('100')
 
-      await closeNodeEditorPanel(app)
+      await closeStepEditorPanel(app)
     } finally {
       await deleteWorkflow(app, workflowName)
     }
@@ -139,33 +139,33 @@ test.describe('Loop Node Configuration [UI-16]', () => {
     try {
       await startWorkflowWithTrigger(app)
 
-      await openAddNodePanel(app)
-      await selectCategoryAndType(app, 'Logic', 'Loop')
-      await configureLoopNode(app, {
+      await openAddStepPanel(app)
+      await selectCategoryAndStepType(app, 'Logic', 'Loop')
+      await configureLoopStep(app, {
         name: 'Switchable loop',
         type: 'while',
         condition: 'true',
       })
-      await saveAndCloseNodeForm(app)
+      await saveAndCloseStepForm(app)
 
-      await verifyNodeVisible(app, 'Switchable loop')
+      await verifyStepVisible(app, 'Switchable loop')
 
-      await openNodeForEditing(app, 'Switchable loop')
-      await configureLoopNode(app, {
+      await openStepForEditing(app, 'Switchable loop')
+      await configureLoopStep(app, {
         type: 'forEach',
         items: '${input.data}',
       })
-      await saveAndCloseNodeForm(app)
+      await saveAndCloseStepForm(app)
 
       await saveWorkflow(app, workflowName)
 
-      await openNodeForEditing(app, 'Switchable loop')
+      await openStepForEditing(app, 'Switchable loop')
 
       await expect(app.getByRole('button', { name: 'Type', exact: true })).toContainText('For each')
       await expect(app.getByRole('textbox', { name: 'Items expression', exact: true })).toHaveValue('${input.data}')
       await expect(app.getByLabel(/Raw expression/i)).not.toBeVisible()
 
-      await closeNodeEditorPanel(app)
+      await closeStepEditorPanel(app)
     } finally {
       await deleteWorkflow(app, workflowName)
     }
@@ -174,9 +174,9 @@ test.describe('Loop Node Configuration [UI-16]', () => {
   test('verifies Parameters panel displays conditional fields by loop type', async ({ app }) => {
     await startWorkflowWithTrigger(app)
 
-    await openAddNodePanel(app)
-    await selectCategoryAndType(app, 'Logic', 'Loop')
-    await configureLoopNode(app, { type: 'while' })
+    await openAddStepPanel(app)
+    await selectCategoryAndStepType(app, 'Logic', 'Loop')
+    await configureLoopStep(app, { type: 'while' })
 
     await expect(app.getByRole('textbox', { name: 'Name', exact: true })).toBeVisible()
     await expect(app.getByText('Type', { exact: true })).toBeVisible()
@@ -186,7 +186,7 @@ test.describe('Loop Node Configuration [UI-16]', () => {
     await expect(app.getByText('Max iterations', { exact: true })).toBeVisible()
     await expect(app.getByRole('spinbutton', { name: /Max iterations/i })).toBeVisible()
 
-    await configureLoopNode(app, { type: 'forEach' })
+    await configureLoopStep(app, { type: 'forEach' })
 
     await expect(app.getByText('Items expression', { exact: true })).toBeVisible()
     await expect(app.getByRole('textbox', { name: 'Items expression', exact: true })).toBeVisible()
@@ -202,8 +202,8 @@ test.describe('Loop Node Configuration [UI-16]', () => {
   const loopBodyTestCases = [
     {
       type: 'While',
-      addLoop: (app: Parameters<typeof addWhileLoopNode>[0]) =>
-        addWhileLoopNode(app, {
+      addLoop: (app: Parameters<typeof addWhileLoopStep>[0]) =>
+        addWhileLoopStep(app, {
           name: 'While with body',
           condition: '${counter} < 5',
         }),
@@ -214,8 +214,8 @@ test.describe('Loop Node Configuration [UI-16]', () => {
     },
     {
       type: 'For Each',
-      addLoop: (app: Parameters<typeof addForEachLoopNode>[0]) =>
-        addForEachLoopNode(app, {
+      addLoop: (app: Parameters<typeof addForEachLoopStep>[0]) =>
+        addForEachLoopStep(app, {
           name: 'For each with body',
           items: '${input.items}',
         }),
@@ -233,13 +233,13 @@ test.describe('Loop Node Configuration [UI-16]', () => {
       try {
         await startWorkflowWithTrigger(app)
         await testCase.addLoop(app)
-        await verifyNodeVisible(app, testCase.loopNodeName)
+        await verifyStepVisible(app, testCase.loopNodeName)
 
-        await addChildScriptToLoop(app, testCase.scriptName, testCase.scriptCode, testCase.loopNodeName)
+        await addChildScriptToLoopStep(app, testCase.scriptName, testCase.scriptCode, testCase.loopNodeName)
         await waitForUIReady(app)
 
-        await verifyNodeVisible(app, testCase.loopNodeName)
-        await verifyNodeVisible(app, testCase.scriptName)
+        await verifyStepVisible(app, testCase.loopNodeName)
+        await verifyStepVisible(app, testCase.scriptName)
 
         await saveWorkflow(app, workflowName)
 
@@ -256,11 +256,11 @@ test.describe('Loop Node Configuration [UI-16]', () => {
     try {
       await startWorkflowWithTrigger(app)
 
-      await addWhileLoopNode(app, {
+      await addWhileLoopStep(app, {
         name: 'Loop header',
         condition: 'true',
       })
-      await addChildScriptToLoop(app, 'Loop body', 'print("body")', 'Loop header')
+      await addChildScriptToLoopStep(app, 'Loop body', 'print("body")', 'Loop header')
       await waitForUIReady(app)
       await triggerLayout(app)
 
@@ -272,8 +272,8 @@ test.describe('Loop Node Configuration [UI-16]', () => {
       expect(workflowId).toBeTruthy()
 
       await openWorkflowInBuilder(app, workflowName, workflowId)
-      await verifyNodeVisible(app, 'Loop header')
-      await verifyNodeVisible(app, 'Loop body')
+      await verifyStepVisible(app, 'Loop header')
+      await verifyStepVisible(app, 'Loop body')
       await triggerLayout(app)
 
       const edgePaths = await app.evaluate(() =>
@@ -295,7 +295,7 @@ test.describe('Loop Node Configuration [UI-16]', () => {
     try {
       await startWorkflowWithTrigger(app)
 
-      await addForEachLoopNode(app, {
+      await addForEachLoopStep(app, {
         name: 'Initial loop',
         items: '${input.list}',
         itemVariable: 'item',
@@ -303,32 +303,32 @@ test.describe('Loop Node Configuration [UI-16]', () => {
       })
 
       // First edit - change items and add maxIterations (before workflow save)
-      await openNodeForEditing(app, 'Initial loop')
-      await configureLoopNode(app, {
+      await openStepForEditing(app, 'Initial loop')
+      await configureLoopStep(app, {
         items: '${trigger.data}',
         maxIterations: 50,
       })
-      await saveAndCloseNodeForm(app)
+      await saveAndCloseStepForm(app)
 
       // Second edit - change itemVariable (still before workflow save)
-      await openNodeForEditing(app, 'Initial loop')
-      await configureLoopNode(app, {
+      await openStepForEditing(app, 'Initial loop')
+      await configureLoopStep(app, {
         itemVariable: 'element',
       })
-      await saveAndCloseNodeForm(app)
+      await saveAndCloseStepForm(app)
 
       // Now save the workflow with all the edits
       await saveWorkflow(app, workflowName)
 
       // Verify all changes persisted
-      await openNodeForEditing(app, 'Initial loop')
+      await openStepForEditing(app, 'Initial loop')
 
       await expect(app.getByRole('textbox', { name: 'Items expression', exact: true })).toHaveValue('${trigger.data}')
       await expect(app.getByRole('textbox', { name: 'Item variable', exact: true })).toHaveValue('element')
       await expect(app.getByRole('textbox', { name: 'Index variable', exact: true })).toHaveValue('idx')
       await expect(app.getByRole('spinbutton', { name: /Max iterations/i })).toHaveValue('50')
 
-      await closeNodeEditorPanel(app)
+      await closeStepEditorPanel(app)
     } finally {
       await deleteWorkflow(app, workflowName)
     }

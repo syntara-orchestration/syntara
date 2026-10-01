@@ -18,7 +18,7 @@ export { clickSaveAndWait, isWorkflowSaveResponse } from './workflow-save'
 
 export const buildUniqueName = (prefix: string) => `${prefix}-${Date.now()}-${randomUUID()}`
 
-export const addNodePanel = (page: Page) =>
+export const addStepPanel = (page: Page) =>
   page.getByRole('region', {
     name: /add step|select an action node|select a trigger node|select a logic node|select an aap execution node/i,
   })
@@ -43,7 +43,7 @@ export async function waitForUIReady(page: Page) {
 /**
  * Click the "Reset layout" button to trigger an auto-layout of the canvas.
  * Uses explicit `toBeVisible()` to ride out any layout animations still settling
- * from a previous call (e.g. after addScriptNode).
+ * from a previous call (e.g. after addScriptStep).
  *
  * Use this when you only need nodes repositioned after adding steps. Use
  * {@link layoutCanvas} when tests must also fit the viewport (typical in CI) before
@@ -58,7 +58,7 @@ export async function triggerLayout(page: Page) {
 
 export { clickNode, layoutCanvas } from './canvas-interaction'
 
-export async function closeNodeEditorPanel(page: Page) {
+export async function closeStepEditorPanel(page: Page) {
   // The node editor cancel button has different aria-labels depending on mode:
   //   edit mode  → "Cancel without saving"
   //   add mode   → "Cancel step creation"
@@ -89,14 +89,14 @@ export async function closeNodeEditorPanel(page: Page) {
 }
 
 /**
- * Save and close a node form by clicking Create/Update button.
+ * Save and close a step form by clicking Create/Update button.
  * Waits for the button to detach (form closed) and optionally verifies the node appears on canvas.
  *
  * @param page - Playwright Page instance
  * @param isUpdate - If true, clicks "Update" button; otherwise clicks "Create" button
  * @param nodeName - Optional node name to verify it appears on canvas after saving
  */
-export async function saveAndCloseNodeForm(page: Page, isUpdate = false, nodeName?: string) {
+export async function saveAndCloseStepForm(page: Page, isUpdate = false, nodeName?: string) {
   const buttonName = isUpdate ? 'Update' : 'Create'
   const saveButton = page.getByRole('button', { name: buttonName })
   await expect(saveButton).toBeEnabled()
@@ -106,11 +106,11 @@ export async function saveAndCloseNodeForm(page: Page, isUpdate = false, nodeNam
   await expect(page.getByRole('button', { name: buttonName })).not.toBeAttached({ timeout: 15_000 })
 
   await waitForUIReady(page)
-  await closeNodeEditorPanel(page)
+  await closeStepEditorPanel(page)
 
   // Wait for positive signal (node appears on canvas) if node name provided
   if (nodeName) {
-    await verifyNodeVisible(page, nodeName)
+    await verifyStepVisible(page, nodeName)
   }
 }
 
@@ -124,7 +124,7 @@ export async function saveAndCloseNodeForm(page: Page, isUpdate = false, nodeNam
  * @param page - Playwright Page instance
  * @param nodeName - Name of the node to open
  */
-export async function openNodeForEditing(page: Page, nodeName: string) {
+export async function openStepForEditing(page: Page, nodeName: string) {
   await triggerLayout(page)
   const node = page.locator('[role="group"][aria-roledescription="node"]').filter({ hasText: nodeName })
   await waitForUIReady(page)
@@ -534,7 +534,7 @@ export async function createBasicWorkflow(page: Page, workflowName: string, acti
   await page.getByRole('textbox', { name: 'Name', exact: true }).fill(actionName)
   await fillCodeEditor(page, { value: 'print("hello")' })
   await page.getByRole('button', { name: 'Create', exact: true }).click()
-  await closeNodeEditorPanel(page)
+  await closeStepEditorPanel(page)
 
   // Select project (required on real backend), then name and save
   await selectProjectIfRequired(page)
@@ -561,7 +561,7 @@ export async function startWorkflowWithTrigger(page: Page) {
   await page.getByRole('textbox', { name: 'Name', exact: true }).fill('Manual trigger')
   await page.getByRole('button', { name: 'Create', exact: true }).click()
   // Wait for the editor panel to finish closing before returning — the panel auto-closes
-  // after trigger creation, but callers that immediately call openAddNodePanel would race
+  // after trigger creation, but callers that immediately call openAddStepPanel would race
   // against the closing animation and not find the edge "Add connected step" buttons.
   await expect(page.getByRole('button', { name: 'Create', exact: true })).not.toBeAttached({ timeout: 10_000 })
 }
@@ -611,7 +611,7 @@ export async function createWorkflowWithTrigger(page: Page, workflowName: string
 /**
  * Add a Script action node to the workflow canvas.
  */
-export async function addScriptNode(page: Page, name: string, code: string) {
+export async function addScriptStep(page: Page, name: string, code: string) {
   const panel = await clickAddConnectedStep(page)
 
   const actionBtn = panel.getByRole('button', { name: 'Action', exact: true })
@@ -654,7 +654,7 @@ export async function addScriptNode(page: Page, name: string, code: string) {
   await expect(saveButton).toBeEnabled({ timeout: 20000 })
   await saveButton.click()
 
-  // Wait for the Script form to close — AddNodePanel unmounts immediately when Script
+  // Wait for the Script form to close — AddStepPanel unmounts immediately when Script
   // is selected so panel.toHaveCount(0) passes instantly and is not a useful gate.
   // Waiting for the Create button to leave the DOM is the real signal that the form unmounted.
   await expect(page.getByRole('button', { name: 'Create', exact: true })).not.toBeAttached({ timeout: 15000 })
@@ -672,9 +672,9 @@ export async function addScriptNode(page: Page, name: string, code: string) {
  * Add a Script action node WITHOUT auto-connecting it (uses "Add step" instead of "Add connected step").
  * Useful for testing manual edge creation.
  */
-export async function addScriptNodeUnconnected(page: Page, name: string, code: string) {
+export async function addScriptStepUnconnected(page: Page, name: string, code: string) {
   // Wait for any existing panel to close and network to settle
-  const panel = addNodePanel(page)
+  const panel = addStepPanel(page)
   await expect(panel).toHaveCount(0, { timeout: 10000 })
   await waitForUIReady(page)
 
@@ -722,7 +722,7 @@ export async function addScriptNodeUnconnected(page: Page, name: string, code: s
 /**
  * Verify that a node with the given name is visible on the canvas.
  */
-export async function verifyNodeVisible(page: Page, nodeName: string) {
+export async function verifyStepVisible(page: Page, nodeName: string) {
   // ReactFlow nodes have role="group" with aria-roledescription="node"
   await expect(page.locator('[role="group"][aria-roledescription="node"]').filter({ hasText: nodeName })).toBeVisible({
     timeout: 10000,
@@ -730,7 +730,7 @@ export async function verifyNodeVisible(page: Page, nodeName: string) {
 }
 
 /**
- * Navigate to the workflow builder and add an API action node form
+ * Navigate to the workflow builder and add an API action step form
  * where the credential selector is visible and enabled.
  */
 export async function navigateToApiActionForm(page: Page) {
@@ -761,7 +761,7 @@ export async function navigateToApiActionForm(page: Page) {
  * Pass mockData (JSON string) to use mock data, or omit to run all previous steps.
  * Retries kebab → Run step when React Flow remounts the menu mid-click.
  */
-export async function runSingleWorkflowNode(page: Page, nodeName: string, mockData?: string) {
+export async function runSingleWorkflowStep(page: Page, nodeName: string, mockData?: string) {
   const node = page.locator('[role="group"][aria-roledescription="node"]').filter({ hasText: nodeName })
   await expect(node).toBeVisible()
   await waitForUIReady(page)
