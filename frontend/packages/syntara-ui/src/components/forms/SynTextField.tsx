@@ -69,7 +69,9 @@ function isPartialNumberInput(value: string): boolean {
 function numberInputDisplayValue(draft: string | null, fieldValue: unknown): string {
   if (draft !== null) return draft
   if (fieldValue === undefined || fieldValue === null) return ''
-  return String(fieldValue)
+  if (typeof fieldValue === 'number') return String(fieldValue)
+  if (typeof fieldValue === 'string') return fieldValue
+  return ''
 }
 
 /**
