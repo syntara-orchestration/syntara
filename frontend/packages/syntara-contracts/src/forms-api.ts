@@ -585,7 +585,10 @@ export interface components {
     }
     /**
      * DynamicOptions
-     * @description Dynamic option list resolved from upstream node output.
+     * @description Dynamic option list resolved from a non-empty array of upstream objects.
+     *
+     *     Each object must contain a string label and scalar value using the configured
+     *     keys (defaulting to display_label and value).
      */
     DynamicOptions: {
       /**
@@ -593,11 +596,20 @@ export interface components {
        * @enum {string}
        */
       source: 'dynamic'
-      /** Expression */
+      /**
+       * Expression
+       * @description Template expression resolving to a non-empty array of objects. Each object must contain a string label and scalar value using the configured keys (defaulting to 'display_label' and 'value'); flat scalar arrays are not supported.
+       */
       expression: string
-      /** Value Key */
+      /**
+       * Value Key
+       * @description Object key containing the typed option value. Defaults to 'value'.
+       */
       value_key?: string | null
-      /** Label Key */
+      /**
+       * Label Key
+       * @description Object key containing the option label. Defaults to 'display_label'.
+       */
       label_key?: string | null
     }
     /**
@@ -613,7 +625,7 @@ export interface components {
        * @description discriminator enum property added by openapi-typescript
        * @enum {string}
        */
-      source: 'resolved'
+      source: 'dynamic_resolved'
       /** Values */
       values: components['schemas']['ResolvedOption'][]
     }

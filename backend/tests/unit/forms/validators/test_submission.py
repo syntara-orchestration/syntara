@@ -26,7 +26,7 @@ _DYNAMIC_OPTIONS: dict[str, Any] = {
 }
 
 _RESOLVED_NUMERIC_OPTIONS: dict[str, Any] = {
-    "source": "resolved",
+    "source": "dynamic_resolved",
     "values": [
         {"display_label": "Five", "value": 5},
         {"display_label": "Six", "value": 6},

@@ -160,7 +160,7 @@ class TestOptions:
         form = _form(
             _text(
                 type="dropdown",
-                options={"source": "resolved", "values": [{"display_label": "1", "value": 1}]},
+                options={"source": "dynamic_resolved", "values": [{"display_label": "1", "value": 1}]},
             )
         )
 
@@ -173,11 +173,11 @@ class TestOptions:
     def test_resolved_options_require_values(self) -> None:
         """Resolved options always carry a concrete option list."""
         with pytest.raises(ValidationError):
-            _form(_text(type="dropdown", options={"source": "resolved"}))
+            _form(_text(type="dropdown", options={"source": "dynamic_resolved"}))
 
     def test_resolved_options_reject_empty_values(self) -> None:
         with pytest.raises(ValidationError):
-            _form(_text(type="dropdown", options={"source": "resolved", "values": []}))
+            _form(_text(type="dropdown", options={"source": "dynamic_resolved", "values": []}))
 
     def test_resolved_options_reject_extra_keys(self) -> None:
         with pytest.raises(ValidationError):
@@ -185,7 +185,7 @@ class TestOptions:
                 _text(
                     type="dropdown",
                     options={
-                        "source": "resolved",
+                        "source": "dynamic_resolved",
                         "values": [{"display_label": "One", "value": 1, "extra": True}],
                     },
                 )
@@ -299,7 +299,7 @@ class TestResolvedOptionDefaults:
     @staticmethod
     def _options() -> dict[str, Any]:
         return {
-            "source": "resolved",
+            "source": "dynamic_resolved",
             "values": [
                 {"display_label": "One", "value": 1},
                 {"display_label": "Two", "value": 2},

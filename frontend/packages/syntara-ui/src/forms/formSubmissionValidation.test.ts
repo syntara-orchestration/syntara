@@ -18,7 +18,7 @@ const staticOptions = {
 }
 
 const resolvedOptions = {
-  source: 'resolved' as const,
+  source: 'dynamic_resolved' as const,
   values: [
     { display_label: 'One', value: 1 },
     { display_label: 'Two', value: 2 },
@@ -145,7 +145,7 @@ describe('validateFormSubmission', () => {
     const definition = form(
       field(FormFieldTypeEnum.DROPDOWN, 'choice', {
         options: {
-          source: 'resolved',
+          source: 'dynamic_resolved',
           values: [
             { display_label: 'Number one', value: 1 },
             { display_label: 'Text one', value: '1' },

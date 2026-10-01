@@ -897,7 +897,7 @@ components:
             mapping:
               static: '#/components/schemas/StaticOptions'
               dynamic: '#/components/schemas/DynamicOptions'
-              resolved: '#/components/schemas/ResolvedOptions'
+              dynamic_resolved: '#/components/schemas/ResolvedOptions'
         default:
           anyOf:
             - type: string
@@ -957,7 +957,7 @@ components:
             mapping:
               static: '#/components/schemas/StaticOptions'
               dynamic: '#/components/schemas/DynamicOptions'
-              resolved: '#/components/schemas/ResolvedOptions'
+              dynamic_resolved: '#/components/schemas/ResolvedOptions'
         default:
           anyOf:
             - type: array
@@ -1012,7 +1012,11 @@ components:
     DynamicOptions:
       type: object
       title: DynamicOptions
-      description: Dynamic option list resolved from upstream node output.
+      description: |-
+        Dynamic option list resolved from a non-empty array of upstream objects.
+
+        Each object must contain a string label and scalar value using the configured
+        keys (defaulting to display_label and value).
       additionalProperties: false
       required:
         - source
@@ -1025,16 +1029,19 @@ components:
         expression:
           type: string
           title: Expression
+          description: Template expression resolving to a non-empty array of objects. Each object must contain a string label and scalar value using the configured keys (defaulting to 'display_label' and 'value'); flat scalar arrays are not supported.
         value_key:
           anyOf:
             - type: string
             - type: 'null'
           title: Value Key
+          description: Object key containing the typed option value. Defaults to 'value'.
         label_key:
           anyOf:
             - type: string
             - type: 'null'
           title: Label Key
+          description: Object key containing the option label. Defaults to 'display_label'.
 
     ResolvedOptions:
       type: object
@@ -1052,7 +1059,7 @@ components:
       properties:
         source:
           type: string
-          const: resolved
+          const: dynamic_resolved
           title: Source
         values:
           type: array

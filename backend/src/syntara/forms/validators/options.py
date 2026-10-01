@@ -24,9 +24,9 @@ _OPTION_LABEL_MAX_LENGTH = 200
 _OptionScalar = str | int | float | bool
 
 
-def _validate_scalar(value: Any, field_name: str, index: int, *, key: str | None = None) -> _OptionScalar:  # noqa: ANN401
+def _validate_scalar(value: Any, field_name: str, index: int, *, key: str) -> _OptionScalar:  # noqa: ANN401
     """Validate one option value without including its contents in errors."""
-    location = f" at key '{key}'" if key is not None else ""
+    location = f" at key '{key}'"
     if not isinstance(value, (str, int, float, bool)):
         msg = (
             f"Dynamic options for field '{field_name}' at index {index}{location} "
@@ -79,28 +79,23 @@ def _record_option(
     return ResolvedOption(display_label=label, value=value)
 
 
-def _resolve_option_items(
+def resolve_dynamic_option_items(
     items: list[Any],
     field_name: str,
     label_key: str,
     value_key: str,
 ) -> list[ResolvedOption]:
-    """Convert a consistently shaped scalar or record list into options."""
-    record_shape = isinstance(items[0], dict)
+    """Convert a list of upstream records into typed options."""
     options: list[ResolvedOption] = []
     seen: set[_OptionScalar] = set()
     for index, item in enumerate(items):
-        if isinstance(item, dict):
-            if not record_shape:
-                msg = f"Dynamic options for field '{field_name}' mixes scalar and record shapes at index {index}"
-                raise TypeError(msg)
-            option = _record_option(item, field_name, index, label_key, value_key)
-        else:
-            if record_shape and isinstance(item, (str, int, float, bool)):
-                msg = f"Dynamic options for field '{field_name}' mixes record and scalar shapes at index {index}"
-                raise TypeError(msg)
-            value = _validate_scalar(item, field_name, index)
-            option = ResolvedOption(display_label=str(value), value=value)
+        if not isinstance(item, dict):
+            msg = (
+                f"Dynamic options for field '{field_name}' at index {index} must be an object "
+                f"with label key '{label_key}' and value key '{value_key}', got {type(item).__name__}"
+            )
+            raise TypeError(msg)
+        option = _record_option(item, field_name, index, label_key, value_key)
 
         if option.value in seen:
             logger.warning("Duplicate option value in dynamic options", field=field_name, index=index)
@@ -111,18 +106,17 @@ def _resolve_option_items(
     return options
 
 
-def resolve_dynamic_options(
+def resolve_dynamic_option_values(
     resolved_list: Any,  # noqa: ANN401
     field_name: str,
     *,
     label_key: str | None = None,
     value_key: str | None = None,
 ) -> ResolvedOptions:
-    """Resolve scalar or record output into typed options.
+    """Resolve an upstream list of records into typed options.
 
-    Scalar entries use their string representation as the label. Record entries
-    use ``label_key`` and ``value_key`` (defaulting to ``display_label`` and
-    ``value``). A list must contain one shape throughout.
+    Records use ``label_key`` and ``value_key`` (defaulting to
+    ``display_label`` and ``value``).
     """
     if not isinstance(resolved_list, list):
         type_name = type(resolved_list).__name__
@@ -146,8 +140,8 @@ def resolve_dynamic_options(
 
     resolved_label_key = "display_label" if label_key is None else label_key
     resolved_value_key = "value" if value_key is None else value_key
-    options = _resolve_option_items(resolved_list, field_name, resolved_label_key, resolved_value_key)
-    return ResolvedOptions(source="resolved", values=options)
+    options = resolve_dynamic_option_items(resolved_list, field_name, resolved_label_key, resolved_value_key)
+    return ResolvedOptions(source="dynamic_resolved", values=options)
 
 
 def _validation_summary(error: ValidationError, form_definition: dict[str, Any]) -> str:
@@ -175,7 +169,7 @@ def _validation_summary(error: ValidationError, form_definition: dict[str, Any])
     return f"Resolved form definition is invalid: {message}"
 
 
-def materialize_dynamic_options(form_definition: dict[str, Any]) -> dict[str, Any]:
+def resolve_dynamic_options(form_definition: dict[str, Any]) -> dict[str, Any]:
     """Replace dynamic options with a runtime-resolved list, without mutating input.
 
     This operates after workflow expressions have been interpolated. The final
@@ -199,7 +193,7 @@ def materialize_dynamic_options(form_definition: dict[str, Any]) -> dict[str, An
         if not isinstance(field_name, str):
             field_name = f"<unnamed at index {index}>"
         try:
-            resolved = resolve_dynamic_options(
+            resolved = resolve_dynamic_option_values(
                 options.get("expression"),
                 field_name,
                 label_key=options.get("label_key"),

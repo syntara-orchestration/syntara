@@ -23,7 +23,7 @@ function getDynamicExpression(field: OptionsFormField): string | null {
 }
 
 function getStaticOptions(optionsField: OptionsFormField | null): readonly SynDynamicFormSelectOption[] {
-  if (optionsField?.options.source !== 'static' && optionsField?.options.source !== 'resolved') {
+  if (optionsField?.options.source !== 'static' && optionsField?.options.source !== 'dynamic_resolved') {
     return []
   }
   return resolveStaticOptions(optionsField.options)

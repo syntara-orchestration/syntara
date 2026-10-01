@@ -112,7 +112,7 @@ class TestFormPromptGetAPI:
                         "value_name": "region_id",
                         "type": "dropdown",
                         "label": "Region",
-                        "options": {"source": "resolved", "values": [{"display_label": "US", "value": 1}]},
+                        "options": {"source": "dynamic_resolved", "values": [{"display_label": "US", "value": 1}]},
                     }
                 ]
             },
@@ -123,7 +123,7 @@ class TestFormPromptGetAPI:
         assert response.status_code == 200
         data = response.json()
         options = data["form_definition"]["fields"][0]["options"]
-        assert options == {"source": "resolved", "values": [{"display_label": "US", "value": 1}]}
+        assert options == {"source": "dynamic_resolved", "values": [{"display_label": "US", "value": 1}]}
         assert not _contains_key(data, "expression")
 
     async def test_get_form_prompt_not_found(self, auth_client: AsyncClient) -> None:

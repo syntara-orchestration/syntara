@@ -139,7 +139,7 @@
               "source": {},
               "expression": {
                 "type": "string",
-                "description": "Expression resolving at runtime to a list of strings, integers, booleans, or finite numbers, or to records with option labels and values. Resolved option values preserve their scalar types."
+                "description": "Template expression resolving at runtime to an array of objects. Each object must provide the configured label and value keys. Resolved option values preserve their scalar types."
               },
               "label_key": { "type": ["string", "null"] },
               "value_key": { "type": ["string", "null"] }

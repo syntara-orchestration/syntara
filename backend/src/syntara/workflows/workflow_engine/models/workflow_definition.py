@@ -920,7 +920,7 @@ class FormPromptNodeParameters(BaseModel):
         for field in v.fields:
             if isinstance(getattr(field, "options", None), ResolvedOptions):
                 msg = (
-                    f"Field '{field.value_name}': options source 'resolved' is produced by the "
+                    f"Field '{field.value_name}': options source 'dynamic_resolved' is produced by the "
                     "workflow engine at run time and cannot be authored. Use 'static' or 'dynamic'."
                 )
                 raise SafeValueError(msg)

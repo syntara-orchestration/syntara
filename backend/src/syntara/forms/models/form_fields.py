@@ -100,14 +100,30 @@ class StaticOptions(BaseModel):
 
 
 class DynamicOptions(BaseModel):
-    """Dynamic option list resolved from upstream node output."""
+    """Dynamic option list resolved from a non-empty array of upstream objects.
+
+    Each object must contain a string label and scalar value using the configured
+    keys (defaulting to display_label and value).
+    """
 
     model_config = ConfigDict(extra="forbid")
 
     source: Literal["dynamic"]
-    expression: str
-    label_key: str | None = None
-    value_key: str | None = None
+    expression: str = Field(
+        description=(
+            "Template expression resolving to a non-empty array of objects. Each object must contain a string label "
+            "and scalar value using the configured keys (defaulting to 'display_label' and 'value'); flat scalar "
+            "arrays are not supported."
+        )
+    )
+    label_key: str | None = Field(
+        default=None,
+        description="Object key containing the option label. Defaults to 'display_label'.",
+    )
+    value_key: str | None = Field(
+        default=None,
+        description="Object key containing the typed option value. Defaults to 'value'.",
+    )
 
 
 class ResolvedOption(BaseModel):
@@ -134,7 +150,7 @@ class ResolvedOptions(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    source: Literal["resolved"]
+    source: Literal["dynamic_resolved"]
     values: list[ResolvedOption] = Field(min_length=1, max_length=FieldLimits.FORM_OPTIONS_MAX_LENGTH)
 
 

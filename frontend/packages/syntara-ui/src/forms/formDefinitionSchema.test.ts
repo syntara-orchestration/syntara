@@ -13,7 +13,7 @@ const staticOptions = {
 }
 
 const resolvedOptions = {
-  source: 'resolved' as const,
+  source: 'dynamic_resolved' as const,
   values: [
     { display_label: 'One', value: 1 },
     { display_label: 'Two', value: 2 },
@@ -102,7 +102,7 @@ describe('formDefinitionSchema', () => {
 
     const field = data.fields[0]
     expect(field?.type).toBe(FormFieldTypeEnum.DROPDOWN)
-    if (field?.type === FormFieldTypeEnum.DROPDOWN && field.options.source === 'resolved') {
+    if (field?.type === FormFieldTypeEnum.DROPDOWN && field.options.source === 'dynamic_resolved') {
       expect(field.options.values.map((option) => option.value)).toEqual([1, 2])
       expect(field.default).toBe(2)
     }
@@ -115,7 +115,7 @@ describe('formDefinitionSchema', () => {
           type: FormFieldTypeEnum.DROPDOWN,
           value_name: 'count',
           label: 'Count',
-          options: { source: 'resolved', values: [] },
+          options: { source: 'dynamic_resolved', values: [] },
         },
       ],
     })

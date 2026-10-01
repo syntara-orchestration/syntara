@@ -52,7 +52,7 @@ const resolvedOptionSchema = z.object({
 })
 
 const resolvedOptionsSchema = z.object({
-  source: z.literal('resolved'),
+  source: z.literal('dynamic_resolved'),
   values: z.array(resolvedOptionSchema).min(1).max(FORM_STATIC_OPTIONS_MAX_LENGTH),
 })
 
@@ -183,7 +183,7 @@ function validateOptionDefaults(fields: ReadonlyArray<z.infer<typeof formFieldSc
   for (const [index, field] of fields.entries()) {
     if (
       (field.type !== FormFieldTypeEnum.DROPDOWN && field.type !== FormFieldTypeEnum.MULTI_SELECT) ||
-      (field.options.source !== 'static' && field.options.source !== 'resolved')
+      (field.options.source !== 'static' && field.options.source !== 'dynamic_resolved')
     ) {
       continue
     }

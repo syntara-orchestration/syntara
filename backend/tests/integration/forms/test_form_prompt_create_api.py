@@ -113,7 +113,7 @@ class TestFormPromptCreateAPI:
                     "value_name": "region_id",
                     "type": "dropdown",
                     "label": "Region",
-                    "options": {"source": "resolved", "values": [{"display_label": "US", "value": 1}]},
+                    "options": {"source": "dynamic_resolved", "values": [{"display_label": "US", "value": 1}]},
                 }
             ]
         }
@@ -131,7 +131,7 @@ class TestFormPromptCreateAPI:
         resolved_field = prompt.form_definition.fields[0]
         assert isinstance(resolved_field, DropdownField)
         assert isinstance(resolved_field.options, ResolvedOptions)
-        assert resolved_field.options.source == "resolved"
+        assert resolved_field.options.source == "dynamic_resolved"
         assert resolved_field.options.values[0].value == 1
         assert type(resolved_field.options.values[0].value) is int
 
@@ -173,7 +173,7 @@ class TestFormPromptCreateAPI:
                         "value_name": "region_id",
                         "type": "dropdown",
                         "label": "Region",
-                        "options": {"source": "resolved", "values": []},
+                        "options": {"source": "dynamic_resolved", "values": []},
                     }
                 ]
             },

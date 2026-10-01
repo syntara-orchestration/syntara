@@ -12,13 +12,17 @@ T = TypeVar("T", bound="DynamicOptions")
 
 @_attrs_define
 class DynamicOptions:
-    """Dynamic option list resolved from upstream node output.
+    """Dynamic option list resolved from a non-empty array of upstream objects.
 
-    Attributes:
-        source (Literal['dynamic']):
-        expression (str):
-        value_key (None | str | Unset):
-        label_key (None | str | Unset):
+    Each object must contain a string label and scalar value using the configured
+    keys (defaulting to display_label and value).
+
+        Attributes:
+            source (Literal['dynamic']):
+            expression (str): Template expression resolving to a non-empty array of objects. Each object must contain a
+                string label and scalar value using the configured keys (defaulting to 'display_label' and 'value').
+            value_key (None | str | Unset): Object key containing the typed option value. Defaults to 'value'.
+            label_key (None | str | Unset): Object key containing the option label. Defaults to 'display_label'.
     """
 
     source: Literal["dynamic"]

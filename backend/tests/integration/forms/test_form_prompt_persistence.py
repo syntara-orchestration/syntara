@@ -93,7 +93,7 @@ class TestFormPromptPersistence:
                     value_name="region_id",
                     label="Region",
                     options=ResolvedOptions(
-                        source="resolved",
+                        source="dynamic_resolved",
                         values=[ResolvedOption(display_label="US", value=1)],
                     ),
                     default=1,

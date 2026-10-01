@@ -468,7 +468,7 @@ class TestFormPromptNodeParameters:
                     "value_name": "region",
                     "label": "Region",
                     "options": {
-                        "source": "resolved",
+                        "source": "dynamic_resolved",
                         "values": [{"display_label": "US", "value": 1}],
                     },
                 }

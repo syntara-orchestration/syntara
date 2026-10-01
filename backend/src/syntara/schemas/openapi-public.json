@@ -44945,7 +44945,7 @@
               "mapping": {
                 "static": "#/components/schemas/StaticOptions",
                 "dynamic": "#/components/schemas/DynamicOptions",
-                "resolved": "#/components/schemas/ResolvedOptions"
+                "dynamic_resolved": "#/components/schemas/ResolvedOptions"
               }
             }
           },
@@ -45045,7 +45045,7 @@
               "mapping": {
                 "static": "#/components/schemas/StaticOptions",
                 "dynamic": "#/components/schemas/DynamicOptions",
-                "resolved": "#/components/schemas/ResolvedOptions"
+                "dynamic_resolved": "#/components/schemas/ResolvedOptions"
               }
             }
           },
@@ -45129,7 +45129,7 @@
       "DynamicOptions": {
         "type": "object",
         "title": "DynamicOptions",
-        "description": "Dynamic option list resolved from upstream node output.",
+        "description": "Dynamic option list resolved from a non-empty array of upstream objects.\n\nEach object must contain a string label and scalar value using the configured\nkeys (defaulting to display_label and value).",
         "additionalProperties": false,
         "required": [
           "source",
@@ -45143,7 +45143,8 @@
           },
           "expression": {
             "type": "string",
-            "title": "Expression"
+            "title": "Expression",
+            "description": "Template expression resolving to a non-empty array of objects. Each object must contain a string label and scalar value using the configured keys (defaulting to 'display_label' and 'value'); flat scalar arrays are not supported."
           },
           "value_key": {
             "anyOf": [
@@ -45154,7 +45155,8 @@
                 "type": "null"
               }
             ],
-            "title": "Value Key"
+            "title": "Value Key",
+            "description": "Object key containing the typed option value. Defaults to 'value'."
           },
           "label_key": {
             "anyOf": [
@@ -45165,7 +45167,8 @@
                 "type": "null"
               }
             ],
-            "title": "Label Key"
+            "title": "Label Key",
+            "description": "Object key containing the option label. Defaults to 'display_label'."
           }
         }
       },
@@ -45181,7 +45184,7 @@
         "properties": {
           "source": {
             "type": "string",
-            "const": "resolved",
+            "const": "dynamic_resolved",
             "title": "Source"
           },
           "values": {

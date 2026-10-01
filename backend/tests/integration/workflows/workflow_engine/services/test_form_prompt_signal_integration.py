@@ -62,7 +62,11 @@ async def _test_script_activity(
     outputs: dict[str, str] | None = None,
     **kwargs: object,
 ) -> dict[str, Any]:
-    choices: list[str] | str = "not-a-list" if resolved_parameters.get("code") == "return-scalar" else ["us", "eu"]
+    choices: list[dict[str, str]] | str = (
+        "not-a-list"
+        if resolved_parameters.get("code") == "return-scalar"
+        else [{"display_label": "US", "value": "us"}, {"display_label": "EU", "value": "eu"}]
+    )
     return {"output": {"status": "completed", "output": {"choices": choices}}}
 
 
@@ -204,10 +208,10 @@ class TestFormPromptSignalIntegration:
         assert "process_step" in wf_result["completed_activities"]
         options = _captured_form_definitions[0]["fields"][1]["options"]
         assert options == {
-            "source": "resolved",
+            "source": "dynamic_resolved",
             "values": [
-                {"display_label": "us", "value": "us"},
-                {"display_label": "eu", "value": "eu"},
+                {"display_label": "US", "value": "us"},
+                {"display_label": "EU", "value": "eu"},
             ],
         }
 

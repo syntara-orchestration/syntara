@@ -188,14 +188,14 @@ function coerceField(field: FormField, raw: unknown): OptionScalar | Array<Optio
 type SelectFormField = Extract<FormField, { type: 'dropdown' }> | Extract<FormField, { type: 'multi_select' }>
 
 type SelectFormFieldWithOptionList = SelectFormField & {
-  options: Extract<SelectFormField['options'], { source: 'static' | 'resolved' }>
+  options: Extract<SelectFormField['options'], { source: 'static' | 'dynamic_resolved' }>
 }
 
 function hasOptionList(field: FormField): field is SelectFormFieldWithOptionList {
   if (field.type !== FormFieldTypeEnum.DROPDOWN && field.type !== FormFieldTypeEnum.MULTI_SELECT) {
     return false
   }
-  return field.options.source === 'static' || field.options.source === 'resolved'
+  return field.options.source === 'static' || field.options.source === 'dynamic_resolved'
 }
 
 function checkOptionMembership(

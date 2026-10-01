@@ -21,11 +21,11 @@ class ResolvedOptions:
     validation operate on the same snapshot.
 
         Attributes:
-            source (Literal['resolved']):
+            source (Literal['dynamic_resolved']):
             values (list[ResolvedOption]):
     """
 
-    source: Literal["resolved"]
+    source: Literal["dynamic_resolved"]
     values: list[ResolvedOption]
 
     def to_dict(self) -> dict[str, Any]:
@@ -52,9 +52,9 @@ class ResolvedOptions:
         from ..models.resolved_option import ResolvedOption
 
         d = dict(src_dict)
-        source = cast(Literal["resolved"], d.pop("source"))
-        if source != "resolved":
-            raise ValueError(f"source must match const 'resolved', got '{source}'")
+        source = cast(Literal["dynamic_resolved"], d.pop("source"))
+        if source != "dynamic_resolved":
+            raise ValueError(f"source must match const 'dynamic_resolved', got '{source}'")
 
         values = []
         _values = d.pop("values")

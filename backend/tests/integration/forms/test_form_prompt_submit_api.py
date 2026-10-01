@@ -30,7 +30,7 @@ _RESOLVED_FORM_DEFINITION = {
             "value_name": "region_id",
             "type": "dropdown",
             "label": "Region",
-            "options": {"source": "resolved", "values": [{"display_label": "US", "value": 1}]},
+            "options": {"source": "dynamic_resolved", "values": [{"display_label": "US", "value": 1}]},
         }
     ]
 }

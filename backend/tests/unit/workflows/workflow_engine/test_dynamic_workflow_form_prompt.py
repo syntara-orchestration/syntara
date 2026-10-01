@@ -332,7 +332,10 @@ class TestPrepareFormPromptArgsDynamicOptions:
     @pytest.mark.asyncio
     async def test_dropdown_options_materialized_from_namespace(self) -> None:
         resolver = NamespaceResolver()
-        resolver.set_namespace("scan", {"output": {"choices": ["a", "b"]}})
+        resolver.set_namespace(
+            "scan",
+            {"output": {"choices": [{"display_label": "A", "value": "a"}, {"display_label": "B", "value": "b"}]}},
+        )
         wf = _make_workflow(resolver=resolver)
         graph = _build_form_prompt_graph()
         node = self._node({"fields": [self._dynamic_field("dropdown", "choice", "${scan.output.choices}")]})
@@ -343,17 +346,20 @@ class TestPrepareFormPromptArgsDynamicOptions:
             args = await wf._prepare_form_prompt_args(node, graph, resolved)
 
         assert args[_FORM_DEFINITION_ARG]["fields"][0]["options"] == {
-            "source": "resolved",
+            "source": "dynamic_resolved",
             "values": [
-                {"display_label": "a", "value": "a"},
-                {"display_label": "b", "value": "b"},
+                {"display_label": "A", "value": "a"},
+                {"display_label": "B", "value": "b"},
             ],
         }
 
     @pytest.mark.asyncio
     async def test_multi_select_options_materialized(self) -> None:
         resolver = NamespaceResolver()
-        resolver.set_namespace("scan", {"output": {"choices": ["a", "b"]}})
+        resolver.set_namespace(
+            "scan",
+            {"output": {"choices": [{"display_label": "A", "value": "a"}, {"display_label": "B", "value": "b"}]}},
+        )
         wf = _make_workflow(resolver=resolver)
         graph = _build_form_prompt_graph()
         node = self._node({"fields": [self._dynamic_field("multi_select", "choices", "${scan.output.choices}")]})
@@ -364,12 +370,23 @@ class TestPrepareFormPromptArgsDynamicOptions:
         ):
             args = await wf._prepare_form_prompt_args(node, graph, wf._resolve_node_parameters(node))
 
-        assert args[_FORM_DEFINITION_ARG]["fields"][0]["options"]["source"] == "resolved"
+        assert args[_FORM_DEFINITION_ARG]["fields"][0]["options"]["source"] == "dynamic_resolved"
 
     @pytest.mark.asyncio
     async def test_types_preserved_end_to_end(self) -> None:
         resolver = NamespaceResolver()
-        resolver.set_namespace("scan", {"output": {"choices": [1, 2, 3]}})
+        resolver.set_namespace(
+            "scan",
+            {
+                "output": {
+                    "choices": [
+                        {"display_label": "One", "value": 1},
+                        {"display_label": "Two", "value": 2},
+                        {"display_label": "Three", "value": 3},
+                    ]
+                }
+            },
+        )
         wf = _make_workflow(resolver=resolver)
         graph = _build_form_prompt_graph()
         node = self._node({"fields": [self._dynamic_field("dropdown", "choice", "${scan.output.choices}")]})
@@ -440,7 +457,7 @@ class TestPrepareFormPromptArgsDynamicOptions:
     @pytest.mark.asyncio
     async def test_mixed_static_and_dynamic_fields(self) -> None:
         resolver = NamespaceResolver()
-        resolver.set_namespace("scan", {"output": {"choices": ["us"]}})
+        resolver.set_namespace("scan", {"output": {"choices": [{"display_label": "US", "value": "us"}]}})
         wf = _make_workflow(resolver=resolver)
         graph = _build_form_prompt_graph()
         static_field = {
@@ -466,13 +483,13 @@ class TestPrepareFormPromptArgsDynamicOptions:
 
         fields = args[_FORM_DEFINITION_ARG]["fields"]
         assert fields[0] == static_field
-        assert fields[1]["options"]["source"] == "resolved"
+        assert fields[1]["options"]["source"] == "dynamic_resolved"
 
     @pytest.mark.asyncio
     async def test_two_dynamic_fields_from_different_nodes(self) -> None:
         resolver = NamespaceResolver()
-        resolver.set_namespace("scan", {"output": {"choices": ["us"]}})
-        resolver.set_namespace("teams", {"output": {"choices": ["platform"]}})
+        resolver.set_namespace("scan", {"output": {"choices": [{"display_label": "US", "value": "us"}]}})
+        resolver.set_namespace("teams", {"output": {"choices": [{"display_label": "Platform", "value": "platform"}]}})
         wf = _make_workflow(resolver=resolver)
         graph = _build_form_prompt_graph()
         node = self._node(
@@ -495,7 +512,7 @@ class TestPrepareFormPromptArgsDynamicOptions:
         assert fields[1]["options"]["values"][0]["value"] == "platform"
 
     @pytest.mark.asyncio
-    @pytest.mark.parametrize("upstream", ["not-a-list", []])
+    @pytest.mark.parametrize("upstream", ["not-a-list", [], [1, 2]])
     async def test_malformed_upstream_fails_before_any_activity(self, upstream: object) -> None:
         resolver = NamespaceResolver()
         resolver.set_namespace("scan", {"output": {"choices": upstream}})
@@ -515,7 +532,7 @@ class TestPrepareFormPromptArgsDynamicOptions:
     @pytest.mark.asyncio
     async def test_default_not_in_resolved_list_fails_before_activity(self) -> None:
         resolver = NamespaceResolver()
-        resolver.set_namespace("scan", {"output": {"choices": ["us"]}})
+        resolver.set_namespace("scan", {"output": {"choices": [{"display_label": "US", "value": "us"}]}})
         wf = _make_workflow(resolver=resolver)
         graph = _build_form_prompt_graph()
         node = self._node(
@@ -541,7 +558,7 @@ class TestPrepareFormPromptArgsDynamicOptions:
     @pytest.mark.asyncio
     async def test_node_parameters_not_mutated(self) -> None:
         resolver = NamespaceResolver()
-        resolver.set_namespace("scan", {"output": {"choices": ["us"]}})
+        resolver.set_namespace("scan", {"output": {"choices": [{"display_label": "US", "value": "us"}]}})
         wf = _make_workflow(resolver=resolver)
         graph = _build_form_prompt_graph()
         node = self._node({"fields": [self._dynamic_field("dropdown", "region", "${scan.output.choices}")]})

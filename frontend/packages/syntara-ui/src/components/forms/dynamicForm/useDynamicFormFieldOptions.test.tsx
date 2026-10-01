@@ -47,7 +47,7 @@ describe('useDynamicFormFieldOptions', () => {
           value_name: 'regions',
           label: 'Regions',
           options: {
-            source: 'resolved',
+            source: 'dynamic_resolved',
             values: [
               { display_label: 'US East', value: 1 },
               { display_label: 'EU West', value: 'eu-west-1' },
