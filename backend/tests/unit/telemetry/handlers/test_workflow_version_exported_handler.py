@@ -32,7 +32,7 @@ class TestWorkflowVersionExportedTelemetryHandler:
         registry.send_event.assert_called_once()
         event = registry.send_event.call_args[0][0]
         assert isinstance(event, WorkflowVersionExportedTelemetryEvent)
-        assert event.workflow_id == str(workflow_id)
+        assert event.workflow_id == workflow_id
         assert event.version == 5
         assert event.workflow_name == "test-wf"
         assert event.entitlement_id == "ent-test-export"
