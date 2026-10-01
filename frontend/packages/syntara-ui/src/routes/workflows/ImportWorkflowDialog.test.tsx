@@ -46,10 +46,7 @@ const mockOnProjectSelect = vi.fn()
 let mockHasValidationError = false
 
 vi.mock('../../hooks/useProjectSelector', () => ({
-  useProjectSelector: (options?: {
-    onProjectSelect?: (project: unknown) => void
-    hasValidationError?: boolean
-  }) => {
+  useProjectSelector: (options?: { onProjectSelect?: (project: unknown) => void; hasValidationError?: boolean }) => {
     if (options?.onProjectSelect) {
       mockOnProjectSelect.mockImplementation(options.onProjectSelect)
     }
@@ -156,8 +153,7 @@ describe('ImportWorkflowDialog', () => {
       expect(screen.getByTestId('project-selector')).toHaveAttribute('data-has-validation-error', 'true')
     })
 
-    rerender(<ImportWorkflowDialog isOpen={false} onClose={vi.fn()} onSuccess={vi.fn()} />)
-    rerender(<ImportWorkflowDialog isOpen onClose={vi.fn()} onSuccess={vi.fn()} />)
+    await user.click(screen.getByRole('button', { name: /Cancel/i }))
 
     expect(screen.getByTestId('project-selector')).toHaveAttribute('data-has-validation-error', 'false')
   })

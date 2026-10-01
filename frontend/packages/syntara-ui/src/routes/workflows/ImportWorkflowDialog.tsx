@@ -10,7 +10,7 @@ import {
 } from '@patternfly/react-core'
 import type { V2WorkflowDefinition } from '@syntara/contracts'
 import { useNavigate } from '@tanstack/react-router'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 
 import { workflowFetchClient } from '../../client'
 import { SynFileField } from '../../components/forms/SynFileField'
@@ -89,12 +89,6 @@ export function ImportWorkflowDialog({ isOpen, onClose, onSuccess }: ImportWorkf
     },
   })
   const { handleSubmit, handleClose, setError } = form
-
-  useEffect(() => {
-    if (!isOpen) {
-      setSaveAttemptedWithoutProject(false)
-    }
-  }, [isOpen])
 
   const onImportSuccess = (
     wfName: string,
