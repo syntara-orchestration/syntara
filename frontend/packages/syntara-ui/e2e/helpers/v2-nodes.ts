@@ -14,6 +14,7 @@
  */
 
 import { expect, type Page } from '../fixtures'
+import { EXPRESSION_MODE_LABELS } from '../../src/components/expressions/expressionBuilderLabels'
 
 import {
   ensureLlmCredential,
@@ -345,10 +346,10 @@ export async function addConditionNode(page: Page, name: string, expression = 't
 
   // Condition type dropdown: form builder or freeform text
   // Switch to freeform text to fill the expression directly
-  const editorModeToggle = page.getByRole('button', { name: 'Condition type', exact: true })
+  const editorModeToggle = page.getByRole('button', { name: EXPRESSION_MODE_LABELS.visual, exact: true })
   await expect(editorModeToggle).toBeVisible()
   await editorModeToggle.click()
-  await page.getByRole('option', { name: 'Freeform text' }).click()
+  await page.getByRole('option', { name: EXPRESSION_MODE_LABELS.raw }).click()
 
   // Wait for raw expression input to appear
   const rawExpressionInput = page.getByLabel(/Raw expression/i)
@@ -531,10 +532,10 @@ export async function addSwitchNodeWithCases(page: Page, name: string, cases: Sw
   const fillCase = async (i: number) => {
     // ExpressionBuilder uses a PatternFly MenuToggle — click to open, then select option
     await page
-      .getByLabel(/Condition type/i)
+      .getByRole('button', { name: EXPRESSION_MODE_LABELS.visual, exact: true })
       .nth(i)
       .click()
-    await page.getByRole('option', { name: 'Freeform text', exact: true }).click()
+    await page.getByRole('option', { name: EXPRESSION_MODE_LABELS.raw, exact: true }).click()
 
     const rawExpression = page.getByLabel(/Raw expression/i).nth(i)
     await rawExpression.fill(cases[i].condition)

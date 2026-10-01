@@ -8,6 +8,7 @@
  */
 
 import { test, expect } from '../fixtures'
+import { EXPRESSION_MODE_LABELS } from '../../src/components/expressions/expressionBuilderLabels'
 import {
   buildUniqueName,
   deleteWorkflow,
@@ -176,8 +177,8 @@ test('user can add a Logic (Conditional) node to the canvas', async ({ app }) =>
     await expect(app.getByRole('textbox', { name: 'Name', exact: true })).toBeVisible()
     await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Conditional Node')
 
-    await app.getByRole('button', { name: 'Condition type', exact: true }).click()
-    await app.getByRole('option', { name: 'Freeform text' }).click()
+    await app.getByRole('button', { name: EXPRESSION_MODE_LABELS.visual, exact: true }).click()
+    await app.getByRole('option', { name: EXPRESSION_MODE_LABELS.raw }).click()
 
     await app.getByLabel('Raw expression').fill('${status == "active"}')
 
@@ -344,8 +345,8 @@ test('multiple nodes can be added sequentially', async ({ app }) => {
     const logicNameInput = app.getByRole('textbox', { name: 'Name', exact: true })
     await logicNameInput.fill('Logic Node 1')
 
-    await app.getByRole('button', { name: 'Condition type', exact: true }).click()
-    await app.getByRole('option', { name: 'Freeform text' }).click()
+    await app.getByRole('button', { name: EXPRESSION_MODE_LABELS.visual, exact: true }).click()
+    await app.getByRole('option', { name: EXPRESSION_MODE_LABELS.raw }).click()
     await app.getByLabel('Raw expression').fill('${x == 1}')
 
     const logicSaveBtn = app.getByRole('button', { name: 'Create', exact: true })

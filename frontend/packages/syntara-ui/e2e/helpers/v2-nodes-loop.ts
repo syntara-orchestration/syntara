@@ -4,6 +4,7 @@
  */
 
 import { expect, type Page } from '../fixtures'
+import { EXPRESSION_MODE_LABELS } from '../../src/components/expressions/expressionBuilderLabels'
 
 import { openAddNodePanel, selectCategoryAndType } from './v2-nodes'
 import { addNodePanel, closeNodeEditorPanel, fillCodeEditor, openNodeForEditing } from './workflows'
@@ -53,7 +54,7 @@ export async function configureLoopNode(
     await page.getByRole('option', { name: config.type === 'while' ? 'While' : 'For each' }).click()
     // Wait for the type-specific field to appear, confirming the form re-rendered
     if (config.type === 'while') {
-      await expect(page.getByRole('button', { name: 'Condition type', exact: true })).toBeVisible()
+      await expect(page.getByRole('button', { name: EXPRESSION_MODE_LABELS.visual, exact: true })).toBeVisible()
     } else {
       await expect(page.getByRole('textbox', { name: 'Items expression', exact: true })).toBeVisible()
     }
@@ -61,10 +62,10 @@ export async function configureLoopNode(
 
   // While-specific fields
   if (config.type === 'while' && config.condition !== undefined) {
-    const editorModeToggle = page.getByRole('button', { name: 'Condition type', exact: true })
+    const editorModeToggle = page.getByRole('button', { name: EXPRESSION_MODE_LABELS.visual, exact: true })
     await expect(editorModeToggle).toBeVisible()
     await editorModeToggle.click()
-    await page.getByRole('option', { name: 'Freeform text', exact: true }).click()
+    await page.getByRole('option', { name: EXPRESSION_MODE_LABELS.raw, exact: true }).click()
 
     const rawExpressionInput = page.getByLabel(/Raw expression/i)
     await expect(rawExpressionInput).toBeVisible()
