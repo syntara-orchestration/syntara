@@ -4,6 +4,6 @@ export const SYNTARA_FORM_OPTIONS_EXTENSION = 'x-syntara-form-options' as const
 export type SyntaraFormOptionsExtension = {
   source: 'dynamic'
   expression: string
-  label_key?: string | null
-  value_key?: string | null
+  label_key: string
+  value_key: string
 }

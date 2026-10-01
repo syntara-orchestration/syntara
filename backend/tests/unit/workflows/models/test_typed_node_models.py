@@ -482,7 +482,12 @@ class TestFormPromptNodeParameters:
         """Static and dynamic source definitions remain valid for authors."""
         for options in (
             {"source": "static", "values": [{"display_label": "US", "value": "us"}]},
-            {"source": "dynamic", "expression": "${fetch.output.regions}"},
+            {
+                "source": "dynamic",
+                "expression": "${fetch.output.regions}",
+                "label_key": "display_label",
+                "value_key": "value",
+            },
         ):
             form_definition = FormDefinition.model_validate(
                 {

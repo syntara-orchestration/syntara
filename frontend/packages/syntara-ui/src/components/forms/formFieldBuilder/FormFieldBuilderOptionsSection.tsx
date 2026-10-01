@@ -91,13 +91,15 @@ export function FormFieldBuilderOptionsSection({
           setValue(`fields.${index}.options`, defaultDynamicOptionsSource(), { shouldValidate: false })
           setValue(`fields.${index}.default`, null, { shouldValidate: false })
           clearErrors(`fields.${index}.options.expression`)
+          clearErrors(`fields.${index}.options.label_key`)
+          clearErrors(`fields.${index}.options.value_key`)
           commit()
         }}
       />
       {optionsSource === 'static' ? (
         <StaticOptionsEditor fieldIndex={index} isDisabled={isDisabled} />
       ) : (
-        <div className={styles.optionsDynamicExpression}>
+        <div className={styles.optionsDynamicFields}>
           <SynTextField
             name={`fields.${index}.options.expression`}
             control={control}
@@ -107,6 +109,28 @@ export function FormFieldBuilderOptionsSection({
             isDisabled={isDisabled}
             placeholder="e.g. ${trigger.environments}"
             hint={FORM_FIELD_BUILDER_LABEL_HELP.dynamicOptionsExpression}
+            onValueChange={commit}
+          />
+          <SynTextField
+            name={`fields.${index}.options.label_key`}
+            control={control}
+            label="Label key"
+            fieldId={`${idPrefix}-label-key`}
+            isRequired
+            isDisabled={isDisabled}
+            placeholder="e.g. name"
+            hint="Object property containing each option's display label."
+            onValueChange={commit}
+          />
+          <SynTextField
+            name={`fields.${index}.options.value_key`}
+            control={control}
+            label="Value key"
+            fieldId={`${idPrefix}-value-key`}
+            isRequired
+            isDisabled={isDisabled}
+            placeholder="e.g. id"
+            hint="Object property containing each option's submitted value."
             onValueChange={commit}
           />
         </div>

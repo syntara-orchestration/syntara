@@ -97,11 +97,17 @@ function parseSyntaraOptionsExtension(property: JsonSchemaProperty): SyntaraForm
   if (typeof raw.expression !== 'string' || raw.expression.trim() === '') {
     return null
   }
+  if (typeof raw.label_key !== 'string' || raw.label_key.trim() === '') {
+    return null
+  }
+  if (typeof raw.value_key !== 'string' || raw.value_key.trim() === '') {
+    return null
+  }
   return {
     source: 'dynamic',
     expression: raw.expression,
-    label_key: typeof raw.label_key === 'string' ? raw.label_key : null,
-    value_key: typeof raw.value_key === 'string' ? raw.value_key : null,
+    label_key: raw.label_key,
+    value_key: raw.value_key,
   }
 }
 

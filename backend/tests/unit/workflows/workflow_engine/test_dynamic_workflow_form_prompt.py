@@ -322,7 +322,13 @@ class TestPrepareFormPromptArgsDynamicOptions:
             "type": field_type,
             "value_name": value_name,
             "label": value_name.title(),
-            "options": {"source": "dynamic", "expression": expression, **option_keys},
+            "options": {
+                "source": "dynamic",
+                "expression": expression,
+                "label_key": "display_label",
+                "value_key": "value",
+                **option_keys,
+            },
         }
 
     @staticmethod

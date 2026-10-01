@@ -29,8 +29,8 @@ export function defaultDynamicOptionsSource() {
   return {
     source: 'dynamic' as const,
     expression: '',
-    label_key: null,
-    value_key: null,
+    label_key: '',
+    value_key: '',
   }
 }
 

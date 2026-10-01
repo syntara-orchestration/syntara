@@ -87,7 +87,7 @@ describe('jsonSchemaToFormDefinition', () => {
           type: FormFieldTypeEnum.MULTI_SELECT,
           value_name: 'tags',
           label: 'Tags',
-          options: { source: 'dynamic', expression: 'options.tags', label_key: null, value_key: null },
+          options: { source: 'dynamic', expression: 'options.tags', label_key: 'display_label', value_key: 'value' },
         },
       ],
     })

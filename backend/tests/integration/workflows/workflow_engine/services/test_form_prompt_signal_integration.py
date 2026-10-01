@@ -111,6 +111,8 @@ nodes:
         options:
           source: dynamic
           expression: "${scan.output.choices}"
+          label_key: display_label
+          value_key: value
 - id: process_step
   type: script
   parameters:

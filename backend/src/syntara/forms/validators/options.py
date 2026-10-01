@@ -110,13 +110,12 @@ def resolve_dynamic_option_values(
     resolved_list: Any,  # noqa: ANN401
     field_name: str,
     *,
-    label_key: str | None = None,
-    value_key: str | None = None,
+    label_key: str,
+    value_key: str,
 ) -> ResolvedOptions:
     """Resolve an upstream list of records into typed options.
 
-    Records use ``label_key`` and ``value_key`` (defaulting to
-    ``display_label`` and ``value``).
+    Each record must provide the configured ``label_key`` and ``value_key``.
     """
     if not isinstance(resolved_list, list):
         type_name = type(resolved_list).__name__
@@ -138,9 +137,7 @@ def resolve_dynamic_option_values(
         msg = f"Dynamic options for field '{field_name}' resolved to an empty list"
         raise ValueError(msg)
 
-    resolved_label_key = "display_label" if label_key is None else label_key
-    resolved_value_key = "value" if value_key is None else value_key
-    options = resolve_dynamic_option_items(resolved_list, field_name, resolved_label_key, resolved_value_key)
+    options = resolve_dynamic_option_items(resolved_list, field_name, label_key, value_key)
     return ResolvedOptions(source="dynamic_resolved", values=options)
 
 
@@ -192,12 +189,20 @@ def resolve_dynamic_options(form_definition: dict[str, Any]) -> dict[str, Any]:
         field_name = field.get("value_name")
         if not isinstance(field_name, str):
             field_name = f"<unnamed at index {index}>"
+        label_key = options.get("label_key")
+        value_key = options.get("value_key")
+        if not isinstance(label_key, str) or not label_key:
+            message = f"Dynamic options for field '{field_name}' require a non-empty 'label_key'"
+            raise SafeValueError(message)
+        if not isinstance(value_key, str) or not value_key:
+            message = f"Dynamic options for field '{field_name}' require a non-empty 'value_key'"
+            raise SafeValueError(message)
         try:
             resolved = resolve_dynamic_option_values(
                 options.get("expression"),
                 field_name,
-                label_key=options.get("label_key"),
-                value_key=options.get("value_key"),
+                label_key=label_key,
+                value_key=value_key,
             )
         except (TypeError, ValueError) as error:
             raise SafeValueError(str(error)) from error

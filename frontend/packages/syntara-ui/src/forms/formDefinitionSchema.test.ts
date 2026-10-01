@@ -38,6 +38,54 @@ describe('formDefinitionSchema', () => {
     expect(data.fields).toHaveLength(3)
   })
 
+  it('requires non-empty label and value keys for dynamic options', () => {
+    const missingKeys = safeParseFormDefinition({
+      fields: [
+        {
+          type: FormFieldTypeEnum.DROPDOWN,
+          value_name: 'region',
+          label: 'Region',
+          options: { source: 'dynamic', expression: '${trigger.regions}' },
+        },
+      ],
+    })
+    expect(missingKeys.success).toBe(false)
+
+    const emptyKeys = safeParseFormDefinition({
+      fields: [
+        {
+          type: FormFieldTypeEnum.DROPDOWN,
+          value_name: 'region',
+          label: 'Region',
+          options: {
+            source: 'dynamic',
+            expression: '${trigger.regions}',
+            label_key: '',
+            value_key: 'id',
+          },
+        },
+      ],
+    })
+    expect(emptyKeys.success).toBe(false)
+
+    const valid = parseFormDefinition({
+      fields: [
+        {
+          type: FormFieldTypeEnum.DROPDOWN,
+          value_name: 'region',
+          label: 'Region',
+          options: {
+            source: 'dynamic',
+            expression: '${trigger.regions}',
+            label_key: 'name',
+            value_key: 'id',
+          },
+        },
+      ],
+    })
+    expect(valid.fields).toHaveLength(1)
+  })
+
   it('rejects duplicate value_name entries', () => {
     const result = safeParseFormDefinition({
       fields: [
@@ -122,7 +170,7 @@ describe('formDefinitionSchema', () => {
 
     expect(result.success).toBe(false)
     if (!result.success) {
-      expect(result.errors[0]?.field).toBe('fields[0]')
+      expect(result.errors[0]?.field).toBe('fields[0].options.values')
       expect(result.errors[0]?.message).toMatch(/>=1/)
     }
   })
@@ -144,7 +192,7 @@ describe('formDefinitionSchema', () => {
 
     expect(result.success).toBe(false)
     if (!result.success) {
-      expect(result.errors[0]?.field).toBe('fields[0]')
+      expect(result.errors[0]?.field).toBe('fields[0].options.values.0.value')
       expect(result.errors[0]?.message).toMatch(/expected string/i)
     }
   })

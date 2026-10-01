@@ -280,7 +280,7 @@ describe('validateFormSubmission', () => {
           type: FormFieldTypeEnum.DROPDOWN,
           value_name: 'env',
           label: 'Env',
-          options: { source: 'dynamic', expression: 'options' },
+          options: { source: 'dynamic', expression: 'options', label_key: 'display_label', value_key: 'value' },
         },
       ],
     })

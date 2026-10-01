@@ -42,8 +42,8 @@ const staticOptionsSchema = z.object({
 const dynamicOptionsSchema = z.object({
   source: z.literal('dynamic'),
   expression: z.string().min(1),
-  label_key: z.string().nullable().optional(),
-  value_key: z.string().nullable().optional(),
+  label_key: z.string().min(1),
+  value_key: z.string().min(1),
 })
 
 const resolvedOptionSchema = z.object({
@@ -218,7 +218,9 @@ export const formDefinitionSchema = z
 function zodPathToField(path: ReadonlyArray<PropertyKey>): string {
   const segments = path.map(String)
   if (segments.length >= 2 && segments[0] === 'fields' && !Number.isNaN(Number(segments[1]))) {
-    return `fields[${segments[1]}]`
+    const fieldPath = `fields[${segments[1]}]`
+    const propertyPath = segments.slice(2).join('.')
+    return propertyPath ? `${fieldPath}.${propertyPath}` : fieldPath
   }
   return segments.join('.')
 }

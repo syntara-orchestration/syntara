@@ -23,6 +23,8 @@ _STRING_FIELD_TYPES = ["text", "textarea", "masked_text"]
 _DYNAMIC_OPTIONS: dict[str, Any] = {
     "source": "dynamic",
     "expression": "${upstream.output}",
+    "label_key": "display_label",
+    "value_key": "value",
 }
 
 _RESOLVED_NUMERIC_OPTIONS: dict[str, Any] = {
@@ -395,7 +397,12 @@ class TestOptionMembership:
             _field(
                 "dropdown",
                 "pick",
-                options={"source": "dynamic", "expression": "${a.output}"},
+                options={
+                    "source": "dynamic",
+                    "expression": "${a.output}",
+                    "label_key": "display_label",
+                    "value_key": "value",
+                },
             )
         )
 

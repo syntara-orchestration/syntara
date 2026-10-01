@@ -139,7 +139,10 @@
   opacity: 0.6;
 }
 
-.optionsDynamicExpression {
+.optionsDynamicFields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pf-t--global--spacer--md);
   margin-block-start: var(--pf-t--global--spacer--md);
 }
 

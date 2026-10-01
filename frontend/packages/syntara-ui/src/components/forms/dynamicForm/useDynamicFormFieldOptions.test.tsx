@@ -110,7 +110,7 @@ describe('useDynamicFormFieldOptions', () => {
           type: FormFieldTypeEnum.DROPDOWN,
           value_name: 'region',
           label: 'Region',
-          options: { source: 'dynamic', expression: '${nodes.x}' },
+          options: { source: 'dynamic', expression: '${nodes.x}', label_key: 'label', value_key: 'value' },
         },
       ],
     }).fields[0]
@@ -128,7 +128,7 @@ describe('useDynamicFormFieldOptions', () => {
           type: FormFieldTypeEnum.DROPDOWN,
           value_name: 'region',
           label: 'Region',
-          options: { source: 'dynamic', expression: '${nodes.x}' },
+          options: { source: 'dynamic', expression: '${nodes.x}', label_key: 'label', value_key: 'value' },
         },
       ],
     }).fields[0]

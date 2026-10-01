@@ -45129,11 +45129,13 @@
       "DynamicOptions": {
         "type": "object",
         "title": "DynamicOptions",
-        "description": "Dynamic option list resolved from a non-empty array of upstream objects.\n\nEach object must contain a string label and scalar value using the configured\nkeys (defaulting to display_label and value).",
+        "description": "Dynamic option list resolved from a non-empty array of upstream objects.\n\nEach object must contain a string label and scalar value at the required\nlabel_key and value_key.",
         "additionalProperties": false,
         "required": [
           "source",
-          "expression"
+          "expression",
+          "label_key",
+          "value_key"
         ],
         "properties": {
           "source": {
@@ -45144,31 +45146,19 @@
           "expression": {
             "type": "string",
             "title": "Expression",
-            "description": "Template expression resolving to a non-empty array of objects. Each object must contain a string label and scalar value using the configured keys (defaulting to 'display_label' and 'value')."
+            "description": "Template expression resolving to a non-empty array of objects. Each object must contain a string label and scalar value at the required label_key and value_key."
           },
           "value_key": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "type": "string",
             "title": "Value Key",
-            "description": "Object key containing the typed option value. Defaults to 'value'."
+            "minLength": 1,
+            "description": "Required object key containing the typed option value."
           },
           "label_key": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "type": "string",
             "title": "Label Key",
-            "description": "Object key containing the option label. Defaults to 'display_label'."
+            "minLength": 1,
+            "description": "Required object key containing the option label."
           }
         }
       },

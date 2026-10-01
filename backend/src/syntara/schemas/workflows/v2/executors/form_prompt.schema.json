@@ -134,15 +134,15 @@
             "required": ["source"]
           },
           "then": {
-            "required": ["expression"],
+            "required": ["expression", "label_key", "value_key"],
             "properties": {
               "source": {},
               "expression": {
                 "type": "string",
                 "description": "Template expression resolving at runtime to an array of objects. Each object must provide the configured label and value keys. Resolved option values preserve their scalar types."
               },
-              "label_key": { "type": ["string", "null"] },
-              "value_key": { "type": ["string", "null"] }
+              "label_key": { "type": "string", "minLength": 1 },
+              "value_key": { "type": "string", "minLength": 1 }
             },
             "additionalProperties": false
           }

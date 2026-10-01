@@ -102,8 +102,8 @@ class StaticOptions(BaseModel):
 class DynamicOptions(BaseModel):
     """Dynamic option list resolved from a non-empty array of upstream objects.
 
-    Each object must contain a string label and scalar value using the configured
-    keys (defaulting to display_label and value).
+    Each object must contain a string label and scalar value at the required
+    ``label_key`` and ``value_key``.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -112,16 +112,16 @@ class DynamicOptions(BaseModel):
     expression: str = Field(
         description=(
             "Template expression resolving to a non-empty array of objects. Each object must contain a string label "
-            "and scalar value using the configured keys (defaulting to 'display_label' and 'value')."
+            "and scalar value at the required 'label_key' and 'value_key'."
         )
     )
-    label_key: str | None = Field(
-        default=None,
-        description="Object key containing the option label. Defaults to 'display_label'.",
+    label_key: str = Field(
+        min_length=1,
+        description="Required object key containing the option label.",
     )
-    value_key: str | None = Field(
-        default=None,
-        description="Object key containing the typed option value. Defaults to 'value'.",
+    value_key: str = Field(
+        min_length=1,
+        description="Required object key containing the typed option value.",
     )
 
 

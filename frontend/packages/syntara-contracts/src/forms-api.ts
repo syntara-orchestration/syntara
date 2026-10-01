@@ -587,8 +587,8 @@ export interface components {
      * DynamicOptions
      * @description Dynamic option list resolved from a non-empty array of upstream objects.
      *
-     *     Each object must contain a string label and scalar value using the configured
-     *     keys (defaulting to display_label and value).
+     *     Each object must contain a string label and scalar value at the required
+     *     label_key and value_key.
      */
     DynamicOptions: {
       /**
@@ -598,19 +598,19 @@ export interface components {
       source: 'dynamic'
       /**
        * Expression
-       * @description Template expression resolving to a non-empty array of objects. Each object must contain a string label and scalar value using the configured keys (defaulting to 'display_label' and 'value').
+       * @description Template expression resolving to a non-empty array of objects. Each object must contain a string label and scalar value at the required label_key and value_key.
        */
       expression: string
       /**
        * Value Key
-       * @description Object key containing the typed option value. Defaults to 'value'.
+       * @description Required object key containing the typed option value.
        */
-      value_key?: string | null
+      value_key: string
       /**
        * Label Key
-       * @description Object key containing the option label. Defaults to 'display_label'.
+       * @description Required object key containing the option label.
        */
-      label_key?: string | null
+      label_key: string
     }
     /**
      * ResolvedOptions

@@ -354,9 +354,10 @@ describe('SynFormFieldBuilder', () => {
       expect(one).not.toBeChecked()
     })
 
-    it('switches dropdown options to dynamic expression', async () => {
+    it('requires dynamic expression, label key, and value key before saving', async () => {
       const user = userEvent.setup()
-      renderBuilder(<SynFormFieldBuilder value={dropdownFieldDefinition()} onChange={vi.fn()} />)
+      const onChange = vi.fn<(definition: FormDefinition) => void>()
+      renderBuilder(<SynFormFieldBuilder value={dropdownFieldDefinition()} onChange={onChange} />)
 
       await user.click(screen.getByRole('button', { name: 'Dynamic' }))
       expect(
@@ -364,6 +365,19 @@ describe('SynFormFieldBuilder', () => {
       ).toBeInTheDocument()
       await user.type(screen.getByRole('textbox', { name: 'Dynamic options expression' }), 'steps.envs')
       expect(screen.getByRole('textbox', { name: 'Dynamic options expression' })).toHaveValue('steps.envs')
+      expect(onChange).not.toHaveBeenCalled()
+
+      await user.type(screen.getByRole('textbox', { name: 'Label key' }), 'name')
+      await user.type(screen.getByRole('textbox', { name: 'Value key' }), 'id')
+      await waitFor(() => expect(onChange).toHaveBeenCalled())
+      expect(onChange.mock.calls.at(-1)?.[0].fields[0]).toMatchObject({
+        options: {
+          source: 'dynamic',
+          expression: 'steps.envs',
+          label_key: 'name',
+          value_key: 'id',
+        },
+      })
     })
 
     it('edits static option labels and removes an option', async () => {

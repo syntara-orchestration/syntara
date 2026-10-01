@@ -135,12 +135,27 @@ class TestOptions:
         with pytest.raises(ValidationError):
             _form(_text(type="dropdown", options={"source": "static", "values": []}))
 
-    def test_dynamic_options(self) -> None:
-        """A dynamic source resolves to DynamicOptions."""
+    def test_dynamic_options_require_label_and_value_keys(self) -> None:
+        """Dynamic sources need explicit label and value keys at save time."""
+        for options in (
+            {"source": "dynamic", "expression": "${a.output}"},
+            {"source": "dynamic", "expression": "${a.output}", "label_key": "name"},
+            {"source": "dynamic", "expression": "${a.output}", "value_key": "id"},
+            {"source": "dynamic", "expression": "${a.output}", "label_key": "", "value_key": "id"},
+            {"source": "dynamic", "expression": "${a.output}", "label_key": "name", "value_key": ""},
+        ):
+            with pytest.raises(ValidationError):
+                _form(_text(type="multi_select", options=options))
+
         form = _form(
             _text(
                 type="multi_select",
-                options={"source": "dynamic", "expression": "${a.output}", "label_key": "name"},
+                options={
+                    "source": "dynamic",
+                    "expression": "${a.output}",
+                    "label_key": "name",
+                    "value_key": "id",
+                },
             )
         )
 
@@ -148,7 +163,8 @@ class TestOptions:
         assert isinstance(field, MultiSelectField)
         assert isinstance(field.options, DynamicOptions)
         assert field.options.expression == "${a.output}"
-        assert field.options.value_key is None
+        assert field.options.label_key == "name"
+        assert field.options.value_key == "id"
 
     def test_unknown_source_rejected(self) -> None:
         """An unrecognized option source fails validation."""
@@ -268,7 +284,12 @@ class TestStaticOptionDefaults:
     @pytest.mark.parametrize("value", ["a", 5, 5.5, True])
     def test_dynamic_multi_select_defaults_accept_scalar_types(self, value: object) -> None:
         """Dynamic multi-select defaults retain each supported scalar type."""
-        options = {"source": "dynamic", "expression": "${upstream.output}"}
+        options = {
+            "source": "dynamic",
+            "expression": "${upstream.output}",
+            "label_key": "display_label",
+            "value_key": "value",
+        }
 
         form = _form(_text(type="multi_select", options=options, default=[value]))
 
@@ -285,7 +306,12 @@ class TestStaticOptionDefaults:
         form = _form(
             _text(
                 type="dropdown",
-                options={"source": "dynamic", "expression": "${a.output}"},
+                options={
+                    "source": "dynamic",
+                    "expression": "${a.output}",
+                    "label_key": "display_label",
+                    "value_key": "value",
+                },
                 default="anything",
             )
         )
