@@ -76,6 +76,7 @@ class ExecutionMonitorMetadata:
     mode: ExecutionMode | None = None
     workflow_version: int | None = None
     used_published: bool | None = None
+    is_retry: bool = False
 
 
 type QueueItem = HistoryEvent | SyntheticActivityStarted | SyntheticPartialOutput | None

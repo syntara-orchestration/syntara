@@ -492,6 +492,7 @@ class ActivityData(SQLModel):
 
     activity_id: str
     status: str
+    replayed: bool | None = None
     error_details: str | None = None
     output_data: dict[str, Any] | None = None
     started_at: datetime | None = None

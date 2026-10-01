@@ -296,6 +296,11 @@ export interface components {
     }
     ActivityExecution: components['schemas']['BaseResource'] & {
       /**
+       * Replayed
+       * @description True when output was reused from the source run; null for older records
+       */
+      replayed?: boolean | null
+      /**
        * Execution Id
        * Format: uuid
        * @description Parent execution ID
@@ -361,6 +366,8 @@ export interface components {
      * @description Activity data for execution response.
      */
     ActivityData: {
+      /** Replayed */
+      replayed?: boolean | null
       /** Activity Id */
       activity_id: string
       /** Status */
