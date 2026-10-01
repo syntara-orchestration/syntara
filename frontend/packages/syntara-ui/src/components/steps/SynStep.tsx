@@ -127,7 +127,7 @@ export function SynStep(props: {
   const isCollapsible = props.collapsible ?? true
 
   const hasSemanticZoomSummary = props.semanticZoomSummary !== undefined
-  const isSemanticZoom = useSemanticZoom(props.nodeProps.id, hasSemanticZoomSummary)
+  const isSemanticZoom = useSemanticZoom(hasSemanticZoomSummary)
 
   const semanticFillColor = props.topBarColor ?? NODE_TYPE_COLORS.generic
 
