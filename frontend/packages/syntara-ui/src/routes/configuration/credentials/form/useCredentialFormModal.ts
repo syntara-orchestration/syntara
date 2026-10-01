@@ -62,12 +62,6 @@ export function useCredentialFormModal({
   const [activeGroupIndex, setActiveGroupIndex] = useState(0)
 
   const resetKey = isOpen ? (credentialToEdit?.id ?? preSelectedTypeId ?? 'create') : 'closed'
-  const [prevResetKey, setPrevResetKey] = useState<string | null>(null)
-  if (resetKey !== prevResetKey) {
-    setPrevResetKey(resetKey)
-    setActiveGroupIndex(computeInitialGroupIndex(credentialToEdit, types))
-    setTouchedSecrets(new Set())
-  }
 
   const { mutate: createCredential, isPending: isCreating } = credentialsClient.useMutation('post', '/credentials')
   const { mutate: patchCredential, isPending: isPatching } = credentialsClient.useMutation(
@@ -108,6 +102,8 @@ export function useCredentialFormModal({
   useEffect(() => {
     if (!isOpen) return
 
+    setTouchedSecrets(new Set())
+
     if (credentialToEdit) {
       reset({
         name: credentialToEdit.name,
@@ -116,6 +112,9 @@ export function useCredentialFormModal({
         credential_type_id: credentialToEdit.credential_type_id,
         inputs: credentialToEdit.inputs as Record<string, unknown>,
       })
+      if (types.length > 0) {
+        setActiveGroupIndex(computeInitialGroupIndex(credentialToEdit, types))
+      }
       return
     }
 
@@ -127,8 +126,8 @@ export function useCredentialFormModal({
       credential_type_id: preSelectedTypeId ?? '',
       inputs: preSelectedType ? getDefaultInputs(preSelectedType) : {},
     })
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset on modal open / target change, keyed by resetKey
-  }, [resetKey])
+    setActiveGroupIndex(0)
+  }, [isOpen, resetKey, reset, credentialToEdit, preSelectedTypeId, defaultProjectId, types])
 
   useEffect(() => {
     if (!isEditMode && !selectedTypeId && !preSelectedTypeId && types.length > 0) {
