@@ -46,6 +46,7 @@ dependencies = [
     "langchain-mcp-adapters>=0.1.0,<0.2.0",
     "langgraph>=1.2.4",
     "boto3>=1.35.0",
+    "aiokafka>=0.11.0",
     "filelock>=3.20.0",
     "pypandoc>=1.14",
     "tiktoken>=0.5.0",
@@ -275,6 +276,10 @@ ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = "jmespath.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "aiokafka.*"
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
