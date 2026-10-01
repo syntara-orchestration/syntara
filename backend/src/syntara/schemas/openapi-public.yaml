@@ -30985,7 +30985,7 @@ components:
         Dynamic option list resolved from a non-empty array of upstream objects.
 
         Each object must contain a string label and scalar value at the required
-        label_key and value_key.
+        ``label_key`` and ``value_key``.
       additionalProperties: false
       required:
         - source
@@ -31000,7 +31000,7 @@ components:
         expression:
           type: string
           title: Expression
-          description: Template expression resolving to a non-empty array of objects. Each object must contain a string label and scalar value at the required label_key and value_key.
+          description: Template expression resolving to a non-empty array of objects. Each object must contain a string label and scalar value at the required 'label_key' and 'value_key'.
         value_key:
           type: string
           title: Value Key

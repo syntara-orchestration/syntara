@@ -1366,7 +1366,7 @@ export interface components {
      * @description Dynamic option list resolved from a non-empty array of upstream objects.
      *
      *     Each object must contain a string label and scalar value at the required
-     *     label_key and value_key.
+     *     ``label_key`` and ``value_key``.
      */
     DynamicOptions: {
       /**
@@ -1376,7 +1376,7 @@ export interface components {
       source: 'dynamic'
       /**
        * Expression
-       * @description Template expression resolving to a non-empty array of objects. Each object must contain a string label and scalar value at the required label_key and value_key.
+       * @description Template expression resolving to a non-empty array of objects. Each object must contain a string label and scalar value at the required 'label_key' and 'value_key'.
        */
       expression: string
       /**

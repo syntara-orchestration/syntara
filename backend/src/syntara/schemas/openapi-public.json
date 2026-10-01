@@ -45129,7 +45129,7 @@
       "DynamicOptions": {
         "type": "object",
         "title": "DynamicOptions",
-        "description": "Dynamic option list resolved from a non-empty array of upstream objects.\n\nEach object must contain a string label and scalar value at the required\nlabel_key and value_key.",
+        "description": "Dynamic option list resolved from a non-empty array of upstream objects.\n\nEach object must contain a string label and scalar value at the required\n``label_key`` and ``value_key``.",
         "additionalProperties": false,
         "required": [
           "source",
@@ -45146,7 +45146,7 @@
           "expression": {
             "type": "string",
             "title": "Expression",
-            "description": "Template expression resolving to a non-empty array of objects. Each object must contain a string label and scalar value at the required label_key and value_key."
+            "description": "Template expression resolving to a non-empty array of objects. Each object must contain a string label and scalar value at the required 'label_key' and 'value_key'."
           },
           "value_key": {
             "type": "string",

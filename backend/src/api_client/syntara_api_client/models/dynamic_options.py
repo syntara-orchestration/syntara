@@ -13,12 +13,12 @@ class DynamicOptions:
     """Dynamic option list resolved from a non-empty array of upstream objects.
 
     Each object must contain a string label and scalar value at the required
-    label_key and value_key.
+    ``label_key`` and ``value_key``.
 
         Attributes:
             source (Literal['dynamic']):
             expression (str): Template expression resolving to a non-empty array of objects. Each object must contain a
-                string label and scalar value at the required label_key and value_key.
+                string label and scalar value at the required 'label_key' and 'value_key'.
             value_key (str): Required object key containing the typed option value.
             label_key (str): Required object key containing the option label.
     """
