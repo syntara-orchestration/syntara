@@ -20,6 +20,7 @@ from syntara.forms.models.form_fields import (
     MaskedTextField,
     MultiSelectField,
     NumberField,
+    ResolvedOptions,
     StaticOptions,
     TextAreaField,
     TextField,
@@ -134,12 +135,27 @@ class TestOptions:
         with pytest.raises(ValidationError):
             _form(_text(type="dropdown", options={"source": "static", "values": []}))
 
-    def test_dynamic_options(self) -> None:
-        """A dynamic source resolves to DynamicOptions."""
+    def test_dynamic_options_require_label_and_value_keys(self) -> None:
+        """Dynamic sources need explicit label and value keys at save time."""
+        for options in (
+            {"source": "dynamic", "expression": "${a.output}"},
+            {"source": "dynamic", "expression": "${a.output}", "label_key": "name"},
+            {"source": "dynamic", "expression": "${a.output}", "value_key": "id"},
+            {"source": "dynamic", "expression": "${a.output}", "label_key": "", "value_key": "id"},
+            {"source": "dynamic", "expression": "${a.output}", "label_key": "name", "value_key": ""},
+        ):
+            with pytest.raises(ValidationError):
+                _form(_text(type="multi_select", options=options))
+
         form = _form(
             _text(
                 type="multi_select",
-                options={"source": "dynamic", "expression": "${a.output}", "label_key": "name"},
+                options={
+                    "source": "dynamic",
+                    "expression": "${a.output}",
+                    "label_key": "name",
+                    "value_key": "id",
+                },
             )
         )
 
@@ -147,12 +163,59 @@ class TestOptions:
         assert isinstance(field, MultiSelectField)
         assert isinstance(field.options, DynamicOptions)
         assert field.options.expression == "${a.output}"
-        assert field.options.value_key is None
+        assert field.options.label_key == "name"
+        assert field.options.value_key == "id"
 
     def test_unknown_source_rejected(self) -> None:
         """An unrecognized option source fails validation."""
         with pytest.raises(ValidationError):
             _form(_text(type="dropdown", options={"source": "magic", "values": []}))
+
+    def test_resolved_options_parse_with_typed_values(self) -> None:
+        """Resolved option values preserve their upstream scalar types."""
+        form = _form(
+            _text(
+                type="dropdown",
+                options={"source": "dynamic_resolved", "values": [{"display_label": "1", "value": 1}]},
+            )
+        )
+
+        field = form.fields[0]
+        assert isinstance(field, DropdownField)
+        assert isinstance(field.options, ResolvedOptions)
+        assert field.options.values[0].value == 1
+        assert type(field.options.values[0].value) is int
+
+    def test_resolved_options_require_values(self) -> None:
+        """Resolved options always carry a concrete option list."""
+        with pytest.raises(ValidationError):
+            _form(_text(type="dropdown", options={"source": "dynamic_resolved"}))
+
+    def test_resolved_options_reject_empty_values(self) -> None:
+        with pytest.raises(ValidationError):
+            _form(_text(type="dropdown", options={"source": "dynamic_resolved", "values": []}))
+
+    def test_resolved_options_reject_extra_keys(self) -> None:
+        with pytest.raises(ValidationError):
+            _form(
+                _text(
+                    type="dropdown",
+                    options={
+                        "source": "dynamic_resolved",
+                        "values": [{"display_label": "One", "value": 1, "extra": True}],
+                    },
+                )
+            )
+
+    def test_static_option_value_stays_string_only(self) -> None:
+        """Static values are authored strings; typed values belong to resolved options."""
+        with pytest.raises(ValidationError):
+            _form(
+                _text(
+                    type="dropdown",
+                    options={"source": "static", "values": [{"display_label": "One", "value": 1}]},
+                )
+            )
 
 
 class TestFormDefinition:
@@ -221,7 +284,12 @@ class TestStaticOptionDefaults:
     @pytest.mark.parametrize("value", ["a", 5, 5.5, True])
     def test_dynamic_multi_select_defaults_accept_scalar_types(self, value: object) -> None:
         """Dynamic multi-select defaults retain each supported scalar type."""
-        options = {"source": "dynamic", "expression": "${upstream.output}"}
+        options = {
+            "source": "dynamic",
+            "expression": "${upstream.output}",
+            "label_key": "display_label",
+            "value_key": "value",
+        }
 
         form = _form(_text(type="multi_select", options=options, default=[value]))
 
@@ -238,9 +306,41 @@ class TestStaticOptionDefaults:
         form = _form(
             _text(
                 type="dropdown",
-                options={"source": "dynamic", "expression": "${a.output}"},
+                options={
+                    "source": "dynamic",
+                    "expression": "${a.output}",
+                    "label_key": "display_label",
+                    "value_key": "value",
+                },
                 default="anything",
             )
         )
 
         assert form.fields[0].default == "anything"
+
+
+class TestResolvedOptionDefaults:
+    """Defaults on resolved option lists are checked against typed values."""
+
+    @staticmethod
+    def _options() -> dict[str, Any]:
+        return {
+            "source": "dynamic_resolved",
+            "values": [
+                {"display_label": "One", "value": 1},
+                {"display_label": "Two", "value": 2},
+            ],
+        }
+
+    def test_default_checked_against_resolved_options(self) -> None:
+        with pytest.raises(ValidationError, match="not in the option list"):
+            _form(_text(type="dropdown", options=self._options(), default=3))
+
+    def test_typed_default_accepted_against_resolved_options(self) -> None:
+        form = _form(_text(type="dropdown", options=self._options(), default=2))
+
+        assert form.fields[0].default == 2
+
+    def test_multi_select_defaults_checked_against_resolved_options(self) -> None:
+        with pytest.raises(ValidationError, match="3"):
+            _form(_text(type="multi_select", options=self._options(), default=[1, 3]))

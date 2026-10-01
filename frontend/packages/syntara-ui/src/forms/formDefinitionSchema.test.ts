@@ -12,6 +12,14 @@ const staticOptions = {
   ],
 }
 
+const resolvedOptions = {
+  source: 'dynamic_resolved' as const,
+  values: [
+    { display_label: 'One', value: 1 },
+    { display_label: 'Two', value: 2 },
+  ],
+}
+
 describe('formDefinitionSchema', () => {
   it('parses a valid multi-field definition', () => {
     const data = parseFormDefinition({
@@ -28,6 +36,54 @@ describe('formDefinitionSchema', () => {
     })
 
     expect(data.fields).toHaveLength(3)
+  })
+
+  it('requires non-empty label and value keys for dynamic options', () => {
+    const missingKeys = safeParseFormDefinition({
+      fields: [
+        {
+          type: FormFieldTypeEnum.DROPDOWN,
+          value_name: 'region',
+          label: 'Region',
+          options: { source: 'dynamic', expression: '${trigger.regions}' },
+        },
+      ],
+    })
+    expect(missingKeys.success).toBe(false)
+
+    const emptyKeys = safeParseFormDefinition({
+      fields: [
+        {
+          type: FormFieldTypeEnum.DROPDOWN,
+          value_name: 'region',
+          label: 'Region',
+          options: {
+            source: 'dynamic',
+            expression: '${trigger.regions}',
+            label_key: '',
+            value_key: 'id',
+          },
+        },
+      ],
+    })
+    expect(emptyKeys.success).toBe(false)
+
+    const valid = parseFormDefinition({
+      fields: [
+        {
+          type: FormFieldTypeEnum.DROPDOWN,
+          value_name: 'region',
+          label: 'Region',
+          options: {
+            source: 'dynamic',
+            expression: '${trigger.regions}',
+            label_key: 'name',
+            value_key: 'id',
+          },
+        },
+      ],
+    })
+    expect(valid.fields).toHaveLength(1)
   })
 
   it('rejects duplicate value_name entries', () => {
@@ -76,6 +132,68 @@ describe('formDefinitionSchema', () => {
     expect(result.success).toBe(false)
     if (!result.success) {
       expect(result.errors[0]?.message).toContain('default values')
+    }
+  })
+
+  it('parses resolved options while preserving typed values', () => {
+    const data = parseFormDefinition({
+      fields: [
+        {
+          type: FormFieldTypeEnum.DROPDOWN,
+          value_name: 'count',
+          label: 'Count',
+          options: resolvedOptions,
+          default: 2,
+        },
+      ],
+    })
+
+    const field = data.fields[0]
+    expect(field?.type).toBe(FormFieldTypeEnum.DROPDOWN)
+    if (field?.type === FormFieldTypeEnum.DROPDOWN && field.options.source === 'dynamic_resolved') {
+      expect(field.options.values.map((option) => option.value)).toEqual([1, 2])
+      expect(field.default).toBe(2)
+    }
+  })
+
+  it('rejects an empty resolved option list', () => {
+    const result = safeParseFormDefinition({
+      fields: [
+        {
+          type: FormFieldTypeEnum.DROPDOWN,
+          value_name: 'count',
+          label: 'Count',
+          options: { source: 'dynamic_resolved', values: [] },
+        },
+      ],
+    })
+
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.errors[0]?.field).toBe('fields[0].options.values')
+      expect(result.errors[0]?.message).toMatch(/>=1/)
+    }
+  })
+
+  it('rejects typed values on authored static options', () => {
+    const result = safeParseFormDefinition({
+      fields: [
+        {
+          type: FormFieldTypeEnum.DROPDOWN,
+          value_name: 'count',
+          label: 'Count',
+          options: {
+            source: 'static',
+            values: [{ display_label: 'One', value: 1 }],
+          },
+        },
+      ],
+    })
+
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.errors[0]?.field).toBe('fields[0].options.values.0.value')
+      expect(result.errors[0]?.message).toMatch(/expected string/i)
     }
   })
 

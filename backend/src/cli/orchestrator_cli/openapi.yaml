@@ -31509,11 +31509,13 @@ components:
           oneOf:
             - $ref: '#/components/schemas/StaticOptions'
             - $ref: '#/components/schemas/DynamicOptions'
+            - $ref: '#/components/schemas/ResolvedOptions'
           discriminator:
             propertyName: source
             mapping:
               static: '#/components/schemas/StaticOptions'
               dynamic: '#/components/schemas/DynamicOptions'
+              dynamic_resolved: '#/components/schemas/ResolvedOptions'
         default:
           anyOf:
             - type: string
@@ -31566,11 +31568,13 @@ components:
           oneOf:
             - $ref: '#/components/schemas/StaticOptions'
             - $ref: '#/components/schemas/DynamicOptions'
+            - $ref: '#/components/schemas/ResolvedOptions'
           discriminator:
             propertyName: source
             mapping:
               static: '#/components/schemas/StaticOptions'
               dynamic: '#/components/schemas/DynamicOptions'
+              dynamic_resolved: '#/components/schemas/ResolvedOptions'
         default:
           anyOf:
             - type: array
@@ -31622,11 +31626,17 @@ components:
     DynamicOptions:
       type: object
       title: DynamicOptions
-      description: Dynamic option list resolved from upstream node output.
+      description: |-
+        Dynamic option list resolved from a non-empty array of upstream objects.
+
+        Each object must contain a string label and scalar value at the required
+        ``label_key`` and ``value_key``.
       additionalProperties: false
       required:
         - source
         - expression
+        - label_key
+        - value_key
       properties:
         source:
           type: string
@@ -31635,16 +31645,68 @@ components:
         expression:
           type: string
           title: Expression
+          description: Template expression resolving to a non-empty array of objects. Each object must contain a string label and scalar value at the required 'label_key' and 'value_key'.
         value_key:
-          anyOf:
-            - type: string
-            - type: 'null'
+          type: string
           title: Value Key
+          minLength: 1
+          description: Required object key containing the typed option value.
         label_key:
+          type: string
+          title: Label Key
+          minLength: 1
+          description: Required object key containing the option label.
+    ResolvedOptions:
+      type: object
+      title: ResolvedOptions
+      description: |-
+        Dynamic options materialized into a concrete list at prompt creation.
+
+        Produced only by the workflow engine, never authored. A form prompt is
+        persisted with this shape so the responder view and submission membership
+        validation operate on the same snapshot.
+      additionalProperties: false
+      required:
+        - source
+        - values
+      properties:
+        source:
+          type: string
+          const: dynamic_resolved
+          title: Source
+        values:
+          type: array
+          title: Values
+          minItems: 1
+          maxItems: 500
+          items:
+            $ref: '#/components/schemas/ResolvedOption'
+    ResolvedOption:
+      type: object
+      title: ResolvedOption
+      description: |-
+        An option materialized from upstream output while preserving its scalar type.
+
+        Python set membership considers ``1``, ``1.0``, and ``True`` equal. That
+        behavior is used by the backend's de-duplication and membership checks.
+        Static options remain strings because they are authored by a user.
+      additionalProperties: false
+      required:
+        - display_label
+        - value
+      properties:
+        display_label:
+          type: string
+          title: Display Label
+          minLength: 1
+          maxLength: 200
+        value:
           anyOf:
             - type: string
-            - type: 'null'
-          title: Label Key
+            - type: integer
+            - type: number
+            - type: boolean
+          title: Value
     FormPromptSummary:
       type: object
       title: FormPromptSummary

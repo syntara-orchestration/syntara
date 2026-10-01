@@ -11,26 +11,19 @@ function isOptionScalar(value: unknown): value is string | number | boolean {
   return kind === 'string' || kind === 'number' || kind === 'boolean'
 }
 
-export function isSynDynamicFormSelectOption(value: unknown): value is SynDynamicFormSelectOption {
-  return isRecord(value) && typeof value.label === 'string' && isOptionScalar(value.value)
-}
-
 /**
  * Maps upstream expression output (array of objects) to select options using
  * {@link DynamicOptionsSource.label_key} and {@link DynamicOptionsSource.value_key}
- * (defaults: `display_label` / `value`, matching static options).
+ * (both required by the authored form definition).
  */
 export function mapDynamicOptionsFromRecords(
   records: readonly unknown[],
   config: DynamicOptionsSource
 ): SynDynamicFormSelectOption[] {
-  const labelKey = config.label_key ?? 'display_label'
-  const valueKey = config.value_key ?? 'value'
+  const labelKey = config.label_key
+  const valueKey = config.value_key
 
   return records.map((record, index) => {
-    if (isSynDynamicFormSelectOption(record)) {
-      return record
-    }
     if (!isRecord(record)) {
       throw new TypeError(`Dynamic option at index ${index} must be an object`)
     }
@@ -47,20 +40,8 @@ export function mapDynamicOptionsFromRecords(
 }
 
 export function normalizeDynamicOptionsResult(
-  result: readonly SynDynamicFormSelectOption[] | readonly unknown[],
+  result: readonly unknown[],
   config: DynamicOptionsSource
 ): SynDynamicFormSelectOption[] {
-  if (result.length === 0) {
-    return []
-  }
-  const prebuilt: SynDynamicFormSelectOption[] = []
-  for (const item of result) {
-    if (isSynDynamicFormSelectOption(item)) {
-      prebuilt.push(item)
-    }
-  }
-  if (prebuilt.length === result.length) {
-    return prebuilt
-  }
   return mapDynamicOptionsFromRecords(result, config)
 }

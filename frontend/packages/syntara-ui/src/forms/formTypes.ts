@@ -3,6 +3,7 @@ import type { FormField } from '@syntara/contracts'
 export type FormFieldByType<T extends FormField['type']> = Extract<FormField, { type: T }>
 
 export type StaticOptionsSource = Extract<FormField, { options: { source: 'static' } }>['options']
+export type ResolvedOptionsSource = Extract<FormField, { options: { source: 'dynamic_resolved' } }>['options']
 export type DynamicOptionsSource = Extract<FormField, { options: { source: 'dynamic' } }>['options']
 
 /** Raw submitted values keyed by `value_name` before coercion. */

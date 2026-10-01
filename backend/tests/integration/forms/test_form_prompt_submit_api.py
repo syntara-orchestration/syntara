@@ -24,6 +24,16 @@ from syntara.forms.models.form_prompt import FormPrompt
 
 FORM_PROMPTS_URL = "/api/v1/form_prompts"
 _FORM_DEFINITION = {"fields": [{"value_name": "reason", "type": "text", "label": "Reason", "required": True}]}
+_RESOLVED_FORM_DEFINITION = {
+    "fields": [
+        {
+            "value_name": "region_id",
+            "type": "dropdown",
+            "label": "Region",
+            "options": {"source": "dynamic_resolved", "values": [{"display_label": "US", "value": 1}]},
+        }
+    ]
+}
 
 
 async def _create_prompt(
@@ -164,6 +174,58 @@ class TestFormPromptSubmitAPI:
         assert call["form_response"]["responded_by"] == test_user.username
         assert call["form_response"]["prompt_id"] == str(prompt.id)
         assert "responded_at" in call["form_response"]
+
+    async def test_submit_accepts_typed_resolved_option_and_signals_integer(
+        self,
+        auth_client: AsyncClient,
+        test_db_session: AsyncSession,
+        test_project_id: UUID,
+    ) -> None:
+        prompt = await _create_prompt(
+            test_db_session,
+            test_project_id,
+            form_definition=_RESOLVED_FORM_DEFINITION,
+        )
+
+        with patch("syntara.forms.clients.workflow_client.WorkflowApiClient") as client_class:
+            client = client_class.return_value.__aenter__.return_value
+            client.send_form_signal = AsyncMock()
+            response = await auth_client.post(
+                f"{FORM_PROMPTS_URL}/{prompt.id}/submit",
+                json={"response_data": {"region_id": 1}},
+            )
+
+        assert response.status_code == 200
+        response_data = response.json()["response_data"]
+        assert response_data == {"region_id": 1}
+        assert type(response_data["region_id"]) is int
+        signal_data = client.send_form_signal.await_args.kwargs["form_response"]["response_data"]
+        assert signal_data == {"region_id": 1}
+        assert type(signal_data["region_id"]) is int
+
+    async def test_submit_rejects_value_outside_resolved_options(
+        self,
+        auth_client: AsyncClient,
+        test_db_session: AsyncSession,
+        test_project_id: UUID,
+    ) -> None:
+        prompt = await _create_prompt(
+            test_db_session,
+            test_project_id,
+            form_definition=_RESOLVED_FORM_DEFINITION,
+        )
+
+        with patch("syntara.forms.clients.workflow_client.WorkflowApiClient") as client_class:
+            client = client_class.return_value.__aenter__.return_value
+            client.send_form_signal = AsyncMock()
+            response = await auth_client.post(
+                f"{FORM_PROMPTS_URL}/{prompt.id}/submit",
+                json={"response_data": {"region_id": 2}},
+            )
+
+        assert response.status_code == 422
+        assert "region_id" in response.json()["detail"]
+        client.send_form_signal.assert_not_awaited()
 
     async def test_submit_signal_failure_still_returns_submitted_prompt(
         self,

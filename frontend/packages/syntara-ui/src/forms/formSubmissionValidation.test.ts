@@ -17,6 +17,14 @@ const staticOptions = {
   ],
 }
 
+const resolvedOptions = {
+  source: 'dynamic_resolved' as const,
+  values: [
+    { display_label: 'One', value: 1 },
+    { display_label: 'Two', value: 2 },
+  ],
+}
+
 function field(type: FormFieldType, value_name: string, overrides: Record<string, unknown> = {}) {
   return { type, value_name, label: value_name, ...overrides }
 }
@@ -117,6 +125,39 @@ describe('validateFormSubmission', () => {
 
     expect(validateFormSubmission(definition, { choice: 'a' })).toEqual({ choice: 'a' })
     expectValidationErrors(definition, { choice: 'z' }, [['choice', 'not_in_options']])
+  })
+
+  it.each([FormFieldTypeEnum.DROPDOWN, FormFieldTypeEnum.MULTI_SELECT])(
+    'enforces resolved option membership for %s fields',
+    (type) => {
+      const definition = form(field(type, 'choice', { options: resolvedOptions }))
+
+      expect(validateFormSubmission(definition, { choice: type === FormFieldTypeEnum.MULTI_SELECT ? [1] : 1 })).toEqual(
+        { choice: type === FormFieldTypeEnum.MULTI_SELECT ? [1] : 1 }
+      )
+      expectValidationErrors(definition, { choice: type === FormFieldTypeEnum.MULTI_SELECT ? ['1'] : '1' }, [
+        ['choice', 'not_in_options'],
+      ])
+    }
+  )
+
+  it('keeps JavaScript Set semantics for typed resolved values', () => {
+    const definition = form(
+      field(FormFieldTypeEnum.DROPDOWN, 'choice', {
+        options: {
+          source: 'dynamic_resolved',
+          values: [
+            { display_label: 'Number one', value: 1 },
+            { display_label: 'Text one', value: '1' },
+            { display_label: 'Boolean true', value: true },
+          ],
+        },
+      })
+    )
+
+    expect(validateFormSubmission(definition, { choice: 1 })).toEqual({ choice: 1 })
+    expect(validateFormSubmission(definition, { choice: '1' })).toEqual({ choice: '1' })
+    expect(validateFormSubmission(definition, { choice: true })).toEqual({ choice: true })
   })
 
   it('does not mutate the submitted object', () => {
@@ -232,14 +273,14 @@ describe('validateFormSubmission', () => {
     expectValidationErrors(definition, { choice: { toString: () => 'a' } }, [['choice', 'type']])
   })
 
-  it('allows dynamic-option fields without static membership validation', () => {
+  it('allows unresolved dynamic fields without option membership validation', () => {
     const definition = parseFormDefinition({
       fields: [
         {
           type: FormFieldTypeEnum.DROPDOWN,
           value_name: 'env',
           label: 'Env',
-          options: { source: 'dynamic', expression: 'options' },
+          options: { source: 'dynamic', expression: 'options', label_key: 'display_label', value_key: 'value' },
         },
       ],
     })

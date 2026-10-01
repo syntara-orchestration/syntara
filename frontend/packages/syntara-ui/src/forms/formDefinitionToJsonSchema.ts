@@ -45,8 +45,8 @@ function syntaraOptionsExtension(field: FormField): SyntaraFormOptionsExtension 
   return {
     source: 'dynamic',
     expression: field.options.expression,
-    label_key: field.options.label_key ?? null,
-    value_key: field.options.value_key ?? null,
+    label_key: field.options.label_key,
+    value_key: field.options.value_key,
   }
 }
 

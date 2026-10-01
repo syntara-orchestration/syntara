@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import {
-  isSynDynamicFormSelectOption,
-  mapDynamicOptionsFromRecords,
-  normalizeDynamicOptionsResult,
-} from './mapDynamicOptionsFromRecords'
+import { mapDynamicOptionsFromRecords, normalizeDynamicOptionsResult } from './mapDynamicOptionsFromRecords'
 
 const dynamicConfig = {
   source: 'dynamic' as const,
@@ -28,25 +24,33 @@ describe('mapDynamicOptionsFromRecords', () => {
     ])
   })
 
-  it('uses display_label and value as defaults', () => {
+  it('maps the configured display_label and value keys', () => {
     const options = mapDynamicOptionsFromRecords([{ display_label: 'Low', value: 'low' }], {
       source: 'dynamic',
       expression: '${x}',
+      label_key: 'display_label',
+      value_key: 'value',
     })
     expect(options).toEqual([{ label: 'Low', value: 'low' }])
   })
 
-  it('passes through pre-built select options', () => {
+  it('uses configured keys even when records already look like select options', () => {
     const built = [{ label: 'A', value: 'a' }]
-    expect(mapDynamicOptionsFromRecords(built, dynamicConfig)).toEqual(built)
+    expect(() => mapDynamicOptionsFromRecords(built, dynamicConfig)).toThrow(/key "name"/)
   })
 })
 
 describe('normalizeDynamicOptionsResult', () => {
-  it('returns pre-built options when every item is normalized', () => {
+  it('maps options using explicitly configured label and value keys', () => {
     const built = [{ label: 'A', value: 1 }]
-    expect(normalizeDynamicOptionsResult(built, dynamicConfig)).toEqual(built)
-    expect(isSynDynamicFormSelectOption(built[0])).toBe(true)
+    expect(
+      normalizeDynamicOptionsResult(built, {
+        source: 'dynamic',
+        expression: '${nodes.x}',
+        label_key: 'label',
+        value_key: 'value',
+      })
+    ).toEqual(built)
   })
 
   it('maps raw records when items are not pre-built options', () => {

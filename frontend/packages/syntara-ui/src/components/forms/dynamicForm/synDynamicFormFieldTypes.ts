@@ -7,6 +7,7 @@ export type MultiSelectFormField = FormFieldByType<'multi_select'>
 export type OptionsFormField = DropdownFormField | MultiSelectFormField
 
 export type StaticOptionsSource = Extract<OptionsFormField['options'], { source: 'static' }>
+export type ResolvedOptionsSource = Extract<OptionsFormField['options'], { source: 'dynamic_resolved' }>
 export type DynamicOptionsSource = Extract<OptionsFormField['options'], { source: 'dynamic' }>
 
 export type DynamicOptionsFormField = OptionsFormField & { options: DynamicOptionsSource }

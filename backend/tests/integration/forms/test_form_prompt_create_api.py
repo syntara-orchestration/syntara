@@ -4,12 +4,16 @@ Tests verify that form_prompts are correctly created through the internal
 Forms API endpoint.
 """
 
+from typing import Any
 from uuid import UUID
 
 import pytest
 from httpx import AsyncClient
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from syntara.core.models import User
+from syntara.forms.models.form_fields import DropdownField, ResolvedOptions
+from syntara.forms.models.form_prompt import FormPrompt
 from syntara.workflows.models.execution import Execution
 
 FORM_PROMPTS_URL = "/api/v1/form_prompts"
@@ -25,7 +29,7 @@ def _form_prompt_payload(
     project_id: UUID,
     prompt_node_id: str = "form1",
     name: str = "Test Form",
-    form_definition: dict[str, object] | None = None,
+    form_definition: dict[str, Any] | None = None,
     loop_iteration_path: list[int] | None = None,
 ) -> dict[str, object]:
     """Build a minimal form_prompt creation request payload."""
@@ -95,6 +99,89 @@ class TestFormPromptCreateAPI:
         # FormPromptSummary doesn't include message (only 8 minimal fields)
         assert "id" in data
         assert data["execution_id"] == str(exec_id)
+
+    async def test_create_form_prompt_with_resolved_typed_options_round_trips(
+        self,
+        jwt_client: AsyncClient,
+        test_execution: Execution,
+        test_db_session: AsyncSession,
+    ) -> None:
+        """Resolved typed options are accepted and persist with their original types."""
+        form_definition = {
+            "fields": [
+                {
+                    "value_name": "region_id",
+                    "type": "dropdown",
+                    "label": "Region",
+                    "options": {"source": "dynamic_resolved", "values": [{"display_label": "US", "value": 1}]},
+                }
+            ]
+        }
+        payload = _form_prompt_payload(
+            test_execution.id,
+            test_execution.project_id,
+            form_definition=form_definition,
+        )
+
+        response = await jwt_client.post(FORM_PROMPTS_URL, json=payload)
+
+        assert response.status_code == 201
+        prompt = await test_db_session.get(FormPrompt, UUID(response.json()["id"]))
+        assert prompt is not None
+        resolved_field = prompt.form_definition.fields[0]
+        assert isinstance(resolved_field, DropdownField)
+        assert isinstance(resolved_field.options, ResolvedOptions)
+        assert resolved_field.options.source == "dynamic_resolved"
+        assert resolved_field.options.values[0].value == 1
+        assert type(resolved_field.options.values[0].value) is int
+
+    async def test_create_rejects_typed_static_option_value(
+        self,
+        jwt_client: AsyncClient,
+        test_execution: Execution,
+    ) -> None:
+        payload = _form_prompt_payload(
+            test_execution.id,
+            test_execution.project_id,
+            form_definition={
+                "fields": [
+                    {
+                        "value_name": "region_id",
+                        "type": "dropdown",
+                        "label": "Region",
+                        "options": {"source": "static", "values": [{"display_label": "US", "value": 1}]},
+                    }
+                ]
+            },
+        )
+
+        response = await jwt_client.post(FORM_PROMPTS_URL, json=payload)
+
+        assert response.status_code == 422
+
+    async def test_create_rejects_empty_resolved_options(
+        self,
+        jwt_client: AsyncClient,
+        test_execution: Execution,
+    ) -> None:
+        payload = _form_prompt_payload(
+            test_execution.id,
+            test_execution.project_id,
+            form_definition={
+                "fields": [
+                    {
+                        "value_name": "region_id",
+                        "type": "dropdown",
+                        "label": "Region",
+                        "options": {"source": "dynamic_resolved", "values": []},
+                    }
+                ]
+            },
+        )
+
+        response = await jwt_client.post(FORM_PROMPTS_URL, json=payload)
+
+        assert response.status_code == 422
 
     async def test_create_duplicate_form_prompt_returns_409(
         self,
