@@ -2598,7 +2598,7 @@ export interface components {
       source: 'dynamic'
       /**
        * Expression
-       * @description Template expression resolving to a non-empty array of objects. Each object must contain a string label and scalar value using the configured keys (defaulting to 'display_label' and 'value'); flat scalar arrays are not supported.
+       * @description Template expression resolving to a non-empty array of objects. Each object must contain a string label and scalar value using the configured keys (defaulting to 'display_label' and 'value').
        */
       expression: string
       /**

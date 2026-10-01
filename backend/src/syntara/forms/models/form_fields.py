@@ -112,8 +112,7 @@ class DynamicOptions(BaseModel):
     expression: str = Field(
         description=(
             "Template expression resolving to a non-empty array of objects. Each object must contain a string label "
-            "and scalar value using the configured keys (defaulting to 'display_label' and 'value'); flat scalar "
-            "arrays are not supported."
+            "and scalar value using the configured keys (defaulting to 'display_label' and 'value')."
         )
     )
     label_key: str | None = Field(
