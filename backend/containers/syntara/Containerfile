@@ -125,6 +125,22 @@ COPY LICENSE /licenses/LICENSE
 COPY --from=builder /opt/app-root/ /opt/app-root/
 COPY --from=builder /usr/local/bin/uv /usr/local/bin/uv
 
+# Bake the Segment write key only when a customer-facing Konflux build mounts
+# nexus-segment-write-keys, or when a non-empty build-arg is passed.
+# required=false keeps internal builds (no secret) successful and key-less.
+# The value is written to .env rather than ENV so an empty build-arg does not
+# override a mounted key. Settings load this file from WORKDIR.
+RUN --mount=type=secret,id=nexus-segment-write-keys/SEGMENT_WRITE_KEY_DEV,required=false \
+    key="${APP_SEGMENT_WRITE_KEY:-}"; \
+    secret_file="/run/secrets/nexus-segment-write-keys/SEGMENT_WRITE_KEY_DEV"; \
+    if [ -z "$key" ] && [ -f "$secret_file" ]; then \
+        IFS= read -r key < "$secret_file" || key=""; \
+    fi; \
+    if [ -n "$key" ]; then \
+        printf 'APP_SEGMENT_WRITE_KEY=%s\n' "$key" > /opt/app-root/src/.env; \
+        chmod 640 /opt/app-root/src/.env; \
+    fi
+
 # Set environment variables
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
@@ -133,7 +149,6 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONPATH=/opt/app-root/src/src \
     PATH="/opt/app-root/src/.venv/bin:/opt/app-root/bin:$PATH" \
     APP_CONTAINER_IMAGE_VERSION="${CONTAINER_IMAGE_VERSION}" \
-    APP_SEGMENT_WRITE_KEY="${APP_SEGMENT_WRITE_KEY}" \
     MALLOC_ARENA_MAX=2 \
     MALLOC_TRIM_THRESHOLD_=131072
 
