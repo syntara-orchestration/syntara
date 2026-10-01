@@ -3,6 +3,8 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { EXPRESSION_MODE_LABELS } from '../../../components/expressions/expressionBuilderLabels'
+
 import type { LogicFormData } from './LogicNodeForm'
 import { LogicNodeForm } from './LogicNodeForm'
 import { renderWithHeader } from './test-utils/renderWithHeader'
@@ -172,7 +174,7 @@ describe('LogicNodeForm', () => {
       await user.clear(nameInput)
       await user.type(nameInput, 'Updated Condition')
 
-      await user.click(screen.getByRole('button', { name: /^Condition type$/ }))
+      await user.click(screen.getByRole('button', { name: EXPRESSION_MODE_LABELS.visual }))
       await user.click(await screen.findByRole('option', { name: 'Freeform text' }))
       const rawInput = screen.getByLabelText(/Raw expression/i)
       await user.clear(rawInput)

@@ -2,6 +2,8 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { EXPRESSION_MODE_LABELS } from '../../../components/expressions/expressionBuilderLabels'
+
 import { LoopNodeForm, type LoopFormData } from './LoopNodeForm'
 import { renderWithHeader } from './test-utils/renderWithHeader'
 
@@ -83,7 +85,7 @@ describe('LoopNodeForm', () => {
       renderWithHeader(<LoopNodeForm onSubmit={mockOnSubmit} initialData={{ type: 'while' }} />)
 
       await user.type(screen.getByPlaceholderText(/Enter activity name/i), 'Invalid Max Loop')
-      await user.click(screen.getByRole('button', { name: /^Condition type$/ }))
+      await user.click(screen.getByRole('button', { name: EXPRESSION_MODE_LABELS.visual }))
       await user.click(await screen.findByRole('option', { name: 'Freeform text' }))
       const rawInput = screen.getByLabelText(/Raw expression/i)
       await user.click(rawInput)
@@ -302,7 +304,7 @@ describe('LoopNodeForm', () => {
 
       await user.type(screen.getByRole('spinbutton', { name: /Max iterations/i }), '500')
 
-      await user.click(screen.getByRole('button', { name: /^Condition type$/ }))
+      await user.click(screen.getByRole('button', { name: EXPRESSION_MODE_LABELS.visual }))
       await user.click(await screen.findByRole('option', { name: 'Freeform text' }))
       const rawInput = screen.getByLabelText(/Raw expression/i)
       await user.click(rawInput)
@@ -328,7 +330,7 @@ describe('LoopNodeForm', () => {
 
       await user.type(screen.getByPlaceholderText(/Enter activity name/i), 'Simple While')
 
-      await user.click(screen.getByRole('button', { name: /^Condition type$/ }))
+      await user.click(screen.getByRole('button', { name: EXPRESSION_MODE_LABELS.visual }))
       await user.click(await screen.findByRole('option', { name: 'Freeform text' }))
       const rawInput = screen.getByLabelText(/Raw expression/i)
       await user.click(rawInput)
@@ -349,7 +351,7 @@ describe('LoopNodeForm', () => {
       renderWithHeader(<LoopNodeForm onSubmit={mockOnSubmit} initialData={{ type: 'while' }} />)
 
       await user.type(screen.getByPlaceholderText(/Enter activity name/i), 'Clean While')
-      await user.click(screen.getByRole('button', { name: /^Condition type$/ }))
+      await user.click(screen.getByRole('button', { name: EXPRESSION_MODE_LABELS.visual }))
       await user.click(await screen.findByRole('option', { name: 'Freeform text' }))
       const rawInput = screen.getByLabelText(/Raw expression/i)
       await user.click(rawInput)

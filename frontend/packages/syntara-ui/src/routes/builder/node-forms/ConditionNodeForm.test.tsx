@@ -2,6 +2,8 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { EXPRESSION_MODE_LABELS } from '../../../components/expressions/expressionBuilderLabels'
+
 import { ConditionNodeForm, type ConditionFormData } from './ConditionNodeForm'
 import { renderWithHeader } from './test-utils/renderWithHeader'
 
@@ -94,7 +96,7 @@ describe('ConditionNodeForm', () => {
       await user.paste('Test Condition')
 
       // Switch to raw mode and enter expression
-      await user.click(screen.getByRole('button', { name: /^Condition type$/ }))
+      await user.click(screen.getByRole('button', { name: EXPRESSION_MODE_LABELS.visual }))
       await user.click(await screen.findByRole('option', { name: 'Freeform text' }))
       const rawInput = screen.getByLabelText(/Raw expression/i)
       await user.click(rawInput)
@@ -119,7 +121,7 @@ describe('ConditionNodeForm', () => {
       const nameInput = screen.getByPlaceholderText(/Enter activity name/i)
       await user.click(nameInput)
       await user.paste('Another Condition')
-      await user.click(screen.getByRole('button', { name: /^Condition type$/ }))
+      await user.click(screen.getByRole('button', { name: EXPRESSION_MODE_LABELS.visual }))
       await user.click(await screen.findByRole('option', { name: 'Freeform text' }))
       const rawInput = screen.getByLabelText(/Raw expression/i)
       await user.click(rawInput)

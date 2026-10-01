@@ -1,7 +1,7 @@
 import { Stack, StackItem } from '@patternfly/react-core'
 
-import { FieldHelpPopover } from '../../../../components/FieldHelpPopover'
 import { EXPRESSION_MODE_LABELS } from '../../../../components/expressions/expressionBuilderLabels'
+import { FieldHelpPopover } from '../../../../components/FieldHelpPopover'
 
 type ExpressionHelpPopoverProps = {
   headerContent: string
