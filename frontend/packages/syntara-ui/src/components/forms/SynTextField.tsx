@@ -100,6 +100,7 @@ export function SynTextField<
           onChange={field.onChange}
           onBlur={field.onBlur}
           name={field.name}
+          isRequired={isRequired}
           isDisabled={isDisabled}
           autoComplete={autoComplete}
         />

@@ -27,6 +27,10 @@ export type UseSynFormOptions<T extends FieldValues> = {
   values?: T
   /** Passed through to RHF `useForm` when using the `values` prop (e.g. `keepDirtyValues`). */
   resetOptions?: UseFormProps<T>['resetOptions']
+  /** RHF validation mode (e.g. `onChange` for builder node editors). */
+  mode?: 'onBlur' | 'onChange' | 'onSubmit'
+  /** RHF re-validation mode (e.g. `onChange` for builder node editors). */
+  reValidateMode?: 'onBlur' | 'onChange' | 'onSubmit'
   /** Called after `reset()` when `handleClose` is invoked. */
   onClose?: () => void
 }
@@ -99,6 +103,8 @@ export function useSynForm<T extends FieldValues>({
   defaultValues,
   values,
   resetOptions,
+  mode,
+  reValidateMode,
   onClose,
 }: UseSynFormOptions<T>): UseSynFormReturn<T> {
   const form = useForm<T>({
@@ -106,6 +112,8 @@ export function useSynForm<T extends FieldValues>({
     defaultValues,
     values,
     resetOptions,
+    ...(mode !== undefined ? { mode } : {}),
+    ...(reValidateMode !== undefined ? { reValidateMode } : {}),
   })
 
   const { reset, setError } = form
