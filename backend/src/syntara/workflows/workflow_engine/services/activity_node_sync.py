@@ -14,6 +14,7 @@ from syntara.workflows.models.activity_execution import TERMINAL_ACTIVITY_STATUS
 from syntara.workflows.models.workflow_version import WorkflowVersion
 from syntara.workflows.workflow_engine.models.workflow_definition import NodeType
 from syntara.workflows.workflow_engine.services.activity_sync_types import ExecutionMonitorMetadata
+from syntara.workflows.workflow_engine.services.retry_activity_sync import sync_restored_activities
 
 logger = structlog.stdlib.get_logger(__name__)
 
@@ -66,6 +67,7 @@ class ActivityNodeSyncMixin:
         handle: WorkflowHandle[Any, Any],
     ) -> None:
         """Query workflow for skipped and pre-resolved nodes and update them in database."""
+        await self._sync_restored_retry_nodes(metadata, handle)
         skipped_node_ids: list[str] = []
         pre_resolved_node_ids: list[str] = []
 
@@ -105,6 +107,35 @@ class ActivityNodeSyncMixin:
                 "Error syncing skipped nodes to database",
                 execution_id=metadata.execution_id,
             )
+
+    async def _sync_restored_retry_nodes(
+        self,
+        metadata: ExecutionMonitorMetadata,
+        handle: WorkflowHandle[Any, Any],
+    ) -> None:
+        """Persist supplied retry completions, which emit no node activity events."""
+        if not metadata.is_retry:
+            return
+        try:
+            restored = await handle.query("get_restored_nodes")
+            if not restored:
+                return
+            async with self.session_factory() as session:
+                updated, created = await sync_restored_activities(session, metadata.execution_id, restored)
+                await session.commit()
+            for row in [item[0] for item in updated] + created:
+                name = row.activity_name
+                if _COMPOSITE_ITER_SEP in name:
+                    base_id, _, suffix = name.rpartition(_COMPOSITE_ITER_SEP)
+                    metadata.iteration_counters[base_id] = max(metadata.iteration_counters.get(base_id, 0), int(suffix))
+                else:
+                    metadata.terminal_activity_ids.add(name)
+                if name not in metadata.activity_index_map:
+                    metadata.activity_index_map[name] = metadata.next_activity_index
+                    metadata.next_activity_index += 1
+            await self._publish_activity_patches(metadata, updated, new_iteration_activities=created)
+        except Exception:
+            logger.exception("Error syncing restored retry nodes", execution_id=metadata.execution_id)
 
     async def _sync_detached_nodes(
         self,

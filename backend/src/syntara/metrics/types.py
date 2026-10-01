@@ -77,6 +77,7 @@ class MetricType(StrEnum):
     ACTIVITY_EXECUTION_SUCCESS_RATE = "activity_execution_success_rate"
 
     # Execution Service Metrics
+    RETRY_RESTORATION_DURATION = "retry_restoration_ms"
     WORKFLOW_START_LATENCY = "workflow_start_latency_ms"
     WORKFLOW_COMPLETION_RATE = "workflow_completion_rate"
     TEMPORAL_EXECUTION_SERVICE_DURATION = "temporal_execution_service_duration_ms"
@@ -180,6 +181,7 @@ METRIC_CATEGORIES: dict[MetricsCategoryType, list[MetricType]] = {
         MetricType.ACTIVITY_DURATION,
     ],
     MetricsCategoryType.EXECUTION_SERVICE: [
+        MetricType.RETRY_RESTORATION_DURATION,
         MetricType.WORKFLOW_START_LATENCY,
         MetricType.WORKFLOW_COMPLETION_RATE,
         MetricType.TEMPORAL_EXECUTION_SERVICE_DURATION,

@@ -245,3 +245,54 @@ async def test_iteration_column_wins_over_the_name_suffix(
     assert result["loop_1"]["resume_iteration"] == 6
     # Iteration 5 is below the resume point; the row named like iteration 0 is too.
     assert result["loop_1"]["iteration_results"]["body_a.receipt"] == ["r0", "r5"]
+
+
+async def test_retained_outputs_persist_for_the_next_retry(
+    test_db_session: AsyncSession,
+    source_execution: Execution,
+) -> None:
+    """Real SQL copies outputs once and makes them available to another retry."""
+    from syntara.workflows.workflow_engine.activities.retry_output_activity import (
+        fetch_retry_outputs_activity,
+        fetch_retry_source_state_activity,
+    )
+    from syntara.workflows.workflow_engine.services.retry_activity_sync import sync_restored_activities
+
+    source_row = _activity(source_execution, "upstream", ActivityStatus.COMPLETED, output={"receipt": "retained"})
+    test_db_session.add(source_row)
+    retry = Execution(
+        workflow_id=source_execution.workflow_id,
+        workflow_version_id=source_execution.workflow_version_id,
+        temporal_workflow_id=f"temporal-{uuid.uuid4()}",
+        status=ExecutionStatus.FAILED,
+        created_by=source_execution.created_by,
+        input_data={},
+        labels={},
+        project_id=source_execution.project_id,
+        mode=ExecutionMode.STANDARD,
+        trigger_node_id="trigger_manual",
+        retried_from_execution_id=source_execution.id,
+    )
+    test_db_session.add(retry)
+    await test_db_session.commit()
+    pending = _activity(retry, "upstream", ActivityStatus.PENDING)
+    test_db_session.add(pending)
+    await test_db_session.commit()
+    updated, created = await sync_restored_activities(test_db_session, retry.id, ["upstream"])
+    assert len(updated) == 1
+    assert created == []
+    await test_db_session.commit()
+    await test_db_session.refresh(pending)
+    assert pending.replayed is True
+    assert pending.status == ActivityStatus.COMPLETED
+    assert pending.output_data == {"receipt": "retained"}
+    assert await sync_restored_activities(test_db_session, retry.id, ["upstream"]) == ([], [])
+
+    async def get_retry_db() -> AsyncGenerator[AsyncSession, None]:
+        yield test_db_session
+
+    with patch("syntara.workflows.workflow_engine.activities.retry_output_activity.get_db", get_retry_db):
+        assert await fetch_retry_outputs_activity(str(retry.id), ["upstream"]) == {
+            "upstream": {"receipt": "retained"},
+        }
+        assert await fetch_retry_source_state_activity(str(retry.id)) == {"upstream": "completed"}

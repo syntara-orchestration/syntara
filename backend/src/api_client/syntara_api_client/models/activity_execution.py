@@ -48,6 +48,7 @@ class ActivityExecution:
             updated_at (datetime.datetime | Unset): Timestamp when resource was last updated Example: 2025-10-09T12:30:00Z.
             labels (ActivityExecutionLabels | Unset): Key-value pairs for resource labeling and filtering Example:
                 {'environment': 'production', 'region': 'us-east-1', 'team': 'platform'}.
+            replayed (bool | None | Unset): True when output was reused from the source run; null for older records
             started_at (datetime.datetime | None | Unset): When activity started execution
             completed_at (datetime.datetime | None | Unset): When activity completed/failed
             input_data (ActivityExecutionInputData | Unset): Runtime input parameters
@@ -66,6 +67,7 @@ class ActivityExecution:
     created_at: datetime.datetime | Unset = UNSET
     updated_at: datetime.datetime | Unset = UNSET
     labels: ActivityExecutionLabels | Unset = UNSET
+    replayed: bool | None | Unset = UNSET
     started_at: datetime.datetime | None | Unset = UNSET
     completed_at: datetime.datetime | None | Unset = UNSET
     input_data: ActivityExecutionInputData | Unset = UNSET
@@ -102,6 +104,12 @@ class ActivityExecution:
         labels: dict[str, Any] | Unset = UNSET
         if not isinstance(self.labels, Unset):
             labels = self.labels.to_dict()
+
+        replayed: bool | None | Unset
+        if isinstance(self.replayed, Unset):
+            replayed = UNSET
+        else:
+            replayed = self.replayed
 
         started_at: None | str | Unset
         if isinstance(self.started_at, Unset):
@@ -164,6 +172,8 @@ class ActivityExecution:
             field_dict["updated_at"] = updated_at
         if labels is not UNSET:
             field_dict["labels"] = labels
+        if replayed is not UNSET:
+            field_dict["replayed"] = replayed
         if started_at is not UNSET:
             field_dict["started_at"] = started_at
         if completed_at is not UNSET:
@@ -225,6 +235,15 @@ class ActivityExecution:
             labels = UNSET
         else:
             labels = ActivityExecutionLabels.from_dict(_labels)
+
+        def _parse_replayed(data: object) -> bool | None | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(bool | None | Unset, data)
+
+        replayed = _parse_replayed(d.pop("replayed", UNSET))
 
         def _parse_started_at(data: object) -> datetime.datetime | None | Unset:
             if data is None:
@@ -314,6 +333,7 @@ class ActivityExecution:
             created_at=created_at,
             updated_at=updated_at,
             labels=labels,
+            replayed=replayed,
             started_at=started_at,
             completed_at=completed_at,
             input_data=input_data,

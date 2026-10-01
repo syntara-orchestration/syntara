@@ -31,6 +31,7 @@ class MetricType(str, Enum):
     LLM_TTFT_MS = "llm_ttft_ms"
     OPA_REQUEST_DURATION_MS = "opa_request_duration_ms"
     REQUEST_DURATION_MS = "request_duration_ms"
+    RETRY_RESTORATION_MS = "retry_restoration_ms"
     SCHEDULED_TRIGGER_FIRES_TOTAL = "scheduled_trigger_fires_total"
     SCHEDULED_TRIGGER_LATENCY_MS = "scheduled_trigger_latency_ms"
     SYSTEM_E2E_LATENCY_MS = "system_e2e_latency_ms"

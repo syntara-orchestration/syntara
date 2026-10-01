@@ -111,7 +111,10 @@ def _retry(*eligible: str) -> dict[str, Any]:
 
 @pytest.fixture
 def mock_wf() -> Generator[MagicMock, None, None]:
-    with patch("syntara.workflows.workflow_engine.dynamic_workflow.workflow") as patched:
+    with (
+        patch("syntara.workflows.workflow_engine.dynamic_workflow.workflow") as patched,
+        patch("syntara.workflows.workflow_engine.retry_mixin.workflow", patched),
+    ):
         patched.logger = MagicMock()
         yield patched
 
@@ -200,7 +203,13 @@ async def test_restored_predecessor_counts_toward_converge_gate(mock_wf: MagicMo
     """
     wf = _wf(_retry("b2"))
     mock_wf.execute_activity = AsyncMock(return_value={"b1": {"v": 1}})
-    await wf._restore_node_output(ActivityNode(node_id="b1", node_type="script", parameters={}))
+    node = ActivityNode(node_id="b1", node_type="script", parameters={})
+    result = await wf._restore_node_output(node)
+    from .conftest import complete_supplied_node
+
+    assert result is not None
+
+    await complete_supplied_node(wf, node, result, _converge_graph())
     wf.resolver.set_namespace("b2", {"v": 2, "status": "completed"})
 
     assert "b1" in wf._restored_nodes
@@ -213,7 +222,13 @@ async def test_converge_is_not_skipped_when_a_predecessor_was_restored(mock_wf: 
     """The gate holds, so the skip branch must not be reachable."""
     wf = _wf(_retry("b2"))
     mock_wf.execute_activity = AsyncMock(return_value={"b1": {"v": 1}})
-    await wf._restore_node_output(ActivityNode(node_id="b1", node_type="script", parameters={}))
+    node = ActivityNode(node_id="b1", node_type="script", parameters={})
+    result = await wf._restore_node_output(node)
+    from .conftest import complete_supplied_node
+
+    assert result is not None
+
+    await complete_supplied_node(wf, node, result, _converge_graph())
     wf.resolver.set_namespace("b2", {"v": 2, "status": "completed"})
 
     graph = _converge_graph()
@@ -285,3 +300,78 @@ def test_unrelated_upstream_node_is_still_restorable() -> None:
     wf = _wf(_retry("boom"))
 
     assert "prep" in wf._retry_restorable_nodes(graph)
+
+
+def test_unselected_failure_is_skipped_but_shared_selected_descendants_run() -> None:
+    wf = _wf(_retry("b2"))
+    wf._retry_source_statuses = {"b1": "failed", "b2": "failed"}
+    graph = _converge_graph()
+    wf._classify_unselected_branches(graph)
+    assert "b1" in wf.skipped_nodes
+    assert "b2" not in wf.skipped_nodes
+    assert "join" not in wf.skipped_nodes
+
+
+def test_completed_converge_is_retained_after_moot_failed_branch() -> None:
+    wf = _wf(_retry("unrelated"))
+    wf._retry_source_statuses = {"b1": "failed", "b2": "completed", "join": "completed"}
+    graph = _converge_graph()
+    wf._classify_unselected_branches(graph)
+    assert "b1" in wf.skipped_nodes
+    assert "join" not in wf.skipped_nodes
+    assert wf._should_restore_node("join", graph)
+    assert not wf._should_skip_successor(
+        graph.get_node("join"), "b2", is_loop_iterate=False, pending_tasks={}, graph=graph
+    )
+
+
+@pytest.mark.asyncio
+async def test_loop_resume_fetches_all_body_outputs(mock_wf: MagicMock) -> None:
+    wf = _wf(_retry("body_b"))
+    wf.loop_state = {}
+    wf.loop_iteration_results = {}
+    wf._resumed_loops = set()
+    graph = _loop_body_graph()
+    mock_wf.execute_activity = AsyncMock(
+        return_value={
+            "loop_1": {
+                "resume_iteration": 1,
+                "iteration_results": {
+                    "body_a.value": [1],
+                    "body_b.value": [2],
+                    "body_c.value": [3],
+                },
+            },
+        }
+    )
+    await wf._maybe_resume_loop(graph.get_node("loop_1"), graph)
+    assert mock_wf.execute_activity.call_args.kwargs["args"][1] == {
+        "loop_1": ["body_a", "body_b", "body_c"],
+    }
+    assert wf.loop_iteration_results["loop_1"]["body_c.value"] == [3]
+
+
+def test_definition_validator_and_retry_share_loop_body_membership() -> None:
+    """Raw edges and built-graph adapters agree across plain and feedback edges."""
+    from syntara.workflows.validators.template_expressions import _identify_loop_body_nodes
+
+    definition = {
+        "nodes": [{"id": "loop_1", "type": "loop"}],
+        "edges": [
+            {"from": "trigger", "to": "loop_1"},
+            {"from": "loop_1", "to": "body_a", "from_port": "iterate"},
+            {"from": "body_a", "to": "body_b"},
+            {"from": "body_b", "to": "body_c"},
+            {"from": "body_c", "to": "loop_1", "to_port": "iterate"},
+            {"from": "loop_1", "to": "step_2", "from_port": "complete"},
+        ],
+    }
+    assert (
+        set(_identify_loop_body_nodes(definition))
+        == _wf()._loop_body_node_ids(_loop_body_graph())
+        == {
+            "body_a",
+            "body_b",
+            "body_c",
+        }
+    )

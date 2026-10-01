@@ -216,6 +216,13 @@ class OrchestratorPrometheusMetrics:
             registry=self.registry,
         )
 
+        self.retry_restoration_seconds = Histogram(
+            "orchestrator_retry_restoration_seconds",
+            "Time to restore retained retry outputs",
+            ["component", "execution_mode", "node_count", "restored_node_count"],
+            buckets=LATENCY_BUCKETS_MEDIUM,
+            registry=self.registry,
+        )
         self.workflow_start_latency_seconds = Histogram(
             "orchestrator_workflow_start_latency_seconds",
             "Workflow start latency in seconds",

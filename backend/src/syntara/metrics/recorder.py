@@ -56,6 +56,11 @@ _COMPONENT_METRIC_MAP: dict[MetricType, tuple[str, str, tuple[str, ...]]] = {
     MetricType.ACTIVE_WORKFLOWS: ("active_workflows", "gauge", ()),
     MetricType.ACTIVITY_EXECUTION_SUCCESS_RATE: ("activity_execution_success_rate", "gauge", ()),
     # Execution Service
+    MetricType.RETRY_RESTORATION_DURATION: (
+        "retry_restoration_seconds",
+        "histogram",
+        ("execution_mode", "node_count", "restored_node_count"),
+    ),
     MetricType.WORKFLOW_START_LATENCY: ("workflow_start_latency_seconds", "histogram", ()),
     MetricType.WORKFLOW_COMPLETION_RATE: ("workflow_completion_rate", "gauge", ()),
     MetricType.TEMPORAL_EXECUTION_SERVICE_DURATION: ("temporal_execution_service_duration_seconds", "histogram", ()),

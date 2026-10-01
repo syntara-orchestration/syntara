@@ -111,7 +111,10 @@ def test_rebuild_of_nothing_is_empty() -> None:
 @pytest.fixture
 def mock_wf() -> Generator[MagicMock, None, None]:
     """Patch the Temporal workflow module so execute_activity is awaitable."""
-    with patch("syntara.workflows.workflow_engine.dynamic_workflow.workflow") as patched:
+    with (
+        patch("syntara.workflows.workflow_engine.dynamic_workflow.workflow") as patched,
+        patch("syntara.workflows.workflow_engine.retry_mixin.workflow", patched),
+    ):
         patched.logger = MagicMock()
         yield patched
 
@@ -129,7 +132,7 @@ async def test_loop_is_resumed_at_the_failed_iteration(mock_wf: MagicMock) -> No
 
     source, loops = mock_wf.execute_activity.call_args.kwargs["args"]
     assert source == "src-1"
-    assert loops == {"loop_1": ["body_a"]}
+    assert loops == {"loop_1": ["body_a", "body_b"]}
 
     assert wf.loop_state["loop_1"].current_index == 3
     assert wf.loop_iteration_results["loop_1"]["body_a.receipt"] == ["r0", "r1", "r2"]

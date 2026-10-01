@@ -38,6 +38,7 @@ class ActivitySyncMonitorMixin:
     _sync_activities_to_db: Any
     _update_execution_to_running: Any
     _sync_failed_nodes: Any
+    _sync_restored_retry_nodes: Any
     _sync_skipped_nodes: Any
     _sync_detached_nodes: Any
     _update_execution_status_from_event: Any
@@ -176,6 +177,10 @@ class ActivitySyncMonitorMixin:
             await self._update_execution_status_from_event(metadata, event, failed_node_map)
             metadata.last_processed_event_id = event.event_id
             return not self._shutdown
+
+        # Restore retained iterations before assigning IDs to new loop activity events.
+        if event.event_type == EventType.EVENT_TYPE_ACTIVITY_TASK_SCHEDULED:
+            await self._sync_restored_retry_nodes(metadata, handle)
 
         # Process activity events
         self._process_activity_event(event, metadata)
