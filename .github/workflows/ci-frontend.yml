@@ -169,13 +169,10 @@ jobs:
   # Dedicated contract check for the UI route compatibility baseline.
   # Vitest covers collector/update helpers; this job is the single place that
   # fails when live route sources drift from scripts/route-baseline/manifest.gen.json.
-  # Keep it non-blocking while its signal stabilizes; add it to the gate jobs
-  # and remove continue-on-error when it is ready to enforce.
   route-baseline:
-    name: (Frontend) Route Baseline (Allowed to Fail)
+    name: (Frontend) Route Baseline
     needs: changes
     if: needs.changes.outputs.code == 'true' || needs.changes.outputs.contracts == 'true'
-    continue-on-error: true
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
@@ -520,7 +517,7 @@ jobs:
   frontend-checks-gate:
     name: (Frontend) Checks Gate
     runs-on: ubuntu-24.04
-    needs: [changes, checks, unit-tests]
+    needs: [changes, checks, unit-tests, route-baseline]
     if: needs.changes.outputs.code == 'true' || needs.changes.outputs.contracts == 'true'
     steps:
       - run: echo "Frontend checks passed"
@@ -532,10 +529,10 @@ jobs:
   # See docs/ci/workflows.md for complete behavior table and debugging guide.
   test-compose-e2e:
     name: (Frontend) Test Podman Compose E2E
-    needs: [changes, frontend-checks-gate]
-    # always() + gate != failure|cancelled lets workflow_dispatch still run when the
-    # checks gate is skipped (e.g. docs-only PR), while preserving fast-fail when
-    # lint/unit actually failed.
+    needs: [changes, frontend-checks-gate, route-baseline]
+    # always() lets workflow_dispatch still run when checks are skipped for a
+    # docs-only PR. Scheduled E2E stays unconditional; merge-queue/manual runs
+    # require a passing route baseline unless change detection skips it.
     if: |
       always() &&
       (
@@ -544,6 +541,10 @@ jobs:
           needs.changes.result == 'success' &&
           needs.frontend-checks-gate.result != 'failure' &&
           needs.frontend-checks-gate.result != 'cancelled' &&
+          (
+            needs.route-baseline.result == 'success' ||
+            needs.route-baseline.result == 'skipped'
+          ) &&
           (
             github.event_name == 'merge_group' ||
             github.event_name == 'workflow_dispatch'
@@ -831,6 +832,7 @@ jobs:
       - gen-contracts
       - checks
       - unit-tests
+      - route-baseline
       - coverage-report
       - storybook-build
       - test-build
@@ -849,11 +851,12 @@ jobs:
           fi
 
           ok="success|skipped"
-          for job in gen-contracts checks unit-tests coverage-report storybook-build test-build scripts-checks frontend-checks-gate test-compose-e2e konflux-frontend-gate konflux-ui-tests-gate shared-checks-gate; do
+          for job in gen-contracts checks unit-tests route-baseline coverage-report storybook-build test-build scripts-checks frontend-checks-gate test-compose-e2e konflux-frontend-gate konflux-ui-tests-gate shared-checks-gate; do
             case "$job" in
               gen-contracts)           result="${{ needs.gen-contracts.result }}" ;;
               checks)                  result="${{ needs.checks.result }}" ;;
               unit-tests)              result="${{ needs.unit-tests.result }}" ;;
+              route-baseline)          result="${{ needs.route-baseline.result }}" ;;
               coverage-report)         result="${{ needs.coverage-report.result }}" ;;
               storybook-build)         result="${{ needs.storybook-build.result }}" ;;
               test-build)              result="${{ needs.test-build.result }}" ;;
