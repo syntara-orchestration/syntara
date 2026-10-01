@@ -1,23 +1,23 @@
 # Node Registry System
 
-A plugin-based architecture for registering and managing **workflow step types** (what users add from the **Add step** panel). Code still uses React Flow **nodes** on the canvas; `NodeRegistry` holds metadata, forms, and submit handlers per step type.
+A plugin-based architecture for registering and managing **workflow step types** (what users add from the **Add step** panel). Code still uses React Flow **nodes** on the canvas; `StepRegistry` holds metadata, forms, and submit handlers per step type.
 
 ## Architecture Overview
 
 ```text
 registry/
-├── NodeRegistry.ts          # Core registry singleton
+├── StepRegistry.ts          # Core registry singleton
 ├── helpers/                 # Node template helpers
-│   └── nodeTemplates.ts
+│   └── stepTemplates.ts
 ├── nodes/                   # Step type registrations (register*.ts)
 │   ├── index.ts            # Auto-discovery entry point
-│   ├── registerAAPNode.ts
-│   ├── registerActionNode.ts
-│   ├── registerAIAgentNode.ts
-│   ├── registerApprovalNode.ts
-│   ├── registerGenericNode.ts
-│   ├── registerLogicNode.ts
-│   └── registerTriggerNode.ts
+│   ├── registerAAPStep.ts
+│   ├── registerActionStep.ts
+│   ├── registerAIAgentStep.ts
+│   ├── registerApprovalStep.ts
+│   ├── registerGenericStep.ts
+│   ├── registerLogicStep.ts
+│   └── registerTriggerStep.ts
 └── README.md               # This file
 ```
 
@@ -58,8 +58,8 @@ Note: the `order` default of `100` applies to top-level step types only, not sub
 ### Step 1: Create Your Form Component
 
 ```typescript
-// routes/builder/node-forms/MyCustomForm.tsx
-import type { BaseNodeFormProps } from '../registry/NodeRegistry'
+// routes/builder/step-forms/MyCustomForm.tsx
+import type { BaseStepFormProps } from '../registry/StepRegistry'
 
 export interface MyCustomFormData {
   name: string
@@ -70,7 +70,7 @@ export function MyCustomForm({
   onSubmit,
   onCancel,
   initialData
-}: BaseNodeFormProps<MyCustomFormData>) {
+}: BaseStepFormProps<MyCustomFormData>) {
   // Your form implementation
   return <form>...</form>
 }
@@ -79,14 +79,14 @@ export function MyCustomForm({
 ### Step 2: Create Registration File
 
 ```typescript
-// routes/builder/registry/nodes/registerMyNode.ts
+// routes/builder/registry/steps/registerMyStep.ts
 import { RhUiMyIcon } from '@patternfly/react-icons'
-import { NodeRegistry } from '../NodeRegistry'
-import { MyCustomForm } from '../../node-forms/MyCustomForm'
-import type { MyCustomFormData } from '../../node-forms/MyCustomForm'
+import { StepRegistry } from '../StepRegistry'
+import { MyCustomForm } from '../../step-forms/MyCustomForm'
+import type { MyCustomFormData } from '../../step-forms/MyCustomForm'
 
-export default function registerMyNode() {
-  NodeRegistry.register<MyCustomFormData>({
+export default function registerMyStep() {
+  StepRegistry.register<MyCustomFormData>({
     id: 'my-node',
     label: 'My Custom Step',
     icon: RhUiMyIcon,
@@ -105,12 +105,12 @@ export default function registerMyNode() {
 
 ### Step 3: That's It! (Auto-Discovery)
 
-The registration system uses **auto-discovery** via Vite's `import.meta.glob`. Any file matching `register*.ts` in `routes/builder/registry/nodes/` with a **default export** is automatically discovered and registered at app startup.
+The registration system uses **auto-discovery** via Vite's `import.meta.glob`. Any file matching `register*.ts` in `routes/builder/registry/steps/` with a **default export** is automatically discovered and registered at app startup.
 
 **No manual imports needed** — just create the file with the correct naming pattern and export your registration function as `default`.
 
 ```typescript
-// routes/builder/registry/nodes/index.ts (auto-discovery implementation)
+// routes/builder/registry/steps/index.ts (auto-discovery implementation)
 const modules = import.meta.glob('./register*.ts', { eager: true })
 for (const path in modules) {
   const module = modules[path] as { default: () => void }
@@ -122,9 +122,9 @@ for (const path in modules) {
 
 ```typescript
 // In main.tsx - called once before React renders
-import { registerAllNodes } from './routes/builder/registry/nodes'
+import { registerAllSteps } from './routes/builder/registry/steps'
 
-registerAllNodes() // Auto-discovers and registers all step types
+registerAllSteps() // Auto-discovers and registers all step types
 ```
 
 ## Benefits of This Architecture
@@ -143,16 +143,16 @@ registerAllNodes() // Auto-discovers and registers all step types
 ### ✅ **Easy Testing**
 
 ```typescript
-import { NodeRegistry } from './registry/NodeRegistry'
+import { StepRegistry } from './registry/StepRegistry'
 
 describe('MyNode', () => {
   beforeEach(() => {
-    NodeRegistry.clear()
-    registerMyNode()
+    StepRegistry.clear()
+    registerMyStep()
   })
 
   it('should be registered', () => {
-    expect(NodeRegistry.get('my-node')).toBeDefined()
+    expect(StepRegistry.get('my-node')).toBeDefined()
   })
 })
 ```
@@ -171,9 +171,9 @@ describe('MyNode', () => {
 
 ## API Reference
 
-### NodeRegistry
+### StepRegistry
 
-#### `register<TFormData>(definition: NodeTypeDefinition<TFormData>): void`
+#### `register<TFormData>(definition: StepTypeDefinition<TFormData>): void`
 
 Register a new workflow step type.
 
@@ -181,19 +181,19 @@ Register a new workflow step type.
 
 Remove a step type from the registry.
 
-#### `get(id: string): NodeTypeDefinition | undefined`
+#### `get(id: string): StepTypeDefinition | undefined`
 
 Get a specific step type by ID.
 
-#### `getAll(): NodeTypeDefinition[]`
+#### `getAll(): StepTypeDefinition[]`
 
 Get all enabled step types, sorted by order.
 
-#### `getByCategory(category): NodeTypeDefinition[]`
+#### `getByCategory(category): StepTypeDefinition[]`
 
 Get all step types in a specific category.
 
-#### `search(query: string): NodeTypeDefinition[]`
+#### `search(query: string): StepTypeDefinition[]`
 
 Search step types by label, keywords, or ID.
 
@@ -206,7 +206,7 @@ Remove all registrations (testing only).
 ### Before (Hard-coded)
 
 ```typescript
-// AddNodePanel.tsx - tightly coupled
+// AddStepPanel.tsx - tightly coupled
 const nodeTypes = [
   { id: 'trigger', label: 'Triggers', icon: TriggerIcon },
   // ... hard-coded list
@@ -214,8 +214,8 @@ const nodeTypes = [
 
 const renderForm = () => {
   switch (selectedNodeType) {
-    case 'trigger': return <TriggerNodeForm ... />
-    case 'action': return <ActionNodeForm ... />
+    case 'trigger': return <TriggerStepForm ... />
+    case 'action': return <ActionStepForm ... />
     // ... switch statement grows with each step type
   }
 }
@@ -224,17 +224,17 @@ const renderForm = () => {
 ### After (Registry-based)
 
 ```typescript
-// AddNodePanel.tsx - decoupled
-const allNodeTypes = NodeRegistry.getAll()
+// AddStepPanel.tsx - decoupled
+const allNodeTypes = StepRegistry.getAll()
 
-const selectedNode = NodeRegistry.get(selectedNodeType)
+const selectedNode = StepRegistry.get(selectedNodeType)
 const FormComponent = selectedNode.formComponent
 return <FormComponent ... />
 ```
 
 ## Examples
 
-See the existing `register*.ts` files in `nodes/` for working examples (e.g., `registerApprovalNode.ts`, `registerActionNode.ts`).
+See the existing `register*.ts` files in `steps/` for working examples (e.g., `registerApprovalStep.ts`, `registerActionStep.ts`).
 
 ## Future Enhancements
 

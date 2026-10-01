@@ -1,0 +1,137 @@
+import AnsibleIcon from '../../../../assets/ansible-automation-platform.svg?react'
+import { RegistryStepId } from '../../../../constants'
+import {
+  createAAPJobTemplateActivity,
+  createAAPWorkflowTemplateActivity,
+  useWorkflowStore,
+} from '../../../../stores/useWorkflowStore'
+import { AAPJobTemplateForm, type AAPJobTemplateFormData } from '../../step-forms/AAPJobTemplateForm'
+import { AAPWorkflowTemplateForm, type AAPWorkflowTemplateFormData } from '../../step-forms/AAPWorkflowTemplateForm'
+import {
+  buildAAPConfig,
+  buildAAPWorkflowTemplateConfig,
+  buildExpressionModeActivity,
+  buildWorkflowExpressionModeActivity,
+  isJobTemplateInputVariablesMode,
+  isWorkflowTemplateInputVariablesMode,
+} from '../../utils/aapHelpers'
+import { buildNamedActivity } from '../../utils/stepCreationHelpers'
+import { getDefaultStepBaseName } from '../../utils/stepNaming'
+import { createCustomStep } from '../helpers/stepTemplates'
+import { StepRegistry } from '../StepRegistry'
+
+/**
+ * Register the AAP (Ansible Automation Platform) Execution category.
+ * Includes Job Template and Workflow Template subtypes.
+ */
+export default function registerAAPStep() {
+  StepRegistry.register(
+    createCustomStep<AAPJobTemplateFormData | AAPWorkflowTemplateFormData>(
+      {
+        id: RegistryStepId.AAP_EXECUTION,
+        label: 'AAP Execution',
+        icon: AnsibleIcon,
+        category: 'action',
+        description: 'Execute Ansible Automation Platform jobs and workflows',
+        keywords: ['ansible', 'aap', 'workflow', 'playbook', 'job', 'template'],
+        order: 40,
+        selectionTitle: 'Select an AAP execution node',
+        // Category node with subtypes - form component not used, subtypes provide their own forms
+        formComponent: AAPJobTemplateForm,
+        subtypes: [
+          {
+            id: RegistryStepId.AAP_JOB_TEMPLATE,
+            label: 'Launch AAP job template',
+            icon: AnsibleIcon,
+            description: 'Execute an Ansible job template',
+            formTitle: 'Configure AAP Job Template',
+            formComponent: AAPJobTemplateForm,
+          },
+          {
+            id: RegistryStepId.AAP_WORKFLOW_TEMPLATE,
+            label: 'Launch AAP workflow template',
+            icon: AnsibleIcon,
+            description: 'Execute an Ansible workflow template',
+            formTitle: 'Configure AAP Workflow Template',
+            formComponent: AAPWorkflowTemplateForm,
+          },
+        ],
+      },
+      (
+        data: AAPJobTemplateFormData | AAPWorkflowTemplateFormData,
+        onSuccess: (newStepId?: string) => void,
+        onError: (error: string) => void,
+        subtypeId?: string
+      ) => {
+        try {
+          const { addActivity } = useWorkflowStore.getState()
+
+          // Job Template subtype
+          if (subtypeId === RegistryStepId.AAP_JOB_TEMPLATE) {
+            const jobData = data as AAPJobTemplateFormData
+            if (isJobTemplateInputVariablesMode(jobData)) {
+              const baseName = getDefaultStepBaseName({
+                stepTypeId: RegistryStepId.AAP_JOB_TEMPLATE,
+                label: 'AAP Job Template',
+              })
+              const { activityId, activity } = buildNamedActivity(baseName, jobData.name, (id, name) =>
+                buildExpressionModeActivity(id, name, jobData)
+              )
+              addActivity(activity)
+              onSuccess(activityId)
+            } else {
+              const config = buildAAPConfig(jobData)
+              const baseName = getDefaultStepBaseName({
+                stepTypeId: RegistryStepId.AAP_JOB_TEMPLATE,
+                label: 'AAP Job Template',
+              })
+              const { activityId, activity } = buildNamedActivity(baseName, jobData.name, (id, name) =>
+                createAAPJobTemplateActivity({ id, name, jobTemplateId: jobData.job_template_id, config })
+              )
+              addActivity(activity)
+              onSuccess(activityId)
+            }
+            return
+          }
+
+          // Workflow Template subtype
+          if (subtypeId === RegistryStepId.AAP_WORKFLOW_TEMPLATE) {
+            const workflowData = data as AAPWorkflowTemplateFormData
+            if (isWorkflowTemplateInputVariablesMode(workflowData)) {
+              const baseName = getDefaultStepBaseName({
+                stepTypeId: RegistryStepId.AAP_WORKFLOW_TEMPLATE,
+                label: 'AAP Workflow Template',
+              })
+              const { activityId, activity } = buildNamedActivity(baseName, workflowData.name, (id, name) =>
+                buildWorkflowExpressionModeActivity(id, name, workflowData)
+              )
+              addActivity(activity)
+              onSuccess(activityId)
+            } else {
+              const config = buildAAPWorkflowTemplateConfig(workflowData)
+              const baseName = getDefaultStepBaseName({
+                stepTypeId: RegistryStepId.AAP_WORKFLOW_TEMPLATE,
+                label: 'AAP Workflow Template',
+              })
+              const { activityId, activity } = buildNamedActivity(baseName, workflowData.name, (id, name) =>
+                createAAPWorkflowTemplateActivity({
+                  id,
+                  name,
+                  workflowTemplateId: workflowData.workflow_job_template_id,
+                  config,
+                })
+              )
+              addActivity(activity)
+              onSuccess(activityId)
+            }
+            return
+          }
+
+          onError('Invalid AAP execution type')
+        } catch (error) {
+          onError(error instanceof Error ? error.message : 'Failed to add AAP step')
+        }
+      }
+    )
+  )
+}

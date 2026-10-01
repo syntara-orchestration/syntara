@@ -10,7 +10,7 @@ import type { RunStepDialogData } from '../components/RunStepDialog'
 export function useRunStepDialog(
   handleSaveWorkflow: () => Promise<boolean>,
   isTerminalStatus: boolean,
-  isNodeEditorOpen: boolean
+  isStepEditorOpen: boolean
 ) {
   const reactFlowInstance = useReactFlow()
   const runStepDialog = useDialogState<RunStepDialogData>()
@@ -41,15 +41,15 @@ export function useRunStepDialog(
       const node = reactFlowInstance.getNode(nodeId)
       if (!node?.data) return
 
-      // Only save when there is something to persist: the node editor is open
+      // Only save when there is something to persist: the step editor is open
       // (its form may hold unsaved edits) or the workflow is dirty. Skipping the
       // save on a clean, closed-editor workflow avoids a redundant PATCH.
-      if (isNodeEditorOpen || useWorkflowStore.getState().isDirty) {
+      if (isStepEditorOpen || useWorkflowStore.getState().isDirty) {
         // Suppress panel close during save - guardedSaveWorkflow may auto-submit
-        // the node editor form, which triggers onClose() that we need to block
+        // the step editor form, which triggers onClose() that we need to block
         suppressPanelCloseRef.current = true
         try {
-          // guardedSaveWorkflow auto-submits node editor form if open, then saves
+          // guardedSaveWorkflow auto-submits step editor form if open, then saves
           if (!(await handleSaveWorkflow())) return
         } finally {
           suppressPanelCloseRef.current = false
@@ -64,7 +64,7 @@ export function useRunStepDialog(
 
       openRunStepDialog({ nodeId, nodeName: (node.data as { name?: string }).name ?? nodeId, predecessors })
     },
-    [reactFlowInstance, openRunStepDialog, handleSaveWorkflow, isNodeEditorOpen]
+    [reactFlowInstance, openRunStepDialog, handleSaveWorkflow, isStepEditorOpen]
   )
 
   const hasCleanedUpRef = useRef(false)

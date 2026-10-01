@@ -669,7 +669,7 @@ export default tseslint.config(
   },
   {
     files: [
-      '**/registry/nodes/register*.ts',
+      '**/registry/steps/register*.ts',
       '**/app/App.tsx',
       '**/routes/**/Workflows.tsx',
       '**/routes/**/BuilderNew.tsx',

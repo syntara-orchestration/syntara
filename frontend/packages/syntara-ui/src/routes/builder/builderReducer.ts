@@ -27,10 +27,10 @@ export type BuilderState = {
   versionHistoryOpen: boolean
   viewingVersion: number | null
   isKebabOpen: boolean
-  addNodePanelOpen: boolean
-  nodeEditorMode: 'add' | 'edit' | null
-  nodeEditorNodeTypeId: string | null
-  nodeEditorNodeSubtypeId: string | null
+  addStepPanelOpen: boolean
+  stepEditorMode: 'add' | 'edit' | null
+  stepEditorStepTypeId: string | null
+  stepEditorStepSubtypeId: string | null
   selectedNode: Node<NodeType['data']> | null
   sourceNodeId: string | null
   targetNodeId: string | null
@@ -65,8 +65,8 @@ export type BuilderAction =
   | { type: 'SET_VIEWING_VERSION'; payload: number | null }
   | { type: 'EXIT_VERSION_VIEW' }
   | { type: 'SET_KEBAB_OPEN'; payload: boolean }
-  | { type: 'SET_ADD_NODE_PANEL'; payload: boolean }
-  | { type: 'OPEN_NODE_EDITOR_ADD'; payload: { nodeTypeId: string; nodeSubtypeId: string | null } }
+  | { type: 'SET_ADD_STEP_PANEL'; payload: boolean }
+  | { type: 'OPEN_NODE_EDITOR_ADD'; payload: { stepTypeId: string; stepSubtypeId: string | null } }
   | { type: 'CLOSE_NODE_EDITOR' }
   | { type: 'SET_SELECTED_NODE'; payload: Node<NodeType['data']> | null }
   | { type: 'SET_SOURCE_NODE_ID'; payload: string | null }
@@ -128,7 +128,7 @@ const SIMPLE_STATE_KEY_MAP: Record<
     | 'versionHistoryOpen'
     | 'viewingVersion'
     | 'isKebabOpen'
-    | 'addNodePanelOpen'
+    | 'addStepPanelOpen'
     | 'selectedNode'
     | 'sourceNodeId'
     | 'targetNodeId'
@@ -150,7 +150,7 @@ const SIMPLE_STATE_KEY_MAP: Record<
   SET_VERSION_HISTORY_OPEN: 'versionHistoryOpen',
   SET_VIEWING_VERSION: 'viewingVersion',
   SET_KEBAB_OPEN: 'isKebabOpen',
-  SET_ADD_NODE_PANEL: 'addNodePanelOpen',
+  SET_ADD_STEP_PANEL: 'addStepPanelOpen',
   SET_SELECTED_NODE: 'selectedNode',
   SET_SOURCE_NODE_ID: 'sourceNodeId',
   SET_TARGET_NODE_ID: 'targetNodeId',
@@ -177,14 +177,14 @@ function handleSimpleStateUpdate(state: BuilderState, action: SimpleAction): Bui
 function clearEditorAndOtherPanels(): Partial<BuilderState> {
   return {
     selectedNode: null,
-    nodeEditorMode: null,
-    nodeEditorNodeTypeId: null,
-    nodeEditorNodeSubtypeId: null,
+    stepEditorMode: null,
+    stepEditorStepTypeId: null,
+    stepEditorStepSubtypeId: null,
   }
 }
 
 /**
- * Helper: Handle panel-related actions (node editor, add node panel)
+ * Helper: Handle panel-related actions (step editor, add step panel)
  *
  * Uses default case to pass through all non-panel actions to the main reducer.
  * The main builderReducer has exhaustiveness checking, so new actions will be caught there.
@@ -195,26 +195,26 @@ function handlePanelActions(state: BuilderState, action: BuilderAction): Builder
     case 'OPEN_NODE_EDITOR_ADD':
       return {
         ...state,
-        nodeEditorMode: 'add',
-        nodeEditorNodeTypeId: action.payload.nodeTypeId,
-        nodeEditorNodeSubtypeId: action.payload.nodeSubtypeId,
+        stepEditorMode: 'add',
+        stepEditorStepTypeId: action.payload.stepTypeId,
+        stepEditorStepSubtypeId: action.payload.stepSubtypeId,
         selectedNode: null,
-        addNodePanelOpen: false,
+        addStepPanelOpen: false,
       }
     case 'CLOSE_NODE_EDITOR':
       return {
         ...state,
-        nodeEditorMode: null,
-        nodeEditorNodeTypeId: null,
-        nodeEditorNodeSubtypeId: null,
+        stepEditorMode: null,
+        stepEditorStepTypeId: null,
+        stepEditorStepSubtypeId: null,
         selectedNode: null,
       }
     case 'OPEN_ADD_NODE_FROM_EDGE':
       return {
         ...state,
-        nodeEditorMode: null,
-        nodeEditorNodeTypeId: null,
-        nodeEditorNodeSubtypeId: null,
+        stepEditorMode: null,
+        stepEditorStepTypeId: null,
+        stepEditorStepSubtypeId: null,
         selectedNode: null,
         detailsOpen: false,
         historyCardOpen: false,
@@ -226,7 +226,7 @@ function handlePanelActions(state: BuilderState, action: BuilderAction): Builder
         targetHandle: action.payload.targetHandle,
         replacementNodeId: null,
         newNodeDesiredPosition: action.payload.desiredPosition ?? null,
-        addNodePanelOpen: true,
+        addStepPanelOpen: true,
       }
     case 'CLEAR_NEW_NODE_DESIRED_POSITION':
       return { ...state, newNodeDesiredPosition: null }
@@ -235,9 +235,9 @@ function handlePanelActions(state: BuilderState, action: BuilderAction): Builder
     case 'OPEN_ADD_NODE_PANEL':
       return {
         ...state,
-        nodeEditorMode: null,
-        nodeEditorNodeTypeId: null,
-        nodeEditorNodeSubtypeId: null,
+        stepEditorMode: null,
+        stepEditorStepTypeId: null,
+        stepEditorStepSubtypeId: null,
         selectedNode: null,
         detailsOpen: false,
         historyCardOpen: false,
@@ -249,15 +249,15 @@ function handlePanelActions(state: BuilderState, action: BuilderAction): Builder
         targetHandle: undefined,
         replacementNodeId: action.payload.replacementNodeId,
         newNodeDesiredPosition: null,
-        addNodePanelOpen: true,
+        addStepPanelOpen: true,
       }
     case 'CLOSE_ADD_NODE_PANEL':
       return {
         ...state,
-        addNodePanelOpen: false,
-        nodeEditorMode: null,
-        nodeEditorNodeTypeId: null,
-        nodeEditorNodeSubtypeId: null,
+        addStepPanelOpen: false,
+        stepEditorMode: null,
+        stepEditorStepTypeId: null,
+        stepEditorStepSubtypeId: null,
         sourceNodeId: null,
         targetNodeId: null,
         edgeIdToReplace: null,
@@ -288,17 +288,17 @@ function handleNodeClick(state: BuilderState, action: Extract<BuilderAction, { t
     return {
       ...state,
       selectedNode: action.payload.node,
-      nodeEditorMode: 'edit',
-      nodeEditorNodeTypeId: null,
-      nodeEditorNodeSubtypeId: null,
+      stepEditorMode: 'edit',
+      stepEditorStepTypeId: null,
+      stepEditorStepSubtypeId: null,
     }
   }
   if (action.payload.isGeneric) {
     return {
       ...state,
-      nodeEditorMode: null,
-      nodeEditorNodeTypeId: null,
-      nodeEditorNodeSubtypeId: null,
+      stepEditorMode: null,
+      stepEditorStepTypeId: null,
+      stepEditorStepSubtypeId: null,
       selectedNode: null,
       detailsOpen: false,
       historyCardOpen: false,
@@ -306,7 +306,7 @@ function handleNodeClick(state: BuilderState, action: Extract<BuilderAction, { t
       sourceNodeId: null,
       replacementNodeId: action.payload.node.id,
       newNodeDesiredPosition: null,
-      addNodePanelOpen: true,
+      addStepPanelOpen: true,
       // SECURITY: Clear edge insertion context to prevent mixing replacement mode with edge-insert state
       targetNodeId: null,
       edgeIdToReplace: null,
@@ -317,10 +317,10 @@ function handleNodeClick(state: BuilderState, action: Extract<BuilderAction, { t
   return {
     ...state,
     selectedNode: action.payload.node,
-    nodeEditorMode: 'edit',
-    nodeEditorNodeTypeId: null,
-    nodeEditorNodeSubtypeId: null,
-    addNodePanelOpen: false,
+    stepEditorMode: 'edit',
+    stepEditorStepTypeId: null,
+    stepEditorStepSubtypeId: null,
+    addStepPanelOpen: false,
     detailsOpen: false,
     historyCardOpen: false,
     versionHistoryOpen: false,
@@ -338,7 +338,7 @@ const SIMPLE_ACTIONS = [
   'SET_VERSION_HISTORY_OPEN',
   'SET_VIEWING_VERSION',
   'SET_KEBAB_OPEN',
-  'SET_ADD_NODE_PANEL',
+  'SET_ADD_STEP_PANEL',
   'SET_SELECTED_NODE',
   'SET_SOURCE_NODE_ID',
   'SET_TARGET_NODE_ID',
@@ -407,7 +407,7 @@ export function builderReducer(state: BuilderState, action: BuilderAction): Buil
             detailsOpen: true,
             historyCardOpen: false,
             versionHistoryOpen: false,
-            addNodePanelOpen: false,
+            addStepPanelOpen: false,
             ...clearEditorAndOtherPanels(),
           }
         : {
@@ -423,7 +423,7 @@ export function builderReducer(state: BuilderState, action: BuilderAction): Buil
             historyCardOpen: true,
             detailsOpen: false,
             versionHistoryOpen: false,
-            addNodePanelOpen: false,
+            addStepPanelOpen: false,
             ...clearEditorAndOtherPanels(),
           }
         : {
@@ -439,7 +439,7 @@ export function builderReducer(state: BuilderState, action: BuilderAction): Buil
             versionHistoryOpen: true,
             detailsOpen: false,
             historyCardOpen: false,
-            addNodePanelOpen: false,
+            addStepPanelOpen: false,
             ...clearEditorAndOtherPanels(),
           }
         : {
@@ -479,10 +479,10 @@ export function builderReducer(state: BuilderState, action: BuilderAction): Buil
         workflowDescription: action.payload.description,
         // Reset UI state to prevent stale selections/panels from previous workflow
         selectedNode: null,
-        nodeEditorMode: null,
-        nodeEditorNodeTypeId: null,
-        nodeEditorNodeSubtypeId: null,
-        addNodePanelOpen: false,
+        stepEditorMode: null,
+        stepEditorStepTypeId: null,
+        stepEditorStepSubtypeId: null,
+        addStepPanelOpen: false,
         detailsOpen: false,
         historyCardOpen: false,
         versionHistoryOpen: action.payload.initialViewVersion != null,
@@ -519,10 +519,10 @@ export function getInitialBuilderState(): BuilderState {
     versionHistoryOpen: false,
     viewingVersion: null,
     isKebabOpen: false,
-    addNodePanelOpen: false,
-    nodeEditorMode: null,
-    nodeEditorNodeTypeId: null,
-    nodeEditorNodeSubtypeId: null,
+    addStepPanelOpen: false,
+    stepEditorMode: null,
+    stepEditorStepTypeId: null,
+    stepEditorStepSubtypeId: null,
     selectedNode: null,
     sourceNodeId: null,
     targetNodeId: null,
