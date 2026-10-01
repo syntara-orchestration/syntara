@@ -24,7 +24,6 @@ class ActivityData:
     Attributes:
         activity_id (str):
         status (str):
-        replayed (bool | None | Unset):
         error_details (None | str | Unset):
         iteration (int | None | Unset):
         output_data (ActivityDataOutputDataType0 | None | Unset):
@@ -34,7 +33,6 @@ class ActivityData:
 
     activity_id: str
     status: str
-    replayed: bool | None | Unset = UNSET
     error_details: None | str | Unset = UNSET
     iteration: int | None | Unset = UNSET
     output_data: ActivityDataOutputDataType0 | None | Unset = UNSET
@@ -48,12 +46,6 @@ class ActivityData:
         activity_id = self.activity_id
 
         status = self.status
-
-        replayed: bool | None | Unset
-        if isinstance(self.replayed, Unset):
-            replayed = UNSET
-        else:
-            replayed = self.replayed
 
         error_details: None | str | Unset
         if isinstance(self.error_details, Unset):
@@ -99,8 +91,6 @@ class ActivityData:
                 "status": status,
             }
         )
-        if replayed is not UNSET:
-            field_dict["replayed"] = replayed
         if error_details is not UNSET:
             field_dict["error_details"] = error_details
         if iteration is not UNSET:
@@ -122,15 +112,6 @@ class ActivityData:
         activity_id = d.pop("activity_id")
 
         status = d.pop("status")
-
-        def _parse_replayed(data: object) -> bool | None | Unset:
-            if data is None:
-                return data
-            if isinstance(data, Unset):
-                return data
-            return cast(bool | None | Unset, data)
-
-        replayed = _parse_replayed(d.pop("replayed", UNSET))
 
         def _parse_error_details(data: object) -> None | str | Unset:
             if data is None:
@@ -204,7 +185,6 @@ class ActivityData:
         activity_data = cls(
             activity_id=activity_id,
             status=status,
-            replayed=replayed,
             error_details=error_details,
             iteration=iteration,
             output_data=output_data,

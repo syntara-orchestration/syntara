@@ -2312,8 +2312,6 @@ export interface components {
      * @description Activity data for execution response.
      */
     ActivityData: {
-      /** Replayed */
-      replayed?: boolean | null
       /** Activity Id */
       activity_id: string
       /** Status */
