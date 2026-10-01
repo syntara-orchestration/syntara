@@ -8,9 +8,9 @@ ARG APP_SEGMENT_WRITE_KEY=""
 
 FROM ${DOWNSTREAM_OVERRIDE} AS override
 
-# ── builder-base: uv + workspace metadata ───────────────────────────────────
-# Shared by all builder stages; no heavy build tools here so the EP builder
-# stays lean (asyncpg/temporalio ship manylinux wheels — no compilation needed).
+# ── builder-base: uv + project metadata ────────────────────────────────────
+# Keep this shared stage minimal; compilation tools are installed by
+# syntara-builder only.
 FROM ${BUILDER_IMAGE} AS builder-base
 
 USER 0
@@ -30,11 +30,10 @@ WORKDIR /opt/app-root/src
 RUN (command -v uv >/dev/null 2>&1 || pip3.12 install --no-cache-dir uv==0.12.3) \
     && [ -f /usr/local/bin/uv ] || { command -v uv && ln -s "$(command -v uv)" /usr/local/bin/uv; }
 
-# Workspace root metadata and all workspace member sources (shared by both builders).
-# execution-plane/ must be present for uv to resolve the full workspace in syntara-builder,
-# and it's the only source ep-builder needs.
+# Workspace root metadata for Syntara. Konflux prefetches the pinned EP Git
+# dependency from requirements.txt into PIP_FIND_LINKS; the hermetic lock uses
+# that local source archive after the sanitizer drops the VCS source override.
 COPY pyproject.toml uv.lock LICENSE ./
-COPY execution-plane/ ./execution-plane/
 
 
 # ── syntara-builder: regopy (C/C++) + full workspace ────────────────────────
@@ -92,16 +91,6 @@ RUN if [ -n "${PIP_FIND_LINKS:-}" ]; then \
     fi
 
 
-# ── ep-builder: execution-plane package only ─────────────────────────────────
-# syntara and its heavy deps (regopy, LLM libs, etc.) are excluded from this venv.
-# execution-plane/ is already present (inherited from builder-base).
-FROM builder-base AS ep-builder
-
-RUN uv sync --frozen --no-dev --no-editable --package execution-plane
-# Development-only CLI and tests are intentionally kept outside the EP runtime image.
-RUN rm -rf /opt/app-root/src/execution-plane/tools
-
-
 # ── runtime-base: shared minimal UBI runtime ────────────────────────────────
 FROM registry.access.redhat.com/ubi9/ubi-minimal:latest@sha256:8eb2830d0936237fc13a1f2f7e45aecf90d69043380ad167fad0343632937f41 AS runtime-base
 
@@ -126,32 +115,7 @@ ENV PYTHONUNBUFFERED=1 \
 WORKDIR /opt/app-root/src
 
 
-# ── execution-plane: EP worker only ─────────────────────────────────────────
-FROM runtime-base AS execution-plane
-
-ARG CONTAINER_IMAGE_VERSION=""
-
-COPY --from=ep-builder /opt/app-root/ /opt/app-root/
-COPY --from=ep-builder /usr/local/bin/uv /usr/local/bin/uv
-
-ENV PATH="/opt/app-root/src/.venv/bin:/opt/app-root/bin:$PATH" \
-    APP_CONTAINER_IMAGE_VERSION="${CONTAINER_IMAGE_VERSION}"
-
-RUN chown -R 1001:0 /opt/app-root && chmod -R g=u /opt/app-root
-
-USER 1001
-
-CMD ["execution-plane-worker"]
-
-LABEL com.redhat.component="ansible-automation-orchestrator-ep-container" \
-      name="ansible-automation-platform/automation-orchestrator-execution-plane-rhel9" \
-      summary="Ansible Automation Orchestrator Execution Plane Worker" \
-      io.k8s.display-name="automation-orchestrator-execution-plane-rhel9" \
-      io.k8s.description="Ansible Automation Orchestrator Execution Plane Worker" \
-      vendor="Red Hat, Inc."
-
-
-# ── syntara: API + Temporal workers ─────────────────────────────────────────
+# ── syntara: API + Temporal workers ────────────────────────────────────────
 FROM runtime-base AS syntara
 
 ARG CONTAINER_IMAGE_VERSION=""

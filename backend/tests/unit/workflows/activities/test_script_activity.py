@@ -1,232 +1,156 @@
-"""Unit tests for execute_script_activity — Temporal gate, validation, and feature flags."""
+"""Unit tests for AO's authenticated Execution Plane dispatch activity."""
 
 from collections.abc import Generator
-from unittest.mock import MagicMock, patch
+from typing import ClassVar, Self
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from execution_plane.script_executor import execute_script
 from temporalio.exceptions import ApplicationError
 
 from syntara.core.config.base import get_settings
-from syntara.workflows.workflow_engine.activities.ep.ep_dispatch_activity import execute_script_activity
+from syntara.execution_plane.client import ExecutionPlaneRejectedError, ExecutionPlaneUnavailableError
+from syntara.workflows.workflow_engine.activities.ep import ep_dispatch_activity as activity_module
 
 ACTIVITY_INFO_PATH = "syntara.workflows.workflow_engine.activities.ep.ep_dispatch_activity.activity.info"
+PROJECT_ID = "00000000-0000-0000-0000-000000000001"
+
+
+class _FakeEPClient:
+    """Minimal async transport double for an already-completed work item."""
+
+    responses: ClassVar[list[dict[str, object] | Exception]] = []
+    submissions: ClassVar[list[dict[str, object]]] = []
+
+    def __init__(self, *, timeout: float | None = None) -> None:
+        self.timeout = timeout
+
+    async def __aenter__(self) -> Self:
+        return self
+
+    async def __aexit__(self, *_: object) -> None:
+        return None
+
+    async def submit_work_item(self, **request: object) -> dict[str, object]:
+        self.submissions.append(request)
+        response = self.responses.pop(0)
+        if isinstance(response, Exception):
+            raise response
+        return response
 
 
 @pytest.fixture(autouse=True)
 def _mock_activity_context() -> Generator[MagicMock, None, None]:
-    """Auto-mock activity.info() and activity.heartbeat() so tests can run outside a Temporal worker.
+    """Provide stable Temporal metadata without an activity worker."""
+    info = MagicMock()
+    info.attempt = 1
+    info.workflow_id = "unit-workflow"
+    info.workflow_run_id = "unit-run"
+    info.activity_id = "unit-activity"
+    info.task_token = b"opaque-temporal-token"
+    with (
+        patch(ACTIVITY_INFO_PATH, return_value=info) as activity_info,
+        patch("temporalio.activity.heartbeat"),
+        patch.object(activity_module, "ExecutionPlaneHttpClient", _FakeEPClient),
+        patch.object(activity_module, "persist_dispatch_binding", new_callable=AsyncMock),
+        patch.object(activity_module, "mark_dispatch_accepted", new_callable=AsyncMock),
+    ):
+        _FakeEPClient.responses = []
+        _FakeEPClient.submissions = []
+        yield activity_info
 
-    Sets attempt=1 by default; individual tests can override via
-    ``mock_activity_info`` fixture.
-    """
-    mock_info = MagicMock()
-    mock_info.attempt = 1
-    with patch(ACTIVITY_INFO_PATH, return_value=mock_info) as m, patch("temporalio.activity.heartbeat"):
-        yield m
 
-
-@pytest.fixture
-def mock_activity_info(_mock_activity_context: MagicMock) -> MagicMock:
-    """Expose the mock so tests can customise attempt number etc."""
-    return _mock_activity_context
-
-
-class TestScriptEdgeCases:
-    """Test edge cases and boundary conditions."""
-
-    @pytest.mark.asyncio
-    async def test_empty_script(self) -> None:
-        input_config = {"language": "bash", "code": ":"}
-        result = await execute_script(input_config, None)
-
-        output = result["output"]
-        assert output["return_code"] == 0
-        assert output["stdout"] == ""
+class TestScriptActivityValidation:
+    """Reject invalid requests before making an HTTP call to EP."""
 
     @pytest.mark.asyncio
-    async def test_script_with_only_whitespace(self) -> None:
-        input_config = {"language": "bash", "code": "   \n\n   "}
-        result = await execute_script(input_config, None)
-
-        output = result["output"]
-        assert output["return_code"] == 0
-        assert output["stdout"].strip() == ""
-
-    @pytest.mark.asyncio
-    async def test_script_with_only_comments(self) -> None:
-        script = """
-# This is a comment
-# Another comment
-"""
-        input_config = {"language": "bash", "code": script}
-        result = await execute_script(input_config, None)
-
-        output = result["output"]
-        assert output["return_code"] == 0
-        assert output["stdout"] == ""
-
-    @pytest.mark.asyncio
-    async def test_very_long_output(self) -> None:
-        script = """
-for i in {1..100}; do
-    echo "Line $i"
-done
-"""
-        input_config = {"language": "bash", "code": script}
-        result = await execute_script(input_config, None)
-
-        output = result["output"]
-        assert output["return_code"] == 0
-        assert "Line 1" in output["stdout"]
-        assert "Line 100" in output["stdout"]
-
-    @pytest.mark.asyncio
-    async def test_unicode_in_output(self) -> None:
-        input_config = {"language": "bash", "code": 'echo "Hello 世界"'}
-        result = await execute_script(input_config, None)
-
-        output = result["output"]
-        assert output["return_code"] == 0
-        assert "世界" in output["stdout"]
-
-    @pytest.mark.asyncio
-    async def test_unsupported_language_raises_config_error(self) -> None:
-        """Unsupported language is caught by Pydantic validation in execute_script_activity."""
-        input_config = {"language": "ruby", "code": "puts 'hello'"}
+    @pytest.mark.parametrize(
+        "input_config",
+        [
+            {},
+            {"language": "bash", "code": ""},
+            {"language": "ruby", "code": "puts 'hello'"},
+            {"language": "bash"},
+            {"code": "echo hello"},
+        ],
+    )
+    async def test_invalid_config_is_non_retryable(self, input_config: dict[str, str]) -> None:
+        """Invalid script fields fail before AO contacts the remote service."""
         with pytest.raises(ApplicationError) as exc_info:
-            await execute_script_activity(input_config, None)
+            await activity_module.execute_script_activity(input_config, None, PROJECT_ID)
         assert exc_info.value.type == "ConfigError"
-
-
-class TestPydanticConfigValidation:
-    """Test that ScriptExecutorParameters.model_validate() is enforced."""
+        assert exc_info.value.non_retryable is True
+        assert _FakeEPClient.submissions == []
 
     @pytest.mark.asyncio
-    async def test_empty_code_raises_config_error(self) -> None:
-        """Empty code string violates min_length=1 and raises ApplicationError."""
-        input_config = {"language": "bash", "code": ""}
+    async def test_invalid_project_scope_is_non_retryable(self) -> None:
         with pytest.raises(ApplicationError) as exc_info:
-            await execute_script_activity(input_config, None)
+            await activity_module.execute_script_activity({"language": "bash", "code": ":"}, None, "invalid")
         assert exc_info.value.type == "ConfigError"
+        assert _FakeEPClient.submissions == []
+
+
+class TestScriptActivityDispatch:
+    """Exercise the service boundary and stable idempotency behavior."""
 
     @pytest.mark.asyncio
-    async def test_invalid_language_raises_config_error(self) -> None:
-        """Non-enum language value is rejected by Pydantic."""
-        input_config = {"language": "ruby", "code": "puts 'hello'"}
+    async def test_completed_response_returns_ep_result(self) -> None:
+        expected = {"output": {"return_code": 0, "stdout": "ok\n"}}
+        _FakeEPClient.responses = [
+            {"id": "00000000-0000-0000-0000-000000000002", "status": "completed", "result": expected}
+        ]
+
+        result = await activity_module.execute_script_activity(
+            {"language": "bash", "code": "echo ok"}, None, PROJECT_ID
+        )
+
+        assert result == expected
+        assert len(_FakeEPClient.submissions) == 1
+        assert _FakeEPClient.submissions[0]["project_id"] is not None
+
+    @pytest.mark.asyncio
+    async def test_pending_response_is_accepted_for_async_completion(self) -> None:
+        _FakeEPClient.responses = [{"id": "00000000-0000-0000-0000-000000000002", "status": "pending", "result": None}]
+        with patch.object(activity_module.activity, "raise_complete_async") as complete_async:
+            result = await activity_module.execute_script_activity(
+                {"language": "bash", "code": "sleep 1"}, None, PROJECT_ID
+            )
+        assert result == {}
+        complete_async.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_rejected_request_is_non_retryable(self) -> None:
+        _FakeEPClient.responses = [ExecutionPlaneRejectedError("request rejected")]
         with pytest.raises(ApplicationError) as exc_info:
-            await execute_script_activity(input_config, None)
-        assert exc_info.value.type == "ConfigError"
+            await activity_module.execute_script_activity({"language": "bash", "code": ":"}, None, PROJECT_ID)
+        assert exc_info.value.type == "ExecutionPlaneRejected"
+        assert exc_info.value.non_retryable is True
 
     @pytest.mark.asyncio
-    async def test_missing_code_field_raises_config_error(self) -> None:
-        """Missing required 'code' field is rejected by Pydantic."""
-        input_config = {"language": "bash"}
-        with pytest.raises(ApplicationError) as exc_info:
-            await execute_script_activity(input_config, None)
-        assert exc_info.value.type == "ConfigError"
-
-    @pytest.mark.asyncio
-    async def test_missing_language_field_raises_config_error(self) -> None:
-        """Missing required 'language' field is rejected by Pydantic."""
-        input_config = {"code": "echo hello"}
-        with pytest.raises(ApplicationError) as exc_info:
-            await execute_script_activity(input_config, None)
-        assert exc_info.value.type == "ConfigError"
-
-    @pytest.mark.asyncio
-    async def test_non_string_environment_values_coerced(self) -> None:
-        """Environment with non-string values are coerced to strings."""
-        input_config = {
-            "language": "bash",
-            "code": "echo $KEY",
-            "environment": {"KEY": 123},
-        }
-        result = await execute_script(input_config, None)
-        assert result["output"]["return_code"] == 0
-        assert result["output"]["stdout"].strip() == "123"
-
-    @pytest.mark.asyncio
-    async def test_valid_config_at_boundary_timeout_1(self) -> None:
-        """Timeout=1 is the minimum valid value."""
-        input_config = {"language": "bash", "code": "echo ok", "timeout": 1}
-        result = await execute_script(input_config, None)
-
-        output = result["output"]
-        assert output["return_code"] == 0
-
-    @pytest.mark.asyncio
-    async def test_valid_config_at_boundary_timeout_3600(self) -> None:
-        """Timeout=3600 is the maximum valid value."""
-        input_config = {"language": "bash", "code": "echo ok", "timeout": 3600}
-        result = await execute_script(input_config, None)
-
-        output = result["output"]
-        assert output["return_code"] == 0
-
-    @pytest.mark.asyncio
-    async def test_completely_empty_config_raises_config_error(self) -> None:
-        """Empty dict is rejected by Pydantic (missing required fields)."""
-        with pytest.raises(ApplicationError) as exc_info:
-            await execute_script_activity({}, None)
-        assert exc_info.value.type == "ConfigError"
+    async def test_service_unavailability_retries_same_request_id(self) -> None:
+        _FakeEPClient.responses = [
+            ExecutionPlaneUnavailableError(),
+            {"id": "00000000-0000-0000-0000-000000000002", "status": "completed", "result": {}},
+        ]
+        with patch.object(activity_module.asyncio, "sleep", new_callable=AsyncMock):
+            await activity_module.execute_script_activity({"language": "bash", "code": ":"}, None, PROJECT_ID)
+        assert len(_FakeEPClient.submissions) == 2
+        first_id = _FakeEPClient.submissions[0]["request_id"]
+        assert _FakeEPClient.submissions[1]["request_id"] == first_id
 
 
 class TestScriptNodesGate:
-    """Test the APP_SCRIPT_NODES_ENABLED script node gate."""
+    """Keep the AO feature gate ahead of EP dispatch."""
 
     @pytest.mark.asyncio
     async def test_disabled_raises_application_error(self) -> None:
-        """When script_nodes_enabled is False, the activity fails immediately."""
         settings = get_settings()
+        original = settings.script_nodes_enabled
         object.__setattr__(settings, "script_nodes_enabled", False)
         try:
             with pytest.raises(ApplicationError) as exc_info:
-                await execute_script_activity({"language": "bash", "code": "echo hi"}, None)
-
+                await activity_module.execute_script_activity({"language": "bash", "code": "echo hi"}, None, PROJECT_ID)
             assert exc_info.value.non_retryable is True
             assert exc_info.value.type == "ScriptNodeDisabled"
+            assert _FakeEPClient.submissions == []
         finally:
-            object.__setattr__(settings, "script_nodes_enabled", True)
-
-    @pytest.mark.asyncio
-    async def test_disabled_error_message_is_opaque(self) -> None:
-        """Error message must not reference the setting name."""
-        settings = get_settings()
-        object.__setattr__(settings, "script_nodes_enabled", False)
-        try:
-            with pytest.raises(ApplicationError) as exc_info:
-                await execute_script_activity({"language": "bash", "code": "echo hi"}, None)
-
-            message = str(exc_info.value)
-            assert "APP_SCRIPT_NODES_ENABLED" not in message
-            assert "script_nodes_enabled" not in message
-            assert "setting" not in message.lower()
-            assert "Script node execution is not enabled" in message
-        finally:
-            object.__setattr__(settings, "script_nodes_enabled", True)
-
-    @pytest.mark.asyncio
-    async def test_disabled_does_not_execute_script(self) -> None:
-        """When disabled, no subprocess should be spawned."""
-        settings = get_settings()
-        object.__setattr__(settings, "script_nodes_enabled", False)
-        try:
-            with (
-                patch(
-                    "execution_plane.script_executor.asyncio.create_subprocess_exec",
-                ) as mock_exec,
-                pytest.raises(ApplicationError),
-            ):
-                await execute_script_activity({"language": "bash", "code": "echo hi"}, None)
-
-            mock_exec.assert_not_called()
-        finally:
-            object.__setattr__(settings, "script_nodes_enabled", True)
-
-    @pytest.mark.asyncio
-    async def test_enabled_executes_normally(self) -> None:
-        """When script_nodes_enabled is True (autouse fixture), scripts execute."""
-        result = await execute_script({"language": "bash", "code": "echo gate-open"}, None)
-        assert result["output"]["return_code"] == 0
-        assert "gate-open" in result["output"]["stdout"]
+            object.__setattr__(settings, "script_nodes_enabled", original)

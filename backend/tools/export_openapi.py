@@ -136,7 +136,7 @@ def _consolidate_identical_input_output_schemas(spec: dict[str, Any]) -> None:
 
 def build_ep_spec_app() -> FastAPI:
     """Build a minimal FastAPI app with only the Execution Plane router for spec generation."""
-    from execution_plane.router import router as ep_router
+    from syntara.api.execution_plane_facade import router as ep_router
 
     configure_app_logging()
 

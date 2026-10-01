@@ -41,6 +41,7 @@ SERVICE_CERTS = [
     ("worker", "worker.ao.svc", ["temporal-worker"]),
     ("background-worker", "background-worker.ao.svc", ["temporal-background-worker"]),
     ("temporal", "temporal.ao.svc", ["temporal"]),
+    ("execution-plane", "execution-plane.ao.svc", ["execution-plane-worker", "execution-plane-api"]),
 ]
 
 # Validate against the canonical list in principal.py
@@ -183,9 +184,21 @@ def _missing_service_certs() -> list[tuple[str, str, list[str]]]:
     for filename, cn, sans in SERVICE_CERTS:
         cert_path = CERTS_DIR / f"{filename}.crt"
         key_path = CERTS_DIR / f"{filename}.key"
-        if not cert_path.is_file() or not key_path.is_file():
+        if not cert_path.is_file() or not key_path.is_file() or not _has_expected_dns_sans(cert_path, sans):
             missing.append((filename, cn, sans))
     return missing
+
+
+def _has_expected_dns_sans(cert_path: Path, dns_sans: list[str]) -> bool:
+    """Regenerate an existing certificate when a newly added service alias needs it."""
+    try:
+        cert = x509.load_pem_x509_certificate(cert_path.read_bytes())
+        existing = set(
+            cert.extensions.get_extension_for_class(x509.SubjectAlternativeName).value.get_values_for_type(x509.DNSName)
+        )
+    except (OSError, ValueError, x509.ExtensionNotFound):
+        return False
+    return set(dns_sans).issubset(existing)
 
 
 def _chmod_public_certs() -> None:
@@ -233,7 +246,7 @@ def main() -> None:
 
     print()
     print(f"[INFO] TLS certificates ready in {CERTS_DIR}")
-    print("[INFO] Services: backend, worker, background-worker, temporal")
+    print("[INFO] Services: backend, worker, background-worker, temporal, execution-plane")
 
 
 if __name__ == "__main__":

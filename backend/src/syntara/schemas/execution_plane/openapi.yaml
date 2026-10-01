@@ -75,16 +75,97 @@ paths:
       x-app-permission:
         resource: work_item
         action: read
+  /api/execution_plane/v1/events:
+    post:
+      tags:
+        - Execution Plane
+      summary: Accept an Execution Plane completion event
+      description: Persist an EP callback before acknowledging delivery to the producer.
+      operationId: accept_execution_plane_event
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EPCompletionEvent'
+        required: true
+      responses:
+        '202':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                additionalProperties:
+                  type: string
+                type: object
+                title: Response Accept Execution Plane Event
+        '422':
+          description: Validation Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      x-app-permission:
+        resource: null
+        action: null
 components:
   schemas:
-    BackendType:
-      type: string
-      enum:
-        - vanilla_k8s
-        - openshell
-      title: BackendType
-      description: Supported execution target backends.
-    ExecutionTarget:
+    EPCompletionEvent:
+      properties:
+        event_id:
+          type: string
+          format: uuid
+          title: Event Id
+        event_schema_version:
+          type: integer
+          const: 1
+          title: Event Schema Version
+        client_id:
+          type: string
+          title: Client Id
+        project_id:
+          type: string
+          format: uuid
+          title: Project Id
+        work_id:
+          type: string
+          format: uuid
+          title: Work Id
+        request_id:
+          type: string
+          title: Request Id
+        state_revision:
+          type: integer
+          title: State Revision
+        status:
+          type: string
+          enum:
+            - completed
+            - failed
+            - cancelled
+          title: Status
+        result:
+          additionalProperties: true
+          type: object
+          title: Result
+        completed_at:
+          type: string
+          format: date-time
+          title: Completed At
+      type: object
+      required:
+        - event_id
+        - event_schema_version
+        - client_id
+        - project_id
+        - work_id
+        - request_id
+        - state_revision
+        - status
+        - result
+        - completed_at
+      title: EPCompletionEvent
+      description: Authenticated result event delivered by the independent EP service.
+    ExecutionTargetFacadeRead:
       properties:
         id:
           type: string
@@ -98,25 +179,23 @@ components:
           type: string
           title: Name
         backend_type:
-          $ref: '#/components/schemas/BackendType'
+          type: string
+          title: Backend Type
         endpoint:
           type: string
           title: Endpoint
         namespace:
           type: string
           title: Namespace
-          default: default
         status:
-          $ref: '#/components/schemas/TargetStatus'
-          default: registering
+          type: string
+          title: Status
         enabled:
           type: boolean
           title: Enabled
-          default: true
         is_default:
           type: boolean
           title: Is Default
-          default: false
         status_message:
           anyOf:
             - type: string
@@ -127,22 +206,10 @@ components:
             type: string
           type: object
           title: Labels
-        created_by:
-          type: string
-          format: uuid
-          title: Created By
         created_at:
           type: string
           format: date-time
           title: Created At
-        updated_by:
-          type: string
-          format: uuid
-          title: Updated By
-        updated_at:
-          type: string
-          format: date-time
-          title: Updated At
         last_ran_at:
           anyOf:
             - type: string
@@ -151,21 +218,24 @@ components:
           title: Last Ran At
       type: object
       required:
+        - id
         - cluster_id
         - name
         - backend_type
         - endpoint
-        - created_by
+        - namespace
+        - status
+        - enabled
+        - is_default
+        - labels
         - created_at
-        - updated_by
-        - updated_at
-      title: ExecutionTarget
-      description: A registered compute environment where worker pods run.
+      title: ExecutionTargetFacadeRead
+      description: Safe target fields available to AO's authorized management API.
     ExecutionTargetListResponse:
       properties:
         resources:
           items:
-            $ref: '#/components/schemas/ExecutionTarget'
+            $ref: '#/components/schemas/ExecutionTargetFacadeRead'
           type: array
           title: Resources
         next:
@@ -197,18 +267,6 @@ components:
           title: Detail
       type: object
       title: HTTPValidationError
-    TargetStatus:
-      type: string
-      enum:
-        - registering
-        - validating
-        - bootstrapping
-        - active
-        - degraded
-        - draining
-        - failed
-      title: TargetStatus
-      description: Lifecycle states of an execution target.
     ValidationError:
       properties:
         loc:
@@ -235,33 +293,26 @@ components:
         - msg
         - type
       title: ValidationError
-    WorkItem:
+    WorkItemFacadeRead:
       properties:
         id:
           type: string
           format: uuid
           title: Id
+        project_id:
+          type: string
+          format: uuid
+          title: Project Id
+        request_id:
+          type: string
+          title: Request Id
         work_correlation_id:
           type: string
           format: uuid
           title: Work Correlation Id
-        activity_handle:
-          type: string
-          title: Activity Handle
         status:
-          $ref: '#/components/schemas/WorkItemStatus'
-          default: pending
-        execution_target_id:
-          anyOf:
-            - type: string
-              format: uuid
-            - type: 'null'
-          title: Execution Target Id
-        payload:
-          additionalProperties: true
-          type: object
-          title: Payload
-          default: {}
+          type: string
+          title: Status
         result:
           anyOf:
             - additionalProperties: true
@@ -284,24 +335,21 @@ components:
               format: date-time
             - type: 'null'
           title: Completed At
-        signaled_at:
-          anyOf:
-            - type: string
-              format: date-time
-            - type: 'null'
-          title: Signaled At
       type: object
       required:
+        - id
+        - project_id
+        - request_id
         - work_correlation_id
-        - activity_handle
+        - status
         - created_at
-      title: WorkItem
-      description: A unit of work written by the Temporal Worker and consumed by the Task Executor.
+      title: WorkItemFacadeRead
+      description: Safe work state; internal tokens and storage metadata stay private.
     WorkItemListResponse:
       properties:
         resources:
           items:
-            $ref: '#/components/schemas/WorkItem'
+            $ref: '#/components/schemas/WorkItemFacadeRead'
           type: array
           title: Resources
         next:
@@ -324,17 +372,6 @@ components:
         - resources
       title: WorkItemListResponse
       description: Paginated list response for WorkItem.
-    WorkItemStatus:
-      type: string
-      enum:
-        - pending
-        - claimed
-        - dispatched
-        - completed
-        - failed
-        - cancelled
-      title: WorkItemStatus
-      description: Lifecycle states of a dispatched work item.
   securitySchemes:
     bearerAuth:
       type: http

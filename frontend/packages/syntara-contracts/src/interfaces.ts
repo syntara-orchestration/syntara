@@ -185,6 +185,14 @@ export const IntegrationStatusEnum = {
   AVAILABLE: 'available',
   ERROR: 'error',
 } as const
+
+/** Constants for Execution Plane integration synchronization status values. */
+export const ExecutionPlaneSyncStatusEnum = {
+  PENDING: 'pending',
+  READY: 'ready',
+  ERROR: 'error',
+  DELETING: 'deleting',
+} as const
 export type WorkflowsResponse =
   WorkflowAPI.paths['/workflows']['get']['responses']['200']['content']['application/json']
 export type WorkflowWithVersion = WorkflowAPI.components['schemas']['WorkflowReadWithVersion']

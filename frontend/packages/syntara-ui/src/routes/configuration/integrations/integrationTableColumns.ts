@@ -8,6 +8,7 @@ import type { SortableColumn, SortConfig } from '../../../types/sorting'
 export const integrationTableColumns: SortableColumn[] = [
   { field: 'name', label: 'Server name / ID', isSortable: true },
   { field: 'validation_status', label: 'Status', isSortable: true },
+  { field: 'execution_plane_status', label: 'Execution Plane' },
   { field: 'integration_type', label: 'Integration type', isSortable: true },
   { field: 'api_url', label: 'API URL' },
   { field: 'enabled_resources', label: 'Enabled resources' },

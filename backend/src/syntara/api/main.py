@@ -14,7 +14,6 @@ from typing import Annotated, Any
 
 import structlog
 import uvicorn
-from execution_plane.router import router as ep_router
 from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -34,6 +33,7 @@ from syntara.api.constants import (
     API_V1_PATH_PREFIX,
     API_V1_VERSION,
 )
+from syntara.api.execution_plane_facade import router as ep_router
 from syntara.audit.lifecycle import start_audit_subsystems, stop_audit_subsystems
 from syntara.audit.middleware import AuditMiddleware
 from syntara.audit.registration import discover_and_register_all_handlers
@@ -218,12 +218,10 @@ async def _lifespan_startup(app: FastAPI) -> dict[str, Any]:  # noqa: PLR0915
         logger.warning("Router discovery disabled - no routers will be automatically registered")
 
     # ========================================================================
-    # TEMPORARY SYNTARA / EXECUTION PLANE BOUNDARY
+    # EXECUTION PLANE API FACADE
     # ------------------------------------------------------------------------
-    # BOUNDARY CROSSING — see docs/execution-plane/integration.md.
-    # The EP public API (GET /execution_targets, GET /work_items) is temporarily
-    # hosted by Syntara. When the EP worker becomes a standalone service this
-    # include_router call and its import move out with it.
+    # Syntara owns public authorization. Execution Plane reads and mutations
+    # cross its versioned HTTP contract through the AO-owned adapter.
     # ------------------------------------------------------------------------
     app.include_router(ep_router)
     # ========================================================================

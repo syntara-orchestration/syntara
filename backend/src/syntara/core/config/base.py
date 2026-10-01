@@ -1806,6 +1806,22 @@ class WorkflowClientSettings(BaseSettings):
         gt=0,
     )
 
+    ep_api_url: str | None = Field(
+        default=None,
+        description="Base URL for the independently deployed Execution Plane API.",
+    )
+
+    ep_request_timeout_seconds: float = Field(
+        default=10.0,
+        description="Per-request timeout for AO to EP HTTP operations.",
+        gt=0,
+    )
+
+    ep_callback_service_cn: str = Field(
+        default="execution-plane.ao.svc",
+        description="mTLS service identity permitted to deliver EP completion events.",
+    )
+
     @model_validator(mode="after")
     def validate_backoff_relationship(self) -> "WorkflowClientSettings":
         """Validate that max_backoff >= initial_backoff.

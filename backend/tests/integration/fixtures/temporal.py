@@ -2,16 +2,11 @@
 
 from __future__ import annotations
 
-import asyncio
-import contextlib
-from functools import partial
 from typing import TYPE_CHECKING, Any
 
 import pytest
 import pytest_asyncio
 import structlog
-from execution_plane.temporal_client import send_temporal_callback
-from execution_plane.worker import run_worker
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 
@@ -22,12 +17,13 @@ from syntara.workflows.workflow_engine.activities.internal_activity import execu
 from syntara.workflows.workflow_engine.activities.manual_trigger import manual_trigger
 from syntara.workflows.workflow_engine.activities.runtime_settings_activity import fetch_workflow_runtime_settings
 from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkflow
+from tests.fixtures.fake_execution_plane import FakeExecutionPlaneHttpClient
+from tests.fixtures.settings import FakeSettingsCache
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Callable
 
     from sqlalchemy.ext.asyncio import AsyncEngine
-    from sqlmodel.ext.asyncio.session import AsyncSession as SQLModelAsyncSession
     from temporalio.client import Client
 
 logger = structlog.stdlib.get_logger(__name__)
@@ -48,7 +44,6 @@ async def _create_temporal_worker(
     """Start a Temporal worker with all registered activities."""
     import syntara.settings.cache.settings_cache as _settings_mod
     from syntara.core.config.base import get_settings
-    from tests.fixtures.settings import FakeSettingsCache
 
     original = _settings_mod._runtime_settings
     _settings_mod._runtime_settings = FakeSettingsCache()  # type: ignore[assignment]
@@ -84,31 +79,16 @@ async def _temporal_server() -> AsyncGenerator[WorkflowEnvironment, None]:
 async def temporal_env(
     _temporal_server: WorkflowEnvironment,
     test_db_engine: AsyncEngine,
-    test_db_session: SQLModelAsyncSession,
     monkeypatch: pytest.MonkeyPatch,
 ) -> AsyncGenerator[WorkflowEnvironment, None]:
-    """Pair Temporal with real execution-plane processing after database restore.
+    """Pair Temporal with a test double for the independently deployed EP API."""
+    from syntara.workflows.workflow_engine.activities.ep import ep_dispatch_activity
 
-    External database/subprocess work needs wall-clock time, so Temporal must
-    not skip ahead to activity timeouts while the execution plane is running.
-    """
     database_url = test_db_engine.url
     monkeypatch.setenv("APP_DATABASE_URL", database_url.render_as_string(hide_password=False))
-    callback = partial(send_temporal_callback, client=_temporal_server.client)
-    worker_task = asyncio.create_task(
-        run_worker(
-            database_url.render_as_string(hide_password=False),
-            callback,
-        ),
-        name="test-execution-plane",
-    )
-    try:
-        with _temporal_server.auto_time_skipping_disabled():
-            yield _temporal_server
-    finally:
-        worker_task.cancel()
-        with contextlib.suppress(asyncio.CancelledError):
-            await worker_task
+    monkeypatch.setattr(ep_dispatch_activity, "ExecutionPlaneHttpClient", FakeExecutionPlaneHttpClient)
+    with _temporal_server.auto_time_skipping_disabled():
+        yield _temporal_server
 
 
 @pytest_asyncio.fixture

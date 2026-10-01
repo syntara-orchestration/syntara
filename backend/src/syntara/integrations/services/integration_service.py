@@ -2,11 +2,8 @@
 
 from collections.abc import Iterable
 from datetime import UTC, datetime, timedelta
-from typing import TYPE_CHECKING, NoReturn
+from typing import NoReturn
 from uuid import UUID
-
-if TYPE_CHECKING:
-    from execution_plane.cluster.cluster_registry import ClusterRegistry
 
 import structlog
 from sqlalchemy import case, func
@@ -26,6 +23,7 @@ from syntara.core.services.secret_service import SecretService
 from syntara.core.services.user_reference_resolution import UserReferenceResolverMixin
 from syntara.credentials.exceptions import CredentialDisabledError
 from syntara.credentials.lib.injector_resolver import InjectorResolver
+from syntara.execution_plane.integration_sync_model import ExecutionPlaneIntegrationSync
 from syntara.integrations.adapters.factory import create_health_check_adapter
 from syntara.integrations.adapters.protocol import (
     DiscoveredLLMModel,
@@ -53,6 +51,7 @@ from syntara.integrations.exceptions import (
 from syntara.integrations.lib.credential_resolver import fetch_credential_with_type, resolve_mcp_bearer_token
 from syntara.integrations.lib.url_validation import validate_integration_configuration_no_ssrf
 from syntara.integrations.models.integration import (
+    ExecutionPlaneSyncStatus,
     Integration,
     IntegrationCreate,
     IntegrationListResponse,
@@ -69,10 +68,7 @@ from syntara.integrations.models.integration import (
     IntegrationUpdate,
     RefreshResult,
 )
-from syntara.integrations.models.integration_configuration import (
-    IntegrationConfigurationInputTypes,
-    OpenShiftConfiguration,
-)
+from syntara.integrations.models.integration_configuration import IntegrationConfigurationInputTypes
 from syntara.integrations.models.llm_model import LLMModel
 from syntara.integrations.services.model_profile_lookup import lookup_model_profile
 from syntara.settings.cache.settings_cache import get_runtime_settings
@@ -119,7 +115,6 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
         session: AsyncSession,
         user: User,
         secret_service: SecretService | None = None,
-        cluster_registry: "ClusterRegistry | None" = None,
     ) -> None:
         """Initialize with database session, current user, and optional services.
 
@@ -127,12 +122,10 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
             session: SQLModel async database session
             user: Current authenticated user
             secret_service: Optional SecretService for credential decryption
-            cluster_registry: Optional ClusterRegistry for cluster lifecycle sync
 
         """
         super().__init__(session, user, convert_resource_mixin=IntegrationConvertResourceMixin())
         self._secret_service = secret_service
-        self._cluster_registry = cluster_registry
 
     def _is_duplicate_name_error(self, e: IntegrityError) -> bool:
         return "uq_integrations_name" in str(e)
@@ -338,6 +331,7 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
             )
             self.session.add(existing)
             await self.session.flush()
+            self._queue_execution_plane_sync(integration, operation="upsert")
 
         await self.session.commit()
         return IntegrationProjectAssignmentRead(
@@ -354,11 +348,21 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
                 integration_id,
                 f"Cannot unassign projects from a {integration.scope.value}-scoped integration",
             )
+        existing = (
+            await self.session.exec(
+                select(IntegrationProjectAssignment).where(
+                    IntegrationProjectAssignment.integration_id == integration_id,
+                    IntegrationProjectAssignment.project_id == project_id,
+                )
+            )
+        ).one_or_none()
         stmt = delete(IntegrationProjectAssignment).where(
             IntegrationProjectAssignment.integration_id == integration_id,  # type: ignore[arg-type]
             IntegrationProjectAssignment.project_id == project_id,  # type: ignore[arg-type]
         )
         await self.session.exec(stmt)
+        if existing is not None:
+            self._queue_execution_plane_sync(integration, operation="upsert")
         await self.session.commit()
 
     async def list_assigned_projects(
@@ -482,8 +486,7 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
         self._validate_discovered_resources(data)
         await self._sync_initial_resources(integration, data)
 
-        # Sync cluster record for OpenShift integrations (hard dependency — must succeed before commit)
-        await self._sync_create_cluster(integration)
+        self._queue_execution_plane_sync(integration, operation="upsert")
 
         await self.session.commit()
 
@@ -649,112 +652,37 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
         if data.name is not None and data.name != integration.name:
             await self._raise_if_name_exists(data.name)
 
-    async def _sync_create_cluster(self, integration: Integration) -> None:
-        """Create a cluster record when an OpenShift integration is created.
-
-        Cluster sync is a hard dependency: if sync fails, the integration creation fails.
-        """
-        if integration.integration_type != IntegrationType.OPENSHIFT or not self._cluster_registry:
+    def _queue_execution_plane_sync(self, integration: Integration, *, operation: str) -> None:
+        """Record EP desired-state delivery in the current AO transaction."""
+        if integration.integration_type != IntegrationType.OPENSHIFT:
             return
+        configuration = integration.configuration
+        endpoint = getattr(configuration, "base_url", None)
+        namespace = getattr(configuration, "namespace", None)
+        if not endpoint or not namespace:
+            msg = "OpenShift configuration is missing its EP endpoint or namespace"
+            raise SafeValueError(msg)
+        if configuration.insecure_skip_tls_verify:
+            msg = "Execution Plane integrations require verified TLS; provide a CA certificate instead"
+            raise SafeValueError(msg)
 
-        if not isinstance(integration.configuration, OpenShiftConfiguration):
-            logger.warning(
-                "Skipping cluster sync: invalid configuration type",
-                integration_id=str(integration.id),
-                config_type=type(integration.configuration).__name__,
+        now = datetime.now(UTC)
+        integration.execution_plane_revision += 1
+        integration.execution_plane_status = (
+            ExecutionPlaneSyncStatus.DELETING if operation == "delete" else ExecutionPlaneSyncStatus.PENDING
+        )
+        integration.execution_plane_error = None
+        self.session.add(
+            ExecutionPlaneIntegrationSync(
+                integration_id=integration.id,
+                source_revision=integration.execution_plane_revision,
+                operation=operation,
+                name=integration.name,
+                endpoint=endpoint,
+                namespace=namespace,
+                created_at=now,
+                next_attempt_at=now,
             )
-            return
-
-        if not integration.management_credential_id:
-            msg = "OpenShift integration requires a management credential"
-            raise SafeValueError(msg)
-
-        resolved_credential = await self._resolve_credential(integration.management_credential_id)
-
-        # HTTP Bearer Token credential maps to 'bearer_token' in extra_vars
-        api_key = str(
-            resolved_credential.get("bearer_token")
-            or resolved_credential.get("token")
-            or resolved_credential.get("api_key")
-            or ""
-        )
-        if not api_key:
-            msg = "Credential missing required authentication field (bearer_token, token, or api_key)"
-            raise SafeValueError(msg)
-
-        labels = dict(integration.labels or {})
-        labels["integration_id"] = str(integration.id)
-        labels["integration_name"] = integration.name
-
-        await self._cluster_registry.provision(
-            name=integration.name,
-            endpoint=integration.configuration.base_url,
-            api_key=api_key,
-            namespace=integration.configuration.namespace,
-            created_by=self.user.id,
-            labels=labels,
-        )
-
-    async def _sync_delete_cluster(self, integration: Integration) -> None:
-        """Request deletion of a cluster record when an OpenShift integration is deleted.
-
-        Marks the cluster as DRAINING and disables all its ExecutionTargets.
-        Actual deletion is asynchronous when all targets finish draining.
-        """
-        if integration.integration_type != IntegrationType.OPENSHIFT or not self._cluster_registry:
-            return
-
-        cluster = await self._cluster_registry.get_by_name(integration.name)
-        if cluster is None:
-            msg = f"Cluster '{integration.name}' not found; cannot delete integration"
-            raise SafeValueError(msg)
-        await self._cluster_registry.request_delete(cluster.id, self.user.id)
-
-    async def _sync_update_cluster(
-        self,
-        integration: Integration,
-        data: IntegrationUpdate,
-        old_name: str,
-    ) -> None:
-        """Propagate integration field changes to the cluster and its default target.
-
-        Only runs when cluster-relevant fields (name, configuration,
-        management_credential_id) are in the patch set.
-        """
-        if integration.integration_type != IntegrationType.OPENSHIFT or not self._cluster_registry:
-            return
-
-        relevant_fields = {"name", "configuration", "management_credential_id"}
-        if not (data.model_fields_set & relevant_fields):
-            return
-
-        if not isinstance(integration.configuration, OpenShiftConfiguration):
-            return
-
-        cluster = await self._cluster_registry.get_by_name(old_name)
-        if cluster is None:
-            msg = f"Cluster '{old_name}' not found; cannot update integration"
-            raise SafeValueError(msg)
-
-        api_key: str | None = None
-        if "management_credential_id" in data.model_fields_set and integration.management_credential_id:
-            resolved = await self._resolve_credential(integration.management_credential_id)
-            api_key = str(resolved.get("bearer_token") or resolved.get("token") or resolved.get("api_key") or "")
-            if not api_key:
-                msg = "Credential missing required authentication field (bearer_token, token, or api_key)"
-                raise SafeValueError(msg)
-
-        new_name = integration.name if "name" in data.model_fields_set else None
-        new_endpoint = integration.configuration.base_url if "configuration" in data.model_fields_set else None
-        new_namespace = integration.configuration.namespace if "configuration" in data.model_fields_set else None
-
-        await self._cluster_registry.sync_update(
-            cluster.id,
-            updated_by=self.user.id,
-            name=new_name,
-            endpoint=new_endpoint,
-            api_key=api_key,
-            namespace=new_namespace,
         )
 
     async def update_integration(self, integration_id: UUID, data: IntegrationUpdate) -> IntegrationRead:
@@ -779,7 +707,6 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
             )
             await self.session.exec(stmt)
 
-        old_name = integration.name
         integration_name = data.name if data.name is not None else integration.name
         updated_fields = list(data.model_fields_set)
 
@@ -805,8 +732,9 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
             )
             await self._handle_integrity_error(e, integration_name)
 
-        # Sync cluster record before committing the integration change (hard dependency)
-        await self._sync_update_cluster(integration, data, old_name)
+        ep_relevant_fields = {"name", "configuration", "management_credential_id", "enabled", "scope", "labels"}
+        if integration.integration_type == IntegrationType.OPENSHIFT and data.model_fields_set & ep_relevant_fields:
+            self._queue_execution_plane_sync(integration, operation="upsert")
 
         await self.session.commit()
 
@@ -1367,8 +1295,7 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
             )
         )
 
-        # Sync cluster deletion before deleting integration (hard dependency)
-        await self._sync_delete_cluster(integration)
+        self._queue_execution_plane_sync(integration, operation="delete")
 
         await self.session.delete(integration)
         await self.session.flush()

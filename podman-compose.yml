@@ -21,6 +21,29 @@ services:
       timeout: 5s
       retries: 5
 
+  execution-plane-db-init:
+    image: ${POSTGRES_IMAGE:-quay.io/sclorg/postgresql-15-c9s}
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - >-
+        psql -h database -U postgres -d postgres
+        -v ep_migrator_password="$${EP_DB_MIGRATOR_PASSWORD}"
+        -v ep_runtime_password="$${EP_DB_RUNTIME_PASSWORD}"
+        -v ao_database="$${APP_DB_NAME}"
+        -v ao_runtime_role="$${APP_DB_USER}"
+        -f /scripts/create_database.sql
+    environment:
+      PGPASSWORD: ${APP_DB_PASSWORD:-admin}
+      APP_DB_NAME: ${APP_DB_NAME:-syntara_api}
+      APP_DB_USER: ${APP_DB_USER:-admin}
+      EP_DB_MIGRATOR_PASSWORD: ${EP_DB_MIGRATOR_PASSWORD:-ep-migrator}
+      EP_DB_RUNTIME_PASSWORD: ${EP_DB_RUNTIME_PASSWORD:-ep-runtime}
+    volumes:
+      - ./backend/containers/execution-plane/create_database.sql:/scripts/create_database.sql:ro,z
+    depends_on:
+      database:
+        condition: service_healthy
+
   redis:
     image: ${APP_CACHE_IMAGE:-mirror.gcr.io/library/redis:6.2.22@sha256:da7091440b2b4d9456603be812dba895cd75bedd66564d7f01f1f010521f8467}
     restart: unless-stopped
@@ -148,6 +171,7 @@ services:
       - APP_S3_USE_PATH_STYLE=${APP_S3_USE_PATH_STYLE:-true}
 
       - APP_TEMPORAL_ADDRESS=temporal:7233
+      - APP_EP_API_URL=https://execution-plane-api:8443
       - APP_TEMPORAL_NAMESPACE=default
       - APP_CACHE_HOST=redis
       - APP_CACHE_PASSWORD=${APP_CACHE_PASSWORD:-cache}
@@ -181,7 +205,7 @@ services:
       - APP_S2S_TLS_CA_CERT_PATH=/run/secrets/s2s-ca.pem
       - APP_S2S_TLS_CERT_PATH=/run/secrets/s2s-cert.crt
       - APP_S2S_TLS_KEY_PATH=/run/secrets/s2s-cert.key
-      - APP_S2S_TLS_CN_ALLOWLIST=["backend.ao.svc","worker.ao.svc","background-worker.ao.svc","temporal.ao.svc"]
+      - APP_S2S_TLS_CN_ALLOWLIST=["backend.ao.svc","worker.ao.svc","background-worker.ao.svc","temporal.ao.svc","execution-plane.ao.svc"]
       - APP_BACKGROUND_TASK_QUEUE=orchestrator-background-queue
       # Docs on by default; set to false to disable in locked-down environments.
       - APP_ENABLE_API_DOCS=${APP_ENABLE_API_DOCS:-true}
@@ -238,6 +262,7 @@ services:
       - APP_SERVER_PUBLIC_URL=${APP_SERVER_PUBLIC_URL:-}
       - APP_TEMPORAL_ADDRESS=temporal:7233
       - APP_TEMPORAL_NAMESPACE=default
+      - APP_EP_API_URL=https://execution-plane-api:8443
       - APP_TASK_QUEUE=orchestrator-workflow-queue
       - APP_SCRIPT_NODES_ENABLED=${APP_SCRIPT_NODES_ENABLED:-false}
       - APP_ENV_FILE_PATH=${APP_ENV_FILE_PATH:-.env}
@@ -373,33 +398,70 @@ services:
       start_period: 10s
 
 
+  execution-plane-migrate:
+    image: ${EP_IMAGE:-localhost/execution-plane:latest}
+    command: [alembic, -c, alembic.ini, upgrade, head]
+    environment:
+      DATABASE_URL: postgresql+asyncpg://execution_plane_migrator:${EP_DB_MIGRATOR_PASSWORD:-ep-migrator}@database:5432/execution_plane
+    depends_on:
+      execution-plane-db-init:
+        condition: service_completed_successfully
+
+  execution-plane-api:
+    image: ${EP_IMAGE:-localhost/execution-plane:latest}
+    restart: unless-stopped
+    command: [execution-plane-api]
+    ports:
+      - "127.0.0.1:${EP_API_PORT:-8001}:8443"
+    environment:
+      - EP_API_HOST=0.0.0.0
+      - EP_API_PORT=8443
+      - EP_API_TLS_CERT_PATH=/run/secrets/ep-api/tls.crt
+      - EP_API_TLS_KEY_PATH=/run/secrets/ep-api/tls.key
+      - EP_API_TLS_CLIENT_CA_PATH=/run/secrets/ep-api/ca.pem
+      - EP_DATABASE_URL=postgresql+asyncpg://execution_plane_runtime:${EP_DB_RUNTIME_PASSWORD:-ep-runtime}@database:5432/execution_plane
+      - EP_AO_JWT_PUBLIC_KEY_PATH=/run/secrets/ao-jwt-public.pem
+      - EP_AO_JWT_ISSUER=${APP_SERVER_PUBLIC_URL:-https://0.0.0.0:8000}
+      - EP_AO_CLIENT_ID=syntara-orchestration
+      - EP_CREDENTIAL_ENCRYPTION_KEY_PATH=/run/secrets/ep-credential-encryption-key
+    volumes:
+      - ./backend/.secrets/jwt-primary.pub:/run/secrets/ao-jwt-public.pem:ro,z
+      - ./backend/.secrets/ep-credential-encryption-key:/run/secrets/ep-credential-encryption-key:ro,z
+      - ./backend/.secrets/certs/execution-plane.crt:/run/secrets/ep-api/tls.crt:ro,z
+      - ./backend/.secrets/certs/execution-plane.key:/run/secrets/ep-api/tls.key:ro,z
+      - ./backend/.secrets/certs/ca.pem:/run/secrets/ep-api/ca.pem:ro,z
+    depends_on:
+      execution-plane-migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: [CMD, python3, -c, "import ssl,urllib.request; c=ssl.create_default_context(cafile='/run/secrets/ep-api/ca.pem'); urllib.request.urlopen('https://localhost:8443/healthz/ready',context=c)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
   execution-plane-worker:
-    build:
-      context: ./backend
-      dockerfile: Containerfile
-      target: execution-plane
     image: ${EP_IMAGE:-localhost/execution-plane:latest}
     restart: unless-stopped
     environment:
-      # Construct the URL from component vars so it stays in sync with the database service.
-      - APP_DATABASE_URL=postgresql+asyncpg://${APP_DB_USER:-admin}:${APP_DB_PASSWORD:-admin}@database:5432/${APP_DB_NAME:-syntara_api}
-      - APP_TEMPORAL_ADDRESS=temporal:7233
-      - APP_TEMPORAL_NAMESPACE=default
+      - EP_DATABASE_URL=postgresql+asyncpg://execution_plane_runtime:${EP_DB_RUNTIME_PASSWORD:-ep-runtime}@database:5432/execution_plane
+      - EP_CREDENTIAL_ENCRYPTION_KEY_PATH=/run/secrets/ep-credential-encryption-key
+      - EP_COMPLETION_CALLBACK_URL=https://syntara:8000/api/execution_plane/v1/events
+      - EP_CALLBACK_CA_CERT_PATH=/run/secrets/s2s-ca.pem
+      - EP_CALLBACK_CERT_PATH=/run/secrets/ep-callback.crt
+      - EP_CALLBACK_KEY_PATH=/run/secrets/ep-callback.key
+      - EP_WORKLOAD_RUNNER_IMAGE=${EP_WORKLOAD_RUNNER_IMAGE:-}
+      - EP_WORKLOAD_ALLOWED_EGRESS_CIDRS=${EP_WORKLOAD_ALLOWED_EGRESS_CIDRS:-[]}
+      - EP_WORKLOAD_FORBIDDEN_EGRESS_CIDRS=${EP_WORKLOAD_FORBIDDEN_EGRESS_CIDRS:-[]}
       - APP_FALLBACK_LOG_LEVEL=${APP_FALLBACK_LOG_LEVEL:-INFO}
-      - APP_S2S_TLS_ENABLED=${APP_S2S_TLS_ENABLED:-true}
-      - APP_S2S_TLS_CA_CERT_PATH=/run/secrets/s2s-ca.pem
-      - APP_S2S_TLS_CERT_PATH=/run/secrets/s2s-cert.crt
-      - APP_S2S_TLS_KEY_PATH=/run/secrets/s2s-cert.key
     volumes:
-      # Reuses the workflow worker cert for the MVP; add a dedicated ep-worker cert when needed.
       - ./backend/.secrets/certs/ca.pem:/run/secrets/s2s-ca.pem:ro,z
-      - ./backend/.secrets/certs/worker.crt:/run/secrets/s2s-cert.crt:ro,z
-      - ./backend/.secrets/certs/worker.key:/run/secrets/s2s-cert.key:ro,z
+      - ./backend/.secrets/certs/execution-plane.crt:/run/secrets/ep-callback.crt:ro,z
+      - ./backend/.secrets/certs/execution-plane.key:/run/secrets/ep-callback.key:ro,z
+      - ./backend/.secrets/ep-credential-encryption-key:/run/secrets/ep-credential-encryption-key:ro,z
     depends_on:
-      database:
-        condition: service_healthy
-      temporal:
-        condition: service_healthy
+      execution-plane-migrate:
+        condition: service_completed_successfully
     healthcheck:
       test: [CMD-SHELL, 'cat /proc/[0-9]*/cmdline 2>/dev/null | grep -qa execution_plane.worker']
       interval: 30s

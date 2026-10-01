@@ -11,7 +11,7 @@ from typing import Any, ClassVar
 from uuid import UUID, uuid4
 
 from pydantic import ConfigDict, model_validator
-from sqlalchemy import Index, Text, UniqueConstraint, text
+from sqlalchemy import Column, Index, Integer, String, Text, UniqueConstraint, text
 from sqlmodel import DateTime, Field, SQLModel
 
 from syntara.core.constants import FieldLimits
@@ -63,6 +63,15 @@ class IntegrationRefreshStatus(StrEnum):
     AVAILABLE = "available"
     WARNING = "warning"
     ERROR = "error"
+
+
+class ExecutionPlaneSyncStatus(StrEnum):
+    """Observed state of the independent EP resource for an integration."""
+
+    PENDING = "pending"
+    READY = "ready"
+    ERROR = "error"
+    DELETING = "deleting"
 
 
 class Integration(NamedResource, UserOwnedResource, table=True):
@@ -120,6 +129,18 @@ class Integration(NamedResource, UserOwnedResource, table=True):
         description="Optional credential for admin operations (validation, tool/model discovery)",
     )
 
+    execution_plane_status: ExecutionPlaneSyncStatus | None = Field(
+        default=None,
+        sa_column=Column(String(32), nullable=True),
+        description="Independent Execution Plane cluster synchronization status",
+    )
+    execution_plane_revision: int = Field(default=0, sa_column=Column(Integer, nullable=False, server_default="0"))
+    execution_plane_error: str | None = Field(
+        default=None,
+        sa_column=Column(Text(), nullable=True),
+        description="Safe synchronization diagnostic from the Execution Plane",
+    )
+
     last_validated_at: datetime | None = Field(
         default=None,
         description="Timestamp of last validation check",
@@ -172,6 +193,9 @@ class Integration(NamedResource, UserOwnedResource, table=True):
             "refresh_error",
             "last_refreshed_at",
             "last_successful_refresh_at",
+            "execution_plane_status",
+            "execution_plane_error",
+            "execution_plane_revision",
         }
     )
 
@@ -407,6 +431,9 @@ class IntegrationRead(UserReferenceFieldsMixin, NamedResource, UserOwnedResource
         description=_CONFIGURATION_DESCRIPTION, discriminator="integration_type"
     )
     management_credential_id: UUID | None = None
+    execution_plane_status: ExecutionPlaneSyncStatus | None = None
+    execution_plane_revision: int = 0
+    execution_plane_error: str | None = None
     last_validated_at: datetime | None = None
     validation_error: str | None = None
     refresh_status: IntegrationRefreshStatus | None = None

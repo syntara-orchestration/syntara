@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 2
 requires-python = ">=3.12, <3.15"
 resolution-markers = [
     "python_full_version >= '3.14'",
@@ -960,33 +960,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/bf/89/780e11f9588d9e7128a3f87788354c7946a9cbb1401ad38a48c4db9a4f07/execnet-2.1.2.tar.gz", hash = "sha256:63d83bfdd9a23e35b9c6a3261412324f964c2ec8dcd8d3c6916ee9373e0befcd", size = 166622, upload-time = "2025-11-12T09:56:37.75Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/ab/84/02fc1827e8cdded4aa65baef11296a9bbe595c474f0d6d758af082d849fd/execnet-2.1.2-py3-none-any.whl", hash = "sha256:67fba928dd5a544b783f6056f449e5e3931a5c378b128bc18501f7ea79e296ec", size = 40708, upload-time = "2025-11-12T09:56:36.333Z" },
-]
-
-[[package]]
-name = "execution-plane"
-version = "0.1.0"
-source = { editable = "execution-plane" }
-dependencies = [
-    { name = "alembic" },
-    { name = "asyncpg" },
-    { name = "fastapi" },
-    { name = "pydantic-settings" },
-    { name = "sqlmodel" },
-    { name = "structlog" },
-    { name = "temporalio" },
-    { name = "uvicorn", extra = ["standard"] },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "alembic", specifier = ">=1.14.0" },
-    { name = "asyncpg", specifier = ">=0.30.0" },
-    { name = "fastapi", specifier = ">=0.135.0" },
-    { name = "pydantic-settings", specifier = ">=2.0.0" },
-    { name = "sqlmodel", specifier = ">=0.0.22" },
-    { name = "structlog", specifier = ">=24.0.0" },
-    { name = "temporalio", specifier = ">=1.7.0" },
-    { name = "uvicorn", extras = ["standard"], specifier = ">=0.47.0" },
 ]
 
 [[package]]
@@ -4269,7 +4242,6 @@ dependencies = [
     { name = "boto3" },
     { name = "cachetools" },
     { name = "cryptography" },
-    { name = "execution-plane" },
     { name = "fastapi" },
     { name = "filelock" },
     { name = "httpx" },
@@ -4377,7 +4349,6 @@ requires-dist = [
     { name = "boto3-stubs", extras = ["s3"], marker = "extra == 'dev'", specifier = ">=1.35.0" },
     { name = "cachetools", specifier = ">=5.0" },
     { name = "cryptography", specifier = ">=48.0.1" },
-    { name = "execution-plane", editable = "execution-plane" },
     { name = "fastapi", specifier = ">=0.135.0" },
     { name = "fastmcp", marker = "extra == 'dev'", specifier = ">=3.2.0,<4.0.0" },
     { name = "filelock", specifier = ">=3.20.0" },

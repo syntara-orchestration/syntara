@@ -374,7 +374,7 @@ SYSTEM_SCOPED_REPRESENTATIVE: list[PolicyTestCase] = [
 
 # ---------------------------------------------------------------------------
 # Execution-plane policy cases — system-wide read permissions from
-# execution_plane/router.py. These entries track policies only; HTTP
+# syntara.api.execution_plane_router. These entries track policies only; HTTP
 # authorization tests are not yet wired to this list.
 # ---------------------------------------------------------------------------
 

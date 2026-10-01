@@ -1042,6 +1042,16 @@ components:
       title: IntegrationScope
       description: Visibility scope of an integration.
 
+    ExecutionPlaneSyncStatus:
+      type: string
+      description: Synchronization state of an OpenShift integration in the independent Execution Plane service.
+      enum:
+        - pending
+        - ready
+        - error
+        - deleting
+      title: ExecutionPlaneSyncStatus
+
     IntegrationProjectAssignmentRead:
       type: object
       title: IntegrationProjectAssignmentRead
@@ -1383,6 +1393,22 @@ components:
             validation_status:
               $ref: '#/components/schemas/IntegrationStatus'
               default: unknown
+            execution_plane_status:
+              anyOf:
+                - $ref: '#/components/schemas/ExecutionPlaneSyncStatus'
+                - type: "null"
+              title: Execution Plane Status
+              description: Observed synchronization state for OpenShift integrations
+            execution_plane_revision:
+              type: integer
+              title: Execution Plane Revision
+              default: 0
+            execution_plane_error:
+              anyOf:
+                - type: string
+                - type: "null"
+              title: Execution Plane Error
+              description: Safe diagnostic for the latest failed Execution Plane synchronization
             scope:
               $ref: '#/components/schemas/IntegrationScope'
               default: global

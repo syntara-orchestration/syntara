@@ -324,6 +324,12 @@ export interface components {
      */
     IntegrationScope: 'global' | 'project'
     /**
+     * ExecutionPlaneSyncStatus
+     * @description Synchronization state of an OpenShift integration in the independent Execution Plane service.
+     * @enum {string}
+     */
+    ExecutionPlaneSyncStatus: 'pending' | 'ready' | 'error' | 'deleting'
+    /**
      * IntegrationProjectAssignmentRead
      * @description Read schema for a single project assignment.
      */
@@ -569,6 +575,21 @@ export interface components {
       enabled?: boolean
       /** @default unknown */
       validation_status?: components['schemas']['IntegrationStatus']
+      /**
+       * Execution Plane Status
+       * @description Observed synchronization state for OpenShift integrations
+       */
+      execution_plane_status?: components['schemas']['ExecutionPlaneSyncStatus'] | null
+      /**
+       * Execution Plane Revision
+       * @default 0
+       */
+      execution_plane_revision?: number
+      /**
+       * Execution Plane Error
+       * @description Safe diagnostic for the latest failed Execution Plane synchronization
+       */
+      execution_plane_error?: string | null
       /** @default global */
       scope?: components['schemas']['IntegrationScope']
       /**

@@ -117,8 +117,7 @@ make build-images
 ```
 
 ```bash
-# Start the full stack, including the registered local EP cluster and the
-# containerized Execution Plane worker
+# Start the full stack, including the separate EP API and worker containers
 make run-all
 ```
 
@@ -127,21 +126,9 @@ make run-all
 # Install dependencies and setup project
 make install
 
-# Start PostgreSQL, Redis, and Temporal in separate terminals.
-make db-run
-make cache-run
-make temporal-run
-
-# In another terminal, create/register a local Kind/Minikube cluster.
-make ep-dev-up
-
-# In another terminal, start the backend API. This applies the backend and
-# Execution Plane migrations before starting the API.
+# Start supporting services, then start AO and the standalone EP API/worker.
+make services-up
 make dev
-
-# After the API startup has completed its migrations, start the standalone
-# Execution Plane worker in another terminal.
-make ep-worker-run
 
 # Run tests
 make test-all
@@ -154,180 +141,56 @@ make lint
 
 ### Execution Plane development
 
-The Execution Plane development workflow uses the `dev_cli.py` tool through the
-`ep-dev-*` Make targets. It supports local Kind and Minikube clusters, or a
-remote OpenShift cluster. The cluster targets create or register the selected
-environment; they do not start an EP worker.
+Execution Plane is an independent service in the public
+[syntara-execution-plane repository](https://github.com/syntara-orchestration/syntara-execution-plane).
+AO does not install or import the EP implementation package. The optional sibling
+checkout is used only when developing both services locally or building a local
+container image; deployed AO instances consume the configured EP image and API.
 
-The worker is started by the selected application startup path: the repository root
-`make dev` starts one standalone host worker, while backend `make run-all`
-starts the containerized `execution-plane-worker` service.
+The first iteration can keep one PostgreSQL server, but it creates a separate
+`execution_plane` database with dedicated migration and runtime roles. Configure
+`EP_REPOSITORY` if the EP checkout is not at `../syntara-execution-plane`.
 
-#### Prerequisites
-
-For a local cluster, install:
-
-- `kubectl`
-- either [Kind](https://kind.sigs.k8s.io/) or [Minikube](https://minikube.sigs.k8s.io/)
-
-For OpenShift, install `oc` and log in to the cluster before connecting.
-
-For the host-based EP workflow, start PostgreSQL, Redis, and Temporal in
-separate terminals before starting the API:
+For host-based local development, start the supporting containers and then run
+from the Syntara repository root:
 
 ```bash
-make install
-make db-run
-make cache-run
-make temporal-run
-```
-
-The usual local workflow is then:
-
-```bash
-# Create/register the local cluster. This target does not start a worker.
-# It automatically selects the only installed provider, or fails if both
-# Kind and Minikube are installed and --provider is not specified.
-make ep-dev-up
-
-# In another terminal, start the API, run migrations, and seed data.
+make services-up
 make dev
-
-# After the API startup has completed its migrations, start the standalone
-# Execution Plane worker in another terminal.
-make ep-worker-run
 ```
 
-Select a provider explicitly when needed:
+`make dev` runs the AO API/workers and starts the EP API and worker from their
+separate repositories. The EP worker delivers completion events back to AO over
+the configured mTLS callback. Set `APP_EP_API_URL` and the EP runtime/migration
+database URLs in the backend environment when using a non-default setup.
+
+For the complete containerized stack, build the local images and run:
 
 ```bash
-# Kind
-make ep-dev-up EP_DEV_ARGS="--provider kind --cluster execution-plane"
-
-# Minikube
-make ep-dev-up EP_DEV_ARGS="--provider minikube --cluster execution-plane"
-
-# Remote OpenShift; --namespace is required.
-make ep-dev-connect EP_DEV_ARGS="--context my-dev --namespace execution-plane"
+make build-images
+make -C backend run-all
 ```
 
-The provider, cluster, namespace, and kubeconfig context can also be supplied
-through `EP_DEV_PROVIDER`, `EP_DEV_CLUSTER`, `EP_DEV_NAMESPACE`, and
-`EP_DEV_CONTEXT`. The default local cluster and namespace are both named
-`execution-plane`.
+The compose file consumes one EP image for its independent migration job, API,
+and worker containers. Production deployments should configure `EP_IMAGE` to an
+immutable image tag or digest published by the EP repository; they do not need
+the EP source checkout. The EP repository contains its own compose and Kubernetes
+base manifests and owns EP migrations, runtime configuration, and release assets.
 
-#### Loading workload images into a local cluster
+### Execution Plane ownership and acceptance
 
-Images used by Pods in a local Kind or Minikube cluster must be loaded into
-that cluster's node image store. Building an image locally is not sufficient:
-the cluster runtime cannot automatically use an image that exists only in the
-host's container runtime.
+AO owns its HTTP client, authorization, integration-sync outbox, Temporal dispatch
+bindings, and durable completion inbox. EP owns its HTTP API, database, cluster
+credentials, accepted work, execution state, and completion-event outbox. The two
+services have separate database URLs and database roles; the EP runtime has no AO
+database or Temporal configuration.
 
-Set `WORKLOAD_IMAGE` to the arbitrary image you want Pods to run. The image may
-be built locally or pulled into the host's Docker/Podman image store first:
-
-```bash
-WORKLOAD_IMAGE=example/workload:dev
-
-# Example local build; use any image build or pull workflow appropriate to
-# your workload instead.
-podman build -t "$WORKLOAD_IMAGE" path/to/workload
-```
-
-For Kind, load the image into the `execution-plane` cluster:
-
-```bash
-# If the image is available to Docker:
-kind load docker-image "$WORKLOAD_IMAGE" --name execution-plane
-
-# If the image is in Podman, export it and load the archive:
-podman save --format docker-archive -o /tmp/workload-image.tar "$WORKLOAD_IMAGE"
-kind load image-archive /tmp/workload-image.tar --name execution-plane
-```
-
-For Minikube, load the image into the `execution-plane` profile:
-
-```bash
-# If the image is available directly to the local Minikube runtime:
-minikube image load "$WORKLOAD_IMAGE" --profile execution-plane
-```
-
-If the local runtime cannot resolve the image by name, export an archive with
-Docker or Podman and load that instead:
-
-```bash
-podman save --format docker-archive -o /tmp/workload-image.tar "$WORKLOAD_IMAGE"
-# Or: docker save -o /tmp/workload-image.tar "$WORKLOAD_IMAGE"
-minikube image load /tmp/workload-image.tar --profile execution-plane
-```
-
-Reference the same image name in the Pod and prevent Kubernetes from trying to
-pull it from a registry:
-
-```yaml
-containers:
-  - name: workload
-    image: example/workload:dev
-    imagePullPolicy: IfNotPresent
-```
-
-Repeat the image-load command after rebuilding an image. Loading an updated
-image with the same tag does not automatically restart existing Pods; delete
-or recreate those Pods when you need them to use the new image. The image must
-be loaded after `make ep-dev-up` creates or recreates the local cluster.
-
-#### Make targets
-
-Available lifecycle targets:
-
-| Target | Description |
-| --- | --- |
-| `make ep-dev-doctor` | Check that the selected cluster or OpenShift namespace is reachable |
-| `make ep-dev-status` | Check the selected environment and its connectivity |
-| `make ep-dev-up` | Create/start a local cluster and register it |
-| `make ep-dev-connect` | Validate and register an OpenShift environment |
-| `make ep-dev-reset` | Recreate the local cluster and register it |
-| `make ep-dev-down` | Remove the local cluster registration and stop the local cluster |
-
-Pass additional CLI options through `EP_DEV_ARGS`, for example:
-
-```bash
-make ep-dev-status EP_DEV_ARGS="--provider kind --cluster execution-plane"
-make ep-dev-reset EP_DEV_ARGS="--provider minikube --cluster execution-plane"
-```
-
-The root `make dev` runs `ep-dev-up` first, then starts the API, Temporal
-workers, frontend, and one standalone host EP worker. When running commands
-from the `backend` directory, the equivalent host-based workflow is to run
-`make ep-dev-up`, `make dev`, and `make ep-worker-run` in separate terminals;
-the backend `make dev` target only starts the backend API and
-`make ep-worker-run` owns the standalone EP worker.
-
-From the repository root, `make setup` starts supporting infrastructure,
-applies migrations, and seeds the database, but does not create the EP cluster
-or start an EP worker. From the repository root, use `make dev` for the
-host-worker workflow or `make -C backend run-all` for the containerized
-workflow. From the `backend` directory, use `make services-run` to start
-supporting services, followed by the local workflow above, or use `make run-all`;
-`run-all` registers the local cluster before starting the compose
-`execution-plane-worker` service. `make services-run` does not create the EP
-cluster or start an EP worker.
-
-If both Kind and Minikube are installed, specify `--provider`. If registration
-fails, verify that the database is running, `make ep-migrate` has completed,
-and that `kubectl`/`oc` is authenticated to the intended environment.
-
-### Execution-plane CI coverage
-
-Unit and combined test targets include `execution-plane/tests/`. CLI,
-integration, and E2E targets retain their own suites. Coverage reports and
-SonarCloud include `execution-plane/src/`, excluding generated migrations
-from coverage in the same way as the main backend.
-
-`make format`, `make lint`, and `make typecheck` include execution-plane source
-and tests. `make typecheck-pyrefly` checks its source alongside the main backend.
-The pre-commit workflow uses these shared targets. Static checks also inspect
-execution-plane API paths, dead code, imports, test structure, and migrations.
+The current script executor still runs scripts as child processes in the EP worker
+container. Production readiness therefore requires the separate workload-pod
+backend, network-policy enforcement, database grant verification, and end-to-end
+recovery checks described in `execution-plane-service-isolation-plan.md`. The
+manifests establish independent API, worker, and migration deployments, but do
+not by themselves satisfy that workload isolation gate.
 
 ### Database Setup
 
@@ -458,7 +321,10 @@ The `podman-compose.yml` defines the following services:
 | **temporal** | Temporal workflow engine | 7233 | `temporalio/auto-setup:1.25.1` |
 | **temporal-ui** | Temporal web UI (dev only) | 8081 | `temporalio/ui:2.31.2` |
 | **temporal-worker** | Temporal workflow worker | - | Built from `containers/syntara/Containerfile` |
-| **execution-plane-worker** | Execution Plane task worker | - | Built from `containers/execution-plane/Containerfile` |
+| **execution-plane-db-init** | Creates the EP database and separate database roles | - | PostgreSQL image |
+| **execution-plane-migrate** | EP-owned schema migration job | - | Published or locally built EP image |
+| **execution-plane-api** | Versioned EP HTTP API | 8001 | Published or locally built EP image |
+| **execution-plane-worker** | EP controller and completion delivery | - | Published or locally built EP image |
 | **syntara** | Syntara API service | 8000 | Built from `containers/syntara/Containerfile` |
 | **syntara-ui** | Syntara web interface | 8080 | Built from `../frontend/packages/syntara-ui/Containerfile` |
 
@@ -732,12 +598,11 @@ If `APP_BASE_URL` is not set, the target automatically starts the database and d
 
 > **Note:** The E2E tests use an auto-generated Python API client. If you change the OpenAPI schema, regenerate the client with `make generate-api-client` before running E2E tests.
 
-Workflow integration tests run a real execution-plane worker alongside the Temporal
-test server, using the same PostgreSQL testcontainer as the test. Database setup
-applies both the backend and execution-plane migrations. Processing starts after
-each database restore and stops before teardown; completion callbacks use the test
-Temporal client. Automatic time skipping is disabled while this fixture is active
-so external script execution is not overtaken by activity timeouts.
+AO tests own the AO persistence and HTTP adapter boundary. EP persistence, migrations,
+and worker behavior are tested in the standalone execution-plane repository. A
+cross-service PostgreSQL recovery and real-cluster acceptance run remains a release
+gate; the AO unit/integration suite is not evidence of the production isolation
+boundary.
 
 ### Syntara Test SDK
 

@@ -70,6 +70,18 @@ function buildRowActions(
   ]
 }
 
+function ExecutionPlaneStatus({ integration }: Readonly<{ integration: IntegrationRead }>) {
+  if (integration.integration_type !== 'openshift') return <>—</>
+
+  const status = integration.execution_plane_status ?? 'pending'
+  const badge = <Badge isRead>{status.charAt(0).toUpperCase() + status.slice(1)}</Badge>
+  return integration.execution_plane_error ? (
+    <Tooltip content={integration.execution_plane_error}>{badge}</Tooltip>
+  ) : (
+    badge
+  )
+}
+
 function IntegrationsTableContent({
   results,
   getSortParams,
@@ -91,6 +103,7 @@ function IntegrationsTableContent({
         <Tr>
           <Th sort={getSortParams('name')}>Server name / ID</Th>
           <Th sort={getSortParams('validation_status')}>Status</Th>
+          <Th>Execution Plane</Th>
           <Th sort={getSortParams('integration_type')}>Integration type</Th>
           <Th>API URL</Th>
           <Th>Enabled resources</Th>
@@ -114,6 +127,9 @@ function IntegrationsTableContent({
                 status={integration.validation_status ?? 'unknown'}
                 errorMessage={integration.validation_error}
               />
+            </Td>
+            <Td dataLabel="Execution Plane">
+              <ExecutionPlaneStatus integration={integration} />
             </Td>
             <Td dataLabel="Integration type">
               {INTEGRATION_TYPE_LABELS[integration.integration_type ?? ''] ?? integration.integration_type ?? ''}

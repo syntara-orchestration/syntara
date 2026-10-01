@@ -19,12 +19,12 @@ pre-commit-install: ## Install pre-commit hooks
 	uv run pre-commit install
 	uv run pre-commit install --hook-type commit-msg
 
-dev: ## Set up the local EP cluster, then start the API, workers, and frontend dev server
+dev: ## Start AO and the standalone EP API/worker from their separate checkouts
 	@pids=""; \
 	run_backend_target() { \
 		target="$$1"; \
 		trap 'kill -TERM "$$child" 2>/dev/null || true; wait "$$child" 2>/dev/null || true; exit 0' INT TERM; \
-		$(MAKE) -C backend "$$target" 2> >(sed -E '/^make\[[0-9]+\]: \*\*\* \[Makefile:[0-9]+: (dev|worker-run|background-worker-run|ep-worker-run)\] Error (130|143)$$/d' >&2) & \
+		$(MAKE) -C backend "$$target" 2> >(sed -E '/^make\[[0-9]+\]: \*\*\* \[Makefile:[0-9]+: (dev|worker-run|background-worker-run|ep-api-run|ep-worker-run)\] Error (130|143)$$/d' >&2) & \
 		child=$$!; \
 		wait "$$child"; \
 		status=$$?; \
@@ -40,17 +40,18 @@ dev: ## Set up the local EP cluster, then start the API, workers, and frontend d
 	}; \
 	trap 'cleanup 0' INT TERM; \
 	trap cleanup EXIT; \
-	$(MAKE) -C backend ep-dev-up || exit $$?; \
+	$(MAKE) -C backend ep-migrate || exit $$?; \
 	run_backend_target dev & pids="$$pids $$!"; \
 	run_backend_target worker-run & pids="$$pids $$!"; \
 	run_backend_target background-worker-run & pids="$$pids $$!"; \
+	run_backend_target ep-api-run & pids="$$pids $$!"; \
 	run_backend_target ep-worker-run & pids="$$pids $$!"; \
 	cd frontend && VITE_API_URL=https://localhost:8000 npm run start
 
 
 setup: _ensure-env install secrets certs build-images services-up db-migrate db-seed admin-password ## One-shot bootstrap: install, secrets, certs, services, migrations, and seed data
 	@echo ""
-	@echo "Setup complete. Run 'make dev' for host-based EP development or 'make -C backend run-all' for the containerized EP worker."
+	@echo "Setup complete. Run 'make dev' to start AO and the standalone EP API/worker."
 
 _ensure-env:
 	@if [ ! -f backend/.env ]; then \

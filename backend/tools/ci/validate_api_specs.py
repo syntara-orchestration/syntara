@@ -54,7 +54,7 @@ SCHEMA_IGNORE_DIRS = {
     "internal_metrics",
     "schemas",
     "v2",
-    # EP router lives outside the syntara package (execution-plane/src/execution_plane/);
+    # Execution Plane facade is served by Syntara but backed by the execution-plane package;
     # the router-module check does not apply. Drift is checked via api-spec-drift-ep.
     "execution_plane",
 }

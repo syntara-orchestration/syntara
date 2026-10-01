@@ -96,10 +96,11 @@ jobs:
         working-directory: scan/backend
         run: |
           python -m pip install --upgrade pip
-          # uv exports workspace packages as local paths alongside their pinned
-          # third-party dependencies. pip cannot install local paths when the
-          # manifest enables hash checking, so scan the pinned packages only.
-          sed '/^\.\//d' requirements.txt > requirements-snyk.txt
+          # uv exports first-party workspace packages as local paths and the
+          # Execution Plane package as a VCS ref. Remove those package entries
+          # from this hash-checked scan manifest; keep their resolved third-party
+          # dependencies so Snyk still scans the full runtime dependency set.
+          sed -E '/^\.\//d; /^execution-plane @ git\+/d' requirements.txt > requirements-snyk.txt
           pip install -r requirements-snyk.txt
 
       - name: Scan dependencies
@@ -129,7 +130,7 @@ jobs:
         working-directory: base/backend
         run: |
           python -m pip install --upgrade pip
-          sed '/^\.\//d' requirements.txt > requirements-snyk.txt
+          sed -E '/^\.\//d; /^execution-plane @ git\+/d' requirements.txt > requirements-snyk.txt
           pip install -r requirements-snyk.txt
 
       - name: Scan base branch dependencies

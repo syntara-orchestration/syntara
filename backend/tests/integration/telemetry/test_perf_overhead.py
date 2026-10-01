@@ -9,10 +9,9 @@ exercises the full SDK code path (serialization, batching, queuing)
 without mocking, while ensuring the consumer threads never block on
 TCP timeouts so ``shutdown()`` returns promptly.
 
-Each iteration calls the execution-plane script executor directly, including
-subprocess creation, environment setup, and output handling. This measures
-telemetry overhead against real script execution without requiring a Temporal
-activity context or measuring asynchronous dispatch instead of execution.
+Each iteration uses a test-only HTTP-contract double that runs a local script
+subprocess. This measures telemetry overhead against equivalent script work
+without importing the separately deployed Execution Plane implementation.
 
 Run with: make test-integration-coverage
 """
@@ -24,7 +23,6 @@ import uuid
 
 import pytest
 import structlog
-from execution_plane.script_executor import execute_script
 
 from syntara.audit.dispatcher import AuditEventDispatcher
 from syntara.telemetry.client import TelemetryClientRegistry
@@ -39,6 +37,7 @@ from syntara.workflows.workflow_engine.models.workflow_definition import (
     NodeType,
     WorkflowTerminalStatus,
 )
+from tests.fixtures.fake_execution_plane import execute_fixture_script
 
 logger = structlog.stdlib.get_logger(__name__)
 
@@ -77,7 +76,7 @@ _SCRIPT_CONFIG: dict[str, str] = {
 async def _run_workflow_activities() -> None:
     """Execute real bash script activities like a workflow would."""
     for _ in range(_ACTIVITIES_PER_WORKFLOW):
-        await execute_script(_SCRIPT_CONFIG, None)
+        await execute_fixture_script({"input_config": _SCRIPT_CONFIG, "output_config": None})
 
 
 async def _run_baseline(iterations: int) -> list[float]:

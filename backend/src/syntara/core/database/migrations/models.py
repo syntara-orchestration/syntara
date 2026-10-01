@@ -21,6 +21,8 @@ from syntara.core.models.principal import Principal
 from syntara.core.models.secret import EncryptedSecret, Secret
 from syntara.credentials.models.credential import Credential
 from syntara.credentials.models.credential_type import CredentialType
+from syntara.execution_plane.integration_sync_model import ExecutionPlaneIntegrationSync
+from syntara.execution_plane.models import ExecutionPlaneActivityBinding, ExecutionPlaneCompletionInbox
 from syntara.files.models import FileMetadata
 from syntara.identity_providers.models.identity_provider import IdentityProvider
 from syntara.identity_providers.models.idp_group_mapping import IdpGroupMappingEntry
@@ -79,4 +81,7 @@ ALL_MODELS = [
     WebhookTrigger,
     AuditOutboxRecord,
     AuditTableMetadata,
+    ExecutionPlaneActivityBinding,
+    ExecutionPlaneCompletionInbox,
+    ExecutionPlaneIntegrationSync,
 ]

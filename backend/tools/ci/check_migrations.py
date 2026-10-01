@@ -34,7 +34,7 @@ class DatabaseConfig:
     """Alembic database configuration pointer."""
 
     name: str
-    ini_file: str
+    ini_file: str | None
     script_location: str
 
 
@@ -44,19 +44,17 @@ DATABASES: list[DatabaseConfig] = [
         ini_file="alembic.ini",
         script_location="src/syntara/core/database/migrations",
     ),
-    DatabaseConfig(
-        name="execution-plane",
-        ini_file="execution-plane/alembic.ini",
-        script_location="execution-plane/src/execution_plane/migrations",
-    ),
 ]
 
 
 def _get_alembic_config(db_config: DatabaseConfig, db_url: str) -> Config:
-    alembic_cfg = Config(str(PROJECT_ROOT / db_config.ini_file))
+    alembic_cfg = Config(str(PROJECT_ROOT / db_config.ini_file)) if db_config.ini_file else Config()
+    script_location = Path(db_config.script_location)
+    if not script_location.is_absolute():
+        script_location = PROJECT_ROOT / script_location
     alembic_cfg.set_main_option(
         "script_location",
-        str(PROJECT_ROOT / db_config.script_location),
+        str(script_location),
     )
     alembic_cfg.set_main_option("sqlalchemy.url", db_url)
     return alembic_cfg
@@ -93,10 +91,12 @@ def check_multiple_heads(cfg: Config, db_config: DatabaseConfig) -> bool:
         print("\nMigration heads:", file=sys.stderr)
         for head in heads:
             print(f"  {head}", file=sys.stderr)
-        print(
-            f"\nMerge them with: alembic -c {db_config.ini_file} merge -m 'merge heads' <rev1> <rev2>",
-            file=sys.stderr,
+        merge_command = (
+            f"alembic -c {db_config.ini_file} merge -m 'merge heads' <rev1> <rev2>"
+            if db_config.ini_file
+            else "update the execution-plane package migration chain and publish a new package revision"
         )
+        print(f"\nResolve the multiple heads with: {merge_command}", file=sys.stderr)
         return False
     print(f"{GREEN}✅ [{db_config.name}] No multiple heads detected{RESET}")
     return True

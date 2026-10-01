@@ -44,26 +44,86 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/execution_plane/v1/events': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Accept an Execution Plane completion event
+     * @description Persist an EP callback before acknowledging delivery to the producer.
+     */
+    post: operations['accept_execution_plane_event']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
 }
 export type webhooks = Record<string, never>
 export interface components {
   schemas: {
     /**
-     * BackendType
-     * @description Supported execution target backends.
-     * @enum {string}
+     * EPCompletionEvent
+     * @description Authenticated result event delivered by the independent EP service.
      */
-    BackendType: 'vanilla_k8s' | 'openshell'
+    EPCompletionEvent: {
+      /**
+       * Event Id
+       * Format: uuid
+       */
+      event_id: string
+      /**
+       * Event Schema Version
+       * @constant
+       */
+      event_schema_version: 1
+      /** Client Id */
+      client_id: string
+      /**
+       * Project Id
+       * Format: uuid
+       */
+      project_id: string
+      /**
+       * Work Id
+       * Format: uuid
+       */
+      work_id: string
+      /** Request Id */
+      request_id: string
+      /** State Revision */
+      state_revision: number
+      /**
+       * Status
+       * @enum {string}
+       */
+      status: 'completed' | 'failed' | 'cancelled'
+      /** Result */
+      result: {
+        [key: string]: unknown
+      }
+      /**
+       * Completed At
+       * Format: date-time
+       */
+      completed_at: string
+    }
     /**
-     * ExecutionTarget
-     * @description A registered compute environment where worker pods run.
+     * ExecutionTargetFacadeRead
+     * @description Safe target fields available to AO's authorized management API.
      */
-    ExecutionTarget: {
+    ExecutionTargetFacadeRead: {
       /**
        * Id
        * Format: uuid
        */
-      id?: string
+      id: string
       /**
        * Cluster Id
        * Format: uuid
@@ -71,52 +131,29 @@ export interface components {
       cluster_id: string
       /** Name */
       name: string
-      backend_type: components['schemas']['BackendType']
+      /** Backend Type */
+      backend_type: string
       /** Endpoint */
       endpoint: string
-      /**
-       * Namespace
-       * @default default
-       */
-      namespace?: string
-      /** @default registering */
-      status?: components['schemas']['TargetStatus']
-      /**
-       * Enabled
-       * @default true
-       */
-      enabled?: boolean
-      /**
-       * Is Default
-       * @default false
-       */
-      is_default?: boolean
+      /** Namespace */
+      namespace: string
+      /** Status */
+      status: string
+      /** Enabled */
+      enabled: boolean
+      /** Is Default */
+      is_default: boolean
       /** Status Message */
       status_message?: string | null
       /** Labels */
-      labels?: {
+      labels: {
         [key: string]: string
       }
-      /**
-       * Created By
-       * Format: uuid
-       */
-      created_by: string
       /**
        * Created At
        * Format: date-time
        */
       created_at: string
-      /**
-       * Updated By
-       * Format: uuid
-       */
-      updated_by: string
-      /**
-       * Updated At
-       * Format: date-time
-       */
-      updated_at: string
       /** Last Ran At */
       last_ran_at?: string | null
     }
@@ -126,7 +163,7 @@ export interface components {
      */
     ExecutionTargetListResponse: {
       /** Resources */
-      resources: components['schemas']['ExecutionTarget'][]
+      resources: components['schemas']['ExecutionTargetFacadeRead'][]
       /** Next */
       next?: string | null
       /** Prev */
@@ -139,12 +176,6 @@ export interface components {
       /** Detail */
       detail?: components['schemas']['ValidationError'][]
     }
-    /**
-     * TargetStatus
-     * @description Lifecycle states of an execution target.
-     * @enum {string}
-     */
-    TargetStatus: 'registering' | 'validating' | 'bootstrapping' | 'active' | 'degraded' | 'draining' | 'failed'
     /** ValidationError */
     ValidationError: {
       /** Location */
@@ -159,33 +190,29 @@ export interface components {
       ctx?: Record<string, never>
     }
     /**
-     * WorkItem
-     * @description A unit of work written by the Temporal Worker and consumed by the Task Executor.
+     * WorkItemFacadeRead
+     * @description Safe work state; internal tokens and storage metadata stay private.
      */
-    WorkItem: {
+    WorkItemFacadeRead: {
       /**
        * Id
        * Format: uuid
        */
-      id?: string
+      id: string
+      /**
+       * Project Id
+       * Format: uuid
+       */
+      project_id: string
+      /** Request Id */
+      request_id: string
       /**
        * Work Correlation Id
        * Format: uuid
        */
       work_correlation_id: string
-      /** Activity Handle */
-      activity_handle: string
-      /** @default pending */
-      status?: components['schemas']['WorkItemStatus']
-      /** Execution Target Id */
-      execution_target_id?: string | null
-      /**
-       * Payload
-       * @default {}
-       */
-      payload?: {
-        [key: string]: unknown
-      }
+      /** Status */
+      status: string
       /** Result */
       result?: {
         [key: string]: unknown
@@ -199,8 +226,6 @@ export interface components {
       claimed_at?: string | null
       /** Completed At */
       completed_at?: string | null
-      /** Signaled At */
-      signaled_at?: string | null
     }
     /**
      * WorkItemListResponse
@@ -208,7 +233,7 @@ export interface components {
      */
     WorkItemListResponse: {
       /** Resources */
-      resources: components['schemas']['WorkItem'][]
+      resources: components['schemas']['WorkItemFacadeRead'][]
       /** Next */
       next?: string | null
       /** Prev */
@@ -216,12 +241,6 @@ export interface components {
       /** Total */
       total?: number | null
     }
-    /**
-     * WorkItemStatus
-     * @description Lifecycle states of a dispatched work item.
-     * @enum {string}
-     */
-    WorkItemStatus: 'pending' | 'claimed' | 'dispatched' | 'completed' | 'failed' | 'cancelled'
   }
   responses: never
   parameters: never
@@ -280,6 +299,41 @@ export interface operations {
         }
         content: {
           'application/json': components['schemas']['WorkItemListResponse']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/problem+json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  accept_execution_plane_event: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['EPCompletionEvent']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      202: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': {
+            [key: string]: string
+          }
         }
       }
       /** @description Validation Error */
