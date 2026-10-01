@@ -142,7 +142,9 @@ class ServiceAccountCredentialService(UserReferenceResolverMixin, BaseService):
 
         return credential, plaintext_secret
 
-    async def get_credential(self, credential_id: UUID, *, service_account_id: UUID) -> ServiceAccountCredential:
+    async def get_credential(
+        self, credential_id: UUID, *, service_account_id: UUID, for_update: bool = False
+    ) -> ServiceAccountCredential:
         """Get a credential by ID, scoped to the owning service account.
 
         Raises:
@@ -153,6 +155,8 @@ class ServiceAccountCredentialService(UserReferenceResolverMixin, BaseService):
             ServiceAccountCredential.id == credential_id,
             ServiceAccountCredential.service_account_id == service_account_id,
         )
+        if for_update:
+            query = query.with_for_update()
         result = await self.session.exec(query)
         credential = result.one_or_none()
 
@@ -175,7 +179,7 @@ class ServiceAccountCredentialService(UserReferenceResolverMixin, BaseService):
             Tuple of (updated credential, new plaintext secret/key).
 
         """
-        credential = await self.get_credential(credential_id, service_account_id=service_account_id)
+        credential = await self.get_credential(credential_id, service_account_id=service_account_id, for_update=True)
 
         grace = grace_period_seconds if grace_period_seconds is not None else credential.grace_period_seconds
 
