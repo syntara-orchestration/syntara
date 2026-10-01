@@ -13,8 +13,8 @@
  * fills the minimum required form fields, submits, and closes the editor.
  */
 
-import { expect, type Page } from '../fixtures'
 import { EXPRESSION_MODE_LABELS } from '../../src/components/expressions/expressionBuilderLabels'
+import { expect, type Page } from '../fixtures'
 
 import {
   ensureLlmCredential,

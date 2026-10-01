@@ -3,8 +3,8 @@
  * Extracted from v2-nodes.ts to keep file sizes within lint limits.
  */
 
-import { expect, type Page } from '../fixtures'
 import { EXPRESSION_MODE_LABELS } from '../../src/components/expressions/expressionBuilderLabels'
+import { expect, type Page } from '../fixtures'
 
 import { openAddNodePanel, selectCategoryAndType } from './v2-nodes'
 import { addNodePanel, closeNodeEditorPanel, fillCodeEditor, openNodeForEditing } from './workflows'

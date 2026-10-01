@@ -174,8 +174,8 @@ describe('LogicNodeForm', () => {
       await user.clear(nameInput)
       await user.type(nameInput, 'Updated Condition')
 
-      await user.click(screen.getByRole('button', { name: EXPRESSION_MODE_LABELS.visual }))
-      await user.click(await screen.findByRole('option', { name: 'Freeform text' }))
+      await user.click(screen.getByRole('button', { name: EXPRESSION_MODE_LABELS.raw }))
+      await user.click(await screen.findByRole('option', { name: EXPRESSION_MODE_LABELS.raw }))
       const rawInput = screen.getByLabelText(/Raw expression/i)
       await user.clear(rawInput)
       await user.paste('${x > 5}')

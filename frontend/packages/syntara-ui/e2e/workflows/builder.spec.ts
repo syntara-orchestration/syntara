@@ -7,8 +7,8 @@
  * - Canvas interactions and layout
  */
 
-import { test, expect } from '../fixtures'
 import { EXPRESSION_MODE_LABELS } from '../../src/components/expressions/expressionBuilderLabels'
+import { test, expect } from '../fixtures'
 import {
   buildUniqueName,
   deleteWorkflow,

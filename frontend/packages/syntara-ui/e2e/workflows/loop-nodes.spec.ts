@@ -10,8 +10,8 @@
  * - Configuration persistence across saves and edits
  */
 
-import { test, expect } from '../fixtures'
 import { EXPRESSION_MODE_LABELS } from '../../src/components/expressions/expressionBuilderLabels'
+import { test, expect } from '../fixtures'
 import { openAddNodePanel, selectCategoryAndType } from '../helpers/v2-nodes'
 import {
   addChildScriptToLoop,
