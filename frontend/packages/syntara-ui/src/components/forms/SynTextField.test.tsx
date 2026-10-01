@@ -114,6 +114,19 @@ describe('SynTextField', () => {
     expect(onSubmit).toHaveBeenCalledWith({ count: 300 }, expect.anything())
   })
 
+  it('allows typing decimal values without stripping the decimal point mid-edit', async () => {
+    const user = userEvent.setup()
+    const numberSchema = z.object({ rate: z.number().positive().optional() })
+
+    renderWithForm({ schema: numberSchema, defaultValues: {} }, ({ control }) => (
+      <SynTextField name="rate" control={control} label="Rate" type="number" step={0.1} />
+    ))
+
+    const input = screen.getByRole('spinbutton', { name: 'Rate' })
+    await user.type(input, '1.5')
+    expect(input).toHaveValue(1.5)
+  })
+
   it('forwards autoComplete to the input', () => {
     renderWithForm<FormData>({ schema, defaultValues: { name: '', email: '' } }, ({ control }) => (
       <SynTextField name="name" control={control} label="Group name" autoComplete="off" />

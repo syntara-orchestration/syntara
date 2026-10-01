@@ -1,5 +1,5 @@
 import { TextInput } from '@patternfly/react-core'
-import type { ReactElement } from 'react'
+import { useState, type ReactElement } from 'react'
 import type { Control, FieldPath, FieldValues } from 'react-hook-form'
 
 import { SynFormField } from './SynFormField'
@@ -65,6 +65,10 @@ function optionalNumberFromInput(value: string | number | undefined): number | u
   return Number.isNaN(n) ? undefined : n
 }
 
+function isPartialNumberInput(value: string): boolean {
+  return value === '' || value === '-' || value.endsWith('.') || value.endsWith('e') || value.endsWith('E')
+}
+
 /**
  * A single-line text input bound to a react-hook-form field.
  *
@@ -106,6 +110,7 @@ export function SynTextField<
 }: Readonly<SynTextFieldProps<TFieldValues, TName>>) {
   const resolvedFieldId = fieldId ?? name
   const isNumberInput = type === 'number'
+  const [numberDraft, setNumberDraft] = useState<string | null>(null)
 
   return (
     <SynFormField
@@ -118,22 +123,39 @@ export function SynTextField<
       hint={hint}
       hideFormGroupLabel={hideFormGroupLabel}
     >
-      {({ field, fieldState }) => (
+      {({ field, fieldState }) => {
+        const displayValue = isNumberInput
+          ? (numberDraft ??
+            (field.value === undefined || field.value === null ? '' : String(field.value)))
+          : (field.value ?? '')
+
+        return (
         <TextInput
           id={resolvedFieldId}
           type={type}
           aria-label={ariaLabel}
           placeholder={placeholder}
           validated={fieldState.error ? 'error' : 'default'}
-          value={isNumberInput && (field.value === undefined || field.value === null) ? '' : (field.value ?? '')}
+          value={displayValue}
           onChange={(_event, value) => {
             if (isNumberInput) {
-              field.onChange(optionalNumberFromInput(value))
+              setNumberDraft(value)
+              if (!isPartialNumberInput(value)) {
+                field.onChange(optionalNumberFromInput(value))
+                setNumberDraft(null)
+              }
             } else {
               field.onChange(value)
             }
           }}
-          onBlur={field.onBlur}
+          onBlur={() => {
+            if (isNumberInput) {
+              const raw = numberDraft ?? displayValue
+              field.onChange(optionalNumberFromInput(String(raw)))
+              setNumberDraft(null)
+            }
+            field.onBlur()
+          }}
           name={field.name}
           isDisabled={isDisabled}
           autoComplete={autoComplete}
@@ -141,7 +163,8 @@ export function SynTextField<
           max={isNumberInput ? max : undefined}
           step={isNumberInput ? step : undefined}
         />
-      )}
+        )
+      }}
     </SynFormField>
   )
 }
