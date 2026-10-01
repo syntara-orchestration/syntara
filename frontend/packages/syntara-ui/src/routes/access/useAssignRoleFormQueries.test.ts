@@ -9,9 +9,9 @@ import { RolePrincipalType } from '../access-management/RoleAssignmentTypes'
 
 import { accessClient } from './accessClient'
 import { assignRoleSchema, type AssignRoleFormData } from './assignRoleSchema'
+import { useAlreadyAssignedRoles } from './useAlreadyAssignedRoles'
 import { useAssignRoleFormQueries } from './useAssignRoleFormQueries'
 import { useSelectableProjects } from './useAllProjects'
-import { useAlreadyAssignedRoles } from './useAlreadyAssignedRoles'
 
 vi.mock('./accessClient', () => ({
   accessClient: {
@@ -38,6 +38,14 @@ function createWrapper() {
   return function Wrapper({ children }: { children: ReactNode }) {
     return createElement(QueryClientProvider, { client: queryClient }, children)
   }
+}
+
+function mockQueryData<T>(resources: T[]) {
+  return {
+    data: { resources },
+    isLoading: false,
+    error: null,
+  } as never
 }
 
 function renderQueriesHook(overrides?: Partial<AssignRoleFormData>) {
@@ -81,30 +89,15 @@ describe('useAssignRoleFormQueries', () => {
 
     vi.mocked(accessClient.useQuery).mockImplementation((_method, path) => {
       if (path === '/roles') {
-        return {
-          data: { resources: [{ name: 'admin' }, { name: 'editor' }, { name: 'viewer' }] },
-          isLoading: false,
-          error: null,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } as any
+        return mockQueryData([{ name: 'admin' }, { name: 'editor' }, { name: 'viewer' }])
       }
       if (path === '/projects/{project_id}/roles') {
-        return {
-          data: { resources: [{ name: 'project-admin' }, { name: 'admin' }] },
-          isLoading: false,
-          error: null,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } as any
+        return mockQueryData([{ name: 'project-admin' }, { name: 'admin' }])
       }
       if (path === '/users/directory') {
-        return {
-          data: { resources: [{ id: 'user-1', username: 'alice' }] },
-          isLoading: false,
-          error: null,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } as any
+        return mockQueryData([{ id: 'user-1', username: 'alice' }])
       }
-      return { data: { resources: [] }, isLoading: false, error: null } as never
+      return mockQueryData([])
     })
   })
 
