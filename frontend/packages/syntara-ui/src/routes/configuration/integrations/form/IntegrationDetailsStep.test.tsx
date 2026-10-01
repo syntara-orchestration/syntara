@@ -22,6 +22,53 @@ vi.mock('../../../access/useAllProjects', () => {
   return { useAllProjects: projectsMock, useSelectableProjects: projectsMock }
 })
 
+function defaultConfigForType(defaultType: string): IntegrationFormData {
+  if (defaultType === IntegrationTypeEnum.ANSIBLE_AUTOMATION_PLATFORM) {
+    return {
+      name: '',
+      description: '',
+      integration_type: IntegrationTypeEnum.ANSIBLE_AUTOMATION_PLATFORM,
+      configuration: {
+        integration_type: IntegrationTypeEnum.ANSIBLE_AUTOMATION_PLATFORM,
+        base_url: '',
+        allow_http: false,
+        insecure_skip_tls_verify: false,
+      },
+      scope: 'global',
+      project_ids: [],
+    }
+  }
+  if (defaultType === IntegrationTypeEnum.TERRAFORM_ENTERPRISE) {
+    return {
+      name: '',
+      description: '',
+      integration_type: IntegrationTypeEnum.TERRAFORM_ENTERPRISE,
+      configuration: {
+        integration_type: IntegrationTypeEnum.TERRAFORM_ENTERPRISE,
+        base_url: '',
+        organization: '',
+        allow_http: false,
+        insecure_skip_tls_verify: false,
+      },
+      scope: 'global',
+      project_ids: [],
+    }
+  }
+  return {
+    name: '',
+    description: '',
+    integration_type: IntegrationTypeEnum.MCP_SERVER,
+    configuration: {
+      integration_type: IntegrationTypeEnum.MCP_SERVER,
+      base_url: '',
+      allow_http: false,
+      insecure_skip_tls_verify: false,
+    },
+    scope: 'global',
+    project_ids: [],
+  }
+}
+
 function TestWrapper({
   defaultType = IntegrationTypeEnum.MCP_SERVER,
   onTypeChange: onTypeChangeProp = vi.fn(),
@@ -29,34 +76,7 @@ function TestWrapper({
   defaultType?: string
   onTypeChange?: (newType: string) => void
 } = {}) {
-  const defaultValues: IntegrationFormData =
-    defaultType === IntegrationTypeEnum.ANSIBLE_AUTOMATION_PLATFORM
-      ? {
-          name: '',
-          description: '',
-          integration_type: IntegrationTypeEnum.ANSIBLE_AUTOMATION_PLATFORM,
-          configuration: {
-            integration_type: IntegrationTypeEnum.ANSIBLE_AUTOMATION_PLATFORM,
-            base_url: '',
-            allow_http: false,
-            insecure_skip_tls_verify: false,
-          },
-          scope: 'global',
-          project_ids: [],
-        }
-      : {
-          name: '',
-          description: '',
-          integration_type: IntegrationTypeEnum.MCP_SERVER,
-          configuration: {
-            integration_type: IntegrationTypeEnum.MCP_SERVER,
-            base_url: '',
-            allow_http: false,
-            insecure_skip_tls_verify: false,
-          },
-          scope: 'global',
-          project_ids: [],
-        }
+  const defaultValues = defaultConfigForType(defaultType)
 
   const { control, setValue } = useForm<IntegrationFormData>({ defaultValues })
 
@@ -75,6 +95,14 @@ function TestWrapper({
         newConfig = {
           integration_type: 'ansible_automation_platform' as const,
           base_url: '',
+          allow_http: false,
+          insecure_skip_tls_verify: false,
+        }
+      } else if (newType === IntegrationTypeEnum.TERRAFORM_ENTERPRISE) {
+        newConfig = {
+          integration_type: 'terraform_enterprise' as const,
+          base_url: '',
+          organization: '',
           allow_http: false,
           insecure_skip_tls_verify: false,
         }
@@ -166,6 +194,23 @@ describe('IntegrationDetailsStep', () => {
       render(<TestWrapper defaultType={IntegrationTypeEnum.ANSIBLE_AUTOMATION_PLATFORM} />)
 
       expect(screen.getByRole('textbox', { name: /server name/i })).toBeInTheDocument()
+    })
+  })
+
+  describe('Terraform Enterprise', () => {
+    it('renders TFE URL and organization fields', () => {
+      render(<TestWrapper defaultType={IntegrationTypeEnum.TERRAFORM_ENTERPRISE} />)
+
+      const tfeUrl = screen.getByRole('textbox', { name: /tfe url/i })
+      expect(tfeUrl).toBeInTheDocument()
+      expect(tfeUrl).toHaveAttribute('placeholder', 'e.g. https://app.terraform.io')
+      expect(screen.getByRole('textbox', { name: /organization/i })).toBeInTheDocument()
+    })
+
+    it('renders security section for Terraform Enterprise', () => {
+      render(<TestWrapper defaultType={IntegrationTypeEnum.TERRAFORM_ENTERPRISE} />)
+
+      expect(screen.getByText('Security')).toBeInTheDocument()
     })
   })
 

@@ -49,4 +49,30 @@ describe('registerTerraformNode', () => {
     expect(onError).not.toHaveBeenCalled()
     expect(onSuccess).toHaveBeenCalled()
   })
+
+  it('onSubmit reports an error for an unknown subtype', () => {
+    const node = NodeRegistry.get(RegistryNodeId.TERRAFORM)
+    const onSuccess = vi.fn()
+    const onError = vi.fn()
+    node?.onSubmit({ name: 'Bad' }, onSuccess, onError, 'tfe-unknown-step')
+    expect(onSuccess).not.toHaveBeenCalled()
+    expect(onError).toHaveBeenCalledWith('Unknown Terraform step type')
+  })
+
+  it('onSubmit reports an error when subtypeId is missing', () => {
+    const node = NodeRegistry.get(RegistryNodeId.TERRAFORM)
+    const onSuccess = vi.fn()
+    const onError = vi.fn()
+    node?.onSubmit({ name: 'Bad' }, onSuccess, onError)
+    expect(onSuccess).not.toHaveBeenCalled()
+    expect(onError).toHaveBeenCalledWith('Unknown Terraform step type')
+  })
+
+  it('registers variable and run subtypes', () => {
+    const node = NodeRegistry.get(RegistryNodeId.TERRAFORM)
+    const ids = new Set(node?.subtypes?.map((s) => s.id))
+    expect(ids.has(RegistryNodeId.TFE_ADD_VARIABLE)).toBe(true)
+    expect(ids.has(RegistryNodeId.TFE_TRIGGER_RUN)).toBe(true)
+    expect(ids.has(RegistryNodeId.TFE_ASSIGN_TEAM_PERMISSIONS)).toBe(true)
+  })
 })

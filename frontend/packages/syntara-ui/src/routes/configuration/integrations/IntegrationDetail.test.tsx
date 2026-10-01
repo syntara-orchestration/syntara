@@ -786,6 +786,35 @@ describe('IntegrationDetail', () => {
     })
   })
 
+  describe('Terraform Enterprise', () => {
+    const mockTfeIntegration: IntegrationRead = {
+      ...mockIntegration,
+      id: 'int-tfe',
+      name: 'My TFE',
+      description: 'HCP Terraform',
+      integration_type: 'terraform_enterprise',
+      configuration: {
+        integration_type: 'terraform_enterprise',
+        base_url: 'https://app.terraform.io',
+        organization: 'acme-org',
+        allow_http: false,
+        insecure_skip_tls_verify: false,
+        ca_certificate: null,
+      },
+      enabled_tool_count: 0,
+      total_tool_count: 0,
+    }
+
+    it('shows Terraform Enterprise type label and organization', () => {
+      setupDefaultMocks({ integration: mockTfeIntegration })
+      render(<IntegrationDetail />, { wrapper })
+
+      expect(screen.getByText('Terraform Enterprise')).toBeInTheDocument()
+      expect(screen.getByText('acme-org')).toBeInTheDocument()
+      expect(screen.getByText('https://app.terraform.io')).toBeInTheDocument()
+    })
+  })
+
   describe('Ansible Automation Platform', () => {
     const mockAapIntegration: IntegrationRead = {
       ...mockIntegration,

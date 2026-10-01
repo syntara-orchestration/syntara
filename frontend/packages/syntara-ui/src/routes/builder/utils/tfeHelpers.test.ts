@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
-import { buildTFEParameters, resourceAddressesToCsv } from './tfeHelpers'
+import {
+  buildTFEParameters,
+  createTFEActivity,
+  resourceAddressesToCsv,
+  TFE_SUBTYPE_TO_ACTIVITY_TYPE,
+} from './tfeHelpers'
 
 describe('buildTFEParameters sensitive variables', () => {
   it('omits plaintext value when sensitive and keeps value_credential_id', () => {
@@ -27,6 +32,37 @@ describe('buildTFEParameters sensitive variables', () => {
     })
     expect(params.value).toBe('us-east-1')
     expect(params.value_credential_id).toBeUndefined()
+  })
+})
+
+describe('createTFEActivity and subtype map', () => {
+  it('maps registry subtype ids to activity types', () => {
+    expect(TFE_SUBTYPE_TO_ACTIVITY_TYPE['tfe-create-workspace']).toBe('tfe_create_workspace')
+    expect(TFE_SUBTYPE_TO_ACTIVITY_TYPE['tfe-add-variable']).toBe('tfe_add_variable')
+  })
+
+  it('builds an activity with parameters', () => {
+    const activity = createTFEActivity({
+      id: 'n1',
+      name: 'Create WS',
+      activityType: 'tfe_create_workspace',
+      parameters: { name: 'demo' },
+    })
+    expect(activity).toEqual({
+      id: 'n1',
+      type: 'tfe_create_workspace',
+      name: 'Create WS',
+      parameters: { name: 'demo' },
+    })
+  })
+
+  it('maps comment into comment and message parameters', () => {
+    const params = buildTFEParameters({
+      name: 'Comment',
+      comment: 'hello run',
+    })
+    expect(params.comment).toBe('hello run')
+    expect(params.message).toBe('hello run')
   })
 })
 

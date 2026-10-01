@@ -206,6 +206,24 @@ vi.mock('./AIAgentNodeDetails', () => ({
   ),
 }))
 
+vi.mock('./TerraformTaskDetails', () => ({
+  TerraformTaskDetails: ({
+    executor,
+    taskData,
+    nodeId,
+  }: {
+    executor: string
+    taskData: Record<string, unknown>
+    nodeId: string
+  }) => (
+    <div data-testid="terraform-task-details">
+      <div data-testid="tfe-executor">{executor}</div>
+      <div data-testid="tfe-node-id">{nodeId}</div>
+      <div data-testid="tfe-task-name">{String(taskData.name)}</div>
+    </div>
+  ),
+}))
+
 describe('TaskNodeDetails Component', () => {
   const mockOnClose = vi.fn()
   const renderTaskNodeDetails = (taskData: TaskActivity, nodeId: string) =>
@@ -374,6 +392,26 @@ describe('TaskNodeDetails Component', () => {
     expect(screen.getByTestId('ai-agent-node-details')).toBeInTheDocument()
     expect(screen.getByTestId('agent-node-id')).toHaveTextContent('task-agent')
     expect(screen.getByTestId('agent-task-name')).toHaveTextContent('Task Agent')
+  })
+
+  it('renders TerraformTaskDetails for TFE tasks', () => {
+    const taskData = {
+      type: 'tfe_create_workspace' as const,
+      id: 'task-tfe',
+      name: 'Create Workspace',
+      parameters: {
+        integration_id: '11111111-1111-1111-1111-111111111111',
+        credential_id: '22222222-2222-2222-2222-222222222222',
+        name: 'demo',
+      },
+    }
+
+    renderTaskNodeDetails(taskData as unknown as TaskActivity, 'task-tfe')
+
+    expect(screen.getByTestId('terraform-task-details')).toBeInTheDocument()
+    expect(screen.getByTestId('tfe-executor')).toHaveTextContent('tfe_create_workspace')
+    expect(screen.getByTestId('tfe-node-id')).toHaveTextContent('task-tfe')
+    expect(screen.getByTestId('tfe-task-name')).toHaveTextContent('Create Workspace')
   })
 
   it('returns null for unsupported executor type', () => {
