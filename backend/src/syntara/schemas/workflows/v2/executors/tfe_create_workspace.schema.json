@@ -18,10 +18,14 @@
       "credential_id": {
         "type": "string"
       },
-      "name": {
-        "type": "string"
-      },
       "organization": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "Optional organization override; defaults to the integration organization"
+      },
+      "name": {
         "type": "string"
       },
       "auto_apply": {

@@ -2,18 +2,44 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 import structlog
+from temporalio import activity
 from temporalio.exceptions import ApplicationError
 
-from syntara.terraform.client import TFEClient
+from syntara.terraform.client import TFEClient, resolve_http_timeout_from_engine
 from syntara.terraform.errors import TFEError, TFEErrorCode
+from syntara.workflows.workflow_engine.constants import (
+    ENGINE_TIMEOUT_SECONDS_KEY,
+    INTERNAL_ACTIVITY_HEARTBEAT_INTERVAL_SECONDS,
+)
 from syntara.workflows.workflow_engine.utils.credential_scrubber import ensure_resolved_credentials_dict
 
 logger = structlog.stdlib.get_logger(__name__)
 
 _BEARER_TOKEN_KEY = "bearer_token"  # noqa: S105
+
+
+async def heartbeat_until_cancelled() -> None:
+    """Heartbeat on a fixed interval until the surrounding task is cancelled.
+
+    Temporal delivers cancellation only through heartbeats, and only when the
+    activity was scheduled with a ``heartbeat_timeout``. Beat before the first
+    sleep so cancel is deliverable immediately. Outside an activity context
+    (unit tests) ``activity.heartbeat`` raises ``RuntimeError`` and the loop
+    exits quietly. Ref: AAP-88614.
+    """
+    while True:
+        try:
+            activity.heartbeat()
+        except RuntimeError:  # not inside an activity context
+            return
+        except Exception:
+            logger.exception("TFE activity heartbeat failed; cancellation may no longer be deliverable")
+            return
+        await asyncio.sleep(INTERNAL_ACTIVITY_HEARTBEAT_INTERVAL_SECONDS)
 
 
 def raise_as_application_error(exc: TFEError) -> None:
@@ -60,8 +86,14 @@ def build_client_from_resolution(
     token: str,
     *,
     organization_override: str | None = None,
+    engine_timeout_seconds: float | None = None,
 ) -> TFEClient:
-    """Build a TFEClient from integration resolution payload + token."""
+    """Build a TFEClient from integration resolution payload + token.
+
+    ``engine_timeout_seconds`` is the activity budget injected by the workflow
+    engine (``ENGINE_TIMEOUT_SECONDS_KEY``). The HTTP client timeout is derived
+    from it so httpx cannot outlive Temporal's start_to_close timeout.
+    """
     base_url = integration.get("base_url")
     organization = organization_override or integration.get("organization")
     if not base_url or not organization:
@@ -73,7 +105,16 @@ def build_client_from_resolution(
         organization=organization,
         verify_ssl=bool(integration.get("verify_ssl", True)),
         ca_certificate=integration.get("ca_certificate"),
+        timeout_seconds=resolve_http_timeout_from_engine(engine_timeout_seconds),
     )
+
+
+def engine_timeout_from_input(input_config: dict[str, Any]) -> float | int | None:
+    """Return the engine-injected activity timeout, if present."""
+    value = input_config.get(ENGINE_TIMEOUT_SECONDS_KEY)
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return value
+    return None
 
 
 def data_id(payload: dict[str, Any]) -> str | None:

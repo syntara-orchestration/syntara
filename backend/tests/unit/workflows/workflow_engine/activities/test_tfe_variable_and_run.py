@@ -4,7 +4,7 @@ import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from temporalio.exceptions import ApplicationError
+from temporalio.exceptions import ApplicationError, CancelledError
 
 from syntara.workflows.workflow_engine.activities.tfe_activities import (
     execute_tfe_add_variable_activity,
@@ -20,6 +20,8 @@ INPUT = {
     "credential_id": "22222222-2222-2222-2222-222222222222",
 }
 CLIENT_PATH = "syntara.workflows.workflow_engine.activities.tfe_activities._client_from_input"
+HEARTBEAT_PATH = "syntara.workflows.workflow_engine.activities.tfe_common.activity.heartbeat"
+IS_CANCELLED_PATH = "syntara.workflows.workflow_engine.activities.tfe_activities.activity.is_cancelled"
 
 
 @pytest.mark.asyncio
@@ -95,9 +97,102 @@ async def test_polling_deadline_interrupts_a_stalled_request() -> None:
         await asyncio.sleep(60)
 
     client = MagicMock(get_run=AsyncMock(side_effect=stalled_request))
-    with patch(CLIENT_PATH, return_value=client), pytest.raises(ApplicationError) as error:
+    with (
+        patch(CLIENT_PATH, return_value=client),
+        patch(HEARTBEAT_PATH),
+        patch(IS_CANCELLED_PATH, return_value=False),
+        pytest.raises(ApplicationError) as error,
+    ):
         await execute_tfe_get_run_status_activity(
             {**INPUT, "run_id": "run-1", "wait_for_completion": True, "timeout_seconds": 1}
         )
     assert error.value.type == "TRANSIENT"
     assert error.value.non_retryable
+
+
+@pytest.mark.asyncio
+async def test_wait_for_completion_starts_heartbeat_loop() -> None:
+    """wait_for_completion must start the background heartbeat task used for cancel delivery."""
+    payloads = [
+        {"data": {"attributes": {"status": "planning", "actions": {}}}},
+        {"data": {"attributes": {"status": "applied", "actions": {}, "has-changes": False}}},
+    ]
+    client = MagicMock(get_run=AsyncMock(side_effect=payloads))
+    with (
+        patch(CLIENT_PATH, return_value=client),
+        patch(
+            "syntara.workflows.workflow_engine.activities.tfe_activities.heartbeat_until_cancelled",
+            new_callable=AsyncMock,
+        ) as mock_heartbeat_loop,
+        patch(IS_CANCELLED_PATH, return_value=False),
+        patch("syntara.workflows.workflow_engine.activities.tfe_activities.asyncio.sleep", new_callable=AsyncMock),
+    ):
+        result = await execute_tfe_get_run_status_activity(
+            {
+                **INPUT,
+                "run_id": "run-1",
+                "wait_for_completion": True,
+                "poll_interval_seconds": 1,
+                "timeout_seconds": 30,
+            }
+        )
+    assert result["status"] == "applied"
+    assert mock_heartbeat_loop.call_count == 1
+
+
+@pytest.mark.asyncio
+async def test_one_shot_status_does_not_start_heartbeat_loop() -> None:
+    """A non-waiting status check must not start the heartbeat loop."""
+    client = MagicMock(
+        get_run=AsyncMock(
+            return_value={"data": {"attributes": {"status": "applied", "actions": {}, "has-changes": False}}},
+        )
+    )
+    with (
+        patch(CLIENT_PATH, return_value=client),
+        patch(
+            "syntara.workflows.workflow_engine.activities.tfe_activities.heartbeat_until_cancelled",
+            new_callable=AsyncMock,
+        ) as mock_heartbeat_loop,
+    ):
+        result = await execute_tfe_get_run_status_activity({**INPUT, "run_id": "run-1"})
+    assert result["status"] == "applied"
+    mock_heartbeat_loop.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_heartbeat_until_cancelled_beats_before_first_sleep() -> None:
+    """Cancel is undeliverable for one interval if the loop sleeps before beating."""
+    from syntara.workflows.workflow_engine.activities.tfe_common import heartbeat_until_cancelled
+
+    with (
+        patch(
+            "syntara.workflows.workflow_engine.activities.tfe_common.INTERNAL_ACTIVITY_HEARTBEAT_INTERVAL_SECONDS",
+            600.0,
+        ),
+        patch(HEARTBEAT_PATH) as mock_heartbeat,
+    ):
+        task = asyncio.create_task(heartbeat_until_cancelled())
+        await asyncio.sleep(0)
+        task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
+
+    assert mock_heartbeat.call_count == 1
+
+
+@pytest.mark.asyncio
+async def test_wait_for_completion_raises_when_cancelled() -> None:
+    client = MagicMock(
+        get_run=AsyncMock(
+            return_value={"data": {"attributes": {"status": "planning", "actions": {}}}},
+        )
+    )
+    with (
+        patch(CLIENT_PATH, return_value=client),
+        patch(HEARTBEAT_PATH),
+        patch(IS_CANCELLED_PATH, return_value=True),
+        pytest.raises(CancelledError),
+    ):
+        await execute_tfe_get_run_status_activity(
+            {**INPUT, "run_id": "run-1", "wait_for_completion": True, "timeout_seconds": 30}
+        )

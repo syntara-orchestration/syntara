@@ -18,6 +18,13 @@
       "credential_id": {
         "type": "string"
       },
+      "organization": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "Optional organization override; defaults to the integration organization"
+      },
       "workspace_id": {
         "type": "string"
       }

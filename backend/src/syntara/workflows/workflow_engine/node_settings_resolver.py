@@ -23,12 +23,47 @@ from syntara.workflows.workflow_engine.models.workflow_definition import (
 # Maps executor node type to its catalog setting key for timeout.
 # Approval and converge are excluded — they use dedicated parameters fields
 # (decision_window and wait_duration) resolved by their own functions below.
+_TFE_TIMEOUT_KEY = "workflow_engine.tfe_timeout_seconds"
+_TFE_UPLOAD_TIMEOUT_KEY = "workflow_engine.tfe_upload_timeout_seconds"
+
+_TFE_STANDARD_TIMEOUT_NODE_TYPES: tuple[str, ...] = (
+    NodeType.TFE_CREATE_WORKSPACE,
+    NodeType.TFE_LIST_WORKSPACES,
+    NodeType.TFE_UPDATE_WORKSPACE,
+    NodeType.TFE_DELETE_WORKSPACE,
+    NodeType.TFE_FETCH_STATE_OUTPUTS,
+    NodeType.TFE_ADD_VARIABLE,
+    NodeType.TFE_LIST_VARIABLES,
+    NodeType.TFE_UPDATE_VARIABLE,
+    NodeType.TFE_DELETE_VARIABLE,
+    NodeType.TFE_TRIGGER_RUN,
+    NodeType.TFE_GET_RUN_STATUS,
+    NodeType.TFE_APPLY_RUN,
+    NodeType.TFE_DISCARD_RUN,
+    NodeType.TFE_CANCEL_RUN,
+    NodeType.TFE_FORCE_CANCEL_RUN,
+    NodeType.TFE_LIST_RUNS,
+    NodeType.TFE_ADD_RUN_COMMENT,
+    NodeType.TFE_LIST_GITHUB_INSTALLATIONS,
+    NodeType.TFE_GET_GITHUB_INSTALLATION,
+    NodeType.TFE_LINK_VCS,
+    NodeType.TFE_CREATE_PROJECT,
+    NodeType.TFE_LIST_PROJECTS,
+    NodeType.TFE_GET_PROJECT,
+    NodeType.TFE_UPDATE_PROJECT,
+    NodeType.TFE_DELETE_PROJECT,
+    NodeType.TFE_MOVE_WORKSPACE_TO_PROJECT,
+    NodeType.TFE_ASSIGN_TEAM_PERMISSIONS,
+)
+
 _TIMEOUT_CATALOG_KEYS: dict[str, str] = {
     NodeType.SCRIPT: "workflow_engine.script_timeout_seconds",
     NodeType.HTTP_REQUEST: "workflow_engine.http_request_timeout_seconds",
     NodeType.AAP_JOB_TEMPLATE: "workflow_engine.aap_timeout_seconds",
     NodeType.AAP_WORKFLOW_JOB_TEMPLATE: "workflow_engine.aap_timeout_seconds",
     NodeType.AGENTIC: "workflow_engine.agentic_timeout_seconds",
+    **dict.fromkeys(_TFE_STANDARD_TIMEOUT_NODE_TYPES, _TFE_TIMEOUT_KEY),
+    NodeType.TFE_UPLOAD_CONFIGURATION_VERSION: _TFE_UPLOAD_TIMEOUT_KEY,
 }
 
 _MAX_OUTPUT_CATALOG_KEYS: dict[str, str] = {

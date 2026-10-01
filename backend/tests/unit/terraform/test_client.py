@@ -7,7 +7,11 @@ import httpx
 import pytest
 import respx
 
-from syntara.terraform.client import TFEClient
+from syntara.terraform.client import (
+    DEFAULT_TFE_HTTP_TIMEOUT_SECONDS,
+    TFEClient,
+    resolve_http_timeout_from_engine,
+)
 from syntara.terraform.errors import TFEError, TFEErrorCode
 from syntara.terraform.presets import workspace_preset_parts
 
@@ -17,6 +21,26 @@ BASE_URL = "https://terraform.example.com/api/v2"
 @pytest.fixture
 def client() -> TFEClient:
     return TFEClient(base_url="https://terraform.example.com", token="test", organization="acme")  # noqa: S106
+
+
+def test_resolve_http_timeout_from_engine_leaves_margin() -> None:
+    """Client HTTP budget must stay under the activity timeout."""
+    assert resolve_http_timeout_from_engine(180) == 170.0
+    assert resolve_http_timeout_from_engine(900) == 890.0
+    assert resolve_http_timeout_from_engine(5) == 1.0
+    assert resolve_http_timeout_from_engine(None) == DEFAULT_TFE_HTTP_TIMEOUT_SECONDS
+
+
+def test_request_timeout_divides_budget_for_reads() -> None:
+    """Read retries share the activity HTTP budget; mutating calls use the full budget."""
+    client = TFEClient(
+        base_url="https://terraform.example.com",
+        token="test",  # noqa: S106
+        organization="acme",
+        timeout_seconds=170.0,
+    )
+    assert client._request_timeout(mutating=True) == 170.0
+    assert client._request_timeout(mutating=False) == pytest.approx(170.0 / 3)
 
 
 @pytest.mark.asyncio

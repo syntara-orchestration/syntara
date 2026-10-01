@@ -28,6 +28,23 @@ _API_PREFIX = "/api/v2"
 _MAX_READ_ATTEMPTS = 3
 _BACKOFF_BASE_SECONDS = 0.5
 _HTTP_NO_CONTENT = 204
+# Leave headroom under the activity budget for decode/telemetry before Temporal
+# cancels the attempt. Must stay ≤ OrchestratorWorkflow._TEMPORAL_MARGIN.
+_CLIENT_TIMEOUT_MARGIN_SECONDS = 10.0
+DEFAULT_TFE_HTTP_TIMEOUT_SECONDS = 60.0
+
+
+def resolve_http_timeout_from_engine(engine_timeout_seconds: float | None) -> float:
+    """Derive a per-client HTTP budget from the activity timeout.
+
+    The returned value is the total HTTP budget for the activity (client timeout
+    <= activity budget - margin). Callers that retry reads should further divide
+    this budget across attempts via :meth:`TFEClient._request_timeout`.
+    """
+    if engine_timeout_seconds is None:
+        return DEFAULT_TFE_HTTP_TIMEOUT_SECONDS
+    budget = float(engine_timeout_seconds) - _CLIENT_TIMEOUT_MARGIN_SECONDS
+    return max(1.0, budget)
 
 
 class TFEClient:
@@ -41,9 +58,14 @@ class TFEClient:
         organization: str,
         verify_ssl: bool = True,
         ca_certificate: str | None = None,
-        timeout_seconds: float = 60.0,
+        timeout_seconds: float = DEFAULT_TFE_HTTP_TIMEOUT_SECONDS,
     ) -> None:
-        """Initialize the client with connection settings."""
+        """Initialize the client with connection settings.
+
+        ``timeout_seconds`` is the total HTTP budget for the activity. Mutating
+        calls and uploads use it as the per-request timeout; read calls divide it
+        across retry attempts so the worst case still fits the activity budget.
+        """
         self.base_url = base_url.rstrip("/")
         self.organization = organization
         self._token = token
@@ -52,6 +74,12 @@ class TFEClient:
             insecure_skip_tls_verify=not verify_ssl,
             ca_certificate=ca_certificate,
         )
+
+    def _request_timeout(self, *, mutating: bool) -> float:
+        """Per-request httpx timeout that stays within the activity HTTP budget."""
+        if mutating:
+            return self._timeout
+        return max(1.0, self._timeout / _MAX_READ_ATTEMPTS)
 
     def _headers(self) -> dict[str, str]:
         return {
@@ -87,9 +115,10 @@ class TFEClient:
         attempts = 1 if mutating else _MAX_READ_ATTEMPTS
         last_error: Exception | None = None
 
+        request_timeout = self._request_timeout(mutating=mutating)
         for attempt in range(1, attempts + 1):
             try:
-                async with httpx.AsyncClient(verify=self._verify, timeout=self._timeout) as client:
+                async with httpx.AsyncClient(verify=self._verify, timeout=request_timeout) as client:
                     response = await client.request(
                         method,
                         self._url(path),

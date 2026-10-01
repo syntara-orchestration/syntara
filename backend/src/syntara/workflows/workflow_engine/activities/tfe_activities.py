@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any
 
 import structlog
 from temporalio import activity
+from temporalio.exceptions import CancelledError
 
 from syntara.terraform.errors import TFEError, TFEErrorCode
 from syntara.terraform.presets import workspace_preset_parts
@@ -30,8 +31,10 @@ from syntara.workflows.workflow_engine.activities.tfe_common import (
     build_client_from_resolution,
     data_attrs,
     data_id,
+    engine_timeout_from_input,
     extract_bearer_token,
     extract_secret_string_value,
+    heartbeat_until_cancelled,
     list_resources,
     map_run_phase,
     raise_as_application_error,
@@ -116,7 +119,12 @@ def _client_from_input(input_config: dict[str, Any], organization: str | None = 
         msg = "credential_id is required"
         raise TFEError(msg, error_code=TFEErrorCode.CONFIG_MISSING)
     token = extract_bearer_token(input_config.get("_resolved_credentials"))
-    return build_client_from_resolution(integration, token, organization_override=organization)
+    return build_client_from_resolution(
+        integration,
+        token,
+        organization_override=organization,
+        engine_timeout_seconds=engine_timeout_from_input(input_config),
+    )
 
 
 # ── Workspace ──────────────────────────────────────────────────────────────
@@ -486,53 +494,85 @@ async def execute_tfe_trigger_run_activity(
             raise
 
 
+async def _wait_for_run_completion(
+    client: TFEClient,
+    *,
+    run_id: str,
+    run_payload: dict[str, Any],
+    poll_interval_seconds: int,
+    deadline: float,
+) -> dict[str, Any]:
+    """Poll TFE until the run reaches a terminal status or the deadline expires."""
+    while True:
+        if activity.is_cancelled():
+            msg = f"Cancelled while waiting for TFE run {run_id}"
+            raise CancelledError(msg)
+        status = data_attrs(run_payload).get("status")
+        if status in _FINAL_RUN_STATUSES:
+            return run_payload
+        if time.monotonic() >= deadline:
+            msg = f"Timed out waiting for run {run_id}; last status={status}"
+            raise TFEError(
+                msg,
+                error_code=TFEErrorCode.TRANSIENT,
+                details={"status": status},
+            )
+        await asyncio.sleep(max(1, poll_interval_seconds))
+        run_payload = await client.get_run(run_id)
+
+
+async def _run_status_plan_details(
+    client: TFEClient,
+    run_payload: dict[str, Any],
+) -> tuple[int | None, dict[str, Any] | None]:
+    """Fetch plan exit code and resource-change counts when a plan relation exists."""
+    plan_rel = (run_payload.get("data") or {}).get("relationships", {}).get("plan", {}).get("data")
+    if not isinstance(plan_rel, dict) or not plan_rel.get("id"):
+        return None, None
+    try:
+        plan = await client.get_plan(plan_rel["id"])
+    except TFEError:
+        return None, None
+    plan_attrs = data_attrs(plan)
+    return plan_attrs.get("exit-code"), {
+        "toAdd": plan_attrs.get("resource-additions"),
+        "toChange": plan_attrs.get("resource-changes"),
+        "toDestroy": plan_attrs.get("resource-destructions"),
+    }
+
+
 @activity.defn(name=ActivityName.TFE_GET_RUN_STATUS)
 async def execute_tfe_get_run_status_activity(
     input_config: dict[str, Any],
     outputs: dict[str, str] | None = None,
 ) -> dict[str, Any]:
-    """Get run status (optionally wait for completion)."""
+    """Get run status (optionally wait for completion).
+
+    When ``wait_for_completion`` is true the workflow schedules this activity with
+    a ``heartbeat_timeout``. A background heartbeat loop keeps cancel deliverable
+    while the poll sleeps or waits on HTTP (see AAP-88614).
+    """
     params = TFEGetRunStatusParameters.model_validate(input_config)
+    heartbeat_task: asyncio.Task[None] | None = None
+    if params.wait_for_completion:
+        heartbeat_task = asyncio.create_task(heartbeat_until_cancelled())
     try:
         async with asyncio.timeout(params.timeout_seconds if params.wait_for_completion else None):
             client = _client_from_input(input_config, params.organization)
-            deadline = time.monotonic() + params.timeout_seconds
             run_payload = await client.get_run(params.run_id)
-
-            while params.wait_for_completion:
-                status = data_attrs(run_payload).get("status")
-                if status in _FINAL_RUN_STATUSES:
-                    break
-                if time.monotonic() >= deadline:
-                    msg = f"Timed out waiting for run {params.run_id}; last status={status}"
-                    raise TFEError(
-                        msg,
-                        error_code=TFEErrorCode.TRANSIENT,
-                        details={"status": status},
-                    )
-                await asyncio.sleep(max(1, params.poll_interval_seconds))
-                activity.heartbeat({"run_id": params.run_id, "status": status})
-                run_payload = await client.get_run(params.run_id)
+            if params.wait_for_completion:
+                run_payload = await _wait_for_run_completion(
+                    client,
+                    run_id=params.run_id,
+                    run_payload=run_payload,
+                    poll_interval_seconds=params.poll_interval_seconds,
+                    deadline=time.monotonic() + params.timeout_seconds,
+                )
 
             attrs = data_attrs(run_payload)
             status = attrs.get("status")
             actions = attrs.get("actions") or {}
-            plan_exit_code = None
-            resource_changes = None
-            plan_rel = (run_payload.get("data") or {}).get("relationships", {}).get("plan", {}).get("data")
-            if isinstance(plan_rel, dict) and plan_rel.get("id"):
-                try:
-                    plan = await client.get_plan(plan_rel["id"])
-                    plan_attrs = data_attrs(plan)
-                    plan_exit_code = plan_attrs.get("exit-code")
-                    resource_changes = {
-                        "toAdd": plan_attrs.get("resource-additions"),
-                        "toChange": plan_attrs.get("resource-changes"),
-                        "toDestroy": plan_attrs.get("resource-destructions"),
-                    }
-                except TFEError:
-                    pass
-
+            plan_exit_code, resource_changes = await _run_status_plan_details(client, run_payload)
             return TFEGetRunStatusOutput(
                 run_id=params.run_id,
                 status=status,
@@ -552,6 +592,12 @@ async def execute_tfe_get_run_status_activity(
     except TFEError as exc:
         raise_as_application_error(exc)
         raise
+    finally:
+        if heartbeat_task is not None:
+            heartbeat_task.cancel()
+            # gather(return_exceptions=True) keeps the heartbeat task's own
+            # CancelledError from masking a cancel aimed at this activity.
+            await asyncio.gather(heartbeat_task, return_exceptions=True)
 
 
 async def _run_control_action(

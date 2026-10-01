@@ -18,7 +18,11 @@
         "type": "string"
       },
       "organization": {
-        "type": "string"
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "Optional organization override; defaults to the integration organization"
       },
       "search": {
         "type": "string"

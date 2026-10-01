@@ -20,7 +20,11 @@
         "type": "string"
       },
       "organization": {
-        "type": ["string", "null"]
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "Optional organization override; defaults to the integration organization"
       },
       "workspace_id": {
         "type": "string"
@@ -29,11 +33,17 @@
         "type": "string"
       },
       "value": {
-        "type": ["string", "null"],
+        "type": [
+          "string",
+          "null"
+        ],
         "description": "Plaintext value (non-sensitive only). Use value_credential_id when sensitive=true."
       },
       "value_credential_id": {
-        "type": ["string", "null"],
+        "type": [
+          "string",
+          "null"
+        ],
         "description": "UUID of a Secret String credential providing the variable value"
       },
       "category": {

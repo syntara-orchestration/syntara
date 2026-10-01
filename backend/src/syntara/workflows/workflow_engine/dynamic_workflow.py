@@ -1050,6 +1050,7 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
 
     # Executor node types whose activities enforce their own internal deadline,
     # so Temporal's start_to_close_timeout must include the margin.
+    # TFE types are included via _TFE_NODE_TYPES at the call site (defined later).
     _EXECUTOR_TIMEOUT_MARGIN_TYPES: ClassVar[frozenset[str]] = frozenset(
         {
             NodeType.SCRIPT,
@@ -1120,7 +1121,16 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
             args.extend(extra_args)
 
         retry_policy = resolve_retry_policy(node, self._runtime_settings)
-        if node_type == NodeType.TFE_GET_RUN_STATUS:
+        # Temporal delivers cancellation to an activity only through its heartbeats,
+        # and only when the schedule carries a heartbeat_timeout -- otherwise the
+        # beats are dropped and cancelling the workflow leaves a long-running
+        # activity executing until start_to_close_timeout. Only activities that
+        # actually heartbeat may receive a heartbeat_timeout; others would fail
+        # spuriously (see AAP-88614).
+        heartbeat_timeout: timedelta | None = None
+        if node_type == NodeType.INTERNAL_ACTIVITY:
+            heartbeat_timeout = timedelta(seconds=INTERNAL_ACTIVITY_HEARTBEAT_TIMEOUT_SECONDS)
+        elif node_type == NodeType.TFE_GET_RUN_STATUS:
             params = TFEGetRunStatusParameters.model_validate(resolved_parameters)
             if params.wait_for_completion:
                 # Use resolved parameters so templated wait durations work too.
@@ -1129,17 +1139,9 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
                     timeout_seconds,
                     params.timeout_seconds + self._TEMPORAL_MARGIN,
                 )
-        # Temporal delivers cancellation to an activity only through its heartbeats,
-        # and only when the schedule carries a heartbeat_timeout -- otherwise the
-        # beats are dropped and cancelling the workflow leaves a long-running
-        # activity (the agent run) executing until start_to_close_timeout. Only
-        # internal activities heartbeat; giving the others a heartbeat timeout would
-        # fail them spuriously. Ref: AAP-88614.
-        heartbeat_timeout = (
-            timedelta(seconds=INTERNAL_ACTIVITY_HEARTBEAT_TIMEOUT_SECONDS)
-            if node_type == NodeType.INTERNAL_ACTIVITY
-            else None
-        )
+                # Long polls heartbeat on a fixed interval; size the timeout like
+                # internal activities (3x the beat interval).
+                heartbeat_timeout = timedelta(seconds=INTERNAL_ACTIVITY_HEARTBEAT_TIMEOUT_SECONDS)
         return cast(
             "dict[str, Any]",
             await workflow.execute_activity(
@@ -1667,9 +1669,11 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
                 parameters_with_timeout[ENGINE_MAX_OUTPUT_BYTES_KEY] = resolve_max_output_bytes(
                     node, self._runtime_settings
                 )
+            # TFE activities size httpx timeouts from ENGINE_TIMEOUT_SECONDS_KEY;
+            # Temporal must outlive that budget (same pattern as HTTP/AAP).
             temporal_timeout = (
                 timeout_seconds + self._TEMPORAL_MARGIN
-                if node_type in self._EXECUTOR_TIMEOUT_MARGIN_TYPES
+                if (node_type in self._EXECUTOR_TIMEOUT_MARGIN_TYPES or node_type in self._TFE_NODE_TYPES)
                 else timeout_seconds
             )
             return await self._execute_executor_node(

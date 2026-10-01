@@ -248,6 +248,71 @@ class TestExecuteExecutorNodeHeartbeatTimeout:
             kwargs = await self._schedule(node_type)
             assert kwargs["heartbeat_timeout"] is None, f"{node_type} must not get a heartbeat timeout"
 
+    @pytest.mark.asyncio
+    async def test_tfe_run_status_wait_gets_a_heartbeat_timeout(self) -> None:
+        """Long TFE run polls heartbeat; without a timeout cancel never reaches the activity."""
+        wf = _make_workflow()
+        node = ActivityNode("n1", NodeType.TFE_GET_RUN_STATUS, {})
+        with (
+            patch(
+                "syntara.workflows.workflow_engine.dynamic_workflow.workflow.execute_activity",
+                new=AsyncMock(return_value={"output": {}}),
+            ) as mock_exec,
+            patch(
+                "syntara.workflows.workflow_engine.dynamic_workflow.resolve_retry_policy",
+                return_value=None,
+            ),
+        ):
+            await wf._execute_executor_node(
+                node=node,
+                node_type=NodeType.TFE_GET_RUN_STATUS,
+                resolved_parameters={
+                    "integration_id": "11111111-1111-1111-1111-111111111111",
+                    "credential_id": "22222222-2222-2222-2222-222222222222",
+                    "run_id": "run-1",
+                    "wait_for_completion": True,
+                    "timeout_seconds": 120,
+                },
+                outputs=None,
+                timeout_seconds=180,
+            )
+        assert mock_exec.await_args is not None
+        kwargs = dict(mock_exec.await_args.kwargs)
+        assert kwargs["heartbeat_timeout"] == timedelta(seconds=INTERNAL_ACTIVITY_HEARTBEAT_TIMEOUT_SECONDS)
+        # max(passed timeout 180, params.timeout_seconds 120 + margin) → 180
+        assert kwargs["start_to_close_timeout"] == timedelta(seconds=180)
+
+    @pytest.mark.asyncio
+    async def test_tfe_run_status_without_wait_gets_no_heartbeat_timeout(self) -> None:
+        """A one-shot status check must not receive a heartbeat_timeout."""
+        wf = _make_workflow()
+        node = ActivityNode("n1", NodeType.TFE_GET_RUN_STATUS, {})
+        with (
+            patch(
+                "syntara.workflows.workflow_engine.dynamic_workflow.workflow.execute_activity",
+                new=AsyncMock(return_value={"output": {}}),
+            ) as mock_exec,
+            patch(
+                "syntara.workflows.workflow_engine.dynamic_workflow.resolve_retry_policy",
+                return_value=None,
+            ),
+        ):
+            await wf._execute_executor_node(
+                node=node,
+                node_type=NodeType.TFE_GET_RUN_STATUS,
+                resolved_parameters={
+                    "integration_id": "11111111-1111-1111-1111-111111111111",
+                    "credential_id": "22222222-2222-2222-2222-222222222222",
+                    "run_id": "run-1",
+                    "wait_for_completion": False,
+                },
+                outputs=None,
+                timeout_seconds=180,
+            )
+        assert mock_exec.await_args is not None
+        kwargs = dict(mock_exec.await_args.kwargs)
+        assert kwargs["heartbeat_timeout"] is None
+
 
 class TestMarkDownstreamEdgeCases:
     """Additional edge cases for downstream skipping."""
@@ -797,6 +862,34 @@ class TestPerNodeTimeout:
         call_kwargs = _mock_temporal_workflow.execute_activity.call_args
         expected = get_default_timeout(NodeType.AAP_JOB_TEMPLATE, wf._runtime_settings) + _TEMPORAL_MARGIN
         assert call_kwargs.kwargs["start_to_close_timeout"] == timedelta(seconds=expected)
+
+    @pytest.mark.asyncio
+    async def test_tfe_upload_uses_long_running_timeout_with_margin(
+        self,
+        _mock_temporal_workflow: MagicMock,  # noqa: PT019
+    ) -> None:
+        """TFE upload catalog timeout is injected into the activity and Temporal gets +margin."""
+        from syntara.workflows.workflow_engine.constants import ENGINE_TIMEOUT_SECONDS_KEY
+
+        _mock_temporal_workflow.execute_activity = AsyncMock(return_value={"output": {"result": "ok"}})
+
+        wf = _make_workflow()
+        node = ActivityNode(
+            node_id="upload_cfg",
+            node_type=NodeType.TFE_UPLOAD_CONFIGURATION_VERSION,
+            parameters={"workspace_id": "ws-1", "artifact": "e30="},
+        )
+        graph = _build_chain_graph()
+        timeout = get_default_timeout(NodeType.TFE_UPLOAD_CONFIGURATION_VERSION, wf._runtime_settings)
+
+        await wf._dispatch_node_to_executor(node, dict(node.parameters), graph, timeout)
+
+        _mock_temporal_workflow.execute_activity.assert_called_once()
+        call = _mock_temporal_workflow.execute_activity.call_args
+        assert call.kwargs["start_to_close_timeout"] == timedelta(seconds=timeout + _TEMPORAL_MARGIN)
+        activity_args = call.kwargs["args"]
+        assert activity_args[0][ENGINE_TIMEOUT_SECONDS_KEY] == timeout
+        assert timeout > get_default_timeout(NodeType.TFE_CREATE_WORKSPACE, wf._runtime_settings)
 
 
 class TestLoopMaxIterationsEnforcement:
