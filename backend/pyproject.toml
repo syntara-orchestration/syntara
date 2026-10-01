@@ -72,6 +72,7 @@ dependencies = [
     "uuid-utils>=0.9.0",
     "pypdf>=6.15.0",
     "nh3>=0.2.21",
+    "faststream[kafka]>=0.5.0",  # native event-stream consumer POC (Kafka backend is aiokafka)
 ]
 
 [project.optional-dependencies]
@@ -214,6 +215,12 @@ ignore = [
     "BLE001", # broad Exception needed for external lib error handling
 ]
 "src/syntara/workflows/workflow_engine/unified_eval.py" = ["PLR0911"]  # _eval_node dispatcher needs 7 returns for clarity
+"src/syntara/eventstreams/multicloud/**/*.py" = [
+    "ANN401",   # FastStream DI injects dynamically-typed params (db/log/msg); illustrative broker builders return Any
+    "B008",     # Depends()/Context() in argument defaults IS the FastStream DI idiom — cannot hoist to module singletons
+    "TC003",    # AsyncIterator must stay runtime — used in a Depends async-generator provider signature
+    "PLC0415",  # deliberate lazy/guarded broker imports (probe for absent first-party AWS/Azure brokers)
+]
 
 # Pyrefly configuration — used in pre-commit for fast local type checking (~3s).
 # Mypy (strict) continues to run in CI via a dedicated GitHub Actions job.
@@ -283,6 +290,11 @@ ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = "kubernetes.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# FastStream's Kafka backend is aiokafka; it ships no py.typed for these submodules.
+module = "aiokafka.*"
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]

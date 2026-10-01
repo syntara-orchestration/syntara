@@ -372,6 +372,37 @@ services:
       start_period: 10s
 
 
+  # Native FastStream event-stream consumer (POC). Opt-in via the "eventstream"
+  # profile: `podman-compose --profile eventstream up eventstream-consumer`.
+  # The broker URL, topics, and token are hardcoded in
+  # syntara.eventstreams.static_broker (edit there before starting).
+  eventstream-consumer:
+    image: ${APP_IMAGE:-localhost/syntara:latest}
+    restart: unless-stopped
+    profiles: [eventstream]
+    command: [python, -m, syntara.eventstreams.consumer_entrypoint]
+    extra_hosts:
+      - "syntara:host-gateway"
+    environment:
+      - APP_EVENTSTREAM_ENABLED=${APP_EVENTSTREAM_ENABLED:-true}
+      - APP_FALLBACK_LOG_LEVEL=${APP_FALLBACK_LOG_LEVEL:-INFO}
+      - APP_ENV_FILE_PATH=${APP_ENV_FILE_PATH:-.env}
+      - APP_JWT_PRIVATE_KEY_PATH=/run/secrets/jwt-primary.pem
+      - APP_JWT_BACKUP_KEYS=[{"key_id":"orchestrator-backup","key_path":"/run/secrets/jwt-backup.pem"}]
+      - APP_SECRET_ENCRYPTION_KEY_PATH=/run/secrets/encryption-key
+    volumes:
+      - ./backend/src:/opt/app-root/src/src:z
+      - ./backend/.secrets/jwt-primary.pem:/run/secrets/jwt-primary.pem:ro,z
+      - ./backend/.secrets/jwt-backup.pem:/run/secrets/jwt-backup.pem:ro,z
+      - ./backend/.secrets/encryption-key:/run/secrets/encryption-key:ro,z
+    healthcheck:
+      test: [CMD-SHELL, 'cat /proc/[0-9]*/cmdline 2>/dev/null | grep -qa syntara.eventstreams.consumer_entrypoint']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+
   mcp-server:
     build:
       context: ./backend

@@ -1938,7 +1938,26 @@ def _get_env_file() -> str:
     return os.getenv("APP_ENV_FILE_PATH", ".env")
 
 
+class EventStreamSettings(BaseSettings):
+    """Event-stream consumer worker settings.
+
+    Only the on/off switch is a setting. The broker URL, topics, and auth token are
+    deliberately NOT here — for the FastStream POC they are hardcoded in
+    ``syntara.eventstreams.static_broker`` (single stand-in for the future
+    Integration/Credential-backed provider).
+    """
+
+    eventstream_enabled: bool = Field(
+        default=False,
+        description=(
+            "Enable the event-stream consumer worker. Set via APP_EVENTSTREAM_ENABLED. "
+            "When false the consumer entrypoint exits immediately without connecting to a broker."
+        ),
+    )
+
+
 class Settings(
+    EventStreamSettings,
     CredentialEncryptionSettings,
     OpenRouterSettings,
     FileUploadSettings,
