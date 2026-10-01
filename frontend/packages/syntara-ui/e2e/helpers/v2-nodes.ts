@@ -256,7 +256,7 @@ export async function addAapNode(page: Page, name: string) {
 /** Add an approval node (v2 type: "approval") without completing branches. */
 export async function addApprovalNode(page: Page, name: string) {
   await openAddNodePanel(page)
-  await selectDirectNodeType(page, 'Approval')
+  await selectCategoryAndType(page, 'Human tasks', 'Approval')
   const nameInput = page.getByRole('textbox', { name: 'Name', exact: true })
   await expect(nameInput).toBeVisible({ timeout: 10_000 })
   await nameInput.fill(name)
@@ -276,6 +276,60 @@ export async function addApprovalNode(page: Page, name: string) {
 export async function addApprovalNodeWithBranch(page: Page, name: string) {
   await addApprovalNode(page, name)
   await addScriptOnHandle(page, 'approved', `${name} - approved action`, 'print("approved")')
+}
+
+/** Add a form prompt node (Human tasks → Form) without completing branches. */
+export async function addFormPromptNode(page: Page, name: string) {
+  await openAddNodePanel(page)
+  await selectCategoryAndType(page, 'Human tasks', 'Form')
+  const nameInput = page.getByRole('textbox', { name: 'Name', exact: true })
+  await expect(nameInput).toBeVisible({ timeout: 10_000 })
+  await nameInput.fill(name)
+  await page.getByRole('button', { name: 'Create', exact: true }).click()
+  await closeNodeEditorPanel(page)
+}
+
+/**
+ * Add a form prompt with script steps on the submitted and fallback branches so the workflow can save.
+ */
+export async function addFormPromptNodeWithBranches(page: Page, name: string) {
+  await addFormPromptNode(page, name)
+  await expect(page.getByText(name)).toBeVisible({ timeout: 5000 })
+
+  const layoutButton = page.getByRole('button', { name: 'Layout' })
+  if ((await layoutButton.count()) > 0) {
+    await layoutButton.click()
+  }
+
+  const submittedButton = page.getByTestId('add-node-button-submitted')
+  await expect(submittedButton).toBeVisible({ timeout: 5000 })
+  await submittedButton.click({ force: true })
+  await expect(addNodePanel(page)).toHaveCount(1)
+  await selectCategoryAndType(page, 'Action', 'Script')
+  let nameInput = page.getByRole('textbox', { name: 'Name', exact: true })
+  await expect(nameInput).toBeVisible({ timeout: 10_000 })
+  await nameInput.fill(`${name} submitted path`)
+  await fillCodeEditor(page, { value: 'print("submitted")' })
+  await page.getByRole('button', { name: 'Create', exact: true }).click()
+  await closeNodeEditorPanel(page)
+
+  if ((await layoutButton.count()) > 0) {
+    await layoutButton.click()
+  }
+
+  const fallbackButton = page.getByTestId('add-node-button-fallback')
+  const hasFallback = await fallbackButton.isVisible().catch(() => false)
+  if (hasFallback) {
+    await fallbackButton.click({ force: true })
+    await expect(addNodePanel(page)).toHaveCount(1)
+    await selectCategoryAndType(page, 'Action', 'Script')
+    nameInput = page.getByRole('textbox', { name: 'Name', exact: true })
+    await expect(nameInput).toBeVisible({ timeout: 10_000 })
+    await nameInput.fill(`${name} fallback path`)
+    await fillCodeEditor(page, { value: 'print("fallback")' })
+    await page.getByRole('button', { name: 'Create', exact: true }).click()
+    await closeNodeEditorPanel(page)
+  }
 }
 
 // ---------------------------------------------------------------------------

@@ -99,6 +99,18 @@ export const NODE_OUTPUT_SCHEMAS: Record<string, OutputFieldDef[]> = {
       description: "Optional notes provided by approver or system (e.g., 'Auto-rejected due to timeout')",
     },
   ],
+  form_prompt: [
+    { name: 'status', type: 'string', description: 'Form was submitted or timed out' },
+    { name: 'outcome', type: 'string', description: 'Specific outcome' },
+    {
+      name: 'responded_by',
+      type: 'string',
+      description: "Username of the user who submitted (or 'system' for timeout/cancellation)",
+    },
+    { name: 'responded_at', type: 'string', description: 'When the response occurred (ISO 8601)' },
+    { name: 'response_data', type: 'object', description: 'Submitted form field values' },
+    { name: 'prompt_id', type: 'string', description: 'ID of the form_prompts row' },
+  ],
   internal_activity: [{ name: 'status', type: 'string', description: 'Operation result status' }],
   condition: [
     { name: 'status', type: 'string', description: 'Condition evaluated successfully' },

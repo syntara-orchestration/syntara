@@ -16,6 +16,7 @@ _settings = get_settings()
 # Agentic activity infrastructure
 AGENT_ORCHESTRATOR_BASE_URL = str(_settings.agent_orchestrator_base_url)
 APPROVALS_API_BASE_URL = str(_settings.approvals_api_base_url)
+FORMS_API_BASE_URL = str(_settings.forms_api_base_url)
 
 # Script activity settings
 SCRIPT_CLEANUP_TERMINATE_TIMEOUT = _settings.script_cleanup_terminate_timeout

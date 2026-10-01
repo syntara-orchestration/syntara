@@ -6,6 +6,7 @@ class ValidationCategory(str, Enum):
     CONVERGE_CONFIGURATION = "converge_configuration"
     CYCLE_DETECTED = "cycle_detected"
     DEFINITION_LIMITS = "definition_limits"
+    FORM_PROMPT_CONFIGURATION = "form_prompt_configuration"
     INVALID_REFERENCE = "invalid_reference"
     MISSING_FIELD = "missing_field"
     ORPHANED_NODE = "orphaned_node"

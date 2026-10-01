@@ -311,8 +311,8 @@ flowchart LR
     D[registerActionNode.ts]
     E[registerLogicNode.ts]
     F[registerTriggerNode.ts]
-    G[registerApprovalNode.ts]
-    H["registerAIAgentNode.ts<br/>registerAAPNode.ts<br/>registerGenericNode.ts"]
+    G[registerHumanTasksNode.ts]
+    H["registerApprovalNode.ts<br/>registerAIAgentNode.ts<br/>registerAAPNode.ts<br/>registerGenericNode.ts"]
   end
 
   subgraph Registry["NodeRegistry (singleton)"]
@@ -655,13 +655,13 @@ This section is the “how it really works” view of the builder. It’s here s
 // Simple registrations can call NodeRegistry.register() directly:
 import { NodeRegistry } from '../NodeRegistry'
 
-export default function registerApprovalNode() {
+export default function registerHumanTasksNode() {
   NodeRegistry.register({
-    id: 'approval',
-    label: 'Approval',
-    icon: RhUiUserCheckIcon,
-    category: 'logic', // Type-safe - must be a valid NodeCategory
-    description: 'Require human approval before continuing workflow',
+    id: 'human-tasks',
+    label: 'Human tasks',
+    icon: RhUiCheckClipboardIcon,
+    category: 'human_tasks',
+    description: 'Pause the workflow for human approval or structured input',
     keywords: ['approve', 'approval', 'review', 'manual'],
     order: 50,
     formComponent: ApprovalNodeForm,
@@ -721,8 +721,8 @@ Categories are defined in `registry/categories.ts` with full metadata:
 | `trigger`     | Start workflow execution               | 1     |
 | `action`      | Execute tasks or API calls             | 2     |
 | `logic`       | Conditional branching and control flow | 3     |
+| `human_tasks` | Human approval and form input steps    | 45    |
 | `integration` | External service integrations          | 4     |
-| `approval`    | Human approval gates                   | 5     |
 | `other`       | Miscellaneous step types               | 99    |
 
 Access category metadata: `getCategoryMetadata('trigger')` or `CATEGORY_METADATA.trigger`

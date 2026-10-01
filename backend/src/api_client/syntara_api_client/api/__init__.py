@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from .credentials import CredentialsApi
     from .executions import ExecutionsApi
     from .files import FilesApi
+    from .form_prompts import FormPromptsApi
     from .groups import GroupsApi
     from .groups_directory import GroupsDirectoryApi
     from .identity_providers import IdentityProvidersApi
@@ -100,6 +101,12 @@ class SyntaraApiRegistry:
         from .files import FilesApi
 
         return FilesApi(client=self._client)
+
+    @cached_property
+    def form_prompts(self) -> FormPromptsApi:
+        from .form_prompts import FormPromptsApi
+
+        return FormPromptsApi(client=self._client)
 
     @cached_property
     def identity_providers(self) -> IdentityProvidersApi:

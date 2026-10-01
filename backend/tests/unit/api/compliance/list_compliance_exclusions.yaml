@@ -37,6 +37,9 @@ exclusions:
   - operation_id: batch_decide_approvals
     reason: "Batch operation with custom response (BatchApprovalResponse), returns results not resources"
 
+  - operation_id: batch_update_form_prompts
+    reason: "Batch operation with custom response (BatchUpdateResponse), returns results not resources"
+
   # Auth provider management
   - operation_id: list_auth_providers
     reason: "Non-standard response shape (AuthProvidersResponse), missing next/prev fields"

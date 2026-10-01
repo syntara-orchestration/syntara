@@ -6,6 +6,7 @@ import * as AuthzAPI from './authz-api.js'
 import * as CredentialsAPI from './credentials-api.js'
 import * as ExecutionsAPI from './executions-api.js'
 import * as FilesAPI from './files-api.js'
+import * as FormsAPI from './forms-api.js'
 import * as IdentityProvidersAPI from './identity-providers-api.js'
 import * as IntegrationsAPI from './integrations-api.js'
 import * as PoliciesAPI from './policies-api.js'
@@ -27,6 +28,7 @@ export {
   CredentialsAPI,
   ExecutionsAPI,
   FilesAPI,
+  FormsAPI,
   IdentityProvidersAPI,
   IntegrationsAPI,
   PoliciesAPI,

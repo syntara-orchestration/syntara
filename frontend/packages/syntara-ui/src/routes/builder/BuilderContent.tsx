@@ -53,6 +53,7 @@ import { useNodePanelNavigation } from './hooks/useNodePanelNavigation'
 import { usePublishWorkflow, useUnpublishWorkflow } from './hooks/usePublishWorkflow'
 import { useRunStepDialog } from './hooks/useRunStepDialog'
 import { useUndoRedoKeyboard } from './hooks/useUndoRedoKeyboard'
+import { useValidationOnWorkflowLoad } from './hooks/useValidationOnWorkflowLoad'
 import { useWorkflowMetadata } from './hooks/useWorkflowMetadata'
 import { NodeActionsContext } from './NodeActionsContext'
 import { SaveBeforeViewDialog } from './SaveBeforeViewDialog'
@@ -200,6 +201,12 @@ export function BuilderContent(props: BuilderContentProps) {
   }, [initialViewVersion, dispatch, clearExecutionFilters])
   const { handleVerifySilent } = useBuilderValidation({
     dispatch,
+  })
+  useValidationOnWorkflowLoad({
+    isNew,
+    workflow,
+    storeReady: currentWorkflow != null && (currentWorkflow.workflow.activities?.length ?? 0) > 0,
+    handleVerifySilent,
   })
   const { mutate: createWorkflow, isPending: isCreating } = workflowClient.useMutation('post', '/workflows')
   const { mutate: updateWorkflow, isPending: isUpdating } = workflowClient.useMutation(

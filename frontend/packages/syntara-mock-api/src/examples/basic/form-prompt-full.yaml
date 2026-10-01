@@ -1,0 +1,75 @@
+---
+schema_version: '2.0.0'
+name: form-prompt-full
+description: Form prompt with all parameters populated
+
+triggers:
+  - id: trigger
+    type: manual_trigger
+
+nodes:
+  - id: collect_info
+    type: form_prompt
+    parameters:
+      message: 'Please provide deployment details to continue'
+      form_definition:
+        fields:
+          - type: dropdown
+            value_name: environment
+            label: Environment
+            required: true
+            options:
+              source: static
+              values:
+                - display_label: Development
+                  value: dev
+                - display_label: Staging
+                  value: staging
+                - display_label: Production
+                  value: production
+          - type: text
+            value_name: version
+            label: Version
+            required: true
+            placeholder: 'v1.0.0'
+            help_text: 'Version must match pattern: v#.#.#'
+          - type: checkbox
+            value_name: confirmation
+            label: I confirm this deployment
+            required: true
+      responder_users:
+        - alice
+        - bob
+      responder_groups:
+        - team-sre
+      response_window: 3600
+      fallback_decision: fallback
+      submit_label: Deploy
+      success_message: Deployment request submitted successfully
+      timezone: America/New_York
+      css_override: '.form { max-width: 600px; margin: 0 auto; }'
+    settings:
+      timeout: 3700
+      continue_on_failure: false
+  - id: deploy
+    type: script
+    parameters:
+      language: bash
+      code: |
+        echo "Deploying to: ${collect_info.response_data.environment}"
+        echo "Version: ${collect_info.response_data.version}"
+  - id: fallback_handler
+    type: script
+    parameters:
+      language: bash
+      code: echo "Form expired, using defaults"
+
+edges:
+  - from: trigger
+    to: collect_info
+  - from: collect_info
+    to: deploy
+    from_port: submitted
+  - from: collect_info
+    to: fallback_handler
+    from_port: fallback

@@ -13,7 +13,7 @@ import { nodeSettingsSchema } from './nodeSettingsSchema'
 
 const mockDefaults = {
   continueOnFailure: false,
-  timeoutSeconds: { script: 300, agentic: 300, aap: 3600, approval: 86400, http_request: 30 },
+  timeoutSeconds: { script: 300, agentic: 300, aap: 3600, approval: 86400, form_prompt: 86400, http_request: 30 },
   retry: { maxRetries: 3, initialInterval: 1, maxInterval: 60, backoffCoefficient: 2 },
   maxLoopIterations: 10000,
   convergeWaitDuration: null,
@@ -96,6 +96,12 @@ describe('NodeSettingsForm', () => {
     it('renders custom help text when provided', () => {
       setup({ continueOnFailureHelp: 'Custom help text here' })
       expect(screen.getByText('Custom help text here')).toBeInTheDocument()
+    })
+
+    it('exposes on failure behavior name when the inner field label is hidden', () => {
+      setup({ continueOnFailureHideFieldLabel: true })
+      expect(screen.getByRole('button', { name: 'On failure behavior' })).toBeInTheDocument()
+      expect(screen.queryByText('On failure behavior', { selector: 'label' })).not.toBeInTheDocument()
     })
   })
 

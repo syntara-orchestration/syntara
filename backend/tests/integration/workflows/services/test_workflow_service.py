@@ -22,6 +22,8 @@ from syntara.core.exceptions import SafeValueError
 from syntara.core.models import User
 from syntara.credentials.models.credential import Credential
 from syntara.credentials.models.credential_type import CredentialType
+from syntara.forms.models.api_models import FormPromptStatus
+from syntara.forms.models.form_prompt import FormPrompt
 from syntara.workflows.exceptions import (
     BuiltinWorkflowDeleteError,
     BuiltinWorkflowModifyError,
@@ -33,6 +35,7 @@ from syntara.workflows.exceptions import (
     WorkflowVersionNotFoundError,
 )
 from syntara.workflows.models import Workflow, WorkflowListResponse, WorkflowRead, WorkflowVersion
+from syntara.workflows.models.execution import Execution, ExecutionStatus
 from syntara.workflows.models.validation_finding import (
     ValidationCategory,
     ValidationFinding,
@@ -879,6 +882,43 @@ class TestWorkflowServiceDeleteWorkflow(TestWorkflowServiceBase):
         # Verify workflow is hard deleted
         result = await test_db_session.get(Workflow, workflow.id)
         assert result is None
+
+    @pytest.mark.asyncio
+    async def test_delete_workflow_removes_form_prompts_for_cascaded_executions(
+        self,
+        test_db_session: AsyncSession,
+        test_user: User,
+    ) -> None:
+        """Workflow deletion removes prompts whose soft-referenced execution is cascaded."""
+        workflow = self._create_test_workflow(name="workflow-with-form-prompt", created_by=test_user.id)
+        version = self._create_test_workflow_version(workflow_id=workflow.id, created_by=test_user.id)
+        execution = Execution(
+            id=uuid4(),
+            workflow_id=workflow.id,
+            workflow_version_id=version.id,
+            temporal_workflow_id=f"exec-{uuid4()}",
+            status=ExecutionStatus.COMPLETED,
+            created_by=test_user.id,
+            project_id=workflow.project_id,
+        )
+        prompt = FormPrompt(
+            project_id=workflow.project_id,
+            execution_id=execution.id,
+            prompt_node_id="collect_input",
+            temporal_activity_id="collect_input",
+            name="Collect input",
+            form_definition={"fields": [{"value_name": "name", "type": "text", "label": "Name", "required": False}]},
+            status=FormPromptStatus.PENDING,
+        )
+        test_db_session.add_all([workflow, version, execution, prompt])
+        await test_db_session.commit()
+
+        await WorkflowService(test_db_session, test_user).delete_workflow(workflow.id)
+
+        remaining_prompts = await test_db_session.exec(
+            select(FormPrompt).where(FormPrompt.execution_id == execution.id)
+        )
+        assert remaining_prompts.all() == []
 
     @pytest.mark.asyncio
     async def test_delete_workflow_not_found(self, test_db_session: AsyncSession, test_user: User) -> None:

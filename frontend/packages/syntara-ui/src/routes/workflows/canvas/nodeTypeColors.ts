@@ -32,7 +32,7 @@ export function getNodeTypeColor(nodeType: string, data?: { type?: string }): st
   if (nodeType === FlowNodeType.TRIGGER) {
     return NODE_TYPE_COLORS.trigger
   }
-  if (nodeType === ActivityTypeEnum.APPROVAL) {
+  if (nodeType === ActivityTypeEnum.APPROVAL || nodeType === ActivityTypeEnum.FORM_PROMPT) {
     return NODE_TYPE_COLORS.approval
   }
   if (
@@ -108,7 +108,13 @@ export function getAddNodePanelColor(registryNodeId: string): string | undefined
   if (!registryNodeId) return undefined
   if (ADD_PANEL_TRIGGER_IDS.has(registryNodeId)) return undefined
   if (ADD_PANEL_LOGIC_IDS.has(registryNodeId)) return NODE_TYPE_COLORS.logic
-  if (registryNodeId === RegistryNodeId.APPROVAL) return NODE_TYPE_COLORS.approval
+  if (
+    registryNodeId === RegistryNodeId.HUMAN_TASKS ||
+    registryNodeId === RegistryNodeId.APPROVAL ||
+    registryNodeId === RegistryNodeId.FORM_PROMPT
+  ) {
+    return NODE_TYPE_COLORS.approval
+  }
   if (ADD_PANEL_ACTION_IDS.has(registryNodeId)) return NODE_TYPE_COLORS.actionScript
   if (registryNodeId === RegistryNodeId.AGENT) return NODE_TYPE_COLORS.actionAgentic
   // AAP category and all AAP subtypes use the same color
