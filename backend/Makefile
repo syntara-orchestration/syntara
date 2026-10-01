@@ -774,7 +774,7 @@ endif
 
 # Code quality
 # ========================================================
-FORMAT_PATHS := src/ tools/ tests/ execution-plane/src/ execution-plane/tests/ execution-plane/tools/
+FORMAT_PATHS := src/ tools/ tests/ execution-plane/src/ execution-plane/tests/ execution-plane/tools/ nodes/
 SDK_SRC := test-sdk/src/
 
 .PHONY: reachability

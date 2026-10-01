@@ -73,6 +73,8 @@ dependencies = [
     "pypdf>=6.15.0",
     "nh3>=0.2.21",
     "execution-plane",
+    "syntara-node-protocol",
+    "kubernetes>=32.0,<35",
 ]
 
 [project.optional-dependencies]
@@ -95,6 +97,7 @@ dev = [
     "jsonschema>=4.0.0",  # for schema validation tests
     "types-PyYAML>=6.0.0",  # for mypy type stubs
     "types-jsonschema>=4.0.0",  # for mypy type stubs
+    "grpc-stubs>=1.53.0.6",
     "types-requests>=2.31.0",  # type stubs for requests library
     "types-python-dateutil>=2.8.0",  # type stubs for python-dateutil
     "psutil>=5.9.0",  # for memory monitoring in performance tests
@@ -139,6 +142,7 @@ syntara-api-client = { path = "src/api_client", editable = true }
 orchestrator-cli = { path = "src/cli", editable = true }
 orchestrator-test-sdk = { path = "test-sdk", editable = true }
 execution-plane = { path = "execution-plane", editable = true }
+syntara-node-protocol = { path = "nodes/_protocol", editable = true }
 
 [project.scripts]
 orchestrator-admin = "syntara.orchestrator_admin:app"
@@ -164,6 +168,7 @@ only-include = [
 [tool.ruff]
 target-version = "py312"
 line-length = 120
+extend-exclude = ["*_pb2.py", "*_pb2.pyi", "*_pb2_grpc.py", "*_pb2_grpc.pyi"]
 
 [tool.ruff.lint]
 select = ["ALL"]
@@ -204,6 +209,7 @@ ignore = [
     "PGH003",   # Allow generic type: ignore comments in tests
     "SIM117",   # Allow nested with statements (required for SonarQube S5707 — pytest.raises in own block)
 ]
+"nodes/**/tests/**/*.py" = ["INP001", "ARG005", "ANN003", "S603"]
 "execution-plane/tests/**/*.py" = ["INP001"]  # Keep this separate test tree out of the tests package namespace
 "execution-plane/src/execution_plane/migrations/**/*.py" = ["INP001", "D400", "D415", "PLR0915"]
 "execution-plane/tools/dev_cli.py" = ["EM101", "EM102", "FBT001", "INP001", "T201", "TRY003", "TRY301"]

@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "inputs": {
+    "language": "python",
+    "code": "print(42)"
+  },
+  "timeout_seconds": 300
+}

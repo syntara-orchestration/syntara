@@ -156,3 +156,14 @@ run-standards-checks-all: run-standards-checks-frontend run-standards-checks-bac
 
 sync: ## Pull latest changes from upstream syntara repos
 	bash scripts/sync-from-upstream.sh
+
+.PHONY: node-images node-image push-node-images test-nodes
+node-images node-image push-node-images:
+	$(MAKE) -C backend/nodes $@
+
+test-nodes:
+	$(MAKE) -C backend/nodes test
+
+.PHONY: smoke-node-images
+smoke-node-images:
+	$(MAKE) -C backend/nodes smoke-images

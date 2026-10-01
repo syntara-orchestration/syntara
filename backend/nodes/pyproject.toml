@@ -1,0 +1,46 @@
+[project]
+name = "syntara-nodes"
+version = "0.1.0"
+requires-python = ">=3.12,<3.15"
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    "pytest-asyncio>=0.24",
+    "respx>=0.22",
+    "mypy>=1.8",
+    "types-PyYAML",
+    "grpcio-tools==1.78.0",
+    "types-protobuf>=6,<7",
+    "grpc-stubs>=1.53.0.6",
+    "mypy-protobuf>=3.6,<4",
+]
+
+[tool.uv.workspace]
+members = ["_protocol", "_shared", "http-request", "agent", "script", "aap-job", "aap-workflow"]
+
+[tool.uv.sources]
+syntara-node-runtime = { workspace = true }
+syntara-node-protocol = { workspace = true }
+syntara-sdk = { git = "https://github.com/syntara-orchestration/syntara-node-sdk.git", rev = "b1398927636a1442e59afac6627fcebd6f2a4647", subdirectory = "sdk-python" }
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests", "http-request/tests", "agent/tests", "script/tests", "aap-job/tests", "aap-workflow/tests"]
+addopts = "--import-mode=importlib"
+
+[tool.mypy]
+strict = true
+follow_imports = "silent"
+python_version = "3.12"
+check_untyped_defs = true
+warn_return_any = true
+
+[[tool.mypy.overrides]]
+module = ["syntara_sdk.*", "jsonschema.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["syntara_sdk.*"]
+follow_untyped_imports = true

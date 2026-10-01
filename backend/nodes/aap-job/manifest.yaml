@@ -1,0 +1,186 @@
+---
+apiVersion: syntara.io/v1alpha1
+kind: NodeType
+metadata:
+  name: aap_job_template
+  displayName: Aap Job
+  version: 0.1.0
+  description: SDK container preserving the Syntara aap_job_template workflow contract.
+spec:
+  category: task
+  execution:
+    type: container
+    image: localhost/syntara-node-aap-job:migration-test
+    entrypoint: python -m syntara_node_runtime.server
+  inputs:
+    description: 'Parameters for Ansible Automation Platform Job Template executor. #magic___^_^___line #magic___^_^___line Inherits common Ansible Automation Platform fields from AAPResourceReferenceMixin (credential_id, organization, #magic___^_^___line inventory, extra_vars, limit, tags, skip_tags, labels, timeout).'
+    properties:
+      credential_id:
+        anyOf:
+          - type: string
+          - type: 'null'
+        default: null
+        description: Orchestrator credential UUID for Ansible Automation Platform API authentication. Separate from legacy credentials list.
+      integration_id:
+        anyOf:
+          - type: string
+          - type: 'null'
+        default: null
+        description: UUID of the Ansible Automation Platform Gateway integration for connection URL resolution.
+      organizationId:
+        anyOf:
+          - minimum: 1
+            type: integer
+          - type: 'null'
+        default: null
+        description: Ansible Automation Platform organization ID (takes precedence over organization_name)
+      organization_name:
+        anyOf:
+          - type: string
+          - type: 'null'
+        default: null
+        description: Ansible Automation Platform organization name (used with template_name or inventory_name)
+      inventory_id:
+        anyOf:
+          - minimum: 1
+            type: integer
+          - type: 'null'
+        default: null
+        description: Override default inventory by ID (mutually exclusive with inventory_name)
+      inventory_name:
+        anyOf:
+          - type: string
+          - type: 'null'
+        default: null
+        description: Override default inventory by name (requires organization_name)
+      extra_vars:
+        additionalProperties: true
+        description: Extra variables to pass to job/workflow job
+        type: object
+      limit:
+        anyOf:
+          - type: string
+          - type: 'null'
+        default: null
+        description: Limit job execution to specific hosts
+      tags:
+        anyOf:
+          - type: string
+          - type: 'null'
+        default: null
+        description: Ansible tags to run (comma-separated)
+      skip_tags:
+        anyOf:
+          - type: string
+          - type: 'null'
+        default: null
+        description: Ansible tags to skip (comma-separated)
+      labels:
+        anyOf:
+          - items:
+              type: string
+            type: array
+          - type: 'null'
+        default: null
+        description: 'Ansible Automation Platform label names to append to template''s default labels. Names are resolved to IDs at launch time. New labels that don''t exist in Ansible Automation Platform will be created automatically. Note: Labels are APPENDED to template defaults, not replaced.'
+      job_template_id:
+        anyOf:
+          - minimum: 1
+            type: integer
+          - type: 'null'
+        default: null
+        description: Ansible Automation Platform job template ID to launch
+      job_template_name:
+        anyOf:
+          - type: string
+          - type: 'null'
+        default: null
+        description: Ansible Automation Platform job template name (used with organization_name)
+      job_credentials:
+        anyOf:
+          - items:
+              type: integer
+            type: array
+          - type: 'null'
+        default: null
+        description: List of Ansible Automation Platform credential IDs to use (takes precedence over credential_names)
+      credentialNames:
+        anyOf:
+          - items:
+              type: string
+            type: array
+          - type: 'null'
+        default: null
+        description: List of Ansible Automation Platform credential names to use (requires organization_name, resolved at launch time)
+      verbosity:
+        description: Ansible Automation Platform job verbosity levels (0-5).
+        enum:
+          - 0
+          - 1
+          - 2
+          - 3
+          - 4
+          - 5
+        type: integer
+      job_type:
+        anyOf:
+          - description: Ansible Automation Platform job type values.
+            enum:
+              - run
+              - check
+            type: string
+          - type: 'null'
+        default: null
+        description: 'Job type override: ''run'' or ''check'' (dry run)'
+      forks:
+        anyOf:
+          - minimum: 0
+            type: integer
+          - type: 'null'
+        default: null
+        description: Number of parallel forks for job execution
+      job_slicing:
+        anyOf:
+          - minimum: 1
+            type: integer
+          - type: 'null'
+        default: null
+        description: Number of job slices
+      diff_mode:
+        anyOf:
+          - type: boolean
+          - type: 'null'
+        default: null
+        description: Enable diff mode for playbook runs
+      execution_environment:
+        anyOf:
+          - type: string
+          - type: 'null'
+        default: null
+        description: "Execution environment override (deferred — requires ID resolution)"
+      instance_group_id:
+        anyOf:
+          - minimum: 1
+            type: integer
+          - type: 'null'
+        default: null
+        description: Override instance group by ID (takes precedence over instance_group_name)
+      instance_group_name:
+        anyOf:
+          - type: string
+          - type: 'null'
+        default: null
+        description: Override instance group by name (requires organization_name for lookup)
+    type: object
+  outputs:
+    $ref: ../schemas/common-definitions.json#/definitions/StandardOutputWrapper
+  resourceRequirements:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: '1'
+      memory: 512Mi
+  executionTimeout: 300
+  credentialSpecification:
+    workloadClassification: action

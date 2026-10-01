@@ -22,6 +22,13 @@ def _mock_heartbeat() -> Generator[None, None, None]:
         yield
 
 
+@pytest.fixture(autouse=True)
+def _mock_public_dns() -> Generator[None, None, None]:
+    """Keep mocked HTTP requests independent of public DNS; SSRF tests override this."""
+    with patch("socket.getaddrinfo", return_value=[(None, None, None, None, ("93.184.216.34", 443))]):
+        yield
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

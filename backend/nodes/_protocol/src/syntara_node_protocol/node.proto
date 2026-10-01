@@ -1,0 +1,62 @@
+syntax = "proto3";
+
+package syntara.node.v1;
+
+// A pod accepts one invocation. Execute is never automatically retried.
+service NodeService {
+  rpc Execute(ExecuteRequest) returns (stream ExecutionEvent);
+  rpc Cancel(CancelRequest) returns (CancelResponse);
+  rpc Health(HealthRequest) returns (HealthResponse);
+}
+
+enum Operation {
+  EXECUTE = 0;
+  // Ask an agent adapter to cancel previously acknowledged AO invocations.
+  CANCEL_EXTERNAL = 1;
+}
+
+message ExecuteRequest {
+  string invocation_id = 1;
+  uint32 protocol_version = 2;
+  Operation operation = 3;
+  // JSON bytes preserve arbitrary workflow schemas and exact integer values.
+  // Each field must contain a JSON object. Credentials never appear in metadata.
+  bytes inputs_json = 4;
+  bytes credentials_json = 5;
+  bytes workflow_context_json = 6;
+  bytes settings_json = 7;
+  uint32 timeout_seconds = 8;
+  uint32 max_output_bytes = 9;
+}
+
+message Progress {
+  string event = 1;
+  bytes data_json = 2;
+}
+
+message Result {
+  bytes output_json = 1;
+  uint32 status_code = 2;
+  string status_message = 3;
+  string error_message = 4;
+  string error_type = 5;
+  bool retryable = 6;
+}
+
+message ExecutionEvent {
+  string invocation_id = 1;
+  oneof event {
+    Progress progress = 2;
+    Result result = 3;
+  }
+}
+
+// Cooperative cancellation keeps Execute open so partial output can be returned.
+// A disconnected or expired Execute RPC also cancels the node's running work.
+message CancelRequest { string invocation_id = 1; }
+message CancelResponse { bool accepted = 1; }
+message HealthRequest {}
+message HealthResponse {
+  bool ready = 1;
+  uint32 protocol_version = 2;
+}

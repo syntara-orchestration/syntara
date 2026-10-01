@@ -973,3 +973,10 @@ Code quality and coverage are tracked via SonarCloud. SonarCloud analysis runs a
 - 📖 **[Developer Getting Started Guide](docs/developer-getting-started.md)** - Architecture deep dive with examples
 - 📖 **[Development with Worktrees Guide](docs/development-with-worktrees.md)** - Parallel development setup
 - 📖 **[Architecture Decision Records](decision-records.md)** - Design rationale and decisions
+
+### SDK node containers
+
+HTTP, agent, script, AAP job and AAP workflow container implementations live in
+[`nodes/`](nodes/README.md). The guide covers individual/all-image builds, the
+versioned gRPC protocol, and the temporary direct OpenShift execution adapter.
+The adapter is disabled by default and can be enabled per node type.

@@ -1,0 +1,41 @@
+---
+schema_version: "2.0.0"
+name: sdk-remote-http-python-bash
+description: HTTP, Python and Bash execute in separate OpenShift pods.
+triggers:
+  - id: manual
+    type: manual_trigger
+    parameters: {}
+nodes:
+  - id: fetch
+    type: http_request
+    parameters:
+      method: GET
+      url: https://httpbin.org/json
+    outputs:
+      title: ${result.body.slideshow.title}
+  - id: python
+    type: script
+    parameters:
+      language: python
+      environment:
+        INPUT_TITLE: ${fetch.title}
+      code: |
+        import json
+        import os
+        print(json.dumps({"title": os.environ["INPUT_TITLE"], "answer": 42}))
+  - id: bash
+    type: script
+    parameters:
+      language: bash
+      environment:
+        INPUT_TITLE: ${python.stdout_json.title}
+      code: |
+        printf 'Remote containers: %s\n' "$INPUT_TITLE"
+edges:
+  - from: manual
+    to: fetch
+  - from: fetch
+    to: python
+  - from: python
+    to: bash

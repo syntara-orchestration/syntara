@@ -35,6 +35,7 @@ RUN (command -v uv >/dev/null 2>&1 || pip3.12 install --no-cache-dir uv==0.12.3)
 # and it's the only source ep-builder needs.
 COPY pyproject.toml uv.lock LICENSE ./
 COPY execution-plane/ ./execution-plane/
+COPY nodes/_protocol/ ./nodes/_protocol/
 
 
 # ── syntara-builder: regopy (C/C++) + full workspace ────────────────────────

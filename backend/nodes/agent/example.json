@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "inputs": {
+    "prompt": "Summarize this request"
+  },
+  "workflow_context": {
+    "project_id": "<project-uuid>",
+    "created_by_user_id": "<user-uuid>",
+    "agent_base_url": "https://agent.example/api/v1",
+    "agent_metadata": {
+      "callback_url": "https://syntara.example/api/v1/workflows/executions/<execution>/activities/<activity>/signal"
+    }
+  },
+  "timeout_seconds": 300
+}

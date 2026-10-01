@@ -88,5 +88,9 @@ async def execute_script_activity(
         msg = "Script activity configuration validation failed"
         raise ApplicationError(msg, type="ConfigError", non_retryable=True) from None
 
+    if input_config.get("_container_route"):
+        from syntara.workflows.node_containers.dispatch import dispatch  # noqa: PLC0415
+
+        return await dispatch("script", input_config, output_config)
     await _dispatch_to_te(input_config, output_config)
-    activity.raise_complete_async()
+    return activity.raise_complete_async()

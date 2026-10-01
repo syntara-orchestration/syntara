@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "inputs": {
+    "method": "GET",
+    "url": "https://example.com"
+  },
+  "timeout_seconds": 300
+}
