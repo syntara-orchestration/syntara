@@ -4,7 +4,7 @@
 
 We're excited that you're interested in contributing to the Syntara UI project. This document provides guidelines to help you contribute effectively.
 
-All pull requests must pass the `(Frontend) Required Checks` CI gate before merging. This includes unit tests, type-checking, linting, and builds. SonarCloud analysis runs on PRs but is informational only and does not block merges.
+All pull requests must pass the `(Frontend) Required Checks` CI gate before merging. This includes the route-baseline contract check, unit tests, type-checking, linting, and builds. The route-baseline check verifies the committed route manifest against current route sources. SonarCloud analysis runs on PRs but is informational only and does not block merges.
 
 ## AI-Assisted Development
 
