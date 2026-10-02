@@ -168,33 +168,34 @@ into claim/placement (the Work Scheduler loop in
 [worker-manager.md](worker-manager.md)), replacing the hard-coded default-target
 select in `claim_one()`.
 
-### 9. Node container image is a locally-built tag, not a published artifact
+### 9. Node container image is a mutable tag in a personal namespace, not a pipeline artifact
 
-**Shortcut.** `node_container_images` (config `base.py`) defaults to `{}`, and the
-value we run with — e.g. `localhost/syntara-node-script:migration-test` — is a
-**local build tag**, not a registry ref. Producing it is manual: build the SDK
-node Containerfiles under `backend/nodes/` and load the result into the target
-cluster (`kind load docker-image <ref> --name execution-plane`). Nothing pulls or
-publishes it. The dev full-stack compose wires the two required settings on the
-`temporal-worker` service (that is where the AO dispatch activity runs) —
-`APP_SCRIPT_NODES_ENABLED` and `APP_NODE_CONTAINER_IMAGES` — see the commented
-block in [`podman-compose.yml`](../../../podman-compose.yml).
+**Shortcut.** `node_container_images` (config `base.py`) now defaults to the public
+pre-release node images Aaron published on quay.io
+(`quay.io/ahetheri/syntara-node-script:migration-test` and the matching
+`http-executor` / `syntara-node-aap-job` / `syntara-node-aap-workflow` refs). These
+are real registry refs, so the target cluster pulls them directly — no local build
+or `kind load`. But `migration-test` is a **mutable tag in a personal namespace**,
+not a digest-pinned artifact from an owned CI pipeline. The dev full-stack compose
+also wires the two required settings on the `temporal-worker` service (that is where
+the AO dispatch activity runs) — `APP_SCRIPT_NODES_ENABLED` and
+`APP_NODE_CONTAINER_IMAGES` — see the commented block in
+[`podman-compose.yml`](../../../podman-compose.yml).
 
 **Why acceptable for MVP.** The SDK node images (script, agent, http-request,
-aap-job, aap-workflow) live on a separate, not-yet-merged branch
-(`feat/sdk-node-containers`, PR #701). Until that lands and CI publishes images,
-building locally and loading by tag is the only way to get an image into the
-cluster. Nothing in the cold-start path runs without one, so this is called out
-as an explicit, assignable obligation rather than left as a silent gap.
+aap-job, aap-workflow) are built from a separate, not-yet-merged branch
+(`feat/sdk-node-containers`, PR #701) and pushed by hand to a personal quay
+namespace. That is enough to pull an image into the cluster and demo the full
+cold-start path without a local build, but it is not a trustworthy supply chain,
+so the publishing obligation below still stands.
 
 **Followup shape.** (1) Land the SDK node containers work so the Containerfiles
 and node runtime reach `devel`/`1803`. (2) Have CI build and push immutable,
-digest-pinned node images to a registry the target clusters can pull. (3) Replace
-the local tag with those published refs — at which point a documented default for
-`node_container_images` becomes reasonable, with the `APP_`-prefixed setting still
-available for installers shipping a custom image. `script_nodes_enabled` stays
-`False` by default (security gate); only per-environment config (like the dev
-compose) enables it.
+digest-pinned node images to an **owned** registry/namespace the target clusters
+can pull. (3) Replace the personal-namespace `migration-test` default with those
+digest-pinned refs, with the `APP_`-prefixed setting still available for installers
+shipping a custom image. `script_nodes_enabled` stays `False` by default (security
+gate); only per-environment config (like the dev compose) enables it.
 
 ### 10. Script nodes have almost no environment surface — and no secrets at all
 

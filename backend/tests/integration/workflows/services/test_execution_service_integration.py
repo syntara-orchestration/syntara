@@ -47,10 +47,10 @@ TEST_WORKFLOW_METADATA = {
 }
 
 # These tests dispatch a real `script` node through the Execution Plane, which needs
-# a Kubernetes (kind) cluster plus a built node container image to run the pod and
-# resume the activity. CI's integration job has neither (no cluster, empty
-# `node_container_images`), so the dispatch can't complete. This coverage moves with
-# the Execution Plane code to its own repository; see AAP-93615.
+# a Kubernetes (kind) cluster plus a reachable node container image to run the pod
+# and resume the activity. CI's integration job has no cluster (and registers only a
+# placeholder `local://` target), so the dispatch can't complete. This coverage moves
+# with the Execution Plane code to its own repository; see AAP-93615.
 _EP_DISPATCH_SKIP = pytest.mark.skip(
     reason="Execution Plane script dispatch requires a kind cluster + node image not present in CI (AAP-93615)"
 )

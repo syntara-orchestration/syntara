@@ -41,16 +41,15 @@ podman resolves the API server by container name
 
 - `podman`, `kind` (with `KIND_EXPERIMENTAL_PROVIDER=podman` if Docker is also
   installed), `kubectl`, `jq`.
-- A **script node image**. The SDK node Containerfiles are not in this tree yet
-  (they live on PR [#701](https://github.com/syntara-orchestration/syntara/pull/701),
-  `feat/sdk-node-containers`; see shortcut 9 in
-  [cold-start-node-dispatch.md](cold-start-node-dispatch.md)). This runbook uses
-  the locally-built tag `localhost/syntara-node-script:migration-test`. From that
-  checkout:
-
-  ```bash
-  make node-images CONTAINER_ENGINE=podman TAG=migration-test
-  ```
+- A **script node image**, pulled by the kind node from a registry at pod
+  creation. The default is the public pre-release image
+  `quay.io/ahetheri/syntara-node-script:migration-test` (published by Aaron while
+  the node-image pipeline is in flight — see shortcut 9 in
+  [cold-start-node-dispatch.md](cold-start-node-dispatch.md)). No local build or
+  `kind load` is required; the kind node just needs egress to quay.io. The SDK
+  node Containerfiles themselves live on PR
+  [#701](https://github.com/syntara-orchestration/syntara/pull/701)
+  (`feat/sdk-node-containers`) if you want to build your own.
 
 Bring up the control plane in Step 1 **before** migrations or registration.
 Kind cluster creation (Step 3) does not need the database; `ep-migrate` and the
@@ -223,19 +222,25 @@ kubectl --server="https://127.0.0.1:$PORT" --insecure-skip-tls-verify \
   --token="$(cat /tmp/sa-token.txt)" get pods -n execution-plane
 ```
 
-## Step 5 — Load the script node image into kind
+## Step 5 — (Nothing to load — kind pulls from quay)
 
-`kind load docker-image` fails against the podman provider here
-("image not present locally"). Use the archive path, which preserves the exact
-ref:
+The default `script` image (`quay.io/ahetheri/syntara-node-script:migration-test`)
+is a public registry image, so the kind node pulls it directly when it creates the
+cold-start pod. There is no local build and no `kind load` step — the kind node
+just needs egress to quay.io.
+
+Optional: pre-warm the cache and confirm the node has registry egress before the
+demo (avoids a first-run `ImagePullBackOff` surprise):
 
 ```bash
-# /var/tmp is disk-backed; /tmp is often a tmpfs RAM disk too small for an image.
-podman save -o /var/tmp/node-script.tar localhost/syntara-node-script:migration-test
-kind load image-archive /var/tmp/node-script.tar --name execution-plane
-# verify:
-podman exec execution-plane-control-plane crictl images | grep node-script
+podman exec execution-plane-control-plane crictl pull \
+  quay.io/ahetheri/syntara-node-script:migration-test
+podman exec execution-plane-control-plane crictl images | grep syntara-node-script
 ```
+
+To run against a locally-built image instead, build it (Prerequisites), load it
+with `podman save` + `kind load image-archive` (the podman provider rejects
+`kind load docker-image`), and override `APP_NODE_CONTAINER_IMAGES` in Step 7.
 
 ## Step 6 — Register the ExecutionTarget
 
@@ -269,8 +274,8 @@ The override file ([`podman-compose.kind-demo.override.yml`](../../../podman-com
 
 The base compose already wires the AO side on `temporal-worker`:
 `APP_SCRIPT_NODES_ENABLED=true` and
-`APP_NODE_CONTAINER_IMAGES={"script":"localhost/syntara-node-script:migration-test"}`
-(shortcut 9).
+`APP_NODE_CONTAINER_IMAGES={"script":"quay.io/ahetheri/syntara-node-script:migration-test"}`
+(shortcut 9). Override `APP_NODE_CONTAINER_IMAGES` if you built a local image.
 
 The EP worker runs a **baked image** (no `src` mount). Rebuild after EP source
 changes:
@@ -372,9 +377,11 @@ kubernetes-client ≥36 with Bearer-token targets hit it.
   change — including the transport fix above — requires a rebuild:
   `$COMPOSE build execution-plane-worker && $COMPOSE up -d --force-recreate execution-plane-worker`.
 - **`kind load docker-image` "not present locally"** with the podman provider —
-  use `podman save` + `kind load image-archive` (Step 5).
-- **Image pull errors in the pod** — the PR 701 image was not loaded into kind
-  (Step 5).
+  only relevant if you opted into a locally-built image; use `podman save` +
+  `kind load image-archive` (Step 5).
+- **`ImagePullBackOff` / image pull errors in the pod** — the kind node could not
+  reach quay.io (no egress, or the ref/tag is wrong). Pre-pull with `crictl pull`
+  (Step 5) to confirm connectivity.
 
 ## Teardown
 

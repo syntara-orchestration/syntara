@@ -36,10 +36,11 @@ def _ensure_runtime_settings() -> Generator[None, None, None]:
 # auth) but use `script` nodes as their unit of work. AAP-93615 moved script
 # execution out of an in-process subprocess and into cold-start Kubernetes pods, so
 # the in-process EP worker started by the `temporal_env` fixture now needs a real
-# kind cluster plus a built node image to run the pod and resume the activity. CI's
-# integration job has neither, so every script dispatch fails ('failed' !=
-# 'completed'). This coverage moves with the Execution Plane code to its own
-# repository; the non-script tests in these modules still run.
+# kind cluster plus a reachable node image to run the pod and resume the activity.
+# CI's integration job has neither (it registers only a placeholder `local://`
+# target), so every script dispatch fails ('failed' != 'completed'). This coverage
+# moves with the Execution Plane code to its own repository; the non-script tests in
+# these modules still run.
 _EP_DISPATCH_TESTS = frozenset(
     {
         "test_for_each_loop",

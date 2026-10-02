@@ -243,16 +243,13 @@ services:
       # launches a node pod runs in THIS worker, so both settings live here.
       #   APP_SCRIPT_NODES_ENABLED — feature gate (ships False for security; the
       #     dev stack turns it on so script nodes work out of the box).
-      #   APP_NODE_CONTAINER_IMAGES — node type -> container image. The value below
-      #     is a LOCAL build tag that must first be built from the SDK node
-      #     Containerfiles (backend/nodes/, PR #701) and loaded into the dev
-      #     cluster: `kind load docker-image <ref> --name execution-plane`.
-      # Nothing in the cold-start path works until a real image exists here. The
-      # packaging obligation (publish immutable node images, then supply a proper
-      # default) is tracked as shortcut #9 in
-      # backend/docs/execution-plane/cold-start-node-dispatch.md.
+      #   APP_NODE_CONTAINER_IMAGES — node type -> container image. Defaults to the
+      #     public pre-release node image Aaron published on quay.io, so the kind
+      #     demo cluster pulls it directly — no local build or `kind load` needed.
+      #     (TEMPORARY: `migration-test` is a mutable tag in a personal namespace;
+      #     replace with a digest pin once the node-image pipeline lands.)
       - APP_SCRIPT_NODES_ENABLED=${APP_SCRIPT_NODES_ENABLED:-true}
-      - 'APP_NODE_CONTAINER_IMAGES=${APP_NODE_CONTAINER_IMAGES:-{"script":"localhost/syntara-node-script:migration-test"}}'
+      - 'APP_NODE_CONTAINER_IMAGES=${APP_NODE_CONTAINER_IMAGES:-{"script":"quay.io/ahetheri/syntara-node-script:migration-test"}}'
       - APP_ENV_FILE_PATH=${APP_ENV_FILE_PATH:-.env}
       - APP_FALLBACK_LOG_LEVEL=${APP_FALLBACK_LOG_LEVEL:-INFO}
       - APP_CACHE_HOST=redis

@@ -1506,11 +1506,25 @@ class WorkflowEngineSettings(BaseSettings):
     # Cold-start Execution Plane node dispatch: the AO activity selects the
     # container image per node type and writes it into the WorkItem payload; the
     # EP worker creates a fresh pod from that reference. Keys are workflow node
-    # types (e.g. "script"); values are fully-qualified, immutable image refs the
-    # target cluster can pull (e.g. "localhost:5001/syntara-node-script:dev").
+    # types (e.g. "script"); values are fully-qualified image refs the target
+    # cluster can pull.
+    #
+    # TEMPORARY: these default to the public pre-release node images Aaron
+    # published on quay.io so the cold-start path (and the kind demo) works out
+    # of the box without a local build + `kind load`. The `migration-test` tag is
+    # mutable; once the node-image publishing pipeline lands, replace these with
+    # immutable digest pins and move ownership off a personal namespace. Today
+    # only "script" is actually EP-dispatched (see ep_dispatch_activity); the
+    # other node types still run in-process, so their entries are staged for the
+    # upcoming migration and currently unused.
     node_container_images: dict[str, str] = Field(
-        default_factory=dict,
-        description="Node type to immutable container image reference for Execution Plane dispatch",
+        default_factory=lambda: {
+            "script": "quay.io/ahetheri/syntara-node-script:migration-test",
+            "http_request": "quay.io/ahetheri/http-executor:migration-test",
+            "aap_job_template": "quay.io/ahetheri/syntara-node-aap-job:migration-test",
+            "aap_workflow_job_template": "quay.io/ahetheri/syntara-node-aap-workflow:migration-test",
+        },
+        description="Node type to container image reference for Execution Plane dispatch",
     )
 
     agent_orchestrator_base_url: HttpUrl = Field(  # type: ignore[assignment]
