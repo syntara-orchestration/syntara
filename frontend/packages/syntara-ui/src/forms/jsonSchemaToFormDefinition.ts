@@ -25,6 +25,10 @@ type FieldBase = {
   required: boolean
 }
 
+const DATE_COMPONENT_NAMES = ['date', 'time', 'timezone'] as const
+
+type DateDefaultValue = NonNullable<Extract<FormField, { type: 'date' }>['default']>
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
@@ -32,6 +36,33 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function isOptionScalar(value: unknown): value is OptionScalar {
   const kind = typeof value
   return kind === 'string' || kind === 'number' || kind === 'boolean'
+}
+
+function dateDefaultFromImported(value: unknown): DateDefaultValue | null {
+  if (typeof value === 'string') {
+    return { date: value }
+  }
+  if (!isRecord(value)) {
+    return null
+  }
+
+  const keys = Object.keys(value)
+  if (keys.some((key) => !DATE_COMPONENT_NAMES.some((component) => component === key))) {
+    return null
+  }
+
+  const dateDefault: DateDefaultValue = {}
+  for (const component of DATE_COMPONENT_NAMES) {
+    const componentValue = value[component]
+    if (componentValue === undefined) {
+      continue
+    }
+    if (componentValue !== null && typeof componentValue !== 'string') {
+      return null
+    }
+    dateDefault[component] = componentValue
+  }
+  return dateDefault
 }
 
 function parseEnumValues(raw: unknown): OptionScalar[] | null {
@@ -250,7 +281,7 @@ function fieldFromProperty(valueName: string, property: JsonSchemaProperty, requ
       return {
         ...base,
         type: FormFieldTypeEnum.DATE,
-        default: typeof importedDefault === 'string' ? { date: importedDefault } : null,
+        default: dateDefaultFromImported(importedDefault),
       }
     case FormFieldTypeEnum.DROPDOWN:
       return dropdownFieldFromProperty(base, property)

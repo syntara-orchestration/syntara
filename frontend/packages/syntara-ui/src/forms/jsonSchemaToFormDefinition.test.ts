@@ -12,7 +12,7 @@ describe('jsonSchemaToFormDefinition', () => {
         { type: FormFieldTypeEnum.TEXT, value_name: 'title', label: 'Title', default: 'preset' },
         { type: FormFieldTypeEnum.NUMBER, value_name: 'qty', label: 'Qty', default: 3 },
         { type: FormFieldTypeEnum.CHECKBOX, value_name: 'agree', label: 'Agree', default: true },
-        { type: FormFieldTypeEnum.DATE, value_name: 'due', label: 'Due', default: '2026-01-02' },
+        { type: FormFieldTypeEnum.DATE, value_name: 'due', label: 'Due', default: { date: '2026-01-02' } },
         {
           type: FormFieldTypeEnum.DROPDOWN,
           value_name: 'tier',
@@ -39,7 +39,7 @@ describe('jsonSchemaToFormDefinition', () => {
     expect(fields[0]?.default).toBe('preset')
     expect(fields[1]?.default).toBe(3)
     expect(fields[2]?.default).toBe(true)
-    expect(fields[3]?.default).toBe('2026-01-02')
+    expect(fields[3]?.default).toEqual({ date: '2026-01-02' })
     const tier = fields[4]
     expect(tier?.type).toBe(FormFieldTypeEnum.DROPDOWN)
     if (tier?.type === FormFieldTypeEnum.DROPDOWN) {

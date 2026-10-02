@@ -100,7 +100,13 @@ describe('SynDynamicForm', () => {
     const definition = parseFormDefinition({
       fields: [
         { type: FormFieldTypeEnum.NUMBER, value_name: 'count', label: 'Count', default: 3, required: true },
-        { type: FormFieldTypeEnum.DATE, value_name: 'start', label: 'Start', default: '2026-02-01', required: true },
+        {
+          type: FormFieldTypeEnum.DATE,
+          value_name: 'start',
+          label: 'Start',
+          default: { date: '2026-02-01' },
+          required: true,
+        },
         { type: FormFieldTypeEnum.TEXTAREA, value_name: 'notes', label: 'Notes', required: true },
         {
           type: FormFieldTypeEnum.DROPDOWN,
@@ -124,7 +130,7 @@ describe('SynDynamicForm', () => {
     await waitFor(() => {
       expect(onSubmit).toHaveBeenCalledWith({
         count: 3,
-        start: '2026-02-01',
+        start: { date: '2026-02-01' },
         notes: 'hello',
         priority: 'high',
       })
