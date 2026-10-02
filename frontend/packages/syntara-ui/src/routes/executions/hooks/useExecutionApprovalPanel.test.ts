@@ -211,6 +211,29 @@ describe('useExecutionApprovalPanel', () => {
     expect(mockSetApprovalsAndIndex).toHaveBeenCalledWith([mockApproval], 0)
   })
 
+  it('auto-detection callback does not open panel when run history is open', async () => {
+    const { useAutoApprovalDetection } = await import('./useAutoApprovalDetection')
+
+    let capturedCallback: ((a: Approval) => void) | undefined
+    vi.mocked(useAutoApprovalDetection).mockImplementation((opts: { onApprovalDetected: (a: Approval) => void }) => {
+      capturedCallback = opts.onApprovalDetected
+    })
+
+    mockFetchApprovals.mockResolvedValue([mockApproval])
+
+    const { result } = renderHook(() =>
+      useExecutionApprovalPanel('exec-1', 'history=open', makeNodeClick(), undefined)
+    )
+
+    await act(async () => {
+      capturedCallback!(mockApproval)
+      await vi.runAllTimersAsync()
+    })
+
+    expect(result.current.panelOpen).toBe(false)
+    expect(mockSetApprovalsAndIndex).toHaveBeenCalledWith([mockApproval], 0)
+  })
+
   it('returns approvalMessage from workflow definition', () => {
     const nodeClick = makeNodeClick(mockApproval, [mockApproval])
     const wfDef = {
