@@ -60,6 +60,10 @@ async def sync_restored_activities(
                 node_type=source.node_type,
                 temporal_activity_id=source.activity_name,
                 status=ActivityStatus.COMPLETED,
+                output_data=source.output_data,
+                iteration=source.iteration,
+                started_at=source.started_at,
+                completed_at=source.completed_at,
             )
             session.add(target)
             created.append(target)
@@ -81,6 +85,11 @@ async def sync_restored_activities(
         target.status = ActivityStatus.COMPLETED
         target.output_data = source.output_data
         target.iteration = source.iteration
-        target.completed_at = now
+        # The source run's own timestamps, not now(). A node's row records when
+        # that work happened, so a restored row reporting the restore time would
+        # show a five-minute job as having finished in milliseconds. Copying is
+        # reversible; overwriting with now() is not recoverable.
+        target.started_at = source.started_at
+        target.completed_at = source.completed_at
         target.updated_at = now
     return updated, created

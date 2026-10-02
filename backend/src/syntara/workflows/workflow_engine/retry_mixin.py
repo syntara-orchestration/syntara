@@ -36,6 +36,7 @@ class WorkflowRetryMixin:
     _runtime_settings: dict[str, Any]
     _retry_source_statuses: dict[str, str]
     skipped_nodes: set[str]
+    node_inputs: dict[str, dict[str, Any]]
     loop_state: dict[str, LoopState]
     loop_iteration_results: dict[str, dict[str, list[Any]]]
 
@@ -207,11 +208,16 @@ class WorkflowRetryMixin:
         return strip_iteration_suffix(node_id) in self._retry_restorable_nodes(graph)
 
     async def _restore_node_output(self, node: ActivityNode) -> dict[str, Any] | None:
-        """Fetch and inject this node's stored output, or None if unavailable.
+        """Fetch and inject this node's stored input and output, or None.
 
-        Returns None when the source run has no completed output for the node, so
+        Returns None when the source run has no completed record for the node, so
         the caller falls through to normal execution. A node that never completed
         cannot be skipped, because there would be nothing to inject.
+
+        Both halves are republished: the output into the execution namespace, and
+        the input into ``node_inputs``. The latter is what
+        ``get_activity_input`` reads, so a restored node shows the same input and
+        output on drill-down as one that executed.
         """
         fetched = await workflow.execute_activity(
             ActivityName.RETRY_OUTPUTS,
@@ -219,12 +225,17 @@ class WorkflowRetryMixin:
             activity_id=f"__internal__fetch_retry_output_{node.id}",
             start_to_close_timeout=timedelta(seconds=DEFAULT_ACTIVITY_TIMEOUT_SECONDS),
         )
-        output = (fetched or {}).get(node.id)
-        if output is None:
+        record = (fetched or {}).get(node.id)
+        if record is None:
             return None
 
+        output = record.get("output_data") or {}
+        self.node_inputs[node.id] = record.get("input_data") or {}
         self._restored_nodes.add(node.id)
-        workflow.logger.info("Restored retry output", extra={"node_id": node.id, "output_keys": sorted(output)})
+        workflow.logger.info(
+            "Restored retry node data",
+            extra={"node_id": node.id, "input_keys": sorted(self.node_inputs[node.id]), "output_keys": sorted(output)},
+        )
         return {"output": output, "control": None}
 
     async def _maybe_resume_loop(self, node: ActivityNode, graph: WorkflowGraph | None) -> None:
