@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { ActivityStatus } from '../../workflows/execution/types'
 
-import { useNodeExecutionDetails } from './useNodeExecutionDetails'
+import { useStepExecutionDetails } from './useStepExecutionDetails'
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -62,12 +62,12 @@ beforeEach(() => {
 // Tests
 // ---------------------------------------------------------------------------
 
-describe('useNodeExecutionDetails', () => {
+describe('useStepExecutionDetails', () => {
   describe('return values — data mapping', () => {
     it('returns null inputData and outputData when query has no data', () => {
       mockUseQuery.mockReturnValue({ data: undefined, isLoading: false, error: null, refetch: mockRefetch })
 
-      const { result } = renderHook(() => useNodeExecutionDetails('my_activity', 'exec-1'), {
+      const { result } = renderHook(() => useStepExecutionDetails('my_activity', 'exec-1'), {
         wrapper: makeWrapper(queryClient),
       })
 
@@ -78,7 +78,7 @@ describe('useNodeExecutionDetails', () => {
     it('returns inputData and outputData from the first activity in the response', () => {
       mockUseQuery.mockReturnValue({ data: mockActivityResponse, isLoading: false, error: null, refetch: mockRefetch })
 
-      const { result } = renderHook(() => useNodeExecutionDetails('my_activity', 'exec-1'), {
+      const { result } = renderHook(() => useStepExecutionDetails('my_activity', 'exec-1'), {
         wrapper: makeWrapper(queryClient),
       })
 
@@ -89,7 +89,7 @@ describe('useNodeExecutionDetails', () => {
 
   describe('enabled flag', () => {
     it('is false when executionId is null', () => {
-      renderHook(() => useNodeExecutionDetails('my_activity', null), { wrapper: makeWrapper(queryClient) })
+      renderHook(() => useStepExecutionDetails('my_activity', null), { wrapper: makeWrapper(queryClient) })
 
       // The fourth argument to useQuery carries the { enabled } option
       expect(mockUseQuery).toHaveBeenCalledWith(
@@ -101,7 +101,7 @@ describe('useNodeExecutionDetails', () => {
     })
 
     it('is false when nodeId is empty string', () => {
-      renderHook(() => useNodeExecutionDetails('', 'exec-1'), { wrapper: makeWrapper(queryClient) })
+      renderHook(() => useStepExecutionDetails('', 'exec-1'), { wrapper: makeWrapper(queryClient) })
 
       expect(mockUseQuery).toHaveBeenCalledWith(
         'get',
@@ -112,7 +112,7 @@ describe('useNodeExecutionDetails', () => {
     })
 
     it('is true when both nodeId and executionId are provided', () => {
-      renderHook(() => useNodeExecutionDetails('my_activity', 'exec-1'), { wrapper: makeWrapper(queryClient) })
+      renderHook(() => useStepExecutionDetails('my_activity', 'exec-1'), { wrapper: makeWrapper(queryClient) })
 
       expect(mockUseQuery).toHaveBeenCalledWith(
         'get',
@@ -125,7 +125,7 @@ describe('useNodeExecutionDetails', () => {
 
   describe('refetch on activityStatus change', () => {
     it('is NOT called on mount', () => {
-      renderHook(() => useNodeExecutionDetails('my_activity', 'exec-1', 'running'), {
+      renderHook(() => useStepExecutionDetails('my_activity', 'exec-1', 'running'), {
         wrapper: makeWrapper(queryClient),
       })
 
@@ -135,7 +135,7 @@ describe('useNodeExecutionDetails', () => {
 
     it('is called when activityStatus changes from one value to another', () => {
       const { rerender } = renderHook(
-        ({ status }: { status?: ActivityStatus }) => useNodeExecutionDetails('my_activity', 'exec-1', status),
+        ({ status }: { status?: ActivityStatus }) => useStepExecutionDetails('my_activity', 'exec-1', status),
         {
           initialProps: { status: 'running' as ActivityStatus | undefined },
           wrapper: makeWrapper(queryClient),
@@ -151,7 +151,7 @@ describe('useNodeExecutionDetails', () => {
 
     it('is NOT called when activityStatus stays the same', () => {
       const { rerender } = renderHook(
-        ({ status }: { status?: ActivityStatus }) => useNodeExecutionDetails('my_activity', 'exec-1', status),
+        ({ status }: { status?: ActivityStatus }) => useStepExecutionDetails('my_activity', 'exec-1', status),
         {
           initialProps: { status: 'running' as ActivityStatus | undefined },
           wrapper: makeWrapper(queryClient),

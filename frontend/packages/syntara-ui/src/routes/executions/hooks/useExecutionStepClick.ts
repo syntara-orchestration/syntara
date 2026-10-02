@@ -18,7 +18,7 @@ import { isWaitingApprovalNode, useExecutionApprovals } from './useExecutionAppr
  * - Provides handlers for node clicks on waiting approval nodes
  * - Delegates to: `useFetchPendingApprovals`
  *
- * **Layer 3: Interaction (useExecutionNodeClick)** ← You are here
+ * **Layer 3: Interaction (useExecutionStepClick)** ← You are here
  * - Composes approval clicks + node selection clicks
  * - Routes waiting approval nodes → approval flow
  * - Routes completed/failed nodes → details panel
@@ -28,17 +28,17 @@ import { isWaitingApprovalNode, useExecutionApprovals } from './useExecutionAppr
  * - Manages panel open/close state
  * - Handles URL-based deep linking (`?approval=abc-123`)
  * - Integrates auto-detection via WebSocket
- * - Delegates to: result from `useExecutionNodeClick`
+ * - Delegates to: result from `useExecutionStepClick`
  *
  * **Usage in ExecutionDetail:**
  * ```tsx
- * const nodeClick = useExecutionNodeClick(executionId)
+ * const nodeClick = useExecutionStepClick(executionId)
  * const approval = useExecutionApprovalPanel(executionId, searchParams, nodeClick, workflowDef)
  * ```
  *
  * **Why layered instead of one big hook?**
  * - Each layer has a single, testable responsibility
- * - `useExecutionNodeClick` can be used independently for non-approval node clicks
+ * - `useExecutionStepClick` can be used independently for non-approval node clicks
  * - `useFetchPendingApprovals` is reusable in other contexts (e.g., approval list page)
  * - Easier to test in isolation (4 focused test files vs 1 massive test file)
  * - Follows React hook composition patterns (like `useState` + `useEffect` instead of one giant state hook)
@@ -56,12 +56,12 @@ function getExecutionState(node: ExecutionNode): ExecutionState | undefined {
   return undefined
 }
 
-function getNodeDisplayName(node: ExecutionNode): string {
+function getStepDisplayName(node: ExecutionNode): string {
   const name = node.data.name
   return typeof name === 'string' ? name : node.id
 }
 
-function getNodeActivityId(node: ExecutionNode): string {
+function getStepActivityId(node: ExecutionNode): string {
   const defId = node.data.definitionId
   if (typeof defId === 'string') return defId
   return node.id
@@ -72,11 +72,11 @@ function getNodeActivityId(node: ExecutionNode): string {
  *
  * Routes canvas node clicks to either:
  * 1. Approval nodes in "waiting" status → delegates to useExecutionApprovals
- * 2. Completed/failed nodes → toggles node details panel via selectedNodeId
+ * 2. Completed/failed steps → toggles step details panel via selectedNodeId
  *
  * See file-level JSDoc for the full approval hooks architecture.
  */
-export function useExecutionNodeClick(executionId: string | undefined) {
+export function useExecutionStepClick(executionId: string | undefined) {
   const {
     approvals,
     currentIndex,
@@ -103,10 +103,10 @@ export function useExecutionNodeClick(executionId: string | undefined) {
 
       const execState = getExecutionState(node)
       if (execState?.status === 'completed' || execState?.status === 'failed') {
-        const activityId = getNodeActivityId(node)
+        const activityId = getStepActivityId(node)
         selectedNodeIdRef.current = activityId
         setSelectedNodeId(activityId)
-        setSelectedNodeName(getNodeDisplayName(node))
+        setSelectedNodeName(getStepDisplayName(node))
       }
     },
     [handleApprovalNodeClick]

@@ -5,12 +5,12 @@ import { FlowNodeType } from '../../../constants'
 
 import { isWaitingApprovalNode, useExecutionApproval } from './useExecutionApproval'
 
-const mockFetchForNode = vi.fn()
+const mockFetchForStep = vi.fn()
 const mockClear = vi.fn()
 
-vi.mock('./useFetchApprovalForNode', () => ({
-  useFetchApprovalForNode: () => ({
-    fetchForNode: mockFetchForNode,
+vi.mock('./useFetchApprovalForStep', () => ({
+  useFetchApprovalForStep: () => ({
+    fetchForStep: mockFetchForStep,
     clear: mockClear,
     approval: null,
     isLoading: false,
@@ -59,7 +59,7 @@ describe('isWaitingApprovalNode', () => {
 describe('useExecutionApproval', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockFetchForNode.mockResolvedValue(mockApproval)
+    mockFetchForStep.mockResolvedValue(mockApproval)
   })
 
   it('returns null pendingApproval initially', () => {
@@ -74,7 +74,7 @@ describe('useExecutionApproval', () => {
 
     result.current.handleNodeClick(makeMouseEvent(), makeNode({ type: FlowNodeType.TASK }))
 
-    expect(mockFetchForNode).not.toHaveBeenCalled()
+    expect(mockFetchForStep).not.toHaveBeenCalled()
     expect(result.current.pendingApproval).toBeNull()
   })
 
@@ -83,7 +83,7 @@ describe('useExecutionApproval', () => {
 
     result.current.handleNodeClick(makeMouseEvent(), makeNode({ data: { __executionState: { status: 'completed' } } }))
 
-    expect(mockFetchForNode).not.toHaveBeenCalled()
+    expect(mockFetchForStep).not.toHaveBeenCalled()
     expect(result.current.pendingApproval).toBeNull()
   })
 
@@ -93,20 +93,20 @@ describe('useExecutionApproval', () => {
     result.current.handleNodeClick(makeMouseEvent(), makeNode())
 
     await waitFor(() => {
-      expect(mockFetchForNode).toHaveBeenCalledWith('node-abc')
+      expect(mockFetchForStep).toHaveBeenCalledWith('node-abc')
       expect(result.current.pendingApproval).toEqual(mockApproval)
     })
   })
 
   it('does not set pendingApproval when fetch returns null', async () => {
-    mockFetchForNode.mockResolvedValue(null)
+    mockFetchForStep.mockResolvedValue(null)
 
     const { result } = renderHook(() => useExecutionApproval('exec-1'))
 
     result.current.handleNodeClick(makeMouseEvent(), makeNode())
 
     await waitFor(() => {
-      expect(mockFetchForNode).toHaveBeenCalled()
+      expect(mockFetchForStep).toHaveBeenCalled()
     })
 
     expect(result.current.pendingApproval).toBeNull()
@@ -142,14 +142,14 @@ describe('useExecutionApproval', () => {
   })
 
   it('handles fetch rejection without throwing', async () => {
-    mockFetchForNode.mockRejectedValue(new Error('Network error'))
+    mockFetchForStep.mockRejectedValue(new Error('Network error'))
 
     const { result } = renderHook(() => useExecutionApproval('exec-1'))
 
     result.current.handleNodeClick(makeMouseEvent(), makeNode())
 
     await waitFor(() => {
-      expect(mockFetchForNode).toHaveBeenCalled()
+      expect(mockFetchForStep).toHaveBeenCalled()
     })
 
     expect(result.current.pendingApproval).toBeNull()
@@ -160,13 +160,13 @@ describe('useExecutionApproval', () => {
 
     result.current.handleNodeClick(makeMouseEvent(), makeNode({ data: {} }))
 
-    expect(mockFetchForNode).not.toHaveBeenCalled()
+    expect(mockFetchForStep).not.toHaveBeenCalled()
   })
 
   it('discards stale fetch when a different node is clicked before fetch resolves', async () => {
     const approvalB = { ...mockApproval, id: 'approval-2', approval_node_id: 'node-xyz' }
     let resolveFirst: (value: typeof mockApproval) => void
-    mockFetchForNode
+    mockFetchForStep
       .mockReturnValueOnce(
         new Promise<typeof mockApproval>((resolve) => {
           resolveFirst = resolve
@@ -191,14 +191,14 @@ describe('useExecutionApproval', () => {
 
     // pendingApproval should stay as approvalB (from node-xyz), not revert to mockApproval
     await waitFor(() => {
-      expect(mockFetchForNode).toHaveBeenCalledTimes(2)
+      expect(mockFetchForStep).toHaveBeenCalledTimes(2)
     })
     expect(result.current.pendingApproval).toEqual(approvalB)
   })
 
   it('discards stale fetch result when executionId changes before fetch resolves', async () => {
     let resolveFetch: (value: typeof mockApproval) => void
-    mockFetchForNode.mockReturnValue(
+    mockFetchForStep.mockReturnValue(
       new Promise<typeof mockApproval>((resolve) => {
         resolveFetch = resolve
       })
@@ -210,7 +210,7 @@ describe('useExecutionApproval', () => {
 
     // Click approval node — fetch starts but hasn't resolved
     result.current.handleNodeClick(makeMouseEvent(), makeNode())
-    expect(mockFetchForNode).toHaveBeenCalledWith('node-abc')
+    expect(mockFetchForStep).toHaveBeenCalledWith('node-abc')
 
     // User navigates to a different execution before fetch resolves
     rerender({ execId: 'exec-2' })
@@ -219,7 +219,7 @@ describe('useExecutionApproval', () => {
     resolveFetch!(mockApproval)
 
     await waitFor(() => {
-      expect(mockFetchForNode).toHaveBeenCalled()
+      expect(mockFetchForStep).toHaveBeenCalled()
     })
 
     // pendingApproval should remain null — the result was for exec-1, not exec-2

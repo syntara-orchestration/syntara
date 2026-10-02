@@ -13,10 +13,10 @@ import { latestActivityStateForCanvasNode } from '../../workflows/execution/util
 import { useExecutionStore } from '../../workflows/stores/useExecutionStore'
 
 import { useAutoApprovalDetection } from './useAutoApprovalDetection'
-import type { useExecutionNodeClick } from './useExecutionNodeClick'
+import type { useExecutionStepClick } from './useExecutionStepClick'
 import { useFetchApprovalForUrlParam } from './useFetchApprovalForUrlParam'
 
-type NodeClickResult = ReturnType<typeof useExecutionNodeClick>
+type StepClickResult = ReturnType<typeof useExecutionStepClick>
 
 export type WorkflowDefinitionLike = {
   nodes?: Array<Record<string, unknown>>
@@ -33,12 +33,12 @@ export type WorkflowDefinitionLike = {
  * - Extracting approval message/prompt from the approval record, with a
  *   workflow-definition fallback for older rows that have no persisted prompt
  *
- * Part of the approval hooks architecture. See `useExecutionNodeClick.ts` for the full layering explanation.
+ * Part of the approval hooks architecture. See `useExecutionStepClick.ts` for the full layering explanation.
  */
 export function useExecutionApprovalPanel(
   executionId: string | undefined,
   searchParams: string,
-  nodeClick: NodeClickResult,
+  nodeClick: StepClickResult,
   workflowDefinition: WorkflowDefinitionLike | undefined
 ) {
   const { clearApprovals, setApprovalsAndIndex, fetchApprovals, currentApproval, approvals } = nodeClick
@@ -132,7 +132,7 @@ export function useExecutionApprovalPanel(
 
   useAutoApprovalDetection({
     executionId,
-    fetchForNode: async (nodeId: string) => {
+    fetchForStep: async (nodeId: string) => {
       const fetchedApprovals = await fetchApprovals()
       return findApprovalForCanvasNode(fetchedApprovals, nodeId) ?? null
     },
