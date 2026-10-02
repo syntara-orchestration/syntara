@@ -4,9 +4,9 @@ import { type Node, type NodeProps } from '@xyflow/react'
 import { SynStep } from '../../../../components/steps/SynStep'
 import { FlowNodeType } from '../../../../constants'
 import type { ActivityStatus } from '../../execution/types'
-import { getNodeTypeColor } from '../nodeTypeColors'
+import { getStepTypeColor } from '../stepTypeColors'
 
-import { nodeMetadata } from './nodeMetadata'
+import { stepMetadata } from './stepMetadata'
 import { TaskActivityDetails } from './TaskNode'
 import { getTaskSemanticLabels } from './taskSemanticLabels'
 
@@ -22,8 +22,8 @@ import { getTaskSemanticLabels } from './taskSemanticLabels'
  */
 export type TaskReversedNode = { type: typeof FlowNodeType.TASK_REVERSED } & Node<TaskActivity>
 
-export function TaskReversedNodeComponent(props: NodeProps<TaskReversedNode>) {
-  const metadata = nodeMetadata.task
+export function TaskReversedStepComponent(props: NodeProps<TaskReversedNode>) {
+  const metadata = stepMetadata.task
 
   // Extract execution state if present
   const executionState = (props.data as Record<string, unknown>).__executionState as
@@ -42,10 +42,10 @@ export function TaskReversedNodeComponent(props: NodeProps<TaskReversedNode>) {
       nodeProps={props}
       reverseHandles
       executionState={executionState}
-      topBarColor={getNodeTypeColor(FlowNodeType.TASK_REVERSED, props.data)}
+      topBarColor={getStepTypeColor(FlowNodeType.TASK_REVERSED, props.data)}
       semanticZoomSummary={getTaskSemanticLabels(props.data)}
     >
-      <TaskActivityDetails data={props.data} iconColor={getNodeTypeColor(FlowNodeType.TASK_REVERSED, props.data)} />
+      <TaskActivityDetails data={props.data} iconColor={getStepTypeColor(FlowNodeType.TASK_REVERSED, props.data)} />
     </SynStep>
   )
 }
