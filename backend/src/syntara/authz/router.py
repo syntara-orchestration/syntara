@@ -64,9 +64,22 @@ class CanIRequest(SQLModel):
 
     model_config: ClassVar[ConfigDict] = ConfigDict(title="Can I Request")  # type: ignore[assignment]
 
-    action: str = Field(title=None, description='The action to check (e.g., "read", "create", "delete")')
-    resource_type: str = Field(title=None, description='The type of resource (e.g., "workflow", "project")')
-    resource_id: str = Field(default="", title=None, description="Optional specific resource ID")
+    action: str = Field(
+        title=None,
+        max_length=FieldLimits.NAME_MAX_LENGTH,
+        description='The action to check (e.g., "read", "create", "delete")',
+    )
+    resource_type: str = Field(
+        title=None,
+        max_length=FieldLimits.NAME_MAX_LENGTH,
+        description='The type of resource (e.g., "workflow", "project")',
+    )
+    resource_id: str = Field(
+        default="",
+        title=None,
+        max_length=FieldLimits.NAME_MAX_LENGTH,
+        description="Optional specific resource ID",
+    )
     resource_labels: Annotated[dict[str, str], Field(description="Labels on the target resource")] = {}
     resource_metadata: Annotated[
         dict[str, Any], Field(description="Additional metadata about the target resource")
@@ -110,9 +123,13 @@ class CanIResponse(SQLModel):
 class WhoCanRequest(BasePaginatedRequest):
     """Request body for the Who can? endpoint."""
 
-    action: str = PydanticField(json_schema_extra={"x-query-param": True})
-    resource_type: str = PydanticField(json_schema_extra={"x-query-param": True})
-    resource_id: str = PydanticField(default="", json_schema_extra={"x-query-param": True})
+    action: str = PydanticField(max_length=FieldLimits.NAME_MAX_LENGTH, json_schema_extra={"x-query-param": True})
+    resource_type: str = PydanticField(
+        max_length=FieldLimits.NAME_MAX_LENGTH, json_schema_extra={"x-query-param": True}
+    )
+    resource_id: str = PydanticField(
+        default="", max_length=FieldLimits.NAME_MAX_LENGTH, json_schema_extra={"x-query-param": True}
+    )
     resource_labels: dict[str, str] = PydanticField(default_factory=dict, json_schema_extra={"x-query-param": True})
     resource_metadata: dict[str, Any] = PydanticField(default_factory=dict, json_schema_extra={"x-query-param": True})
     resource_project: str = PydanticField(
