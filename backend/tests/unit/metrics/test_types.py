@@ -89,6 +89,8 @@ class TestMetricType:
             # Authorization
             "AUTHZ_DURATION",
             "OPA_REQUEST_DURATION",
+            # Stall Detection
+            "STALLS_DETECTED",
         }
         actual = {m.name for m in MetricType}
         assert actual == expected

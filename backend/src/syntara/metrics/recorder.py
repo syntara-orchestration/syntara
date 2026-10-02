@@ -423,6 +423,11 @@ class MetricsRecorder:
         }:
             MetricsRecorder._dispatch_scheduled_trigger(metric_type, value, labels, p)
 
+        elif metric_type == MetricType.STALLS_DETECTED:
+            p.stalls_detected_total.labels(
+                node_type=labels.get("node_type", "unknown"),
+            ).inc()
+
         else:
             MetricsRecorder._dispatch_component(metric_type, value, labels, p)
 
