@@ -141,9 +141,9 @@ const { register, handleSubmit } = useForm<FormData>({
 
 ### Step form (with Zod)
 
-1. Create a schema file next to your form: `myNodeFormSchema.ts` — define shape and validation with `z.object()` (use `.superRefine()` for conditional rules, or `z.discriminatedUnion()` for executor-type-style forms). Export the schema and `type MyFormData = z.infer<typeof myNodeFormSchema>`. Import `z` from `'zod'`.
-2. For optional number fields use `optionalNumber` from `src/routes/builder/node-forms/shared/formSchemaUtils` so empty `valueAsNumber` inputs (NaN) validate
-3. In form component: `useForm<MyFormData>({ resolver: zodResolver(myNodeFormSchema, undefined, { mode: 'sync' }), defaultValues })` — import `zodResolver` from `./shared/formSchemaUtils`
+1. Create a schema file next to your form: `myStepFormSchema.ts` — define shape and validation with `z.object()` (use `.superRefine()` for conditional rules, or `z.discriminatedUnion()` for executor-type-style forms). Export the schema and `type MyFormData = z.infer<typeof myStepFormSchema>`. Import `z` from `'zod'`.
+2. For optional number fields use `optionalNumber` from `src/routes/builder/step-forms/shared/formSchemaUtils` so empty `valueAsNumber` inputs (NaN) validate
+3. In form component: `useForm<MyFormData>({ resolver: zodResolver(myStepFormSchema, undefined, { mode: 'sync' }), defaultValues })` — import `zodResolver` from `./shared/formSchemaUtils`
 4. Use `useFormMutationErrorHandler(setError)` for API 422 field errors; Zod handles client-side only. See: [`frontend/docs/error-handling.md`](frontend/docs/error-handling.md) - "Client-side validation (Zod + @hookform/resolvers)"
 
 ---
@@ -1664,7 +1664,7 @@ function WorkflowsPage() {
 
 `SynPageHeader` renders the `docLink` as an external link icon next to the page title.
 
-For the workflow builder's node editor panel, pass `docLink` as a prop to `NodeEditorLayout`, which enables its "Documentation" button (previously disabled with "Coming soon").
+For the workflow builder's node editor panel, pass `docLink` as a prop to `StepEditorLayout`, which enables its "Documentation" button (previously disabled with "Coming soon").
 
 The sidebar help icon (`AppDockedNav`) uses the `home` key. In community mode that is the same README URL as every other key; in extended mode it resolves to the configured product landing page.
 

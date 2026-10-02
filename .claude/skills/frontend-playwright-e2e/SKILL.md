@@ -29,7 +29,7 @@ Your goal is to author comprehensive, production-grade end-to-end tests using Pl
 - **Navigation:** `toAppUrl('/path')` helper for all URLs
 - **Unique names:** `buildUniqueName(prefix)` for all test data
 - **Locators:** `getByRole` > `getByLabel` > `getByPlaceholder` > `getByText` > `getByTestId`
-- **Helpers:** `createBasicWorkflow`, `addNodePanel` (opens **Add step** UI), `fillCodeEditor`, `closeNodeEditorPanel`
+- **Helpers:** `createBasicWorkflow`, `addStepPanel` (opens **Add step** UI), `fillCodeEditor`, `closeStepEditorPanel`
 
 ### Commands
 
@@ -142,7 +142,7 @@ To test against the real Syntara backend instead of the mock API:
 Read all files in `frontend/packages/syntara-ui/e2e/`:
 
 - `fixtures.ts` — custom `{ app }` fixture definition and `toAppUrl` helper
-- `helpers/workflows.ts` — `buildUniqueName`, `createBasicWorkflow`, `addNodePanel` (Add step panel), `fillCodeEditor`, `closeNodeEditorPanel`
+- `helpers/workflows.ts` — `buildUniqueName`, `createBasicWorkflow`, `addStepPanel` (Add step panel), `fillCodeEditor`, `closeStepEditorPanel`
 - All `*.spec.ts` files — naming conventions, structure, assertion style, cleanup patterns
 
 ### Step 2: Extract conventions
@@ -355,7 +355,7 @@ test('user creates and verifies a workflow', async ({ app }) => {
 - ✅ Use `{ app }` fixture (NOT `{ page }`)
 - ✅ Use `toAppUrl('/path')` for navigation
 - ✅ Use `buildUniqueName(prefix)` for unique test data
-- ✅ Use existing helpers (`createBasicWorkflow`, `addNodePanel` for the **Add step** panel, etc.)
+- ✅ Use existing helpers (`createBasicWorkflow`, `addStepPanel` for the **Add step** panel, etc.)
 
 **Asserting API calls**
 
@@ -478,8 +478,8 @@ The CSS-selector ban applies equally to **locators** and **assertions**. Any `.p
 **Scoping locators to containers:**
 
 ```typescript
-// ✅ Scoped to Add step panel (helper name is addNodePanel)
-const panel = addNodePanel(app)
+// ✅ Scoped to Add step panel (helper name is addStepPanel)
+const panel = addStepPanel(app)
 await panel.getByRole('button', { name: 'Action', exact: true }).click()
 
 // ✅ Scoped to a row

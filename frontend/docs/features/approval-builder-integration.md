@@ -6,20 +6,20 @@ The Approval node creates a human approval gate that pauses workflow execution u
 
 ## Node Registration
 
-**File**: `packages/syntara-ui/src/routes/builder/registry/nodes/registerApprovalNode.ts`
+**File**: `packages/syntara-ui/src/routes/builder/registry/steps/registerApprovalStep.ts`
 
 ### Registry Properties
 
 ```typescript
-NodeRegistry.register<ApprovalFormSubmitData>({
-  id: RegistryNodeId.APPROVAL,
+StepRegistry.register<ApprovalFormSubmitData>({
+  id: RegistryStepId.APPROVAL,
   label: 'Approval',
   icon: RhUiUserCheckIcon,
   category: 'logic',
   description: 'Wait for approval or human input before continuing',
   keywords: ['approve', 'approval', 'review', 'manual', 'gate', 'checkpoint'],
   order: 50,
-  formComponent: ApprovalNodeForm,
+  formComponent: ApprovalStepForm,
   enabled: true,
   onSubmit: (data, onSuccess, onError) => {
     /* ... */
@@ -32,7 +32,7 @@ NodeRegistry.register<ApprovalFormSubmitData>({
 - **No `DetailsComponent`** — the approval node uses the standard activity details view, not a custom renderer
 - **Category**: `'logic'` — appears in the logic section of the node picker
 - **Order**: `50` — positioned after control flow nodes, before utility nodes
-- **Form Component**: `ApprovalNodeForm` — handles all user input
+- **Form Component**: `ApprovalStepForm` — handles all user input
 
 ### onSubmit Handler
 
@@ -41,8 +41,8 @@ The `onSubmit` handler transforms the form data into an approval activity and ad
 ```typescript
 onSubmit: (data, onSuccess, onError) => {
   try {
-    const baseName = getDefaultNodeBaseName({
-      nodeTypeId: RegistryNodeId.APPROVAL,
+    const baseName = getDefaultStepBaseName({
+      stepTypeId: RegistryStepId.APPROVAL,
       label: 'Approval',
     })
     const { activityId, activity } = buildNamedActivity(baseName, data.name, (id, name) =>
@@ -80,13 +80,13 @@ onSubmit: (data, onSuccess, onError) => {
 
 ## Form Schema & Validation
 
-**File**: `packages/syntara-ui/src/routes/builder/node-forms/approvalFormSchema.ts`
+**File**: `packages/syntara-ui/src/routes/builder/step-forms/approvalFormSchema.ts`
 
 ### Zod Schema
 
 ```typescript
 import { z } from 'zod'
-import { nodeSettingsSchema } from './shared/nodeSettingsSchema'
+import { stepSettingsSchema } from './shared/stepSettingsSchema'
 
 const MAX_APPROVER_USERS = 100
 const MAX_APPROVER_GROUPS = 50
@@ -104,7 +104,7 @@ export const approvalFormSchema = z.object({
   prompt: z.string().optional(),
   fallback_decision: z.enum(['approve', 'reject']).optional(),
   decision_window: z.number().int().positive().optional(),
-  settings: nodeSettingsSchema.optional(),
+  settings: stepSettingsSchema.optional(),
 })
 
 export type ApprovalFormData = z.infer<typeof approvalFormSchema>
@@ -150,16 +150,16 @@ export type ApprovalFormSubmitData = {
 
 ## Form Component Structure
 
-**File**: `packages/syntara-ui/src/routes/builder/node-forms/ApprovalNodeForm.tsx`
+**File**: `packages/syntara-ui/src/routes/builder/step-forms/ApprovalStepForm.tsx`
 
 ### Component Hierarchy
 
 ```
-ApprovalNodeForm
+ApprovalStepForm
 ├── FormProvider (react-hook-form)
-│   └── NodeFormContainer
+│   └── StepFormContainer
 │       └── ApprovalFormFields
-│           └── NodeFormTabsLayout
+│           └── StepFormTabsLayout
 │               ├── Parameters Tab (default)
 │               │   ├── ActivityNameField (in header)
 │               │   ├── ApproverUsersSelect
@@ -168,7 +168,7 @@ ApprovalNodeForm
 │               │   ├── FormSelect (fallback_decision)
 │               │   └── DurationInput (decision_window)
 │               └── Settings Tab
-│                   └── NodeSettingsForm
+│                   └── StepSettingsForm
 ```
 
 ### Key Hooks
@@ -317,7 +317,7 @@ const approvalTimeoutDefault = defaults?.timeoutSeconds.approval ?? null
 
 ```typescript
 const settingsContent = (
-  <NodeSettingsForm
+  <StepSettingsForm
     supportsTimeout={false}
     continueOnFailureHelp="When enabled and the approval cannot complete (decision window expired or send failure), the workflow proceeds. The outcome is determined by the fallback decision in the approval config."
   />
@@ -335,7 +335,7 @@ The decision window is the correct timeout mechanism for approval semantics. Exp
 
 ### Settings Fields
 
-When `supportsTimeout: false`, `NodeSettingsForm` renders:
+When `supportsTimeout: false`, `StepSettingsForm` renders:
 
 - **Continue on failure** (`settings.continue_on_failure`):
   - When enabled and the approval cannot complete (decision window expired or send failure), the workflow proceeds
@@ -464,7 +464,7 @@ The builder also handles approval interactions when viewing a live or recent exe
 
 ### Group Permission Filtering
 
-`useApprovalDecideGroups` (`packages/syntara-ui/src/routes/builder/node-forms/useApprovalDecideGroups.ts`) returns **all groups** without filtering by `approval:decide` permission. Users can select groups whose members lack the required permission, creating approvals that no group member can decide (effectively hanging forever). The helper text warns about empty groups, but there is no check for permission eligibility.
+`useApprovalDecideGroups` (`packages/syntara-ui/src/routes/builder/step-forms/useApprovalDecideGroups.ts`) returns **all groups** without filtering by `approval:decide` permission. Users can select groups whose members lack the required permission, creating approvals that no group member can decide (effectively hanging forever). The helper text warns about empty groups, but there is no check for permission eligibility.
 
 **Why**: The `/authz/who_can` endpoint returns users, not groups. Client-side filtering would require N×M API calls (N groups × M members). A proper fix requires a backend `/authz/which_groups_can` endpoint.
 
@@ -474,7 +474,7 @@ The builder also handles approval interactions when viewing a live or recent exe
 
 ### Data Flow
 
-1. **User opens approval node form** → `ApprovalNodeForm` renders with default values
+1. **User opens approval step form** → `ApprovalStepForm` renders with default values
 2. **User selects approvers** → `useApprovalDecideUsers` and `useApprovalDecideGroups` populate dropdowns
 3. **User configures settings** → Form state tracked by `react-hook-form`
 4. **User submits form** → `approvalFormSchema` validates via Zod

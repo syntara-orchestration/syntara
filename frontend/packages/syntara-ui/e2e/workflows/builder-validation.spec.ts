@@ -4,7 +4,7 @@
  * Covers: verification error banner when a workflow contains a disconnected node.
  */
 import { test, expect } from '../fixtures'
-import { buildUniqueName, createWorkflowWithTrigger, addScriptNodeUnconnected } from '../helpers/workflows'
+import { buildUniqueName, createWorkflowWithTrigger, addScriptStepUnconnected } from '../helpers/workflows'
 import { apiRequest } from '../utils/api'
 
 test.describe('UI-31: Workflow Verification — Pre-Execution Validation', () => {
@@ -17,7 +17,7 @@ test.describe('UI-31: Workflow Verification — Pre-Execution Validation', () =>
 
     try {
       // Add a script node that is NOT connected to anything (dangling/orphaned)
-      await addScriptNodeUnconnected(app, 'Orphaned Step', 'echo "orphan"')
+      await addScriptStepUnconnected(app, 'Orphaned Step', 'echo "orphan"')
 
       // Trigger verification via the kebab menu (Save does not run validation — verification is a separate action)
       await app.getByRole('button', { name: 'Workflow actions' }).click()

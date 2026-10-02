@@ -17,15 +17,15 @@
  */
 
 import { test, expect } from '../fixtures'
-import { addWaitNode } from '../helpers/v2-nodes-loop'
+import { addWaitStep } from '../helpers/v2-steps-loop'
 import {
   buildUniqueName,
-  closeNodeEditorPanel,
+  closeStepEditorPanel,
   deleteWorkflow,
-  openNodeForEditing,
+  openStepForEditing,
   saveWorkflow,
   startWorkflowWithTrigger,
-  verifyNodeVisible,
+  verifyStepVisible,
 } from '../helpers/workflows'
 
 test.describe('Wait Node Configuration', () => {
@@ -36,17 +36,17 @@ test.describe('Wait Node Configuration', () => {
       await startWorkflowWithTrigger(app)
 
       // Add Wait node with 30 seconds
-      await addWaitNode(app, 'Wait 30s', { seconds: 30 })
-      await verifyNodeVisible(app, 'Wait 30s')
+      await addWaitStep(app, 'Wait 30s', { seconds: 30 })
+      await verifyStepVisible(app, 'Wait 30s')
 
       // Save and verify persistence
       // saveWorkflow now gates on the create response, so no URL guard is needed
       await saveWorkflow(app, workflowName)
 
       // Reopen to verify configuration persisted
-      await openNodeForEditing(app, 'Wait 30s')
+      await openStepForEditing(app, 'Wait 30s')
       await expect(app.getByLabel('Seconds')).toHaveValue('30')
-      await closeNodeEditorPanel(app)
+      await closeStepEditorPanel(app)
     } finally {
       await deleteWorkflow(app, workflowName)
     }
@@ -59,14 +59,14 @@ test.describe('Wait Node Configuration', () => {
       await startWorkflowWithTrigger(app)
 
       // Add Wait node with hours and minutes
-      await addWaitNode(app, 'Wait 1h 30m', { hours: 1, minutes: 30 })
+      await addWaitStep(app, 'Wait 1h 30m', { hours: 1, minutes: 30 })
       await saveWorkflow(app, workflowName)
 
       // Verify both time units persisted
-      await openNodeForEditing(app, 'Wait 1h 30m')
+      await openStepForEditing(app, 'Wait 1h 30m')
       await expect(app.getByLabel('Hours')).toHaveValue('1')
       await expect(app.getByLabel('Minutes')).toHaveValue('30')
-      await closeNodeEditorPanel(app)
+      await closeStepEditorPanel(app)
     } finally {
       await deleteWorkflow(app, workflowName)
     }
@@ -79,7 +79,7 @@ test.describe('Wait Node Configuration', () => {
       await startWorkflowWithTrigger(app)
 
       // Add Wait node with all four time units
-      await addWaitNode(app, 'Wait all units', {
+      await addWaitStep(app, 'Wait all units', {
         days: 1,
         hours: 2,
         minutes: 30,
@@ -88,12 +88,12 @@ test.describe('Wait Node Configuration', () => {
       await saveWorkflow(app, workflowName)
 
       // Verify all time units persisted correctly
-      await openNodeForEditing(app, 'Wait all units')
+      await openStepForEditing(app, 'Wait all units')
       await expect(app.getByLabel('Days')).toHaveValue('1')
       await expect(app.getByLabel('Hours')).toHaveValue('2')
       await expect(app.getByLabel('Minutes')).toHaveValue('30')
       await expect(app.getByLabel('Seconds')).toHaveValue('45')
-      await closeNodeEditorPanel(app)
+      await closeStepEditorPanel(app)
     } finally {
       await deleteWorkflow(app, workflowName)
     }
@@ -106,10 +106,10 @@ test.describe('Wait Node Configuration', () => {
       await startWorkflowWithTrigger(app)
 
       // Add Wait node with minimal duration
-      await addWaitNode(app, 'Wait node', { seconds: 1 })
+      await addWaitStep(app, 'Wait node', { seconds: 1 })
 
       // Edit the duration
-      await openNodeForEditing(app, 'Wait node')
+      await openStepForEditing(app, 'Wait node')
       await app.getByLabel('Seconds').fill('30')
       await app.getByLabel('Minutes').fill('10')
 
@@ -118,13 +118,13 @@ test.describe('Wait Node Configuration', () => {
       await expect(updateButton).toBeEnabled()
       await updateButton.click()
       await expect(updateButton).not.toBeAttached({ timeout: 15_000 })
-      await closeNodeEditorPanel(app)
+      await closeStepEditorPanel(app)
 
       // Verify the edit persisted
-      await openNodeForEditing(app, 'Wait node')
+      await openStepForEditing(app, 'Wait node')
       await expect(app.getByLabel('Minutes')).toHaveValue('10')
       await expect(app.getByLabel('Seconds')).toHaveValue('30')
-      await closeNodeEditorPanel(app)
+      await closeStepEditorPanel(app)
 
       await saveWorkflow(app, workflowName)
     } finally {

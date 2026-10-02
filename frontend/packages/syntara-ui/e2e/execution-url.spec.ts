@@ -1,5 +1,5 @@
 import { test, expect } from './fixtures'
-import { addScriptNode } from './helpers/v2-nodes'
+import { addScriptStep } from './helpers/v2-steps'
 import { buildUniqueName, createBasicWorkflowViaApi, deleteWorkflow, openWorkflowInBuilder } from './helpers/workflows'
 
 test.describe('Execution URL unification', () => {
@@ -156,7 +156,7 @@ test.describe('Execution URL unification', () => {
       await openWorkflowInBuilder(app, workflowName, id)
 
       // Make the workflow dirty by adding a node
-      await addScriptNode(app, 'Dirty node')
+      await addScriptStep(app, 'Dirty node')
 
       // Open run history via kebab menu
       await app.getByLabel('Workflow actions').click()

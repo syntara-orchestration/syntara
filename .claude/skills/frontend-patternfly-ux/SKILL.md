@@ -366,7 +366,7 @@ Filter bar is visible when data exists or when filters are active; hidden only w
   - Use PatternFly's [Validated component](https://www.patternfly.org/components/forms/form/#validated) for general form validation
   - Use PatternFly's [Number Input component](https://www.patternfly.org/components/number-input/#numberinput) for number input fields
   - Use PatternFly's [DatePicker](https://www.patternfly.org/components/date-and-time/date-picker) for date inputs — never use native `<TextInput type="date">`. DatePicker provides a consistent cross-browser calendar popover, date validation via the `validators` prop, and proper formatting/parsing via `dateFormat`/`dateParse`. Use `appendTo={() => document.body}` for correct popover positioning. Pass validation state through `inputProps={{ validated: ... }}`.
-  - Use PatternFly's [popover help text](https://www.patternfly.org/components/popover/design-guidelines) on form field labels. In the workflow builder, use the shared `FieldHelpPopover` component (`components/FieldHelpPopover.tsx`, wrapping PF6 `FormGroupLabelHelp` + `Popover`) rather than inline `Popover` JSX per field, fed from a central copy registry (`routes/builder/node-forms/shared/nodeFieldHelp.tsx`) so help text is defined once and reused across node forms instead of duplicated per component.
+  - Use PatternFly's [popover help text](https://www.patternfly.org/components/popover/design-guidelines) on form field labels. In the workflow builder, use the shared `FieldHelpPopover` component (`components/FieldHelpPopover.tsx`, wrapping PF6 `FormGroupLabelHelp` + `Popover`) rather than inline `Popover` JSX per field, fed from a central copy registry (`routes/builder/step-forms/shared/stepFieldHelp.tsx`) so help text is defined once and reused across step forms instead of duplicated per component.
   - Use PatternFly's [`HelperText`](https://www.patternfly.org/components/forms/helper-text) / `HelperTextItem` below form inputs to provide brief, contextual guidance (e.g., accepted formats, valid ranges, constraints). The help popover icon on the field label is for longer explanatory descriptions. When both are present, inline helper text gives at-a-glance guidance while the popover provides full context. Validation errors (`validated="error"`) take priority — replace the helper text with the error message when the field is invalid.
   - **`autoComplete` on sensitive create-form fields** — Browsers aggressively offer saved-credential autofill on username/password-shaped inputs even on "Create new resource" forms, where that's semantically wrong (there's no existing account to autofill). Set `autoComplete="off"` on username-shaped fields and `autoComplete="new-password"` on password/secret fields for any create-account or create-credential form.
 - **Dropdowns:** Never use native `<select>` or PatternFly's legacy `FormSelect` / `FormSelectOption` — this is enforced by a `no-restricted-imports` ESLint rule (`eslint.config.js`) that errors on any `FormSelect`/`FormSelectOption` import. Always use `SynSelect` (not raw PatternFly `Select`) with `MenuToggle` + `SelectList` + `SelectOption`. Enforced by `syntara/prefer-syn-select`. Inside modals, use `popperProps={{ appendTo: 'inline' }}` for correct dropdown positioning — **except** for long menus (see "Long menus" below), which should not use `appendTo: 'inline'`. Add `shouldFocusToggleOnSelect` for keyboard accessibility after selection. When dropdown options represent policies or modes where the label alone isn't self-explanatory, use the `description` prop on `SelectOption` to provide inline context (e.g., "Skip" with description "Only one run at a time; skip if the previous run is still in progress").
@@ -1331,7 +1331,7 @@ onCreateWorkflow={permissions.canCreate ? handler : undefined}
 When a user can view but not edit a workflow:
 
 1. **Info banner** — `Alert variant="info" isInline` explaining read-only mode
-2. **Hide editing affordances** — Add Node panel hidden, toolbar actions disabled
+2. **Hide editing affordances** — Add Step panel hidden, toolbar actions disabled
 3. **Canvas lockdown** — `nodesDraggable={false}`, `nodesConnectable={false}`, `deleteKeyCode={null}`
 4. **Toolbar actions** — Save/Publish disabled via `DisabledWithTooltip`; Run has its own `canRun` check
 
@@ -1537,10 +1537,10 @@ The version history side panel lets users browse, compare, and manage published 
 - Via "Add step" action from canvas toolbar
 - Clicking `+` on the connector line after a step adds a new connected step
 - Clicking `+` on the connector line between two steps inserts a new step in between
-- **Empty workflow onboarding:** When a workflow has no triggers and no steps (`hasNoWorkflowNodes`):
+- **Empty workflow onboarding:** When a workflow has no triggers and no steps (`hasNoWorkflowSteps`):
   - The "Add step" toolbar button is **hidden entirely** (not disabled — hidden) to prevent confusion when the user should be selecting a trigger first
   - The add-step side panel is **forced open** automatically (showing trigger options)
-  - The toolbar returns `null` when `!canEdit && hasNoWorkflowNodes && isNew` (brand-new workflow with no permission and no steps)
+  - The toolbar returns `null` when `!canEdit && hasNoWorkflowSteps && isNew` (brand-new workflow with no permission and no steps)
   - Once the user adds their first trigger or step, the "Add step" button appears in the toolbar
 - **Toggle-style button:** When the add-step panel is open (and the workflow has steps), the toolbar button uses `isClicked` + `aria-pressed` for visible active/inactive feedback. Clicking the button toggles the panel open/closed.
 
@@ -1626,7 +1626,7 @@ Verify validates the entire workflow graph against the backend and surfaces erro
 - **Loading state:** Toolbar shows a "Verifying..." button with spinner during the API call
 - **`ValidationBanner`:** Expandable inline `Alert` rendered above the canvas; dismissing the banner clears all node badges
 - **Per-node error badges:** Failed nodes show a circular warning badge (bottom-right, matching execution badge positioning) via `data.__validationError` on the node
-- **Clickable node links:** Node-specific errors in the banner are inline links (`Button variant="link" isInline`) that navigate to the node editor panel via `useNodePanelNavigation`. Fallback label "Go to step" when name is unparseable; global errors (`nodeId: null`) stay as plain text
+- **Clickable node links:** Step-specific errors in the banner are inline links (`Button variant="link" isInline`) that navigate to the node editor panel via `useStepPanelNavigation`. Fallback label "Go to step" when name is unparseable; global errors (`nodeId: null`) stay as plain text
 - **Grouped/humanized errors:** `parseValidationMessage()` / `humanizeValidationMessage()` extract node names and error lists; the banner uses compact horizontal `DescriptionList` (`isCompact isFluid isHorizontal`) — term = node name link, description = comma-separated messages. Display key "Workflow" for global errors
 
 ### Two-Tier Validation Severity
@@ -1656,10 +1656,10 @@ Validation findings have two severity levels that drive different UI behavior:
 
 ### Node Settings
 
-Every activity node form uses `NodeFormTabsLayout` to split configuration into **Parameters** and **Settings** tabs.
+Every activity step form uses `StepFormTabsLayout` to split configuration into **Parameters** and **Settings** tabs.
 
-- **Parameters tab:** Node-specific configuration fields (the existing form)
-- **Settings tab:** Shared `NodeSettingsForm` component for:
+- **Parameters tab:** Step-specific configuration fields (the existing form)
+- **Settings tab:** Shared `StepSettingsForm` component for:
   - **Continue on failure:** Three-way select (System default / On / Off) via `COF_OPTIONS`
   - **Timeout:** `DurationInput` component
   - **Retry policy:** Retry count + delay configuration
@@ -1691,9 +1691,9 @@ The node editor panel provides **Previous/Next arrow controls** for navigating c
 
 - **Single upstream/downstream:** Plain icon button with tooltip showing the connected step name
 - **Multiple targets:** Dropdown menu on the arrow listing all connected steps
-- **Components:** `NodePanelNavigationArrow`, `useNodePanelNavigation`, `useAdjacentNodes`, `getAdjacentNodesFromFlow`
+- **Components:** `StepPanelNavigationArrow`, `useStepPanelNavigation`, `useAdjacentSteps`, `getAdjacentStepsFromFlow`
 - **Icons:** `RhUiCaretLeftIcon` (previous) / `RhUiCaretRightIcon` (next)
-- **Positioning:** Tab-style arrows on panel edges via CSS module (`NodePanelNavigationArrow.module.css`)
+- **Positioning:** Tab-style arrows on panel edges via CSS module (`StepPanelNavigationArrow.module.css`)
 
 ### Node Disable/Enable
 
@@ -1702,7 +1702,7 @@ Activity nodes (Task, Approval) support toggling their enabled state directly fr
 - **Kebab actions:** "Disable step" / "Enable step" — **no confirmation dialog** (immediate toggle)
 - **Visual treatment:** Disabled nodes show dashed gray border + 50% opacity (matches skipped execution state)
 - **Persistence:** State stored in `settings.disabled` on the node definition
-- **Control flow nodes** (Loop, Condition, Switch, Converge, Wait) use `MenuNodeType.CONTROL_FLOW` and show only **Replace** and **Delete** in their kebab — no disable/enable option
+- **Control flow nodes** (Loop, Condition, Switch, Converge, Wait) use `StepMenuCategory.CONTROL_FLOW` and show only **Replace** and **Delete** in their kebab — no disable/enable option
 - **CSS note:** Use individual border-side CSS properties (`borderTopStyle`, `borderRightStyle`, etc.) instead of shorthand `border` for dashed/solid toggling — avoids React diffing issues
 
 ### Switch Node Expression Builder

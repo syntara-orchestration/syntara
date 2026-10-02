@@ -5,13 +5,13 @@ import {
   ensureLlmCredential,
   expectAiAgentIntegrationGroupsVisible,
   openAiAgentModelPicker,
-  openAiAgentNodeForEditing,
-  openTaskAgentNodeCreateForm,
+  openAiAgentStepForEditing,
+  openTaskAgentStepCreateForm,
   selectLlmCredential,
-} from './helpers/v2-nodes'
+} from './helpers/v2-steps'
 import {
   buildUniqueName,
-  closeNodeEditorPanel,
+  closeStepEditorPanel,
   deleteWorkflow,
   fillCodeEditor,
   openWorkflowInBuilder,
@@ -34,7 +34,7 @@ test.describe('AI Agent Node @pr-check', () => {
       const { name: credName } = await ensureLlmCredential(app)
 
       await startWorkflowWithTrigger(app)
-      await openTaskAgentNodeCreateForm(app)
+      await openTaskAgentStepCreateForm(app)
 
       await app.getByRole('textbox', { name: 'Name', exact: true }).fill('TestAgent')
       await app.getByRole('textbox', { name: 'Prompt', exact: true }).fill('Analyze the input data')
@@ -59,20 +59,20 @@ test.describe('AI Agent Node @pr-check', () => {
       const { name: credName } = await ensureLlmCredential(app)
 
       await startWorkflowWithTrigger(app)
-      await openTaskAgentNodeCreateForm(app)
+      await openTaskAgentStepCreateForm(app)
 
       await app.getByRole('textbox', { name: 'Name', exact: true }).fill('PromptAgent')
       await app.getByRole('textbox', { name: 'Prompt', exact: true }).fill('Analyze this data')
       await selectLlmCredential(app, credName, integrationName)
 
       await app.getByRole('button', { name: 'Create' }).click()
-      await closeNodeEditorPanel(app)
+      await closeStepEditorPanel(app)
       await saveWorkflow(app, workflowName, { timeout: 30_000 })
 
       await openWorkflowInBuilder(app, workflowName)
-      await openAiAgentNodeForEditing(app, 'PromptAgent')
+      await openAiAgentStepForEditing(app, 'PromptAgent')
 
-      const form = app.getByTestId('ai-agent-node-form')
+      const form = app.getByTestId('ai-agent-step-form')
       await expect(form.getByRole('textbox', { name: 'Prompt', exact: true })).toHaveValue('Analyze this data', {
         timeout: 30_000,
       })
@@ -83,7 +83,7 @@ test.describe('AI Agent Node @pr-check', () => {
     }
   })
 
-  test('AI Agent node form shows models grouped by integration', async ({ app }) => {
+  test('AI Agent step form shows models grouped by integration', async ({ app }) => {
     const integrationName1 = buildUniqueName('e2e-llm-integ-a')
     const integrationName2 = buildUniqueName('e2e-llm-integ-b')
     let integration1: SeededLlmIntegration | undefined
@@ -95,7 +95,7 @@ test.describe('AI Agent Node @pr-check', () => {
       const name2 = integration2.name
 
       await startWorkflowWithTrigger(app)
-      await openTaskAgentNodeCreateForm(app)
+      await openTaskAgentStepCreateForm(app)
 
       await openAiAgentModelPicker(app)
       await expectAiAgentIntegrationGroupsVisible(app, [name1, name2])
@@ -117,7 +117,7 @@ test.describe('AI Agent Node @pr-check', () => {
       const { name: credName } = await ensureLlmCredential(app)
 
       await startWorkflowWithTrigger(app)
-      await openTaskAgentNodeCreateForm(app)
+      await openTaskAgentStepCreateForm(app)
 
       await app.getByRole('textbox', { name: 'Name', exact: true }).fill('SchemaAgent')
       await app.getByRole('textbox', { name: 'Prompt', exact: true }).fill('Generate structured output')
@@ -134,11 +134,11 @@ test.describe('AI Agent Node @pr-check', () => {
       await fillCodeEditor(app, { value: validSchema, label: 'Response schema editor' })
 
       await app.getByRole('button', { name: 'Create' }).click()
-      await closeNodeEditorPanel(app)
+      await closeStepEditorPanel(app)
       await saveWorkflow(app, workflowName)
 
       await openWorkflowInBuilder(app, workflowName)
-      await openAiAgentNodeForEditing(app, 'SchemaAgent')
+      await openAiAgentStepForEditing(app, 'SchemaAgent')
 
       const codeEditor = app.getByTestId('inline-code-editor')
       await expect(codeEditor).toBeVisible({ timeout: 10_000 })
@@ -172,7 +172,7 @@ test.describe('AI Agent Node @pr-check', () => {
       const { name: credName } = await ensureLlmCredential(app)
 
       await startWorkflowWithTrigger(app)
-      await openTaskAgentNodeCreateForm(app)
+      await openTaskAgentStepCreateForm(app)
 
       await app.getByRole('textbox', { name: 'Name', exact: true }).fill('ToolsSchemaAgent')
       await app
@@ -201,13 +201,13 @@ test.describe('AI Agent Node @pr-check', () => {
       await fillCodeEditor(app, { value: validSchema, label: 'Response schema editor' })
 
       await app.getByRole('button', { name: 'Create' }).click()
-      await closeNodeEditorPanel(app)
+      await closeStepEditorPanel(app)
       await saveWorkflow(app, workflowName)
 
       await openWorkflowInBuilder(app, workflowName)
-      await openAiAgentNodeForEditing(app, 'ToolsSchemaAgent')
+      await openAiAgentStepForEditing(app, 'ToolsSchemaAgent')
 
-      const form = app.getByTestId('ai-agent-node-form')
+      const form = app.getByTestId('ai-agent-step-form')
       await expect(form.getByRole('textbox', { name: 'Select tools' })).toHaveValue('All tools selected', {
         timeout: 30_000,
       })
@@ -233,18 +233,18 @@ test.describe('AI Agent Node @pr-check', () => {
       const { name: credName } = await ensureLlmCredential(app)
 
       await startWorkflowWithTrigger(app)
-      await openTaskAgentNodeCreateForm(app)
+      await openTaskAgentStepCreateForm(app)
 
       await app.getByRole('textbox', { name: 'Name', exact: true }).fill('EditableAgent')
       await app.getByRole('textbox', { name: 'Prompt', exact: true }).fill('Original prompt')
       await selectLlmCredential(app, credName, integrationName)
 
       await app.getByRole('button', { name: 'Create' }).click()
-      await closeNodeEditorPanel(app)
+      await closeStepEditorPanel(app)
       await saveWorkflow(app, workflowName, { timeout: 30_000 })
 
       await openWorkflowInBuilder(app, workflowName)
-      await openAiAgentNodeForEditing(app, 'EditableAgent')
+      await openAiAgentStepForEditing(app, 'EditableAgent')
 
       // Wait for model queries and stale detection to fully settle before editing.
       // Stale detection fires after models load and can re-render the form, losing edits.
@@ -259,9 +259,9 @@ test.describe('AI Agent Node @pr-check', () => {
       await saveWorkflow(app, workflowName, { timeout: 30_000 })
 
       await openWorkflowInBuilder(app, workflowName)
-      await openAiAgentNodeForEditing(app, 'EditableAgent')
+      await openAiAgentStepForEditing(app, 'EditableAgent')
 
-      const form = app.getByTestId('ai-agent-node-form')
+      const form = app.getByTestId('ai-agent-step-form')
       // Wait for stale detection to settle before asserting
       await expect(modelName.or(staleWarning)).toBeVisible({ timeout: 15_000 })
       await expect(form.getByRole('textbox', { name: 'Prompt', exact: true })).toHaveValue('Updated prompt', {
@@ -284,21 +284,21 @@ test.describe('AI Agent Node @pr-check', () => {
 
       await startWorkflowWithTrigger(app)
 
-      await openTaskAgentNodeCreateForm(app)
+      await openTaskAgentStepCreateForm(app)
       await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Agent1')
       await app.getByRole('textbox', { name: 'Prompt', exact: true }).fill('First agent prompt')
       await selectLlmCredential(app, credName, integrationName)
 
       await app.getByRole('button', { name: 'Create' }).click()
-      await closeNodeEditorPanel(app)
+      await closeStepEditorPanel(app)
 
-      await openTaskAgentNodeCreateForm(app)
+      await openTaskAgentStepCreateForm(app)
       await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Agent2')
       await app.getByRole('textbox', { name: 'Prompt', exact: true }).fill('Second agent prompt')
       await selectLlmCredential(app, credName, integrationName)
 
       await app.getByRole('button', { name: 'Create' }).click()
-      await closeNodeEditorPanel(app)
+      await closeStepEditorPanel(app)
 
       await expect(canvasNode(app, 'Agent1')).toBeVisible()
       await expect(canvasNode(app, 'Agent2')).toBeVisible()
@@ -374,7 +374,7 @@ test.describe('AI Agent Node @pr-check', () => {
 
       // Open workflow builder and add an Agent node
       await startWorkflowWithTrigger(app)
-      await openTaskAgentNodeCreateForm(app)
+      await openTaskAgentStepCreateForm(app)
 
       // Model selector should show "Select a model" — no pre-selection
       await expect(app.getByPlaceholder('Select a model')).toBeVisible({ timeout: 10_000 })

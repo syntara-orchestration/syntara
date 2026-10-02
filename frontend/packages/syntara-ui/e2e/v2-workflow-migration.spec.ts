@@ -24,18 +24,18 @@
 import { test, expect, toAppUrl } from './fixtures'
 import {
   addManualTrigger,
-  addScriptNode,
-  addHttpRequestNode,
-  addAgenticNode,
-  addAapNode,
-  addApprovalNodeWithBranch,
-  addConditionNodeWithBranch,
-  addLoopNodeWithBody,
-  addScriptOnHandle,
+  addScriptStep,
+  addHttpRequestStep,
+  addAgenticStep,
+  addAapStep,
+  addApprovalStepWithBranch,
+  addConditionStepWithBranch,
+  addLoopStepWithBody,
+  addScriptStepOnHandle,
   createLlmIntegration,
   deleteLlmIntegration,
-} from './helpers/v2-nodes'
-import { addConvergeNode } from './helpers/v2-nodes-converge'
+} from './helpers/v2-steps'
+import { addConvergeStep } from './helpers/v2-steps-converge'
 import {
   buildUniqueName,
   clickSaveAndWait,
@@ -112,7 +112,7 @@ test.describe('V2 Workflow Schema Migration', () => {
 
     // Build a minimal workflow: manual trigger → script
     await addManualTrigger(app)
-    await addScriptNode(app, 'Validate input', 'print("validating")')
+    await addScriptStep(app, 'Validate input', 'print("validating")')
 
     // Intercept the POST /workflows request (select project first to avoid name reset)
     const saveRequestPromise = app.waitForRequest(isWorkflowCreateRequest)
@@ -166,11 +166,11 @@ test.describe('V2 Workflow Schema Migration', () => {
       // Manual trigger + all 5 executor types
       // Note: Approval node must have a branch completed to be valid
       await addManualTrigger(app, 'Start workflow')
-      await addScriptNode(app, 'Run script', 'echo "hello"')
-      await addHttpRequestNode(app, 'Fetch data', 'https://api.example.com/data')
-      await addAgenticNode(app, 'AI analysis', 'Analyze the fetched data', llmIntegrationName)
-      await addAapNode(app, 'Deploy with Ansible')
-      await addApprovalNodeWithBranch(app, 'Approve deployment')
+      await addScriptStep(app, 'Run script', 'echo "hello"')
+      await addHttpRequestStep(app, 'Fetch data', 'https://api.example.com/data')
+      await addAgenticStep(app, 'AI analysis', 'Analyze the fetched data', llmIntegrationName)
+      await addAapStep(app, 'Deploy with Ansible')
+      await addApprovalStepWithBranch(app, 'Approve deployment')
       // After approval, the workflow ends (the WithBranch helper adds a script on approved branch)
       await triggerLayout(app)
 
@@ -236,11 +236,11 @@ test.describe('V2 Workflow Schema Migration', () => {
     try {
       // Manual trigger + all 3 control flow types
       await addManualTrigger(app, 'Start')
-      await addConditionNodeWithBranch(app, 'Check condition')
-      await addLoopNodeWithBody(app, 'Iterate items')
-      await addConvergeNode(app, 'Merge branches', 'done')
+      await addConditionStepWithBranch(app, 'Check condition')
+      await addLoopStepWithBody(app, 'Iterate items')
+      await addConvergeStep(app, 'Merge branches', 'done')
       // Attach the unused false stub last, when it is the unique remaining branch port.
-      await addScriptOnHandle(app, 'false', 'Check condition - false action', 'print("condition is false")')
+      await addScriptStepOnHandle(app, 'false', 'Check condition - false action', 'print("condition is false")')
 
       const saveRequestPromise = app.waitForRequest(isWorkflowCreateRequest)
       await selectProjectIfRequired(app)
@@ -385,7 +385,7 @@ test.describe('V2 Workflow Schema Migration', () => {
 
     // Create and save a simple workflow (select project first to avoid name reset)
     await addManualTrigger(app)
-    await addScriptNode(app, 'Test script', 'print("test")')
+    await addScriptStep(app, 'Test script', 'print("test")')
     await selectProjectIfRequired(app)
     await app.getByPlaceholder('Workflow name').fill(workflowName)
     await clickSaveAndWait(app)
@@ -443,13 +443,13 @@ test.describe('V2 Workflow Schema Migration', () => {
     try {
       // Create a simple workflow
       await addManualTrigger(app)
-      await addScriptNode(app, 'Original script', 'print("original")')
+      await addScriptStep(app, 'Original script', 'print("original")')
       await selectProjectIfRequired(app)
       await app.getByPlaceholder('Workflow name').fill(workflowName)
       await clickSaveAndWait(app)
 
       // Add a second node (edit the workflow)
-      await addScriptNode(app, 'Added script', 'print("added")')
+      await addScriptStep(app, 'Added script', 'print("added")')
 
       // Re-save and capture the PATCH payload
       const patchPromise = app.waitForRequest((req) => req.url().includes('/workflows/') && req.method() === 'PATCH')
@@ -484,7 +484,7 @@ test.describe('V2 Workflow Schema Migration', () => {
     try {
       // Create a workflow with a condition node (produces true/false port edges)
       await addManualTrigger(app)
-      await addConditionNodeWithBranch(app, 'Branch check')
+      await addConditionStepWithBranch(app, 'Branch check')
 
       // Save
       const savePromise = app.waitForRequest(isWorkflowCreateRequest)

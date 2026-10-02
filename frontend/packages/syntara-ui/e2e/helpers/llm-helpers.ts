@@ -82,7 +82,7 @@ export async function ensureLlmCredential(page: Page): Promise<{ name: string; i
 
 /**
  * Ensure an AAP credential exists via the API.
- * Returns the credential name and id for use in the AAP node form.
+ * Returns the credential name and id for use in the AAP step form.
  */
 export async function ensureAapCredential(page: Page): Promise<{ name: string; id: string }> {
   const targetProjectId = await getBuilderProjectId(page)
@@ -124,7 +124,7 @@ export async function ensureAapCredential(page: Page): Promise<{ name: string; i
 
 /**
  * Ensure an AAP integration exists, backed by an AAP credential.
- * Returns the integration name for selection in the AAP node form.
+ * Returns the integration name for selection in the AAP step form.
  */
 export async function ensureAapIntegration(page: Page): Promise<{ name: string; credName: string }> {
   const cred = await ensureAapCredential(page)

@@ -25,9 +25,9 @@ import {
 import {
   buildUniqueName,
   clickAddConnectedStep,
-  closeNodeEditorPanel,
+  closeStepEditorPanel,
   deleteWorkflow,
-  openNodeForEditing,
+  openStepForEditing,
   openWorkflowInBuilder,
   saveWorkflow,
   startWorkflowWithTrigger,
@@ -52,7 +52,7 @@ async function expectAuthenticationCredential(app: Page, credName: string) {
 
 async function openApiNodeAfterReload(app: Page, nodeName: string) {
   const credentialsLoaded = app.waitForResponse(isCredentialsResponse)
-  await openNodeForEditing(app, nodeName)
+  await openStepForEditing(app, nodeName)
   await credentialsLoaded
 }
 
@@ -85,14 +85,14 @@ test.describe('Credential Persistence', () => {
       await selectLlmCredential(app, credName)
 
       await app.getByRole('button', { name: 'Create' }).click()
-      await closeNodeEditorPanel(app)
+      await closeStepEditorPanel(app)
       await saveWorkflow(app, workflowName)
 
       await openWorkflowInBuilder(app, workflowName)
-      await openNodeForEditing(app, 'Test Task Agent')
+      await openStepForEditing(app, 'Test Task Agent')
 
       // Wait for the form to render, then for the credential name to resolve
-      const form = app.getByTestId('ai-agent-node-form')
+      const form = app.getByTestId('ai-agent-step-form')
       await expect(form).toBeVisible({ timeout: 10_000 })
       await expect(form.getByText(credName)).toBeVisible({ timeout: 30_000 })
     } finally {
@@ -127,7 +127,7 @@ test.describe('Credential Persistence', () => {
       await selectCredential(app, 'Authentication credential', credName)
 
       await app.getByRole('button', { name: 'Create' }).click()
-      await closeNodeEditorPanel(app)
+      await closeStepEditorPanel(app)
       await saveWorkflow(app, workflowName)
 
       await openWorkflowInBuilder(app, workflowName)
@@ -140,7 +140,7 @@ test.describe('Credential Persistence', () => {
   })
 
   // TODO: AAP credential persistence fails — buildAAPConfig writes credentialId (camelCase)
-  // but AAPNodeForm reads credential_id (snake_case). Same class of bug as PR #561.
+  // but AAPStepForm reads credential_id (snake_case). Same class of bug as PR #561.
   test.fixme('AAP node credential persists after save/reload', async ({ app }) => {
     const credName = buildUniqueName('e2e-persist-aap')
     const workflowName = buildUniqueName('e2e-persist-aap-wf')
@@ -180,7 +180,7 @@ test.describe('Credential Persistence', () => {
       }
 
       await app.getByRole('button', { name: 'Create' }).click()
-      await closeNodeEditorPanel(app)
+      await closeStepEditorPanel(app)
       await saveWorkflow(app, workflowName)
 
       await openWorkflowInBuilder(app, workflowName)

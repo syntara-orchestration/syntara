@@ -14,7 +14,7 @@
 
 import { type Page, expect } from '../fixtures'
 
-const addNodePanel = (page: Page) =>
+const addStepPanel = (page: Page) =>
   page.getByRole('region', {
     name: /add step|select an action node|select a trigger node|select a logic node|select an aap execution node/i,
   })
@@ -87,7 +87,7 @@ async function clickRoleFallback(page: Page) {
 }
 
 async function clickStubAndOpenPanel(page: Page, preferredHandle: string | undefined, state: RevealState) {
-  const panel = addNodePanel(page)
+  const panel = addStepPanel(page)
   if ((await panel.count()) === 1) return
 
   const stubs = await revealConnectedStepStubs(page, preferredHandle, state)
@@ -106,7 +106,7 @@ async function clickStubAndOpenPanel(page: Page, preferredHandle: string | undef
   await expect(panel).toHaveCount(1)
 }
 
-/** Fit view (retrying), then click an edge add-step stub and return the add-node panel. */
+/** Fit view (retrying), then click an edge add-step stub and return the add-step panel. */
 export async function clickAddConnectedStep(page: Page, preferredHandle?: string) {
   await expect(page.getByRole('button', { name: 'Create', exact: true })).not.toBeAttached({
     timeout: CREATE_DETACH_TIMEOUT,
@@ -115,7 +115,7 @@ export async function clickAddConnectedStep(page: Page, preferredHandle?: string
   await expect(async () => {
     await clickStubAndOpenPanel(page, preferredHandle, revealState)
   }).toPass({ timeout: STUB_RETRY_TIMEOUT, intervals: [500, 1_000] })
-  const panel = addNodePanel(page)
+  const panel = addStepPanel(page)
   await expect(panel.getByRole('button', { name: 'Action', exact: true })).toBeVisible({ timeout: 15_000 })
   return panel
 }

@@ -101,7 +101,7 @@ Every API call is type-checked at compile time. If the backend changes a field n
 
 **5. Step types are hardcoded in the UI**
 
-The available step types (Script, REST API, Task Agent, etc.) are defined in the UI's `NodeRegistry` (`src/routes/builder/registry/nodes/register*.ts`), not derived from the contracts. Each registration wires up the icon, form component, and factory function.
+The available step types (Script, REST API, Task Agent, etc.) are defined in the UI's `StepRegistry` (`src/routes/builder/registry/steps/register*.ts`), not derived from the contracts. Each registration wires up the icon, form component, and factory function.
 
 ### What changes for v2
 
