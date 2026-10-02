@@ -11,7 +11,8 @@ export function buildDefaultValues(definition: FormDefinition, overrides?: FormS
   for (const field of definition.fields) {
     const override = overrides?.[field.value_name]
     if (override !== undefined) {
-      values[field.value_name] = override
+      values[field.value_name] =
+        field.type === FormFieldTypeEnum.DATE && typeof override === 'string' ? { date: override } : override
       continue
     }
 

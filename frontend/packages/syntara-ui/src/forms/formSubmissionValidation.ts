@@ -332,10 +332,13 @@ function checkOptionMembership(
     return null
   }
 
-  if (Array.isArray(coerced) || !validValues.has(coerced)) {
-    if (Array.isArray(coerced)) {
-      return fieldError(field, 'type', 'Dropdown expects a single value, not a list')
-    }
+  if (Array.isArray(coerced)) {
+    return fieldError(field, 'type', 'Dropdown expects a single value, not a list')
+  }
+  if (!isOptionScalarValue(coerced)) {
+    return fieldError(field, 'type', 'Dropdown expects a scalar value')
+  }
+  if (!validValues.has(coerced)) {
     return {
       field: field.value_name,
       label: field.label,

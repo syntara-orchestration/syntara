@@ -250,7 +250,7 @@ function fieldFromProperty(valueName: string, property: JsonSchemaProperty, requ
       return {
         ...base,
         type: FormFieldTypeEnum.DATE,
-        default: typeof importedDefault === 'string' ? importedDefault : null,
+        default: typeof importedDefault === 'string' ? { date: importedDefault } : null,
       }
     case FormFieldTypeEnum.DROPDOWN:
       return dropdownFieldFromProperty(base, property)

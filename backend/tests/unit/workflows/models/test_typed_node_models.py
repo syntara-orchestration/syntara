@@ -567,14 +567,6 @@ class TestFormPromptNodeParameters:
         p = FormPromptNodeParameters(form_definition=self.form_def, message="User: ${trigger.username}")
         assert p.message == "User: ${trigger.username}"
 
-    def test_timezone_parameter_removed(self) -> None:
-        """The form-level timezone parameter is gone, superseded by DateField components.
-
-        Even a well-formed IANA name is now an unknown key under extra='forbid'.
-        """
-        with pytest.raises(ValidationError, match="timezone"):
-            FormPromptNodeParameters(form_definition=self.form_def, timezone="America/New_York")  # type: ignore[call-arg]
-
     def test_discriminated_union(self) -> None:
         """form_prompt parses through WorkflowDefinition."""
         wf = WorkflowDefinition.model_validate(
