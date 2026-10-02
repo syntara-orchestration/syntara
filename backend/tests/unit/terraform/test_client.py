@@ -118,6 +118,47 @@ async def test_upload_configuration_version_omits_authorization(client: TFEClien
 
 
 @pytest.mark.asyncio
+@respx.mock
+async def test_http_error_redacts_token_in_json_detail() -> None:
+    token = "atatatatatatatatatatatatatatat"  # noqa: S105
+    client = TFEClient(
+        base_url="https://terraform.example.com",
+        token=token,
+        organization="acme",
+    )
+    error_body = {
+        "errors": [
+            {
+                "title": "Unauthorized",
+                "detail": f"Invalid token {token} or Bearer {token} in request",
+            }
+        ]
+    }
+    respx.get(f"{BASE_URL}/organizations/acme/workspaces").mock(
+        return_value=httpx.Response(401, json=error_body),
+    )
+    with pytest.raises(TFEError) as exc_info:
+        await client.list_workspaces()
+    message = exc_info.value.message
+    assert token not in message
+    assert "[REDACTED]" in message
+    assert "Bearer [REDACTED]" in message
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_http_error_non_json_body_not_echoed(client: TFEClient) -> None:
+    leaked = "super-secret-body-leak-should-not-appear"
+    respx.get(f"{BASE_URL}/organizations/acme/workspaces").mock(
+        return_value=httpx.Response(500, text=leaked),
+    )
+    with pytest.raises(TFEError) as exc_info:
+        await client.list_workspaces()
+    assert leaked not in exc_info.value.message
+    assert exc_info.value.message == "TFE API returned HTTP 500"
+
+
+@pytest.mark.asyncio
 async def test_upload_configuration_version_rejects_unsafe_url(client: TFEClient) -> None:
     with (
         patch(

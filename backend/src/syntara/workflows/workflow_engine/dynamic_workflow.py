@@ -360,6 +360,7 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         """Record a node failure; skip downstream unless continue_on_failure is set."""
         app_error = self._extract_application_error(error)
         error_message = self._resolve_failure_message(node_id, error, app_error, graph)
+        error_message = scrub_credential_values(error_message, self._secret_values)
         is_cancellation = app_error is not None and app_error.type == "InvocationCancelledError"
 
         # Extract output from ApplicationError.details if executor attached it

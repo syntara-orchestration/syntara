@@ -8,9 +8,36 @@ uses ``VALIDATION`` without going through ``map_http_status_to_error``.
 
 from __future__ import annotations
 
+import re
 from enum import StrEnum
 from http import HTTPStatus
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import Collection
+
+_REDACTED = "[REDACTED]"
+_MIN_SECRET_LENGTH = 4
+
+_BEARER_PATTERN = re.compile(r"Bearer\s+\S+", re.IGNORECASE)
+_AUTHORIZATION_HEADER_PATTERN = re.compile(r"Authorization:\s*\S+", re.IGNORECASE)
+
+
+def redact_sensitive_content(text: str, secrets: Collection[str] | None = None) -> str:
+    """Replace known secrets and auth header patterns in error text."""
+    if not text:
+        return text
+    result = text
+    if secrets:
+        for value in sorted(
+            (s for s in secrets if s and len(s) >= _MIN_SECRET_LENGTH),
+            key=len,
+            reverse=True,
+        ):
+            if value in result:
+                result = result.replace(value, _REDACTED)
+    result = _BEARER_PATTERN.sub(f"Bearer {_REDACTED}", result)
+    return _AUTHORIZATION_HEADER_PATTERN.sub(f"Authorization: {_REDACTED}", result)
 
 
 class TFEErrorCode(StrEnum):
