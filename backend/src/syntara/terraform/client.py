@@ -615,7 +615,7 @@ def _extract_error_detail(
     try:
         payload = response.json()
         errors = payload.get("errors") if isinstance(payload, dict) else None
-        if isinstance(errors, list) and errors:
+        if isinstance(errors, list):
             parts: list[str] = []
             for err in errors:
                 if not isinstance(err, dict):
