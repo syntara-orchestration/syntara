@@ -44170,19 +44170,6 @@
             "title": "Success Message",
             "description": "Message shown after successful form submission"
           },
-          "timezone": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 64
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Timezone",
-            "description": "IANA timezone name for interpreting date/datetime field values"
-          },
           "css_override": {
             "anyOf": [
               {
@@ -44806,7 +44793,7 @@
       "DateField": {
         "type": "object",
         "title": "DateField",
-        "description": "Date field.",
+        "description": "Date field collecting any combination of date, time, and timezone.",
         "additionalProperties": false,
         "required": [
           "value_name",
@@ -44858,16 +44845,81 @@
             "const": "date",
             "title": "Type"
           },
+          "include_date": {
+            "type": "boolean",
+            "title": "Include Date",
+            "default": true,
+            "description": "Collect a calendar date."
+          },
+          "include_time": {
+            "type": "boolean",
+            "title": "Include Time",
+            "default": false,
+            "description": "Collect a 24-hour time. Requires include_timezone."
+          },
+          "include_timezone": {
+            "type": "boolean",
+            "title": "Include Timezone",
+            "default": false,
+            "description": "Collect an IANA timezone name."
+          },
           "default": {
             "anyOf": [
               {
-                "type": "string"
+                "$ref": "#/components/schemas/DateValue"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Default"
+            "description": "Default value used when the responder submits nothing. Must supply exactly the included components."
+          }
+        }
+      },
+      "DateValue": {
+        "type": "object",
+        "title": "DateValue",
+        "description": "The date, time, and timezone components of a date field value.",
+        "additionalProperties": false,
+        "properties": {
+          "date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date",
+            "description": "ISO 8601 calendar date in YYYY-MM-DD format."
+          },
+          "time": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?:[01][0-9]|2[0-3]):[0-5][0-9]$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time",
+            "description": "24-hour time in HH:MM format."
+          },
+          "timezone": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timezone",
+            "description": "IANA timezone name, such as America/New_York."
           }
         }
       },
@@ -45597,19 +45649,6 @@
             ],
             "title": "Success Message",
             "description": "Success message after submit"
-          },
-          "timezone": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 64
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Timezone",
-            "description": "IANA timezone for date fields"
           },
           "css_override": {
             "anyOf": [
@@ -55972,19 +56011,6 @@
             ],
             "title": "Success Message",
             "description": "Shown after submission."
-          },
-          "timezone": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 64
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Timezone",
-            "description": "IANA timezone for interpreting date/datetime field values in the form."
           },
           "css_override": {
             "anyOf": [

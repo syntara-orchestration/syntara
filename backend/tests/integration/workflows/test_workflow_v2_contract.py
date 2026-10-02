@@ -761,7 +761,6 @@ class TestNodeSettingsValidation:
                         "fallback_decision": "fallback",
                         "submit_label": "Submit",
                         "success_message": "Thanks!",
-                        "timezone": "America/New_York",
                         "css_override": ".form { color: blue; }",
                     },
                     "settings": {"continue_on_failure": True, "timeout": 7200},
@@ -794,7 +793,6 @@ class TestNodeSettingsValidation:
         assert params["responder_users"] == ["alice", "bob"]
         assert params["response_window"] == 3600
         assert params["fallback_decision"] == "fallback"
-        assert params["timezone"] == "America/New_York"
         assert params["css_override"] == ".form { color: blue; }"
 
         # Verify settings tier

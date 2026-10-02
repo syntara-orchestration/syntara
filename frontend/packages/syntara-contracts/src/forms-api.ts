@@ -202,11 +202,6 @@ export interface components {
        */
       success_message?: string | null
       /**
-       * Timezone
-       * @description IANA timezone name for interpreting date/datetime field values
-       */
-      timezone?: string | null
-      /**
        * Css Override
        * @description Custom CSS applied to the form view
        */
@@ -474,7 +469,7 @@ export interface components {
     }
     /**
      * DateField
-     * @description Date field.
+     * @description Date field collecting any combination of date, time, and timezone.
      */
     DateField: {
       /** Value Name */
@@ -495,8 +490,47 @@ export interface components {
        * @enum {string}
        */
       type: 'date'
-      /** Default */
-      default?: string | null
+      /**
+       * Include Date
+       * @description Collect a calendar date.
+       * @default true
+       */
+      include_date?: boolean
+      /**
+       * Include Time
+       * @description Collect a 24-hour time. Requires include_timezone.
+       * @default false
+       */
+      include_time?: boolean
+      /**
+       * Include Timezone
+       * @description Collect an IANA timezone name.
+       * @default false
+       */
+      include_timezone?: boolean
+      /** @description Default value used when the responder submits nothing. Must supply exactly the included components. */
+      default?: components['schemas']['DateValue'] | null
+    }
+    /**
+     * DateValue
+     * @description The date, time, and timezone components of a date field value.
+     */
+    DateValue: {
+      /**
+       * Date
+       * @description ISO 8601 calendar date in YYYY-MM-DD format.
+       */
+      date?: string | null
+      /**
+       * Time
+       * @description 24-hour time in HH:MM format.
+       */
+      time?: string | null
+      /**
+       * Timezone
+       * @description IANA timezone name, such as America/New_York.
+       */
+      timezone?: string | null
     }
     /**
      * DropdownField
@@ -863,11 +897,6 @@ export interface components {
        * @description Success message after submit
        */
       success_message?: string | null
-      /**
-       * Timezone
-       * @description IANA timezone for date fields
-       */
-      timezone?: string | null
       /**
        * Css Override
        * @description Custom CSS for form rendering

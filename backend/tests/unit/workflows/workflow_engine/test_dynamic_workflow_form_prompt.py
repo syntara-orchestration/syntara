@@ -35,9 +35,8 @@ _TEMPORAL_ID_ARG = 9
 _MESSAGE_ARG = 10
 _SUBMIT_LABEL_ARG = 11
 _SUCCESS_MESSAGE_ARG = 12
-_TIMEZONE_ARG = 13
-_CSS_OVERRIDE_ARG = 14
-_NEW_FORM_PROMPT_ARG_COUNT = 15
+_CSS_OVERRIDE_ARG = 13
+_NEW_FORM_PROMPT_ARG_COUNT = 14
 
 
 @pytest.fixture(autouse=True)
@@ -273,13 +272,12 @@ class TestPrepareFormPromptArgs:
 
     @pytest.mark.asyncio
     async def test_presentation_fields_passed_through(self) -> None:
-        """submit_label, success_message, timezone, css_override are all passed through."""
+        """submit_label, success_message, and css_override are all passed through."""
         wf = _make_workflow()
         graph = _build_form_prompt_graph()
         config = {
             "submit_label": "Send",
             "success_message": "Thanks!",
-            "timezone": "America/New_York",
             "css_override": ".form { color: blue; }",
         }
         node = ActivityNode("form1", "form_prompt", config, name="Form")
@@ -290,7 +288,6 @@ class TestPrepareFormPromptArgs:
 
         assert args[_SUBMIT_LABEL_ARG] == "Send"
         assert args[_SUCCESS_MESSAGE_ARG] == "Thanks!"
-        assert args[_TIMEZONE_ARG] == "America/New_York"
         assert args[_CSS_OVERRIDE_ARG] == ".form { color: blue; }"
 
     @pytest.mark.asyncio

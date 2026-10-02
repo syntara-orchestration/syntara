@@ -902,11 +902,6 @@ class FormPromptNodeParameters(BaseModel):
         max_length=FieldLimits.FORM_SUCCESS_MESSAGE_MAX_LENGTH,
         description="Shown after submission.",
     )
-    timezone: str | None = Field(
-        default=None,
-        max_length=FieldLimits.FORM_TIMEZONE_MAX_LENGTH,
-        description="IANA timezone for interpreting date/datetime field values in the form.",
-    )
     css_override: str | None = Field(
         default=None,
         max_length=FieldLimits.FORM_CSS_OVERRIDE_MAX_LENGTH,
@@ -925,17 +920,6 @@ class FormPromptNodeParameters(BaseModel):
                 )
                 raise SafeValueError(msg)
         validate_form_definition(v, form_id=None)
-        return v
-
-    @field_validator("timezone")
-    @classmethod
-    def validate_timezone(cls, v: str | None) -> str | None:
-        """Validate that timezone is a valid IANA timezone name."""
-        if v is None:
-            return v
-        if v not in _get_valid_timezones():
-            msg = f"Invalid timezone: '{v}'. Must be a valid IANA timezone name (e.g., 'America/New_York')."
-            raise SafeValueError(msg)
         return v
 
     @field_validator("css_override")

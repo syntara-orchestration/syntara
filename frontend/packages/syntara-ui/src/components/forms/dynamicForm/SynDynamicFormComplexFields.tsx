@@ -1,8 +1,8 @@
-import { Checkbox, DatePicker, NumberInput } from '@patternfly/react-core'
+import { Checkbox, DatePicker, FormGroup, NumberInput, Stack, StackItem, TextInput } from '@patternfly/react-core'
 import type { FormField } from '@syntara/contracts'
 import { useController } from 'react-hook-form'
 
-import type { FormSubmissionInput } from '../../../forms'
+import type { DateSubmissionValue, FormSubmissionInput } from '../../../forms'
 import { formatDateYMD, parseDateYMD } from '../../../utils/dateUtils'
 import { FormFieldError } from '../../FormFieldError'
 import type { DynamicOptionsResolver } from '../SynDynamicForm.types'
@@ -10,6 +10,40 @@ import { SynFormField } from '../SynFormField'
 
 import type { OptionsFormField } from './synDynamicFormFieldTypes'
 import { SynDynamicFormOptionsSelect } from './SynDynamicFormOptionsSelect'
+
+const DATE_COMPONENT_NAMES = ['date', 'time', 'timezone'] as const
+
+type DateComponentName = (typeof DATE_COMPONENT_NAMES)[number]
+
+function includedDateComponents(field: Extract<FormField, { type: 'date' }>): Array<DateComponentName> {
+  const included: Record<DateComponentName, boolean> = {
+    date: field.include_date ?? true,
+    time: field.include_time ?? false,
+    timezone: field.include_timezone ?? false,
+  }
+  return DATE_COMPONENT_NAMES.filter((name) => included[name])
+}
+
+function dateComponentValue(raw: unknown, name: DateComponentName): string {
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
+    return ''
+  }
+  const value: unknown = Reflect.get(raw, name)
+  return typeof value === 'string' ? value : ''
+}
+
+function updateDateValue(
+  raw: unknown,
+  updatedComponent: DateComponentName,
+  updatedValue: string,
+  included: Array<DateComponentName>
+): DateSubmissionValue | '' {
+  const value: DateSubmissionValue = {}
+  for (const name of included) {
+    value[name] = name === updatedComponent ? updatedValue : dateComponentValue(raw, name)
+  }
+  return included.every((name) => value[name] === '') ? '' : value
+}
 
 function parseNumberFieldValue(value: unknown): number | undefined {
   if (typeof value === 'number' && Number.isFinite(value)) {
@@ -129,29 +163,62 @@ export function SynDynamicFormDateField({
   isRequired: boolean
   isDisabled?: boolean
 }>) {
+  const included = includedDateComponents(field)
+  const primaryComponent = included[0]
+  const componentId = (name: DateComponentName) => (name === primaryComponent ? fieldId : `${fieldId}-${name}`)
+
   return (
     <SynFormField<FormSubmissionInput>
       name={field.value_name}
       label={field.label}
-      fieldId={fieldId}
+      fieldId={`${fieldId}-group`}
       isRequired={isRequired}
+      hideFormGroupLabel
       hint={hint}
     >
       {({ field: rhfField, fieldState }) => (
-        <DatePicker
-          value={typeof rhfField.value === 'string' ? rhfField.value : ''}
-          onChange={(_event, value) => rhfField.onChange(value)}
-          dateFormat={formatDateYMD}
-          dateParse={parseDateYMD}
-          isDisabled={isDisabled}
-          aria-label={field.label}
-          inputProps={{
-            id: fieldId,
-            validated: fieldState.error ? 'error' : 'default',
-            onBlur: rhfField.onBlur,
-          }}
-          appendTo={() => document.body}
-        />
+        <Stack hasGutter>
+          {included.map((name) => (
+            <StackItem key={name}>
+              <FormGroup
+                label={`${field.label} ${name === 'timezone' ? 'time zone' : name}`}
+                fieldId={componentId(name)}
+                isRequired={isRequired}
+              >
+                {name === 'date' ? (
+                  <DatePicker
+                    value={dateComponentValue(rhfField.value, name)}
+                    onChange={(_event, value) =>
+                      rhfField.onChange(updateDateValue(rhfField.value, name, value, included))
+                    }
+                    dateFormat={formatDateYMD}
+                    dateParse={parseDateYMD}
+                    isDisabled={isDisabled}
+                    inputProps={{
+                      id: componentId(name),
+                      validated: fieldState.error ? 'error' : 'default',
+                      onBlur: rhfField.onBlur,
+                    }}
+                    appendTo={() => document.body}
+                  />
+                ) : (
+                  <TextInput
+                    id={componentId(name)}
+                    type={name === 'time' ? 'time' : 'text'}
+                    placeholder={name === 'timezone' ? 'America/New_York' : undefined}
+                    value={dateComponentValue(rhfField.value, name)}
+                    onChange={(_event, value) =>
+                      rhfField.onChange(updateDateValue(rhfField.value, name, value, included))
+                    }
+                    onBlur={rhfField.onBlur}
+                    isDisabled={isDisabled}
+                    validated={fieldState.error ? 'error' : 'default'}
+                  />
+                )}
+              </FormGroup>
+            </StackItem>
+          ))}
+        </Stack>
       )}
     </SynFormField>
   )
