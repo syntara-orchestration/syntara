@@ -5984,11 +5984,6 @@ class TestFormPromptSubmissionResumeMetric:
         event.event_time = event_time
         return event
 
-    def _set_submission_times(self, submitted_times: dict[str, datetime]) -> AsyncMock:
-        lookup = AsyncMock(return_value=submitted_times)
-        self.service._load_form_prompt_submission_times = lookup
-        return lookup
-
     async def _drain_metric_queue(self) -> None:
         await self.service._form_prompt_metric_queue.join()
         task = self.service._form_prompt_metric_task
@@ -5999,7 +5994,6 @@ class TestFormPromptSubmissionResumeMetric:
     async def test_records_submission_to_first_resumed_workflow_task(self) -> None:
         """The callback's persisted timestamp is compared with Temporal's task start time."""
         submitted_at = datetime(2026, 1, 1, 12, 0, 0, tzinfo=UTC)
-        lookup = self._set_submission_times({"form-node_iter_2": submitted_at})
         self.service._track_scheduled_form_prompt(self._scheduled_event(10), self.metadata)
         completed_event = self._completed_event(event_id=11, scheduled_event_id=10)
         self.service._track_completed_form_prompt(completed_event, self.metadata)
@@ -6009,6 +6003,13 @@ class TestFormPromptSubmissionResumeMetric:
             event_time=datetime(2026, 1, 1, 12, 0, 1, 250_000, tzinfo=UTC),
         )
         with (
+            patch.object(
+                self.service,
+                "_load_form_prompt_submission_times",
+                new_callable=AsyncMock,
+                return_value={"form-node_iter_2": submitted_at},
+            ) as lookup,
+            patch.object(self.service, "session_factory") as session_factory,
             patch(
                 "syntara.workflows.workflow_engine.services.activity_sync_service.get_metrics_recorder",
                 return_value=self.recorder,
@@ -6037,14 +6038,13 @@ class TestFormPromptSubmissionResumeMetric:
         assert sample._sum.get() == pytest.approx(1.25)
         assert self.metadata.last_processed_event_id == 0
         assert self.metadata.pending_form_prompt_submission_activity_ids == set()
-        self.service.session_factory.assert_not_called()
+        session_factory.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_replay_does_not_reobserve_resume_in_same_monitor(self) -> None:
         """A monitor retry replays history without enqueueing the same resume twice."""
         self.metadata.last_processed_event_id = 10
         responded_at = datetime(2026, 1, 1, 12, 0, 0, tzinfo=UTC)
-        lookup = self._set_submission_times({"form-node_iter_2": responded_at})
         schedule_event = self._scheduled_event(event_id=8)
         completion_event = self._completed_event(event_id=9, scheduled_event_id=8)
         resume_event = self._workflow_task_started_event(
@@ -6053,6 +6053,12 @@ class TestFormPromptSubmissionResumeMetric:
         )
 
         with (
+            patch.object(
+                self.service,
+                "_load_form_prompt_submission_times",
+                new_callable=AsyncMock,
+                return_value={"form-node_iter_2": responded_at},
+            ) as lookup,
             patch(
                 "syntara.workflows.workflow_engine.services.activity_sync_service.get_metrics_recorder",
                 return_value=self.recorder,
@@ -6075,7 +6081,6 @@ class TestFormPromptSubmissionResumeMetric:
 
     @pytest.mark.asyncio
     async def test_ignores_missing_or_non_submitted_database_timestamp(self) -> None:
-        self._set_submission_times({})
         self.service._track_scheduled_form_prompt(self._scheduled_event(event_id=20), self.metadata)
         self.service._track_completed_form_prompt(
             self._completed_event(event_id=21, scheduled_event_id=20),
@@ -6085,9 +6090,17 @@ class TestFormPromptSubmissionResumeMetric:
             event_id=22,
             event_time=datetime(2026, 1, 1, 12, 0, 1, tzinfo=UTC),
         )
-        with patch(
-            "syntara.workflows.workflow_engine.services.activity_sync_service.get_metrics_recorder",
-            return_value=self.recorder,
+        with (
+            patch.object(
+                self.service,
+                "_load_form_prompt_submission_times",
+                new_callable=AsyncMock,
+                return_value={},
+            ),
+            patch(
+                "syntara.workflows.workflow_engine.services.activity_sync_service.get_metrics_recorder",
+                return_value=self.recorder,
+            ),
         ):
             await self.service._process_history_event(resume_event, self.metadata, AsyncMock(), self.queue, [])
             await self._drain_metric_queue()
@@ -6098,7 +6111,6 @@ class TestFormPromptSubmissionResumeMetric:
     @pytest.mark.asyncio
     async def test_skips_negative_clock_skew(self) -> None:
         submitted_at = datetime(2026, 1, 1, 12, 0, 2, tzinfo=UTC)
-        self._set_submission_times({"form-node_iter_2": submitted_at})
         self.service._track_scheduled_form_prompt(self._scheduled_event(event_id=30), self.metadata)
         self.service._track_completed_form_prompt(
             self._completed_event(event_id=31, scheduled_event_id=30),
@@ -6110,6 +6122,12 @@ class TestFormPromptSubmissionResumeMetric:
         )
 
         with (
+            patch.object(
+                self.service,
+                "_load_form_prompt_submission_times",
+                new_callable=AsyncMock,
+                return_value={"form-node_iter_2": submitted_at},
+            ),
             patch(
                 "syntara.workflows.workflow_engine.services.activity_sync_service.get_metrics_recorder",
                 return_value=self.recorder,
@@ -6124,8 +6142,6 @@ class TestFormPromptSubmissionResumeMetric:
 
     @pytest.mark.asyncio
     async def test_lookup_and_recorder_failures_do_not_escape_history_processing(self) -> None:
-        lookup = AsyncMock(side_effect=RuntimeError("lookup failed"))
-        self.service._load_form_prompt_submission_times = lookup
         self.service._track_scheduled_form_prompt(self._scheduled_event(event_id=40), self.metadata)
         self.service._track_completed_form_prompt(
             self._completed_event(event_id=41, scheduled_event_id=40),
@@ -6135,9 +6151,17 @@ class TestFormPromptSubmissionResumeMetric:
             event_id=42,
             event_time=datetime(2026, 1, 1, 12, 0, 1, tzinfo=UTC),
         )
-        with patch(
-            "syntara.workflows.workflow_engine.services.activity_sync_service.get_metrics_recorder",
-            return_value=self.recorder,
+        with (
+            patch.object(
+                self.service,
+                "_load_form_prompt_submission_times",
+                new_callable=AsyncMock,
+                side_effect=RuntimeError("lookup failed"),
+            ),
+            patch(
+                "syntara.workflows.workflow_engine.services.activity_sync_service.get_metrics_recorder",
+                return_value=self.recorder,
+            ),
         ):
             result = await self.service._process_history_event(
                 first_resume_event,
@@ -6151,8 +6175,6 @@ class TestFormPromptSubmissionResumeMetric:
         assert list(self.recorder.query(metric_types={MetricType.FORM_PROMPT_SUBMISSION_TO_EXECUTION_START})) == []
 
         submitted_at = datetime(2026, 1, 1, 12, 0, 0, tzinfo=UTC)
-        lookup = AsyncMock(return_value={"form-node_iter_2": submitted_at})
-        self.service._load_form_prompt_submission_times = lookup
         self.service._track_scheduled_form_prompt(self._scheduled_event(event_id=43), self.metadata)
         self.service._track_completed_form_prompt(
             self._completed_event(event_id=44, scheduled_event_id=43),
@@ -6166,6 +6188,12 @@ class TestFormPromptSubmissionResumeMetric:
         failing_recorder.record.side_effect = RuntimeError("metrics disabled")
 
         with (
+            patch.object(
+                self.service,
+                "_load_form_prompt_submission_times",
+                new_callable=AsyncMock,
+                return_value={"form-node_iter_2": submitted_at},
+            ),
             patch(
                 "syntara.workflows.workflow_engine.services.activity_sync_service.get_metrics_recorder",
                 return_value=failing_recorder,

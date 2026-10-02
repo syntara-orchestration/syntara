@@ -20,7 +20,7 @@ from sqlalchemy.exc import InterfaceError, OperationalError
 from sqlalchemy.exc import TimeoutError as SATimeoutError
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlalchemy.orm import selectinload
-from sqlmodel import select
+from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 from temporalio.api.enums.v1 import EventType, PendingActivityState
 from temporalio.api.history.v1 import HistoryEvent
@@ -1657,9 +1657,9 @@ class ActivitySyncService:
 
         statement = (
             select(FormPrompt.temporal_activity_id, FormPrompt.responded_at)
-            .where(FormPrompt.execution_id == observation.execution_id)  # type: ignore[arg-type]
-            .where(FormPrompt.temporal_activity_id.in_(observation.activity_ids))  # type: ignore[attr-defined]
-            .where(FormPrompt.status == FormPromptStatus.SUBMITTED)  # type: ignore[arg-type]
+            .where(FormPrompt.execution_id == observation.execution_id)
+            .where(col(FormPrompt.temporal_activity_id).in_(observation.activity_ids))
+            .where(FormPrompt.status == FormPromptStatus.SUBMITTED)
             .where(FormPrompt.responded_at.is_not(None))  # type: ignore[union-attr]
         )
         async with self.session_factory() as session:
