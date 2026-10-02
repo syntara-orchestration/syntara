@@ -27,6 +27,7 @@ from dev_cli import (
     _remove_target_work_items,
     available_local_providers,
     main,
+    resolve_database_url,
     select_provider,
 )
 from execution_plane.cluster.cluster_store import ClusterStore
@@ -178,6 +179,31 @@ def executable_checker(*installed: str) -> Callable[[str], str | None]:
 
 def test_auto_selects_the_only_available_local_provider() -> None:
     assert select_provider("auto", [EnvironmentProvider.KIND]) is LocalEnvironment
+
+
+def test_resolve_database_url_prefers_app_database_url(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("APP_DATABASE_URL", "postgresql+asyncpg://override/db")
+    monkeypatch.setenv("DATABASE_URL", "postgresql+asyncpg://ignored/db")
+    monkeypatch.setenv("APP_DB_HOST", "ignored-host")
+    assert resolve_database_url() == "postgresql+asyncpg://override/db"
+
+
+def test_resolve_database_url_builds_from_app_db_parts(monkeypatch: pytest.MonkeyPatch) -> None:
+    for key in (
+        "APP_DATABASE_URL",
+        "DATABASE_URL",
+        "APP_DB_USER",
+        "APP_DB_PASSWORD",
+        "APP_DB_HOST",
+        "APP_DB_PORT",
+        "APP_DB_NAME",
+    ):
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv("APP_DB_USER", "ao")
+    monkeypatch.setenv("APP_DB_PASSWORD", "p@ss:word")
+    monkeypatch.setenv("APP_DB_HOST", "ao-postgres")
+    monkeypatch.setenv("APP_DB_NAME", "orchestrator")
+    assert resolve_database_url() == "postgresql+asyncpg://ao:p%40ss%3Aword@ao-postgres:5432/orchestrator"
 
 
 def test_auto_rejects_ambiguous_local_providers() -> None:

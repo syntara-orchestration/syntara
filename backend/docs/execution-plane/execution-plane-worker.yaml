@@ -1,0 +1,55 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: execution-plane-worker
+  namespace: execution-plane
+  labels:
+    app.kubernetes.io/name: execution-plane-worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: execution-plane-worker
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: execution-plane-worker
+    spec:
+      serviceAccountName: syntara-dispatcher
+      automountServiceAccountToken: true
+      containers:
+        - name: worker
+          image: __IMAGE__
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - -c
+            - |
+              export NODE_K8S_CA_CERTIFICATE="$(cat /var/run/secrets/kubernetes.io/serviceaccount/ca.crt)"
+              exec /opt/app-root/src/.venv/bin/execution-plane-worker
+          env:
+            - name: APP_DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: execution-plane-worker-env
+                  key: APP_DATABASE_URL
+            - name: APP_TEMPORAL_ADDRESS
+              value: __TEMPORAL__
+            - name: APP_TEMPORAL_NAMESPACE
+              value: default
+            - name: APP_S2S_TLS_ENABLED
+              value: "false"
+            - name: NODE_K8S_VERIFY_SSL
+              value: "true"
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
