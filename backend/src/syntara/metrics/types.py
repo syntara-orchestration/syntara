@@ -48,6 +48,7 @@ class MetricType(StrEnum):
     WORKFLOW_DURATION = "workflow_duration_ms"
     WORKFLOW_STATUS = "workflow_status"
     ACTIVITY_DURATION = "activity_duration_ms"
+    FORM_PROMPT_SUBMISSION_TO_EXECUTION_START = "form_prompt_submission_to_execution_start_ms"
 
     # Agent Metrics (FR-018 to FR-020)
     AGENT_ROUTING_DURATION = "agent_routing_ms"
@@ -147,6 +148,7 @@ METRIC_CATEGORIES: dict[MetricsCategoryType, list[MetricType]] = {
         MetricType.WORKFLOW_DURATION,
         MetricType.WORKFLOW_STATUS,
         MetricType.ACTIVITY_DURATION,
+        MetricType.FORM_PROMPT_SUBMISSION_TO_EXECUTION_START,
     ],
     MetricsCategoryType.AGENT: [
         MetricType.AGENT_ROUTING_DURATION,
@@ -172,6 +174,7 @@ METRIC_CATEGORIES: dict[MetricsCategoryType, list[MetricType]] = {
         MetricType.WORKFLOW_VALIDATION_DURATION,
         MetricType.WORKFLOW_DURATION,
         MetricType.WORKFLOW_STATUS,
+        MetricType.FORM_PROMPT_SUBMISSION_TO_EXECUTION_START,
     ],
     MetricsCategoryType.TEMPORAL_WORKER: [
         MetricType.TEMPORAL_QUEUE_DEPTH,

@@ -209,6 +209,7 @@ export interface components {
       | 'workflow_duration_ms'
       | 'workflow_status'
       | 'activity_duration_ms'
+      | 'form_prompt_submission_to_execution_start_ms'
       | 'agent_routing_ms'
       | 'agent_invocation_ms'
       | 'agent_status'

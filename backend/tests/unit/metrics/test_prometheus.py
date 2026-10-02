@@ -48,6 +48,7 @@ class TestMetricDefinitions:
         assert prom.workflow_serialization_duration_seconds is not None
         assert prom.workflow_validation_duration_seconds is not None
         assert prom.workflow_start_latency_seconds is not None
+        assert prom.form_prompt_submission_to_execution_start_seconds is not None
         assert prom.tool_execution_duration_seconds is not None
         assert prom.database_query_response_time_seconds is not None
         assert prom.system_e2e_latency_seconds is not None
@@ -126,12 +127,14 @@ class TestPrometheusOutput:
         prom.requests_total.labels(status="success", endpoint="/api", interface="api").inc(10)
         prom.cache_hits_total.inc(5)
         prom.active_workflows.labels(component="temporal_worker").set(3)
+        prom.form_prompt_submission_to_execution_start_seconds.labels(component="workflow_engine").observe(0.25)
 
         output = generate_latest(prom.registry).decode("utf-8")
 
         assert "orchestrator_requests_total" in output
         assert "orchestrator_cache_hits_total" in output
         assert "orchestrator_active_workflows" in output
+        assert "orchestrator_form_prompt_submission_to_execution_start_seconds" in output
         assert "# HELP" in output
         assert "# TYPE" in output
 
@@ -155,6 +158,11 @@ class TestBucketConstants:
     def test_fast_buckets_sorted(self) -> None:
         """Fast buckets are in ascending order."""
         assert list(LATENCY_BUCKETS_FAST) == sorted(LATENCY_BUCKETS_FAST)
+
+    def test_form_prompt_resume_uses_medium_buckets(self, prom: OrchestratorPrometheusMetrics) -> None:
+        """Form prompt resume latency shares the standard medium latency buckets."""
+        actual_buckets = prom.form_prompt_submission_to_execution_start_seconds._upper_bounds[:-1]
+        assert actual_buckets == list(LATENCY_BUCKETS_MEDIUM)
 
     def test_medium_buckets_sorted(self) -> None:
         """Medium buckets are in ascending order."""

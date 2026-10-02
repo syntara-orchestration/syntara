@@ -224,6 +224,14 @@ class OrchestratorPrometheusMetrics:
             registry=self.registry,
         )
 
+        self.form_prompt_submission_to_execution_start_seconds = Histogram(
+            "orchestrator_form_prompt_submission_to_execution_start_seconds",
+            "Seconds from accepted form prompt submission to the first Temporal workflow task that resumes it",
+            ["component"],
+            buckets=LATENCY_BUCKETS_MEDIUM,
+            registry=self.registry,
+        )
+
         self.temporal_execution_service_duration_seconds = Histogram(
             "orchestrator_temporal_execution_service_duration_seconds",
             "Temporal client start_workflow RPC duration including network and server startup",
