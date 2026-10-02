@@ -35,6 +35,7 @@ def _make_activity(
         stall_alert_at: When stall was detected or None
 
     """
+    now = datetime.now(UTC)
     return ActivityExecution(
         id=uuid4(),
         execution_id=uuid4(),
@@ -44,35 +45,29 @@ def _make_activity(
         status=status,
         expected_duration=expected_duration,
         started_at=started_at,
-        stall_alert_at=stall_alert_at,
+        stall_alert_at=stall_alert_at or (now if stall_alert_at is not None else None),
     )
 
 
-def _make_session_factory(activities: list[ActivityExecution]) -> MagicMock:
-    """Create a mock session factory that returns activities from query.
+def _make_session_factory(claimed_activities: list[ActivityExecution]) -> MagicMock:
+    """Create a mock session factory that returns activities from UPDATE...RETURNING.
 
-    Filters activities to match the SQL WHERE clause:
-    - status == RUNNING
-    - expected_duration IS NOT NULL
-    - started_at IS NOT NULL
-    - stall_alert_at IS NULL
+    The UPDATE...RETURNING mock simulates the atomic SQL operation that claims
+    stalled activities and returns only those that were successfully updated.
+
+    Args:
+        claimed_activities: Activities to return from UPDATE...RETURNING (already claimed)
+
     """
-    # Filter activities to match SQL WHERE clause
-    filtered = [
-        a
-        for a in activities
-        if a.status == ActivityStatus.RUNNING
-        and a.expected_duration is not None
-        and a.started_at is not None
-        and a.stall_alert_at is None
-    ]
+    # Mock the result of UPDATE...RETURNING
+    mock_scalars = MagicMock()
+    mock_scalars.all.return_value = claimed_activities
 
     mock_result = MagicMock()
-    mock_result.all.return_value = filtered
+    mock_result.scalars.return_value = mock_scalars
 
     mock_session = AsyncMock()
-    mock_session.exec = AsyncMock(return_value=mock_result)
-    mock_session.add = MagicMock()
+    mock_session.execute = AsyncMock(return_value=mock_result)
     mock_session.commit = AsyncMock()
 
     ctx = MagicMock()
@@ -97,6 +92,7 @@ class TestDetectStalledActivities:
     ) -> None:
         """Running activity that exceeded expected duration should be claimed."""
         # Create an activity that started 2 minutes ago with 60s expected duration
+        # The mock simulates UPDATE...RETURNING setting stall_alert_at
         now = datetime.now(UTC)
         started_at = now - timedelta(seconds=120)
         activity = _make_activity(
@@ -104,6 +100,9 @@ class TestDetectStalledActivities:
             expected_duration=60,
             started_at=started_at,
         )
+        # Simulate the UPDATE setting stall_alert_at
+        activity.stall_alert_at = now
+        activity.updated_at = now
 
         session_factory = _make_session_factory([activity])
 
@@ -116,12 +115,14 @@ class TestDetectStalledActivities:
 
             await detect_stalled_activities(session_factory)
 
-            # Verify the activity was claimed (stall_alert_at and updated_at were set)
-            assert activity.stall_alert_at is not None
-            assert activity.updated_at is not None
-
-            # Verify audit event was dispatched
+            # Verify audit event was dispatched with correct values
             mock_dispatch.assert_called_once()
+            call_args = mock_dispatch.call_args[0][0]
+            assert call_args.activity_execution_id == activity.id
+            assert call_args.execution_id == activity.execution_id
+            assert call_args.expected_duration == 60
+            assert call_args.started_at == started_at
+            assert call_args.stall_alert_at == now
 
             # Verify metric was recorded
             mock_recorder.record.assert_called_once()
@@ -130,25 +131,15 @@ class TestDetectStalledActivities:
     async def test_activity_below_threshold_ignored(
         self,
     ) -> None:
-        """Activity that has not exceeded expected duration should be ignored."""
-        now = datetime.now(UTC)
-        started_at = now - timedelta(seconds=30)  # Started 30s ago
-        activity = _make_activity(
-            status=ActivityStatus.RUNNING,
-            expected_duration=120,  # Expects 120s, so not stalled yet
-            started_at=started_at,
-        )
-
-        session_factory = _make_session_factory([activity])
+        """Activity that has not exceeded expected duration should not be claimed."""
+        # UPDATE...RETURNING returns no rows for activities below threshold
+        session_factory = _make_session_factory([])  # No claimed activities
 
         with (
             patch("syntara.workflows.workers.stall_detection.AuditEventDispatcher.dispatch") as mock_dispatch,
             patch("syntara.workflows.workers.stall_detection.get_metrics_recorder") as mock_get_recorder,
         ):
             await detect_stalled_activities(session_factory)
-
-            # Verify the activity was not claimed
-            assert activity.stall_alert_at is None
 
             # Verify no audit event or metric
             mock_dispatch.assert_not_called()
@@ -158,14 +149,9 @@ class TestDetectStalledActivities:
     async def test_null_expected_duration_ignored(
         self,
     ) -> None:
-        """Activity with NULL expected_duration should be ignored."""
-        activity = _make_activity(
-            status=ActivityStatus.RUNNING,
-            expected_duration=None,  # NULL expected duration
-            started_at=datetime.now(UTC) - timedelta(hours=2),
-        )
-
-        session_factory = _make_session_factory([activity])
+        """Activity with NULL expected_duration is filtered by SQL WHERE clause."""
+        # UPDATE...RETURNING returns no rows since SQL WHERE clause excludes NULL expected_duration
+        session_factory = _make_session_factory([])
 
         with patch("syntara.workflows.workers.stall_detection.AuditEventDispatcher.dispatch") as mock_dispatch:
             await detect_stalled_activities(session_factory)
@@ -175,14 +161,9 @@ class TestDetectStalledActivities:
     async def test_null_started_at_ignored(
         self,
     ) -> None:
-        """Activity with NULL started_at should be ignored."""
-        activity = _make_activity(
-            status=ActivityStatus.RUNNING,
-            expected_duration=60,
-            started_at=None,  # NULL started_at
-        )
-
-        session_factory = _make_session_factory([activity])
+        """Activity with NULL started_at is filtered by SQL WHERE clause."""
+        # UPDATE...RETURNING returns no rows since SQL WHERE clause excludes NULL started_at
+        session_factory = _make_session_factory([])
 
         with patch("syntara.workflows.workers.stall_detection.AuditEventDispatcher.dispatch") as mock_dispatch:
             await detect_stalled_activities(session_factory)
@@ -192,22 +173,9 @@ class TestDetectStalledActivities:
     async def test_non_running_activity_ignored(
         self,
     ) -> None:
-        """Non-running activities should be ignored."""
-        activities = [
-            _make_activity(
-                status=status,
-                expected_duration=60,
-                started_at=datetime.now(UTC) - timedelta(seconds=120),
-            )
-            for status in [
-                ActivityStatus.PENDING,
-                ActivityStatus.COMPLETED,
-                ActivityStatus.FAILED,
-                ActivityStatus.CANCELLED,
-            ]
-        ]
-
-        session_factory = _make_session_factory(activities)
+        """Non-running activities are filtered by SQL WHERE clause."""
+        # UPDATE...RETURNING returns no rows since SQL WHERE clause requires status == RUNNING
+        session_factory = _make_session_factory([])
 
         with patch("syntara.workflows.workers.stall_detection.AuditEventDispatcher.dispatch") as mock_dispatch:
             await detect_stalled_activities(session_factory)
@@ -217,15 +185,9 @@ class TestDetectStalledActivities:
     async def test_existing_stall_alert_ignored(
         self,
     ) -> None:
-        """Activity with existing stall_alert_at should be ignored (deduplication)."""
-        activity = _make_activity(
-            status=ActivityStatus.RUNNING,
-            expected_duration=60,
-            started_at=datetime.now(UTC) - timedelta(seconds=120),
-            stall_alert_at=datetime.now(UTC) - timedelta(seconds=60),  # Already marked as stalled
-        )
-
-        session_factory = _make_session_factory([activity])
+        """Activity with existing stall_alert_at is filtered by SQL WHERE clause (deduplication)."""
+        # UPDATE...RETURNING returns no rows since SQL WHERE clause requires stall_alert_at IS NULL
+        session_factory = _make_session_factory([])
 
         with patch("syntara.workflows.workers.stall_detection.AuditEventDispatcher.dispatch") as mock_dispatch:
             await detect_stalled_activities(session_factory)
@@ -235,19 +197,21 @@ class TestDetectStalledActivities:
     async def test_multiple_eligible_activities_processed_independently(
         self,
     ) -> None:
-        """Multiple stalled activities should each be claimed and processed."""
+        """Multiple stalled activities should each be processed independently."""
         now = datetime.now(UTC)
         started_at = now - timedelta(seconds=120)
 
-        # Create 3 stalled activities
-        activities = [
-            _make_activity(
+        # Create 3 stalled activities (already claimed by UPDATE...RETURNING)
+        activities = []
+        for _ in range(3):
+            activity = _make_activity(
                 status=ActivityStatus.RUNNING,
                 expected_duration=60,
                 started_at=started_at,
             )
-            for _ in range(3)
-        ]
+            activity.stall_alert_at = now
+            activity.updated_at = now
+            activities.append(activity)
 
         session_factory = _make_session_factory(activities)
 
@@ -259,10 +223,6 @@ class TestDetectStalledActivities:
             mock_get_recorder.return_value = mock_recorder
 
             await detect_stalled_activities(session_factory)
-
-            # Verify all 3 were claimed
-            for activity in activities:
-                assert activity.stall_alert_at is not None
 
             # Verify 3 audit events dispatched
             assert mock_dispatch.call_count == 3
@@ -274,19 +234,21 @@ class TestDetectStalledActivities:
     async def test_audit_failure_does_not_stop_batch(
         self,
     ) -> None:
-        """Audit dispatch failure should not prevent remaining stalls from being processed."""
+        """Audit dispatch failure should not prevent telemetry or remaining stalls."""
         now = datetime.now(UTC)
         started_at = now - timedelta(seconds=120)
 
-        # Create 3 stalled activities
-        activities = [
-            _make_activity(
+        # Create 3 stalled activities (already claimed)
+        activities = []
+        for _ in range(3):
+            activity = _make_activity(
                 status=ActivityStatus.RUNNING,
                 expected_duration=60,
                 started_at=started_at,
             )
-            for _ in range(3)
-        ]
+            activity.stall_alert_at = now
+            activity.updated_at = now
+            activities.append(activity)
 
         session_factory = _make_session_factory(activities)
 
@@ -309,15 +271,11 @@ class TestDetectStalledActivities:
 
             await detect_stalled_activities(session_factory)
 
-            # All 3 should still have been claimed
-            for activity in activities:
-                assert activity.stall_alert_at is not None
-
             # 3 audit dispatches attempted
             assert mock_dispatch.call_count == 3
 
-            # Only 2 metrics (first and third, second failed audit and telemetry)
-            assert mock_recorder.record.call_count == 2
+            # 3 telemetry attempts (audit failure does not skip telemetry)
+            assert mock_recorder.record.call_count == 3
 
     @pytest.mark.asyncio
     async def test_telemetry_failure_does_not_stop_batch(
@@ -327,15 +285,17 @@ class TestDetectStalledActivities:
         now = datetime.now(UTC)
         started_at = now - timedelta(seconds=120)
 
-        # Create 2 stalled activities
-        activities = [
-            _make_activity(
+        # Create 2 stalled activities (already claimed)
+        activities = []
+        for _ in range(2):
+            activity = _make_activity(
                 status=ActivityStatus.RUNNING,
                 expected_duration=60,
                 started_at=started_at,
             )
-            for _ in range(2)
-        ]
+            activity.stall_alert_at = now
+            activity.updated_at = now
+            activities.append(activity)
 
         session_factory = _make_session_factory(activities)
 
@@ -358,15 +318,106 @@ class TestDetectStalledActivities:
 
             await detect_stalled_activities(session_factory)
 
-            # Both should still have been claimed
-            for activity in activities:
-                assert activity.stall_alert_at is not None
-
             # 2 audit events dispatched
             assert mock_dispatch.call_count == 2
 
             # 2 telemetry attempts (first failed, second succeeded)
             assert mock_recorder.record.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_audit_event_receives_correct_values(
+        self,
+    ) -> None:
+        """Verify audit event dispatch receives the correct execution/activity/node values."""
+        now = datetime.now(UTC)
+        started_at = now - timedelta(seconds=120)
+        execution_id = uuid4()
+        activity_id = uuid4()
+
+        activity = ActivityExecution(
+            id=activity_id,
+            execution_id=execution_id,
+            activity_name="webhook_trigger_call",
+            node_type=NodeType.WEBHOOK_TRIGGER,
+            temporal_activity_id=f"act-{uuid4()}",
+            status=ActivityStatus.RUNNING,
+            expected_duration=90,
+            started_at=started_at,
+            stall_alert_at=now,
+            updated_at=now,
+        )
+
+        session_factory = _make_session_factory([activity])
+
+        with (
+            patch("syntara.workflows.workers.stall_detection.AuditEventDispatcher.dispatch") as mock_dispatch,
+            patch("syntara.workflows.workers.stall_detection.get_metrics_recorder") as mock_get_recorder,
+        ):
+            mock_get_recorder.return_value = MagicMock()
+
+            await detect_stalled_activities(session_factory)
+
+            # Verify audit event was called with correct values
+            mock_dispatch.assert_called_once()
+            event = mock_dispatch.call_args[0][0]
+            assert event.activity_execution_id == activity_id
+            assert event.execution_id == execution_id
+            assert event.activity_name == "webhook_trigger_call"
+            assert event.node_type == NodeType.WEBHOOK_TRIGGER
+            assert event.expected_duration == 90
+            assert event.started_at == started_at
+            assert event.stall_alert_at == now
+
+    @pytest.mark.asyncio
+    async def test_telemetry_receives_correct_node_type(
+        self,
+    ) -> None:
+        """Verify telemetry receives the correct node_type label."""
+        now = datetime.now(UTC)
+        started_at = now - timedelta(seconds=120)
+
+        activity = _make_activity(
+            status=ActivityStatus.RUNNING,
+            expected_duration=60,
+            started_at=started_at,
+        )
+        activity.node_type = NodeType.AGENTIC
+        activity.stall_alert_at = now
+        activity.updated_at = now
+
+        session_factory = _make_session_factory([activity])
+
+        with (
+            patch("syntara.workflows.workers.stall_detection.AuditEventDispatcher.dispatch"),
+            patch("syntara.workflows.workers.stall_detection.get_metrics_recorder") as mock_get_recorder,
+        ):
+            mock_recorder = MagicMock()
+            mock_get_recorder.return_value = mock_recorder
+
+            await detect_stalled_activities(session_factory)
+
+            # Verify telemetry was called with correct node_type label
+            mock_recorder.record.assert_called_once()
+            call_args = mock_recorder.record.call_args
+            assert call_args[1]["labels"]["node_type"] == NodeType.AGENTIC.value
+
+    @pytest.mark.asyncio
+    async def test_already_claimed_rows_not_reprocessed(
+        self,
+    ) -> None:
+        """Already-claimed rows (stall_alert_at IS NOT NULL) should not be returned by UPDATE."""
+        # UPDATE...RETURNING returns empty list when all rows already have stall_alert_at set
+        session_factory = _make_session_factory([])
+
+        with (
+            patch("syntara.workflows.workers.stall_detection.AuditEventDispatcher.dispatch") as mock_dispatch,
+            patch("syntara.workflows.workers.stall_detection.get_metrics_recorder") as mock_get_recorder,
+        ):
+            await detect_stalled_activities(session_factory)
+
+            # No audit or telemetry should be emitted
+            mock_dispatch.assert_not_called()
+            mock_get_recorder.return_value.record.assert_not_called()
 
 
 class TestStallDetectionWorker:

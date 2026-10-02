@@ -181,6 +181,7 @@ METRIC_CATEGORIES: dict[MetricsCategoryType, list[MetricType]] = {
         MetricType.ACTIVE_WORKFLOWS,
         MetricType.ACTIVITY_EXECUTION_SUCCESS_RATE,
         MetricType.ACTIVITY_DURATION,
+        MetricType.STALLS_DETECTED,
     ],
     MetricsCategoryType.EXECUTION_SERVICE: [
         MetricType.WORKFLOW_START_LATENCY,

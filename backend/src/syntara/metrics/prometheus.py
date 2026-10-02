@@ -392,7 +392,7 @@ class OrchestratorPrometheusMetrics:
 
         # ---- Stall Detection (AAP-92825) ----
         self.stalls_detected_total = Counter(
-            "syntara_stalls_detected_total",
+            "orchestrator_stalls_detected_total",
             "Total number of activity stalls detected by the periodic worker",
             ["node_type"],
             registry=self.registry,

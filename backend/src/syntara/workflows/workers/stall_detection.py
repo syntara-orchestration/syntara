@@ -12,12 +12,12 @@ observability and alerting only. Intervention logic belongs to AAP-92826.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from functools import lru_cache
 from typing import TYPE_CHECKING
 
 import structlog
-from sqlmodel import select
+from sqlalchemy import text, update
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import async_sessionmaker
@@ -40,7 +40,7 @@ async def detect_stalled_activities(
 ) -> None:
     """Scan for and claim running activities that have exceeded their expected duration.
 
-    Uses an atomic conditional update to claim stalled activities, ensuring
+    Uses an atomic UPDATE...RETURNING to claim stalled activities, ensuring
     each stall is detected exactly once even under concurrent workers.
 
     Only rows successfully claimed by the update may produce audit events or
@@ -53,43 +53,38 @@ async def detect_stalled_activities(
     if session_factory is None:
         return
 
-    async with session_factory() as session:
-        # Find eligible activities: running, has expected_duration, overdue, not yet marked
-        now = datetime.now(UTC)
+    now = datetime.now(UTC)
 
-        # Query for stalled activities
-        stmt = select(ActivityExecution).where(
-            ActivityExecution.status == ActivityStatus.RUNNING,
-            ActivityExecution.expected_duration.isnot(None),  # type: ignore[union-attr]
-            ActivityExecution.started_at.isnot(None),  # type: ignore[union-attr]
-            ActivityExecution.stall_alert_at.is_(None),  # type: ignore[union-attr]
+    # Atomic UPDATE...RETURNING that claims stalled activities in a single database round-trip.
+    # All eligibility conditions are in the WHERE clause to ensure only qualifying rows are updated.
+    async with session_factory() as session:
+        stmt = (
+            update(ActivityExecution)
+            .where(
+                ActivityExecution.status == ActivityStatus.RUNNING,  # type: ignore[arg-type]
+                ActivityExecution.expected_duration.isnot(None),  # type: ignore[union-attr]
+                ActivityExecution.started_at.isnot(None),  # type: ignore[union-attr]
+                ActivityExecution.stall_alert_at.is_(None),  # type: ignore[union-attr]
+                # PostgreSQL: started_at + make_interval(secs => expected_duration) < now
+                text("started_at + make_interval(secs => expected_duration) < :now"),
+            )
+            .values(stall_alert_at=now, updated_at=now)
+            .returning(ActivityExecution)
+            .execution_options(synchronize_session=False)
         )
 
-        result = await session.exec(stmt)
-        all_running = result.all()
-
-        # Filter to those that are overdue
-        claimed_rows: list[ActivityExecution] = []
-        for activity in all_running:
-            if (
-                activity.expected_duration is not None
-                and activity.started_at is not None
-                and activity.started_at + timedelta(seconds=activity.expected_duration) < now
-            ):
-                # Atomically claim by setting stall_alert_at
-                activity.stall_alert_at = now
-                activity.updated_at = now
-                session.add(activity)
-                claimed_rows.append(activity)
-
-        if claimed_rows:
-            await session.commit()
+        result = await session.execute(stmt, {"now": now})
+        await session.commit()
+        claimed_rows = list(result.scalars().all())
 
     if not claimed_rows:
         logger.debug("stall_detection_noop", cycle_time=now.isoformat())
         return
 
-    # Emit audit events and telemetry for each claimed stall
+    # Emit audit events and telemetry for each claimed stall.
+    # Audit and telemetry failures are independent: an audit failure does not
+    # roll back the database claim and does not prevent telemetry from being
+    # attempted. A telemetry failure does not stop later claimed rows.
     recorder = get_metrics_recorder()
     success_count = 0
     audit_failure_count = 0
@@ -97,17 +92,19 @@ async def detect_stalled_activities(
 
     for activity in claimed_rows:
         # Emit audit event
+        audit_succeeded = False
         try:
             event = NodeStalledEvent(
                 activity_execution_id=activity.id,
                 execution_id=activity.execution_id,
                 activity_name=activity.activity_name,
                 node_type=activity.node_type,
-                expected_duration=activity.expected_duration or 0,  # Should not be None due to filter
-                started_at=activity.started_at or now,  # Should not be None due to filter
-                stall_alert_at=now,
+                expected_duration=activity.expected_duration,
+                started_at=activity.started_at,
+                stall_alert_at=activity.stall_alert_at,
             )
             AuditEventDispatcher.dispatch(event)
+            audit_succeeded = True
         except Exception:  # noqa: BLE001
             logger.warning(
                 "stall_detection_audit_failed",
@@ -116,17 +113,16 @@ async def detect_stalled_activities(
                 exc_info=True,
             )
             audit_failure_count += 1
-            # Skip telemetry for this activity and continue to next
-            continue
 
-        # Record Prometheus metric
+        # Record Prometheus metric (independent of audit success/failure)
         try:
             recorder.record(
                 MetricType.STALLS_DETECTED,
                 1.0,
                 labels={"node_type": activity.node_type.value},
             )
-            success_count += 1
+            if audit_succeeded:
+                success_count += 1
         except Exception:  # noqa: BLE001
             logger.warning(
                 "stall_detection_telemetry_failed",
