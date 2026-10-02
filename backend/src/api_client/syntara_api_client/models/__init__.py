@@ -152,6 +152,7 @@ __all__ = (
     "ForEachLoopParameters",
     "FormDefinition",
     "FormPromptCreateRequest",
+    "FormPromptListRead",
     "FormPromptListResponse",
     "FormPromptNode",
     "FormPromptNodeOutputsType0",
