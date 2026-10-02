@@ -6,7 +6,6 @@ import copy
 import os
 import time
 import urllib.parse
-import urllib.request
 from typing import TYPE_CHECKING, Any, cast
 from uuid import UUID
 
@@ -386,27 +385,38 @@ def poll_execution_until_complete(
 # httpbin helpers — shared across E2E test files
 # ---------------------------------------------------------------------------
 
+# aap-dev deploys go-httpbin next to AO as Service ``httpbin`` on port 8080
+# (see ansible/aap-dev commit 99b8902). The Temporal worker can reach that
+# ClusterIP; it often cannot reach the public internet (httpbin.org).
+_IN_CLUSTER_HTTPBIN_URL = "http://httpbin:8080"
+_PUBLIC_HTTPBIN_URL = "https://httpbin.org"
 _HTTPBIN_ALLOWED_HOSTS = {"httpbin.org", "httpbin"}
 
-HTTPBIN_URL: str = os.environ.get("HTTPBIN_URL", "https://httpbin.org")
 
-_parsed = urllib.parse.urlparse(HTTPBIN_URL)
-if _parsed.scheme not in ("http", "https") or not any(h in (_parsed.hostname or "") for h in _HTTPBIN_ALLOWED_HOSTS):
-    HTTPBIN_URL = "https://httpbin.org"
+def resolve_httpbin_url(
+    configured: str | None = None,
+    *,
+    in_kubernetes: bool | None = None,
+) -> str:
+    """Return the httpbin base URL for E2E HTTP Request nodes.
+
+    ``HTTPBIN_URL`` wins when it is an allowed http(s) host. Otherwise prefer
+    the in-cluster Service when running inside Kubernetes, and the public
+    instance for local / GitHub CI.
+    """
+    if configured is None:
+        configured = os.environ.get("HTTPBIN_URL")
+    if configured:
+        parsed = urllib.parse.urlparse(configured)
+        if parsed.scheme in {"http", "https"} and any(
+            host in (parsed.hostname or "") for host in _HTTPBIN_ALLOWED_HOSTS
+        ):
+            return configured.rstrip("/")
+    if in_kubernetes is None:
+        in_kubernetes = bool(os.environ.get("KUBERNETES_SERVICE_HOST"))
+    if in_kubernetes:
+        return _IN_CLUSTER_HTTPBIN_URL
+    return _PUBLIC_HTTPBIN_URL
 
 
-def httpbin_available() -> bool:
-    """Check if httpbin is reachable (uncached — always makes a fresh network request)."""
-    try:
-        urllib.request.urlopen(f"{HTTPBIN_URL}/status/200", timeout=5)  # noqa: S310
-    except Exception:
-        return False
-    else:
-        return True
-
-
-# Plain mark — runtime skip is handled by the pytest_runtest_setup hook in
-# tests/e2e/conftest.py, which calls httpbin_available() just before the test
-# body runs.  Using a collection-time skipif caused tests to be collected (not
-# skipped) when httpbin was up at import time but went down before execution.
-requires_httpbin = pytest.mark.requires_httpbin
+HTTPBIN_URL: str = resolve_httpbin_url()

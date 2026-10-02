@@ -33,7 +33,7 @@ if not os.environ.get("APP_BASE_URL"):
     pytest.skip("APP_BASE_URL not set — full stack required", allow_module_level=True)
 
 from orchestrator_test_sdk.e2e import unique_name
-from orchestrator_test_sdk.e2e.helpers import HTTPBIN_URL, create_and_run_workflow, poll_execution, requires_httpbin
+from orchestrator_test_sdk.e2e.helpers import HTTPBIN_URL, create_and_run_workflow, poll_execution
 from orchestrator_test_sdk.factories import get_basic_auth_type_id, get_bearer_token_type_id
 from syntara_api_client.models.credential_create import CredentialCreate
 from syntara_api_client.models.credential_create_inputs import CredentialCreateInputs
@@ -148,7 +148,6 @@ def _get_activity_output(execution: ExecutionRead, activity_id: str) -> dict[str
     return result
 
 
-@requires_httpbin
 class TestWorkflowWithValidCredential:
     """Verify credential resolution succeeds at runtime (ANSTRAT-1901)."""
 
@@ -258,7 +257,6 @@ class TestWorkflowWithValidCredential:
 # ===================================================================
 
 
-@requires_httpbin
 class TestWorkflowWithDisabledCredential:
     """Verify disabled credentials fail with clear error (ANSTRAT-1901)."""
 
@@ -317,7 +315,6 @@ class TestWorkflowWithDisabledCredential:
 # ===================================================================
 
 
-@requires_httpbin
 class TestWorkflowWithDeletedCredential:
     """Verify deleted credentials fail with clear error (ANSTRAT-1901)."""
 
@@ -372,7 +369,6 @@ class TestWorkflowWithDeletedCredential:
 # ===================================================================
 
 
-@requires_httpbin
 class TestCredentialScrubbing:
     """Verify secret values are scrubbed from execution history (AAP-79021)."""
 
