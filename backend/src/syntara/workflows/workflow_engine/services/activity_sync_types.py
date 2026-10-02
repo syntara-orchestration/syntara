@@ -68,6 +68,7 @@ class ExecutionMonitorMetadata:
     request_id: UUID | None = None
     workflow_run_timeout_seconds: float | None = None
     workflow_name: str | None = None
+    is_retry: bool = False
 
 
 type QueueItem = HistoryEvent | SyntheticActivityStarted | SyntheticPartialOutput | None
