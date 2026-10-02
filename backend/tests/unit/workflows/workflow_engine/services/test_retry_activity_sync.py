@@ -1,5 +1,6 @@
 """Retained outputs survive retry chains without duplicate activity records."""
 
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
@@ -9,6 +10,9 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from syntara.workflows.models.activity_execution import ActivityExecution, ActivityStatus
 from syntara.workflows.workflow_engine.models.workflow_definition import NodeType
 from syntara.workflows.workflow_engine.services.retry_activity_sync import sync_restored_activities
+
+SOURCE_STARTED = datetime(2026, 3, 1, 10, 0, tzinfo=UTC)
+SOURCE_COMPLETED = datetime(2026, 3, 1, 10, 5, tzinfo=UTC)
 
 
 def row(name: str, status: ActivityStatus = ActivityStatus.COMPLETED) -> ActivityExecution:
@@ -21,6 +25,8 @@ def row(name: str, status: ActivityStatus = ActivityStatus.COMPLETED) -> Activit
         status=status,
         output_data={"receipt": "source"},
         iteration=1 if "#iter-" in name else 0,
+        started_at=SOURCE_STARTED,
+        completed_at=SOURCE_COMPLETED,
     )
 
 
@@ -142,3 +148,35 @@ async def test_monitor_seeds_iteration_counters_before_resumed_scheduling() -> N
     assert created
     assert new_row is not None
     assert new_row.activity_name == "body#iter-2"
+
+
+@pytest.mark.asyncio
+async def test_new_row_inherits_source_timestamps_not_restore_time() -> None:
+    """A created restored row reports when the work ran, not when it was reloaded.
+
+    The row records when the node executed. Stamping the restore time would show a
+    five-minute job as finishing in milliseconds, and unlike the original timestamp
+    the restore time cannot be recovered afterwards.
+    """
+    source = row("body_a")
+
+    _, created = await sync_restored_activities(session_for([source], []), source.execution_id, ["body_a"])
+
+    assert len(created) == 1
+    assert created[0].started_at == SOURCE_STARTED
+    assert created[0].completed_at == SOURCE_COMPLETED
+
+
+@pytest.mark.asyncio
+async def test_updated_row_inherits_source_timestamps() -> None:
+    """A previously pending row also takes the source's times when restored."""
+    source = row("body_a")
+    target = row("body_a", ActivityStatus.PENDING)
+    target.started_at = None
+    target.completed_at = None
+
+    updated, _ = await sync_restored_activities(session_for([source], [target]), target.execution_id, ["body_a"])
+
+    assert [item[0] for item in updated] == [target]
+    assert target.started_at == SOURCE_STARTED
+    assert target.completed_at == SOURCE_COMPLETED

@@ -44,9 +44,12 @@ async def fetch_retry_outputs_activity(
             accepted and resolved to their base node.
 
     Returns:
-        Map of node id to the output of its most recent ``COMPLETED`` activity
-        in the source run. Nodes with no completed activity are absent from the
-        map rather than mapped to an empty output, so the caller can tell
+        Map of node id to the stored ``input_data`` and ``output_data`` of its
+        most recent ``COMPLETED`` activity in the source run. Both are returned
+        so a restored node is indistinguishable from one that executed: the
+        caller republishes the input into ``node_inputs`` and the output into
+        the execution namespace. Nodes with no completed activity are absent
+        from the map rather than mapped to empty, so the caller can tell
         "nothing ran" apart from "ran and produced nothing".
 
     Raises:
@@ -63,7 +66,7 @@ async def fetch_retry_outputs_activity(
     if not wanted:
         return {}
 
-    outputs: dict[str, dict[str, Any]] = {}
+    stored: dict[str, dict[str, Any]] = {}
     async for session in get_db():
         activities = (
             await session.exec(
@@ -83,15 +86,18 @@ async def fetch_retry_outputs_activity(
         for activity_row in activities:
             base_id = strip_iteration_suffix(activity_row.activity_name)
             if base_id in wanted:
-                outputs[base_id] = activity_row.output_data or {}
+                stored[base_id] = {
+                    "input_data": activity_row.input_data or {},
+                    "output_data": activity_row.output_data or {},
+                }
 
     # Measure the JSON that will actually cross the result blob. ``len(str(...))``
     # would measure Python's repr, which is a different and only accidentally
     # similar number.
-    serialized_bytes = len(json.dumps(outputs, default=str).encode("utf-8"))
+    serialized_bytes = len(json.dumps(stored, default=str).encode("utf-8"))
     if serialized_bytes > JsonbLimits.MAX_FIELD_BYTES:
         msg = (
-            f"restored retry outputs total {serialized_bytes} bytes across {len(outputs)} node(s), "
+            f"restored retry data totals {serialized_bytes} bytes across {len(stored)} node(s), "
             f"over the {JsonbLimits.MAX_FIELD_BYTES} byte maximum. This retry cannot restore the "
             "upstream outputs it needs in order to skip those nodes."
         )
@@ -100,10 +106,10 @@ async def fetch_retry_outputs_activity(
     logger.info(
         "Fetched retry outputs",
         source_execution_id=source_execution_id,
-        node_count=len(outputs),
+        node_count=len(stored),
         serialized_bytes=serialized_bytes,
     )
-    return outputs
+    return stored
 
 
 @activity.defn(name="fetch_retry_loop_state")
