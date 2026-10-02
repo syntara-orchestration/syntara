@@ -13,6 +13,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Protocol
+from urllib.parse import quote
 
 from ao_registration import register_integration_record
 from execution_plane.cluster.cluster_registry import (
@@ -32,6 +33,25 @@ from sqlmodel import col
 DEFAULT_DATABASE_URL = "postgresql+asyncpg://admin:admin@localhost:5432/syntara_api"
 DEFAULT_LOCAL_NAMESPACE = "execution-plane"
 CLI_ACTOR_ID = uuid.UUID(int=0)
+
+
+def resolve_database_url() -> str:
+    """Return APP_DATABASE_URL, DATABASE_URL, or a URL built from APP_DB_* parts.
+
+    AO operator pods typically set APP_DB_USER/PASSWORD/HOST/NAME and leave
+    APP_DATABASE_URL unset. Falling back to DEFAULT_DATABASE_URL would try
+    localhost inside the pod and fail to connect.
+    """
+    if url := os.environ.get("APP_DATABASE_URL") or os.environ.get("DATABASE_URL"):
+        return url
+    user = os.environ.get("APP_DB_USER", "admin")
+    password = os.environ.get("APP_DB_PASSWORD", "admin")
+    host = os.environ.get("APP_DB_HOST", "localhost")
+    port = os.environ.get("APP_DB_PORT", "5432")
+    name = os.environ.get("APP_DB_NAME", "syntara_api")
+    return (
+        f"postgresql+asyncpg://{quote(user, safe='')}:{quote(password, safe='')}@{host}:{port}/{quote(name, safe='')}"
+    )
 
 
 class EnvironmentSelectionError(RuntimeError):
@@ -355,7 +375,7 @@ def _register_environment(
         if not shutil.which("kubectl"):
             raise EnvironmentSelectionError("kubectl is not available; install kubectl")
         details = _collect_local_details(runner, provider, cluster, namespace, context)
-    database_url = os.environ.get("APP_DATABASE_URL") or os.environ.get("DATABASE_URL") or DEFAULT_DATABASE_URL
+    database_url = resolve_database_url()
     try:
         asyncio.run(_register_environment_and_integration(details, database_url))
     except EnvironmentSelectionError:
@@ -366,7 +386,7 @@ def _register_environment(
 
 def _remove_environment(*, provider: EnvironmentProvider, cluster: str) -> None:
     """Remove a local CLI registration from the development database."""
-    database_url = os.environ.get("APP_DATABASE_URL") or os.environ.get("DATABASE_URL") or DEFAULT_DATABASE_URL
+    database_url = resolve_database_url()
     try:
         asyncio.run(_remove_environment_record(provider, cluster, database_url))
     except Exception as exc:

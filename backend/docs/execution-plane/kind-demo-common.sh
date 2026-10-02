@@ -41,12 +41,17 @@ kind_demo_login() {
 
 kind_demo_poll_execution() {
   local token="$1" exec_id="$2" status="" i
-  for i in $(seq 1 30); do
+  local attempts="${KIND_DEMO_POLL_ATTEMPTS:-30}"
+  for i in $(seq 1 "${attempts}"); do
     status="$(curl -sk "${API}/executions/${exec_id}" \
       -H "Authorization: Bearer ${token}" | jq -r .status)"
     echo "${status}"
-    if [[ "${status}" == "completed" || "${status}" == "failed" ]]; then
+    if [[ "${status}" == "completed" ]]; then
       return 0
+    fi
+    if [[ "${status}" == "failed" ]]; then
+      echo "Error: execution ${exec_id} failed" >&2
+      return 1
     fi
     sleep 3
   done

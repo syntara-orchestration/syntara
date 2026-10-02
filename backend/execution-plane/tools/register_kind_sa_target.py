@@ -8,16 +8,15 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import os
 import sys
 from collections.abc import Sequence
 from pathlib import Path
 
 from dev_cli import (
-    DEFAULT_DATABASE_URL,
     EnvironmentDetails,
     EnvironmentProvider,
     _register_environment_record,
+    resolve_database_url,
 )
 
 DEFAULT_CLUSTER = "execution-plane"
@@ -53,7 +52,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         api_key=token,
         labels={"provider": EnvironmentProvider.KIND.value, "cluster": args.cluster},
     )
-    database_url = os.environ.get("APP_DATABASE_URL") or os.environ.get("DATABASE_URL") or DEFAULT_DATABASE_URL
+    database_url = resolve_database_url()
     asyncio.run(_register_environment_record(details, database_url))
     print("registered cluster + default target")
     return 0
