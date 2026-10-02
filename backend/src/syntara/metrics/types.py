@@ -174,6 +174,7 @@ METRIC_CATEGORIES: dict[MetricsCategoryType, list[MetricType]] = {
         MetricType.WORKFLOW_VALIDATION_DURATION,
         MetricType.WORKFLOW_DURATION,
         MetricType.WORKFLOW_STATUS,
+        MetricType.FORM_PROMPT_SUBMISSION_TO_EXECUTION_START,
     ],
     MetricsCategoryType.TEMPORAL_WORKER: [
         MetricType.TEMPORAL_QUEUE_DEPTH,

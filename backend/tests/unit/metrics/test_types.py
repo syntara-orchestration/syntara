@@ -157,6 +157,10 @@ class TestMetricType:
         assert MetricType.DATABASE_QUERY_RESPONSE_TIME in METRIC_CATEGORIES[MetricsCategoryType.DATABASE]
         assert MetricType.SYSTEM_UPTIME in METRIC_CATEGORIES[MetricsCategoryType.SYSTEM_WIDE]
         assert MetricType.WORKFLOW_DURATION in METRIC_CATEGORIES[MetricsCategoryType.WORKFLOW_ENGINE]
+        assert (
+            MetricType.FORM_PROMPT_SUBMISSION_TO_EXECUTION_START
+            in METRIC_CATEGORIES[MetricsCategoryType.WORKFLOW_ENGINE]
+        )
         assert MetricType.ACTIVITY_DURATION in METRIC_CATEGORIES[MetricsCategoryType.TEMPORAL_WORKER]
         assert MetricType.REQUEST_DURATION in METRIC_CATEGORIES[MetricsCategoryType.SYSTEM_OVERHEAD]
         assert MetricType.CONTEXT_DURATION in METRIC_CATEGORIES[MetricsCategoryType.SYSTEM_OVERHEAD]
