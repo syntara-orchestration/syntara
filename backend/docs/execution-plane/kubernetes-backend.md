@@ -27,6 +27,7 @@ This document will cover the `vanilla_k8s` backend type: how the EP worker sched
 - Pod eviction during execution
 - Node failure / unreachable kubelet
 - Timeout handling and work item retry policy
+- Target health (API reachability, namespace existence): [resource-monitor.md](resource-monitor.md)
 
 ### Configuration
 
