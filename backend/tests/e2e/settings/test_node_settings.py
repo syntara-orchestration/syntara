@@ -15,7 +15,6 @@ from uuid import UUID
 
 import pytest
 from orchestrator_test_sdk.e2e.helpers import HTTPBIN_URL as _HTTPBIN_URL
-from orchestrator_test_sdk.e2e.helpers import requires_httpbin
 from syntara_api_client.api import SyntaraApiRegistry
 from syntara_api_client.models import (
     ExecutionCreate,
@@ -390,7 +389,6 @@ def test_per_node_cof_overrides_global(syntara_api: SyntaraApiRegistry, first_pr
 # ---------------------------------------------------------------------------
 
 
-@requires_httpbin
 @pytest.mark.e2e
 def test_retry_policy_retries_on_transient_error(syntara_api: SyntaraApiRegistry, first_project_id: UUID) -> None:
     """HTTP request with retry_policy retries on 503 (transient). Slower than no-retry."""
@@ -432,7 +430,6 @@ def test_retry_policy_retries_on_transient_error(syntara_api: SyntaraApiRegistry
     assert elapsed > 5, f"Should have taken >5s due to 2 retries with 2s interval, took {elapsed:.1f}s"
 
 
-@requires_httpbin
 @pytest.mark.e2e
 def test_retry_policy_max_retries_zero_no_retry(syntara_api: SyntaraApiRegistry, first_project_id: UUID) -> None:
     """max_retries=0 disables retry — fails faster than max_retries=2 on same 503."""
@@ -629,7 +626,6 @@ def test_control_node_with_empty_settings_completes(syntara_api: SyntaraApiRegis
 # ---------------------------------------------------------------------------
 
 
-@requires_httpbin
 @pytest.mark.e2e
 def test_http_request_per_node_timeout(syntara_api: SyntaraApiRegistry, first_project_id: UUID) -> None:
     """HTTP request node per-node timeout (2s) overrides global http_request_timeout_seconds."""
@@ -714,7 +710,6 @@ def test_retry_no_retry_on_permanent_error(
 # ---------------------------------------------------------------------------
 
 
-@requires_httpbin
 @pytest.mark.e2e
 def test_global_retry_defaults_apply_to_http_request(syntara_api: SyntaraApiRegistry, first_project_id: UUID) -> None:
     """HTTP request with no per-node retry_policy uses global retry defaults."""
