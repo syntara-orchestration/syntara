@@ -1,6 +1,6 @@
 import { Button } from '@patternfly/react-core'
 import { Link as TanStackLink } from '@tanstack/react-router'
-import type { ComponentProps, ReactNode } from 'react'
+import type { ComponentProps, ReactNode, Ref } from 'react'
 
 type ButtonOnClick = ComponentProps<typeof Button>['onClick']
 
@@ -21,15 +21,16 @@ type SynLinkProps = {
   children: ReactNode
   className?: string
   onClick?: ButtonOnClick
+  ref?: Ref<HTMLAnchorElement>
 }
 
 /**
  * Application-level link that renders a PatternFly inline link button
  * wired to TanStack Router for client-side navigation.
  */
-export function SynLink({ to, children, className, onClick }: Readonly<SynLinkProps>) {
+export function SynLink({ to, children, className, onClick, ref }: Readonly<SynLinkProps>) {
   return (
-    <Button variant="link" isInline component={RouterLink} href={to} className={className} onClick={onClick}>
+    <Button ref={ref} variant="link" isInline component={RouterLink} href={to} className={className} onClick={onClick}>
       {children}
     </Button>
   )
