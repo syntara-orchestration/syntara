@@ -2,16 +2,16 @@
 
 Usage::
 
-    orchestrator-admin enable-user --username alice --yes
+    automation-orchestrator-admin enable-user --username alice --yes
 
-    orchestrator-admin reset-password --username alice
-    orchestrator-admin reset-password --username alice --yes
+    automation-orchestrator-admin reset-password --username alice
+    automation-orchestrator-admin reset-password --username alice --yes
 
     # Non-interactive: provide password via flag (visible in process list)
-    orchestrator-admin reset-password --username alice --password 'MySecureP@ss1'
+    automation-orchestrator-admin reset-password --username alice --password 'MySecureP@ss1'
 
     # Non-interactive: provide password via stdin (recommended)
-    cat /run/secrets/admin-password | orchestrator-admin reset-password --username alice --password-stdin
+    cat /run/secrets/admin-password | automation-orchestrator-admin reset-password --username alice --password-stdin
 """
 
 from __future__ import annotations
@@ -37,7 +37,7 @@ if TYPE_CHECKING:
 _product_name = _get_settings().product_name
 
 app = typer.Typer(
-    name="orchestrator-admin",
+    name="automation-orchestrator-admin",
     help=f"{_product_name} production administrative operations.",
     no_args_is_help=True,
     add_completion=False,
@@ -54,7 +54,7 @@ def _get_actor() -> str:
     try:
         return os.getlogin()
     except OSError:
-        return "orchestrator-admin"
+        return "automation-orchestrator-admin"
 
 
 def _validate_password(password: str) -> tuple[bool, str | None]:
@@ -206,7 +206,7 @@ async def _enable_user_async(username: str, actor: str) -> None:
     typer.echo(f"User '{user.username}' has been re-enabled.\nActor: {actor}")
     if user.auth_type == AuthType.LOCAL:
         typer.echo(
-            f"\nConsider running 'orchestrator-admin reset-password --username {user.username}' "
+            f"\nConsider running 'automation-orchestrator-admin reset-password --username {user.username}' "
             f"if a password reset is also needed."
         )
 

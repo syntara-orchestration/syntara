@@ -14,19 +14,45 @@ vi.mock('../../../../stores/useWorkflowStore', () => ({
     })),
   },
   createAAPJobTemplateActivity: vi.fn(
-    (id: string, name: string, templateId: number, parameters: Record<string, unknown>) => ({
+    ({
+      id,
+      name,
+      jobTemplateId,
+      config,
+    }: {
+      id: string
+      name: string
+      jobTemplateId?: number
+      config?: Record<string, unknown>
+    }) => ({
       id,
       name,
       type: 'aap_job_template' as const,
-      parameters: { job_template_id: templateId, ...parameters },
+      parameters: {
+        ...(jobTemplateId !== undefined && { job_template_id: jobTemplateId }),
+        ...config,
+      },
     })
   ),
   createAAPWorkflowTemplateActivity: vi.fn(
-    (id: string, name: string, workflowTemplateId: number, parameters: Record<string, unknown>) => ({
+    ({
+      id,
+      name,
+      workflowTemplateId,
+      config,
+    }: {
+      id: string
+      name: string
+      workflowTemplateId?: number
+      config?: Record<string, unknown>
+    }) => ({
       id,
       name,
       type: 'aap_workflow_job_template' as const,
-      parameters: { workflow_job_template_id: workflowTemplateId, ...parameters },
+      parameters: {
+        ...(workflowTemplateId !== undefined && { workflow_job_template_id: workflowTemplateId }),
+        ...config,
+      },
     })
   ),
 }))
@@ -134,6 +160,38 @@ describe('registerAAPNode', () => {
     expect(onSuccess).toHaveBeenCalledWith(expect.any(String))
     expect(onError).not.toHaveBeenCalled()
     expect(mockAddActivity).toHaveBeenCalled()
+  })
+
+  it('creates expression-mode workflow activity when use_input_variables is true without a template', () => {
+    const mockAddActivity = vi.fn()
+    vi.mocked(useWorkflowStore.getState).mockReturnValue({
+      addActivity: mockAddActivity,
+    } as never)
+
+    registerAAPNode()
+    const registration = NodeRegistry.get(RegistryNodeId.AAP_EXECUTION)
+    const onSuccess = vi.fn()
+    const onError = vi.fn()
+
+    registration?.onSubmit(
+      {
+        name: 'Test AAP Workflow',
+        use_input_variables: true,
+        organization_name: '',
+        workflow_job_template_name: '',
+        workflow_job_template_id: undefined,
+      },
+      onSuccess,
+      onError,
+      RegistryNodeId.AAP_WORKFLOW_TEMPLATE
+    )
+
+    expect(onError).not.toHaveBeenCalled()
+    expect(onSuccess).toHaveBeenCalledWith(expect.any(String))
+    expect(mockAddActivity).toHaveBeenCalled()
+    const activity = mockAddActivity.mock.calls[0]?.[0] as { parameters?: Record<string, unknown> }
+    expect(activity.parameters).not.toHaveProperty('workflow_job_template_id')
+    expect(activity.parameters?.use_input_variables).toBe(true)
   })
 
   it('creates expression-mode activity when use_input_variables is true without a job template', () => {

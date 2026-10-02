@@ -127,7 +127,13 @@ function ApprovalsPage({ approvalsDocLink }: { approvalsDocLink: string | null |
       return next
     })
 
-  useCursorReset(enrichedApprovals.length, hasActiveFilters, cursor, approvalsQuery.isFetching, resetPagination)
+  useCursorReset({
+    itemCount: enrichedApprovals.length,
+    hasActiveFilters,
+    cursor,
+    isFetching: approvalsQuery.isFetching,
+    resetPagination,
+  })
 
   // Get per-project approval:decide permissions
   const {

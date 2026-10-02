@@ -21,7 +21,7 @@ logic in isolation.
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pytest
 from fastapi import FastAPI
@@ -357,6 +357,43 @@ class TestDocsEnabledWiring:
 
 class TestProductionAppWiring:
     """Verify the real app has correct doc endpoint wiring for coverage."""
+
+    def test_product_name_translation_rewrites_string_values(self) -> None:
+        """Product-name translation changes values but not schema keys or identifiers."""
+        import syntara.api.main as main_module
+
+        schema: dict[str, Any] = {
+            "info": {"title": "Syntara API", "description": "Syntara documentation"},
+            "components": {"schemas": {"SyntaraModel": {"description": "Syntara model"}}},
+            "x-package": "syntara_api_client",
+        }
+
+        translated = main_module._translate_product_name(schema, "Automation Orchestrator")
+
+        assert translated["info"]["title"] == "Automation Orchestrator API"
+        assert translated["info"]["description"] == "Automation Orchestrator documentation"
+        assert translated["components"]["schemas"]["SyntaraModel"]["description"] == "Automation Orchestrator model"
+        assert translated["x-package"] == "syntara_api_client"
+        assert schema["info"]["title"] == "Syntara API"
+
+    def test_app_title_uses_configured_product_name(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """The runtime app and OpenAPI document use APP_PRODUCT_NAME."""
+        import importlib
+
+        import syntara.api.main as main_module
+
+        monkeypatch.setenv("APP_PRODUCT_NAME", "Automation Orchestrator")
+        monkeypatch.setenv("APP_ENABLE_API_DOCS", "false")
+        get_settings.cache_clear()
+        importlib.reload(main_module)
+        try:
+            assert main_module.app.title == "Automation Orchestrator API"
+            assert main_module.app.openapi()["info"]["title"] == "Automation Orchestrator API"
+        finally:
+            monkeypatch.delenv("APP_PRODUCT_NAME", raising=False)
+            monkeypatch.setenv("APP_ENABLE_API_DOCS", "false")
+            get_settings.cache_clear()
+            importlib.reload(main_module)
 
     def test_builtin_docs_url_disabled(self) -> None:
         from syntara.api.main import app as real_app

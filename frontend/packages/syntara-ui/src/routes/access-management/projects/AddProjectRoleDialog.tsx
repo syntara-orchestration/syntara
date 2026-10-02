@@ -2,16 +2,13 @@ import { Button, Form, Modal, ModalBody, ModalFooter, ModalHeader } from '@patte
 import { RhUiAddIcon } from '@patternfly/react-icons'
 
 import { SynForm } from '../../../components/forms/SynForm'
-import { SynFormField } from '../../../components/forms/SynFormField'
-import { SynTextField } from '../../../components/forms/SynTextField'
 import { useSynForm } from '../../../hooks/useSynForm'
 import { useAlerts } from '../../../providers/alerts'
 import { accessClient } from '../../access/accessClient'
-import { accessControlHelp } from '../../access/accessControlFieldHelp'
+import { ProjectRoleSynFormFields } from '../../access/RoleFormFields'
 
-import { addProjectRoleSchema, PROJECT_ROLE_NAME_HINT } from './addProjectRoleSchema'
+import { addProjectRoleSchema } from './addProjectRoleSchema'
 import type { AddProjectRoleFormData } from './addProjectRoleSchema'
-import { ProjectPolicySelect } from './ProjectPolicySelect'
 
 type AddProjectRoleDialogProps = {
   projectId: string
@@ -62,30 +59,14 @@ export function AddProjectRoleDialog({ projectId, onClose, onSuccess }: Readonly
       <ModalBody>
         <Form id="add-project-role-form" onSubmit={handleSubmit(onSubmit)}>
           <SynForm form={form}>
-            <SynTextField
-              name="name"
-              label="Role name"
-              fieldId="project-role-name"
-              isRequired
-              hint={PROJECT_ROLE_NAME_HINT}
+            <ProjectRoleSynFormFields
+              projectId={projectId}
+              fieldIds={{
+                name: 'project-role-name',
+                description: 'project-role-description',
+                policies: 'project-role-policies',
+              }}
             />
-            <SynTextField name="description" label="Role description" fieldId="project-role-description" />
-            <SynFormField<AddProjectRoleFormData, 'policies'>
-              name="policies"
-              label="Policies"
-              fieldId="project-role-policies"
-              isRequired
-              labelHelp={accessControlHelp.policies}
-            >
-              {({ field, fieldState }) => (
-                <ProjectPolicySelect
-                  projectId={projectId}
-                  selected={field.value}
-                  onChange={field.onChange}
-                  hasError={!!fieldState.error}
-                />
-              )}
-            </SynFormField>
           </SynForm>
         </Form>
       </ModalBody>

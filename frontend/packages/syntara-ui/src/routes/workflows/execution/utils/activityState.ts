@@ -119,13 +119,19 @@ function resolveActivityId(
  * @param activityArray - Optional array for index-based lookups
  * @throws Error if operation is invalid or path doesn't exist
  */
-function applyAddOperation(
-  activities: Map<string, ActivityState>,
-  resolvedId: string,
-  field: string,
-  value: unknown,
+function applyAddOperation({
+  activities,
+  resolvedId,
+  field,
+  value,
+  existing,
+}: {
+  activities: Map<string, ActivityState>
+  resolvedId: string
+  field: string
+  value: unknown
   existing: ActivityState | undefined
-): void {
+}): void {
   if (value === undefined) {
     throw new Error(`Operation 'add' requires a value`)
   }
@@ -141,13 +147,19 @@ function applyAddOperation(
   activities.set(resolvedId, applyFieldUpdate(existing, field, value))
 }
 
-function applyReplaceOperation(
-  activities: Map<string, ActivityState>,
-  resolvedId: string,
-  field: string,
-  value: unknown,
+function applyReplaceOperation({
+  activities,
+  resolvedId,
+  field,
+  value,
+  existing,
+}: {
+  activities: Map<string, ActivityState>
+  resolvedId: string
+  field: string
+  value: unknown
   existing: ActivityState | undefined
-): void {
+}): void {
   if (value === undefined) {
     throw new Error(`Operation 'replace' requires a value`)
   }
@@ -224,10 +236,10 @@ export function applyOperation(
 
   switch (op) {
     case 'add':
-      applyAddOperation(activities, resolvedId, field, value, existing)
+      applyAddOperation({ activities, resolvedId, field, value, existing })
       break
     case 'replace':
-      applyReplaceOperation(activities, resolvedId, field, value, existing)
+      applyReplaceOperation({ activities, resolvedId, field, value, existing })
       break
     case 'remove':
       applyRemoveOperation(activities, resolvedId, field, existing)

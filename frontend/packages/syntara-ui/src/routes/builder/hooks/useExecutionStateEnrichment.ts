@@ -108,13 +108,13 @@ export function useExecutionStateEnrichment({
         }
         const activity = activitiesById.get(node.id)
         if (!activity) return node
-        const enriched = executionStateEnricher.enrichActivity(
+        const enriched = executionStateEnricher.enrichActivity({
           activity,
-          effectiveExecutionStatus,
+          executionStatus: effectiveExecutionStatus,
           activityStates,
-          edgeSnapshot,
-          { preResolvedNodes, skipInferenceActivityIds: copiedRunActivityIds ?? undefined }
-        )
+          edges: edgeSnapshot,
+          options: { preResolvedNodes, skipInferenceActivityIds: copiedRunActivityIds ?? undefined },
+        })
         return applyEnrichedDataStable(node, enriched, anyChangedRef)
       })
 

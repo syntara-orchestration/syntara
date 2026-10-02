@@ -278,7 +278,11 @@ describe('useWorkflowVerification', () => {
     act(() => result.current.handleVerify())
 
     await waitFor(() => {
-      expect(mockBuildDefinition).toHaveBeenCalledWith('workflow', '', [], [], {
+      expect(mockBuildDefinition).toHaveBeenCalledWith({
+        workflowName: 'workflow',
+        workflowDescription: '',
+        activities: [],
+        triggers: [],
         edges: [],
         nodePositions: {},
       })
@@ -304,16 +308,14 @@ describe('useWorkflowVerification', () => {
     act(() => result.current.handleVerify())
 
     await waitFor(() => {
-      expect(mockBuildDefinition).toHaveBeenCalledWith(
-        'Test',
-        'desc',
-        workflowState.currentWorkflow.workflow.activities,
-        workflowState.currentWorkflow.triggers,
-        {
-          edges: workflowState.edges,
-          nodePositions: positions,
-        }
-      )
+      expect(mockBuildDefinition).toHaveBeenCalledWith({
+        workflowName: 'Test',
+        workflowDescription: 'desc',
+        activities: workflowState.currentWorkflow.workflow.activities,
+        triggers: workflowState.currentWorkflow.triggers,
+        edges: workflowState.edges,
+        nodePositions: positions,
+      })
     })
   })
 

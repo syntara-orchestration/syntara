@@ -1,8 +1,10 @@
-import { FormGroup, FormHelperText, HelperText, HelperTextItem, StackItem } from '@patternfly/react-core'
+import { StackItem } from '@patternfly/react-core'
 import type { ReactElement } from 'react'
-import { Controller, useFormContext } from 'react-hook-form'
+import type { FieldPath, FieldValues, PathValue } from 'react-hook-form'
+import { useFormContext } from 'react-hook-form'
 
-import type { AAPJobTemplateFormData } from './aapJobTemplateSchema'
+import { SynFormField } from '../../../components/forms/SynFormField'
+
 import { AAPTypeaheadSelect } from './AAPTypeaheadSelect'
 
 type AAPResourceItem = {
@@ -10,11 +12,11 @@ type AAPResourceItem = {
   readonly name: string
 }
 
-type AAPResourceSelectFieldProps = {
+type AAPResourceSelectFieldProps<TFieldValues extends FieldValues> = {
   readonly label: string
   readonly fieldId: string
-  readonly nameField: keyof AAPJobTemplateFormData
-  readonly idField: keyof AAPJobTemplateFormData
+  readonly nameField: FieldPath<TFieldValues>
+  readonly idField: FieldPath<TFieldValues>
   readonly items: readonly AAPResourceItem[]
   readonly isLoading: boolean
   readonly helperText: string
@@ -23,7 +25,7 @@ type AAPResourceSelectFieldProps = {
   readonly labelHelp?: ReactElement
 }
 
-export function AAPResourceSelectField({
+export function AAPResourceSelectField<TFieldValues extends FieldValues>({
   label,
   fieldId,
   nameField,
@@ -34,53 +36,46 @@ export function AAPResourceSelectField({
   placeholderText,
   onSearchChange,
   labelHelp,
-}: AAPResourceSelectFieldProps) {
-  const { control, setValue } = useFormContext<AAPJobTemplateFormData>()
+}: AAPResourceSelectFieldProps<TFieldValues>) {
+  const { setValue } = useFormContext<TFieldValues>()
   const options = items.map((item) => ({ value: String(item.id), label: item.name }))
 
   return (
     <StackItem>
-      <FormGroup label={label} labelHelp={labelHelp} fieldId={fieldId}>
-        <Controller
-          control={control}
-          name={nameField}
-          render={({ field }) => {
-            // Find the item by ID from the current field value (which stores the name)
-            // When the user selects, we'll update both name and ID
-            const selectedItem = items.find((item) => item.name === field.value)
-            const selectedId = selectedItem ? String(selectedItem.id) : ''
+      <SynFormField<TFieldValues, FieldPath<TFieldValues>>
+        name={nameField}
+        label={label}
+        labelHelp={labelHelp}
+        fieldId={fieldId}
+        hint={helperText}
+      >
+        {({ field }) => {
+          const selectedItem = items.find((item) => item.name === field.value)
+          const selectedId = selectedItem ? String(selectedItem.id) : ''
 
-            return (
-              <AAPTypeaheadSelect
-                id={fieldId}
-                ariaLabel={label}
-                options={options}
-                selected={selectedId}
-                onChange={(value) => {
-                  // value is now the item.id (as string)
-                  const selectedItem = items.find((item) => String(item.id) === value)
-                  if (selectedItem) {
-                    field.onChange(selectedItem.name)
-                    setValue(idField, selectedItem.id)
-                  } else {
-                    // Clear both on empty selection
-                    field.onChange('')
-                    setValue(idField, undefined)
-                  }
-                }}
-                onSearchChange={onSearchChange}
-                placeholder={placeholderText}
-                isLoading={isLoading}
-              />
-            )
-          }}
-        />
-        <FormHelperText>
-          <HelperText>
-            <HelperTextItem>{helperText}</HelperTextItem>
-          </HelperText>
-        </FormHelperText>
-      </FormGroup>
+          return (
+            <AAPTypeaheadSelect
+              id={fieldId}
+              ariaLabel={label}
+              options={options}
+              selected={selectedId}
+              onChange={(value) => {
+                const matchedItem = items.find((item) => String(item.id) === value)
+                if (matchedItem) {
+                  field.onChange(matchedItem.name)
+                  setValue(idField, matchedItem.id as PathValue<TFieldValues, typeof idField>)
+                } else {
+                  field.onChange('')
+                  setValue(idField, undefined as PathValue<TFieldValues, typeof idField>)
+                }
+              }}
+              onSearchChange={onSearchChange}
+              placeholder={placeholderText}
+              isLoading={isLoading}
+            />
+          )
+        }}
+      </SynFormField>
     </StackItem>
   )
 }

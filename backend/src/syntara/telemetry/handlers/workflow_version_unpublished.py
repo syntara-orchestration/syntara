@@ -35,10 +35,10 @@ class WorkflowVersionUnpublishedTelemetryHandler(AuditEventHandler[WorkflowVersi
 
             registry.send_event(
                 WorkflowVersionUnpublishedTelemetryEvent(
-                    workflow_id=str(event.workflow_id),
+                    workflow_id=event.workflow_id,
                     version=event.version,
                     workflow_name=event.workflow_name,
-                    project_id=str(event.project_id) if event.project_id else None,
+                    project_id=event.project_id,
                     error_type=event.error_type,
                     entitlement_id=registry.entitlement_id,
                 )

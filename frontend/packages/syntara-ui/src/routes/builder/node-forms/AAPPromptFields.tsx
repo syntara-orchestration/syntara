@@ -3,10 +3,6 @@
  * Extracted from AAPPromptOnLaunchFields.tsx to keep file size under 500 lines.
  */
 import {
-  FormGroup,
-  FormHelperText,
-  HelperText,
-  HelperTextItem,
   MenuToggle,
   type MenuToggleElement,
   SelectList,
@@ -15,10 +11,12 @@ import {
   Switch,
   TextInput,
 } from '@patternfly/react-core'
-import { RhUiErrorIcon } from '@patternfly/react-icons'
 import React, { type ReactElement, useState } from 'react'
-import { Controller, useFormContext } from 'react-hook-form'
+import { useFormContext } from 'react-hook-form'
 
+import { FormFieldError } from '../../../components/FormFieldError'
+import { SynFormField } from '../../../components/forms/SynFormField'
+import { SynTextField } from '../../../components/forms/SynTextField'
 import { TagInput } from '../../../components/forms/TagInput'
 import { SynSelect } from '../../../components/SynSelect'
 import { ExpandableCodeEditor, type ExpandableCodeEditorHandle } from '../components/ExpandableCodeEditor'
@@ -119,17 +117,17 @@ function VerbositySelect({ value, onChange }: { value: string; onChange: (value:
 // ── Run Type Field ──────────────────────────────────────────────────────
 
 export function RunTypeField() {
-  const { control } = useFormContext<AAPJobTemplateFormData>()
-
   return (
     <StackItem>
-      <FormGroup label="Run type" labelHelp={nodeHelp.aapJobType} fieldId="aap-jobType">
-        <Controller
-          control={control}
-          name="job_type"
-          render={({ field }) => <RunTypeSelect value={field.value ?? ''} onChange={field.onChange} />}
-        />
-      </FormGroup>
+      <SynFormField<AAPJobTemplateFormData, 'job_type'>
+        name="job_type"
+        label="Run type"
+        labelHelp={nodeHelp.aapJobType}
+        fieldId="aap-jobType"
+        hideFooter
+      >
+        {({ field }) => <RunTypeSelect value={field.value ?? ''} onChange={field.onChange} />}
+      </SynFormField>
     </StackItem>
   )
 }
@@ -137,17 +135,17 @@ export function RunTypeField() {
 // ── Verbosity Field ─────────────────────────────────────────────────────
 
 export function VerbosityField() {
-  const { control } = useFormContext<AAPJobTemplateFormData>()
-
   return (
     <StackItem>
-      <FormGroup label="Verbosity" labelHelp={nodeHelp.aapVerbosity} fieldId="aap-verbosity">
-        <Controller
-          control={control}
-          name="verbosity"
-          render={({ field }) => <VerbositySelect value={field.value ?? ''} onChange={field.onChange} />}
-        />
-      </FormGroup>
+      <SynFormField<AAPJobTemplateFormData, 'verbosity'>
+        name="verbosity"
+        label="Verbosity"
+        labelHelp={nodeHelp.aapVerbosity}
+        fieldId="aap-verbosity"
+        hideFooter
+      >
+        {({ field }) => <VerbositySelect value={field.value ?? ''} onChange={field.onChange} />}
+      </SynFormField>
     </StackItem>
   )
 }
@@ -155,24 +153,24 @@ export function VerbosityField() {
 // ── Diff Mode Field ─────────────────────────────────────────────────────
 
 export function DiffModeField() {
-  const { control } = useFormContext<AAPJobTemplateFormData>()
-
   return (
     <StackItem>
-      <FormGroup label="Show changes" labelHelp={nodeHelp.aapDiffMode} fieldId="aap-diffMode">
-        <Controller
-          control={control}
-          name="diff_mode"
-          render={({ field }) => (
-            <Switch
-              id="aap-diffMode"
-              aria-label="Show changes"
-              isChecked={field.value ?? false}
-              onChange={(_event, checked) => field.onChange(checked)}
-            />
-          )}
-        />
-      </FormGroup>
+      <SynFormField<AAPJobTemplateFormData, 'diff_mode'>
+        name="diff_mode"
+        label="Show changes"
+        labelHelp={nodeHelp.aapDiffMode}
+        fieldId="aap-diffMode"
+        hideFooter
+      >
+        {({ field }) => (
+          <Switch
+            id="aap-diffMode"
+            aria-label="Show changes"
+            isChecked={field.value ?? false}
+            onChange={(_event, checked) => field.onChange(checked)}
+          />
+        )}
+      </SynFormField>
     </StackItem>
   )
 }
@@ -184,43 +182,34 @@ export type ExtraVariablesFieldProps = {
 }
 
 export function ExtraVariablesField({ editorRef }: ExtraVariablesFieldProps) {
-  const {
-    control,
-    formState: { errors },
-  } = useFormContext<AAPJobTemplateFormData>()
-  const extraVarsMessage = errors.extra_vars?.message
+  const { formState } = useFormContext<AAPJobTemplateFormData>()
+  const extraVarsMessage = formState.errors.extra_vars?.message
 
   return (
     <StackItem>
-      <FormGroup label="Extra variables" labelHelp={nodeHelp.aapExtraVars} fieldId="aap-extra_vars">
-        <Controller
-          control={control}
-          name="extra_vars"
-          render={({ field }) => (
-            <div className={extraVarsMessage ? 'pf-v6-c-form-control pf-m-error' : undefined}>
-              <ExpandableCodeEditor
-                ref={editorRef}
-                code={field.value ?? ''}
-                onCodeChange={field.onChange}
-                onBlur={field.onBlur}
-                language="json"
-                height="150px"
-                modalTitle="Edit extra variables"
-                ariaLabel="Extra Variables"
-              />
-            </div>
-          )}
-        />
-        {extraVarsMessage && (
-          <FormHelperText>
-            <HelperText>
-              <HelperTextItem icon={<RhUiErrorIcon />} variant="error">
-                {extraVarsMessage}
-              </HelperTextItem>
-            </HelperText>
-          </FormHelperText>
+      <SynFormField<AAPJobTemplateFormData, 'extra_vars'>
+        name="extra_vars"
+        label="Extra variables"
+        labelHelp={nodeHelp.aapExtraVars}
+        fieldId="aap-extra_vars"
+        hideFooter
+      >
+        {({ field }) => (
+          <div className={extraVarsMessage ? 'pf-v6-c-form-control pf-m-error' : undefined}>
+            <ExpandableCodeEditor
+              ref={editorRef}
+              code={field.value ?? ''}
+              onCodeChange={field.onChange}
+              onBlur={field.onBlur}
+              language="json"
+              height="150px"
+              modalTitle="Edit extra variables"
+              ariaLabel="Extra Variables"
+            />
+          </div>
         )}
-      </FormGroup>
+      </SynFormField>
+      {extraVarsMessage && <FormFieldError message={extraVarsMessage} />}
     </StackItem>
   )
 }
@@ -235,42 +224,54 @@ export type TextInputFieldProps = {
 }
 
 export function TextInputField({ label, fieldId, name, labelHelp }: TextInputFieldProps) {
-  const { register } = useFormContext<AAPJobTemplateFormData>()
-
   return (
     <StackItem>
-      <FormGroup label={label} labelHelp={labelHelp} fieldId={fieldId}>
-        <TextInput {...register(name)} id={fieldId} type="text" />
-      </FormGroup>
+      <SynTextField<AAPJobTemplateFormData, typeof name>
+        name={name}
+        label={label}
+        fieldId={fieldId}
+        labelHelp={labelHelp}
+      />
     </StackItem>
   )
 }
 
 // ── Number Input Field ──────────────────────────────────────────────────
 
+type AAPNumberFieldName = 'forks' | 'job_slice_count'
+
 export type NumberInputFieldProps = {
   readonly label: string
   readonly fieldId: string
-  readonly name: keyof AAPJobTemplateFormData
+  readonly name: AAPNumberFieldName
   readonly placeholder: string
   readonly min: number
   readonly labelHelp?: ReactElement
 }
 
 export function NumberInputField({ label, fieldId, name, placeholder, min, labelHelp }: NumberInputFieldProps) {
-  const { register } = useFormContext<AAPJobTemplateFormData>()
-
   return (
     <StackItem>
-      <FormGroup label={label} labelHelp={labelHelp} fieldId={fieldId}>
-        <TextInput
-          {...register(name, { valueAsNumber: true })}
-          id={fieldId}
-          type="number"
-          placeholder={placeholder}
-          min={min}
-        />
-      </FormGroup>
+      <SynFormField<AAPJobTemplateFormData, AAPNumberFieldName>
+        name={name}
+        label={label}
+        fieldId={fieldId}
+        labelHelp={labelHelp}
+      >
+        {({ field, fieldState }) => (
+          <TextInput
+            id={fieldId}
+            type="number"
+            placeholder={placeholder}
+            min={min}
+            validated={fieldState.error ? 'error' : 'default'}
+            value={typeof field.value === 'number' ? String(field.value) : ''}
+            onChange={(_event, value) => field.onChange(value === '' ? undefined : Number(value))}
+            onBlur={field.onBlur}
+            name={field.name}
+          />
+        )}
+      </SynFormField>
     </StackItem>
   )
 }
@@ -287,35 +288,35 @@ export type TagInputFieldProps = {
 }
 
 export function TagInputField({ label, fieldId, name, placeholder, helperText, labelHelp }: TagInputFieldProps) {
-  const { control } = useFormContext<AAPJobTemplateFormData>()
-
   return (
     <StackItem>
-      <FormGroup label={label} labelHelp={labelHelp} fieldId={fieldId}>
-        <Controller
-          control={control}
-          name={name}
-          render={({ field }) => {
-            const items =
-              typeof field.value === 'string' && field.value
-                ? field.value
-                    .split(',')
-                    .map((s) => s.trim())
-                    .filter(Boolean)
-                : []
-            return (
-              <TagInput
-                id={fieldId}
-                value={items}
-                onChange={(arr) => field.onChange(arr.join(', '))}
-                ariaLabel={label}
-                placeholder={placeholder}
-                helperText={helperText}
-              />
-            )
-          }}
-        />
-      </FormGroup>
+      <SynFormField<AAPJobTemplateFormData, typeof name>
+        name={name}
+        label={label}
+        labelHelp={labelHelp}
+        fieldId={fieldId}
+        hideFooter
+      >
+        {({ field }) => {
+          const items =
+            typeof field.value === 'string' && field.value
+              ? field.value
+                  .split(',')
+                  .map((s) => s.trim())
+                  .filter(Boolean)
+              : []
+          return (
+            <TagInput
+              id={fieldId}
+              value={items}
+              onChange={(arr) => field.onChange(arr.join(', '))}
+              ariaLabel={label}
+              placeholder={placeholder}
+              helperText={helperText}
+            />
+          )
+        }}
+      </SynFormField>
     </StackItem>
   )
 }

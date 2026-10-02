@@ -36,6 +36,7 @@ class WorkflowVersionCreatedEvent:
     version: int
     workflow_name: str
     change_summary: dict[str, Any] | None = field(default=None)
+    user_id: UUID | None = field(default=None)
 
 
 @dataclass
@@ -55,6 +56,8 @@ class WorkflowVersionPublishedEvent:
     version: int
     workflow_name: str
     project_id: UUID | None = field(default=None)
+    published_version_id: UUID | None = field(default=None)
+    user_id: UUID | None = field(default=None)
     error_type: str | None = field(default=None)
 
 
