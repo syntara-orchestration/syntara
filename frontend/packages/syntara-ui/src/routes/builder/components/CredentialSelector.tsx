@@ -105,6 +105,7 @@ type TypeGroup = {
 
 type MenuToggleProps = {
   toggleRef: React.Ref<MenuToggleElement>
+  fieldId: string
   isOpen: boolean
   isDisabled: boolean
   isPending: boolean
@@ -117,6 +118,7 @@ type MenuToggleProps = {
 
 function CredentialMenuToggle({
   toggleRef,
+  fieldId,
   isOpen,
   isDisabled,
   isPending,
@@ -129,6 +131,7 @@ function CredentialMenuToggle({
   return (
     <MenuToggle
       ref={toggleRef}
+      id={fieldId}
       onClick={() => setIsOpen((prev) => !prev)}
       isExpanded={isOpen}
       isDisabled={isDisabled || isPending}
@@ -306,6 +309,7 @@ export function CredentialSelector({
     (toggleRef: React.Ref<MenuToggleElement>) => (
       <CredentialMenuToggle
         toggleRef={toggleRef}
+        fieldId={fieldId}
         isOpen={isOpen}
         isDisabled={isDisabled}
         isPending={isPending || isSingleCredPending}
@@ -316,13 +320,12 @@ export function CredentialSelector({
         setIsOpen={setIsOpen}
       />
     ),
-    [isOpen, isDisabled, isPending, isSingleCredPending, isReadOnlyCredential, hasDanger, label, toggleLabel]
+    [fieldId, isOpen, isDisabled, isPending, isSingleCredPending, isReadOnlyCredential, hasDanger, label, toggleLabel]
   )
 
   return (
     <FormGroup label={label} labelHelp={resolvedLabelHelp} fieldId={fieldId} isRequired={isRequired}>
       <SynSelect
-        id={fieldId}
         isOpen={isOpen}
         selected={value ?? NO_CREDENTIAL_VALUE}
         onSelect={handleSelect}

@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { axe } from 'vitest-axe'
 
 import { AddNodePanel, AddNodePanelHeader } from './AddNodePanel'
 
@@ -41,6 +42,33 @@ const mockNodeTypes = [
         id: 'trigger-manual',
         label: 'Manual',
         icon: () => <div>ManualIcon</div>,
+        description: 'Start the workflow manually',
+      },
+    ],
+  },
+  {
+    id: 'terraform',
+    label: 'Terraform Enterprise',
+    icon: () => <div>TerraformIcon</div>,
+    category: 'action',
+    description: 'Manage Terraform Enterprise workspaces',
+    keywords: ['terraform', 'tfe'],
+    order: 45,
+    selectionTitle: 'Select a Terraform step',
+    formComponent: () => null,
+    onSubmit: vi.fn(),
+    subtypes: [
+      {
+        id: 'tfe-create-workspace',
+        label: 'Create Workspace',
+        icon: () => <div>CreateWorkspaceIcon</div>,
+        description: 'Create a TFE workspace',
+      },
+      {
+        id: 'tfe-link-vcs',
+        label: 'Link VCS to Workspace',
+        icon: () => <div>LinkVcsIcon</div>,
+        description: 'Link a GitHub repo to a workspace',
       },
     ],
   },
@@ -213,6 +241,7 @@ describe('AddNodePanel Component', () => {
 
     expect(screen.getByRole('button', { name: 'Manual' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Action' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('textbox', { name: 'Search...' })).not.toBeInTheDocument()
   })
 
   it('hides close and back buttons when the canvas has no workflow steps yet', () => {
@@ -227,6 +256,52 @@ describe('AddNodePanel Component', () => {
 
     expect(screen.queryByRole('button', { name: 'Trigger' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Action' })).toBeInTheDocument()
+  })
+
+  it('filters the catalog and shows an empty state', async () => {
+    const user = userEvent.setup()
+    render(<AddNodePanel onClose={mockOnClose} onSelectNode={mockOnSelectNode} />)
+
+    await user.type(screen.getByRole('textbox', { name: 'Search...' }), 'terraform')
+
+    expect(screen.getByRole('button', { name: 'Terraform Enterprise' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Action' })).not.toBeInTheDocument()
+
+    await user.type(screen.getByRole('textbox', { name: 'Search...' }), 'zzz')
+
+    expect(screen.getByText('No results found')).toBeInTheDocument()
+  })
+
+  it('includes matching Terraform actions in the catalog results', async () => {
+    const user = userEvent.setup()
+    render(<AddNodePanel onClose={mockOnClose} onSelectNode={mockOnSelectNode} />)
+
+    await user.type(screen.getByRole('textbox', { name: 'Search...' }), 'github')
+
+    expect(screen.getByRole('button', { name: 'Link VCS to Workspace' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Action' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Create Workspace' })).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Link VCS to Workspace' }))
+
+    expect(mockOnSelectNode).toHaveBeenCalledWith('terraform', 'tfe-link-vcs')
+  })
+
+  it('filters Terraform actions in the step list', async () => {
+    const user = userEvent.setup()
+    render(<AddNodePanel onClose={mockOnClose} onSelectNode={mockOnSelectNode} />)
+
+    await user.click(screen.getByRole('button', { name: 'Terraform Enterprise' }))
+    await user.type(screen.getByRole('textbox', { name: 'Search actions...' }), 'github')
+
+    expect(screen.getByRole('button', { name: 'Link VCS to Workspace' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Create Workspace' })).not.toBeInTheDocument()
+  })
+
+  it('has no accessibility violations', async () => {
+    const { container } = render(<AddNodePanel onClose={mockOnClose} onSelectNode={mockOnSelectNode} />)
+
+    expect(await axe(container)).toHaveNoViolations()
   })
 
   it('filters out triggers when replacing a generic step', () => {

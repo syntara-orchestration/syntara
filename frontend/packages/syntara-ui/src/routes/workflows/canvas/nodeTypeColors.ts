@@ -1,6 +1,6 @@
 import { ActivityTypeEnum, ExecutorTypeEnum, type TaskActivity } from '@syntara/contracts'
 
-import { AAP_NODE_IDS, FlowNodeType, RegistryNodeId } from '../../../constants'
+import { AAP_NODE_IDS, FlowNodeType, isTerraformNodeId, RegistryNodeId } from '../../../constants'
 
 import { detectTaskNodeType, DetectedExecutorType } from './nodes/common/detectTaskNodeType'
 
@@ -111,6 +111,7 @@ export function getAddNodePanelColor(registryNodeId: string): string | undefined
   if (registryNodeId === RegistryNodeId.APPROVAL) return NODE_TYPE_COLORS.approval
   if (ADD_PANEL_ACTION_IDS.has(registryNodeId)) return NODE_TYPE_COLORS.actionScript
   if (registryNodeId === RegistryNodeId.AGENT) return NODE_TYPE_COLORS.actionAgentic
+  if (isTerraformNodeId(registryNodeId)) return NODE_TYPE_COLORS.actionScript
   // AAP category and all AAP subtypes use the same color
   if (AAP_NODE_IDS.has(registryNodeId as (typeof RegistryNodeId)[keyof typeof RegistryNodeId])) {
     return NODE_TYPE_COLORS.actionAap

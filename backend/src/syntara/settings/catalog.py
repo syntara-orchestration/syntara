@@ -791,6 +791,39 @@ SETTINGS_CATALOG: list[SettingDefinition] = [
         validation_schema={"min": 1},
     ),
     SettingDefinition(
+        key="workflow_engine.tfe_timeout_seconds",
+        name="TFE timeout (seconds)",
+        category=SettingCategory.WORKFLOW_EXECUTION,
+        value_type=SettingValueType.INTEGER,
+        default_value=180,
+        description=(
+            "Maximum execution time for Terraform Enterprise workflow "
+            "activities (workspace, variable, run, project, and VCS steps). "
+            "Must cover HTTP client attempts including read retries. If "
+            "exceeded, the activity is terminated and fails. Configuration "
+            "version uploads use a separate longer timeout."
+        ),
+        helper_text="Minimum 1 second. Default: 180 (3 minutes).",
+        group=WorkflowEngineGroup.EXECUTION,
+        validation_schema={"min": 1},
+    ),
+    SettingDefinition(
+        key="workflow_engine.tfe_upload_timeout_seconds",
+        name="TFE upload timeout (seconds)",
+        category=SettingCategory.WORKFLOW_EXECUTION,
+        value_type=SettingValueType.INTEGER,
+        default_value=900,
+        description=(
+            "Maximum execution time for Terraform Enterprise configuration "
+            "version upload activities. Uploads transfer archive bytes to "
+            "TFE object storage and can take longer than ordinary API calls. "
+            "If exceeded, the activity is terminated and fails."
+        ),
+        helper_text="Minimum 1 second. Default: 900 (15 minutes).",
+        group=WorkflowEngineGroup.EXECUTION,
+        validation_schema={"min": 1},
+    ),
+    SettingDefinition(
         key="workflow_engine.converge_wait_duration_seconds",
         name="Converge wait duration (seconds)",
         category=SettingCategory.WORKFLOW_EXECUTION,

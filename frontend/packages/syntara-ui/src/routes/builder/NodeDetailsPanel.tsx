@@ -103,6 +103,11 @@ function getAddModeFormId(
     return aapFormMap[nodeSubtypeId]
   }
 
+  // Terraform node subtypes all share the same form
+  if (nodeTypeId === RegistryNodeId.TERRAFORM && nodeSubtypeId) {
+    return 'terraform-node-form'
+  }
+
   return undefined
 }
 
@@ -123,6 +128,10 @@ function getTaskFormId(taskData: TaskActivity): string {
   // Check if it's an AI Agent task
   if (executor === ExecutorTypeEnum.AGENTIC) {
     return 'ai-agent-node-form'
+  }
+
+  if (executor.startsWith('tfe_')) {
+    return 'terraform-node-form'
   }
 
   // Script or HTTP request

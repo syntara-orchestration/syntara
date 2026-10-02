@@ -119,6 +119,11 @@ describe('getAddNodePanelColor', () => {
     expect(getAddNodePanelColor(RegistryNodeId.AAP_EXECUTION)).toBe(NODE_TYPE_COLORS.actionAap)
   })
 
+  it('returns the purple action color for Terraform Enterprise and its actions', () => {
+    expect(getAddNodePanelColor(RegistryNodeId.TERRAFORM)).toBe(NODE_TYPE_COLORS.actionScript)
+    expect(getAddNodePanelColor(RegistryNodeId.TFE_CREATE_WORKSPACE)).toBe(NODE_TYPE_COLORS.actionScript)
+  })
+
   it('returns undefined for empty or unknown registry id', () => {
     expect(getAddNodePanelColor('')).toBeUndefined()
     expect(getAddNodePanelColor('unknown')).toBeUndefined()

@@ -247,9 +247,8 @@ export function LLMModelSelector({
   const hasNoIntegrations = integrations.length === 0 && !isPending
 
   return (
-    <FormGroup label={label} labelHelp={resolvedLabelHelp} fieldId={fieldId} isRequired>
+    <FormGroup label={label} labelHelp={resolvedLabelHelp} isRequired>
       <SynSelect
-        id={fieldId}
         isOpen={isOpen}
         selected={selectedKey}
         onSelect={handleSelect}

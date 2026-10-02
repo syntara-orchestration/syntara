@@ -1,9 +1,25 @@
 """Tests for node_settings_resolver pure functions."""
 
+import pytest
+
 from syntara.settings.catalog import SETTINGS_CATALOG
-from syntara.workflows.workflow_engine.constants import DEFAULT_MAX_OUTPUT_BYTES
+from syntara.workflows.workflow_engine.constants import DEFAULT_ACTIVITY_TIMEOUT_SECONDS, DEFAULT_MAX_OUTPUT_BYTES
 from syntara.workflows.workflow_engine.graph import ActivityNode
-from syntara.workflows.workflow_engine.node_settings_resolver import resolve_max_output_bytes, resolve_retry_policy
+from syntara.workflows.workflow_engine.models.workflow_definition import NodeType
+from syntara.workflows.workflow_engine.node_settings_resolver import (
+    get_default_timeout,
+    resolve_max_output_bytes,
+    resolve_retry_policy,
+)
+
+_TFE_STANDARD_SAMPLES = (
+    NodeType.TFE_CREATE_WORKSPACE,
+    NodeType.TFE_ADD_VARIABLE,
+    NodeType.TFE_TRIGGER_RUN,
+    NodeType.TFE_GET_RUN_STATUS,
+    NodeType.TFE_LIST_PROJECTS,
+    NodeType.TFE_ASSIGN_TEAM_PERMISSIONS,
+)
 
 
 def _catalog_defaults() -> dict[str, object]:
@@ -50,3 +66,38 @@ def test_resolve_max_output_bytes_non_script_node() -> None:
     node = ActivityNode(node_id="n", node_type="http_request", parameters={})
     result = resolve_max_output_bytes(node, {"workflow_engine.script_max_output_kb": 512})
     assert result == DEFAULT_MAX_OUTPUT_BYTES
+
+
+def test_tfe_standard_timeout_uses_catalog_default() -> None:
+    """TFE API steps resolve to workflow_engine.tfe_timeout_seconds, not the 30s fallback."""
+    defaults = _catalog_defaults()
+    expected = int(defaults["workflow_engine.tfe_timeout_seconds"])
+    assert expected > DEFAULT_ACTIVITY_TIMEOUT_SECONDS
+    for node_type in _TFE_STANDARD_SAMPLES:
+        assert get_default_timeout(node_type, defaults) == expected
+
+
+def test_tfe_upload_timeout_uses_long_running_catalog_default() -> None:
+    """Configuration uploads use a longer catalog timeout than ordinary TFE steps."""
+    defaults = _catalog_defaults()
+    upload = int(defaults["workflow_engine.tfe_upload_timeout_seconds"])
+    standard = int(defaults["workflow_engine.tfe_timeout_seconds"])
+    assert upload > standard
+    assert get_default_timeout(NodeType.TFE_UPLOAD_CONFIGURATION_VERSION, defaults) == upload
+
+
+@pytest.mark.parametrize(
+    ("node_type", "key"),
+    [
+        (NodeType.TFE_CREATE_WORKSPACE, "workflow_engine.tfe_timeout_seconds"),
+        (NodeType.TFE_UPLOAD_CONFIGURATION_VERSION, "workflow_engine.tfe_upload_timeout_seconds"),
+    ],
+)
+def test_tfe_timeout_respects_runtime_override(node_type: str, key: str) -> None:
+    """Operator-configured runtime settings override catalog defaults for TFE."""
+    assert get_default_timeout(node_type, {key: 42}) == 42
+
+
+def test_tfe_timeout_falls_back_without_catalog() -> None:
+    """Missing runtime settings still fall back to the global default."""
+    assert get_default_timeout(NodeType.TFE_TRIGGER_RUN, {}) == DEFAULT_ACTIVITY_TIMEOUT_SECONDS

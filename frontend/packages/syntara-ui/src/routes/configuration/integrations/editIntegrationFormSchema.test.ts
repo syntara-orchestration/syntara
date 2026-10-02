@@ -41,6 +41,17 @@ const validLlm = {
   ...securityDefaults,
 }
 
+const validTfe = {
+  name: 'My TFE',
+  description: '',
+  integration_type: 'terraform_enterprise',
+  base_url: 'https://app.terraform.io',
+  organization: 'acme',
+  scope: 'global' as const,
+  management_credential_id: null,
+  ...securityDefaults,
+}
+
 describe('buildEditSchema', () => {
   describe('MCP Server', () => {
     it('accepts valid MCP data', () => {
@@ -138,6 +149,35 @@ describe('buildEditSchema', () => {
     it('rejects FTP scheme', () => {
       const result = schema.safeParse({ ...validAap, base_url: 'ftp://aap.example.com' })
       expect(result.success).toBe(false)
+    })
+  })
+
+  describe('Terraform Enterprise', () => {
+    it('accepts valid TFE data', () => {
+      const result = schema.safeParse(validTfe)
+      expect(result.success).toBe(true)
+    })
+
+    it.each([
+      ['empty base_url', { base_url: '' }, 'TFE URL is required'],
+      ['HTTP URL (HTTPS only)', { base_url: 'http://tfe.example.com' }, 'Must be an HTTPS URL'],
+      ['invalid URL', { base_url: 'not-a-url' }, 'Must be a valid URL'],
+      ['empty organization', { organization: '' }, 'Organization is required'],
+    ])('rejects %s', (_label, overrides, expectedMessage) => {
+      const result = schema.safeParse({ ...validTfe, ...overrides })
+      expect(result.success).toBe(false)
+      if (!result.success) {
+        expect(result.error.issues.some((i) => i.message === expectedMessage)).toBe(true)
+      }
+    })
+
+    it('accepts HTTP URL when allow_http is true', () => {
+      const result = schema.safeParse({
+        ...validTfe,
+        base_url: 'http://tfe.example.com',
+        allow_http: true,
+      })
+      expect(result.success).toBe(true)
     })
   })
 
@@ -302,6 +342,35 @@ describe('buildConfiguration', () => {
       const aapValues = { ...baseValues, base_url: 'https://aap.example.com', insecure_skip_tls_verify: true }
       const config = buildConfiguration('ansible_automation_platform', aapValues)
       expect(config).toHaveProperty('insecure_skip_tls_verify', true)
+    })
+  })
+
+  describe('Terraform Enterprise', () => {
+    it('returns TFE configuration with organization and security fields', () => {
+      const tfeValues = {
+        ...baseValues,
+        integration_type: 'terraform_enterprise',
+        base_url: 'https://app.terraform.io',
+        organization: 'acme',
+      }
+      const config = buildConfiguration('terraform_enterprise', tfeValues)
+      expect(config).toEqual({
+        integration_type: 'terraform_enterprise',
+        base_url: 'https://app.terraform.io',
+        organization: 'acme',
+        ...expectedSecurityDefaults,
+      })
+    })
+
+    it('defaults organization to empty string when undefined', () => {
+      const tfeValues = {
+        ...baseValues,
+        integration_type: 'terraform_enterprise',
+        base_url: 'https://app.terraform.io',
+        organization: undefined,
+      }
+      const config = buildConfiguration('terraform_enterprise', tfeValues)
+      expect(config).toHaveProperty('organization', '')
     })
   })
 

@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://automation.example.com/schemas/workflows/v2/executors/tfe_fetch_state_outputs",
+  "title": "Fetch State and Outputs Node",
+  "description": "Fetch workspace state outputs",
+  "parameterSchema": {
+    "type": "object",
+    "required": [
+      "integration_id",
+      "credential_id",
+      "workspace_id"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "integration_id": {
+        "type": "string"
+      },
+      "credential_id": {
+        "type": "string"
+      },
+      "organization": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "Optional organization override; defaults to the integration organization"
+      },
+      "workspace_id": {
+        "type": "string"
+      }
+    }
+  },
+  "resultSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "has_state": {
+        "type": [
+          "boolean",
+          "null"
+        ]
+      },
+      "state_version_id": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "outputs": {
+        "type": [
+          "object",
+          "null"
+        ]
+      }
+    }
+  }
+}

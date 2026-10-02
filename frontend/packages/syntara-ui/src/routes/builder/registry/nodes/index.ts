@@ -3,9 +3,12 @@
  * Auto-discovers registration modules using import.meta.glob (each maps to React Flow node components).
  */
 
-const nodeModules = import.meta.glob<{ default: () => void }>(['./register*Node.ts', '!./*.test.ts', '!./*.spec.ts'], {
-  eager: true,
-})
+const nodeModules = import.meta.glob<{ default: () => void }>(
+  ['./register*Node.ts', './register*Node.tsx', '!./*.test.ts', '!./*.spec.ts', '!./*.test.tsx'],
+  {
+    eager: true,
+  }
+)
 
 /**
  * Register all workflow step types.

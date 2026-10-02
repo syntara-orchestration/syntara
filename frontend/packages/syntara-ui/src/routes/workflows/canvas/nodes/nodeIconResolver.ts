@@ -2,6 +2,7 @@ import { ExecutorTypeEnum, TriggerTypeEnum, type TaskActivity } from '@syntara/c
 import type { Node } from '@xyflow/react'
 import type { ComponentType } from 'react'
 
+import TerraformIcon from '../../../../assets/terraform.svg?react'
 import { type RegistryNodeIdUnion, RegistryNodeId } from '../../../../constants'
 import { parseTriggerIndex } from '../../../../utils/triggerNodeIds'
 
@@ -32,6 +33,8 @@ export function getTaskIconDescriptor(taskData: TaskActivity): IconDescriptor {
     iconId = RegistryNodeId.AGENT
   } else if (actualExecutor === ExecutorTypeEnum.HTTP_REQUEST) {
     iconId = RegistryNodeId.ACTION_API
+  } else if (actualExecutor.startsWith('tfe_')) {
+    return { icon: TerraformIcon, id: RegistryNodeId.TERRAFORM }
   }
   return { icon: executorMeta?.icon, id: iconId }
 }

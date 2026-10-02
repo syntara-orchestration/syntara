@@ -1,6 +1,7 @@
 import { ExecutorTypeEnum, TriggerTypeEnum, type TaskActivity } from '@syntara/contracts'
 import { describe, expect, it, vi } from 'vitest'
 
+import TerraformIcon from '../../../../assets/terraform.svg?react'
 import { RegistryNodeId } from '../../../../constants'
 
 import { DetectedExecutorType } from './common/detectTaskNodeType'
@@ -76,6 +77,16 @@ describe('nodeIconResolver', () => {
         name: 'Approve',
       } as unknown as TaskActivity)
       expect(result.id).toBe(RegistryNodeId.APPROVAL)
+    })
+
+    it('returns the Terraform mark for tfe activities', () => {
+      const result = getTaskIconDescriptor({
+        type: 'tfe_create_workspace',
+        id: 't7',
+        name: 'Create Workspace',
+      } as unknown as TaskActivity)
+      expect(result.id).toBe(RegistryNodeId.TERRAFORM)
+      expect(result.icon).toBe(TerraformIcon)
     })
 
     it('returns AAP icon for aap_job_template', () => {

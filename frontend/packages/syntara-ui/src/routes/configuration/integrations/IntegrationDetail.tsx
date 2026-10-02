@@ -82,6 +82,13 @@ function IntegrationProjectsList({ integrationId }: Readonly<{ integrationId: st
   )
 }
 
+function TerraformOrganizationDetail({ integration }: Readonly<{ integration: IntegrationRead }>) {
+  if (integration.integration_type !== IntegrationTypeEnum.TERRAFORM_ENTERPRISE) return null
+  const configuration = integration.configuration
+  if (!configuration || !('organization' in configuration)) return null
+  return <SynDetail label="Organization">{String(configuration.organization ?? '—')}</SynDetail>
+}
+
 function IntegrationDetailsTab({
   integration,
   enabledResourceCount,
@@ -126,6 +133,7 @@ function IntegrationDetailsTab({
             </SynDetail>
           )}
           <SynDetail label="URL">{getBaseUrl(integration) || '—'}</SynDetail>
+          <TerraformOrganizationDetail integration={integration} />
           <SynDetail label="Connection credential">
             {!credentialId || !credentialName ? (
               <>None</>

@@ -776,3 +776,9 @@ Code quality and coverage are tracked via SonarCloud. SonarCloud analysis runs a
 - 📖 **[Developer Getting Started Guide](docs/developer-getting-started.md)** - Architecture deep dive with examples
 - 📖 **[Development with Worktrees Guide](docs/development-with-worktrees.md)** - Parallel development setup
 - 📖 **[Architecture Decision Records](decision-records.md)** - Design rationale and decisions
+
+## TFE step SDK bridge
+
+The native TFE workflow steps can be adapted to a manifest-driven SDK runtime through
+a worker-scoped executor and transport interface. See [TFE SDK bridge](docs/tfe-sdk-bridge.md)
+for the implementation inventory, wiring example, compatibility limits, and tests.
