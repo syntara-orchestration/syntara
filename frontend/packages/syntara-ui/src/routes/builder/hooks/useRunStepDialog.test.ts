@@ -73,9 +73,9 @@ vi.mock('../../../utils/graphTraversal', () => ({
 function renderRunStepDialog(
   handleSaveWorkflow = vi.fn().mockResolvedValue(true),
   isTerminalStatus = false,
-  isNodeEditorOpen = false
+  isStepEditorOpen = false
 ) {
-  return renderHook(({ isTerminal }) => useRunStepDialog(handleSaveWorkflow, isTerminal, isNodeEditorOpen), {
+  return renderHook(({ isTerminal }) => useRunStepDialog(handleSaveWorkflow, isTerminal, isStepEditorOpen), {
     initialProps: { isTerminal: isTerminalStatus },
   })
 }
@@ -155,7 +155,7 @@ describe('useRunStepDialog', () => {
       expect(mockDialogOpen).not.toHaveBeenCalled()
     })
 
-    it('saves before opening dialog when node editor is open', async () => {
+    it('saves before opening dialog when step editor is open', async () => {
       mockGetNode.mockReturnValue({ id: 'node-1', data: { name: 'Step' } })
       const handleSaveWorkflow = vi.fn().mockResolvedValue(true)
 
@@ -184,7 +184,7 @@ describe('useRunStepDialog', () => {
       expect(mockDialogOpen).toHaveBeenCalled()
     })
 
-    it('skips save when workflow is clean and node editor is closed', async () => {
+    it('skips save when workflow is clean and step editor is closed', async () => {
       mockGetNode.mockReturnValue({ id: 'node-1', data: { name: 'Step' } })
       const handleSaveWorkflow = vi.fn().mockResolvedValue(true)
 

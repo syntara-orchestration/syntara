@@ -33,36 +33,36 @@ describe('builderReducer', () => {
       const stateWithPanelsOpen: BuilderState = {
         ...initialState,
         detailsOpen: false,
-        addNodePanelOpen: true,
+        addStepPanelOpen: true,
         historyCardOpen: true,
         selectedNode: { id: 'node-1' } as Node<NodeType['data']>,
-        nodeEditorMode: 'edit',
-        nodeEditorNodeTypeId: 'script',
-        nodeEditorNodeSubtypeId: null,
+        stepEditorMode: 'edit',
+        stepEditorStepTypeId: 'script',
+        stepEditorStepSubtypeId: null,
       }
 
       const action: BuilderAction = { type: 'TOGGLE_DETAILS' }
       const result = builderReducer(stateWithPanelsOpen, action)
 
       expect(result.detailsOpen).toBe(true)
-      expect(result.addNodePanelOpen).toBe(false)
+      expect(result.addStepPanelOpen).toBe(false)
       expect(result.historyCardOpen).toBe(false)
       expect(result.selectedNode).toBeNull()
-      expect(result.nodeEditorMode).toBeNull()
-      expect(result.nodeEditorNodeTypeId).toBeNull()
-      expect(result.nodeEditorNodeSubtypeId).toBeNull()
+      expect(result.stepEditorMode).toBeNull()
+      expect(result.stepEditorStepTypeId).toBeNull()
+      expect(result.stepEditorStepSubtypeId).toBeNull()
     })
 
     it('TOGGLE_DETAILS when already open preserves panel state', () => {
       const stateWithDetailsOpen: BuilderState = {
         ...initialState,
         detailsOpen: true,
-        addNodePanelOpen: true,
+        addStepPanelOpen: true,
         historyCardOpen: true,
         selectedNode: { id: 'node-1' } as Node<NodeType['data']>,
-        nodeEditorMode: 'edit',
-        nodeEditorNodeTypeId: 'script',
-        nodeEditorNodeSubtypeId: 'python',
+        stepEditorMode: 'edit',
+        stepEditorStepTypeId: 'script',
+        stepEditorStepSubtypeId: 'python',
       }
 
       const action: BuilderAction = { type: 'TOGGLE_DETAILS' }
@@ -70,12 +70,12 @@ describe('builderReducer', () => {
 
       expect(result.detailsOpen).toBe(false)
       // When closing, keep the other panel states
-      expect(result.addNodePanelOpen).toBe(true)
+      expect(result.addStepPanelOpen).toBe(true)
       expect(result.historyCardOpen).toBe(true)
       expect(result.selectedNode).toEqual({ id: 'node-1' })
-      expect(result.nodeEditorMode).toBe('edit')
-      expect(result.nodeEditorNodeTypeId).toBe('script')
-      expect(result.nodeEditorNodeSubtypeId).toBe('python')
+      expect(result.stepEditorMode).toBe('edit')
+      expect(result.stepEditorStepTypeId).toBe('script')
+      expect(result.stepEditorStepSubtypeId).toBe('python')
     })
 
     it('SET_HISTORY_CARD_OPEN sets historyCardOpen', () => {
@@ -88,34 +88,34 @@ describe('builderReducer', () => {
       const stateWithPanelsOpen: BuilderState = {
         ...initialState,
         historyCardOpen: false,
-        addNodePanelOpen: true,
+        addStepPanelOpen: true,
         detailsOpen: true,
         selectedNode: { id: 'node-1' } as Node<NodeType['data']>,
-        nodeEditorMode: 'edit',
-        nodeEditorNodeTypeId: 'script',
-        nodeEditorNodeSubtypeId: null,
+        stepEditorMode: 'edit',
+        stepEditorStepTypeId: 'script',
+        stepEditorStepSubtypeId: null,
       }
 
       const action: BuilderAction = { type: 'TOGGLE_HISTORY' }
       const result = builderReducer(stateWithPanelsOpen, action)
 
       expect(result.historyCardOpen).toBe(true)
-      expect(result.addNodePanelOpen).toBe(false)
+      expect(result.addStepPanelOpen).toBe(false)
       expect(result.detailsOpen).toBe(false)
       expect(result.selectedNode).toBeNull()
-      expect(result.nodeEditorMode).toBeNull()
+      expect(result.stepEditorMode).toBeNull()
     })
 
     it('TOGGLE_HISTORY when already open preserves panel state', () => {
       const stateWithHistoryOpen: BuilderState = {
         ...initialState,
         historyCardOpen: true,
-        addNodePanelOpen: true,
+        addStepPanelOpen: true,
         detailsOpen: true,
         selectedNode: { id: 'node-1' } as Node<NodeType['data']>,
-        nodeEditorMode: 'edit',
-        nodeEditorNodeTypeId: 'script',
-        nodeEditorNodeSubtypeId: 'python',
+        stepEditorMode: 'edit',
+        stepEditorStepTypeId: 'script',
+        stepEditorStepSubtypeId: 'python',
       }
 
       const action: BuilderAction = { type: 'TOGGLE_HISTORY' }
@@ -123,10 +123,10 @@ describe('builderReducer', () => {
 
       expect(result.historyCardOpen).toBe(false)
       // When closing, keep the other panel states
-      expect(result.addNodePanelOpen).toBe(true)
+      expect(result.addStepPanelOpen).toBe(true)
       expect(result.detailsOpen).toBe(true)
       expect(result.selectedNode).toEqual({ id: 'node-1' })
-      expect(result.nodeEditorMode).toBe('edit')
+      expect(result.stepEditorMode).toBe('edit')
     })
   })
 
@@ -137,43 +137,43 @@ describe('builderReducer', () => {
       expect(result.isKebabOpen).toBe(true)
     })
 
-    it('SET_ADD_NODE_PANEL sets addNodePanelOpen', () => {
-      const action: BuilderAction = { type: 'SET_ADD_NODE_PANEL', payload: true }
+    it('SET_ADD_STEP_PANEL sets addStepPanelOpen', () => {
+      const action: BuilderAction = { type: 'SET_ADD_STEP_PANEL', payload: true }
       const result = builderReducer(initialState, action)
-      expect(result.addNodePanelOpen).toBe(true)
+      expect(result.addStepPanelOpen).toBe(true)
     })
   })
 
-  describe('Node editor actions', () => {
+  describe('Step editor actions', () => {
     it('OPEN_NODE_EDITOR_ADD sets editor to add mode', () => {
       const action: BuilderAction = {
         type: 'OPEN_NODE_EDITOR_ADD',
-        payload: { nodeTypeId: 'script', nodeSubtypeId: 'python' },
+        payload: { stepTypeId: 'script', stepSubtypeId: 'python' },
       }
       const result = builderReducer(initialState, action)
 
-      expect(result.nodeEditorMode).toBe('add')
-      expect(result.nodeEditorNodeTypeId).toBe('script')
-      expect(result.nodeEditorNodeSubtypeId).toBe('python')
+      expect(result.stepEditorMode).toBe('add')
+      expect(result.stepEditorStepTypeId).toBe('script')
+      expect(result.stepEditorStepSubtypeId).toBe('python')
       expect(result.selectedNode).toBeNull()
-      expect(result.addNodePanelOpen).toBe(false)
+      expect(result.addStepPanelOpen).toBe(false)
     })
 
     it('CLOSE_NODE_EDITOR clears editor state', () => {
       const stateWithEditor: BuilderState = {
         ...initialState,
-        nodeEditorMode: 'edit',
-        nodeEditorNodeTypeId: 'script',
-        nodeEditorNodeSubtypeId: 'python',
+        stepEditorMode: 'edit',
+        stepEditorStepTypeId: 'script',
+        stepEditorStepSubtypeId: 'python',
         selectedNode: { id: 'node-1' } as Node<NodeType['data']>,
       }
 
       const action: BuilderAction = { type: 'CLOSE_NODE_EDITOR' }
       const result = builderReducer(stateWithEditor, action)
 
-      expect(result.nodeEditorMode).toBeNull()
-      expect(result.nodeEditorNodeTypeId).toBeNull()
-      expect(result.nodeEditorNodeSubtypeId).toBeNull()
+      expect(result.stepEditorMode).toBeNull()
+      expect(result.stepEditorStepTypeId).toBeNull()
+      expect(result.stepEditorStepSubtypeId).toBeNull()
       expect(result.selectedNode).toBeNull()
     })
 
@@ -259,7 +259,7 @@ describe('builderReducer', () => {
       expect(result.sourceHandle).toBe('loop')
       expect(result.targetHandle).toBe('target')
       expect(result.newNodeDesiredPosition).toEqual({ x: 100, y: 200 })
-      expect(result.addNodePanelOpen).toBe(true)
+      expect(result.addStepPanelOpen).toBe(true)
       expect(result.detailsOpen).toBe(false)
       expect(result.historyCardOpen).toBe(false)
     })
@@ -279,7 +279,7 @@ describe('builderReducer', () => {
       expect(result.sourceHandle).toBeUndefined() // undefined → undefined
       expect(result.targetHandle).toBeUndefined()
       expect(result.newNodeDesiredPosition).toBeNull() // undefined → null
-      expect(result.addNodePanelOpen).toBe(true)
+      expect(result.addStepPanelOpen).toBe(true)
     })
 
     it('CLEAR_NEW_NODE_DESIRED_POSITION clears newNodeDesiredPosition', () => {
@@ -308,7 +308,7 @@ describe('builderReducer', () => {
       }
       const result = builderReducer(initialState, action)
 
-      expect(result.addNodePanelOpen).toBe(true)
+      expect(result.addStepPanelOpen).toBe(true)
       expect(result.sourceNodeId).toBe('source-1')
       expect(result.replacementNodeId).toBe('replacement-1')
       expect(result.targetNodeId).toBeNull()
@@ -324,7 +324,7 @@ describe('builderReducer', () => {
       }
       const result = builderReducer(initialState, action)
 
-      expect(result.addNodePanelOpen).toBe(true)
+      expect(result.addStepPanelOpen).toBe(true)
       expect(result.sourceNodeId).toBe('condition-1')
       expect(result.sourceHandle).toBe('true')
       expect(result.replacementNodeId).toBeNull()
@@ -335,7 +335,7 @@ describe('builderReducer', () => {
     it('CLOSE_ADD_NODE_PANEL clears all panel-related state', () => {
       const stateWithPanel: BuilderState = {
         ...initialState,
-        addNodePanelOpen: true,
+        addStepPanelOpen: true,
         sourceNodeId: 'source-1',
         targetNodeId: 'target-1',
         edgeIdToReplace: 'edge-1',
@@ -348,7 +348,7 @@ describe('builderReducer', () => {
       const action: BuilderAction = { type: 'CLOSE_ADD_NODE_PANEL' }
       const result = builderReducer(stateWithPanel, action)
 
-      expect(result.addNodePanelOpen).toBe(false)
+      expect(result.addStepPanelOpen).toBe(false)
       expect(result.sourceNodeId).toBeNull()
       expect(result.targetNodeId).toBeNull()
       expect(result.edgeIdToReplace).toBeNull()
@@ -381,7 +381,7 @@ describe('builderReducer', () => {
       const action: BuilderAction = { type: 'NODE_CLICK', payload: { node, isGeneric: true } }
       const result = builderReducer(initialState, action)
 
-      expect(result.addNodePanelOpen).toBe(true)
+      expect(result.addStepPanelOpen).toBe(true)
       expect(result.replacementNodeId).toBe('generic-node-1')
       expect(result.selectedNode).toBeNull()
       expect(result.detailsOpen).toBe(false)
@@ -411,7 +411,7 @@ describe('builderReducer', () => {
       expect(result.sourceNodeId).toBeNull()
       // But still set replacement mode
       expect(result.replacementNodeId).toBe('generic-node-1')
-      expect(result.addNodePanelOpen).toBe(true)
+      expect(result.addStepPanelOpen).toBe(true)
     })
 
     it('opens editor for non-generic node clicks', () => {
@@ -420,14 +420,14 @@ describe('builderReducer', () => {
       const result = builderReducer(initialState, action)
 
       expect(result.selectedNode).toBe(node)
-      expect(result.nodeEditorMode).toBe('edit')
-      expect(result.addNodePanelOpen).toBe(false)
+      expect(result.stepEditorMode).toBe('edit')
+      expect(result.addStepPanelOpen).toBe(false)
       expect(result.detailsOpen).toBe(false)
       expect(result.historyCardOpen).toBe(false)
       expect(result.replacementNodeId).toBeNull()
     })
 
-    it('opens node editor in edit mode when viewingVersion is set', () => {
+    it('opens step editor in edit mode when viewingVersion is set', () => {
       const stateViewing: BuilderState = { ...initialState, viewingVersion: 2, versionHistoryOpen: true }
       const node = { id: 'task-1', type: 'script' } as Node<NodeType['data']>
       const action: BuilderAction = { type: 'NODE_CLICK', payload: { node, isGeneric: false } }
@@ -435,7 +435,7 @@ describe('builderReducer', () => {
 
       expect(result.versionHistoryOpen).toBe(true)
       expect(result.viewingVersion).toBe(2)
-      expect(result.nodeEditorMode).toBe('edit')
+      expect(result.stepEditorMode).toBe('edit')
       expect(result.selectedNode).toBe(node)
     })
   })
@@ -494,8 +494,8 @@ describe('builderReducer', () => {
       const stateWithSelections: BuilderState = {
         ...initialState,
         selectedNode: { id: 'node-1', type: 'task' } as Node<NodeType['data']>,
-        nodeEditorMode: 'edit',
-        addNodePanelOpen: true,
+        stepEditorMode: 'edit',
+        addStepPanelOpen: true,
         detailsOpen: true,
         historyCardOpen: true,
         sourceNodeId: 'source-1',
@@ -523,10 +523,10 @@ describe('builderReducer', () => {
 
       // UI state should be reset to initial values
       expect(result.selectedNode).toBeNull()
-      expect(result.nodeEditorMode).toBeNull()
-      expect(result.nodeEditorNodeTypeId).toBeNull()
-      expect(result.nodeEditorNodeSubtypeId).toBeNull()
-      expect(result.addNodePanelOpen).toBe(false)
+      expect(result.stepEditorMode).toBeNull()
+      expect(result.stepEditorStepTypeId).toBeNull()
+      expect(result.stepEditorStepSubtypeId).toBeNull()
+      expect(result.addStepPanelOpen).toBe(false)
       expect(result.detailsOpen).toBe(false)
       expect(result.historyCardOpen).toBe(false)
       expect(result.sourceNodeId).toBeNull()
@@ -628,7 +628,7 @@ describe('builderReducer', () => {
       expect(result.versionHistoryOpen).toBe(true)
       expect(result.detailsOpen).toBe(false)
       expect(result.historyCardOpen).toBe(false)
-      expect(result.addNodePanelOpen).toBe(false)
+      expect(result.addStepPanelOpen).toBe(false)
     })
 
     it('TOGGLE_VERSION_HISTORY closes panel when already open', () => {
@@ -664,8 +664,8 @@ describe('builderReducer', () => {
       expect(state.detailsOpen).toBe(false)
       expect(state.historyCardOpen).toBe(false)
       expect(state.isKebabOpen).toBe(false)
-      expect(state.addNodePanelOpen).toBe(false)
-      expect(state.nodeEditorMode).toBeNull()
+      expect(state.addStepPanelOpen).toBe(false)
+      expect(state.stepEditorMode).toBeNull()
       expect(state.selectedNode).toBeNull()
       expect(state.workflowName).toBe('')
       expect(state.workflowDescription).toBe('')
