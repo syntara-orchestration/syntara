@@ -16,8 +16,8 @@ describe('PathExpressionHelp', () => {
 
     await user.click(screen.getByRole('button', { name: /more info/i }))
 
-    expect(screen.getByText(/Visual expression builder/i)).toBeInTheDocument()
-    expect(screen.getByText(/Custom expression/i)).toBeInTheDocument()
+    expect(screen.getByText(/Form builder/i)).toBeInTheDocument()
+    expect(screen.getByText(/Freeform text/i)).toBeInTheDocument()
   })
 
   it('displays path-specific description in popover', async () => {

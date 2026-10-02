@@ -13,6 +13,10 @@
  * fills the minimum required form fields, submits, and closes the editor.
  */
 
+import {
+  DEFAULT_BUILDER_GROUP_LABEL,
+  EXPRESSION_MODE_LABELS,
+} from '../../src/components/expressions/expressionBuilderLabels'
 import { expect, type Page } from '../fixtures'
 
 import {
@@ -32,6 +36,21 @@ import {
 } from './workflows'
 
 export { ensureLlmCredential, createLlmIntegration, deleteLlmIntegration, selectLlmCredential }
+
+/** Switch one expression builder (Condition group) to raw / freeform mode. */
+async function switchExpressionBuilderToRaw(page: Page, builderIndex = 0) {
+  const builder = page.getByRole('group', { name: DEFAULT_BUILDER_GROUP_LABEL }).nth(builderIndex)
+  const modeToggle = builder.getByRole('button', {
+    name: new RegExp(`^(${EXPRESSION_MODE_LABELS.visual}|${EXPRESSION_MODE_LABELS.raw})$`),
+  })
+  await expect(modeToggle).toBeVisible({ timeout: 15_000 })
+  if ((await modeToggle.textContent())?.trim() === EXPRESSION_MODE_LABELS.raw) {
+    return
+  }
+  await modeToggle.click()
+  await page.getByRole('option', { name: EXPRESSION_MODE_LABELS.raw, exact: true }).click()
+  await expect(builder.getByLabel(/Raw expression/i)).toBeVisible()
+}
 
 // ---------------------------------------------------------------------------
 // Internal helpers
@@ -308,7 +327,7 @@ export async function addConditionalNode(
   await expect(nameInput).toBeVisible({ timeout: 10_000 })
   await nameInput.fill(name)
 
-  // Fill in Visual expression builder fields
+  // Fill in form builder fields
   const fieldInput = page.getByRole('textbox', { name: 'Field', exact: true })
   await expect(fieldInput).toBeVisible({ timeout: 10_000 })
   await fieldInput.fill(config.field)
@@ -343,12 +362,9 @@ export async function addConditionNode(page: Page, name: string, expression = 't
   await expect(page.getByRole('textbox', { name: 'Name', exact: true })).toBeVisible()
   await page.getByRole('textbox', { name: 'Name', exact: true }).fill(name)
 
-  // Expression builder has two modes: visual builder or raw expression
-  // Switch to raw mode to fill the expression directly
-  const editorModeToggle = page.getByRole('button', { name: /Expression editor mode/i })
-  await expect(editorModeToggle).toBeVisible()
-  await editorModeToggle.click()
-  await page.getByRole('option', { name: 'Custom expression' }).click()
+  // Condition type dropdown: form builder or freeform text
+  // Switch to freeform text to fill the expression directly
+  await switchExpressionBuilderToRaw(page, 0)
 
   // Wait for raw expression input to appear
   const rawExpressionInput = page.getByLabel(/Raw expression/i)
@@ -529,12 +545,7 @@ export async function addSwitchNodeWithCases(page: Page, name: string, cases: Sw
    * the field.
    */
   const fillCase = async (i: number) => {
-    // ExpressionBuilder uses a PatternFly MenuToggle — click to open, then select option
-    await page
-      .getByLabel(/Expression editor mode/i)
-      .nth(i)
-      .click()
-    await page.getByRole('option', { name: 'Custom expression', exact: true }).click()
+    await switchExpressionBuilderToRaw(page, i)
 
     const rawExpression = page.getByLabel(/Raw expression/i).nth(i)
     await rawExpression.fill(cases[i].condition)
