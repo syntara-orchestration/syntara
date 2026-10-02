@@ -1,4 +1,10 @@
-"""TFE error contract (SDP R10.2)."""
+"""TFE error contract (SDP R10.2).
+
+HTTP responses from TFE are mapped to stable error codes: authentication (401),
+authorization (403), remote rejection (4xx including 400/422 and unmapped client
+errors), not-found/conflict/rate-limit, and transient (5xx). Local invalid input
+uses ``VALIDATION`` without going through ``map_http_status_to_error``.
+"""
 
 from __future__ import annotations
 
@@ -18,6 +24,7 @@ class TFEErrorCode(StrEnum):
     NOT_FOUND = "NOT_FOUND"
     STATE_CONFLICT = "STATE_CONFLICT"
     VALIDATION = "VALIDATION"
+    TFE_REJECTED = "TFE_REJECTED"
     RATE_LIMITED = "RATE_LIMITED"
     TRANSIENT = "TRANSIENT"
     OUTCOME_UNKNOWN = "OUTCOME_UNKNOWN"
@@ -55,11 +62,12 @@ class TFEError(Exception):
 
 
 _STATUS_TO_CODE: dict[int, TFEErrorCode] = {
+    HTTPStatus.BAD_REQUEST: TFEErrorCode.TFE_REJECTED,
     HTTPStatus.UNAUTHORIZED: TFEErrorCode.AUTH_FAILED,
     HTTPStatus.FORBIDDEN: TFEErrorCode.AUTHZ_FAILED,
     HTTPStatus.NOT_FOUND: TFEErrorCode.NOT_FOUND,
     HTTPStatus.CONFLICT: TFEErrorCode.STATE_CONFLICT,
-    HTTPStatus.UNPROCESSABLE_ENTITY: TFEErrorCode.VALIDATION,
+    HTTPStatus.UNPROCESSABLE_ENTITY: TFEErrorCode.TFE_REJECTED,
     HTTPStatus.TOO_MANY_REQUESTS: TFEErrorCode.RATE_LIMITED,
 }
 
@@ -96,7 +104,7 @@ def map_http_status_to_error(
     if code is None and status_code >= HTTPStatus.INTERNAL_SERVER_ERROR:
         code = TFEErrorCode.TRANSIENT
     if code is None:
-        code = TFEErrorCode.VALIDATION
+        code = TFEErrorCode.TFE_REJECTED
 
     if code == TFEErrorCode.AUTH_FAILED:
         message = message or "Authentication failed: invalid or missing TFE token"
