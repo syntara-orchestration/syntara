@@ -20,14 +20,21 @@ function makeEdge(source: string, target: string, sourceHandle?: string, targetH
   }
 }
 
-function roundTrip(
-  activities: Activity[],
-  triggers: Activity[],
-  edges: EdgeConnection[],
-  name = 'round-trip-test',
-  description = ''
-) {
-  const v2Def = buildWorkflowDefinition(name, description, activities, triggers, { edges })
+function roundTrip(params: {
+  activities: Activity[]
+  triggers: Activity[]
+  edges: EdgeConnection[]
+  name?: string
+  description?: string
+}) {
+  const { activities, triggers, edges, name = 'round-trip-test', description = '' } = params
+  const v2Def = buildWorkflowDefinition({
+    workflowName: name,
+    workflowDescription: description,
+    activities,
+    triggers,
+    edges,
+  })
 
   const {
     flattenedActivities,
@@ -35,7 +42,11 @@ function roundTrip(
     triggers: loadedTriggers,
   } = convertV2Definition(v2Def.nodes, v2Def.edges, v2Def.triggers)
 
-  const rebuilt = buildWorkflowDefinition(name, description, flattenedActivities, loadedTriggers, {
+  const rebuilt = buildWorkflowDefinition({
+    workflowName: name,
+    workflowDescription: description,
+    activities: flattenedActivities,
+    triggers: loadedTriggers,
     edges: loadedEdges,
   })
 
@@ -60,7 +71,7 @@ describe('V2 Workflow Definition Round-Trip', () => {
       ]
       const edges = [makeEdge('trigger-0', 'script_1'), makeEdge('script_1', 'script_2')]
 
-      const { original, rebuilt } = roundTrip(activities, triggers, edges)
+      const { original, rebuilt } = roundTrip({ activities, triggers, edges })
 
       expect(rebuilt.schema_version).toBe('2.0.0')
       expect(rebuilt.nodes).toHaveLength(original.nodes.length)
@@ -81,7 +92,7 @@ describe('V2 Workflow Definition Round-Trip', () => {
         makeEdge('http_node', 'condition_node'),
       ]
 
-      const { original, rebuilt } = roundTrip(activities, triggers, edges)
+      const { original, rebuilt } = roundTrip({ activities, triggers, edges })
 
       const originalTypes = original.nodes.map((n) => n.type).sort()
       const rebuiltTypes = rebuilt.nodes.map((n) => n.type).sort()
@@ -103,7 +114,7 @@ describe('V2 Workflow Definition Round-Trip', () => {
         makeEdge('cond', 'false_branch', EdgeHandleEnum.FALSE),
       ]
 
-      const { original, rebuilt } = roundTrip(activities, triggers, edges)
+      const { original, rebuilt } = roundTrip({ activities, triggers, edges })
 
       const originalCondEdges = original.edges.filter((e) => e.from === 'cond')
       const rebuiltCondEdges = rebuilt.edges.filter((e) => e.from === 'cond')
@@ -135,7 +146,7 @@ describe('V2 Workflow Definition Round-Trip', () => {
         makeEdge('loop_node', 'after_loop', EdgeHandleEnum.DONE),
       ]
 
-      const { rebuilt } = roundTrip(activities, triggers, edges)
+      const { rebuilt } = roundTrip({ activities, triggers, edges })
 
       const rebuiltLoopEdges = rebuilt.edges.filter((e) => e.from === 'loop_node')
       expect(rebuiltLoopEdges).toHaveLength(2)
@@ -161,7 +172,7 @@ describe('V2 Workflow Definition Round-Trip', () => {
         makeEdge('approval_node', 'rejected_action', EdgeHandleEnum.REJECTED),
       ]
 
-      const { rebuilt } = roundTrip(activities, triggers, edges)
+      const { rebuilt } = roundTrip({ activities, triggers, edges })
 
       const rebuiltApprovalEdges = rebuilt.edges.filter((e) => e.from === 'approval_node')
       expect(rebuiltApprovalEdges).toHaveLength(2)
@@ -194,7 +205,7 @@ describe('V2 Workflow Definition Round-Trip', () => {
         makeEdge('switch_node', 'default_action', EdgeHandleEnum.DEFAULT),
       ]
 
-      const { rebuilt } = roundTrip(activities, triggers, edges)
+      const { rebuilt } = roundTrip({ activities, triggers, edges })
 
       const rebuiltSwitchEdges = rebuilt.edges.filter((e) => e.from === 'switch_node')
       expect(rebuiltSwitchEdges).toHaveLength(3)
@@ -210,7 +221,7 @@ describe('V2 Workflow Definition Round-Trip', () => {
       const activities = [makeActivity({ id: 'script_1', type: ActivityTypeEnum.SCRIPT })]
       const edges = [makeEdge('trigger-0', 'script_1')]
 
-      const { original, rebuilt } = roundTrip(activities, triggers, edges)
+      const { original, rebuilt } = roundTrip({ activities, triggers, edges })
 
       expect(rebuilt.triggers[0].id).toBe(original.triggers[0].id)
       expect(rebuilt.triggers[0].type).toBe('manual_trigger')
@@ -224,7 +235,7 @@ describe('V2 Workflow Definition Round-Trip', () => {
       const activities = [makeActivity({ id: 'script_1', type: ActivityTypeEnum.SCRIPT })]
       const edges = [makeEdge('trigger-0', 'script_1'), makeEdge('trigger-1', 'script_1')]
 
-      const { original, rebuilt } = roundTrip(activities, triggers, edges)
+      const { original, rebuilt } = roundTrip({ activities, triggers, edges })
 
       expect(rebuilt.triggers).toHaveLength(2)
       for (let i = 0; i < original.triggers.length; i++) {
@@ -246,7 +257,7 @@ describe('V2 Workflow Definition Round-Trip', () => {
       ]
       const edges = [makeEdge('trigger-0', 'script_1')]
 
-      const { original, rebuilt } = roundTrip(activities, triggers, edges)
+      const { original, rebuilt } = roundTrip({ activities, triggers, edges })
 
       const originalNode = original.nodes.find((n) => n.id === 'script_1')!
       const rebuiltNode = rebuilt.nodes.find((n) => n.id === 'script_1')!
@@ -268,7 +279,7 @@ describe('V2 Workflow Definition Round-Trip', () => {
       ]
       const edges = [makeEdge('trigger-0', 'http_1')]
 
-      const { original, rebuilt } = roundTrip(activities, triggers, edges)
+      const { original, rebuilt } = roundTrip({ activities, triggers, edges })
 
       expect(rebuilt.nodes[0].parameters).toEqual(original.nodes[0].parameters)
     })
@@ -285,7 +296,7 @@ describe('V2 Workflow Definition Round-Trip', () => {
       ]
       const edges = [makeEdge('trigger-0', 'script_1')]
 
-      const { original, rebuilt } = roundTrip(activities, triggers, edges)
+      const { original, rebuilt } = roundTrip({ activities, triggers, edges })
 
       expect(rebuilt.nodes[0].outputs).toEqual(original.nodes[0].outputs)
     })
@@ -306,7 +317,7 @@ describe('V2 Workflow Definition Round-Trip', () => {
       ]
       const edges = [makeEdge('trigger-0', 'http_1')]
 
-      const { original, rebuilt } = roundTrip(activities, triggers, edges)
+      const { original, rebuilt } = roundTrip({ activities, triggers, edges })
 
       expect(rebuilt.nodes[0].settings).toEqual(original.nodes[0].settings)
     })
@@ -322,7 +333,7 @@ describe('V2 Workflow Definition Round-Trip', () => {
       const activities = [makeActivity({ id: 'script_1', type: ActivityTypeEnum.SCRIPT })]
       const edges = [makeEdge('trigger-0', 'script_1')]
 
-      const { original, rebuilt } = roundTrip(activities, triggers, edges)
+      const { original, rebuilt } = roundTrip({ activities, triggers, edges })
 
       expect(rebuilt.triggers[0].parameters).toEqual(original.triggers[0].parameters)
     })
@@ -345,7 +356,7 @@ describe('V2 Workflow Definition Round-Trip', () => {
         makeEdge('branch_b', 'converge_node'),
       ]
 
-      const { original, rebuilt } = roundTrip(activities, triggers, edges)
+      const { original, rebuilt } = roundTrip({ activities, triggers, edges })
 
       const originalConverge = original.nodes.find((n) => n.id === 'converge_node')!
       const rebuiltConverge = rebuilt.nodes.find((n) => n.id === 'converge_node')!

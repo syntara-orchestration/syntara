@@ -178,16 +178,16 @@ describe('useEdgeExecutionStatus', () => {
       const updater = setEdges.mock.calls[0][0] as (edges: TestEdge[]) => TestEdge[]
       updater([edge])
 
-      expect(mockDetermineEdgeStatus).toHaveBeenCalledWith(
+      expect(mockDetermineEdgeStatus).toHaveBeenCalledWith({
         edge,
-        defaultActivity,
-        [],
-        new Map([
+        activityStates: defaultActivity,
+        activities: [],
+        triggerDisplayToRealId: new Map([
           ['trigger-display-0', 'real-trigger-1'],
           ['trigger-display-1', 'real-trigger-2'],
         ]),
-        []
-      )
+        edges: [],
+      })
     })
   })
 

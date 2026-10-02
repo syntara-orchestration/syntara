@@ -440,7 +440,7 @@ describe('ConvergeNode Menu Actions', () => {
         </ReactFlowProvider>
       )
 
-      // Act — exclude nested-interactive: pre-existing issue in shared NodeMenu component
+      // Act — exclude nested-interactive: pre-existing issue in shared SynStepMenu component
       const results = await axe(container, { rules: { 'nested-interactive': { enabled: false } } })
 
       // Assert

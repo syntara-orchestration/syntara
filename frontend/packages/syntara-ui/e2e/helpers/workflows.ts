@@ -44,6 +44,10 @@ export async function waitForUIReady(page: Page) {
  * Click the "Reset layout" button to trigger an auto-layout of the canvas.
  * Uses explicit `toBeVisible()` to ride out any layout animations still settling
  * from a previous call (e.g. after addScriptNode).
+ *
+ * Use this when you only need nodes repositioned after adding steps. Use
+ * {@link layoutCanvas} when tests must also fit the viewport (typical in CI) before
+ * clicking nodes or edge controls.
  */
 export async function triggerLayout(page: Page) {
   const layoutButton = page.getByRole('button', { name: 'Reset layout', exact: true })
@@ -51,6 +55,8 @@ export async function triggerLayout(page: Page) {
   await layoutButton.click()
   await waitForUIReady(page)
 }
+
+export { clickNode, layoutCanvas } from './canvas-interaction'
 
 export async function closeNodeEditorPanel(page: Page) {
   // The node editor cancel button has different aria-labels depending on mode:

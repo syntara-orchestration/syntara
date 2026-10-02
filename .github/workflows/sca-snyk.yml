@@ -33,7 +33,7 @@ permissions:
 jobs:
   changes:
     name: Snyk SCA (Identify changes)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       backend: ${{ steps.filter.outputs.backend }}
       frontend: ${{ steps.filter.outputs.frontend }}
@@ -69,7 +69,7 @@ jobs:
 
   snyk-sca-backend:
     name: Snyk SCA (Backend)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: changes
     if: >-
       needs.changes.outputs.has_snyk_token == 'true'
@@ -232,7 +232,7 @@ jobs:
 
   snyk-sca-frontend:
     name: Snyk SCA (Frontend)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: changes
     if: >-
       needs.changes.outputs.has_snyk_token == 'true'

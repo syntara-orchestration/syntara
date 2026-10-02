@@ -11,7 +11,7 @@ import { SynPage } from '../../components/layout/SynPage'
 import { SynPanel } from '../../components/layout/SynPanel'
 import { SynPanelStack, SynPanelStackItem } from '../../components/layout/SynPanelStack'
 import { SynReactFlowViewportGuard } from '../../components/layout/SynReactFlowViewportGuard'
-import { NodeExpandedAllContext } from '../../components/nodes/NodeExpandedAllContext'
+import { SynStepExpandedAllContext } from '../../components/steps/SynStepExpandedAllContext'
 import { useSearchParams } from '../../hooks/routing/useSearchParams'
 import { useCursorPagination } from '../../hooks/useCursorPagination'
 import { useProjectSelector } from '../../hooks/useProjectSelector'
@@ -260,21 +260,23 @@ export function BuilderContent(props: BuilderContentProps) {
     createWorkflow: createWorkflow,
     updateWorkflow,
   })
-  const guardedSaveWorkflow = useGuardedSaveWorkflow(
+  const guardedSaveWorkflow = useGuardedSaveWorkflow({
     handleSaveWorkflow,
     isNodeEditorOpen,
     nodeEditorMode,
     autoSubmitRef,
-    dispatch
-  )
+    dispatch,
+  })
 
-  const { publish: onPublish, isPublishing } = usePublishWorkflow(
+  const { publish: onPublish, isPublishing } = usePublishWorkflow({
     workflowId,
     currentVersion,
     workflowName,
     workflowDescription,
-    { expectedVersion: loadedVersion, onConflict: handleConflict('publish'), onVersionUpdated }
-  )
+    expectedVersion: loadedVersion,
+    onConflict: handleConflict('publish'),
+    onVersionUpdated,
+  })
 
   const mostRecentExecution = mostRecentExecutionQuery.data
   const {
@@ -459,7 +461,11 @@ export function BuilderContent(props: BuilderContentProps) {
     const { edges, nodePositions } = useWorkflowStore.getState()
     const activities = currentWorkflow.workflow.activities ?? []
     const triggers = currentWorkflow.triggers ?? []
-    const definition = buildWorkflowDefinition(workflowName, workflowDescription, activities, triggers, {
+    const definition = buildWorkflowDefinition({
+      workflowName: workflowName,
+      workflowDescription: workflowDescription,
+      activities: activities,
+      triggers: triggers,
       edges,
       nodePositions,
     })
@@ -576,7 +582,7 @@ export function BuilderContent(props: BuilderContentProps) {
   })
   return (
     <NodeActionsContext.Provider value={nodeActionsValue}>
-      <NodeExpandedAllContext.Provider value={nodeExpandedAllContextValue}>
+      <SynStepExpandedAllContext.Provider value={nodeExpandedAllContextValue}>
         <VersionViewProvider value={versionPanel.isViewingVersion}>
           <SynPage>
             <SynReactFlowViewportGuard>
@@ -779,7 +785,7 @@ export function BuilderContent(props: BuilderContentProps) {
             />
           </SynPage>
         </VersionViewProvider>
-      </NodeExpandedAllContext.Provider>
+      </SynStepExpandedAllContext.Provider>
     </NodeActionsContext.Provider>
   )
 }

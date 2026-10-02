@@ -1,29 +1,17 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import {
-  Button,
-  Form,
-  FormGroup,
-  FormHelperText,
-  HelperText,
-  HelperTextItem,
-  Modal,
-  ModalBody,
-  ModalFooter,
-  ModalHeader,
-  TextInput,
-} from '@patternfly/react-core'
+import { Button, Form, Modal, ModalBody, ModalFooter, ModalHeader } from '@patternfly/react-core'
 import { useQueryClient } from '@tanstack/react-query'
-import { Controller, useForm } from 'react-hook-form'
+import { useForm } from 'react-hook-form'
 
 import { invalidateAuthzCaches } from '../../hooks/invalidateAuthzCaches'
 import { useFormMutationErrorHandler } from '../../hooks/useFormMutationErrorHandler'
 import { useAlerts } from '../../providers/alerts'
 
 import { accessClient } from './accessClient'
-import { accessControlHelp } from './accessControlFieldHelp'
 import { roleBaseSchema } from './addRoleSchema'
 import type { EditRoleFormData } from './addRoleSchema'
 import { PolicySelect } from './PolicySelect'
+import { RoleFormFields } from './RoleFormFields'
 import type { RoleRead } from './types'
 
 type EditRoleDialogProps = {
@@ -81,66 +69,23 @@ export function EditRoleDialog({ role, onClose, onSuccess }: Readonly<EditRoleDi
       <ModalHeader title={`Edit ${role.name}`} />
       <ModalBody>
         <Form id="edit-role-form" onSubmit={handleSubmit(onSubmit)}>
-          <FormGroup label="Name" isRequired fieldId="role-name">
-            <TextInput
-              id="role-name"
-              isRequired
-              aria-label="Role name"
-              validated={errors.name ? 'error' : 'default'}
-              {...register('name')}
-            />
-            {errors.name ? (
-              <FormHelperText>
-                <HelperText>
-                  <HelperTextItem variant="error">{errors.name.message}</HelperTextItem>
-                </HelperText>
-              </FormHelperText>
-            ) : (
-              <FormHelperText>
-                <HelperText>
-                  <HelperTextItem>Lowercase alphanumeric with hyphens (e.g. my-custom-role)</HelperTextItem>
-                </HelperText>
-              </FormHelperText>
+          <RoleFormFields
+            fieldIds={{ name: 'role-name', description: 'role-description', policies: 'role-policies' }}
+            register={register}
+            control={control}
+            errors={errors}
+            nameField="name"
+            descriptionField="description"
+            policiesField="policies"
+            renderPolicySelect={({ selected, onChange, hasError }) => (
+              <PolicySelect
+                selected={selected}
+                onChange={onChange}
+                hasError={hasError}
+                scopeProjectId={role.project_id ?? null}
+              />
             )}
-          </FormGroup>
-
-          <FormGroup label="Description" fieldId="role-description">
-            <TextInput
-              id="role-description"
-              aria-label="Role description"
-              validated={errors.description ? 'error' : 'default'}
-              {...register('description')}
-            />
-            {errors.description && (
-              <FormHelperText>
-                <HelperText>
-                  <HelperTextItem variant="error">{errors.description.message}</HelperTextItem>
-                </HelperText>
-              </FormHelperText>
-            )}
-          </FormGroup>
-
-          <FormGroup label="Policies" isRequired fieldId="role-policies" labelHelp={accessControlHelp.policies}>
-            <Controller
-              name="policies"
-              control={control}
-              render={({ field }) => (
-                <PolicySelect
-                  selected={field.value}
-                  onChange={field.onChange}
-                  hasError={!!errors.policies}
-                  scopeProjectId={role.project_id ?? null}
-                />
-              )}
-            />
-            {errors.policies && (
-              <FormHelperText>
-                <HelperText>
-                  <HelperTextItem variant="error">{errors.policies.message}</HelperTextItem>
-                </HelperText>
-              </FormHelperText>
-            )}
-          </FormGroup>
+          />
         </Form>
       </ModalBody>
       <ModalFooter>

@@ -34,12 +34,37 @@ class TestWorkflowVersionPublishedTelemetryHandler:
         registry.send_event.assert_called_once()
         event = registry.send_event.call_args[0][0]
         assert isinstance(event, WorkflowVersionPublishedTelemetryEvent)
-        assert event.workflow_id == str(workflow_id)
+        assert event.workflow_id == workflow_id
         assert event.version == 3
         assert event.workflow_name == "test-wf"
-        assert event.project_id == str(project_id)
+        assert event.project_id == project_id
         assert event.error_type is None
         assert event.entitlement_id == "ent-test-789"
+
+    @patch("syntara.telemetry.handlers.workflow_version_published.get_telemetry_registry")
+    def test_emits_user_id_hash_and_published_version_id(self, mock_get_registry: MagicMock) -> None:
+        from syntara.telemetry.client import hash_user_id
+
+        registry = MagicMock()
+        registry.is_initialized.return_value = True
+        registry.entitlement_id = "ent"
+        registry.installation_salt = "salt-value"
+        mock_get_registry.return_value = registry
+
+        user_id = uuid4()
+        published_version_id = uuid4()
+        domain_event = WorkflowVersionPublishedEvent(
+            workflow_id=uuid4(),
+            workflow_name="wf",
+            version=4,
+            published_version_id=published_version_id,
+            user_id=user_id,
+        )
+        WorkflowVersionPublishedTelemetryHandler().handle(domain_event)
+
+        event = registry.send_event.call_args[0][0]
+        assert event.published_version_id == published_version_id
+        assert event.user_id_hash == hash_user_id("salt-value", user_id)
 
     @patch("syntara.telemetry.handlers.workflow_version_published.get_telemetry_registry")
     def test_skips_when_not_initialized(self, mock_get_registry: MagicMock) -> None:

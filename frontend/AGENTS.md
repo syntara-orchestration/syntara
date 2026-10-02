@@ -262,6 +262,7 @@ See: [`docs/data-flow.md`](docs/data-flow.md) — "Type-Safe API Clients"
 2. Add navigation item to `packages/syntara-ui/src/app/navigationItems.tsx` with lazy-loaded component
 3. The router auto-discovers it from `navigationItems` — no manual route config needed
 4. In the page component, render `<title>{toPageTitle(['Page Name'])}</title>` as the first child of `<SynPage>`; import `toPageTitle` from `src/utils/toPageTitle`
+5. Run `npm run route-baseline:update` and commit the regenerated `manifest.gen.json`
 
 #### How do I add filters to a list page?
 
