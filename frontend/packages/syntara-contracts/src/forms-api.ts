@@ -522,7 +522,10 @@ export interface components {
        */
       type: 'dropdown'
       /** Options */
-      options: components['schemas']['StaticOptions'] | components['schemas']['DynamicOptions']
+      options:
+        | components['schemas']['StaticOptions']
+        | components['schemas']['DynamicOptions']
+        | components['schemas']['ResolvedOptions']
       /** Default */
       default?: string | number | boolean | null
     }
@@ -550,7 +553,10 @@ export interface components {
        */
       type: 'multi_select'
       /** Options */
-      options: components['schemas']['StaticOptions'] | components['schemas']['DynamicOptions']
+      options:
+        | components['schemas']['StaticOptions']
+        | components['schemas']['DynamicOptions']
+        | components['schemas']['ResolvedOptions']
       /** Default */
       default?: (string | number | boolean)[] | null
     }
@@ -579,7 +585,10 @@ export interface components {
     }
     /**
      * DynamicOptions
-     * @description Dynamic option list resolved from upstream node output.
+     * @description Dynamic option list resolved from a non-empty array of upstream objects.
+     *
+     *     Each object must contain a string label and scalar value at the required
+     *     ``label_key`` and ``value_key``.
      */
     DynamicOptions: {
       /**
@@ -587,12 +596,52 @@ export interface components {
        * @enum {string}
        */
       source: 'dynamic'
-      /** Expression */
+      /**
+       * Expression
+       * @description Template expression resolving to a non-empty array of objects. Each object must contain a string label and scalar value at the required 'label_key' and 'value_key'.
+       */
       expression: string
-      /** Value Key */
-      value_key?: string | null
-      /** Label Key */
-      label_key?: string | null
+      /**
+       * Value Key
+       * @description Required object key containing the typed option value.
+       */
+      value_key: string
+      /**
+       * Label Key
+       * @description Required object key containing the option label.
+       */
+      label_key: string
+    }
+    /**
+     * ResolvedOptions
+     * @description Dynamic options materialized into a concrete list at prompt creation.
+     *
+     *     Produced only by the workflow engine, never authored. A form prompt is
+     *     persisted with this shape so the responder view and submission membership
+     *     validation operate on the same snapshot.
+     */
+    ResolvedOptions: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      source: 'dynamic_resolved'
+      /** Values */
+      values: components['schemas']['ResolvedOption'][]
+    }
+    /**
+     * ResolvedOption
+     * @description An option materialized from upstream output while preserving its scalar type.
+     *
+     *     Python set membership considers ``1``, ``1.0``, and ``True`` equal. That
+     *     behavior is used by the backend's de-duplication and membership checks.
+     *     Static options remain strings because they are authored by a user.
+     */
+    ResolvedOption: {
+      /** Display Label */
+      display_label: string
+      /** Value */
+      value: string | number | boolean
     }
     /**
      * FormPromptSummary

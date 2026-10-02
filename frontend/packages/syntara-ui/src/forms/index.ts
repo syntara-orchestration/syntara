@@ -33,6 +33,7 @@ export type {
   FormFieldByType,
   FormSubmissionData,
   FormSubmissionInput,
+  ResolvedOptionsSource,
   StaticOptionsSource,
 } from './formTypes'
 export type { FormDefinition, FormField, FormPromptConfig } from '@syntara/contracts'

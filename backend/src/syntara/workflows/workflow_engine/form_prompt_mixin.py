@@ -17,6 +17,7 @@ from temporalio.exceptions import TimeoutError as TemporalTimeoutError
 with workflow.unsafe.imports_passed_through():
     from syntara.core.constants import FieldLimits
     from syntara.core.exceptions import SafeValueError
+    from syntara.forms.validators.options import resolve_dynamic_options
     from syntara.workflows.workflow_engine.activities.form_prompt_activity import fail_detached_form_prompt_activity
     from syntara.workflows.workflow_engine.constants import DEFAULT_ACTIVITY_TIMEOUT_SECONDS
     from syntara.workflows.workflow_engine.models.workflow_definition import (
@@ -195,6 +196,11 @@ class WorkflowFormPromptMixin:
             )
             raise SafeValueError(msg)
 
+        # Workflow expression resolution has already substituted each dynamic
+        # options expression with the upstream value. Materialize a snapshot so
+        # the prompt and its submission validator use the same option list.
+        form_definition = resolve_dynamic_options(resolved_parameters.get("form_definition", {}))
+
         name = node.name or f"Form prompt for {node.id}"
 
         # Resolve responders (reuse the approver resolution activity - it's generic)
@@ -220,9 +226,6 @@ class WorkflowFormPromptMixin:
             max_length=_FORM_PROMPT_MESSAGE_MAX_LENGTH,
             scrub_data=self._scrub_data,
         )
-
-        # Get form_definition
-        form_definition = resolved_parameters.get("form_definition", {})
 
         # Get presentation fields
         submit_label = resolved_parameters.get("submit_label")

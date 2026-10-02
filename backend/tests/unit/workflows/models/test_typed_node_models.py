@@ -459,6 +459,51 @@ class TestFormPromptNodeParameters:
         assert p.message is None
         assert p.fallback_decision is None
 
+    def test_resolved_options_rejected_in_authored_definition(self) -> None:
+        """Runtime-materialized option snapshots cannot be authored in workflows."""
+        form_definition = {
+            "fields": [
+                {
+                    "type": "dropdown",
+                    "value_name": "region",
+                    "label": "Region",
+                    "options": {
+                        "source": "dynamic_resolved",
+                        "values": [{"display_label": "US", "value": 1}],
+                    },
+                }
+            ]
+        }
+
+        with pytest.raises(ValidationError, match="Use 'static' or 'dynamic'"):
+            FormPromptNodeParameters(form_definition=form_definition)  # type: ignore[arg-type]
+
+    def test_static_and_dynamic_options_remain_authored_sources(self) -> None:
+        """Static and dynamic source definitions remain valid for authors."""
+        for options in (
+            {"source": "static", "values": [{"display_label": "US", "value": "us"}]},
+            {
+                "source": "dynamic",
+                "expression": "${fetch.output.regions}",
+                "label_key": "display_label",
+                "value_key": "value",
+            },
+        ):
+            form_definition = FormDefinition.model_validate(
+                {
+                    "fields": [
+                        {
+                            "type": "dropdown",
+                            "value_name": "region",
+                            "label": "Region",
+                            "options": options,
+                        }
+                    ]
+                }
+            )
+            parameters = FormPromptNodeParameters(form_definition=form_definition)
+            assert parameters.form_definition.model_dump()["fields"][0]["options"]["source"] == options["source"]
+
     def test_fully_populated(self) -> None:
         """All fields populated."""
         p = FormPromptNodeParameters(

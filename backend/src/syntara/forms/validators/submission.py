@@ -35,6 +35,7 @@ from syntara.forms.models.form_fields import (
     MaskedTextField,
     MultiSelectField,
     NumberField,
+    ResolvedOptions,
     StaticOptions,
     TextAreaField,
     TextField,
@@ -369,22 +370,26 @@ def _coerce_date(raw: Any) -> str:  # noqa: ANN401
 
 
 def _check_option_membership(field: FormField, coerced: Any) -> FormFieldError | None:  # noqa: ANN401
-    """Check a coerced value against a field's static option list.
+    """Check a coerced value against a static or resolved option list.
 
     Args:
         field: Field definition
         coerced: The already-coerced submitted value
 
     Returns:
-        A field error, or None if the field has no static options or the value
-        is a member of them. Dynamic options resolve at runtime and are not
-        checked here.
+        A field error, or None if the field has no concrete option list or the
+        value is a member of it. Dynamic options are unresolved only while a
+        workflow definition is being authored; persisted prompts use resolved
+        options and are checked here.
 
     """
-    if not (isinstance(field, (DropdownField, MultiSelectField)) and isinstance(field.options, StaticOptions)):
+    if not (
+        isinstance(field, (DropdownField, MultiSelectField))
+        and isinstance(field.options, (StaticOptions, ResolvedOptions))
+    ):
         return None
 
-    valid_values = {opt.value for opt in field.options.values}
+    valid_values: set[str | int | float | bool] = {opt.value for opt in field.options.values}
 
     if isinstance(field, MultiSelectField):
         if not isinstance(coerced, list):
@@ -435,8 +440,8 @@ def _coerce_option_value(raw: Any) -> str | int | float | bool:  # noqa: ANN401
         TypeError: If the value is not a supported scalar
 
     """
-    # bool is redundant with int (it subclasses int) but is listed to mirror
-    # the StaticOption.value type exactly
+    # bool is redundant with int (it subclasses int) but remains explicit for
+    # clarity at this JSON-facing boundary.
     if isinstance(raw, (str, int, float, bool)):
         return raw
 

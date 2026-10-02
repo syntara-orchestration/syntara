@@ -142,7 +142,12 @@ class TestMultiSelectScalarDefaults:
     @pytest.mark.parametrize("value", ["a", 5, 5.5, True])
     def test_dynamic_scalar_defaults_are_accepted(self, value: object) -> None:
         """String, integer, float, and boolean defaults are valid for dynamic options."""
-        options = {"source": "dynamic", "expression": "${upstream.output}"}
+        options = {
+            "source": "dynamic",
+            "expression": "${upstream.output}",
+            "label_key": "display_label",
+            "value_key": "value",
+        }
 
         form = _form(_field("multi_select", "picks", options=options, default=[value]))
 
@@ -153,7 +158,12 @@ class TestMultiSelectScalarDefaults:
     @pytest.mark.parametrize("bad", [{"a": 1}, ["nested"]])
     def test_non_scalar_default_items_are_rejected(self, bad: Any) -> None:  # noqa: ANN401
         """Nested lists and dictionaries fail field parsing before definition validation."""
-        options = {"source": "dynamic", "expression": "${upstream.output}"}
+        options = {
+            "source": "dynamic",
+            "expression": "${upstream.output}",
+            "label_key": "display_label",
+            "value_key": "value",
+        }
 
         field = _field("multi_select", "picks", options=options, default=[bad])
         with pytest.raises(ValidationError):

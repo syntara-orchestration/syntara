@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 
 import { FORM_FIELD_TYPE_VALUES, FormFieldTypeEnum } from '../../../forms'
 
-import { createDefaultField, fieldTypeLabel, replaceFieldType } from './createDefaultField'
+import { createDefaultField, defaultDynamicOptionsSource, fieldTypeLabel, replaceFieldType } from './createDefaultField'
 
 describe('createDefaultField', () => {
   it('creates dropdown fields with static options', () => {
@@ -19,6 +19,15 @@ describe('createDefaultField', () => {
       const field = createDefaultField(type, [])
       expect(field.type).toBe(type)
     }
+  })
+
+  it('leaves required dynamic option keys empty until the author sets them', () => {
+    expect(defaultDynamicOptionsSource()).toEqual({
+      source: 'dynamic',
+      expression: '',
+      label_key: '',
+      value_key: '',
+    })
   })
 
   it('fieldTypeLabel returns a human label for each type', () => {

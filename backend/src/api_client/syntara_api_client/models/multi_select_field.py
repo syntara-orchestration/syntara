@@ -9,6 +9,7 @@ from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
     from ..models.dynamic_options import DynamicOptions
+    from ..models.resolved_options import ResolvedOptions
     from ..models.static_options import StaticOptions
 
 
@@ -23,7 +24,7 @@ class MultiSelectField:
         value_name (str):
         label (str):
         type_ (Literal['multi_select']):
-        options (DynamicOptions | StaticOptions):
+        options (DynamicOptions | ResolvedOptions | StaticOptions):
         placeholder (None | str | Unset):
         help_text (None | str | Unset):
         required (bool | Unset):  Default: False.
@@ -33,13 +34,14 @@ class MultiSelectField:
     value_name: str
     label: str
     type_: Literal["multi_select"]
-    options: DynamicOptions | StaticOptions
+    options: DynamicOptions | ResolvedOptions | StaticOptions
     placeholder: None | str | Unset = UNSET
     help_text: None | str | Unset = UNSET
     required: bool | Unset = False
     default: list[bool | float | int | str] | None | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
+        from ..models.dynamic_options import DynamicOptions
         from ..models.static_options import StaticOptions
 
         value_name = self.value_name
@@ -50,6 +52,8 @@ class MultiSelectField:
 
         options: dict[str, Any]
         if isinstance(self.options, StaticOptions):
+            options = self.options.to_dict()
+        elif isinstance(self.options, DynamicOptions):
             options = self.options.to_dict()
         else:
             options = self.options.to_dict()
@@ -105,6 +109,7 @@ class MultiSelectField:
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         from ..models.dynamic_options import DynamicOptions
+        from ..models.resolved_options import ResolvedOptions
         from ..models.static_options import StaticOptions
 
         d = dict(src_dict)
@@ -116,7 +121,7 @@ class MultiSelectField:
         if type_ != "multi_select":
             raise ValueError(f"type must match const 'multi_select', got '{type_}'")
 
-        def _parse_options(data: object) -> DynamicOptions | StaticOptions:
+        def _parse_options(data: object) -> DynamicOptions | ResolvedOptions | StaticOptions:
             try:
                 if not isinstance(data, dict):
                     raise TypeError()
@@ -125,11 +130,19 @@ class MultiSelectField:
                 return options_type_0
             except (TypeError, ValueError, AttributeError, KeyError):
                 pass
+            try:
+                if not isinstance(data, dict):
+                    raise TypeError()
+                options_type_1 = DynamicOptions.from_dict(data)
+
+                return options_type_1
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
             if not isinstance(data, dict):
                 raise TypeError()
-            options_type_1 = DynamicOptions.from_dict(data)
+            options_type_2 = ResolvedOptions.from_dict(data)
 
-            return options_type_1
+            return options_type_2
 
         options = _parse_options(d.pop("options"))
 
