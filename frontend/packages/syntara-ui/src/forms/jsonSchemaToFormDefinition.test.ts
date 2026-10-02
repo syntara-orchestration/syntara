@@ -50,6 +50,58 @@ describe('jsonSchemaToFormDefinition', () => {
     }
   })
 
+  it.each([
+    { label: 'null', defaultValue: null },
+    { label: 'number', defaultValue: 42 },
+    { label: 'array', defaultValue: ['2026-01-02'] },
+    { label: 'unknown component', defaultValue: { date: '2026-01-02', offset: '-05:00' } },
+    { label: 'non-string component', defaultValue: { date: '2026-01-02', time: 1430 } },
+  ])('imports an unsupported $label date default as null', ({ defaultValue }) => {
+    const imported = jsonSchemaToFormDefinition({
+      type: 'object',
+      properties: {
+        due: { type: 'string', format: 'date', default: defaultValue },
+      },
+    })
+
+    expect(imported.success).toBe(true)
+    if (imported.success) {
+      const due = imported.data.fields[0]
+      expect(due?.type).toBe(FormFieldTypeEnum.DATE)
+      if (due?.type === FormFieldTypeEnum.DATE) {
+        expect(due.default).toBeNull()
+      }
+    }
+  })
+
+  it('preserves null time and timezone components on import', () => {
+    const imported = jsonSchemaToFormDefinition({
+      type: 'object',
+      properties: {
+        due: { type: 'string', format: 'date', default: { date: '2026-01-02', time: null, timezone: null } },
+      },
+    })
+
+    expect(imported.success).toBe(true)
+    if (imported.success) {
+      expect(imported.data.fields[0]?.default).toEqual({ date: '2026-01-02', time: null, timezone: null })
+    }
+  })
+
+  it('converts an imported date string default to a date component value', () => {
+    const imported = jsonSchemaToFormDefinition({
+      type: 'object',
+      properties: {
+        due: { type: 'string', format: 'date', default: '2026-01-02' },
+      },
+    })
+
+    expect(imported.success).toBe(true)
+    if (imported.success) {
+      expect(imported.data.fields[0]?.default).toEqual({ date: '2026-01-02' })
+    }
+  })
+
   it('coerces numeric JSON Schema enums to string static option values on import', () => {
     const imported = jsonSchemaToFormDefinition({
       type: 'object',
