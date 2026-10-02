@@ -68,6 +68,7 @@ def _make_workflow(
     init_workflow_runtime(wf)
     wf.pre_resolved_outputs = {}
     wf.stop_after_nodes = set()
+    wf._secret_values = set()
     return wf
 
 
@@ -1503,6 +1504,29 @@ class TestBuildResultStatus:
         result = wf._build_result("exec-1", include_node_results=False)
         assert result["status"] == "cancelled"
         assert "node_a" not in result["failed_activities"]
+
+
+class TestHandleNodeFailureSecretScrubbing:
+    """_handle_node_failure scrubs workflow secrets from stored error messages."""
+
+    def test_failure_message_scrubs_secret_values(self) -> None:
+        from temporalio.exceptions import ApplicationError
+
+        graph = _build_linear_graph()
+        wf = _make_workflow()
+        wf.resolver.set_namespace("trigger", {})
+        secret = "wf-secret-token-value"  # noqa: S105
+        wf._secret_values.add(secret)
+
+        error = ApplicationError(f"TFE step failed: {secret}", type="AUTH_FAILED", non_retryable=True)
+        wf._handle_node_failure("node_a", error, graph)
+
+        stored = wf.failed_nodes["node_a"]
+        namespace = wf.resolver.get_namespace("node_a")
+        assert secret not in stored
+        assert secret not in namespace["error"]
+        assert "[REDACTED]" in stored
+        assert namespace["error"] == stored
 
 
 class TestHandleNodeFailureCancellation:

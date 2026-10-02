@@ -2,7 +2,7 @@
 
 from http import HTTPStatus
 
-from syntara.terraform.errors import TFEError, TFEErrorCode, map_http_status_to_error
+from syntara.terraform.errors import TFEError, TFEErrorCode, map_http_status_to_error, redact_sensitive_content
 
 
 def test_auth_failed() -> None:
@@ -76,6 +76,56 @@ def test_transient_mutating_not_retryable() -> None:
     err = map_http_status_to_error(HTTPStatus.BAD_GATEWAY, "bad gateway", mutating=True)
     assert err.error_code == TFEErrorCode.TRANSIENT
     assert not err.retryable
+
+
+def test_redact_sensitive_content_replaces_known_secret() -> None:
+    secret = "my-long-api-token"  # noqa: S105
+    text = f"request failed with header {secret} embedded"
+    result = redact_sensitive_content(text, {secret})
+    assert secret not in result
+    assert "[REDACTED]" in result
+
+
+def test_redact_sensitive_content_skips_short_secrets() -> None:
+    short = "abc"
+    text = f"value {short} here"
+    assert redact_sensitive_content(text, {short}) == text
+
+
+def test_redact_sensitive_content_bearer_pattern() -> None:
+    text = "Auth was Bearer super-secret-token in logs"
+    result = redact_sensitive_content(text)
+    assert "super-secret-token" not in result
+    assert "Bearer [REDACTED]" in result
+
+
+def test_redact_sensitive_content_bearer_pattern_case_insensitive() -> None:
+    text = "bearer tok12345 failed"
+    result = redact_sensitive_content(text)
+    assert "tok12345" not in result
+    assert "[REDACTED]" in result
+    assert result.startswith("Bearer ")
+
+
+def test_redact_sensitive_content_authorization_header_pattern() -> None:
+    text = "Header dump: Authorization: at-at-at-at-at"
+    result = redact_sensitive_content(text)
+    assert "at-at-at-at-at" not in result
+    assert "Authorization: [REDACTED]" in result
+
+
+def test_redact_sensitive_content_longer_secret_before_substring() -> None:
+    long_secret = "abcdefghij"  # noqa: S105
+    short_secret = "abcde"  # noqa: S105
+    text = f"leaked {long_secret}"
+    result = redact_sensitive_content(text, {short_secret, long_secret})
+    assert long_secret not in result
+    assert short_secret not in result
+    assert result == "leaked [REDACTED]"
+
+
+def test_redact_sensitive_content_empty_string() -> None:
+    assert redact_sensitive_content("") == ""
 
 
 def test_to_dict_includes_error_code() -> None:
