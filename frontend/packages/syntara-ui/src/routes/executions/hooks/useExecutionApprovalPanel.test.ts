@@ -221,9 +221,7 @@ describe('useExecutionApprovalPanel', () => {
 
     mockFetchApprovals.mockResolvedValue([mockApproval])
 
-    const { result } = renderHook(() =>
-      useExecutionApprovalPanel('exec-1', 'history=open', makeNodeClick(), undefined)
-    )
+    const { result } = renderHook(() => useExecutionApprovalPanel('exec-1', 'history=open', makeNodeClick(), undefined))
 
     await act(async () => {
       capturedCallback!(mockApproval)
