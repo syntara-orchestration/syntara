@@ -8,10 +8,10 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any, ClassVar
 from uuid import UUID
 
-from pydantic import PrivateAttr
+from pydantic import ConfigDict, PrivateAttr
 from sqlalchemy import Column, Index, String, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlmodel import DateTime, Field, Relationship
+from sqlmodel import DateTime, Field, Relationship, SQLModel
 
 from syntara.core.constants import FieldLimits
 from syntara.core.models.base import BaseResource
@@ -20,7 +20,6 @@ from syntara.core.models.user_reference import UserReference, UserReferenceField
 from syntara.core.utils.sqlmodel import DiscriminatedJSONB, postgres_enum_column
 from syntara.forms.models.api_models import (
     FormPromptStatus,
-    FormPromptSummary,
     ResponderGroupSummary,
     ResponderUserSummary,
 )
@@ -290,14 +289,44 @@ class FormPromptRead(UserReferenceFieldsMixin, BaseFormPrompt, table=False):
     )
 
 
+class FormPromptListRead(UserReferenceFieldsMixin, SQLModel):
+    """User-facing form prompt row for list endpoints (Tasks / Form responses table)."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(from_attributes=True)  # type: ignore[assignment]
+
+    USER_REFERENCE_FIELDS: ClassVar[tuple[str, ...]] = ("responded_by",)
+
+    id: UUID = Field(..., description="Form prompt unique identifier")
+    created_at: datetime = Field(..., description="When the form prompt was created")
+    execution_id: UUID = Field(..., description="Parent workflow execution ID")
+    project_id: UUID = Field(..., description="Project ID (denormalized from execution)")
+    prompt_node_id: str = Field(..., description="Canvas node ID from the workflow definition")
+    name: str = Field(..., description="Display name for the form prompt")
+    status: FormPromptStatus = Field(..., description="Current prompt status")
+    timeout_at: datetime | None = Field(
+        default=None,
+        description="When this prompt expires (null = no timeout)",
+    )
+    responded_at: datetime | None = Field(
+        default=None,
+        description="When the response was submitted (null until submitted)",
+    )
+    responded_by: UserReference | None = Field(
+        default=None,
+        description="User who submitted the response",
+    )
+    workflow_id: UUID | None = Field(default=None, description="ID of the parent workflow")
+    workflow_version: int | None = Field(
+        default=None,
+        description="Integer version number of the workflow version executed",
+    )
+    workflow_name: str | None = Field(default=None, description="Name of the parent workflow")
+
+
 # ============================================================================
 # List Response
 # ============================================================================
 
 
-class FormPromptListResponse(ResourcesResponse[FormPromptSummary]):
-    """Paginated list response for form prompts.
-
-    Uses FormPromptSummary (8 documented fields) for internal workflow engine endpoints.
-    AAP-91889 will add user-facing list endpoints using FormPromptRead.
-    """
+class FormPromptListResponse(ResourcesResponse[FormPromptListRead]):
+    """Paginated list response for form prompts."""

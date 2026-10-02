@@ -225,6 +225,42 @@ class TestFormPromptCreateAPI:
         assert "Form 1" in prompt_names
         assert "Form 2" in prompt_names
 
+        for item in data["resources"]:
+            assert "created_at" in item
+            assert "workflow_name" in item
+            assert "responded_at" in item
+            assert "timeout_at" in item
+            assert "temporal_activity_id" not in item
+            assert "loop_iteration_path" not in item
+
+    async def test_list_form_prompts_includes_submission_metadata(
+        self,
+        jwt_client: AsyncClient,
+        test_execution: Execution,
+        test_user: User,
+    ) -> None:
+        """List returns responded_at and responded_by after a prompt is submitted."""
+        exec_id = test_execution.id
+        payload = _form_prompt_payload(exec_id, test_execution.project_id, name="Responded form")
+        create_response = await jwt_client.post(FORM_PROMPTS_URL, json=payload)
+        assert create_response.status_code == 201
+        prompt_id = create_response.json()["id"]
+
+        submit_response = await jwt_client.post(
+            f"{FORM_PROMPTS_URL}/{prompt_id}/submit",
+            json={"response_data": {"field1": "answer"}},
+        )
+        assert submit_response.status_code == 200
+
+        list_response = await jwt_client.get(FORM_PROMPTS_URL, params={"execution_id": str(exec_id)})
+        assert list_response.status_code == 200
+        resources = list_response.json()["resources"]
+        submitted = next(item for item in resources if item["id"] == prompt_id)
+        assert submitted["status"] == "submitted"
+        assert submitted["responded_at"] is not None
+        assert submitted["responded_by"] is not None
+        assert submitted["responded_by"]["name"]
+
     async def test_batch_update_form_prompt_status(self, jwt_client: AsyncClient, test_execution: Execution) -> None:
         """Batch update form_prompt status via /form_prompts/batch endpoint."""
         exec_id = test_execution.id
