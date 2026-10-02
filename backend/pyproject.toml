@@ -56,7 +56,7 @@ dependencies = [
     "structlog>=25.5.0,<26.0.0",
     "segment-analytics-python>=2.3.5",
     "prometheus-client>=0.19.0",
-    "PyJWT[crypto]>=2.13.0",
+    "PyJWT[crypto]>=2.14.0",
     "argon2-cffi>=25.1.0",
     "cachetools>=5.0",
     "cryptography>=48.0.1",
@@ -70,7 +70,7 @@ dependencies = [
     "opentelemetry-exporter-otlp-proto-http>=1.39.1",
     "wrapt>=1.17.3",
     "uuid-utils>=0.9.0",
-    "pypdf>=6.15.0",
+    "pypdf>=6.18.1",
     "nh3>=0.2.21",
 ]
 
@@ -103,7 +103,7 @@ dev = [
     "boto3-stubs[s3]>=1.35.0",  # type stubs for boto3 S3
     # MCP testing infrastructure
     "fastmcp>=3.2.0,<4.0.0",  # for MCP test server creation
-    "authlib>=1.7.1",  # CVE-2026-44681: open redirect in OIDC implicit/hybrid grants
+    "authlib>=1.7.1",  # CVE-2026-44681: open redirect in OIDC implicit/hybrid grants; CVE-2026-96760: JWS signature bypass (no fix release yet — bump when patched)
     "testcontainers[postgres,redis]>=4.14.0",  # for auto-starting PostgreSQL/Redis in tests
     "syntara-api-client",  # local API client for E2E tests
     "azure-identity>=1.19.0",  # ClientSecretCredential for Azure AD fixture
