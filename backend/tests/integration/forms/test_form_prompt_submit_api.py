@@ -163,7 +163,9 @@ class TestFormPromptSubmitAPI:
         assert call["form_response"]["response_data"] == submitted
         assert call["form_response"]["responded_by"] == test_user.username
         assert call["form_response"]["prompt_id"] == str(prompt.id)
-        assert "responded_at" in call["form_response"]
+        assert datetime.fromisoformat(call["form_response"]["responded_at"]) == datetime.fromisoformat(
+            response.json()["responded_at"]
+        )
 
     async def test_submit_signal_failure_still_returns_submitted_prompt(
         self,

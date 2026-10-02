@@ -679,6 +679,22 @@ class TestRecorderPrometheus:
         )
         assert sample._sum.get() == pytest.approx(0.25)
 
+    def test_form_prompt_submission_to_execution_start_updates_histogram(self, recorder: MetricsRecorder) -> None:
+        """The form-prompt resume latency is observed in seconds with the workflow-engine label."""
+        recorder.record(
+            MetricType.FORM_PROMPT_SUBMISSION_TO_EXECUTION_START,
+            250.0,
+            unit="ms",
+            component=ComponentLabel.WORKFLOW_ENGINE,
+        )
+
+        sample = recorder.prometheus.form_prompt_submission_to_execution_start_seconds.labels(
+            component="workflow_engine",
+        )
+        assert sample._sum.get() == pytest.approx(0.25)
+        records = list(recorder.query(metric_types={MetricType.FORM_PROMPT_SUBMISSION_TO_EXECUTION_START}))
+        assert len(records) == 1
+
     def test_workflow_completion_rate_updates_gauge(self, recorder: MetricsRecorder) -> None:
         """Recording WORKFLOW_COMPLETION_RATE sets the gauge."""
         recorder.record(

@@ -15,7 +15,7 @@ from prometheus_client import CollectorRegistry
 from syntara.metrics.dependencies import get_metrics_recorder
 from syntara.metrics.openmetrics import openmetrics_endpoint
 from syntara.metrics.recorder import MetricsRecorder
-from syntara.metrics.types import MetricType
+from syntara.metrics.types import ComponentLabel, MetricType
 
 
 @pytest.fixture
@@ -96,6 +96,32 @@ class TestOpenMetricsEndpoint:
         assert "orchestrator_tool_execution_duration_seconds" in content
         assert 'namespaced_name="github::search_code"' in content
         assert 'status="success"' in content
+
+    def test_form_prompt_resume_latency_appears_in_openmetrics(
+        self,
+        client: TestClient,
+        recorder: MetricsRecorder,
+    ) -> None:
+        """Form prompt resume latency is exported as a seconds histogram with bounded labels."""
+        recorder.record(
+            MetricType.FORM_PROMPT_SUBMISSION_TO_EXECUTION_START,
+            value=250.0,
+            unit="ms",
+            component=ComponentLabel.WORKFLOW_ENGINE,
+        )
+
+        response = client.get("/metrics")
+
+        assert response.status_code == 200
+        assert "# TYPE orchestrator_form_prompt_submission_to_execution_start_seconds histogram" in response.text
+        assert (
+            'orchestrator_form_prompt_submission_to_execution_start_seconds_sum{component="workflow_engine"} 0.25'
+            in response.text
+        )
+        assert (
+            'orchestrator_form_prompt_submission_to_execution_start_seconds_count{component="workflow_engine"} 1.0'
+            in response.text
+        )
 
     def test_tool_error_status_in_openmetrics(self, client: TestClient, recorder: MetricsRecorder) -> None:
         """OpenMetrics output reflects error and timeout status labels."""

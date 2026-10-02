@@ -4,16 +4,19 @@ import asyncio
 import json
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 from unittest.mock import AsyncMock, Mock, patch
 from uuid import UUID, uuid4
 
 import pytest
+from prometheus_client import CollectorRegistry
 from temporalio.api.enums.v1 import EventType
 from temporalio.client import WorkflowExecutionStatus, WorkflowQueryRejectedError
 from temporalio.service import RPCError, RPCStatusCode
 
 from syntara.core.exceptions import SafeValueError
+from syntara.metrics.recorder import MetricsRecorder
+from syntara.metrics.types import ComponentLabel, MetricType
 from syntara.workflows.models.activity_execution import ActivityExecution, ActivityStatus
 from syntara.workflows.models.execution import Execution, ExecutionStatus
 from syntara.workflows.workflow_engine.activities.internal import register_activity_monitoring
@@ -5939,3 +5942,215 @@ class TestActivitySyncPreservesIoOnQueryFailure:
 
         assert activity.output_data == heartbeat_partial
         assert activity.status == ActivityStatus.RUNNING
+
+
+class TestFormPromptSubmissionResumeMetric:
+    """Submission-to-resume latency is observed from Temporal history at workflow resumption."""
+
+    def setup_method(self) -> None:
+        self.service = ActivitySyncService(Mock(), Mock())
+        self.metadata = create_test_metadata(
+            activity_definitions_map={"form-node": {"id": "form-node", "type": NodeType.FORM_PROMPT}},
+        )
+        self.recorder = MetricsRecorder(prometheus_registry=CollectorRegistry())
+        self.queue: asyncio.Queue[Any] = asyncio.Queue()
+
+    def _scheduled_event(self, event_id: int, activity_id: str = "form-node_iter_2") -> Mock:
+        event = Mock()
+        event.event_type = EventType.EVENT_TYPE_ACTIVITY_TASK_SCHEDULED
+        event.event_id = event_id
+        attrs = Mock()
+        attrs.activity_id = activity_id
+        event.activity_task_scheduled_event_attributes = attrs
+        return event
+
+    @staticmethod
+    def _completed_event(event_id: int, scheduled_event_id: int) -> Mock:
+        event = Mock()
+        event.event_type = EventType.EVENT_TYPE_ACTIVITY_TASK_COMPLETED
+        event.event_id = event_id
+        attrs = Mock()
+        attrs.scheduled_event_id = scheduled_event_id
+        attrs.result = Mock(payloads=[Mock()])
+        event.activity_task_completed_event_attributes = attrs
+        return event
+
+    @staticmethod
+    def _workflow_task_started_event(event_id: int, event_time: datetime) -> Mock:
+        event = Mock()
+        event.event_type = EventType.EVENT_TYPE_WORKFLOW_TASK_STARTED
+        event.event_id = event_id
+        event.event_time = event_time
+        return event
+
+    def _set_decoded_completion(self, output: dict[str, Any]) -> AsyncMock:
+        decoder = AsyncMock(return_value=[{"output": output}])
+        cast("Any", self.service.temporal_client.data_converter).decode = decoder
+        return decoder
+
+    @pytest.mark.asyncio
+    async def test_records_submission_to_first_resumed_workflow_task(self) -> None:
+        """The callback's persisted timestamp is compared with Temporal's task start time."""
+        submitted_at = datetime(2026, 1, 1, 12, 0, 0, tzinfo=UTC)
+        decoder = self._set_decoded_completion(
+            {
+                "outcome": "submitted",
+                "responded_at": submitted_at.isoformat(),
+                "response_data": {"private-answer": "must-not-be-a-label"},
+            },
+        )
+        self.service._track_scheduled_form_prompt(self._scheduled_event(10), self.metadata)
+        completed_event = self._completed_event(event_id=11, scheduled_event_id=10)
+        await self.service._capture_form_prompt_submission_time(completed_event, self.metadata)
+
+        resume_event = self._workflow_task_started_event(
+            event_id=12,
+            event_time=datetime(2026, 1, 1, 12, 0, 1, 250_000, tzinfo=UTC),
+        )
+        with (
+            patch.object(self.service, "_advance_history_cursor", new_callable=AsyncMock, return_value=True),
+            patch(
+                "syntara.workflows.workflow_engine.services.activity_sync_service.get_metrics_recorder",
+                return_value=self.recorder,
+            ),
+        ):
+            result = await self.service._process_history_event(
+                resume_event,
+                self.metadata,
+                AsyncMock(),
+                self.queue,
+                [],
+            )
+
+        decoder.assert_awaited_once_with(completed_event.activity_task_completed_event_attributes.result.payloads)
+        assert result is True
+        records = list(self.recorder.query(metric_types={MetricType.FORM_PROMPT_SUBMISSION_TO_EXECUTION_START}))
+        assert len(records) == 1
+        assert records[0].value == pytest.approx(1250.0)
+        assert records[0].unit == "ms"
+        assert records[0].labels == {"component": ComponentLabel.WORKFLOW_ENGINE.value}
+        sample = self.recorder.prometheus.form_prompt_submission_to_execution_start_seconds.labels(
+            component=ComponentLabel.WORKFLOW_ENGINE.value,
+        )
+        assert sample._sum.get() == pytest.approx(1.25)
+        assert self.metadata.last_processed_event_id == resume_event.event_id
+        assert self.metadata.pending_form_prompt_submission_times == {}
+
+    @pytest.mark.asyncio
+    async def test_rebuilds_pending_submission_after_restart_without_reobserving_processed_resume(self) -> None:
+        """History replay rebuilds pending metadata and consumes each resume event once."""
+        self.metadata.last_processed_event_id = 10
+        responded_at = datetime(2026, 1, 1, 12, 0, 0, tzinfo=UTC)
+        self._set_decoded_completion({"outcome": "submitted", "responded_at": responded_at.isoformat()})
+        schedule_event = self._scheduled_event(event_id=8)
+        completion_event = self._completed_event(event_id=9, scheduled_event_id=8)
+        resume_event = self._workflow_task_started_event(
+            event_id=11,
+            event_time=datetime(2026, 1, 1, 12, 0, 2, tzinfo=UTC),
+        )
+
+        with (
+            patch.object(self.service, "_advance_history_cursor", new_callable=AsyncMock, return_value=True) as advance,
+            patch(
+                "syntara.workflows.workflow_engine.services.activity_sync_service.get_metrics_recorder",
+                return_value=self.recorder,
+            ),
+        ):
+            for event in (schedule_event, completion_event, resume_event):
+                await self.service._process_history_event(event, self.metadata, AsyncMock(), self.queue, [])
+
+            # A monitor retry replays the same history after the cursor was committed.
+            for event in (schedule_event, completion_event, resume_event):
+                await self.service._process_history_event(event, self.metadata, AsyncMock(), self.queue, [])
+
+        records = list(self.recorder.query(metric_types={MetricType.FORM_PROMPT_SUBMISSION_TO_EXECUTION_START}))
+        assert len(records) == 1
+        advance.assert_awaited_once_with(self.metadata, resume_event.event_id)
+        assert self.metadata.pending_form_prompt_submission_times == {}
+
+    @pytest.mark.parametrize(
+        "output",
+        [
+            {"outcome": "expired", "responded_at": "2026-01-01T12:00:00+00:00"},
+            {"outcome": "submitted"},
+            {"outcome": "submitted", "responded_at": "not-a-timestamp"},
+            {"outcome": "submitted", "responded_at": 123},
+        ],
+    )
+    @pytest.mark.asyncio
+    async def test_ignores_non_submitted_or_invalid_completion_metadata(self, output: dict[str, Any]) -> None:
+        self._set_decoded_completion(output)
+        self.service._track_scheduled_form_prompt(self._scheduled_event(event_id=20), self.metadata)
+
+        await self.service._capture_form_prompt_submission_time(
+            self._completed_event(event_id=21, scheduled_event_id=20),
+            self.metadata,
+        )
+
+        assert self.metadata.pending_form_prompt_submission_times == {}
+
+    @pytest.mark.asyncio
+    async def test_skips_negative_clock_skew(self) -> None:
+        submitted_at = datetime(2026, 1, 1, 12, 0, 2, tzinfo=UTC)
+        self._set_decoded_completion({"outcome": "submitted", "responded_at": submitted_at.isoformat()})
+        self.service._track_scheduled_form_prompt(self._scheduled_event(event_id=30), self.metadata)
+        await self.service._capture_form_prompt_submission_time(
+            self._completed_event(event_id=31, scheduled_event_id=30),
+            self.metadata,
+        )
+        resume_event = self._workflow_task_started_event(
+            event_id=32,
+            event_time=datetime(2026, 1, 1, 12, 0, 1, tzinfo=UTC),
+        )
+
+        with (
+            patch.object(self.service, "_advance_history_cursor", new_callable=AsyncMock, return_value=True),
+            patch(
+                "syntara.workflows.workflow_engine.services.activity_sync_service.get_metrics_recorder",
+                return_value=self.recorder,
+            ),
+        ):
+            await self.service._process_history_event(resume_event, self.metadata, AsyncMock(), self.queue, [])
+
+        records = list(self.recorder.query(metric_types={MetricType.FORM_PROMPT_SUBMISSION_TO_EXECUTION_START}))
+        assert records == []
+        assert self.metadata.last_processed_event_id == resume_event.event_id
+
+    @pytest.mark.asyncio
+    async def test_decoder_and_recorder_failures_do_not_escape_history_processing(self) -> None:
+        cast("Any", self.service.temporal_client.data_converter).decode = AsyncMock(
+            side_effect=RuntimeError("decode failed"),
+        )
+        self.service._track_scheduled_form_prompt(self._scheduled_event(event_id=40), self.metadata)
+        await self.service._capture_form_prompt_submission_time(
+            self._completed_event(event_id=41, scheduled_event_id=40),
+            self.metadata,
+        )
+        assert self.metadata.pending_form_prompt_submission_times == {}
+
+        submitted_at = datetime(2026, 1, 1, 12, 0, 0, tzinfo=UTC)
+        self._set_decoded_completion({"outcome": "submitted", "responded_at": submitted_at.isoformat()})
+        self.service._track_scheduled_form_prompt(self._scheduled_event(event_id=42), self.metadata)
+        await self.service._capture_form_prompt_submission_time(
+            self._completed_event(event_id=43, scheduled_event_id=42),
+            self.metadata,
+        )
+        resume_event = self._workflow_task_started_event(
+            event_id=44,
+            event_time=datetime(2026, 1, 1, 12, 0, 1, tzinfo=UTC),
+        )
+        failing_recorder = Mock()
+        failing_recorder.record.side_effect = RuntimeError("metrics disabled")
+
+        with (
+            patch.object(self.service, "_advance_history_cursor", new_callable=AsyncMock, return_value=True),
+            patch(
+                "syntara.workflows.workflow_engine.services.activity_sync_service.get_metrics_recorder",
+                return_value=failing_recorder,
+            ),
+        ):
+            result = await self.service._process_history_event(resume_event, self.metadata, AsyncMock(), self.queue, [])
+
+        assert result is True
+        failing_recorder.record.assert_called_once()
+        assert self.metadata.pending_form_prompt_submission_times == {}

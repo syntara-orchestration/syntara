@@ -15,7 +15,7 @@ from uuid import UUID
 
 import structlog
 from jsonpatch import JsonPatch  # type: ignore[import-untyped]
-from sqlalchemy import or_
+from sqlalchemy import or_, update
 from sqlalchemy.exc import InterfaceError, OperationalError
 from sqlalchemy.exc import TimeoutError as SATimeoutError
 from sqlalchemy.ext.asyncio import async_sessionmaker
@@ -32,6 +32,8 @@ from syntara.audit.context_managers import actor_context
 from syntara.audit.dispatcher import AuditEventDispatcher
 from syntara.core.constants import FieldLimits
 from syntara.core.exceptions import SafeValueError
+from syntara.metrics.dependencies import get_metrics_recorder
+from syntara.metrics.types import ComponentLabel, MetricType
 from syntara.telemetry.events.workflow_emitters import (
     _map_execution_status_to_telemetry,
     emit_activities,
@@ -145,6 +147,8 @@ class ExecutionMonitorMetadata:
     activity_index_map: dict[str, int]
     pending_activity_updates: dict[int, dict[str, Any]]
     pending_sync_event_ids: set[int] = field(default_factory=set)
+    scheduled_form_prompt_activity_ids: dict[int, str] = field(default_factory=dict)
+    pending_form_prompt_submission_times: dict[str, datetime] = field(default_factory=dict)
     terminal_activity_ids: set[str] = field(default_factory=set)
     iteration_counters: dict[str, int] = field(default_factory=dict)
     next_activity_index: int = 0
@@ -891,6 +895,40 @@ class ActivitySyncService:
         metadata.pending_sync_event_ids.add(event.scheduled_event_id)
         await self._sync_activities_to_db(metadata, handle)
 
+    async def _process_form_prompt_history_event(
+        self,
+        event: HistoryEvent,
+        metadata: ExecutionMonitorMetadata,
+    ) -> bool:
+        """Rebuild form prompt correlations and handle workflow resume events.
+
+        Returns True when a workflow-task-start event is fully handled. Other
+        events continue through the normal activity synchronization path.
+        """
+        event_type = event.event_type
+        if event_type == EventType.EVENT_TYPE_ACTIVITY_TASK_SCHEDULED:
+            self._track_scheduled_form_prompt(event, metadata)
+        elif event_type == EventType.EVENT_TYPE_ACTIVITY_TASK_COMPLETED:
+            await self._capture_form_prompt_submission_time(event, metadata)
+        elif event_type in {
+            EventType.EVENT_TYPE_ACTIVITY_TASK_FAILED,
+            EventType.EVENT_TYPE_ACTIVITY_TASK_TIMED_OUT,
+            EventType.EVENT_TYPE_ACTIVITY_TASK_CANCELED,
+        }:
+            self._forget_scheduled_form_prompt(event, metadata)
+
+        if event_type != EventType.EVENT_TYPE_WORKFLOW_TASK_STARTED:
+            return False
+
+        if event.event_id <= metadata.last_processed_event_id:
+            # This is a replayed resume: clear reconstructed state without
+            # observing the already-processed latency a second time.
+            metadata.pending_form_prompt_submission_times.clear()
+            return True
+
+        await self._record_form_prompt_resume_latency(event, metadata)
+        return True
+
     async def _process_history_event(
         self,
         event: HistoryEvent,
@@ -903,6 +941,9 @@ class ActivitySyncService:
 
         Returns False if the monitor loop should stop (shutdown requested).
         """
+        if await self._process_form_prompt_history_event(event, metadata):
+            return True
+
         if event.event_id <= metadata.last_processed_event_id:
             return True
 
@@ -1459,6 +1500,129 @@ class ActivitySyncService:
         except Exception:  # noqa: BLE001
             logger.debug("Could not parse failed_activities from workflow result", exc_info=True)
         return {}
+
+    @staticmethod
+    def _track_scheduled_form_prompt(event: HistoryEvent, metadata: ExecutionMonitorMetadata) -> None:
+        """Remember scheduled form prompt IDs while scanning Temporal history.
+
+        The map is rebuilt during history replay after monitor restarts. It is
+        intentionally limited to form prompt activities so it does not retain
+        unrelated workflow history.
+        """
+        attrs = event.activity_task_scheduled_event_attributes
+        activity_id = attrs.activity_id
+        canvas_id = strip_loop_iteration_suffixes(activity_id)
+        activity_definition = metadata.activity_definitions_map.get(canvas_id, {})
+        if activity_definition.get("type") == NodeType.FORM_PROMPT:
+            metadata.scheduled_form_prompt_activity_ids[event.event_id] = activity_id
+
+    async def _capture_form_prompt_submission_time(
+        self,
+        event: HistoryEvent,
+        metadata: ExecutionMonitorMetadata,
+    ) -> None:
+        """Capture the successful form response timestamp from async activity completion.
+
+        Forms completes the async activity with ``{"output": signal_data}``.
+        Decode through the configured Temporal data converter so the worker's
+        payload codec is honored. Only the timestamp is retained in monitor
+        state; response values and identity never enter metrics or logs.
+        """
+        attrs = event.activity_task_completed_event_attributes
+        activity_id = metadata.scheduled_form_prompt_activity_ids.pop(attrs.scheduled_event_id, None)
+        if activity_id is None or attrs.result is None or not attrs.result.payloads:
+            return
+
+        try:
+            decoded = await self.temporal_client.data_converter.decode(attrs.result.payloads)
+            if not decoded or not isinstance(decoded[0], dict):
+                return
+
+            output = decoded[0].get("output")
+            if not isinstance(output, dict) or output.get("outcome") != "submitted":
+                return
+
+            responded_at = output.get("responded_at")
+            if not isinstance(responded_at, str):
+                return
+
+            timestamp = datetime.fromisoformat(responded_at)
+            metadata.pending_form_prompt_submission_times[activity_id] = ensure_timezone_aware(timestamp).astimezone(
+                UTC
+            )
+        except Exception:  # noqa: BLE001
+            # Temporal result decoding is instrumentation-only. Do not include
+            # payload contents or identifiers in logs.
+            logger.debug("Could not extract form prompt submission time from Temporal history")
+
+    @staticmethod
+    def _forget_scheduled_form_prompt(event: HistoryEvent, metadata: ExecutionMonitorMetadata) -> None:
+        """Forget a form prompt schedule when the Temporal activity does not complete successfully."""
+        scheduled_event_id: int | None = None
+        if event.event_type == EventType.EVENT_TYPE_ACTIVITY_TASK_FAILED:
+            scheduled_event_id = event.activity_task_failed_event_attributes.scheduled_event_id
+        elif event.event_type == EventType.EVENT_TYPE_ACTIVITY_TASK_TIMED_OUT:
+            scheduled_event_id = event.activity_task_timed_out_event_attributes.scheduled_event_id
+        elif event.event_type == EventType.EVENT_TYPE_ACTIVITY_TASK_CANCELED:
+            scheduled_event_id = event.activity_task_canceled_event_attributes.scheduled_event_id
+
+        if scheduled_event_id is not None:
+            metadata.scheduled_form_prompt_activity_ids.pop(scheduled_event_id, None)
+
+    async def _advance_history_cursor(self, metadata: ExecutionMonitorMetadata, event_id: int) -> bool:
+        """Atomically advance the database history cursor before emitting a resume metric."""
+        statement = (
+            update(Execution)
+            .where(Execution.id == metadata.execution_id)  # type: ignore[arg-type]
+            .where(Execution.last_processed_event_id < event_id)  # type: ignore[arg-type]
+            .values(last_processed_event_id=event_id)
+        )
+        async with self.session_factory() as session:
+            result = await session.exec(statement)
+            await session.commit()
+            return result.rowcount == 1
+
+    async def _record_form_prompt_resume_latency(
+        self,
+        event: HistoryEvent,
+        metadata: ExecutionMonitorMetadata,
+    ) -> None:
+        """Record pending submission-to-resume observations at a workflow task start."""
+        if not metadata.pending_form_prompt_submission_times:
+            return
+
+        try:
+            cursor_advanced = await self._advance_history_cursor(metadata, event.event_id)
+        except Exception:  # noqa: BLE001
+            logger.warning("Failed to advance Temporal history cursor for form prompt resume metric (non-fatal)")
+            metadata.pending_form_prompt_submission_times.clear()
+            return
+
+        if not cursor_advanced:
+            # Another monitor or a prior replay has already consumed this event.
+            metadata.pending_form_prompt_submission_times.clear()
+            return
+
+        metadata.last_processed_event_id = event.event_id
+        resumed_at = ensure_timezone_aware(event.event_time).astimezone(UTC)
+        submitted_times = tuple(metadata.pending_form_prompt_submission_times.values())
+        metadata.pending_form_prompt_submission_times.clear()
+
+        for submitted_at in submitted_times:
+            latency_ms = (resumed_at - submitted_at).total_seconds() * 1000
+            if latency_ms < 0:
+                logger.debug("Skipped negative form prompt submission-to-resume latency")
+                continue
+
+            try:
+                get_metrics_recorder().record(
+                    MetricType.FORM_PROMPT_SUBMISSION_TO_EXECUTION_START,
+                    latency_ms,
+                    unit="ms",
+                    component=ComponentLabel.WORKFLOW_ENGINE,
+                )
+            except Exception:  # noqa: BLE001
+                logger.warning("Failed to record form prompt submission-to-resume metric (non-fatal)")
 
     @staticmethod
     def _finalize_non_terminal_activities(

@@ -10,7 +10,7 @@ from __future__ import annotations
 import asyncio
 import signal
 import sys
-from collections.abc import Callable, Coroutine
+from collections.abc import Callable, Coroutine, Iterator
 from typing import Any
 
 import prometheus_client
@@ -20,6 +20,7 @@ from syntara.audit.registration import discover_and_register_all_handlers
 from syntara.core.config.base import get_settings
 from syntara.core.database.session import AsyncSessionLocal
 from syntara.core.logging.logging import apply_runtime_log_level
+from syntara.metrics.dependencies import get_metrics_recorder
 from syntara.settings.cache.settings_cache import SettingsCache, get_runtime_settings, set_runtime_settings
 from syntara.workflows.workflow_engine.services.temporal_worker import (
     TemporalWorkerService,
@@ -29,6 +30,31 @@ from syntara.workflows.workflow_engine.services.temporal_worker import (
 logger = structlog.stdlib.get_logger(__name__)
 
 StartFn = Callable[[], Coroutine[Any, Any, TemporalWorkerService]]
+
+
+class _CombinedMetricsCollector:
+    """Expose both default process metrics and an application metrics registry."""
+
+    def __init__(self, registries: tuple[prometheus_client.CollectorRegistry, ...]) -> None:
+        self._registries = registries
+
+    def collect(self) -> Iterator[Any]:
+        """Yield metric families from each source registry."""
+        for registry in self._registries:
+            yield from registry.collect()
+
+    def describe(self) -> Iterator[Any]:
+        """Describe all metric families for CollectorRegistry registration."""
+        yield from self.collect()
+
+
+def _build_worker_metrics_registry(
+    application_registry: prometheus_client.CollectorRegistry,
+) -> prometheus_client.CollectorRegistry:
+    """Combine default Python process metrics with the application registry."""
+    registry = prometheus_client.CollectorRegistry(auto_describe=True)
+    registry.register(_CombinedMetricsCollector((prometheus_client.REGISTRY, application_registry)))
+    return registry
 
 
 async def run_worker(start_fn: StartFn, *, worker_name: str) -> None:
@@ -61,7 +87,8 @@ async def run_worker(start_fn: StartFn, *, worker_name: str) -> None:
     # a missing metrics endpoint must never prevent the worker from starting.
     _metrics_port = get_settings().metrics_worker_port
     try:
-        prometheus_client.start_http_server(_metrics_port)
+        metrics_registry = _build_worker_metrics_registry(get_metrics_recorder().prometheus.registry)
+        prometheus_client.start_http_server(_metrics_port, registry=metrics_registry)
         logger.info("Worker metrics server started", port=_metrics_port, worker=worker_name)
     except OSError as exc:
         logger.warning(
@@ -69,6 +96,13 @@ async def run_worker(start_fn: StartFn, *, worker_name: str) -> None:
             port=_metrics_port,
             worker=worker_name,
             error=str(exc),
+        )
+    except Exception:  # noqa: BLE001 - metrics endpoint failure must not stop worker startup
+        logger.warning(
+            "Worker metrics server could not expose the application registry — skipping",
+            port=_metrics_port,
+            worker=worker_name,
+            exc_info=True,
         )
 
     get_runtime_settings().start_watching()
