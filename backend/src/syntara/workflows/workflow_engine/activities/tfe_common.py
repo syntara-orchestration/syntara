@@ -44,12 +44,17 @@ async def heartbeat_until_cancelled() -> None:
 
 def raise_as_application_error(exc: TFEError) -> None:
     """Convert a TFEError into a Temporal ApplicationError and raise it."""
+    logger.debug(
+        "Raising TFE ApplicationError",
+        error_code=exc.error_code.value,
+        http_status=exc.http_status,
+    )
     raise ApplicationError(
         exc.message,
         exc.to_dict(),
         type=exc.error_code.value,
         non_retryable=not exc.retryable,
-    ) from exc
+    ) from None
 
 
 def extract_bearer_token(resolved_credentials: dict[str, Any] | None, _credential_id: str | None = None) -> str:

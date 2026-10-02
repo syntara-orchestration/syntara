@@ -12,6 +12,7 @@ from syntara.integrations.models.integration_configuration import (
     IntegrationConfigurationTypes,
     LLMProviderConfiguration,
     MCPServerConfiguration,
+    TFEConfiguration,
 )
 
 
@@ -62,6 +63,12 @@ class IntegrationFactory:
             configuration = AAPConfiguration(
                 integration_type="ansible_automation_platform",
                 base_url=base_url,
+            )
+        elif integration_type == IntegrationType.TERRAFORM_ENTERPRISE:
+            configuration = TFEConfiguration(
+                integration_type="terraform_enterprise",
+                base_url=base_url,
+                organization="acme",
             )
         else:
             assert_never(integration_type)

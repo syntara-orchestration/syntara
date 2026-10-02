@@ -10,7 +10,10 @@ Design rules (SDP):
 from __future__ import annotations
 
 import asyncio
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import Collection
 from urllib.parse import quote
 
 import httpx
@@ -19,7 +22,7 @@ import structlog
 from syntara.core.config.base import get_settings
 from syntara.core.lib.tls_utils import build_integration_httpx_verify
 from syntara.core.lib.url_validation import validate_url_no_ssrf
-from syntara.terraform.errors import TFEError, TFEErrorCode, map_http_status_to_error
+from syntara.terraform.errors import TFEError, TFEErrorCode, map_http_status_to_error, redact_sensitive_content
 
 logger = structlog.stdlib.get_logger(__name__)
 
@@ -145,7 +148,7 @@ class TFEClient:
             if response.is_success:
                 return response
 
-            detail = _extract_error_detail(response)
+            detail = _extract_error_detail(response, secrets=(self._token,))
             error = map_http_status_to_error(response.status_code, detail, mutating=mutating)
             if error.retryable and attempt < attempts:
                 await asyncio.sleep(_BACKOFF_BASE_SECONDS * (2 ** (attempt - 1)))
@@ -405,7 +408,7 @@ class TFEClient:
         if response.status_code == _HTTP_NO_CONTENT or response.is_success:
             return
 
-        detail = _extract_error_detail(response)
+        detail = _extract_error_detail(response, secrets=(self._token,))
         raise map_http_status_to_error(response.status_code, detail, mutating=True)
 
     # ── Runs ───────────────────────────────────────────────────────────────
@@ -578,7 +581,11 @@ class TFEClient:
         return await self._json("POST", "/team-projects", json_body=body, mutating=True)
 
 
-def _extract_error_detail(response: httpx.Response) -> str:
+def _extract_error_detail(
+    response: httpx.Response,
+    *,
+    secrets: Collection[str] | None = None,
+) -> str:
     """Extract a safe human-readable detail from a TFE error response."""
     try:
         payload = response.json()
@@ -588,9 +595,8 @@ def _extract_error_detail(response: httpx.Response) -> str:
             for err in errors:
                 if not isinstance(err, dict):
                     continue
-                title = err.get("title") or ""
-                detail = err.get("detail") or ""
-                # Never echo potential secrets from error bodies beyond title/detail
+                title = redact_sensitive_content(str(err.get("title") or ""), secrets)
+                detail = redact_sensitive_content(str(err.get("detail") or ""), secrets)
                 text = ": ".join(p for p in (title, detail) if p)
                 if text:
                     parts.append(text)
