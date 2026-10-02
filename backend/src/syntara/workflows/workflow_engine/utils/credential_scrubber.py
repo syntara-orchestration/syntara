@@ -18,6 +18,7 @@ MIN_SECRET_LENGTH = 4
 _INTERNAL_CREDENTIAL_KEYS = frozenset(
     {
         "_resolved_credentials",
+        "_resolved_value_credentials",
         "activity_credentials",
         "_secret_values",
         "_has_credentials",

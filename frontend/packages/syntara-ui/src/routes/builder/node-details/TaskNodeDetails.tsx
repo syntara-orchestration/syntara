@@ -41,6 +41,7 @@ import {
 } from '../utils/aapHelpers'
 
 import { AIAgentNodeDetails } from './AIAgentNodeDetails'
+import { TerraformTaskDetails } from './TerraformTaskDetails'
 
 /**
  * Stored AAP config supports both snake_case (API) and camelCase (legacy) field names.
@@ -543,6 +544,20 @@ export function TaskNodeDetails({
   if (executor === ExecutorTypeEnum.AGENTIC) {
     return (
       <AIAgentNodeDetails
+        taskData={taskData}
+        nodeId={nodeId}
+        onClose={onClose}
+        onHeaderContentChange={onHeaderContentChange}
+        projectId={projectId}
+      />
+    )
+  }
+
+  if (executor.startsWith('tfe_')) {
+    return (
+      <TerraformTaskDetails
+        executor={executor}
+        config={config}
         taskData={taskData}
         nodeId={nodeId}
         onClose={onClose}

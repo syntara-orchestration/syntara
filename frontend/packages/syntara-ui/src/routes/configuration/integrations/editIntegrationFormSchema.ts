@@ -27,6 +27,26 @@ function validateUrl(
   return undefined
 }
 
+function addTerraformEditIssues(
+  data: { integration_type: string; base_url?: string; allow_http: boolean; organization?: string },
+  ctx: z.RefinementCtx
+): void {
+  if (data.integration_type !== IntegrationTypeEnum.TERRAFORM_ENTERPRISE) return
+  const err = validateUrl(data.base_url, {
+    required: true,
+    allowHttp: data.allow_http,
+    fieldLabel: 'TFE URL',
+  })
+  if (err) ctx.addIssue({ code: z.ZodIssueCode.custom, message: err, path: ['base_url'] })
+  if (!data.organization?.trim()) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Organization is required',
+      path: ['organization'],
+    })
+  }
+}
+
 export function buildEditSchema(requiresBaseUrl: boolean) {
   return z
     .object({
@@ -34,6 +54,7 @@ export function buildEditSchema(requiresBaseUrl: boolean) {
       description: z.string(),
       integration_type: z.string(),
       base_url: z.string().optional(),
+      organization: z.string().optional(),
       allow_http: z.boolean(),
       insecure_skip_tls_verify: z.boolean(),
       ca_certificate: z.string().optional().nullable(),
@@ -65,6 +86,7 @@ export function buildEditSchema(requiresBaseUrl: boolean) {
         })
         if (err) ctx.addIssue({ code: z.ZodIssueCode.custom, message: err, path: ['base_url'] })
       }
+      addTerraformEditIssues(data, ctx)
       if (data.integration_type === IntegrationTypeEnum.LLM_PROVIDER) {
         const err = validateUrl(data.base_url, {
           required: requiresBaseUrl,
@@ -96,6 +118,14 @@ export function buildConfiguration(integrationType: string, values: EditIntegrat
     return {
       integration_type: IntegrationTypeEnum.ANSIBLE_AUTOMATION_PLATFORM,
       base_url: values.base_url ?? '',
+      ...securityFields(values),
+    }
+  }
+  if (integrationType === IntegrationTypeEnum.TERRAFORM_ENTERPRISE) {
+    return {
+      integration_type: IntegrationTypeEnum.TERRAFORM_ENTERPRISE,
+      base_url: values.base_url ?? '',
+      organization: values.organization ?? '',
       ...securityFields(values),
     }
   }

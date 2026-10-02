@@ -2,7 +2,7 @@ import { Icon } from '@patternfly/react-core'
 import type { IconSize } from '@patternfly/react-core'
 import type { ComponentType, CSSProperties, ReactNode } from 'react'
 
-import { AAP_NODE_IDS, RegistryNodeId } from '../../../../constants'
+import { AAP_NODE_IDS, isTerraformNodeId, RegistryNodeId } from '../../../../constants'
 
 export type NodeIconVariant = 'canvas' | 'list' | 'header' | 'legend'
 
@@ -24,6 +24,14 @@ const edaVariantConfig: Record<NodeIconVariant, VariantConfig> = {
   legend: { size: 'md', iconSize: 'md', customIconScale: 1, customIconOffsetY: 0 },
 }
 
+/** Terraform path already fills its 24x24 viewBox. Extra scale crops the mark. */
+const terraformVariantConfig: Record<NodeIconVariant, VariantConfig> = {
+  canvas: { size: 'md', iconSize: 'md', customIconScale: 1, customIconOffsetY: 0 },
+  list: { size: 'xl', iconSize: 'xl', customIconScale: 1, customIconOffsetY: 0 },
+  header: { size: 'xl', iconSize: 'xl', customIconScale: 1, customIconOffsetY: 0 },
+  legend: { size: 'md', iconSize: 'md', customIconScale: 1, customIconOffsetY: 0 },
+}
+
 /** Standard PF icon sizing (no custom scaling). */
 const standardVariantConfig: Record<NodeIconVariant, VariantConfig> = {
   canvas: { size: 'md', iconSize: 'md', customIconScale: 1, customIconOffsetY: 0 },
@@ -39,6 +47,9 @@ function getVariantConfig(nodeId: string | undefined): Record<NodeIconVariant, V
   if (nodeId === RegistryNodeId.TRIGGER_EDA) {
     return edaVariantConfig
   }
+  if (isTerraformNodeId(nodeId)) {
+    return terraformVariantConfig
+  }
   return standardVariantConfig
 }
 
@@ -53,7 +64,8 @@ export function renderNodeIcon(
 
   const isAapIcon = AAP_NODE_IDS.has(nodeId as (typeof RegistryNodeId)[keyof typeof RegistryNodeId])
   const isEdaIcon = nodeId === RegistryNodeId.TRIGGER_EDA
-  const isCustomIcon = isAapIcon || isEdaIcon
+  const isTerraformIcon = isTerraformNodeId(nodeId)
+  const isCustomIcon = isAapIcon || isEdaIcon || isTerraformIcon
   const shouldRotateIcon = nodeId === RegistryNodeId.LOGIC_CONDITION || nodeId === RegistryNodeId.LOGIC_CONVERGE
   const { size, iconSize, customIconScale, customIconOffsetY } = getVariantConfig(nodeId)[variant]
 

@@ -138,6 +138,35 @@ class ActivityName(StrEnum):
     HTTP_REQUEST = "execute_http_request_activity"
     INTERNAL_ACTIVITY = "execute_internal_activity"
     SCRIPT = "execute_script_activity"
+    # Terraform Enterprise
+    TFE_CREATE_WORKSPACE = "execute_tfe_create_workspace_activity"
+    TFE_LIST_WORKSPACES = "execute_tfe_list_workspaces_activity"
+    TFE_UPDATE_WORKSPACE = "execute_tfe_update_workspace_activity"
+    TFE_DELETE_WORKSPACE = "execute_tfe_delete_workspace_activity"
+    TFE_FETCH_STATE_OUTPUTS = "execute_tfe_fetch_state_outputs_activity"
+    TFE_ADD_VARIABLE = "execute_tfe_add_variable_activity"
+    TFE_LIST_VARIABLES = "execute_tfe_list_variables_activity"
+    TFE_UPDATE_VARIABLE = "execute_tfe_update_variable_activity"
+    TFE_DELETE_VARIABLE = "execute_tfe_delete_variable_activity"
+    TFE_UPLOAD_CONFIGURATION_VERSION = "execute_tfe_upload_configuration_version_activity"
+    TFE_TRIGGER_RUN = "execute_tfe_trigger_run_activity"
+    TFE_GET_RUN_STATUS = "execute_tfe_get_run_status_activity"
+    TFE_APPLY_RUN = "execute_tfe_apply_run_activity"
+    TFE_DISCARD_RUN = "execute_tfe_discard_run_activity"
+    TFE_CANCEL_RUN = "execute_tfe_cancel_run_activity"
+    TFE_FORCE_CANCEL_RUN = "execute_tfe_force_cancel_run_activity"
+    TFE_LIST_RUNS = "execute_tfe_list_runs_activity"
+    TFE_ADD_RUN_COMMENT = "execute_tfe_add_run_comment_activity"
+    TFE_LIST_GITHUB_INSTALLATIONS = "execute_tfe_list_github_installations_activity"
+    TFE_GET_GITHUB_INSTALLATION = "execute_tfe_get_github_installation_activity"
+    TFE_LINK_VCS = "execute_tfe_link_vcs_activity"
+    TFE_CREATE_PROJECT = "execute_tfe_create_project_activity"
+    TFE_LIST_PROJECTS = "execute_tfe_list_projects_activity"
+    TFE_GET_PROJECT = "execute_tfe_get_project_activity"
+    TFE_UPDATE_PROJECT = "execute_tfe_update_project_activity"
+    TFE_DELETE_PROJECT = "execute_tfe_delete_project_activity"
+    TFE_MOVE_WORKSPACE_TO_PROJECT = "execute_tfe_move_workspace_to_project_activity"
+    TFE_ASSIGN_TEAM_PERMISSIONS = "execute_tfe_assign_team_permissions_activity"
     # Internal
     CREDENTIAL_RESOLUTION = "resolve_workflow_credentials"
     INTEGRATION_RESOLUTION = "resolve_workflow_integration"
@@ -175,6 +204,35 @@ class NodeType(str, Enum):
     HTTP_REQUEST = "http_request"
     INTERNAL_ACTIVITY = "internal_activity"
     SCRIPT = "script"
+    # Terraform Enterprise
+    TFE_CREATE_WORKSPACE = "tfe_create_workspace"
+    TFE_LIST_WORKSPACES = "tfe_list_workspaces"
+    TFE_UPDATE_WORKSPACE = "tfe_update_workspace"
+    TFE_DELETE_WORKSPACE = "tfe_delete_workspace"
+    TFE_FETCH_STATE_OUTPUTS = "tfe_fetch_state_outputs"
+    TFE_ADD_VARIABLE = "tfe_add_variable"
+    TFE_LIST_VARIABLES = "tfe_list_variables"
+    TFE_UPDATE_VARIABLE = "tfe_update_variable"
+    TFE_DELETE_VARIABLE = "tfe_delete_variable"
+    TFE_UPLOAD_CONFIGURATION_VERSION = "tfe_upload_configuration_version"
+    TFE_TRIGGER_RUN = "tfe_trigger_run"
+    TFE_GET_RUN_STATUS = "tfe_get_run_status"
+    TFE_APPLY_RUN = "tfe_apply_run"
+    TFE_DISCARD_RUN = "tfe_discard_run"
+    TFE_CANCEL_RUN = "tfe_cancel_run"
+    TFE_FORCE_CANCEL_RUN = "tfe_force_cancel_run"
+    TFE_LIST_RUNS = "tfe_list_runs"
+    TFE_ADD_RUN_COMMENT = "tfe_add_run_comment"
+    TFE_LIST_GITHUB_INSTALLATIONS = "tfe_list_github_installations"
+    TFE_GET_GITHUB_INSTALLATION = "tfe_get_github_installation"
+    TFE_LINK_VCS = "tfe_link_vcs"
+    TFE_CREATE_PROJECT = "tfe_create_project"
+    TFE_LIST_PROJECTS = "tfe_list_projects"
+    TFE_GET_PROJECT = "tfe_get_project"
+    TFE_UPDATE_PROJECT = "tfe_update_project"
+    TFE_DELETE_PROJECT = "tfe_delete_project"
+    TFE_MOVE_WORKSPACE_TO_PROJECT = "tfe_move_workspace_to_project"
+    TFE_ASSIGN_TEAM_PERMISSIONS = "tfe_assign_team_permissions"
 
 
 def resolve_trigger_node(
@@ -1035,6 +1093,68 @@ NODE_OUTPUT_MODELS: dict[str, type[NodeOutput]] = {
     NodeType.LOOP: LoopOutput,
     NodeType.WAIT: WaitOutput,
 }
+
+# Register TFE node outputs (imported late to avoid circular imports with tfe_types).
+from syntara.workflows.workflow_engine.models.tfe_types import (  # noqa: E402
+    TFEAddRunCommentOutput,
+    TFEAddVariableOutput,
+    TFEAssignTeamPermissionsOutput,
+    TFECreateProjectOutput,
+    TFECreateWorkspaceOutput,
+    TFEDeleteProjectOutput,
+    TFEDeleteVariableOutput,
+    TFEDeleteWorkspaceOutput,
+    TFEFetchStateOutputsOutput,
+    TFEGetGitHubInstallationOutput,
+    TFEGetProjectOutput,
+    TFEGetRunStatusOutput,
+    TFELinkVCSOutput,
+    TFEListGitHubInstallationsOutput,
+    TFEListProjectsOutput,
+    TFEListRunsOutput,
+    TFEListVariablesOutput,
+    TFEListWorkspacesOutput,
+    TFEMoveWorkspaceToProjectOutput,
+    TFERunActionOutput,
+    TFETriggerRunOutput,
+    TFEUpdateProjectOutput,
+    TFEUpdateVariableOutput,
+    TFEUpdateWorkspaceOutput,
+    TFEUploadConfigurationVersionOutput,
+)
+
+NODE_OUTPUT_MODELS.update(
+    {
+        NodeType.TFE_CREATE_WORKSPACE: TFECreateWorkspaceOutput,
+        NodeType.TFE_LIST_WORKSPACES: TFEListWorkspacesOutput,
+        NodeType.TFE_UPDATE_WORKSPACE: TFEUpdateWorkspaceOutput,
+        NodeType.TFE_DELETE_WORKSPACE: TFEDeleteWorkspaceOutput,
+        NodeType.TFE_FETCH_STATE_OUTPUTS: TFEFetchStateOutputsOutput,
+        NodeType.TFE_ADD_VARIABLE: TFEAddVariableOutput,
+        NodeType.TFE_LIST_VARIABLES: TFEListVariablesOutput,
+        NodeType.TFE_UPDATE_VARIABLE: TFEUpdateVariableOutput,
+        NodeType.TFE_DELETE_VARIABLE: TFEDeleteVariableOutput,
+        NodeType.TFE_UPLOAD_CONFIGURATION_VERSION: TFEUploadConfigurationVersionOutput,
+        NodeType.TFE_TRIGGER_RUN: TFETriggerRunOutput,
+        NodeType.TFE_GET_RUN_STATUS: TFEGetRunStatusOutput,
+        NodeType.TFE_APPLY_RUN: TFERunActionOutput,
+        NodeType.TFE_DISCARD_RUN: TFERunActionOutput,
+        NodeType.TFE_CANCEL_RUN: TFERunActionOutput,
+        NodeType.TFE_FORCE_CANCEL_RUN: TFERunActionOutput,
+        NodeType.TFE_LIST_RUNS: TFEListRunsOutput,
+        NodeType.TFE_ADD_RUN_COMMENT: TFEAddRunCommentOutput,
+        NodeType.TFE_LIST_GITHUB_INSTALLATIONS: TFEListGitHubInstallationsOutput,
+        NodeType.TFE_GET_GITHUB_INSTALLATION: TFEGetGitHubInstallationOutput,
+        NodeType.TFE_LINK_VCS: TFELinkVCSOutput,
+        NodeType.TFE_CREATE_PROJECT: TFECreateProjectOutput,
+        NodeType.TFE_LIST_PROJECTS: TFEListProjectsOutput,
+        NodeType.TFE_GET_PROJECT: TFEGetProjectOutput,
+        NodeType.TFE_UPDATE_PROJECT: TFEUpdateProjectOutput,
+        NodeType.TFE_DELETE_PROJECT: TFEDeleteProjectOutput,
+        NodeType.TFE_MOVE_WORKSPACE_TO_PROJECT: TFEMoveWorkspaceToProjectOutput,
+        NodeType.TFE_ASSIGN_TEAM_PERMISSIONS: TFEAssignTeamPermissionsOutput,
+    }
+)
 
 
 class ScheduleType(StrEnum):

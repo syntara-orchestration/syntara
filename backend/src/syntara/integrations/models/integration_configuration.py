@@ -141,8 +141,41 @@ class AAPConfiguration(IntegrationSecurityMixin):
         return self
 
 
+class TFEConfiguration(IntegrationSecurityMixin):
+    """Configuration for Terraform Enterprise / HCP Terraform integrations."""
+
+    integration_type: Literal["terraform_enterprise"] = "terraform_enterprise"
+
+    base_url: str = Field(
+        title="TFE URL",
+        description="Base URL for Terraform Enterprise or HCP Terraform (e.g. https://app.terraform.io)",
+        json_schema_extra={"format": "uri"},
+    )
+
+    organization: str = Field(
+        title="Organization",
+        description="Default Terraform Enterprise organization name used as the scope for workflow steps",
+        min_length=1,
+        max_length=255,
+    )
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")  # type: ignore[assignment]
+
+    @model_validator(mode="after")
+    def validate_base_url_and_organization(self) -> Self:
+        """Validate and normalize URL; strip trailing slash; trim organization."""
+        self.base_url = validate_host_url(self.base_url, allow_http=self.allow_http).rstrip("/")
+        self.organization = self.organization.strip()
+        if not self.organization:
+            msg = "organization must not be empty"
+            raise ValueError(msg)
+        return self
+
+
 # Configuration types (used by DB model, read schema, and create/patch)
-IntegrationConfigurationTypes = MCPServerConfigurationInput | LLMProviderConfiguration | AAPConfiguration
+IntegrationConfigurationTypes = (
+    MCPServerConfigurationInput | LLMProviderConfiguration | AAPConfiguration | TFEConfiguration
+)
 IntegrationConfiguration = Annotated[
     IntegrationConfigurationTypes,
     Field(discriminator="integration_type"),

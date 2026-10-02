@@ -134,6 +134,34 @@ const mockAapIntegration = {
   labels: {},
 }
 
+const mockTfeIntegration = {
+  id: 'int-tfe',
+  name: 'My TFE Integration',
+  description: 'HCP Terraform',
+  integration_type: 'terraform_enterprise',
+  enabled: true,
+  validation_status: 'available',
+  scope: 'global',
+  configuration: {
+    integration_type: 'terraform_enterprise',
+    base_url: 'https://app.terraform.io',
+    organization: 'acme-org',
+    allow_http: false,
+    insecure_skip_tls_verify: false,
+    ca_certificate: null,
+  },
+  management_credential_id: null,
+  last_validated_at: '2026-01-01T00:00:00Z',
+  validation_error: null,
+  refresh_status: 'available',
+  last_refreshed_at: '2026-01-01T00:00:00Z',
+  refresh_error: null,
+  created_at: '2026-01-01T00:00:00Z',
+  updated_at: '2026-01-01T00:00:00Z',
+  created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'user-1', type: 'user' },
+  labels: {},
+}
+
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
 })
@@ -771,6 +799,80 @@ describe('EditIntegrationForm', () => {
       render(<EditIntegrationForm />, { wrapper })
 
       expect(screen.getByRole('textbox', { name: /api url/i })).toHaveValue('')
+    })
+  })
+
+  describe('Terraform Enterprise', () => {
+    beforeEach(() => {
+      setupMocks({ integration: mockTfeIntegration })
+    })
+
+    it('shows Terraform Enterprise as integration type', () => {
+      render(<EditIntegrationForm />, { wrapper })
+
+      expect(screen.getByText('Terraform Enterprise')).toBeInTheDocument()
+    })
+
+    it('renders TFE URL and organization fields', () => {
+      render(<EditIntegrationForm />, { wrapper })
+
+      expect(screen.getByRole('textbox', { name: /tfe url/i })).toHaveValue('https://app.terraform.io')
+      expect(screen.getByRole('textbox', { name: /organization/i })).toHaveValue('acme-org')
+    })
+
+    it('shows TFE-specific credential description text', () => {
+      render(<EditIntegrationForm />, { wrapper })
+
+      expect(screen.getByText(/verify the connection to Terraform Enterprise/i)).toBeInTheDocument()
+    })
+
+    it('calls PATCH with Terraform Enterprise configuration on save', async () => {
+      const { patchMutate } = setupMutationMocks()
+      const user = userEvent.setup()
+      render(<EditIntegrationForm />, { wrapper })
+
+      await user.click(screen.getByRole('button', { name: 'Save integration' }))
+
+      await waitFor(() => {
+        expect(patchMutate).toHaveBeenCalledWith(
+          expect.objectContaining({
+            body: expect.objectContaining({
+              configuration: {
+                integration_type: 'terraform_enterprise',
+                base_url: 'https://app.terraform.io',
+                organization: 'acme-org',
+                allow_http: false,
+                insecure_skip_tls_verify: false,
+                ca_certificate: null,
+              },
+            }) as Record<string, unknown>,
+          })
+        )
+      })
+    })
+
+    it('shows error when organization is empty', async () => {
+      const user = userEvent.setup()
+      render(<EditIntegrationForm />, { wrapper })
+
+      await user.clear(screen.getByRole('textbox', { name: /organization/i }))
+      await user.click(screen.getByRole('button', { name: 'Save integration' }))
+
+      await waitFor(() => {
+        expect(screen.getByText(/organization is required/i)).toBeInTheDocument()
+      })
+    })
+
+    it('shows error when TFE URL is empty', async () => {
+      const user = userEvent.setup()
+      render(<EditIntegrationForm />, { wrapper })
+
+      await user.clear(screen.getByRole('textbox', { name: /tfe url/i }))
+      await user.click(screen.getByRole('button', { name: 'Save integration' }))
+
+      await waitFor(() => {
+        expect(screen.getByText(/tfe url is required/i)).toBeInTheDocument()
+      })
     })
   })
 

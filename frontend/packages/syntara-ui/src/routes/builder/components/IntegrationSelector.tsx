@@ -68,6 +68,7 @@ export type IntegrationSelectorProps = {
 function IntegrationMenuToggle(
   props: Readonly<{
     toggleRef: React.Ref<MenuToggleElement>
+    fieldId: string
     ariaLabel: string
     displayText: string
     isOpen: boolean
@@ -77,10 +78,11 @@ function IntegrationMenuToggle(
     onClick: () => void
   }>
 ) {
-  const { toggleRef, ariaLabel, displayText, isOpen, isDisabled, isPending, isError, onClick } = props
+  const { toggleRef, fieldId, ariaLabel, displayText, isOpen, isDisabled, isPending, isError, onClick } = props
   return (
     <MenuToggle
       ref={toggleRef}
+      id={fieldId}
       onClick={onClick}
       isExpanded={isOpen}
       isDisabled={isDisabled || isPending}
@@ -149,6 +151,7 @@ export function IntegrationSelector({
     (toggleRef: React.Ref<MenuToggleElement>) => (
       <IntegrationMenuToggle
         toggleRef={toggleRef}
+        fieldId={fieldId}
         ariaLabel={label}
         displayText={toggleLabel}
         isOpen={isOpen}
@@ -158,7 +161,7 @@ export function IntegrationSelector({
         onClick={() => setIsOpen((prev) => !prev)}
       />
     ),
-    [label, toggleLabel, isOpen, isDisabled, isPending, isError]
+    [fieldId, label, toggleLabel, isOpen, isDisabled, isPending, isError]
   )
 
   const resolvedLabelHelp = resolveFormGroupLabelHelp(label, labelHelp, helpText)
@@ -166,7 +169,6 @@ export function IntegrationSelector({
   return (
     <FormGroup label={label} labelHelp={resolvedLabelHelp} fieldId={fieldId}>
       <SynSelect
-        id={fieldId}
         isOpen={isOpen}
         selected={value ?? NO_INTEGRATION_VALUE}
         onSelect={handleSelect}

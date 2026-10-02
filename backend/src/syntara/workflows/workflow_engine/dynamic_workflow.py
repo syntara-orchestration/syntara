@@ -30,6 +30,7 @@ with workflow.unsafe.imports_passed_through():
         ENGINE_TIMEOUT_SECONDS_KEY,
         INTERNAL_ACTIVITY_HEARTBEAT_TIMEOUT_SECONDS,
     )
+    from syntara.workflows.workflow_engine.models.tfe_types import TFEGetRunStatusParameters
     from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName
     from syntara.workflows.workflow_engine.node_settings_resolver import (
         resolve_continue_on_failure,
@@ -1049,6 +1050,7 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
 
     # Executor node types whose activities enforce their own internal deadline,
     # so Temporal's start_to_close_timeout must include the margin.
+    # TFE types are included via _TFE_NODE_TYPES at the call site (defined later).
     _EXECUTOR_TIMEOUT_MARGIN_TYPES: ClassVar[frozenset[str]] = frozenset(
         {
             NodeType.SCRIPT,
@@ -1071,6 +1073,34 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         NodeType.CONDITION: ActivityName.CONDITION,
         NodeType.SWITCH: ActivityName.SWITCH,
         NodeType.AGENTIC: ActivityName.AGENTIC,
+        NodeType.TFE_CREATE_WORKSPACE: ActivityName.TFE_CREATE_WORKSPACE,
+        NodeType.TFE_LIST_WORKSPACES: ActivityName.TFE_LIST_WORKSPACES,
+        NodeType.TFE_UPDATE_WORKSPACE: ActivityName.TFE_UPDATE_WORKSPACE,
+        NodeType.TFE_DELETE_WORKSPACE: ActivityName.TFE_DELETE_WORKSPACE,
+        NodeType.TFE_FETCH_STATE_OUTPUTS: ActivityName.TFE_FETCH_STATE_OUTPUTS,
+        NodeType.TFE_ADD_VARIABLE: ActivityName.TFE_ADD_VARIABLE,
+        NodeType.TFE_LIST_VARIABLES: ActivityName.TFE_LIST_VARIABLES,
+        NodeType.TFE_UPDATE_VARIABLE: ActivityName.TFE_UPDATE_VARIABLE,
+        NodeType.TFE_DELETE_VARIABLE: ActivityName.TFE_DELETE_VARIABLE,
+        NodeType.TFE_UPLOAD_CONFIGURATION_VERSION: ActivityName.TFE_UPLOAD_CONFIGURATION_VERSION,
+        NodeType.TFE_TRIGGER_RUN: ActivityName.TFE_TRIGGER_RUN,
+        NodeType.TFE_GET_RUN_STATUS: ActivityName.TFE_GET_RUN_STATUS,
+        NodeType.TFE_APPLY_RUN: ActivityName.TFE_APPLY_RUN,
+        NodeType.TFE_DISCARD_RUN: ActivityName.TFE_DISCARD_RUN,
+        NodeType.TFE_CANCEL_RUN: ActivityName.TFE_CANCEL_RUN,
+        NodeType.TFE_FORCE_CANCEL_RUN: ActivityName.TFE_FORCE_CANCEL_RUN,
+        NodeType.TFE_LIST_RUNS: ActivityName.TFE_LIST_RUNS,
+        NodeType.TFE_ADD_RUN_COMMENT: ActivityName.TFE_ADD_RUN_COMMENT,
+        NodeType.TFE_LIST_GITHUB_INSTALLATIONS: ActivityName.TFE_LIST_GITHUB_INSTALLATIONS,
+        NodeType.TFE_GET_GITHUB_INSTALLATION: ActivityName.TFE_GET_GITHUB_INSTALLATION,
+        NodeType.TFE_LINK_VCS: ActivityName.TFE_LINK_VCS,
+        NodeType.TFE_CREATE_PROJECT: ActivityName.TFE_CREATE_PROJECT,
+        NodeType.TFE_LIST_PROJECTS: ActivityName.TFE_LIST_PROJECTS,
+        NodeType.TFE_GET_PROJECT: ActivityName.TFE_GET_PROJECT,
+        NodeType.TFE_UPDATE_PROJECT: ActivityName.TFE_UPDATE_PROJECT,
+        NodeType.TFE_DELETE_PROJECT: ActivityName.TFE_DELETE_PROJECT,
+        NodeType.TFE_MOVE_WORKSPACE_TO_PROJECT: ActivityName.TFE_MOVE_WORKSPACE_TO_PROJECT,
+        NodeType.TFE_ASSIGN_TEAM_PERMISSIONS: ActivityName.TFE_ASSIGN_TEAM_PERMISSIONS,
     }
 
     async def _execute_executor_node(
@@ -1094,14 +1124,24 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         # Temporal delivers cancellation to an activity only through its heartbeats,
         # and only when the schedule carries a heartbeat_timeout -- otherwise the
         # beats are dropped and cancelling the workflow leaves a long-running
-        # activity (the agent run) executing until start_to_close_timeout. Only
-        # internal activities heartbeat; giving the others a heartbeat timeout would
-        # fail them spuriously. Ref: AAP-88614.
-        heartbeat_timeout = (
-            timedelta(seconds=INTERNAL_ACTIVITY_HEARTBEAT_TIMEOUT_SECONDS)
-            if node_type == NodeType.INTERNAL_ACTIVITY
-            else None
-        )
+        # activity executing until start_to_close_timeout. Only activities that
+        # actually heartbeat may receive a heartbeat_timeout; others would fail
+        # spuriously (see AAP-88614).
+        heartbeat_timeout: timedelta | None = None
+        if node_type == NodeType.INTERNAL_ACTIVITY:
+            heartbeat_timeout = timedelta(seconds=INTERNAL_ACTIVITY_HEARTBEAT_TIMEOUT_SECONDS)
+        elif node_type == NodeType.TFE_GET_RUN_STATUS:
+            params = TFEGetRunStatusParameters.model_validate(resolved_parameters)
+            if params.wait_for_completion:
+                # Use resolved parameters so templated wait durations work too.
+                # Let the activity report its own polling deadline before Temporal times out.
+                timeout_seconds = max(
+                    timeout_seconds,
+                    params.timeout_seconds + self._TEMPORAL_MARGIN,
+                )
+                # Long polls heartbeat on a fixed interval; size the timeout like
+                # internal activities (3x the beat interval).
+                heartbeat_timeout = timedelta(seconds=INTERNAL_ACTIVITY_HEARTBEAT_TIMEOUT_SECONDS)
         return cast(
             "dict[str, Any]",
             await workflow.execute_activity(
@@ -1446,14 +1486,21 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
     ) -> None:
         """Resolve and inject Syntara credentials for a task node.
 
-        If the node's parameters has a credential_id, calls the credential resolution
-        activity to decrypt and inject resolved credentials into the parameters.
+        Resolves ``credential_id`` (auth) and optional ``value_credential_id``
+        (secret-backed parameter values such as sensitive TFE variables).
         """
         credential_id = resolved_parameters.get("credential_id")
-        if not credential_id:
+        value_credential_id = resolved_parameters.get("value_credential_id")
+        if not credential_id and not value_credential_id:
             return
 
-        credential_map = {node.id: credential_id}
+        credential_map: dict[str, str] = {}
+        if credential_id:
+            credential_map[node.id] = credential_id
+        value_map_key = f"{node.id}__value"
+        if value_credential_id:
+            credential_map[value_map_key] = value_credential_id
+
         resolved_creds = await workflow.execute_activity(
             resolve_workflow_credentials,
             args=[credential_map, self._project_id],
@@ -1468,8 +1515,48 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
                 if isinstance(val, str):
                     self._secret_values.add(val)
 
+        if value_map_key in resolved_creds:
+            value_cred_data = resolved_creds[value_map_key]
+            resolved_parameters["_resolved_value_credentials"] = value_cred_data
+            for val in value_cred_data.get("_secret_values", []):
+                if isinstance(val, str):
+                    self._secret_values.add(val)
+
     _AAP_NODE_TYPES: ClassVar[frozenset[str]] = frozenset(
         {NodeType.AAP_JOB_TEMPLATE, NodeType.AAP_WORKFLOW_JOB_TEMPLATE}
+    )
+
+    _TFE_NODE_TYPES: ClassVar[frozenset[str]] = frozenset(
+        {
+            NodeType.TFE_CREATE_WORKSPACE,
+            NodeType.TFE_LIST_WORKSPACES,
+            NodeType.TFE_UPDATE_WORKSPACE,
+            NodeType.TFE_DELETE_WORKSPACE,
+            NodeType.TFE_FETCH_STATE_OUTPUTS,
+            NodeType.TFE_ADD_VARIABLE,
+            NodeType.TFE_LIST_VARIABLES,
+            NodeType.TFE_UPDATE_VARIABLE,
+            NodeType.TFE_DELETE_VARIABLE,
+            NodeType.TFE_UPLOAD_CONFIGURATION_VERSION,
+            NodeType.TFE_TRIGGER_RUN,
+            NodeType.TFE_GET_RUN_STATUS,
+            NodeType.TFE_APPLY_RUN,
+            NodeType.TFE_DISCARD_RUN,
+            NodeType.TFE_CANCEL_RUN,
+            NodeType.TFE_FORCE_CANCEL_RUN,
+            NodeType.TFE_LIST_RUNS,
+            NodeType.TFE_ADD_RUN_COMMENT,
+            NodeType.TFE_LIST_GITHUB_INSTALLATIONS,
+            NodeType.TFE_GET_GITHUB_INSTALLATION,
+            NodeType.TFE_LINK_VCS,
+            NodeType.TFE_CREATE_PROJECT,
+            NodeType.TFE_LIST_PROJECTS,
+            NodeType.TFE_GET_PROJECT,
+            NodeType.TFE_UPDATE_PROJECT,
+            NodeType.TFE_DELETE_PROJECT,
+            NodeType.TFE_MOVE_WORKSPACE_TO_PROJECT,
+            NodeType.TFE_ASSIGN_TEAM_PERMISSIONS,
+        }
     )
 
     _REFERENCE_BEARING_NODE_TYPES: ClassVar[frozenset[str]] = frozenset(
@@ -1482,7 +1569,7 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         resolved_parameters: dict[str, Any],
     ) -> None:
         """Validate integration/model/tool references before dispatch."""
-        if node.type not in self._REFERENCE_BEARING_NODE_TYPES:
+        if node.type not in self._REFERENCE_BEARING_NODE_TYPES and node.type not in self._TFE_NODE_TYPES:
             return
         ref_keys = (
             "integration_id",
@@ -1512,7 +1599,7 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         activity to fetch the integration's URL and SSL settings and injects
         them into the parameters so execution uses the same connection as the UI.
         """
-        if node.type not in self._AAP_NODE_TYPES:
+        if node.type not in self._AAP_NODE_TYPES and node.type not in self._TFE_NODE_TYPES:
             return
 
         integration_id = resolved_parameters.get("integration_id")
@@ -1532,6 +1619,7 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
     def _scrub_activity_credentials(resolved_parameters: dict[str, Any]) -> None:
         """Remove resolved credentials and integration data from parameters after execution."""
         resolved_parameters.pop("_resolved_credentials", None)
+        resolved_parameters.pop("_resolved_value_credentials", None)
         resolved_parameters.pop("_resolved_integration", None)
         scrubbed = scrub_credentials(resolved_parameters)
         resolved_parameters.clear()
@@ -1581,9 +1669,11 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
                 parameters_with_timeout[ENGINE_MAX_OUTPUT_BYTES_KEY] = resolve_max_output_bytes(
                     node, self._runtime_settings
                 )
+            # TFE activities size httpx timeouts from ENGINE_TIMEOUT_SECONDS_KEY;
+            # Temporal must outlive that budget (same pattern as HTTP/AAP).
             temporal_timeout = (
                 timeout_seconds + self._TEMPORAL_MARGIN
-                if node_type in self._EXECUTOR_TIMEOUT_MARGIN_TYPES
+                if (node_type in self._EXECUTOR_TIMEOUT_MARGIN_TYPES or node_type in self._TFE_NODE_TYPES)
                 else timeout_seconds
             )
             return await self._execute_executor_node(

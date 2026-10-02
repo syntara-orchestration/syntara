@@ -4,8 +4,9 @@ Defines ACTIVITY_REGISTRY (all activities for the main workflow worker) and
 BACKGROUND_ACTIVITY_REGISTRY (minimal subset for the background queue worker).
 """
 
-from collections.abc import Callable
-from typing import Any
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
 
 from syntara.workflows.workflow_engine.activities.aap_job_template_activity import execute_aap_job_template_activity
 from syntara.workflows.workflow_engine.activities.aap_workflow_job_template_activity import (
@@ -37,9 +38,17 @@ from syntara.workflows.workflow_engine.activities.runtime_settings_activity impo
 from syntara.workflows.workflow_engine.activities.scheduled_trigger import scheduled_trigger
 from syntara.workflows.workflow_engine.activities.script_activity import execute_script_activity
 from syntara.workflows.workflow_engine.activities.switch import switch
+from syntara.workflows.workflow_engine.activities.tfe_activities import TFE_ACTIVITIES
+from syntara.workflows.workflow_engine.activities.tfe_dispatch import build_tfe_activity_registry
 from syntara.workflows.workflow_engine.activities.wait_activity import complete_wait, wait
 from syntara.workflows.workflow_engine.activities.webhook_trigger import webhook_trigger
 from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from syntara.terraform.step_executor import TFEStepExecutor
+
 
 _TEMPORAL_ACTIVITIES: list[Callable[..., Any]] = [
     register_activity_monitoring,
@@ -69,6 +78,7 @@ _TEMPORAL_ACTIVITIES: list[Callable[..., Any]] = [
     wait,
     complete_wait,
     webhook_trigger,
+    *TFE_ACTIVITIES,
 ]
 
 ACTIVITY_REGISTRY: dict[ActivityName, Callable[..., Any]] = {
@@ -91,3 +101,8 @@ BACKGROUND_ACTIVITY_REGISTRY: dict[ActivityName, Callable[..., Any]] = {
     ActivityName(fn.__temporal_activity_definition.name): fn  # type: ignore[attr-defined]  # noqa: SLF001
     for fn in _BACKGROUND_ACTIVITIES
 }
+
+
+def build_activity_registry(tfe_executor: TFEStepExecutor | None = None) -> dict[ActivityName, Callable[..., Any]]:
+    """Build an isolated worker registry with an optional SDK-backed TFE executor."""
+    return {**ACTIVITY_REGISTRY, **build_tfe_activity_registry(tfe_executor)}

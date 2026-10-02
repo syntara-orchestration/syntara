@@ -12,7 +12,7 @@ import {
 } from '@patternfly/react-core'
 
 import { SynPanel } from '../../components/layout/SynPanel'
-import { AAP_NODE_IDS, RegistryNodeId } from '../../constants'
+import { AAP_NODE_IDS, isTerraformNodeId, RegistryNodeId } from '../../constants'
 import { renderNodeIcon } from '../workflows/canvas/nodes/renderNodeIcon'
 import { getAddNodePanelColor } from '../workflows/canvas/nodeTypeColors'
 
@@ -32,7 +32,8 @@ export function NodeTypeOptionsList(props: NodeTypeOptionsListProps) {
     const accentColor = getAddNodePanelColor(nodeType.id)
     // AAP nodes use gray icon (no color tint)
     const isAAPNode = AAP_NODE_IDS.has(nodeType.id as (typeof RegistryNodeId)[keyof typeof RegistryNodeId])
-    const iconColor = isAAPNode ? undefined : accentColor
+    const keepsBrandColor = isAAPNode || isTerraformNodeId(nodeType.id)
+    const iconColor = keepsBrandColor ? undefined : accentColor
     const nodeIcon = renderNodeIcon(icon, id, 'list', iconColor)
 
     return (

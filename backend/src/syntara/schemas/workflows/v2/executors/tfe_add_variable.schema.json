@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://automation.example.com/schemas/workflows/v2/executors/tfe_add_variable",
+  "title": "Add Variable Node",
+  "description": "Add a workspace variable",
+  "parameterSchema": {
+    "type": "object",
+    "required": [
+      "integration_id",
+      "credential_id",
+      "workspace_id",
+      "key"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "integration_id": {
+        "type": "string"
+      },
+      "credential_id": {
+        "type": "string"
+      },
+      "organization": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "Optional organization override; defaults to the integration organization"
+      },
+      "workspace_id": {
+        "type": "string"
+      },
+      "key": {
+        "type": "string"
+      },
+      "value": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "Plaintext value (non-sensitive only). Use value_credential_id when sensitive=true."
+      },
+      "value_credential_id": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "UUID of a Secret String credential providing the variable value"
+      },
+      "category": {
+        "type": "string",
+        "enum": [
+          "terraform",
+          "env"
+        ]
+      },
+      "sensitive": {
+        "type": "boolean"
+      },
+      "hcl": {
+        "type": "boolean"
+      }
+    }
+  },
+  "resultSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "variable_id": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    }
+  }
+}

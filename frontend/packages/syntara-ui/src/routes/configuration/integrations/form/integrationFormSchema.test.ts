@@ -37,6 +37,17 @@ const validLlmBase = {
   scope: 'global' as const,
 }
 
+const validTfeBase = {
+  integration_type: 'terraform_enterprise' as const,
+  configuration: {
+    integration_type: 'terraform_enterprise' as const,
+    base_url: 'https://app.terraform.io',
+    organization: 'acme',
+    ...securityDefaults,
+  },
+  scope: 'global' as const,
+}
+
 describe('integrationFormSchema', () => {
   describe('MCP Server', () => {
     it('accepts valid form data', () => {
@@ -326,6 +337,85 @@ describe('integrationFormSchema', () => {
     })
   })
 
+  describe('Terraform Enterprise', () => {
+    it('accepts valid form data', () => {
+      const result = integrationFormSchema.safeParse({
+        ...validTfeBase,
+        name: 'My TFE',
+        description: 'HCP Terraform',
+        management_credential_id: 'cred-tfe-123',
+      })
+      expect(result.success).toBe(true)
+      if (result.success) {
+        expect(result.data.integration_type).toBe(IntegrationTypeEnum.TERRAFORM_ENTERPRISE)
+        expect(result.data.configuration).toHaveProperty('organization', 'acme')
+      }
+    })
+
+    it('rejects empty TFE URL', () => {
+      const result = integrationFormSchema.safeParse({
+        ...validTfeBase,
+        name: 'TFE',
+        configuration: {
+          integration_type: 'terraform_enterprise' as const,
+          base_url: '',
+          organization: 'acme',
+          ...securityDefaults,
+        },
+      })
+      expect(result.success).toBe(false)
+      if (!result.success) {
+        expect(result.error.issues.some((i) => i.message === 'TFE URL is required')).toBe(true)
+      }
+    })
+
+    it('rejects empty organization', () => {
+      const result = integrationFormSchema.safeParse({
+        ...validTfeBase,
+        name: 'TFE',
+        configuration: {
+          integration_type: 'terraform_enterprise' as const,
+          base_url: 'https://app.terraform.io',
+          organization: '',
+          ...securityDefaults,
+        },
+      })
+      expect(result.success).toBe(false)
+      if (!result.success) {
+        expect(result.error.issues.some((i) => i.message === 'Organization is required')).toBe(true)
+      }
+    })
+
+    it('rejects HTTP URL when allow_http is false', () => {
+      const result = integrationFormSchema.safeParse({
+        ...validTfeBase,
+        name: 'TFE',
+        configuration: {
+          integration_type: 'terraform_enterprise' as const,
+          base_url: 'http://tfe.example.com',
+          organization: 'acme',
+          ...securityDefaults,
+        },
+      })
+      expect(result.success).toBe(false)
+    })
+
+    it('accepts HTTP URL when allow_http is true', () => {
+      const result = integrationFormSchema.safeParse({
+        ...validTfeBase,
+        name: 'TFE',
+        configuration: {
+          integration_type: 'terraform_enterprise' as const,
+          base_url: 'http://tfe.example.com',
+          organization: 'acme',
+          ...securityDefaults,
+          allow_http: true,
+        },
+      })
+      expect(result.success).toBe(true)
+    })
+  })
+
   describe('getStep1Fields', () => {
     it('returns name and base_url for MCP Server', () => {
       const fields = getStep1Fields(IntegrationTypeEnum.MCP_SERVER)
@@ -337,6 +427,13 @@ describe('integrationFormSchema', () => {
       const fields = getStep1Fields(IntegrationTypeEnum.ANSIBLE_AUTOMATION_PLATFORM)
       expect(fields).toContain('name')
       expect(fields).toContain('configuration.base_url')
+    })
+
+    it('returns name, base_url, and organization for Terraform Enterprise', () => {
+      const fields = getStep1Fields(IntegrationTypeEnum.TERRAFORM_ENTERPRISE)
+      expect(fields).toContain('name')
+      expect(fields).toContain('configuration.base_url')
+      expect(fields).toContain('configuration.organization')
     })
 
     it('returns name and provider fields for LLM Provider', () => {
@@ -414,6 +511,15 @@ describe('integrationFormSchema', () => {
       [
         IntegrationTypeEnum.ANSIBLE_AUTOMATION_PLATFORM,
         { integration_type: 'ansible_automation_platform', base_url: '', ...expectedSecurityDefaults },
+      ],
+      [
+        IntegrationTypeEnum.TERRAFORM_ENTERPRISE,
+        {
+          integration_type: 'terraform_enterprise',
+          base_url: '',
+          organization: '',
+          ...expectedSecurityDefaults,
+        },
       ],
       [
         IntegrationTypeEnum.LLM_PROVIDER,

@@ -197,6 +197,342 @@
       "schema_ref": "../control-nodes/wait.schema.json",
       "deprecated": false,
       "since": "2.0.0"
+    },
+    {
+      "type": "tfe_create_workspace",
+      "name": "Create Workspace",
+      "description": "Create a Terraform Enterprise workspace",
+      "labels": {
+        "category": "executor",
+        "domain": "terraform"
+      },
+      "schema_ref": "../executors/tfe_create_workspace.schema.json",
+      "deprecated": false,
+      "since": "2.0.0"
+    },
+    {
+      "type": "tfe_list_workspaces",
+      "name": "List Workspaces",
+      "description": "List Terraform Enterprise workspaces",
+      "labels": {
+        "category": "executor",
+        "domain": "terraform"
+      },
+      "schema_ref": "../executors/tfe_list_workspaces.schema.json",
+      "deprecated": false,
+      "since": "2.0.0"
+    },
+    {
+      "type": "tfe_update_workspace",
+      "name": "Update Workspace Settings",
+      "description": "Update Terraform Enterprise workspace settings",
+      "labels": {
+        "category": "executor",
+        "domain": "terraform"
+      },
+      "schema_ref": "../executors/tfe_update_workspace.schema.json",
+      "deprecated": false,
+      "since": "2.0.0"
+    },
+    {
+      "type": "tfe_delete_workspace",
+      "name": "Delete Workspace",
+      "description": "Delete a Terraform Enterprise workspace",
+      "labels": {
+        "category": "executor",
+        "domain": "terraform"
+      },
+      "schema_ref": "../executors/tfe_delete_workspace.schema.json",
+      "deprecated": false,
+      "since": "2.0.0"
+    },
+    {
+      "type": "tfe_fetch_state_outputs",
+      "name": "Fetch State and Outputs",
+      "description": "Fetch workspace state outputs",
+      "labels": {
+        "category": "executor",
+        "domain": "terraform"
+      },
+      "schema_ref": "../executors/tfe_fetch_state_outputs.schema.json",
+      "deprecated": false,
+      "since": "2.0.0"
+    },
+    {
+      "type": "tfe_add_variable",
+      "name": "Add Variable",
+      "description": "Add a workspace variable",
+      "labels": {
+        "category": "executor",
+        "domain": "terraform"
+      },
+      "schema_ref": "../executors/tfe_add_variable.schema.json",
+      "deprecated": false,
+      "since": "2.0.0"
+    },
+    {
+      "type": "tfe_list_variables",
+      "name": "List Variables",
+      "description": "List workspace variables (values never returned)",
+      "labels": {
+        "category": "executor",
+        "domain": "terraform"
+      },
+      "schema_ref": "../executors/tfe_list_variables.schema.json",
+      "deprecated": false,
+      "since": "2.0.0"
+    },
+    {
+      "type": "tfe_update_variable",
+      "name": "Update Variable",
+      "description": "Update a workspace variable",
+      "labels": {
+        "category": "executor",
+        "domain": "terraform"
+      },
+      "schema_ref": "../executors/tfe_update_variable.schema.json",
+      "deprecated": false,
+      "since": "2.0.0"
+    },
+    {
+      "type": "tfe_delete_variable",
+      "name": "Delete Variable",
+      "description": "Delete a workspace variable",
+      "labels": {
+        "category": "executor",
+        "domain": "terraform"
+      },
+      "schema_ref": "../executors/tfe_delete_variable.schema.json",
+      "deprecated": false,
+      "since": "2.0.0"
+    },
+    {
+      "type": "tfe_upload_configuration_version",
+      "name": "Upload Configuration Version",
+      "description": "Upload HCL configuration artifact",
+      "labels": {
+        "category": "executor",
+        "domain": "terraform"
+      },
+      "schema_ref": "../executors/tfe_upload_configuration_version.schema.json",
+      "deprecated": false,
+      "since": "2.0.0"
+    },
+    {
+      "type": "tfe_trigger_run",
+      "name": "Trigger Run",
+      "description": "Trigger a Terraform Enterprise run",
+      "labels": {
+        "category": "executor",
+        "domain": "terraform"
+      },
+      "schema_ref": "../executors/tfe_trigger_run.schema.json",
+      "deprecated": false,
+      "since": "2.0.0"
+    },
+    {
+      "type": "tfe_get_run_status",
+      "name": "Get Run Status",
+      "description": "Get Terraform Enterprise run status",
+      "labels": {
+        "category": "executor",
+        "domain": "terraform"
+      },
+      "schema_ref": "../executors/tfe_get_run_status.schema.json",
+      "deprecated": false,
+      "since": "2.0.0"
+    },
+    {
+      "type": "tfe_apply_run",
+      "name": "Apply Run",
+      "description": "Apply a confirmable run",
+      "labels": {
+        "category": "executor",
+        "domain": "terraform"
+      },
+      "schema_ref": "../executors/tfe_apply_run.schema.json",
+      "deprecated": false,
+      "since": "2.0.0"
+    },
+    {
+      "type": "tfe_discard_run",
+      "name": "Discard Run",
+      "description": "Discard a run",
+      "labels": {
+        "category": "executor",
+        "domain": "terraform"
+      },
+      "schema_ref": "../executors/tfe_discard_run.schema.json",
+      "deprecated": false,
+      "since": "2.0.0"
+    },
+    {
+      "type": "tfe_cancel_run",
+      "name": "Cancel Run",
+      "description": "Cancel an in-flight run",
+      "labels": {
+        "category": "executor",
+        "domain": "terraform"
+      },
+      "schema_ref": "../executors/tfe_cancel_run.schema.json",
+      "deprecated": false,
+      "since": "2.0.0"
+    },
+    {
+      "type": "tfe_force_cancel_run",
+      "name": "Force Cancel Run",
+      "description": "Force-cancel a run",
+      "labels": {
+        "category": "executor",
+        "domain": "terraform"
+      },
+      "schema_ref": "../executors/tfe_force_cancel_run.schema.json",
+      "deprecated": false,
+      "since": "2.0.0"
+    },
+    {
+      "type": "tfe_list_runs",
+      "name": "List Runs",
+      "description": "List runs for a workspace",
+      "labels": {
+        "category": "executor",
+        "domain": "terraform"
+      },
+      "schema_ref": "../executors/tfe_list_runs.schema.json",
+      "deprecated": false,
+      "since": "2.0.0"
+    },
+    {
+      "type": "tfe_add_run_comment",
+      "name": "Add Run Comment",
+      "description": "Add a comment to a run",
+      "labels": {
+        "category": "executor",
+        "domain": "terraform"
+      },
+      "schema_ref": "../executors/tfe_add_run_comment.schema.json",
+      "deprecated": false,
+      "since": "2.0.0"
+    },
+    {
+      "type": "tfe_list_github_installations",
+      "name": "List GitHub Installations",
+      "description": "List GitHub App installations",
+      "labels": {
+        "category": "executor",
+        "domain": "terraform"
+      },
+      "schema_ref": "../executors/tfe_list_github_installations.schema.json",
+      "deprecated": false,
+      "since": "2.0.0"
+    },
+    {
+      "type": "tfe_get_github_installation",
+      "name": "Get Installation Details",
+      "description": "Get GitHub App installation details",
+      "labels": {
+        "category": "executor",
+        "domain": "terraform"
+      },
+      "schema_ref": "../executors/tfe_get_github_installation.schema.json",
+      "deprecated": false,
+      "since": "2.0.0"
+    },
+    {
+      "type": "tfe_link_vcs",
+      "name": "Link VCS to Workspace",
+      "description": "Link a GitHub repository to a workspace",
+      "labels": {
+        "category": "executor",
+        "domain": "terraform"
+      },
+      "schema_ref": "../executors/tfe_link_vcs.schema.json",
+      "deprecated": false,
+      "since": "2.0.0"
+    },
+    {
+      "type": "tfe_create_project",
+      "name": "Create Project",
+      "description": "Create a Terraform Enterprise project",
+      "labels": {
+        "category": "executor",
+        "domain": "terraform"
+      },
+      "schema_ref": "../executors/tfe_create_project.schema.json",
+      "deprecated": false,
+      "since": "2.0.0"
+    },
+    {
+      "type": "tfe_list_projects",
+      "name": "List Projects",
+      "description": "List Terraform Enterprise projects",
+      "labels": {
+        "category": "executor",
+        "domain": "terraform"
+      },
+      "schema_ref": "../executors/tfe_list_projects.schema.json",
+      "deprecated": false,
+      "since": "2.0.0"
+    },
+    {
+      "type": "tfe_get_project",
+      "name": "Get Project Details",
+      "description": "Get project details and team permissions",
+      "labels": {
+        "category": "executor",
+        "domain": "terraform"
+      },
+      "schema_ref": "../executors/tfe_get_project.schema.json",
+      "deprecated": false,
+      "since": "2.0.0"
+    },
+    {
+      "type": "tfe_update_project",
+      "name": "Update Project Settings",
+      "description": "Update a Terraform Enterprise project",
+      "labels": {
+        "category": "executor",
+        "domain": "terraform"
+      },
+      "schema_ref": "../executors/tfe_update_project.schema.json",
+      "deprecated": false,
+      "since": "2.0.0"
+    },
+    {
+      "type": "tfe_delete_project",
+      "name": "Delete Project",
+      "description": "Delete a Terraform Enterprise project",
+      "labels": {
+        "category": "executor",
+        "domain": "terraform"
+      },
+      "schema_ref": "../executors/tfe_delete_project.schema.json",
+      "deprecated": false,
+      "since": "2.0.0"
+    },
+    {
+      "type": "tfe_move_workspace_to_project",
+      "name": "Move Workspace to Project",
+      "description": "Move a workspace into a project",
+      "labels": {
+        "category": "executor",
+        "domain": "terraform"
+      },
+      "schema_ref": "../executors/tfe_move_workspace_to_project.schema.json",
+      "deprecated": false,
+      "since": "2.0.0"
+    },
+    {
+      "type": "tfe_assign_team_permissions",
+      "name": "Assign Team Permissions",
+      "description": "Assign team permissions on a project",
+      "labels": {
+        "category": "executor",
+        "domain": "terraform"
+      },
+      "schema_ref": "../executors/tfe_assign_team_permissions.schema.json",
+      "deprecated": false,
+      "since": "2.0.0"
     }
   ]
 }

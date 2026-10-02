@@ -60,7 +60,15 @@ paths:
   /workflows:
     get:
       summary: List workflows
-      description: "List workflows the current user has read access to.\n\nSupports filtering using query parameters with standard operators:\n- created_by: Filter by creator user ID (created_by=uuid)\n- is_enabled: Filter by enabled status (is_enabled=true|false)\n- labels: Filter by labels using bracket notation (labels[environment]=production)\n\nUses cursor-based pagination for scalability and consistency."
+      description: |-
+        List workflows the current user has read access to.
+
+        Supports filtering using query parameters with standard operators:
+        - created_by: Filter by creator user ID (created_by=uuid)
+        - is_enabled: Filter by enabled status (is_enabled=true|false)
+        - labels: Filter by labels using bracket notation (labels[environment]=production)
+
+        Uses cursor-based pagination for scalability and consistency.
       operationId: list_workflows
       tags:
         - Workflows
@@ -82,21 +90,21 @@ paths:
               schema:
                 $ref: '#/components/schemas/WorkflowListResponse'
         '400':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/BadRequestError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/BadRequestError
         '401':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError
         '403':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError
         '404':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/NotFoundError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/NotFoundError
         '409':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ConflictError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/ConflictError
         '422':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ValidationError'
-        "429":
-          $ref: "../../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/ValidationError
+        '429':
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/RateLimitError
         '500':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError
     post:
       summary: Create workflow
       description: Create a new workflow with initial version.
@@ -122,21 +130,21 @@ paths:
               schema:
                 $ref: '#/components/schemas/WorkflowRead'
         '400':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/BadRequestError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/BadRequestError
         '401':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError
         '403':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError
         '404':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/NotFoundError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/NotFoundError
         '409':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ConflictError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/ConflictError
         '422':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ValidationError'
-        "429":
-          $ref: "../../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/ValidationError
+        '429':
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/RateLimitError
         '500':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError
   /workflows/validate:
     post:
       summary: Validate workflow definition
@@ -168,25 +176,25 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationResult'
         '400':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/BadRequestError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/BadRequestError
         '401':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError
         '403':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError
         '404':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/NotFoundError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/NotFoundError
         '409':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ConflictError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/ConflictError
         '422':
           description: Unprocessable Content
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/DetailedValidationProblemDetail'
-        "429":
-          $ref: "../../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+        '429':
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/RateLimitError
         '500':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError
   /workflows/{workflow_id}:
     get:
       summary: Get workflow
@@ -215,24 +223,30 @@ paths:
               schema:
                 $ref: '#/components/schemas/WorkflowReadWithVersion'
         '400':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/BadRequestError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/BadRequestError
         '401':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError
         '403':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError
         '404':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/NotFoundError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/NotFoundError
         '409':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ConflictError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/ConflictError
         '422':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ValidationError'
-        "429":
-          $ref: "../../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/ValidationError
+        '429':
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/RateLimitError
         '500':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError
     patch:
       summary: Update workflow
-      description: "Update workflow.\n\nSupports both metadata-only updates and workflow definition updates:\n- Metadata only (name, description, labels): Updates without creating new version\n- With workflow_definition: Validates definition, compares with current version, creates new WorkflowVersion\n  only if definition differs (change detection optimization)"
+      description: |-
+        Update workflow.
+
+        Supports both metadata-only updates and workflow definition updates:
+        - Metadata only (name, description, labels): Updates without creating new version
+        - With workflow_definition: Validates definition, compares with current version, creates new WorkflowVersion
+          only if definition differs (change detection optimization)
       operationId: update_workflow
       tags:
         - Workflows
@@ -263,21 +277,21 @@ paths:
               schema:
                 $ref: '#/components/schemas/WorkflowReadWithVersion'
         '400':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/BadRequestError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/BadRequestError
         '401':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError
         '403':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError
         '404':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/NotFoundError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/NotFoundError
         '409':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ConflictError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/ConflictError
         '422':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ValidationError'
-        "429":
-          $ref: "../../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/ValidationError
+        '429':
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/RateLimitError
         '500':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError
     delete:
       summary: Delete workflow
       description: Permanently delete a workflow and cascade-delete all its versions and executions.
@@ -301,21 +315,21 @@ paths:
         '204':
           description: Workflow deleted
         '400':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/BadRequestError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/BadRequestError
         '401':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError
         '403':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError
         '404':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/NotFoundError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/NotFoundError
         '409':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ConflictError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/ConflictError
         '422':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ValidationError'
-        "429":
-          $ref: "../../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/ValidationError
+        '429':
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/RateLimitError
         '500':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError
   /workflows/{workflow_id}/test:
     post:
       summary: Test a single node in a workflow
@@ -350,21 +364,21 @@ paths:
               schema:
                 $ref: '#/components/schemas/ExecutionRead'
         '400':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/BadRequestError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/BadRequestError
         '401':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError
         '403':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError
         '404':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/NotFoundError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/NotFoundError
         '409':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ConflictError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/ConflictError
         '422':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ValidationError'
-        "429":
-          $ref: "../../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/ValidationError
+        '429':
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/RateLimitError
         '500':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError
   /workflows/{workflow_id}/versions:
     get:
       summary: List workflow versions
@@ -426,21 +440,21 @@ paths:
               schema:
                 $ref: '#/components/schemas/WorkflowVersionListResponse'
         '400':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/BadRequestError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/BadRequestError
         '401':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError
         '403':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError
         '404':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/NotFoundError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/NotFoundError
         '409':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ConflictError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/ConflictError
         '422':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ValidationError'
-        "429":
-          $ref: "../../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/ValidationError
+        '429':
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/RateLimitError
         '500':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError
   /workflows/{workflow_id}/versions/{version}:
     get:
       summary: Get workflow version
@@ -476,21 +490,21 @@ paths:
               schema:
                 $ref: '#/components/schemas/WorkflowVersionRead'
         '400':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/BadRequestError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/BadRequestError
         '401':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError
         '403':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError
         '404':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/NotFoundError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/NotFoundError
         '409':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ConflictError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/ConflictError
         '422':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ValidationError'
-        "429":
-          $ref: "../../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/ValidationError
+        '429':
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/RateLimitError
         '500':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError
     patch:
       summary: Update workflow version metadata
       description: Update a workflow version's metadata (name, change_description).
@@ -527,21 +541,21 @@ paths:
               schema:
                 $ref: '#/components/schemas/WorkflowVersionRead'
         '400':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/BadRequestError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/BadRequestError
         '401':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError
         '403':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError
         '404':
           description: Workflow not found
         '409':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ConflictError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/ConflictError
         '422':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ValidationError'
-        "429":
-          $ref: "../../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/ValidationError
+        '429':
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/RateLimitError
         '500':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError
   /workflows/{workflow_id}/versions/{version}/publish:
     post:
       summary: Publish workflow version
@@ -583,21 +597,21 @@ paths:
               schema:
                 $ref: '#/components/schemas/PublishWorkflowVersionResponse'
         '400':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/BadRequestError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/BadRequestError
         '401':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError
         '403':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError
         '404':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/NotFoundError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/NotFoundError
         '409':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ConflictError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/ConflictError
         '422':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ValidationError'
-        "429":
-          $ref: "../../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/ValidationError
+        '429':
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/RateLimitError
         '500':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError
   /workflows/{workflow_id}/unpublish:
     post:
       summary: Unpublish workflow
@@ -626,21 +640,21 @@ paths:
               schema:
                 $ref: '#/components/schemas/WorkflowRead'
         '400':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/BadRequestError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/BadRequestError
         '401':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError
         '403':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError
         '404':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/NotFoundError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/NotFoundError
         '409':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ConflictError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/ConflictError
         '422':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ValidationError'
-        "429":
-          $ref: "../../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/ValidationError
+        '429':
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/RateLimitError
         '500':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError
   /workflows/{workflow_id}/versions/{version}/restore:
     post:
       summary: Restore workflow version
@@ -676,21 +690,21 @@ paths:
               schema:
                 $ref: '#/components/schemas/WorkflowReadWithVersion'
         '400':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/BadRequestError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/BadRequestError
         '401':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError
         '403':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError
         '404':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/NotFoundError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/NotFoundError
         '409':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ConflictError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/ConflictError
         '422':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ValidationError'
-        "429":
-          $ref: "../../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/ValidationError
+        '429':
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/RateLimitError
         '500':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError
   /workflows/{workflow_id}/versions/{version}/export:
     get:
       summary: Export workflow version
@@ -724,30 +738,28 @@ paths:
           content:
             application/json: {}
         '400':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/BadRequestError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/BadRequestError
         '401':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError
         '403':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError
         '404':
           description: Workflow not found
         '409':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ConflictError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/ConflictError
         '422':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ValidationError'
-        "429":
-          $ref: "../../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/ValidationError
+        '429':
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/RateLimitError
         '500':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError'
-  # Note: Approval endpoints are in a separate API
-  # See: src/syntara/schemas/approvals/openapi.yaml
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError
   /webhooks/{webhook_path}:
     post:
       summary: Receive webhook event
-      description: >-
-        Receive a webhook event from an external system and trigger the matching workflow. Requires a service account Bearer token. Only POST method is supported; other methods receive 405 Method Not Allowed.
+      description: Receive a webhook event from an external system and trigger the matching workflow. Requires a service account Bearer token. Only POST method is supported; other methods receive 405 Method Not Allowed.
       operationId: receive_webhook
-      tags: [Webhooks]
+      tags:
+        - Webhooks
       security:
         - bearerAuth: []
       x-app-permission:
@@ -776,42 +788,42 @@ paths:
               schema:
                 $ref: '#/components/schemas/WebhookResponse'
         '400':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/BadRequestError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/BadRequestError
         '401':
           description: Missing or invalid service account Bearer token
           content:
             application/problem+json:
               schema:
-                $ref: '../../base/shared-resources.openapi.yaml#/components/schemas/ErrorData'
+                $ref: ../../base/shared-resources.openapi.yaml#/components/schemas/ErrorData
         '403':
           description: Service account is not authorized for this trigger
           content:
             application/problem+json:
               schema:
-                $ref: '../../base/shared-resources.openapi.yaml#/components/schemas/ErrorData'
+                $ref: ../../base/shared-resources.openapi.yaml#/components/schemas/ErrorData
         '404':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/NotFoundError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/NotFoundError
         '409':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ConflictError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/ConflictError
         '422':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ValidationError'
-        "429":
-          $ref: "../../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/ValidationError
+        '429':
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/RateLimitError
         '500':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError
         '413':
           description: Payload exceeds the 1 MB size limit
           content:
             application/problem+json:
               schema:
-                $ref: '../../base/shared-resources.openapi.yaml#/components/schemas/ErrorData'
+                $ref: ../../base/shared-resources.openapi.yaml#/components/schemas/ErrorData
   /webhooks/eda/{webhook_path}:
     post:
       summary: Receive EDA webhook event
-      description: >-
-        Receive a webhook event from Event-Driven Ansible and trigger the matching workflow. Requires a service account Bearer token. Each EDA trigger node has its own unique webhook path. The payload can be any JSON structure.
+      description: Receive a webhook event from Event-Driven Ansible and trigger the matching workflow. Requires a service account Bearer token. Each EDA trigger node has its own unique webhook path. The payload can be any JSON structure.
       operationId: receive_eda_webhook
-      tags: [Webhooks]
+      tags:
+        - Webhooks
       security:
         - bearerAuth: []
       x-app-permission:
@@ -840,38 +852,37 @@ paths:
               schema:
                 $ref: '#/components/schemas/WebhookResponse'
         '400':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/BadRequestError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/BadRequestError
         '401':
           description: Missing or invalid service account Bearer token
           content:
             application/problem+json:
               schema:
-                $ref: '../../base/shared-resources.openapi.yaml#/components/schemas/ErrorData'
+                $ref: ../../base/shared-resources.openapi.yaml#/components/schemas/ErrorData
         '403':
           description: Service account is not authorized for this trigger
           content:
             application/problem+json:
               schema:
-                $ref: '../../base/shared-resources.openapi.yaml#/components/schemas/ErrorData'
+                $ref: ../../base/shared-resources.openapi.yaml#/components/schemas/ErrorData
         '404':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/NotFoundError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/NotFoundError
         '409':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ConflictError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/ConflictError
         '422':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ValidationError'
-        "429":
-          $ref: "../../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/ValidationError
+        '429':
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/RateLimitError
         '500':
-          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError'
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError
         '413':
           description: Payload exceeds the 1 MB size limit
           content:
             application/problem+json:
               schema:
-                $ref: '../../base/shared-resources.openapi.yaml#/components/schemas/ErrorData'
+                $ref: ../../base/shared-resources.openapi.yaml#/components/schemas/ErrorData
 components:
   schemas:
-    # Import workflow-specific schemas
     WorkflowRead:
       $ref: ./shared-schemas.yaml#/components/schemas/WorkflowRead
     WorkflowReadWithVersion:
@@ -912,8 +923,7 @@ components:
             - type: integer
             - type: 'null'
           title: Expected Version
-          description: >-
-            Version the client was editing. If the server's current_version is higher, returns 409 Conflict.
+          description: Version the client was editing. If the server's current_version is higher, returns 409 Conflict.
     WorkflowVersionUpdate:
       type: object
       title: WorkflowVersionUpdate
@@ -1009,7 +1019,6 @@ components:
           total: 150
         - next: eyJpZCI6Im5leHQifQ
           prev: eyJpZCI6InByZXYifQ
-    # Note: Approval schemas are in src/syntara/schemas/approvals/openapi.yaml
     WorkflowCreate:
       $ref: ./shared-schemas.yaml#/components/schemas/WorkflowCreate
     WorkflowUpdate:
@@ -1024,7 +1033,6 @@ components:
       $ref: ./shared-schemas.yaml#/components/schemas/ExecutionRead
     WorkflowDefinition:
       $ref: ./shared-schemas.yaml#/components/schemas/WorkflowDefinition
-    # Node type schemas (referenced by WorkflowDefinition.nodes oneOf)
     AAPJobTemplateNode:
       $ref: ./shared-schemas.yaml#/components/schemas/AAPJobTemplateNode
     AAPWorkflowJobTemplateNode:
@@ -1047,7 +1055,6 @@ components:
       $ref: ./shared-schemas.yaml#/components/schemas/ConvergeNode
     WaitNode:
       $ref: ./shared-schemas.yaml#/components/schemas/WaitNode
-    # Node parameter and settings schemas
     AAPJobTemplateExecutorParameters:
       $ref: ./shared-schemas.yaml#/components/schemas/AAPJobTemplateExecutorParameters
     AAPWorkflowJobTemplateExecutorParameters:
@@ -1156,7 +1163,6 @@ components:
         - converge_configuration
         - approval_configuration
         - definition_limits
-
     ValidationFinding:
       type: object
       title: ValidationFinding
@@ -1263,6 +1269,112 @@ components:
           title: Instance
         validation_result:
           $ref: '#/components/schemas/ValidationResult'
+    TFEAddRunCommentNode:
+      $ref: ./shared-schemas.yaml#/components/schemas/TFEAddRunCommentNode
+    TFEAddRunCommentParameters:
+      $ref: ./shared-schemas.yaml#/components/schemas/TFEAddRunCommentParameters
+    TFEAddVariableNode:
+      $ref: ./shared-schemas.yaml#/components/schemas/TFEAddVariableNode
+    TFEAddVariableParameters:
+      $ref: ./shared-schemas.yaml#/components/schemas/TFEAddVariableParameters
+    TFEApplyRunNode:
+      $ref: ./shared-schemas.yaml#/components/schemas/TFEApplyRunNode
+    TFEAssignTeamPermissionsNode:
+      $ref: ./shared-schemas.yaml#/components/schemas/TFEAssignTeamPermissionsNode
+    TFEAssignTeamPermissionsParameters:
+      $ref: ./shared-schemas.yaml#/components/schemas/TFEAssignTeamPermissionsParameters
+    TFECancelRunNode:
+      $ref: ./shared-schemas.yaml#/components/schemas/TFECancelRunNode
+    TFECreateProjectNode:
+      $ref: ./shared-schemas.yaml#/components/schemas/TFECreateProjectNode
+    TFECreateProjectParameters:
+      $ref: ./shared-schemas.yaml#/components/schemas/TFECreateProjectParameters
+    TFECreateWorkspaceNode:
+      $ref: ./shared-schemas.yaml#/components/schemas/TFECreateWorkspaceNode
+    TFECreateWorkspaceParameters:
+      $ref: ./shared-schemas.yaml#/components/schemas/TFECreateWorkspaceParameters
+    TFEDeleteProjectNode:
+      $ref: ./shared-schemas.yaml#/components/schemas/TFEDeleteProjectNode
+    TFEDeleteProjectParameters:
+      $ref: ./shared-schemas.yaml#/components/schemas/TFEDeleteProjectParameters
+    TFEDeleteVariableNode:
+      $ref: ./shared-schemas.yaml#/components/schemas/TFEDeleteVariableNode
+    TFEDeleteVariableParameters:
+      $ref: ./shared-schemas.yaml#/components/schemas/TFEDeleteVariableParameters
+    TFEDeleteWorkspaceNode:
+      $ref: ./shared-schemas.yaml#/components/schemas/TFEDeleteWorkspaceNode
+    TFEDeleteWorkspaceParameters:
+      $ref: ./shared-schemas.yaml#/components/schemas/TFEDeleteWorkspaceParameters
+    TFEDiscardRunNode:
+      $ref: ./shared-schemas.yaml#/components/schemas/TFEDiscardRunNode
+    TFEFetchStateOutputsNode:
+      $ref: ./shared-schemas.yaml#/components/schemas/TFEFetchStateOutputsNode
+    TFEFetchStateOutputsParameters:
+      $ref: ./shared-schemas.yaml#/components/schemas/TFEFetchStateOutputsParameters
+    TFEForceCancelRunNode:
+      $ref: ./shared-schemas.yaml#/components/schemas/TFEForceCancelRunNode
+    TFEGetGitHubInstallationNode:
+      $ref: ./shared-schemas.yaml#/components/schemas/TFEGetGitHubInstallationNode
+    TFEGetGitHubInstallationParameters:
+      $ref: ./shared-schemas.yaml#/components/schemas/TFEGetGitHubInstallationParameters
+    TFEGetProjectNode:
+      $ref: ./shared-schemas.yaml#/components/schemas/TFEGetProjectNode
+    TFEGetProjectParameters:
+      $ref: ./shared-schemas.yaml#/components/schemas/TFEGetProjectParameters
+    TFEGetRunStatusNode:
+      $ref: ./shared-schemas.yaml#/components/schemas/TFEGetRunStatusNode
+    TFEGetRunStatusParameters:
+      $ref: ./shared-schemas.yaml#/components/schemas/TFEGetRunStatusParameters
+    TFELinkVCSNode:
+      $ref: ./shared-schemas.yaml#/components/schemas/TFELinkVCSNode
+    TFELinkVCSParameters:
+      $ref: ./shared-schemas.yaml#/components/schemas/TFELinkVCSParameters
+    TFEListGitHubInstallationsNode:
+      $ref: ./shared-schemas.yaml#/components/schemas/TFEListGitHubInstallationsNode
+    TFEListGitHubInstallationsParameters:
+      $ref: ./shared-schemas.yaml#/components/schemas/TFEListGitHubInstallationsParameters
+    TFEListProjectsNode:
+      $ref: ./shared-schemas.yaml#/components/schemas/TFEListProjectsNode
+    TFEListProjectsParameters:
+      $ref: ./shared-schemas.yaml#/components/schemas/TFEListProjectsParameters
+    TFEListRunsNode:
+      $ref: ./shared-schemas.yaml#/components/schemas/TFEListRunsNode
+    TFEListRunsParameters:
+      $ref: ./shared-schemas.yaml#/components/schemas/TFEListRunsParameters
+    TFEListVariablesNode:
+      $ref: ./shared-schemas.yaml#/components/schemas/TFEListVariablesNode
+    TFEListVariablesParameters:
+      $ref: ./shared-schemas.yaml#/components/schemas/TFEListVariablesParameters
+    TFEListWorkspacesNode:
+      $ref: ./shared-schemas.yaml#/components/schemas/TFEListWorkspacesNode
+    TFEListWorkspacesParameters:
+      $ref: ./shared-schemas.yaml#/components/schemas/TFEListWorkspacesParameters
+    TFEMoveWorkspaceToProjectNode:
+      $ref: ./shared-schemas.yaml#/components/schemas/TFEMoveWorkspaceToProjectNode
+    TFEMoveWorkspaceToProjectParameters:
+      $ref: ./shared-schemas.yaml#/components/schemas/TFEMoveWorkspaceToProjectParameters
+    TFERunActionParameters:
+      $ref: ./shared-schemas.yaml#/components/schemas/TFERunActionParameters
+    TFETriggerRunNode:
+      $ref: ./shared-schemas.yaml#/components/schemas/TFETriggerRunNode
+    TFETriggerRunParameters:
+      $ref: ./shared-schemas.yaml#/components/schemas/TFETriggerRunParameters
+    TFEUpdateProjectNode:
+      $ref: ./shared-schemas.yaml#/components/schemas/TFEUpdateProjectNode
+    TFEUpdateProjectParameters:
+      $ref: ./shared-schemas.yaml#/components/schemas/TFEUpdateProjectParameters
+    TFEUpdateVariableNode:
+      $ref: ./shared-schemas.yaml#/components/schemas/TFEUpdateVariableNode
+    TFEUpdateVariableParameters:
+      $ref: ./shared-schemas.yaml#/components/schemas/TFEUpdateVariableParameters
+    TFEUpdateWorkspaceNode:
+      $ref: ./shared-schemas.yaml#/components/schemas/TFEUpdateWorkspaceNode
+    TFEUpdateWorkspaceParameters:
+      $ref: ./shared-schemas.yaml#/components/schemas/TFEUpdateWorkspaceParameters
+    TFEUploadConfigurationVersionNode:
+      $ref: ./shared-schemas.yaml#/components/schemas/TFEUploadConfigurationVersionNode
+    TFEUploadConfigurationVersionParameters:
+      $ref: ./shared-schemas.yaml#/components/schemas/TFEUploadConfigurationVersionParameters
   securitySchemes:
     bearerAuth:
       type: http

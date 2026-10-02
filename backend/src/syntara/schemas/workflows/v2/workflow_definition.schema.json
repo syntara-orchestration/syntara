@@ -455,6 +455,566 @@
               }
             }
           ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/node_base"
+            },
+            {
+              "properties": {
+                "type": {
+                  "const": "tfe_create_workspace"
+                },
+                "parameters": {
+                  "$ref": "executors/tfe_create_workspace.schema.json#/parameterSchema"
+                },
+                "settings": {
+                  "$ref": "common-definitions.schema.json#/$defs/nodeSettingsNoRetry"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/node_base"
+            },
+            {
+              "properties": {
+                "type": {
+                  "const": "tfe_list_workspaces"
+                },
+                "parameters": {
+                  "$ref": "executors/tfe_list_workspaces.schema.json#/parameterSchema"
+                },
+                "settings": {
+                  "$ref": "common-definitions.schema.json#/$defs/nodeSettingsFull"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/node_base"
+            },
+            {
+              "properties": {
+                "type": {
+                  "const": "tfe_update_workspace"
+                },
+                "parameters": {
+                  "$ref": "executors/tfe_update_workspace.schema.json#/parameterSchema"
+                },
+                "settings": {
+                  "$ref": "common-definitions.schema.json#/$defs/nodeSettingsNoRetry"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/node_base"
+            },
+            {
+              "properties": {
+                "type": {
+                  "const": "tfe_delete_workspace"
+                },
+                "parameters": {
+                  "$ref": "executors/tfe_delete_workspace.schema.json#/parameterSchema"
+                },
+                "settings": {
+                  "$ref": "common-definitions.schema.json#/$defs/nodeSettingsNoRetry"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/node_base"
+            },
+            {
+              "properties": {
+                "type": {
+                  "const": "tfe_fetch_state_outputs"
+                },
+                "parameters": {
+                  "$ref": "executors/tfe_fetch_state_outputs.schema.json#/parameterSchema"
+                },
+                "settings": {
+                  "$ref": "common-definitions.schema.json#/$defs/nodeSettingsFull"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/node_base"
+            },
+            {
+              "properties": {
+                "type": {
+                  "const": "tfe_add_variable"
+                },
+                "parameters": {
+                  "$ref": "executors/tfe_add_variable.schema.json#/parameterSchema"
+                },
+                "settings": {
+                  "$ref": "common-definitions.schema.json#/$defs/nodeSettingsNoRetry"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/node_base"
+            },
+            {
+              "properties": {
+                "type": {
+                  "const": "tfe_list_variables"
+                },
+                "parameters": {
+                  "$ref": "executors/tfe_list_variables.schema.json#/parameterSchema"
+                },
+                "settings": {
+                  "$ref": "common-definitions.schema.json#/$defs/nodeSettingsFull"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/node_base"
+            },
+            {
+              "properties": {
+                "type": {
+                  "const": "tfe_update_variable"
+                },
+                "parameters": {
+                  "$ref": "executors/tfe_update_variable.schema.json#/parameterSchema"
+                },
+                "settings": {
+                  "$ref": "common-definitions.schema.json#/$defs/nodeSettingsNoRetry"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/node_base"
+            },
+            {
+              "properties": {
+                "type": {
+                  "const": "tfe_delete_variable"
+                },
+                "parameters": {
+                  "$ref": "executors/tfe_delete_variable.schema.json#/parameterSchema"
+                },
+                "settings": {
+                  "$ref": "common-definitions.schema.json#/$defs/nodeSettingsNoRetry"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/node_base"
+            },
+            {
+              "properties": {
+                "type": {
+                  "const": "tfe_upload_configuration_version"
+                },
+                "parameters": {
+                  "$ref": "executors/tfe_upload_configuration_version.schema.json#/parameterSchema"
+                },
+                "settings": {
+                  "$ref": "common-definitions.schema.json#/$defs/nodeSettingsNoRetry"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/node_base"
+            },
+            {
+              "properties": {
+                "type": {
+                  "const": "tfe_trigger_run"
+                },
+                "parameters": {
+                  "$ref": "executors/tfe_trigger_run.schema.json#/parameterSchema"
+                },
+                "settings": {
+                  "$ref": "common-definitions.schema.json#/$defs/nodeSettingsNoRetry"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/node_base"
+            },
+            {
+              "properties": {
+                "type": {
+                  "const": "tfe_get_run_status"
+                },
+                "parameters": {
+                  "$ref": "executors/tfe_get_run_status.schema.json#/parameterSchema"
+                },
+                "settings": {
+                  "$ref": "common-definitions.schema.json#/$defs/nodeSettingsFull"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/node_base"
+            },
+            {
+              "properties": {
+                "type": {
+                  "const": "tfe_apply_run"
+                },
+                "parameters": {
+                  "$ref": "executors/tfe_apply_run.schema.json#/parameterSchema"
+                },
+                "settings": {
+                  "$ref": "common-definitions.schema.json#/$defs/nodeSettingsNoRetry"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/node_base"
+            },
+            {
+              "properties": {
+                "type": {
+                  "const": "tfe_discard_run"
+                },
+                "parameters": {
+                  "$ref": "executors/tfe_discard_run.schema.json#/parameterSchema"
+                },
+                "settings": {
+                  "$ref": "common-definitions.schema.json#/$defs/nodeSettingsNoRetry"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/node_base"
+            },
+            {
+              "properties": {
+                "type": {
+                  "const": "tfe_cancel_run"
+                },
+                "parameters": {
+                  "$ref": "executors/tfe_cancel_run.schema.json#/parameterSchema"
+                },
+                "settings": {
+                  "$ref": "common-definitions.schema.json#/$defs/nodeSettingsNoRetry"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/node_base"
+            },
+            {
+              "properties": {
+                "type": {
+                  "const": "tfe_force_cancel_run"
+                },
+                "parameters": {
+                  "$ref": "executors/tfe_force_cancel_run.schema.json#/parameterSchema"
+                },
+                "settings": {
+                  "$ref": "common-definitions.schema.json#/$defs/nodeSettingsNoRetry"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/node_base"
+            },
+            {
+              "properties": {
+                "type": {
+                  "const": "tfe_list_runs"
+                },
+                "parameters": {
+                  "$ref": "executors/tfe_list_runs.schema.json#/parameterSchema"
+                },
+                "settings": {
+                  "$ref": "common-definitions.schema.json#/$defs/nodeSettingsFull"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/node_base"
+            },
+            {
+              "properties": {
+                "type": {
+                  "const": "tfe_add_run_comment"
+                },
+                "parameters": {
+                  "$ref": "executors/tfe_add_run_comment.schema.json#/parameterSchema"
+                },
+                "settings": {
+                  "$ref": "common-definitions.schema.json#/$defs/nodeSettingsNoRetry"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/node_base"
+            },
+            {
+              "properties": {
+                "type": {
+                  "const": "tfe_list_github_installations"
+                },
+                "parameters": {
+                  "$ref": "executors/tfe_list_github_installations.schema.json#/parameterSchema"
+                },
+                "settings": {
+                  "$ref": "common-definitions.schema.json#/$defs/nodeSettingsFull"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/node_base"
+            },
+            {
+              "properties": {
+                "type": {
+                  "const": "tfe_get_github_installation"
+                },
+                "parameters": {
+                  "$ref": "executors/tfe_get_github_installation.schema.json#/parameterSchema"
+                },
+                "settings": {
+                  "$ref": "common-definitions.schema.json#/$defs/nodeSettingsFull"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/node_base"
+            },
+            {
+              "properties": {
+                "type": {
+                  "const": "tfe_link_vcs"
+                },
+                "parameters": {
+                  "$ref": "executors/tfe_link_vcs.schema.json#/parameterSchema"
+                },
+                "settings": {
+                  "$ref": "common-definitions.schema.json#/$defs/nodeSettingsNoRetry"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/node_base"
+            },
+            {
+              "properties": {
+                "type": {
+                  "const": "tfe_create_project"
+                },
+                "parameters": {
+                  "$ref": "executors/tfe_create_project.schema.json#/parameterSchema"
+                },
+                "settings": {
+                  "$ref": "common-definitions.schema.json#/$defs/nodeSettingsNoRetry"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/node_base"
+            },
+            {
+              "properties": {
+                "type": {
+                  "const": "tfe_list_projects"
+                },
+                "parameters": {
+                  "$ref": "executors/tfe_list_projects.schema.json#/parameterSchema"
+                },
+                "settings": {
+                  "$ref": "common-definitions.schema.json#/$defs/nodeSettingsFull"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/node_base"
+            },
+            {
+              "properties": {
+                "type": {
+                  "const": "tfe_get_project"
+                },
+                "parameters": {
+                  "$ref": "executors/tfe_get_project.schema.json#/parameterSchema"
+                },
+                "settings": {
+                  "$ref": "common-definitions.schema.json#/$defs/nodeSettingsFull"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/node_base"
+            },
+            {
+              "properties": {
+                "type": {
+                  "const": "tfe_update_project"
+                },
+                "parameters": {
+                  "$ref": "executors/tfe_update_project.schema.json#/parameterSchema"
+                },
+                "settings": {
+                  "$ref": "common-definitions.schema.json#/$defs/nodeSettingsNoRetry"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/node_base"
+            },
+            {
+              "properties": {
+                "type": {
+                  "const": "tfe_delete_project"
+                },
+                "parameters": {
+                  "$ref": "executors/tfe_delete_project.schema.json#/parameterSchema"
+                },
+                "settings": {
+                  "$ref": "common-definitions.schema.json#/$defs/nodeSettingsNoRetry"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/node_base"
+            },
+            {
+              "properties": {
+                "type": {
+                  "const": "tfe_move_workspace_to_project"
+                },
+                "parameters": {
+                  "$ref": "executors/tfe_move_workspace_to_project.schema.json#/parameterSchema"
+                },
+                "settings": {
+                  "$ref": "common-definitions.schema.json#/$defs/nodeSettingsNoRetry"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/node_base"
+            },
+            {
+              "properties": {
+                "type": {
+                  "const": "tfe_assign_team_permissions"
+                },
+                "parameters": {
+                  "$ref": "executors/tfe_assign_team_permissions.schema.json#/parameterSchema"
+                },
+                "settings": {
+                  "$ref": "common-definitions.schema.json#/$defs/nodeSettingsNoRetry"
+                }
+              }
+            }
+          ]
         }
       ]
     },
