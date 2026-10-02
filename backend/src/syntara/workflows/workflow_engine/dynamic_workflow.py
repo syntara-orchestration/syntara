@@ -1651,7 +1651,12 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
         Shared by single-step mocks and retry restoration. Do not publish a
         namespace here: successors must observe completion in the scheduler.
         """
-        self.node_inputs[node.id] = {PRE_RESOLVED_MARKER: True}
+        # Only when nothing has recorded an input yet. A retry-restored node
+        # publishes its source run's stored input before reaching here, and
+        # overwriting it with the marker would blank the input that
+        # get_activity_input serves to drill-down. Single-step mocks reach this
+        # with no recorded input, so the marker still marks them.
+        self.node_inputs.setdefault(node.id, {PRE_RESOLVED_MARKER: True})
         if node.type == NodeType.LOOP and node.id not in self.loop_state:
             loop_type = node.parameters.get("type", LoopType.FOR_EACH)
             self.loop_state[node.id] = self._create_loop_state_for_type(loop_type, node)

@@ -473,7 +473,9 @@ async def test_restored_output_is_injected_into_the_namespace(mock_wf: MagicMock
     wf = _injectable_workflow()
     wf.retry_context = _retry("step_2")
     node = ActivityNode(node_id="step_1", node_type="script", parameters={})
-    mock_wf.execute_activity = AsyncMock(return_value={"step_1": {"result": "from-source"}})
+    mock_wf.execute_activity = AsyncMock(
+        return_value={"step_1": {"input_data": {}, "output_data": {"result": "from-source"}}}
+    )
 
     result = await wf._restore_node_output(node)
 
@@ -490,18 +492,27 @@ async def test_restored_output_is_injected_into_the_namespace(mock_wf: MagicMock
 
 
 @pytest.mark.asyncio
-async def test_restored_node_is_marked_as_skipped_in_node_inputs(mock_wf: MagicMock) -> None:
-    """node_inputs records the node as pre-resolved so it is not re-dispatched."""
+async def test_restored_input_survives_supplied_result_handling(mock_wf: MagicMock) -> None:
+    """node_inputs keeps the source run's stored input through result processing.
+
+    ``get_activity_input`` reads node_inputs, so drill-down has to show the input
+    the node actually ran with. Processing the supplied result must not replace it
+    with the pre-resolved marker. A non-empty input is used so "preserved" is
+    distinguishable from "never recorded".
+    """
     wf = _injectable_workflow()
     wf.retry_context = _retry("step_2")
     node = ActivityNode(node_id="step_1", node_type="script", parameters={})
-    mock_wf.execute_activity = AsyncMock(return_value={"step_1": {"result": "ok"}})
+    mock_wf.execute_activity = AsyncMock(
+        return_value={"step_1": {"input_data": {"query": "select 1"}, "output_data": {"result": "ok"}}}
+    )
 
     result = await wf._restore_node_output(node)
     assert result is not None
     wf._process_supplied_result(node, result)
 
-    assert wf.node_inputs["step_1"] == {PRE_RESOLVED_MARKER: True}
+    assert wf.node_inputs["step_1"] == {"query": "select 1"}
+    assert PRE_RESOLVED_MARKER not in wf.node_inputs["step_1"]
 
 
 @pytest.mark.asyncio
@@ -538,7 +549,7 @@ async def test_restore_dispatches_the_retry_outputs_activity(mock_wf: MagicMock)
     wf = _injectable_workflow()
     wf.retry_context = _retry("step_2")
     node = ActivityNode(node_id="step_1", node_type="script", parameters={})
-    mock_wf.execute_activity = AsyncMock(return_value={"step_1": {"result": "ok"}})
+    mock_wf.execute_activity = AsyncMock(return_value={"step_1": {"input_data": {}, "output_data": {"result": "ok"}}})
 
     await wf._restore_node_output(node)
 
@@ -553,7 +564,9 @@ async def test_maybe_restore_delegates_and_returns_the_synthetic_completion(mock
     wf = _injectable_workflow()
     wf.retry_context = _retry("step_2")
     node = ActivityNode(node_id="step_1", node_type="script", parameters={})
-    mock_wf.execute_activity = AsyncMock(return_value={"step_1": {"result": "from-source"}})
+    mock_wf.execute_activity = AsyncMock(
+        return_value={"step_1": {"input_data": {}, "output_data": {"result": "from-source"}}}
+    )
 
     result = await wf._maybe_restore_retry_output(node, _chain_graph())
 
