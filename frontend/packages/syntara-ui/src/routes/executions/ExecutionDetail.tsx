@@ -19,7 +19,6 @@ import { useAlerts } from '../../providers/alerts'
 import type { FilterConfig } from '../../types/filters'
 import { detachPromise } from '../../utils/detachPromise'
 import { useDocLink } from '../../utils/docs/useDocLink'
-import { canvasNodeIdFromApprovalNodeId } from '../approvals/approvalNodeId'
 import { ExecutionDetailsPanel, type WorkflowDefShape } from '../builder/ExecutionDetailsPanel'
 import { ExecutionViewContent } from '../builder/ExecutionViewContent'
 import { useActivityNameMap } from '../builder/useActivityNameMap'
@@ -27,17 +26,20 @@ import { WorkflowHistoryCard } from '../builder/WorkflowHistoryCard'
 import type { ActivityState } from '../workflows/execution/types'
 import { useExecutionStore, useExecutionWithLiveStatus } from '../workflows/stores/useExecutionStore'
 
-import { ApprovalSidePanel } from './ApprovalSidePanel'
 import { ExecutionDetailErrorStates } from './components/ExecutionDetailErrorStates'
 import { ConnectionBanner } from './ConnectionBanner'
 import { CopyToEditorDialog } from './CopyToEditorDialog'
 import { isExecutionCancellable } from './executionCancellable'
 import styles from './ExecutionDetail.module.css'
+import { resolveWaitingNodeHighlightId } from './executionDetailHighlight'
 import { ExecutionDetailHeaderToolbar, ExecutionDetailTitleRowAddons } from './ExecutionDetailPageHeaderParts'
 import { executionDetailHasTitleRowExtras, executionDetailPageHeading } from './executionDetailPageHeaderTitle'
+import { ExecutionDetailSidePanel } from './ExecutionDetailSidePanel'
 import { executionRefetchInterval } from './executionPolling'
 import { useApprovalNavigation } from './hooks/useApprovalNavigation'
 import { useExecutionApprovalPanel } from './hooks/useExecutionApprovalPanel'
+import { useExecutionDetailInteractions } from './hooks/useExecutionDetailInteractions'
+import { useExecutionFormPromptPanel } from './hooks/useExecutionFormPromptPanel'
 import { useExecutionNodeClick } from './hooks/useExecutionNodeClick'
 import { useExecutionRunHistory } from './hooks/useExecutionRunHistory'
 import { useExecutionStreaming, useSyncActivityStore } from './hooks/useExecutionStreaming'
@@ -272,6 +274,7 @@ function ExecutionDetailContent({
   )
 }
 
+// eslint-disable-next-line complexity -- page shell wiring canvas, approvals, form prompts, and run history
 export default function ExecutionDetail() {
   const executionsDocLink = useDocLink('executions')
   const { executionId }: { executionId: string } = useParams({ strict: false })
@@ -313,36 +316,52 @@ export default function ExecutionDetail() {
 
   const activityNameMap = useActivityNamesForExecution(execution?.workflow_definition, activities)
 
-  const nodeClick = useExecutionNodeClick(executionId)
-  const { approvals, currentIndex, currentApproval, isApprovalLoading, handleNodeClick, navigateToIndex } = nodeClick
-  const { selectedNodeId, selectedNodeName, selectNode } = nodeClick
+  const nodeClick = useExecutionNodeClick(executionId, execution?.workflow_definition ?? undefined)
+  const {
+    approvals,
+    currentIndex,
+    currentApproval,
+    isApprovalLoading,
+    navigateToIndex,
+    formPrompts,
+    formPromptIndex,
+    currentFormPrompt,
+    isFormPromptLoading,
+    navigateToFormPromptIndex,
+  } = nodeClick
+  const { selectedNodeId, selectedNodeName } = nodeClick
   const approval = useExecutionApprovalPanel(
     executionId,
     searchParams,
     nodeClick,
     execution?.workflow_definition ?? undefined
   )
+  const formPromptPanel = useExecutionFormPromptPanel(
+    executionId,
+    searchParams,
+    nodeClick,
+    execution?.workflow_definition ?? undefined
+  )
   const approvalNavigation = useApprovalNavigation(currentIndex, navigateToIndex, approvals)
+  const formPromptNavigation = useApprovalNavigation(formPromptIndex, navigateToFormPromptIndex, formPrompts)
   const copyToEditorDialog = useDialogState<void>()
   const isCancellable = isExecutionCancellable(execution?.status)
+
+  const { onCanvasNodeClick, onActivityRowSelect, toggleHistoryCard } = useExecutionDetailInteractions({
+    executionId,
+    historyCardOpen,
+    navigate,
+    nodeClick,
+    approval,
+    formPromptPanel,
+    workflowDefinition: workflow?.version.workflow_definition ?? undefined,
+  })
 
   const { forkAsNewWorkflow, isForkLoading } = useForkWorkflow({
     workflowDefinition: execution?.workflow_definition,
     workflowName: workflow?.name ?? 'Workflow',
     projectId: execution?.project_id,
   })
-
-  const toggleHistoryCard = () => {
-    const willOpen = !historyCardOpen
-    if (willOpen) approval.close()
-    detachPromise(
-      navigate({
-        to: '/executions/$executionId',
-        params: { executionId },
-        search: (prev: Record<string, unknown>) => ({ ...prev, history: willOpen ? 'open' : 'closed' }),
-      })
-    )
-  }
 
   if (shouldShowFallbackState(executionId, executionQuery)) {
     return (
@@ -374,6 +393,10 @@ export default function ExecutionDetail() {
               isApprovalLoading={isApprovalLoading}
               isApprovalPanelOpen={approval.panelOpen}
               onReviewClick={approval.open}
+              showFormPromptActionStrip={Boolean(isFormPromptLoading || currentFormPrompt?.status === 'pending')}
+              isFormPromptLoading={isFormPromptLoading}
+              isFormPromptPanelOpen={formPromptPanel.panelOpen}
+              onRespondClick={formPromptPanel.open}
               historyCardOpen={historyCardOpen}
               onToggleHistory={toggleHistoryCard}
               onBackToEditor={() => {
@@ -393,24 +416,28 @@ export default function ExecutionDetail() {
         <SynPageBody>
           <ExecutionDetailContent
             key={executionId}
-            historyCardOpen={historyCardOpen && !approval.panelOpen}
+            historyCardOpen={historyCardOpen && !approval.panelOpen && !formPromptPanel.panelOpen}
             approvalPanel={
-              approval.panelOpen && currentApproval ? (
-                <ApprovalSidePanel
-                  approval={currentApproval}
-                  message={approval.approvalMessage}
-                  activityNameMap={activityNameMap}
-                  onClose={approval.close}
-                  onDecisionSubmitted={approval.dismiss}
-                  onNavigate={(path) => detachPromise(navigate({ to: path }))}
-                  currentIndex={currentIndex}
-                  totalCount={approvals.length}
-                  hasPrev={approvalNavigation.hasPrev}
-                  hasNext={approvalNavigation.hasNext}
-                  onNavigatePrev={approvalNavigation.navigatePrev}
-                  onNavigateNext={approvalNavigation.navigateNext}
-                />
-              ) : undefined
+              <ExecutionDetailSidePanel
+                formPromptPanelOpen={formPromptPanel.panelOpen}
+                currentFormPrompt={currentFormPrompt}
+                formPromptNavigation={formPromptNavigation}
+                formPromptIndex={formPromptIndex}
+                formPromptCount={formPrompts.length}
+                executionId={executionId}
+                activityNameMap={activityNameMap}
+                onFormPromptClose={formPromptPanel.close}
+                onFormPromptSubmitted={formPromptPanel.dismiss}
+                approvalPanelOpen={approval.panelOpen}
+                currentApproval={currentApproval}
+                approvalMessage={approval.approvalMessage}
+                approvalNavigation={approvalNavigation}
+                currentApprovalIndex={currentIndex}
+                approvalCount={approvals.length}
+                onApprovalClose={approval.close}
+                onApprovalDecisionSubmitted={approval.dismiss}
+                onNavigate={(path) => detachPromise(navigate({ to: path }))}
+              />
             }
             workflow={workflow}
             execution={execution}
@@ -421,13 +448,11 @@ export default function ExecutionDetail() {
             filters={executionFilters}
             onFilterChange={handleExecutionFilterChange}
             paginationFooterProps={executionPaginationFooterProps}
-            onNodeClick={handleNodeClick}
+            onNodeClick={onCanvasNodeClick}
             selectedNodeId={selectedNodeId}
             selectedNodeName={selectedNodeName}
-            onNodeSelect={selectNode}
-            currentApprovalNodeId={
-              currentApproval ? canvasNodeIdFromApprovalNodeId(currentApproval.approval_node_id) : undefined
-            }
+            onNodeSelect={onActivityRowSelect}
+            currentApprovalNodeId={resolveWaitingNodeHighlightId(currentFormPrompt, currentApproval)}
           />
         </SynPageBody>
       </SynReactFlowViewportGuard>

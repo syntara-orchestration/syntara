@@ -1,12 +1,16 @@
 import { Flex, FlexItem } from '@patternfly/react-core'
 import { ActivityTypeEnum, EdgeHandleEnum, type Activity } from '@syntara/contracts'
 import { type Node, type NodeProps } from '@xyflow/react'
+import { useMemo } from 'react'
+import { useShallow } from 'zustand/react/shallow'
 
 import { SynDetailList } from '../../../../components/details/SynDetailList'
 import { NodeBody } from '../../../../components/nodes/NodeBody'
 import { NodeComponent } from '../../../../components/nodes/NodeComponent'
 import { FlowNodeType } from '../../../../constants'
 import type { ActivityStatus } from '../../execution/types'
+import { latestActivityStateForCanvasNode } from '../../execution/utils/activityState'
+import { useExecutionStore } from '../../stores/useExecutionStore'
 import { getNodeTypeColor } from '../nodeTypeColors'
 import { semanticZoomActivityTitle } from '../semanticZoom'
 
@@ -35,7 +39,7 @@ export function FormPromptNodeComponent(props: NodeProps<FormPromptNode>) {
   )
   const taskExecutor = metadata.label
 
-  const executionState = (props.data as Record<string, unknown>).__executionState as
+  const executionStateFromData = (props.data as Record<string, unknown>).__executionState as
     | {
         status: ActivityStatus
         started_at?: string
@@ -44,6 +48,22 @@ export function FormPromptNodeComponent(props: NodeProps<FormPromptNode>) {
         retry_count?: number
       }
     | undefined
+
+  const { liveStatus, liveStartedAt } = useExecutionStore(
+    useShallow((state) => {
+      const activity = latestActivityStateForCanvasNode(state.activityStates, props.data.id)
+      return { liveStatus: activity?.status, liveStartedAt: activity?.startedAt }
+    })
+  )
+
+  const executionState = useMemo(() => {
+    if (!executionStateFromData) return undefined
+    return {
+      ...executionStateFromData,
+      status: liveStatus ?? executionStateFromData.status,
+      started_at: liveStartedAt ?? executionStateFromData.started_at,
+    }
+  }, [executionStateFromData, liveStatus, liveStartedAt])
 
   const showExecutionBadge =
     ((props.data as Record<string, unknown>).metadata as { __showExecutionBadge?: boolean } | undefined)

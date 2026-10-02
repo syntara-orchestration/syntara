@@ -169,6 +169,25 @@ export const executions: Execution[] = [
   },
   // Execution for deployment-approval — waiting at approval gate
   {
+    id: 'exec-form-prompt',
+    created_at: mockDate.minutesAgo10,
+    updated_at: mockDate.minutesAgo10,
+    workflow_id: HELLO_WORLD,
+    workflow_name: workflowNames[HELLO_WORLD],
+    status: 'paused',
+    started_at: mockDate.minutesAgo10,
+    completed_at: null,
+    started_by: 'user-1',
+    input_data: {},
+    current_activities: [
+      {
+        activity_name: 'collect_input',
+        temporal_activity_id: 'collect_input-activity',
+        iteration: null,
+      },
+    ],
+  },
+  {
     id: 'exec-approval',
     created_at: mockDate.minutesAgo10,
     updated_at: mockDate.minutesAgo10,

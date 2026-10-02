@@ -71,8 +71,8 @@ vi.mock('./useFetchApprovalForUrlParam', () => ({
   useFetchApprovalForUrlParam: vi.fn(() => undefined),
 }))
 
-vi.mock('./useAutoApprovalDetection', () => ({
-  useAutoApprovalDetection: vi.fn(),
+vi.mock('./useAutoWaitingNodeDetection', () => ({
+  useAutoWaitingNodeDetection: vi.fn(),
 }))
 
 vi.mock('../../../providers/alerts', () => ({
@@ -186,11 +186,11 @@ describe('useExecutionApprovalPanel', () => {
   })
 
   it('auto-detection callback opens panel', async () => {
-    const { useAutoApprovalDetection } = await import('./useAutoApprovalDetection')
+    const { useAutoWaitingNodeDetection } = await import('./useAutoWaitingNodeDetection')
 
     let capturedCallback: ((a: Approval) => void) | undefined
-    vi.mocked(useAutoApprovalDetection).mockImplementation((opts: { onApprovalDetected: (a: Approval) => void }) => {
-      capturedCallback = opts.onApprovalDetected
+    vi.mocked(useAutoWaitingNodeDetection).mockImplementation((opts: { onDetected: (a: Approval) => void }) => {
+      capturedCallback = opts.onDetected
     })
 
     mockFetchApprovals.mockResolvedValue([mockApproval])
@@ -393,7 +393,7 @@ describe('useExecutionApprovalPanel', () => {
   })
 
   it('auto-detection shows error when fetch fails', async () => {
-    const { useAutoApprovalDetection } = await import('./useAutoApprovalDetection')
+    const { useAutoWaitingNodeDetection } = await import('./useAutoWaitingNodeDetection')
     const { useAlerts } = await import('../../../providers/alerts')
     const showError = vi.fn()
     vi.mocked(useAlerts).mockReturnValueOnce({
@@ -404,8 +404,8 @@ describe('useExecutionApprovalPanel', () => {
     } as never)
 
     let capturedCallback: ((a: Approval) => void) | undefined
-    vi.mocked(useAutoApprovalDetection).mockImplementation((opts: { onApprovalDetected: (a: Approval) => void }) => {
-      capturedCallback = opts.onApprovalDetected
+    vi.mocked(useAutoWaitingNodeDetection).mockImplementation((opts: { onDetected: (a: Approval) => void }) => {
+      capturedCallback = opts.onDetected
     })
 
     mockFetchApprovals.mockRejectedValue(new Error('Fetch failed'))
@@ -424,11 +424,11 @@ describe('useExecutionApprovalPanel', () => {
   })
 
   it('auto-detection sets index when detected approval not in list (defaults to first)', async () => {
-    const { useAutoApprovalDetection } = await import('./useAutoApprovalDetection')
+    const { useAutoWaitingNodeDetection } = await import('./useAutoWaitingNodeDetection')
 
     let capturedCallback: ((a: Approval) => void) | undefined
-    vi.mocked(useAutoApprovalDetection).mockImplementation((opts: { onApprovalDetected: (a: Approval) => void }) => {
-      capturedCallback = opts.onApprovalDetected
+    vi.mocked(useAutoWaitingNodeDetection).mockImplementation((opts: { onDetected: (a: Approval) => void }) => {
+      capturedCallback = opts.onDetected
     })
 
     const detectedApproval = { ...mockApproval, id: 'detected-not-in-list' }

@@ -41,7 +41,7 @@ type ExecutionDetailsPanelProps = {
   workflowDefinition?: WorkflowDefShape | null
   selectedNodeId?: string | null
   selectedNodeName?: string | null
-  onNodeSelect?: (nodeId: string, nodeName: string) => void
+  onNodeSelect?: (nodeId: string, nodeName: string, activityKey?: string) => void
   headerLabel?: string
   onClosePanel?: () => void
 }
