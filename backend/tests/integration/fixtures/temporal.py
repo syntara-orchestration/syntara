@@ -22,6 +22,7 @@ from syntara.workflows.workflow_engine.activities.internal_activity import execu
 from syntara.workflows.workflow_engine.activities.manual_trigger import manual_trigger
 from syntara.workflows.workflow_engine.activities.runtime_settings_activity import fetch_workflow_runtime_settings
 from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkflow
+from tests.fixtures.ep_cluster import ep_cluster_configured, register_ep_cluster_target
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Callable
@@ -93,11 +94,25 @@ async def temporal_env(
     not skip ahead to activity timeouts while the execution plane is running.
     """
     database_url = test_db_engine.url
-    monkeypatch.setenv("APP_DATABASE_URL", database_url.render_as_string(hide_password=False))
+    db_url_str = database_url.render_as_string(hide_password=False)
+    monkeypatch.setenv("APP_DATABASE_URL", db_url_str)
+
+    # When a real Kubernetes cluster is configured (CI's kind job, or a local kind
+    # cluster), register it as the default ExecutionTarget before the worker's
+    # bootstrap runs, so script nodes dispatch to a real pod instead of the
+    # in-process placeholder. No-op otherwise — the worker falls back to the
+    # local:// placeholder and EP-dispatch tests skip (see fixtures.ep_cluster).
+    if ep_cluster_configured():
+        from execution_plane.config import get_ep_settings
+
+        monkeypatch.setenv("NODE_K8S_VERIFY_SSL", "false")
+        get_ep_settings.cache_clear()
+        await register_ep_cluster_target(db_url_str)
+
     callback = partial(send_temporal_callback, client=_temporal_server.client)
     worker_task = asyncio.create_task(
         run_worker(
-            database_url.render_as_string(hide_password=False),
+            db_url_str,
             callback,
         ),
         name="test-execution-plane",
@@ -109,6 +124,10 @@ async def temporal_env(
         worker_task.cancel()
         with contextlib.suppress(asyncio.CancelledError):
             await worker_task
+        if ep_cluster_configured():
+            from execution_plane.config import get_ep_settings
+
+            get_ep_settings.cache_clear()
 
 
 @pytest_asyncio.fixture

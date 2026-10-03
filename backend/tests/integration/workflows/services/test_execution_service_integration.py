@@ -46,22 +46,12 @@ TEST_WORKFLOW_METADATA = {
     "workflow_context": {"workflow": {"project_id": str(uuid4())}},
 }
 
-# These tests dispatch a real `script` node through the Execution Plane, which needs
-# a Kubernetes (kind) cluster plus a reachable node container image to run the pod
-# and resume the activity. CI's integration job has no cluster (and registers only a
-# placeholder `local://` target), so the dispatch can't complete. This coverage moves
-# with the Execution Plane code to its own repository; see AAP-93615.
-_EP_DISPATCH_SKIP = pytest.mark.skip(
-    reason="Execution Plane script dispatch requires a kind cluster + node image not present in CI (AAP-93615)"
-)
-
 
 @pytest.mark.integration
 @pytest.mark.asyncio
 class TestTemporalExecutionServiceIntegration:
     """Integration tests for TemporalExecutionService with real Temporal."""
 
-    @_EP_DISPATCH_SKIP
     async def test_start_and_complete_workflow(self, execution_service: TemporalExecutionService) -> None:
         """Test starting a workflow and waiting for completion."""
         workflow_yaml = """
@@ -108,7 +98,6 @@ edges:
         # Verify completion (activity_outputs are empty when include_node_results=False)
         assert workflow_result["status"] == "completed"
 
-    @_EP_DISPATCH_SKIP
     async def test_start_workflow_with_custom_id(self, execution_service: TemporalExecutionService) -> None:
         """Test starting a workflow with a custom workflow ID."""
         workflow_yaml = """
@@ -150,7 +139,6 @@ edges:
         workflow_result = await asyncio.wait_for(handle.result(), timeout=30)
         assert workflow_result["status"] == "completed"
 
-    @_EP_DISPATCH_SKIP
     async def test_start_workflow_with_inputs(self, execution_service: TemporalExecutionService) -> None:
         """Test starting a workflow with input parameters."""
         workflow_yaml = """
@@ -223,7 +211,6 @@ edges: []
                 workflow_metadata=TEST_WORKFLOW_METADATA,
             )
 
-    @_EP_DISPATCH_SKIP
     async def test_cancel_workflow(self, execution_service: TemporalExecutionService) -> None:
         """Test cancelling a running workflow."""
         workflow_yaml = """
@@ -271,7 +258,6 @@ edges:
 class TestCreateTemporalExecutionServiceFactory:
     """Test the factory function for creating TemporalExecutionService."""
 
-    @_EP_DISPATCH_SKIP
     async def test_create_execution_service_integration(
         self,
         temporal_env: WorkflowEnvironment,

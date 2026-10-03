@@ -489,6 +489,42 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
+      # Execution Plane cold-start dispatch (AAP-93615) runs each `script` node as a
+      # fresh pod in a real Kubernetes cluster, so the integration suite needs a
+      # cluster to exercise workflow routing. Stand up a throwaway kind cluster,
+      # apply the dispatcher ServiceAccount/RBAC, and hand the coordinates to the
+      # suite via EP_IT_K8S_* env (see backend/tests/fixtures/ep_cluster.py).
+      - name: Create kind cluster
+        uses: helm/kind-action@06c1ae10762d3b9c1644e7fe69596ae519e015a2 # v1.15.0
+        with:
+          cluster_name: integration-test
+
+      - name: Provision dispatcher ServiceAccount and RBAC
+        run: kubectl apply -f backend/docs/execution-plane/execution-plane-init.yaml
+
+      # Pre-pull the script node image onto the kind node up front. The node pod uses
+      # imagePullPolicy: IfNotPresent, so with the image already present it starts
+      # immediately instead of racing a cold registry pull against the test's result
+      # wait while the full integration suite saturates the runner. The node's
+      # containerd pulls the public image directly (crictl into the k8s.io namespace
+      # kubelet checks); `kind load` is avoided because exporting a multi-arch image
+      # from the docker daemon fails with "content digest not found".
+      - name: Pre-pull the script node image into kind
+        run: |
+          docker exec integration-test-control-plane \
+            crictl pull quay.io/ahetheri/syntara-node-script:migration-test
+
+      - name: Export cluster coordinates for the test suite
+        run: |
+          endpoint="$(kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}')"
+          token="$(kubectl create token syntara-dispatcher -n execution-plane --duration=2h)"
+          echo "::add-mask::${token}"
+          {
+            echo "EP_IT_K8S_ENDPOINT=${endpoint}"
+            echo "EP_IT_K8S_TOKEN=${token}"
+            echo "EP_IT_K8S_NAMESPACE=execution-plane"
+          } >> "$GITHUB_ENV"
+
       - name: Run integration tests with coverage
         run: |
           set -o pipefail
