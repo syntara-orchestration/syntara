@@ -42,6 +42,11 @@ export type SynTextFieldProps<
   autoComplete?: string
   /** Input type. Defaults to `'text'`. */
   type?: 'text' | 'email' | 'password' | 'search' | 'tel' | 'url' | 'number'
+  /**
+   * Accessible name for the input when it must differ from the visible label
+   * (for example E2E-stable `aria-label` values on credential fields).
+   */
+  ariaLabel?: string
 }
 
 /**
@@ -77,6 +82,7 @@ export function SynTextField<
   isDisabled,
   autoComplete,
   type = 'text',
+  ariaLabel,
 }: Readonly<SynTextFieldProps<TFieldValues, TName>>) {
   const resolvedFieldId = fieldId ?? name
 
@@ -102,6 +108,7 @@ export function SynTextField<
           name={field.name}
           isDisabled={isDisabled}
           autoComplete={autoComplete}
+          aria-label={ariaLabel}
         />
       )}
     </SynFormField>
