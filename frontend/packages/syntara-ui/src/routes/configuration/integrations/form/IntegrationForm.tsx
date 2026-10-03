@@ -1,4 +1,3 @@
-import { zodResolver } from '@hookform/resolvers/zod'
 import {
   ActionList,
   ActionListGroup,
@@ -12,18 +11,19 @@ import {
 import type { IntegrationsAPI } from '@syntara/contracts'
 import { IntegrationTypeEnum } from '@syntara/contracts'
 import { useCallback, useState } from 'react'
-import { useForm, useWatch, type Resolver, type UseFormTrigger } from 'react-hook-form'
+import { useWatch, type UseFormTrigger } from 'react-hook-form'
 
 import { AppRoute } from '../../../../app/AppRoute'
 import { breadcrumbsIntegrationConfigure } from '../../../../app/breadcrumbBuilders'
 import { tanstackRouter } from '../../../../app/tanstackRouter'
 import { integrationsClient } from '../../../../client'
+import { SynForm } from '../../../../components/forms/SynForm'
 import { SynPage, SynPageBody } from '../../../../components/layout/SynPage'
 import { SynPageHeader } from '../../../../components/layout/SynPageHeader'
 import { SynPanel } from '../../../../components/layout/SynPanel'
 import { SynPageTitle } from '../../../../components/SynPageTitle'
 import { useDirtyFormGuard } from '../../../../hooks/useDirtyFormGuard'
-import { useFormMutationErrorHandler } from '../../../../hooks/useFormMutationErrorHandler'
+import { useSynForm } from '../../../../hooks/useSynForm'
 import { useAlerts } from '../../../../providers/alerts'
 import { getErrorMessage } from '../../../../utils/apiErrors'
 import { detachPromise } from '../../../../utils/detachPromise'
@@ -245,39 +245,38 @@ function useDiscoverConnection(getValues: () => IntegrationFormData) {
   }
 }
 
+const integrationFormDefaultValues: IntegrationFormData = {
+  name: '',
+  description: '',
+  integration_type: IntegrationTypeEnum.MCP_SERVER,
+  configuration: {
+    integration_type: IntegrationTypeEnum.MCP_SERVER,
+    base_url: '',
+    allow_http: false,
+    insecure_skip_tls_verify: false,
+    ca_certificate: null,
+  },
+  management_credential_id: null,
+  scope: 'global',
+  project_ids: [],
+}
+
 export function IntegrationForm() {
   const docLink = useDocLink('configureIntegration')
-  // zodResolver with discriminated unions produces a resolver type that react-hook-form
-  // cannot reconcile — the TFieldValues generic diverges. This is a known @hookform/resolvers
-  // limitation. The cast is safe because the schema defines the actual validation.
+  const form = useSynForm({
+    schema: integrationFormSchema,
+    defaultValues: integrationFormDefaultValues,
+  })
   const {
     control,
     handleSubmit,
-    setError,
+    handleError,
     trigger,
     setValue,
     getValues,
     formState: { isDirty },
     reset,
-  } = useForm<IntegrationFormData>({
-    resolver: zodResolver(integrationFormSchema, undefined, { mode: 'sync' }) as Resolver<IntegrationFormData>,
-    defaultValues: {
-      name: '',
-      description: '',
-      integration_type: IntegrationTypeEnum.MCP_SERVER,
-      configuration: {
-        integration_type: IntegrationTypeEnum.MCP_SERVER,
-        base_url: '',
-        allow_http: false,
-        insecure_skip_tls_verify: false,
-        ca_certificate: null,
-      },
-      management_credential_id: null,
-      scope: 'global',
-      project_ids: [],
-    },
-  })
-  const handleError = useFormMutationErrorHandler<IntegrationFormData>(setError)
+  } = form
 
   const { dismiss } = useDirtyFormGuard({
     isDirty,
@@ -357,66 +356,67 @@ export function IntegrationForm() {
       <SynPageHeader title="Configure integration" breadcrumbs={breadcrumbsIntegrationConfigure()} docLink={docLink} />
       <SynPageBody>
         <SynPanel isFullHeight panelMainBodyProps={{ className: styles.wizardPanel }}>
-          <Wizard
-            isVisitRequired
-            footer={
-              <WizardNavFooter
-                trigger={trigger}
-                onSubmit={() => detachPromise(onSubmit())}
-                credentialId={credentialId}
-                integrationTypeValue={integrationTypeValue}
-                scopeValue={scopeValue}
-                isCredentialRequired={isCredentialRequired}
-                onDetailsStepValidated={() => setIsDetailsStepValid(true)}
-              />
-            }
-          >
-            <WizardStep name="Integration details" id="integration-details">
-              <IntegrationDetailsStep control={control} setValue={setValue} onTypeChange={onTypeChange} />
-            </WizardStep>
-
-            <WizardStep name="Connection credential" id="credential" navItem={{ isDisabled: !isDetailsStepValid }}>
-              <CredentialStep
-                control={control}
-                setValue={setValue}
-                credentialId={credentialId}
-                integrationTypeValue={integrationTypeValue}
-                isTesting={isTesting}
-                onTestConnection={handleTestConnection}
-                onCredentialChange={resetTestState}
-              />
-            </WizardStep>
-
-            <WizardStep
-              name="Enable tools"
-              id="enable-tools"
-              isHidden={integrationTypeValue !== IntegrationTypeEnum.MCP_SERVER}
-              isDisabled={isCredentialRequired && !credentialId}
+          <SynForm form={form}>
+            <Wizard
+              isVisitRequired
+              footer={
+                <WizardNavFooter
+                  trigger={trigger}
+                  onSubmit={() => detachPromise(onSubmit())}
+                  credentialId={credentialId}
+                  integrationTypeValue={integrationTypeValue}
+                  scopeValue={scopeValue}
+                  isCredentialRequired={isCredentialRequired}
+                  onDetailsStepValidated={() => setIsDetailsStepValid(true)}
+                />
+              }
             >
-              <EnableToolsWrapper
-                testResult={testResult}
-                selectedNames={selectedToolNames}
-                onSelectionChange={setSelectedToolNames}
-                onTestConnection={handleTestConnection}
-                isTestDisabled={(isCredentialRequired && !credentialId) || isTesting}
-              />
-            </WizardStep>
+              <WizardStep name="Integration details" id="integration-details">
+                <IntegrationDetailsStep setValue={setValue} onTypeChange={onTypeChange} />
+              </WizardStep>
 
-            <WizardStep
-              name="Enable models"
-              id="enable-models"
-              isHidden={!isLLM}
-              isDisabled={isCredentialRequired && !credentialId}
-            >
-              <EnableModelsWrapper
-                testResult={testResult}
-                selectedModels={selectedModels}
-                onSelectionChange={setSelectedModels}
-                onTestConnection={handleTestConnection}
-                isTestDisabled={(isCredentialRequired && !credentialId) || isTesting}
-              />
-            </WizardStep>
-          </Wizard>
+              <WizardStep name="Connection credential" id="credential" navItem={{ isDisabled: !isDetailsStepValid }}>
+                <CredentialStep
+                  setValue={setValue}
+                  credentialId={credentialId}
+                  integrationTypeValue={integrationTypeValue}
+                  isTesting={isTesting}
+                  onTestConnection={handleTestConnection}
+                  onCredentialChange={resetTestState}
+                />
+              </WizardStep>
+
+              <WizardStep
+                name="Enable tools"
+                id="enable-tools"
+                isHidden={integrationTypeValue !== IntegrationTypeEnum.MCP_SERVER}
+                isDisabled={isCredentialRequired && !credentialId}
+              >
+                <EnableToolsWrapper
+                  testResult={testResult}
+                  selectedNames={selectedToolNames}
+                  onSelectionChange={setSelectedToolNames}
+                  onTestConnection={handleTestConnection}
+                  isTestDisabled={(isCredentialRequired && !credentialId) || isTesting}
+                />
+              </WizardStep>
+
+              <WizardStep
+                name="Enable models"
+                id="enable-models"
+                isHidden={!isLLM}
+                isDisabled={isCredentialRequired && !credentialId}
+              >
+                <EnableModelsWrapper
+                  testResult={testResult}
+                  selectedModels={selectedModels}
+                  onSelectionChange={setSelectedModels}
+                  onTestConnection={handleTestConnection}
+                  isTestDisabled={(isCredentialRequired && !credentialId) || isTesting}
+                />
+              </WizardStep>
+            </Wizard>
+          </SynForm>
         </SynPanel>
       </SynPageBody>
     </SynPage>
