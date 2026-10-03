@@ -67,7 +67,9 @@
     "playwright-core": "1.62.1",
     "playwright": "1.62.1",
     "picomatch": "4.0.4",
-    "nanoid": "^3.3.17"
+    "nanoid": "^3.3.17",
+    "seroval": ">=1.6.3",
+    "seroval-plugins": ">=1.6.3"
   },
   "devDependencies": {
     "@emnapi/core": "2.0.0-alpha.3",
