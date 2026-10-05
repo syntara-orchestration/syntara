@@ -233,6 +233,21 @@ class TestFormPromptCreateAPI:
             assert "temporal_activity_id" not in item
             assert "loop_iteration_path" not in item
 
+    async def test_list_form_prompts_sort_by_workflow_name(
+        self, jwt_client: AsyncClient, test_execution: Execution
+    ) -> None:
+        """Sort by workflow_name is accepted and returns 200 (join sort on workflow)."""
+        exec_id = test_execution.id
+        payload = _form_prompt_payload(exec_id, test_execution.project_id, name="Sort by workflow test")
+        create_response = await jwt_client.post(FORM_PROMPTS_URL, json=payload)
+        assert create_response.status_code == 201
+
+        for sort_param in ("workflow_name", "-workflow_name"):
+            list_response = await jwt_client.get(FORM_PROMPTS_URL, params={"sort": sort_param})
+            assert list_response.status_code == 200, list_response.text
+            data = list_response.json()
+            assert "resources" in data
+
     async def test_list_form_prompts_includes_submission_metadata(
         self,
         jwt_client: AsyncClient,

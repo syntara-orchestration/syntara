@@ -200,6 +200,7 @@ class FormPrompt(BaseFormPrompt, table=True):
     __sortable_fields__: ClassVar[list[str]] = [
         *BaseResource.__sortable_fields__,
         "name",
+        "workflow_name",
         "timeout_at",
         "responded_at",
         "status",

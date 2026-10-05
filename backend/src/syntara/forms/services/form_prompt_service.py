@@ -5,16 +5,16 @@ from __future__ import annotations
 import time
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
+from uuid import UUID
 
 import structlog
-from sqlalchemy import or_
+from sqlalchemy import asc, desc, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 from sqlmodel import select, update
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
-    from uuid import UUID
 
     from sqlalchemy import Select
     from sqlmodel.ext.asyncio.session import AsyncSession
@@ -28,6 +28,14 @@ from syntara.core.models.user_reference import UserReference, UserReferenceType
 from syntara.core.services import BaseService, GroupMembershipService
 from syntara.core.services.extensions import EnrichQueryMixin
 from syntara.core.services.user_reference_resolution import DELETED_USER_NAME, UserReferenceResolverMixin
+from syntara.core.utils.cursor import (
+    SortDirection,
+    decode_cursor,
+    deserialize_column_sort_value,
+    extract_keyset_from_cursor,
+)
+from syntara.core.utils.pagination import PaginationResult, generate_response
+from syntara.core.utils.sorting import parse_sort
 from syntara.forms.audit.form_prompt import (
     FormPromptCreatedEvent,
     FormPromptExpiredEvent,
@@ -59,6 +67,7 @@ from syntara.metrics.dependencies import get_metrics_recorder
 from syntara.metrics.types import ComponentLabel, MetricType
 from syntara.workflows.exceptions import ExecutionNotFoundError
 from syntara.workflows.models.execution import Execution
+from syntara.workflows.models.workflow import Workflow
 
 logger = structlog.stdlib.get_logger(__name__)
 
@@ -311,6 +320,214 @@ class FormPromptService(UserReferenceResolverMixin, BaseService):
         except Exception:
             await self.session.rollback()
             raise
+
+    def _apply_sorting(
+        self,
+        query: Select[tuple[FormPrompt]] | SelectOfScalar[tuple[FormPrompt]],
+        sort: str | None,
+        model: type[FormPrompt],
+        *,
+        reverse_for_backward: bool = False,
+    ) -> tuple[
+        Select[tuple[FormPrompt]] | SelectOfScalar[tuple[FormPrompt]],
+        str,
+        SortDirection,
+    ]:
+        """Sort by workflow name via execution → workflow join."""
+        sort_field, sort_direction = parse_sort(sort, model.__sortable_fields__)
+        if sort_field != "workflow_name":
+            return super()._apply_sorting(
+                query,
+                sort,
+                model,
+                reverse_for_backward=reverse_for_backward,
+            )
+
+        actual_sort_direction = sort_direction
+        if reverse_for_backward:
+            actual_sort_direction = SortDirection.ASC if sort_direction == SortDirection.DESC else SortDirection.DESC
+
+        query = query.join(Execution, FormPrompt.execution_id == Execution.id)
+        query = query.join(Workflow, Execution.workflow_id == Workflow.id)
+        name_col = Workflow.name
+        id_col = FormPrompt.id
+        if actual_sort_direction == SortDirection.ASC:
+            query = query.order_by(asc(name_col), asc(id_col))
+        else:
+            query = query.order_by(desc(name_col), desc(id_col))
+        return query, sort_field, sort_direction
+
+    def _apply_cursor_pagination(
+        self,
+        query: Select[tuple[FormPrompt]] | SelectOfScalar[tuple[FormPrompt]],
+        cursor: str | None,
+        sort_field: str,
+        sort_direction: SortDirection,
+        model: type[FormPrompt],
+    ) -> tuple[
+        Select[tuple[FormPrompt]] | SelectOfScalar[tuple[FormPrompt]],
+        bool,
+    ]:
+        """Keyset pagination for workflow name sort uses Workflow.name."""
+        if sort_field != "workflow_name":
+            return super()._apply_cursor_pagination(
+                query,
+                cursor,
+                sort_field,
+                sort_direction,
+                model,
+            )
+
+        if not cursor:
+            return query, False
+
+        needs_reverse = False
+        cursor_data = decode_cursor(cursor)
+        cursor_sort_field, cursor_sort_value, resource_id, created_at, direction = extract_keyset_from_cursor(
+            cursor_data
+        )
+
+        use_sort_col = (
+            cursor_sort_value is not None
+            and cursor_sort_field is not None
+            and cursor_sort_field != "created_at"
+            and cursor_sort_field == sort_field
+        )
+
+        if resource_id:
+            try:
+                cursor_id = UUID(resource_id)
+            except ValueError:
+                return query, needs_reverse
+
+            if use_sort_col:
+                sort_col = Workflow.name
+                cursor_sv = deserialize_column_sort_value(str(cursor_sort_value), sort_col)
+                query, needs_reverse = self._apply_keyset_filter(
+                    query,
+                    sort_col,
+                    cursor_sv,
+                    FormPrompt.id,
+                    cursor_id,
+                    sort_direction,
+                    direction,
+                )
+            elif created_at:
+                try:
+                    cursor_timestamp = datetime.fromisoformat(created_at)
+                except ValueError:
+                    return query, needs_reverse
+                query, needs_reverse = self._apply_keyset_filter(
+                    query,
+                    FormPrompt.created_at,
+                    cursor_timestamp,
+                    FormPrompt.id,
+                    cursor_id,
+                    sort_direction,
+                    direction,
+                )
+
+        return query, needs_reverse
+
+    async def _workflow_names_for_prompts(self, prompts: list[FormPrompt]) -> dict[UUID, str]:
+        if not prompts:
+            return {}
+        execution_ids = {prompt.execution_id for prompt in prompts}
+        execution_result = await self.session.exec(
+            select(Execution)
+            .where(Execution.id.in_(execution_ids))  # type: ignore[attr-defined]
+            .options(selectinload(Execution.workflow))  # type: ignore[arg-type]
+        )
+        executions = {execution.id: execution for execution in execution_result.all()}
+        names: dict[UUID, str] = {}
+        for prompt in prompts:
+            execution = executions.get(prompt.execution_id)
+            workflow = execution.workflow if execution is not None else None
+            names[prompt.id] = workflow.name if workflow is not None else ""
+        return names
+
+    async def _fetch_and_paginate(
+        self,
+        query: Select[tuple[FormPrompt]] | SelectOfScalar[tuple[FormPrompt]],
+        model: type[FormPrompt],
+        query_params: dict[str, str],
+        filter_context: tuple,
+        sort: str | None,
+        cursor: str | None,
+        limit: int,
+        *,
+        include_total: bool,
+        is_backward: bool,
+        special_field_handlers: dict[str, Any] | None,
+        allowed_projects: AllowedProjectsResult | None,
+        id_restriction: list[UUID] | None = None,
+        sort_context: tuple[str, SortDirection] = ("created_at", SortDirection.DESC),
+    ) -> tuple[list[FormPrompt], PaginationResult]:
+        sort_field_name, sort_direction = sort_context
+        if sort_field_name != "workflow_name":
+            return await super()._fetch_and_paginate(
+                query,
+                model,
+                query_params,
+                filter_context,
+                sort,
+                cursor,
+                limit,
+                include_total=include_total,
+                is_backward=is_backward,
+                special_field_handlers=special_field_handlers,
+                allowed_projects=allowed_projects,
+                id_restriction=id_restriction,
+                sort_context=sort_context,
+            )
+
+        filters, label_filters = filter_context
+        result = await self.session.exec(query)  # type: ignore[arg-type]
+        resources = list(result.all())
+
+        if is_backward:
+            resources.reverse()
+
+        total_count = None
+        if include_total:
+            total_count = await self._get_total_count(
+                filters,
+                model,
+                special_field_handlers,
+                label_filters,
+                allowed_projects,
+                id_restriction=id_restriction,
+            )
+
+        is_first_page = False
+        if is_backward and len(resources) > 0:
+            has_items_before = await self._check_has_items_before(
+                first_item=resources[0],
+                query_params=query_params,
+                filters=filters,
+                sort=sort,
+                model=model,
+                special_field_handlers=special_field_handlers,
+                allowed_projects=allowed_projects,
+            )
+            is_first_page = not has_items_before
+
+        workflow_names = await self._workflow_names_for_prompts(resources)
+
+        pagination = generate_response(
+            items=resources,
+            limit=limit,
+            cursor=cursor,
+            include_total=include_total,
+            total_count=total_count,
+            is_first_page=is_first_page,
+            sort_field=sort_field_name,
+            sort_direction=sort_direction,
+            sort_value_fn=lambda item: workflow_names.get(item.id, ""),
+        )
+
+        trimmed: list[FormPrompt] = pagination["trimmed_items"]  # type: ignore[assignment]
+        return trimmed, pagination
 
     async def list(
         self,

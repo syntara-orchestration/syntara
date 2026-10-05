@@ -22,7 +22,7 @@ import { executions } from './resources/executions'
 import { getExecutionDetail } from './resources/executionDetails'
 import { activityExecutions } from './resources/activityExecutions'
 import { approvals } from './resources/approvals'
-import { alignPendingFormPromptClock, formPrompts } from './resources/formPrompts'
+import { alignPendingFormPromptClock, formPromptToListRead, formPrompts } from './resources/formPrompts'
 import { settings, settingsCategories } from './resources/settings'
 import { revocationState } from './resources/revocation'
 import { identityProviders, type IdentityProvider } from './resources/identityProviders'
@@ -2168,22 +2168,64 @@ export const handlers = [
     const includeTotal = url.searchParams.get('include_total') === 'true'
     const limit = Math.min(Math.max(1, limitParam ? parseInt(limitParam, 10) : 20), 100)
 
+    const sort = url.searchParams.get('sort')
+
     const filtered = formPrompts.filter((prompt) => {
       if (status && prompt.status !== status) return false
       if (execution_id && prompt.execution_id !== execution_id) return false
       return true
     })
 
-    const summaries = filtered.map((prompt) => ({
-      id: prompt.id,
-      execution_id: prompt.execution_id,
-      project_id: prompt.project_id,
-      prompt_node_id: prompt.prompt_node_id,
-      name: prompt.name,
-      status: prompt.status,
-      loop_iteration_path: prompt.loop_iteration_path ?? [],
-      temporal_activity_id: 'collect_input-activity',
-    }))
+    const summaries = filtered.map((prompt) => formPromptToListRead(alignPendingFormPromptClock(prompt)))
+
+    if (sort) {
+      const isDesc = sort.startsWith('-')
+      const field = isDesc ? sort.slice(1) : sort
+      summaries.sort((a, b) => {
+        let aVal: string | number = ''
+        let bVal: string | number = ''
+        switch (field) {
+          case 'name':
+            aVal = a.name ?? ''
+            bVal = b.name ?? ''
+            break
+          case 'workflow_name':
+            aVal = a.workflow_name ?? ''
+            bVal = b.workflow_name ?? ''
+            break
+          case 'created_at':
+            aVal = a.created_at ? new Date(a.created_at).getTime() : 0
+            bVal = b.created_at ? new Date(b.created_at).getTime() : 0
+            break
+          case 'responded_at':
+            aVal = a.responded_at ? new Date(a.responded_at).getTime() : 0
+            bVal = b.responded_at ? new Date(b.responded_at).getTime() : 0
+            break
+          case 'timeout_at':
+            aVal = a.timeout_at ? new Date(a.timeout_at).getTime() : 0
+            bVal = b.timeout_at ? new Date(b.timeout_at).getTime() : 0
+            break
+          case 'status':
+            aVal = a.status ?? ''
+            bVal = b.status ?? ''
+            break
+          case 'id':
+            aVal = a.id ?? ''
+            bVal = b.id ?? ''
+            break
+          default:
+            return 0
+        }
+        const cmp =
+          typeof aVal === 'string' && typeof bVal === 'string'
+            ? aVal.localeCompare(bVal)
+            : (aVal as number) - (bVal as number)
+        if (cmp !== 0) {
+          return isDesc ? -cmp : cmp
+        }
+        return isDesc ? (b.id ?? '').localeCompare(a.id ?? '') : (a.id ?? '').localeCompare(b.id ?? '')
+      })
+    }
 
     const body = paginate(summaries, cursor, limit, includeTotal)
     return HttpResponse.json(body)

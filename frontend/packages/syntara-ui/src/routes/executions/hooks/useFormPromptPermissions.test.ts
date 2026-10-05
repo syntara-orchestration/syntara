@@ -9,6 +9,10 @@ vi.mock('../../../hooks/useCanI', () => ({
   useCanI: (...args: unknown[]): unknown => mockUseCanI(...args),
 }))
 
+vi.mock('../../access/useAllPermissions', () => ({
+  useAllPermissions: () => ({ permissions: [], isLoading: false, error: null }),
+}))
+
 describe('useFormPromptPermissions', () => {
   beforeEach(() => {
     vi.clearAllMocks()

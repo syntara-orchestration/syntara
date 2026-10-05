@@ -98,20 +98,20 @@ describe('useFilteredNavigationItems', () => {
       'project:read': false,
       'role-assignment:read': false,
       'role-assignment:assign': false,
-      'approval:read': true, // Approvals now requires approval:read permission
+      'approval:read': true, // Tasks nav requires approval or form_prompt permissions
     })
     const { result } = renderHook(() => useFilteredNavigationItems())
 
     expect(findItem(result.current, 'Workflows')).toBeDefined()
-    expect(findItem(result.current, 'Approvals')).toBeDefined()
+    expect(findItem(result.current, 'Tasks')).toBeDefined()
     expect(findItem(result.current, 'Workflow Runs')).toBeDefined()
   })
 
-  it('excludes Approvals when approval:read is denied', () => {
+  it('excludes Tasks when approval and form_prompt read are denied', () => {
     setPermissions({ 'approval:read': false })
     const { result } = renderHook(() => useFilteredNavigationItems())
 
-    expect(findItem(result.current, 'Approvals')).toBeUndefined()
+    expect(findItem(result.current, 'Tasks')).toBeUndefined()
     expect(findItem(result.current, 'Workflows')).toBeDefined()
     expect(findItem(result.current, 'Workflow Runs')).toBeDefined()
   })
@@ -252,25 +252,25 @@ describe('useFilteredNavigationItems', () => {
   })
 
   describe('project-scoped permissions via check_any_project', () => {
-    it('shows Approvals when approval:read is granted anywhere', () => {
+    it('shows Tasks when approval:read is granted anywhere', () => {
       setPermissions({ 'approval:read': true, 'approval:decide': false })
       const { result } = renderHook(() => useFilteredNavigationItems())
 
-      expect(findItem(result.current, 'Approvals')).toBeDefined()
+      expect(findItem(result.current, 'Tasks')).toBeDefined()
     })
 
-    it('shows Approvals when approval:decide is granted anywhere', () => {
+    it('shows Tasks when approval:decide is granted anywhere', () => {
       setPermissions({ 'approval:read': false, 'approval:decide': true })
       const { result } = renderHook(() => useFilteredNavigationItems())
 
-      expect(findItem(result.current, 'Approvals')).toBeDefined()
+      expect(findItem(result.current, 'Tasks')).toBeDefined()
     })
 
-    it('still hides Approvals when user has no approval permissions at any scope', () => {
+    it('still hides Tasks when user has no task-related permissions at any scope', () => {
       setPermissions({ 'approval:read': false, 'approval:decide': false })
       const { result } = renderHook(() => useFilteredNavigationItems())
 
-      expect(findItem(result.current, 'Approvals')).toBeUndefined()
+      expect(findItem(result.current, 'Tasks')).toBeUndefined()
     })
 
     it('shows Access Management for project-admin via role-assignment:read anywhere', () => {

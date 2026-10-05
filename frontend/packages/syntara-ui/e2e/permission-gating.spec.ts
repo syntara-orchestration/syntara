@@ -180,7 +180,7 @@ test.describe('Permission gating — Navigation visibility', () => {
 
     await expect(nav.getByRole('link', { name: 'Workflows' })).toBeVisible()
     await expect(nav.getByRole('link', { name: 'Workflow Runs' })).toBeVisible()
-    await expect(nav.getByRole('link', { name: 'Approvals' })).toBeVisible()
+    await expect(nav.getByRole('link', { name: 'Tasks' })).toBeVisible()
 
     const configItem = nav.getByLabel('Configuration')
     await expect(configItem).toBeVisible()
@@ -204,7 +204,7 @@ test.describe('Permission gating — Navigation visibility', () => {
 
     await expect(nav.getByRole('link', { name: 'Workflows' })).toBeVisible()
     await expect(nav.getByRole('link', { name: 'Workflow Runs' })).toBeVisible()
-    await expect(nav.getByRole('link', { name: 'Approvals' })).toBeVisible()
+    await expect(nav.getByRole('link', { name: 'Tasks' })).toBeVisible()
     await expect(nav.getByLabel('Configuration')).toBeVisible()
 
     await expect(nav.getByLabel('System Administration')).not.toBeVisible()
@@ -215,7 +215,7 @@ test.describe('Permission gating — Navigation visibility', () => {
 
     await expect(nav.getByRole('link', { name: 'Workflows' })).toBeVisible()
     await expect(nav.getByRole('link', { name: 'Workflow Runs' })).toBeVisible()
-    await expect(nav.getByRole('link', { name: 'Approvals' })).toBeVisible()
+    await expect(nav.getByRole('link', { name: 'Tasks' })).toBeVisible()
     await expect(nav.getByLabel('Configuration')).toBeVisible()
 
     const sysAdminItem = nav.getByLabel('System Administration')
@@ -231,7 +231,7 @@ test.describe('Permission gating — Navigation visibility', () => {
 
     await expect(nav.getByRole('link', { name: 'Workflows' })).toBeVisible()
     await expect(nav.getByRole('link', { name: 'Workflow Runs' })).toBeVisible()
-    await expect(nav.getByRole('link', { name: 'Approvals' })).toBeVisible()
+    await expect(nav.getByRole('link', { name: 'Tasks' })).toBeVisible()
     await expect(nav.getByLabel('Configuration')).toBeVisible()
 
     // When only one SA child is visible (Access Management), the nav renders
@@ -240,6 +240,18 @@ test.describe('Permission gating — Navigation visibility', () => {
     await expect(sysAdminLink).toBeVisible()
     await sysAdminLink.click()
     await expect(userApp.getByRole('heading', { name: 'Access Management' })).toBeVisible()
+  })
+})
+
+// ── Tasks tab visibility ─────────────────────────────────────────────────
+
+test.describe('Permission gating — Tasks tabs', () => {
+  test('admin sees Approvals and Form responses tabs on the Tasks page', async ({ app }) => {
+    await app.goto(toAppUrl('/tasks/approvals'))
+
+    await expect(app.getByRole('heading', { level: 1, name: 'Tasks' })).toBeVisible()
+    await expect(app.getByRole('tab', { name: 'Approvals' })).toBeVisible()
+    await expect(app.getByRole('tab', { name: 'Form responses' })).toBeVisible()
   })
 })
 

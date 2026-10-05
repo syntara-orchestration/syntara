@@ -338,10 +338,22 @@ describe('SynListPanelView', () => {
       expect(screen.getByRole('search', { name: 'Filters' })).toBeInTheDocument()
     })
 
-    it('wraps toolbar in a disabled fieldset when isFetching', () => {
+    it('keeps toolbar enabled during background refetch when the table is visible', () => {
       renderPanel(
         <SynListPanel>
           <SynListPanelView {...baseViewProps()} isFetching toolbar={minimalToolbar} body={minimalTable} />
+        </SynListPanel>
+      )
+
+      const filters = screen.getByRole('search', { name: 'Filters' })
+      expect(filters.closest('fieldset')).not.toBeDisabled()
+      expect(screen.queryByRole('group', { name: 'Filters — loading' })).not.toBeInTheDocument()
+    })
+
+    it('wraps toolbar in a disabled fieldset when isFetching before data is shown', () => {
+      renderPanel(
+        <SynListPanel>
+          <SynListPanelView {...baseViewProps()} isEmpty isFetching toolbar={minimalToolbar} body={minimalTable} />
         </SynListPanel>
       )
 

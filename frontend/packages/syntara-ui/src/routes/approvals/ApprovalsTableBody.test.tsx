@@ -175,36 +175,7 @@ describe('FlatApprovalsTableBody', () => {
     expect(screen.getByText('Not ready yet.')).toBeInTheDocument()
   })
 
-  it('does not render an expand toggle for a pending approval with no decision notes', () => {
-    const Wrapper = createWrapper()
-    render(
-      <Wrapper>
-        <Table aria-label="Approvals" isExpandable>
-          <FlatApprovalsTableBody {...defaultProps} approvals={[makeApproval({ decision_notes: null })]} />
-        </Table>
-      </Wrapper>
-    )
-
-    expect(screen.queryByRole('button', { name: /details/i })).not.toBeInTheDocument()
-  })
-
-  it('does not render an expand toggle for a decided approval with no decision notes', () => {
-    const Wrapper = createWrapper()
-    render(
-      <Wrapper>
-        <Table aria-label="Approvals" isExpandable>
-          <FlatApprovalsTableBody
-            {...defaultProps}
-            approvals={[makeApproval({ status: 'approved', decision_notes: null })]}
-          />
-        </Table>
-      </Wrapper>
-    )
-
-    expect(screen.queryByRole('button', { name: /details/i })).not.toBeInTheDocument()
-  })
-
-  it('renders an expand toggle only for approvals with decision notes', () => {
+  it('renders an expand toggle for every approval row', () => {
     const Wrapper = createWrapper()
     render(
       <Wrapper>
@@ -220,7 +191,25 @@ describe('FlatApprovalsTableBody', () => {
       </Wrapper>
     )
 
-    expect(screen.getAllByRole('button', { name: /details/i })).toHaveLength(1)
+    expect(screen.getAllByRole('button', { name: /details/i })).toHaveLength(2)
+  })
+
+  it('shows an em dash in the expanded row when decision notes are empty', async () => {
+    const user = userEvent.setup()
+    const Wrapper = createWrapper()
+    render(
+      <Wrapper>
+        <Table aria-label="Approvals" isExpandable>
+          <FlatApprovalsTableBody
+            {...defaultProps}
+            approvals={[makeApproval({ status: 'pending', decision_notes: null })]}
+          />
+        </Table>
+      </Wrapper>
+    )
+
+    await user.click(screen.getByRole('button', { name: /details/i }))
+    expect(screen.getByText('—')).toBeInTheDocument()
   })
 
   it('renders "Actioned on" with UserTimestamp when decided_at is set', () => {

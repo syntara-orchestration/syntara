@@ -10,3 +10,6 @@ export const approvalTableColumns: SortableColumn[] = [
 
 /** Stable default sort — newest requested first (`sort=-created_at`). */
 export const approvalDefaultSort: SortConfig = { field: 'created_at', direction: 'desc' }
+
+/** Visible data columns in the approvals list (excluding select and expand controls). */
+export const APPROVALS_TABLE_DATA_COLUMN_COUNT = 5
