@@ -1,9 +1,9 @@
-"""The production Segment write key is not baked into container images.
+"""Konflux builds must not mount the production Segment secret.
 
-Konflux ``additional-secret`` would expose the production Segment secret to the
-image build. Copying that value into a layer or an image environment variable
-lets anyone who can pull the image read it. Telemetry stays configured at
-runtime through ``APP_SEGMENT_WRITE_KEY``.
+The image still accepts the write key as a build argument and publishes it as
+``APP_SEGMENT_WRITE_KEY``. The default is empty, so a build that does not pass
+the argument does not carry the production key. The key must not be copied
+from ``nexus-segment-write-keys`` into an image layer.
 """
 
 from __future__ import annotations
@@ -25,10 +25,11 @@ def test_pipelines_do_not_mount_prod_segment_secret() -> None:
     assert offenders == []
 
 
-def test_containerfile_does_not_bake_segment_write_key() -> None:
-    """The image build must not copy the write key into a layer or image config."""
+def test_containerfile_passes_segment_write_key_only_as_build_arg() -> None:
+    """The image publishes APP_SEGMENT_WRITE_KEY from a build-arg, defaulting to empty."""
     text = CONTAINERFILE.read_text()
+    assert 'ARG APP_SEGMENT_WRITE_KEY=""' in text
+    assert 'APP_SEGMENT_WRITE_KEY="${APP_SEGMENT_WRITE_KEY}"' in text
     assert SEGMENT_WRITE_KEYS_RESOURCE not in text
-    assert "SEGMENT_WRITE_KEY" not in text
-    assert "APP_SEGMENT_WRITE_KEY" not in text
+    assert "SEGMENT_WRITE_KEY_DEV" not in text
     assert "/opt/app-root/src/.env" not in text

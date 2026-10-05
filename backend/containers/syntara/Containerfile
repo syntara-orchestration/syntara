@@ -101,6 +101,7 @@ RUN if [ -n "${PIP_FIND_LINKS:-}" ]; then \
 FROM registry.access.redhat.com/ubi9/ubi-minimal:latest@sha256:8eb2830d0936237fc13a1f2f7e45aecf90d69043380ad167fad0343632937f41
 
 ARG CONTAINER_IMAGE_VERSION=""
+ARG APP_SEGMENT_WRITE_KEY=""
 
 USER root
 
@@ -132,6 +133,7 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONPATH=/opt/app-root/src/src \
     PATH="/opt/app-root/src/.venv/bin:/opt/app-root/bin:$PATH" \
     APP_CONTAINER_IMAGE_VERSION="${CONTAINER_IMAGE_VERSION}" \
+    APP_SEGMENT_WRITE_KEY="${APP_SEGMENT_WRITE_KEY}" \
     MALLOC_ARENA_MAX=2 \
     MALLOC_TRIM_THRESHOLD_=131072
 
