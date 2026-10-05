@@ -3,8 +3,19 @@
 Builds on
 [01-select-region-and-env.md](01-select-region-and-env.md)
 and [02-data-sharing-with-workspace.md](02-data-sharing-with-workspace.md).
-Same three activities (git clone, HTTP GET, playbook). The workspace
-is an **object-store snapshot** of `/workspace`, not a volume.
+
+This is **example 02 with S3 instead of a PVC.** Same three
+activities (git clone, HTTP GET, playbook), same workspace UUID, same
+`/workspace` mount. The difference is the backing store: an
+**object-store snapshot** of the whole tree, so WorkItems do not have
+to share an ExecutionTarget.
+
+| | Example 02 | This example |
+|---|---|---|
+| Backing store | Volume (PVC) on one ExecutionTarget | S3 snapshot of `/workspace` |
+| Placement | Reuse **pins** B and C to A's target | Each WorkItem still goes through the reconciler |
+| Clusters | One | Two (`ocp-us-east-1`, `ocp-eu-west-1`) |
+| Next `rw` WorkItem | Unmount + mount. Does not wait on S3 | Waits until the previous snapshot is `available` |
 
 WorkItem A places on `ocp-us-east-1`. After it exits, EP PUTs the
 whole tree to S3. B places on `ocp-eu-west-1` and hydrates that
@@ -15,13 +26,14 @@ still goes through the reconciler.
 - Ticket: [AAP-94189](https://redhat.atlassian.net/browse/AAP-94189)
 - Feature: [ANSTRAT-1803](https://redhat.atlassian.net/browse/ANSTRAT-1803)
 - Parent epic: [AAP-82060](https://redhat.atlassian.net/browse/AAP-82060)
-- Contract: [data-sharing.md](../data-sharing.md)
+- Contract: [data-sharing-with-workspace.md](../data-sharing-with-workspace.md)
 
 ## What this example is
 
 A concrete inventory of an **object-store workspace**. The snapshot is
-the **whole tree**, not listed `outputs`. Any ExecutionTarget that can
-reach the bucket can run the next WorkItem.
+the **whole tree**, not [listed outputs](../collect-of-workitem-execution-results.md) (those
+are named files after exit). Any ExecutionTarget that can reach the
+bucket can run the next WorkItem.
 
 `access` is `rw` on all three (the default). Exclusive `rw` is serial:
 one writer per generation. B does not start until A's snapshot is
@@ -44,8 +56,9 @@ AO execution
 
 ## Workspace create
 
-AO mints the UUID and puts it on the WorkItems. There is **no
-volume**. There is no create-on-target step.
+AO mints the UUID. Same default as example 02: **one workspace per
+workflow**, passed on every WorkItem. There is **no volume**. There
+is no create-on-target step.
 
 The UUID names the snapshot prefix. WorkItem A starts with an empty
 `/workspace`. After a `rw` exit, the Worker Manager PUTs the tree.
@@ -315,7 +328,7 @@ sequenceDiagram
 | `env=production` namespace | [Example 01](01-select-region-and-env.md) |
 | Selectors that match nothing | [Example 05](05-no-matching-targets.md) |
 | OpenShell sandbox policy | [Example 04](04-openshell-sandbox-policy.md). Snapshot hydrate is how OpenShell can share `/workspace`. |
-| `ro` / `copy` in parallel | [data-sharing.md](../data-sharing.md). After a generation is `available`, many `ro` or `copy` WorkItems may run. |
-| Listed `outputs` / sidecar / S3 artifacts | [data-sharing.md](../data-sharing.md) use-case 2. Listed files, not the whole tree. |
-| Snapshot format (tar vs prefix) | Open question in [data-sharing.md](../data-sharing.md) |
+| `ro` / `copy` in parallel | [data-sharing-with-workspace.md](../data-sharing-with-workspace.md). After a generation is `available`, many `ro` or `copy` WorkItems may run. |
+| Listed `outputs` / sidecar / S3 artifacts | [collect-of-workitem-execution-results.md](../collect-of-workitem-execution-results.md). Listed files, not the whole tree. |
+| Snapshot format (tar vs prefix) | Open question in [data-sharing-with-workspace.md](../data-sharing-with-workspace.md) |
 | AO workflow / node / Execution Profile rows | Not visible to EP |

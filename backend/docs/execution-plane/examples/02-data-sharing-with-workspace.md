@@ -7,6 +7,11 @@ volume across three successive WorkItems. Each container mounts it at
 `/workspace`. Files written by an earlier WorkItem are still there for
 the next.
 
+This is the volume path. [Example 03](03-data-sharing-with-workspace-object-store.md)
+is the **same three WorkItems** (git clone, HTTP GET, playbook) but
+the workspace is an S3 snapshot instead of a PVC, so B can run on
+another cluster.
+
 WorkItem A places with empty selectors ([default
 routing](../executiontarget-reconciler.md#default-routing)). After EP
 creates the volume on `ep-default`, B and C **reuse** that UUID. That
@@ -16,16 +21,22 @@ that is the ExecutionTarget associated with the workspace.
 - Ticket: [AAP-94189](https://redhat.atlassian.net/browse/AAP-94189)
 - Feature: [ANSTRAT-1803](https://redhat.atlassian.net/browse/ANSTRAT-1803)
 - Parent epic: [AAP-82060](https://redhat.atlassian.net/browse/AAP-82060)
-- Contract: [data-sharing.md](../data-sharing.md)
+- Contract: [data-sharing-with-workspace.md](../data-sharing-with-workspace.md)
 
 ## What this example is
 
 A concrete inventory of a **volume-based workspace** (Kubernetes PVC
 on this target).
 
-The three WorkItems run **one at a time** (ReadWriteOnce). After each
-exits, the Worker Manager unmounts. The volume is not deleted. The
-next WorkItem mounts the same UUID and sees the same tree.
+The three WorkItems run **one at a time**. That is the default
+access mode (`rw`): a ReadWriteOnce volume cannot have a second
+writable mount. After each exits, the Worker Manager unmounts. The
+volume is not deleted. The next WorkItem mounts the same UUID and
+sees the same tree.
+
+`ro` (read-only, parallel OK) and `copy` (private clone, parallel OK,
+writes discarded) are in [data-sharing-with-workspace.md](../data-sharing-with-workspace.md). This
+example stays on successive `rw` to keep the payload simple.
 
 ```text
 workspace id 7c1a9f3e-4b2d-41a8-9c1f-91c0d4e5a6b7
@@ -42,8 +53,14 @@ AO execution
 
 ## Workspace create
 
-AO mints the UUID and puts it on the WorkItems. It does **not** create
-the volume. It does not know the ExecutionTarget yet.
+AO mints the UUID. A good default is **one workspace per workflow**:
+AO generates the id when the run starts and puts the same id on
+every WorkItem that should see the files (here A, B, and C). Making
+the workspace optional is an AO / UX problem. EP does not look at
+`activity.params` to guess which WorkItems share a folder.
+
+AO does **not** create the volume. It does not know the
+ExecutionTarget yet.
 
 EP creates the volume **after** WorkItem A is matched, **before** it
 is dispatched. Size is the ExecutionTarget default. EP refuses the
@@ -123,6 +140,14 @@ B does not re-clone. `/workspace/src` is already on the volume from A.
 C does not fetch. It reads what A and B left under `/workspace` and
 writes `/workspace/out/report.json`.
 
+`/workspace` is the **default mount** for every Extension in this
+example. Paths in `activity.params` (`dest`, `playbook`,
+`extra_vars_file`) are absolute paths on that mount, not relative
+paths rewritten by an SDK helper. If this contract is accepted,
+coordinate with
+[ANSTRAT-2422](https://redhat.atlassian.net/browse/ANSTRAT-2422) so
+Git, HTTP, playbook, and other images document the same location.
+
 | Field | Meaning for EP |
 |---|---|
 | `selectors` | Used for **A** (empty → default routing). Not how B and C pick a target. |
@@ -180,6 +205,11 @@ The directory outlives each container. Only the mount comes and goes.
 If AO submits a fourth WorkItem with the same UUID, that tree is still
 there until AO `DELETE`s it. TTL is only a safety net if nobody
 DELETEs.
+
+Parallel branches and loops are AO's graph, not EP's. For this
+volume, a second `rw` WorkItem waits until the first unmounts. To
+overlap, AO would set `access` to `ro` or `copy` (see
+[data-sharing-with-workspace.md](../data-sharing-with-workspace.md)); this example does not.
 
 ## What EP does
 
@@ -266,7 +296,7 @@ sequenceDiagram
 | Empty selectors without a workspace | [Example 00](00-one-workload-default-target.md) |
 | `region` / `env` placement | [Example 01](01-select-region-and-env.md) |
 | Selectors that match nothing | [Example 05](05-no-matching-targets.md) |
-| Listed `outputs` / sidecar / S3 artifacts | [data-sharing.md](../data-sharing.md) use-case 2 |
+| Listed `outputs` / sidecar / S3 artifacts | [collect-of-workitem-execution-results.md](../collect-of-workitem-execution-results.md) |
 | Object-store workspace snapshot | [Example 03](03-data-sharing-with-workspace-object-store.md) |
 | OpenShell sandbox policy | [Example 04](04-openshell-sandbox-policy.md). OpenShell has no volume attach. |
 | Warm pools | Volume workspace is a cold-start mount in this example |

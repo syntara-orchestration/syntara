@@ -15,8 +15,9 @@ A concrete inventory of the objects EP sees in the MVP cold-start path.
 selectors (`region`, `env`).
 [Example 02](02-data-sharing-with-workspace.md) shares a volume workspace across three
 WorkItems.
-[Example 03](03-data-sharing-with-workspace-object-store.md) shares a
-workspace via object-store snapshots across two Clusters.
+[Example 03](03-data-sharing-with-workspace-object-store.md) is the same
+three WorkItems as example 02, using an object-store snapshot instead of
+a PVC, across two Clusters.
 [Example 04](04-openshell-sandbox-policy.md) adds an OpenShell
 ExecutionTarget and a sandbox policy on the payload.
 [Example 05](05-no-matching-targets.md) is example 01 when no target
