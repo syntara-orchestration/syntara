@@ -47,9 +47,6 @@ spec:
       value: '[{"type": "pip", "path": "backend"}, {"type": "rpm", "path": "backend"}, {"type": "generic", "path": "backend"}]'
     - name: prefetch-mode
       value: permissive
-    # Production Segment write key. Only this customer-facing push may mount it.
-    - name: additional-secret
-      value: nexus-segment-write-keys
   pipelineRef:
     params:
       - name: name
