@@ -13,7 +13,7 @@ info:
     - CRUD operations for Integrations with discriminated configuration per type
     - Project-scoped visibility via integration-project assignments
     - Soft-delete support
-  version: 1.0.0
+  version: 1.1.0
 
 servers:
   - url: /api/v1
@@ -1704,6 +1704,8 @@ components:
       type: string
       enum:
         - auth_failure
+        - authorization_failure
+        - token_expired
         - connection_error
         - rate_limit
         - ssl_error

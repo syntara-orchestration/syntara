@@ -462,7 +462,7 @@ class TestLLMProviderDiscoverErrors:
             result = await adapter.discover(_openai_cred(), timeout_seconds=10)
 
         assert result.success is False
-        assert result.error_type == HealthCheckErrorType.AUTH_FAILURE
+        assert result.error_type == HealthCheckErrorType.AUTHORIZATION_FAILURE
 
     @pytest.mark.asyncio
     async def test_discover_http_429_rate_limit(self) -> None:

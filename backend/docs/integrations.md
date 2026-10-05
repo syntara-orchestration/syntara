@@ -220,12 +220,16 @@ For Get Run Status with **Wait for completion** enabled, `timeout_seconds`
 allows that duration plus a short margin for reporting the deadline, even when
 the normal step timeout is shorter.
 
-The TFE integration stores `base_url`, `organization`, and TLS configuration. It requires an **HTTP Bearer Token** management credential (user or team API token). Validate pings `GET /api/v2/organizations/{org}`. There is no resource discovery/refresh — workspace, run, VCS, and project operations are modular workflow node types that call the TFE v2 API at execution time via `syntara.terraform.client.TFEClient`.
+The TFE integration stores `base_url`, `organization`, and TLS configuration. It requires an **HTTP Bearer Token** management credential (user or team API token) for health checks. Validate pings `GET /api/v2/organizations/{org}`. There is no resource discovery/refresh — workspace, run, VCS, and project operations are modular workflow node types that call the TFE v2 API at execution time via `syntara.terraform.client.TFEClient`.
+
+**Credential roles (TFE):**
+- **Management credential** (`Integration.management_credential_id`) — health-check / validate only
+- **Execution credential** — selected per TFE step in the workflow builder (`credential_id`). Tokens are never stored in workflow or step definitions.
 
 **Design Decisions:**
-- **Static credential authentication.** The adapter uses `aap_oauth_token` (Bearer) if present, falling back to `aap_username` + `aap_password` (Basic Auth). No support for short-lived tokens, token refresh, or OIDC — this is a known limitation.
-- **Single endpoint.** Uses `/api/gateway/v1/me/` (not `/ping/`) because `/ping/` doesn't require authentication and cannot validate the management credential.
-- **No refresh.** `discover()` delegates to `validate()` — calling refresh on an AAP integration returns `IntegrationRefreshNotSupportedError` (422).
+- **Bearer token authentication.** The adapter uses the HTTP Bearer Token injector (`bearer_token`). No support for short-lived tokens, token refresh, or OIDC — this is a known limitation.
+- **Organization-scoped validate.** Uses `GET /api/v2/organizations/{org}` so validate confirms endpoint reachability, credential validity, and organization access.
+- **No refresh.** `discover()` delegates to `validate()` — calling refresh on a TFE integration returns `IntegrationRefreshNotSupportedError` (422).
 
 ## TLS and Security
 
