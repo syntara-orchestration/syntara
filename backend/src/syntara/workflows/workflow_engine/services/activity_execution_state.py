@@ -27,6 +27,28 @@ logger = structlog.stdlib.get_logger(__name__)
 _COMPOSITE_ITER_SEP = "#iter-"
 
 
+def _completion_error_type(*, is_workflow_timeout: bool, has_error_details: bool) -> str | None:
+    """Categorize the error_type for a workflow completion telemetry event.
+
+    A workflow-level timeout is surfaced as ``WorkflowTimedOut`` so the
+    ``timeout_count`` metric is derivable from the completion event alone
+    (AAP-92215); any other failure with error details is a generic activity error.
+
+    Args:
+        is_workflow_timeout: Whether the terminal event was a workflow timeout.
+        has_error_details: Whether the execution recorded error details.
+
+    Returns:
+        The categorized error type, or None when the run succeeded.
+
+    """
+    if is_workflow_timeout:
+        return "WorkflowTimedOut"
+    if has_error_details:
+        return "ActivityExecutionError"
+    return None
+
+
 class ActivityExecutionStateMixin:
     """Workflow execution status transitions and terminal activity handling."""
 
@@ -282,7 +304,12 @@ class ActivityExecutionStateMixin:
                 error_count = sum(1 for a in activities if a.status == ActivityStatus.FAILED)
                 duration_ms = int((completed_at - execution.created_at).total_seconds() * 1000)
                 telemetry_status = _map_execution_status_to_telemetry(status)
-                error_type: str | None = "ActivityExecutionError" if error_details else None
+                # Surface a workflow timeout on the completion event so the timeout_count
+                # metric is derivable from a single event (AAP-92215).
+                error_type = _completion_error_type(
+                    is_workflow_timeout=event.event_type == EventType.EVENT_TYPE_WORKFLOW_EXECUTION_TIMED_OUT,
+                    has_error_details=bool(error_details),
+                )
                 trigger_type = next((a for a in ActivityName if a == execution.trigger_type), None)
 
                 self._dispatch_audit_event(
@@ -296,6 +323,10 @@ class ActivityExecutionStateMixin:
                         error_type=error_type,
                         trigger_type=trigger_type,
                         interface=execution.interface,
+                        mode=metadata.mode,
+                        workflow_version=metadata.workflow_version,
+                        used_published=metadata.used_published,
+                        is_retry=execution.retried_from_execution_id is not None,
                         request_id=metadata.request_id,
                         workflow_name=metadata.workflow_name,
                     )

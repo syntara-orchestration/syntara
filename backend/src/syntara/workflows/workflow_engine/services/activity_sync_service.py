@@ -25,6 +25,7 @@ from syntara.workflows.models.activity_execution import TERMINAL_ACTIVITY_STATUS
 from syntara.workflows.models.execution import Execution, ExecutionStatus
 from syntara.workflows.models.visualization import JsonPatchOperation
 from syntara.workflows.models.workflow import Workflow
+from syntara.workflows.models.workflow_version import WorkflowVersion
 from syntara.workflows.services.activity_update_publisher import ActivityUpdatePublisher
 from syntara.workflows.workflow_engine.models.workflow_definition import NodeType
 from syntara.workflows.workflow_engine.services.activity_execution_state import ActivityExecutionStateMixin
@@ -273,6 +274,10 @@ class ActivitySyncService(
                             workflow_name=workflow_name,
                             trigger_type=trigger_activity_type,
                             interface=execution.interface,
+                            mode=metadata.mode,
+                            workflow_version=metadata.workflow_version,
+                            used_published=metadata.used_published,
+                            is_retry=execution.retried_from_execution_id is not None,
                             request_id=metadata.request_id,
                         )
                     )
@@ -436,6 +441,7 @@ class ActivitySyncService(
             workflow_id = execution.workflow_id
             workflow_version_id = execution.workflow_version_id
             last_processed_event_id = execution.last_processed_event_id
+            mode = execution.mode
 
             # Load workflow name for audit events
             workflow_result = await session.exec(select(Workflow).where(Workflow.id == workflow_id))
@@ -445,6 +451,12 @@ class ActivitySyncService(
                 logger.error(msg)
                 raise RuntimeError(msg)
             workflow_name = workflow.name
+            # Telemetry: version number and whether the run used the published version
+            used_published = workflow.published_version_id == workflow_version_id
+            version_result = await session.exec(
+                select(WorkflowVersion.version).where(WorkflowVersion.id == workflow_version_id)
+            )
+            workflow_version = version_result.one_or_none()
 
         activity_definitions_map = await self._fetch_activity_definitions_map(workflow_version_id)
 
@@ -482,6 +494,9 @@ class ActivitySyncService(
             request_id=request_id,
             workflow_name=workflow_name,
             is_retry=is_retry,
+            mode=mode,
+            workflow_version=workflow_version,
+            used_published=used_published,
         )
 
     async def _build_activity_index_map(self, execution_id: UUID) -> dict[str, int]:
