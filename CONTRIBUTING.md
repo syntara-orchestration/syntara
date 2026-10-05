@@ -130,7 +130,7 @@ classification for GitHub Actions is documented in
 | --- | --- |
 | `(Backend) Konflux Gate` / `(Frontend) Konflux Gate` | Waits for Konflux build + Conforma on the PR |
 | `Konflux kflux-prd-rh03 / ansible-automation-orchestrator-*-devel-on-pull-request` | Konflux container build for backend or UI |
-| `Red Hat Konflux / conforma-on-pull-request-devel / …` | Conforma policy checks on the built image |
+| `Red Hat Konflux / conforma-on-pull-request-devel / …` or `Integration Service / conforma-on-pull-request-devel / …` | Conforma policy checks on the built image (Konflux may post either check title) |
 | `Konflux kflux-prd-rh03 / automation-orchestrator-api-tests-devel-pull-request` | Konflux API tests (when `backend/` changes) |
 | `Konflux kflux-prd-rh03 / automation-orchestrator-ui-tests-devel-pull-request` | Konflux UI tests (when `frontend/` and/or `backend/` changes) |
 
