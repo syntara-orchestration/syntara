@@ -12,6 +12,7 @@ present so internal builds keep working with telemetry disabled.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import yaml
 
@@ -23,11 +24,12 @@ SEGMENT_WRITE_KEYS_RESOURCE = "nexus-segment-write-keys"
 CUSTOMER_FACING_PIPELINE = "ansible-automation-orchestrator-backend-early-access-push.yaml"
 
 
-def _pipeline(name: str) -> dict:
-    return yaml.safe_load((TEKTON_DIR / name).read_text())
+def _pipeline(name: str) -> dict[str, Any]:
+    loaded: dict[str, Any] = yaml.safe_load((TEKTON_DIR / name).read_text())
+    return loaded
 
 
-def _param(pipeline: dict, name: str) -> str | None:
+def _param(pipeline: dict[str, Any], name: str) -> str | None:
     for param in pipeline["spec"]["params"]:
         if param["name"] == name:
             value = param["value"]
@@ -36,8 +38,10 @@ def _param(pipeline: dict, name: str) -> str | None:
     return None
 
 
-def _cel(pipeline: dict) -> str:
-    return pipeline["metadata"]["annotations"]["pipelinesascode.tekton.dev/on-cel-expression"]
+def _cel(pipeline: dict[str, Any]) -> str:
+    expression = pipeline["metadata"]["annotations"]["pipelinesascode.tekton.dev/on-cel-expression"]
+    assert isinstance(expression, str)
+    return expression
 
 
 def test_prod_segment_secret_is_not_on_internal_builds() -> None:
