@@ -1,3 +1,4 @@
+import { RhUiInformationIcon } from '@patternfly/react-icons'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
@@ -580,6 +581,26 @@ describe('NodeEditorLayout', () => {
       expect(link).toHaveAttribute('target', '_blank')
       expect(link).toHaveAttribute('rel', 'noopener noreferrer')
       expect(link).not.toBeDisabled()
+    })
+
+    // AAP-89702: the docs link should use the information icon, matching the
+    // page header doc links updated in AAP-85110, not the external-link icon.
+    it('uses the information icon, not the external-link icon', () => {
+      render(
+        <NodeEditorLayout
+          parametersContent={<div>Parameters</div>}
+          showInputPanel={false}
+          docLink="https://docs.ansible.com/workflows"
+        />
+      )
+
+      const link = screen.getByRole('link', { name: /Documentation/i })
+      const renderedPath = link.querySelector('svg path')?.getAttribute('d')
+
+      const { container: referenceContainer } = render(<RhUiInformationIcon />)
+      const expectedPath = referenceContainer.querySelector('svg path')?.getAttribute('d')
+
+      expect(renderedPath).toBe(expectedPath)
     })
 
     it('hides the Documentation control when docLink is not provided', () => {
