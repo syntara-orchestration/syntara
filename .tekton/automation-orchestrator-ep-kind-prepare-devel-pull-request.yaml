@@ -13,6 +13,7 @@ metadata:
       event == "pull_request" && target_branch == "feat/ANSTRAT-1803" &&
       (".tekton/automation-orchestrator-ep-kind-prepare-devel-pull-request.yaml".pathChanged()
       || "backend/docs/execution-plane/execution-plane-init.yaml".pathChanged()
+      || "backend/docs/execution-plane/execution-plane-worker.yaml".pathChanged()
       || "backend/docs/execution-plane/konflux-prepare-execution-plane.sh".pathChanged()
       || "backend/docs/execution-plane/konflux-run-hello-world-demo.sh".pathChanged()
       || "backend/docs/execution-plane/run-hello-world-demo.sh".pathChanged()

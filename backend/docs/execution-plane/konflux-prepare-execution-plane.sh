@@ -33,7 +33,10 @@ SA_NAME="${SA_NAME:-syntara-dispatcher}"
 CLUSTER_NAME="${CLUSTER_NAME:-27-next-ao-operator}"
 ENDPOINT="${ENDPOINT:-https://kubernetes.default.svc}"
 TOKEN_FILE="${TOKEN_FILE:-/var/tmp/syntara-dispatcher.token}"
-TOKEN_DURATION="${TOKEN_DURATION:-24h}"
+POD_TOKEN_FILE="/tmp/sa-token.txt"
+# Token is only needed until register_kind_sa_target.py finishes; keep it short
+# so a missed cleanup cannot leave a valid credential for a full day.
+TOKEN_DURATION="${TOKEN_DURATION:-1h}"
 # Same public default as node_container_images (PR #747). Override with NODE_IMAGE
 # when CI publishes a digest-pinned tag.
 NODE_IMAGE="${NODE_IMAGE:-quay.io/ahetheri/syntara-node-script:migration-test}"
@@ -365,6 +368,13 @@ _enable_script_dispatch() {
   kubectl rollout status deploy/myao-worker -n "${AO_NAMESPACE}" --timeout=180s
 }
 
+_cleanup_sa_tokens() {
+  rm -f "${TOKEN_FILE}"
+  if [[ -n "${BACKEND_POD:-}" ]]; then
+    kubectl exec -n "${AO_NAMESPACE}" "${BACKEND_POD}" -- rm -f "${POD_TOKEN_FILE}" >/dev/null 2>&1 || true
+  fi
+}
+
 echo "=== Cluster ==="
 kubectl cluster-info
 kubectl get namespace "${AO_NAMESPACE}" >/dev/null
@@ -388,6 +398,7 @@ if [[ -z "${TOKEN}" ]]; then
 fi
 printf '%s' "${TOKEN}" > "${TOKEN_FILE}"
 chmod 600 "${TOKEN_FILE}"
+trap _cleanup_sa_tokens EXIT
 echo "minted ${SA_NAME} token (${#TOKEN} chars)"
 unset TOKEN
 
@@ -410,14 +421,17 @@ echo "using backend pod ${BACKEND_POD} for schema + registration"
 
 # AO operator pods expose APP_DB_* rather than APP_DATABASE_URL. Alembic only
 # reads DATABASE_URL; register_kind_sa_target.py used to fall back to localhost.
-_IN_POD_DATABASE_URL='
+# Quote user/password/database the same way as resolve_database_url() so a
+# password containing @ : / # cannot break the PostgreSQL URL.
+_IN_POD_DATABASE_URL=$(cat <<'EOF'
 if [ -n "${APP_DATABASE_URL:-}" ]; then
   DATABASE_URL="${APP_DATABASE_URL}"
 else
-  DATABASE_URL="postgresql+asyncpg://${APP_DB_USER}:${APP_DB_PASSWORD}@${APP_DB_HOST}:${APP_DB_PORT:-5432}/${APP_DB_NAME}"
+  DATABASE_URL="$(/opt/app-root/src/.venv/bin/python -c 'import os; from urllib.parse import quote; print("postgresql+asyncpg://%s:%s@%s:%s/%s" % (quote(os.environ["APP_DB_USER"], safe=""), quote(os.environ["APP_DB_PASSWORD"], safe=""), os.environ["APP_DB_HOST"], os.environ.get("APP_DB_PORT", "5432"), quote(os.environ["APP_DB_NAME"], safe="")), end="")')"
 fi
 export DATABASE_URL
-'
+EOF
+)
 
 echo "=== execution_plane schema ==="
 kubectl exec -n "${AO_NAMESPACE}" "${BACKEND_POD}" -- /bin/sh -c "
@@ -436,14 +450,14 @@ echo "=== Register ExecutionTarget (before worker start) ==="
 _write_to_pod /tmp/register_kind_sa_target.py < "${TOOLS_DIR}/register_kind_sa_target.py"
 _write_to_pod /tmp/dev_cli.py < "${TOOLS_DIR}/dev_cli.py"
 _write_to_pod /tmp/ao_registration.py < "${TOOLS_DIR}/ao_registration.py"
-_write_to_pod /tmp/sa-token.txt < "${TOKEN_FILE}"
+_write_to_pod "${POD_TOKEN_FILE}" < "${TOKEN_FILE}"
 kubectl exec -n "${AO_NAMESPACE}" "${BACKEND_POD}" -- /bin/sh -c "
 ${_IN_POD_DATABASE_URL}
 cd /tmp && PYTHONPATH=\"/tmp:\${PYTHONPATH:-/opt/app-root/src/src}\" \
-  /opt/app-root/src/.venv/bin/python register_kind_sa_target.py /tmp/sa-token.txt \
+  /opt/app-root/src/.venv/bin/python register_kind_sa_target.py ${POD_TOKEN_FILE} \
   --cluster '${CLUSTER_NAME}' --namespace '${NAMESPACE}' --endpoint '${ENDPOINT}'
 "
-kubectl exec -n "${AO_NAMESPACE}" "${BACKEND_POD}" -- rm -f /tmp/sa-token.txt
+_cleanup_sa_tokens
 echo "registered cluster ${CLUSTER_NAME} namespace ${NAMESPACE} endpoint ${ENDPOINT}"
 
 echo "=== Deploy execution-plane-worker ==="
