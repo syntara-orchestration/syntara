@@ -8,6 +8,7 @@ tracked by ToolExecutionEvent.
 from __future__ import annotations
 
 from enum import StrEnum
+from uuid import UUID  # noqa: TC003
 
 from sqlmodel import Field
 
@@ -35,7 +36,7 @@ class WorkflowErrorEvent(BaseTelemetryEvent):
 
     """
 
-    workflow_execution_id: str = Field(description="Unique workflow execution identifier (UUID v4)")
+    workflow_execution_id: UUID = Field(description="Unique workflow execution identifier (UUID v4)")
     timed_out_component: TimedOutComponent = Field(
         description="Whether the workflow or an activity timed out",
     )

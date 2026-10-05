@@ -190,15 +190,25 @@ export default function Executions() {
                 <SynScrollableTableContainer caption="Executions table" footer={getFooterProps(executionsQuery.data)}>
                   <Thead>
                     <Tr>
-                      <Th modifier="nowrap">Run ID</Th>
-                      <Th modifier="nowrap" sort={getSortParams('workflow_id')}>
+                      <Th width={20} modifier="nowrap">
+                        Run ID
+                      </Th>
+                      <Th width={20} modifier="nowrap" sort={getSortParams('workflow_id')}>
                         Workflow name
                       </Th>
-                      <Th sort={getSortParams('status')}>Status</Th>
-                      <Th modifier="nowrap">Version</Th>
-                      <Th sort={getSortParams('created_at')}>Created at</Th>
-                      <Th sort={getSortParams('completed_at')}>Completed at</Th>
-                      <Th screenReaderText="Actions" />
+                      <Th width={15} sort={getSortParams('status')}>
+                        Status
+                      </Th>
+                      <Th width={15} modifier="nowrap">
+                        Version
+                      </Th>
+                      <Th width={15} sort={getSortParams('created_at')}>
+                        Created at
+                      </Th>
+                      <Th width={15} sort={getSortParams('completed_at')}>
+                        Completed at
+                      </Th>
+                      <Th width={10} screenReaderText="Actions" />
                     </Tr>
                   </Thead>
                   {isAllProjects && groupedExecutions ? (

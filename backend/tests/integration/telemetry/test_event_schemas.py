@@ -38,7 +38,7 @@ class TestWorkflowExecutionStartEventSchema:
             entitlement_id="",
             trigger_type=ActivityName.MANUAL_TRIGGER,
         )
-        event_dict = event.model_dump()
+        event_dict = event.model_dump(mode="json")
         jsonschema.validate(instance=event_dict, schema=schema)
         # Segment event must be JSON-serializable
         assert json.dumps(event.to_segment_event())
@@ -66,7 +66,7 @@ class TestWorkflowExecutionCompletedEventSchema:
             error_type=None,
             entitlement_id="",
         )
-        event_dict = event.model_dump()
+        event_dict = event.model_dump(mode="json")
         jsonschema.validate(instance=event_dict, schema=schema)
         # Segment event must be JSON-serializable
         assert json.dumps(event.to_segment_event())
@@ -92,7 +92,7 @@ class TestNodeExecutionEventSchema:
             error_type=None,
             entitlement_id="",
         )
-        event_dict = event.model_dump()
+        event_dict = event.model_dump(mode="json")
         jsonschema.validate(instance=event_dict, schema=schema)
         # Segment event must be JSON-serializable
         assert json.dumps(event.to_segment_event())
@@ -117,7 +117,7 @@ class TestNodeExecutionEventSchema:
                 status="completed",
                 entitlement_id="",
             )
-            event_dict = event.model_dump()
+            event_dict = event.model_dump(mode="json")
             jsonschema.validate(instance=event_dict, schema=schema)
 
 
@@ -137,6 +137,6 @@ class TestWorkflowVersionCreatedEventSchema:
             version=3,
             entitlement_id="",
         )
-        event_dict = event.model_dump()
+        event_dict = event.model_dump(mode="json")
         jsonschema.validate(instance=event_dict, schema=schema)
         assert json.dumps(event.to_segment_event())
