@@ -81,7 +81,7 @@ class TestMissingRequiredFields:
 
 
 class TestLongActionStrings:
-    """Verify API handles very long action strings gracefully."""
+    """Verify API rejects unreasonably long query field values."""
 
     @pytest.mark.asyncio
     async def test_can_i_long_action(
@@ -89,13 +89,12 @@ class TestLongActionStrings:
         auth_client: AsyncClient,
         test_user: User,
     ) -> None:
-        """CHAOS-005a: Long action string is handled (denied, not crashed)."""
+        """CHAOS-005a: Long action string is rejected with a validation error."""
         resp = await auth_client.post(
             "/api/v1/authz/can_i",
             json={"action": "a" * 10000, "resource_type": "workflow"},
         )
-        assert resp.status_code == 200
-        assert resp.json()["allowed"] is False
+        assert resp.status_code == 422
 
     @pytest.mark.asyncio
     async def test_can_i_long_resource_type(
@@ -103,13 +102,12 @@ class TestLongActionStrings:
         auth_client: AsyncClient,
         test_user: User,
     ) -> None:
-        """CHAOS-005b: Long resource_type is handled (denied, not crashed)."""
+        """CHAOS-005b: Long resource_type is rejected with a validation error."""
         resp = await auth_client.post(
             "/api/v1/authz/can_i",
             json={"action": "read", "resource_type": "x" * 10000},
         )
-        assert resp.status_code == 200
-        assert resp.json()["allowed"] is False
+        assert resp.status_code == 422
 
 
 # ============================================================================
