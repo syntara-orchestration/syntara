@@ -21,9 +21,11 @@ import {
 import { RhUiAddIcon, RhUiEditIcon, RhUiSyncIcon } from '@patternfly/react-icons'
 import { Tbody } from '@patternfly/react-table'
 import { useCallback, useMemo, useState } from 'react'
-import { Controller, type Control, type FieldError, type FieldErrors } from 'react-hook-form'
+import type { Control, FieldError, FieldErrors } from 'react-hook-form'
 
 import { FilterBar } from '../../../../components/filters/FilterBar'
+import { FormFieldHintOrError } from '../../../../components/FormFieldError'
+import { SynFormField } from '../../../../components/forms/SynFormField'
 import { SynPanelContentStack } from '../../../../components/layout/SynPanelContentStack'
 import { SynEmptyStateFilter } from '../../../../components/states/SynEmptyStateFilter'
 import { SynEmptyStateNoData } from '../../../../components/states/SynEmptyStateNoData'
@@ -33,7 +35,6 @@ import type { FilterConfig, FilterFieldDefinition } from '../../../../types/filt
 import { FilterOperatorEnum, FilterTypeEnum } from '../../../../types/filters'
 import { APP_TITLE } from '../../../../utils/appTitle'
 
-import { HintOrError } from './formFieldHelpers'
 import type { GroupMappingEditFormValues } from './groupMappingEditFormSchema'
 import { EditMappingRow, MappingRow } from './groupMappingFields'
 import { GroupMappingTableHead } from './groupMappingTableHead'
@@ -126,28 +127,27 @@ export function AdvancedSection({ control, defaultExpression, idpType, rawClaims
       <Form>
         <Stack hasGutter>
           <StackItem>
-            <Controller
+            <SynFormField<GroupMappingEditFormValues, 'expression'>
               name="expression"
               control={control}
-              render={({ field, fieldState }) => (
+              label="Group extraction expression"
+              fieldId="jmespath-expression-tab"
+              labelHelp={idpHelp.groupExtractionExpression}
+              hideFooter
+            >
+              {({ field, fieldState }) => (
                 <Stack hasGutter>
                   <StackItem>
-                    <FormGroup
-                      label="Group extraction expression"
-                      fieldId="jmespath-expression-tab"
-                      labelHelp={idpHelp.groupExtractionExpression}
-                    >
-                      <TextInput
-                        id="jmespath-expression-tab"
-                        placeholder="groups[*]"
-                        validated={fieldState.error ? 'error' : 'default'}
-                        {...field}
-                      />
-                      <HintOrError
-                        error={fieldState.error}
-                        hint="JMESPath expression to extract group values from the ID token. Changes are included when you click Save mapping."
-                      />
-                    </FormGroup>
+                    <TextInput
+                      id="jmespath-expression-tab"
+                      placeholder="groups[*]"
+                      validated={fieldState.error ? 'error' : 'default'}
+                      {...field}
+                    />
+                    <FormFieldHintOrError
+                      error={fieldState.error}
+                      hint="JMESPath expression to extract group values from the ID token. Changes are included when you click Save mapping."
+                    />
                   </StackItem>
                   {defaultExpression && field.value !== defaultExpression && (
                     <StackItem>
@@ -158,7 +158,7 @@ export function AdvancedSection({ control, defaultExpression, idpType, rawClaims
                   )}
                 </Stack>
               )}
-            />
+            </SynFormField>
           </StackItem>
           {rawClaims && (
             <StackItem>

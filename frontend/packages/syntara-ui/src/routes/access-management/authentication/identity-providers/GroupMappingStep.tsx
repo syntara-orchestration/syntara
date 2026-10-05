@@ -15,10 +15,12 @@ import {
   SelectOption,
   TextInput,
 } from '@patternfly/react-core'
-import { RhUiAddIcon, RhUiErrorIcon, RhUiTrashIcon } from '@patternfly/react-icons'
+import { RhUiAddIcon, RhUiTrashIcon } from '@patternfly/react-icons'
 import React, { useCallback, useEffect, useState } from 'react'
-import { Controller, useFieldArray, useWatch, type Control, type UseFormSetValue } from 'react-hook-form'
+import { useFieldArray, useWatch, type Control, type UseFormSetValue } from 'react-hook-form'
 
+import { FormFieldHintOrError } from '../../../../components/FormFieldError'
+import { SynFormField } from '../../../../components/forms/SynFormField'
 import { SynSelect } from '../../../../components/SynSelect'
 import { APP_TITLE } from '../../../../utils/appTitle'
 import { useAllGroups } from '../../../access/useAllGroups'
@@ -100,10 +102,15 @@ type MappingEntryRowProps = {
 function MappingEntryRow({ index, control, mappedGroups, onRemove }: Readonly<MappingEntryRowProps>) {
   return (
     <div style={mappingRowStyle}>
-      <Controller
+      <SynFormField
         name={`groupMapping.entries.${index}.idpGroupValue`}
         control={control}
-        render={({ field, fieldState }) => (
+        label={`IdP group value ${index + 1}`}
+        fieldId={`group-mapping-idp-value-${index}`}
+        hideFormGroupLabel
+        hideFooter
+      >
+        {({ field, fieldState }) => (
           <div style={flexOneStyle}>
             <TextInput
               aria-label={`IdP group value ${index + 1}`}
@@ -113,11 +120,16 @@ function MappingEntryRow({ index, control, mappedGroups, onRemove }: Readonly<Ma
             />
           </div>
         )}
-      />
-      <Controller
+      </SynFormField>
+      <SynFormField
         name={`groupMapping.entries.${index}.mappedGroupId`}
         control={control}
-        render={({ field, fieldState }) => (
+        label={`${APP_TITLE} group ${index + 1}`}
+        fieldId={`group-mapping-group-${index}`}
+        hideFormGroupLabel
+        hideFooter
+      >
+        {({ field, fieldState }) => (
           <div style={flexOneStyle}>
             <MappedGroupSelect
               value={field.value}
@@ -129,7 +141,7 @@ function MappingEntryRow({ index, control, mappedGroups, onRemove }: Readonly<Ma
             />
           </div>
         )}
-      />
+      </SynFormField>
       <Button variant="plain" aria-label={`Remove mapping ${index + 1}`} onClick={onRemove} icon={<RhUiTrashIcon />} />
     </div>
   )
@@ -262,15 +274,16 @@ export function GroupMappingStep({ control, setValue, providerId }: Readonly<Gro
       </FormGroup>
 
       <ExpandableSection toggleText="Advanced: Group Extraction Expression">
-        <Controller
+        <SynFormField<IdentityProviderFormData, 'groupMapping.jmespathExpression'>
           name="groupMapping.jmespathExpression"
           control={control}
-          render={({ field, fieldState }) => (
-            <FormGroup
-              label="Group extraction expression"
-              fieldId="jmespath-expression"
-              labelHelp={idpHelp.groupExtractionExpression}
-            >
+          label="Group extraction expression"
+          fieldId="jmespath-expression"
+          labelHelp={idpHelp.groupExtractionExpression}
+          hideFooter
+        >
+          {({ field, fieldState }) => (
+            <>
               <TextInput
                 id="jmespath-expression"
                 placeholder="groups[*]"
@@ -278,19 +291,13 @@ export function GroupMappingStep({ control, setValue, providerId }: Readonly<Gro
                 {...field}
                 value={field.value ?? 'groups[*]'}
               />
-              <FormHelperText>
-                <HelperText>
-                  <HelperTextItem
-                    variant={fieldState.error ? 'error' : 'default'}
-                    icon={fieldState.error ? <RhUiErrorIcon /> : undefined}
-                  >
-                    {fieldState.error?.message ?? 'JMESPath expression to extract group values from the ID token'}
-                  </HelperTextItem>
-                </HelperText>
-              </FormHelperText>
-            </FormGroup>
+              <FormFieldHintOrError
+                error={fieldState.error}
+                hint="JMESPath expression to extract group values from the ID token"
+              />
+            </>
           )}
-        />
+        </SynFormField>
       </ExpandableSection>
     </Form>
   )
