@@ -7,6 +7,7 @@ import { useCallback, useMemo } from 'react'
 import { IconLabel } from '../../components/IconLabel'
 import { SynListPanelTable, SynListPanelToolbar, SynListPanelView } from '../../components/panels/list/SynListPanel'
 import { SynEmptyStateNoData } from '../../components/states/SynEmptyStateNoData'
+import { CodeTruncateCell } from '../../components/table/CodeTruncateCell'
 import { useCursorReset } from '../../hooks/useCursorPagination'
 import { useDialogState } from '../../hooks/useDialogState'
 import { FilterOperatorEnum, FilterTypeEnum } from '../../types/filters'
@@ -107,9 +108,7 @@ function PoliciesTableBody({
         {policies.map((policy) => (
           <Tr key={policy.id} data-testid={`policy-row-${policy.id}`}>
             <Td dataLabel="Name">
-              <code>
-                <Truncate content={policy.name} />
-              </code>
+              <CodeTruncateCell content={policy.name} />
             </Td>
             <Td dataLabel="Description">
               <Truncate content={policy.description ?? '-'} />
