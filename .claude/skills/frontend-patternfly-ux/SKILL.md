@@ -254,6 +254,7 @@ Use `SynPageBreadcrumbs` for detail and form page navigation.
 - Last item is the current page (rendered as non-link text)
 - Middle segments collapse to a dropdown at ≤768px viewport width
 - Use PF6 default breadcrumb styling (dashed underline) — no CSS overrides
+- **Detail-page tabs:** Tabs describe views within the current resource; they are not breadcrumb hierarchy. Keep the resource name as the final, non-link breadcrumb on every tab. Add a segment after the resource only for a distinct route, such as Edit or a subordinate form.
 
 For live examples:
 
@@ -1576,7 +1577,7 @@ Trigger configuration supports two scheduling types:
 - **Single trigger** — Plain "Run" button in the builder toolbar
 - **Multiple triggers** — "Run" button becomes a dropdown, letting the user select which trigger to start from
 - Run flow:
-  1. Confirmation dialog ("Run [workflow name]?") with a "Don't show again" checkbox
+  1. Confirmation dialog titled "Run workflow?" with a "Don't show again" checkbox. Name the workflow in the body (for example, "You are about to manually run the workflow **{name}**.") so the title stays predictable while the affected resource remains clear.
   2. `RunWorkflowModal` — JSON code editor for providing mock trigger output data; validates against the trigger's `input_schema` when defined
 - After run, the execution visualizer panel opens showing real-time results
 
@@ -1688,13 +1689,14 @@ When a node is opened for editing, the builder can display a three-column layout
 - **Branching nodes** (Condition, Switch): The center column header includes a branch-handle dropdown (`MenuToggle` with branch icon) for selecting which output path to inspect in the Output panel
 - Columns use `ResizableDivider` for user-adjustable widths
 - Center panel uses `variant="raised"` to maintain visual hierarchy — Input/Output panels stay flat
+- **Contextual documentation:** Resolve documentation from the selected step type and show the external Documentation link only when a matching destination exists. Omit the control when there is no step-specific documentation; do not show a disabled "Coming soon" affordance.
 
 ### Node Panel Navigation
 
 The node editor panel provides **Previous/Next arrow controls** for navigating connected steps in graph order.
 
 - **Single upstream/downstream:** Plain icon button with tooltip showing the connected step name
-- **Multiple targets:** Dropdown menu on the arrow listing all connected steps
+- **Multiple targets:** Dropdown menu on the arrow listing all connected steps. Each item includes the step-type icon and display name so users can distinguish similarly named targets at a glance.
 - **Components:** `NodePanelNavigationArrow`, `useNodePanelNavigation`, `useAdjacentNodes`, `getAdjacentNodesFromFlow`
 - **Icons:** `RhUiCaretLeftIcon` (previous) / `RhUiCaretRightIcon` (next)
 - **Positioning:** Tab-style arrows on panel edges via CSS module (`NodePanelNavigationArrow.module.css`)
@@ -1778,6 +1780,7 @@ The canvas layout engine uses unified spacing constants shared between auto-layo
 - **Unified constants:** `LOOP_BODY_SPACING` from `layoutConstants.ts` — `horizontal` (80px), `vertical` (100px), `nodeGap` (40px). Never use magic numbers for loop body positioning.
 - **Branch ordering:** Branching nodes (condition, approval, switch, loop) use edge weight-based ordering via `buildBranchNodeOrdering()`. Higher-weight branches render first (leftmost/topmost): true/approved branches get weight 2, false/rejected get weight 1. Switch cases use descending weights (case_0=50, case_1=49, ..., default=1).
 - **Layout algorithm:** Uses `network-simplex` ranker with `nodesep: 90` for proper horizontal spacing between branch targets.
+- **Loop-group drag:** Dragging a loop moves every step in its body by the same offset and persists their positions together. Moving the loop must preserve the body layout rather than leaving its contained steps behind.
 
 ### Execution View Panels
 
@@ -1787,6 +1790,7 @@ The canvas layout engine uses unified spacing constants shared between auto-layo
 - Panels may use a `ResizableDivider` to allow users to resize panel split areas
 - The most recent run details can display inline in the editor after workflow execution
 - **Activity filtering:** The execution details panel includes a `FilterBar` toolbar (role="search", aria-label="Filters") for filtering activities by name. Filter state persists across Overview/Details tab switches. When no activities match, show `SynEmptyStateFilter` with a "Clear all filters" button.
+- **Initial details selection:** When the user opens Details with no activity selected, select the first currently visible activity and synchronize the row, canvas, and detail pane. Do not replace a selection the user has already made.
 - **Human-readable error messages:** Execution error messages must resolve internal activity IDs to human-readable node names. Use a name map (`Map<activityId, nodeName>`) and `resolveErrorDetails()` to replace IDs in error strings before displaying them to users. Never show raw activity IDs in user-facing error alerts.
 
 ### AI Agent Reasoning Trace ("Agent Steps")

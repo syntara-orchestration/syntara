@@ -72,7 +72,7 @@ Every page must follow this structural hierarchy:
 
 ### Breadcrumbs
 
-- Use `SynPageBreadcrumbs`; renders nothing when < 2 items; last item = current page (non-link); middle segments collapse at ≤768px. No CSS overrides.
+- Use `SynPageBreadcrumbs`; renders nothing when < 2 items; last item = current page (non-link); middle segments collapse at ≤768px. No CSS overrides. Detail-page tabs are views within the resource, not breadcrumb hierarchy: keep the resource name as the terminal crumb on every tab, and add a segment only for a distinct route such as Edit.
 
 ### Structure Checklist
 
@@ -335,7 +335,7 @@ All icons MUST use the **`RhUi` prefix** (e.g., `RhUiAddIcon`, `RhUiEditIcon`, `
 - **Save behavior:** `isAriaDisabled` when `!isDirty` for existing workflows. Tooltip shows "Last saved {datetime}". No toast on update; toast on create only.
 - Add step: opens side panel, auto-adjusts canvas. **Empty workflow onboarding:** When no triggers/steps exist, "Add step" button is **hidden** (not disabled) and the panel is forced open for trigger selection. Once first step is added, button appears. **Toggle-style button:** When panel is open (and steps exist), button uses `isClicked` + `aria-pressed` for toggle feedback.
 - **Duplicate workflow:** Row kebab action with `RhUiDuplicateIcon`; no confirmation dialog; success toast with inline deep-link to new workflow.
-- Run workflow: single trigger → plain Run button; multiple triggers → dropdown for trigger selection; confirmation dialog with "Don't show again" (stored in `localStorage` per user — skips confirmation on next run), then `RunWorkflowModal` JSON editor for mock trigger data
+- Run workflow: single trigger → plain Run button; multiple triggers → dropdown for trigger selection; confirmation dialog with "Don't show again" (stored in `localStorage` per user — skips confirmation on next run), then `RunWorkflowModal` JSON editor for mock trigger data. Use the stable title "Run workflow?" and name the workflow in the confirmation body.
 - **Schedule triggers:** Interval (`DurationInput`) and Cron (`TextInput` with 5-field validation). "Continuous" type removed. Both show "Next run" preview when valid.
 - Test step (Run step): from step kebab menu → choice dialog ("Run all previous steps" or mock data) → mock data editor (CodeEditor with JSON); upstream steps mocked as "skipped"; results in execution visualizer
 - **Cancel run:** secondary destructive button (`variant="secondary"` + `isDanger`), no confirmation dialog. Visible only when status is `pending`/`running`.
@@ -343,15 +343,16 @@ All icons MUST use the **`RhUi` prefix** (e.g., `RhUiAddIcon`, `RhUiEditIcon`, `
 - Legend toggle: accessible labels **Show step legend** / **Hide step legend**
 - **Canvas step styling:** workflow steps use `variant="raised"` with border-radius override to match `Card` / canvas chrome; fixed 240px width — use `overflow-wrap: anywhere` on all dynamic text (`Title`, `Content`) to prevent overflow (prefer `anywhere` over `break-word`)
 - **Floating canvas panels:** prefer `SynPanel` with `variant="raised"` for compact controls or `opaqueFloatingFill` for large flat shells without raised chrome (see `SynPanel.tsx` JSDoc)
-- Execution view panels: use `SynPanel isFullHeight` for proper scroll — don't hand-roll flex column inline styles
+- Execution view panels: use `SynPanel isFullHeight` for proper scroll — don't hand-roll flex column inline styles. On entering Details with no selection, select the first currently visible activity and synchronize the row, canvas, and detail pane; keep an existing user selection.
 - View-only views: Run view, Run history, Version history
 - **Verify workflow:** Kebab action → `POST /workflows/validate` → expandable `Alert` (`ValidationBanner`) above canvas + per-node error badges. Node names are clickable links to the node editor; errors grouped via compact horizontal `DescriptionList`.
-- **Two-tier validation:** Errors (`severity: 'error'`) block publish; warnings (`severity: 'warning'`) allow save via `force_save=true` retry. Banner variant: any error → `danger`; all warnings → `warning`. Verify-then-publish gate: Publish always verifies first; `isAriaDisabled` when errors exist or verifying.
+- **Two-tier validation:** Errors (`severity: 'error'`) block publish; warnings (`severity: 'warning'`) allow save. Banner variant: any error → `danger`; all warnings → `warning`. Verify-then-publish gate: Publish always verifies first; `isAriaDisabled` when errors exist or verifying.
 - **Version history panel:** Right-side `SynPanel isFullHeight` with `SimpleList` grouped by date. Each version shows name + timestamp + status badge (Published/Draft). Kebab per version: Restore, Export, Publish. Viewing a version sets canvas to read-only mode. Mutually exclusive with approval panel.
-- **Three-column node editor:** Input (flat) | Parameters (`variant="raised"`) | Output (flat). Branching nodes add branch-handle dropdown in center column header. Columns use `ResizableDivider`.
+- **Three-column node editor:** Input (flat) | Parameters (`variant="raised"`) | Output (flat). Branching nodes add branch-handle dropdown in center column header. Columns use `ResizableDivider`. Resolve Documentation from the selected step type; show the external link only when a matching destination exists.
 - **Node settings:** `NodeFormTabsLayout` splits node forms into Parameters + Settings tabs. Settings tab: continue-on-failure (three-way select), timeout, retry via shared `NodeSettingsForm`. System defaults as live placeholders from `/settings`. Hidden for Condition/Switch/triggers.
-- **Node panel navigation:** Previous/Next arrow controls on panel edges for navigating connected steps. Single target = icon button + tooltip; multiple = dropdown menu. Uses `useAdjacentNodes`.
+- **Node panel navigation:** Previous/Next arrow controls on panel edges for navigating connected steps. Single target = icon button + tooltip; multiple = dropdown menu whose items include each target's type icon and display name. Uses `useAdjacentNodes`.
 - **Node disable/enable:** Activity nodes (Task, Approval) get Disable/Enable kebab action (no confirmation). Disabled = dashed gray border + 50% opacity. Control flow nodes only get Replace + Delete.
+- **Loop-group drag:** Dragging a loop moves every step in its body by the same offset and persists their positions together, preserving the body layout.
 - **Switch node expressions:** Paths share `ExpressionBuilderCore` (AND/OR groups + custom expression toggle). Label the selector "Condition type" with "Form builder" and "Freeform text" options; default the editor group label to "Condition". Keep visible and accessible labels in shared constants. Drag-reorder paths via `@dnd-kit/sortable` with grip handle.
 - **Approval side panel:** Right-side panel on execution viewer for inline approval review. Mutually exclusive with history panel; auto-open on pending approval via `useAutoApprovalDetection` only when history is not open, so automatic state never replaces the user's current context. **Multi-approval navigation:** `ApprovalNavigationHeader` with prev/next arrows, "2 of 5" counter, keyboard nav support.
 - **Wait node countdown:** Live `HH:MM:SS` countdown on canvas during execution via `useWaitCountdown` (1s interval). Clears on terminal status.
