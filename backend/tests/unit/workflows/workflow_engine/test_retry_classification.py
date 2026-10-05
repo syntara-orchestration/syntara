@@ -485,9 +485,9 @@ async def test_restored_output_is_injected_into_the_namespace(mock_wf: MagicMock
 
     await complete_supplied_node(wf, node, result, MagicMock())
     assert wf.resolver.get_namespace("step_1") == {"result": "from-source", "status": "completed"}
-    # Tracked as restored, not as skipped: it did not get skipped, it ran in an
+    # Tracked as replayed, not as skipped: it did not get skipped, it ran in an
     # earlier execution. The converge predicates read skipped_nodes as "never ran".
-    assert "step_1" in wf._restored_nodes
+    assert "step_1" in wf._restored_node_timestamps
     assert "step_1" not in wf.skipped_nodes
 
 
@@ -545,7 +545,11 @@ async def test_empty_activity_result_falls_through(mock_wf: MagicMock) -> None:
 
 @pytest.mark.asyncio
 async def test_restore_dispatches_the_retry_outputs_activity(mock_wf: MagicMock) -> None:
-    """The fetch carries the source execution id, not the output inline."""
+    """The fetch carries the source execution id, not the output inline.
+
+    The replay runs under the node's own id — not an ``__internal__`` id — so the
+    normal event-driven sync records it node-by-node and maps it to this node.
+    """
     wf = _injectable_workflow()
     wf.retry_context = _retry("step_2")
     node = ActivityNode(node_id="step_1", node_type="script", parameters={})
@@ -553,9 +557,35 @@ async def test_restore_dispatches_the_retry_outputs_activity(mock_wf: MagicMock)
 
     await wf._restore_node_output(node)
 
-    name, args = mock_wf.execute_activity.call_args[0][0], mock_wf.execute_activity.call_args.kwargs["args"]
-    assert name == ActivityName.RETRY_OUTPUTS
-    assert args == ["src-1", ["step_1"]]
+    call = mock_wf.execute_activity.call_args
+    assert call[0][0] == ActivityName.RETRY_OUTPUTS
+    assert call.kwargs["args"] == ["src-1", ["step_1"]]
+    assert call.kwargs["activity_id"] == "step_1"
+
+
+@pytest.mark.asyncio
+async def test_restore_captures_source_timestamps(mock_wf: MagicMock) -> None:
+    """The source run's timestamps are kept so the replayed row reports when it ran."""
+    wf = _injectable_workflow()
+    wf.retry_context = _retry("step_2")
+    node = ActivityNode(node_id="step_1", node_type="script", parameters={})
+    mock_wf.execute_activity = AsyncMock(
+        return_value={
+            "step_1": {
+                "input_data": {},
+                "output_data": {"result": "ok"},
+                "started_at": "2026-01-01T00:00:00+00:00",
+                "completed_at": "2026-01-01T00:05:00+00:00",
+            }
+        }
+    )
+
+    await wf._restore_node_output(node)
+
+    assert wf._restored_node_timestamps["step_1"] == {
+        "started_at": "2026-01-01T00:00:00+00:00",
+        "completed_at": "2026-01-01T00:05:00+00:00",
+    }
 
 
 @pytest.mark.asyncio
@@ -571,7 +601,7 @@ async def test_maybe_restore_delegates_and_returns_the_synthetic_completion(mock
     result = await wf._maybe_restore_retry_output(node, _chain_graph())
 
     assert result == {"output": {"result": "from-source"}, "control": None}
-    assert "step_1" in wf._restored_nodes
+    assert "step_1" in wf._restored_node_timestamps
     assert "step_1" not in wf.skipped_nodes
 
 

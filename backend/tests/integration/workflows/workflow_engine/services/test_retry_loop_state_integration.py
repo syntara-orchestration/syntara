@@ -292,6 +292,43 @@ async def test_retained_outputs_persist_for_the_next_retry(
 
     with patch("syntara.workflows.workflow_engine.activities.retry_output_activity.get_db", get_retry_db):
         assert await fetch_retry_outputs_activity(str(retry.id), ["upstream"]) == {
-            "upstream": {"receipt": "retained"},
+            "upstream": {
+                "input_data": {},
+                "output_data": {"receipt": "retained"},
+                "started_at": None,
+                "completed_at": None,
+            },
         }
         assert await fetch_retry_source_state_activity(str(retry.id)) == {"upstream": "completed"}
+
+
+async def test_fetch_retry_outputs_returns_source_timestamps(
+    test_db_session: AsyncSession, source_execution: Execution
+) -> None:
+    """The source row's timestamps round-trip through real SQL as ISO strings.
+
+    A regular node is replayed under its own id, so the sync service records it
+    node-by-node with this run's event times. It then applies these source
+    timestamps over them, so the row reports when the work actually ran rather
+    than the restore time. This confirms the activity carries them faithfully.
+    """
+    from datetime import UTC, datetime
+
+    from syntara.workflows.workflow_engine.activities.retry_output_activity import fetch_retry_outputs_activity
+
+    started = datetime(2026, 1, 1, 0, 0, tzinfo=UTC)
+    completed = datetime(2026, 1, 1, 0, 5, tzinfo=UTC)
+    row = _activity(source_execution, "upstream", ActivityStatus.COMPLETED, output={"receipt": "r"})
+    row.started_at = started
+    row.completed_at = completed
+    test_db_session.add(row)
+    await test_db_session.commit()
+
+    async def get_source_db() -> AsyncGenerator[AsyncSession, None]:
+        yield test_db_session
+
+    with patch("syntara.workflows.workflow_engine.activities.retry_output_activity.get_db", get_source_db):
+        result = await fetch_retry_outputs_activity(str(source_execution.id), ["upstream"])
+
+    assert result["upstream"]["started_at"] == started.isoformat()
+    assert result["upstream"]["completed_at"] == completed.isoformat()

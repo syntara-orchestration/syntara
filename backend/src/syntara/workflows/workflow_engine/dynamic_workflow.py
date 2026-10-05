@@ -186,6 +186,7 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
         # neither of which changes during a run.
         self._retry_restorable_cache: set[str] | None = None
         self._restored_nodes: set[str] = set()
+        self._restored_node_timestamps: dict[str, dict[str, str | None]] = {}
         self._retry_source_statuses: dict[str, str] = {}
         if workflow_metadata:
             for ns_key, ns_data in workflow_metadata.items():
@@ -1863,6 +1864,17 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
     def get_restored_nodes(self) -> list[str]:
         """Return source activity names reused by this retry (including iterations)."""
         return sorted(self._restored_nodes)
+
+    @workflow.query
+    def get_restored_activity_timestamps(self) -> dict[str, dict[str, str | None]]:
+        """Source-run timestamps for nodes this retry replayed under their own id.
+
+        Consumed by ActivitySyncService: a replayed node is recorded node-by-node
+        through the normal event path, which stamps it with this run's event
+        times. These source timestamps are applied over those so the node reports
+        when the work actually ran rather than when it was restored.
+        """
+        return dict(self._restored_node_timestamps)
 
     @workflow.query
     def get_pre_resolved_nodes(self) -> list[str]:

@@ -14,6 +14,7 @@ from syntara.telemetry.events.workflow_emitters import emit_activities
 from syntara.telemetry.events.workflow_error import TimedOutComponent
 from syntara.workflows.audit.execution_error import WorkflowExecutionErrorEvent
 from syntara.workflows.models.activity_execution import TERMINAL_ACTIVITY_STATUSES, ActivityExecution, ActivityStatus
+from syntara.workflows.utils.datetime import ensure_timezone_aware
 from syntara.workflows.workflow_engine.services.activity_sync_types import ExecutionMonitorMetadata
 from syntara.workflows.workflow_engine.utils.credential_scrubber import scrub_credentials
 
@@ -184,6 +185,65 @@ class ActivityExecutionSyncMixin:
         existing.updated_at = datetime.now(UTC)
 
         return old_values
+
+    async def _refresh_restored_timestamps(
+        self,
+        metadata: ExecutionMonitorMetadata,
+        handle: WorkflowHandle[Any, Any],
+    ) -> None:
+        """Load source-run timestamps for retry-replayed nodes.
+
+        A replayed node is recorded node-by-node through the normal event path,
+        which stamps it with this run's event times. The source run's own
+        timestamps are queried here and applied in ``_process_single_activity_sync``
+        so a replayed node reports when the work actually ran, not the restore
+        time. Only loops still use the separate bulk copy, which carries its own
+        source timestamps, so they are not covered here.
+        """
+        try:
+            raw = await handle.query("get_restored_activity_timestamps") or {}
+        except (TemporalError, ValueError):
+            logger.warning(
+                "Could not query restored activity timestamps",
+                execution_id=metadata.execution_id,
+            )
+            return
+        for node_id, times in raw.items():
+            metadata.restored_activity_timestamps[node_id] = {
+                "started_at": self._parse_source_timestamp(times.get("started_at")),
+                "completed_at": self._parse_source_timestamp(times.get("completed_at")),
+            }
+
+    @staticmethod
+    def _parse_source_timestamp(value: str | None) -> datetime | None:
+        """Parse an ISO timestamp from the replay activity, or None."""
+        if not value:
+            return None
+        try:
+            return ensure_timezone_aware(datetime.fromisoformat(value))
+        except ValueError:
+            return None
+
+    @staticmethod
+    def _apply_restored_timestamps(
+        metadata: ExecutionMonitorMetadata,
+        activity_id: str,
+        activity_data: dict[str, Any],
+    ) -> None:
+        """Swap a retry-replayed node's event times for its source-run timestamps.
+
+        A replayed node is recorded through the normal event path with this run's
+        event times. These source timestamps are applied over them so the node
+        reports when the work actually ran rather than when it was restored.
+        No-op for a node this retry did not replay.
+        """
+        restored_ts = metadata.restored_activity_timestamps.get(activity_id)
+        if restored_ts is None:
+            return
+        if restored_ts.get("started_at") is not None:
+            activity_data["started_at"] = restored_ts["started_at"]
+        if restored_ts.get("completed_at") is not None and activity_data.get("status") == ActivityStatus.COMPLETED:
+            activity_data["completed_at"] = restored_ts["completed_at"]
 
     @staticmethod
     def _collect_terminal_activities(
@@ -385,6 +445,10 @@ class ActivityExecutionSyncMixin:
         # For per-iteration records, set the iteration number in activity_data
         if is_new and existing.iteration is not None:
             activity_data["iteration"] = existing.iteration
+
+        # A retry-replayed node is recorded through this normal path with this
+        # run's event times; swap in the source run's timestamps instead.
+        self._apply_restored_timestamps(metadata, activity_id, activity_data)
 
         # Update existing activity and track old values for patch generation
         old_values = self._update_activity_record(

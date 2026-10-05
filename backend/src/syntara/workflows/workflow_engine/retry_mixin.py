@@ -32,6 +32,7 @@ class WorkflowRetryMixin:
     retry_context: dict[str, Any]
     _retry_restorable_cache: set[str] | None
     _restored_nodes: set[str]
+    _restored_node_timestamps: dict[str, dict[str, str | None]]
     _resumed_loops: set[str]
     _runtime_settings: dict[str, Any]
     _retry_source_statuses: dict[str, str]
@@ -208,21 +209,26 @@ class WorkflowRetryMixin:
         return strip_iteration_suffix(node_id) in self._retry_restorable_nodes(graph)
 
     async def _restore_node_output(self, node: ActivityNode) -> dict[str, Any] | None:
-        """Fetch and inject this node's stored input and output, or None.
+        """Replay this node from its source run instead of executing it, or None.
 
         Returns None when the source run has no completed record for the node, so
         the caller falls through to normal execution. A node that never completed
         cannot be skipped, because there would be nothing to inject.
 
-        Both halves are republished: the output into the execution namespace, and
-        the input into ``node_inputs``. The latter is what
-        ``get_activity_input`` reads, so a restored node shows the same input and
-        output on drill-down as one that executed.
+        The replay activity runs under the node's own id — not an
+        ``__internal__`` id — so the normal event-driven sync records it
+        node-by-node: the sync service maps it to this node, writes its row, and
+        emits a per-node WebSocket delta exactly as for an executed node. Both
+        halves are republished: the output into the execution namespace, and the
+        input into ``node_inputs`` (what ``get_activity_input`` reads), so a
+        restored node shows the same input and output on drill-down as one that
+        executed. The source timestamps are kept so the sync service can report
+        when the work ran rather than the restore time.
         """
         fetched = await workflow.execute_activity(
             ActivityName.RETRY_OUTPUTS,
             args=[self.retry_context.get("retry_from_execution_id"), [node.id]],
-            activity_id=f"__internal__fetch_retry_output_{node.id}",
+            activity_id=node.id,
             start_to_close_timeout=timedelta(seconds=DEFAULT_ACTIVITY_TIMEOUT_SECONDS),
         )
         record = (fetched or {}).get(node.id)
@@ -231,9 +237,12 @@ class WorkflowRetryMixin:
 
         output = record.get("output_data") or {}
         self.node_inputs[node.id] = record.get("input_data") or {}
-        self._restored_nodes.add(node.id)
+        self._restored_node_timestamps[node.id] = {
+            "started_at": record.get("started_at"),
+            "completed_at": record.get("completed_at"),
+        }
         workflow.logger.info(
-            "Restored retry node data",
+            "Replayed retry node data",
             extra={"node_id": node.id, "input_keys": sorted(self.node_inputs[node.id]), "output_keys": sorted(output)},
         )
         return {"output": output, "control": None}

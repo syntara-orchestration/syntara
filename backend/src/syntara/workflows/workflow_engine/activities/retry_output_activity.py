@@ -45,12 +45,15 @@ async def fetch_retry_outputs_activity(
 
     Returns:
         Map of node id to the stored ``input_data`` and ``output_data`` of its
-        most recent ``COMPLETED`` activity in the source run. Both are returned
-        so a restored node is indistinguishable from one that executed: the
-        caller republishes the input into ``node_inputs`` and the output into
-        the execution namespace. Nodes with no completed activity are absent
-        from the map rather than mapped to empty, so the caller can tell
-        "nothing ran" apart from "ran and produced nothing".
+        most recent ``COMPLETED`` activity in the source run, plus that row's
+        ``started_at`` and ``completed_at`` as ISO strings. All four are
+        returned so a restored node is indistinguishable from one that
+        executed: the caller republishes the input into ``node_inputs`` and the
+        output into the execution namespace, and the sync service applies the
+        source timestamps so the replayed node reports when the work actually
+        happened rather than when it was restored. Nodes with no completed
+        activity are absent from the map rather than mapped to empty, so the
+        caller can tell "nothing ran" apart from "ran and produced nothing".
 
     Raises:
         SafeValueError: If the combined serialized size would exceed
@@ -89,6 +92,10 @@ async def fetch_retry_outputs_activity(
                 stored[base_id] = {
                     "input_data": activity_row.input_data or {},
                     "output_data": activity_row.output_data or {},
+                    # The source row's own timestamps, carried so the replayed
+                    # node's row reports when the work ran, not the restore time.
+                    "started_at": activity_row.started_at.isoformat() if activity_row.started_at else None,
+                    "completed_at": activity_row.completed_at.isoformat() if activity_row.completed_at else None,
                 }
 
     # Measure the JSON that will actually cross the result blob. ``len(str(...))``

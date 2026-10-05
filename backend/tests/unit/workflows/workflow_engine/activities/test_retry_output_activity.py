@@ -4,6 +4,7 @@ These outputs are injected into a run in place of the nodes it skipped, so a
 wrong one is a silently wrong result rather than a failure.
 """
 
+from datetime import UTC, datetime
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -22,11 +23,15 @@ class _Row:
         status: ActivityStatus,
         output: dict[str, Any] | None,
         input_data: dict[str, Any] | None = None,
+        started_at: datetime | None = None,
+        completed_at: datetime | None = None,
     ) -> None:
         self.activity_name = activity_name
         self.status = status
         self.output_data = output
         self.input_data = input_data
+        self.started_at = started_at
+        self.completed_at = completed_at
 
 
 def _mock_session(rows: list[Any]) -> AsyncMock:
@@ -58,7 +63,9 @@ async def test_returns_completed_output_for_a_node() -> None:
     """A completed node's stored output is what gets injected in its place."""
     rows = [_Row("step_1", ActivityStatus.COMPLETED, {"result": "ok"})]
 
-    assert await _run(rows, ["step_1"]) == {"step_1": {"input_data": {}, "output_data": {"result": "ok"}}}
+    assert await _run(rows, ["step_1"]) == {
+        "step_1": {"input_data": {}, "output_data": {"result": "ok"}, "started_at": None, "completed_at": None}
+    }
 
 
 @pytest.mark.asyncio
@@ -69,7 +76,9 @@ async def test_only_requested_nodes_are_returned() -> None:
         _Row("step_2", ActivityStatus.COMPLETED, {"result": "other"}),
     ]
 
-    assert await _run(rows, ["step_1"]) == {"step_1": {"input_data": {}, "output_data": {"result": "ok"}}}
+    assert await _run(rows, ["step_1"]) == {
+        "step_1": {"input_data": {}, "output_data": {"result": "ok"}, "started_at": None, "completed_at": None}
+    }
 
 
 @pytest.mark.asyncio
@@ -90,7 +99,9 @@ async def test_completed_node_with_no_output_returns_empty_dict() -> None:
     """A node that completed but produced nothing is an empty output, not absent."""
     rows = [_Row("step_1", ActivityStatus.COMPLETED, None)]
 
-    assert await _run(rows, ["step_1"]) == {"step_1": {"input_data": {}, "output_data": {}}}
+    assert await _run(rows, ["step_1"]) == {
+        "step_1": {"input_data": {}, "output_data": {}, "started_at": None, "completed_at": None}
+    }
 
 
 @pytest.mark.asyncio
@@ -98,7 +109,9 @@ async def test_iteration_suffixed_request_resolves_to_the_base_node() -> None:
     """``step_1#iter-2`` asks for node step_1, and gets step_1's output."""
     rows = [_Row("step_1", ActivityStatus.COMPLETED, {"result": "ok"})]
 
-    assert await _run(rows, ["step_1#iter-2"]) == {"step_1": {"input_data": {}, "output_data": {"result": "ok"}}}
+    assert await _run(rows, ["step_1#iter-2"]) == {
+        "step_1": {"input_data": {}, "output_data": {"result": "ok"}, "started_at": None, "completed_at": None}
+    }
 
 
 @pytest.mark.asyncio
@@ -109,7 +122,9 @@ async def test_loop_iteration_rows_resolve_to_the_most_recent_one() -> None:
         _Row("step_1#iter-1", ActivityStatus.COMPLETED, {"result": "iter-1"}),
     ]
 
-    assert await _run(rows, ["step_1"]) == {"step_1": {"input_data": {}, "output_data": {"result": "iter-1"}}}
+    assert await _run(rows, ["step_1"]) == {
+        "step_1": {"input_data": {}, "output_data": {"result": "iter-1"}, "started_at": None, "completed_at": None}
+    }
 
 
 @pytest.mark.asyncio
@@ -129,7 +144,9 @@ async def test_ids_are_whitespace_trimmed() -> None:
     """A padded id still resolves to its node."""
     rows = [_Row("step_1", ActivityStatus.COMPLETED, {"result": "ok"})]
 
-    assert await _run(rows, ["  step_1  "]) == {"step_1": {"input_data": {}, "output_data": {"result": "ok"}}}
+    assert await _run(rows, ["  step_1  "]) == {
+        "step_1": {"input_data": {}, "output_data": {"result": "ok"}, "started_at": None, "completed_at": None}
+    }
 
 
 @pytest.mark.asyncio
@@ -173,7 +190,29 @@ async def test_returns_stored_input_alongside_output() -> None:
     assert result["step_1"] == {
         "input_data": {"query": "select 1"},
         "output_data": {"result": "ok"},
+        "started_at": None,
+        "completed_at": None,
     }
+
+
+@pytest.mark.asyncio
+async def test_returns_source_timestamps_as_iso_strings() -> None:
+    """The source row's timestamps come back as ISO strings.
+
+    The replayed node is recorded through the normal sync path with this run's
+    event times; the sync service applies these source timestamps over them so the
+    row reports when the work actually ran rather than the restore time.
+    """
+    started = datetime(2026, 1, 1, 0, 0, tzinfo=UTC)
+    completed = datetime(2026, 1, 1, 0, 5, tzinfo=UTC)
+    rows = [
+        _Row("step_1", ActivityStatus.COMPLETED, {"result": "ok"}, started_at=started, completed_at=completed),
+    ]
+
+    result = await _run(rows, ["step_1"])
+
+    assert result["step_1"]["started_at"] == started.isoformat()
+    assert result["step_1"]["completed_at"] == completed.isoformat()
 
 
 @pytest.mark.asyncio
