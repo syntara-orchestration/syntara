@@ -1,8 +1,7 @@
-import type { AddProjectRoleFormData } from '../access-management/projects/addProjectRoleSchema'
-import { ProjectPolicySelect } from '../access-management/projects/ProjectPolicySelect'
-
 import { SynFormField } from '../../components/forms/SynFormField'
 import { SynTextField } from '../../components/forms/SynTextField'
+import type { AddProjectRoleFormData } from '../access-management/projects/addProjectRoleSchema'
+import { ProjectPolicySelect } from '../access-management/projects/ProjectPolicySelect'
 
 import { accessControlHelp } from './accessControlFieldHelp'
 import { ROLE_NAME_HINT } from './roleFieldHelp'
