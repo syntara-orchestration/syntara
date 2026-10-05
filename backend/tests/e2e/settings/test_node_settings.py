@@ -427,7 +427,10 @@ def test_retry_policy_retries_on_transient_error(syntara_api: SyntaraApiRegistry
 
     assert result.status == ExecutionStatus.FAILED, f"Expected FAILED after retries, got {result.status}"
     # 2 retries x 2s interval = 4s retry delay + poll/scheduling overhead > 5s
-    assert elapsed > 5, f"Should have taken >5s due to 2 retries with 2s interval, took {elapsed:.1f}s"
+    assert elapsed > 5, (
+        f"Should have taken >5s due to 2 retries with 2s interval, took {elapsed:.1f}s; "
+        f"error_details={result.error_details}"
+    )
 
 
 @pytest.mark.e2e
@@ -750,7 +753,9 @@ def test_global_retry_defaults_apply_to_http_request(syntara_api: SyntaraApiRegi
 
         assert result.status == ExecutionStatus.FAILED, f"Expected FAILED, got {result.status}"
         # Global: 2 retries x 2s = 4s retry delay + poll/scheduling overhead > 5s
-        assert elapsed > 5, f"Global retry (2 retries x 2s) should take >5s, took {elapsed:.1f}s"
+        assert elapsed > 5, (
+            f"Global retry (2 retries x 2s) should take >5s, took {elapsed:.1f}s; error_details={result.error_details}"
+        )
     finally:
         _restore_settings(syntara_api, {key_max: orig_max, key_interval: orig_interval})
 

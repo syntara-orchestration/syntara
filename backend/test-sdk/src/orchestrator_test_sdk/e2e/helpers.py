@@ -395,6 +395,11 @@ def poll_execution_until_complete(
 # credentials sent to httpbin are synthetic E2E fixtures (never production
 # secrets). Local and GitHub CI still use HTTPS. Do not reuse this URL
 # outside E2E tests, and do not add TLS just for this fixture.
+#
+# ClusterIP targets are still SSRF-blocked unless ``httpbin`` is on
+# ``spec.workflowHttpRequestAllowedHosts`` / ``APP_WORKFLOW_HTTP_REQUEST_ALLOWED_HOSTS``
+# on the worker. aap-dev's AO CR already lists it; CI must not overwrite that
+# allowlist to only ``myao-backend``.
 _IN_CLUSTER_HTTPBIN_URL = "http://httpbin:8080"
 _PUBLIC_HTTPBIN_URL = "https://httpbin.org"
 # Exact hostnames only. Substring matching would accept evilhttpbin.com.

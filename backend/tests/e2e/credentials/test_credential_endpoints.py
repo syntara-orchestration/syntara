@@ -148,6 +148,16 @@ def _get_activity_output(execution: ExecutionRead, activity_id: str) -> dict[str
     return result
 
 
+def _httpbin_auth_succeeded(body: dict[str, Any]) -> bool:
+    """Return True if an httpbin auth endpoint reported success.
+
+    python-httpbin / httpbin.org uses ``authenticated``; go-httpbin <= 2.20
+    uses ``authorized``; later go-httpbin returns both. CI environments
+    (Konflux in particular) may hit either implementation.
+    """
+    return body.get("authenticated") is True or body.get("authorized") is True
+
+
 class TestWorkflowWithValidCredential:
     """Verify credential resolution succeeds at runtime (ANSTRAT-1901)."""
 
@@ -175,11 +185,13 @@ class TestWorkflowWithValidCredential:
             syntara_api, workflow_name, definition, timeout=30, project_id=first_project_id
         )
 
-        assert execution.status == ExecutionStatus.COMPLETED, f"Unexpected status: {execution.status}"
+        assert execution.status == ExecutionStatus.COMPLETED, (
+            f"Unexpected status: {execution.status}: {execution.error_details}"
+        )
         output = _get_activity_output(execution, "api_call")
         assert output.get("status_code") == 200
         body = output.get("body", {})
-        assert body.get("authenticated") is True
+        assert _httpbin_auth_succeeded(body), f"Expected httpbin auth success, got: {body}"
 
     def test_basic_auth_credential_resolves(
         self,
@@ -215,7 +227,7 @@ class TestWorkflowWithValidCredential:
         output = _get_activity_output(execution, "api_call")
         assert output.get("status_code") == 200
         body = output.get("body", {})
-        assert body.get("authenticated") is True
+        assert _httpbin_auth_succeeded(body), f"Expected httpbin auth success, got: {body}"
         assert body.get("user") == "admin"
 
     def test_no_credential_returns_401(
@@ -305,7 +317,9 @@ class TestWorkflowWithDisabledCredential:
             syntara_api, workflow_name, definition, timeout=30, project_id=first_project_id
         )
 
-        assert execution.status == ExecutionStatus.COMPLETED, f"Unexpected status after re-enable: {execution.status}"
+        assert execution.status == ExecutionStatus.COMPLETED, (
+            f"Unexpected status after re-enable: {execution.status}: {execution.error_details}"
+        )
         output = _get_activity_output(execution, "api_call")
         assert output.get("status_code") == 200
 
