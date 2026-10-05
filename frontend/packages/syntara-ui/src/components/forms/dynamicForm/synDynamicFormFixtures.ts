@@ -28,7 +28,7 @@ export const sampleDynamicFormDefinition = parseFormDefinition({
       type: FormFieldTypeEnum.DATE,
       value_name: 'start_date',
       label: 'Start date',
-      default: '2026-01-15',
+      default: { date: '2026-01-15' },
     },
     {
       type: FormFieldTypeEnum.DROPDOWN,

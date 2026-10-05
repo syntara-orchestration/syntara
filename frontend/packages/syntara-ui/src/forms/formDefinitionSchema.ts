@@ -92,10 +92,91 @@ const checkboxFieldSchema = formFieldBaseSchema.extend({
   default: z.boolean().optional(),
 })
 
-const dateFieldSchema = formFieldBaseSchema.extend({
-  type: z.literal(FormFieldTypeEnum.DATE),
-  default: z.string().nullable().optional(),
+const isoDateSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be an ISO 8601 date in YYYY-MM-DD format')
+  .refine((value) => {
+    const year = Number(value.slice(0, 4))
+    const parsed = new Date(`${value}T00:00:00.000Z`)
+    return year > 0 && !Number.isNaN(parsed.valueOf()) && parsed.toISOString().slice(0, 10) === value
+  }, 'Date must be a valid ISO 8601 calendar date')
+
+const dateValueSchema = z.object({
+  date: isoDateSchema.nullable().optional(),
+  time: z
+    .string()
+    .regex(/^(?:[01][0-9]|2[0-3]):[0-5][0-9]$/, 'Time must use 24-hour HH:MM format')
+    .nullable()
+    .optional(),
+  timezone: z
+    .string()
+    .max(64)
+    .refine((value) => {
+      try {
+        new Intl.DateTimeFormat('en-US', { timeZone: value })
+        return true
+      } catch {
+        return false
+      }
+    }, 'Timezone must be a valid IANA timezone name')
+    .nullable()
+    .optional(),
 })
+
+const DATE_COMPONENTS = ['date', 'time', 'timezone'] as const
+
+const dateFieldSchema = formFieldBaseSchema
+  .extend({
+    type: z.literal(FormFieldTypeEnum.DATE),
+    include_date: z.boolean().optional(),
+    include_time: z.boolean().optional(),
+    include_timezone: z.boolean().optional(),
+    default: dateValueSchema.nullable().optional(),
+  })
+  .superRefine((field, ctx) => {
+    const included = {
+      date: field.include_date ?? true,
+      time: field.include_time ?? false,
+      timezone: field.include_timezone ?? false,
+    }
+
+    if (!included.date && !included.time && !included.timezone) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'At least one of include_date, include_time, or include_timezone must be true',
+        path: ['include_date'],
+      })
+    }
+
+    // A wall-clock time is ambiguous without the zone it is read in.
+    if (included.time && !included.timezone) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'include_timezone is required when include_time is true',
+        path: ['include_timezone'],
+      })
+    }
+
+    // A default stands in for a whole skipped answer, so it must be complete.
+    if (field.default == null) return
+
+    for (const component of DATE_COMPONENTS) {
+      const supplied = field.default[component] != null
+      if (included[component] && !supplied) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Default is missing ${component}`,
+          path: ['default', component],
+        })
+      } else if (!included[component] && supplied) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Default supplies ${component}, which this field does not collect`,
+          path: ['default', component],
+        })
+      }
+    }
+  })
 
 const dropdownFieldSchema = formFieldBaseSchema.extend({
   type: z.literal(FormFieldTypeEnum.DROPDOWN),

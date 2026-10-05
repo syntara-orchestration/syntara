@@ -96,7 +96,6 @@ class TestFieldDiscriminator:
             ("email", EmailField, "a@b.com"),
             ("number", NumberField, 4.5),
             ("checkbox", CheckboxField, True),
-            ("date", DateField, "2026-01-05"),
         ],
     )
     def test_simple_types_resolve(self, type_name: str, expected_cls: type, default: Any) -> None:  # noqa: ANN401
@@ -317,6 +316,124 @@ class TestStaticOptionDefaults:
         )
 
         assert form.fields[0].default == "anything"
+
+
+def _date(**overrides: Any) -> dict[str, Any]:  # noqa: ANN401
+    """Build a minimal valid date field payload."""
+    return {"type": "date", "value_name": "start", "label": "Start", **overrides}
+
+
+class TestDateFieldComponents:
+    """The include_* toggles decide which components a date field collects."""
+
+    def test_defaults_to_date_only(self) -> None:
+        """A bare date field collects a calendar date and nothing else."""
+        field = DateField.model_validate(_date())
+
+        assert field.included_components() == ("date",)
+
+    @pytest.mark.parametrize(
+        ("toggles", "expected"),
+        [
+            ({}, ("date",)),
+            ({"include_timezone": True}, ("date", "timezone")),
+            ({"include_time": True, "include_timezone": True}, ("date", "time", "timezone")),
+            ({"include_date": False, "include_time": True, "include_timezone": True}, ("time", "timezone")),
+            ({"include_date": False, "include_timezone": True}, ("timezone",)),
+        ],
+    )
+    def test_valid_combinations(self, toggles: dict[str, bool], expected: tuple[str, ...]) -> None:
+        """Every combination that pairs a time with a timezone is accepted."""
+        field = DateField.model_validate(_date(**toggles))
+
+        assert field.included_components() == expected
+
+    @pytest.mark.parametrize(
+        "toggles",
+        [
+            {"include_time": True},
+            {"include_date": False, "include_time": True},
+        ],
+    )
+    def test_time_requires_timezone(self, toggles: dict[str, bool]) -> None:
+        """A wall-clock time is ambiguous without the zone it is read in."""
+        with pytest.raises(ValidationError, match=r"include_timezone is required when include_time is true"):
+            DateField.model_validate(_date(**toggles))
+
+    def test_at_least_one_component_required(self) -> None:
+        """A field that collects nothing cannot be answered at all."""
+        with pytest.raises(ValidationError, match=r"at least one of include_date"):
+            DateField.model_validate(_date(include_date=False))
+
+
+class TestDateFieldDefault:
+    """A date default must match the components the field collects, exactly."""
+
+    def test_date_only_default(self) -> None:
+        """A default covering the single included component is accepted."""
+        field = DateField.model_validate(_date(default={"date": "2026-01-05"}))
+
+        assert field.default is not None
+        assert field.default.date == "2026-01-05"
+
+    def test_full_default(self) -> None:
+        """All three components default together when all three are collected."""
+        field = DateField.model_validate(
+            _date(
+                include_time=True,
+                include_timezone=True,
+                default={"date": "2026-01-05", "time": "14:30", "timezone": "America/New_York"},
+            )
+        )
+
+        assert field.default is not None
+        assert field.default.supplied_components() == ("date", "time", "timezone")
+
+    def test_partial_default_rejected(self) -> None:
+        """A default is substituted wholesale, so an incomplete one is useless."""
+        with pytest.raises(ValidationError, match=r"default is missing timezone"):
+            DateField.model_validate(_date(include_timezone=True, default={"date": "2026-01-05"}))
+
+    def test_default_for_uncollected_component_rejected(self) -> None:
+        """Defaulting a component the field never asks for is an authoring mistake."""
+        with pytest.raises(ValidationError, match=r"default supplies time, which this field does not collect"):
+            DateField.model_validate(_date(default={"date": "2026-01-05", "time": "14:30"}))
+
+    @pytest.mark.parametrize("bad_date", ["tomorrow", "01/05/2026", "2026-13-01", "20260105"])
+    def test_non_iso_date_rejected(self, bad_date: str) -> None:
+        """Only the ISO 8601 extended YYYY-MM-DD form is accepted."""
+        with pytest.raises(ValidationError):
+            DateField.model_validate(_date(default={"date": bad_date}))
+
+    def test_impossible_calendar_date_rejected(self) -> None:
+        """A well-shaped string still has to name a real day."""
+        with pytest.raises(ValidationError, match=r"Invalid date: '2026-02-30'"):
+            DateField.model_validate(_date(default={"date": "2026-02-30"}))
+
+    @pytest.mark.parametrize("bad_time", ["25:00", "14:60", "2:30", "14:30:00", "noon"])
+    def test_malformed_time_rejected(self, bad_time: str) -> None:
+        """Times are 24-hour HH:MM, zero-padded, with no seconds."""
+        with pytest.raises(ValidationError):
+            DateField.model_validate(
+                _date(
+                    include_date=False,
+                    include_time=True,
+                    include_timezone=True,
+                    default={"time": bad_time, "timezone": "UTC"},
+                )
+            )
+
+    def test_unknown_timezone_rejected(self) -> None:
+        """Timezones are checked against the IANA database, not just length."""
+        with pytest.raises(ValidationError, match=r"Invalid timezone: 'Mars/Olympus'"):
+            DateField.model_validate(
+                _date(include_date=False, include_timezone=True, default={"timezone": "Mars/Olympus"})
+            )
+
+    def test_unknown_component_rejected(self) -> None:
+        """A date value carries the three known components and nothing else."""
+        with pytest.raises(ValidationError):
+            DateField.model_validate(_date(default={"date": "2026-01-05", "offset": "-05:00"}))
 
 
 class TestResolvedOptionDefaults:

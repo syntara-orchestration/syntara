@@ -100,6 +100,13 @@ export function extractValidationErrorsFromUnknown(error: unknown): ValidationEr
   return null
 }
 
+export function getWorkflowValidationFailureDescription(error: unknown): string | undefined {
+  const findings = extractValidationErrorsFromUnknown(error)
+  if (!findings?.length) return undefined
+
+  return `Workflow validation failed:\n• ${findings.map((finding) => finding.message).join('\n• ')}`
+}
+
 type ValidateResponse = {
   data?: { is_valid?: boolean; findings?: ValidationFinding[] }
   error?: unknown

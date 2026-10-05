@@ -49,7 +49,6 @@ class FormPromptRead:
             timeout_at (datetime.datetime | None | Unset): When this prompt expires
             submit_label (None | str | Unset): Submit button label shown to the responder
             success_message (None | str | Unset): Message shown after successful form submission
-            timezone (None | str | Unset): IANA timezone name for interpreting date/datetime field values
             css_override (None | str | Unset): Custom CSS applied to the form view
             response_data (FormPromptReadResponseDataType0 | None | Unset): Submitted form values
             responded_at (datetime.datetime | None | Unset): When response was submitted
@@ -77,7 +76,6 @@ class FormPromptRead:
     timeout_at: datetime.datetime | None | Unset = UNSET
     submit_label: None | str | Unset = UNSET
     success_message: None | str | Unset = UNSET
-    timezone: None | str | Unset = UNSET
     css_override: None | str | Unset = UNSET
     response_data: FormPromptReadResponseDataType0 | None | Unset = UNSET
     responded_at: datetime.datetime | None | Unset = UNSET
@@ -155,12 +153,6 @@ class FormPromptRead:
             success_message = UNSET
         else:
             success_message = self.success_message
-
-        timezone: None | str | Unset
-        if isinstance(self.timezone, Unset):
-            timezone = UNSET
-        else:
-            timezone = self.timezone
 
         css_override: None | str | Unset
         if isinstance(self.css_override, Unset):
@@ -245,8 +237,6 @@ class FormPromptRead:
             field_dict["submit_label"] = submit_label
         if success_message is not UNSET:
             field_dict["success_message"] = success_message
-        if timezone is not UNSET:
-            field_dict["timezone"] = timezone
         if css_override is not UNSET:
             field_dict["css_override"] = css_override
         if response_data is not UNSET:
@@ -374,15 +364,6 @@ class FormPromptRead:
 
         success_message = _parse_success_message(d.pop("success_message", UNSET))
 
-        def _parse_timezone(data: object) -> None | str | Unset:
-            if data is None:
-                return data
-            if isinstance(data, Unset):
-                return data
-            return cast(None | str | Unset, data)
-
-        timezone = _parse_timezone(d.pop("timezone", UNSET))
-
         def _parse_css_override(data: object) -> None | str | Unset:
             if data is None:
                 return data
@@ -487,7 +468,6 @@ class FormPromptRead:
             timeout_at=timeout_at,
             submit_label=submit_label,
             success_message=success_message,
-            timezone=timezone,
             css_override=css_override,
             response_data=response_data,
             responded_at=responded_at,

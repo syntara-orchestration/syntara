@@ -52,7 +52,6 @@ async def _test_form_prompt_activity(
     message: str | None = None,
     submit_label: str | None = None,
     success_message: str | None = None,
-    timezone: str | None = None,
     css_override: str | None = None,
 ) -> dict[str, Any]:
     """Test form_prompt activity that blocks until Temporal times it out.

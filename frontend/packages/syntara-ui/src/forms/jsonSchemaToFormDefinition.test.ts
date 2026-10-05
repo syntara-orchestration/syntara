@@ -12,7 +12,7 @@ describe('jsonSchemaToFormDefinition', () => {
         { type: FormFieldTypeEnum.TEXT, value_name: 'title', label: 'Title', default: 'preset' },
         { type: FormFieldTypeEnum.NUMBER, value_name: 'qty', label: 'Qty', default: 3 },
         { type: FormFieldTypeEnum.CHECKBOX, value_name: 'agree', label: 'Agree', default: true },
-        { type: FormFieldTypeEnum.DATE, value_name: 'due', label: 'Due', default: '2026-01-02' },
+        { type: FormFieldTypeEnum.DATE, value_name: 'due', label: 'Due', default: { date: '2026-01-02' } },
         {
           type: FormFieldTypeEnum.DROPDOWN,
           value_name: 'tier',
@@ -39,7 +39,7 @@ describe('jsonSchemaToFormDefinition', () => {
     expect(fields[0]?.default).toBe('preset')
     expect(fields[1]?.default).toBe(3)
     expect(fields[2]?.default).toBe(true)
-    expect(fields[3]?.default).toBe('2026-01-02')
+    expect(fields[3]?.default).toEqual({ date: '2026-01-02' })
     const tier = fields[4]
     expect(tier?.type).toBe(FormFieldTypeEnum.DROPDOWN)
     if (tier?.type === FormFieldTypeEnum.DROPDOWN) {
@@ -47,6 +47,58 @@ describe('jsonSchemaToFormDefinition', () => {
       if (tier.options.source === 'static') {
         expect(tier.options.values.map((option) => option.value)).toEqual(['1', '2'])
       }
+    }
+  })
+
+  it.each([
+    { label: 'null', defaultValue: null },
+    { label: 'number', defaultValue: 42 },
+    { label: 'array', defaultValue: ['2026-01-02'] },
+    { label: 'unknown component', defaultValue: { date: '2026-01-02', offset: '-05:00' } },
+    { label: 'non-string component', defaultValue: { date: '2026-01-02', time: 1430 } },
+  ])('imports an unsupported $label date default as null', ({ defaultValue }) => {
+    const imported = jsonSchemaToFormDefinition({
+      type: 'object',
+      properties: {
+        due: { type: 'string', format: 'date', default: defaultValue },
+      },
+    })
+
+    expect(imported.success).toBe(true)
+    if (imported.success) {
+      const due = imported.data.fields[0]
+      expect(due?.type).toBe(FormFieldTypeEnum.DATE)
+      if (due?.type === FormFieldTypeEnum.DATE) {
+        expect(due.default).toBeNull()
+      }
+    }
+  })
+
+  it('preserves null time and timezone components on import', () => {
+    const imported = jsonSchemaToFormDefinition({
+      type: 'object',
+      properties: {
+        due: { type: 'string', format: 'date', default: { date: '2026-01-02', time: null, timezone: null } },
+      },
+    })
+
+    expect(imported.success).toBe(true)
+    if (imported.success) {
+      expect(imported.data.fields[0]?.default).toEqual({ date: '2026-01-02', time: null, timezone: null })
+    }
+  })
+
+  it('converts an imported date string default to a date component value', () => {
+    const imported = jsonSchemaToFormDefinition({
+      type: 'object',
+      properties: {
+        due: { type: 'string', format: 'date', default: '2026-01-02' },
+      },
+    })
+
+    expect(imported.success).toBe(true)
+    if (imported.success) {
+      expect(imported.data.fields[0]?.default).toEqual({ date: '2026-01-02' })
     }
   })
 

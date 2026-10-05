@@ -6,7 +6,7 @@ import pytest
 
 from syntara.forms.exceptions import FormDataValidationError
 from syntara.forms.models.form_fields import FormDefinition, FormField
-from syntara.forms.validators.submission import _COERCERS, validate_form_submission
+from syntara.forms.validators.submission import validate_form_submission
 
 _STATIC_OPTIONS: dict[str, Any] = {
     "source": "static",
@@ -65,9 +65,11 @@ class TestSubmissionFlow:
             _field("date", "start"),
         )
 
-        cleaned = validate_form_submission(form, {"name": "bob", "age": 30, "subscribe": True, "start": "2026-01-05"})
+        cleaned = validate_form_submission(
+            form, {"name": "bob", "age": 30, "subscribe": True, "start": {"date": "2026-01-05"}}
+        )
 
-        assert cleaned == {"name": "bob", "age": 30, "subscribe": True, "start": "2026-01-05"}
+        assert cleaned == {"name": "bob", "age": 30, "subscribe": True, "start": {"date": "2026-01-05"}}
 
     def test_absent_optional_key_omitted(self) -> None:
         """An absent optional field is omitted entirely, not set to None."""
@@ -201,16 +203,13 @@ class TestCoercion:
 
         assert [e.code for e in errors] == ["type"]
 
-    @pytest.mark.parametrize(("raw", "expected"), [("2026-01-05", "2026-01-05"), ("20260105", "2026-01-05")])
-    def test_date_accepted(self, raw: str, expected: str) -> None:
-        """ISO dates normalize to YYYY-MM-DD strings."""
-        cleaned = validate_form_submission(_form(_field("date", "start")), {"start": raw})
+    @pytest.mark.parametrize("raw", ["2026-01-05", "01/05/2026", "not-a-date", 20260105, ["2026-01-05"]])
+    def test_date_must_be_an_object(self, raw: Any) -> None:  # noqa: ANN401
+        """A date value is always a component object, never a bare scalar.
 
-        assert cleaned["start"] == expected
-
-    @pytest.mark.parametrize("raw", ["01/05/2026", "not-a-date", "2026-13-01", "2026-1-5", 20260105])
-    def test_date_rejected(self, raw: Any) -> None:  # noqa: ANN401
-        """Non-ISO and non-string dates are rejected."""
+        Even a date-only field takes {"date": ...}: keeping one shape means
+        enabling a timezone later cannot silently break downstream expressions.
+        """
         errors = _errors(_form(_field("date", "start")), {"start": raw})
 
         assert [e.code for e in errors] == ["type"]
@@ -293,25 +292,26 @@ class TestCoercion:
 
 
 class TestCoercerDispatch:
-    """The dispatch table stays in sync with the FormField union."""
+    """coerce_field handles every field type in the FormField union.
 
-    def test_every_field_type_has_a_coercer(self) -> None:
-        """A new field type must be registered in _COERCERS.
+    A missing case is a mypy error via assert_never, but the pre-commit pyrefly
+    hook does not flag it, so this is the backstop for anyone who adds a field
+    type without running `make typecheck`.
+    """
 
-        Without this, adding a union member and forgetting the table entry
-        fails at runtime with "Unknown field type" instead of at CI time.
-        """
+    def test_every_field_type_is_routed(self) -> None:
         union, _discriminator = get_args(FormField)
-        members = set(get_args(union))
-
+        members = get_args(union)
         assert members, "FormField union introspection returned nothing - the test needs updating"
-        assert members - set(_COERCERS) == set()
 
-    def test_no_stale_coercer_entries(self) -> None:
-        """A removed field type must not linger in the table."""
-        union, _discriminator = get_args(FormField)
+        for member in members:
+            (type_name,) = get_args(member.model_fields["type"].annotation)
+            overrides = {"options": _STATIC_OPTIONS} if "options" in member.model_fields else {}
+            form = _form(_field(type_name, "probe", **overrides))
 
-        assert set(_COERCERS) - set(get_args(union)) == set()
+            # No coercer accepts a bare object, so every case must turn this
+            # into a field error rather than falling through to assert_never.
+            assert _errors(form, {"probe": object()}), f"{type_name} produced no error"
 
 
 class TestEmailField:
@@ -407,6 +407,117 @@ class TestOptionMembership:
         )
 
         assert validate_form_submission(form, {"pick": "anything"}) == {"pick": "anything"}
+
+
+class TestDateFieldSubmission:
+    """A date submission must carry exactly the components the field collects."""
+
+    @staticmethod
+    def _date_form(**toggles: Any) -> FormDefinition:  # noqa: ANN401
+        return _form(_field("date", "start", **toggles))
+
+    @pytest.mark.parametrize(
+        ("toggles", "submitted"),
+        [
+            ({}, {"date": "2026-01-05"}),
+            ({"include_timezone": True}, {"date": "2026-01-05", "timezone": "America/New_York"}),
+            (
+                {"include_time": True, "include_timezone": True},
+                {"date": "2026-01-05", "time": "14:30", "timezone": "America/New_York"},
+            ),
+            (
+                {"include_date": False, "include_time": True, "include_timezone": True},
+                {"time": "14:30", "timezone": "America/New_York"},
+            ),
+            ({"include_date": False, "include_timezone": True}, {"timezone": "America/New_York"}),
+        ],
+    )
+    def test_complete_submission_round_trips(self, toggles: dict[str, bool], submitted: dict[str, str]) -> None:
+        """A submission covering every included component is returned verbatim."""
+        cleaned = validate_form_submission(self._date_form(**toggles), {"start": submitted})
+
+        assert cleaned["start"] == submitted
+
+    def test_missing_component_rejected(self) -> None:
+        """Every included component is mandatory once the field is answered."""
+        form = self._date_form(include_time=True, include_timezone=True)
+
+        errors = _errors(form, {"start": {"date": "2026-01-05", "time": "14:30"}})
+
+        assert [e.code for e in errors] == ["invalid_format"]
+        assert "Missing required component: timezone" in errors[0].message
+
+    def test_uncollected_component_rejected(self) -> None:
+        """Sending a component the field does not collect is an error, not ignored."""
+        errors = _errors(self._date_form(), {"start": {"date": "2026-01-05", "time": "14:30"}})
+
+        assert [e.code for e in errors] == ["invalid_format"]
+        assert "This field does not collect: time" in errors[0].message
+
+    def test_unknown_component_rejected(self) -> None:
+        """Only the three known component keys are accepted."""
+        errors = _errors(self._date_form(), {"start": {"date": "2026-01-05", "offset": "-05:00"}})
+
+        assert [e.code for e in errors] == ["invalid_format"]
+        assert "'offset' is not a date component" in errors[0].message
+
+    def test_blank_component_reads_as_absent(self) -> None:
+        """An untouched input posting "" is missing, not malformed."""
+        errors = _errors(self._date_form(), {"start": {"date": ""}})
+
+        assert "Missing required component: date" in errors[0].message
+
+    @pytest.mark.parametrize(
+        ("bad", "expected_message"),
+        [
+            ({"date": "01/05/2026"}, "date must be a date in YYYY-MM-DD format"),
+            ({"date": "2026-02-30"}, "Invalid date: '2026-02-30'"),
+        ],
+    )
+    def test_malformed_date_reports_plain_language(self, bad: dict[str, str], expected_message: str) -> None:
+        """Responders see a readable hint, never the raw validation pattern."""
+        errors = _errors(self._date_form(), {"start": bad})
+
+        assert [e.code for e in errors] == ["invalid_format"]
+        assert expected_message in errors[0].message
+
+    def test_malformed_time_reports_plain_language(self) -> None:
+        """A bad time names the expected format rather than the regex."""
+        form = self._date_form(include_date=False, include_time=True, include_timezone=True)
+
+        errors = _errors(form, {"start": {"time": "25:00", "timezone": "UTC"}})
+
+        assert "time must be a 24-hour time in HH:MM format" in errors[0].message
+
+    def test_unknown_timezone_rejected(self) -> None:
+        """Timezones are checked against the IANA database at submission time."""
+        form = self._date_form(include_date=False, include_timezone=True)
+
+        errors = _errors(form, {"start": {"timezone": "Mars/Olympus"}})
+
+        assert "Invalid timezone: 'Mars/Olympus'" in errors[0].message
+
+    def test_absent_optional_date_is_omitted(self) -> None:
+        """An unanswered optional date field contributes no key."""
+        assert validate_form_submission(self._date_form(), {}) == {}
+
+    def test_absent_required_date_reports_required(self) -> None:
+        """The inherited required flag governs skipping the field entirely."""
+        errors = _errors(self._date_form(required=True), {})
+
+        assert [e.code for e in errors] == ["required"]
+
+    def test_default_fills_an_absent_field(self) -> None:
+        """A complete default stands in for the whole answer."""
+        form = self._date_form(
+            include_time=True,
+            include_timezone=True,
+            default={"date": "2026-03-01", "time": "08:00", "timezone": "Europe/Paris"},
+        )
+
+        cleaned = validate_form_submission(form, {})
+
+        assert cleaned["start"] == {"date": "2026-03-01", "time": "08:00", "timezone": "Europe/Paris"}
 
     @pytest.mark.parametrize("field_type", ["dropdown", "multi_select"])
     def test_resolved_options_enforce_typed_membership(self, field_type: str) -> None:

@@ -68,7 +68,9 @@ export function FormFieldBuilderFieldDefaultEditor({
               aria-label="Default value"
               placeholder={examples.defaultValue}
               isDisabled={isDisabled}
-              value={rhfField.value === null || rhfField.value === undefined ? '' : String(rhfField.value)}
+              value={
+                typeof rhfField.value === 'number' || typeof rhfField.value === 'string' ? String(rhfField.value) : ''
+              }
               onChange={(_event, value) => {
                 if (value === '') {
                   rhfField.onChange(null)
