@@ -453,7 +453,13 @@ export function builderReducer(state: BuilderState, action: BuilderAction): Buil
       return handleNodeClick(state, action)
     case 'CLEAR_SELECTED_IF_DELETED':
       if (state.selectedNode && action.payload.includes(state.selectedNode.id)) {
-        return { ...state, selectedNode: null }
+        return {
+          ...state,
+          selectedNode: null,
+          nodeEditorMode: null,
+          nodeEditorNodeTypeId: null,
+          nodeEditorNodeSubtypeId: null,
+        }
       }
       return state
     case 'SET_MOST_RECENT_EXECUTION':
