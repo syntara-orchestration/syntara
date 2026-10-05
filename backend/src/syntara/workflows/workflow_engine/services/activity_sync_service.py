@@ -20,7 +20,7 @@ from sqlalchemy.exc import InterfaceError, OperationalError
 from sqlalchemy.exc import TimeoutError as SATimeoutError
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlalchemy.orm import selectinload
-from sqlmodel import col, select
+from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 from temporalio.api.enums.v1 import EventType, PendingActivityState
 from temporalio.api.history.v1 import HistoryEvent
@@ -32,8 +32,6 @@ from syntara.audit.context_managers import actor_context
 from syntara.audit.dispatcher import AuditEventDispatcher
 from syntara.core.constants import FieldLimits
 from syntara.core.exceptions import SafeValueError
-from syntara.forms.models.api_models import FormPromptStatus
-from syntara.forms.models.form_prompt import FormPrompt
 from syntara.metrics.dependencies import get_metrics_recorder
 from syntara.metrics.types import ComponentLabel, MetricType
 from syntara.telemetry.events.workflow_emitters import (
@@ -90,8 +88,6 @@ _MONITOR_RETRY_BASE_DELAY_S = 1.0
 _MONITOR_RETRY_MAX_DELAY_S = 30.0
 _MONITOR_RETRY_BACKOFF_FACTOR = 2.0
 _MONITOR_RETRY_JITTER_FACTOR = 0.5
-_FORM_PROMPT_METRIC_QUEUE_SIZE = 64
-_FORM_PROMPT_METRIC_LOOKUP_TIMEOUT_SECONDS = 2.0
 
 
 @dataclass
@@ -123,15 +119,6 @@ class SyntheticPartialOutput:
     partial_output: dict[str, Any]
 
 
-@dataclass(frozen=True, slots=True)
-class _FormPromptResumeMetricObservation:
-    """Metric-only data captured without delaying activity history processing."""
-
-    execution_id: UUID
-    resumed_at: datetime
-    activity_ids: tuple[str, ...]
-
-
 _QueueItem = HistoryEvent | SyntheticActivityStarted | SyntheticPartialOutput | None
 
 
@@ -161,7 +148,7 @@ class ExecutionMonitorMetadata:
     pending_activity_updates: dict[int, dict[str, Any]]
     pending_sync_event_ids: set[int] = field(default_factory=set)
     scheduled_form_prompt_activity_ids: dict[int, str] = field(default_factory=dict)
-    pending_form_prompt_submission_activity_ids: set[str] = field(default_factory=set)
+    pending_form_prompt_completed_at: list[datetime] = field(default_factory=list)
     last_form_prompt_resume_metric_event_id: int = 0
     terminal_activity_ids: set[str] = field(default_factory=set)
     iteration_counters: dict[str, int] = field(default_factory=dict)
@@ -193,10 +180,6 @@ class ActivitySyncService:
         self.session_factory = session_factory
         self.activity_publisher = activity_publisher or ActivityUpdatePublisher()
         self._sync_tasks: dict[str, asyncio.Task[None]] = {}
-        self._form_prompt_metric_queue: asyncio.Queue[_FormPromptResumeMetricObservation] = asyncio.Queue(
-            maxsize=_FORM_PROMPT_METRIC_QUEUE_SIZE,
-        )
-        self._form_prompt_metric_task: asyncio.Task[None] | None = None
         self._shutdown = False
 
     def is_monitoring_execution(self, execution_id: UUID) -> bool:
@@ -405,10 +388,6 @@ class ActivitySyncService:
             await asyncio.gather(*self._sync_tasks.values(), return_exceptions=True)
 
         self._sync_tasks.clear()
-        if self._form_prompt_metric_task is not None and not self._form_prompt_metric_task.done():
-            self._form_prompt_metric_task.cancel()
-            await asyncio.gather(self._form_prompt_metric_task, return_exceptions=True)
-        self._form_prompt_metric_task = None
         logger.info("Activity sync service shutdown complete")
 
     _TEMPORAL_TERMINAL_STATUSES: frozenset[str] = frozenset(
@@ -947,10 +926,10 @@ class ActivitySyncService:
         if event.event_id <= metadata.last_processed_event_id:
             # This is a replayed resume: clear reconstructed state without
             # observing the already-processed latency a second time.
-            metadata.pending_form_prompt_submission_activity_ids.clear()
+            metadata.pending_form_prompt_completed_at.clear()
             return True
 
-        self._enqueue_form_prompt_resume_latency(event, metadata)
+        self._record_form_prompt_resume_dispatch(event, metadata)
         return True
 
     async def _process_history_event(
@@ -1545,16 +1524,16 @@ class ActivitySyncService:
         event: HistoryEvent,
         metadata: ExecutionMonitorMetadata,
     ) -> None:
-        """Remember form prompt completions for a deferred metrics lookup.
+        """Remember when Temporal recorded each form prompt activity completion.
 
-        The submitted timestamp is already persisted in the form_prompts table.
-        Looking it up in the bounded metrics queue avoids decoding response
-        payloads in the serial activity-history consumer.
+        The completion event time is the start of the resume-dispatch interval.
+        It comes from the Temporal server clock, the same clock that stamps the
+        WorkflowTaskStarted event used as the end of the interval, so the
+        resulting measurement cannot be contaminated by cross-host clock offset.
         """
         attrs = event.activity_task_completed_event_attributes
-        activity_id = metadata.scheduled_form_prompt_activity_ids.pop(attrs.scheduled_event_id, None)
-        if activity_id is not None:
-            metadata.pending_form_prompt_submission_activity_ids.add(activity_id)
+        if metadata.scheduled_form_prompt_activity_ids.pop(attrs.scheduled_event_id, None) is not None:
+            metadata.pending_form_prompt_completed_at.append(ensure_timezone_aware(event.event_time).astimezone(UTC))
 
     @staticmethod
     def _forget_scheduled_form_prompt(event: HistoryEvent, metadata: ExecutionMonitorMetadata) -> None:
@@ -1570,107 +1549,46 @@ class ActivitySyncService:
         if scheduled_event_id is not None:
             metadata.scheduled_form_prompt_activity_ids.pop(scheduled_event_id, None)
 
-    def _enqueue_form_prompt_resume_latency(
-        self,
+    @staticmethod
+    def _record_form_prompt_resume_dispatch(
         event: HistoryEvent,
         metadata: ExecutionMonitorMetadata,
     ) -> None:
-        """Queue form resume metrics without waiting on decoding or storage."""
-        activity_ids = tuple(metadata.pending_form_prompt_submission_activity_ids)
-        metadata.pending_form_prompt_submission_activity_ids.clear()
-        if not activity_ids or event.event_id <= metadata.last_form_prompt_resume_metric_event_id:
+        """Record form prompt resume dispatch latency using Temporal clock only.
+
+        Both endpoints of the interval are Temporal history event times
+        (ActivityTaskCompleted -> WorkflowTaskStarted), so the measurement is
+        immune to clock offset between the API pod, the worker and the Temporal
+        server. Recording is synchronous because ``MetricsRecorder.record`` is
+        non-blocking (in-memory store plus a Prometheus observe) and no database
+        lookup is involved.
+        """
+        completed_times = metadata.pending_form_prompt_completed_at
+        metadata.pending_form_prompt_completed_at = []
+        if not completed_times or event.event_id <= metadata.last_form_prompt_resume_metric_event_id:
             return
 
-        observation = _FormPromptResumeMetricObservation(
-            execution_id=metadata.execution_id,
-            resumed_at=ensure_timezone_aware(event.event_time).astimezone(UTC),
-            activity_ids=activity_ids,
-        )
-        try:
-            self._form_prompt_metric_queue.put_nowait(observation)
-        except asyncio.QueueFull:
-            # Metrics are best-effort. Dropping an observation is preferable to
-            # applying backpressure to the activity history consumer.
-            logger.debug("Dropped form prompt submission-to-resume metric: queue full")
-            return
-
-        metadata.last_form_prompt_resume_metric_event_id = event.event_id
-        if self._form_prompt_metric_task is None or self._form_prompt_metric_task.done():
-            self._form_prompt_metric_task = asyncio.create_task(
-                self._drain_form_prompt_metric_queue(),
-                name="form_prompt_resume_metrics",
-            )
-
-    async def _drain_form_prompt_metric_queue(self) -> None:
-        """Load timestamps and record queued form metrics outside the history path."""
-        while True:
-            try:
-                observation = self._form_prompt_metric_queue.get_nowait()
-            except asyncio.QueueEmpty:
-                return
-
-            try:
-                await self._record_form_prompt_resume_latency(observation)
-            except asyncio.CancelledError:
-                raise
-            except Exception:  # noqa: BLE001 - metric processing is best-effort
-                logger.debug("Failed to process form prompt submission-to-resume metric", exc_info=True)
-            finally:
-                self._form_prompt_metric_queue.task_done()
-
-    async def _record_form_prompt_resume_latency(self, observation: _FormPromptResumeMetricObservation) -> None:
-        """Look up submitted timestamps and record them outside the history consumer."""
-        try:
-            async with asyncio.timeout(_FORM_PROMPT_METRIC_LOOKUP_TIMEOUT_SECONDS):
-                submitted_times = await self._load_form_prompt_submission_times(observation)
-        except TimeoutError:
-            logger.debug("Timed out loading form prompt submission time for metric")
-            return
-        except Exception:  # noqa: BLE001 - lookup failures must not affect activity synchronization
-            logger.debug("Could not load form prompt submission time for metric", exc_info=True)
-            return
-
-        resumed_at = observation.resumed_at
-        for submitted_at in submitted_times.values():
-            latency_ms = (resumed_at - submitted_at).total_seconds() * 1000
+        resumed_at = ensure_timezone_aware(event.event_time).astimezone(UTC)
+        for completed_at in completed_times:
+            latency_ms = (resumed_at - completed_at).total_seconds() * 1000
             if latency_ms < 0:
-                logger.debug("Skipped negative form prompt submission-to-resume latency")
+                # Temporal assigns history event times per shard owner, so a
+                # shard failover between the two events could in principle
+                # invert them. This should effectively never fire.
+                logger.debug("Skipped negative form prompt resume dispatch latency")
                 continue
 
             try:
                 get_metrics_recorder().record(
-                    MetricType.FORM_PROMPT_SUBMISSION_TO_EXECUTION_START,
+                    MetricType.FORM_PROMPT_RESUME_DISPATCH,
                     latency_ms,
                     unit="ms",
                     component=ComponentLabel.WORKFLOW_ENGINE,
                 )
             except Exception:  # noqa: BLE001
-                logger.warning("Failed to record form prompt submission-to-resume metric (non-fatal)")
+                logger.warning("Failed to record form prompt resume dispatch metric (non-fatal)")
 
-    async def _load_form_prompt_submission_times(
-        self,
-        observation: _FormPromptResumeMetricObservation,
-    ) -> dict[str, datetime]:
-        """Load accepted submission timestamps for the queued form activities."""
-        if not observation.activity_ids:
-            return {}
-
-        statement = (
-            select(FormPrompt.temporal_activity_id, FormPrompt.responded_at)
-            .where(FormPrompt.execution_id == observation.execution_id)
-            .where(col(FormPrompt.temporal_activity_id).in_(observation.activity_ids))
-            .where(FormPrompt.status == FormPromptStatus.SUBMITTED)
-            .where(FormPrompt.responded_at.is_not(None))  # type: ignore[union-attr]
-        )
-        async with self.session_factory() as session:
-            result = await session.exec(statement)
-            rows = result.all()
-
-        return {
-            activity_id: ensure_timezone_aware(submitted_at).astimezone(UTC)
-            for activity_id, submitted_at in rows
-            if submitted_at is not None
-        }
+        metadata.last_form_prompt_resume_metric_event_id = event.event_id
 
     @staticmethod
     def _finalize_non_terminal_activities(

@@ -10,6 +10,7 @@ from uuid import UUID, uuid4
 import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
+from prometheus_client import CollectorRegistry
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -21,6 +22,8 @@ from syntara.core.database.session import get_db
 from syntara.core.models import User
 from syntara.forms.models.api_models import FormPromptStatus
 from syntara.forms.models.form_prompt import FormPrompt
+from syntara.metrics.recorder import MetricsRecorder
+from syntara.metrics.types import ComponentLabel, MetricType
 
 FORM_PROMPTS_URL = "/api/v1/form_prompts"
 _FORM_DEFINITION = {"fields": [{"value_name": "reason", "type": "text", "label": "Reason", "required": True}]}
@@ -176,6 +179,63 @@ class TestFormPromptSubmitAPI:
         assert datetime.fromisoformat(call["form_response"]["responded_at"]) == datetime.fromisoformat(
             response.json()["responded_at"]
         )
+
+    async def test_submit_records_handoff_metric_after_successful_signal(
+        self,
+        auth_client: AsyncClient,
+        test_db_session: AsyncSession,
+        test_project_id: UUID,
+    ) -> None:
+        prompt = await _create_prompt(test_db_session, test_project_id)
+        recorder = MetricsRecorder(prometheus_registry=CollectorRegistry())
+
+        with (
+            patch("syntara.forms.clients.workflow_client.WorkflowApiClient") as client_class,
+            patch(
+                "syntara.forms.services.form_prompt_service.get_metrics_recorder",
+                return_value=recorder,
+            ),
+        ):
+            client_class.return_value.__aenter__.return_value.send_form_signal = AsyncMock()
+            response = await auth_client.post(
+                f"{FORM_PROMPTS_URL}/{prompt.id}/submit",
+                json={"response_data": {"reason": "record the handoff"}},
+            )
+
+        assert response.status_code == 200
+        records = list(recorder.query(metric_types={MetricType.FORM_PROMPT_SUBMISSION_HANDOFF}))
+        assert len(records) == 1
+        assert records[0].unit == "ms"
+        assert records[0].value >= 0
+        assert records[0].labels == {"component": ComponentLabel.API_SERVICE.value}
+
+    async def test_submit_does_not_record_handoff_metric_after_signal_failure(
+        self,
+        auth_client: AsyncClient,
+        test_db_session: AsyncSession,
+        test_project_id: UUID,
+    ) -> None:
+        prompt = await _create_prompt(test_db_session, test_project_id)
+        recorder = MetricsRecorder(prometheus_registry=CollectorRegistry())
+
+        with (
+            patch("syntara.forms.clients.workflow_client.WorkflowApiClient") as client_class,
+            patch(
+                "syntara.forms.services.form_prompt_service.get_metrics_recorder",
+                return_value=recorder,
+            ),
+        ):
+            client_class.return_value.__aenter__.return_value.send_form_signal = AsyncMock(
+                side_effect=RuntimeError("Temporal unavailable"),
+            )
+            response = await auth_client.post(
+                f"{FORM_PROMPTS_URL}/{prompt.id}/submit",
+                json={"response_data": {"reason": "record no handoff"}},
+            )
+
+        assert response.status_code == 200
+        assert response.json()["signal_delivery_error"] == "Workflow signal delivery failed"
+        assert list(recorder.query(metric_types={MetricType.FORM_PROMPT_SUBMISSION_HANDOFF})) == []
 
     async def test_submit_accepts_typed_resolved_option_and_signals_integer(
         self,

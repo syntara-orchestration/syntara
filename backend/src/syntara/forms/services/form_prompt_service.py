@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
@@ -51,6 +52,8 @@ from syntara.forms.models.api_models import (
 from syntara.forms.models.form_prompt import FormPrompt, FormPromptListResponse, FormPromptRead
 from syntara.forms.models.form_prompt_responders import FormPromptResponderGroup, FormPromptResponderUser
 from syntara.forms.validators.submission import validate_form_submission, validate_prompt_submission_state
+from syntara.metrics.dependencies import get_metrics_recorder
+from syntara.metrics.types import ComponentLabel, MetricType
 from syntara.workflows.exceptions import ExecutionNotFoundError
 from syntara.workflows.models.execution import Execution
 
@@ -536,6 +539,7 @@ class FormPromptService(BaseService):
         )
 
         responded_at = datetime.now(UTC)
+        handoff_started = time.monotonic()
 
         # SECURITY: Optimistic locking prevents TOCTOU race condition.
         # UPDATE with WHERE status=PENDING ensures only one concurrent submission succeeds.
@@ -623,6 +627,21 @@ class FormPromptService(BaseService):
                 error=str(e),
                 exc_info=True,
             )
+        else:
+            # Single-process monotonic interval starting at `handoff_started`,
+            # taken alongside `responded_at` above: immune to cross-host clock
+            # offset and to NTP step corrections. Covers persisting the
+            # submission (UPDATE + commit), the HTTP hop to the workflow engine
+            # including retries, and the Temporal complete_async_activity RPC.
+            try:
+                get_metrics_recorder().record(
+                    MetricType.FORM_PROMPT_SUBMISSION_HANDOFF,
+                    (time.monotonic() - handoff_started) * 1000,
+                    unit="ms",
+                    component=ComponentLabel.API_SERVICE,
+                )
+            except Exception:  # noqa: BLE001
+                logger.warning("Failed to record form prompt submission handoff metric (non-fatal)")
 
         # Emit the lifecycle event with metadata only
         AuditEventDispatcher.dispatch(

@@ -98,7 +98,7 @@ class TestWorkerMetricsServer:
         port = _free_port()
         recorder = MetricsRecorder(prometheus_registry=prometheus_client.CollectorRegistry())
         recorder.record(
-            MetricType.FORM_PROMPT_SUBMISSION_TO_EXECUTION_START,
+            MetricType.FORM_PROMPT_RESUME_DISPATCH,
             250.0,
             unit="ms",
             component=ComponentLabel.WORKFLOW_ENGINE,
@@ -111,13 +111,13 @@ class TestWorkerMetricsServer:
         try:
             response = httpx.get(f"http://localhost:{port}/metrics", timeout=5.0)
             assert response.status_code == 200
-            assert "# TYPE orchestrator_form_prompt_submission_to_execution_start_seconds histogram" in response.text
+            assert "# TYPE orchestrator_form_prompt_resume_dispatch_seconds histogram" in response.text
             assert (
-                'orchestrator_form_prompt_submission_to_execution_start_seconds_count{component="workflow_engine"} 1.0'
+                'orchestrator_form_prompt_resume_dispatch_seconds_count{component="workflow_engine"} 1.0'
                 in response.text
             )
             assert (
-                'orchestrator_form_prompt_submission_to_execution_start_seconds_sum{component="workflow_engine"} 0.25'
+                'orchestrator_form_prompt_resume_dispatch_seconds_sum{component="workflow_engine"} 0.25'
                 in response.text
             )
         finally:
@@ -146,7 +146,7 @@ class TestWorkerMetricsServer:
 
         recorder = MetricsRecorder(prometheus_registry=CollectorRegistry())
         recorder.record(
-            MetricType.FORM_PROMPT_SUBMISSION_TO_EXECUTION_START,
+            MetricType.FORM_PROMPT_RESUME_DISPATCH,
             250.0,
             unit="ms",
             component=ComponentLabel.WORKFLOW_ENGINE,
@@ -194,5 +194,42 @@ class TestWorkerMetricsServer:
         assert captured_port[0] == expected_port, f"Expected port {expected_port}, got {captured_port[0]}"
         assert len(captured_registry) == 1
         output = prometheus_client.generate_latest(captured_registry[0]).decode("utf-8")
-        assert "orchestrator_form_prompt_submission_to_execution_start_seconds" in output
+        assert "orchestrator_form_prompt_resume_dispatch_seconds" in output
         assert "python_gc_objects_collected_total" in output
+
+    def test_worker_startup_continues_when_metrics_registry_setup_fails(self) -> None:
+        """Metrics setup failures must not prevent starting the Temporal worker."""
+        import asyncio
+
+        from prometheus_client import CollectorRegistry
+
+        from syntara.metrics.recorder import MetricsRecorder
+        from syntara.workflows.worker_lifecycle import run_worker
+
+        recorder = MetricsRecorder(prometheus_registry=CollectorRegistry())
+        start_called: list[bool] = []
+
+        async def _fail_after_start() -> TemporalWorkerService:
+            start_called.append(True)
+            msg = "simulated Temporal connection failure"
+            raise RuntimeError(msg)
+
+        with (
+            patch("syntara.workflows.worker_lifecycle.get_metrics_recorder", return_value=recorder),
+            patch(
+                "syntara.workflows.worker_lifecycle._build_worker_metrics_registry",
+                side_effect=RuntimeError("simulated registry failure"),
+            ),
+            patch("syntara.workflows.worker_lifecycle.set_runtime_settings"),
+            patch("syntara.workflows.worker_lifecycle.apply_runtime_log_level", new_callable=AsyncMock),
+            patch(
+                "syntara.workflows.worker_lifecycle.get_runtime_settings",
+                return_value=Mock(stop_watching=AsyncMock(), start_watching=Mock()),
+            ),
+            patch("syntara.workflows.worker_lifecycle.discover_and_register_all_handlers"),
+        ):
+            coro = run_worker(_fail_after_start, worker_name="test-worker")
+            with pytest.raises(SystemExit):
+                asyncio.run(coro)
+
+        assert start_called == [True]
