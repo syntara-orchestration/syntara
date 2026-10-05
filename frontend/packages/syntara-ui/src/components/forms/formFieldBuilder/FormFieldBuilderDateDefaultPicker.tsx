@@ -33,29 +33,38 @@ export function FormFieldBuilderDateDefaultPicker({
       <Controller
         control={control}
         name={`fields.${index}.default`}
-        render={({ field: rhfField, fieldState }) => (
-          <>
-            <DatePicker
-              value={typeof rhfField.value === 'string' ? rhfField.value : ''}
-              onChange={(_event, value) => {
-                rhfField.onChange(value === '' ? null : value)
-                commit()
-              }}
-              dateFormat={formatDateYMD}
-              dateParse={parseDateYMD}
-              isDisabled={isDisabled}
-              aria-label="Default date"
-              inputProps={{
-                id: dateFieldId,
-                placeholder: `e.g. ${examples.defaultValue}`,
-                validated: fieldState.error ? 'error' : 'default',
-                onBlur: rhfField.onBlur,
-              }}
-              appendTo={() => document.body}
-            />
-            <FormFieldError error={fieldState.error} />
-          </>
-        )}
+        render={({ field: rhfField, fieldState }) => {
+          const defaultValue = rhfField.value
+          const dateValue =
+            typeof defaultValue === 'object' && defaultValue !== null && !Array.isArray(defaultValue)
+              ? defaultValue
+              : undefined
+          const date = dateValue && 'date' in dateValue ? dateValue.date : undefined
+
+          return (
+            <>
+              <DatePicker
+                value={typeof date === 'string' ? date : ''}
+                onChange={(_event, value) => {
+                  rhfField.onChange(value === '' ? null : { ...dateValue, date: value })
+                  commit()
+                }}
+                dateFormat={formatDateYMD}
+                dateParse={parseDateYMD}
+                isDisabled={isDisabled}
+                aria-label="Default date"
+                inputProps={{
+                  id: dateFieldId,
+                  placeholder: `e.g. ${examples.defaultValue}`,
+                  validated: fieldState.error ? 'error' : 'default',
+                  onBlur: rhfField.onBlur,
+                }}
+                appendTo={() => document.body}
+              />
+              <FormFieldError error={fieldState.error} />
+            </>
+          )
+        }}
       />
     </FormGroup>
   )

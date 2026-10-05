@@ -64,14 +64,14 @@ describe('validateFormSubmission', () => {
       name: 'bob',
       age: 30,
       subscribe: true,
-      start: '2026-01-05',
+      start: { date: '2026-01-05' },
     })
 
     expect(cleaned).toEqual({
       name: 'bob',
       age: 30,
       subscribe: true,
-      start: '2026-01-05',
+      start: { date: '2026-01-05' },
     })
   })
 
@@ -314,5 +314,65 @@ describe('assertValidFormDefinition', () => {
     })
 
     expect(assertValidFormDefinition(definition)).toBe(definition)
+  })
+})
+
+describe('date field submission', () => {
+  function dateForm(overrides: Record<string, unknown> = {}) {
+    return form(field(FormFieldTypeEnum.DATE, 'start', overrides))
+  }
+
+  it.each([
+    [{}, { date: '2026-01-05' }],
+    [{ include_timezone: true }, { date: '2026-01-05', timezone: 'America/New_York' }],
+    [
+      { include_time: true, include_timezone: true },
+      { date: '2026-01-05', time: '14:30', timezone: 'America/New_York' },
+    ],
+    [
+      { include_date: false, include_time: true, include_timezone: true },
+      { time: '14:30', timezone: 'America/New_York' },
+    ],
+    [{ include_date: false, include_timezone: true }, { timezone: 'America/New_York' }],
+  ])('round-trips a complete submission for %o', (toggles, submitted) => {
+    expect(validateFormSubmission(dateForm(toggles), { start: submitted })).toEqual({ start: submitted })
+  })
+
+  it('rejects a submission missing an included component', () => {
+    const definition = dateForm({ include_time: true, include_timezone: true })
+
+    expectValidationErrors(definition, { start: { date: '2026-01-05', time: '14:30' } }, [['start', 'invalid_format']])
+  })
+
+  it('rejects a component the field does not collect', () => {
+    expectValidationErrors(dateForm(), { start: { date: '2026-01-05', time: '14:30' } }, [['start', 'invalid_format']])
+  })
+
+  it('rejects an unknown component key', () => {
+    expectValidationErrors(dateForm(), { start: { date: '2026-01-05', offset: '-05:00' } }, [
+      ['start', 'invalid_format'],
+    ])
+  })
+
+  it('treats a blank component as absent', () => {
+    expectValidationErrors(dateForm(), { start: { date: '' } }, [['start', 'invalid_format']])
+  })
+
+  it('rejects an unknown IANA timezone', () => {
+    const definition = dateForm({ include_date: false, include_timezone: true })
+
+    expectValidationErrors(definition, { start: { timezone: 'Mars/Olympus' } }, [['start', 'invalid_format']])
+  })
+
+  it('fills an absent field from a complete default', () => {
+    const definition = dateForm({
+      include_time: true,
+      include_timezone: true,
+      default: { date: '2026-03-01', time: '08:00', timezone: 'Europe/Paris' },
+    })
+
+    expect(validateFormSubmission(definition, {})).toEqual({
+      start: { date: '2026-03-01', time: '08:00', timezone: 'Europe/Paris' },
+    })
   })
 })

@@ -1,7 +1,7 @@
 import type { FormDefinition, FormField } from '@syntara/contracts'
 
 import { FormFieldTypeEnum } from './formFieldTypeEnum'
-import type { FormSubmissionData, FormSubmissionInput } from './formTypes'
+import type { DateSubmissionValue, FormSubmissionData, FormSubmissionInput } from './formTypes'
 import {
   FormDataValidationError,
   FormDefinitionValidationError,
@@ -12,7 +12,7 @@ const MISSING = Symbol('missing')
 
 type OptionScalar = string | number | boolean
 
-type Coercer = (raw: unknown) => OptionScalar | Array<OptionScalar>
+type CoercedValue = FormSubmissionData[string]
 
 function isEmptyValue(value: unknown): boolean {
   return value === '' || value === null || value === undefined || (Array.isArray(value) && value.length === 0)
@@ -116,24 +116,114 @@ function coerceCheckbox(raw: unknown): boolean {
   throw new TypeError(`Must be a boolean, got ${typeof raw}`)
 }
 
-function coerceDate(raw: unknown): string {
-  if (typeof raw !== 'string') {
-    throw new TypeError(`Must be a date string, got ${typeof raw}`)
+const DATE_COMPONENT_NAMES = ['date', 'time', 'timezone'] as const
+
+type DateComponentName = (typeof DATE_COMPONENT_NAMES)[number]
+
+type DateFormField = Extract<FormField, { type: 'date' }>
+
+/** The components a date field collects, in DATE_COMPONENT_NAMES order. */
+function includedDateComponents(field: DateFormField): Array<DateComponentName> {
+  const included: Record<DateComponentName, boolean> = {
+    date: field.include_date ?? true,
+    time: field.include_time ?? false,
+    timezone: field.include_timezone ?? false,
   }
+  return DATE_COMPONENT_NAMES.filter((name) => included[name])
+}
+
+function assertIsoDate(raw: string): void {
   if (raw.length !== 10 || raw[4] !== '-' || raw[7] !== '-') {
-    throw new Error('Must be a valid ISO 8601 date (YYYY-MM-DD)')
+    throw new Error('date must be a date in YYYY-MM-DD format')
   }
   const year = Number(raw.slice(0, 4))
   const month = Number(raw.slice(5, 7))
   const day = Number(raw.slice(8, 10))
   if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) {
-    throw new TypeError('Must be a valid ISO 8601 date (YYYY-MM-DD)')
+    throw new Error('date must be a date in YYYY-MM-DD format')
   }
-  const date = new Date(Date.UTC(year, month - 1, day))
-  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) {
-    throw new Error('Must be a valid ISO 8601 date (YYYY-MM-DD)')
+  const parsed = new Date(Date.UTC(year, month - 1, day))
+  if (parsed.getUTCFullYear() !== year || parsed.getUTCMonth() !== month - 1 || parsed.getUTCDate() !== day) {
+    throw new Error(`Invalid date: '${raw}'. Use a valid ISO 8601 date in YYYY-MM-DD format.`)
   }
-  return raw
+}
+
+function assertTime(raw: string): void {
+  if (!/^(?:[01][0-9]|2[0-3]):[0-5][0-9]$/.test(raw)) {
+    throw new Error('time must be a 24-hour time in HH:MM format')
+  }
+}
+
+function assertTimezone(raw: string): void {
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: raw })
+  } catch {
+    throw new Error(`Invalid timezone: '${raw}'. Use a valid IANA timezone name, such as 'America/New_York'.`)
+  }
+}
+
+const DATE_COMPONENT_ASSERTIONS: Record<DateComponentName, (raw: string) => void> = {
+  date: assertIsoDate,
+  time: assertTime,
+  timezone: assertTimezone,
+}
+
+/**
+ * Coerce to a date value object holding exactly the field's components.
+ *
+ * Mirrors the backend `_coerce_date`: the value is always an object, every
+ * included component is mandatory, and components the field does not collect
+ * are rejected rather than silently dropped.
+ */
+function toDateComponentEntries(raw: unknown, included: Array<DateComponentName>): Record<string, unknown> {
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
+    throw new TypeError(`Must be an object with keys: ${included.join(', ')}; got ${typeof raw}`)
+  }
+
+  const entries = raw as Record<string, unknown>
+  for (const key of Object.keys(entries)) {
+    if (!DATE_COMPONENT_NAMES.includes(key as DateComponentName)) {
+      throw new Error(`'${key}' is not a date component`)
+    }
+  }
+  return entries
+}
+
+function validateDateComponent(name: DateComponentName, supplied: unknown): string {
+  if (typeof supplied !== 'string') {
+    throw new TypeError(`${name} must be a string, got ${typeof supplied}`)
+  }
+  DATE_COMPONENT_ASSERTIONS[name](supplied)
+  return supplied
+}
+
+function coerceDate(field: DateFormField, raw: unknown): DateSubmissionValue {
+  const included = includedDateComponents(field)
+  const entries = toDateComponentEntries(raw, included)
+
+  const value: DateSubmissionValue = {}
+  const missing: Array<DateComponentName> = []
+
+  for (const name of DATE_COMPONENT_NAMES) {
+    // Drop blanks so an untouched input posting "" reads as absent.
+    const supplied = isEmptyValue(entries[name]) ? undefined : entries[name]
+
+    if (!included.includes(name)) {
+      if (supplied !== undefined) {
+        throw new Error(`This field does not collect: ${name}`)
+      }
+    } else if (supplied === undefined) {
+      missing.push(name)
+    } else {
+      value[name] = validateDateComponent(name, supplied)
+    }
+  }
+
+  if (missing.length > 0) {
+    throw new Error(`Missing required ${missing.length === 1 ? 'component' : 'components'}: ${missing.join(', ')}`)
+  }
+
+  return value
 }
 
 function isOptionScalarValue(raw: unknown): raw is OptionScalar {
@@ -169,20 +259,37 @@ function coerceMultiSelect(raw: unknown): Array<OptionScalar> {
   return [coerceOptionScalar(raw)]
 }
 
-const COERCERS: Record<FormField['type'], Coercer> = {
-  [FormFieldTypeEnum.TEXT]: coerceString,
-  [FormFieldTypeEnum.TEXTAREA]: coerceString,
-  [FormFieldTypeEnum.MASKED_TEXT]: coerceString,
-  [FormFieldTypeEnum.EMAIL]: coerceEmail,
-  [FormFieldTypeEnum.NUMBER]: coerceNumber,
-  [FormFieldTypeEnum.CHECKBOX]: coerceCheckbox,
-  [FormFieldTypeEnum.DATE]: coerceDate,
-  [FormFieldTypeEnum.DROPDOWN]: coerceDropdown,
-  [FormFieldTypeEnum.MULTI_SELECT]: coerceMultiSelect,
-}
-
-function coerceField(field: FormField, raw: unknown): OptionScalar | Array<OptionScalar> {
-  return COERCERS[field.type](raw)
+/**
+ * Coerce a submitted value according to its field's type.
+ *
+ * `FormField` is a closed union, so every field type needs a `case` here. The
+ * `never` default makes a missing one a compile error.
+ */
+function coerceField(field: FormField, raw: unknown): CoercedValue {
+  switch (field.type) {
+    case FormFieldTypeEnum.TEXT:
+    case FormFieldTypeEnum.TEXTAREA:
+    case FormFieldTypeEnum.MASKED_TEXT:
+      return coerceString(raw)
+    case FormFieldTypeEnum.EMAIL:
+      return coerceEmail(raw)
+    case FormFieldTypeEnum.NUMBER:
+      return coerceNumber(raw)
+    case FormFieldTypeEnum.CHECKBOX:
+      return coerceCheckbox(raw)
+    case FormFieldTypeEnum.DATE:
+      // The only coercer that reads its own definition, to learn which date
+      // components the field collects.
+      return coerceDate(field, raw)
+    case FormFieldTypeEnum.DROPDOWN:
+      return coerceDropdown(raw)
+    case FormFieldTypeEnum.MULTI_SELECT:
+      return coerceMultiSelect(raw)
+    default: {
+      const exhaustive: never = field
+      return exhaustive
+    }
+  }
 }
 
 type SelectFormField = Extract<FormField, { type: 'dropdown' }> | Extract<FormField, { type: 'multi_select' }>
@@ -225,10 +332,13 @@ function checkOptionMembership(
     return null
   }
 
-  if (Array.isArray(coerced) || !validValues.has(coerced)) {
-    if (Array.isArray(coerced)) {
-      return fieldError(field, 'type', 'Dropdown expects a single value, not a list')
-    }
+  if (Array.isArray(coerced)) {
+    return fieldError(field, 'type', 'Dropdown expects a single value, not a list')
+  }
+  if (!isOptionScalarValue(coerced)) {
+    return fieldError(field, 'type', 'Dropdown expects a scalar value')
+  }
+  if (!validValues.has(coerced)) {
     return {
       field: field.value_name,
       label: field.label,
@@ -281,8 +391,10 @@ function validateFieldSubmission(field: FormField, submitted: FormSubmissionInpu
     coerced = coerceField(field, raw)
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Invalid value'
-    const isFormatError =
-      field.type === FormFieldTypeEnum.EMAIL && error instanceof Error && !(error instanceof TypeError)
+    // Email and date coercers distinguish a wrong-typed value (TypeError) from
+    // a right-typed value in the wrong format, matching the backend's codes.
+    const distinguishesFormat = field.type === FormFieldTypeEnum.EMAIL || field.type === FormFieldTypeEnum.DATE
+    const isFormatError = distinguishesFormat && error instanceof Error && !(error instanceof TypeError)
     return {
       status: 'invalid',
       error: fieldError(field, isFormatError ? 'invalid_format' : 'type', message),

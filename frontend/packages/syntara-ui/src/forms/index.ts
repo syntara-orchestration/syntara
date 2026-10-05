@@ -29,6 +29,7 @@ export {
   type JsonSchemaToFormDefinitionResult,
 } from './jsonSchemaToFormDefinition'
 export type {
+  DateSubmissionValue,
   DynamicOptionsSource,
   FormFieldByType,
   FormSubmissionData,

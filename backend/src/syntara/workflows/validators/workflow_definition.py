@@ -18,6 +18,7 @@ from referencing.jsonschema import DRAFT202012
 
 from syntara.core.constants import JsonbLimits
 from syntara.core.exceptions import SafeValueError
+from syntara.forms.exceptions import FormDefinitionError
 from syntara.schemas import SCHEMA_DIR
 from syntara.workflows.models.validation_finding import (
     ValidationCategory,
@@ -27,7 +28,11 @@ from syntara.workflows.models.validation_finding import (
 )
 from syntara.workflows.validators.template_expressions import check_template_expressions
 from syntara.workflows.workflow_engine.graph_backend import InMemoryGraphBackend
-from syntara.workflows.workflow_engine.models.workflow_definition import NodeType, ScheduledTriggerConfig
+from syntara.workflows.workflow_engine.models.workflow_definition import (
+    FormPromptNodeParameters,
+    NodeType,
+    ScheduledTriggerConfig,
+)
 
 _SCHEMA_DIR = SCHEMA_DIR / "workflows" / "v2"
 _BASE_URI = "https://automation.example.com/schemas/workflows/v2/"
@@ -427,6 +432,99 @@ def _check_form_prompt_node_findings(
     return findings
 
 
+def _collect_form_prompt_model_findings(
+    workflow_definition: dict[str, Any],
+) -> list[ValidationFinding]:
+    """Collect form model validation errors omitted by the generated JSON Schema.
+
+    JSON Schema covers the shape of form values, but it cannot represent custom
+    Pydantic validators such as calendar-date validation or checks that a default
+    can be submitted. Request models may retain the raw workflow dictionary when
+    typed parsing fails, so run the form parameter model here as part of the
+    shared verify/save/publish validation path.
+    """
+    findings: list[ValidationFinding] = []
+    for node in workflow_definition.get("nodes", []):
+        if not isinstance(node, dict) or node.get("type") != NodeType.FORM_PROMPT:
+            continue
+
+        raw_node_id = node.get("id")
+        node_id = raw_node_id if isinstance(raw_node_id, str) else None
+        parameters = node.get("parameters")
+        if not isinstance(parameters, dict):
+            continue
+
+        try:
+            FormPromptNodeParameters.model_validate(parameters)
+        except ValidationError as exc:
+            findings.extend(_collect_safe_value_error_findings(exc, node_id))
+        except FormDefinitionError as exc:
+            findings.extend(_collect_form_definition_error_findings(exc, parameters, node_id))
+
+    return findings
+
+
+def _collect_safe_value_error_findings(exc: ValidationError, node_id: str | None) -> list[ValidationFinding]:
+    """Convert safe Pydantic value errors into workflow findings."""
+    findings: list[ValidationFinding] = []
+    for error in exc.errors():
+        context = error.get("ctx")
+        safe_error = context.get("error") if isinstance(context, dict) else None
+        if not isinstance(safe_error, SafeValueError):
+            continue
+
+        location = error.get("loc", ())
+        field_path = "parameters"
+        if location:
+            field_path += "." + ".".join(str(part) for part in location)
+        findings.append(
+            ValidationFinding(
+                severity=ValidationSeverity.error,
+                category=ValidationCategory.form_prompt_configuration,
+                message=str(safe_error),
+                node_id=node_id,
+                field_path=field_path,
+            )
+        )
+    return findings
+
+
+def _collect_form_definition_error_findings(
+    exc: FormDefinitionError,
+    parameters: dict[str, Any],
+    node_id: str | None,
+) -> list[ValidationFinding]:
+    """Convert invalid form defaults into findings with field paths."""
+    form_definition = parameters.get("form_definition")
+    raw_fields = form_definition.get("fields", []) if isinstance(form_definition, dict) else []
+    if not isinstance(raw_fields, list):
+        raw_fields = []
+
+    findings: list[ValidationFinding] = []
+    for field_error in exc.errors:
+        field_index = next(
+            (
+                index
+                for index, field in enumerate(raw_fields)
+                if isinstance(field, dict) and field.get("value_name") == field_error.field
+            ),
+            None,
+        )
+        field_path = "parameters.form_definition.fields"
+        if field_index is not None:
+            field_path += f".{field_index}.default"
+        findings.append(
+            ValidationFinding(
+                severity=ValidationSeverity.error,
+                category=ValidationCategory.form_prompt_configuration,
+                message=field_error.message,
+                node_id=node_id,
+                field_path=field_path,
+            )
+        )
+    return findings
+
+
 def _select_best_branch(
     context_errors: list[jsonschema.ValidationError],
 ) -> tuple[Any, dict[Any, list[jsonschema.ValidationError]]]:
@@ -781,6 +879,7 @@ class WorkflowValidator:
             findings.extend(_check_form_prompt_node_findings(workflow_definition))
             findings.extend(check_template_expressions(workflow_definition, node_ids))
 
+        findings.extend(_collect_form_prompt_model_findings(workflow_definition))
         findings.extend(collect_scheduled_trigger_config_findings(workflow_definition))
 
         return findings

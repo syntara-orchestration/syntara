@@ -7,12 +7,11 @@ and enforcing required fields and option membership constraints.
 from __future__ import annotations
 
 import math
-from datetime import UTC, date, datetime
-from typing import TYPE_CHECKING, Any
+from collections.abc import Mapping
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Any, assert_never
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Mapping
-
     from syntara.forms.models.form_prompt import FormPrompt
 
 from pydantic import EmailStr, TypeAdapter, ValidationError
@@ -28,6 +27,7 @@ from syntara.forms.models.form_errors import FormFieldError
 from syntara.forms.models.form_fields import (
     CheckboxField,
     DateField,
+    DateValue,
     DropdownField,
     EmailField,
     FormDefinition,
@@ -192,6 +192,10 @@ def _is_empty(value: Any) -> bool:  # noqa: ANN401
 def coerce_field(field: FormField, raw: Any) -> Any:  # noqa: ANN401
     """Coerce raw submitted value to the field's expected type.
 
+    FormField is a closed union, so every field type needs a case here. The
+    assert_never fallback turns a missing one into a mypy error - note that
+    pyrefly does not flag it, so `make typecheck` is what catches this.
+
     Args:
         field: Field definition
         raw: Raw submitted value
@@ -203,15 +207,28 @@ def coerce_field(field: FormField, raw: Any) -> Any:  # noqa: ANN401
         ValueError: If coercion fails
 
     """
-    coercer = _COERCERS.get(type(field))
+    coerced: Any
+    match field:
+        case TextField() | TextAreaField() | MaskedTextField():
+            coerced = _coerce_string(raw)
+        case EmailField():
+            coerced = _coerce_email(raw)
+        case NumberField():
+            coerced = _coerce_number(raw)
+        case CheckboxField():
+            coerced = _coerce_checkbox(raw)
+        case DateField():
+            # The only coercer that reads its own definition, to learn which
+            # date components the field collects.
+            coerced = _coerce_date(field, raw)
+        case DropdownField():
+            coerced = _coerce_dropdown(raw)
+        case MultiSelectField():
+            coerced = _coerce_multi_select(raw)
+        case _:
+            assert_never(field)
 
-    # Should never happen: FormField is a closed discriminated union, and the
-    # table below covers every member.
-    if coercer is None:
-        msg = f"Unknown field type: {type(field)}"
-        raise ValueError(msg)
-
-    return coercer(raw)
+    return coerced
 
 
 def _coerce_string(raw: Any) -> str:  # noqa: ANN401
@@ -340,33 +357,90 @@ def _coerce_checkbox(raw: Any) -> bool:  # noqa: ANN401
     return result
 
 
-def _coerce_date(raw: Any) -> str:  # noqa: ANN401
-    """Coerce to ISO 8601 date string.
+def _coerce_date(field: DateField, raw: Any) -> dict[str, str]:  # noqa: ANN401
+    """Coerce to a date value object holding exactly the field's components.
 
-    Accepts: ISO 8601 date string (YYYY-MM-DD).
-    Returns: Normalized ISO 8601 string (JSON-serializable for Temporal namespace).
+    Accepts: a mapping with any of the "date", "time", and "timezone" keys.
+    Returns: a plain dict (JSON-serializable for the Temporal namespace) whose
+    keys are exactly the components the field collects.
+
+    The shape is always an object, even for a date-only field. A bare string
+    would read more naturally today, but it would mean that enabling a timezone
+    toggle later silently changes the namespace shape and breaks every
+    downstream expression already reading the field.
 
     Args:
+        field: Date field definition, which decides the required components
         raw: Raw value
 
     Returns:
-        ISO 8601 date string
+        Component dict with exactly the included components
 
     Raises:
-        ValueError: If coercion fails
+        TypeError: If the value is not a mapping
+        ValueError: If a component is malformed, missing, or not collected
 
     """
-    if not isinstance(raw, str):
-        msg = f"Must be a date string, got {type(raw).__name__}"
+    # A field default arrives as an already-validated DateValue, both from the
+    # default substitution above and from validate_form_definition.
+    if isinstance(raw, DateValue):
+        raw = raw.model_dump(exclude_none=True)
+
+    if not isinstance(raw, Mapping):
+        expected = ", ".join(field.included_components())
+        msg = f"Must be an object with keys: {expected}; got {type(raw).__name__}"
         raise TypeError(msg)
 
+    # Drop blanks so an untouched input posting "" reads as absent, matching
+    # _is_empty at the top level.
+    present = {key: value for key, value in raw.items() if not _is_empty(value)}
+
     try:
-        # Parse and re-emit to normalize format
-        parsed = date.fromisoformat(raw)
-        return parsed.isoformat()
-    except ValueError:
-        msg = "Must be a valid ISO 8601 date (YYYY-MM-DD)"
-        raise ValueError(msg) from None
+        value = DateValue.model_validate(present)
+    except ValidationError as exc:
+        raise _FormatError(_format_date_errors(exc)) from None
+
+    included = set(field.included_components())
+    supplied = set(value.supplied_components())
+
+    if missing := sorted(included - supplied):
+        msg = f"Missing required {'component' if len(missing) == 1 else 'components'}: {', '.join(missing)}"
+        raise _FormatError(msg)
+
+    if extra := sorted(supplied - included):
+        msg = f"This field does not collect: {', '.join(extra)}"
+        raise _FormatError(msg)
+
+    return {name: getattr(value, name) for name in field.included_components()}
+
+
+# Pydantic reports a failed `pattern=` as the raw regex, which is noise to a
+# responder. Each component gets a plain-language equivalent instead.
+_DATE_FORMAT_HINTS = {
+    "date": "must be a date in YYYY-MM-DD format",
+    "time": "must be a 24-hour time in HH:MM format",
+    "timezone": "must be an IANA timezone name, such as America/New_York",
+}
+
+
+def _format_date_errors(exc: ValidationError) -> str:
+    """Render pydantic's component errors as one user-safe sentence."""
+    parts: list[str] = []
+    for error in exc.errors():
+        location = ".".join(str(part) for part in error["loc"]) or "value"
+
+        if error["type"] == "extra_forbidden":
+            parts.append(f"'{location}' is not a date component")
+            continue
+
+        hint = _DATE_FORMAT_HINTS.get(location)
+        if hint is not None and error["type"] == "string_pattern_mismatch":
+            parts.append(f"{location} {hint}")
+            continue
+
+        # Custom validators surface through pydantic as "Value error, <msg>".
+        parts.append(f"{location}: {error['msg'].removeprefix('Value error, ')}")
+    return "; ".join(parts)
 
 
 def _check_option_membership(field: FormField, coerced: Any) -> FormFieldError | None:  # noqa: ANN401
@@ -493,21 +567,3 @@ def _coerce_multi_select(raw: Any) -> list[str | int | float | bool]:  # noqa: A
 
     # Wrap single scalar into list (browser behavior)
     return [_coerce_option_value(raw)]
-
-
-# Dispatch for coerce_field, keyed on the exact field class. FormField is a
-# closed discriminated union whose members all derive from FormFieldBase
-# directly, so there are no subclass relationships to order around and an exact
-# type lookup is unambiguous. Every member must appear here; the parity test in
-# test_submission.py asserts that.
-_COERCERS: dict[type, Callable[[Any], Any]] = {
-    TextField: _coerce_string,
-    TextAreaField: _coerce_string,
-    MaskedTextField: _coerce_string,
-    EmailField: _coerce_email,
-    NumberField: _coerce_number,
-    CheckboxField: _coerce_checkbox,
-    DateField: _coerce_date,
-    DropdownField: _coerce_dropdown,
-    MultiSelectField: _coerce_multi_select,
-}

@@ -135,13 +135,6 @@ class BaseFormPrompt(BaseResource, table=False):
         description="Message shown after successful form submission",
     )
 
-    timezone: str | None = Field(
-        default=None,
-        max_length=FieldLimits.FORM_TIMEZONE_MAX_LENGTH,
-        sa_type=String(FieldLimits.FORM_TIMEZONE_MAX_LENGTH),  # type: ignore[call-overload]
-        description="IANA timezone name for interpreting date/datetime field values",
-    )
-
     css_override: str | None = Field(
         default=None,
         max_length=FieldLimits.FORM_CSS_OVERRIDE_MAX_LENGTH,

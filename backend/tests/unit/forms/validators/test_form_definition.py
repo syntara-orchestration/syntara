@@ -52,7 +52,7 @@ class TestValidDefinitions:
             ("number", 42),
             ("number", 3.5),
             ("checkbox", True),
-            ("date", "2026-01-05"),
+            ("date", {"date": "2026-01-05"}),
         ],
     )
     def test_valid_defaults_pass(self, field_type: str, default: Any) -> None:  # noqa: ANN401
@@ -81,30 +81,33 @@ class TestInvalidDefaults:
 
     @pytest.mark.parametrize("default", ["tomorrow", "01/05/2026", "2026-13-01"])
     def test_non_iso_date_default(self, default: str) -> None:
-        """A date default that is not ISO 8601 is rejected up front."""
-        errors = _errors(_form(_field("date", "start", default=default)))
+        """A date default that is not ISO 8601 never parses into a form at all.
 
-        assert [(e.field, e.code) for e in errors] == [("start", "invalid_default")]
+        DateField validates its own default, so a bad one fails at model
+        construction rather than reaching validate_form_definition.
+        """
+        with pytest.raises(ValidationError):
+            _form(_field("date", "start", default={"date": default}))
 
     def test_message_names_the_field_type(self) -> None:
         """The author-facing message says which field type rejected the value."""
-        errors = _errors(_form(_field("date", "start", default="tomorrow")))
+        errors = _errors(_form(_field("email", "contact", default="tomorrow")))
 
-        assert "'date' field" in errors[0].message
+        assert "'email' field" in errors[0].message
 
     def test_errors_accumulate_across_fields(self) -> None:
         """Every bad default is reported, not just the first."""
         form = _form(
             _field("email", "contact", default="nope"),
             _field("text", "name", default="fine"),
-            _field("date", "start", default="tomorrow"),
+            _field("email", "backup", default="also-nope"),
         )
 
         errors = _errors(form)
 
         assert [(e.field, e.code) for e in errors] == [
             ("contact", "invalid_default"),
-            ("start", "invalid_default"),
+            ("backup", "invalid_default"),
         ]
 
     def test_form_id_is_carried(self) -> None:

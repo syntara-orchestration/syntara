@@ -238,7 +238,6 @@ class FormPromptService(UserReferenceResolverMixin, BaseService):
                 form_definition=request.form_definition,
                 submit_label=request.submit_label,
                 success_message=request.success_message,
-                timezone=request.timezone,
                 css_override=request.css_override,
                 status=FormPromptStatus.PENDING,
             )
