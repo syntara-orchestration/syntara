@@ -18,8 +18,8 @@ describe('ExpressionHelpPopover', () => {
     await user.click(screen.getByRole('button', { name: 'More info for Condition' }))
 
     expect(screen.getByText('When to take this path.')).toBeInTheDocument()
-    expect(screen.getByText(/Visual expression builder/i)).toBeInTheDocument()
-    expect(screen.getByText(/Custom expression/i)).toBeInTheDocument()
+    expect(screen.getByText(/Form builder/i)).toBeInTheDocument()
+    expect(screen.getByText(/Freeform text/i)).toBeInTheDocument()
   })
 
   it('has no accessibility violations', async () => {

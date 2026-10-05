@@ -4,9 +4,9 @@ import { describe, expect, it, vi } from 'vitest'
 
 import type { NodeMenuAction } from '../../routes/workflows/canvas/nodes/hooks/useNodeMenuActions'
 
-import { NodeMenu } from './NodeMenu'
+import { SynStepMenu } from './SynStepMenu'
 
-describe('NodeMenu', () => {
+describe('SynStepMenu', () => {
   const createMenuAction = (overrides: Partial<NodeMenuAction> = {}): NodeMenuAction => ({
     id: 'test-action',
     label: 'Test Action',
@@ -16,20 +16,20 @@ describe('NodeMenu', () => {
 
   describe('rendering', () => {
     it('returns null when menuActions is empty', () => {
-      const { container } = render(<NodeMenu menuActions={[]} />)
+      const { container } = render(<SynStepMenu menuActions={[]} />)
       expect(container).toBeEmptyDOMElement()
     })
 
     it('renders menu toggle button when actions provided', () => {
       const actions = [createMenuAction()]
-      render(<NodeMenu menuActions={actions} />)
+      render(<SynStepMenu menuActions={actions} />)
 
       expect(screen.getByRole('button', { name: /step actions menu/i })).toBeInTheDocument()
     })
 
     it('applies custom className', () => {
       const actions = [createMenuAction()]
-      render(<NodeMenu menuActions={actions} className="custom-menu-class" />)
+      render(<SynStepMenu menuActions={actions} className="custom-menu-class" />)
 
       const wrapper = screen.getByTestId('node-menu-wrapper')
       expect(wrapper).toHaveClass('custom-menu-class')
@@ -37,7 +37,7 @@ describe('NodeMenu', () => {
 
     it('applies custom style', () => {
       const actions = [createMenuAction()]
-      render(<NodeMenu menuActions={actions} style={{ marginTop: '10px' }} />)
+      render(<SynStepMenu menuActions={actions} style={{ marginTop: '10px' }} />)
 
       const wrapper = screen.getByTestId('node-menu-wrapper')
       expect(wrapper).toHaveStyle({ marginTop: '10px' })
@@ -45,7 +45,7 @@ describe('NodeMenu', () => {
 
     it('has nodrag nopan classes', () => {
       const actions = [createMenuAction()]
-      render(<NodeMenu menuActions={actions} />)
+      render(<SynStepMenu menuActions={actions} />)
 
       const wrapper = screen.getByTestId('node-menu-wrapper')
       expect(wrapper).toHaveClass('nodrag')
@@ -57,7 +57,7 @@ describe('NodeMenu', () => {
     it('opens dropdown when toggle is clicked', async () => {
       const user = userEvent.setup()
       const actions = [createMenuAction({ label: 'Delete' })]
-      render(<NodeMenu menuActions={actions} />)
+      render(<SynStepMenu menuActions={actions} />)
 
       const toggle = screen.getByRole('button', { name: /step actions menu/i })
       await user.click(toggle)
@@ -72,7 +72,7 @@ describe('NodeMenu', () => {
       const actions = [createMenuAction({ label: 'Delete' })]
       render(
         <div>
-          <NodeMenu menuActions={actions} />
+          <SynStepMenu menuActions={actions} />
           <button data-testid="outside">Outside</button>
         </div>
       )
@@ -102,7 +102,7 @@ describe('NodeMenu', () => {
         createMenuAction({ id: '2', label: 'Duplicate' }),
         createMenuAction({ id: '3', label: 'Delete' }),
       ]
-      render(<NodeMenu menuActions={actions} />)
+      render(<SynStepMenu menuActions={actions} />)
 
       await user.click(screen.getByRole('button', { name: /step actions menu/i }))
 
@@ -117,7 +117,7 @@ describe('NodeMenu', () => {
       const user = userEvent.setup()
       const onClickHandler = vi.fn()
       const actions = [createMenuAction({ label: 'Delete', onClick: onClickHandler })]
-      render(<NodeMenu menuActions={actions} />)
+      render(<SynStepMenu menuActions={actions} />)
 
       await user.click(screen.getByRole('button', { name: /step actions menu/i }))
 
@@ -133,7 +133,7 @@ describe('NodeMenu', () => {
     it('closes menu after clicking menu item', async () => {
       const user = userEvent.setup()
       const actions = [createMenuAction({ label: 'Delete' })]
-      render(<NodeMenu menuActions={actions} />)
+      render(<SynStepMenu menuActions={actions} />)
 
       await user.click(screen.getByRole('button', { name: /step actions menu/i }))
 
@@ -151,7 +151,7 @@ describe('NodeMenu', () => {
     it('renders danger variant menu item', async () => {
       const user = userEvent.setup()
       const actions = [createMenuAction({ label: 'Delete', variant: 'danger' })]
-      render(<NodeMenu menuActions={actions} />)
+      render(<SynStepMenu menuActions={actions} />)
 
       await user.click(screen.getByRole('button', { name: /step actions menu/i }))
 
@@ -167,7 +167,7 @@ describe('NodeMenu', () => {
       const user = userEvent.setup()
       const icon = <svg data-testid="action-icon" />
       const actions = [createMenuAction({ label: 'Edit', icon })]
-      render(<NodeMenu menuActions={actions} />)
+      render(<SynStepMenu menuActions={actions} />)
 
       await user.click(screen.getByRole('button', { name: /step actions menu/i }))
 
@@ -183,7 +183,7 @@ describe('NodeMenu', () => {
         { id: 'sep', label: '', onClick: vi.fn(), separator: true },
         createMenuAction({ id: '2', label: 'Delete', variant: 'danger' }),
       ]
-      render(<NodeMenu menuActions={actions} />)
+      render(<SynStepMenu menuActions={actions} />)
 
       await user.click(screen.getByRole('button', { name: /step actions menu/i }))
 
@@ -202,7 +202,7 @@ describe('NodeMenu', () => {
       render(
         // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions
         <div onClick={parentClickHandler}>
-          <NodeMenu menuActions={actions} />
+          <SynStepMenu menuActions={actions} />
         </div>
       )
 
@@ -219,7 +219,7 @@ describe('NodeMenu', () => {
       render(
         // eslint-disable-next-line jsx-a11y/no-static-element-interactions
         <div onMouseDown={parentMouseDownHandler}>
-          <NodeMenu menuActions={actions} />
+          <SynStepMenu menuActions={actions} />
         </div>
       )
 
@@ -236,7 +236,7 @@ describe('NodeMenu', () => {
       render(
         // eslint-disable-next-line jsx-a11y/no-static-element-interactions
         <div onKeyDown={parentKeyDownHandler}>
-          <NodeMenu menuActions={actions} />
+          <SynStepMenu menuActions={actions} />
         </div>
       )
 
@@ -254,7 +254,7 @@ describe('NodeMenu', () => {
       render(
         // eslint-disable-next-line jsx-a11y/no-static-element-interactions
         <div onKeyDown={parentKeyDownHandler}>
-          <NodeMenu menuActions={actions} />
+          <SynStepMenu menuActions={actions} />
         </div>
       )
 
@@ -272,7 +272,7 @@ describe('NodeMenu', () => {
       render(
         // eslint-disable-next-line jsx-a11y/no-static-element-interactions
         <div onKeyDown={parentKeyDownHandler}>
-          <NodeMenu menuActions={actions} />
+          <SynStepMenu menuActions={actions} />
         </div>
       )
 
@@ -286,7 +286,7 @@ describe('NodeMenu', () => {
   describe('accessibility', () => {
     it('wrapper has no interactive role — interactivity is on the inner MenuToggle button', () => {
       const actions = [createMenuAction()]
-      render(<NodeMenu menuActions={actions} />)
+      render(<SynStepMenu menuActions={actions} />)
 
       const wrapper = screen.getByTestId('node-menu-wrapper')
       expect(wrapper).not.toHaveAttribute('role')
@@ -295,7 +295,7 @@ describe('NodeMenu', () => {
 
     it('menu toggle has aria-label', () => {
       const actions = [createMenuAction()]
-      render(<NodeMenu menuActions={actions} />)
+      render(<SynStepMenu menuActions={actions} />)
 
       expect(screen.getByRole('button', { name: /step actions menu/i })).toBeInTheDocument()
     })

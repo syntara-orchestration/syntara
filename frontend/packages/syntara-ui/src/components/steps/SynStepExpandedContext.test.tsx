@@ -2,23 +2,23 @@ import { render, screen } from '@testing-library/react'
 import { use, useState } from 'react'
 import { describe, expect, it } from 'vitest'
 
-import { NodeExpandedContext } from './NodeExpandedContext'
+import { SynStepExpandedContext } from './SynStepExpandedContext'
 
 function TestConsumer() {
-  const context = use(NodeExpandedContext)
+  const context = use(SynStepExpandedContext)
   return <div data-testid="context-value">{context === null ? 'null' : String(context[0])}</div>
 }
 
 function TestProvider({ initialValue }: { initialValue: boolean }) {
   const state = useState(initialValue)
   return (
-    <NodeExpandedContext.Provider value={state}>
+    <SynStepExpandedContext.Provider value={state}>
       <TestConsumer />
-    </NodeExpandedContext.Provider>
+    </SynStepExpandedContext.Provider>
   )
 }
 
-describe('NodeExpandedContext', () => {
+describe('SynStepExpandedContext', () => {
   it('has null as default value', () => {
     render(<TestConsumer />)
 
