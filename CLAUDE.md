@@ -131,6 +131,7 @@ For a known flaky test that needs temporary quarantine from the pipeline, see
 **Key Konflux constraints:**
 - Does **not** set `CI=true` — guards like `test.skip(!!process.env.CI, ...)` have no effect.
 - The Temporal worker runs in a separate network namespace; it may not reach external URLs even when the test runner can. E2E HTTP Request tests therefore use the in-cluster httpbin Service (`http://httpbin:8080`) that [aap-dev](https://github.com/ansible/aap-dev) deploys next to AO. `HTTPBIN_URL` defaults to that URL when `KUBERNETES_SERVICE_HOST` is set; local and GitHub CI still default to `https://httpbin.org`.
+- That in-cluster URL is HTTP because aap-dev's go-httpbin Service has no TLS. That is an accepted trade-off for ephemeral CI: the cluster is torn down after the run, traffic stays on the cluster overlay, and credentials sent to httpbin are synthetic E2E fixtures, not production secrets. Do not add TLS or NetworkPolicies just for this test fixture.
 - Cluster load causes 30-second timeouts and transient 502 Bad Gateway responses.
 
 #### Backend pytest skip patterns (`backend/tests/e2e/`)

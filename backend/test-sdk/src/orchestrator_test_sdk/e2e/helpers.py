@@ -388,8 +388,16 @@ def poll_execution_until_complete(
 # aap-dev deploys go-httpbin next to AO as Service ``httpbin`` on port 8080
 # (see ansible/aap-dev commit 99b8902). The Temporal worker can reach that
 # ClusterIP; it often cannot reach the public internet (httpbin.org).
+#
+# The in-cluster URL is HTTP because that Service has no TLS. That is an
+# accepted trade-off for ephemeral Konflux/aap-dev CI: the cluster is torn
+# down after the run, traffic stays on the overlay to a ClusterIP, and
+# credentials sent to httpbin are synthetic E2E fixtures (never production
+# secrets). Local and GitHub CI still use HTTPS. Do not reuse this URL
+# outside E2E tests, and do not add TLS just for this fixture.
 _IN_CLUSTER_HTTPBIN_URL = "http://httpbin:8080"
 _PUBLIC_HTTPBIN_URL = "https://httpbin.org"
+# Exact hostnames only. Substring matching would accept evilhttpbin.com.
 _HTTPBIN_ALLOWED_HOSTS = {"httpbin.org", "httpbin"}
 
 
@@ -400,17 +408,16 @@ def resolve_httpbin_url(
 ) -> str:
     """Return the httpbin base URL for E2E HTTP Request nodes.
 
-    ``HTTPBIN_URL`` wins when it is an allowed http(s) host. Otherwise prefer
-    the in-cluster Service when running inside Kubernetes, and the public
-    instance for local / GitHub CI.
+    ``HTTPBIN_URL`` wins when its hostname is exactly one of
+    ``_HTTPBIN_ALLOWED_HOSTS`` and the scheme is http or https. Otherwise
+    prefer the in-cluster Service when running inside Kubernetes, and the
+    public instance for local / GitHub CI.
     """
     if configured is None:
         configured = os.environ.get("HTTPBIN_URL")
     if configured:
         parsed = urllib.parse.urlparse(configured)
-        if parsed.scheme in {"http", "https"} and any(
-            host in (parsed.hostname or "") for host in _HTTPBIN_ALLOWED_HOSTS
-        ):
+        if parsed.scheme in {"http", "https"} and parsed.hostname in _HTTPBIN_ALLOWED_HOSTS:
             return configured.rstrip("/")
     if in_kubernetes is None:
         in_kubernetes = bool(os.environ.get("KUBERNETES_SERVICE_HOST"))

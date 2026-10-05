@@ -19,6 +19,10 @@ from orchestrator_test_sdk.e2e.helpers import (
         ("http://httpbin:8080/", True, "http://httpbin:8080"),
         ("https://httpbin.org", True, "https://httpbin.org"),
         ("https://evil.example.com", True, _IN_CLUSTER_HTTPBIN_URL),
+        ("https://evilhttpbin.com", True, _IN_CLUSTER_HTTPBIN_URL),
+        ("https://evilhttpbin.com", False, _PUBLIC_HTTPBIN_URL),
+        ("http://attacker-httpbin.net", False, _PUBLIC_HTTPBIN_URL),
+        ("https://httpbin.org.evil.com", True, _IN_CLUSTER_HTTPBIN_URL),
         ("ftp://httpbin.org", False, _PUBLIC_HTTPBIN_URL),
     ],
 )
