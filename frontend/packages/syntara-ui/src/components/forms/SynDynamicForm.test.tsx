@@ -137,6 +137,68 @@ describe('SynDynamicForm', () => {
     })
   })
 
+  it('preserves other date components when a component changes', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+    const definition = parseFormDefinition({
+      fields: [
+        {
+          type: FormFieldTypeEnum.DATE,
+          value_name: 'schedule',
+          label: 'Schedule',
+          include_date: false,
+          include_time: true,
+          include_timezone: true,
+        },
+      ],
+    })
+
+    renderWithQueryClient(
+      <SynDynamicForm
+        definition={definition}
+        initialValues={{ schedule: { time: '08:30', timezone: 'UTC' } }}
+        onSubmit={onSubmit}
+      />
+    )
+
+    const timezoneInput = screen.getByRole('textbox', { name: 'Schedule time zone' })
+    await user.clear(timezoneInput)
+    await user.type(timezoneInput, 'Europe/Paris')
+    await user.click(screen.getByRole('button', { name: 'Submit' }))
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith({ schedule: { time: '08:30', timezone: 'Europe/Paris' } })
+    })
+  })
+
+  it('clears a date value when its only included component is emptied', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+    const definition = parseFormDefinition({
+      fields: [
+        {
+          type: FormFieldTypeEnum.DATE,
+          value_name: 'zone',
+          label: 'Zone',
+          include_date: false,
+          include_time: false,
+          include_timezone: true,
+        },
+      ],
+    })
+
+    renderWithQueryClient(
+      <SynDynamicForm definition={definition} initialValues={{ zone: { timezone: 'UTC' } }} onSubmit={onSubmit} />
+    )
+
+    await user.clear(screen.getByRole('textbox', { name: 'Zone time zone' }))
+    await user.click(screen.getByRole('button', { name: 'Submit' }))
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith({})
+    })
+  })
+
   it('submits multi-select values from initialValues', async () => {
     const user = userEvent.setup()
     const onSubmit = vi.fn()
