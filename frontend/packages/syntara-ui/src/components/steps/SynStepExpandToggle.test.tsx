@@ -3,35 +3,35 @@ import userEvent from '@testing-library/user-event'
 import { useMemo, useState } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 
-import { NodeExpandedContext, type NodeExpandedContextValue } from './NodeExpandedContext'
-import { NodeExpandToggle } from './NodeExpandToggle'
+import { SynStepExpandedContext, type SynStepExpandedContextValue } from './SynStepExpandedContext'
+import { SynStepExpandToggle } from './SynStepExpandToggle'
 
-describe('NodeExpandToggle', () => {
+describe('SynStepExpandToggle', () => {
   // Helper to render with context
   const renderWithContext = (expanded: boolean, setExpanded: React.Dispatch<React.SetStateAction<boolean>>) => {
     return render(
-      <NodeExpandedContext.Provider value={[expanded, setExpanded]}>
-        <NodeExpandToggle />
-      </NodeExpandedContext.Provider>
+      <SynStepExpandedContext.Provider value={[expanded, setExpanded]}>
+        <SynStepExpandToggle />
+      </SynStepExpandedContext.Provider>
     )
   }
 
   // Helper component that manages its own state
   const StatefulWrapper = ({ initialExpanded = true }: { initialExpanded?: boolean }) => {
     const [expanded, setExpanded] = useState(initialExpanded)
-    const expandedContextValue = useMemo<NodeExpandedContextValue>(() => [expanded, setExpanded], [expanded])
+    const expandedContextValue = useMemo<SynStepExpandedContextValue>(() => [expanded, setExpanded], [expanded])
 
     return (
-      <NodeExpandedContext.Provider value={expandedContextValue}>
+      <SynStepExpandedContext.Provider value={expandedContextValue}>
         <div data-testid="expanded-state">{expanded ? 'expanded' : 'collapsed'}</div>
-        <NodeExpandToggle />
-      </NodeExpandedContext.Provider>
+        <SynStepExpandToggle />
+      </SynStepExpandedContext.Provider>
     )
   }
 
   describe('rendering', () => {
     it('returns null when context is not provided', () => {
-      const { container } = render(<NodeExpandToggle />)
+      const { container } = render(<SynStepExpandToggle />)
       expect(container).toBeEmptyDOMElement()
     })
 
@@ -39,7 +39,17 @@ describe('NodeExpandToggle', () => {
       const setExpanded = vi.fn()
       renderWithContext(true, setExpanded)
 
-      expect(screen.getByTestId('node-expand-toggle')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Collapse step details' })).toBeInTheDocument()
+    })
+
+    it('includes the node label in the accessible name when provided', () => {
+      render(
+        <SynStepExpandedContext.Provider value={[true, vi.fn()]}>
+          <SynStepExpandToggle nodeLabel="Disabled deployment" />
+        </SynStepExpandedContext.Provider>
+      )
+
+      expect(screen.getByRole('button', { name: 'Collapse details for Disabled deployment' })).toBeInTheDocument()
     })
 
     it('renders with expanded rotation (180deg) when expanded', () => {

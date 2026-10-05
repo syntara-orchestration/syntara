@@ -14,12 +14,11 @@ import {
   ModalHeader,
   SelectList,
   SelectOption,
-  TextInput,
 } from '@patternfly/react-core'
 import { RhUiAddIcon } from '@patternfly/react-icons'
 import { useQueryClient } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
-import { Controller, useForm, useWatch, type Control, type FieldErrors, type UseFormRegister } from 'react-hook-form'
+import { useForm, useWatch, type Control, type FieldErrors, type UseFormRegister } from 'react-hook-form'
 
 import { SynSelect } from '../../components/SynSelect'
 import { invalidateAuthzCaches } from '../../hooks/invalidateAuthzCaches'
@@ -31,6 +30,7 @@ import { accessControlHelp } from './accessControlFieldHelp'
 import { addRoleSchema } from './addRoleSchema'
 import type { AddRoleFormData } from './addRoleSchema'
 import { PolicySelect } from './PolicySelect'
+import { RoleFormFields } from './RoleFormFields'
 import { TypeaheadSelect } from './TypeaheadSelect'
 import { useSelectableProjects } from './useAllProjects'
 
@@ -96,47 +96,8 @@ function AddRoleFormFields({
   onScopeChange,
   onProjectChange,
 }: Readonly<AddRoleFormFieldsProps>) {
-  return (
+  const scopeAndProjectFields = (
     <>
-      <FormGroup label="Name" isRequired fieldId="role-name">
-        <TextInput
-          id="role-name"
-          isRequired
-          aria-label="Role name"
-          validated={errors.name ? 'error' : 'default'}
-          {...register('name')}
-        />
-        {errors.name ? (
-          <FormHelperText>
-            <HelperText>
-              <HelperTextItem variant="error">{errors.name.message}</HelperTextItem>
-            </HelperText>
-          </FormHelperText>
-        ) : (
-          <FormHelperText>
-            <HelperText>
-              <HelperTextItem>Lowercase alphanumeric with hyphens (e.g. my-custom-role)</HelperTextItem>
-            </HelperText>
-          </FormHelperText>
-        )}
-      </FormGroup>
-
-      <FormGroup label="Description" fieldId="role-description">
-        <TextInput
-          id="role-description"
-          aria-label="Role description"
-          validated={errors.description ? 'error' : 'default'}
-          {...register('description')}
-        />
-        {errors.description && (
-          <FormHelperText>
-            <HelperText>
-              <HelperTextItem variant="error">{errors.description.message}</HelperTextItem>
-            </HelperText>
-          </FormHelperText>
-        )}
-      </FormGroup>
-
       <FormGroup label="Scope" isRequired fieldId="role-scope" labelHelp={accessControlHelp.scope}>
         <RoleScopeSelect value={scope} onChange={onScopeChange} hasError={!!errors.scope} />
         <FormHelperText>
@@ -170,39 +131,40 @@ function AddRoleFormFields({
           )}
         </FormGroup>
       )}
-
-      <FormGroup label="Policies" isRequired fieldId="role-policies" labelHelp={accessControlHelp.policies}>
-        <Controller
-          name="policies"
-          control={control}
-          render={({ field }) => (
-            <PolicySelect
-              selected={field.value}
-              onChange={field.onChange}
-              hasError={!!errors.policies}
-              scopeProjectId={scope === 'project' ? projectId || null : null}
-              projectEligible={scope === 'project'}
-              isDisabled={scope === 'project' && !projectId}
-            />
-          )}
-        />
-        {scope === 'project' && !projectId ? (
-          <FormHelperText>
-            <HelperText>
-              <HelperTextItem>Select a project first to see available policies</HelperTextItem>
-            </HelperText>
-          </FormHelperText>
-        ) : (
-          errors.policies && (
-            <FormHelperText>
-              <HelperText>
-                <HelperTextItem variant="error">{errors.policies.message}</HelperTextItem>
-              </HelperText>
-            </FormHelperText>
-          )
-        )}
-      </FormGroup>
     </>
+  )
+
+  const policiesHelper =
+    scope === 'project' && !projectId ? (
+      <FormHelperText>
+        <HelperText>
+          <HelperTextItem>Select a project first to see available policies</HelperTextItem>
+        </HelperText>
+      </FormHelperText>
+    ) : undefined
+
+  return (
+    <RoleFormFields
+      fieldIds={{ name: 'role-name', description: 'role-description', policies: 'role-policies' }}
+      register={register}
+      control={control}
+      errors={errors}
+      nameField="name"
+      descriptionField="description"
+      policiesField="policies"
+      beforePolicies={scopeAndProjectFields}
+      policiesHelper={policiesHelper}
+      renderPolicySelect={({ selected, onChange, hasError }) => (
+        <PolicySelect
+          selected={selected}
+          onChange={onChange}
+          hasError={hasError}
+          scopeProjectId={scope === 'project' ? projectId || null : null}
+          projectEligible={scope === 'project'}
+          isDisabled={scope === 'project' && !projectId}
+        />
+      )}
+    />
   )
 }
 
