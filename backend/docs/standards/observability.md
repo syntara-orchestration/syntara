@@ -19,7 +19,8 @@ Both systems follow the fire-and-forget principle: observability code MUST NEVER
 
 **Endpoint:** `/metrics` (OpenMetrics/Prometheus format)
 
-Temporal worker processes also expose `/metrics` on the configured `metrics_worker_port`. That scrape registry includes Python process metrics and the worker process's `MetricsRecorder` registry.
+Temporal workers also expose `/metrics` on the configured `metrics_worker_port`. The
+worker registry includes Python process metrics and the worker's `MetricsRecorder` metrics.
 
 **Components:**
 - `MetricsRecorder` - Central recording API
@@ -32,22 +33,7 @@ Temporal worker processes also expose `/metrics` on the configured `metrics_work
 - HTTP error rates (classified by type: timeout, rate_limit, validation, internal)
 - LLM call duration, token usage (input/output), Time-To-First-Token (TTFT)
 - Workflow execution duration, completion rate
-- **`orchestrator_form_prompt_submission_handoff_seconds`** (component `api_service`):
-  time from the API accepting a form prompt submission (the instant `responded_at` is
-  taken) until the signal call to the workflow engine returns. Includes persisting the
-  submission and committing the transaction, the HTTP hop including retries, and the
-  Temporal `complete_async_activity` RPC. Measured with a monotonic clock inside a single
-  process. Only recorded when signal delivery succeeds.
-- **`orchestrator_form_prompt_resume_dispatch_seconds`** (component `workflow_engine`):
-  time from Temporal recording the form prompt `ActivityTaskCompleted` event until the
-  `WorkflowTaskStarted` event of the workflow task that resumes the workflow. Both
-  endpoints are Temporal history event times.
-
-These metrics are split so each interval uses a single clock; subtracting the API pod
-clock from the Temporal server clock would include host clock offset in the latency.
-The intervals overlap because Temporal records `ActivityTaskCompleted` while the API's
-completion RPC is still in flight. Their sum is a safe upper bound on submission-to-resume
-latency, not an exact end-to-end duration.
+- Form prompt submission handoff and workflow resume dispatch latency
 - Activity execution success rate
 - Database query response time, connection pool utilization
 - Tool execution duration and success rate
