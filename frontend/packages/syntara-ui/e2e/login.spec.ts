@@ -132,6 +132,15 @@ test.describe('Login form error handling', () => {
     const results = await new AxeBuilder({ page }).withTags([...WCAG_TAGS]).analyze()
     expect(results.violations).toEqual([])
   })
+
+  // AAP-85206: login page has no <h1>, failing axe-core's "page-has-heading-one" rule.
+  // Not covered by the WCAG-tagged scans above because that rule is tagged "best-practice", not wcag2*.
+  test('login page has a level 1 heading (axe page-has-heading-one)', async ({ page }) => {
+    await goToLoginPage(page)
+
+    const results = await new AxeBuilder({ page }).withRules(['page-has-heading-one']).analyze()
+    expect(results.violations).toEqual([])
+  })
 })
 
 test.describe('Login form validation', () => {
