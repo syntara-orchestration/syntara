@@ -189,17 +189,17 @@ class TestAAPValidateAuthErrors:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_validate_auth_failure_403(
+    async def test_validate_authorization_failure_403(
         self, aap_config: AAPConfiguration, resolved_credential: dict[str, Any]
     ) -> None:
-        """HTTP 403 returns AUTH_FAILURE."""
+        """HTTP 403 returns AUTHORIZATION_FAILURE."""
         respx.get(_HEALTH_URL).mock(return_value=Response(403))
 
         adapter = AAPAdapter(aap_config)
         result = await adapter.validate(resolved_credential, timeout_seconds=10)
 
         assert result.success is False
-        assert result.error_type == HealthCheckErrorType.AUTH_FAILURE
+        assert result.error_type == HealthCheckErrorType.AUTHORIZATION_FAILURE
 
     @pytest.mark.asyncio
     async def test_validate_no_credentials_at_all(self, aap_config: AAPConfiguration) -> None:

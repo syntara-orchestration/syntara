@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Protocol, runtime_checkable
 if TYPE_CHECKING:
     from typing import Any
 
-from httpx import HTTPStatusError, codes
+from httpx import HTTPStatusError, Response, codes
 from sqlmodel import SQLModel
 
 
@@ -18,6 +18,8 @@ class HealthCheckErrorType(StrEnum):
     """Classification of health check failures."""
 
     AUTH_FAILURE = "auth_failure"
+    AUTHORIZATION_FAILURE = "authorization_failure"
+    TOKEN_EXPIRED = "token_expired"  # noqa: S105
     CONNECTION_ERROR = "connection_error"
     RATE_LIMIT = "rate_limit"
     SSL_ERROR = "ssl_error"
@@ -80,13 +82,23 @@ class DiscoverResult(SQLModel):
     discovered_models: list[DiscoveredLLMModel] | None = None
 
 
+def _response_body_suggests_expired_token(response: Response) -> bool:
+    """Best-effort detection of expired-token wording in an HTTP error body."""
+    try:
+        text = response.text.lower()
+    except Exception:  # noqa: BLE001 — best-effort body inspection
+        return False
+    return any(marker in text for marker in ("expired", "token has expired", "token is expired", "jwt expired"))
+
+
 def classify_http_error(
     errors: Sequence[BaseException],
 ) -> tuple[HealthCheckErrorType, str]:
-    """Classify HTTP status errors into auth vs. connection failures.
+    """Classify HTTP status errors into distinct failure categories.
 
     Shared by all adapter implementations. Iterates errors and returns
-    AUTH_FAILURE for 401/403, RATE_LIMIT for 429, CONNECTION_ERROR for other HTTP statuses.
+    TOKEN_EXPIRED / AUTH_FAILURE for 401, AUTHORIZATION_FAILURE for 403,
+    RATE_LIMIT for 429, CONNECTION_ERROR for other HTTP statuses.
     """
     # Guard against empty errors list (defensive programming for error handling code)
     if not errors:
@@ -98,9 +110,16 @@ def classify_http_error(
             status = error.response.status_code
 
             # Map specific status codes to error types and messages
-            if status in (codes.UNAUTHORIZED, codes.FORBIDDEN):
-                error_type = HealthCheckErrorType.AUTH_FAILURE
-                message = f"Authentication failed: HTTP {status}"
+            if status == codes.UNAUTHORIZED:
+                if _response_body_suggests_expired_token(error.response):
+                    error_type = HealthCheckErrorType.TOKEN_EXPIRED
+                    message = f"Token expired: HTTP {status}"
+                else:
+                    error_type = HealthCheckErrorType.AUTH_FAILURE
+                    message = f"Authentication failed: HTTP {status}"
+            elif status == codes.FORBIDDEN:
+                error_type = HealthCheckErrorType.AUTHORIZATION_FAILURE
+                message = f"Authorization failed: HTTP {status}"
             elif status == codes.TOO_MANY_REQUESTS:
                 error_type = HealthCheckErrorType.RATE_LIMIT
                 message = f"Rate limit exceeded: HTTP {status}"

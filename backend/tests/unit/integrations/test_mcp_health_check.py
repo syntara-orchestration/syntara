@@ -287,16 +287,16 @@ class TestMCPServerValidate:
         assert "Authentication failed: HTTP 401" in (result.error or "")
 
     @pytest.mark.asyncio
-    async def test_validate_http_403_auth_failure(self, mcp_config: MCPServerConfiguration) -> None:
-        """validate() returns AUTH_FAILURE error type for HTTP 403."""
+    async def test_validate_http_403_authorization_failure(self, mcp_config: MCPServerConfiguration) -> None:
+        """validate() returns AUTHORIZATION_FAILURE error type for HTTP 403."""
         adapter = MCPServerAdapter(mcp_config)
 
         with MockMCPSDK(init_error=_mock_http_error(403)) as (_mock_sse_client, _mock_session):
             result = await adapter.validate(resolved_credential={}, timeout_seconds=10)
 
         assert result.success is False
-        assert result.error_type == HealthCheckErrorType.AUTH_FAILURE
-        assert "Authentication failed: HTTP 403" in (result.error or "")
+        assert result.error_type == HealthCheckErrorType.AUTHORIZATION_FAILURE
+        assert "Authorization failed: HTTP 403" in (result.error or "")
 
     @pytest.mark.asyncio
     async def test_validate_http_429_rate_limit(self, mcp_config: MCPServerConfiguration) -> None:
@@ -479,8 +479,8 @@ class TestMCPServerDiscoverErrors:
         assert "401" in (result.error or "")
 
     @pytest.mark.asyncio
-    async def test_http_403_classified_as_auth_failure(self, mcp_config: MCPServerConfiguration) -> None:
-        """HTTP 403 returns AUTH_FAILURE error type."""
+    async def test_http_403_classified_as_authorization_failure(self, mcp_config: MCPServerConfiguration) -> None:
+        """HTTP 403 returns AUTHORIZATION_FAILURE error type."""
         adapter = MCPServerAdapter(mcp_config)
 
         with patch(
@@ -494,7 +494,7 @@ class TestMCPServerDiscoverErrors:
             )
 
         assert result.success is False
-        assert result.error_type == HealthCheckErrorType.AUTH_FAILURE
+        assert result.error_type == HealthCheckErrorType.AUTHORIZATION_FAILURE
 
     @pytest.mark.asyncio
     async def test_http_500_classified_as_connection_error(self, mcp_config: MCPServerConfiguration) -> None:

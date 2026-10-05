@@ -9,6 +9,19 @@ def test_auth_failed() -> None:
     assert not err.retryable
 
 
+def test_token_expired() -> None:
+    err = map_http_status_to_error(401, "unauthorized: token has expired")
+    assert err.error_code == TFEErrorCode.TOKEN_EXPIRED
+    assert not err.retryable
+
+
+def test_authz_failed() -> None:
+    err = map_http_status_to_error(403, "forbidden")
+    assert err.error_code == TFEErrorCode.AUTHZ_FAILED
+    assert not err.retryable
+    assert "Authorization failed" in err.message or "forbidden" in err.message.lower()
+
+
 def test_conflict() -> None:
     err = map_http_status_to_error(409, "conflict")
     assert err.error_code == TFEErrorCode.STATE_CONFLICT

@@ -130,12 +130,14 @@ class TFEClient:
                     )
             except (httpx.TimeoutException, httpx.NetworkError, OSError) as exc:
                 last_error = exc
-                if mutating:
-                    msg = "Network error during mutating TFE call; verify outcome in TFE before retrying"
-                    raise TFEError(msg, error_code=TFEErrorCode.OUTCOME_UNKNOWN, retryable=False) from exc
-                if attempt >= attempts:
-                    msg = f"Transient network error talking to TFE: {type(exc).__name__}"
-                    raise TFEError(msg, error_code=TFEErrorCode.TRANSIENT, retryable=False) from exc
+                terminal = _terminal_transport_error(
+                    exc,
+                    mutating=mutating,
+                    attempt=attempt,
+                    attempts=attempts,
+                )
+                if terminal is not None:
+                    raise terminal from exc
                 await asyncio.sleep(_BACKOFF_BASE_SECONDS * (2 ** (attempt - 1)))
                 continue
 
@@ -576,6 +578,29 @@ class TFEClient:
             }
         }
         return await self._json("POST", "/team-projects", json_body=body, mutating=True)
+
+
+def _terminal_transport_error(
+    exc: Exception,
+    *,
+    mutating: bool,
+    attempt: int,
+    attempts: int,
+) -> TFEError | None:
+    """Map a transport failure to a terminal error, or None when the caller should retry.
+
+    Mutating calls never retry: a dropped connection may already have applied the change.
+    """
+    if mutating:
+        msg = "Network error during mutating TFE call; verify outcome in TFE before retrying"
+        return TFEError(msg, error_code=TFEErrorCode.OUTCOME_UNKNOWN, retryable=False)
+    if attempt < attempts:
+        return None
+    if isinstance(exc, httpx.TimeoutException):
+        msg = f"TFE endpoint timed out: {type(exc).__name__}"
+    else:
+        msg = f"TFE endpoint unreachable: {type(exc).__name__}"
+    return TFEError(msg, error_code=TFEErrorCode.UNREACHABLE, retryable=False)
 
 
 def _extract_error_detail(response: httpx.Response) -> str:

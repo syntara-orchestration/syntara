@@ -12,6 +12,9 @@ class TFEErrorCode(StrEnum):
 
     CONFIG_MISSING = "CONFIG_MISSING"
     AUTH_FAILED = "AUTH_FAILED"
+    AUTHZ_FAILED = "AUTHZ_FAILED"
+    TOKEN_EXPIRED = "TOKEN_EXPIRED"  # noqa: S105
+    UNREACHABLE = "UNREACHABLE"
     NOT_FOUND = "NOT_FOUND"
     STATE_CONFLICT = "STATE_CONFLICT"
     VALIDATION = "VALIDATION"
@@ -53,12 +56,25 @@ class TFEError(Exception):
 
 _STATUS_TO_CODE: dict[int, TFEErrorCode] = {
     HTTPStatus.UNAUTHORIZED: TFEErrorCode.AUTH_FAILED,
-    HTTPStatus.FORBIDDEN: TFEErrorCode.AUTH_FAILED,
+    HTTPStatus.FORBIDDEN: TFEErrorCode.AUTHZ_FAILED,
     HTTPStatus.NOT_FOUND: TFEErrorCode.NOT_FOUND,
     HTTPStatus.CONFLICT: TFEErrorCode.STATE_CONFLICT,
     HTTPStatus.UNPROCESSABLE_ENTITY: TFEErrorCode.VALIDATION,
     HTTPStatus.TOO_MANY_REQUESTS: TFEErrorCode.RATE_LIMITED,
 }
+
+_EXPIRED_TOKEN_MARKERS = (
+    "expired",
+    "token has expired",
+    "token is expired",
+    "jwt expired",
+    "credential expired",
+)
+
+
+def _looks_like_expired_token(message: str) -> bool:
+    lowered = message.lower()
+    return any(marker in lowered for marker in _EXPIRED_TOKEN_MARKERS)
 
 
 def map_http_status_to_error(
@@ -68,10 +84,24 @@ def map_http_status_to_error(
     mutating: bool = False,
 ) -> TFEError:
     """Map an HTTP status from TFE to the SDP error contract."""
+    if status_code == HTTPStatus.UNAUTHORIZED and _looks_like_expired_token(message):
+        return TFEError(
+            message,
+            error_code=TFEErrorCode.TOKEN_EXPIRED,
+            http_status=status_code,
+            retryable=False,
+        )
+
     code = _STATUS_TO_CODE.get(status_code)
     if code is None and status_code >= HTTPStatus.INTERNAL_SERVER_ERROR:
         code = TFEErrorCode.TRANSIENT
     if code is None:
         code = TFEErrorCode.VALIDATION
+
+    if code == TFEErrorCode.AUTH_FAILED:
+        message = message or "Authentication failed: invalid or missing TFE token"
+    elif code == TFEErrorCode.AUTHZ_FAILED:
+        message = message or "Authorization failed: token lacks permission for this TFE operation"
+
     retryable = code in {TFEErrorCode.RATE_LIMITED, TFEErrorCode.TRANSIENT} and not mutating
     return TFEError(message, error_code=code, http_status=status_code, retryable=retryable)
