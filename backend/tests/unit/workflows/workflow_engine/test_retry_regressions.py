@@ -92,6 +92,7 @@ def _wf(retry_context: dict[str, Any] | None = None) -> OrchestratorWorkflow:
     wf.retry_context = retry_context or {}
     wf._retry_restorable_cache = None
     wf._restored_nodes = set()
+    wf._restored_node_timestamps = {}
     wf._resumed_loops = set()
     wf.resolver = NamespaceResolver()
     wf.skipped_nodes = set()
@@ -212,7 +213,7 @@ async def test_restored_predecessor_counts_toward_converge_gate(mock_wf: MagicMo
     await complete_supplied_node(wf, node, result, _converge_graph())
     wf.resolver.set_namespace("b2", {"v": 2, "status": "completed"})
 
-    assert "b1" in wf._restored_nodes
+    assert "b1" in wf._restored_node_timestamps
     assert "b1" not in wf.skipped_nodes, "a restored node did not get skipped; it ran"
     assert wf._are_predecessors_complete("join", _converge_graph()) is True
 

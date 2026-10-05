@@ -69,6 +69,7 @@ class ExecutionMonitorMetadata:
     pending_sync_event_ids: set[int] = field(default_factory=set)
     terminal_activity_ids: set[str] = field(default_factory=set)
     iteration_counters: dict[str, int] = field(default_factory=dict)
+    restored_activity_timestamps: dict[str, dict[str, Any]] = field(default_factory=dict)
     next_activity_index: int = 0
     workflow_id: UUID | None = None
     request_id: UUID | None = None
