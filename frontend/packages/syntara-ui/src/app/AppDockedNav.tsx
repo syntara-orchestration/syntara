@@ -56,6 +56,26 @@ function findFirstEnabledPath(item: TNavigationItem): string {
 }
 
 /** Items with multiple children render as expandable groups instead of direct links. */
+type RouterNavLinkProps = React.AnchorHTMLAttributes<HTMLAnchorElement>
+
+function RouterNavLink({ href, children, ...rest }: RouterNavLinkProps) {
+  return (
+    <Link to={href ?? '/'} {...(rest as Omit<React.ComponentProps<typeof Link>, 'to' | 'children'>)}>
+      {children}
+    </Link>
+  )
+}
+
+function isModifiedClick(event: React.SyntheticEvent | undefined): boolean {
+  if (!event || typeof globalThis.MouseEvent === 'undefined') return false
+
+  const mouseEvent = event.nativeEvent
+  return (
+    mouseEvent instanceof globalThis.MouseEvent &&
+    (mouseEvent.button !== 0 || mouseEvent.metaKey || mouseEvent.ctrlKey || mouseEvent.shiftKey || mouseEvent.altKey)
+  )
+}
+
 function hasDropdownChildren(item: TNavigationItem): boolean {
   return (item.children?.length ?? 0) > 1
 }
@@ -80,9 +100,15 @@ function createExpandableRefs(items: TNavigationItem[]) {
 
 function navigateToNavItem(
   itemId: string | number,
+  to: string | undefined,
   visibleItems: TNavigationItem[],
   requestNavigation: (path: string) => void
 ) {
+  if (to) {
+    requestNavigation(to)
+    return
+  }
+
   const item = visibleItems.find((navItem) => navItem.path === itemId)
   if (item) requestNavigation(findFirstEnabledPath(item))
 }
@@ -103,7 +129,6 @@ function NavExpandableItem({
   buttonRef,
   location,
   onExpand,
-  requestNavigation,
 }: Readonly<{
   item: TNavigationItem
   isActive: boolean
@@ -112,7 +137,6 @@ function NavExpandableItem({
   buttonRef?: React.RefObject<HTMLButtonElement | null>
   location: string
   onExpand: (event: React.MouseEvent<HTMLButtonElement>, isExpanded: boolean) => void
-  requestNavigation: (path: string) => void
 }>) {
   const enabledChildren = item.children ?? []
   const groupId = getNavGroupId(item.path)
@@ -137,14 +161,13 @@ function NavExpandableItem({
       {enabledChildren.map((child) => (
         <NavItem
           key={child.path}
-          preventDefault
           id={`nav-${child.path.replaceAll('/', '-')}`}
           groupId={groupId}
           itemId={child.path}
-          href={child.path}
+          to={child.path}
+          component={RouterNavLink}
           isActive={location.startsWith(child.path)}
           icon={child.icon}
-          onClick={() => requestNavigation(child.path)}
         >
           {child.label}
         </NavItem>
@@ -283,8 +306,11 @@ export function AppDockedNav() {
             <ToolbarContent>
               <ToolbarItem>
                 <Nav
-                  onSelect={(_event, selectedItem) => {
-                    navigateToNavItem(selectedItem.itemId, visibleItems, requestNavigation)
+                  onSelect={(event, selectedItem) => {
+                    if (isModifiedClick(event)) return
+
+                    event.preventDefault()
+                    navigateToNavItem(selectedItem.itemId, selectedItem.to, visibleItems, requestNavigation)
                     onNavSelect()
                   }}
                   variant="docked"
@@ -309,7 +335,6 @@ export function AppDockedNav() {
                             buttonRef={expandableRefs[item.path]}
                             location={location}
                             onExpand={(event, expanded) => onExpandNavGroup(event, getNavGroupId(item.path), expanded)}
-                            requestNavigation={requestNavigation}
                           />,
                         ]
                       }
@@ -317,10 +342,10 @@ export function AppDockedNav() {
                         separator,
                         <NavItem
                           key={item.path}
-                          preventDefault
                           id={`nav-${item.path.replaceAll('/', '-')}`}
                           itemId={item.path}
-                          href={findFirstEnabledPath(item)}
+                          to={findFirstEnabledPath(item)}
+                          component={RouterNavLink}
                           isActive={isActive}
                           icon={item.icon}
                           aria-label={item.label}
