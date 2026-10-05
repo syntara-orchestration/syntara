@@ -337,3 +337,112 @@ class TestStallDetectionScanner:
         # 3 audit events and 3 metrics
         assert mock_dispatch.call_count == 3
         assert mock_recorder.return_value.record.call_count == 3
+
+    async def test_update_returning_yields_mapped_orm_instances(
+        self,
+        test_db_session: AsyncSession,
+        test_db_session_factory: async_sessionmaker[AsyncSession],
+        test_user: User,
+    ) -> None:
+        """UPDATE...RETURNING returns mapped ActivityExecution instances with accessible attributes."""
+        now = datetime.now(UTC)
+        started_at = now - timedelta(seconds=120)
+
+        # Seed an overdue activity
+        activity = await _seed_activity(
+            test_db_session,
+            test_user,
+            status=ActivityStatus.RUNNING,
+            expected_duration=60,
+            started_at=started_at,
+            stall_alert_at=None,
+        )
+
+        # Track what audit dispatch receives
+        received_event = None
+
+        def capture_event(event: object) -> None:
+            nonlocal received_event
+            received_event = event
+
+        with (
+            patch(
+                "syntara.workflows.workers.stall_detection.AuditEventDispatcher.dispatch",
+                side_effect=capture_event,
+            ),
+            patch("syntara.workflows.workers.stall_detection.get_metrics_recorder") as mock_recorder,
+        ):
+            mock_recorder.return_value = MagicMock()
+            await detect_stalled_activities(test_db_session_factory)
+
+        # Verify audit event received a properly mapped object with all expected fields
+        assert received_event is not None
+        from syntara.workflows.audit.node_stalled import NodeStalledEvent
+
+        assert isinstance(received_event, NodeStalledEvent)
+        assert received_event.activity_execution_id == activity.id
+        assert received_event.execution_id == activity.execution_id
+        assert received_event.activity_name == "test_activity"
+        assert received_event.node_type == NodeType.HTTP_REQUEST
+        assert received_event.expected_duration == 60
+        assert received_event.started_at == started_at
+        assert received_event.stall_alert_at is not None
+
+        # Verify database was updated
+        await test_db_session.refresh(activity)
+        assert activity.stall_alert_at is not None
+        assert activity.stall_alert_at == received_event.stall_alert_at
+
+    async def test_concurrent_scans_claim_each_row_once(
+        self,
+        test_db_session: AsyncSession,
+        test_db_session_factory: async_sessionmaker[AsyncSession],
+        test_user: User,
+    ) -> None:
+        """Two concurrent scanner invocations claim each row exactly once."""
+        import asyncio
+
+        now = datetime.now(UTC)
+        started_at = now - timedelta(seconds=120)
+
+        # Seed multiple overdue activities
+        activities = []
+        for _ in range(5):
+            activity = await _seed_activity(
+                test_db_session,
+                test_user,
+                status=ActivityStatus.RUNNING,
+                expected_duration=60,
+                started_at=started_at,
+                stall_alert_at=None,
+            )
+            activities.append(activity)
+
+        audit_call_count = 0
+
+        def count_dispatch(*_args: object, **_kwargs: object) -> None:
+            nonlocal audit_call_count
+            audit_call_count += 1
+
+        with (
+            patch(
+                "syntara.workflows.workers.stall_detection.AuditEventDispatcher.dispatch",
+                side_effect=count_dispatch,
+            ),
+            patch("syntara.workflows.workers.stall_detection.get_metrics_recorder") as mock_recorder,
+        ):
+            mock_recorder.return_value = MagicMock()
+
+            # Run two scans concurrently
+            await asyncio.gather(
+                detect_stalled_activities(test_db_session_factory),
+                detect_stalled_activities(test_db_session_factory),
+            )
+
+        # Verify all activities were claimed, but each exactly once (5 total, not 10)
+        for activity in activities:
+            await test_db_session.refresh(activity)
+            assert activity.stall_alert_at is not None
+
+        # Should have exactly 5 audit dispatches, not 10
+        assert audit_call_count == 5

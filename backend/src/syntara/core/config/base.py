@@ -1296,9 +1296,9 @@ class TemporalSettings(BaseSettings):
     )
 
     stall_detection_interval_seconds: float = Field(
-        default=30.0,
+        default=10.0,
         gt=0,
-        description="Seconds between stall-detection worker cycles",
+        description="Seconds between stall-detection worker cycles (SDP R16/AC-10)",
     )
 
 

@@ -423,10 +423,9 @@ class MetricsRecorder:
         }:
             MetricsRecorder._dispatch_scheduled_trigger(metric_type, value, labels, p)
 
-        elif metric_type == MetricType.STALLS_DETECTED:
-            p.stalls_detected_total.labels(
-                node_type=labels.get("node_type", "unknown"),
-            ).inc()
+        elif metric_type == MetricType.STALLED_WORKFLOWS_TOTAL:
+            # Counter incremented once per execution entering stalled state
+            p.stalled_workflows_total.inc()
 
         else:
             MetricsRecorder._dispatch_component(metric_type, value, labels, p)

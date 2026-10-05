@@ -286,7 +286,16 @@ class Execution(UserOwnedResource, table=True):
     )
 
     # Stall detection (AAP-92824): correlated EXISTS subquery set via column_property below.
-    is_stalled: bool  # type: ignore[assignment]  # populated by column_property after class def
+    is_stalled: bool  # populated by column_property after class def
+
+    # Stall detection: execution-level first stall timestamp (SDP R23/AC-13 counter deduplication)
+    first_stall_detected_at: datetime | None = Field(
+        default=None,
+        nullable=True,
+        sa_type=DateTime(timezone=True),  # type: ignore[call-overload]
+        description="When this execution first entered stalled state (set once, permanent)",
+        index=True,
+    )
 
     # Note: creator and updater relationships inherited from UserOwnedResource
     # creator = User who started the execution (created_by)
@@ -327,7 +336,7 @@ class Execution(UserOwnedResource, table=True):
 Execution.is_stalled = column_property(  # type: ignore[assignment]
     sa_select(1)
     .where(
-        ActivityExecution.execution_id == Execution.id,
+        ActivityExecution.execution_id == Execution.id,  # type: ignore[arg-type]
         col(ActivityExecution.stall_alert_at).is_not(None),
     )
     .exists(),

@@ -390,10 +390,21 @@ class OrchestratorPrometheusMetrics:
             registry=self.registry,
         )
 
-        # ---- Stall Detection (AAP-92825) ----
-        self.stalls_detected_total = Counter(
-            "orchestrator_stalls_detected_total",
-            "Total number of activity stalls detected by the periodic worker",
-            ["node_type"],
+        # ---- Stall Detection (SDP R23/AC-13) ----
+        self.stalled_workflows_current = Gauge(
+            "orchestrator_stalled_workflows_current",
+            "Current number of stalled workflow executions (distinct executions with at least one stalled activity)",
+            registry=self.registry,
+        )
+
+        self.stalled_steps_current = Gauge(
+            "orchestrator_stalled_steps_current",
+            "Current number of stalled workflow steps (activities with status=RUNNING and stall_alert_at IS NOT NULL)",
+            registry=self.registry,
+        )
+
+        self.stalled_workflows_total = Counter(
+            "orchestrator_stalled_workflows_total",
+            "Total number of workflow executions that entered stalled state (incremented once per execution)",
             registry=self.registry,
         )
