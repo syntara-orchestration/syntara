@@ -17,6 +17,7 @@ import {
   LoginMainBody,
   LoginMainHeader,
   TextInput,
+  Title,
   ValidatedOptions,
 } from '@patternfly/react-core'
 import { RhUiErrorIcon } from '@patternfly/react-icons'
@@ -321,6 +322,9 @@ function AppLoginForm() {
   if (!hasProviders) {
     return (
       <Login header={header} className={styles.login}>
+        <Title headingLevel="h1" className="pf-v6-u-screen-reader">
+          {brand.appTitle}
+        </Title>
         <LoginMainHeader title={`Log in to ${brand.appTitle}`} subtitle="Enter your credentials to continue" />
         <LoginMainBody>
           {sessionExpiredAlert}
@@ -333,6 +337,9 @@ function AppLoginForm() {
   // State B/C: IDPs exist
   return (
     <Login header={header} className={styles.login}>
+      <Title headingLevel="h1" className="pf-v6-u-screen-reader">
+        {brand.appTitle}
+      </Title>
       <LoginMainHeader
         title={`Log in to ${brand.appTitle}`}
         subtitle={`Select your identity provider to access ${brand.appTitle}. Contact your administrator if you need assistance.`}
