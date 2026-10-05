@@ -9,7 +9,7 @@ from attrs import field as _attrs_field
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
-    from ..models.form_prompt_summary import FormPromptSummary
+    from ..models.form_prompt_list_read import FormPromptListRead
 
 
 T = TypeVar("T", bound="FormPromptListResponse")
@@ -19,17 +19,14 @@ T = TypeVar("T", bound="FormPromptListResponse")
 class FormPromptListResponse:
     """Paginated list response for form prompts.
 
-    Uses FormPromptSummary (8 documented fields) for internal workflow engine endpoints.
-    AAP-91889 will add user-facing list endpoints using FormPromptRead.
-
-        Attributes:
-            resources (list[FormPromptSummary]): Array of resources in current page
-            next_ (None | str | Unset): Cursor for next page of results
-            prev (None | str | Unset): Cursor for previous page of results
-            total (int | None | Unset): Total count of resources (only when include_total=true)
+    Attributes:
+        resources (list[FormPromptListRead]): Array of resources in current page
+        next_ (None | str | Unset): Cursor for next page of results
+        prev (None | str | Unset): Cursor for previous page of results
+        total (int | None | Unset): Total count of resources (only when include_total=true)
     """
 
-    resources: list[FormPromptSummary]
+    resources: list[FormPromptListRead]
     next_: None | str | Unset = UNSET
     prev: None | str | Unset = UNSET
     total: int | None | Unset = UNSET
@@ -77,13 +74,13 @@ class FormPromptListResponse:
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
-        from ..models.form_prompt_summary import FormPromptSummary
+        from ..models.form_prompt_list_read import FormPromptListRead
 
         d = dict(src_dict)
         resources = []
         _resources = d.pop("resources")
         for resources_item_data in _resources:
-            resources_item = FormPromptSummary.from_dict(resources_item_data)
+            resources_item = FormPromptListRead.from_dict(resources_item_data)
 
             resources.append(resources_item)
 

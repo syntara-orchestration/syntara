@@ -16,7 +16,9 @@ if TYPE_CHECKING:
     from collections.abc import Iterable
     from uuid import UUID
 
+    from sqlalchemy import Select
     from sqlmodel.ext.asyncio.session import AsyncSession
+    from sqlmodel.sql._expression_select_cls import SelectOfScalar
 
     from syntara.authz.engine import AllowedProjectsResult
     from syntara.core.models import User
@@ -24,7 +26,8 @@ if TYPE_CHECKING:
 from syntara.audit.dispatcher import AuditEventDispatcher
 from syntara.core.models.user_reference import UserReference, UserReferenceType
 from syntara.core.services import BaseService, GroupMembershipService
-from syntara.core.services.user_reference_resolution import DELETED_USER_NAME
+from syntara.core.services.extensions import EnrichQueryMixin
+from syntara.core.services.user_reference_resolution import DELETED_USER_NAME, UserReferenceResolverMixin
 from syntara.forms.audit.form_prompt import (
     FormPromptCreatedEvent,
     FormPromptExpiredEvent,
@@ -49,7 +52,7 @@ from syntara.forms.models.api_models import (
     ResponderUserSummary,
     can_transition,
 )
-from syntara.forms.models.form_prompt import FormPrompt, FormPromptListResponse, FormPromptRead
+from syntara.forms.models.form_prompt import FormPrompt, FormPromptListRead, FormPromptListResponse, FormPromptRead
 from syntara.forms.models.form_prompt_responders import FormPromptResponderGroup, FormPromptResponderUser
 from syntara.forms.validators.submission import validate_form_submission, validate_prompt_submission_state
 from syntara.metrics.dependencies import get_metrics_recorder
@@ -60,7 +63,20 @@ from syntara.workflows.models.execution import Execution
 logger = structlog.stdlib.get_logger(__name__)
 
 
-class FormPromptService(BaseService):
+class FormPromptEnrichQuery(EnrichQueryMixin):
+    """Eagerly load responder for list conversion and user-reference resolution."""
+
+    def enrich(  # type: ignore[override]
+        self,
+        query: Select[tuple[FormPrompt]] | SelectOfScalar[tuple[FormPrompt]],
+    ) -> Select[tuple[FormPrompt]] | SelectOfScalar[tuple[FormPrompt]]:
+        """Add selectinload for the responder relationship."""
+        return query.options(
+            selectinload(FormPrompt.responder),  # type: ignore[arg-type]
+        )
+
+
+class FormPromptService(UserReferenceResolverMixin, BaseService):
     """Service for managing form prompts.
 
     Service covering workflow engine needs:
@@ -82,7 +98,11 @@ class FormPromptService(BaseService):
             user: Current authenticated user or service principal
 
         """
-        super().__init__(session=session, user=user)
+        super().__init__(
+            session=session,
+            user=user,
+            enrich_query_mixin=FormPromptEnrichQuery(),
+        )
 
     async def _get_form_prompt_record(self, prompt_id: UUID) -> FormPrompt | None:
         """Fetch a prompt with relationships required by ``FormPromptRead`` eagerly loaded."""
@@ -317,9 +337,63 @@ class FormPromptService(BaseService):
             FormPromptListResponse with form prompts, pagination metadata, and optional total
 
         """
+        executions_by_id: dict[UUID, Execution] = {}
+
+        async def _fetch_executions(prompts: list[FormPrompt]) -> None:
+            if not prompts:
+                return
+            execution_ids = {prompt.execution_id for prompt in prompts}
+            execution_result = await self.session.exec(
+                select(Execution)
+                .where(Execution.id.in_(execution_ids))  # type: ignore[attr-defined]
+                .options(
+                    selectinload(Execution.workflow),  # type: ignore[arg-type]
+                    selectinload(Execution.workflow_version),  # type: ignore[arg-type]
+                )
+            )
+            executions_by_id.clear()
+            executions_by_id.update({execution.id: execution for execution in execution_result.all()})
+
+        def _to_list_read(prompt: FormPrompt) -> FormPromptListRead:
+            execution = executions_by_id.get(prompt.execution_id)
+            workflow_id: UUID | None = None
+            workflow_version: int | None = None
+            workflow_name: str | None = None
+            if execution is not None:
+                workflow_id = execution.workflow_id
+                workflow = execution.workflow
+                workflow_name = workflow.name if workflow is not None else None
+                version_record = execution.workflow_version
+                if version_record is not None:
+                    workflow_version = version_record.version
+
+            list_read = FormPromptListRead(
+                id=prompt.id,
+                created_at=prompt.created_at,
+                execution_id=prompt.execution_id,
+                project_id=prompt.project_id,
+                prompt_node_id=prompt.prompt_node_id,
+                name=prompt.name,
+                status=prompt.status,
+                timeout_at=prompt.timeout_at,
+                responded_at=prompt.responded_at,
+                workflow_id=workflow_id,
+                workflow_version=workflow_version,
+                workflow_name=workflow_name or "Unknown",
+            )
+            if prompt.responded_by is not None:
+                list_read.responded_by = UserReference(
+                    id=prompt.responded_by,
+                    name="",
+                    type=UserReferenceType.USER,
+                )
+            return list_read
+
         return await self.list_resources(
             model=FormPrompt,
             response_type=FormPromptListResponse,
+            response_type_converter=_to_list_read,
+            post_query_callback=_fetch_executions,
             limit=limit,
             cursor=cursor,
             sort=sort,

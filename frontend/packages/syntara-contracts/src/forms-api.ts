@@ -694,11 +694,77 @@ export interface components {
       temporal_activity_id: string
     }
     /**
+     * FormPromptListRead
+     * @description User-facing form prompt row for list endpoints (Tasks / Form responses table).
+     */
+    FormPromptListRead: {
+      /**
+       * Id
+       * Format: uuid
+       * @description Form prompt unique identifier
+       */
+      id: string
+      /**
+       * Created At
+       * Format: date-time
+       * @description When the form prompt was created
+       */
+      created_at: string
+      /**
+       * Execution Id
+       * Format: uuid
+       * @description Parent workflow execution ID
+       */
+      execution_id: string
+      /**
+       * Project Id
+       * Format: uuid
+       * @description Project ID (denormalized from execution)
+       */
+      project_id: string
+      /**
+       * Prompt Node Id
+       * @description Canvas node ID from the workflow definition
+       */
+      prompt_node_id: string
+      /**
+       * Name
+       * @description Display name for the form prompt
+       */
+      name: string
+      /** @description Current prompt status */
+      status: components['schemas']['FormPromptStatus']
+      /**
+       * Timeout At
+       * @description When this prompt expires (null = no timeout)
+       */
+      timeout_at?: string | null
+      /**
+       * Responded At
+       * @description When the response was submitted (null until submitted)
+       */
+      responded_at?: string | null
+      /** @description User who submitted the response */
+      readonly responded_by?: components['schemas']['UserReference'] | null
+      /**
+       * Workflow Id
+       * @description ID of the parent workflow
+       */
+      workflow_id?: string | null
+      /**
+       * Workflow Version
+       * @description Integer version number of the workflow version executed
+       */
+      workflow_version?: number | null
+      /**
+       * Workflow Name
+       * @description Name of the parent workflow
+       */
+      workflow_name?: string | null
+    }
+    /**
      * FormPromptListResponse
      * @description Paginated list response for form prompts.
-     *
-     *     Uses FormPromptSummary (8 documented fields) for internal workflow engine endpoints.
-     *     AAP-91889 will add user-facing list endpoints using FormPromptRead.
      * @example {
      *       "next": "eyJpZCI6InV1aWQifQ",
      *       "total": 150
@@ -728,7 +794,7 @@ export interface components {
        * Resources
        * @description Array of resources in current page
        */
-      resources: components['schemas']['FormPromptSummary'][]
+      resources: components['schemas']['FormPromptListRead'][]
     }
     /**
      * FormPromptStatus
@@ -904,6 +970,34 @@ export interface components {
       total_failed: number
     }
     /**
+     * UserReferenceType
+     * @description Kind of principal a UserReference points at.
+     *
+     *     Only ``user`` references have a user detail page. ``deleted_user`` and
+     *     ``deleted_service_account`` mark principals that were hard-deleted but are
+     *     still recorded as the actor.
+     * @enum {string}
+     */
+    UserReferenceType: 'user' | 'service_account' | 'service' | 'system' | 'deleted_user' | 'deleted_service_account'
+    /**
+     * UserReference
+     * @description Minimal user identification for embedding in other resources.
+     *     The name is resolved from the database when the response is built, not
+     *     stored alongside the id, so it always reflects the principal's current
+     *     name. Renaming a user therefore changes the name shown for their past actions.
+     */
+    UserReference: {
+      /**
+       * Format: uuid
+       * @description User's unique identifier
+       */
+      id: string
+      /** @description Principal's current display name, resolved when the response is built. Not a username: for a user this is their first and last name, falling back to the username when both are blank; for a service account it is the account name; for an internal service it is derived from the certificate CN. */
+      name: string
+      /** @description Kind of principal this reference points at. Only `user` references have a user detail page; `deleted_user` / `deleted_service_account` are hard-deleted principals that are still recorded as the actor. */
+      type: components['schemas']['UserReferenceType']
+    }
+    /**
      * ErrorData
      * @description RFC 9457 Problem Details format for error event data.
      *     This model is used for streaming error events and follows the RFC 9457 Problem Details specification. It provides machine-readable and human-readable error information with consistent structure.
@@ -968,34 +1062,6 @@ export interface components {
        * @example /invocations/550e8400-e29b-41d4-a716-446655440000
        */
       instance?: string | null
-    }
-    /**
-     * UserReferenceType
-     * @description Kind of principal a UserReference points at.
-     *
-     *     Only ``user`` references have a user detail page. ``deleted_user`` and
-     *     ``deleted_service_account`` mark principals that were hard-deleted but are
-     *     still recorded as the actor.
-     * @enum {string}
-     */
-    UserReferenceType: 'user' | 'service_account' | 'service' | 'system' | 'deleted_user' | 'deleted_service_account'
-    /**
-     * UserReference
-     * @description Minimal user identification for embedding in other resources.
-     *     The name is resolved from the database when the response is built, not
-     *     stored alongside the id, so it always reflects the principal's current
-     *     name. Renaming a user therefore changes the name shown for their past actions.
-     */
-    UserReference: {
-      /**
-       * Format: uuid
-       * @description User's unique identifier
-       */
-      id: string
-      /** @description Principal's current display name, resolved when the response is built. Not a username: for a user this is their first and last name, falling back to the username when both are blank; for a service account it is the account name; for an internal service it is derived from the certificate CN. */
-      name: string
-      /** @description Kind of principal this reference points at. Only `user` references have a user detail page; `deleted_user` / `deleted_service_account` are hard-deleted principals that are still recorded as the actor. */
-      type: components['schemas']['UserReferenceType']
     }
   }
   responses: {

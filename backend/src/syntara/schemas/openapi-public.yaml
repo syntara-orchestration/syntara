@@ -31117,14 +31117,93 @@ components:
           maxLength: 512
           title: Temporal Activity Id
           description: Temporal activity ID for async completion
+    FormPromptListRead:
+      type: object
+      title: FormPromptListRead
+      description: User-facing form prompt row for list endpoints (Tasks / Form responses table).
+      required:
+        - id
+        - created_at
+        - execution_id
+        - project_id
+        - prompt_node_id
+        - name
+        - status
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+          description: Form prompt unique identifier
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+          description: When the form prompt was created
+        execution_id:
+          type: string
+          format: uuid
+          title: Execution Id
+          description: Parent workflow execution ID
+        project_id:
+          type: string
+          format: uuid
+          title: Project Id
+          description: Project ID (denormalized from execution)
+        prompt_node_id:
+          type: string
+          title: Prompt Node Id
+          description: Canvas node ID from the workflow definition
+        name:
+          type: string
+          title: Name
+          description: Display name for the form prompt
+        status:
+          $ref: '#/components/schemas/FormPromptStatus'
+          description: Current prompt status
+        timeout_at:
+          anyOf:
+            - type: string
+              format: date-time
+            - type: 'null'
+          title: Timeout At
+          description: When this prompt expires (null = no timeout)
+        responded_at:
+          anyOf:
+            - type: string
+              format: date-time
+            - type: 'null'
+          title: Responded At
+          description: When the response was submitted (null until submitted)
+        responded_by:
+          anyOf:
+            - $ref: '#/components/schemas/UserReference'
+            - type: 'null'
+          description: User who submitted the response
+          readOnly: true
+        workflow_id:
+          anyOf:
+            - type: string
+              format: uuid
+            - type: 'null'
+          title: Workflow Id
+          description: ID of the parent workflow
+        workflow_version:
+          anyOf:
+            - type: integer
+            - type: 'null'
+          title: Workflow Version
+          description: Integer version number of the workflow version executed
+        workflow_name:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Workflow Name
+          description: Name of the parent workflow
     FormPromptListResponse:
       type: object
       title: FormPromptListResponse
-      description: |-
-        Paginated list response for form prompts.
-
-        Uses FormPromptSummary (8 documented fields) for internal workflow engine endpoints.
-        AAP-91889 will add user-facing list endpoints using FormPromptRead.
+      description: Paginated list response for form prompts.
       required:
         - resources
       properties:
@@ -31153,7 +31232,7 @@ components:
           title: Resources
           description: Array of resources in current page
           items:
-            $ref: '#/components/schemas/FormPromptSummary'
+            $ref: '#/components/schemas/FormPromptListRead'
       examples:
         - next: eyJpZCI6InV1aWQifQ
           total: 150
