@@ -54,6 +54,11 @@ class ActivityExecutionSynchronizer:
                 )
                 existing_activities = {activity.activity_name: activity for activity in result.all()}
 
+                # Retry-replayed nodes are recorded node-by-node below with this
+                # run's event times; load the source timestamps that override them.
+                if metadata.is_retry:
+                    await self.host._refresh_restored_timestamps(metadata, handle)
+
                 updated_activities: list[tuple[ActivityExecution, dict[str, Any]]] = []
                 new_iteration_activities: list[ActivityExecution] = []
 

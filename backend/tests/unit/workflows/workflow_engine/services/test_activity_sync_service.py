@@ -5972,3 +5972,150 @@ class TestActivitySyncPreservesIoOnQueryFailure:
 
         assert activity.output_data == heartbeat_partial
         assert activity.status == ActivityStatus.RUNNING
+
+
+class TestRestoredTimestampOverride:
+    """Retry-replayed nodes must report their source-run timestamps, not the restore time.
+
+    A regular restored node is replayed under its own id, so the normal event
+    path records it node-by-node with this run's event times. These tests cover
+    loading the source timestamps and applying them over the event times.
+    """
+
+    def setup_method(self) -> None:
+        self.service = ActivitySyncService(Mock(), Mock())
+        self.execution_id = uuid4()
+
+    def _build_activity_data(self, status: ActivityStatus) -> dict[str, Any]:
+        return {
+            "activity_id": "script_1",
+            "activity_name": "script_1",
+            "_is_loop_iteration": False,
+            "_is_loop_control": False,
+            "status": status,
+            "started_at": datetime(2026, 6, 1, 12, 0, 0, tzinfo=UTC),  # this run's event time
+            "completed_at": datetime(2026, 6, 1, 12, 0, 1, tzinfo=UTC),
+            "error_details": None,
+            "retry_count": 0,
+            "iteration": None,
+            "scheduled_at": datetime(2026, 6, 1, 12, 0, 0, tzinfo=UTC),
+            "configured_timeout_seconds": None,
+        }
+
+    def test_parse_source_timestamp_round_trips_iso(self) -> None:
+        parsed = self.service._parse_source_timestamp("2026-01-01T00:00:00+00:00")
+        assert parsed == datetime(2026, 1, 1, 0, 0, 0, tzinfo=UTC)
+
+    def test_parse_source_timestamp_handles_none_and_garbage(self) -> None:
+        assert self.service._parse_source_timestamp(None) is None
+        assert self.service._parse_source_timestamp("") is None
+        assert self.service._parse_source_timestamp("not-a-date") is None
+
+    @pytest.mark.asyncio
+    async def test_refresh_populates_metadata_from_workflow_query(self) -> None:
+        metadata = create_test_metadata(execution_id=self.execution_id)
+        handle = AsyncMock()
+        handle.query = AsyncMock(
+            return_value={
+                "script_1": {"started_at": "2026-01-01T00:00:00+00:00", "completed_at": "2026-01-01T00:05:00+00:00"}
+            }
+        )
+
+        await self.service._refresh_restored_timestamps(metadata, handle)
+
+        handle.query.assert_awaited_once_with("get_restored_activity_timestamps")
+        assert metadata.restored_activity_timestamps["script_1"] == {
+            "started_at": datetime(2026, 1, 1, 0, 0, 0, tzinfo=UTC),
+            "completed_at": datetime(2026, 1, 1, 0, 5, 0, tzinfo=UTC),
+        }
+
+    @pytest.mark.asyncio
+    async def test_refresh_swallows_query_failure(self) -> None:
+        from temporalio.exceptions import TemporalError
+
+        metadata = create_test_metadata(execution_id=self.execution_id)
+        handle = AsyncMock()
+        handle.query = AsyncMock(side_effect=TemporalError("worker gone"))
+
+        await self.service._refresh_restored_timestamps(metadata, handle)
+
+        assert metadata.restored_activity_timestamps == {}
+
+    @pytest.mark.asyncio
+    async def test_completed_restored_node_uses_source_timestamps(self) -> None:
+        existing = Mock(spec=ActivityExecution)
+        existing.activity_name = "script_1"
+        existing.status = ActivityStatus.RUNNING
+        existing.node_type = NodeType.SCRIPT
+        existing.started_at = None
+        existing.completed_at = None
+        existing.input_data = {}
+        existing.output_data = None
+        existing.error_details = None
+        existing.retry_count = 0
+        existing.iteration = None
+        existing.updated_at = datetime(2026, 6, 1, 12, 0, 0, tzinfo=UTC)
+
+        metadata = create_test_metadata(execution_id=self.execution_id)
+        metadata.restored_activity_timestamps = {
+            "script_1": {
+                "started_at": datetime(2026, 1, 1, 0, 0, 0, tzinfo=UTC),
+                "completed_at": datetime(2026, 1, 1, 0, 5, 0, tzinfo=UTC),
+            }
+        }
+
+        with patch.object(
+            self.service,
+            "_query_activity_io",
+            new_callable=AsyncMock,
+            return_value=({"input": "data"}, {"output": "data"}),
+        ):
+            result = await self.service._process_single_activity_sync(
+                metadata,
+                Mock(),
+                self._build_activity_data(ActivityStatus.COMPLETED),
+                {"script_1": existing},
+                Mock(),
+            )
+
+        assert result is not None
+        activity, _old_values, _is_new = result
+        # Source-run timestamps win over this run's event times.
+        assert activity.started_at == datetime(2026, 1, 1, 0, 0, 0, tzinfo=UTC)
+        assert activity.completed_at == datetime(2026, 1, 1, 0, 5, 0, tzinfo=UTC)
+
+    @pytest.mark.asyncio
+    async def test_non_restored_node_keeps_event_timestamps(self) -> None:
+        existing = Mock(spec=ActivityExecution)
+        existing.activity_name = "script_1"
+        existing.status = ActivityStatus.RUNNING
+        existing.node_type = NodeType.SCRIPT
+        existing.started_at = None
+        existing.completed_at = None
+        existing.input_data = {}
+        existing.output_data = None
+        existing.error_details = None
+        existing.retry_count = 0
+        existing.iteration = None
+        existing.updated_at = datetime(2026, 6, 1, 12, 0, 0, tzinfo=UTC)
+
+        metadata = create_test_metadata(execution_id=self.execution_id)  # no restored timestamps
+
+        with patch.object(
+            self.service,
+            "_query_activity_io",
+            new_callable=AsyncMock,
+            return_value=({"input": "data"}, {"output": "data"}),
+        ):
+            result = await self.service._process_single_activity_sync(
+                metadata,
+                Mock(),
+                self._build_activity_data(ActivityStatus.COMPLETED),
+                {"script_1": existing},
+                Mock(),
+            )
+
+        assert result is not None
+        activity, _old_values, _is_new = result
+        assert activity.started_at == datetime(2026, 6, 1, 12, 0, 0, tzinfo=UTC)
+        assert activity.completed_at == datetime(2026, 6, 1, 12, 0, 1, tzinfo=UTC)
