@@ -31,7 +31,7 @@ How the UI is anchored:
 - **Layout** — Page and shell structure follow PatternFly's **Compass** layout architecture
 - **Theming** — Visual treatment uses PatternFly's **Unified Theme**
 - **Icons** — Use icons with the `RhUi` prefix (e.g., `RhUiAddIcon`, `RhUiEditIcon`), NOT standard PatternFly defaults
-- **Automation builder** — Based on [React Flow](https://reactflow.dev/) with PatternFly as visual wrapper
+- **Automation builder** — Based on [React Flow](https://reactflow.dev/) with PatternFly as visual wrapper. Use **step** in user-facing copy and UX guidance; reserve **node** for React Flow and other technical identifiers.
 - **Accessibility** — Must achieve [WCAG 2.1 AA](https://www.w3.org/WAI/WCAG2AA-Conformance) and [Section 508](https://www.section508.gov/) compliance
 - **PatternFly gaps** — Check PF docs first → Raise with UX team → Engage PatternFly → Document with `patternfly-override` label → Resolve upstream
 - **`Syn` prefix convention** — opinionated global components use the `Syn` prefix (e.g., `SynPage`, `SynPanel`, `SynConfirmationDialog`, `SynDetailList`, `SynUrlTabs`, `SynListPanel`) in `src/components/` organized by: `layout/`, `dialogs/`, `details/`, `tabs/`, `states/`, `labels/`, `table/`, `panels/`. Use the `Syn*` wrapper, not the raw PF component.
@@ -352,8 +352,8 @@ All icons MUST use the **`RhUi` prefix** (e.g., `RhUiAddIcon`, `RhUiEditIcon`, `
 - **Node settings:** `NodeFormTabsLayout` splits node forms into Parameters + Settings tabs. Settings tab: continue-on-failure (three-way select), timeout, retry via shared `NodeSettingsForm`. System defaults as live placeholders from `/settings`. Hidden for Condition/Switch/triggers.
 - **Node panel navigation:** Previous/Next arrow controls on panel edges for navigating connected steps. Single target = icon button + tooltip; multiple = dropdown menu. Uses `useAdjacentNodes`.
 - **Node disable/enable:** Activity nodes (Task, Approval) get Disable/Enable kebab action (no confirmation). Disabled = dashed gray border + 50% opacity. Control flow nodes only get Replace + Delete.
-- **Switch node expressions:** Paths share `ExpressionBuilderCore` (AND/OR groups + custom expression toggle). Drag-reorder paths via `@dnd-kit/sortable` with grip handle.
-- **Approval side panel:** Right-side panel on execution viewer for inline approval review. Mutually exclusive with history panel; auto-opens on pending approval via `useAutoApprovalDetection`. **Multi-approval navigation:** `ApprovalNavigationHeader` with prev/next arrows, "2 of 5" counter, keyboard nav support.
+- **Switch node expressions:** Paths share `ExpressionBuilderCore` (AND/OR groups + custom expression toggle). Label the selector "Condition type" with "Form builder" and "Freeform text" options; default the editor group label to "Condition". Keep visible and accessible labels in shared constants. Drag-reorder paths via `@dnd-kit/sortable` with grip handle.
+- **Approval side panel:** Right-side panel on execution viewer for inline approval review. Mutually exclusive with history panel; auto-open on pending approval via `useAutoApprovalDetection` only when history is not open, so automatic state never replaces the user's current context. **Multi-approval navigation:** `ApprovalNavigationHeader` with prev/next arrows, "2 of 5" counter, keyboard nav support.
 - **Wait node countdown:** Live `HH:MM:SS` countdown on canvas during execution via `useWaitCountdown` (1s interval). Clears on terminal status.
 - **Import confirmation:** Modal with radio choices ("Import as new" vs "Import into current") for existing saved workflows. Direct import for new/empty. Warns about unsaved changes when `isDirty`.
 - **Run history rows:** Use `HistoryListItemLink` (real `<a>` via TanStack Router), not `Button` + `navigate`. Overlay pattern when row has nested controls (version link, kebab). `SynLink` cannot be used — it renders a Button.

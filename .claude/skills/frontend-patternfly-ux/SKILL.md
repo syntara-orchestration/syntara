@@ -1423,6 +1423,10 @@ For panels that display structured data (input/output panels in the workflow bui
 
 The automation builder experience is based on [React Flow](https://reactflow.dev/) as the underlying graph/canvas foundation, with PatternFly as the visual wrapper. The canvas is built **left to right**.
 
+### Step Terminology
+
+Use **step** in user-facing copy and UX guidance: for example, "Add step", "Run step", and "Step settings". Reserve **node** for technical identifiers and implementation concepts such as React Flow APIs, data fields, component names, and hooks. This keeps the operator-facing vocabulary consistent without obscuring the underlying graph model for contributors.
+
 ### Builder Toolbar Action Hierarchy
 
 Primary actions are always visible in the toolbar; secondary actions and views live in a grouped kebab menu.
@@ -1709,6 +1713,7 @@ Activity nodes (Task, Approval) support toggling their enabled state directly fr
 
 Switch node paths share the same `ExpressionBuilderCore` used by Condition nodes, providing visual AND/OR expression groups with a custom expression mode toggle.
 
+- **Mode copy:** Label the selector "Condition type". Its options are "Form builder" and "Freeform text"; the editor group defaults to the accessible label "Condition". Keep visible and accessible labels in one shared constants module so they cannot drift.
 - **Expression groups:** Level-0 groups have no border; nested groups get a left accent border for visual hierarchy
 - **Path reordering:** Drag-reorder paths via `@dnd-kit/sortable` with inline `RhUiGripVerticalFillIcon` grip handle, `DragOverlay`, and `restrictToVerticalAxis`
 - **Path identity:** Each path uses `caseId` (not `id`) for stable edge remapping during reorder
@@ -1727,8 +1732,8 @@ Payload-validation UI for webhook and event-driven (EDA) triggers uses a **Simpl
 Pending approval review happens inline in the execution viewer rather than on a dedicated full-page route.
 
 - **Layout:** Right-side `SynPanel isFullHeight` + `SidePanelHeader` + scrollable `ApprovalDetailContent`; mirrors `WorkflowHistoryCard` layout pattern
-- **Mutual exclusivity:** History panel and approval panel cannot be open simultaneously
-- **Auto-open:** `useAutoApprovalDetection` automatically opens the panel when a pending approval is detected on the current execution
+- **Mutual exclusivity:** History panel and approval panel cannot be open simultaneously. Auto-detection must not replace an open history panel; preserve the user's current context and let them open the approval panel explicitly.
+- **Auto-open:** `useAutoApprovalDetection` automatically opens the panel when a pending approval is detected on the current execution, unless the user is viewing run history
 - **Components:** `ApprovalSidePanel`, `useExecutionApprovalPanel`, `ApprovalDetailContent`
 
 **Multi-approval navigation (`ApprovalNavigationHeader`):**
