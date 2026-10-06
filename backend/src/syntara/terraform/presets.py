@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Any, Literal, assert_never
 
 from syntara.terraform.errors import TFEError, TFEErrorCode
 
@@ -63,5 +63,4 @@ def workspace_preset_parts(
             raise _validation(_GITHUB_REQUIRED)
         return _vcs_repo(repository, branch, {"github-app-installation-id": github_app_installation_id}), {}
 
-    message = f"Unknown workspace preset '{preset}'"
-    raise _validation(message)
+    assert_never(preset)

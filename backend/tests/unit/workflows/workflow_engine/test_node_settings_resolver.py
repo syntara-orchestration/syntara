@@ -71,7 +71,9 @@ def test_resolve_max_output_bytes_non_script_node() -> None:
 def test_tfe_standard_timeout_uses_catalog_default() -> None:
     """TFE API steps resolve to workflow_engine.tfe_timeout_seconds, not the 30s fallback."""
     defaults = _catalog_defaults()
-    expected = int(defaults["workflow_engine.tfe_timeout_seconds"])
+    tfe_timeout = defaults["workflow_engine.tfe_timeout_seconds"]
+    assert isinstance(tfe_timeout, int)
+    expected = tfe_timeout
     assert expected > DEFAULT_ACTIVITY_TIMEOUT_SECONDS
     for node_type in _TFE_STANDARD_SAMPLES:
         assert get_default_timeout(node_type, defaults) == expected
@@ -80,8 +82,12 @@ def test_tfe_standard_timeout_uses_catalog_default() -> None:
 def test_tfe_upload_timeout_uses_long_running_catalog_default() -> None:
     """Configuration uploads use a longer catalog timeout than ordinary TFE steps."""
     defaults = _catalog_defaults()
-    upload = int(defaults["workflow_engine.tfe_upload_timeout_seconds"])
-    standard = int(defaults["workflow_engine.tfe_timeout_seconds"])
+    upload_value = defaults["workflow_engine.tfe_upload_timeout_seconds"]
+    standard_value = defaults["workflow_engine.tfe_timeout_seconds"]
+    assert isinstance(upload_value, int)
+    assert isinstance(standard_value, int)
+    upload = upload_value
+    standard = standard_value
     assert upload > standard
     assert get_default_timeout(NodeType.TFE_UPLOAD_CONFIGURATION_VERSION, defaults) == upload
 
