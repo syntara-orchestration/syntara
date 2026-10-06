@@ -163,6 +163,33 @@ describe('FlatFormResponsesTableBody', () => {
     expect(screen.getByText('Fill this in')).toBeInTheDocument()
   })
 
+  it('links pending rows to the execution form prompt responder (shared FormPromptResponseContent surface)', () => {
+    const Wrapper = createWrapper()
+    render(
+      <Wrapper>
+        <Table aria-label="Form responses" isExpandable>
+          <FlatFormResponsesTableBody
+            {...defaultProps}
+            rows={[
+              makeRow({
+                id: 'fp-exec-form-prompt-dynamic',
+                execution_id: 'exec-form-prompt',
+                prompt_node_id: 'pick_environment',
+                name: 'Pick environment',
+              }),
+            ]}
+          />
+        </Table>
+      </Wrapper>
+    )
+
+    const link = screen.getByRole('link', { name: 'Pick environment' })
+    expect(link).toHaveAttribute(
+      'href',
+      '/executions/exec-form-prompt?form_prompt=fp-exec-form-prompt-dynamic&history=closed'
+    )
+  })
+
   it('links to the workflow builder when workflowId is set without a version', () => {
     const Wrapper = createWrapper()
     render(

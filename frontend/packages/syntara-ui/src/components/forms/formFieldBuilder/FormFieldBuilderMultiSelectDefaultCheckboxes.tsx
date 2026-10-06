@@ -9,6 +9,7 @@ import { optionKey, type OptionScalarValue } from '../dynamicForm/synDynamicForm
 
 import styles from './formFieldBuilder.module.css'
 import { useFormFieldBuilderCommit } from './formFieldBuilderCommitContext'
+import { FORM_FIELD_BUILDER_INITIAL_ANSWER_LABEL } from './formFieldBuilderInitialAnswerCopy'
 
 type StaticOptionRow = {
   display_label: string
@@ -75,7 +76,11 @@ export function FormFieldBuilderMultiSelectDefaultCheckboxes({
         const selected = normalizeDefault(rhfField.value)
 
         return (
-          <FormGroup label="Default value" fieldId={`${idPrefix}-default`} labelHelp={labelHelp}>
+          <FormGroup
+            label={FORM_FIELD_BUILDER_INITIAL_ANSWER_LABEL}
+            fieldId={`${idPrefix}-default`}
+            labelHelp={labelHelp}
+          >
             <div className={styles.defaultValueCheckboxList}>
               {options.map((option) => {
                 const checkboxId = `${idPrefix}-default-${optionKey(option.value)}`

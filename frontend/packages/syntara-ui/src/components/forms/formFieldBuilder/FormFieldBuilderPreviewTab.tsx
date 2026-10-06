@@ -4,6 +4,11 @@ import { useMemo } from 'react'
 import { useFormContext, useWatch } from 'react-hook-form'
 
 import { safeParseFormDefinition } from '../../../forms'
+import {
+  formDefinitionHasUnresolvedDynamicOptions,
+  FORM_PROMPT_PREVIEW_DYNAMIC_OPTIONS_ALERT_BODY,
+  FORM_PROMPT_PREVIEW_DYNAMIC_OPTIONS_ALERT_TITLE,
+} from '../../../forms/formPromptDynamicOptions'
 import { SynDynamicForm } from '../SynDynamicForm'
 
 export function FormFieldBuilderPreviewTab() {
@@ -27,13 +32,26 @@ export function FormFieldBuilderPreviewTab() {
     )
   }
 
+  const showDynamicOptionsNotice = parsed.success && formDefinitionHasUnresolvedDynamicOptions(parsed.data)
+
   return (
-    <SynDynamicForm
-      definition={parsed.data}
-      hideSubmitButton
-      isReadOnly
-      onSubmit={() => undefined}
-      description="Preview of the configured form. Dynamic options are not resolved in the builder."
-    />
+    <Stack hasGutter>
+      {showDynamicOptionsNotice ? (
+        <StackItem>
+          <Alert variant="info" isInline title={FORM_PROMPT_PREVIEW_DYNAMIC_OPTIONS_ALERT_TITLE}>
+            {FORM_PROMPT_PREVIEW_DYNAMIC_OPTIONS_ALERT_BODY}
+          </Alert>
+        </StackItem>
+      ) : null}
+      <StackItem>
+        <SynDynamicForm
+          definition={parsed.data}
+          hideSubmitButton
+          isReadOnly
+          onSubmit={() => undefined}
+          description="Preview of the configured form."
+        />
+      </StackItem>
+    </Stack>
   )
 }

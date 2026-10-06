@@ -299,6 +299,32 @@ describe('SynDynamicForm', () => {
     expect(await screen.findByRole('option', { name: 'US East' })).toBeInTheDocument()
   })
 
+  it('renders workflow-resolved dynamic options without a client resolver', async () => {
+    const user = userEvent.setup()
+
+    const definition = parseFormDefinition({
+      fields: [
+        {
+          type: FormFieldTypeEnum.DROPDOWN,
+          value_name: 'region',
+          label: 'Region',
+          options: {
+            source: 'dynamic_resolved',
+            values: [
+              { display_label: 'US East', value: 'use1' },
+              { display_label: 'EU West', value: 'euw1' },
+            ],
+          },
+        },
+      ],
+    })
+
+    renderWithQueryClient(<SynDynamicForm definition={definition} onSubmit={vi.fn()} hideSubmitButton />)
+
+    await user.click(screen.getByRole('button', { name: 'Region' }))
+    expect(await screen.findByRole('option', { name: 'US East' })).toBeInTheDocument()
+  })
+
   it('has no accessibility violations on initial render', async () => {
     const { container } = renderWithQueryClient(
       <SynDynamicForm

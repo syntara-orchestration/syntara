@@ -40,16 +40,34 @@ const sampleFormDefinition: FormsAPI.components['schemas']['FormDefinition'] = {
   ],
 }
 
+const dynamicResolvedFormDefinition: FormsAPI.components['schemas']['FormDefinition'] = {
+  fields: [
+    {
+      value_name: 'environment',
+      type: 'dropdown',
+      label: 'Environment',
+      required: true,
+      options: {
+        source: 'dynamic_resolved',
+        values: [
+          { display_label: 'Development', value: 'dev' },
+          { display_label: 'Production', value: 'prod' },
+        ],
+      },
+    },
+  ],
+}
+
 /** Maps a full form prompt record to the list-row shape returned by GET /form_prompts. */
 export function formPromptToListRead(prompt: FormPromptRead): FormPromptListRead {
   return {
-    id: prompt.id,
-    created_at: prompt.created_at,
+    id: prompt.id!,
+    created_at: prompt.created_at!,
     execution_id: prompt.execution_id,
     project_id: prompt.project_id,
     prompt_node_id: prompt.prompt_node_id,
     name: prompt.name,
-    status: prompt.status,
+    status: prompt.status!,
     timeout_at: prompt.timeout_at ?? null,
     responded_at: prompt.responded_at ?? null,
     responded_by: prompt.responded_by ?? null,
@@ -102,5 +120,26 @@ export const formPrompts: FormPromptRead[] = [
     response_data: { reason: 'Approved for production rollout' },
     responded_at: mockDate.daysAgo1,
     responded_by: { id: 'user-admin', name: 'Admin User', type: 'user' },
+  },
+  {
+    id: 'fp-exec-form-prompt-dynamic',
+    created_at: mockDate.minutesAgo10,
+    updated_at: mockDate.minutesAgo10,
+    labels: {},
+    project_id: 'p-001',
+    execution_id: 'exec-form-prompt',
+    prompt_node_id: 'pick_environment',
+    name: 'Pick environment',
+    message: 'Choose where to deploy.',
+    status: 'pending',
+    timeout_at: mockDate.hoursFromNow23,
+    form_definition: dynamicResolvedFormDefinition,
+    submit_label: 'Submit response',
+    success_message: 'Deployment will continue.',
+    responder_users: [{ id: 'user-admin', username: 'admin' }],
+    responder_groups: [],
+    response_data: null,
+    responded_at: null,
+    responded_by: null,
   },
 ]

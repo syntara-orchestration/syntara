@@ -20,6 +20,7 @@ import { DisabledWithTooltip } from '../../components/DisabledWithTooltip'
 import { SynDynamicForm } from '../../components/forms/SynDynamicForm'
 import { SynEmptyStateAccessDenied } from '../../components/states/SynEmptyStateAccessDenied'
 import { useQueryState } from '../../components/states/useQueryState'
+import { formDefinitionHasUnresolvedDynamicOptions } from '../../forms/formPromptDynamicOptions'
 import { invalidateAuthzCaches } from '../../hooks/invalidateAuthzCaches'
 import { useMutationErrorHandler } from '../../hooks/useMutationErrorHandler'
 import { useAlerts } from '../../providers/alerts'
@@ -32,6 +33,7 @@ import {
   resolveFormPromptWaitingStartedAt,
 } from './formPrompt/formPromptNodeId'
 import { formPromptClosedStatusLabel, isFormPromptResponsePending } from './formPrompt/formPromptResponseState'
+import { FormPromptUnresolvedDynamicOptionsAlert } from './formPrompt/FormPromptUnresolvedDynamicOptionsAlert'
 import type { WorkflowDefinitionLike } from './formPrompt/resolveCanvasNodeType'
 import { resolveFormPromptRunningLongThresholdSeconds } from './formPrompt/resolveFormPromptRunningLongThreshold'
 import styles from './FormPromptResponseContent.module.css'
@@ -181,6 +183,7 @@ function FormPromptResponseBody({
     prompt.prompt_node_id,
     workflowDefinition
   )
+  const hasUnresolvedDynamicOptions = formDefinitionHasUnresolvedDynamicOptions(prompt.form_definition)
 
   return (
     <Stack hasGutter className={styles.outerStack}>
@@ -205,6 +208,7 @@ function FormPromptResponseBody({
           ) : null}
           {isPending ? (
             <StackItem>
+              {hasUnresolvedDynamicOptions ? <FormPromptUnresolvedDynamicOptionsAlert /> : null}
               <SynDynamicForm
                 id={responseFormId}
                 definition={prompt.form_definition}

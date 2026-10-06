@@ -11,6 +11,11 @@ import { FormFieldBuilderDateDefaultPicker } from './FormFieldBuilderDateDefault
 import { FormFieldBuilderDropdownDefaultSelect } from './FormFieldBuilderDropdownDefaultSelect'
 import { getFormFieldBuilderExamplePlaceholders } from './formFieldBuilderExamplePlaceholders'
 import { formFieldBuilderLabelHelp } from './formFieldBuilderFieldHelp'
+import {
+  FORM_FIELD_BUILDER_INITIAL_ANSWER_CHECKBOX_LABEL,
+  FORM_FIELD_BUILDER_INITIAL_ANSWER_DYNAMIC_UNAVAILABLE_HINT,
+  FORM_FIELD_BUILDER_INITIAL_ANSWER_LABEL,
+} from './formFieldBuilderInitialAnswerCopy'
 import { FormFieldBuilderMultiSelectDefaultCheckboxes } from './FormFieldBuilderMultiSelectDefaultCheckboxes'
 
 type FormFieldBuilderFieldDefaultEditorProps = {
@@ -29,19 +34,23 @@ export function FormFieldBuilderFieldDefaultEditor({
   const commit = useFormFieldBuilderCommit()
   const { control } = useFormContext<FormDefinition>()
 
-  const defaultValueLabelHelp = formFieldBuilderLabelHelp('defaultValue', 'Default value')
+  const defaultValueLabelHelp = formFieldBuilderLabelHelp('defaultValue', FORM_FIELD_BUILDER_INITIAL_ANSWER_LABEL)
   const examples = getFormFieldBuilderExamplePlaceholders(field.type)
 
   if (field.type === FormFieldTypeEnum.CHECKBOX) {
     return (
-      <FormGroup label="Default value" fieldId={`${idPrefix}-default`} labelHelp={defaultValueLabelHelp}>
+      <FormGroup
+        label={FORM_FIELD_BUILDER_INITIAL_ANSWER_LABEL}
+        fieldId={`${idPrefix}-default`}
+        labelHelp={defaultValueLabelHelp}
+      >
         <Controller
           control={control}
           name={`fields.${index}.default`}
           render={({ field: rhfField }) => (
             <Checkbox
               id={`${idPrefix}-default`}
-              label="Default to checked"
+              label={FORM_FIELD_BUILDER_INITIAL_ANSWER_CHECKBOX_LABEL}
               isChecked={Boolean(rhfField.value)}
               isDisabled={isDisabled}
               onChange={(_event, checked) => {
@@ -61,11 +70,15 @@ export function FormFieldBuilderFieldDefaultEditor({
         control={control}
         name={`fields.${index}.default`}
         render={({ field: rhfField }) => (
-          <FormGroup label="Default value" fieldId={`${idPrefix}-default`} labelHelp={defaultValueLabelHelp}>
+          <FormGroup
+            label={FORM_FIELD_BUILDER_INITIAL_ANSWER_LABEL}
+            fieldId={`${idPrefix}-default`}
+            labelHelp={defaultValueLabelHelp}
+          >
             <TextInput
               id={`${idPrefix}-default`}
               type="number"
-              aria-label="Default value"
+              aria-label={FORM_FIELD_BUILDER_INITIAL_ANSWER_LABEL}
               placeholder={examples.defaultValue}
               isDisabled={isDisabled}
               value={
@@ -92,8 +105,12 @@ export function FormFieldBuilderFieldDefaultEditor({
   if (field.type === FormFieldTypeEnum.DROPDOWN || field.type === FormFieldTypeEnum.MULTI_SELECT) {
     if (field.options.source === 'dynamic') {
       return (
-        <FormGroup label="Default value" fieldId={`${idPrefix}-default`} labelHelp={defaultValueLabelHelp}>
-          <FormFieldHintOrError hint="Default values are not available when options are populated dynamically at runtime." />
+        <FormGroup
+          label={FORM_FIELD_BUILDER_INITIAL_ANSWER_LABEL}
+          fieldId={`${idPrefix}-default`}
+          labelHelp={defaultValueLabelHelp}
+        >
+          <FormFieldHintOrError hint={FORM_FIELD_BUILDER_INITIAL_ANSWER_DYNAMIC_UNAVAILABLE_HINT} />
         </FormGroup>
       )
     }
@@ -138,7 +155,7 @@ export function FormFieldBuilderFieldDefaultEditor({
       <SynTextField
         name={`fields.${index}.default`}
         control={control}
-        label="Default value"
+        label={FORM_FIELD_BUILDER_INITIAL_ANSWER_LABEL}
         fieldId={`${idPrefix}-default`}
         isDisabled={isDisabled}
         labelHelp={defaultValueLabelHelp}

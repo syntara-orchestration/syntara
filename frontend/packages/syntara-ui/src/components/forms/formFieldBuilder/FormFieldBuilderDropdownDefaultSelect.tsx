@@ -10,6 +10,11 @@ import { optionKey, type OptionScalarValue } from '../dynamicForm/synDynamicForm
 
 import styles from './formFieldBuilder.module.css'
 import { useFormFieldBuilderCommit } from './formFieldBuilderCommitContext'
+import {
+  FORM_FIELD_BUILDER_INITIAL_ANSWER_DROPDOWN_PLACEHOLDER,
+  FORM_FIELD_BUILDER_INITIAL_ANSWER_LABEL,
+  FORM_FIELD_BUILDER_INITIAL_ANSWER_OPTIONS_LIST_ARIA_LABEL,
+} from './formFieldBuilderInitialAnswerCopy'
 
 const STATIC_DEFAULT_NONE = '__form_field_builder_default_none__'
 
@@ -34,7 +39,7 @@ function defaultToggleText(
   options: ReadonlyArray<StaticOptionRow>
 ): string {
   if (current == null) {
-    return 'Select a default...'
+    return FORM_FIELD_BUILDER_INITIAL_ANSWER_DROPDOWN_PLACEHOLDER
   }
   const match = options.find((option) => option.value === current)
   return match?.display_label ?? String(current)
@@ -64,7 +69,7 @@ function DropdownDefaultSelectToggle({
       isExpanded={isOpen}
       isDisabled={isDisabled}
       isFullWidth
-      aria-label="Default value"
+      aria-label={FORM_FIELD_BUILDER_INITIAL_ANSWER_LABEL}
     >
       <span className={isPlaceholder ? styles.staticDefaultPlaceholder : undefined}>{toggleText}</span>
     </MenuToggle>
@@ -114,7 +119,7 @@ function DropdownDefaultSelectControl({
   )
 
   return (
-    <FormGroup label="Default value" fieldId={`${idPrefix}-default`} labelHelp={labelHelp}>
+    <FormGroup label={FORM_FIELD_BUILDER_INITIAL_ANSWER_LABEL} fieldId={`${idPrefix}-default`} labelHelp={labelHelp}>
       <SynSelect
         id={`${idPrefix}-default`}
         isOpen={isOpen}
@@ -134,7 +139,7 @@ function DropdownDefaultSelectControl({
         shouldFocusToggleOnSelect
         toggle={renderToggle}
       >
-        <SelectList aria-label="Default value options">
+        <SelectList aria-label={FORM_FIELD_BUILDER_INITIAL_ANSWER_OPTIONS_LIST_ARIA_LABEL}>
           <SelectOption value={STATIC_DEFAULT_NONE} isSelected={currentDefault == null}>
             None
           </SelectOption>
