@@ -309,6 +309,7 @@ worker-run: check-deps _ensure-secrets _ensure-certs ## Run Temporal workflow wo
 	APP_WORKFLOW_BASE_URL=$(WORKER_BASE_URL) \
 	APP_AGENT_ORCHESTRATOR_BASE_URL=$(WORKER_BASE_URL) \
 	APP_APPROVALS_API_BASE_URL=$(WORKER_BASE_URL) \
+	APP_FORMS_API_BASE_URL=$(WORKER_BASE_URL) \
 	APP_TOOL_MANAGER_BASE_URL=$(WORKER_BASE_URL) \
 	uv run python -m syntara.workflows.worker
 
@@ -324,6 +325,7 @@ background-worker-run: check-deps _ensure-secrets _ensure-certs ## Run Temporal 
 	APP_WORKFLOW_BASE_URL=$(WORKER_BASE_URL) \
 	APP_AGENT_ORCHESTRATOR_BASE_URL=$(WORKER_BASE_URL) \
 	APP_APPROVALS_API_BASE_URL=$(WORKER_BASE_URL) \
+	APP_FORMS_API_BASE_URL=$(WORKER_BASE_URL) \
 	APP_TOOL_MANAGER_BASE_URL=$(WORKER_BASE_URL) \
 	uv run python -m syntara.workflows.background_worker
 

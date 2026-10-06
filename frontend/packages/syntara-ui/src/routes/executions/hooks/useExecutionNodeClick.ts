@@ -1,6 +1,9 @@
 import { useCallback, useRef, useState } from 'react'
 
+import type { WorkflowDefShape } from '../../builder/useActivityNameMap'
+
 import { isWaitingApprovalNode, useExecutionApprovals } from './useExecutionApprovals'
+import { isWaitingFormPromptNode, useExecutionFormPrompts } from './useExecutionFormPrompts'
 
 /**
  * Execution Approval Hooks Architecture
@@ -71,12 +74,12 @@ function getNodeActivityId(node: ExecutionNode): string {
  * Composes node click handling for the execution view (Layer 3: Interaction).
  *
  * Routes canvas node clicks to either:
- * 1. Approval nodes in "waiting" status → delegates to useExecutionApprovals
- * 2. Completed/failed nodes → toggles node details panel via selectedNodeId
+ * 1. Approval / form prompt nodes in "waiting" status → human-task response flow
+ * 2. Completed/failed nodes → node details panel via selectedNodeId
  *
  * See file-level JSDoc for the full approval hooks architecture.
  */
-export function useExecutionNodeClick(executionId: string | undefined) {
+export function useExecutionNodeClick(executionId: string | undefined, workflowDefinition?: WorkflowDefShape) {
   const {
     approvals,
     currentIndex,
@@ -89,27 +92,50 @@ export function useExecutionNodeClick(executionId: string | undefined) {
     fetchApprovals,
   } = useExecutionApprovals(executionId)
 
+  const {
+    formPrompts,
+    currentIndex: formPromptIndex,
+    currentFormPrompt,
+    isLoading: isFormPromptLoading,
+    handleNodeClick: handleFormPromptNodeClick,
+    handleActivityRowClick,
+    navigateToIndex: navigateToFormPromptIndex,
+    clearFormPrompts,
+    setFormPromptsAndIndex,
+    fetchFormPrompts,
+    fetchPendingFormPrompts,
+  } = useExecutionFormPrompts(executionId, workflowDefinition)
+
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
   const [selectedNodeName, setSelectedNodeName] = useState<string | null>(null)
   // Ref mirrors selectedNodeId so the click callback never goes stale
   const selectedNodeIdRef = useRef<string | null>(null)
 
+  const selectCompletedOrFailedNode = useCallback((node: ExecutionNode) => {
+    const execState = getExecutionState(node)
+    if (execState?.status === 'completed' || execState?.status === 'failed') {
+      const activityId = getNodeActivityId(node)
+      selectedNodeIdRef.current = activityId
+      setSelectedNodeId(activityId)
+      setSelectedNodeName(getNodeDisplayName(node))
+    }
+  }, [])
+
   const handleNodeClick = useCallback(
     (event: React.MouseEvent, node: ExecutionNode) => {
+      if (isWaitingFormPromptNode(node)) {
+        handleFormPromptNodeClick(event, node)
+        return
+      }
+
       if (isWaitingApprovalNode(node)) {
         handleApprovalNodeClick(event, node)
         return
       }
 
-      const execState = getExecutionState(node)
-      if (execState?.status === 'completed' || execState?.status === 'failed') {
-        const activityId = getNodeActivityId(node)
-        selectedNodeIdRef.current = activityId
-        setSelectedNodeId(activityId)
-        setSelectedNodeName(getNodeDisplayName(node))
-      }
+      selectCompletedOrFailedNode(node)
     },
-    [handleApprovalNodeClick]
+    [handleApprovalNodeClick, handleFormPromptNodeClick, selectCompletedOrFailedNode]
   )
 
   const selectNode = useCallback((nodeId: string, nodeName: string) => {
@@ -134,6 +160,16 @@ export function useExecutionNodeClick(executionId: string | undefined) {
     clearApprovals,
     setApprovalsAndIndex,
     fetchApprovals,
+    formPrompts,
+    formPromptIndex,
+    currentFormPrompt,
+    isFormPromptLoading,
+    navigateToFormPromptIndex,
+    clearFormPrompts,
+    setFormPromptsAndIndex,
+    fetchFormPrompts,
+    fetchPendingFormPrompts,
+    handleActivityRowClick,
     // Node selection state
     selectedNodeId,
     selectedNodeName,

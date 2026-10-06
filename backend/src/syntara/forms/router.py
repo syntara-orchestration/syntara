@@ -11,7 +11,6 @@ from syntara.authz.dependencies import PermissionChecker, VisibilityFilter
 from syntara.authz.engine import VisibilityResult
 from syntara.core.database.session import get_db
 from syntara.core.models import User
-from syntara.core.models.base.query_params import BaseListParams
 from syntara.core.syntara_router import SyntaraRouter
 from syntara.forms.models.api_models import (
     BatchFormPromptRequest,
@@ -21,6 +20,7 @@ from syntara.forms.models.api_models import (
     FormPromptSummary,
 )
 from syntara.forms.models.form_prompt import FormPrompt, FormPromptListResponse, FormPromptRead
+from syntara.forms.models.query_params import FormPromptListParams
 from syntara.forms.services.form_prompt_service import FormPromptService
 
 router = SyntaraRouter(prefix="/form_prompts", tags=["Form Prompts"])
@@ -84,7 +84,7 @@ Uses cursor-based pagination for scalability and consistency.""",
 async def list_form_prompts(
     request: Request,
     service: Annotated[FormPromptService, Depends(get_form_prompt_service)],
-    params: Annotated[BaseListParams, Depends()],
+    params: Annotated[FormPromptListParams, Depends()],
     visibility: Annotated[VisibilityResult, Depends(VisibilityFilter("form_prompt", "read"))],
 ) -> FormPromptListResponse:
     """List form prompts with filtering, sorting, and pagination.

@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
 import { ExecutionStatusBadge } from './ExecutionStatusBadge'
@@ -102,20 +102,33 @@ describe('ExecutionStatusBadge', () => {
     render(<ExecutionStatusBadge status="running" />)
 
     const badge = screen.getByLabelText('Running')
-    const style = badge.getAttribute('style') ?? ''
-    expect(style).toContain('position: absolute')
-    expect(style).toContain('bottom: -20px')
-    expect(style).toContain('right: -20px')
+    const anchorStyle = badge.parentElement?.getAttribute('style') ?? ''
+    expect(anchorStyle).toContain('position: absolute')
+    expect(anchorStyle).toContain('bottom: -20px')
+    expect(anchorStyle).toContain('right: -20px')
   })
 
   it('renders with correct size', () => {
     render(<ExecutionStatusBadge status="pending" />)
 
     const badge = screen.getByLabelText('Pending')
-    const style = badge.getAttribute('style') ?? ''
-    expect(style).toContain('width: 48px')
-    expect(style).toContain('height: 48px')
-    expect(style).toContain('border-radius: 50%')
+    const anchorStyle = badge.parentElement?.getAttribute('style') ?? ''
+    expect(anchorStyle).toContain('width: 48px')
+    expect(anchorStyle).toContain('height: 48px')
+    const circleStyle = badge.getAttribute('style') ?? ''
+    expect(circleStyle).toContain('border-radius: 50%')
+  })
+
+  it('shows elapsed time under the badge for waiting form prompt nodes', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-10-01T12:00:00.000Z'))
+
+    render(<ExecutionStatusBadge status="waiting" nodeType="form_prompt" startedAt="2026-10-01T11:59:30.000Z" />)
+
+    expect(screen.getByText('30s')).toBeInTheDocument()
+    expect(screen.getByLabelText('Waiting for input, elapsed 30s')).toBeInTheDocument()
+
+    vi.useRealTimers()
   })
 
   it('has no accessibility violations', async () => {

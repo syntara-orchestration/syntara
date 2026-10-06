@@ -22,6 +22,7 @@ import { executions } from './resources/executions'
 import { getExecutionDetail } from './resources/executionDetails'
 import { activityExecutions } from './resources/activityExecutions'
 import { approvals } from './resources/approvals'
+import { alignPendingFormPromptClock, formPrompts } from './resources/formPrompts'
 import { settings, settingsCategories } from './resources/settings'
 import { revocationState } from './resources/revocation'
 import { identityProviders, type IdentityProvider } from './resources/identityProviders'
@@ -2156,6 +2157,73 @@ export const handlers = [
       total_success: results.filter((r) => r.success).length,
       total_failed: results.filter((r) => !r.success).length,
     })
+  }),
+
+  http.get('/api/v1/form_prompts', ({ request }) => {
+    const url = new URL(request.url)
+    const status = url.searchParams.get('status')
+    const execution_id = url.searchParams.get('execution_id')
+    const cursor = url.searchParams.get('cursor')
+    const limitParam = url.searchParams.get('limit')
+    const includeTotal = url.searchParams.get('include_total') === 'true'
+    const limit = Math.min(Math.max(1, limitParam ? parseInt(limitParam, 10) : 20), 100)
+
+    const filtered = formPrompts.filter((prompt) => {
+      if (status && prompt.status !== status) return false
+      if (execution_id && prompt.execution_id !== execution_id) return false
+      return true
+    })
+
+    const summaries = filtered.map((prompt) => ({
+      id: prompt.id,
+      execution_id: prompt.execution_id,
+      project_id: prompt.project_id,
+      prompt_node_id: prompt.prompt_node_id,
+      name: prompt.name,
+      status: prompt.status,
+      loop_iteration_path: prompt.loop_iteration_path ?? [],
+      temporal_activity_id: 'collect_input-activity',
+    }))
+
+    const body = paginate(summaries, cursor, limit, includeTotal)
+    return HttpResponse.json(body)
+  }),
+
+  http.get('/api/v1/form_prompts/:formPromptId', (request) => {
+    const formPromptId = request.params.formPromptId
+    const body = formPrompts.find((p) => p.id === formPromptId)
+    if (!body) {
+      return HttpResponse.json(
+        {
+          type: 'https://api.example.com/errors/not-found',
+          title: 'Not Found',
+          detail: 'Form prompt not found',
+          code: 'NOT_FOUND',
+          retryable: false,
+          instance: `/api/v1/form_prompts/${String(formPromptId)}`,
+        },
+        { status: 404 }
+      )
+    }
+    return HttpResponse.json(alignPendingFormPromptClock(body))
+  }),
+
+  http.post('/api/v1/form_prompts/:formPromptId/submit', async (request) => {
+    const formPromptId = request.params.formPromptId
+    const prompt = formPrompts.find((p) => p.id === formPromptId)
+    if (!prompt) {
+      return HttpResponse.json({ title: 'Not Found', detail: 'Form prompt not found' }, { status: 404 })
+    }
+    if (prompt.status !== 'pending') {
+      return HttpResponse.json({ title: 'Conflict', detail: 'Form prompt is not pending' }, { status: 409 })
+    }
+    const body = (await request.request.json()) as { response_data?: Record<string, unknown> }
+    prompt.status = 'submitted'
+    prompt.response_data = body.response_data ?? {}
+    prompt.responded_at = mockDate.now
+    prompt.responded_by = { id: 'user-admin', name: 'admin', type: 'user' }
+    prompt.updated_at = mockDate.now
+    return HttpResponse.json(prompt)
   }),
 
   // Auth providers (public endpoint for login page)
@@ -5309,6 +5377,7 @@ export const handlers = [
       'test',
       'run',
       'decide',
+      'submit',
       'rotate_secret',
       'disable',
       'enable',
@@ -5324,6 +5393,7 @@ export const handlers = [
       execution: new Set(['read', 'run']),
       credential: new Set(['read', 'create', 'update', 'delete', 'use']),
       approval: new Set(['read', 'decide']),
+      form_prompt: new Set(['read', 'submit']),
     }
 
     const projectUserGrants: Record<string, Set<string>> = {
@@ -5334,12 +5404,20 @@ export const handlers = [
       execution: new Set(['read', 'run']),
       credential: new Set(['read', 'create', 'update', 'use']),
       approval: new Set(['read', 'decide']),
+      form_prompt: new Set(['read', 'submit']),
     }
 
     let allowed = true
 
     if (username === 'viewer') {
-      const readableResources = new Set(['workflow', 'execution', 'approval', 'credential', 'integration'])
+      const readableResources = new Set([
+        'workflow',
+        'execution',
+        'approval',
+        'form_prompt',
+        'credential',
+        'integration',
+      ])
       if (readableResources.has(resourceType)) {
         allowed = action === 'read'
       } else {

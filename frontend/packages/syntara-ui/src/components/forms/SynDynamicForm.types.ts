@@ -51,6 +51,11 @@ export type SynDynamicFormProps = {
   submitLabel?: string
   /** Disables inputs and hides the submit button. */
   isReadOnly?: boolean
+  /**
+   * When fields are non-interactive, shown on hover over each field (permission / responder UX).
+   * Use `permissionTooltip()` for missing policy; pass explicit copy for responder restrictions.
+   */
+  disabledFieldTooltip?: string
   hideSubmitButton?: boolean
   id?: string
   'data-testid'?: string

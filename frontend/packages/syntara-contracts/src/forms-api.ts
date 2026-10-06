@@ -1241,7 +1241,16 @@ export interface components {
       }
     }
   }
-  parameters: never
+  parameters: {
+    /** @description Maximum number of results per page */
+    limitParam: number
+    /** @description Pagination cursor from previous response */
+    cursorParam: string | null
+    /** @description Sort parameter (e.g., 'name', '-created_at') */
+    sortParam: string | null
+    /** @description Include total count in response (expensive) */
+    includeTotalParam: boolean
+  }
   requestBodies: never
   headers: never
   pathItems: never
@@ -1251,10 +1260,16 @@ export interface operations {
   list_form_prompts: {
     parameters: {
       query?: {
-        limit?: number
-        cursor?: string | null
-        sort?: string | null
-        include_total?: boolean
+        /** @description Maximum number of results per page */
+        limit?: components['parameters']['limitParam']
+        /** @description Pagination cursor from previous response */
+        cursor?: components['parameters']['cursorParam']
+        /** @description Sort parameter (e.g., 'name', '-created_at') */
+        sort?: components['parameters']['sortParam']
+        /** @description Include total count in response (expensive) */
+        include_total?: components['parameters']['includeTotalParam']
+        status?: components['schemas']['FormPromptStatus'] | null
+        execution_id?: string | null
       }
       header?: never
       path?: never
