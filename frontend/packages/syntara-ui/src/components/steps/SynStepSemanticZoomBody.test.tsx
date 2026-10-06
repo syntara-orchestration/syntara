@@ -3,12 +3,12 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import { axe } from 'vitest-axe'
 
-import { NodeSemanticZoomBody } from './NodeSemanticZoomBody'
+import { SynStepSemanticZoomBody } from './SynStepSemanticZoomBody'
 
-describe('NodeSemanticZoomBody', () => {
+describe('SynStepSemanticZoomBody', () => {
   it('exposes name and type in aria-label', () => {
     render(
-      <NodeSemanticZoomBody
+      <SynStepSemanticZoomBody
         title="Analyze Data"
         typeLabel="Task Agent"
         backgroundColor="rgb(100, 100, 200)"
@@ -22,7 +22,7 @@ describe('NodeSemanticZoomBody', () => {
 
   it('has no accessibility violations', async () => {
     const { container } = render(
-      <NodeSemanticZoomBody
+      <SynStepSemanticZoomBody
         title="Node A"
         typeLabel="Condition"
         backgroundColor="#ccc"
@@ -37,7 +37,7 @@ describe('NodeSemanticZoomBody', () => {
   it('shows tooltip content on hover', async () => {
     const user = userEvent.setup()
     render(
-      <NodeSemanticZoomBody
+      <SynStepSemanticZoomBody
         title="My Task"
         typeLabel="REST API"
         backgroundColor="#999"

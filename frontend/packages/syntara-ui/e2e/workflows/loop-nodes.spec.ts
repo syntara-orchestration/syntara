@@ -10,6 +10,7 @@
  * - Configuration persistence across saves and edits
  */
 
+import { EXPRESSION_MODE_LABELS } from '../../src/components/expressions/expressionBuilderLabels'
 import { test, expect } from '../fixtures'
 import { openAddNodePanel, selectCategoryAndType } from '../helpers/v2-nodes'
 import {
@@ -181,8 +182,8 @@ test.describe('Loop Node Configuration [UI-16]', () => {
     await expect(app.getByRole('textbox', { name: 'Name', exact: true })).toBeVisible()
     await expect(app.getByText('Type', { exact: true })).toBeVisible()
     await expect(app.getByRole('button', { name: 'Type', exact: true })).toContainText('While')
-    await expect(app.getByText('Conditional expression', { exact: true })).toBeVisible()
-    await expect(app.getByRole('button', { name: /Expression editor mode/i })).toBeVisible()
+    await expect(app.getByText('Condition type', { exact: true })).toBeVisible()
+    await expect(app.getByRole('button', { name: EXPRESSION_MODE_LABELS.visual, exact: true })).toBeVisible()
     await expect(app.getByText('Max iterations', { exact: true })).toBeVisible()
     await expect(app.getByRole('spinbutton', { name: /Max iterations/i })).toBeVisible()
 
@@ -194,7 +195,7 @@ test.describe('Loop Node Configuration [UI-16]', () => {
     await expect(app.getByRole('textbox', { name: 'Item variable', exact: true })).toBeVisible()
     await expect(app.getByText('Index variable', { exact: true })).toBeVisible()
     await expect(app.getByRole('textbox', { name: 'Index variable', exact: true })).toBeVisible()
-    await expect(app.getByRole('button', { name: /Expression editor mode/i })).not.toBeVisible()
+    await expect(app.getByRole('button', { name: EXPRESSION_MODE_LABELS.visual, exact: true })).not.toBeVisible()
 
     await app.getByRole('button', { name: 'Cancel' }).click()
   })

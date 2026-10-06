@@ -1,14 +1,14 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 
-import { NodeHeader } from './NodeHeader'
+import { SynStepHeader } from './SynStepHeader'
 
-describe('NodeHeader', () => {
+describe('SynStepHeader', () => {
   it('renders children', () => {
     render(
-      <NodeHeader>
+      <SynStepHeader>
         <span data-testid="child">Header Content</span>
-      </NodeHeader>
+      </SynStepHeader>
     )
 
     expect(screen.getByTestId('child')).toBeInTheDocument()
@@ -17,11 +17,11 @@ describe('NodeHeader', () => {
 
   it('renders multiple children', () => {
     render(
-      <NodeHeader>
+      <SynStepHeader>
         <span data-testid="child-1">First</span>
         <span data-testid="child-2">Second</span>
         <span data-testid="child-3">Third</span>
-      </NodeHeader>
+      </SynStepHeader>
     )
 
     expect(screen.getByTestId('child-1')).toBeInTheDocument()
@@ -31,9 +31,9 @@ describe('NodeHeader', () => {
 
   it('applies padding styles', () => {
     render(
-      <NodeHeader>
+      <SynStepHeader>
         <span>Content</span>
-      </NodeHeader>
+      </SynStepHeader>
     )
 
     const headerDiv = screen.getByTestId('node-header')
@@ -47,9 +47,9 @@ describe('NodeHeader', () => {
 
   it('uses Flex layout for children', () => {
     render(
-      <NodeHeader>
+      <SynStepHeader>
         <span>Content</span>
-      </NodeHeader>
+      </SynStepHeader>
     )
 
     const flexContainer = screen.getByTestId('node-header-content')
@@ -57,13 +57,13 @@ describe('NodeHeader', () => {
   })
 
   it('renders without crashing with empty children', () => {
-    render(<NodeHeader>{null}</NodeHeader>)
+    render(<SynStepHeader>{null}</SynStepHeader>)
     expect(screen.getByTestId('node-header-content')).toBeInTheDocument()
   })
 
   it('renders complex nested content', () => {
     render(
-      <NodeHeader>
+      <SynStepHeader>
         <div data-testid="icon-wrapper">
           <svg data-testid="icon" />
         </div>
@@ -72,7 +72,7 @@ describe('NodeHeader', () => {
           <span>Subtitle</span>
         </div>
         <button data-testid="menu-button">Menu</button>
-      </NodeHeader>
+      </SynStepHeader>
     )
 
     expect(screen.getByTestId('icon-wrapper')).toBeInTheDocument()

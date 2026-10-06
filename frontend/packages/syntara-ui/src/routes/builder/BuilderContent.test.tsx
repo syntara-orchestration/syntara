@@ -1555,8 +1555,8 @@ describe('BuilderContent', () => {
   // ============================================================================
 
   describe('Context Providers', () => {
-    it('provides NodeExpandedAllContext to children', async () => {
-      // The component provides NodeExpandedAllContext
+    it('provides SynStepExpandedAllContext to children', async () => {
+      // The component provides SynStepExpandedAllContext
       await renderBuilder({ workflow: mockWorkflow, isNew: false, workflowId: 'workflow-1' })
       expect(screen.getByPlaceholderText('Workflow name')).toBeInTheDocument()
     })

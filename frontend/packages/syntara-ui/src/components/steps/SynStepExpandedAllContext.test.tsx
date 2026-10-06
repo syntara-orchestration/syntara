@@ -2,10 +2,10 @@ import { render, screen } from '@testing-library/react'
 import { use } from 'react'
 import { describe, expect, it } from 'vitest'
 
-import { NodeExpandedAllContext } from './NodeExpandedAllContext'
+import { SynStepExpandedAllContext } from './SynStepExpandedAllContext'
 
 function TestConsumer() {
-  const context = use(NodeExpandedAllContext)
+  const context = use(SynStepExpandedAllContext)
   return (
     <div>
       <div data-testid="expand-event">{context.expandAllEvent instanceof EventTarget ? 'valid' : 'invalid'}</div>
@@ -14,7 +14,7 @@ function TestConsumer() {
   )
 }
 
-describe('NodeExpandedAllContext', () => {
+describe('SynStepExpandedAllContext', () => {
   it('provides default EventTarget instances', () => {
     render(<TestConsumer />)
 
@@ -27,9 +27,9 @@ describe('NodeExpandedAllContext', () => {
     const customCollapse = new EventTarget()
 
     render(
-      <NodeExpandedAllContext.Provider value={{ expandAllEvent: customExpand, collapseAllEvent: customCollapse }}>
+      <SynStepExpandedAllContext.Provider value={{ expandAllEvent: customExpand, collapseAllEvent: customCollapse }}>
         <TestConsumer />
-      </NodeExpandedAllContext.Provider>
+      </SynStepExpandedAllContext.Provider>
     )
 
     expect(screen.getByTestId('expand-event')).toHaveTextContent('valid')

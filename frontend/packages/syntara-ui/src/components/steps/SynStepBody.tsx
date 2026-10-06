@@ -1,9 +1,9 @@
 import { StackItem } from '@patternfly/react-core'
 import { use, type ReactNode } from 'react'
 
-import { NodeExpandedContext } from './NodeExpandedContext'
+import { SynStepExpandedContext } from './SynStepExpandedContext'
 
-export type NodeBodyProps = {
+export type SynStepBodyProps = {
   children: ReactNode
   className?: string
 }
@@ -12,11 +12,11 @@ export type NodeBodyProps = {
  * Collapsible, scrollable content area for workflow steps (React Flow node bodies).
  *
  * Features:
- * - Expands/collapses based on NodeExpandedContext
+ * - Expands/collapses based on SynStepExpandedContext
  * - Uses PatternFly Stack/StackItem components for layout
  */
-export function NodeBody(props: Readonly<NodeBodyProps>) {
-  const expandedState = use(NodeExpandedContext)
+export function SynStepBody(props: Readonly<SynStepBodyProps>) {
+  const expandedState = use(SynStepExpandedContext)
   const expanded = expandedState === null ? true : expandedState[0]
 
   if (!expanded) {

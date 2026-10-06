@@ -1,4 +1,4 @@
-"""Persistent token storage for the Orchestrator CLI.
+"""Persistent token storage for the Automation Orchestrator CLI.
 
 Tokens are stored per-instance under ``~/.orchestrator/``.  Each instance
 (base URL) gets its own JSON file, keyed by a URL-safe slug derived from the

@@ -13,9 +13,9 @@ import type { SemanticZoomBranchSource } from '../../routes/workflows/canvas/sem
 import type { ActivityStatus } from '../../routes/workflows/execution/types'
 import { SynPanel } from '../layout/SynPanel'
 
-import { NodeExpandedAllContext } from './NodeExpandedAllContext'
-import { NodeExpandedContext } from './NodeExpandedContext'
-import { NodeSemanticZoomBody } from './NodeSemanticZoomBody'
+import { SynStepExpandedAllContext } from './SynStepExpandedAllContext'
+import { SynStepExpandedContext } from './SynStepExpandedContext'
+import { SynStepSemanticZoomBody } from './SynStepSemanticZoomBody'
 
 type ExecutionState = {
   status: ActivityStatus
@@ -98,7 +98,7 @@ const isWideTaskNode = (nodeProps: NodeProps) => {
 }
 
 // eslint-disable-next-line complexity
-export function NodeComponent(props: {
+export function SynStep(props: {
   children: React.ReactNode
   disableSource?: boolean
   disableTarget?: boolean
@@ -122,7 +122,7 @@ export function NodeComponent(props: {
   /** Optional stable hook for tests (e.g. canvas node root) */
   rootTestId?: string
 }) {
-  const { expandAllEvent, collapseAllEvent } = React.use(NodeExpandedAllContext)
+  const { expandAllEvent, collapseAllEvent } = React.use(SynStepExpandedAllContext)
   const expandedContext = useState(true)
   const isCollapsible = props.collapsible ?? true
 
@@ -231,7 +231,7 @@ export function NodeComponent(props: {
   }
 
   return (
-    <NodeExpandedContext.Provider value={expandedContext}>
+    <SynStepExpandedContext.Provider value={expandedContext}>
       <SynPanel
         hasNoPadding
         variant="raised"
@@ -249,7 +249,7 @@ export function NodeComponent(props: {
         tabIndex={props.onClick ? 0 : undefined}
       >
         {isSemanticZoom && summary ? (
-          <NodeSemanticZoomBody
+          <SynStepSemanticZoomBody
             title={summary.title}
             typeLabel={summary.typeLabel}
             backgroundColor={semanticFillColor}
@@ -309,6 +309,6 @@ export function NodeComponent(props: {
           />
         )}
       </SynPanel>
-    </NodeExpandedContext.Provider>
+    </SynStepExpandedContext.Provider>
   )
 }
