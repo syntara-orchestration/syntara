@@ -813,7 +813,7 @@ describe('EditIntegrationForm', () => {
       expect(screen.getByText('Terraform Enterprise')).toBeInTheDocument()
     })
 
-    it('renders TFE URL and organization fields', () => {
+    it('renders Terraform Enterprise URL and organization fields', () => {
       render(<EditIntegrationForm />, { wrapper })
 
       expect(screen.getByRole('textbox', { name: /terraform enterprise url/i })).toHaveValue('https://app.terraform.io')
@@ -863,7 +863,7 @@ describe('EditIntegrationForm', () => {
       })
     })
 
-    it('shows error when TFE URL is empty', async () => {
+    it('shows error when Terraform Enterprise URL is empty', async () => {
       const user = userEvent.setup()
       render(<EditIntegrationForm />, { wrapper })
 

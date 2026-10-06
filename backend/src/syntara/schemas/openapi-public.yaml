@@ -31014,7 +31014,7 @@ components:
         base_url:
           type: string
           format: uri
-          title: TFE URL
+          title: Terraform Enterprise URL
           description: Base URL for Terraform Enterprise or HCP Terraform (e.g. https://app.terraform.io)
         organization:
           type: string
