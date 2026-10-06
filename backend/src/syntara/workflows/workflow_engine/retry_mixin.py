@@ -10,7 +10,7 @@ from syntara.workflows.utils.loop_body_nodes import collect_loop_bodies
 from syntara.workflows.utils.loop_iteration_names import strip_iteration_suffix
 from syntara.workflows.workflow_engine.constants import DEFAULT_ACTIVITY_TIMEOUT_SECONDS
 from syntara.workflows.workflow_engine.graph import ActivityNode, WorkflowGraph
-from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName, LoopState, LoopType, NodeType
+from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName, LoopState, NodeType
 from syntara.workflows.workflow_engine.node_settings_resolver import resolve_continue_on_failure
 
 #: Node types that decide routing rather than producing an output. A retry never
@@ -31,9 +31,11 @@ class WorkflowRetryMixin:
 
     retry_context: dict[str, Any]
     _retry_restorable_cache: set[str] | None
-    _restored_nodes: set[str]
+    #: Nodes this retry may replay, decided up front in ``_prepare_retry``.
+    #: The sync service asks the workflow whether a completing activity is one of
+    #: these before waiting on it, so it must be populated before any node runs.
+    _retry_replay_candidates: set[str]
     _restored_node_timestamps: dict[str, dict[str, str | None]]
-    _resumed_loops: set[str]
     _runtime_settings: dict[str, Any]
     _retry_source_statuses: dict[str, str]
     skipped_nodes: set[str]
@@ -54,6 +56,10 @@ class WorkflowRetryMixin:
             start_to_close_timeout=timedelta(seconds=DEFAULT_ACTIVITY_TIMEOUT_SECONDS),
         )
         self._classify_unselected_branches(graph)
+        # Decided here rather than on first use: the sync service consults this set
+        # the moment an activity completes, so a node discovered mid-graph would
+        # otherwise look like an ordinary execution and never get its source times.
+        self._retry_replay_candidates = set(self._retry_restorable_nodes(graph))
 
     def _classify_unselected_branches(self, graph: WorkflowGraph) -> None:
         """Skip unselected failures without suppressing shared selected descendants.
@@ -145,10 +151,10 @@ class WorkflowRetryMixin:
         return restorable
 
     @staticmethod
-    def _loop_body_node_ids(graph: WorkflowGraph, loop_id: str | None = None) -> set[str]:
-        """Return the nodes that run inside a loop body.
+    def _loop_body_node_ids(graph: WorkflowGraph) -> set[str]:
+        """Return every node that runs inside a loop body.
 
-        Seeds from the loop node's ``iterate`` successors, then follows plain
+        Seeds from each loop node's ``iterate`` successors, then follows plain
         adjacency. Only a multi-output node's edges carry ``from_port``, so the
         walk may filter on it for the seed and must not for the rest of the body:
         doing so stops after the first node and leaves the remainder of the body
@@ -156,19 +162,15 @@ class WorkflowRetryMixin:
         stripped when the graph is built, so the walk terminates at the end of the
         body and cannot escape via the loop's ``complete`` port.
 
+        A body node is excluded from restoration because it is not one node but
+        one execution per iteration, so a single stored output cannot stand in
+        for all of them.
+
         Args:
             graph: Workflow graph.
-            loop_id: Restrict the result to this loop's body. Required when the
-                result is attributed to a specific loop, since with several loops
-                in one definition the union would let one loop adopt another's
-                body. Omit only to exclude bodies wholesale.
 
         """
-        loop_ids = (
-            [loop_id]
-            if loop_id is not None
-            else [node.id for node in graph.get_all_nodes() if node.type == NodeType.LOOP]
-        )
+        loop_ids = [node.id for node in graph.get_all_nodes() if node.type == NodeType.LOOP]
         bodies = collect_loop_bodies(
             {node.id: graph.get_successors(node.id) for node in graph.get_all_nodes()},
             {owner: [node.id for node in graph.get_next_activities_by_port(owner, "iterate")] for owner in loop_ids},
@@ -225,14 +227,18 @@ class WorkflowRetryMixin:
         executed. The source timestamps are kept so the sync service can report
         when the work ran rather than the restore time.
         """
-        fetched = await workflow.execute_activity(
-            ActivityName.RETRY_OUTPUTS,
-            args=[self.retry_context.get("retry_from_execution_id"), [node.id]],
+        record = await workflow.execute_activity(
+            ActivityName.RETRY_NODE_REPLAY,
+            args=[self.retry_context.get("retry_from_execution_id"), node.id],
             activity_id=node.id,
             start_to_close_timeout=timedelta(seconds=DEFAULT_ACTIVITY_TIMEOUT_SECONDS),
         )
-        record = (fetched or {}).get(node.id)
         if record is None:
+            # Nothing to replay, so this node will really execute. Drop it from
+            # the candidates: the sync service waits on a candidate's timestamp,
+            # and waiting here would stall for the full timeout on a node that
+            # is going to report its real execution time anyway.
+            self._retry_replay_candidates.discard(node.id)
             return None
 
         output = record.get("output_data") or {}
@@ -246,75 +252,6 @@ class WorkflowRetryMixin:
             extra={"node_id": node.id, "input_keys": sorted(self.node_inputs[node.id]), "output_keys": sorted(output)},
         )
         return {"output": output, "control": None}
-
-    async def _maybe_resume_loop(self, node: ActivityNode, graph: WorkflowGraph | None) -> None:
-        """Seed a loop's iteration state when a retry re-enters it mid-run.
-
-        A loop that already completed iterations in the source run must not
-        restart from zero: its iterations may have external side effects, and the
-        loop's aggregated output is assembled from every iteration it has done.
-        This fetches the source run's per-iteration state and seeds
-        ``loop_state`` and ``loop_iteration_results`` so the loop resumes at the
-        failed iteration with the finished iterations already accounted for.
-
-        No-op unless this retry actually re-enters the loop, so a loop running for
-        the first time in this run is untouched.
-        """
-        if not self.retry_context or node.id in self._resumed_loops:
-            return
-        if graph is None:
-            # Only reachable from a caller that omitted the graph; the dispatcher
-            # always supplies one. Warn rather than silently restarting the loop
-            # from iteration 0, which would repeat the skipped iterations'
-            # side effects.
-            workflow.logger.warning(
-                "Retry cannot resume loop without a graph; restarting from the first iteration",
-                extra={"loop_id": node.id},
-            )
-            return
-        eligible = {strip_iteration_suffix(point) for point in self.retry_context.get("eligible_point_ids", [])}
-        # Scoped to this loop: with several loops in one definition the union of
-        # all bodies would let this loop adopt another's body nodes, resume at an
-        # index that belongs to a different loop, and aggregate the wrong results.
-        body_ids = sorted(self._loop_body_node_ids(graph, node.id))
-        if not eligible.intersection(body_ids):
-            return
-        self._resumed_loops.add(node.id)
-
-        state = await workflow.execute_activity(
-            ActivityName.RETRY_LOOP_STATE,
-            args=[self.retry_context.get("retry_from_execution_id"), {node.id: body_ids}],
-            activity_id=f"__internal__fetch_retry_loop_state_{node.id}",
-            start_to_close_timeout=timedelta(seconds=DEFAULT_ACTIVITY_TIMEOUT_SECONDS),
-        )
-        resume = (state or {}).get(node.id)
-        if not resume:
-            return
-
-        self._restored_nodes.update(resume.get("restored_activity_names", []))
-        resume_iteration = int(resume.get("resume_iteration", 0))
-        iteration_results = resume.get("iteration_results") or {}
-
-        # The loop node has not been dispatched yet on this path, so its state is
-        # created from its own parameters first; only the counter and the
-        # accumulated results are seeded from the source run.
-        if node.id not in self.loop_state:
-            loop_type = node.parameters.get("type", LoopType.FOR_EACH)
-            self.loop_state[node.id] = self._create_loop_state_for_type(loop_type, node)
-        self.loop_state[node.id].current_index = resume_iteration
-
-        seeded = self.loop_iteration_results.setdefault(node.id, {})
-        for key, values in iteration_results.items():
-            seeded.setdefault(key, []).extend(values)
-
-        workflow.logger.info(
-            "Resumed loop from source run",
-            extra={
-                "loop_id": node.id,
-                "resume_iteration": resume_iteration,
-                "restored_fields": len(iteration_results),
-            },
-        )
 
     def _apply_input_overrides(self, node: ActivityNode, resolved_parameters: dict[str, Any]) -> None:
         """Replace a node's resolved inputs with the retry's user-supplied overrides.

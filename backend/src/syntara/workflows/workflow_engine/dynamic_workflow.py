@@ -185,7 +185,11 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
         # Memoised restorable set: derived from the graph and the retry context,
         # neither of which changes during a run.
         self._retry_restorable_cache: set[str] | None = None
-        self._restored_nodes: set[str] = set()
+        # Nodes this retry may replay, and the source times for the ones it did.
+        # The sync service consults the candidate set to tell a replayed activity
+        # from an ordinary one before waiting on it, so it is filled during
+        # _prepare_retry rather than on first use.
+        self._retry_replay_candidates: set[str] = set()
         self._restored_node_timestamps: dict[str, dict[str, str | None]] = {}
         self._retry_source_statuses: dict[str, str] = {}
         if workflow_metadata:
@@ -204,7 +208,6 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
         self.loop_state: dict[str, LoopState] = {}
         self.loop_body_map: dict[str, str] = {}
         self.loop_iteration_results: dict[str, dict[str, list[Any]]] = {}
-        self._resumed_loops: set[str] = set()
         self._timeout_tasks: dict[str, asyncio.Task[Any]] = {}
         self._timed_out_converge_nodes: set[str] = set()
         self._detached_nodes: set[str] = set()
@@ -1299,7 +1302,6 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
         node_id: str,
         node: ActivityNode,
         resolved_parameters: dict[str, Any],
-        graph: WorkflowGraph | None = None,
         timeout_seconds: int = DEFAULT_ACTIVITY_TIMEOUT_SECONDS,
     ) -> dict[str, Any]:
         """Execute a loop node.
@@ -1308,9 +1310,6 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
             node_id: Node ID
             node: Activity node
             resolved_parameters: Resolved configuration
-            graph: Workflow graph, used to resolve this loop's body when a retry
-                resumes it mid-run. Optional so loop unit tests need not build
-                one; a retry without a graph cannot resume and logs a warning.
             timeout_seconds: Activity timeout in seconds (default: DEFAULT_ACTIVITY_TIMEOUT_SECONDS)
 
         Returns:
@@ -1318,11 +1317,6 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
 
         """
         loop_type = resolved_parameters.get("type", LoopType.FOR_EACH)
-
-        # A retry re-entering this loop resumes at the failed iteration rather
-        # than restarting from zero. Runs before state is (re)created below so the
-        # seeded counter is not overwritten.
-        await self._maybe_resume_loop(node, graph)
 
         # Get or initialize loop state
         if node_id not in self.loop_state:
@@ -1716,9 +1710,7 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
                 node_id, resolved_parameters, node.outputs, graph, timeout_seconds=timeout_seconds
             )
         if node_type == NodeType.LOOP:
-            return await self._execute_loop_node(
-                node_id, node, resolved_parameters, graph, timeout_seconds=timeout_seconds
-            )
+            return await self._execute_loop_node(node_id, node, resolved_parameters, timeout_seconds=timeout_seconds)
 
         return {"output": {"status": "skipped", "reason": f"Unsupported node type: {node_type}"}}
 
@@ -1860,21 +1852,33 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
         """
         return list(self._detached_nodes)
 
-    @workflow.query
-    def get_restored_nodes(self) -> list[str]:
-        """Return source activity names reused by this retry (including iterations)."""
-        return sorted(self._restored_nodes)
+    @workflow.update
+    async def get_replayed_node_timestamps_when_ready(
+        self,
+        activity_id: str,
+    ) -> dict[str, str | None] | None:
+        """Wait for a replayed node's source timestamps, or report that there are none.
 
-    @workflow.query
-    def get_restored_activity_timestamps(self) -> dict[str, dict[str, str | None]]:
-        """Source-run timestamps for nodes this retry replayed under their own id.
+        A replayed node is recorded through the normal event path, so Temporal
+        stamps it with this run's times. The sync service asks here when the node
+        completes so the source times can be applied over them, making the node
+        report when the work actually ran rather than when it was replayed.
 
-        Consumed by ActivitySyncService: a replayed node is recorded node-by-node
-        through the normal event path, which stamps it with this run's event
-        times. These source timestamps are applied over those so the node reports
-        when the work actually ran rather than when it was restored.
+        This is an update rather than a query because the completed event can
+        arrive before this workflow has stored the node's source times — a query
+        would return an incomplete map, and since the event is consumed once the
+        node's real times would be lost. The wait condition holds until the
+        timestamps land, or until it is clear the activity is not a replay.
+
+        Returns the source ``started_at``/``completed_at``, or None when this
+        activity was an ordinary execution, meaning the caller should keep
+        Temporal's timestamps.
         """
-        return dict(self._restored_node_timestamps)
+        await workflow.wait_condition(
+            lambda: (activity_id in self._restored_node_timestamps or activity_id not in self._retry_replay_candidates),
+            timeout=timedelta(seconds=5),
+        )
+        return self._restored_node_timestamps.get(activity_id)
 
     @workflow.query
     def get_pre_resolved_nodes(self) -> list[str]:

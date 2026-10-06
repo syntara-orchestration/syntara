@@ -38,6 +38,14 @@ class ActivityExecutionSynchronizer:
         if not metadata.pending_sync_event_ids:
             return
 
+        # Resolved before the transaction opens. Asking the workflow blocks until
+        # it can answer, and a replayed node's answer is normally immediate — but
+        # not guaranteed, and the wait is bounded by the update's own timeout.
+        # Holding a database transaction across that wait would stall every other
+        # writer on the same connection pool for as long as one node takes, so the
+        # round trip happens first and only the lookup touches the session.
+        replayed_timestamps = await self.host._resolve_replayed_timestamps(metadata, handle)
+
         async with self.host.session_factory() as session:
             removed_entries: dict[int, dict[str, Any]] = {}
             saved_iteration_counters = dict(metadata.iteration_counters)
@@ -54,11 +62,6 @@ class ActivityExecutionSynchronizer:
                 )
                 existing_activities = {activity.activity_name: activity for activity in result.all()}
 
-                # Retry-replayed nodes are recorded node-by-node below with this
-                # run's event times; load the source timestamps that override them.
-                if metadata.is_retry:
-                    await self.host._refresh_restored_timestamps(metadata, handle)
-
                 updated_activities: list[tuple[ActivityExecution, dict[str, Any]]] = []
                 new_iteration_activities: list[ActivityExecution] = []
 
@@ -68,7 +71,7 @@ class ActivityExecutionSynchronizer:
                         continue
 
                     update_result = await self.host._process_single_activity_sync(
-                        metadata, handle, activity_data, existing_activities, session
+                        metadata, handle, activity_data, existing_activities, session, replayed_timestamps
                     )
                     if update_result is not None:
                         activity, old_values, is_new = update_result

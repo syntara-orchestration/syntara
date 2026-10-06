@@ -33,10 +33,9 @@ from syntara.workflows.workflow_engine.activities.internal import register_activ
 from syntara.workflows.workflow_engine.activities.internal_activity import execute_internal_activity
 from syntara.workflows.workflow_engine.activities.loop import loop
 from syntara.workflows.workflow_engine.activities.manual_trigger import manual_trigger
-from syntara.workflows.workflow_engine.activities.retry_output_activity import (
-    fetch_retry_loop_state_activity,
-    fetch_retry_outputs_activity,
+from syntara.workflows.workflow_engine.activities.retry_node_replay_activity import (
     fetch_retry_source_state_activity,
+    replay_retry_node_activity,
 )
 from syntara.workflows.workflow_engine.activities.runtime_settings_activity import fetch_workflow_runtime_settings
 from syntara.workflows.workflow_engine.activities.scheduled_trigger import scheduled_trigger
@@ -52,9 +51,8 @@ _TEMPORAL_ACTIVITIES: list[Callable[..., Any]] = [
     resolve_workflow_credentials,
     resolve_workflow_integration,
     validate_node_references,
-    fetch_retry_outputs_activity,
+    replay_retry_node_activity,
     fetch_retry_source_state_activity,
-    fetch_retry_loop_state_activity,
     execute_aap_job_template_activity,
     execute_aap_workflow_job_template_activity,
     execute_agentic_activity,

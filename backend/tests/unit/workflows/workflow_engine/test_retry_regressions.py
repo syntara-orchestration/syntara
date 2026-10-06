@@ -91,9 +91,8 @@ def _wf(retry_context: dict[str, Any] | None = None) -> OrchestratorWorkflow:
     wf = OrchestratorWorkflow.__new__(OrchestratorWorkflow)
     wf.retry_context = retry_context or {}
     wf._retry_restorable_cache = None
-    wf._restored_nodes = set()
+    wf._retry_replay_candidates = set()
     wf._restored_node_timestamps = {}
-    wf._resumed_loops = set()
     wf.resolver = NamespaceResolver()
     wf.skipped_nodes = set()
     wf.failed_nodes = {}
@@ -161,23 +160,14 @@ def test_multi_node_body_is_not_restorable() -> None:
 
 
 def test_loop_body_is_scoped_per_loop() -> None:
-    """Resuming loop_b must not seed it with loop_a's body."""
+    """Every loop body is collected, and no loop adopts only one of them."""
     graph = _two_loop_graph()
 
-    assert OrchestratorWorkflow._loop_body_node_ids(graph, "loop_a") == {"a_body"}
-    assert OrchestratorWorkflow._loop_body_node_ids(graph, "loop_b") == {"b_body"}
-
-
-@pytest.mark.asyncio
-async def test_resume_does_not_send_another_loops_body(mock_wf: MagicMock) -> None:
-    """A retry point in loop_a's body must not make loop_b resume at loop_a's index."""
-    wf = _wf(_retry("a_body"))
-    mock_wf.execute_activity = AsyncMock(return_value={})
-    node = ActivityNode(node_id="loop_b", node_type="loop", parameters={"type": "for_each", "items": ["x"]})
-
-    await wf._maybe_resume_loop(node, _two_loop_graph())
-
-    mock_wf.execute_activity.assert_not_called()
+    # Loop resume is a separate piece of work, so this now answers one question
+    # only: which nodes must never be replayed as if they were ordinary nodes.
+    # Both bodies are excluded, because a body node is one execution per
+    # iteration and a single stored output cannot stand in for all of them.
+    assert OrchestratorWorkflow._loop_body_node_ids(graph) == {"a_body", "b_body"}
 
 
 # ---------------------------------------------------------------------------
@@ -324,32 +314,6 @@ def test_completed_converge_is_retained_after_moot_failed_branch() -> None:
     assert not wf._should_skip_successor(
         graph.get_node("join"), "b2", is_loop_iterate=False, pending_tasks={}, graph=graph
     )
-
-
-@pytest.mark.asyncio
-async def test_loop_resume_fetches_all_body_outputs(mock_wf: MagicMock) -> None:
-    wf = _wf(_retry("body_b"))
-    wf.loop_state = {}
-    wf.loop_iteration_results = {}
-    wf._resumed_loops = set()
-    graph = _loop_body_graph()
-    mock_wf.execute_activity = AsyncMock(
-        return_value={
-            "loop_1": {
-                "resume_iteration": 1,
-                "iteration_results": {
-                    "body_a.value": [1],
-                    "body_b.value": [2],
-                    "body_c.value": [3],
-                },
-            },
-        }
-    )
-    await wf._maybe_resume_loop(graph.get_node("loop_1"), graph)
-    assert mock_wf.execute_activity.call_args.kwargs["args"][1] == {
-        "loop_1": ["body_a", "body_b", "body_c"],
-    }
-    assert wf.loop_iteration_results["loop_1"]["body_c.value"] == [3]
 
 
 def test_definition_validator_and_retry_share_loop_body_membership() -> None:

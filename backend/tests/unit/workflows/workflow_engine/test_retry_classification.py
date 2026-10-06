@@ -473,9 +473,7 @@ async def test_restored_output_is_injected_into_the_namespace(mock_wf: MagicMock
     wf = _injectable_workflow()
     wf.retry_context = _retry("step_2")
     node = ActivityNode(node_id="step_1", node_type="script", parameters={})
-    mock_wf.execute_activity = AsyncMock(
-        return_value={"step_1": {"input_data": {}, "output_data": {"result": "from-source"}}}
-    )
+    mock_wf.execute_activity = AsyncMock(return_value={"input_data": {}, "output_data": {"result": "from-source"}})
 
     result = await wf._restore_node_output(node)
 
@@ -504,7 +502,7 @@ async def test_restored_input_survives_supplied_result_handling(mock_wf: MagicMo
     wf.retry_context = _retry("step_2")
     node = ActivityNode(node_id="step_1", node_type="script", parameters={})
     mock_wf.execute_activity = AsyncMock(
-        return_value={"step_1": {"input_data": {"query": "select 1"}, "output_data": {"result": "ok"}}}
+        return_value={"input_data": {"query": "select 1"}, "output_data": {"result": "ok"}}
     )
 
     result = await wf._restore_node_output(node)
@@ -525,7 +523,7 @@ async def test_missing_output_falls_through_to_execution(mock_wf: MagicMock) -> 
     wf = _injectable_workflow()
     wf.retry_context = _retry("step_2")
     node = ActivityNode(node_id="step_1", node_type="script", parameters={})
-    mock_wf.execute_activity = AsyncMock(return_value={})
+    mock_wf.execute_activity = AsyncMock(return_value=None)
 
     assert await wf._restore_node_output(node) is None
     assert "step_1" not in wf.skipped_nodes
@@ -553,13 +551,13 @@ async def test_restore_dispatches_the_retry_outputs_activity(mock_wf: MagicMock)
     wf = _injectable_workflow()
     wf.retry_context = _retry("step_2")
     node = ActivityNode(node_id="step_1", node_type="script", parameters={})
-    mock_wf.execute_activity = AsyncMock(return_value={"step_1": {"input_data": {}, "output_data": {"result": "ok"}}})
+    mock_wf.execute_activity = AsyncMock(return_value={"input_data": {}, "output_data": {"result": "ok"}})
 
     await wf._restore_node_output(node)
 
     call = mock_wf.execute_activity.call_args
-    assert call[0][0] == ActivityName.RETRY_OUTPUTS
-    assert call.kwargs["args"] == ["src-1", ["step_1"]]
+    assert call[0][0] == ActivityName.RETRY_NODE_REPLAY
+    assert call.kwargs["args"] == ["src-1", "step_1"]
     assert call.kwargs["activity_id"] == "step_1"
 
 
@@ -571,12 +569,10 @@ async def test_restore_captures_source_timestamps(mock_wf: MagicMock) -> None:
     node = ActivityNode(node_id="step_1", node_type="script", parameters={})
     mock_wf.execute_activity = AsyncMock(
         return_value={
-            "step_1": {
-                "input_data": {},
-                "output_data": {"result": "ok"},
-                "started_at": "2026-01-01T00:00:00+00:00",
-                "completed_at": "2026-01-01T00:05:00+00:00",
-            }
+            "input_data": {},
+            "output_data": {"result": "ok"},
+            "started_at": "2026-01-01T00:00:00+00:00",
+            "completed_at": "2026-01-01T00:05:00+00:00",
         }
     )
 
@@ -594,9 +590,7 @@ async def test_maybe_restore_delegates_and_returns_the_synthetic_completion(mock
     wf = _injectable_workflow()
     wf.retry_context = _retry("step_2")
     node = ActivityNode(node_id="step_1", node_type="script", parameters={})
-    mock_wf.execute_activity = AsyncMock(
-        return_value={"step_1": {"input_data": {}, "output_data": {"result": "from-source"}}}
-    )
+    mock_wf.execute_activity = AsyncMock(return_value={"input_data": {}, "output_data": {"result": "from-source"}})
 
     result = await wf._maybe_restore_retry_output(node, _chain_graph())
 
@@ -646,3 +640,112 @@ def test_loop_body_walk_survives_a_repeated_node() -> None:
     graph = WorkflowGraph(backend)
 
     assert OrchestratorWorkflow._loop_body_node_ids(graph) == {"body_a", "body_b"}
+
+
+# ---------------------------------------------------------------------------
+# End-to-end replay of a plain linear chain
+#
+# The scope of this change is a straight line of nodes: each upstream node is
+# replayed from the source run under its own id, and the sync service records it
+# through the normal event path. Loop replay is deliberately absent — a failure
+# inside a loop body restarts the loop from its first iteration, which is tracked
+# separately. These tests walk the whole chain in order so the per-node handoff
+# is covered as one sequence rather than node by node in isolation.
+# ---------------------------------------------------------------------------
+
+
+class TestLinearChainReplay:
+    """A linear chain replays upstream nodes one at a time, in execution order."""
+
+    def setup_method(self) -> None:
+        self.graph = _chain_graph()
+
+    def _restored(self, wf: OrchestratorWorkflow, node_id: str) -> dict[str, Any] | None:
+        return wf._restored_node_timestamps.get(node_id)
+
+    @pytest.mark.asyncio
+    async def test_upstream_nodes_replay_in_order_and_record_their_source_times(self, mock_wf: MagicMock) -> None:
+        """Each replayed node carries its own input, output and source times.
+
+        The activity is dispatched under the node's own id, so the sync service
+        sees an ordinary activity event and records the node node-by-node. What
+        distinguishes a replay is the payload coming from the source run and the
+        timestamps being the ones recorded when that work actually ran.
+        """
+        wf = _make_workflow(_retry("step_3"))
+        wf.retry_context = _retry("step_3")
+        node_ids: list[str] = []
+
+        async def _replay(_name: str, **kwargs: object) -> dict[str, Any]:
+            node_id = str(kwargs["activity_id"])
+            node_ids.append(node_id)
+            return {
+                "input_data": {"in": f"{node_id}-input"},
+                "output_data": {"out": f"{node_id}-output"},
+                "started_at": f"2026-01-01T00:0{len(node_ids)}:00+00:00",
+                "completed_at": f"2026-01-01T00:0{len(node_ids)}:30+00:00",
+            }
+
+        mock_wf.execute_activity = AsyncMock(side_effect=_replay)
+
+        first = await wf._maybe_restore_retry_output(self.graph.get_node("step_1"), self.graph)
+        second = await wf._maybe_restore_retry_output(self.graph.get_node("step_2"), self.graph)
+
+        # One node per call, in execution order, each under its own id.
+        assert node_ids == ["step_1", "step_2"]
+        assert first == {"output": {"out": "step_1-output"}, "control": None}
+        assert second == {"output": {"out": "step_2-output"}, "control": None}
+
+        # Both halves republished: the input for drill-down, and an ordinary
+        # completion for the normal result path to publish and schedule from.
+        # That handoff is what makes a replayed node indistinguishable from one
+        # that executed.
+        assert wf.node_inputs["step_1"] == {"in": "step_1-input"}
+        assert wf.node_inputs["step_2"] == {"in": "step_2-input"}
+        assert first["output"] == {"out": "step_1-output"}
+
+        # Source times kept, so the row reports when the work ran.
+        assert self._restored(wf, "step_1") == {
+            "started_at": "2026-01-01T00:01:00+00:00",
+            "completed_at": "2026-01-01T00:01:30+00:00",
+        }
+        assert self._restored(wf, "step_2") == {
+            "started_at": "2026-01-01T00:02:00+00:00",
+            "completed_at": "2026-01-01T00:02:30+00:00",
+        }
+
+    @pytest.mark.asyncio
+    async def test_node_with_no_source_record_executes_and_stops_being_a_candidate(self, mock_wf: MagicMock) -> None:
+        """A node with nothing to replay really runs, and stops waiting on times.
+
+        The sync service waits on a candidate's source times. A restorable node
+        with no source record has none and never will, so it is dropped from the
+        candidates — otherwise every such node would stall the sync transaction
+        for the full wait timeout before falling back to Temporal's times.
+        """
+        wf = _make_workflow(_retry("step_3"))
+        wf.retry_context = _retry("step_3")
+        wf._retry_replay_candidates = {"step_1"}
+        mock_wf.execute_activity = AsyncMock(return_value=None)
+
+        assert await wf._maybe_restore_retry_output(self.graph.get_node("step_1"), self.graph) is None
+
+        assert wf._retry_replay_candidates == set()
+        assert wf._restored_node_timestamps == {}
+
+    @pytest.mark.asyncio
+    async def test_retry_candidates_are_known_before_any_node_runs(self, mock_wf: MagicMock) -> None:
+        """The candidate set is settled up front, not discovered mid-graph.
+
+        The sync service asks the workflow whether a completing activity is a
+        replay. If a node were only added to the set at the moment it replayed, a
+        node the workflow had not reached yet would look like an ordinary
+        execution and its source times would be dropped.
+        """
+        wf = _make_workflow(_retry("step_3"))
+        wf.retry_context = _retry("step_3")
+        mock_wf.execute_activity = AsyncMock(return_value={})
+
+        await wf._prepare_retry(self.graph)
+
+        assert wf._retry_replay_candidates == {"step_1", "step_2"}

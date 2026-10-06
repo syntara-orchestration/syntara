@@ -11,7 +11,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from syntara.workflows.models.activity_execution import ActivityStatus
-from syntara.workflows.workflow_engine.activities.retry_output_activity import fetch_retry_outputs_activity
+from syntara.workflows.workflow_engine.activities.retry_node_replay_activity import replay_retry_node_activity
 
 
 class _Row:
@@ -42,7 +42,7 @@ def _mock_session(rows: list[Any]) -> AsyncMock:
     return session
 
 
-async def _run(rows: list[Any], node_ids: list[str]) -> dict[str, dict[str, Any]]:
+async def _run(rows: list[Any], node_id: str | None) -> dict[str, Any] | None:
     # The mock session does not execute SQL, so the activity's
     # ``status == COMPLETED`` predicate is applied here to keep these tests
     # meaningful. The integration test for this activity covers the real query.
@@ -52,10 +52,10 @@ async def _run(rows: list[Any], node_ids: list[str]) -> dict[str, dict[str, Any]
         yield session
 
     with patch(
-        "syntara.workflows.workflow_engine.activities.retry_output_activity.get_db",
+        "syntara.workflows.workflow_engine.activities.retry_node_replay_activity.get_db",
         mock_get_db,
     ):
-        return await fetch_retry_outputs_activity("src-1", node_ids)
+        return await replay_retry_node_activity("src-1", node_id) if node_id is not None else None
 
 
 @pytest.mark.asyncio
@@ -63,8 +63,11 @@ async def test_returns_completed_output_for_a_node() -> None:
     """A completed node's stored output is what gets injected in its place."""
     rows = [_Row("step_1", ActivityStatus.COMPLETED, {"result": "ok"})]
 
-    assert await _run(rows, ["step_1"]) == {
-        "step_1": {"input_data": {}, "output_data": {"result": "ok"}, "started_at": None, "completed_at": None}
+    assert await _run(rows, "step_1") == {
+        "input_data": {},
+        "output_data": {"result": "ok"},
+        "started_at": None,
+        "completed_at": None,
     }
 
 
@@ -76,8 +79,11 @@ async def test_only_requested_nodes_are_returned() -> None:
         _Row("step_2", ActivityStatus.COMPLETED, {"result": "other"}),
     ]
 
-    assert await _run(rows, ["step_1"]) == {
-        "step_1": {"input_data": {}, "output_data": {"result": "ok"}, "started_at": None, "completed_at": None}
+    assert await _run(rows, "step_1") == {
+        "input_data": {},
+        "output_data": {"result": "ok"},
+        "started_at": None,
+        "completed_at": None,
     }
 
 
@@ -91,7 +97,7 @@ async def test_node_with_no_completed_activity_is_absent_not_empty() -> None:
     """
     rows = [_Row("step_1", ActivityStatus.FAILED, None)]
 
-    assert await _run(rows, ["step_1"]) == {}
+    assert await _run(rows, "step_1") is None
 
 
 @pytest.mark.asyncio
@@ -99,8 +105,11 @@ async def test_completed_node_with_no_output_returns_empty_dict() -> None:
     """A node that completed but produced nothing is an empty output, not absent."""
     rows = [_Row("step_1", ActivityStatus.COMPLETED, None)]
 
-    assert await _run(rows, ["step_1"]) == {
-        "step_1": {"input_data": {}, "output_data": {}, "started_at": None, "completed_at": None}
+    assert await _run(rows, "step_1") == {
+        "input_data": {},
+        "output_data": {},
+        "started_at": None,
+        "completed_at": None,
     }
 
 
@@ -109,8 +118,11 @@ async def test_iteration_suffixed_request_resolves_to_the_base_node() -> None:
     """``step_1#iter-2`` asks for node step_1, and gets step_1's output."""
     rows = [_Row("step_1", ActivityStatus.COMPLETED, {"result": "ok"})]
 
-    assert await _run(rows, ["step_1#iter-2"]) == {
-        "step_1": {"input_data": {}, "output_data": {"result": "ok"}, "started_at": None, "completed_at": None}
+    assert await _run(rows, "step_1#iter-2") == {
+        "input_data": {},
+        "output_data": {"result": "ok"},
+        "started_at": None,
+        "completed_at": None,
     }
 
 
@@ -122,21 +134,24 @@ async def test_loop_iteration_rows_resolve_to_the_most_recent_one() -> None:
         _Row("step_1#iter-1", ActivityStatus.COMPLETED, {"result": "iter-1"}),
     ]
 
-    assert await _run(rows, ["step_1"]) == {
-        "step_1": {"input_data": {}, "output_data": {"result": "iter-1"}, "started_at": None, "completed_at": None}
+    assert await _run(rows, "step_1") == {
+        "input_data": {},
+        "output_data": {"result": "iter-1"},
+        "started_at": None,
+        "completed_at": None,
     }
 
 
 @pytest.mark.asyncio
 async def test_empty_request_short_circuits() -> None:
     """Nothing requested means no query and no result."""
-    assert await _run([], []) == {}
+    assert await _run([], None) is None
 
 
 @pytest.mark.asyncio
 async def test_blank_ids_are_ignored() -> None:
     """Whitespace-only ids are not node ids."""
-    assert await _run([], ["", "   "]) == {}
+    assert await _run([], "   ") is None
 
 
 @pytest.mark.asyncio
@@ -144,8 +159,11 @@ async def test_ids_are_whitespace_trimmed() -> None:
     """A padded id still resolves to its node."""
     rows = [_Row("step_1", ActivityStatus.COMPLETED, {"result": "ok"})]
 
-    assert await _run(rows, ["  step_1  "]) == {
-        "step_1": {"input_data": {}, "output_data": {"result": "ok"}, "started_at": None, "completed_at": None}
+    assert await _run(rows, "  step_1  ") == {
+        "input_data": {},
+        "output_data": {"result": "ok"},
+        "started_at": None,
+        "completed_at": None,
     }
 
 
@@ -162,7 +180,7 @@ async def test_oversized_result_is_refused_rather_than_truncated() -> None:
     rows = [_Row("step_1", ActivityStatus.COMPLETED, {"blob": "x" * 2_000_000})]
 
     with pytest.raises(SafeValueError, match="over the"):
-        await _run(rows, ["step_1"])
+        await _run(rows, "step_1")
 
 
 @pytest.mark.asyncio
@@ -170,9 +188,10 @@ async def test_size_within_the_limit_is_returned() -> None:
     """A payload under the limit passes through untouched."""
     rows = [_Row("step_1", ActivityStatus.COMPLETED, {"blob": "x" * 1000})]
 
-    result = await _run(rows, ["step_1"])
+    result = await _run(rows, "step_1")
 
-    assert result["step_1"]["output_data"]["blob"] == "x" * 1000
+    assert result is not None
+    assert result["output_data"]["blob"] == "x" * 1000
 
 
 @pytest.mark.asyncio
@@ -185,9 +204,9 @@ async def test_returns_stored_input_alongside_output() -> None:
     """
     rows = [_Row("step_1", ActivityStatus.COMPLETED, {"result": "ok"}, input_data={"query": "select 1"})]
 
-    result = await _run(rows, ["step_1"])
+    result = await _run(rows, "step_1")
 
-    assert result["step_1"] == {
+    assert result == {
         "input_data": {"query": "select 1"},
         "output_data": {"result": "ok"},
         "started_at": None,
@@ -209,10 +228,11 @@ async def test_returns_source_timestamps_as_iso_strings() -> None:
         _Row("step_1", ActivityStatus.COMPLETED, {"result": "ok"}, started_at=started, completed_at=completed),
     ]
 
-    result = await _run(rows, ["step_1"])
+    result = await _run(rows, "step_1")
 
-    assert result["step_1"]["started_at"] == started.isoformat()
-    assert result["step_1"]["completed_at"] == completed.isoformat()
+    assert result is not None
+    assert result["started_at"] == started.isoformat()
+    assert result["completed_at"] == completed.isoformat()
 
 
 @pytest.mark.asyncio
@@ -224,6 +244,7 @@ async def test_node_with_no_stored_input_returns_empty_not_missing() -> None:
     """
     rows = [_Row("step_1", ActivityStatus.COMPLETED, {"result": "ok"})]
 
-    result = await _run(rows, ["step_1"])
+    result = await _run(rows, "step_1")
 
-    assert result["step_1"]["input_data"] == {}
+    assert result is not None
+    assert result["input_data"] == {}
