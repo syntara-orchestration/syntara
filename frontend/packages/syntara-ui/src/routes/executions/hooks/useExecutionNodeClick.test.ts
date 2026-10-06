@@ -32,6 +32,34 @@ vi.mock('./useExecutionApprovals', () => ({
   }),
 }))
 
+const mockHandleFormPromptClick = vi.fn()
+const mockHandleActivityRowClick = vi.fn()
+const mockNavigateToFormPromptIndex = vi.fn()
+const mockClearFormPrompts = vi.fn()
+const mockSetFormPromptsAndIndex = vi.fn()
+const mockFetchFormPrompts = vi.fn()
+
+vi.mock('./useExecutionFormPrompts', () => ({
+  isWaitingFormPromptNode: (node: { type?: string; data: Record<string, unknown> }) => {
+    if (node.type !== FlowNodeType.FORM_PROMPT) return false
+    const executionState = node.data.__executionState as { status?: string } | undefined
+    return executionState?.status === 'waiting'
+  },
+  useExecutionFormPrompts: () => ({
+    formPrompts: [],
+    currentIndex: 0,
+    currentFormPrompt: null,
+    isLoading: false,
+    handleNodeClick: mockHandleFormPromptClick,
+    handleActivityRowClick: mockHandleActivityRowClick,
+    navigateToIndex: mockNavigateToFormPromptIndex,
+    clearFormPrompts: mockClearFormPrompts,
+    setFormPromptsAndIndex: mockSetFormPromptsAndIndex,
+    fetchFormPrompts: mockFetchFormPrompts,
+    fetchPendingFormPrompts: mockFetchFormPrompts,
+  }),
+}))
+
 const fakeEvent = {} as React.MouseEvent
 
 function makeNode(
@@ -71,6 +99,32 @@ describe('useExecutionNodeClick', () => {
     expect(mockHandleApprovalClick).toHaveBeenCalledWith(fakeEvent, approvalNode)
     // Should NOT set selectedNodeId for approval nodes
     expect(result.current.selectedNodeId).toBeNull()
+  })
+
+  it('delegates form prompt node clicks to useExecutionFormPrompts', () => {
+    const { result } = renderHook(() => useExecutionNodeClick('exec-1'))
+    const formNode = makeNode('form-1', 'waiting', { type: FlowNodeType.FORM_PROMPT })
+
+    act(() => {
+      result.current.handleNodeClick(fakeEvent, formNode)
+    })
+
+    expect(mockHandleFormPromptClick).toHaveBeenCalledWith(fakeEvent, formNode)
+    expect(result.current.selectedNodeId).toBeNull()
+    expect(mockHandleApprovalClick).not.toHaveBeenCalled()
+  })
+
+  it('selects completed form prompt nodes for activity details (does not open response panel)', () => {
+    const { result } = renderHook(() => useExecutionNodeClick('exec-1'))
+    const formNode = makeNode('form-1', 'completed', { type: FlowNodeType.FORM_PROMPT, name: 'Intake' })
+
+    act(() => {
+      result.current.handleNodeClick(fakeEvent, formNode)
+    })
+
+    expect(mockHandleFormPromptClick).not.toHaveBeenCalled()
+    expect(result.current.selectedNodeId).toBe('form-1')
+    expect(result.current.selectedNodeName).toBe('Intake')
   })
 
   it('selects a completed node on click', () => {

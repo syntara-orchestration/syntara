@@ -321,6 +321,23 @@ export const activityExecutions: Record<string, ActivityExecution[]> = {
       iteration: 1,
     },
   ],
+  'exec-form-prompt': [
+    {
+      id: 'act-fp-1',
+      created_at: mockDate.minutesAgo10,
+      updated_at: mockDate.minutesAgo10,
+      execution_id: 'exec-form-prompt',
+      activity_name: 'collect_input',
+      status: 'waiting',
+      started_at: mockDate.minutesAgo10,
+      completed_at: null,
+      input_data: {} as Record<string, unknown>,
+      output_data: null,
+      error_details: null,
+      retry_count: 0,
+      iteration: null,
+    },
+  ],
   'exec-approval': [
     {
       id: 'act-appr-1',

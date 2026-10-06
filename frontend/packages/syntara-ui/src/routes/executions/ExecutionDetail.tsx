@@ -1,12 +1,11 @@
 import { Flex, FlexItem, TitleSizes } from '@patternfly/react-core'
 import type { ExecutionsAPI } from '@syntara/contracts'
-import { useNavigate, useParams, useRouterState } from '@tanstack/react-router'
+import { useNavigate } from '@tanstack/react-router'
 import type React from 'react'
 import '@xyflow/react/dist/style.css'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { AppRoute } from '../../app/AppRoute'
-import { executionsClient } from '../../client'
 import { SynPage, SynPageBody } from '../../components/layout/SynPage'
 import { SynPageHeader } from '../../components/layout/SynPageHeader'
 import { SynPanelStack, SynPanelStackItem } from '../../components/layout/SynPanelStack'
@@ -14,35 +13,24 @@ import { SynReactFlowViewportGuard } from '../../components/layout/SynReactFlowV
 import { ResizableDivider } from '../../components/ResizableDivider'
 import { SynPageTitle } from '../../components/SynPageTitle'
 import type { PaginationFooterProps } from '../../components/table/PaginationFooter'
-import { useDialogState } from '../../hooks/useDialogState'
 import { useAlerts } from '../../providers/alerts'
 import type { FilterConfig } from '../../types/filters'
 import { detachPromise } from '../../utils/detachPromise'
 import { useDocLink } from '../../utils/docs/useDocLink'
-import { canvasNodeIdFromApprovalNodeId } from '../approvals/approvalNodeId'
 import { ExecutionDetailsPanel, type WorkflowDefShape } from '../builder/ExecutionDetailsPanel'
 import { ExecutionViewContent } from '../builder/ExecutionViewContent'
-import { useActivityNameMap } from '../builder/useActivityNameMap'
 import { WorkflowHistoryCard } from '../builder/WorkflowHistoryCard'
-import type { ActivityState } from '../workflows/execution/types'
-import { useExecutionStore, useExecutionWithLiveStatus } from '../workflows/stores/useExecutionStore'
+import { useExecutionStore } from '../workflows/stores/useExecutionStore'
 
-import { ApprovalSidePanel } from './ApprovalSidePanel'
 import { ExecutionDetailErrorStates } from './components/ExecutionDetailErrorStates'
 import { ConnectionBanner } from './ConnectionBanner'
 import { CopyToEditorDialog } from './CopyToEditorDialog'
-import { isExecutionCancellable } from './executionCancellable'
 import styles from './ExecutionDetail.module.css'
+import { resolveWaitingNodeHighlightId } from './executionDetailHighlight'
 import { ExecutionDetailHeaderToolbar, ExecutionDetailTitleRowAddons } from './ExecutionDetailPageHeaderParts'
 import { executionDetailHasTitleRowExtras, executionDetailPageHeading } from './executionDetailPageHeaderTitle'
-import { executionRefetchInterval } from './executionPolling'
-import { useApprovalNavigation } from './hooks/useApprovalNavigation'
-import { useExecutionApprovalPanel } from './hooks/useExecutionApprovalPanel'
-import { useExecutionNodeClick } from './hooks/useExecutionNodeClick'
-import { useExecutionRunHistory } from './hooks/useExecutionRunHistory'
-import { useExecutionStreaming, useSyncActivityStore } from './hooks/useExecutionStreaming'
-import { useExecutionWorkflow } from './hooks/useExecutionWorkflow'
-import { useForkWorkflow } from './hooks/useForkWorkflow'
+import { ExecutionDetailSidePanel } from './ExecutionDetailSidePanel'
+import { useExecutionDetailPageModel, useResetOnExecutionChange } from './hooks/useExecutionDetailPageModel'
 
 /** Returns true when the page should render a fallback (missing ID, loading, or error) instead of the main content. */
 function shouldShowFallbackState(
@@ -50,39 +38,6 @@ function shouldShowFallbackState(
   query: { isLoading: boolean; error: unknown }
 ): boolean {
   return !executionId || query.isLoading || !!query.error
-}
-
-/** Reset execution store only when the execution ID actually changes. */
-function useResetOnExecutionChange(executionId: string | undefined) {
-  const { reset } = useExecutionStore.getState()
-  const prevExecutionIdRef = useRef<string | null>(null)
-
-  useEffect(() => {
-    if (executionId && prevExecutionIdRef.current !== executionId) {
-      reset()
-    }
-    prevExecutionIdRef.current = executionId ?? null
-  }, [executionId, reset])
-}
-
-/** Build activity name map from workflow definition for resolving approval node names. */
-function useActivityNamesForExecution(
-  workflowDefinition: WorkflowDefShape | undefined | null,
-  activities: (ActivityData | ActivityExecution)[]
-): Map<string, string> {
-  const activityStates = useMemo(() => {
-    const map = new Map<string, ActivityState>()
-    for (const activity of activities) {
-      const activityId = 'activity_id' in activity ? activity.activity_id : null
-      if (activityId) {
-        map.set(activityId, { activityId, status: activity.status } as ActivityState)
-      }
-    }
-    return map
-  }, [activities])
-
-  const { nameMap } = useActivityNameMap(workflowDefinition, activityStates)
-  return nameMap
 }
 
 type Execution = ExecutionsAPI.components['schemas']['ExecutionRead']
@@ -150,6 +105,7 @@ function ExecutionDetailContent({
     })
   }, [workflow?.name, showError])
 
+  /* eslint-disable reactYouMightNotNeedAnEffect/no-event-handler -- toast when run transitions to failed */
   useEffect(() => {
     const prevStatus = prevStatusRef.current
     prevStatusRef.current = execution?.status
@@ -158,6 +114,7 @@ function ExecutionDetailContent({
       showFailureToast()
     }
   }, [execution?.status, showFailureToast])
+  /* eslint-enable reactYouMightNotNeedAnEffect/no-event-handler */
 
   const MIN_PANEL_HEIGHT = 100
   const MAX_PANEL_HEIGHT = 600
@@ -274,86 +231,22 @@ function ExecutionDetailContent({
 
 export default function ExecutionDetail() {
   const executionsDocLink = useDocLink('executions')
-  const { executionId }: { executionId: string } = useParams({ strict: false })
-  const navigate = useNavigate()
-  const searchParams = useRouterState({ select: (s) => s.location.searchStr.replace(/^\?/, '') })
+  const page = useExecutionDetailPageModel()
 
-  useResetOnExecutionChange(executionId)
+  useResetOnExecutionChange(page.executionId)
 
-  const executionQuery = executionsClient.useQuery(
-    'get',
-    '/executions/{execution_id}',
-    {
-      params: {
-        path: { execution_id: executionId ?? '' },
-        query: {
-          include: 'workflow_definition,activities',
-        },
-      },
-      enabled: !!executionId,
-    },
-    { refetchInterval: executionRefetchInterval }
-  )
-
-  const execution = useExecutionWithLiveStatus(executionQuery.data)
-
-  useExecutionStreaming(executionId, execution)
-
-  const historyCardOpen = useMemo(() => {
-    const params = new URLSearchParams(searchParams)
-    return params.get('history') === 'open'
-  }, [searchParams])
-
-  const { executionFilters, handleExecutionFilterChange, executionsQuery, executionPaginationFooterProps } =
-    useExecutionRunHistory(execution?.workflow_id)
-
-  const { workflow, activities } = useExecutionWorkflow(execution)
-
-  useSyncActivityStore(execution, activities)
-
-  const activityNameMap = useActivityNamesForExecution(execution?.workflow_definition, activities)
-
-  const nodeClick = useExecutionNodeClick(executionId)
-  const { approvals, currentIndex, currentApproval, isApprovalLoading, handleNodeClick, navigateToIndex } = nodeClick
-  const { selectedNodeId, selectedNodeName, selectNode } = nodeClick
-  const approval = useExecutionApprovalPanel(
-    executionId,
-    searchParams,
-    nodeClick,
-    execution?.workflow_definition ?? undefined
-  )
-  const approvalNavigation = useApprovalNavigation(currentIndex, navigateToIndex, approvals)
-  const copyToEditorDialog = useDialogState<void>()
-  const isCancellable = isExecutionCancellable(execution?.status)
-
-  const { forkAsNewWorkflow, isForkLoading } = useForkWorkflow({
-    workflowDefinition: execution?.workflow_definition,
-    workflowName: workflow?.name ?? 'Workflow',
-    projectId: execution?.project_id,
-  })
-
-  const toggleHistoryCard = () => {
-    const willOpen = !historyCardOpen
-    if (willOpen) approval.close()
-    detachPromise(
-      navigate({
-        to: '/executions/$executionId',
-        params: { executionId },
-        search: (prev: Record<string, unknown>) => ({ ...prev, history: willOpen ? 'open' : 'closed' }),
-      })
-    )
-  }
-
-  if (shouldShowFallbackState(executionId, executionQuery)) {
+  if (shouldShowFallbackState(page.executionId, page.executionQuery)) {
     return (
       <ExecutionDetailErrorStates
-        executionId={executionId}
-        isLoading={executionQuery.isLoading}
-        error={executionQuery.error}
-        onRetry={executionQuery.refetch}
+        executionId={page.executionId}
+        isLoading={page.executionQuery.isLoading}
+        error={page.executionQuery.error}
+        onRetry={page.executionQuery.refetch}
       />
     )
   }
+
+  const { execution, executionId, navigate } = page
 
   return (
     <SynPage>
@@ -370,12 +263,18 @@ export default function ExecutionDetail() {
           }
           toolbar={
             <ExecutionDetailHeaderToolbar
-              showApprovalActionStrip={Boolean(currentApproval ?? isApprovalLoading)}
-              isApprovalLoading={isApprovalLoading}
-              isApprovalPanelOpen={approval.panelOpen}
-              onReviewClick={approval.open}
-              historyCardOpen={historyCardOpen}
-              onToggleHistory={toggleHistoryCard}
+              showApprovalActionStrip={Boolean(page.currentApproval ?? page.isApprovalLoading)}
+              isApprovalLoading={page.isApprovalLoading}
+              isApprovalPanelOpen={page.approval.panelOpen}
+              onReviewClick={page.approval.open}
+              showFormPromptActionStrip={Boolean(
+                page.isFormPromptLoading || page.currentFormPrompt?.status === 'pending'
+              )}
+              isFormPromptLoading={page.isFormPromptLoading}
+              isFormPromptPanelOpen={page.formPromptPanel.panelOpen}
+              onRespondClick={page.formPromptPanel.open}
+              historyCardOpen={page.historyCardOpen}
+              onToggleHistory={page.toggleHistoryCard}
               onBackToEditor={() => {
                 if (execution?.workflow_id) {
                   detachPromise(
@@ -383,8 +282,8 @@ export default function ExecutionDetail() {
                   )
                 }
               }}
-              onCopyToEditor={() => copyToEditorDialog.open(undefined)}
-              isCancellable={isCancellable}
+              onCopyToEditor={() => page.copyToEditorDialog.open(undefined)}
+              isCancellable={page.isCancellable}
               executionId={executionId}
               execution={execution}
             />
@@ -393,50 +292,55 @@ export default function ExecutionDetail() {
         <SynPageBody>
           <ExecutionDetailContent
             key={executionId}
-            historyCardOpen={historyCardOpen && !approval.panelOpen}
+            historyCardOpen={page.historyCardOpen && !page.approval.panelOpen && !page.formPromptPanel.panelOpen}
             approvalPanel={
-              approval.panelOpen && currentApproval ? (
-                <ApprovalSidePanel
-                  approval={currentApproval}
-                  message={approval.approvalMessage}
-                  activityNameMap={activityNameMap}
-                  onClose={approval.close}
-                  onDecisionSubmitted={approval.dismiss}
+              page.hasOpenExecutionSidePanel ? (
+                <ExecutionDetailSidePanel
+                  formPromptPanelOpen={page.formPromptPanel.panelOpen}
+                  currentFormPrompt={page.currentFormPrompt}
+                  formPromptNavigation={page.formPromptNavigation}
+                  formPromptIndex={page.formPromptIndex}
+                  formPromptCount={page.formPrompts.length}
+                  executionId={executionId}
+                  activityNameMap={page.activityNameMap}
+                  onFormPromptClose={page.formPromptPanel.close}
+                  onFormPromptSubmitted={page.formPromptPanel.dismiss}
+                  workflowDefinition={page.workflowDefinitionForSidePanel}
+                  approvalPanelOpen={page.approval.panelOpen}
+                  currentApproval={page.currentApproval}
+                  approvalMessage={page.approval.approvalMessage}
+                  approvalNavigation={page.approvalNavigation}
+                  currentApprovalIndex={page.currentIndex}
+                  approvalCount={page.approvals.length}
+                  onApprovalClose={page.approval.close}
+                  onApprovalDecisionSubmitted={page.approval.dismiss}
                   onNavigate={(path) => detachPromise(navigate({ to: path }))}
-                  currentIndex={currentIndex}
-                  totalCount={approvals.length}
-                  hasPrev={approvalNavigation.hasPrev}
-                  hasNext={approvalNavigation.hasNext}
-                  onNavigatePrev={approvalNavigation.navigatePrev}
-                  onNavigateNext={approvalNavigation.navigateNext}
                 />
               ) : undefined
             }
-            workflow={workflow}
+            workflow={page.workflow}
             execution={execution}
-            activities={activities}
+            activities={page.activities}
             executionId={executionId}
-            executionsQuery={executionsQuery}
+            executionsQuery={page.executionsQuery}
             navigate={navigate}
-            filters={executionFilters}
-            onFilterChange={handleExecutionFilterChange}
-            paginationFooterProps={executionPaginationFooterProps}
-            onNodeClick={handleNodeClick}
-            selectedNodeId={selectedNodeId}
-            selectedNodeName={selectedNodeName}
-            onNodeSelect={selectNode}
-            currentApprovalNodeId={
-              currentApproval ? canvasNodeIdFromApprovalNodeId(currentApproval.approval_node_id) : undefined
-            }
+            filters={page.executionFilters}
+            onFilterChange={page.handleExecutionFilterChange}
+            paginationFooterProps={page.executionPaginationFooterProps}
+            onNodeClick={page.onCanvasNodeClick}
+            selectedNodeId={page.selectedNodeId}
+            selectedNodeName={page.selectedNodeName}
+            onNodeSelect={page.onActivityRowSelect}
+            currentApprovalNodeId={resolveWaitingNodeHighlightId(page.currentFormPrompt, page.currentApproval)}
           />
         </SynPageBody>
       </SynReactFlowViewportGuard>
 
       <CopyToEditorDialog
-        isOpen={copyToEditorDialog.isOpen}
-        onClose={copyToEditorDialog.close}
+        isOpen={page.copyToEditorDialog.isOpen}
+        onClose={page.copyToEditorDialog.close}
         onReplace={() => {
-          copyToEditorDialog.close()
+          page.copyToEditorDialog.close()
           if (execution?.workflow_id && executionId)
             detachPromise(
               navigate({
@@ -447,9 +351,9 @@ export default function ExecutionDetail() {
             )
         }}
         onFork={async () => {
-          const id = await forkAsNewWorkflow()
+          const id = await page.forkAsNewWorkflow()
           if (!id || !executionId) return
-          copyToEditorDialog.close()
+          page.copyToEditorDialog.close()
           detachPromise(
             navigate({
               to: '/workflow-builder/$workflowId',
@@ -458,7 +362,7 @@ export default function ExecutionDetail() {
             })
           )
         }}
-        isForkLoading={isForkLoading}
+        isForkLoading={page.isForkLoading}
       />
     </SynPage>
   )

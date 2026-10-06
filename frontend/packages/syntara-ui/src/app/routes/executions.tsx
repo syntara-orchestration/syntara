@@ -17,6 +17,7 @@ const executionsSearch = listSearchParams
 const executionDetailSearch = z
   .object({
     approval: z.string().optional(),
+    form_prompt: z.string().optional(),
     history: z.string().optional(),
   })
   .catch({})

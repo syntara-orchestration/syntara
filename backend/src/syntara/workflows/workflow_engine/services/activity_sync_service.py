@@ -1245,46 +1245,69 @@ class ActivitySyncService:
         }
         metadata.pending_sync_event_ids.add(event.event_id)
 
+    @staticmethod
+    def _status_for_activity_task_started(
+        activity_id: str,
+        activity_definitions_map: dict[str, dict[str, Any]],
+        attempt: int,
+    ) -> ActivityStatus:
+        if attempt > 1:
+            return ActivityStatus.RETRYING
+        activity_type = activity_definitions_map.get(activity_id, {}).get("type")
+        if activity_type in (NodeType.APPROVAL, NodeType.FORM_PROMPT, NodeType.WAIT):
+            return ActivityStatus.WAITING
+        return ActivityStatus.RUNNING
+
+    @staticmethod
+    def _truncate_retry_reason(message: str | None) -> str | None:
+        if not message:
+            return None
+        if len(message) <= RETRY_REASON_MAX_LENGTH:
+            return message
+        return message[: RETRY_REASON_MAX_LENGTH - 3] + "..."
+
+    @staticmethod
+    def _failure_type_from_last_failure(last_failure: Any) -> str | None:  # noqa: ANN401
+        if not last_failure:
+            return None
+        cause = last_failure.cause
+        if cause and cause.application_failure_info and cause.application_failure_info.type:
+            return cast("str", cause.application_failure_info.type)
+        app_info = last_failure.application_failure_info
+        if app_info and app_info.type:
+            return cast("str", app_info.type)
+        return None
+
+    @staticmethod
+    def _retry_info_for_started_attempt(attrs: Any, attempt: int) -> dict[str, Any]:  # noqa: ANN401
+        last_failure = attrs.last_failure
+        message = last_failure.message if last_failure else None
+        return {
+            "retry_count": attempt - 1,
+            "retry_reason": ActivitySyncService._truncate_retry_reason(message),
+            "error_type": ActivitySyncService._failure_type_from_last_failure(last_failure),
+        }
+
     def _process_activity_started(self, event: HistoryEvent, metadata: ExecutionMonitorMetadata) -> None:
         """Process ACTIVITY_TASK_STARTED event."""
         attrs = event.activity_task_started_event_attributes
         scheduled_id = attrs.scheduled_event_id
-        if scheduled_id in metadata.pending_activity_updates:
-            attempt = attrs.attempt or 1
-            update = metadata.pending_activity_updates[scheduled_id]
-            if attempt > 1:
-                update["status"] = ActivityStatus.RETRYING
-            else:
-                activity_id = update["activity_id"]
-                activity_def = metadata.activity_definitions_map.get(activity_id, {})
-                activity_type = activity_def.get("type")
-                update["status"] = (
-                    ActivityStatus.WAITING
-                    if activity_type in (NodeType.APPROVAL, NodeType.FORM_PROMPT, NodeType.WAIT)
-                    else ActivityStatus.RUNNING
-                )
-            update["started_at"] = ensure_timezone_aware(event.event_time)
-            update["retry_count"] = attempt - 1
-            metadata.pending_sync_event_ids.add(scheduled_id)
+        if scheduled_id not in metadata.pending_activity_updates:
+            return
 
-            if attempt > 1:
-                last_failure = attrs.last_failure
-                retry_reason = last_failure.message if last_failure else None
-                if retry_reason and len(retry_reason) > RETRY_REASON_MAX_LENGTH:
-                    retry_reason = retry_reason[: RETRY_REASON_MAX_LENGTH - 3] + "..."
-                # Extract failure type name from the Temporal failure chain
-                failure_type: str | None = None
-                if last_failure:
-                    cause = last_failure.cause
-                    if cause and cause.application_failure_info and cause.application_failure_info.type:
-                        failure_type = cause.application_failure_info.type
-                    elif last_failure.application_failure_info and last_failure.application_failure_info.type:
-                        failure_type = last_failure.application_failure_info.type
-                update["_retry_info"] = {
-                    "retry_count": attempt - 1,
-                    "retry_reason": retry_reason,
-                    "error_type": failure_type,
-                }
+        attempt = attrs.attempt or 1
+        update = metadata.pending_activity_updates[scheduled_id]
+        update["status"] = ActivitySyncService._status_for_activity_task_started(
+            update["activity_id"],
+            metadata.activity_definitions_map,
+            attempt,
+        )
+        update["started_at"] = ensure_timezone_aware(event.event_time)
+        update["retry_count"] = attempt - 1
+        metadata.pending_sync_event_ids.add(scheduled_id)
+
+        if attempt > 1:
+            update["_retry_info"] = ActivitySyncService._retry_info_for_started_attempt(attrs, attempt)
 
     @staticmethod
     def _is_agentic_activity(activity_def: dict[str, Any]) -> bool:

@@ -10,6 +10,7 @@ import {
   validateFormSubmission,
 } from '../../forms'
 import { detachPromise } from '../../utils/detachPromise'
+import { DisabledWithTooltip } from '../DisabledWithTooltip'
 import { SynErrorState } from '../states/SynErrorState'
 
 import { applyValidationErrors } from './dynamicForm/applyValidationErrors'
@@ -33,6 +34,7 @@ export function SynDynamicForm({
   onValidationError,
   submitLabel = 'Submit',
   isReadOnly = false,
+  disabledFieldTooltip,
   hideSubmitButton = false,
   id,
   'data-testid': dataTestId,
@@ -69,6 +71,7 @@ export function SynDynamicForm({
   }
 
   const fieldsDisabled = isDisabled || isReadOnly || isLoading || isSubmitting
+  const showFieldTooltip = Boolean(disabledFieldTooltip) && fieldsDisabled && (isReadOnly || isDisabled)
 
   const onFormSubmit = async (raw: FormSubmissionInput) => {
     try {
@@ -100,15 +103,26 @@ export function SynDynamicForm({
         <StackItem>
           <SynForm form={form}>
             <Stack hasGutter>
-              {definition.fields.map((field) => (
-                <StackItem key={field.value_name}>
+              {definition.fields.map((field) => {
+                const fieldControl = (
                   <SynDynamicFormField
                     field={field}
                     isDisabled={fieldsDisabled}
                     resolveDynamicOptions={resolveDynamicOptions}
                   />
-                </StackItem>
-              ))}
+                )
+                return (
+                  <StackItem key={field.value_name}>
+                    {showFieldTooltip ? (
+                      <DisabledWithTooltip isDisabled content={disabledFieldTooltip}>
+                        <span style={{ display: 'block' }}>{fieldControl}</span>
+                      </DisabledWithTooltip>
+                    ) : (
+                      fieldControl
+                    )}
+                  </StackItem>
+                )
+              })}
             </Stack>
           </SynForm>
         </StackItem>
