@@ -97,11 +97,10 @@ class TestStallDetectionScanner:
             await detect_stalled_activities(test_db_session_factory)
 
         # Verify claim in database
+        # Note: updated_at is NOT set for internal stall bookkeeping
         await test_db_session.refresh(activity)
         assert activity.stall_alert_at is not None
-        assert activity.updated_at is not None
         assert activity.stall_alert_at >= now
-        assert activity.updated_at >= now
 
     async def test_activity_below_threshold_ignored(
         self,

@@ -17,18 +17,13 @@ class WorkflowStallEvent(BaseTelemetryEvent):
     workflow/execution/user identifiers or other sensitive data.
 
     Attributes:
-        workflow_step_count: Total number of steps in the workflow definition.
-        execution_mode: Execution mode (e.g., 'production', 'test').
+        execution_mode: Execution mode (e.g., 'standard', 'test', 'debug').
         stalled_step_type: Node type of the stalled step (e.g., 'http_request', 'llm').
 
     """
 
-    workflow_step_count: int = Field(
-        ge=1,
-        description="Total number of steps in the workflow definition",
-    )
     execution_mode: str = Field(
-        description="Execution mode (e.g., 'production', 'test')",
+        description="Execution mode (e.g., 'standard', 'test', 'debug')",
     )
     stalled_step_type: str = Field(
         description="Node type of the stalled step",

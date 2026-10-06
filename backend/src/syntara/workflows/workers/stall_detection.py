@@ -14,6 +14,11 @@ SDP Requirements (R16/AC-10, R23/AC-13):
 - Three Prometheus metrics: stalled workflows (gauge), stalled steps (gauge), stalled workflows total (counter)
 - Segment event with anonymized properties
 - Execution-level counter deduplication via first_stall_detected_at
+
+Timestamp Semantics:
+- stall_alert_at and first_stall_detected_at are permanent markers (never cleared)
+- updated_at is NOT set for internal stall bookkeeping to avoid misleading
+  "last modified" semantics - stall detection is observability, not user action
 """
 
 from __future__ import annotations
@@ -46,12 +51,11 @@ from syntara.telemetry.events.workflow_stall import WorkflowStallEvent
 from syntara.workflows.audit.node_stalled import NodeStalledEvent
 from syntara.workflows.models.activity_execution import ActivityExecution, ActivityStatus
 from syntara.workflows.models.execution import Execution
-from syntara.workflows.models.workflow_version import WorkflowVersion
 
 logger = structlog.stdlib.get_logger(__name__)
 
 
-async def detect_stalled_activities(  # noqa: C901, PLR0912, PLR0915
+async def detect_stalled_activities(
     session_factory: async_sessionmaker[AsyncSession] | None,
 ) -> None:
     """Scan for and claim running activities that have exceeded their expected duration.
@@ -63,7 +67,7 @@ async def detect_stalled_activities(  # noqa: C901, PLR0912, PLR0915
     telemetry increments.
 
     SDP Implementation (R23/AC-13):
-    - Emits Segment event with anonymized properties
+    - Emits Segment event with anonymized properties (execution_mode, stalled_step_type)
     - Updates Prometheus gauges (only from coordinated scanner)
     - Increments stalled workflows counter only once per execution
     - Independent failure handling for audit, Segment, and Prometheus
@@ -90,7 +94,7 @@ async def detect_stalled_activities(  # noqa: C901, PLR0912, PLR0915
                 # PostgreSQL: started_at + make_interval(secs => expected_duration) < now
                 text("started_at + make_interval(secs => expected_duration) < :now"),
             )
-            .values(stall_alert_at=now, updated_at=now)
+            .values(stall_alert_at=now)
             .returning(ActivityExecution)
             .execution_options(synchronize_session=False)
         )
@@ -102,72 +106,49 @@ async def detect_stalled_activities(  # noqa: C901, PLR0912, PLR0915
     if not claimed_rows:
         logger.debug("stall_detection_noop", cycle_time=now.isoformat())
         # Still update gauges even when no new stalls (gauges show current state)
-        await _update_prometheus_gauges(session_factory)
+        await _update_prometheus_gauges_safe(session_factory)
         return
 
-    # Group claimed activities by execution_id for efficient processing
+    # Group claimed activities by execution_id for batch processing
     activities_by_execution: dict[UUID, list[ActivityExecution]] = defaultdict(list)
     for activity in claimed_rows:
         activities_by_execution[activity.execution_id].append(activity)
 
-    # Track execution IDs where this is the first stall (for counter increment)
-    first_stall_execution_ids: set[UUID] = set()
+    execution_ids = list(activities_by_execution.keys())
 
-    # Atomically mark executions entering stalled state for the first time
+    # Atomically mark executions entering stalled state for the first time (batched)
+    # Returns execution IDs that were marked for the first time (for counter deduplication)
+    first_stall_execution_ids: set[UUID] = set()
     async with session_factory() as session:
-        for execution_id in activities_by_execution:
-            stmt = (
-                update(Execution)
-                .where(
-                    Execution.id == execution_id,  # type: ignore[arg-type]
-                    Execution.first_stall_detected_at.is_(None),  # type: ignore[union-attr]
-                )
-                .values(first_stall_detected_at=now, updated_at=now)
-                .returning(Execution)
+        stmt = (
+            update(Execution)
+            .where(
+                col(Execution.id).in_(execution_ids),
+                Execution.first_stall_detected_at.is_(None),  # type: ignore[union-attr]
             )
-            result = await session.execute(stmt)
-            updated_rows = list(result.scalars().all())
-            if updated_rows:
-                first_stall_execution_ids.add(execution_id)
+            .values(first_stall_detected_at=now)
+            .returning(col(Execution.id))
+        )
+        result = await session.execute(stmt)
+        first_stall_execution_ids = set(result.scalars().all())
         await session.commit()
 
-    # Load execution and workflow data for Segment events
-    execution_data: dict[UUID, tuple[str, int]] = {}  # execution_id -> (mode, workflow_step_count)
+    # Load execution mode for Segment events (single batched query)
+    execution_modes: dict[UUID, str] = {}
     async with session_factory() as session:
-        for execution_id in activities_by_execution:
-            exec_stmt = (
-                select(Execution, WorkflowVersion)
-                .where(Execution.id == execution_id)  # type: ignore[arg-type]
-                .join(WorkflowVersion, Execution.workflow_version_id == WorkflowVersion.id)  # type: ignore[arg-type]
-            )
-            result = await session.execute(exec_stmt)
-            row = result.first()
-            if row:
-                execution, workflow_version = row
-                # Count ALL nodes: triggers + nodes
-                workflow_def = workflow_version.workflow_definition
-                step_count = 0
-                if isinstance(workflow_def, dict):
-                    triggers = workflow_def.get("triggers", [])
-                    nodes = workflow_def.get("nodes", [])
-                    step_count = len(triggers) + len(nodes)
-                execution_data[execution_id] = (execution.mode.value, step_count)
+        mode_stmt = select(col(Execution.id), col(Execution.mode)).where(col(Execution.id).in_(execution_ids))
+        mode_result = await session.execute(mode_stmt)
+        execution_modes = {row[0]: row[1].value for row in mode_result.all()}
 
     # Emit audit events, Segment events, and track metrics for each claimed stall
     # All three reporting paths are independent - failure in one doesn't prevent others
     audit_failure_count = 0
     segment_failure_count = 0
-    prometheus_failure_count = 0
-    fully_reported_count = 0
 
     recorder = get_metrics_recorder()
     telemetry_registry = get_telemetry_registry()
 
     for activity in claimed_rows:
-        audit_succeeded = False
-        segment_succeeded = False
-        prometheus_succeeded = False
-
         # Emit audit event
         try:
             event = NodeStalledEvent(
@@ -180,7 +161,6 @@ async def detect_stalled_activities(  # noqa: C901, PLR0912, PLR0915
                 stall_alert_at=activity.stall_alert_at,
             )
             AuditEventDispatcher.dispatch(event)
-            audit_succeeded = True
         except Exception:  # noqa: BLE001
             logger.warning(
                 "stall_detection_audit_failed",
@@ -193,16 +173,14 @@ async def detect_stalled_activities(  # noqa: C901, PLR0912, PLR0915
         # Emit Segment event (SDP R23/AC-13) - independent of audit
         try:
             if telemetry_registry.is_initialized():
-                mode, step_count = execution_data.get(activity.execution_id, ("standard", 0))
+                mode = execution_modes.get(activity.execution_id, "standard")
                 telemetry_registry.send_event(
                     WorkflowStallEvent(
-                        workflow_step_count=max(step_count, 1),  # Ensure at least 1
                         execution_mode=mode,
                         stalled_step_type=activity.node_type.value,
                         entitlement_id=telemetry_registry.entitlement_id,
                     )
                 )
-            segment_succeeded = True
         except Exception:  # noqa: BLE001
             logger.warning(
                 "stall_detection_segment_failed",
@@ -212,14 +190,9 @@ async def detect_stalled_activities(  # noqa: C901, PLR0912, PLR0915
             )
             segment_failure_count += 1
 
-        # Prometheus metrics are updated separately - track success here for logging
-        prometheus_succeeded = True  # Updated in batch below
-
-        if audit_succeeded and segment_succeeded and prometheus_succeeded:
-            fully_reported_count += 1
-
     # Update Prometheus metrics (SDP R23/AC-13)
     # This scanner is coordinated, so only this process updates gauges
+    prometheus_failed = False
     try:
         # Increment counter for executions entering stalled state
         for _ in first_stall_execution_ids:
@@ -232,19 +205,38 @@ async def detect_stalled_activities(  # noqa: C901, PLR0912, PLR0915
             "stall_detection_prometheus_failed",
             exc_info=True,
         )
-        prometheus_failure_count = len(claimed_rows)  # Mark all as failed for logging
-        fully_reported_count = 0  # None fully reported if Prometheus failed
+        prometheus_failed = True
 
     logger.info(
         "stall_detection_completed",
         claimed=len(claimed_rows),
         first_stall_executions=len(first_stall_execution_ids),
-        fully_reported=fully_reported_count,
         audit_failures=audit_failure_count,
         segment_failures=segment_failure_count,
-        prometheus_failures=prometheus_failure_count,
+        prometheus_failed=prometheus_failed,
         cycle_time=now.isoformat(),
     )
+
+
+async def _update_prometheus_gauges_safe(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """Safely update Prometheus gauges with error isolation.
+
+    Wraps _update_prometheus_gauges to prevent Prometheus/DB errors from
+    disrupting the periodic worker cycle.
+
+    Args:
+        session_factory: Database session factory.
+
+    """
+    try:
+        await _update_prometheus_gauges(session_factory)
+    except Exception:  # noqa: BLE001
+        logger.warning(
+            "stall_detection_gauge_refresh_failed",
+            exc_info=True,
+        )
 
 
 async def _update_prometheus_gauges(

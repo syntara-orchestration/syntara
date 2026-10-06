@@ -12,8 +12,6 @@ from uuid import UUID, uuid4
 import pytest
 
 from syntara.workflows.models.activity_execution import ActivityExecution, ActivityStatus
-from syntara.workflows.models.execution import Execution, ExecutionMode, ExecutionStatus
-from syntara.workflows.models.workflow_version import WorkflowVersion
 from syntara.workflows.workers.stall_detection import (
     detect_stalled_activities,
     get_stall_detection_worker,
@@ -55,7 +53,7 @@ def _make_session_factory(
     claimed_activities: list[ActivityExecution],
     *,
     first_stall_execution_ids: list[UUID] | None = None,
-    execution_metadata: dict[UUID, tuple[Execution, WorkflowVersion]] | None = None,
+    execution_modes: dict[UUID, str] | None = None,
     gauge_counts: tuple[int, int] | None = None,
 ) -> MagicMock:
     """Create a mock session factory that returns activities from UPDATE...RETURNING.
@@ -66,12 +64,12 @@ def _make_session_factory(
     Args:
         claimed_activities: Activities to return from initial claim UPDATE...RETURNING
         first_stall_execution_ids: Execution IDs that should be marked as first-stall
-        execution_metadata: Map of execution_id to (Execution, WorkflowVersion) tuples
+        execution_modes: Map of execution_id to mode string (for Segment events)
         gauge_counts: Tuple of (stalled_workflows_count, stalled_steps_count)
 
     """
     first_stall_execution_ids = first_stall_execution_ids or []
-    execution_metadata = execution_metadata or {}
+    execution_modes = execution_modes or {}
     gauge_counts = gauge_counts or (0, 0)
 
     # Track which call we're on to return different results
@@ -89,43 +87,25 @@ def _make_session_factory(
             mock_result.scalars.return_value = mock_scalars
             return mock_result
 
-        # Subsequent calls for first-stall UPDATE...RETURNING (one per execution)
-        num_first_stall_updates = len({a.execution_id for a in claimed_activities})
-        if execute_call_count <= 1 + num_first_stall_updates:
-            # Return execution ID if it's in first_stall list
-            execution_index = execute_call_count - 2
-            if execution_index < len(first_stall_execution_ids):
-                exec_id = first_stall_execution_ids[execution_index]
-                mock_scalars = MagicMock()
-                mock_scalars.all.return_value = [exec_id]
-            else:
-                mock_scalars = MagicMock()
-                mock_scalars.all.return_value = []
+        # Second call: batched first-stall UPDATE...RETURNING
+        if execute_call_count == 2:
+            mock_scalars = MagicMock()
+            mock_scalars.all.return_value = first_stall_execution_ids
             mock_result = MagicMock()
             mock_result.scalars.return_value = mock_scalars
             return mock_result
 
-        # Execution metadata SELECTs (one per execution)
-        num_metadata_selects = len({a.execution_id for a in claimed_activities})
-        if execute_call_count <= 1 + num_first_stall_updates + num_metadata_selects:
-            # Return execution + workflow version data
-            metadata_index = execute_call_count - 1 - num_first_stall_updates - 1
-            execution_ids = list({a.execution_id for a in claimed_activities})
-            if metadata_index < len(execution_ids):
-                exec_id = execution_ids[metadata_index]
-                if exec_id in execution_metadata:
-                    execution, workflow_version = execution_metadata[exec_id]
-                    mock_result = MagicMock()
-                    mock_result.first.return_value = (execution, workflow_version)
-                    return mock_result
-            # Default: return None
+        # Third call: batched execution mode SELECT
+        if execute_call_count == 3:
             mock_result = MagicMock()
-            mock_result.first.return_value = None
+            # Return list of (id, mode) tuples
+            rows = [(exec_id, MagicMock(value=mode)) for exec_id, mode in execution_modes.items()]
+            mock_result.all.return_value = rows
             return mock_result
 
         # Gauge count SELECTs (2 calls: workflows count, steps count)
-        if execute_call_count <= 1 + num_first_stall_updates + num_metadata_selects + 2:
-            gauge_index = execute_call_count - 1 - num_first_stall_updates - num_metadata_selects - 1
+        if execute_call_count <= 5:
+            gauge_index = execute_call_count - 4
             mock_result = MagicMock()
             mock_result.scalar.return_value = gauge_counts[gauge_index]
             return mock_result
@@ -174,10 +154,11 @@ class TestDetectStalledActivities:
         activity.execution_id = execution_id
         # Simulate the UPDATE setting stall_alert_at
         activity.stall_alert_at = now
-        activity.updated_at = now
 
         session_factory = _make_session_factory(
-            [activity], first_stall_execution_ids=[execution_id], execution_metadata={}
+            [activity],
+            first_stall_execution_ids=[execution_id],
+            execution_modes={execution_id: "standard"},
         )
 
         with (
@@ -221,6 +202,7 @@ class TestDetectStalledActivities:
             patch("syntara.workflows.workers.stall_detection.AuditEventDispatcher.dispatch") as mock_dispatch,
             patch("syntara.workflows.workers.stall_detection.get_metrics_recorder") as mock_get_recorder,
             patch("syntara.workflows.workers.stall_detection.get_telemetry_registry") as mock_get_telemetry,
+            patch("syntara.workflows.workers.stall_detection._update_prometheus_gauges") as mock_update_gauges,
         ):
             mock_recorder = MagicMock()
             mock_recorder._prometheus = MagicMock()
@@ -234,6 +216,9 @@ class TestDetectStalledActivities:
             # Verify no audit event or metric
             mock_dispatch.assert_not_called()
             mock_recorder.record.assert_not_called()
+
+            # Verify gauges were still updated (no-op case)
+            mock_update_gauges.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_null_expected_duration_ignored(
@@ -294,9 +279,11 @@ class TestDetectStalledActivities:
         # Create 3 stalled activities in different executions (already claimed by UPDATE...RETURNING)
         activities = []
         execution_ids = []
+        execution_modes = {}
         for _ in range(3):
             execution_id = uuid4()
             execution_ids.append(execution_id)
+            execution_modes[execution_id] = "standard"
             activity = _make_activity(
                 status=ActivityStatus.RUNNING,
                 expected_duration=60,
@@ -304,11 +291,12 @@ class TestDetectStalledActivities:
             )
             activity.execution_id = execution_id
             activity.stall_alert_at = now
-            activity.updated_at = now
             activities.append(activity)
 
         session_factory = _make_session_factory(
-            activities, first_stall_execution_ids=execution_ids, execution_metadata={}
+            activities,
+            first_stall_execution_ids=execution_ids,
+            execution_modes=execution_modes,
         )
 
         with (
@@ -347,9 +335,11 @@ class TestDetectStalledActivities:
         # Create 3 stalled activities in different executions (already claimed)
         activities = []
         execution_ids = []
+        execution_modes = {}
         for _ in range(3):
             execution_id = uuid4()
             execution_ids.append(execution_id)
+            execution_modes[execution_id] = "standard"
             activity = _make_activity(
                 status=ActivityStatus.RUNNING,
                 expected_duration=60,
@@ -357,11 +347,12 @@ class TestDetectStalledActivities:
             )
             activity.execution_id = execution_id
             activity.stall_alert_at = now
-            activity.updated_at = now
             activities.append(activity)
 
         session_factory = _make_session_factory(
-            activities, first_stall_execution_ids=execution_ids, execution_metadata={}
+            activities,
+            first_stall_execution_ids=execution_ids,
+            execution_modes=execution_modes,
         )
 
         call_count = 0
@@ -419,11 +410,12 @@ class TestDetectStalledActivities:
             expected_duration=90,
             started_at=started_at,
             stall_alert_at=now,
-            updated_at=now,
         )
 
         session_factory = _make_session_factory(
-            [activity], first_stall_execution_ids=[execution_id], execution_metadata={}
+            [activity],
+            first_stall_execution_ids=[execution_id],
+            execution_modes={execution_id: "standard"},
         )
 
         with (
@@ -460,7 +452,6 @@ class TestDetectStalledActivities:
         now = datetime.now(UTC)
         started_at = now - timedelta(seconds=120)
         execution_id = uuid4()
-        workflow_version_id = uuid4()
 
         activity = _make_activity(
             status=ActivityStatus.RUNNING,
@@ -470,33 +461,11 @@ class TestDetectStalledActivities:
         activity.execution_id = execution_id
         activity.node_type = NodeType.HTTP_REQUEST
         activity.stall_alert_at = now
-        activity.updated_at = now
-
-        # Create execution and workflow metadata
-        execution = Execution(
-            id=execution_id,
-            workflow_id=uuid4(),
-            workflow_version_id=workflow_version_id,
-            status=ExecutionStatus.RUNNING,
-            mode=ExecutionMode.STANDARD,
-        )
-        workflow_version = WorkflowVersion(
-            id=workflow_version_id,
-            workflow_id=execution.workflow_id,
-            version=1,
-            workflow_definition={
-                "triggers": [{"type": "manual"}],
-                "nodes": [
-                    {"id": "node1", "type": "http_request"},
-                    {"id": "node2", "type": "llm"},
-                ],
-            },
-        )
 
         session_factory = _make_session_factory(
             [activity],
             first_stall_execution_ids=[execution_id],
-            execution_metadata={execution_id: (execution, workflow_version)},
+            execution_modes={execution_id: "test"},
         )
 
         with (
@@ -519,11 +488,11 @@ class TestDetectStalledActivities:
             mock_telemetry.send_event.assert_called_once()
             event = mock_telemetry.send_event.call_args[0][0]
 
-            # Verify anonymized properties
-            assert event.workflow_step_count == 3  # 1 trigger + 2 nodes
-            assert event.execution_mode == "standard"
+            # Verify anonymized properties (no workflow_step_count)
+            assert event.execution_mode == "test"
             assert event.stalled_step_type == "http_request"
             assert event.entitlement_id == "test-entitlement"
+            assert not hasattr(event, "workflow_step_count")
 
     @pytest.mark.asyncio
     async def test_counter_incremented_once_per_execution(
@@ -533,7 +502,6 @@ class TestDetectStalledActivities:
         now = datetime.now(UTC)
         started_at = now - timedelta(seconds=120)
         execution_id = uuid4()
-        workflow_version_id = uuid4()
 
         # Create 3 stalled activities in the same execution
         activities = []
@@ -547,28 +515,12 @@ class TestDetectStalledActivities:
             activity.node_type = NodeType.HTTP_REQUEST
             activity.activity_name = f"activity_{i}"
             activity.stall_alert_at = now
-            activity.updated_at = now
             activities.append(activity)
-
-        # Execution metadata
-        execution = Execution(
-            id=execution_id,
-            workflow_id=uuid4(),
-            workflow_version_id=workflow_version_id,
-            status=ExecutionStatus.RUNNING,
-            mode=ExecutionMode.STANDARD,
-        )
-        workflow_version = WorkflowVersion(
-            id=workflow_version_id,
-            workflow_id=execution.workflow_id,
-            version=1,
-            workflow_definition={"triggers": [], "nodes": [{"id": "n1", "type": "http_request"}]},
-        )
 
         session_factory = _make_session_factory(
             activities,
             first_stall_execution_ids=[execution_id],  # Only one execution
-            execution_metadata={execution_id: (execution, workflow_version)},
+            execution_modes={execution_id: "standard"},
         )
 
         with (
@@ -607,13 +559,12 @@ class TestDetectStalledActivities:
         )
         activity.execution_id = execution_id
         activity.stall_alert_at = now
-        activity.updated_at = now
 
         # Empty first_stall list means UPDATE returned no rows (already marked)
         session_factory = _make_session_factory(
             [activity],
             first_stall_execution_ids=[],  # Already marked, no new first-stall
-            execution_metadata={},
+            execution_modes={execution_id: "standard"},
         )
 
         with (
@@ -648,13 +599,12 @@ class TestDetectStalledActivities:
             started_at=started_at,
         )
         activity.stall_alert_at = now
-        activity.updated_at = now
 
         # Gauge counts: 5 stalled workflows, 12 stalled steps
         session_factory = _make_session_factory(
             [activity],
             first_stall_execution_ids=[activity.execution_id],
-            execution_metadata={},
+            execution_modes={activity.execution_id: "standard"},
             gauge_counts=(5, 12),
         )
 
@@ -694,12 +644,11 @@ class TestDetectStalledActivities:
         )
         activity.execution_id = execution_id
         activity.stall_alert_at = now
-        activity.updated_at = now
 
         session_factory = _make_session_factory(
             [activity],
             first_stall_execution_ids=[execution_id],
-            execution_metadata={},
+            execution_modes={execution_id: "standard"},
         )
 
         with (
@@ -734,7 +683,6 @@ class TestDetectStalledActivities:
         now = datetime.now(UTC)
         started_at = now - timedelta(seconds=120)
         execution_id = uuid4()
-        workflow_version_id = uuid4()
 
         activity = _make_activity(
             status=ActivityStatus.RUNNING,
@@ -743,26 +691,11 @@ class TestDetectStalledActivities:
         )
         activity.execution_id = execution_id
         activity.stall_alert_at = now
-        activity.updated_at = now
-
-        execution = Execution(
-            id=execution_id,
-            workflow_id=uuid4(),
-            workflow_version_id=workflow_version_id,
-            status=ExecutionStatus.RUNNING,
-            mode=ExecutionMode.STANDARD,
-        )
-        workflow_version = WorkflowVersion(
-            id=workflow_version_id,
-            workflow_id=execution.workflow_id,
-            version=1,
-            workflow_definition={"triggers": [], "nodes": []},
-        )
 
         session_factory = _make_session_factory(
             [activity],
             first_stall_execution_ids=[execution_id],
-            execution_metadata={execution_id: (execution, workflow_version)},
+            execution_modes={execution_id: "standard"},
         )
 
         with (
@@ -807,6 +740,26 @@ class TestDetectStalledActivities:
             # No audit or telemetry should be emitted
             mock_dispatch.assert_not_called()
             mock_get_recorder.return_value.record.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_noop_cycle_gauge_refresh_failure_isolated(
+        self,
+    ) -> None:
+        """Gauge refresh failure during no-op cycle should not raise."""
+        session_factory = _make_session_factory([])
+
+        with (
+            patch("syntara.workflows.workers.stall_detection._update_prometheus_gauges") as mock_update_gauges,
+            patch("syntara.workflows.workers.stall_detection.get_metrics_recorder"),
+        ):
+            # Simulate gauge refresh failure
+            mock_update_gauges.side_effect = RuntimeError("DB connection lost")
+
+            # Should not raise
+            await detect_stalled_activities(session_factory)
+
+            # Verify gauge update was attempted
+            mock_update_gauges.assert_called_once()
 
 
 class TestStallDetectionWorker:
