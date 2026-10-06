@@ -193,22 +193,23 @@ class ActivityExecutionSyncMixin:
     ) -> dict[str, dict[str, datetime | None]]:
         """Collect source timestamps for the replayed nodes finishing in this batch.
 
-        One workflow update per replayed node, asked before the sync transaction
-        opens because the update blocks until the workflow can answer and a
-        database transaction must not be held across that wait.
+        One workflow update per completed activity, asked before the sync
+        transaction opens because the update blocks until the workflow can answer
+        and a database transaction must not be held across that wait.
 
-        Only terminal events are asked about. A node that has merely been
-        scheduled has not replayed yet, so asking would wait for a timestamp that
-        is minutes away, and its source times would be applied to a node that has
-        not run. Non-retry runs ask nothing at all.
+        Every node goes through the same path. On an ordinary run the workflow has
+        no replay candidates, so its wait condition is satisfied immediately and
+        it answers "not a replay" without blocking — the round trip costs a
+        request, not a stall.
+
+        Only ``COMPLETED`` is asked about. A node that failed, timed out or was
+        cancelled has no source times to restore, and asking would wait for
+        timestamps that are never coming.
         """
-        if not metadata.is_retry:
-            return {}
-
         resolved: dict[str, dict[str, datetime | None]] = {}
         for event_id in metadata.pending_sync_event_ids:
             activity_data = metadata.pending_activity_updates.get(event_id)
-            if not activity_data or activity_data.get("status") not in TERMINAL_ACTIVITY_STATUSES:
+            if not activity_data or activity_data.get("status") != ActivityStatus.COMPLETED:
                 continue
             activity_id = activity_data["activity_id"]
             if activity_id in resolved:
@@ -233,8 +234,12 @@ class ActivityExecutionSyncMixin:
 
         Returns None when the activity was an ordinary execution, or when the
         workflow cannot answer in time. Either way the caller keeps Temporal's
-        timestamps, so a failure here degrades to a restored node reporting the
+        timestamps, so a failure here degrades to a replayed node reporting the
         replay time rather than losing the node's record.
+
+        Asked for every completed activity, not only on a retry: the workflow
+        answers immediately with None when it has no replay candidates, so an
+        ordinary run pays a request and nothing more.
         """
         try:
             raw = cast(
@@ -275,12 +280,17 @@ class ActivityExecutionSyncMixin:
 
     @staticmethod
     def _parse_source_timestamp(value: str | None) -> datetime | None:
-        """Parse an ISO timestamp from the replay activity, or None."""
+        """Parse an ISO timestamp from the replay activity, or None.
+
+        Never raises. A timestamp is not worth failing a node's sync over, and
+        ``TypeError`` is caught alongside ``ValueError`` because a value that is
+        not a string at all would otherwise escape a caller expecting None.
+        """
         if not value:
             return None
         try:
             return ensure_timezone_aware(datetime.fromisoformat(value))
-        except ValueError:
+        except (TypeError, ValueError):
             return None
 
     @staticmethod

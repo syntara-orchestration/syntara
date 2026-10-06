@@ -5916,6 +5916,9 @@ class TestActivitySyncPreservesIoOnQueryFailure:
         handle.query.side_effect = RPCError(
             "sticky cache evicted", status=RPCStatusCode.UNAVAILABLE, raw_grpc_status=b""
         )
+        # Every completed activity asks the workflow for replayed source times,
+        # and an ordinary run answers None straight away.
+        handle.execute_update = AsyncMock(return_value=None)
 
         metadata = create_test_metadata(
             execution_id=self.execution_id,
@@ -6049,6 +6052,10 @@ class TestReplayedNodeTimestampOverride:
         assert self.service._parse_source_timestamp("") is None
         assert self.service._parse_source_timestamp("not-a-date") is None
 
+    def test_parse_source_timestamp_never_raises_on_a_non_string(self) -> None:
+        """A bad timestamp must not fail the node's sync, whatever shape it arrives in."""
+        assert self.service._parse_source_timestamp(object()) is None  # type: ignore[arg-type]
+
     def test_apply_swaps_event_times_for_source_times(self) -> None:
         activity_data = {"status": ActivityStatus.COMPLETED, "started_at": "event", "completed_at": "event"}
 
@@ -6091,11 +6098,14 @@ class TestReplayedNodeTimestampOverride:
 
 
 class TestReplayedTimestampResolution:
-    """Timestamps are resolved once per replayed node, before the transaction.
+    """Timestamps are resolved once per completed node, before the transaction.
 
     The workflow update blocks until it can answer. Two things follow from that:
-    it must not be asked about a node that has not replayed yet, and it must not
-    happen while a database transaction is open.
+    it must not be asked about a node that will never have source times, and it
+    must not happen while a database transaction is open.
+
+    Every completed node is asked, retry or not. On an ordinary run the workflow
+    has no replay candidates, so it answers immediately with None.
     """
 
     def setup_method(self) -> None:
@@ -6108,7 +6118,6 @@ class TestReplayedTimestampResolution:
 
     def _metadata(self, entries: list[tuple[int, str, ActivityStatus]]) -> ExecutionMonitorMetadata:
         metadata = create_test_metadata(execution_id=self.execution_id)
-        metadata.is_retry = True
         for event_id, activity_id, status in entries:
             metadata.pending_sync_event_ids.add(event_id)
             metadata.pending_activity_updates[event_id] = {
@@ -6120,15 +6129,15 @@ class TestReplayedTimestampResolution:
             }
         return metadata
 
-    def _handle(self) -> Mock:
+    def _handle(self, returned: object = None) -> Mock:
         handle = Mock()
-        handle.execute_update = AsyncMock(return_value=self.source_times)
+        handle.execute_update = AsyncMock(return_value=returned)
         return handle
 
     @pytest.mark.asyncio
     async def test_asks_once_per_node_for_its_completed_event(self) -> None:
         metadata = self._metadata([(1, "script_1", ActivityStatus.COMPLETED)])
-        handle = self._handle()
+        handle = self._handle(self.source_times)
 
         resolved = await self.service._resolve_replayed_timestamps(metadata, handle)
 
@@ -6141,54 +6150,60 @@ class TestReplayedTimestampResolution:
         }
 
     @pytest.mark.asyncio
-    async def test_scheduled_and_started_events_are_not_asked_about(self) -> None:
-        """A node that has not replayed yet has no timestamps to wait for.
+    async def test_only_completed_events_are_asked_about(self) -> None:
+        """A node that did not complete has no source completion time to restore.
 
-        Asking here would block for the update's full timeout and apply source
-        times to a node that has not run — the SCHEDULED event for a replayed
-        node arrives before the workflow has stored anything for it.
+        Asking would wait for timestamps that are never coming, stalling the sync
+        for the full timeout on every failed, timed-out or cancelled node.
         """
         metadata = self._metadata(
             [
                 (1, "script_1", ActivityStatus.PENDING),
                 (2, "script_1", ActivityStatus.RUNNING),
+                (3, "script_2", ActivityStatus.FAILED),
+                (4, "script_3", ActivityStatus.CANCELLED),
+                (5, "script_4", ActivityStatus.SKIPPED),
             ]
         )
-        handle = self._handle()
+        handle = self._handle(self.source_times)
 
         assert await self.service._resolve_replayed_timestamps(metadata, handle) == {}
         handle.execute_update.assert_not_awaited()
 
     @pytest.mark.asyncio
-    async def test_a_node_is_asked_once_across_repeated_terminal_events(self) -> None:
+    async def test_a_node_is_asked_once_across_repeated_completed_events(self) -> None:
         metadata = self._metadata(
             [
                 (1, "script_1", ActivityStatus.COMPLETED),
                 (2, "script_1", ActivityStatus.COMPLETED),
             ]
         )
-        handle = self._handle()
+        handle = self._handle(self.source_times)
 
         await self.service._resolve_replayed_timestamps(metadata, handle)
 
         handle.execute_update.assert_awaited_once()
 
     @pytest.mark.asyncio
-    async def test_non_retry_run_asks_nothing(self) -> None:
-        """Ordinary executions must not pay a workflow round trip per node."""
+    async def test_an_ordinary_run_asks_but_gets_nothing_back(self) -> None:
+        """Every node goes through the same path; a non-replay answers at once.
+
+        The workflow has no replay candidates on an ordinary run, so its wait
+        condition is satisfied immediately and it returns None. The ask costs a
+        request, not a stall.
+        """
         metadata = self._metadata([(1, "script_1", ActivityStatus.COMPLETED)])
-        handle = self._handle()
         metadata.is_retry = False
+        handle = self._handle(None)
 
         assert await self.service._resolve_replayed_timestamps(metadata, handle) == {}
-        handle.execute_update.assert_not_awaited()
+        handle.execute_update.assert_awaited_once_with("get_replayed_node_timestamps_when_ready", "script_1")
 
     @pytest.mark.asyncio
-    async def test_an_ordinary_node_is_left_out_of_the_resolved_map(self) -> None:
+    async def test_a_node_the_workflow_does_not_replay_is_left_out_of_the_map(self) -> None:
         """The workflow reporting "not a replay" means no override, not a failure."""
         metadata = self._metadata([(1, "script_1", ActivityStatus.COMPLETED)])
-        handle = Mock()
-        handle.execute_update = AsyncMock(return_value=None)
+        handle = self._handle(None)
 
         assert await self.service._resolve_replayed_timestamps(metadata, handle) == {}
 
@@ -6198,7 +6213,7 @@ class TestReplayedTimestampResolution:
 
         The update blocks until the workflow can answer. If it ran inside the
         transaction, a pooled connection would be held for that whole wait on
-        every batch that replays a node.
+        every batch containing a completed activity.
         """
         order: list[str] = []
         metadata = self._metadata([(1, "script_1", ActivityStatus.COMPLETED)])
