@@ -3,6 +3,7 @@
  * Extracted from v2-nodes.ts to keep file sizes within lint limits.
  */
 
+import { EXPRESSION_MODE_LABELS } from '../../src/components/expressions/expressionBuilderLabels'
 import { expect, type Page } from '../fixtures'
 
 import { openAddNodePanel, selectCategoryAndType } from './v2-nodes'
@@ -53,7 +54,7 @@ export async function configureLoopNode(
     await page.getByRole('option', { name: config.type === 'while' ? 'While' : 'For each' }).click()
     // Wait for the type-specific field to appear, confirming the form re-rendered
     if (config.type === 'while') {
-      await expect(page.getByLabel(/Expression editor mode/i)).toBeVisible()
+      await expect(page.getByRole('button', { name: EXPRESSION_MODE_LABELS.visual, exact: true })).toBeVisible()
     } else {
       await expect(page.getByRole('textbox', { name: 'Items expression', exact: true })).toBeVisible()
     }
@@ -61,10 +62,10 @@ export async function configureLoopNode(
 
   // While-specific fields
   if (config.type === 'while' && config.condition !== undefined) {
-    const editorModeToggle = page.getByLabel(/Expression editor mode/i)
+    const editorModeToggle = page.getByRole('button', { name: EXPRESSION_MODE_LABELS.visual, exact: true })
     await expect(editorModeToggle).toBeVisible()
     await editorModeToggle.click()
-    await page.getByRole('option', { name: 'Custom expression', exact: true }).click()
+    await page.getByRole('option', { name: EXPRESSION_MODE_LABELS.raw, exact: true }).click()
 
     const rawExpressionInput = page.getByLabel(/Raw expression/i)
     await expect(rawExpressionInput).toBeVisible()

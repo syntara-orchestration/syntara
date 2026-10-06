@@ -2009,7 +2009,7 @@ class Settings(
     @model_validator(mode="after")
     def _derive_otel_service_name(self) -> "Settings":
         """Derive otel_service_name from product_name when not explicitly set."""
-        if self.otel_service_name == type(self).model_fields["otel_service_name"].default:
+        if "otel_service_name" not in self.model_fields_set:
             self.otel_service_name = self.product_name.lower().replace(" ", "-")
         return self
 

@@ -1,10 +1,10 @@
 import { Content, Flex, FlexItem, Stack, StackItem } from '@patternfly/react-core'
 import { useStore } from '@xyflow/react'
 
-import { NodeExpandToggle } from '../../../../../components/nodes/NodeExpandToggle'
-import { NodeHeader } from '../../../../../components/nodes/NodeHeader'
-import { NodeMenu } from '../../../../../components/nodes/NodeMenu'
-import { NodeTitle } from '../../../../../components/nodes/NodeTitle'
+import { SynStepExpandToggle } from '../../../../../components/steps/SynStepExpandToggle'
+import { SynStepHeader } from '../../../../../components/steps/SynStepHeader'
+import { SynStepMenu } from '../../../../../components/steps/SynStepMenu'
+import { SynStepTitle } from '../../../../../components/steps/SynStepTitle'
 import { useIsActiveExecution } from '../../../../builder/ActiveExecutionContext'
 import { useIsExecutionView } from '../../../../builder/ExecutionViewContext'
 import { useIsVersionView } from '../../../../builder/VersionViewContext'
@@ -60,13 +60,13 @@ export function StandardNodeHeader(props: Readonly<StandardNodeHeaderProps>) {
   return (
     <Stack>
       <StackItem>
-        <NodeHeader>
+        <SynStepHeader>
           {props.icon && <FlexItem>{props.icon}</FlexItem>}
           <FlexItem>
             <Flex>
               {props.expandable && (
                 <FlexItem>
-                  <NodeExpandToggle />
+                  <SynStepExpandToggle />
                 </FlexItem>
               )}
               {props.menuActions &&
@@ -76,18 +76,18 @@ export function StandardNodeHeader(props: Readonly<StandardNodeHeaderProps>) {
                 !isVersionView &&
                 nodesConnectable && (
                   <FlexItem>
-                    <NodeMenu menuActions={props.menuActions} />
+                    <SynStepMenu menuActions={props.menuActions} />
                   </FlexItem>
                 )}
             </Flex>
           </FlexItem>
-        </NodeHeader>
+        </SynStepHeader>
       </StackItem>
       {props.badge && <StackItem style={badgeSectionStyle}>{props.badge}</StackItem>}
       {(props.title || props.subtitle) && (
         <StackItem style={titleSectionStyle}>
           <Content>
-            <NodeTitle title={props.title ?? ''} subTitle={props.subtitle ?? ''} />
+            <SynStepTitle title={props.title ?? ''} subTitle={props.subtitle ?? ''} />
           </Content>
         </StackItem>
       )}
