@@ -3,8 +3,8 @@ import type { ConditionActivity } from '@syntara/contracts'
 import { type Node, type NodeProps } from '@xyflow/react'
 
 import { SynDetailList } from '../../../../components/details/SynDetailList'
-import { NodeBody } from '../../../../components/nodes/NodeBody'
-import { NodeComponent } from '../../../../components/nodes/NodeComponent'
+import { SynStep } from '../../../../components/steps/SynStep'
+import { SynStepBody } from '../../../../components/steps/SynStepBody'
 import { RegistryNodeId } from '../../../../constants'
 import type { ActivityStatus } from '../../execution/types'
 import { getNodeTypeColor } from '../nodeTypeColors'
@@ -44,7 +44,7 @@ export function ConditionNodeComponent(props: NodeProps<ConditionNode>) {
     | undefined
 
   return (
-    <NodeComponent
+    <SynStep
       className={metadata.className}
       nodeProps={props}
       disableSource
@@ -70,7 +70,7 @@ export function ConditionNodeComponent(props: NodeProps<ConditionNode>) {
           </BranchHandle>
         </BranchHandles>
       </ConditionNodeDetails>
-    </NodeComponent>
+    </SynStep>
   )
 }
 
@@ -94,12 +94,12 @@ export function ConditionNodeDetails(props: {
       />
       <Flex justifyContent={{ default: 'justifyContentFlexEnd' }} gap={{ default: 'gapNone' }}>
         <FlexItem grow={{ default: 'grow' }} style={{ minWidth: 0 }}>
-          <NodeBody>
+          <SynStepBody>
             <SynDetailList>
               {renderOutputs(props.conditionActivity.outputs)}
               {renderJson(props.conditionActivity, props.showJson, 'Full Definition')}
             </SynDetailList>
-          </NodeBody>
+          </SynStepBody>
         </FlexItem>
         <div style={{ paddingBottom: 'var(--pf-t--global--spacer--md)' }}>{props.children}</div>
       </Flex>

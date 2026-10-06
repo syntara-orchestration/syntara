@@ -16,6 +16,7 @@ from syntara.telemetry.events.workflow_execution import (
 )
 from syntara.telemetry.handlers.node_execution import NodeExecutedTelemetryHandler
 from syntara.workflows.audit.node_execution import NodeExecutedEvent
+from syntara.workflows.models.execution import ExecutionMode
 from syntara.workflows.workflow_engine.models.workflow_definition import (
     ActivityTerminalStatus,
     NodeType,
@@ -34,7 +35,7 @@ class TestEndToEndWorkflowTelemetry:
         registry._entitlement_id = "test-install-001"
         registry._anonymous_id = "anon-test-id"
 
-        execution_id = "test-correlation-id"
+        execution_id = str(uuid4())
 
         registry.send_event(
             WorkflowExecutionStartEvent(
@@ -72,6 +73,41 @@ class TestEndToEndWorkflowTelemetry:
         assert complete_call.kwargs["properties"]["duration_ms"] == 1500
         assert complete_call.kwargs["properties"]["node_count"] == 3
         assert complete_call.kwargs["properties"]["error_count"] == 0
+
+    def test_workflow_metrics_properties_reach_segment(self) -> None:
+        """AAP-92215: workflow_id, mode, workflow_version, used_published, is_retry are emitted."""
+        registry = TelemetryClientRegistry()
+        mock_client = MagicMock()
+        registry._client = mock_client
+        registry._entitlement_id = "test-install-001"
+        registry._anonymous_id = "anon-test-id"
+
+        execution_id = uuid4()
+        workflow_id = uuid4()
+        registry.send_event(
+            WorkflowExecutionCompletedEvent(
+                workflow_execution_id=execution_id,
+                workflow_id=workflow_id,
+                status=WorkflowTerminalStatus.FAILED,
+                duration_ms=200,
+                node_count=2,
+                error_count=1,
+                error_type="WorkflowTimedOut",
+                mode=ExecutionMode.STANDARD,
+                workflow_version=3,
+                used_published=True,
+                is_retry=True,
+                entitlement_id=registry.entitlement_id,
+            )
+        )
+
+        props = mock_client.track.call_args.kwargs["properties"]
+        assert props["workflow_id"] == str(workflow_id)
+        assert props["mode"] == "standard"
+        assert props["workflow_version"] == 3
+        assert props["used_published"] is True
+        assert props["is_retry"] is True
+        assert props["error_type"] == "WorkflowTimedOut"
 
     @patch("syntara.telemetry.handlers.node_execution.get_telemetry_registry")
     def test_node_event_sent_via_audit_handler(self, mock_get_registry: MagicMock) -> None:
@@ -119,7 +155,7 @@ class TestEntitlementIdPropagation:
 
         registry.send_event(
             WorkflowExecutionStartEvent(
-                workflow_execution_id="test-id",
+                workflow_execution_id=uuid4(),
                 entitlement_id=registry.entitlement_id,
             )
         )

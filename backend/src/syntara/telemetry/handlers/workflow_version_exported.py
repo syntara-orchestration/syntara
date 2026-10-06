@@ -35,7 +35,7 @@ class WorkflowVersionExportedTelemetryHandler(AuditEventHandler[WorkflowVersionE
 
             registry.send_event(
                 WorkflowVersionExportedTelemetryEvent(
-                    workflow_id=str(event.workflow_id),
+                    workflow_id=event.workflow_id,
                     version=event.version,
                     workflow_name=event.workflow_name,
                     entitlement_id=registry.entitlement_id,

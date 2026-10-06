@@ -1,6 +1,6 @@
 import { Content, ContentVariants, FlexItem, Title, TitleSizes } from '@patternfly/react-core'
 
-export function NodeTitle(props: { title?: string; subTitle?: string }) {
+export function SynStepTitle(props: { title?: string; subTitle?: string }) {
   return (
     <FlexItem grow={{ default: 'grow' }}>
       <Title

@@ -1,6 +1,6 @@
 import { createContext } from 'react'
 
-export const NodeExpandedAllContext = createContext<{
+export const SynStepExpandedAllContext = createContext<{
   expandAllEvent: EventTarget
   collapseAllEvent: EventTarget
 }>({

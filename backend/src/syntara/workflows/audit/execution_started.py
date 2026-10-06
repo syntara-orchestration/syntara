@@ -22,6 +22,8 @@ from syntara.workflows.workflow_engine.models.workflow_definition import Activit
 if TYPE_CHECKING:
     from uuid import UUID
 
+    from syntara.workflows.models.execution import ExecutionMode
+
 
 @dataclass
 class WorkflowStartEvent:
@@ -32,6 +34,10 @@ class WorkflowStartEvent:
     workflow_name: str
     trigger_type: ActivityName | None = field(default=None)
     interface: str | None = field(default=None)
+    mode: ExecutionMode | None = field(default=None)
+    workflow_version: int | None = field(default=None)
+    used_published: bool | None = field(default=None)
+    is_retry: bool = field(default=False)
     request_id: UUID | None = field(default=None)
 
 
