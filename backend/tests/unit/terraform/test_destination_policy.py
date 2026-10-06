@@ -1,7 +1,7 @@
-"""AAP-94702 AC5: TFE destination / shared network policy enforcement.
+"""Destination policy tests for TFE.
 
-Covers loopback, cloud metadata, link-local, private addresses, redirects to
-disallowed targets, and approved self-managed destinations for TFE paths.
+Covers loopback, cloud metadata, link-local, private addresses, redirects to disallowed targets,
+and approved self-managed destinations for TFE paths.
 """
 
 from __future__ import annotations
@@ -53,23 +53,27 @@ class TestTFEConfigurationDestinationPolicy:
 
     @pytest.mark.ssrf_enforced
     def test_loopback_rejected(self) -> None:
+        config = _tfe_config("http://127.0.0.1", allow_http=True)
         with pytest.raises(ValueError, match="SSRF blocked"):
-            validate_integration_configuration_no_ssrf(_tfe_config("http://127.0.0.1", allow_http=True))
+            validate_integration_configuration_no_ssrf(config)
 
     @pytest.mark.ssrf_enforced
     def test_cloud_metadata_rejected(self) -> None:
+        config = _tfe_config("https://169.254.169.254")
         with pytest.raises(ValueError, match="SSRF blocked"):
-            validate_integration_configuration_no_ssrf(_tfe_config("https://169.254.169.254"))
+            validate_integration_configuration_no_ssrf(config)
 
     @pytest.mark.ssrf_enforced
     def test_link_local_rejected(self) -> None:
+        config = _tfe_config("https://169.254.1.1")
         with pytest.raises(ValueError, match="SSRF blocked"):
-            validate_integration_configuration_no_ssrf(_tfe_config("https://169.254.1.1"))
+            validate_integration_configuration_no_ssrf(config)
 
     @pytest.mark.ssrf_enforced
     def test_private_address_rejected(self) -> None:
+        config = _tfe_config("https://10.0.0.25")
         with pytest.raises(ValueError, match="SSRF blocked"):
-            validate_integration_configuration_no_ssrf(_tfe_config("https://10.0.0.25"))
+            validate_integration_configuration_no_ssrf(config)
 
     @pytest.mark.ssrf_enforced
     def test_approved_self_managed_destination_accepted(self) -> None:
@@ -82,11 +86,12 @@ class TestTFEConfigurationDestinationPolicy:
 
     @pytest.mark.ssrf_enforced
     def test_allowlist_does_not_permit_cloud_metadata(self) -> None:
+        config = _tfe_config("https://169.254.169.254")
         with (
             patch(_PATCH_INTEGRATION_SETTINGS, return_value=_settings(["169.254.169.254"])),
             pytest.raises(ValueError, match="SSRF blocked"),
         ):
-            validate_integration_configuration_no_ssrf(_tfe_config("https://169.254.169.254"))
+            validate_integration_configuration_no_ssrf(config)
 
 
 # ── Upload URL (execution-time destination check) ───────────────────────────
