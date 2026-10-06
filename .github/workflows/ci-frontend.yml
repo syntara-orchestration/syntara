@@ -1,6 +1,6 @@
 ---
 # Frontend CI workflow with conditional E2E execution and cost-saving gates.
-# See docs/ci/workflows.md for detailed behavior and manual trigger documentation.
+# Manual E2E trigger documentation lives in frontend/CONTRIBUTING.md.
 name: CI Frontend
 
 on:
@@ -526,7 +526,6 @@ jobs:
   # - Always run in merge queue (final safety check)
   # - Daily scheduled run with Currents reporting (2 AM UTC)
   # - Manual trigger via /run-e2e-ui-tests comment (OWNER/MEMBER only)
-  # See docs/ci/workflows.md for complete behavior table and debugging guide.
   test-compose-e2e:
     name: (Frontend) Test Podman Compose E2E
     needs: [changes, frontend-checks-gate, route-baseline]
