@@ -5,7 +5,7 @@ Forms API endpoint.
 """
 
 from typing import Any
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import pytest
 from httpx import AsyncClient
@@ -14,7 +14,8 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from syntara.core.models import User
 from syntara.forms.models.form_fields import DropdownField, ResolvedOptions
 from syntara.forms.models.form_prompt import FormPrompt
-from syntara.workflows.models.execution import Execution
+from syntara.workflows.models import Workflow, WorkflowVersion
+from syntara.workflows.models.execution import Execution, ExecutionStatus
 
 FORM_PROMPTS_URL = "/api/v1/form_prompts"
 
@@ -48,6 +49,57 @@ def _form_prompt_payload(
         "loop_iteration_path": iteration_path,
         "temporal_activity_id": temporal_activity_id,
     }
+
+
+async def _create_execution_for_workflow(
+    session: AsyncSession,
+    user: User,
+    project_id: UUID,
+    workflow_name: str,
+    workflow_definition: dict[str, Any],
+) -> Execution:
+    """Create a published workflow named ``workflow_name`` with a single execution.
+
+    Used by the workflow_name sort tests, which need prompts whose parent
+    workflows have known, differing names. Workflow names are unique per
+    project (uq_workflows_name_project), so callers must pass distinct names.
+    """
+    workflow = Workflow(
+        name=workflow_name,
+        description="Workflow for form prompt sort tests",
+        created_by=user.id,
+        is_enabled=False,
+        current_version=1,
+        project_id=project_id,
+    )
+    session.add(workflow)
+
+    version = WorkflowVersion(
+        workflow_id=workflow.id,
+        version=1,
+        schema_version="2.0.0",
+        workflow_definition=workflow_definition,
+        created_by=user.id,
+    )
+    session.add(version)
+    await session.flush()
+
+    # ck_workflows_is_enabled_published_version_id requires these to agree.
+    workflow.published_version_id = version.id
+    workflow.is_enabled = True
+
+    execution = Execution(
+        workflow_id=workflow.id,
+        workflow_version_id=version.id,
+        temporal_workflow_id=f"exec-{uuid4()}",
+        status=ExecutionStatus.PENDING,
+        input_data={},
+        created_by=user.id,
+        project_id=project_id,
+    )
+    session.add(execution)
+    await session.commit()
+    return execution
 
 
 @pytest.mark.integration
@@ -247,6 +299,152 @@ class TestFormPromptCreateAPI:
             assert list_response.status_code == 200, list_response.text
             data = list_response.json()
             assert "resources" in data
+
+    async def test_list_form_prompts_sort_by_workflow_name_orders_results(
+        self,
+        jwt_client: AsyncClient,
+        test_db_session: AsyncSession,
+        test_user: User,
+        test_execution: Execution,
+        test_workflow_definition: dict[str, Any],
+    ) -> None:
+        """Sorting by workflow_name orders prompts by their parent workflow's name."""
+        project_id = test_execution.project_id
+        suffix = uuid4().hex[:8]
+        # Created out of alphabetical order so a pass cannot be an artifact of insertion order.
+        workflow_names = [f"zulu-{suffix}", f"alpha-{suffix}", f"mike-{suffix}"]
+
+        created_ids: set[str] = set()
+        for workflow_name in workflow_names:
+            execution = await _create_execution_for_workflow(
+                test_db_session, test_user, project_id, workflow_name, test_workflow_definition
+            )
+            create_response = await jwt_client.post(
+                FORM_PROMPTS_URL,
+                json=_form_prompt_payload(execution.id, project_id, name=f"prompt-{workflow_name}"),
+            )
+            assert create_response.status_code == 201, create_response.text
+            created_ids.add(create_response.json()["id"])
+
+        ascending = sorted(workflow_names)
+        for sort_param, expected in (
+            ("workflow_name", ascending),
+            ("-workflow_name", list(reversed(ascending))),
+        ):
+            list_response = await jwt_client.get(
+                FORM_PROMPTS_URL,
+                params={"sort": sort_param, "project_id": str(project_id), "limit": "50"},
+            )
+            assert list_response.status_code == 200, list_response.text
+            observed = [
+                item["workflow_name"] for item in list_response.json()["resources"] if item["id"] in created_ids
+            ]
+            assert observed == expected, f"sort={sort_param}"
+
+    async def test_list_form_prompts_sort_by_workflow_name_tie_breaks_on_id(
+        self,
+        jwt_client: AsyncClient,
+        test_execution: Execution,
+    ) -> None:
+        """Prompts sharing a workflow name fall back to the id tiebreaker.
+
+        All prompts hang off a single execution, so every row has an identical
+        workflow_name and ordering is decided entirely by the id tiebreaker that
+        BaseService appends to the sort.
+        """
+        exec_id = test_execution.id
+        created_ids: list[str] = []
+        for index in range(3):
+            create_response = await jwt_client.post(
+                FORM_PROMPTS_URL,
+                json=_form_prompt_payload(
+                    exec_id,
+                    test_execution.project_id,
+                    prompt_node_id=f"tied{index}",
+                    name=f"Tied form {index}",
+                ),
+            )
+            assert create_response.status_code == 201, create_response.text
+            created_ids.append(create_response.json()["id"])
+
+        # Postgres orders uuid bytewise, matching UUID comparison in Python.
+        ascending = sorted(created_ids, key=UUID)
+        for sort_param, expected in (
+            ("workflow_name", ascending),
+            ("-workflow_name", list(reversed(ascending))),
+        ):
+            list_response = await jwt_client.get(
+                FORM_PROMPTS_URL,
+                params={"sort": sort_param, "execution_id": str(exec_id), "limit": "50"},
+            )
+            assert list_response.status_code == 200, list_response.text
+            resources = list_response.json()["resources"]
+            assert len({item["workflow_name"] for item in resources}) == 1, "expected a single tied workflow name"
+            assert [item["id"] for item in resources] == expected, f"sort={sort_param}"
+
+    async def test_list_form_prompts_sort_by_workflow_name_paginates_forward_and_back(
+        self,
+        jwt_client: AsyncClient,
+        test_db_session: AsyncSession,
+        test_user: User,
+        test_execution: Execution,
+        test_workflow_definition: dict[str, Any],
+    ) -> None:
+        """Cursor pagination over a workflow_name sort is stable in both directions."""
+        project_id = test_execution.project_id
+        suffix = uuid4().hex[:8]
+        workflow_names = [f"{letter}-{suffix}" for letter in ("charlie", "alpha", "echo", "bravo", "delta")]
+
+        for workflow_name in workflow_names:
+            execution = await _create_execution_for_workflow(
+                test_db_session, test_user, project_id, workflow_name, test_workflow_definition
+            )
+            create_response = await jwt_client.post(
+                FORM_PROMPTS_URL,
+                json=_form_prompt_payload(execution.id, project_id, name=f"prompt-{workflow_name}"),
+            )
+            assert create_response.status_code == 201, create_response.text
+
+        base_params = {"sort": "workflow_name", "project_id": str(project_id), "limit": "2"}
+
+        # Walk forward, collecting one list of names per page.
+        forward_pages: list[list[str]] = []
+        cursor: str | None = None
+        for _ in range(10):  # bound guards against a cursor that never terminates
+            params = dict(base_params)
+            if cursor:
+                params["cursor"] = cursor
+            response = await jwt_client.get(FORM_PROMPTS_URL, params=params)
+            assert response.status_code == 200, response.text
+            data = response.json()
+            forward_pages.append([item["workflow_name"] for item in data["resources"]])
+            cursor = data["next"]
+            if not cursor:
+                break
+        else:
+            pytest.fail("forward pagination did not terminate")
+
+        assert all(len(page) <= 2 for page in forward_pages)
+        # Pages concatenate to the full ordered set: nothing skipped, nothing repeated.
+        assert [name for page in forward_pages for name in page] == sorted(workflow_names)
+
+        # Walk back from the final page; pages should replay in reverse.
+        backward_pages: list[list[str]] = []
+        cursor = data["prev"]
+        for _ in range(10):
+            if not cursor:
+                break
+            params = dict(base_params)
+            params["cursor"] = cursor
+            response = await jwt_client.get(FORM_PROMPTS_URL, params=params)
+            assert response.status_code == 200, response.text
+            data = response.json()
+            backward_pages.append([item["workflow_name"] for item in data["resources"]])
+            cursor = data["prev"]
+        else:
+            pytest.fail("backward pagination did not terminate")
+
+        assert backward_pages == list(reversed(forward_pages[:-1]))
 
     async def test_list_form_prompts_includes_submission_metadata(
         self,
