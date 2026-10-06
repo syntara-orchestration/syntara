@@ -12,7 +12,7 @@ import type { Node } from '@xyflow/react'
 import type { ReactNode } from 'react'
 import { useState } from 'react'
 
-import { NodeMenu } from '../../components/nodes/NodeMenu'
+import { SynStepMenu } from '../../components/steps/SynStepMenu'
 import { FlowNodeType, RegistryNodeId } from '../../constants'
 import { useAlerts } from '../../providers/alerts'
 import {
@@ -347,7 +347,7 @@ export function NodeDetailsPanel(props: NodeDetailsPanelProps) {
     disabled: getNodeDisabledState(node),
   })
   const panelMenuActions = buildPanelMenuActions(mode, node, menuActions, onClose)
-  const headerActions = panelMenuActions.length > 0 ? <NodeMenu menuActions={panelMenuActions} /> : null
+  const headerActions = panelMenuActions.length > 0 ? <SynStepMenu menuActions={panelMenuActions} /> : null
 
   const iconDescriptor =
     mode === 'edit' && node

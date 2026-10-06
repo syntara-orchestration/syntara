@@ -15,12 +15,14 @@ from syntara.telemetry.events.workflow_execution import (
     WorkflowExecutionCompletedEvent,
     WorkflowExecutionStartEvent,
 )
+from syntara.workflows.models.execution import ExecutionMode
 from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName
 
 # Import shared test data from conftest
 from tests.unit.telemetry.conftest import (
     VALID_NODE_HASH,
     VALID_WORKFLOW_EXECUTION_ID,
+    VALID_WORKFLOW_ID,
 )
 
 # =============================================================================
@@ -118,7 +120,7 @@ class TestWorkflowExecutionStartEvent:
             workflow_execution_id=VALID_WORKFLOW_EXECUTION_ID,
             entitlement_id="",
         )
-        assert event.workflow_execution_id == VALID_WORKFLOW_EXECUTION_ID
+        assert str(event.workflow_execution_id) == VALID_WORKFLOW_EXECUTION_ID
         assert event.trigger_type is None
 
     def test_valid_event_creation_with_trigger_type(self):
@@ -127,7 +129,7 @@ class TestWorkflowExecutionStartEvent:
             entitlement_id="",
             trigger_type=ActivityName.MANUAL_TRIGGER,
         )
-        assert event.workflow_execution_id == VALID_WORKFLOW_EXECUTION_ID
+        assert str(event.workflow_execution_id) == VALID_WORKFLOW_EXECUTION_ID
         assert event.trigger_type == ActivityName.MANUAL_TRIGGER
 
     def test_to_segment_event(self):
@@ -151,6 +153,36 @@ class TestWorkflowExecutionStartEvent:
         )
         props = event.to_segment_event()["properties"]
         assert props["entitlement_id"] == "ent-start-123"
+
+    def test_workflow_metrics_properties_in_segment(self):
+        """AAP-92215: workflow_id, mode, workflow_version, used_published, is_retry."""
+        event = WorkflowExecutionStartEvent(
+            workflow_execution_id=VALID_WORKFLOW_EXECUTION_ID,
+            workflow_id=VALID_WORKFLOW_ID,
+            entitlement_id="",
+            mode=ExecutionMode.STANDARD,
+            workflow_version=4,
+            used_published=True,
+            is_retry=True,
+        )
+        props = event.to_segment_event()["properties"]
+        assert props["workflow_id"] == VALID_WORKFLOW_ID
+        assert props["mode"] == "standard"
+        assert props["workflow_version"] == 4
+        assert props["used_published"] is True
+        assert props["is_retry"] is True
+
+    def test_workflow_metrics_properties_default_to_none(self):
+        """New run properties default to None/False so emission never breaks."""
+        event = WorkflowExecutionStartEvent(
+            workflow_execution_id=VALID_WORKFLOW_EXECUTION_ID,
+            entitlement_id="",
+        )
+        assert event.workflow_id is None
+        assert event.mode is None
+        assert event.workflow_version is None
+        assert event.used_published is None
+        assert event.is_retry is False
 
 
 # =============================================================================
@@ -225,6 +257,30 @@ class TestWorkflowExecutionCompletedEvent:
         props = event.to_segment_event()["properties"]
         assert props["entitlement_id"] == "ent-completed-456"
 
+    def test_workflow_metrics_properties_in_segment(self):
+        """AAP-92215: workflow_id, mode, workflow_version, used_published, is_retry."""
+        event = WorkflowExecutionCompletedEvent(
+            workflow_execution_id=VALID_WORKFLOW_EXECUTION_ID,
+            workflow_id=VALID_WORKFLOW_ID,
+            status="failed",
+            duration_ms=999,
+            node_count=3,
+            error_count=1,
+            error_type="WorkflowTimedOut",
+            entitlement_id="",
+            mode=ExecutionMode.STANDARD,
+            workflow_version=7,
+            used_published=False,
+            is_retry=False,
+        )
+        props = event.to_segment_event()["properties"]
+        assert props["workflow_id"] == VALID_WORKFLOW_ID
+        assert props["mode"] == "standard"
+        assert props["workflow_version"] == 7
+        assert props["used_published"] is False
+        assert props["is_retry"] is False
+        assert props["error_type"] == "WorkflowTimedOut"
+
 
 # =============================================================================
 # NodeExecutionEvent Tests (T021-TEST)
@@ -269,6 +325,21 @@ class TestNodeExecutionEvent:
         assert segment_event["event"] == "node_execution"
         props = segment_event["properties"]
         assert props["node_type"] == "script"
+
+    def test_workflow_metrics_properties_in_segment(self):
+        """AAP-92215: node events carry workflow_id and mode."""
+        event = NodeExecutionEvent(
+            workflow_execution_id=VALID_WORKFLOW_EXECUTION_ID,
+            workflow_id=VALID_WORKFLOW_ID,
+            node_type="script",
+            node_hash=VALID_NODE_HASH,
+            status="completed",
+            mode=ExecutionMode.TEST,
+            entitlement_id="",
+        )
+        props = event.to_segment_event()["properties"]
+        assert props["workflow_id"] == VALID_WORKFLOW_ID
+        assert props["mode"] == "test"
 
     def test_entitlement_id_in_segment_properties(self):
         """entitlement_id value must appear in segment event properties."""
@@ -315,3 +386,18 @@ class TestNodeExecutionEventBuilder:
             entitlement_id="",
         )
         assert event.node_hash == event_same.node_hash
+
+    def test_build_event_forwards_workflow_id_and_mode(self):
+        """AAP-92215: builder forwards workflow_id and mode onto the event."""
+        builder = NodeExecutionEventBuilder()
+        event = builder.build_event(
+            execution_id=VALID_WORKFLOW_EXECUTION_ID,
+            workflow_id=VALID_WORKFLOW_ID,
+            node_type="script",
+            node_def={"a": 1},
+            status="completed",
+            mode=ExecutionMode.DEBUG,
+            entitlement_id="",
+        )
+        assert str(event.workflow_id) == VALID_WORKFLOW_ID
+        assert event.mode == "debug"

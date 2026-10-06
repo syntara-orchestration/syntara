@@ -795,7 +795,7 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/konflux-gate
         with:
-          check-name: 'Red Hat Konflux / conforma-on-pull-request-{branch} / ansible-automation-orchestrator-ui-{branch}'
+          check-name: 'Integration Service / conforma-on-pull-request-{branch} / ansible-automation-orchestrator-ui-{branch}'
           pipeline-check-name: 'Konflux kflux-prd-rh03 / ansible-automation-orchestrator-ui-{branch}-on-pull-request'
           timeout-minutes: '85'
 
