@@ -89,14 +89,24 @@ function IntegrationsTableContent({
     <>
       <Thead>
         <Tr>
-          <Th sort={getSortParams('name')}>Server name / ID</Th>
-          <Th sort={getSortParams('validation_status')}>Status</Th>
-          <Th sort={getSortParams('integration_type')}>Integration type</Th>
-          <Th>API URL</Th>
-          <Th>Enabled resources</Th>
-          <Th sort={getSortParams('last_validated_at')}>Last checked</Th>
-          <Th sort={getSortParams('enabled')}>State</Th>
-          <Th screenReaderText="Actions" />
+          <Th width={20} sort={getSortParams('name')}>
+            Server name / ID
+          </Th>
+          <Th width={10} sort={getSortParams('validation_status')}>
+            Status
+          </Th>
+          <Th width={10} sort={getSortParams('integration_type')}>
+            Integration type
+          </Th>
+          <Th width={15}>API URL</Th>
+          <Th width={10}>Enabled resources</Th>
+          <Th width={15} sort={getSortParams('last_validated_at')}>
+            Last checked
+          </Th>
+          <Th width={10} sort={getSortParams('enabled')}>
+            State
+          </Th>
+          <Th width={10} screenReaderText="Actions" />
         </Tr>
       </Thead>
       <Tbody>
@@ -267,7 +277,7 @@ export default function Integrations() {
               ) : undefined
             }
             body={
-              <SynListPanelTable caption="Integrations" footer={getFooterProps(query.data)}>
+              <SynListPanelTable caption="Integrations" footer={getFooterProps(query.data)} useFixedLayout={false}>
                 <IntegrationsTableContent
                   results={results}
                   getSortParams={getSortParams}

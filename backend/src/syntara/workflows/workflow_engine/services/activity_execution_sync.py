@@ -259,6 +259,8 @@ class ActivityExecutionSyncMixin:
             execution_id=metadata.execution_id,
             activity_definitions_map=metadata.activity_definitions_map,
             updated_activities=updated_activities,
+            workflow_id=metadata.workflow_id,
+            mode=metadata.mode,
             request_id=metadata.request_id,
         )
 
