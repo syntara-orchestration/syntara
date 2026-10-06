@@ -2,10 +2,10 @@ import { render, screen } from '@testing-library/react'
 import { useMemo, useState } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 
-import { NodeBody } from './NodeBody'
-import { NodeExpandedContext, type NodeExpandedContextValue } from './NodeExpandedContext'
+import { SynStepBody } from './SynStepBody'
+import { SynStepExpandedContext, type SynStepExpandedContextValue } from './SynStepExpandedContext'
 
-describe('NodeBody', () => {
+describe('SynStepBody', () => {
   // Helper to render with context
   const renderWithContext = (
     expanded: boolean,
@@ -13,9 +13,9 @@ describe('NodeBody', () => {
     setExpanded?: React.Dispatch<React.SetStateAction<boolean>>
   ) => {
     return render(
-      <NodeExpandedContext.Provider value={[expanded, setExpanded ?? vi.fn()]}>
-        <NodeBody>{children}</NodeBody>
-      </NodeExpandedContext.Provider>
+      <SynStepExpandedContext.Provider value={[expanded, setExpanded ?? vi.fn()]}>
+        <SynStepBody>{children}</SynStepBody>
+      </SynStepExpandedContext.Provider>
     )
   }
 
@@ -30,13 +30,13 @@ describe('NodeBody', () => {
     className?: string
   }) => {
     const [expanded, setExpanded] = useState(initialExpanded)
-    const expandedContextValue = useMemo<NodeExpandedContextValue>(() => [expanded, setExpanded], [expanded])
+    const expandedContextValue = useMemo<SynStepExpandedContextValue>(() => [expanded, setExpanded], [expanded])
 
     return (
-      <NodeExpandedContext.Provider value={expandedContextValue}>
+      <SynStepExpandedContext.Provider value={expandedContextValue}>
         <div data-testid="expanded-state">{expanded ? 'expanded' : 'collapsed'}</div>
-        <NodeBody className={className}>{children}</NodeBody>
-      </NodeExpandedContext.Provider>
+        <SynStepBody className={className}>{children}</SynStepBody>
+      </SynStepExpandedContext.Provider>
     )
   }
 
@@ -57,11 +57,11 @@ describe('NodeBody', () => {
     it('renders with default expanded when context is null', () => {
       // When context is null, expanded defaults to true
       render(
-        <NodeExpandedContext.Provider value={null}>
-          <NodeBody>
+        <SynStepExpandedContext.Provider value={null}>
+          <SynStepBody>
             <div data-testid="content">Content</div>
-          </NodeBody>
-        </NodeExpandedContext.Provider>
+          </SynStepBody>
+        </SynStepExpandedContext.Provider>
       )
 
       expect(screen.getByTestId('content')).toBeInTheDocument()
@@ -119,11 +119,11 @@ describe('NodeBody', () => {
       render(
         // eslint-disable-next-line jsx-a11y/no-static-element-interactions
         <div onMouseDown={parentMouseDownHandler}>
-          <NodeExpandedContext.Provider value={[true, vi.fn()]}>
-            <NodeBody>
+          <SynStepExpandedContext.Provider value={[true, vi.fn()]}>
+            <SynStepBody>
               <div data-testid="content">Content</div>
-            </NodeBody>
-          </NodeExpandedContext.Provider>
+            </SynStepBody>
+          </SynStepExpandedContext.Provider>
         </div>
       )
 

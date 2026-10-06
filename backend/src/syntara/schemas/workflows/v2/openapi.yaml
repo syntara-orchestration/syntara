@@ -47,7 +47,7 @@ info:
     (config and result) are in the `executors/`, `control-nodes/`, and `triggers/` directories.
   version: 2.0.0
   contact:
-    name: Orchestrator Team
+    name: Syntara Team
 servers:
   - url: /api/v1
     description: API server (relative path)

@@ -10,16 +10,15 @@ import { LOOP_WHILE_CONDITION_HELP } from './nodeFieldHelpText'
 export function WhileConditionHelp() {
   return (
     <FieldHelpPopover
-      headerContent="Conditional expression (while loop)"
+      headerContent="Condition type (while loop)"
       helpText={
         <Stack hasGutter>
           <StackItem>{LOOP_WHILE_CONDITION_HELP}</StackItem>
           <StackItem>
-            <strong>Visual expression builder:</strong> Build conditions visually using a form interface with dropdowns
-            and inputs.
+            <strong>Form builder:</strong> Build conditions visually using a form interface with dropdowns and inputs.
           </StackItem>
           <StackItem>
-            <strong>Custom expression:</strong> Write conditions directly as template expressions in the format{' '}
+            <strong>Freeform text:</strong> Write conditions directly as template expressions in the format{' '}
             <code>{'${variable operator value}'}</code>
           </StackItem>
         </Stack>
