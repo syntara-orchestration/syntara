@@ -186,33 +186,92 @@ class ActivityExecutionSyncMixin:
 
         return old_values
 
-    async def _refresh_restored_timestamps(
+    async def _resolve_replayed_timestamps(
         self,
         metadata: ExecutionMonitorMetadata,
         handle: WorkflowHandle[Any, Any],
-    ) -> None:
-        """Load source-run timestamps for retry-replayed nodes.
+    ) -> dict[str, dict[str, datetime | None]]:
+        """Collect source timestamps for the replayed nodes finishing in this batch.
 
-        A replayed node is recorded node-by-node through the normal event path,
-        which stamps it with this run's event times. The source run's own
-        timestamps are queried here and applied in ``_process_single_activity_sync``
-        so a replayed node reports when the work actually ran, not the restore
-        time. Only loops still use the separate bulk copy, which carries its own
-        source timestamps, so they are not covered here.
+        One workflow update per replayed node, asked before the sync transaction
+        opens because the update blocks until the workflow can answer and a
+        database transaction must not be held across that wait.
+
+        Only terminal events are asked about. A node that has merely been
+        scheduled has not replayed yet, so asking would wait for a timestamp that
+        is minutes away, and its source times would be applied to a node that has
+        not run. Non-retry runs ask nothing at all.
+        """
+        if not metadata.is_retry:
+            return {}
+
+        resolved: dict[str, dict[str, datetime | None]] = {}
+        for event_id in metadata.pending_sync_event_ids:
+            activity_data = metadata.pending_activity_updates.get(event_id)
+            if not activity_data or activity_data.get("status") not in TERMINAL_ACTIVITY_STATUSES:
+                continue
+            activity_id = activity_data["activity_id"]
+            if activity_id in resolved:
+                continue
+            restored_ts = await self._replayed_node_timestamps(metadata, handle, activity_id)
+            if restored_ts is not None:
+                resolved[activity_id] = restored_ts
+        return resolved
+
+    async def _replayed_node_timestamps(
+        self,
+        metadata: ExecutionMonitorMetadata,
+        handle: WorkflowHandle[Any, Any],
+        activity_id: str,
+    ) -> dict[str, datetime | None] | None:
+        """Ask the workflow for one replayed node's source-run times, or None.
+
+        Called when the node completes, which is the moment its row is written.
+        The workflow update blocks until it can say whether this activity is a
+        replay and, if so, has the source times ready — a plain query would race
+        the event and lose them, since the event is only processed once.
+
+        Returns None when the activity was an ordinary execution, or when the
+        workflow cannot answer in time. Either way the caller keeps Temporal's
+        timestamps, so a failure here degrades to a restored node reporting the
+        replay time rather than losing the node's record.
         """
         try:
-            raw = await handle.query("get_restored_activity_timestamps") or {}
-        except (TemporalError, ValueError):
-            logger.warning(
-                "Could not query restored activity timestamps",
-                execution_id=metadata.execution_id,
+            raw = cast(
+                "dict[str, str | None] | None",
+                await handle.execute_update("get_replayed_node_timestamps_when_ready", activity_id),
             )
-            return
-        for node_id, times in raw.items():
-            metadata.restored_activity_timestamps[node_id] = {
-                "started_at": self._parse_source_timestamp(times.get("started_at")),
-                "completed_at": self._parse_source_timestamp(times.get("completed_at")),
-            }
+        except RPCError as e:
+            if e.status == RPCStatusCode.NOT_FOUND:
+                # The workflow already closed, so the update was rejected and
+                # there is no handler left to ask. Source times were written
+                # before the node's result was published, so they do exist — but
+                # nothing reads them back now. Keeping Temporal's times still
+                # yields a correct row, only stamped with the replay time.
+                logger.info(
+                    "Workflow closed before replayed node timestamps could be read",
+                    activity_id=activity_id,
+                    execution_id=metadata.execution_id,
+                )
+                return None
+            logger.warning(
+                "Workflow update for replayed node timestamps failed",
+                activity_id=activity_id,
+            )
+            return None
+        except (ApplicationError, TemporalError, ValueError):
+            logger.warning(
+                "Workflow update for replayed node timestamps did not return",
+                activity_id=activity_id,
+            )
+            return None
+
+        if not raw:
+            return None
+        return {
+            "started_at": self._parse_source_timestamp(raw.get("started_at")),
+            "completed_at": self._parse_source_timestamp(raw.get("completed_at")),
+        }
 
     @staticmethod
     def _parse_source_timestamp(value: str | None) -> datetime | None:
@@ -225,19 +284,17 @@ class ActivityExecutionSyncMixin:
             return None
 
     @staticmethod
-    def _apply_restored_timestamps(
-        metadata: ExecutionMonitorMetadata,
-        activity_id: str,
+    def _apply_replayed_timestamps(
+        restored_ts: dict[str, datetime | None] | None,
         activity_data: dict[str, Any],
     ) -> None:
-        """Swap a retry-replayed node's event times for its source-run timestamps.
+        """Swap a replayed node's event times for its source-run timestamps.
 
         A replayed node is recorded through the normal event path with this run's
         event times. These source timestamps are applied over them so the node
-        reports when the work actually ran rather than when it was restored.
+        reports when the work actually ran rather than when it was replayed.
         No-op for a node this retry did not replay.
         """
-        restored_ts = metadata.restored_activity_timestamps.get(activity_id)
         if restored_ts is None:
             return
         if restored_ts.get("started_at") is not None:
@@ -368,6 +425,7 @@ class ActivityExecutionSyncMixin:
         activity_data: dict[str, Any],
         existing_activities: dict[str, ActivityExecution],
         session: AsyncSession,
+        replayed_timestamps: dict[str, dict[str, datetime | None]] | None = None,
     ) -> tuple[ActivityExecution, dict[str, Any], bool] | None:
         """Process a single activity update for database sync.
 
@@ -381,6 +439,8 @@ class ActivityExecutionSyncMixin:
             activity_data: Activity update data from Temporal events
             existing_activities: Map of activity_name to existing ActivityExecution records
             session: Database session for creating new records
+            replayed_timestamps: Source timestamps resolved before this call, keyed
+                by activity id. Empty for an ordinary execution.
 
         Returns:
             Tuple of (activity, old_values, is_new) if updated, None if skipped.
@@ -447,8 +507,9 @@ class ActivityExecutionSyncMixin:
             activity_data["iteration"] = existing.iteration
 
         # A retry-replayed node is recorded through this normal path with this
-        # run's event times; swap in the source run's timestamps instead.
-        self._apply_restored_timestamps(metadata, activity_id, activity_data)
+        # run's event times; its source times were resolved before the
+        # transaction opened and are swapped in here.
+        self._apply_replayed_timestamps((replayed_timestamps or {}).get(activity_id), activity_data)
 
         # Update existing activity and track old values for patch generation
         old_values = self._update_activity_record(

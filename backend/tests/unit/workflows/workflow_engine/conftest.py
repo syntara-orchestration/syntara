@@ -24,7 +24,7 @@ def init_workflow_runtime(wf: OrchestratorWorkflow) -> None:
     # a workflow built for a non-retry test behaves as one.
     wf.retry_context = {}
     wf._retry_restorable_cache = None
-    wf._restored_nodes = set()
+    wf._retry_replay_candidates = set()
     wf._restored_node_timestamps = {}
     wf._retry_source_statuses = {}
 
