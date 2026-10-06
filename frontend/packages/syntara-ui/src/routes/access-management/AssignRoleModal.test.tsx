@@ -390,6 +390,25 @@ describe('AssignRoleModal', () => {
         expect(screen.queryByText('Select at least one role')).not.toBeInTheDocument()
       })
     })
+
+    // AAP-92801: selecting a project (which resets roleIds with shouldValidate)
+    // surfaces "Select at least one role" before the user has touched the role
+    // picker at all; selecting a role right after should clear it immediately.
+    it('clears role error after choosing a project and then a role for a service account', async () => {
+      const user = userEvent.setup()
+      await renderModal({ principalType: 'service_account', principalId: 'sa-1' })
+
+      const projectToggle = screen.getByRole('button', { name: 'Select a project...' })
+      await user.click(projectToggle)
+      await user.click(screen.getByRole('option', { name: 'Project Alpha' }))
+
+      await user.click(screen.getByPlaceholderText('Search for roles...'))
+      await user.click(screen.getByRole('option', { name: /project-admin/i }))
+
+      await waitFor(() => {
+        expect(screen.queryByText('Select at least one role')).not.toBeInTheDocument()
+      })
+    })
   })
 
   describe('Form submission', () => {
