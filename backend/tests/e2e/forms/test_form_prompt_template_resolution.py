@@ -190,7 +190,10 @@ def test_pending_prompt_listed_for_execution(
     """
     exec_id, _ = _start(syntara_api, workflow_factory, first_project_id)
     listed = _assert_and_get_with_502_skip(
-        syntara_api.form_prompts.list(additional_params={"execution_id": str(exec_id), "status": "pending"})
+        syntara_api.form_prompts.list(
+            execution_id=exec_id,
+            status=FormPromptStatus.PENDING,
+        )
     )
 
     assert len(listed.resources) == 1

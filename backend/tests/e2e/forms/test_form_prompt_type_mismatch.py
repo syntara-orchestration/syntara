@@ -70,7 +70,7 @@ def _start(
 def _assert_no_prompt_row(syntara_api: SyntaraApiRegistry, exec_id: UUID) -> None:
     """Verify failed template resolution did not persist a form prompt."""
     listed = _assert_and_get_with_502_skip(
-        syntara_api.form_prompts.list(additional_params={"execution_id": str(exec_id)})
+        syntara_api.form_prompts.list(execution_id=exec_id, limit=5)
     )
     assert not listed.resources, (
         f"No form prompt row should be persisted when template resolution fails; found {len(listed.resources)}"

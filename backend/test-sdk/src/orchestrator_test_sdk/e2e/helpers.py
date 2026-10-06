@@ -20,6 +20,7 @@ from syntara_api_client.models import (
 )
 from syntara_api_client.models.approval_request_status import ApprovalRequestStatus
 from syntara_api_client.models.execution_status import ExecutionStatus
+from syntara_api_client.models.form_prompt_status import FormPromptStatus
 from syntara_api_client.models.workflow_definition import WorkflowDefinition
 from syntara_api_client.types import UnexpectedResponseException
 
@@ -158,8 +159,7 @@ def poll_for_pending_form_prompt(
 ) -> FormPromptListRead:
     """Poll until a PENDING form prompt appears for the given execution.
 
-    The list endpoint filters via query params rather than named arguments, and
-    FormPromptListRead carries no form_definition - callers that need the
+    FormPromptListRead carries no form_definition, so callers that need the
     resolved form must GET the prompt by id.
     """
     elapsed = 0
@@ -168,7 +168,8 @@ def poll_for_pending_form_prompt(
         elapsed += interval
         response = _retry_api_call(
             lambda: api.form_prompts.list(
-                additional_params={"execution_id": str(execution_id), "status": "pending"},
+                execution_id=execution_id,
+                status=FormPromptStatus.PENDING,
                 limit=5,
             )
         )
