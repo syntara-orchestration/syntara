@@ -1,0 +1,143 @@
+"""Source-node replay activity for retry-from-failure.
+
+When an execution is retried from a failure point, the nodes upstream of that
+point are skipped and the workflow needs their stored state injected so
+downstream nodes read them as if those nodes had just run. This activity returns
+the whole node state that was recorded — its input, its output, and the times it
+ran — for exactly one node.
+
+One node per call, rather than a batch, keeps each activity result small: Temporal
+records activity results in history, so restoring them through an activity does
+not remove that history cost. Namespace publication uses the ordinary completion
+path, which is what makes a replayed node indistinguishable from an executed one.
+"""
+
+import json
+from typing import Any
+
+import structlog
+from sqlmodel import col, select
+from temporalio import activity, workflow
+
+with workflow.unsafe.imports_passed_through():
+    from syntara.core.constants import JsonbLimits
+    from syntara.core.database.session import get_db
+    from syntara.core.exceptions import SafeValueError
+    from syntara.workflows.models.activity_execution import ActivityExecution, ActivityStatus
+    from syntara.workflows.utils.loop_iteration_names import strip_iteration_suffix
+
+logger = structlog.stdlib.get_logger(__name__)
+
+
+@activity.defn(name="replay_retry_node")
+async def replay_retry_node_activity(
+    source_execution_id: str,
+    node_id: str,
+) -> dict[str, Any] | None:
+    """Fetch the recorded state of one node a retry will skip.
+
+    Args:
+        source_execution_id: Execution whose ``ActivityExecution`` rows hold the
+            state to restore.
+        node_id: Canvas node id to fetch. A loop-iteration-suffixed id resolves
+            to its base node.
+
+    Returns:
+        The ``input_data``, ``output_data``, ``started_at`` and ``completed_at`` of
+        the node's most recent ``COMPLETED`` activity in the source run, or None
+        when the source run has no completed record for it. All four are returned
+        so a replayed node is indistinguishable from one that executed: the caller
+        republishes the input into ``node_inputs`` and the output into the
+        execution namespace, and the sync service applies the source timestamps so
+        the node reports when the work happened rather than when it was replayed.
+        Returning None rather than an empty record keeps "nothing ran" distinct
+        from "ran and produced nothing" — the caller then executes the node for
+        real instead of injecting an empty result.
+
+    Raises:
+        SafeValueError: If the serialized size would exceed
+            ``JsonbLimits.MAX_FIELD_BYTES``, which would overflow the activity
+            result blob. Raised rather than truncated because a silently truncated
+            output is worse than a refused retry.
+
+    """
+    if not node_id or not node_id.strip():
+        return None
+    wanted = strip_iteration_suffix(node_id.strip())
+
+    stored: dict[str, Any] | None = None
+    async for session in get_db():
+        activities = (
+            await session.exec(
+                select(ActivityExecution)
+                .where(
+                    ActivityExecution.execution_id == source_execution_id,
+                    ActivityExecution.status == ActivityStatus.COMPLETED,
+                )
+                .order_by(
+                    col(ActivityExecution.iteration), col(ActivityExecution.created_at), col(ActivityExecution.id)
+                )
+            )
+        ).all()
+        # Ids are matched on the base node id, so a loop node resolves to the
+        # most recent completed iteration. Per-iteration granularity is
+        # classification's concern, not the transport's.
+        for activity_row in activities:
+            base_id = strip_iteration_suffix(activity_row.activity_name)
+            if base_id == wanted:
+                stored = {
+                    "input_data": activity_row.input_data or {},
+                    "output_data": activity_row.output_data or {},
+                    # The source row's own timestamps, carried so the replayed
+                    # node's row reports when the work ran, not the replay time.
+                    "started_at": activity_row.started_at.isoformat() if activity_row.started_at else None,
+                    "completed_at": activity_row.completed_at.isoformat() if activity_row.completed_at else None,
+                }
+
+    if stored is None:
+        logger.info(
+            "No source record to replay",
+            source_execution_id=source_execution_id,
+            node_id=node_id,
+        )
+        return None
+
+    # Measure the JSON that will actually cross the result blob. ``len(str(...))``
+    # would measure Python's repr, which is a different and only accidentally
+    # similar number.
+    serialized_bytes = len(json.dumps(stored, default=str).encode("utf-8"))
+    if serialized_bytes > JsonbLimits.MAX_FIELD_BYTES:
+        msg = (
+            f"restored retry data totals {serialized_bytes} bytes for node {node_id}, "
+            f"over the {JsonbLimits.MAX_FIELD_BYTES} byte maximum. This retry cannot restore the "
+            "upstream output it needs in order to skip that node."
+        )
+        raise SafeValueError(msg)
+
+    logger.info(
+        "Fetched source node state to replay",
+        source_execution_id=source_execution_id,
+        node_id=node_id,
+        serialized_bytes=serialized_bytes,
+    )
+    return stored
+
+
+@activity.defn(name="fetch_retry_source_state")
+async def fetch_retry_source_state_activity(source_execution_id: str) -> dict[str, str]:
+    """Return source statuses without carrying output payloads into the plan."""
+    states: dict[str, str] = {}
+    async for session in get_db():
+        rows = (
+            await session.exec(
+                select(ActivityExecution)
+                .where(ActivityExecution.execution_id == source_execution_id)
+                .order_by(
+                    col(ActivityExecution.iteration), col(ActivityExecution.created_at), col(ActivityExecution.id)
+                )
+            )
+        ).all()
+        for row in rows:
+            if row.activity_name:
+                states[strip_iteration_suffix(row.activity_name)] = row.status.value
+    return states

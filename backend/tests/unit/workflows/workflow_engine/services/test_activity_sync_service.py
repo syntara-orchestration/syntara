@@ -18,6 +18,9 @@ from syntara.workflows.models.activity_execution import ActivityExecution, Activ
 from syntara.workflows.models.execution import Execution, ExecutionStatus
 from syntara.workflows.workflow_engine.activities.internal import register_activity_monitoring
 from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName, NodeType
+from syntara.workflows.workflow_engine.services.activity_execution_synchronizer import (
+    ActivityExecutionSynchronizer,
+)
 from syntara.workflows.workflow_engine.services.activity_sync_service import (
     _PENDING_ACTIVITY_STATE_STARTED as STARTED_STATE,
 )
@@ -5974,36 +5977,71 @@ class TestActivitySyncPreservesIoOnQueryFailure:
         assert activity.status == ActivityStatus.RUNNING
 
 
-class TestRestoredTimestampOverride:
-    """Retry-replayed nodes must report their source-run timestamps, not the restore time.
+class TestReplayedNodeTimestampOverride:
+    """Retry-replayed nodes must report their source-run timestamps, not the replay time.
 
     A regular restored node is replayed under its own id, so the normal event
-    path records it node-by-node with this run's event times. These tests cover
-    loading the source timestamps and applying them over the event times.
+    path records it node-by-node with this run's event times. As each one
+    completes, the sync service asks the workflow for its source times and
+    applies them over the event times — one activity at a time, through a
+    workflow update that waits for the replay to have stored them.
     """
 
     def setup_method(self) -> None:
         self.service = ActivitySyncService(Mock(), Mock())
         self.execution_id = uuid4()
-
-    def _build_activity_data(self, status: ActivityStatus) -> dict[str, Any]:
-        return {
-            "activity_id": "script_1",
-            "activity_name": "script_1",
-            "_is_loop_iteration": False,
-            "_is_loop_control": False,
-            "status": status,
-            "started_at": datetime(2026, 6, 1, 12, 0, 0, tzinfo=UTC),  # this run's event time
-            "completed_at": datetime(2026, 6, 1, 12, 0, 1, tzinfo=UTC),
-            "error_details": None,
-            "retry_count": 0,
-            "iteration": None,
-            "scheduled_at": datetime(2026, 6, 1, 12, 0, 0, tzinfo=UTC),
-            "configured_timeout_seconds": None,
+        self.source_times = {
+            "started_at": datetime(2026, 1, 1, 0, 0, 0, tzinfo=UTC).isoformat(),
+            "completed_at": datetime(2026, 1, 1, 0, 5, 0, tzinfo=UTC).isoformat(),
         }
+
+    def _handle(self, returned: object = None) -> Mock:
+        handle = Mock()
+        handle.execute_update = AsyncMock(return_value=returned)
+        return handle
+
+    async def test_asks_the_workflow_for_that_one_activity(self) -> None:
+        """One update per activity, carrying that activity's id."""
+        metadata = create_test_metadata(execution_id=self.execution_id)
+        handle = self._handle(self.source_times)
+
+        result = await self.service._replayed_node_timestamps(metadata, handle, "script_1")
+
+        handle.execute_update.assert_awaited_once_with("get_replayed_node_timestamps_when_ready", "script_1")
+        assert result == {
+            "started_at": datetime(2026, 1, 1, 0, 0, 0, tzinfo=UTC),
+            "completed_at": datetime(2026, 1, 1, 0, 5, 0, tzinfo=UTC),
+        }
+
+    async def test_normal_execution_returns_none_so_temporal_times_are_kept(self) -> None:
+        """A node the workflow did not replay has no source times to apply."""
+        metadata = create_test_metadata(execution_id=self.execution_id)
+
+        assert await self.service._replayed_node_timestamps(metadata, self._handle(None), "script_1") is None
+
+    async def test_workflow_closed_falls_back_to_temporal_times(self) -> None:
+        """NOT_FOUND means the workflow is gone; the row is still written."""
+        metadata = create_test_metadata(execution_id=self.execution_id)
+        handle = self._handle()
+        handle.execute_update = AsyncMock(
+            side_effect=RPCError("workflow execution not found", RPCStatusCode.NOT_FOUND, b"")
+        )
+
+        assert await self.service._replayed_node_timestamps(metadata, handle, "script_1") is None
+
+    async def test_update_timeout_falls_back_to_temporal_times(self) -> None:
+        """A replay that never reports its times must not lose the node's row."""
+        from temporalio.exceptions import ApplicationError
+
+        metadata = create_test_metadata(execution_id=self.execution_id)
+        handle = self._handle()
+        handle.execute_update = AsyncMock(side_effect=ApplicationError("timeout"))
+
+        assert await self.service._replayed_node_timestamps(metadata, handle, "script_1") is None
 
     def test_parse_source_timestamp_round_trips_iso(self) -> None:
         parsed = self.service._parse_source_timestamp("2026-01-01T00:00:00+00:00")
+
         assert parsed == datetime(2026, 1, 1, 0, 0, 0, tzinfo=UTC)
 
     def test_parse_source_timestamp_handles_none_and_garbage(self) -> None:
@@ -6011,111 +6049,194 @@ class TestRestoredTimestampOverride:
         assert self.service._parse_source_timestamp("") is None
         assert self.service._parse_source_timestamp("not-a-date") is None
 
-    @pytest.mark.asyncio
-    async def test_refresh_populates_metadata_from_workflow_query(self) -> None:
-        metadata = create_test_metadata(execution_id=self.execution_id)
-        handle = AsyncMock()
-        handle.query = AsyncMock(
-            return_value={
-                "script_1": {"started_at": "2026-01-01T00:00:00+00:00", "completed_at": "2026-01-01T00:05:00+00:00"}
-            }
+    def test_apply_swaps_event_times_for_source_times(self) -> None:
+        activity_data = {"status": ActivityStatus.COMPLETED, "started_at": "event", "completed_at": "event"}
+
+        self.service._apply_replayed_timestamps(
+            {
+                "started_at": datetime(2026, 1, 1, 0, 0, 0, tzinfo=UTC),
+                "completed_at": datetime(2026, 1, 1, 0, 5, 0, tzinfo=UTC),
+            },
+            activity_data,
         )
 
-        await self.service._refresh_restored_timestamps(metadata, handle)
+        assert activity_data["started_at"] == datetime(2026, 1, 1, 0, 0, 0, tzinfo=UTC)
+        assert activity_data["completed_at"] == datetime(2026, 1, 1, 0, 5, 0, tzinfo=UTC)
 
-        handle.query.assert_awaited_once_with("get_restored_activity_timestamps")
-        assert metadata.restored_activity_timestamps["script_1"] == {
-            "started_at": datetime(2026, 1, 1, 0, 0, 0, tzinfo=UTC),
-            "completed_at": datetime(2026, 1, 1, 0, 5, 0, tzinfo=UTC),
+    def test_apply_keeps_event_time_when_node_did_not_complete(self) -> None:
+        """A source completion time cannot describe a node that has not finished."""
+        activity_data = {"status": ActivityStatus.RUNNING, "started_at": "event", "completed_at": None}
+
+        self.service._apply_replayed_timestamps(
+            {
+                "started_at": datetime(2026, 1, 1, 0, 0, 0, tzinfo=UTC),
+                "completed_at": datetime(2026, 1, 1, 0, 5, 0, tzinfo=UTC),
+            },
+            activity_data,
+        )
+
+        assert activity_data["started_at"] == datetime(2026, 1, 1, 0, 0, 0, tzinfo=UTC)
+        assert activity_data["completed_at"] is None
+
+    def test_apply_is_a_no_op_for_an_ordinary_execution(self) -> None:
+        activity_data = {"status": ActivityStatus.COMPLETED, "started_at": "event", "completed_at": "event"}
+
+        self.service._apply_replayed_timestamps(None, activity_data)
+
+        assert activity_data == {
+            "status": ActivityStatus.COMPLETED,
+            "started_at": "event",
+            "completed_at": "event",
         }
 
-    @pytest.mark.asyncio
-    async def test_refresh_swallows_query_failure(self) -> None:
-        from temporalio.exceptions import TemporalError
 
+class TestReplayedTimestampResolution:
+    """Timestamps are resolved once per replayed node, before the transaction.
+
+    The workflow update blocks until it can answer. Two things follow from that:
+    it must not be asked about a node that has not replayed yet, and it must not
+    happen while a database transaction is open.
+    """
+
+    def setup_method(self) -> None:
+        self.service = ActivitySyncService(Mock(), Mock())
+        self.execution_id = uuid4()
+        self.source_times = {
+            "started_at": datetime(2026, 1, 1, 0, 0, 0, tzinfo=UTC).isoformat(),
+            "completed_at": datetime(2026, 1, 1, 0, 5, 0, tzinfo=UTC).isoformat(),
+        }
+
+    def _metadata(self, entries: list[tuple[int, str, ActivityStatus]]) -> ExecutionMonitorMetadata:
         metadata = create_test_metadata(execution_id=self.execution_id)
-        handle = AsyncMock()
-        handle.query = AsyncMock(side_effect=TemporalError("worker gone"))
+        metadata.is_retry = True
+        for event_id, activity_id, status in entries:
+            metadata.pending_sync_event_ids.add(event_id)
+            metadata.pending_activity_updates[event_id] = {
+                "activity_id": activity_id,
+                "activity_name": activity_id,
+                "status": status,
+                "_is_loop_iteration": False,
+                "_is_loop_control": False,
+            }
+        return metadata
 
-        await self.service._refresh_restored_timestamps(metadata, handle)
-
-        assert metadata.restored_activity_timestamps == {}
+    def _handle(self) -> Mock:
+        handle = Mock()
+        handle.execute_update = AsyncMock(return_value=self.source_times)
+        return handle
 
     @pytest.mark.asyncio
-    async def test_completed_restored_node_uses_source_timestamps(self) -> None:
-        existing = Mock(spec=ActivityExecution)
-        existing.activity_name = "script_1"
-        existing.status = ActivityStatus.RUNNING
-        existing.node_type = NodeType.SCRIPT
-        existing.started_at = None
-        existing.completed_at = None
-        existing.input_data = {}
-        existing.output_data = None
-        existing.error_details = None
-        existing.retry_count = 0
-        existing.iteration = None
-        existing.updated_at = datetime(2026, 6, 1, 12, 0, 0, tzinfo=UTC)
+    async def test_asks_once_per_node_for_its_completed_event(self) -> None:
+        metadata = self._metadata([(1, "script_1", ActivityStatus.COMPLETED)])
+        handle = self._handle()
 
-        metadata = create_test_metadata(execution_id=self.execution_id)
-        metadata.restored_activity_timestamps = {
+        resolved = await self.service._resolve_replayed_timestamps(metadata, handle)
+
+        handle.execute_update.assert_awaited_once_with("get_replayed_node_timestamps_when_ready", "script_1")
+        assert resolved == {
             "script_1": {
                 "started_at": datetime(2026, 1, 1, 0, 0, 0, tzinfo=UTC),
                 "completed_at": datetime(2026, 1, 1, 0, 5, 0, tzinfo=UTC),
             }
         }
 
-        with patch.object(
-            self.service,
-            "_query_activity_io",
-            new_callable=AsyncMock,
-            return_value=({"input": "data"}, {"output": "data"}),
-        ):
-            result = await self.service._process_single_activity_sync(
-                metadata,
-                Mock(),
-                self._build_activity_data(ActivityStatus.COMPLETED),
-                {"script_1": existing},
-                Mock(),
-            )
+    @pytest.mark.asyncio
+    async def test_scheduled_and_started_events_are_not_asked_about(self) -> None:
+        """A node that has not replayed yet has no timestamps to wait for.
 
-        assert result is not None
-        activity, _old_values, _is_new = result
-        # Source-run timestamps win over this run's event times.
-        assert activity.started_at == datetime(2026, 1, 1, 0, 0, 0, tzinfo=UTC)
-        assert activity.completed_at == datetime(2026, 1, 1, 0, 5, 0, tzinfo=UTC)
+        Asking here would block for the update's full timeout and apply source
+        times to a node that has not run — the SCHEDULED event for a replayed
+        node arrives before the workflow has stored anything for it.
+        """
+        metadata = self._metadata(
+            [
+                (1, "script_1", ActivityStatus.PENDING),
+                (2, "script_1", ActivityStatus.RUNNING),
+            ]
+        )
+        handle = self._handle()
+
+        assert await self.service._resolve_replayed_timestamps(metadata, handle) == {}
+        handle.execute_update.assert_not_awaited()
 
     @pytest.mark.asyncio
-    async def test_non_restored_node_keeps_event_timestamps(self) -> None:
-        existing = Mock(spec=ActivityExecution)
-        existing.activity_name = "script_1"
-        existing.status = ActivityStatus.RUNNING
-        existing.node_type = NodeType.SCRIPT
-        existing.started_at = None
-        existing.completed_at = None
-        existing.input_data = {}
-        existing.output_data = None
-        existing.error_details = None
-        existing.retry_count = 0
-        existing.iteration = None
-        existing.updated_at = datetime(2026, 6, 1, 12, 0, 0, tzinfo=UTC)
+    async def test_a_node_is_asked_once_across_repeated_terminal_events(self) -> None:
+        metadata = self._metadata(
+            [
+                (1, "script_1", ActivityStatus.COMPLETED),
+                (2, "script_1", ActivityStatus.COMPLETED),
+            ]
+        )
+        handle = self._handle()
 
-        metadata = create_test_metadata(execution_id=self.execution_id)  # no restored timestamps
+        await self.service._resolve_replayed_timestamps(metadata, handle)
 
-        with patch.object(
-            self.service,
-            "_query_activity_io",
-            new_callable=AsyncMock,
-            return_value=({"input": "data"}, {"output": "data"}),
+        handle.execute_update.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_non_retry_run_asks_nothing(self) -> None:
+        """Ordinary executions must not pay a workflow round trip per node."""
+        metadata = self._metadata([(1, "script_1", ActivityStatus.COMPLETED)])
+        handle = self._handle()
+        metadata.is_retry = False
+
+        assert await self.service._resolve_replayed_timestamps(metadata, handle) == {}
+        handle.execute_update.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_an_ordinary_node_is_left_out_of_the_resolved_map(self) -> None:
+        """The workflow reporting "not a replay" means no override, not a failure."""
+        metadata = self._metadata([(1, "script_1", ActivityStatus.COMPLETED)])
+        handle = Mock()
+        handle.execute_update = AsyncMock(return_value=None)
+
+        assert await self.service._resolve_replayed_timestamps(metadata, handle) == {}
+
+    @pytest.mark.asyncio
+    async def test_the_workflow_ask_happens_before_the_transaction_opens(self) -> None:
+        """Ordering, asserted directly: no session is held while the update waits.
+
+        The update blocks until the workflow can answer. If it ran inside the
+        transaction, a pooled connection would be held for that whole wait on
+        every batch that replays a node.
+        """
+        order: list[str] = []
+        metadata = self._metadata([(1, "script_1", ActivityStatus.COMPLETED)])
+
+        handle = Mock()
+
+        async def _update(*_args: object, **_kwargs: object) -> dict[str, str]:
+            order.append("workflow-update")
+            return self.source_times
+
+        handle.execute_update = AsyncMock(side_effect=_update)
+
+        class _Session:
+            async def __aenter__(self) -> "_Session":
+                order.append("session-open")
+                return self
+
+            async def __aexit__(self, *_exc: object) -> None:
+                order.append("session-close")
+
+            async def exec(self, *_args: object, **_kwargs: object) -> Mock:
+                return Mock(all=Mock(return_value=[]), one_or_none=Mock(return_value=None))
+
+            async def commit(self) -> None:
+                return None
+
+            async def rollback(self) -> None:
+                return None
+
+        self.service.session_factory = Mock(side_effect=lambda: _Session())
+
+        sync = ActivityExecutionSynchronizer(self.service)
+        with (
+            patch.object(self.service, "_process_single_activity_sync", new=AsyncMock(return_value=None)),
+            patch.object(self.service, "_collect_terminal_activities", return_value=([], [], {})),
+            patch.object(self.service, "_publish_patches_and_emit_telemetry", new=AsyncMock()),
         ):
-            result = await self.service._process_single_activity_sync(
-                metadata,
-                Mock(),
-                self._build_activity_data(ActivityStatus.COMPLETED),
-                {"script_1": existing},
-                Mock(),
-            )
+            await sync.sync(metadata, handle)
 
-        assert result is not None
-        activity, _old_values, _is_new = result
-        assert activity.started_at == datetime(2026, 6, 1, 12, 0, 0, tzinfo=UTC)
-        assert activity.completed_at == datetime(2026, 6, 1, 12, 0, 1, tzinfo=UTC)
+        assert order[0] == "workflow-update", f"transaction opened first: {order}"
+        assert "session-open" in order

@@ -56,8 +56,7 @@ def _make_workflow(
     # a workflow built for a non-retry test behaves as one.
     wf.retry_context = {}
     wf._retry_restorable_cache = None
-    wf._restored_nodes = set()
-    wf._resumed_loops = set()
+    wf._retry_replay_candidates = set()
     return wf
 
 
