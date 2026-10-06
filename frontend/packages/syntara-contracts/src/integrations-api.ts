@@ -827,7 +827,14 @@ export interface components {
      * @description Classification of health check failures.
      * @enum {string}
      */
-    HealthCheckErrorType: 'auth_failure' | 'connection_error' | 'rate_limit' | 'ssl_error' | 'timeout'
+    HealthCheckErrorType:
+      | 'auth_failure'
+      | 'authorization_failure'
+      | 'token_expired'
+      | 'connection_error'
+      | 'rate_limit'
+      | 'ssl_error'
+      | 'timeout'
     /**
      * ValidateResult
      * @description Result of a lightweight connectivity ping (validate endpoint).
