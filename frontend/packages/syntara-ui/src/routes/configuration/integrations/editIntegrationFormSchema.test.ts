@@ -159,7 +159,7 @@ describe('buildEditSchema', () => {
     })
 
     it.each([
-      ['empty base_url', { base_url: '' }, 'TFE URL is required'],
+      ['empty base_url', { base_url: '' }, 'Terraform Enterprise URL is required'],
       ['HTTP URL (HTTPS only)', { base_url: 'http://tfe.example.com' }, 'Must be an HTTPS URL'],
       ['invalid URL', { base_url: 'not-a-url' }, 'Must be a valid URL'],
       ['empty organization', { organization: '' }, 'Organization is required'],

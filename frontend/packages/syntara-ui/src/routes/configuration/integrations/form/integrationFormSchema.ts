@@ -78,7 +78,7 @@ const tfeSchema = z.object({
   configuration: z
     .object({
       integration_type: z.literal(IntegrationTypeEnum.TERRAFORM_ENTERPRISE),
-      base_url: z.string().min(1, 'TFE URL is required').url('Must be a valid URL'),
+      base_url: z.string().min(1, 'Terraform Enterprise URL is required').url('Must be a valid URL'),
       organization: z.string().min(1, 'Organization is required'),
       ...securityFields,
     })
