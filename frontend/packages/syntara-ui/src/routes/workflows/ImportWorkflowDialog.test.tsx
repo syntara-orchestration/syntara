@@ -43,11 +43,15 @@ const defaultProjects = [
 let mockProjects = [...defaultProjects]
 let mockSelectedProjectId: string | null = 'p1'
 const mockOnProjectSelect = vi.fn()
+let mockHasValidationError = false
 
 vi.mock('../../hooks/useProjectSelector', () => ({
-  useProjectSelector: (options?: { onProjectSelect?: (project: unknown) => void }) => {
+  useProjectSelector: (options?: { onProjectSelect?: (project: unknown) => void; hasValidationError?: boolean }) => {
     if (options?.onProjectSelect) {
       mockOnProjectSelect.mockImplementation(options.onProjectSelect)
+    }
+    if (options?.hasValidationError !== undefined) {
+      mockHasValidationError = options.hasValidationError
     }
     return {
       selectedProject: mockProjects.find((p) => p.id === mockSelectedProjectId) ?? null,
@@ -55,7 +59,11 @@ vi.mock('../../hooks/useProjectSelector', () => ({
       stableProjectId: mockSelectedProjectId ?? undefined,
       isAllProjects: mockSelectedProjectId === null,
       projects: mockProjects,
-      ProjectSelector: <div data-testid="project-selector">Project Selector</div>,
+      ProjectSelector: (
+        <div data-testid="project-selector" data-has-validation-error={String(mockHasValidationError)}>
+          Project Selector
+        </div>
+      ),
     }
   },
 }))
@@ -71,6 +79,7 @@ describe('ImportWorkflowDialog', () => {
     vi.clearAllMocks()
     mockSelectedProjectId = 'p1'
     mockProjects = [...defaultProjects]
+    mockHasValidationError = false
   })
 
   it('renders the dialog with required fields', () => {
@@ -127,6 +136,26 @@ describe('ImportWorkflowDialog', () => {
     await user.click(screen.getByRole('button', { name: /Cancel/i }))
 
     expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('clears project validation state when the dialog is closed and reopened', async () => {
+    const user = userEvent.setup()
+    mockSelectedProjectId = null
+
+    render(<ImportWorkflowDialog isOpen onClose={vi.fn()} onSuccess={vi.fn()} />)
+
+    const file = new File(['{}'], 'test.json', { type: 'application/json' })
+    await user.upload(getFileUploadInput(), file)
+    await user.type(screen.getByLabelText(/Workflow name/i), 'Imported WF')
+    await user.click(screen.getByRole('button', { name: /^Import workflow$/i }))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('project-selector')).toHaveAttribute('data-has-validation-error', 'true')
+    })
+
+    await user.click(screen.getByRole('button', { name: /Cancel/i }))
+
+    expect(screen.getByTestId('project-selector')).toHaveAttribute('data-has-validation-error', 'false')
   })
 
   it('submits successfully with valid file and name', async () => {
