@@ -26,6 +26,7 @@ from syntara_api_client.types import UnexpectedResponseException
 if TYPE_CHECKING:
     from syntara_api_client.api import SyntaraApiRegistry
     from syntara_api_client.models.approval_request_read import ApprovalRequestRead
+    from syntara_api_client.models.form_prompt_list_read import FormPromptListRead
 
 POLL_INTERVAL = 1
 POLL_TIMEOUT = 20
@@ -145,6 +146,37 @@ def poll_for_pending_approval(
             return cast("ApprovalRequestRead", result.resources[0])
     pytest.fail(
         f"No PENDING approval for execution {execution_id} within {timeout}s. "
+        "Check that Temporal is running: make temporal-run"
+    )
+
+
+def poll_for_pending_form_prompt(
+    api: SyntaraApiRegistry,
+    execution_id: UUID,
+    timeout: int = 60,
+    interval: int = 1,
+) -> FormPromptListRead:
+    """Poll until a PENDING form prompt appears for the given execution.
+
+    The list endpoint filters via query params rather than named arguments, and
+    FormPromptListRead carries no form_definition - callers that need the
+    resolved form must GET the prompt by id.
+    """
+    elapsed = 0
+    while elapsed < timeout:
+        time.sleep(interval)
+        elapsed += interval
+        response = _retry_api_call(
+            lambda: api.form_prompts.list(
+                additional_params={"execution_id": str(execution_id), "status": "pending"},
+                limit=5,
+            )
+        )
+        result = response.assert_and_get()
+        if result.resources:
+            return cast("FormPromptListRead", result.resources[0])
+    pytest.fail(
+        f"No PENDING form prompt for execution {execution_id} within {timeout}s. "
         "Check that Temporal is running: make temporal-run"
     )
 
