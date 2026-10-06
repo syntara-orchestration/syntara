@@ -19,6 +19,9 @@ Both systems follow the fire-and-forget principle: observability code MUST NEVER
 
 **Endpoint:** `/metrics` (OpenMetrics/Prometheus format)
 
+Temporal workers also expose `/metrics` on the configured `metrics_worker_port`. The
+worker registry includes Python process metrics and the worker's `MetricsRecorder` metrics.
+
 **Components:**
 - `MetricsRecorder` - Central recording API
 - `MetricsStore` - In-memory retention (configurable, default 24h)
@@ -30,6 +33,7 @@ Both systems follow the fire-and-forget principle: observability code MUST NEVER
 - HTTP error rates (classified by type: timeout, rate_limit, validation, internal)
 - LLM call duration, token usage (input/output), Time-To-First-Token (TTFT)
 - Workflow execution duration, completion rate
+- Form prompt submission handoff and workflow resume dispatch latency
 - Activity execution success rate
 - Database query response time, connection pool utilization
 - Tool execution duration and success rate

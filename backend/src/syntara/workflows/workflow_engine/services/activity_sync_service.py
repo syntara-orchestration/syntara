@@ -32,6 +32,8 @@ from syntara.audit.context_managers import actor_context
 from syntara.audit.dispatcher import AuditEventDispatcher
 from syntara.core.constants import FieldLimits
 from syntara.core.exceptions import SafeValueError
+from syntara.metrics.dependencies import get_metrics_recorder
+from syntara.metrics.types import ComponentLabel, MetricType
 from syntara.telemetry.events.workflow_emitters import (
     _map_execution_status_to_telemetry,
     emit_activities,
@@ -145,6 +147,9 @@ class ExecutionMonitorMetadata:
     activity_index_map: dict[str, int]
     pending_activity_updates: dict[int, dict[str, Any]]
     pending_sync_event_ids: set[int] = field(default_factory=set)
+    scheduled_form_prompt_activity_ids: dict[int, str] = field(default_factory=dict)
+    pending_form_prompt_completed_at: list[datetime] = field(default_factory=list)
+    last_form_prompt_resume_metric_event_id: int = 0
     terminal_activity_ids: set[str] = field(default_factory=set)
     iteration_counters: dict[str, int] = field(default_factory=dict)
     next_activity_index: int = 0
@@ -893,6 +898,40 @@ class ActivitySyncService:
         metadata.pending_sync_event_ids.add(event.scheduled_event_id)
         await self._sync_activities_to_db(metadata, handle)
 
+    async def _process_form_prompt_history_event(
+        self,
+        event: HistoryEvent,
+        metadata: ExecutionMonitorMetadata,
+    ) -> bool:
+        """Rebuild form prompt correlations and handle workflow resume events.
+
+        Returns True when a workflow-task-start event is fully handled. Other
+        events continue through the normal activity synchronization path.
+        """
+        event_type = event.event_type
+        if event_type == EventType.EVENT_TYPE_ACTIVITY_TASK_SCHEDULED:
+            self._track_scheduled_form_prompt(event, metadata)
+        elif event_type == EventType.EVENT_TYPE_ACTIVITY_TASK_COMPLETED:
+            self._track_completed_form_prompt(event, metadata)
+        elif event_type in {
+            EventType.EVENT_TYPE_ACTIVITY_TASK_FAILED,
+            EventType.EVENT_TYPE_ACTIVITY_TASK_TIMED_OUT,
+            EventType.EVENT_TYPE_ACTIVITY_TASK_CANCELED,
+        }:
+            self._forget_scheduled_form_prompt(event, metadata)
+
+        if event_type != EventType.EVENT_TYPE_WORKFLOW_TASK_STARTED:
+            return False
+
+        if event.event_id <= metadata.last_processed_event_id:
+            # This is a replayed resume: clear reconstructed state without
+            # observing the already-processed latency a second time.
+            metadata.pending_form_prompt_completed_at.clear()
+            return True
+
+        self._record_form_prompt_resume_dispatch(event, metadata)
+        return True
+
     async def _process_history_event(
         self,
         event: HistoryEvent,
@@ -905,6 +944,9 @@ class ActivitySyncService:
 
         Returns False if the monitor loop should stop (shutdown requested).
         """
+        if await self._process_form_prompt_history_event(event, metadata):
+            return True
+
         if event.event_id <= metadata.last_processed_event_id:
             return True
 
@@ -1461,6 +1503,92 @@ class ActivitySyncService:
         except Exception:  # noqa: BLE001
             logger.debug("Could not parse failed_activities from workflow result", exc_info=True)
         return {}
+
+    @staticmethod
+    def _track_scheduled_form_prompt(event: HistoryEvent, metadata: ExecutionMonitorMetadata) -> None:
+        """Remember scheduled form prompt IDs while scanning Temporal history.
+
+        The map is rebuilt during history replay after monitor restarts. It is
+        intentionally limited to form prompt activities so it does not retain
+        unrelated workflow history.
+        """
+        attrs = event.activity_task_scheduled_event_attributes
+        activity_id = attrs.activity_id
+        canvas_id = strip_loop_iteration_suffixes(activity_id)
+        activity_definition = metadata.activity_definitions_map.get(canvas_id, {})
+        if activity_definition.get("type") == NodeType.FORM_PROMPT:
+            metadata.scheduled_form_prompt_activity_ids[event.event_id] = activity_id
+
+    @staticmethod
+    def _track_completed_form_prompt(
+        event: HistoryEvent,
+        metadata: ExecutionMonitorMetadata,
+    ) -> None:
+        """Remember when Temporal recorded each form prompt activity completion.
+
+        The completion event time is the start of the resume-dispatch interval.
+        It comes from the Temporal server clock, the same clock that stamps the
+        WorkflowTaskStarted event used as the end of the interval, so the
+        resulting measurement cannot be contaminated by cross-host clock offset.
+        """
+        attrs = event.activity_task_completed_event_attributes
+        if metadata.scheduled_form_prompt_activity_ids.pop(attrs.scheduled_event_id, None) is not None:
+            metadata.pending_form_prompt_completed_at.append(ensure_timezone_aware(event.event_time).astimezone(UTC))
+
+    @staticmethod
+    def _forget_scheduled_form_prompt(event: HistoryEvent, metadata: ExecutionMonitorMetadata) -> None:
+        """Forget a form prompt schedule when the Temporal activity does not complete successfully."""
+        scheduled_event_id: int | None = None
+        if event.event_type == EventType.EVENT_TYPE_ACTIVITY_TASK_FAILED:
+            scheduled_event_id = event.activity_task_failed_event_attributes.scheduled_event_id
+        elif event.event_type == EventType.EVENT_TYPE_ACTIVITY_TASK_TIMED_OUT:
+            scheduled_event_id = event.activity_task_timed_out_event_attributes.scheduled_event_id
+        elif event.event_type == EventType.EVENT_TYPE_ACTIVITY_TASK_CANCELED:
+            scheduled_event_id = event.activity_task_canceled_event_attributes.scheduled_event_id
+
+        if scheduled_event_id is not None:
+            metadata.scheduled_form_prompt_activity_ids.pop(scheduled_event_id, None)
+
+    @staticmethod
+    def _record_form_prompt_resume_dispatch(
+        event: HistoryEvent,
+        metadata: ExecutionMonitorMetadata,
+    ) -> None:
+        """Record form prompt resume dispatch latency using Temporal clock only.
+
+        Both endpoints of the interval are Temporal history event times
+        (ActivityTaskCompleted -> WorkflowTaskStarted), so the measurement is
+        immune to clock offset between the API pod, the worker and the Temporal
+        server. Recording is synchronous because ``MetricsRecorder.record`` is
+        non-blocking (in-memory store plus a Prometheus observe) and no database
+        lookup is involved.
+        """
+        completed_times = metadata.pending_form_prompt_completed_at
+        metadata.pending_form_prompt_completed_at = []
+        if not completed_times or event.event_id <= metadata.last_form_prompt_resume_metric_event_id:
+            return
+
+        resumed_at = ensure_timezone_aware(event.event_time).astimezone(UTC)
+        for completed_at in completed_times:
+            latency_ms = (resumed_at - completed_at).total_seconds() * 1000
+            if latency_ms < 0:
+                # Temporal assigns history event times per shard owner, so a
+                # shard failover between the two events could in principle
+                # invert them. This should effectively never fire.
+                logger.debug("Skipped negative form prompt resume dispatch latency")
+                continue
+
+            try:
+                get_metrics_recorder().record(
+                    MetricType.FORM_PROMPT_RESUME_DISPATCH,
+                    latency_ms,
+                    unit="ms",
+                    component=ComponentLabel.WORKFLOW_ENGINE,
+                )
+            except Exception:  # noqa: BLE001
+                logger.warning("Failed to record form prompt resume dispatch metric (non-fatal)")
+
+        metadata.last_form_prompt_resume_metric_event_id = event.event_id
 
     @staticmethod
     def _finalize_non_terminal_activities(
