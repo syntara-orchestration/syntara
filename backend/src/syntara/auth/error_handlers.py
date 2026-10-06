@@ -46,9 +46,6 @@ if TYPE_CHECKING:
 
 logger = structlog.stdlib.get_logger(__name__)
 
-# RFC 7235 Section 3.1 requires a WWW-Authenticate challenge on every 401 response.
-WWW_AUTHENTICATE_CHALLENGE = 'Bearer realm="automation-orchestrator"'
-
 
 def session_store_unavailable_handler(
     request: Request,
@@ -163,7 +160,7 @@ def authentication_required_handler(
         retryable=False,
         instance=str(request.url),
     )
-    response.headers["WWW-Authenticate"] = WWW_AUTHENTICATE_CHALLENGE
+    response.headers["WWW-Authenticate"] = 'Bearer realm="automation-orchestrator"'
     response.headers["X-Auth-Failure-Type"] = "missing_credentials"
     return response
 
@@ -197,7 +194,6 @@ def token_expired_handler(
         retryable=False,
         instance=str(request.url),
     )
-    response.headers["WWW-Authenticate"] = WWW_AUTHENTICATE_CHALLENGE
     response.headers["X-Auth-Failure-Type"] = "expired_token"
     return response
 
@@ -231,7 +227,6 @@ def invalid_token_handler(
         retryable=False,
         instance=str(request.url),
     )
-    response.headers["WWW-Authenticate"] = WWW_AUTHENTICATE_CHALLENGE
     response.headers["X-Auth-Failure-Type"] = "invalid_token"
     return response
 
@@ -265,7 +260,6 @@ def refresh_token_revoked_handler(
         retryable=False,
         instance=str(request.url),
     )
-    response.headers["WWW-Authenticate"] = WWW_AUTHENTICATE_CHALLENGE
     response.headers["X-Auth-Failure-Type"] = "refresh_revoked"
     return response
 
@@ -305,7 +299,6 @@ def token_globally_revoked_handler(
         instance=str(request.url),
     )
     clear_refresh_cookie(response)
-    response.headers["WWW-Authenticate"] = WWW_AUTHENTICATE_CHALLENGE
     response.headers["X-Auth-Failure-Type"] = "globally_revoked"
     return response
 
