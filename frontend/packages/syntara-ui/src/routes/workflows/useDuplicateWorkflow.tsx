@@ -1,11 +1,12 @@
 import { AlertActionLink } from '@patternfly/react-core'
-import { WEBHOOK_TRIGGER_TYPES, type WorkflowAPI } from '@syntara/contracts'
+import { WEBHOOK_TRIGGER_TYPES } from '@syntara/contracts'
+import type { WorkflowAPI } from '@syntara/contracts'
 import { useCallback, useState } from 'react'
 
 import { workflowFetchClient } from '../../client'
 import type { useAlerts } from '../../providers/alerts'
 import { getErrorMessage } from '../../utils/apiErrors'
-import { normalizeWebhookPath } from '../../utils/webhookPath'
+import { generateWebhookPath } from '../../utils/webhookPath'
 
 type Workflow = WorkflowAPI.components['schemas']['WorkflowRead']
 type WorkflowDefinitionSchema = WorkflowAPI.components['schemas']['WorkflowDefinition']
@@ -50,13 +51,30 @@ export function useDuplicateWorkflow({ showAlert, showError, setLocation, onSucc
           return
         }
 
-        const timestamp = Date.now().toString(36)
+        // Regenerate webhook paths: webhook-style triggers (webhook_trigger, eda_trigger) enforce a
+        // unique (trigger_type, webhook_path) constraint on the backend, so copying the original
+        // path verbatim into the duplicate would collide with the source workflow's trigger.
+        const triggers = definition.triggers as Array<Record<string, unknown>> | undefined
+        const transformedTriggers = triggers?.map((trigger) => {
+          if (WEBHOOK_TRIGGER_TYPES.has(trigger.type as string) && trigger.parameters) {
+            const parameters = trigger.parameters as Record<string, unknown>
+            return {
+              ...trigger,
+              parameters: {
+                ...parameters,
+                webhook_path: generateWebhookPath(),
+              },
+            }
+          }
+          return trigger
+        })
 
         // Transform approval nodes: convert approver_users/approver_groups from objects to string arrays
         // The API returns {id, username}/{id, name} objects but the workflow schema expects string arrays
         const nodes = definition.nodes as Array<Record<string, unknown>> | undefined
         const transformedDefinition = {
           ...definition,
+          triggers: transformedTriggers,
           nodes: nodes?.map((node) => {
             if (node.type === 'approval' && node.config) {
               const config = node.config as Record<string, unknown>
@@ -85,21 +103,6 @@ export function useDuplicateWorkflow({ showAlert, showError, setLocation, onSucc
             }
             return node
           }),
-          triggers: (definition.triggers as Array<Record<string, unknown>> | undefined)?.map((trigger) => {
-            if (!WEBHOOK_TRIGGER_TYPES.has(String(trigger.type))) return trigger
-
-            const parameters = trigger.parameters as Record<string, unknown> | undefined
-            const webhookPath = parameters?.webhook_path
-            if (typeof webhookPath !== 'string' || !webhookPath) return trigger
-
-            return {
-              ...trigger,
-              parameters: {
-                ...parameters,
-                webhook_path: `${normalizeWebhookPath(webhookPath)}-duplicate-${timestamp}`,
-              },
-            }
-          }),
         }
 
         if (!workflow.project_id) {
@@ -107,6 +110,7 @@ export function useDuplicateWorkflow({ showAlert, showError, setLocation, onSucc
           return
         }
 
+        const timestamp = Date.now().toString(36)
         const duplicateName = `${workflow.name ?? 'workflow'} - duplicate-${timestamp}`
 
         const { data: createdWorkflow, error: createError } = await workflowFetchClient.POST('/workflows', {
