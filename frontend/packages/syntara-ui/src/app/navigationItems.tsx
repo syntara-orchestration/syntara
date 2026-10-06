@@ -3,7 +3,7 @@ import {
   RhUiFolderIcon,
   RhUiKeyIcon,
   RhUiLanguageIcon,
-  RhUiLikeIcon,
+  RhUiCheckClipboardIcon,
   RhUiListIcon,
   RhUiNetworkIcon,
   RhUiPlayCircleIcon,
@@ -57,12 +57,15 @@ export const NAV_ITEMS: TNavigationItem[] = [
     icon: <RhUiPlayCircleIcon />,
   },
   {
-    label: 'Approvals',
-    path: AppRoute.Approvals.Root,
-    icon: <RhUiLikeIcon />,
+    label: 'Tasks',
+    path: `${AppRoute.Tasks.Root}/approvals`,
+    icon: <RhUiCheckClipboardIcon />,
+    matchPattern: '/tasks/:tab',
     requiredPermissions: [
       { action: 'read', resourceType: 'approval' },
       { action: 'decide', resourceType: 'approval' },
+      { action: 'read', resourceType: 'form_prompt' },
+      { action: 'submit', resourceType: 'form_prompt' },
     ],
   },
   {

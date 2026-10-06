@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any
 import structlog
 from sqlalchemy import or_
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import column_property, selectinload, undefer
 from sqlmodel import select, update
 
 if TYPE_CHECKING:
@@ -59,8 +59,27 @@ from syntara.metrics.dependencies import get_metrics_recorder
 from syntara.metrics.types import ComponentLabel, MetricType
 from syntara.workflows.exceptions import ExecutionNotFoundError
 from syntara.workflows.models.execution import Execution
+from syntara.workflows.models.workflow import Workflow
 
 logger = structlog.stdlib.get_logger(__name__)
+
+
+# Attach column_property for workflow_name sorting/filtering
+# Must be done after FormPrompt class exists; cannot be in class body due to
+# Pydantic field detection + execution_id not yet being an InstrumentedAttribute.
+#
+# Deferred so the correlated subquery is not evaluated on every FormPrompt load
+# (get, submit, batch status update). The list path undefers it in
+# FormPromptEnrichQuery.enrich(). ORDER BY / WHERE on the class attribute work
+# regardless of deferral — it only controls inclusion in the SELECT list.
+FormPrompt.workflow_name = column_property(
+    select(Workflow.name)
+    .select_from(Workflow)
+    .join(Execution, Execution.workflow_id == Workflow.id)  # type: ignore[arg-type]
+    .where(Execution.id == FormPrompt.execution_id)
+    .scalar_subquery(),
+    deferred=True,
+)
 
 
 class FormPromptEnrichQuery(EnrichQueryMixin):
@@ -70,9 +89,15 @@ class FormPromptEnrichQuery(EnrichQueryMixin):
         self,
         query: Select[tuple[FormPrompt]] | SelectOfScalar[tuple[FormPrompt]],
     ) -> Select[tuple[FormPrompt]] | SelectOfScalar[tuple[FormPrompt]]:
-        """Add selectinload for the responder relationship."""
+        """Add selectinload for the responder relationship.
+
+        Also undefers ``workflow_name``: the list response includes it, and
+        cursor generation reads it off each row. Loading it here keeps the
+        value on the instance, so no lazy load is attempted under AsyncSession.
+        """
         return query.options(
             selectinload(FormPrompt.responder),  # type: ignore[arg-type]
+            undefer(FormPrompt.workflow_name),  # type: ignore[attr-defined]
         )
 
 
@@ -345,10 +370,7 @@ class FormPromptService(UserReferenceResolverMixin, BaseService):
             execution_result = await self.session.exec(
                 select(Execution)
                 .where(Execution.id.in_(execution_ids))  # type: ignore[attr-defined]
-                .options(
-                    selectinload(Execution.workflow),  # type: ignore[arg-type]
-                    selectinload(Execution.workflow_version),  # type: ignore[arg-type]
-                )
+                .options(selectinload(Execution.workflow_version))  # type: ignore[arg-type]
             )
             executions_by_id.clear()
             executions_by_id.update({execution.id: execution for execution in execution_result.all()})
@@ -357,11 +379,8 @@ class FormPromptService(UserReferenceResolverMixin, BaseService):
             execution = executions_by_id.get(prompt.execution_id)
             workflow_id: UUID | None = None
             workflow_version: int | None = None
-            workflow_name: str | None = None
             if execution is not None:
                 workflow_id = execution.workflow_id
-                workflow = execution.workflow
-                workflow_name = workflow.name if workflow is not None else None
                 version_record = execution.workflow_version
                 if version_record is not None:
                     workflow_version = version_record.version
@@ -378,7 +397,7 @@ class FormPromptService(UserReferenceResolverMixin, BaseService):
                 responded_at=prompt.responded_at,
                 workflow_id=workflow_id,
                 workflow_version=workflow_version,
-                workflow_name=workflow_name or "Unknown",
+                workflow_name=prompt.workflow_name or "Unknown",  # type: ignore[attr-defined]
             )
             if prompt.responded_by is not None:
                 list_read.responded_by = UserReference(

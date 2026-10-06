@@ -4,7 +4,7 @@ import type { AppBreadcrumbItem } from './breadcrumbs/appBreadcrumbItem'
 const LABEL_ACCESS_MANAGEMENT = 'Access management'
 const LABEL_IDENTITY_PROVIDERS = 'Identity providers'
 const LABEL_CONFIGURATION = 'Configuration'
-const LABEL_APPROVALS = 'Approvals'
+const LABEL_TASKS = 'Tasks'
 
 function crumbAccessManagement(): AppBreadcrumbItem {
   return { label: LABEL_ACCESS_MANAGEMENT, href: AppRoute.AccessManagement.Root }
@@ -42,8 +42,12 @@ function crumbSettings(): AppBreadcrumbItem {
   return { label: 'Settings', href: AppRoute.SystemAdministration.Settings }
 }
 
+function crumbTasks(): AppBreadcrumbItem {
+  return { label: LABEL_TASKS, href: `${AppRoute.Tasks.Root}/approvals` }
+}
+
 function crumbApprovals(): AppBreadcrumbItem {
-  return { label: LABEL_APPROVALS, href: AppRoute.Approvals.Root }
+  return crumbTasks()
 }
 
 function projectDetailTabLabel(tab: string): string {
@@ -155,6 +159,11 @@ export function breadcrumbsCredentialEarlyShell(currentLabel: string): AppBreadc
 /** Generic two-item trail: parent link + current page label (e.g. loading / error titles). */
 export function breadcrumbsApprovalsPage(currentLabel: string): AppBreadcrumbItem[] {
   return [crumbApprovals(), { label: currentLabel }]
+}
+
+export function breadcrumbsTasksTab(tab: 'approvals' | 'form-responses'): AppBreadcrumbItem[] {
+  const tabLabel = tab === 'form-responses' ? 'Form responses' : 'Approvals'
+  return [crumbTasks(), { label: tabLabel }]
 }
 
 export function breadcrumbsUserFormLoading(currentLabel: string): AppBreadcrumbItem[] {
