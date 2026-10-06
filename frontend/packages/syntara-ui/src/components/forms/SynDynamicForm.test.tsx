@@ -161,9 +161,9 @@ describe('SynDynamicForm', () => {
       />
     )
 
-    const timezoneInput = screen.getByRole('textbox', { name: 'Schedule time zone' })
-    await user.clear(timezoneInput)
-    await user.type(timezoneInput, 'Europe/Paris')
+    await user.click(screen.getByRole('button', { name: 'Schedule time zone' }))
+    await user.type(screen.getByRole('textbox', { name: 'Filter timezones' }), 'Europe/Paris')
+    await user.click(screen.getByRole('option', { name: 'Europe/Paris' }))
     await user.click(screen.getByRole('button', { name: 'Submit' }))
 
     await waitFor(() => {
@@ -191,7 +191,8 @@ describe('SynDynamicForm', () => {
       <SynDynamicForm definition={definition} initialValues={{ zone: { timezone: 'UTC' } }} onSubmit={onSubmit} />
     )
 
-    await user.clear(screen.getByRole('textbox', { name: 'Zone time zone' }))
+    await user.click(screen.getByRole('button', { name: 'Zone time zone' }))
+    await user.click(screen.getByRole('option', { name: 'No time zone' }))
     await user.click(screen.getByRole('button', { name: 'Submit' }))
 
     await waitFor(() => {

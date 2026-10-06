@@ -1,6 +1,7 @@
-import type { Activity } from '@syntara/contracts'
+import type { Activity, FormDefinition } from '@syntara/contracts'
 import type { ReactNode } from 'react'
 
+import { prepareFormDefinitionForCommit, safeParseFormDefinition } from '../../../forms'
 import { useAlerts } from '../../../providers/alerts'
 import { useWorkflowStore } from '../../../stores/useWorkflowStore'
 import type { FormPromptFormSubmitData } from '../node-forms/FormPromptNodeForm'
@@ -9,6 +10,19 @@ import { formPromptStoredParametersSchema } from '../node-forms/formPromptNodeFo
 import { persistNodeSettings } from '../node-forms/shared/nodeSettingsSchema'
 import { buildFormPromptActivityParameters } from '../utils/formPromptActivityParameters'
 import { formPromptFallbackDecisionFromBehavior } from '../utils/formPromptFallbackBehavior'
+
+function readStoredFormDefinition(rawParameters: unknown): FormDefinition | undefined {
+  if (typeof rawParameters !== 'object' || rawParameters === null) {
+    return undefined
+  }
+  const raw = (rawParameters as { form_definition?: unknown }).form_definition
+  if (typeof raw !== 'object' || raw === null || !('fields' in raw)) {
+    return undefined
+  }
+  const prepared = prepareFormDefinitionForCommit(raw as FormDefinition)
+  const parsed = safeParseFormDefinition(prepared)
+  return parsed.success ? parsed.data : undefined
+}
 
 type FormPromptNodeDetailsProps = {
   taskData: Activity
@@ -28,13 +42,19 @@ export function FormPromptNodeDetails({
   const { showError } = useAlerts()
   const updateActivity = useWorkflowStore((state) => state.updateActivity)
 
-  const parsedParameters = formPromptStoredParametersSchema.safeParse(taskData.parameters ?? {})
+  const rawParameters = taskData.parameters ?? {}
+  const parsedParameters = formPromptStoredParametersSchema.safeParse(rawParameters)
   const parameters = parsedParameters.success ? parsedParameters.data : {}
+  const storedFormDefinition = parameters.form_definition ?? readStoredFormDefinition(rawParameters)
 
   const initialData: Partial<FormPromptFormSubmitData> = {
     name: taskData.name,
-    message: parameters.message,
-    form_definition: parameters.form_definition,
+    message:
+      parameters.message ??
+      (typeof rawParameters === 'object' && rawParameters !== null
+        ? (rawParameters as { message?: string }).message
+        : undefined),
+    form_definition: storedFormDefinition,
     responder_users: parameters.responder_users,
     responder_groups: parameters.responder_groups,
     response_window: parameters.response_window,

@@ -3,6 +3,7 @@ import type React from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { FlowNodeType } from '../../../constants'
+import type { ActivityState } from '../../workflows/execution/types'
 
 import { isFormPromptNode, isWaitingFormPromptNode, useExecutionFormPrompts } from './useExecutionFormPrompts'
 
@@ -12,7 +13,11 @@ const mockClear = vi.fn()
 const showInfo = vi.fn()
 const showError = vi.fn()
 
-const activityStates = new Map<string, { status: string; startedAt?: string }>()
+const activityStates = new Map<string, ActivityState>()
+
+function mockActivityState(overrides: Partial<ActivityState> & Pick<ActivityState, 'status'>): ActivityState {
+  return { activityId: 'form_a', ...overrides }
+}
 
 vi.mock('./useFetchFormPromptsForExecution', () => ({
   useFetchFormPromptsForExecution: () => ({
@@ -206,9 +211,30 @@ describe('useExecutionFormPrompts', () => {
     )
   })
 
+  it('describes form step failure when activity failed and list is empty', async () => {
+    activityStates.set('form_a', mockActivityState({ status: 'failed', errorDetails: 'invalid form_definition' }))
+    mockFetchFormPromptsForExecution.mockResolvedValue([])
+
+    const { result } = renderHook(() => useExecutionFormPrompts('exec-1', workflowDefinition))
+
+    act(() => {
+      result.current.handleActivityRowClick('form_a')
+    })
+
+    await act(async () => {
+      await Promise.resolve()
+    })
+
+    const failureCall = showInfo.mock.calls.find((call) => {
+      const arg = call[0] as { description?: string }
+      return arg.description?.includes('invalid form_definition')
+    })
+    expect(failureCall).toBeDefined()
+  })
+
   it('describes still-creating prompt when canvas is waiting but list is empty', async () => {
     vi.useFakeTimers()
-    activityStates.set('form_a', { status: 'waiting' })
+    activityStates.set('form_a', mockActivityState({ status: 'waiting' }))
     mockFetchFormPromptsForExecution.mockResolvedValue([])
 
     const { result } = renderHook(() => useExecutionFormPrompts('exec-1', workflowDefinition))
@@ -329,7 +355,7 @@ describe('useExecutionFormPrompts', () => {
 
   it('retries fetch while canvas node remains waiting', async () => {
     vi.useFakeTimers()
-    activityStates.set('form_a', { status: 'waiting' })
+    activityStates.set('form_a', mockActivityState({ status: 'waiting' }))
     mockFetchFormPromptsForExecution.mockResolvedValueOnce([]).mockResolvedValueOnce([
       {
         id: 'fp-1',

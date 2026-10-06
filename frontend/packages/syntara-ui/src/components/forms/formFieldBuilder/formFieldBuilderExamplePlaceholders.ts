@@ -39,8 +39,8 @@ const EXAMPLES: Record<FormFieldType, FormFieldBuilderExamplePlaceholders> = {
   },
   [FormFieldTypeEnum.DATE]: {
     placeholder: 'e.g. Select a date',
-    helpText: 'e.g. Use ISO format YYYY-MM-DD',
-    defaultValue: '2026-08-07',
+    helpText: 'e.g. Enter the date in MM/DD/YYYY format when shown',
+    defaultValue: '08/07/2026',
   },
   [FormFieldTypeEnum.DROPDOWN]: {
     placeholder: 'e.g. Select an option',

@@ -5,6 +5,8 @@ import { useCallback } from 'react'
 import { FlowNodeType } from '../../../constants'
 import { detachPromise } from '../../../utils/detachPromise'
 import type { WorkflowDefShape } from '../../builder/useActivityNameMap'
+import { useExecutionStore } from '../../workflows/stores/useExecutionStore'
+import { isFormPromptActivityWaiting } from '../formPrompt/formPromptActivityState'
 import { resolveCanvasNodeType } from '../formPrompt/resolveCanvasNodeType'
 
 import type { useExecutionApprovalPanel } from './useExecutionApprovalPanel'
@@ -57,9 +59,14 @@ export function useExecutionDetailInteractions({
       selectNode(nodeId, nodeName)
       const lookupKey = activityKey ?? nodeId
       if (resolveCanvasNodeType(lookupKey, workflowDefinition) === FlowNodeType.FORM_PROMPT) {
-        handleActivityRowClick(lookupKey)
-        formPromptPanel.open()
-        approval.close()
+        const activityStates = useExecutionStore.getState().activityStates
+        if (isFormPromptActivityWaiting(lookupKey, activityStates)) {
+          handleActivityRowClick(lookupKey)
+          formPromptPanel.open()
+          approval.close()
+        } else {
+          formPromptPanel.close()
+        }
         return
       }
       formPromptPanel.close()
