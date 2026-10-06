@@ -816,7 +816,7 @@ describe('EditIntegrationForm', () => {
     it('renders TFE URL and organization fields', () => {
       render(<EditIntegrationForm />, { wrapper })
 
-      expect(screen.getByRole('textbox', { name: /tfe url/i })).toHaveValue('https://app.terraform.io')
+      expect(screen.getByRole('textbox', { name: /terraform enterprise url/i })).toHaveValue('https://app.terraform.io')
       expect(screen.getByRole('textbox', { name: /organization/i })).toHaveValue('acme-org')
     })
 
@@ -867,11 +867,11 @@ describe('EditIntegrationForm', () => {
       const user = userEvent.setup()
       render(<EditIntegrationForm />, { wrapper })
 
-      await user.clear(screen.getByRole('textbox', { name: /tfe url/i }))
+      await user.clear(screen.getByRole('textbox', { name: /terraform enterprise url/i }))
       await user.click(screen.getByRole('button', { name: 'Save integration' }))
 
       await waitFor(() => {
-        expect(screen.getByText(/tfe url is required/i)).toBeInTheDocument()
+        expect(screen.getByText(/terraform enterprise url is required/i)).toBeInTheDocument()
       })
     })
   })
