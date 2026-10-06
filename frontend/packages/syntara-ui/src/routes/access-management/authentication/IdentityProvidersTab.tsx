@@ -351,11 +351,19 @@ export function IdentityProvidersTab({ onHeaderToolbarStateChange }: Readonly<Id
           <SynListPanelTable caption="Identity providers table" footer={getFooterProps(query.data)}>
             <Thead>
               <Tr>
-                <Th sort={getSortParams(0)}>Name</Th>
-                <Th sort={getSortParams(1)}>Issuer URL</Th>
-                <Th sort={getSortParams(2)}>Client ID</Th>
-                <Th sort={getSortParams(3)}>State</Th>
-                <Th screenReaderText="Actions" />
+                <Th width={25} sort={getSortParams(0)}>
+                  Name
+                </Th>
+                <Th width={25} sort={getSortParams(1)}>
+                  Issuer URL
+                </Th>
+                <Th width={20} sort={getSortParams(2)}>
+                  Client ID
+                </Th>
+                <Th width={15} sort={getSortParams(3)}>
+                  State
+                </Th>
+                <Th width={10} screenReaderText="Actions" />
               </Tr>
             </Thead>
             <Tbody>

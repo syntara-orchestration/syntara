@@ -99,11 +99,15 @@ function RoleAssignmentsTable({
     <>
       <Thead>
         <Tr>
-          <Th sort={getSortParams(0)}>Principal name</Th>
-          <Th>Principal type</Th>
-          <Th sort={getSortParams(1)}>Role name</Th>
-          <Th>Policies</Th>
-          <Th screenReaderText="Actions" />
+          <Th width={25} sort={getSortParams(0)}>
+            Principal name
+          </Th>
+          <Th width={25}>Principal type</Th>
+          <Th width={25} sort={getSortParams(1)}>
+            Role name
+          </Th>
+          <Th width={25}>Policies</Th>
+          <Th width={10} screenReaderText="Actions" />
         </Tr>
       </Thead>
       <Tbody>

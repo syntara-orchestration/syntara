@@ -258,13 +258,23 @@ function CredentialsTable({
     <>
       <Thead>
         <Tr>
-          <Th sort={getSortParams(0)}>Client ID</Th>
-          <Th sort={getSortParams(1)}>Created</Th>
-          <Th sort={getSortParams(2)}>Last used</Th>
-          <Th sort={getSortParams(3)}>Expires</Th>
-          <Th sort={getSortParams(4)}>State</Th>
-          <Th screenReaderText="Rotation status" />
-          <Th screenReaderText="Actions" />
+          <Th width={25} sort={getSortParams(0)}>
+            Client ID
+          </Th>
+          <Th width={15} sort={getSortParams(1)}>
+            Created
+          </Th>
+          <Th width={15} sort={getSortParams(2)}>
+            Last used
+          </Th>
+          <Th width={15} sort={getSortParams(3)}>
+            Expires
+          </Th>
+          <Th width={10} sort={getSortParams(4)}>
+            State
+          </Th>
+          <Th width={10} screenReaderText="Rotation status" />
+          <Th width={10} screenReaderText="Actions" />
         </Tr>
       </Thead>
       <Tbody>
