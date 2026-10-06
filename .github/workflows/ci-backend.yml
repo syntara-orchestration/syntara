@@ -3,9 +3,9 @@ name: CI Backend
 
 on:
   pull_request:
-    branches: [devel, early-access, feature/*]
+    branches: [devel, early-access, 'feature/**']
   merge_group:
-    branches: [devel, early-access]
+    branches: [devel, early-access, 'feature/**']
   push:
     branches: [devel, early-access]
 
@@ -571,7 +571,10 @@ jobs:
   test-compose-e2e:
     name: (Backend) Test Podman Compose E2E
     needs: changes
-    if: needs.changes.outputs.backend == 'true' && github.event_name == 'merge_group'
+    if: >-
+      needs.changes.outputs.backend == 'true' &&
+      (github.event_name == 'merge_group' ||
+      (github.event_name == 'pull_request' && startsWith(github.base_ref, 'feature/')))
     runs-on: ubuntu-latest
     timeout-minutes: 120
     env:
