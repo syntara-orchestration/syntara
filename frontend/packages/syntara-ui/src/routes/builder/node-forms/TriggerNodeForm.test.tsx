@@ -481,6 +481,22 @@ describe('TriggerNodeForm Component', () => {
       expect(screen.getByText('EDA activation')).toBeInTheDocument()
     })
 
+    it('does not tell users to configure an EDA rulebook to POST to the endpoint URL', async () => {
+      // AAP-91724: a rulebook cannot POST directly to this endpoint today — only an
+      // action/job template invoking the trigger can. The help text must not claim
+      // otherwise and should instead point users at the job template.
+      const user = userEvent.setup()
+      renderWithHeader(
+        <TriggerNodeForm onSubmit={mockOnSubmit} initialData={{ triggerType: TriggerTypeEnum.EDA_TRIGGER }} />
+      )
+
+      await user.click(screen.getByRole('button', { name: 'Endpoint URL help' }))
+
+      const helpText = screen.getByRole('dialog', { name: 'Endpoint URL help' }).textContent ?? ''
+      expect(helpText.toLowerCase()).not.toContain('rulebook')
+      expect(helpText.toLowerCase()).toContain('job template')
+    })
+
     it('auto-generates a valid webhook path for new EDA triggers', () => {
       renderWithHeader(
         <TriggerNodeForm onSubmit={mockOnSubmit} initialData={{ triggerType: TriggerTypeEnum.EDA_TRIGGER }} />
