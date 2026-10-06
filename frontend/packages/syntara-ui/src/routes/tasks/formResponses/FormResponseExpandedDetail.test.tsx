@@ -54,6 +54,34 @@ describe('FormResponseExpandedDetail', () => {
     )
   })
 
+  it('shows a loading spinner while detail is fetching', () => {
+    mockUseQuery.mockReturnValue({ isLoading: true, isError: false, data: undefined })
+    renderDetail(true)
+    expect(screen.getByRole('progressbar', { name: 'Loading form response details' })).toBeInTheDocument()
+  })
+
+  it('renders em dash placeholders for empty message and response data', () => {
+    mockUseQuery.mockReturnValue({
+      isLoading: false,
+      isError: false,
+      data: { message: '   ', response_data: {} },
+    })
+
+    renderDetail(true)
+    expect(screen.getAllByText('—')).toHaveLength(2)
+  })
+
+  it('formats non-empty response_data as JSON', () => {
+    mockUseQuery.mockReturnValue({
+      isLoading: false,
+      isError: false,
+      data: { message: 'Done', response_data: { field: 'value' } },
+    })
+
+    renderDetail(true)
+    expect(screen.getByText(/"field": "value"/)).toBeInTheDocument()
+  })
+
   it('renders message and submitted data when expanded', () => {
     mockUseQuery.mockReturnValue({
       isLoading: false,
@@ -85,6 +113,17 @@ describe('FormResponseExpandedDetail', () => {
     expect(screen.getByText('Error loading details')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: /retry/i }))
     expect(refetch).toHaveBeenCalled()
+  })
+
+  it('uses the row timeout when detail omits timeout_at', () => {
+    mockUseQuery.mockReturnValue({
+      isLoading: false,
+      isError: false,
+      data: { message: 'Hi', response_data: null },
+    })
+
+    renderDetail(true)
+    expect(screen.getByText(/Deadline/i)).toBeInTheDocument()
   })
 
   it('has no accessibility violations when detail is loaded', async () => {

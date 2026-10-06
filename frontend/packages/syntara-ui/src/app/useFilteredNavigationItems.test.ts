@@ -52,6 +52,9 @@ function setPermissions(overrides: Record<string, boolean>) {
       'role-assignment:assign': true,
       'service_account:read': true,
       'approval:read': true,
+      'approval:decide': true,
+      'form_prompt:read': true,
+      'form_prompt:submit': true,
       ...overrides,
     },
     isLoading: false,
@@ -108,7 +111,12 @@ describe('useFilteredNavigationItems', () => {
   })
 
   it('excludes Tasks when approval and form_prompt read are denied', () => {
-    setPermissions({ 'approval:read': false })
+    setPermissions({
+      'approval:read': false,
+      'approval:decide': false,
+      'form_prompt:read': false,
+      'form_prompt:submit': false,
+    })
     const { result } = renderHook(() => useFilteredNavigationItems())
 
     expect(findItem(result.current, 'Tasks')).toBeUndefined()
@@ -267,7 +275,12 @@ describe('useFilteredNavigationItems', () => {
     })
 
     it('still hides Tasks when user has no task-related permissions at any scope', () => {
-      setPermissions({ 'approval:read': false, 'approval:decide': false })
+      setPermissions({
+        'approval:read': false,
+        'approval:decide': false,
+        'form_prompt:read': false,
+        'form_prompt:submit': false,
+      })
       const { result } = renderHook(() => useFilteredNavigationItems())
 
       expect(findItem(result.current, 'Tasks')).toBeUndefined()

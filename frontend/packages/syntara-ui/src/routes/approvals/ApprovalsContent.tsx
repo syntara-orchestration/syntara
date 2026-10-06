@@ -6,8 +6,8 @@ import type { PaginationFooterProps } from '../../components/table/PaginationFoo
 
 import type { ApprovalWithDetails } from './Approvals'
 import { FlatApprovalsTableBody, GroupedApprovalsTableBody } from './ApprovalsTableBody'
-import { APPROVALS_TABLE_DATA_COLUMN_COUNT } from './approvalTableColumns'
 import { ApprovalsTableHead } from './ApprovalsTableHead'
+import { APPROVALS_TABLE_DATA_COLUMN_COUNT } from './approvalTableColumns'
 import type { useApprovalsData } from './useApprovalsData'
 
 export type ApprovalsContentProps = {

@@ -9,7 +9,7 @@ import { SynPageTitle } from '../../components/SynPageTitle'
 import { useProjectSelector } from '../../hooks/useProjectSelector'
 import { useUrlTab } from '../../hooks/useUrlTab'
 import { useDocLink } from '../../utils/docs/useDocLink'
-import ApprovalsListPanel from '../approvals/ApprovalsListPanel'
+import { ApprovalsListPanel } from '../approvals/ApprovalsListPanel'
 
 import { FormResponsesListPanel } from './formResponses/FormResponsesListPanel'
 import { TASKS_TAB_APPROVALS, TASKS_TAB_FORM_RESPONSES, useTasksTabAccess } from './useTasksTabAccess'

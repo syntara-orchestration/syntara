@@ -7,7 +7,7 @@ import { SynEmptyStateAccessDenied } from '../../components/states/SynEmptyState
 import { SynPageTitle } from '../../components/SynPageTitle'
 import { useDocLink } from '../../utils/docs/useDocLink'
 
-import ApprovalsListPanel from './ApprovalsListPanel'
+import { ApprovalsListPanel } from './ApprovalsListPanel'
 import { useApprovalPermissions } from './useApprovalPermissions'
 
 export type ApprovalWithDetails = Approval & {

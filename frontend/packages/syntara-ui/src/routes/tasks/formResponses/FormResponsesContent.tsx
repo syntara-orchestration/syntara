@@ -4,9 +4,9 @@ import { SynListPanelTable } from '../../../components/panels/list/SynListPanel'
 import { ExpandableListTableColGroup } from '../../../components/table/ExpandableListTableColGroup'
 import type { PaginationFooterProps } from '../../../components/table/PaginationFooter'
 
-import { FORM_RESPONSES_TABLE_DATA_COLUMN_COUNT } from './formResponseTableColumns'
 import { FlatFormResponsesTableBody, GroupedFormResponsesTableBody } from './FormResponsesTableBody'
 import { FormResponsesTableHead } from './FormResponsesTableHead'
+import { FORM_RESPONSES_TABLE_DATA_COLUMN_COUNT } from './formResponseTableColumns'
 import type { useFormResponsesData } from './useFormResponsesData'
 
 export type FormResponsesContentProps = {

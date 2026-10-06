@@ -14,6 +14,16 @@ describe('FormResponseStatusBadges', () => {
     expect(screen.getByText('Timed out')).toBeInTheDocument()
   })
 
+  it('renders submitted status', () => {
+    render(<FormResponseStatusBadges status="submitted" />)
+    expect(screen.getByText('Submitted')).toBeInTheDocument()
+  })
+
+  it('renders cancelled status', () => {
+    render(<FormResponseStatusBadges status="cancelled" />)
+    expect(screen.getByText('Cancelled')).toBeInTheDocument()
+  })
+
   it('renders nothing when status is missing', () => {
     const { container } = render(<FormResponseStatusBadges status={null} />)
     expect(container).toBeEmptyDOMElement()

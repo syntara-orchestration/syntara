@@ -10,8 +10,10 @@ import { useCursorPagination, useCursorReset } from '../../hooks/useCursorPagina
 import { useProjectSelector } from '../../hooks/useProjectSelector'
 import { useProjectsForGrouping } from '../../hooks/useProjectsForGrouping'
 import { detachPromise } from '../../utils/detachPromise'
+import type { ProjectRead } from '../access/types'
 
 import { getApprovalNameFilterDefinition, getApprovalStatusFilterDefinition } from './approvalFilters'
+import type { ApprovalWithDetails } from './Approvals'
 import { ApprovalsBulkActions } from './ApprovalsBulkActions'
 import { ApprovalsContent } from './ApprovalsContent'
 import { approvalsReducer } from './approvalsReducer'
@@ -24,6 +26,26 @@ import { useApprovalSelection } from './useApprovalSelection'
 import { useBulkApprovalActions } from './useBulkApprovalActions'
 import { useSelectableApprovalIds } from './useSelectableApprovalIds'
 
+function toggleIdInSet(prev: Set<string>, id: string) {
+  const next = new Set(prev)
+  if (next.has(id)) next.delete(id)
+  else next.add(id)
+  return next
+}
+
+function buildApprovalPermissionsMap(
+  sortedApprovals: ApprovalWithDetails[],
+  canDecideAllProjects: boolean,
+  canDecideProjectNames: Set<string>,
+  projects: ProjectRead[]
+) {
+  const map = new Map<string, boolean>()
+  for (const approval of sortedApprovals) {
+    map.set(approval.id, canDecideOnApproval(approval, canDecideAllProjects, canDecideProjectNames, projects))
+  }
+  return map
+}
+
 type ApprovalsListPanelProps = {
   embedded?: boolean
   approvalsDocLink?: string | null
@@ -31,7 +53,7 @@ type ApprovalsListPanelProps = {
   tabLabel?: string
 }
 
-export default function ApprovalsListPanel({
+export function ApprovalsListPanel({
   embedded = false,
   approvalsDocLink,
   tabKey,
@@ -81,13 +103,7 @@ export default function ApprovalsListPanel({
 
   const [collapsedProjects, setCollapsedProjects] = useState<Set<string>>(new Set())
 
-  const toggleProjectCollapsed = (id: string) =>
-    setCollapsedProjects((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
+  const toggleProjectCollapsed = (id: string) => setCollapsedProjects((prev) => toggleIdInSet(prev, id))
 
   useCursorReset({
     itemCount: enrichedApprovals.length,
@@ -103,13 +119,10 @@ export default function ApprovalsListPanel({
     isLoading: isLoadingDecideProjects,
   } = useApprovalDecideProjects()
 
-  const approvalPermissions = useMemo(() => {
-    const map = new Map<string, boolean>()
-    for (const approval of sortedApprovals) {
-      map.set(approval.id, canDecideOnApproval(approval, canDecideAllProjects, canDecideProjectNames, projects))
-    }
-    return map
-  }, [sortedApprovals, canDecideAllProjects, canDecideProjectNames, projects])
+  const approvalPermissions = useMemo(
+    () => buildApprovalPermissionsMap(sortedApprovals, canDecideAllProjects, canDecideProjectNames, projects),
+    [sortedApprovals, canDecideAllProjects, canDecideProjectNames, projects]
+  )
 
   const expandableApprovalIds = useMemo(() => sortedApprovals.map((approval) => approval.id), [sortedApprovals])
 

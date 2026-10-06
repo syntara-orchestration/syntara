@@ -21,8 +21,10 @@ vi.mock('../../utils/docs/useDocLink', () => ({
   useDocLink: () => null,
 }))
 
+const mockUseUrlTab = vi.hoisted(() => vi.fn(() => ['approvals']))
+
 vi.mock('../../hooks/useUrlTab', () => ({
-  useUrlTab: () => ['approvals'],
+  useUrlTab: mockUseUrlTab,
 }))
 
 vi.mock('./Tasks', () => ({
@@ -32,7 +34,7 @@ vi.mock('./Tasks', () => ({
 const mockUseTasksTabAccess = vi.hoisted(() => vi.fn())
 
 vi.mock('./useTasksTabAccess', () => ({
-  useTasksTabAccess: () => mockUseTasksTabAccess(),
+  useTasksTabAccess: mockUseTasksTabAccess,
   TASKS_TAB_APPROVALS: 'approvals',
   TASKS_TAB_FORM_RESPONSES: 'form-responses',
 }))
@@ -49,6 +51,32 @@ function renderGate() {
 }
 
 describe('TasksAccessGate', () => {
+  it('uses form responses doc link while that tab is active during loading', () => {
+    mockUseUrlTab.mockReturnValue(['form-responses'])
+    mockUseTasksTabAccess.mockReturnValue({
+      visibleTabs: ['form-responses'],
+      isChecking: true,
+      isError: false,
+      canViewTasks: true,
+    })
+
+    renderGate()
+    expect(screen.getByRole('progressbar', { name: 'Loading task permissions' })).toBeInTheDocument()
+  })
+
+  it('shows a loading spinner while permissions are checked', () => {
+    mockUseUrlTab.mockReturnValue(['approvals'])
+    mockUseTasksTabAccess.mockReturnValue({
+      visibleTabs: [],
+      isChecking: true,
+      isError: false,
+      canViewTasks: false,
+    })
+
+    renderGate()
+    expect(screen.getByRole('progressbar', { name: 'Loading task permissions' })).toBeInTheDocument()
+  })
+
   it('renders Tasks when the user can view tasks', () => {
     mockUseTasksTabAccess.mockReturnValue({
       visibleTabs: ['approvals'],
@@ -74,6 +102,18 @@ describe('TasksAccessGate', () => {
     const invalidateSpy = vi.spyOn(QueryClient.prototype, 'invalidateQueries')
     await userEvent.click(screen.getByRole('button', { name: 'Retry' }))
     expect(invalidateSpy).toHaveBeenCalled()
+  })
+
+  it('shows access denied when the user cannot view tasks', () => {
+    mockUseTasksTabAccess.mockReturnValue({
+      visibleTabs: [],
+      isChecking: false,
+      isError: false,
+      canViewTasks: false,
+    })
+
+    renderGate()
+    expect(screen.getByText(/do not have permission to view tasks/i)).toBeInTheDocument()
   })
 
   it('has no accessibility violations in the access-denied state', async () => {

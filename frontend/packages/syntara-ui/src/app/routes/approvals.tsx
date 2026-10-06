@@ -12,6 +12,8 @@ export const approvalsRoutes = [
     path: '/approvals',
     validateSearch: approvalsSearch,
     beforeLoad: () => {
+      // TanStack Router redirect is thrown, not an Error instance
+      // eslint-disable-next-line @typescript-eslint/only-throw-error
       throw redirect({ to: '/tasks/approvals', replace: true })
     },
   }),

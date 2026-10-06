@@ -345,8 +345,7 @@ describe('SynListPanelView', () => {
         </SynListPanel>
       )
 
-      const filters = screen.getByRole('search', { name: 'Filters' })
-      expect(filters.closest('fieldset')).not.toBeDisabled()
+      expect(screen.getByRole('search', { name: 'Filters' })).toBeEnabled()
       expect(screen.queryByRole('group', { name: 'Filters — loading' })).not.toBeInTheDocument()
     })
 

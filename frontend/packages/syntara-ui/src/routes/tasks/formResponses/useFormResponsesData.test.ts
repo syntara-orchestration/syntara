@@ -102,6 +102,79 @@ describe('useFormResponsesData', () => {
     expect(result.current.groupedRows?.get('proj-a')?.project?.name).toBe('Project A')
   })
 
+  it('uses Unknown when workflow_name is missing', () => {
+    mockUseQuery.mockReturnValue({
+      data: {
+        resources: [{ id: 'fp-9', name: 'No workflow', project_id: 'proj-a', status: 'pending' }],
+      },
+      isPending: false,
+      isFetching: false,
+      error: null,
+    })
+
+    const { result } = renderHook(() =>
+      useFormResponsesData({
+        projectSelectorReady: true,
+        isAllProjects: true,
+        stableProjectId: undefined,
+        queryParams: {},
+        projects,
+      })
+    )
+
+    expect(result.current.enrichedRows[0]?.workflowName).toBe('Unknown')
+  })
+
+  it('groups multiple rows under the same project', () => {
+    mockUseQuery.mockReturnValue({
+      data: {
+        resources: [
+          { id: 'fp-1', name: 'A', workflow_name: 'W', project_id: 'proj-a', status: 'pending' },
+          { id: 'fp-2', name: 'B', workflow_name: 'W', project_id: 'proj-a', status: 'pending' },
+        ],
+      },
+      isPending: false,
+      isFetching: false,
+      error: null,
+    })
+
+    const { result } = renderHook(() =>
+      useFormResponsesData({
+        projectSelectorReady: true,
+        isAllProjects: true,
+        stableProjectId: undefined,
+        queryParams: {},
+        projects,
+      })
+    )
+
+    expect(result.current.groupedRows?.get('proj-a')?.rows).toHaveLength(2)
+  })
+
+  it('groups rows without project_id under unknown', () => {
+    mockUseQuery.mockReturnValue({
+      data: {
+        resources: [{ id: 'fp-0', name: 'Orphan', workflow_name: 'W', project_id: null, status: 'pending' }],
+      },
+      isPending: false,
+      isFetching: false,
+      error: null,
+    })
+
+    const { result } = renderHook(() =>
+      useFormResponsesData({
+        projectSelectorReady: true,
+        isAllProjects: true,
+        stableProjectId: undefined,
+        queryParams: {},
+        projects,
+      })
+    )
+
+    expect(result.current.groupedRows?.get('unknown')?.rows).toHaveLength(1)
+    expect(result.current.groupedRows?.get('unknown')?.project).toBeNull()
+  })
+
   it('returns null grouped rows when a single project is selected', () => {
     mockUseQuery.mockReturnValue({
       data: { resources: [] },

@@ -1,5 +1,5 @@
-import { useQueryClient } from '@tanstack/react-query'
 import { Spinner } from '@patternfly/react-core'
+import { useQueryClient } from '@tanstack/react-query'
 
 import { AppRoute } from '../../app/AppRoute'
 import { SynPage, SynPageBody } from '../../components/layout/SynPage'
