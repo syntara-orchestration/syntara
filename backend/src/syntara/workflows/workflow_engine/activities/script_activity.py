@@ -219,7 +219,7 @@ def _enforce_payload_limit(
     result_dict: dict[str, Any],
     max_bytes: int = constants.TEMPORAL_PAYLOAD_MAX_BYTES,
 ) -> dict[str, Any]:
-    """Truncate stdout/stderr so the serialized activity result fits within Temporal's payload limit.
+    """Truncate stdout/stderr/stdout_json so the serialized activity result fits within Temporal's payload limit.
 
     Temporal's server-side limit.blobSize.error (default 2MB) rejects oversized
     activity results. The SDK treats the rejection as retryable, causing futile
@@ -228,9 +228,14 @@ def _enforce_payload_limit(
 
     Returns a new dict (does not mutate the input).
 
-    Truncation operates on raw UTF-8 bytes, then verifies the complete
-    serialized result. Structured JSON output is omitted when it is the part
-    that keeps the result above the limit.
+    Truncation operates on raw UTF-8 bytes, not the JSON-escaped form. JSON
+    escaping can expand certain characters (e.g. newlines, quotes), so the
+    truncated payload may be slightly larger than ``max_bytes`` after
+    re-serialization. The 10% headroom in TEMPORAL_PAYLOAD_MAX_BYTES absorbs
+    this expansion. As a final safeguard, the serialized size is rechecked
+    after truncation: if it still exceeds ``max_bytes`` (e.g. because
+    ``stdout_json`` itself is oversized, or due to escaping overhead), the
+    offending fields are dropped/trimmed further until the result fits.
     """
     serialized = json.dumps(result_dict)
     payload_size = len(serialized.encode("utf-8"))
@@ -261,30 +266,23 @@ def _enforce_payload_limit(
         output["stderr"] = stderr_bytes[: max(0, len(stderr_bytes) - trim_needed)].decode("utf-8", errors="ignore")
 
     output["stderr"] = (output.get("stderr") or "") + notice
-    truncated_result = {**result_dict, "output": output}
+    enforced = {**result_dict, "output": output}
 
-    # stdout_json can be much larger than stdout (for example, when stdout is
-    # a small JSON document containing a large nested value). It must be part
-    # of the final size check rather than bypassing the limiter.
-    if len(json.dumps(truncated_result).encode("utf-8")) > max_bytes and "stdout_json" in output:
+    final_size = len(json.dumps(enforced).encode("utf-8"))
+    if final_size > max_bytes and output.get("stdout_json") is not None:
         output["stdout_json"] = None
-        truncated_result = {**result_dict, "output": output}
+        enforced = {**result_dict, "output": output}
+        final_size = len(json.dumps(enforced).encode("utf-8"))
 
-    # Account for JSON escaping and the truncation notice itself. This fallback
-    # is only needed when the remaining textual fields still exceed the limit.
-    if len(json.dumps(truncated_result).encode("utf-8")) > max_bytes:
-        output["stdout"] = ""
-        truncated_result = {**result_dict, "output": output}
+    if final_size > max_bytes:
+        remaining_excess = final_size - max_bytes
+        stderr_bytes = (output.get("stderr") or "").encode("utf-8")
+        output["stderr"] = stderr_bytes[: max(0, len(stderr_bytes) - remaining_excess)].decode(
+            "utf-8", errors="ignore"
+        )
+        enforced = {**result_dict, "output": output}
 
-    if len(json.dumps(truncated_result).encode("utf-8")) > max_bytes:
-        output["stderr"] = notice
-        truncated_result = {**result_dict, "output": output}
-
-    if len(json.dumps(truncated_result).encode("utf-8")) > max_bytes:
-        output["stderr"] = ""
-        truncated_result = {**result_dict, "output": output}
-
-    return truncated_result
+    return enforced
 
 
 def _sanitize_env_value(value: object) -> str:
