@@ -10,8 +10,8 @@
 # =============================================================================
 openapi: 3.1.0
 info:
-  title: Orchestrator API
-  version: 1.3.0
+  title: Syntara API
+  version: 1.3.1
   description: A distributed multi-agent workflow orchestration system
 servers:
   - url: /api/v1
@@ -105,7 +105,7 @@ paths:
               - type: 'null'
             title: Credential Id
           description: |
-            Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
+            Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
             If omitted, the selected integration's management credential is used.
             Credential must be of type "Ansible Automation Platform".
         - in: query
@@ -267,7 +267,7 @@ paths:
               - type: 'null'
             title: Credential Id
           description: |
-            Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
+            Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
             If omitted, the selected integration's management credential is used.
             Credential must be of type "Ansible Automation Platform".
         - in: query
@@ -445,7 +445,7 @@ paths:
               - type: 'null'
             title: Credential Id
           description: |
-            Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
+            Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
             If omitted, the selected integration's management credential is used.
             Credential must be of type "Ansible Automation Platform".
         - in: query
@@ -607,7 +607,7 @@ paths:
               - type: 'null'
             title: Credential Id
           description: |
-            Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
+            Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
             If omitted, the selected integration's management credential is used.
             Credential must be of type "Ansible Automation Platform".
         - in: query
@@ -785,7 +785,7 @@ paths:
               - type: 'null'
             title: Credential Id
           description: |
-            Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
+            Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
             If omitted, the selected integration's management credential is used.
             Credential must be of type "Ansible Automation Platform".
         - in: query
@@ -947,7 +947,7 @@ paths:
               - type: 'null'
             title: Credential Id
           description: |
-            Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
+            Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
             If omitted, the selected integration's management credential is used.
             Credential must be of type "Ansible Automation Platform".
         - in: query
@@ -1118,7 +1118,7 @@ paths:
               - type: 'null'
             title: Credential Id
           description: |
-            Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
+            Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
             If omitted, the selected integration's management credential is used.
             Credential must be of type "Ansible Automation Platform".
         - in: query
@@ -1289,7 +1289,7 @@ paths:
               - type: 'null'
             title: Credential Id
           description: |
-            Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
+            Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
             If omitted, the selected integration's management credential is used.
             Credential must be of type "Ansible Automation Platform".
         - in: query
@@ -1451,7 +1451,7 @@ paths:
               - type: 'null'
             title: Credential Id
           description: |
-            Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
+            Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
             If omitted, the selected integration's management credential is used.
             Credential must be of type "Ansible Automation Platform".
         - in: query
@@ -1612,7 +1612,7 @@ paths:
               - type: 'null'
             title: Credential Id
           description: |
-            Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
+            Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
             If omitted, the selected integration's management credential is used.
             Credential must be of type "Ansible Automation Platform".
         - in: query
@@ -12790,11 +12790,11 @@ paths:
         - Internal Metrics
       summary: Metrics store KPIs
       description: |-
-        Return a computed KPI dashboard covering all Orchestrator components.
+        Return a computed KPI dashboard covering all Syntara components.
 
-        Maps metrics to the KPIs defined in the Orchestrator KPI documents:
-        - Orchestrator Key Performance Indicators (KPIs)
-        - Orchestrator LLM/Agent Performance KPIs
+        Maps metrics to the KPIs defined in the Syntara KPI documents:
+        - Syntara Key Performance Indicators (KPIs)
+        - Syntara LLM/Agent Performance KPIs
       operationId: get_internal_metrics_kpis
       responses:
         '200':
@@ -30243,7 +30243,7 @@ components:
     OIDCClaimMapping:
       type: object
       title: OIDCClaimMapping
-      description: Maps Orchestrator user fields to IdP-specific OIDC claim names.
+      description: Maps Syntara user fields to IdP-specific OIDC claim names.
       additionalProperties: false
       properties:
         subject:
@@ -30270,7 +30270,7 @@ components:
       type: object
       title: OIDCGroupMappingEntry
       description: |-
-        API-facing schema for a single IdP-to-Orchestrator group mapping entry.
+        API-facing schema for a single IdP-to-Syntara group mapping entry.
 
         Used in API requests/responses. Actual storage is in the
         ``idp_group_mapping_entries`` table.
@@ -30407,7 +30407,7 @@ components:
           items:
             $ref: '#/components/schemas/OIDCGroupMappingEntry'
           title: Group Mapping Entries
-          description: IdP-to-Orchestrator group mapping entries
+          description: IdP-to-Syntara group mapping entries
         allow_all_authenticated:
           type: boolean
           default: false
@@ -30535,7 +30535,7 @@ components:
           items:
             $ref: '#/components/schemas/OIDCGroupMappingEntry'
           title: Group Mapping Entries
-          description: IdP-to-Orchestrator group mapping entries
+          description: IdP-to-Syntara group mapping entries
         allow_all_authenticated:
           type: boolean
           default: false
@@ -30675,7 +30675,7 @@ components:
                 $ref: '#/components/schemas/OIDCGroupMappingEntry'
             - type: 'null'
           title: Group Mapping Entries
-          description: IdP-to-Orchestrator group mapping entries (omit to keep existing)
+          description: IdP-to-Syntara group mapping entries (omit to keep existing)
         allow_all_authenticated:
           anyOf:
             - type: boolean
@@ -32367,7 +32367,7 @@ components:
       required:
         - component
       title: ComponentKPISummary
-      description: KPI summary for a single Orchestrator component.
+      description: KPI summary for a single Syntara component.
     KPIDashboard:
       properties:
         generated_at:
@@ -32385,7 +32385,7 @@ components:
       required:
         - generated_at
       title: KPIDashboard
-      description: Full KPI dashboard covering all Orchestrator components.
+      description: Full KPI dashboard covering all Syntara components.
     MetricRecord:
       description: |-
         Lightweight in-memory metric data point.
@@ -32472,7 +32472,7 @@ components:
         - opa_request_duration_ms
       title: MetricType
       description: |-
-        Categories of metrics recorded by Orchestrator.
+        Categories of metrics recorded by Syntara.
 
         Each value corresponds to a specific measurable quantity exposed via the
         metrics REST API and (where applicable) Prometheus endpoint.
@@ -35851,7 +35851,7 @@ components:
         - edges
       title: WorkflowDefinition
       description: |-
-        JSON Schema for graph-based workflow definitions in the Orchestrator Workflow Engine v2.
+        JSON Schema for graph-based workflow definitions in the Syntara Workflow Engine v2.
 
         Attributes:
             schema_version: Schema version that this workflow definition conforms to
@@ -36447,7 +36447,7 @@ components:
             - type: string
             - type: 'null'
           title: Credential Id
-          description: Orchestrator credential UUID for Ansible Automation Platform API authentication. Separate from legacy credentials list.
+          description: Syntara credential UUID for Ansible Automation Platform API authentication. Separate from legacy credentials list.
         integration_id:
           anyOf:
             - type: string
@@ -36602,7 +36602,7 @@ components:
             - type: string
             - type: 'null'
           title: Credential Id
-          description: Orchestrator credential UUID for Ansible Automation Platform API authentication. Separate from legacy credentials list.
+          description: Syntara credential UUID for Ansible Automation Platform API authentication. Separate from legacy credentials list.
         integration_id:
           anyOf:
             - type: string
@@ -36723,7 +36723,7 @@ components:
             - type: string
             - type: 'null'
           title: Credential Id
-          description: Orchestrator credential UUID for authentication or Secret URL.
+          description: Syntara credential UUID for authentication or Secret URL.
       type: object
       required:
         - method
@@ -36751,7 +36751,7 @@ components:
             - type: string
             - type: 'null'
           title: Credential Id
-          description: Orchestrator credential UUID for LLM provider authentication
+          description: Syntara credential UUID for LLM provider authentication
         file_ids:
           items:
             type: string
@@ -36805,7 +36805,7 @@ components:
         credential_id:
           type: string
           title: Credential Id
-          description: Orchestrator credential UUID for execution calls (distinct from management credential)
+          description: Syntara credential UUID for execution calls (distinct from management credential)
       type: object
       required:
         - integration_id
@@ -36848,7 +36848,7 @@ components:
             - type: string
             - type: 'null'
           title: Credential Id
-          description: Orchestrator credential UUID
+          description: Syntara credential UUID
         approver_users:
           anyOf:
             - items:

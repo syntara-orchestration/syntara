@@ -2,10 +2,10 @@ import { Icon } from '@patternfly/react-core'
 import { RhUiCaretDownIcon } from '@patternfly/react-icons'
 import { use } from 'react'
 
-import { NodeExpandedContext } from './NodeExpandedContext'
+import { SynStepExpandedContext } from './SynStepExpandedContext'
 
-export function NodeExpandToggle() {
-  const expandedState = use(NodeExpandedContext)
+export function SynStepExpandToggle({ nodeLabel }: Readonly<{ nodeLabel?: string }>) {
+  const expandedState = use(SynStepExpandedContext)
   const expanded = expandedState === null ? true : expandedState[0]
   const setExpanded = expandedState ? expandedState[1] : () => {}
   if (!expandedState) return null
@@ -14,6 +14,9 @@ export function NodeExpandToggle() {
     event.stopPropagation()
     setExpanded((expanded) => !expanded)
   }
+
+  const action = expanded ? 'Collapse' : 'Expand'
+  const ariaLabel = nodeLabel ? `${action} details for ${nodeLabel}` : `${action} step details`
 
   return (
     <Icon
@@ -30,7 +33,7 @@ export function NodeExpandToggle() {
       className="nodrag nopan"
       role="button"
       tabIndex={0}
-      aria-label={expanded ? 'Collapse step details' : 'Expand step details'}
+      aria-label={ariaLabel}
       style={{
         transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)',
         transition: 'transform 0.2s ease-out',
