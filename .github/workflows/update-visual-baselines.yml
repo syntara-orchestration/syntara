@@ -256,6 +256,9 @@ jobs:
               parents: [headSha],
             });
 
+            // This workflow creates the commit directly through the Git database API.
+            // Keep the PR branch unchanged until GitHub confirms that commit is verified;
+            // the weekly workflow's sign-commits option does not apply to this path.
             if (!commit.data.verification?.verified) {
               const reason = commit.data.verification?.reason || 'unknown';
               core.setFailed(
