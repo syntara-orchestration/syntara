@@ -42,11 +42,7 @@ from syntara.workflows.exceptions import (
     WorkflowNotPublishedError,
 )
 from syntara.workflows.json_schema_validation import apply_schema_defaults
-from syntara.workflows.models.activity_execution import (
-    ActivityExecution,
-    ActivityExecutionListResponse,
-    ActivityStatus,
-)
+from syntara.workflows.models.activity_execution import ActivityExecution, ActivityExecutionListResponse
 from syntara.workflows.models.execution import (
     TERMINAL_EXECUTION_STATUSES,
     ActivityData,
@@ -483,14 +479,6 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
 
         self.session.add(execution)
         try:
-            # Copied before the commit, in the same transaction as the execution
-            # row, so a retry never dispatches against a half-populated run: either
-            # the execution and its restored nodes both land or neither does.
-            if retried_from_execution_id is not None:
-                await self._copy_source_node_rows(
-                    source_execution_id=retried_from_execution_id,
-                    target_execution_id=execution.id,
-                )
             await self.session.commit()
         except Exception as exc:
             self._emit_lifecycle_event(
@@ -1263,87 +1251,6 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
             component=component,
             retried_from_execution_id=original.id,
         )
-
-    async def _copy_source_node_rows(
-        self,
-        source_execution_id: UUID,
-        target_execution_id: UUID,
-    ) -> int:
-        """Copy a source run's completed node rows onto a retry as already-restored.
-
-        A retry skips the nodes that completed upstream of its failure point. This
-        gives each of them its row up front, carrying the source run's output and
-        its source timestamps, so the run view shows them as completed work that
-        really happened rather than as steps this run performed.
-
-        Why this removes work rather than adding it: the workflow no longer fetches
-        each restored node one at a time, and no longer has to reconcile a
-        replayed node's timing. Temporal stamps an activity that completes with
-        this run's times, so a node replayed through the event path would be
-        recorded as having finished in milliseconds, and the completed event is
-        consumed once, so those times cannot be recovered afterwards. A row copied
-        here already holds the right ones, so there is nothing to reconcile.
-
-        Every row is copied, not only the nodes that will be skipped. Which nodes
-        those are is decided inside the workflow, where the graph that actually ran
-        is known, and the same logic that skips a node ignores a row it did not
-        need. Over-copying a row costs a little space; guessing wrong about which
-        nodes to copy here would either lose an output a node depends on, or restore
-        a node the retry was asked to re-run.
-
-        Loop nodes and loop bodies are copied as ordinary rows. Loop replay is out
-        of scope here, and classification excludes them from being restored, so
-        their rows sit unused rather than being injected.
-
-        Idempotent in effect: a node that this retry goes on to execute gets its
-        existing row updated through the ordinary completion path, so a retry of a
-        retry converges on the same rows.
-        """
-        source_rows = (
-            await self.session.exec(
-                select(ActivityExecution).where(
-                    ActivityExecution.execution_id == source_execution_id,
-                    ActivityExecution.status == ActivityStatus.COMPLETED,
-                )
-            )
-        ).all()
-        if not source_rows:
-            logger.info(
-                "No source rows to restore for retry",
-                source_execution_id=str(source_execution_id),
-                target_execution_id=str(target_execution_id),
-            )
-            return 0
-
-        now = datetime.now(UTC)
-        copied = 0
-        for source in source_rows:
-            self.session.add(
-                ActivityExecution(
-                    execution_id=target_execution_id,
-                    activity_name=source.activity_name,
-                    node_type=source.node_type,
-                    temporal_activity_id=source.activity_name,
-                    status=ActivityStatus.COMPLETED,
-                    input_data=source.input_data,
-                    output_data=source.output_data,
-                    iteration=source.iteration,
-                    # The source run's own times, so the node reports when the
-                    # work ran rather than when it was copied.
-                    started_at=source.started_at,
-                    completed_at=source.completed_at,
-                )
-            )
-            copied += 1
-
-        logger.info(
-            "Copied source node rows for retry",
-            source_execution_id=str(source_execution_id),
-            target_execution_id=str(target_execution_id),
-            node_count=copied,
-            now=now.isoformat(),
-        )
-        return copied
 
     @staticmethod
     def _to_preview_response(validation: RetryValidation) -> RetryFromFailureValidationResponse:

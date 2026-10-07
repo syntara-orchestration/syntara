@@ -11,7 +11,6 @@ from syntara.workflows.exceptions import (
     ExecutionNotFoundError,
     ExecutionNotRetryableError,
 )
-from syntara.workflows.models.activity_execution import ActivityExecution
 from syntara.workflows.models.execution import Execution, ExecutionMode, ExecutionStatus
 from syntara.workflows.models.workflow import Workflow
 from syntara.workflows.models.workflow_version import WorkflowVersion
@@ -60,14 +59,14 @@ def _make_version(version_id=None) -> WorkflowVersion:
 def _mock_session_with_two_queries(
     execution: Execution | None,
     version: WorkflowVersion | None,
-    source_rows: list[ActivityExecution] | None = None,
 ) -> tuple[AsyncSession, Mock]:
-    """Mock session that returns execution, version, then the source node rows.
-
-    The third query is the bulk copy a retry makes of its source run's rows, so it
-    answers with no rows unless a test asks for some.
+    """Mock session that returns execution on first exec(), version on second.
 
     Returns the session and a separate Mock for .add() so callers can assert on it.
+
+    Exactly two queries: a retry must not read or write the source run's node rows
+    here. Restoring a skipped node's state is the workflow's job — it is the only
+    place that knows which nodes the retry will actually skip.
     """
     exec_result = Mock()
     exec_result.one_or_none.return_value = execution
@@ -75,12 +74,9 @@ def _mock_session_with_two_queries(
     version_result = Mock()
     version_result.one_or_none.return_value = version
 
-    source_result = Mock()
-    source_result.all.return_value = source_rows or []
-
     add_mock = Mock()
     mock_session = Mock(spec=AsyncSession)
-    mock_session.exec = AsyncMock(side_effect=[exec_result, version_result, source_result])
+    mock_session.exec = AsyncMock(side_effect=[exec_result, version_result])
     mock_session.add = add_mock
     mock_session.commit = AsyncMock()
     return mock_session, add_mock
@@ -277,10 +273,8 @@ class TestRetryExecution:
         exec_result.one_or_none.return_value = execution
         version_result = Mock()
         version_result.one_or_none.return_value = version
-        source_result = Mock()
-        source_result.all.return_value = []
         mock_session = Mock(spec=AsyncSession)
-        mock_session.exec = AsyncMock(side_effect=[exec_result, version_result, source_result])
+        mock_session.exec = AsyncMock(side_effect=[exec_result, version_result])
         mock_session.add = Mock()
         mock_session.commit = AsyncMock(side_effect=Exception("DB commit failed"))
         mock_user = Mock(spec=User)
@@ -313,3 +307,97 @@ class TestRetryExecution:
         mock_temporal.cancel_workflow.assert_awaited_once_with(
             temporal_workflow_id=temporal_result.temporal_workflow_id
         )
+
+
+class TestRetryDoesNotTouchSourceNodeRows:
+    """A retry must not seed the new run with the source run's node rows.
+
+    Regression guard. Copying the source run's completed rows at execution creation
+    looked equivalent to restoring only the nodes that get skipped, but a retry
+    re-executes its failure point and everything downstream of it. Seeding those
+    with the previous run's state was worse than not seeding them at all: the sync
+    service refuses to update a row already in a terminal status, so a re-executed
+    node would keep displaying the old output for the rest of the run.
+
+    The fix is that this layer does not touch node rows at all — classification
+    lives in the workflow, which is the only place that knows what will be skipped.
+    """
+
+    @pytest.mark.asyncio
+    async def test_retry_issues_only_the_execution_and_version_queries(self) -> None:
+        """Two reads: the execution, then the workflow version. Nothing else."""
+        execution = _make_execution(ExecutionStatus.FAILED)
+        version = _make_version(execution.workflow_version_id)
+        mock_session, _add_mock = _mock_session_with_two_queries(execution, version)
+
+        mock_user = Mock(spec=User)
+        mock_user.id = uuid4()
+        mock_user.display_name = "Test User"
+
+        temporal_result = Mock()
+        temporal_result.temporal_workflow_id = f"temporal-new-{uuid4()}"
+        temporal_result.execution_id = str(uuid4())
+        mock_temporal = Mock(spec=TemporalExecutionService)
+        mock_temporal.start_workflow = AsyncMock(return_value=temporal_result)
+
+        service = ExecutionService(
+            session=mock_session,
+            user=mock_user,
+            temporal_service=mock_temporal,
+        )
+
+        with (
+            patch(
+                "syntara.workflows.services.execution_service.resolve_user_display_name",
+                new_callable=AsyncMock,
+                return_value="Author",
+            ),
+            patch.object(service, "convert_resource_mixin") as mock_convert,
+        ):
+            mock_convert.convert_resource.return_value = Mock()
+            await service.retry_execution(execution.id)
+
+        assert mock_session.exec.await_count == 2  # type: ignore[attr-defined]
+
+    @pytest.mark.asyncio
+    async def test_retry_adds_only_the_execution_row(self) -> None:
+        """The only row written is the new execution's own.
+
+        Any node row written here would be a node the retry has not yet decided to
+        skip, and would block that node's own result when it runs.
+        """
+        execution = _make_execution(ExecutionStatus.FAILED)
+        version = _make_version(execution.workflow_version_id)
+        mock_session, add_mock = _mock_session_with_two_queries(execution, version)
+
+        mock_user = Mock(spec=User)
+        mock_user.id = uuid4()
+        mock_user.display_name = "Test User"
+
+        temporal_result = Mock()
+        temporal_result.temporal_workflow_id = f"temporal-new-{uuid4()}"
+        temporal_result.execution_id = str(uuid4())
+        mock_temporal = Mock(spec=TemporalExecutionService)
+        mock_temporal.start_workflow = AsyncMock(return_value=temporal_result)
+
+        service = ExecutionService(
+            session=mock_session,
+            user=mock_user,
+            temporal_service=mock_temporal,
+        )
+
+        with (
+            patch(
+                "syntara.workflows.services.execution_service.resolve_user_display_name",
+                new_callable=AsyncMock,
+                return_value="Author",
+            ),
+            patch.object(service, "convert_resource_mixin") as mock_convert,
+        ):
+            mock_convert.convert_resource.return_value = Mock()
+            await service.retry_execution(execution.id)
+
+        assert add_mock.call_count == 1
+        added = add_mock.call_args[0][0]
+        assert isinstance(added, Execution)
+        assert added.retried_from_execution_id == execution.id

@@ -15,7 +15,6 @@ import pytest
 from syntara.workflows.utils.namespace_resolver import NamespaceResolver
 from syntara.workflows.workflow_engine.dynamic_workflow import PRE_RESOLVED_MARKER, OrchestratorWorkflow
 from syntara.workflows.workflow_engine.graph import ActivityNode, WorkflowGraph
-from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName
 
 from .conftest import init_workflow_runtime
 
@@ -54,7 +53,7 @@ def _make_workflow(retry_context: dict[str, Any] | None = None) -> OrchestratorW
     wf.stop_after_nodes = set()
     wf.retry_context = retry_context or {}
     wf._retry_source_statuses = {}
-    wf._replay_records = None
+    wf._replay_records = {}
     return wf
 
 
@@ -526,6 +525,7 @@ async def test_missing_output_falls_through_to_execution(mock_wf: MagicMock) -> 
     node = ActivityNode(node_id="step_1", node_type="script", parameters={})
     mock_wf.execute_activity = AsyncMock(return_value={})
 
+    await wf._prepare_retry(_chain_graph())
     assert await wf._maybe_restore_retry_output(node, _chain_graph()) is None
     assert "step_1" not in wf.skipped_nodes
     assert not wf.resolver.has_namespace("step_1")
@@ -542,34 +542,6 @@ async def test_empty_activity_result_falls_through(mock_wf: MagicMock) -> None:
     wf._replay_records = {"step_1": {"status": "failed", "input_data": {}, "output_data": None}}
 
     assert await wf._maybe_restore_retry_output(node, _chain_graph()) is None
-
-
-@pytest.mark.asyncio
-async def test_the_source_read_asks_for_records_once(mock_wf: MagicMock) -> None:
-    """One read answers every restore, rather than one read per restored node.
-
-    The classification is known before anything dispatches, so the source run's
-    rows are fetched once and cached. N restored nodes cost one read, not N.
-    """
-    wf = _injectable_workflow()
-    wf.retry_context = _retry("step_2")
-    graph = _chain_graph()
-    mock_wf.execute_activity = AsyncMock(
-        return_value={
-            "step_1": {"input_data": {}, "output_data": {"result": "ok"}},
-            "step_2": {"input_data": {}, "output_data": {"result": "second"}},
-        }
-    )
-
-    for node_id in ("step_1", "step_2"):
-        node = ActivityNode(node_id=node_id, node_type="script", parameters={})
-        await wf._maybe_restore_retry_output(node, graph)
-
-    assert mock_wf.execute_activity.call_count == 1
-    call = mock_wf.execute_activity.call_args
-    assert call[0][0] == ActivityName.RETRY_SOURCE_STATE
-    assert call.kwargs["args"] == ["src-1", True]
-    assert call.kwargs["activity_id"].startswith("__internal__")
 
 
 @pytest.mark.asyncio
@@ -687,11 +659,11 @@ class TestLinearChainRestore:
 
         mock_wf.execute_activity = AsyncMock(side_effect=_read)
 
+        await wf._prepare_retry(self.graph)
         first = await wf._maybe_restore_retry_output(self.graph.get_node("step_1"), self.graph)
         second = await wf._maybe_restore_retry_output(self.graph.get_node("step_2"), self.graph)
 
-        # One read, under an internal id: the nodes are not dispatched, so they
-        # produce no completion events of their own.
+        # One read, under an internal id, before anything dispatches.
         assert len(reads) == 1
         assert reads[0].startswith("__internal__")
         assert first == {"output": {"out": "step_1-output"}, "control": None}
@@ -714,6 +686,7 @@ class TestLinearChainRestore:
         wf.retry_context = _retry("step_3")
         mock_wf.execute_activity = AsyncMock(return_value={})
 
+        await wf._prepare_retry(self.graph)
         assert await wf._maybe_restore_retry_output(self.graph.get_node("step_1"), self.graph) is None
         assert "step_1" not in wf.skipped_nodes
 

@@ -186,6 +186,7 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
         # neither of which changes during a run.
         self._retry_restorable_cache: set[str] | None = None
         self._retry_source_statuses: dict[str, str] = {}
+        self._replay_records: dict[str, dict[str, Any]] = {}
         if workflow_metadata:
             for ns_key, ns_data in workflow_metadata.items():
                 if ns_key == "retry":

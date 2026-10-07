@@ -32,10 +32,10 @@ class WorkflowRetryMixin:
 
     retry_context: dict[str, Any]
     _retry_restorable_cache: set[str] | None
-    #: Source-run state for the nodes this retry may replay, fetched once and
-    #: cached. ``None`` until first needed, which is what makes the fetch lazy:
-    #: a retry whose rerunning steps read no upstream output never pays for it.
-    _replay_records: dict[str, dict[str, Any]] | None
+    #: Source-run state for the nodes this retry may replay, read once in
+    #: ``_prepare_retry`` and held for the run. Empty rather than absent, so the
+    #: restore path is a plain lookup and an ordinary run reads nothing.
+    _replay_records: dict[str, dict[str, Any]]
     _runtime_settings: dict[str, Any]
     _retry_source_statuses: dict[str, str]
     skipped_nodes: set[str]
@@ -49,14 +49,26 @@ class WorkflowRetryMixin:
         """Load source state once and exclude branches not selected for retry."""
         if not self.retry_context:
             return
-        self._retry_source_statuses = await workflow.execute_activity(
+        # The restorable set is settled before the read, so one read of the source
+        # run answers classification and restoration together — and carries
+        # payloads only for nodes that may actually be skipped. A node this retry
+        # will re-execute must not be seeded with the previous run's state.
+        records = await workflow.execute_activity(
             ActivityName.RETRY_SOURCE_STATE,
-            args=[self.retry_context["retry_from_execution_id"]],
+            args=[
+                self.retry_context["retry_from_execution_id"],
+                sorted(self._retry_restorable_nodes(graph)),
+            ],
             activity_id="__internal__fetch_retry_source_state",
             start_to_close_timeout=timedelta(seconds=DEFAULT_ACTIVITY_TIMEOUT_SECONDS),
         )
+        self._retry_source_statuses = {
+            node_id: str(record.get("status", "")) for node_id, record in (records or {}).items()
+        }
+        self._replay_records = {
+            node_id: record for node_id, record in (records or {}).items() if isinstance(record, dict)
+        }
         self._classify_unselected_branches(graph)
-        self._replay_records = None
 
     def _classify_unselected_branches(self, graph: WorkflowGraph) -> None:
         """Skip unselected failures without suppressing shared selected descendants.
@@ -88,6 +100,10 @@ class WorkflowRetryMixin:
         only re-derives *which upstream nodes may be skipped* — a node qualifies
         when it is not a retry starting point and nothing downstream of it forced
         it to re-run.
+
+        Only nodes in this set are read back from the source run, and only they are
+        given a stored row, so a node this retry re-executes cannot inherit the
+        previous run's output.
 
         A node that ran downstream of a ``continue_on_failure`` step is excluded:
         its inputs may depend on the failed node's output, which no longer exists,
@@ -197,8 +213,7 @@ class WorkflowRetryMixin:
         if not self.retry_context or not self._should_restore_node(node.id, graph):
             return None
 
-        records = await self._lazy_replay_records()
-        record = records.get(node.id)
+        record = self._replay_records.get(node.id)
         # A record with no output is a node that did not complete. Restoring it
         # would inject nothing and leave downstream expressions unresolved, so it
         # runs for real instead.
@@ -212,48 +227,6 @@ class WorkflowRetryMixin:
             extra={"node_id": node.id, "input_keys": sorted(self.node_inputs[node.id]), "output_keys": sorted(output)},
         )
         return {"output": output, "control": None}
-
-    async def _lazy_replay_records(self) -> dict[str, dict[str, Any]]:
-        """Fetch every restorable node's source-run state in one call.
-
-        Called at most once per workflow and cached. The alternative shape is one
-        activity per node; this asks for the whole set because the classification
-        is already known up front, so a single read of the source run's rows
-        answers every lookup the run will make.
-
-        Lazy in the sense that nothing is fetched until a node actually needs
-        restoring: a retry whose rerunning steps read none of the upstream
-        outputs costs no read at all.
-        """
-        if self._replay_records is not None:
-            return self._replay_records
-
-        self._replay_records = {}
-        if not self.retry_context:
-            return self._replay_records
-
-        source_execution_id = self.retry_context.get("retry_from_execution_id")
-        if not source_execution_id:
-            return self._replay_records
-
-        records = await workflow.execute_activity(
-            ActivityName.RETRY_SOURCE_STATE,
-            args=[source_execution_id, True],
-            activity_id="__internal__fetch_retry_node_records",
-            start_to_close_timeout=timedelta(seconds=DEFAULT_ACTIVITY_TIMEOUT_SECONDS),
-        )
-        self._replay_records = {
-            node_id: record for node_id, record in (records or {}).items() if isinstance(record, dict)
-        }
-        workflow.logger.info(
-            "Fetched source node records for retry replay",
-            extra={
-                "source_execution_id": source_execution_id,
-                "node_count": len(self._replay_records),
-                "node_ids": sorted(self._replay_records),
-            },
-        )
-        return self._replay_records
 
     def _should_restore_node(self, node_id: str, graph: WorkflowGraph) -> bool:
         """Whether this node's stored output may be injected instead of running it."""
