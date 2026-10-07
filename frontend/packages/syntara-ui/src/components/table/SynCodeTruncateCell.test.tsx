@@ -2,17 +2,17 @@ import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { axe } from 'vitest-axe'
 
-import { CodeTruncateCell } from './CodeTruncateCell'
+import { SynCodeTruncateCell } from './SynCodeTruncateCell'
 
-describe('CodeTruncateCell', () => {
+describe('SynCodeTruncateCell', () => {
   it('renders content inside a code element', () => {
-    render(<CodeTruncateCell content="my-long-policy-name" />)
+    render(<SynCodeTruncateCell content="my-long-policy-name" />)
 
     expect(screen.getByRole('code')).toHaveTextContent('my-long-policy-name')
   })
 
   it('has no accessibility violations', async () => {
-    const { container } = render(<CodeTruncateCell content="viewer-policy" />)
+    const { container } = render(<SynCodeTruncateCell content="viewer-policy" />)
 
     expect(await axe(container)).toHaveNoViolations()
   })
