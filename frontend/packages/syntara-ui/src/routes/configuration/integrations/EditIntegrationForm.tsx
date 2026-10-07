@@ -198,7 +198,7 @@ function EditIntegrationFormFields({
 
       {!hideBaseUrl && (
         <FormGroup
-          label={isTFE ? 'TFE URL' : 'API URL'}
+          label={isTFE ? 'Terraform Enterprise URL' : 'API URL'}
           isRequired={!isLLM}
           fieldId="edit-base-url"
           labelHelp={isAnsibleAutomationPlatform ? integrationHelp.aapUrl : integrationHelp.apiUrl}

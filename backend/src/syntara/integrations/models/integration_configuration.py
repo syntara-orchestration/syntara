@@ -147,7 +147,7 @@ class TFEConfiguration(IntegrationSecurityMixin):
     integration_type: Literal["terraform_enterprise"] = "terraform_enterprise"
 
     base_url: str = Field(
-        title="TFE URL",
+        title="Terraform Enterprise URL",
         description="Base URL for Terraform Enterprise or HCP Terraform (e.g. https://app.terraform.io)",
         json_schema_extra={"format": "uri"},
     )

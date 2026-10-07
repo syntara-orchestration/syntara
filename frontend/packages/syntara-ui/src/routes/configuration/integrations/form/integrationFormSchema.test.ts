@@ -365,7 +365,7 @@ describe('integrationFormSchema', () => {
       })
       expect(result.success).toBe(false)
       if (!result.success) {
-        expect(result.error.issues.some((i) => i.message === 'TFE URL is required')).toBe(true)
+        expect(result.error.issues.some((i) => i.message === 'Terraform Enterprise URL is required')).toBe(true)
       }
     })
 

@@ -35,7 +35,7 @@ function addTerraformEditIssues(
   const err = validateUrl(data.base_url, {
     required: true,
     allowHttp: data.allow_http,
-    fieldLabel: 'TFE URL',
+    fieldLabel: 'Terraform Enterprise URL',
   })
   if (err) ctx.addIssue({ code: z.ZodIssueCode.custom, message: err, path: ['base_url'] })
   if (!data.organization?.trim()) {

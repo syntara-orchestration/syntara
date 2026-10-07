@@ -198,10 +198,10 @@ describe('IntegrationDetailsStep', () => {
   })
 
   describe('Terraform Enterprise', () => {
-    it('renders TFE URL and organization fields', () => {
+    it('renders Terraform Enterprise URL and organization fields', () => {
       render(<TestWrapper defaultType={IntegrationTypeEnum.TERRAFORM_ENTERPRISE} />)
 
-      const tfeUrl = screen.getByRole('textbox', { name: /tfe url/i })
+      const tfeUrl = screen.getByRole('textbox', { name: /terraform enterprise url/i })
       expect(tfeUrl).toBeInTheDocument()
       expect(tfeUrl).toHaveAttribute('placeholder', 'e.g. https://app.terraform.io')
       expect(screen.getByRole('textbox', { name: /organization/i })).toBeInTheDocument()

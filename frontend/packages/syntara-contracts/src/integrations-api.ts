@@ -744,7 +744,7 @@ export interface components {
        */
       integration_type: 'terraform_enterprise'
       /**
-       * TFE URL
+       * Terraform Enterprise URL
        * Format: uri
        * @description Base URL for Terraform Enterprise or HCP Terraform (e.g. https://app.terraform.io)
        */

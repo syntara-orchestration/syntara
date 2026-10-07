@@ -415,7 +415,7 @@ export function IntegrationDetailsStep({ control, setValue, onTypeChange }: Inte
           <ControlledTextField
             control={control}
             name="configuration.base_url"
-            label={isTFE ? 'TFE URL' : 'API URL'}
+            label={isTFE ? 'Terraform Enterprise URL' : 'API URL'}
             fieldId="base-url"
             placeholder={typeConfig.baseUrlPlaceholder}
             isRequired={typeConfig.requireBaseUrl}
