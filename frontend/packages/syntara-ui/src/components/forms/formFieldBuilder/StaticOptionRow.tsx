@@ -105,10 +105,10 @@ export function StaticOptionRow({
                   name={`fields.${fieldIndex}.options.values.${optionIndex}.display_label`}
                   render={({ field: rhfField, fieldState }) => (
                     <FormGroup
-                      label="Display label"
+                      label="Option label"
                       fieldId={`${idPrefix}-display-label`}
                       isRequired
-                      labelHelp={formFieldBuilderLabelHelp('optionDisplayLabel', 'Display label')}
+                      labelHelp={formFieldBuilderLabelHelp('optionDisplayLabel', 'Option label')}
                     >
                       <TextInput
                         id={`${idPrefix}-display-label`}
@@ -149,12 +149,12 @@ export function StaticOptionRow({
                 <SynTextField
                   name={`fields.${fieldIndex}.options.values.${optionIndex}.value`}
                   control={control}
-                  label="Value name"
+                  label="Option value"
                   fieldId={`${idPrefix}-value-name`}
                   isRequired
                   isDisabled={isDisabled}
-                  labelHelp={formFieldBuilderLabelHelp('optionValueName', 'Value name')}
-                  hint={valueNameLooksGenerated ? 'Generated from the display label above' : undefined}
+                  labelHelp={formFieldBuilderLabelHelp('optionValueName', 'Option value')}
+                  hint={valueNameLooksGenerated ? 'Generated from the option label above' : undefined}
                   onValueChange={commit}
                 />
               </StackItem>

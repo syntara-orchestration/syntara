@@ -681,6 +681,8 @@ export default tseslint.config(
       '**/routes/**/Glossary.tsx',
       '**/routes/**/Settings.tsx',
       '**/routes/**/Approvals.tsx',
+      '**/routes/**/Tasks.tsx',
+      '**/routes/**/TasksAccessGate.tsx',
       '**/routes/**/Authentication.tsx',
       '**/routes/**/Credentials.tsx',
       '**/routes/**/CredentialDetail.tsx',

@@ -136,6 +136,7 @@ class TestFormPromptValidation:
             "created_at",
             "updated_at",
             "name",
+            "workflow_name",
             "timeout_at",
             "responded_at",
             "status",

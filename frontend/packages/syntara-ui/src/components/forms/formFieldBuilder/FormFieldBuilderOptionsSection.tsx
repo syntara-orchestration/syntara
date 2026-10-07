@@ -8,7 +8,7 @@ import { SynTextField } from '../SynTextField'
 import { defaultDynamicOptionsSource, defaultStaticOptionsSource } from './createDefaultField'
 import styles from './formFieldBuilder.module.css'
 import { useFormFieldBuilderCommit } from './formFieldBuilderCommitContext'
-import { FORM_FIELD_BUILDER_LABEL_HELP, formFieldBuilderLabelHelp } from './formFieldBuilderFieldHelp'
+import { formFieldBuilderLabelHelp } from './formFieldBuilderFieldHelp'
 import { StaticOptionsEditor } from './StaticOptionsEditor'
 
 type OptionsFormField = Extract<
@@ -108,7 +108,7 @@ export function FormFieldBuilderOptionsSection({
             isRequired
             isDisabled={isDisabled}
             placeholder="e.g. ${trigger.environments}"
-            hint={FORM_FIELD_BUILDER_LABEL_HELP.dynamicOptionsExpression}
+            labelHelp={formFieldBuilderLabelHelp('dynamicOptionsExpression', 'Dynamic options expression')}
             onValueChange={commit}
           />
           <SynTextField
@@ -119,7 +119,7 @@ export function FormFieldBuilderOptionsSection({
             isRequired
             isDisabled={isDisabled}
             placeholder="e.g. name"
-            hint="Object property containing each option's display label."
+            labelHelp={formFieldBuilderLabelHelp('dynamicOptionsLabelKey', 'Label key')}
             onValueChange={commit}
           />
           <SynTextField
@@ -130,7 +130,7 @@ export function FormFieldBuilderOptionsSection({
             isRequired
             isDisabled={isDisabled}
             placeholder="e.g. id"
-            hint="Object property containing each option's submitted value."
+            labelHelp={formFieldBuilderLabelHelp('dynamicOptionsValueKey', 'Value key')}
             onValueChange={commit}
           />
         </div>

@@ -110,6 +110,7 @@ vi.mock('./useApprovalPermissions', () => ({
     canRead: true,
     canDecide: true,
     isChecking: false,
+    isError: false,
     tooltips: {
       decide: 'To decide on approvals, you need a role with the approval:decide policy.',
     },
@@ -530,16 +531,13 @@ describe('Approvals Component', () => {
   })
 
   describe('Row Expansion', () => {
-    // mockApprovals[0] is pending with no decision_notes, so it has no expand toggle.
-    // Only mockApprovals[1] (approved) and mockApprovals[2] (rejected) are expandable.
-
-    it('does not render an expand toggle for the pending approval with no decision notes', async () => {
+    it('renders an expand toggle on every approval row', async () => {
       mockApprovalsQuery(mockApprovals)
 
       render(<Approvals />)
 
       const expandButtons = await screen.findAllByRole('button', { name: /details/i })
-      expect(expandButtons).toHaveLength(2)
+      expect(expandButtons).toHaveLength(3)
     })
 
     it('expands a row when clicking the expand button', async () => {
@@ -548,9 +546,8 @@ describe('Approvals Component', () => {
 
       render(<Approvals />)
 
-      // First expand toggle belongs to mockApprovals[1] (the first expandable row)
       const expandButtons = await screen.findAllByRole('button', { name: /details/i })
-      await user.click(expandButtons[0])
+      await user.click(expandButtons[1])
 
       expect(screen.getByText('Approval notes')).toBeInTheDocument()
       expect(screen.getByText('Approved after review')).toBeInTheDocument()
@@ -565,10 +562,10 @@ describe('Approvals Component', () => {
       const expandButtons = await screen.findAllByRole('button', { name: /details/i })
 
       // Expand then collapse
-      await user.click(expandButtons[0])
+      await user.click(expandButtons[1])
       expect(screen.getByText('Approved after review')).toBeInTheDocument()
 
-      await user.click(expandButtons[0])
+      await user.click(expandButtons[1])
       // Row toggle was clicked again - state should be collapsed
       // The expanded row content is still in DOM but the row state changes
       expect(expandButtons[0]).toBeInTheDocument()
@@ -584,7 +581,6 @@ describe('Approvals Component', () => {
       const expandAllButton = await screen.findByRole('button', { name: /expand all/i })
       await user.click(expandAllButton)
 
-      // Both expandable approvals' notes should be visible
       expect(screen.getByText('Approved after review')).toBeInTheDocument()
       expect(screen.getByText('Rejected due to policy violation')).toBeInTheDocument()
     })
@@ -610,7 +606,7 @@ describe('Approvals Component', () => {
       expect(expandAllButton).toBeInTheDocument()
     })
 
-    it('hides the header expand-all toggle when no approvals have decision notes', async () => {
+    it('shows expand controls when decision notes are empty', async () => {
       const pendingOnly = {
         ...mockApprovals[0],
         id: 'no-notes-approval',
@@ -619,10 +615,8 @@ describe('Approvals Component', () => {
 
       render(<Approvals />)
 
-      await waitFor(() => {
-        expect(screen.queryByRole('button', { name: /expand all/i })).not.toBeInTheDocument()
-      })
-      expect(screen.queryByRole('button', { name: /details/i })).not.toBeInTheDocument()
+      expect(await screen.findByRole('button', { name: /expand all/i })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /details/i })).toBeInTheDocument()
     })
   })
 
@@ -1320,6 +1314,7 @@ describe('Approvals Component', () => {
         canRead: true,
         canDecide: true,
         isChecking: false,
+        isError: false,
         tooltips: {
           decide: 'To decide on approvals, you need a role with the approval:decide policy.',
         },
@@ -1331,6 +1326,7 @@ describe('Approvals Component', () => {
         canRead: false,
         canDecide: false,
         isChecking: true,
+        isError: false,
         tooltips: {
           decide: 'To decide on approvals, you need a role with the approval:decide policy.',
         },
@@ -1347,6 +1343,7 @@ describe('Approvals Component', () => {
         canRead: false,
         canDecide: false,
         isChecking: false,
+        isError: false,
         tooltips: {
           decide: 'To decide on approvals, you need a role with the approval:decide policy.',
         },
@@ -1386,6 +1383,7 @@ describe('Approvals Component', () => {
         canRead: true,
         canDecide: false,
         isChecking: false,
+        isError: false,
         tooltips: {
           decide: 'To decide on approvals, you need a role with the approval:decide policy.',
         },

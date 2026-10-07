@@ -10,6 +10,7 @@ import { axe } from 'vitest-axe'
 import { FormFieldTypeEnum, formDefinitionToJsonSchemaString, parseFormDefinition } from '../../forms'
 
 import { createEmptyFormDefinition } from './formFieldBuilder/createDefaultField'
+import { FORM_FIELD_BUILDER_INITIAL_ANSWER_DYNAMIC_UNAVAILABLE_HINT } from './formFieldBuilder/formFieldBuilderInitialAnswerCopy'
 import { SynFormFieldBuilder, type SynFormFieldBuilderProps } from './SynFormFieldBuilder'
 
 function renderBuilder(ui: ReactElement) {
@@ -279,7 +280,7 @@ describe('SynFormFieldBuilder', () => {
         fields: [{ type: FormFieldTypeEnum.DATE, value_name: 'due', label: 'Due', default: null }],
       })
       renderBuilder(<SynFormFieldBuilder value={definition} onChange={vi.fn()} />)
-      const dateInput = screen.getByRole('textbox', { name: 'Default date' })
+      const dateInput = screen.getByRole('textbox', { name: 'Initial answer date' })
       await user.type(dateInput, '2026-03-15')
       expect(dateInput).toHaveValue('2026-03-15')
     })
@@ -291,7 +292,7 @@ describe('SynFormFieldBuilder', () => {
       })
       renderBuilder(<SynFormFieldBuilder value={definition} onChange={vi.fn()} />)
       expect(screen.getByRole('textbox', { name: 'Checkbox label' })).toBeInTheDocument()
-      const defaultChecked = screen.getByRole('checkbox', { name: /Default to checked/ })
+      const defaultChecked = screen.getByRole('checkbox', { name: /Initially checked/ })
       expect(defaultChecked).not.toBeChecked()
       await user.click(defaultChecked)
       expect(defaultChecked).toBeChecked()
@@ -318,7 +319,7 @@ describe('SynFormFieldBuilder', () => {
         fields: [{ type: FormFieldTypeEnum.NUMBER, value_name: 'qty', label: 'Qty', default: null }],
       })
       renderBuilder(<SynFormFieldBuilder value={definition} onChange={vi.fn()} />)
-      const defaultInput = screen.getByRole('spinbutton', { name: 'Default value' })
+      const defaultInput = screen.getByRole('spinbutton', { name: 'Initial answer' })
       await user.type(defaultInput, '12.5')
       expect(defaultInput).toHaveValue(12.5)
     })
@@ -326,7 +327,7 @@ describe('SynFormFieldBuilder', () => {
     it('accepts text default value', async () => {
       const user = userEvent.setup()
       renderBuilder(<SynFormFieldBuilder value={createEmptyFormDefinition()} onChange={vi.fn()} />)
-      const defaultInput = screen.getByRole('textbox', { name: 'Default value' })
+      const defaultInput = screen.getByRole('textbox', { name: 'Initial answer' })
       await user.type(defaultInput, 'preset')
       expect(defaultInput).toHaveValue('preset')
     })
@@ -335,9 +336,9 @@ describe('SynFormFieldBuilder', () => {
       const user = userEvent.setup()
       renderBuilder(<SynFormFieldBuilder value={dropdownFieldDefinition()} onChange={vi.fn()} />)
 
-      await user.click(screen.getByRole('button', { name: 'Default value' }))
+      await user.click(screen.getByRole('button', { name: 'Initial answer' }))
       await user.click(screen.getByRole('option', { name: 'Beta' }))
-      expect(screen.getByRole('button', { name: 'Default value' })).toHaveTextContent('Beta')
+      expect(screen.getByRole('button', { name: 'Initial answer' })).toHaveTextContent('Beta')
     })
 
     it('toggles multi-select default checkboxes', async () => {
@@ -360,9 +361,7 @@ describe('SynFormFieldBuilder', () => {
       renderBuilder(<SynFormFieldBuilder value={dropdownFieldDefinition()} onChange={onChange} />)
 
       await user.click(screen.getByRole('button', { name: 'Dynamic' }))
-      expect(
-        screen.getByText(/Default values are not available when options are populated dynamically/i)
-      ).toBeInTheDocument()
+      expect(screen.getByText(FORM_FIELD_BUILDER_INITIAL_ANSWER_DYNAMIC_UNAVAILABLE_HINT)).toBeInTheDocument()
       await user.type(screen.getByRole('textbox', { name: 'Dynamic options expression' }), 'steps.envs')
       expect(screen.getByRole('textbox', { name: 'Dynamic options expression' })).toHaveValue('steps.envs')
       expect(onChange).not.toHaveBeenCalled()
@@ -384,12 +383,12 @@ describe('SynFormFieldBuilder', () => {
       const user = userEvent.setup()
       renderBuilder(<SynFormFieldBuilder value={dropdownFieldDefinition()} onChange={vi.fn()} />)
 
-      const displayLabel = screen.getAllByRole('textbox', { name: 'Display label' })[0]
+      const displayLabel = screen.getAllByRole('textbox', { name: 'Option label' })[0]
       await user.clear(displayLabel)
       await user.type(displayLabel, 'First choice')
 
       await user.click(screen.getByRole('button', { name: 'Remove option 2 for Choice' }))
-      expect(screen.getAllByRole('textbox', { name: 'Display label' })).toHaveLength(1)
+      expect(screen.getAllByRole('textbox', { name: 'Option label' })).toHaveLength(1)
     })
 
     it('exposes label help for field settings', () => {

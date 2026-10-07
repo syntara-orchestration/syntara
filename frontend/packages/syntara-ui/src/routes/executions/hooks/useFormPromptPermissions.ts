@@ -1,7 +1,8 @@
 import { useMemo } from 'react'
 
-import { permissionTooltip } from '../../../hooks/permissionUtils'
+import { isSystemScope, permissionTooltip, projectScopedNames } from '../../../hooks/permissionUtils'
 import { useCanI } from '../../../hooks/useCanI'
+import { useAllPermissions } from '../../access/useAllPermissions'
 
 /** Permission checks for form prompt read/submit in execution and tasks flows. */
 export function useFormPromptPermissions(projectId?: string | null) {
@@ -10,10 +11,20 @@ export function useFormPromptPermissions(projectId?: string | null) {
   const canSubmitProjectQuery = useCanI('submit', 'form_prompt', projectId ? { resourceProject: projectId } : undefined)
 
   const canReadProjectQuery = useCanI('read', 'form_prompt', projectId ? { resourceProject: projectId } : undefined)
+  const { permissions, isLoading: isLoadingAllPermissions } = useAllPermissions()
+
+  const { canReadAnyProject, canSubmitAnyProject } = useMemo(() => {
+    const readEntries = permissions.filter((p) => p.effect === 'allow' && p.actions.includes('form_prompt:read'))
+    const submitEntries = permissions.filter((p) => p.effect === 'allow' && p.actions.includes('form_prompt:submit'))
+    return {
+      canReadAnyProject: readEntries.some(isSystemScope) || projectScopedNames(readEntries).size > 0,
+      canSubmitAnyProject: submitEntries.some(isSystemScope) || projectScopedNames(submitEntries).size > 0,
+    }
+  }, [permissions])
 
   return useMemo(() => {
-    const canSubmit = canSubmitGlobalQuery.allowed || canSubmitProjectQuery.allowed
-    const canRead = canReadGlobalQuery.allowed || canReadProjectQuery.allowed
+    const canSubmit = canSubmitGlobalQuery.allowed || canSubmitProjectQuery.allowed || canSubmitAnyProject
+    const canRead = canReadGlobalQuery.allowed || canReadProjectQuery.allowed || canReadAnyProject
 
     return {
       canRead,
@@ -22,7 +33,8 @@ export function useFormPromptPermissions(projectId?: string | null) {
         canReadGlobalQuery.isChecking ||
         canReadProjectQuery.isChecking ||
         canSubmitGlobalQuery.isChecking ||
-        canSubmitProjectQuery.isChecking,
+        canSubmitProjectQuery.isChecking ||
+        isLoadingAllPermissions,
       isError:
         canReadGlobalQuery.isError ||
         canReadProjectQuery.isError ||
@@ -45,5 +57,8 @@ export function useFormPromptPermissions(projectId?: string | null) {
     canSubmitProjectQuery.allowed,
     canSubmitProjectQuery.isChecking,
     canSubmitProjectQuery.isError,
+    canReadAnyProject,
+    canSubmitAnyProject,
+    isLoadingAllPermissions,
   ])
 }

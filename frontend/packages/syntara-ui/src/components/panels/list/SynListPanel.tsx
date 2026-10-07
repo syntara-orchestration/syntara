@@ -88,8 +88,10 @@ export type SynListPanelViewProps = {
    */
   toolbar?: ReactNode
   /**
-   * Background refetch in progress — disables toolbar interaction while the body (the table)
-   * continues to render. Wire to TanStack Query's `query.isFetching`.
+   * Background refetch in progress. Wire to TanStack Query's `query.isFetching`.
+   *
+   * The toolbar is disabled only while fetching and the table is not yet shown (empty/error);
+   * during a background refetch with data on screen, filters stay interactive.
    *
    * Consumers should swap `<Tbody>` for `<SynListPanelSkeletonTbody>` when this is true so rows
    * animate while the fresh data loads. Do NOT use this for the initial load — use `isPending`.
@@ -150,16 +152,17 @@ export function SynListPanelView({
 }: SynListPanelViewProps) {
   const showBody = !isPending && !error && !isEmpty
   const tabCtx = useSynListPanelTabContext()
+  const disableToolbar = Boolean(isFetching && !showBody)
 
   const content = (
     <>
       {!isPending && toolbar && (
         <StackItem>
           <fieldset
-            disabled={isFetching}
-            className={isFetching ? `${styles.toolbarFieldset} ${styles.toolbarDisabled}` : styles.toolbarFieldset}
+            disabled={disableToolbar}
+            className={disableToolbar ? `${styles.toolbarFieldset} ${styles.toolbarDisabled}` : styles.toolbarFieldset}
           >
-            {isFetching && <legend className="pf-v6-u-screen-reader">Filters — loading</legend>}
+            {disableToolbar && <legend className="pf-v6-u-screen-reader">Filters — loading</legend>}
             {toolbar}
           </fieldset>
         </StackItem>
