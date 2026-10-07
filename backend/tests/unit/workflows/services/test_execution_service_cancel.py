@@ -60,10 +60,17 @@ class TestCancelExecution:
             temporal_service=mock_temporal,
         )
 
-        with patch(
-            "syntara.workflows.services.invocation_cancellation.cancel_invocations_for_execution",
-            new_callable=AsyncMock,
-            return_value=[],
+        with (
+            patch(
+                "syntara.workflows.services.invocation_cancellation.cancel_invocations_for_execution",
+                new_callable=AsyncMock,
+                return_value=[],
+            ),
+            patch(
+                "syntara.workflows.services.execution_service.request_ep_cancellation_for_workflow",
+                new_callable=AsyncMock,
+                return_value=0,
+            ),
         ):
             await service.cancel_execution(execution.id)
 
@@ -153,7 +160,14 @@ class TestCancelExecution:
             temporal_service=mock_temporal,
         )
 
-        with pytest.raises(RPCError):
+        with (
+            patch(
+                "syntara.workflows.services.execution_service.request_ep_cancellation_for_workflow",
+                new_callable=AsyncMock,
+                return_value=0,
+            ),
+            pytest.raises(RPCError),
+        ):
             await service.cancel_execution(execution.id)
 
     @pytest.mark.asyncio
@@ -178,11 +192,18 @@ class TestCancelExecution:
             temporal_service=mock_temporal,
         )
 
-        with patch(
-            "syntara.workflows.services.invocation_cancellation.cancel_invocations_for_execution",
-            new_callable=AsyncMock,
-            return_value=[],
-        ) as mock_cancel:
+        with (
+            patch(
+                "syntara.workflows.services.invocation_cancellation.cancel_invocations_for_execution",
+                new_callable=AsyncMock,
+                return_value=[],
+            ) as mock_cancel,
+            patch(
+                "syntara.workflows.services.execution_service.request_ep_cancellation_for_workflow",
+                new_callable=AsyncMock,
+                return_value=0,
+            ),
+        ):
             await service.cancel_execution(execution.id)
 
         mock_cancel.assert_awaited_once()
@@ -215,10 +236,17 @@ class TestCancelExecution:
             temporal_service=mock_temporal,
         )
 
-        with patch(
-            "syntara.workflows.services.invocation_cancellation.cancel_invocations_for_execution",
-            new_callable=AsyncMock,
-            side_effect=Exception("DB unavailable"),
+        with (
+            patch(
+                "syntara.workflows.services.invocation_cancellation.cancel_invocations_for_execution",
+                new_callable=AsyncMock,
+                side_effect=Exception("DB unavailable"),
+            ),
+            patch(
+                "syntara.workflows.services.execution_service.request_ep_cancellation_for_workflow",
+                new_callable=AsyncMock,
+                return_value=0,
+            ),
         ):
             await service.cancel_execution(execution.id)
 
