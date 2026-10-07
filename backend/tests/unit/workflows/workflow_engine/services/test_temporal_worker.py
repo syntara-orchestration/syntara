@@ -87,11 +87,11 @@ class TestTemporalWorkerServiceStart:
         create_task_called = False
         original_create_task = asyncio.create_task
 
-        def mock_create_task(coro: Coroutine[Any, Any, None]) -> asyncio.Task[None]:
+        def mock_create_task(coro: Coroutine[Any, Any, None], *, name: str | None = None) -> asyncio.Task[None]:
             nonlocal create_task_called
             create_task_called = True
             # Use the original create_task to avoid recursion
-            return original_create_task(coro)
+            return original_create_task(coro, name=name)
 
         with (
             patch(
@@ -132,9 +132,9 @@ class TestTemporalWorkerServiceStart:
 
         original_create_task = asyncio.create_task
 
-        def mock_create_task(coro: Coroutine[Any, Any, None]) -> asyncio.Task[None]:
+        def mock_create_task(coro: Coroutine[Any, Any, None], *, name: str | None = None) -> asyncio.Task[None]:
             # Use the original create_task to avoid recursion
-            return original_create_task(coro)
+            return original_create_task(coro, name=name)
 
         with (
             patch(
@@ -178,8 +178,8 @@ class TestTemporalWorkerServiceStart:
 
         original_create_task = asyncio.create_task
 
-        def mock_create_task(coro: Coroutine[Any, Any, None]) -> asyncio.Task[None]:
-            return original_create_task(coro)
+        def mock_create_task(coro: Coroutine[Any, Any, None], *, name: str | None = None) -> asyncio.Task[None]:
+            return original_create_task(coro, name=name)
 
         with (
             patch(
@@ -235,8 +235,8 @@ class TestTemporalWorkerServiceStart:
 
         original_create_task = asyncio.create_task
 
-        def mock_create_task(coro: Coroutine[Any, Any, None]) -> asyncio.Task[None]:
-            return original_create_task(coro)
+        def mock_create_task(coro: Coroutine[Any, Any, None], *, name: str | None = None) -> asyncio.Task[None]:
+            return original_create_task(coro, name=name)
 
         with (
             patch(
@@ -279,8 +279,8 @@ class TestTemporalWorkerServiceStart:
 
         original_create_task = asyncio.create_task
 
-        def mock_create_task(coro: Coroutine[Any, Any, None]) -> asyncio.Task[None]:
-            return original_create_task(coro)
+        def mock_create_task(coro: Coroutine[Any, Any, None], *, name: str | None = None) -> asyncio.Task[None]:
+            return original_create_task(coro, name=name)
 
         with (
             patch(
@@ -511,9 +511,9 @@ class TestGlobalWorkerManagement:
 
         original_create_task = asyncio.create_task
 
-        def mock_create_task(coro: Coroutine[Any, Any, None]) -> asyncio.Task[None]:
+        def mock_create_task(coro: Coroutine[Any, Any, None], *, name: str | None = None) -> asyncio.Task[None]:
             # Use the original create_task to avoid recursion
-            return original_create_task(coro)
+            return original_create_task(coro, name=name)
 
         with (
             patch(
@@ -558,8 +558,8 @@ class TestGlobalWorkerManagement:
 
         original_create_task = asyncio.create_task
 
-        def mock_create_task(coro: Coroutine[Any, Any, None]) -> asyncio.Task[None]:
-            return original_create_task(coro)
+        def mock_create_task(coro: Coroutine[Any, Any, None], *, name: str | None = None) -> asyncio.Task[None]:
+            return original_create_task(coro, name=name)
 
         with (
             patch(
@@ -674,9 +674,9 @@ class TestTemporalWorkerServiceLogging:
 
         original_create_task = asyncio.create_task
 
-        def mock_create_task(coro: Coroutine[Any, Any, None]) -> asyncio.Task[None]:
+        def mock_create_task(coro: Coroutine[Any, Any, None], *, name: str | None = None) -> asyncio.Task[None]:
             # Use the original create_task to avoid recursion
-            return original_create_task(coro)
+            return original_create_task(coro, name=name)
 
         with (
             patch(
@@ -888,8 +888,8 @@ class TestActivityQueueingBehavior:
 
         original_create_task = asyncio.create_task
 
-        def mock_create_task(coro: Coroutine[Any, Any, None]) -> asyncio.Task[None]:
-            return original_create_task(coro)
+        def mock_create_task(coro: Coroutine[Any, Any, None], *, name: str | None = None) -> asyncio.Task[None]:
+            return original_create_task(coro, name=name)
 
         with (
             patch(
