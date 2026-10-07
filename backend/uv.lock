@@ -12,7 +12,7 @@ constraints = [
     { name = "attrs", specifier = "<26" },
     { name = "confection", specifier = "<1" },
     { name = "joserfc", specifier = ">=1.6.8" },
-    { name = "langgraph-sdk", specifier = ">=0.4.4" },
+    { name = "langgraph-sdk", specifier = ">=0.4.5" },
     { name = "protobuf", specifier = "<7" },
     { name = "rich", specifier = "<15" },
     { name = "setuptools", specifier = "<83" },
