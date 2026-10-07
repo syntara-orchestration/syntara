@@ -47,7 +47,7 @@ export function useCredentialFormModal({
   const { projects, isLoading: isLoadingProjects, error: projectsError } = useSelectableProjects()
   const [touchedSecrets, setTouchedSecrets] = useState<Set<string>>(() => new Set())
 
-  const { handleSubmit, handleError, handleClose, reset, setValue, setError, control } = form
+  const { handleSubmit, handleError, handleClose, reset, setValue, setError, getValues, control } = form
 
   const selectedTypeId = useWatch({ control, name: 'credential_type_id' }) ?? ''
   const inputs = useWatch({ control, name: 'inputs' }) ?? {}
@@ -150,12 +150,12 @@ export function useCredentialFormModal({
       setValue('credential_type_id', resolvedTypeId)
     }
 
-    const defaultInputs = getDefaultInputs(resolvedType)
-    const hasInputs = Object.keys(inputs).length > 0
+    const currentInputs = getValues('inputs') ?? {}
+    const hasInputs = Object.keys(currentInputs).length > 0
     if (!hasInputs) {
-      setValue('inputs', defaultInputs)
+      setValue('inputs', getDefaultInputs(resolvedType))
     }
-  }, [isOpen, isEditMode, types, selectedTypeId, preSelectedTypeId, inputs, setValue])
+  }, [isOpen, isEditMode, types, selectedTypeId, preSelectedTypeId, setValue, getValues, resetKey])
 
   const isTypeSelectDisabled = isEditMode || Boolean(preSelectedTypeId) || typesQuery.isLoading
 
