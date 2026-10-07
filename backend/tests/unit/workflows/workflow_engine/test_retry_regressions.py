@@ -94,6 +94,7 @@ def _wf(retry_context: dict[str, Any] | None = None) -> OrchestratorWorkflow:
     wf._retry_replay_candidates = set()
     wf._restored_node_timestamps = {}
     wf._restored_node_statuses = {}
+    wf._restored_node_outputs = {}
     wf.resolver = NamespaceResolver()
     wf.skipped_nodes = set()
     wf.failed_nodes = {}
