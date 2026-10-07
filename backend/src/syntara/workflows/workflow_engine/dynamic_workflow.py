@@ -54,6 +54,7 @@ from syntara.workflows.workflow_engine.models.workflow_definition import (
     LoopType,
     NodeType,
 )
+from syntara.workflows.workflow_engine.retry_mixin import WorkflowRetryMixin
 from syntara.workflows.workflow_engine.unified_eval import safe_eval_with_namespace
 from syntara.workflows.workflow_engine.utils.loop_iteration_ids import loop_control_activity_id
 
@@ -81,7 +82,7 @@ def _parse_items(items: Any) -> Any:  # noqa: ANN401
 
 
 @workflow.defn(name="orchestrator_workflow")
-class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
+class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowApprovalMixin):
     """Temporal workflow for executing v2 graph-based workflows."""
 
     @workflow.run
@@ -142,6 +143,7 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
             self._build_converge_branch_nodes_index(graph)
             # Scope skips non-trigger nodes; _execute_trigger handles trigger skipping separately.
             self._apply_execution_scope(graph)
+            await self._prepare_retry(graph)
 
             pending_tasks: dict[str, asyncio.Task[Any]] = {}
             await self._execute_trigger(trigger_node_id, trigger_inputs, graph, pending_tasks)
@@ -175,8 +177,19 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
 
         self._project_id: str = ""
         self._created_by_user_id: str = ""
+        # The retry block is control-plane state, not expression data: a user
+        # expression must not be able to read eligible_point_ids or the input
+        # overrides. Pulled out before the namespace loop so it is never
+        # registered, rather than popped afterwards.
+        self.retry_context: dict[str, Any] = dict(workflow_metadata.get("retry", {})) if workflow_metadata else {}
+        # Memoised restorable set: derived from the graph and the retry context,
+        # neither of which changes during a run.
+        self._retry_restorable_cache: set[str] | None = None
+        self._retry_source_statuses: dict[str, str] = {}
         if workflow_metadata:
             for ns_key, ns_data in workflow_metadata.items():
+                if ns_key == "retry":
+                    continue
                 self.resolver.set_namespace(ns_key, ns_data)
             wf_ctx = workflow_metadata.get("workflow_context", {})
             self._project_id = wf_ctx.get("workflow", {}).get("project_id", "")
@@ -712,6 +725,12 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
             return True
 
         if successor.type == NodeType.CONVERGE:
+            if (
+                self.retry_context
+                and self._retry_source_statuses.get(node_id) == "completed"
+                and self._should_restore_node(node_id, graph)
+            ):
+                return False
             return self._handle_converge_successor(node_id, successor, graph, pending_tasks)
 
         return False
@@ -1367,15 +1386,14 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         """
         # Pre-resolved outputs: skip execution and use mocked output
         if node.id in self.pre_resolved_outputs:
-            self.node_inputs[node.id] = {PRE_RESOLVED_MARKER: True}
+            return self._process_supplied_result(node, self.pre_resolved_outputs[node.id])
 
-            if node.type == NodeType.LOOP and node.id not in self.loop_state:
-                loop_type = node.parameters.get("type", LoopType.FOR_EACH)
-                self.loop_state[node.id] = self._create_loop_state_for_type(loop_type, node)
-                if node.id not in self.loop_iteration_results:
-                    self.loop_iteration_results[node.id] = {}
-
-            return self._process_node_result(node, self.pre_resolved_outputs[node.id])
+        # Retry-from-failure: a node that completed upstream of the failure
+        # point is skipped and its stored output injected. Checked after
+        # pre_resolved_outputs so an explicit mock still wins.
+        restored = await self._maybe_restore_retry_output(node, graph)
+        if restored is not None:
+            return self._process_supplied_result(node, restored)
 
         node_id = node.id
         node_type = node.type
@@ -1410,6 +1428,13 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         else:
             # For all other nodes: standard resolution (Tier 1)
             resolved_parameters = self._resolve_node_parameters(node)
+
+        # Applied for every node type, not just the standard-resolution branch.
+        # condition and switch build their parameters from raw templates, and the
+        # control plane accepts an override on any failed node, so restricting
+        # this to the else branch dropped a validated override with no warning.
+        if self.retry_context:
+            self._apply_input_overrides(node, resolved_parameters)
 
         timeout_seconds = resolve_timeout(node, self._runtime_settings)
         self.node_inputs[node.id] = copy.deepcopy(resolved_parameters)
@@ -1606,6 +1631,24 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
             return await self._execute_loop_node(node_id, node, resolved_parameters, timeout_seconds=timeout_seconds)
 
         return {"output": {"status": "skipped", "reason": f"Unsupported node type: {node_type}"}}
+
+    def _process_supplied_result(self, node: ActivityNode, result: dict[str, Any]) -> dict[str, Any]:
+        """Bypass dispatch for a supplied result; normal completion publishes it.
+
+        Shared by single-step mocks and retry restoration. Do not publish a
+        namespace here: successors must observe completion in the scheduler.
+        """
+        # Only when nothing has recorded an input yet. A retry-restored node
+        # publishes its source run's stored input before reaching here, and
+        # overwriting it with the marker would blank the input that
+        # get_activity_input serves to drill-down. Single-step mocks reach this
+        # with no recorded input, so the marker still marks them.
+        self.node_inputs.setdefault(node.id, {PRE_RESOLVED_MARKER: True})
+        if node.type == NodeType.LOOP and node.id not in self.loop_state:
+            loop_type = node.parameters.get("type", LoopType.FOR_EACH)
+            self.loop_state[node.id] = self._create_loop_state_for_type(loop_type, node)
+            self.loop_iteration_results.setdefault(node.id, {})
+        return self._process_node_result(node, result)
 
     def _process_node_result(self, node: ActivityNode, result: dict[str, Any]) -> dict[str, Any]:
         """Extract control data and output from an activity result."""

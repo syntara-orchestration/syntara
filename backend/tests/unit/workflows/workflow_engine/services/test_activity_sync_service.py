@@ -5913,6 +5913,9 @@ class TestActivitySyncPreservesIoOnQueryFailure:
         handle.query.side_effect = RPCError(
             "sticky cache evicted", status=RPCStatusCode.UNAVAILABLE, raw_grpc_status=b""
         )
+        # Every completed activity asks the workflow for replayed source times,
+        # and an ordinary run answers None straight away.
+        handle.execute_update = AsyncMock(return_value=None)
 
         metadata = create_test_metadata(
             execution_id=self.execution_id,

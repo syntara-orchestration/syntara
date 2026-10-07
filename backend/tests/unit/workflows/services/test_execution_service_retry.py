@@ -11,6 +11,7 @@ from syntara.workflows.exceptions import (
     ExecutionNotFoundError,
     ExecutionNotRetryableError,
 )
+from syntara.workflows.models.activity_execution import ActivityExecution
 from syntara.workflows.models.execution import Execution, ExecutionMode, ExecutionStatus
 from syntara.workflows.models.workflow import Workflow
 from syntara.workflows.models.workflow_version import WorkflowVersion
@@ -59,8 +60,12 @@ def _make_version(version_id=None) -> WorkflowVersion:
 def _mock_session_with_two_queries(
     execution: Execution | None,
     version: WorkflowVersion | None,
+    source_rows: list[ActivityExecution] | None = None,
 ) -> tuple[AsyncSession, Mock]:
-    """Mock session that returns execution on first exec(), version on second.
+    """Mock session that returns execution, version, then the source node rows.
+
+    The third query is the bulk copy a retry makes of its source run's rows, so it
+    answers with no rows unless a test asks for some.
 
     Returns the session and a separate Mock for .add() so callers can assert on it.
     """
@@ -70,9 +75,12 @@ def _mock_session_with_two_queries(
     version_result = Mock()
     version_result.one_or_none.return_value = version
 
+    source_result = Mock()
+    source_result.all.return_value = source_rows or []
+
     add_mock = Mock()
     mock_session = Mock(spec=AsyncSession)
-    mock_session.exec = AsyncMock(side_effect=[exec_result, version_result])
+    mock_session.exec = AsyncMock(side_effect=[exec_result, version_result, source_result])
     mock_session.add = add_mock
     mock_session.commit = AsyncMock()
     return mock_session, add_mock
@@ -269,8 +277,10 @@ class TestRetryExecution:
         exec_result.one_or_none.return_value = execution
         version_result = Mock()
         version_result.one_or_none.return_value = version
+        source_result = Mock()
+        source_result.all.return_value = []
         mock_session = Mock(spec=AsyncSession)
-        mock_session.exec = AsyncMock(side_effect=[exec_result, version_result])
+        mock_session.exec = AsyncMock(side_effect=[exec_result, version_result, source_result])
         mock_session.add = Mock()
         mock_session.commit = AsyncMock(side_effect=Exception("DB commit failed"))
         mock_user = Mock(spec=User)

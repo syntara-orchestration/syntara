@@ -321,6 +321,8 @@ class ActivityExecutionSyncMixin:
             activity_data: Activity update data from Temporal events
             existing_activities: Map of activity_name to existing ActivityExecution records
             session: Database session for creating new records
+            replayed_timestamps: Source timestamps resolved before this call, keyed
+                by activity id. Empty for an ordinary execution.
 
         Returns:
             Tuple of (activity, old_values, is_new) if updated, None if skipped.
@@ -386,6 +388,10 @@ class ActivityExecutionSyncMixin:
         if is_new and existing.iteration is not None:
             activity_data["iteration"] = existing.iteration
 
+        # A restored node's row was copied from the source run when this execution
+        # was created, so it already carries the source times and never reaches
+        # this path: a node that reaches here really executed, and Temporal's event
+        # times are the ones that belong to it.
         # Update existing activity and track old values for patch generation
         old_values = self._update_activity_record(
             existing,

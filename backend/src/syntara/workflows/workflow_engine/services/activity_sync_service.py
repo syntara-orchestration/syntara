@@ -437,6 +437,7 @@ class ActivitySyncService(
                 raise RuntimeError(msg)
 
             # Extract needed fields from execution
+            is_retry = execution.retried_from_execution_id is not None
             workflow_id = execution.workflow_id
             workflow_version_id = execution.workflow_version_id
             last_processed_event_id = execution.last_processed_event_id
@@ -492,6 +493,7 @@ class ActivitySyncService(
             workflow_id=workflow_id,
             request_id=request_id,
             workflow_name=workflow_name,
+            is_retry=is_retry,
             mode=mode,
             workflow_version=workflow_version,
             used_published=used_published,

@@ -54,6 +54,7 @@ class ExecutionMonitorMetadata:
         pending_sync_event_ids: Set of event IDs that need to be synced to database
         request_id: Optional X-Request-Id (UUID) from the originating HTTP request, for telemetry correlation
         workflow_name: Name of the workflow (for audit events)
+        is_retry: Whether this run is a retry from a prior execution's failure point
         mode: Execution mode of the run (standard, test, debug)
         workflow_version: Version number of the workflow definition used by this run
         used_published: Whether the run used the workflow's published version
@@ -73,6 +74,7 @@ class ExecutionMonitorMetadata:
     request_id: UUID | None = None
     workflow_run_timeout_seconds: float | None = None
     workflow_name: str | None = None
+    is_retry: bool = False
     mode: ExecutionMode | None = None
     workflow_version: int | None = None
     used_published: bool | None = None
