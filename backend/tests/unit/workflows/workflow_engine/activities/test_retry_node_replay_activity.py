@@ -369,11 +369,37 @@ async def test_an_unfinished_node_is_not_restorable() -> None:
 
 
 @pytest.mark.asyncio
-async def test_a_cancelled_node_is_restorable() -> None:
-    """CANCELLED is terminal, so it is carried like the others."""
-    rows = [_Row("cancelled_one", ActivityStatus.CANCELLED, None)]
+async def test_a_cancelled_node_is_not_restorable() -> None:
+    """A cancelled row is an interrupted node, not a node with recorded state.
 
-    result = await _run(rows, "cancelled_one")
+    Cancellation only rewrites unfinished rows — a node that had completed keeps its
+    real status and output — so a CANCELLED row carries a synthetic
+    "Workflow was cancelled" error and no output. Restoring it would report an
+    interrupted node as a failure, which sets the run's unhandled-failure flag for a
+    node that merely stopped. Absence makes the caller run it for real, which is what
+    a retry of a cancelled run should do.
+    """
+    rows = [_Row("cancelled_one", ActivityStatus.CANCELLED, None, error_details="Workflow was cancelled")]
+
+    assert await _run(rows, "cancelled_one") is None
+
+
+@pytest.mark.asyncio
+async def test_a_completed_node_in_a_cancelled_run_is_still_restorable() -> None:
+    """Cancelling a run does not invalidate the work that had already finished.
+
+    This is what makes retrying a cancelled run work: the completed nodes keep their
+    real status and output, so they restore, and only the interrupted ones have no
+    restorable record and run for real.
+    """
+    rows = [
+        _Row("finished", ActivityStatus.COMPLETED, {"result": "ok"}),
+        _Row("interrupted", ActivityStatus.CANCELLED, None, error_details="Workflow was cancelled"),
+    ]
+
+    result = await _run(rows, "finished")
 
     assert result is not None
-    assert result["status"] == "cancelled"
+    assert result["status"] == "completed"
+    assert result["output_data"] == {"result": "ok"}
+    assert await _run([rows[1]], "interrupted") is None
