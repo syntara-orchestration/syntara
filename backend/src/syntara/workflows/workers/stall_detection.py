@@ -4,7 +4,8 @@ Runs a database-only scanner that:
 
 1. Identifies running activities where ``started_at + expected_duration < now()``.
 2. Atomically claims them by setting ``stall_alert_at`` (permanent deduplication marker).
-3. Emits audit events, Segment telemetry, and Prometheus metrics for each newly claimed stall.
+3. Commits the claim, then emits best-effort audit events, Segment telemetry,
+   and Prometheus metrics for each newly claimed stall.
 
 Stall detection does NOT cancel, retry, or pause stalled activities. It provides
 observability and alerting only. Intervention logic belongs to AAP-92826.
@@ -69,13 +70,10 @@ async def detect_stalled_activities(
     Only rows successfully claimed by the update may produce audit events or
     telemetry increments.
 
-    Audit events are written to the transactional outbox in the same database
-    transaction as the activity claim. After all audit dispatches, the worker
-    verifies that the expected number of outbox records were added to the session.
-    If verification fails (audit disabled, handler not registered, or outbox write
-    error), the entire claim transaction is rolled back, guaranteeing at-least-once
-    delivery via the outbox pattern. Segment telemetry and Prometheus metrics are
-    best-effort and independent of audit.
+    The claim is committed first. Audit events are then dispatched best-effort
+    using ``AuditEventDispatcher.dispatch()`` without a session, consistent with
+    the application's existing audit-emission pattern. Segment telemetry and
+    Prometheus metrics are also best-effort and independent of audit.
 
     SDP Implementation (R23/AC-13):
     - Emits Segment event with anonymized properties (execution_mode, stalled_step_type)
@@ -92,9 +90,6 @@ async def detect_stalled_activities(
 
     now = datetime.now(UTC)
 
-    # Phase 1: Atomic claim + audit outbox write (single transaction).
-    # The UPDATE...RETURNING and AuditOutboxRecord INSERTs share one transaction,
-    # guaranteeing at-least-once audit delivery via the outbox pattern.
     async with session_factory() as session:
         stmt = (
             update(ActivityExecution)
@@ -113,50 +108,29 @@ async def detect_stalled_activities(
 
         result = await session.execute(stmt, {"now": now})
         claimed_rows = list(result.scalars().all())
-
-        # Write audit events to outbox in the same transaction as the claim.
-        # AuditEventDispatcher.dispatch() never raises — handler errors are
-        # logged at exception level inside the dispatcher.  The try/except
-        # is defensive: if event construction somehow fails for one activity,
-        # the remaining activities and the claim commit are not affected.
-        for activity in claimed_rows:
-            try:
-                event = NodeStalledEvent(
-                    activity_execution_id=activity.id,
-                    execution_id=activity.execution_id,
-                    activity_name=activity.activity_name,
-                    node_type=activity.node_type,
-                    expected_duration=activity.expected_duration,
-                    started_at=activity.started_at,
-                    stall_alert_at=activity.stall_alert_at,
-                )
-                AuditEventDispatcher.dispatch(event, session.sync_session)
-            except Exception:  # noqa: BLE001
-                logger.warning(
-                    "stall_detection_audit_enqueue_failed",
-                    activity_execution_id=str(activity.id),
-                    execution_id=str(activity.execution_id),
-                    exc_info=True,
-                )
-
-        # Verify audit outbox records were added before committing.
-        # The audit path has silent failure modes (audit disabled, handler
-        # not registered, outbox write failure). Explicit verification ensures
-        # the claim only commits if the outbox records are present.
-        from syntara.audit.outbox.models import AuditOutboxRecord  # noqa: PLC0415
-
-        outbox_records_added = sum(1 for obj in session.sync_session.new if isinstance(obj, AuditOutboxRecord))
-        if outbox_records_added != len(claimed_rows):
-            logger.error(
-                "stall_detection_audit_verification_failed",
-                claimed=len(claimed_rows),
-                outbox_records=outbox_records_added,
-                message="Audit outbox verification failed — rolling back claim transaction",
-            )
-            await session.rollback()
-            return
-
         await session.commit()
+
+    # Best-effort audit dispatch (after claim is committed).
+    # Follows the application's existing pattern: dispatch without a session.
+    for activity in claimed_rows:
+        try:
+            event = NodeStalledEvent(
+                activity_execution_id=activity.id,
+                execution_id=activity.execution_id,
+                activity_name=activity.activity_name,
+                node_type=activity.node_type,
+                expected_duration=activity.expected_duration,
+                started_at=activity.started_at,
+                stall_alert_at=activity.stall_alert_at,
+            )
+            AuditEventDispatcher.dispatch(event)
+        except Exception:  # noqa: BLE001
+            logger.warning(
+                "stall_detection_audit_dispatch_failed",
+                activity_execution_id=str(activity.id),
+                execution_id=str(activity.execution_id),
+                exc_info=True,
+            )
 
     if not claimed_rows:
         logger.debug("stall_detection_noop", cycle_time=now.isoformat())
