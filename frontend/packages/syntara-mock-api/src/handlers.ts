@@ -1985,6 +1985,12 @@ export const handlers = [
         } else if (field === 'status') {
           aVal = a.status || ''
           bVal = b.status || ''
+        } else if (field === 'workflow_name') {
+          aVal = a.workflow_context?.workflow_name || ''
+          bVal = b.workflow_context?.workflow_name || ''
+        } else if (field === 'decided_at') {
+          aVal = (a as { decided_at?: string }).decided_at || ''
+          bVal = (b as { decided_at?: string }).decided_at || ''
         }
         const cmp =
           typeof aVal === 'string' && typeof bVal === 'string'
