@@ -1,12 +1,17 @@
+import { zodResolver } from '@hookform/resolvers/zod'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useForm } from 'react-hook-form'
 import { describe, expect, it } from 'vitest'
 import { axe } from 'vitest-axe'
 
 import { IdentityProviderFormFields } from './IdentityProviderFormFields'
-import { identityProviderDefaults, type IdentityProviderFormData } from './identityProviderFormSchema'
+import {
+  identityProviderAddSchema,
+  identityProviderDefaults,
+  type IdentityProviderFormData,
+} from './identityProviderFormSchema'
 import { IdpTypeKey } from './idpTypePresets'
 
 const queryClient = new QueryClient({
@@ -28,9 +33,18 @@ const aapDefaults = {
   aapRoleMappingEnabled: true,
 }
 
-function TestWrapper({ isEdit = false, defaults }: { isEdit?: boolean; defaults?: IdentityProviderFormData }) {
+function TestWrapper({
+  isEdit = false,
+  defaults,
+  withValidation = false,
+}: {
+  isEdit?: boolean
+  defaults?: IdentityProviderFormData
+  withValidation?: boolean
+}) {
   const methods = useForm<IdentityProviderFormData>({
     defaultValues: defaults ?? completedDefaults,
+    ...(withValidation ? { resolver: zodResolver(identityProviderAddSchema) } : {}),
   })
 
   return (
@@ -92,6 +106,22 @@ describe('IdentityProviderFormFields', () => {
     expect(screen.getByText('openid')).toBeInTheDocument()
     expect(screen.getByText('profile')).toBeInTheDocument()
     expect(screen.getByText('email')).toBeInTheDocument()
+  })
+
+  it('shows scopes validation error when all scopes are removed and Next is clicked', async () => {
+    const user = userEvent.setup()
+    render(<TestWrapper withValidation />)
+
+    await user.click(screen.getByRole('button', { name: 'Remove openid' }))
+    await user.click(screen.getByRole('button', { name: 'Remove profile' }))
+    await user.click(screen.getByRole('button', { name: 'Remove email' }))
+
+    await user.click(screen.getByRole('button', { name: 'Next' }))
+
+    await waitFor(() => {
+      expect(screen.getByText('Scopes are required')).toBeInTheDocument()
+    })
+    expect(screen.getByRole('button', { name: /Provider configuration/ })).toHaveAttribute('aria-current', 'step')
   })
 
   it('hides manual endpoint fields when auto-discovery is enabled', () => {

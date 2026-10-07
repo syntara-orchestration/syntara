@@ -109,7 +109,7 @@ export function useSynForm<T extends FieldValues>({
     resolver: zodResolver(schema as ZodResolverSchema, undefined, { mode: 'sync' }) as Resolver<T>,
     defaultValues,
     values,
-    mode,
+    ...(mode !== undefined ? { mode } : {}),
   })
 
   const { reset, setError } = form

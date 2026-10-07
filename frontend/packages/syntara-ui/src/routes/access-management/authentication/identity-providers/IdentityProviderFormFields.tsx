@@ -40,12 +40,6 @@ import { IdpTypeKey, IDP_TYPE_OPTIONS, IDP_TYPE_PRESETS } from './idpTypePresets
 import { JmespathExpressionField } from './JmespathExpressionField'
 import { WizardNavFooter } from './WizardNavFooter'
 
-function getScopesHelperText(hasError: unknown, isPresetTemplate: boolean): string | undefined {
-  if (hasError) return undefined
-  if (isPresetTemplate) return 'Pre-configured by provider template. Select Custom to modify.'
-  return 'Type a scope and press Enter or comma to add'
-}
-
 type IdpTypeSelectDeps = Readonly<{
   onTypeChange: (value: string) => void
   onBlur: () => void
@@ -165,18 +159,22 @@ function IdpTypeField({ onTypeChange }: Readonly<{ onTypeChange: (value: string)
 }
 
 function ScopesField({ isPresetTemplate }: Readonly<{ isPresetTemplate: boolean }>) {
+  const scopesHint = isPresetTemplate
+    ? 'Pre-configured by provider template. Select Custom to modify.'
+    : 'Type a scope and press Enter or comma to add'
+
   return (
     <SynFormField<IdentityProviderFormData, 'scopes'>
       name="scopes"
       label="Scopes"
       fieldId="scopes"
       isRequired
+      hint={scopesHint}
       labelHelp={
         <FieldHelpPopover helpText="OAuth 2.0 scopes to request from the identity provider during authentication." />
       }
-      hideFooter
     >
-      {({ field, fieldState }) => {
+      {({ field }) => {
         const scopesList = field.value ? field.value.split(/\s+/).filter(Boolean) : []
         return (
           <TagInput
@@ -186,7 +184,6 @@ function ScopesField({ isPresetTemplate }: Readonly<{ isPresetTemplate: boolean 
             ariaLabel="Add scope"
             placeholder="openid"
             isDisabled={isPresetTemplate}
-            helperText={getScopesHelperText(fieldState.error, isPresetTemplate)}
           />
         )
       }}
