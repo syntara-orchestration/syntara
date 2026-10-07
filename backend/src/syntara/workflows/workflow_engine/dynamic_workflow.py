@@ -193,6 +193,7 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
         self._retry_replay_candidates: set[str] = set()
         self._restored_node_timestamps: dict[str, dict[str, str | None]] = {}
         self._restored_node_statuses: dict[str, str] = {}
+        self._restored_node_outputs: dict[str, dict[str, Any]] = {}
         self._retry_source_statuses: dict[str, str] = {}
         if workflow_metadata:
             for ns_key, ns_data in workflow_metadata.items():
@@ -397,7 +398,14 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
         message = self.failed_nodes.get(node_id) or f"Restored from a source run that ended {restored_status}"
         failure = SafeValueError(message)
         cof = resolve_continue_on_failure(node, self._runtime_settings)
-        self._handle_node_failure(node_id, failure, graph, pending_tasks, continue_on_failure=cof)
+        self._handle_node_failure(
+            node_id,
+            failure,
+            graph,
+            pending_tasks,
+            continue_on_failure=cof,
+            restored_output=self._restored_node_outputs.get(node_id),
+        )
         if cof:
             self._route_failed_node(node_id, node)
             await self._handle_continued_failure(node_id, node, graph, pending_tasks)
@@ -426,19 +434,23 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
         pending_tasks: dict[str, asyncio.Task[Any]] | None = None,
         *,
         continue_on_failure: bool = False,
+        restored_output: dict[str, Any] | None = None,
     ) -> None:
-        """Record a node failure; skip downstream unless continue_on_failure is set."""
+        """Record a node failure; skip downstream unless continue_on_failure is set.
+
+        ``restored_output`` carries the partial output a node produced before it
+        failed in the source run, when this failure was replayed rather than
+        re-raised. A live failure recovers the same thing from the executor's
+        ``ApplicationError.details``; a restored one has no exception to read it
+        from, so without this it would publish the node's declared output model
+        instead — losing whatever the source run actually produced. Downstream
+        expressions read that output as if the node had just run.
+        """
         app_error = self._extract_application_error(error)
         error_message = self._resolve_failure_message(node_id, error, app_error, graph)
         is_cancellation = app_error is not None and app_error.type == "InvocationCancelledError"
 
-        # Extract output from ApplicationError.details if executor attached it
-        namespace_entry: dict[str, Any] = {}
-        if app_error is not None:
-            for detail in app_error.details:
-                if isinstance(detail, dict) and "output" in detail:
-                    namespace_entry = detail["output"]
-                    break
+        namespace_entry = self._failure_namespace_entry(app_error, restored_output)
 
         # If no output from executor (e.g. parameters resolution failed), build empty output from model
         if not namespace_entry:
@@ -478,6 +490,26 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
             self._mark_downstream_as_skipped(node_id, graph)
         else:
             self._check_converge_successors(node_id, graph, pending_tasks)
+
+    @staticmethod
+    def _failure_namespace_entry(
+        app_error: ApplicationError | None,
+        restored_output: dict[str, Any] | None,
+    ) -> dict[str, Any]:
+        """Resolve what a failed node publishes to the namespace.
+
+        Three sources, in order: whatever the executor attached to the
+        ``ApplicationError``, then the output a replayed failure produced in its
+        source run, then nothing — the caller falls back to the node's declared
+        output model.
+        """
+        if app_error is not None:
+            for detail in app_error.details:
+                if isinstance(detail, dict) and "output" in detail:
+                    return cast("dict[str, Any]", detail["output"])
+        if restored_output is not None:
+            return dict(restored_output)
+        return {}
 
     @staticmethod
     def _extract_application_error(error: Exception) -> ApplicationError | None:
