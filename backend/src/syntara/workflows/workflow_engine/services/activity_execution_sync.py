@@ -214,9 +214,9 @@ class ActivityExecutionSyncMixin:
             activity_id = activity_data["activity_id"]
             if activity_id in resolved:
                 continue
-            restored_ts = await self._replayed_node_timestamps(metadata, handle, activity_id)
-            if restored_ts is not None:
-                resolved[activity_id] = restored_ts
+            replayed_ts = await self._replayed_node_timestamps(metadata, handle, activity_id)
+            if replayed_ts is not None:
+                resolved[activity_id] = replayed_ts
         return resolved
 
     async def _replayed_node_timestamps(
@@ -295,7 +295,7 @@ class ActivityExecutionSyncMixin:
 
     @staticmethod
     def _apply_replayed_timestamps(
-        restored_ts: dict[str, datetime | None] | None,
+        replayed_ts: dict[str, datetime | None] | None,
         activity_data: dict[str, Any],
     ) -> None:
         """Swap a replayed node's event times for its source-run timestamps.
@@ -305,12 +305,12 @@ class ActivityExecutionSyncMixin:
         reports when the work actually ran rather than when it was replayed.
         No-op for a node this retry did not replay.
         """
-        if restored_ts is None:
+        if replayed_ts is None:
             return
-        if restored_ts.get("started_at") is not None:
-            activity_data["started_at"] = restored_ts["started_at"]
-        if restored_ts.get("completed_at") is not None and activity_data.get("status") == ActivityStatus.COMPLETED:
-            activity_data["completed_at"] = restored_ts["completed_at"]
+        if replayed_ts.get("started_at") is not None:
+            activity_data["started_at"] = replayed_ts["started_at"]
+        if replayed_ts.get("completed_at") is not None and activity_data.get("status") == ActivityStatus.COMPLETED:
+            activity_data["completed_at"] = replayed_ts["completed_at"]
 
     @staticmethod
     def _collect_terminal_activities(
