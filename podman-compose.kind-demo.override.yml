@@ -18,6 +18,12 @@
 #     -f ../podman-compose.yml -f ../podman-compose.kind-demo.override.yml \
 #     up -d syntara temporal-worker execution-plane-worker
 services:
+  syntara:
+    # The API validates the Kubernetes endpoint during Integration creation.
+    networks:
+      - default
+      - kind
+
   execution-plane-worker:
     # Join the kind podman network so the API-server hostname resolves in-container.
     networks:

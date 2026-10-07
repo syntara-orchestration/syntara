@@ -177,6 +177,69 @@ immutable image tag or digest published by the EP repository; they do not need
 the EP source checkout. The EP repository contains its own compose and Kubernetes
 base manifests and owns EP migrations, runtime configuration, and release assets.
 
+#### Running locally with a kind-hosted Kubernetes target
+
+The EP API and worker can run in the Syntara Podman stack while the EP worker
+dispatches workloads to a local [kind](https://kind.sigs.k8s.io/) cluster. This
+requires the Syntara and `syntara-execution-plane` repositories to be checked
+out as sibling directories:
+
+```text
+<workspace>/syntara/
+<workspace>/syntara-execution-plane/
+```
+
+Create the kind cluster and its workload namespace and ServiceAccount from the
+`syntara-execution-plane` checkout:
+
+```bash
+cd ../syntara-execution-plane
+kind create cluster --name ep
+kubectl apply -f docs/feature-branch-assets/execution-plane-init.yaml
+kubectl create token syntara-dispatcher -n execution-plane --duration=48h
+kubectl config view --minify --raw \
+  -o jsonpath='{.clusters[0].cluster.certificate-authority-data}' | base64 -d
+```
+
+The `kubectl config view` server value is useful for host-side diagnostics, but
+do not use its `https://127.0.0.1:<port>` value as the Syntara Integration
+endpoint. The EP worker runs in a Podman container and reaches kind through the
+kind network. For the cluster above, use:
+
+```text
+https://ep-control-plane:6443
+```
+
+From the Syntara checkout, initialize the application and start the kind-aware
+full stack:
+
+```bash
+cd ../syntara
+make setup
+export APP_INTEGRATION_URL_ALLOWED_HOSTS='["ep-control-plane"]'
+make -C backend run-all-kind
+```
+
+`run-all-kind` applies `podman-compose.kind-demo.override.yml`. The override
+attaches both `syntara` (needed for Integration endpoint validation) and
+`execution-plane-worker` to the external `kind` network while retaining the
+normal project network for database and Temporal connectivity. Recreate the
+stack after changing the override or the Integration endpoint.
+
+When registering the OpenShift Integration in Syntara, use:
+
+| Field | Value |
+|---|---|
+| Endpoint | `https://ep-control-plane:6443` |
+| Namespace | `execution-plane` |
+| Credential | The `syntara-dispatcher` ServiceAccount token |
+| CA certificate | The decoded `certificate-authority-data` from kind |
+
+The Integration endpoint hostname must match the kind cluster container name.
+For a differently named cluster, replace `ep-control-plane` with the
+corresponding `<cluster-name>-control-plane` container name and update
+`APP_INTEGRATION_URL_ALLOWED_HOSTS` accordingly.
+
 ### Execution Plane ownership and acceptance
 
 AO owns its HTTP client, authorization, integration-sync outbox, Temporal dispatch

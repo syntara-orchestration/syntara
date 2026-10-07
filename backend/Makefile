@@ -18,7 +18,7 @@ POSTGRES_IMAGE ?= quay.io/sclorg/postgresql-15-c9s
 REDIS_IMAGE ?= mirror.gcr.io/library/redis:6
 APP_IMAGE ?= localhost/syntara:latest
 EP_IMAGE ?= localhost/execution-plane:latest
-EP_REPOSITORY ?= ../syntara-execution-plane
+EP_REPOSITORY ?= ../../syntara-execution-plane
 EP_BUILD_CONTEXT ?= $(abspath $(EP_REPOSITORY))
 EP_DB_MIGRATOR_PASSWORD ?= ep-migrator
 EP_DB_RUNTIME_PASSWORD ?= ep-runtime
@@ -518,6 +518,26 @@ run-all: _ensure-secrets _ensure-certs ## Register the local EP cluster and star
 	@echo "Press Ctrl+C to stop"
 	@echo ""
 	$(COMPOSE_FINAL_CMD) up --build --force-recreate
+
+.PHONY: run-all-kind
+run-all-kind: _ensure-secrets _ensure-certs ## Start the full stack with the EP worker attached to the external kind network
+	@echo "🔄 Running database migrations and seed data..."
+	@APP_ADMIN_PASSWORD_PATH=.secrets/admin-password uv run alembic upgrade head
+	@$(MAKE) ep-migrate
+	@$(MAKE) db-seed
+	@$(MAKE) admin-password
+	@echo "✅ Migrations and seeding complete"
+	@echo "🚀 Starting all services with the kind network override..."
+	@echo "📍 Syntara API: http://localhost:$${APP_API_PORT:-8000}"
+	@echo "📍 Syntara UI: http://localhost:$${APP_UI_PORT:-8080}"
+	@echo "📍 Database: postgresql://admin:admin@localhost:$${APP_DB_PORT:-5432}/syntara_api"
+	@echo "📍 Cache: cache://localhost:$${APP_CACHE_PORT:-6379}"
+	@echo "📍 Temporal Server: localhost:$${APP_TEMPORAL_PORT:-7233}"
+	@echo "📍 Temporal UI: http://localhost:$${APP_TEMPORAL_UI_PORT:-8081}"
+	@echo "📍 MCP Server: http://localhost:$${MCP_PORT:-8765}/mcp"
+	@echo "Press Ctrl+C to stop"
+	@echo ""
+	$(COMPOSE_FINAL_CMD) -f ../podman-compose.kind-demo.override.yml up --build --force-recreate
 
 .PHONY: services-run
 services-run: _ensure-secrets _ensure-certs ## Start infrastructure services (including the separate EP database) in background
