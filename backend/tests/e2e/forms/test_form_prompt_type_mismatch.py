@@ -27,6 +27,7 @@ def _start(
     syntara_api: SyntaraApiRegistry,
     workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
     first_project_id: UUID,
+    track_execution: Callable[[UUID], None],
     *,
     producer_output: dict[str, object],
     form_fields: list[dict[str, Any]],
@@ -39,6 +40,7 @@ def _start(
         first_project_id,
         workflow_name_prefix="e2e-form-prompt-type-mismatch",
         description="E2E: reject incompatible form prompt template values",
+        track_execution=track_execution,
         producer_output=producer_output,
         form_fields=form_fields,
         continue_on_failure=continue_on_failure,
@@ -113,6 +115,7 @@ def test_invalid_dynamic_options_fail_before_prompt_creation(
     syntara_api: SyntaraApiRegistry,
     workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
     first_project_id: UUID,
+    form_prompt_execution_cleanup: Callable[[UUID], None],
     producer_output: dict[str, object],
     expression: str,
     expect_in_error: str,
@@ -133,6 +136,7 @@ def test_invalid_dynamic_options_fail_before_prompt_creation(
         syntara_api,
         workflow_factory,
         first_project_id,
+        form_prompt_execution_cleanup,
         producer_output=producer_output,
         form_fields=[dynamic_option_field("environment", expression)],
     )
@@ -149,6 +153,7 @@ def test_array_default_on_text_field_fails_definition_validation(
     syntara_api: SyntaraApiRegistry,
     workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
     first_project_id: UUID,
+    form_prompt_execution_cleanup: Callable[[UUID], None],
 ) -> None:
     """An array resolved into a text default fails final form validation.
 
@@ -165,6 +170,7 @@ def test_array_default_on_text_field_fails_definition_validation(
         syntara_api,
         workflow_factory,
         first_project_id,
+        form_prompt_execution_cleanup,
         producer_output={"env": ["dev", "prod"]},
         form_fields=[
             {
@@ -189,6 +195,7 @@ def test_type_mismatch_with_continue_on_failure_routes_to_fallback(
     syntara_api: SyntaraApiRegistry,
     workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
     first_project_id: UUID,
+    form_prompt_execution_cleanup: Callable[[UUID], None],
 ) -> None:
     """A failed prompt node routes to the fallback when continuation is enabled.
 
@@ -206,6 +213,7 @@ def test_type_mismatch_with_continue_on_failure_routes_to_fallback(
         syntara_api,
         workflow_factory,
         first_project_id,
+        form_prompt_execution_cleanup,
         producer_output={"environments": "production"},
         form_fields=[dynamic_option_field("environment", "${producer.stdout_json.environments}")],
         continue_on_failure=True,

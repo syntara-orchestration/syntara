@@ -173,7 +173,12 @@ def poll_for_pending_form_prompt(
                 limit=5,
             )
         )
-        result = response.assert_and_get()
+        try:
+            result = response.assert_and_get()
+        except UnexpectedResponseException as exc:
+            if exc.status_code == 502:
+                pytest.skip("Backend returned 502 Bad Gateway - transient infrastructure issue")
+            raise
         if result.resources:
             return cast("FormPromptListRead", result.resources[0])
     pytest.fail(

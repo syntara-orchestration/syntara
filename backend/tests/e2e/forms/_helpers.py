@@ -7,7 +7,12 @@ from uuid import UUID
 
 import pytest
 from orchestrator_test_sdk.e2e import unique_name
-from orchestrator_test_sdk.e2e.helpers import poll_execution, poll_for_pending_form_prompt
+from orchestrator_test_sdk.e2e.helpers import (
+    TERMINAL_STATUSES,
+    _retry_api_call,
+    poll_execution,
+    poll_for_pending_form_prompt,
+)
 from syntara_api_client.api import SyntaraApiRegistry
 from syntara_api_client.models import (
     ExecutionCreate,
@@ -27,6 +32,7 @@ from ._workflows import producer_prompt_consumer_workflow
 
 PROMPT_POLL_TIMEOUT = 60
 EXECUTION_POLL_TIMEOUT = 90
+CANCEL_POLL_TIMEOUT = 30
 
 
 def assert_consumer_completed(syntara_api: SyntaraApiRegistry, exec_id: UUID) -> ExecutionRead:
@@ -39,6 +45,24 @@ def assert_consumer_completed(syntara_api: SyntaraApiRegistry, exec_id: UUID) ->
     assert "consumer" in activities, f"Consumer activity missing: {list(activities)}"
     assert activities["consumer"].status == "completed"
     return final
+
+
+def cancel_form_prompt_execution(syntara_api: SyntaraApiRegistry, exec_id: UUID) -> None:
+    """Cancel a still-active form-prompt execution and wait for its terminal state."""
+    execution = _retry_api_call(lambda: syntara_api.executions.get(execution_id=exec_id)).assert_and_get()
+    if execution.status in TERMINAL_STATUSES:
+        return
+
+    response = _retry_api_call(lambda: syntara_api.executions.cancel(execution_id=exec_id))
+    if response.status_code == HTTPStatus.ACCEPTED:
+        poll_execution(syntara_api, str(exec_id), timeout=CANCEL_POLL_TIMEOUT)
+        return
+    if response.status_code == HTTPStatus.CONFLICT:
+        # The workflow may have completed between the status read and cancel request.
+        execution = _retry_api_call(lambda: syntara_api.executions.get(execution_id=exec_id)).assert_and_get()
+        if execution.status in TERMINAL_STATUSES:
+            return
+    response.assert_and_get()
 
 
 def assert_and_get_with_502_skip[ResponseT](response: Response[ResponseT]) -> ResponseT:
@@ -81,9 +105,11 @@ def create_form_prompt_execution(
     *,
     workflow_name_prefix: str,
     description: str,
+    track_execution: Callable[[UUID], None],
     producer_output: Mapping[str, object],
     form_fields: list[dict[str, Any]],
     continue_on_failure: bool = False,
+    response_window: int = 600,
 ) -> UUID:
     """Create and start a workflow containing a form prompt, returning its execution ID."""
     name = unique_name(workflow_name_prefix)
@@ -96,14 +122,20 @@ def create_form_prompt_execution(
                 producer_output=producer_output,
                 form_fields=form_fields,
                 continue_on_failure=continue_on_failure,
+                response_window=response_window,
             ),
             project_id=first_project_id,
         )
     )
-    execution = syntara_api.executions.create(
-        body=ExecutionCreate(workflow_id=workflow.id, trigger_node_id="trigger")
-    ).assert_and_get()
-    return UUID(str(execution.id))
+    execution = cast(
+        "ExecutionRead",
+        assert_and_get_with_502_skip(
+            syntara_api.executions.create(body=ExecutionCreate(workflow_id=workflow.id, trigger_node_id="trigger"))
+        ),
+    )
+    exec_id = UUID(str(execution.id))
+    track_execution(exec_id)
+    return exec_id
 
 
 def start_pending_form_prompt(
@@ -113,9 +145,11 @@ def start_pending_form_prompt(
     *,
     workflow_name_prefix: str,
     description: str,
+    track_execution: Callable[[UUID], None],
     producer_output: Mapping[str, object],
     form_fields: list[dict[str, Any]],
     continue_on_failure: bool = False,
+    response_window: int = 600,
 ) -> tuple[UUID, FormPromptListRead]:
     """Start a workflow and wait until its form prompt is pending."""
     exec_id = create_form_prompt_execution(
@@ -124,9 +158,11 @@ def start_pending_form_prompt(
         first_project_id,
         workflow_name_prefix=workflow_name_prefix,
         description=description,
+        track_execution=track_execution,
         producer_output=producer_output,
         form_fields=form_fields,
         continue_on_failure=continue_on_failure,
+        response_window=response_window,
     )
     prompt = poll_for_pending_form_prompt(syntara_api, exec_id, timeout=PROMPT_POLL_TIMEOUT)
     return exec_id, prompt

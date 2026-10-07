@@ -35,6 +35,7 @@ def producer_prompt_consumer_workflow(
     producer_output: Mapping[str, object],
     form_fields: list[dict[str, Any]],
     continue_on_failure: bool = False,
+    response_window: int = 600,
 ) -> WorkflowDefinition:
     """Build a trigger, Python producer, form prompt, and downstream consumer."""
     payload = json.dumps(producer_output)
@@ -52,7 +53,7 @@ def producer_prompt_consumer_workflow(
             "parameters": {
                 "message": "Choose an environment",
                 "form_definition": {"fields": form_fields},
-                "response_window": 600,
+                "response_window": response_window,
             },
             "settings": {"continue_on_failure": continue_on_failure},
         },

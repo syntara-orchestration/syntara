@@ -30,6 +30,9 @@ def _start(
     syntara_api: SyntaraApiRegistry,
     workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
     first_project_id: UUID,
+    track_execution: Callable[[UUID], None],
+    *,
+    response_window: int = 600,
 ) -> tuple[UUID, FormPromptListRead]:
     """Create and start a workflow that resolves both dynamic options and a default."""
     return start_pending_form_prompt(
@@ -38,6 +41,7 @@ def _start(
         first_project_id,
         workflow_name_prefix="e2e-form-prompt-template",
         description="E2E: resolve form prompt options and defaults",
+        track_execution=track_execution,
         producer_output=_PRODUCER_OUTPUT,
         form_fields=[
             dynamic_option_field("environment", "${producer.stdout_json.environments}"),
@@ -49,6 +53,7 @@ def _start(
                 "default": "${producer.stdout_json.default_version}",
             },
         ],
+        response_window=response_window,
     )
 
 
@@ -56,6 +61,7 @@ def test_dropdown_options_resolved_in_get_response(
     syntara_api: SyntaraApiRegistry,
     workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
     first_project_id: UUID,
+    form_prompt_execution_cleanup: Callable[[UUID], None],
 ) -> None:
     """Resolved dropdown options are persisted with the form prompt.
 
@@ -68,7 +74,13 @@ def test_dropdown_options_resolved_in_get_response(
     - Options use the dynamic_resolved source and retain the producer's order.
     - The persisted definition contains no unresolved expression.
     """
-    _, prompt_row = _start(syntara_api, workflow_factory, first_project_id)
+    _, prompt_row = _start(
+        syntara_api,
+        workflow_factory,
+        first_project_id,
+        form_prompt_execution_cleanup,
+        response_window=30,
+    )
     prompt = get_form_prompt(syntara_api, UUID(str(prompt_row.id)))
     definition = prompt.form_definition.to_dict()
 
@@ -82,6 +94,7 @@ def test_text_field_default_resolved_from_execution_context(
     syntara_api: SyntaraApiRegistry,
     workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
     first_project_id: UUID,
+    form_prompt_execution_cleanup: Callable[[UUID], None],
 ) -> None:
     """A text default expression resolves to its native string value.
 
@@ -93,7 +106,13 @@ def test_text_field_default_resolved_from_execution_context(
     Expected:
     - The default is the string v1.2.3, not the source expression.
     """
-    _, prompt_row = _start(syntara_api, workflow_factory, first_project_id)
+    _, prompt_row = _start(
+        syntara_api,
+        workflow_factory,
+        first_project_id,
+        form_prompt_execution_cleanup,
+        response_window=30,
+    )
     prompt = get_form_prompt(syntara_api, UUID(str(prompt_row.id)))
     definition = prompt.form_definition.to_dict()
 
@@ -106,6 +125,7 @@ def test_submit_resolved_value_resumes_workflow(
     syntara_api: SyntaraApiRegistry,
     workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
     first_project_id: UUID,
+    form_prompt_execution_cleanup: Callable[[UUID], None],
 ) -> None:
     """Submitting values accepted by the resolved form resumes downstream work.
 
@@ -118,7 +138,7 @@ def test_submit_resolved_value_resumes_workflow(
     - The submit returns 200 and execution completes.
     - The consumer completes and the prompt activity records the submission.
     """
-    exec_id, prompt_row = _start(syntara_api, workflow_factory, first_project_id)
+    exec_id, prompt_row = _start(syntara_api, workflow_factory, first_project_id, form_prompt_execution_cleanup)
     submitted = {"environment": "prod", "version": "v9.9.9"}
     response = submit_form_prompt(syntara_api, UUID(str(prompt_row.id)), submitted)
     assert response.status_code == HTTPStatus.OK
@@ -136,6 +156,7 @@ def test_pending_prompt_listed_for_execution(
     syntara_api: SyntaraApiRegistry,
     workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
     first_project_id: UUID,
+    form_prompt_execution_cleanup: Callable[[UUID], None],
 ) -> None:
     """The list endpoint filters pending form prompts by execution.
 
@@ -146,7 +167,13 @@ def test_pending_prompt_listed_for_execution(
     Expected:
     - Exactly one prompt is returned, with the expected node ID and status.
     """
-    exec_id, _ = _start(syntara_api, workflow_factory, first_project_id)
+    exec_id, _ = _start(
+        syntara_api,
+        workflow_factory,
+        first_project_id,
+        form_prompt_execution_cleanup,
+        response_window=30,
+    )
     listed = assert_and_get_with_502_skip(
         syntara_api.form_prompts.list(
             execution_id=exec_id,

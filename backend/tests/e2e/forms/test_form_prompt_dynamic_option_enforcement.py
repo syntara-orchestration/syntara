@@ -28,9 +28,11 @@ def _start(
     syntara_api: SyntaraApiRegistry,
     workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
     first_project_id: UUID,
+    track_execution: Callable[[UUID], None],
     *,
     field_type: str = "dropdown",
     field_name: str = "environment",
+    response_window: int = 600,
 ) -> tuple[UUID, FormPromptListRead]:
     """Create and start a workflow with dynamic environment options."""
     return start_pending_form_prompt(
@@ -39,6 +41,7 @@ def _start(
         first_project_id,
         workflow_name_prefix="e2e-form-prompt-options",
         description="E2E: enforce resolved form prompt options",
+        track_execution=track_execution,
         producer_output={"environments": ENVIRONMENT_RECORDS},
         form_fields=[
             dynamic_option_field(
@@ -47,6 +50,7 @@ def _start(
                 field_type=field_type,
             )
         ],
+        response_window=response_window,
     )
 
 
@@ -69,6 +73,7 @@ def test_submit_value_not_in_resolved_options_returns_422(
     syntara_api: SyntaraApiRegistry,
     workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
     first_project_id: UUID,
+    form_prompt_execution_cleanup: Callable[[UUID], None],
     bad_value: str,
 ) -> None:
     """A value outside the persisted option snapshot is rejected.
@@ -81,7 +86,13 @@ def test_submit_value_not_in_resolved_options_returns_422(
     - The response is 422 with FORM_VALIDATION_ERROR and identifies the field.
     - The error detail does not need to echo the rejected value.
     """
-    _, prompt_row = _start(syntara_api, workflow_factory, first_project_id)
+    _, prompt_row = _start(
+        syntara_api,
+        workflow_factory,
+        first_project_id,
+        form_prompt_execution_cleanup,
+        response_window=30,
+    )
     prompt_id = UUID(str(prompt_row.id))
     _assert_options_resolved(syntara_api, prompt_id)
 
@@ -98,6 +109,7 @@ def test_prompt_remains_pending_after_rejected_submission(
     syntara_api: SyntaraApiRegistry,
     workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
     first_project_id: UUID,
+    form_prompt_execution_cleanup: Callable[[UUID], None],
 ) -> None:
     """A rejected submission leaves the prompt live and able to accept valid input.
 
@@ -112,7 +124,12 @@ def test_prompt_remains_pending_after_rejected_submission(
     - The execution has not completed the consumer activity.
     - A subsequent valid response completes the workflow.
     """
-    exec_id, prompt_row = _start(syntara_api, workflow_factory, first_project_id)
+    exec_id, prompt_row = _start(
+        syntara_api,
+        workflow_factory,
+        first_project_id,
+        form_prompt_execution_cleanup,
+    )
     prompt_id = UUID(str(prompt_row.id))
     _assert_options_resolved(syntara_api, prompt_id)
 
@@ -140,6 +157,7 @@ def test_submit_valid_resolved_value_succeeds(
     syntara_api: SyntaraApiRegistry,
     workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
     first_project_id: UUID,
+    form_prompt_execution_cleanup: Callable[[UUID], None],
 ) -> None:
     """A value from the resolved option snapshot is accepted.
 
@@ -151,7 +169,12 @@ def test_submit_valid_resolved_value_succeeds(
     Expected:
     - The submit returns 200, execution completes, and the consumer runs.
     """
-    exec_id, prompt_row = _start(syntara_api, workflow_factory, first_project_id)
+    exec_id, prompt_row = _start(
+        syntara_api,
+        workflow_factory,
+        first_project_id,
+        form_prompt_execution_cleanup,
+    )
     prompt_id = UUID(str(prompt_row.id))
     _assert_options_resolved(syntara_api, prompt_id)
 
@@ -164,6 +187,7 @@ def test_multi_select_rejects_partially_invalid_selection(
     syntara_api: SyntaraApiRegistry,
     workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
     first_project_id: UUID,
+    form_prompt_execution_cleanup: Callable[[UUID], None],
 ) -> None:
     """Multi-select validation rejects a mixed valid and invalid selection.
 
@@ -180,8 +204,10 @@ def test_multi_select_rejects_partially_invalid_selection(
         syntara_api,
         workflow_factory,
         first_project_id,
+        form_prompt_execution_cleanup,
         field_type="multi_select",
         field_name="environments",
+        response_window=30,
     )
     first_prompt_id = UUID(str(first_prompt.id))
     _assert_options_resolved(syntara_api, first_prompt_id, field_name="environments")
@@ -195,6 +221,7 @@ def test_multi_select_rejects_partially_invalid_selection(
         syntara_api,
         workflow_factory,
         first_project_id,
+        form_prompt_execution_cleanup,
         field_type="multi_select",
         field_name="environments",
     )
