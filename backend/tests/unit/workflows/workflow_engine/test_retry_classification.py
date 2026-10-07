@@ -6,8 +6,9 @@ replacing resolved inputs, and completed upstream nodes being skipped with their
 outputs restored.
 """
 
-from collections.abc import Generator
-from typing import Any
+from collections.abc import Callable, Generator
+from datetime import timedelta
+from typing import Any, ClassVar, cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -749,3 +750,103 @@ class TestLinearChainReplay:
         await wf._prepare_retry(self.graph)
 
         assert wf._retry_replay_candidates == {"step_1", "step_2"}
+
+
+class TestReplayedTimestampUpdateHandler:
+    """The workflow side of the timestamp ask: does it wait, and when.
+
+    The sync service calls this update when a node completes. What matters is
+    which nodes make it block — a node that will never have source times must not
+    hold the caller for the full timeout, and one that will must not answer early.
+
+    ``wait_condition`` is stubbed so the predicate can be evaluated directly: a
+    ``True`` means the handler returns without blocking, ``False`` means it would
+    wait. This exercises the real handler and the real predicate, not a copy.
+    """
+
+    SOURCE_TIMES: ClassVar[dict[str, str | None]] = {
+        "started_at": "2026-01-01T00:00:00+00:00",
+        "completed_at": "2026-01-01T00:05:00+00:00",
+    }
+
+    async def _call(
+        self,
+        activity_id: str,
+        *,
+        candidates: set[str],
+        timestamps: dict[str, dict[str, str | None]],
+    ) -> tuple[dict[str, str | None] | None, bool, int]:
+        """Return (handler result, predicate already true, timeout seconds)."""
+        wf = OrchestratorWorkflow.__new__(OrchestratorWorkflow)
+        wf._retry_replay_candidates = candidates
+        wf._restored_node_timestamps = timestamps
+
+        seen: dict[str, Any] = {}
+
+        async def _wait(predicate: Callable[[], bool], timeout: timedelta | None = None) -> None:  # noqa: ASYNC109
+            # Mirrors wait_condition's real signature, which is why the name stays.
+            seen["satisfied_now"] = predicate()
+            seen["timeout"] = timeout
+
+        with patch(
+            "syntara.workflows.workflow_engine.dynamic_workflow.workflow.wait_condition",
+            _wait,
+        ):
+            result = await cast("Any", wf).get_replayed_node_timestamps_when_ready(activity_id)
+
+        return result, bool(seen["satisfied_now"]), cast("timedelta", seen["timeout"]).seconds
+
+    @pytest.mark.asyncio
+    async def test_a_replayed_node_answers_immediately_with_its_source_times(self) -> None:
+        result, satisfied_now, timeout = await self._call(
+            "script_1",
+            candidates={"script_1"},
+            timestamps={"script_1": self.SOURCE_TIMES},
+        )
+
+        assert result == self.SOURCE_TIMES
+        assert satisfied_now, "a node that already has its times must not make the caller wait"
+        assert timeout == 5
+
+    @pytest.mark.asyncio
+    async def test_a_candidate_without_times_yet_would_wait(self) -> None:
+        """A candidate whose times have not landed is the race the update closes.
+
+        Answering "no times" here would drop them permanently, because the
+        completed event is only ever processed once.
+        """
+        result, satisfied_now, _timeout = await self._call(
+            "script_1",
+            candidates={"script_1", "script_2"},
+            timestamps={},
+        )
+
+        assert satisfied_now is False, "answering early here loses the source times for good"
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_an_ordinary_node_answers_immediately_with_nothing(self) -> None:
+        result, satisfied_now, _timeout = await self._call(
+            "script_9",
+            candidates={"script_1"},
+            timestamps={"script_1": self.SOURCE_TIMES},
+        )
+
+        assert result is None
+        assert satisfied_now, "a node that is not a replay must never make the caller wait"
+
+    @pytest.mark.asyncio
+    async def test_an_ordinary_run_answers_immediately_because_nothing_is_a_candidate(self) -> None:
+        """No retry means an empty candidate set, so every node answers at once.
+
+        This is what makes asking unconditionally cheap: an ordinary run pays a
+        request per completed node and never waits.
+        """
+        result, satisfied_now, _timeout = await self._call(
+            "script_1",
+            candidates=set(),
+            timestamps={},
+        )
+
+        assert result is None
+        assert satisfied_now
