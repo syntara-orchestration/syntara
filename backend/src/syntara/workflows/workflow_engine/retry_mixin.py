@@ -6,8 +6,10 @@ from typing import Any
 
 from temporalio import workflow
 
+from syntara.workflows.models.activity_execution import ActivityStatus
 from syntara.workflows.utils.loop_body_nodes import collect_loop_bodies
 from syntara.workflows.utils.loop_iteration_names import strip_iteration_suffix
+from syntara.workflows.utils.namespace_resolver import NamespaceResolver
 from syntara.workflows.workflow_engine.constants import DEFAULT_ACTIVITY_TIMEOUT_SECONDS
 from syntara.workflows.workflow_engine.graph import ActivityNode, WorkflowGraph
 from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName, LoopState, NodeType
@@ -37,6 +39,13 @@ class WorkflowRetryMixin:
     _retry_replay_candidates: set[str]
     _restored_node_timestamps: dict[str, dict[str, str | None]]
     _runtime_settings: dict[str, Any]
+    #: Published by the workflow: where a restored failure is recorded, so it reads
+    #: the same as one that genuinely failed in this run.
+    failed_nodes: dict[str, str]
+    #: The namespace resolver the workflow holds. Typed by the workflow itself, so
+    #: this only declares that the mixin needs one; a narrower type here would
+    #: override the workflow's own annotation.
+    resolver: NamespaceResolver
     _retry_source_statuses: dict[str, str]
     skipped_nodes: set[str]
     node_inputs: dict[str, dict[str, Any]]
@@ -66,6 +75,13 @@ class WorkflowRetryMixin:
 
         Completed nodes form a boundary: a satisfied converge and its descendants
         retain their results under R6c, even if a different predecessor failed.
+
+        A failure the caller did not select is restored as a failure by
+        ``_restore_node_output``, from its own recorded error. What this suppresses
+        is everything *downstream* of such a failure — those nodes have nothing to
+        run against, and the source run never produced results for them either. The
+        failing node itself is deliberately not added here: marking it skipped would
+        report a failure as a clean skip and drop the reason it failed.
         """
         selected = {strip_iteration_suffix(point) for point in self.retry_context.get("eligible_point_ids", [])}
         rerun: set[str] = set()
@@ -74,7 +90,7 @@ class WorkflowRetryMixin:
         for node_id, status in self._retry_source_statuses.items():
             if status != "failed" or node_id in rerun:
                 continue
-            pending = [node_id]
+            pending = list(graph.get_successors(node_id))
             seen: set[str] = set()
             while pending:
                 current = pending.pop()
@@ -191,11 +207,17 @@ class WorkflowRetryMixin:
         return seen
 
     async def _maybe_restore_retry_output(self, node: ActivityNode, graph: WorkflowGraph) -> dict[str, Any] | None:
-        """Restore this node's source-run output instead of executing it.
+        """Restore this node's source-run outcome instead of executing it.
 
-        Returns the synthetic completion for a node that qualified, or None to
-        fall through to normal execution — either because this is not a retry,
-        the node may not be skipped, or the source run has no output for it.
+        Returns the synthetic completion for a node that qualified, or None to fall
+        through to normal execution — either because this is not a retry, the node
+        may not be skipped, or the source run has no restorable record for it.
+
+        A restored node keeps the status it had in the source run rather than
+        arriving as a success: a skipped node stays skipped, and a failure the
+        caller did not select stays failed. Reporting either as completed would
+        misstate the source run, and a failure reported as a skip would drop the
+        reason it failed.
         """
         if not self.retry_context or not self._should_restore_node(node.id, graph):
             return None
@@ -211,11 +233,12 @@ class WorkflowRetryMixin:
         return strip_iteration_suffix(node_id) in self._retry_restorable_nodes(graph)
 
     async def _restore_node_output(self, node: ActivityNode) -> dict[str, Any] | None:
-        """Replay this node from its source run instead of executing it, or None.
+        """Replay this node's recorded outcome from its source run, or None.
 
-        Returns None when the source run has no completed record for the node, so
-        the caller falls through to normal execution. A node that never completed
-        cannot be skipped, because there would be nothing to inject.
+        Returns None when the source run has no restorable record for the node, so
+        the caller falls through to normal execution. A node that never reached a
+        terminal state cannot be restored, because there would be nothing to
+        reproduce.
 
         The replay activity runs under the node's own id — not an
         ``__internal__`` id — so the normal event-driven sync records it
@@ -224,8 +247,19 @@ class WorkflowRetryMixin:
         halves are republished: the output into the execution namespace, and the
         input into ``node_inputs`` (what ``get_activity_input`` reads), so a
         restored node shows the same input and output on drill-down as one that
-        executed. The source timestamps are kept so the sync service can report
-        when the work ran rather than the restore time.
+        executed.
+
+        The recorded status decides what this returns. COMPLETED publishes a normal
+        completion, so the scheduler treats the node as done and its successors run.
+        SKIPPED and FAILED publish the failure namespace and record the node
+        accordingly, so the scheduler treats them as terminal without executing
+        them — a restored skip must not schedule downstream work, and a restored
+        failure must not read as a success.
+
+        Either way the recorded status and times are kept for the sync service,
+        which is what writes the row: without them the sync records the replay
+        activity's own successful completion and every restored node would be
+        reported as COMPLETED.
         """
         record = await workflow.execute_activity(
             ActivityName.RETRY_NODE_REPLAY,
@@ -241,17 +275,57 @@ class WorkflowRetryMixin:
             self._retry_replay_candidates.discard(node.id)
             return None
 
+        source_status = str(record.get("status") or ActivityStatus.COMPLETED.value)
         output = record.get("output_data") or {}
+        error_details = record.get("error_details")
         self.node_inputs[node.id] = record.get("input_data") or {}
         self._restored_node_timestamps[node.id] = {
             "started_at": record.get("started_at"),
             "completed_at": record.get("completed_at"),
+            # The status and error travel to the sync service so the row reports
+            # what the source run recorded rather than the replay's own success.
+            "status": source_status,
+            "error_details": error_details,
         }
+
         workflow.logger.info(
-            "Replayed retry node data",
-            extra={"node_id": node.id, "input_keys": sorted(self.node_inputs[node.id]), "output_keys": sorted(output)},
+            "Replayed retry node state",
+            extra={
+                "node_id": node.id,
+                "source_status": source_status,
+                "input_keys": sorted(self.node_inputs[node.id]),
+                "output_keys": sorted(output),
+            },
         )
-        return {"output": output, "control": None}
+
+        if source_status == ActivityStatus.COMPLETED.value:
+            return {"output": output, "control": None}
+
+        return self._restored_terminal_result(node, source_status, output, error_details)
+
+    def _restored_terminal_result(
+        self,
+        node: ActivityNode,
+        source_status: str,
+        output: dict[str, Any],
+        error_details: str | None,
+    ) -> dict[str, Any]:
+        """Publish a restored node that did not succeed, and return its result.
+
+        Mirrors what a live failure publishes — namespace entry, ``failed_nodes`` or
+        ``skipped_nodes`` — so the scheduler and the run view see the same shape as
+        for a node that genuinely failed or was genuinely skipped.
+        """
+        if source_status == ActivityStatus.SKIPPED.value:
+            self.skipped_nodes.add(node.id)
+            entry: dict[str, Any] = {**output, "status": "skipped"}
+        else:
+            message = error_details or f"Restored from a source run that ended {source_status}"
+            self.failed_nodes[node.id] = message
+            entry = {**output, "status": "failed", "error": message}
+
+        self.resolver.set_namespace(node.id, entry)
+        return {"output": entry, "control": None}
 
     def _apply_input_overrides(self, node: ActivityNode, resolved_parameters: dict[str, Any]) -> None:
         """Replace a node's resolved inputs with the retry's user-supplied overrides.
