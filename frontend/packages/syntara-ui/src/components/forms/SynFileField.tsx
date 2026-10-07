@@ -19,6 +19,7 @@ type SynFileFieldControlProps<TFieldValues extends FieldValues, TName extends Fi
   dropzoneProps?: FileUploadProps['dropzoneProps']
   hideDefaultPreview: boolean
   isDisabled?: boolean
+  onFileSelected?: (file: File | undefined) => void
 }
 
 function SynFileFieldControl<TFieldValues extends FieldValues, TName extends FieldPath<TFieldValues>>({
@@ -30,6 +31,7 @@ function SynFileFieldControl<TFieldValues extends FieldValues, TName extends Fie
   dropzoneProps,
   hideDefaultPreview,
   isDisabled,
+  onFileSelected,
 }: Readonly<SynFileFieldControlProps<TFieldValues, TName>>) {
   const wrapperRef = useRef<HTMLDivElement>(null)
   const selectedFile = getSelectedFile(field.value)
@@ -50,10 +52,12 @@ function SynFileFieldControl<TFieldValues extends FieldValues, TName extends Fie
 
   const handleFileInputChange = (_event: DropEvent, inputFile: File) => {
     field.onChange(inputFile)
+    onFileSelected?.(inputFile)
   }
 
   const handleClearClick = () => {
     field.onChange(undefined)
+    onFileSelected?.(undefined)
   }
 
   return (
@@ -116,6 +120,12 @@ export type SynFileFieldProps<
   hideDefaultPreview?: boolean
   /** Disables the file upload control. */
   isDisabled?: boolean
+  /**
+   * Called with the newly selected file (or `undefined` on clear), in addition to the
+   * RHF field update. Use for cascading effects, such as prefilling another field from
+   * the file's contents.
+   */
+  onFileSelected?: (file: File | undefined) => void
 }
 
 /**
@@ -151,6 +161,7 @@ export function SynFileField<
   dropzoneProps,
   hideDefaultPreview = true,
   isDisabled,
+  onFileSelected,
 }: Readonly<SynFileFieldProps<TFieldValues, TName>>) {
   const resolvedFieldId = fieldId ?? name
 
@@ -174,6 +185,7 @@ export function SynFileField<
           dropzoneProps={dropzoneProps}
           hideDefaultPreview={hideDefaultPreview}
           isDisabled={isDisabled}
+          onFileSelected={onFileSelected}
         />
       )}
     </SynFormField>

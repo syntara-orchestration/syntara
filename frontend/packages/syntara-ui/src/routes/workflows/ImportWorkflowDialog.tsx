@@ -88,7 +88,7 @@ export function ImportWorkflowDialog({ isOpen, onClose, onSuccess }: ImportWorkf
       onClose()
     },
   })
-  const { handleSubmit, handleClose, setError } = form
+  const { handleSubmit, handleClose, setError, setValue, getFieldState, formState } = form
 
   const onImportSuccess = (
     wfName: string,
@@ -106,6 +106,23 @@ export function ImportWorkflowDialog({ isOpen, onClose, onSuccess }: ImportWorkf
     showAlert({ variant, autoDismiss: true, title, description, actionLinks })
     handleClose()
     onSuccess()
+  }
+
+  const prefillNameFromFile = async (file: File) => {
+    try {
+      const content = await file.text()
+      const parsed = parseWorkflowFile(content, file.name)
+      const parsedName = typeof parsed.name === 'string' ? parsed.name.trim() : ''
+      if (parsedName && !getFieldState('name', formState).isDirty) {
+        setValue('name', parsedName, { shouldValidate: true })
+      }
+    } catch {
+      // Ignore parse failures here; onSubmit surfaces file validation errors.
+    }
+  }
+
+  const handleFileSelected = (file: File | undefined) => {
+    if (file) detachPromise(prefillNameFromFile(file))
   }
 
   const onSubmit = async (data: ImportWorkflowFormData) => {
@@ -176,6 +193,7 @@ export function ImportWorkflowDialog({ isOpen, onClose, onSuccess }: ImportWorkf
               fieldId="import-file"
               isRequired
               dropzoneProps={{ accept: { 'application/json': ['.json'] } }}
+              onFileSelected={handleFileSelected}
             />
             <SynTextField
               name="name"
