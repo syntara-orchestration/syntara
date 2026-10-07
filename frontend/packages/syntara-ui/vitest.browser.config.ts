@@ -1,4 +1,5 @@
-import react from '@vitejs/plugin-react'
+import babel from '@rolldown/plugin-babel'
+import react, { reactCompilerPreset } from '@vitejs/plugin-react'
 import { playwright as playwrightUntyped } from '@vitest/browser-playwright'
 import { defineConfig } from 'vitest/config'
 import type { BrowserProviderOption } from 'vitest/node'
@@ -10,13 +11,7 @@ const playwright = playwrightUntyped as unknown as PlaywrightFactory
 // Use this for tests that require real browser APIs (e.g., IntersectionObserver, ResizeObserver)
 // Run with: npm run test:browser
 export default defineConfig({
-  plugins: [
-    react({
-      babel: {
-        plugins: [['babel-plugin-react-compiler']],
-      },
-    }),
-  ],
+  plugins: [react(), babel({ presets: [reactCompilerPreset()] })],
   test: {
     globals: true,
     // Browser mode with Playwright (Vitest 4.x factory pattern)

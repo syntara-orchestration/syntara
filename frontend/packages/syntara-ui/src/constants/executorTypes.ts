@@ -20,9 +20,4 @@ export const API_EXECUTOR_TYPES = new Set([
  * TypeScript type for API executor types (from contracts).
  */
 export type ApiExecutorType =
-  | 'script'
-  | 'http_request'
-  | 'agentic'
-  | 'aap_job_template'
-  | 'approval'
-  | 'internal_activity'
+  'script' | 'http_request' | 'agentic' | 'aap_job_template' | 'approval' | 'internal_activity'
