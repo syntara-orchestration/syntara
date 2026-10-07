@@ -391,6 +391,9 @@ class OrchestratorPrometheusMetrics:
         )
 
         # ---- Stall Detection (SDP R23/AC-13) ----
+        # Updated only by the coordinated scanner (advisory-lock holder).
+        # Non-leader replicas retain stale values.  Scrape a single target
+        # or aggregate with max(), never sum().
         self.stalled_workflows_current = Gauge(
             "orchestrator_stalled_workflows_current",
             "Current number of stalled workflow executions (distinct executions with at least one stalled activity)",

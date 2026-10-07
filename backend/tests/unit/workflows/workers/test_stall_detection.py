@@ -68,6 +68,8 @@ def _make_session_factory(
         gauge_counts: Tuple of (stalled_workflows_count, stalled_steps_count)
 
     """
+    from syntara.audit.outbox.models import AuditOutboxRecord
+
     first_stall_execution_ids = first_stall_execution_ids or []
     execution_modes = execution_modes or {}
     gauge_counts = gauge_counts or (0, 0)
@@ -118,6 +120,14 @@ def _make_session_factory(
     mock_session = AsyncMock()
     mock_session.execute = AsyncMock(side_effect=execute_side_effect)
     mock_session.commit = AsyncMock()
+    mock_session.rollback = AsyncMock()
+
+    # Mock sync_session.new for audit verification
+    # Create mock outbox records matching the number of claimed activities
+    mock_outbox_records = [MagicMock(spec=AuditOutboxRecord) for _ in claimed_activities]
+    mock_sync_session = MagicMock()
+    mock_sync_session.new = mock_outbox_records
+    mock_session.sync_session = mock_sync_session
 
     ctx = MagicMock()
     ctx.__aenter__ = AsyncMock(return_value=mock_session)
@@ -760,6 +770,254 @@ class TestDetectStalledActivities:
 
             # Verify gauge update was attempted
             mock_update_gauges.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_audit_dispatch_receives_session_for_transactional_write(
+        self,
+    ) -> None:
+        """Audit dispatch receives sync_session for same-transaction outbox write."""
+        now = datetime.now(UTC)
+        execution_id = uuid4()
+
+        activity = _make_activity(
+            status=ActivityStatus.RUNNING,
+            expected_duration=60,
+            started_at=now - timedelta(seconds=120),
+        )
+        activity.execution_id = execution_id
+        activity.stall_alert_at = now
+
+        session_factory = _make_session_factory(
+            [activity],
+            first_stall_execution_ids=[execution_id],
+            execution_modes={execution_id: "standard"},
+        )
+
+        # Get reference to mock session for identity check
+        mock_session = session_factory.return_value.__aenter__.return_value
+
+        with (
+            patch("syntara.workflows.workers.stall_detection.AuditEventDispatcher.dispatch") as mock_dispatch,
+            patch("syntara.workflows.workers.stall_detection.get_metrics_recorder") as mock_get_recorder,
+            patch("syntara.workflows.workers.stall_detection.get_telemetry_registry") as mock_get_telemetry,
+        ):
+            mock_recorder = MagicMock()
+            mock_recorder._prometheus = MagicMock()
+            mock_get_recorder.return_value = mock_recorder
+
+            mock_telemetry = MagicMock()
+            mock_telemetry.is_initialized.return_value = False
+            mock_get_telemetry.return_value = mock_telemetry
+
+            await detect_stalled_activities(session_factory)
+
+            # Verify dispatch was called with event AND sync_session (transactional write)
+            mock_dispatch.assert_called_once()
+            assert len(mock_dispatch.call_args[0]) == 2
+            event_arg, session_arg = mock_dispatch.call_args[0]
+            assert event_arg.activity_execution_id == activity.id
+            assert session_arg is mock_session.sync_session
+
+    @pytest.mark.asyncio
+    async def test_audit_outbox_write_precedes_commit(
+        self,
+    ) -> None:
+        """Audit outbox write happens before commit to ensure atomicity."""
+        now = datetime.now(UTC)
+        execution_id = uuid4()
+
+        activity = _make_activity(
+            status=ActivityStatus.RUNNING,
+            expected_duration=60,
+            started_at=now - timedelta(seconds=120),
+        )
+        activity.execution_id = execution_id
+        activity.stall_alert_at = now
+
+        session_factory = _make_session_factory(
+            [activity],
+            first_stall_execution_ids=[execution_id],
+            execution_modes={execution_id: "standard"},
+        )
+        mock_session = session_factory.return_value.__aenter__.return_value
+
+        call_order: list[str] = []
+
+        async def commit_side_effect() -> None:
+            call_order.append("commit")
+
+        mock_session.commit = AsyncMock(side_effect=commit_side_effect)
+
+        with (
+            patch("syntara.workflows.workers.stall_detection.AuditEventDispatcher.dispatch") as mock_dispatch,
+            patch("syntara.workflows.workers.stall_detection.get_metrics_recorder") as mock_get_recorder,
+            patch("syntara.workflows.workers.stall_detection.get_telemetry_registry") as mock_get_telemetry,
+        ):
+
+            def dispatch_side_effect(*_args: object, **_kwargs: object) -> None:
+                call_order.append("dispatch")
+
+            mock_dispatch.side_effect = dispatch_side_effect
+
+            mock_recorder = MagicMock()
+            mock_recorder._prometheus = MagicMock()
+            mock_get_recorder.return_value = mock_recorder
+
+            mock_telemetry = MagicMock()
+            mock_telemetry.is_initialized.return_value = False
+            mock_get_telemetry.return_value = mock_telemetry
+
+            await detect_stalled_activities(session_factory)
+
+            # Dispatch must happen before the first commit (claim transaction)
+            dispatch_idx = call_order.index("dispatch")
+            first_commit_idx = call_order.index("commit")
+            assert dispatch_idx < first_commit_idx
+
+    @pytest.mark.asyncio
+    async def test_audit_verification_failure_rolls_back_claim(
+        self,
+    ) -> None:
+        """If audit verification fails, the claim transaction is rolled back."""
+        now = datetime.now(UTC)
+        execution_id = uuid4()
+
+        activity = _make_activity(
+            status=ActivityStatus.RUNNING,
+            expected_duration=60,
+            started_at=now - timedelta(seconds=120),
+        )
+        activity.execution_id = execution_id
+        activity.stall_alert_at = now
+
+        session_factory = _make_session_factory(
+            [activity],
+            first_stall_execution_ids=[execution_id],
+            execution_modes={execution_id: "standard"},
+        )
+        mock_session = session_factory.return_value.__aenter__.return_value
+
+        # Mock sync_session.new to return empty (no outbox records added)
+        mock_sync_session = MagicMock()
+        mock_sync_session.new = []  # No outbox records
+        mock_session.sync_session = mock_sync_session
+
+        rollback_called = False
+
+        async def rollback_side_effect() -> None:
+            nonlocal rollback_called
+            rollback_called = True
+
+        mock_session.rollback = AsyncMock(side_effect=rollback_side_effect)
+
+        with (
+            patch("syntara.workflows.workers.stall_detection.AuditEventDispatcher.dispatch"),
+            patch("syntara.workflows.workers.stall_detection.get_metrics_recorder"),
+            patch("syntara.workflows.workers.stall_detection.get_telemetry_registry"),
+        ):
+            await detect_stalled_activities(session_factory)
+
+            # Verify rollback was called
+            assert rollback_called
+            # Verify commit was NOT called
+            mock_session.commit.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_audit_verification_success_commits_claim(
+        self,
+    ) -> None:
+        """If audit verification succeeds, the claim transaction commits."""
+        from syntara.audit.outbox.models import AuditOutboxRecord
+
+        now = datetime.now(UTC)
+        execution_id = uuid4()
+
+        activity = _make_activity(
+            status=ActivityStatus.RUNNING,
+            expected_duration=60,
+            started_at=now - timedelta(seconds=120),
+        )
+        activity.execution_id = execution_id
+        activity.stall_alert_at = now
+
+        session_factory = _make_session_factory(
+            [activity],
+            first_stall_execution_ids=[execution_id],
+            execution_modes={execution_id: "standard"},
+        )
+        mock_session = session_factory.return_value.__aenter__.return_value
+
+        # Mock sync_session.new to return one outbox record (matching claimed count)
+        mock_sync_session = MagicMock()
+        mock_outbox_record = MagicMock(spec=AuditOutboxRecord)
+        mock_sync_session.new = [mock_outbox_record]
+        mock_session.sync_session = mock_sync_session
+
+        with (
+            patch("syntara.workflows.workers.stall_detection.AuditEventDispatcher.dispatch"),
+            patch("syntara.workflows.workers.stall_detection.get_metrics_recorder") as mock_get_recorder,
+            patch("syntara.workflows.workers.stall_detection.get_telemetry_registry") as mock_get_telemetry,
+        ):
+            mock_recorder = MagicMock()
+            mock_recorder._prometheus = MagicMock()
+            mock_get_recorder.return_value = mock_recorder
+
+            mock_telemetry = MagicMock()
+            mock_telemetry.is_initialized.return_value = False
+            mock_get_telemetry.return_value = mock_telemetry
+
+            await detect_stalled_activities(session_factory)
+
+            # Verify commit was called (at least once for the claim transaction)
+            assert mock_session.commit.call_count >= 1
+            # Verify rollback was NOT called
+            mock_session.rollback.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_coordinated_scanner_only_updates_gauges(
+        self,
+    ) -> None:
+        """Gauge updates happen only through the coordinated scanner callback path.
+
+        Non-leader replicas never execute the callback (PeriodicWorker skips
+        when the advisory lock is not acquired), so their gauges stay at 0.
+        See the deployment note in _update_prometheus_gauges for scraping
+        requirements.
+        """
+        now = datetime.now(UTC)
+        activity = _make_activity(
+            status=ActivityStatus.RUNNING,
+            expected_duration=60,
+            started_at=now - timedelta(seconds=120),
+        )
+        activity.stall_alert_at = now
+
+        session_factory = _make_session_factory(
+            [activity],
+            first_stall_execution_ids=[activity.execution_id],
+            execution_modes={activity.execution_id: "standard"},
+            gauge_counts=(3, 7),
+        )
+
+        with (
+            patch("syntara.workflows.workers.stall_detection.AuditEventDispatcher.dispatch"),
+            patch("syntara.workflows.workers.stall_detection.get_metrics_recorder") as mock_get_recorder,
+            patch("syntara.workflows.workers.stall_detection.get_telemetry_registry") as mock_get_telemetry,
+        ):
+            mock_prometheus = MagicMock()
+            mock_recorder = MagicMock()
+            mock_recorder._prometheus = mock_prometheus
+            mock_get_recorder.return_value = mock_recorder
+
+            mock_telemetry = MagicMock()
+            mock_telemetry.is_initialized.return_value = False
+            mock_get_telemetry.return_value = mock_telemetry
+
+            await detect_stalled_activities(session_factory)
+
+            # Gauges set to database-queried values (not increments)
+            mock_prometheus.stalled_workflows_current.set.assert_called_once_with(3.0)
+            mock_prometheus.stalled_steps_current.set.assert_called_once_with(7.0)
 
 
 class TestStallDetectionWorker:

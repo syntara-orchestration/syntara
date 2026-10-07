@@ -265,7 +265,12 @@ class TestStallDetectionScanner:
         test_db_session_factory: async_sessionmaker[AsyncSession],
         test_user: User,
     ) -> None:
-        """stall_alert_at is never cleared, even if activity later completes."""
+        """stall_alert_at is never cleared, even if activity later completes.
+
+        This is Bill's approved permanent-marker decision. AAP-92824 Jira text
+        references resettable stall state, which conflicts — the Jira ticket
+        should be synced with this design decision.
+        """
         now = datetime.now(UTC)
         started_at = now - timedelta(seconds=120)
 

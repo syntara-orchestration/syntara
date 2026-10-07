@@ -19,6 +19,9 @@ Timestamp Semantics:
 - stall_alert_at and first_stall_detected_at are permanent markers (never cleared)
 - updated_at is NOT set for internal stall bookkeeping to avoid misleading
   "last modified" semantics - stall detection is observability, not user action
+- NOTE: AAP-92824 Jira text references resettable stall state, conflicting with
+  Bill's approved permanent-marker decision. This code follows the approved
+  semantics. The Jira ticket should be synced with this decision.
 """
 
 from __future__ import annotations
@@ -66,11 +69,19 @@ async def detect_stalled_activities(
     Only rows successfully claimed by the update may produce audit events or
     telemetry increments.
 
+    Audit events are written to the transactional outbox in the same database
+    transaction as the activity claim. After all audit dispatches, the worker
+    verifies that the expected number of outbox records were added to the session.
+    If verification fails (audit disabled, handler not registered, or outbox write
+    error), the entire claim transaction is rolled back, guaranteeing at-least-once
+    delivery via the outbox pattern. Segment telemetry and Prometheus metrics are
+    best-effort and independent of audit.
+
     SDP Implementation (R23/AC-13):
     - Emits Segment event with anonymized properties (execution_mode, stalled_step_type)
     - Updates Prometheus gauges (only from coordinated scanner)
     - Increments stalled workflows counter only once per execution
-    - Independent failure handling for audit, Segment, and Prometheus
+    - Independent failure handling for Segment and Prometheus
 
     Args:
         session_factory: Async session factory for database access.
@@ -81,8 +92,9 @@ async def detect_stalled_activities(
 
     now = datetime.now(UTC)
 
-    # Atomic UPDATE...RETURNING that claims stalled activities in a single database round-trip.
-    # All eligibility conditions are in the WHERE clause to ensure only qualifying rows are updated.
+    # Phase 1: Atomic claim + audit outbox write (single transaction).
+    # The UPDATE...RETURNING and AuditOutboxRecord INSERTs share one transaction,
+    # guaranteeing at-least-once audit delivery via the outbox pattern.
     async with session_factory() as session:
         stmt = (
             update(ActivityExecution)
@@ -101,6 +113,49 @@ async def detect_stalled_activities(
 
         result = await session.execute(stmt, {"now": now})
         claimed_rows = list(result.scalars().all())
+
+        # Write audit events to outbox in the same transaction as the claim.
+        # AuditEventDispatcher.dispatch() never raises — handler errors are
+        # logged at exception level inside the dispatcher.  The try/except
+        # is defensive: if event construction somehow fails for one activity,
+        # the remaining activities and the claim commit are not affected.
+        for activity in claimed_rows:
+            try:
+                event = NodeStalledEvent(
+                    activity_execution_id=activity.id,
+                    execution_id=activity.execution_id,
+                    activity_name=activity.activity_name,
+                    node_type=activity.node_type,
+                    expected_duration=activity.expected_duration,
+                    started_at=activity.started_at,
+                    stall_alert_at=activity.stall_alert_at,
+                )
+                AuditEventDispatcher.dispatch(event, session.sync_session)
+            except Exception:  # noqa: BLE001
+                logger.warning(
+                    "stall_detection_audit_enqueue_failed",
+                    activity_execution_id=str(activity.id),
+                    execution_id=str(activity.execution_id),
+                    exc_info=True,
+                )
+
+        # Verify audit outbox records were added before committing.
+        # The audit path has silent failure modes (audit disabled, handler
+        # not registered, outbox write failure). Explicit verification ensures
+        # the claim only commits if the outbox records are present.
+        from syntara.audit.outbox.models import AuditOutboxRecord  # noqa: PLC0415
+
+        outbox_records_added = sum(1 for obj in session.sync_session.new if isinstance(obj, AuditOutboxRecord))
+        if outbox_records_added != len(claimed_rows):
+            logger.error(
+                "stall_detection_audit_verification_failed",
+                claimed=len(claimed_rows),
+                outbox_records=outbox_records_added,
+                message="Audit outbox verification failed — rolling back claim transaction",
+            )
+            await session.rollback()
+            return
+
         await session.commit()
 
     if not claimed_rows:
@@ -140,37 +195,49 @@ async def detect_stalled_activities(
         mode_result = await session.execute(mode_stmt)
         execution_modes = {row[0]: row[1].value for row in mode_result.all()}
 
-    # Emit audit events, Segment events, and track metrics for each claimed stall
-    # All three reporting paths are independent - failure in one doesn't prevent others
-    audit_failure_count = 0
-    segment_failure_count = 0
+    # Phase 3: Segment telemetry (best-effort, independent of audit and Prometheus)
+    segment_failure_count = _emit_segment_events(claimed_rows, execution_modes)
 
-    recorder = get_metrics_recorder()
+    # Phase 4: Prometheus metrics (best-effort, independent of audit and Segment).
+    # Only the coordinated scanner updates gauges — see _update_prometheus_gauges
+    # docstring for deployment scraping requirements.
+    prometheus_failed = False
+    try:
+        recorder = get_metrics_recorder()
+
+        for _ in first_stall_execution_ids:
+            recorder.record(MetricType.STALLED_WORKFLOWS_TOTAL, 1.0)
+
+        await _update_prometheus_gauges(session_factory, recorder)
+    except Exception:  # noqa: BLE001
+        logger.warning(
+            "stall_detection_prometheus_failed",
+            exc_info=True,
+        )
+        prometheus_failed = True
+
+    logger.info(
+        "stall_detection_completed",
+        claimed=len(claimed_rows),
+        first_stall_executions=len(first_stall_execution_ids),
+        segment_failures=segment_failure_count,
+        prometheus_failed=prometheus_failed,
+        cycle_time=now.isoformat(),
+    )
+
+
+def _emit_segment_events(
+    claimed_rows: list[ActivityExecution],
+    execution_modes: dict[UUID, str],
+) -> int:
+    """Emit Segment telemetry events for claimed stalls (best-effort).
+
+    Returns the number of failures.
+    """
+    failure_count = 0
     telemetry_registry = get_telemetry_registry()
 
     for activity in claimed_rows:
-        # Emit audit event
-        try:
-            event = NodeStalledEvent(
-                activity_execution_id=activity.id,
-                execution_id=activity.execution_id,
-                activity_name=activity.activity_name,
-                node_type=activity.node_type,
-                expected_duration=activity.expected_duration,
-                started_at=activity.started_at,
-                stall_alert_at=activity.stall_alert_at,
-            )
-            AuditEventDispatcher.dispatch(event)
-        except Exception:  # noqa: BLE001
-            logger.warning(
-                "stall_detection_audit_failed",
-                activity_execution_id=str(activity.id),
-                execution_id=str(activity.execution_id),
-                exc_info=True,
-            )
-            audit_failure_count += 1
-
-        # Emit Segment event (SDP R23/AC-13) - independent of audit
         try:
             if telemetry_registry.is_initialized():
                 mode = execution_modes.get(activity.execution_id, "standard")
@@ -188,34 +255,9 @@ async def detect_stalled_activities(
                 execution_id=str(activity.execution_id),
                 exc_info=True,
             )
-            segment_failure_count += 1
+            failure_count += 1
 
-    # Update Prometheus metrics (SDP R23/AC-13)
-    # This scanner is coordinated, so only this process updates gauges
-    prometheus_failed = False
-    try:
-        # Increment counter for executions entering stalled state
-        for _ in first_stall_execution_ids:
-            recorder.record(MetricType.STALLED_WORKFLOWS_TOTAL, 1.0)
-
-        # Update gauges to reflect current state
-        await _update_prometheus_gauges(session_factory, recorder)
-    except Exception:  # noqa: BLE001
-        logger.warning(
-            "stall_detection_prometheus_failed",
-            exc_info=True,
-        )
-        prometheus_failed = True
-
-    logger.info(
-        "stall_detection_completed",
-        claimed=len(claimed_rows),
-        first_stall_executions=len(first_stall_execution_ids),
-        audit_failures=audit_failure_count,
-        segment_failures=segment_failure_count,
-        prometheus_failed=prometheus_failed,
-        cycle_time=now.isoformat(),
-    )
+    return failure_count
 
 
 async def _update_prometheus_gauges_safe(
@@ -250,6 +292,12 @@ async def _update_prometheus_gauges(
     - stalled_steps_current: count activities with status=RUNNING and stall_alert_at IS NOT NULL
 
     Only called from the coordinated scanner to avoid conflicting updates across replicas.
+
+    Deployment note: when leadership transfers between replicas, the previous
+    leader retains stale gauge values until its process restarts or re-acquires
+    the lock.  Prometheus should be configured to scrape these gauges from a
+    single target (the current leader) or use ``max()`` aggregation — never
+    ``sum()`` — to avoid double-counting.
 
     Args:
         session_factory: Database session factory.
