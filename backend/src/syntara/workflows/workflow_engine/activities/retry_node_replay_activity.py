@@ -39,12 +39,12 @@ async def replay_retry_node_activity(
     Args:
         source_execution_id: Execution whose ``ActivityExecution`` rows hold the
             state to restore.
-        node_id: Canvas node id to fetch. A loop-iteration-suffixed id resolves
-            to its base node.
+        node_id: Canvas node id to fetch, matched exactly against
+            ``ActivityExecution.activity_name``.
 
     Returns:
         The ``input_data``, ``output_data``, ``started_at`` and ``completed_at`` of
-        the node's most recent ``COMPLETED`` activity in the source run, or None
+        that node's ``COMPLETED`` activity in the source run, or None
         when the source run has no completed record for it. All four are returned
         so a replayed node is indistinguishable from one that executed: the caller
         republishes the input into ``node_inputs`` and the output into the
@@ -63,36 +63,41 @@ async def replay_retry_node_activity(
     """
     if not node_id or not node_id.strip():
         return None
-    wanted = strip_iteration_suffix(node_id.strip())
+    wanted = node_id.strip()
 
     stored: dict[str, Any] | None = None
     async for session in get_db():
-        activities = (
+        # Matched by name in the query rather than by scanning the run's rows in
+        # Python: this is called once per restored node, so loading every completed
+        # row made each call cost the whole execution. Matching the indexed name
+        # returns the one row, and its payload with it.
+        #
+        # The name is matched exactly, with no iteration-suffix stripping. Loop
+        # replay is out of scope, and classification already excludes loop nodes
+        # and loop bodies, so nothing sends a suffixed id on this path. Restoring
+        # per-iteration loop state needs more than one record per node — the
+        # results are a list keyed by iteration — so that work reworks this
+        # transport rather than extending it.
+        activity_row = (
             await session.exec(
                 select(ActivityExecution)
                 .where(
                     ActivityExecution.execution_id == source_execution_id,
+                    ActivityExecution.activity_name == wanted,
                     ActivityExecution.status == ActivityStatus.COMPLETED,
                 )
-                .order_by(
-                    col(ActivityExecution.iteration), col(ActivityExecution.created_at), col(ActivityExecution.id)
-                )
+                .limit(1)
             )
-        ).all()
-        # Ids are matched on the base node id, so a loop node resolves to the
-        # most recent completed iteration. Per-iteration granularity is
-        # classification's concern, not the transport's.
-        for activity_row in activities:
-            base_id = strip_iteration_suffix(activity_row.activity_name)
-            if base_id == wanted:
-                stored = {
-                    "input_data": activity_row.input_data or {},
-                    "output_data": activity_row.output_data or {},
-                    # The source row's own timestamps, carried so the replayed
-                    # node's row reports when the work ran, not the replay time.
-                    "started_at": activity_row.started_at.isoformat() if activity_row.started_at else None,
-                    "completed_at": activity_row.completed_at.isoformat() if activity_row.completed_at else None,
-                }
+        ).first()
+        if activity_row is not None:
+            stored = {
+                "input_data": activity_row.input_data or {},
+                "output_data": activity_row.output_data or {},
+                # The source row's own timestamps, carried so the replayed
+                # node's row reports when the work ran, not the replay time.
+                "started_at": activity_row.started_at.isoformat() if activity_row.started_at else None,
+                "completed_at": activity_row.completed_at.isoformat() if activity_row.completed_at else None,
+            }
 
     if stored is None:
         logger.info(
