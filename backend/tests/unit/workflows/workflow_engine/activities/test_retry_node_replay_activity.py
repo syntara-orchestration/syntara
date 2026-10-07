@@ -37,16 +37,20 @@ class _Row:
 def _mock_session(rows: list[Any]) -> AsyncMock:
     session = AsyncMock()
     result = MagicMock()
-    result.all.return_value = rows
+    result.first.return_value = rows[0] if rows else None
     session.exec.return_value = result
     return session
 
 
 async def _run(rows: list[Any], node_id: str | None) -> dict[str, Any] | None:
-    # The mock session does not execute SQL, so the activity's
-    # ``status == COMPLETED`` predicate is applied here to keep these tests
-    # meaningful. The integration test for this activity covers the real query.
-    session = _mock_session([row for row in rows if row.status == ActivityStatus.COMPLETED])
+    # The mock session does not execute SQL, so the activity's predicates are
+    # applied here to keep these tests meaningful: the completed-status filter
+    # and the exact-name match the query performs. The integration test for this
+    # activity covers the real query.
+    wanted = node_id.strip() if node_id else ""
+    session = _mock_session(
+        [row for row in rows if row.status == ActivityStatus.COMPLETED and row.activity_name == wanted]
+    )
 
     async def mock_get_db():  # noqa: ANN202
         yield session
@@ -73,7 +77,11 @@ async def test_returns_completed_output_for_a_node() -> None:
 
 @pytest.mark.asyncio
 async def test_only_requested_nodes_are_returned() -> None:
-    """Unrelated rows in the execution must not be pulled in."""
+    """Unrelated rows in the execution must not be pulled in.
+
+    The name match happens in the query, so the worker only ever holds the
+    requested node's row and payload.
+    """
     rows = [
         _Row("step_1", ActivityStatus.COMPLETED, {"result": "ok"}),
         _Row("step_2", ActivityStatus.COMPLETED, {"result": "other"}),
@@ -114,32 +122,77 @@ async def test_completed_node_with_no_output_returns_empty_dict() -> None:
 
 
 @pytest.mark.asyncio
-async def test_iteration_suffixed_request_resolves_to_the_base_node() -> None:
-    """``step_1#iter-2`` asks for node step_1, and gets step_1's output."""
+async def test_iteration_suffixed_request_is_not_resolved_to_a_base_node() -> None:
+    """A suffixed id matches nothing, because the query matches names exactly.
+
+    Stripping the suffix used to be this activity's job, but only loop replay
+    needs it: classification excludes loop nodes and loop bodies, so no suffixed
+    id reaches here. Resolving one now would need per-iteration state this
+    single-record transport cannot carry.
+    """
     rows = [_Row("step_1", ActivityStatus.COMPLETED, {"result": "ok"})]
 
-    assert await _run(rows, "step_1#iter-2") == {
-        "input_data": {},
-        "output_data": {"result": "ok"},
-        "started_at": None,
-        "completed_at": None,
-    }
+    assert await _run(rows, "step_1#iter-2") is None
 
 
 @pytest.mark.asyncio
-async def test_loop_iteration_rows_resolve_to_the_most_recent_one() -> None:
-    """The base node id maps to its latest completed iteration."""
+async def test_an_iteration_row_is_matched_only_by_its_own_exact_name() -> None:
+    """Exact matching means an iteration row is reachable only by its own name.
+
+    Nothing sends such an id today, since classification excludes loop nodes and
+    bodies. It is worth pinning that the match is literal rather than by suffix,
+    so the loop work knows what this transport does and does not already do.
+    """
     rows = [
         _Row("step_1", ActivityStatus.COMPLETED, {"result": "iter-0"}),
         _Row("step_1#iter-1", ActivityStatus.COMPLETED, {"result": "iter-1"}),
     ]
 
-    assert await _run(rows, "step_1") == {
-        "input_data": {},
-        "output_data": {"result": "iter-1"},
-        "started_at": None,
-        "completed_at": None,
-    }
+    by_iteration = await _run(rows, "step_1#iter-1")
+    by_base = await _run(rows, "step_1")
+
+    assert by_iteration is not None
+    assert by_iteration["output_data"] == {"result": "iter-1"}
+    assert by_base is not None
+    assert by_base["output_data"] == {"result": "iter-0"}
+
+
+@pytest.mark.asyncio
+async def test_the_lookup_filters_by_name_in_the_query() -> None:
+    """The name predicate belongs in the query, not in a Python loop over rows.
+
+    This activity runs once per restored node. Reading the run's completed rows
+    and filtering in Python made each call cost the whole execution, and pulled
+    every node's payload into the worker to answer one question about one node.
+    Asserting on the statement is what pins that: a mock that returns rows
+    cannot tell a name filter from a full scan.
+    """
+    captured: list[Any] = []
+    session = _mock_session([])
+
+    async def capture(stmt: Any) -> MagicMock:  # noqa: ANN401 — the statement type is SQLAlchemy-internal
+        captured.append(stmt)
+        result = MagicMock()
+        result.first.return_value = None
+        return result
+
+    session.exec.side_effect = capture
+
+    async def mock_get_db():  # noqa: ANN202
+        yield session
+
+    with patch(
+        "syntara.workflows.workflow_engine.activities.retry_node_replay_activity.get_db",
+        mock_get_db,
+    ):
+        assert await replay_retry_node_activity("src-1", "step_target") is None
+
+    assert len(captured) == 1
+    statement = captured[0]
+    sql = str(statement)
+    assert "activity_execution.activity_name = " in sql
+    assert "LIMIT" in sql.upper()
+    assert statement.compile().params["activity_name_1"] == "step_target"
 
 
 @pytest.mark.asyncio
