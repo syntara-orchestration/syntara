@@ -43,3 +43,38 @@ export async function pollApprovalVisible(
     expect(found).toBe(true)
   }).toPass({ timeout: options?.timeout ?? 30_000, intervals: [1_000] })
 }
+
+/**
+ * Poll the form prompts API until a pending prompt with the given name is listed.
+ * Use after `pollExecutionStatus` reaches "paused" on real backends when Temporal is available.
+ */
+export async function pollFormPromptVisible(
+  app: Page,
+  promptName: string,
+  options?: { token?: string; timeout?: number }
+): Promise<void> {
+  const token = options?.token ?? (await getAuthToken(app)) ?? undefined
+  await expect(async () => {
+    const resp = await apiRequest(app, 'get', '/form_prompts?status=pending&limit=100', { token })
+    const body = (await resp.json()) as { resources?: Array<{ name: string }> }
+    const found = body.resources?.some((r) => r.name === promptName)
+    expect(found).toBe(true)
+  }).toPass({ timeout: options?.timeout ?? 45_000, intervals: [1_000] })
+}
+
+const TERMINAL_EXECUTION_STATUSES = ['completed', 'failed', 'cancelled', 'completed_with_errors'] as const
+
+/** Request cancellation and wait until the execution reaches a terminal status. */
+export async function cancelExecutionViaApi(
+  app: Page,
+  executionId: string,
+  options?: { token?: string; timeout?: number }
+): Promise<void> {
+  const token = options?.token ?? (await getAuthToken(app)) ?? undefined
+  const resp = await apiRequest(app, 'post', `/executions/${executionId}/cancel`, { token })
+  expect(resp.ok() || resp.status() === 202, `cancel execution ${executionId} failed: ${resp.status()}`).toBeTruthy()
+  await pollExecutionStatus(app, executionId, [...TERMINAL_EXECUTION_STATUSES], {
+    token,
+    timeout: options?.timeout ?? 90_000,
+  })
+}

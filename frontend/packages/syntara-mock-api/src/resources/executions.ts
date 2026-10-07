@@ -188,6 +188,25 @@ export const executions: Execution[] = [
     ],
   },
   {
+    id: 'exec-form-prompt-alice',
+    created_at: mockDate.minutesAgo10,
+    updated_at: mockDate.minutesAgo10,
+    workflow_id: HELLO_WORLD,
+    workflow_name: workflowNames[HELLO_WORLD],
+    status: 'paused',
+    started_at: mockDate.minutesAgo10,
+    completed_at: null,
+    started_by: 'user-1',
+    input_data: {},
+    current_activities: [
+      {
+        activity_name: 'sandbox_review',
+        temporal_activity_id: 'sandbox_review-activity',
+        iteration: null,
+      },
+    ],
+  },
+  {
     id: 'exec-approval',
     created_at: mockDate.minutesAgo10,
     updated_at: mockDate.minutesAgo10,
