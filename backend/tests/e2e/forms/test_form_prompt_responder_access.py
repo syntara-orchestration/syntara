@@ -63,7 +63,7 @@ def responder_env(
     assign_project_role_to_user: AssignProjectRoleFactory,
     syntara_base_url: str,
 ) -> dict[str, Any]:
-    """Project, two groups, and three users with distinct form-prompt access."""
+    """Project, two groups, and four users with distinct form-prompt access."""
     project_id, _ = create_project(admin_api, "form-prompt-rbac")
 
     submitter_role = create_project_role(admin_api, project_id, "fp-submitter", _SUBMIT_POLICIES)
@@ -74,10 +74,12 @@ def responder_env(
     user_a_id, user_a_name, user_a_pass = create_user(admin_api, "fp-allowed", group_names=[])
     user_b_id, user_b_name, user_b_pass = create_user(admin_api, "fp-outsider", group_names=[])
     user_c_id, user_c_name, user_c_pass = create_user(admin_api, "fp-nosubmit", group_names=[])
+    user_d_id, user_d_name, user_d_pass = create_user(admin_api, "fp-neither", group_names=[])
 
     assign_project_role_to_user(admin_api, project_id, user_a_id, submitter_role)
     assign_project_role_to_user(admin_api, project_id, user_b_id, submitter_role)
     assign_project_role_to_user(admin_api, project_id, user_c_id, reader_role)
+    assign_project_role_to_user(admin_api, project_id, user_d_id, submitter_role)
 
     group_x_id, group_x_name = create_group(admin_api, "fp-grp-allowed")
     group_y_id, group_y_name = create_group(admin_api, "fp-grp-other")
@@ -90,9 +92,11 @@ def responder_env(
         "user_a_name": user_a_name,
         "user_b_name": user_b_name,
         "user_c_name": user_c_name,
+        "user_d_name": user_d_name,
         "user_a_api": api_for(syntara_base_url, user_a_name, user_a_pass),
         "user_b_api": api_for(syntara_base_url, user_b_name, user_b_pass),
         "user_c_api": api_for(syntara_base_url, user_c_name, user_c_pass),
+        "user_d_api": api_for(syntara_base_url, user_d_name, user_d_pass),
         "group_x_name": group_x_name,
         "group_y_name": group_y_name,
     }
@@ -338,6 +342,107 @@ class TestResponderGroups:
         assert_consumer_completed(syntara_api, exec_id)
 
 
+class TestCombinedResponderLists:
+    """Combined responder lists allow either direct users or group members."""
+
+    def test_named_user_can_submit_with_both_responder_lists(
+        self,
+        syntara_api: SyntaraApiRegistry,
+        workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
+        responder_env: dict[str, Any],
+        form_prompt_execution_cleanup: Callable[[UUID], None],
+    ) -> None:
+        """A named user can submit even when outside the configured group.
+
+        Procedure:
+        1. Start a prompt naming B directly and listing group X.
+        2. Submit as B, who belongs to group Y rather than group X.
+        3. Wait for the workflow to finish.
+
+        Expected:
+        - Both responder lists are persisted as configured.
+        - B's direct responder entry allows submission and the consumer completes.
+        """
+        exec_id, prompt_id = _start(
+            syntara_api,
+            workflow_factory,
+            responder_env,
+            form_prompt_execution_cleanup,
+            prefix="combined-responders-direct-user",
+            responder_users=[responder_env["user_b_name"]],
+            responder_groups=[responder_env["group_x_name"]],
+        )
+        response = submit_form_prompt(responder_env["user_b_api"], prompt_id, _RESPONSE)
+        assert response.status_code == HTTPStatus.OK
+        assert_consumer_completed(syntara_api, exec_id)
+
+    def test_group_member_can_submit_with_both_responder_lists(
+        self,
+        syntara_api: SyntaraApiRegistry,
+        workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
+        responder_env: dict[str, Any],
+        form_prompt_execution_cleanup: Callable[[UUID], None],
+    ) -> None:
+        """A listed group member can submit without a direct user entry.
+
+        Procedure:
+        1. Start a prompt naming B directly and listing group X.
+        2. Submit as A, who belongs to group X and is not named directly.
+        3. Wait for the workflow to finish.
+
+        Expected:
+        - Both responder lists are persisted as configured.
+        - A's group membership allows submission and the consumer completes.
+        """
+        exec_id, prompt_id = _start(
+            syntara_api,
+            workflow_factory,
+            responder_env,
+            form_prompt_execution_cleanup,
+            prefix="combined-responders-group-member",
+            responder_users=[responder_env["user_b_name"]],
+            responder_groups=[responder_env["group_x_name"]],
+        )
+        response = submit_form_prompt(responder_env["user_a_api"], prompt_id, _RESPONSE)
+        assert response.status_code == HTTPStatus.OK
+        assert_consumer_completed(syntara_api, exec_id)
+
+    def test_user_matching_neither_responder_list_is_forbidden(
+        self,
+        syntara_api: SyntaraApiRegistry,
+        workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
+        responder_env: dict[str, Any],
+        form_prompt_execution_cleanup: Callable[[UUID], None],
+    ) -> None:
+        """A submit-capable user matching neither list is rejected.
+
+        Procedure:
+        1. Start a prompt naming B directly and listing group X.
+        2. Submit as D, who has submit permission but is neither named nor in X.
+        3. Check the prompt remains pending, then submit as A through group X.
+
+        Expected:
+        - D receives 403 FORM_PROMPT_NOT_AUTHORIZED.
+        - The rejection leaves the prompt live and A can complete it.
+        """
+        exec_id, prompt_id = _start(
+            syntara_api,
+            workflow_factory,
+            responder_env,
+            form_prompt_execution_cleanup,
+            prefix="combined-responders-outsider",
+            responder_users=[responder_env["user_b_name"]],
+            responder_groups=[responder_env["group_x_name"]],
+        )
+        response = submit_form_prompt(responder_env["user_d_api"], prompt_id, _RESPONSE)
+        assert_forbidden(response, expected_code="FORM_PROMPT_NOT_AUTHORIZED")
+        assert_prompt_not_consumed(syntara_api, exec_id, prompt_id)
+
+        response = submit_form_prompt(responder_env["user_a_api"], prompt_id, _RESPONSE)
+        assert response.status_code == HTTPStatus.OK
+        assert_consumer_completed(syntara_api, exec_id)
+
+
 class TestEmptyResponderLists:
     """Empty responder lists preserve permission-only submission access."""
 
@@ -381,7 +486,7 @@ class TestEmptyResponderLists:
 
         Procedure:
         1. Start a prompt without responder restrictions.
-        2. Submit a valid response as B, who has submit permission but is not in either group.
+        2. Submit a valid response as B, who has submit permission and belongs to group Y.
         3. Wait for the workflow to finish.
 
         Expected:
