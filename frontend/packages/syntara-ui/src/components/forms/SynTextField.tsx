@@ -42,10 +42,7 @@ export type SynTextFieldProps<
   autoComplete?: string
   /** Input type. Defaults to `'text'`. */
   type?: 'text' | 'email' | 'password' | 'search' | 'tel' | 'url' | 'number'
-  /**
-   * Accessible name for the input when it must differ from the visible label
-   * (for example E2E-stable `aria-label` values on credential fields).
-   */
+  /** Accessible name when the visible `FormGroup` label is not exposed to assistive tech. */
   ariaLabel?: string
 }
 

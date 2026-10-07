@@ -128,23 +128,34 @@ export function useCredentialFormModal({
       return
     }
 
-    const preSelectedType = preSelectedTypeId ? types.find((t) => t.id === preSelectedTypeId) : undefined
     reset({
       name: '',
       description: '',
       project_id: defaultProjectId ?? '',
       credential_type_id: preSelectedTypeId ?? '',
-      inputs: preSelectedType ? getDefaultInputs(preSelectedType) : {},
+      inputs: {},
     })
-  }, [isOpen, resetKey, reset, credentialToEdit, preSelectedTypeId, defaultProjectId, types])
+  }, [isOpen, resetKey, reset, credentialToEdit, preSelectedTypeId, defaultProjectId])
 
   useEffect(() => {
-    if (!isEditMode && !selectedTypeId && !preSelectedTypeId && types.length > 0) {
-      const defaultType = types[0]
-      setValue('credential_type_id', defaultType.id ?? '')
-      setValue('inputs', getDefaultInputs(defaultType))
+    if (!isOpen || isEditMode || types.length === 0) return
+
+    const resolvedTypeId = selectedTypeId || preSelectedTypeId || types[0]?.id
+    if (!resolvedTypeId) return
+
+    const resolvedType = types.find((t) => t.id === resolvedTypeId)
+    if (!resolvedType) return
+
+    if (selectedTypeId !== resolvedTypeId) {
+      setValue('credential_type_id', resolvedTypeId)
     }
-  }, [types, isEditMode, selectedTypeId, preSelectedTypeId, setValue])
+
+    const defaultInputs = getDefaultInputs(resolvedType)
+    const hasInputs = Object.keys(inputs).length > 0
+    if (!hasInputs) {
+      setValue('inputs', defaultInputs)
+    }
+  }, [isOpen, isEditMode, types, selectedTypeId, preSelectedTypeId, inputs, setValue])
 
   const isTypeSelectDisabled = isEditMode || Boolean(preSelectedTypeId) || typesQuery.isLoading
 

@@ -280,6 +280,33 @@ describe('CredentialFormModal', () => {
     expect(screen.getByText('Loading types...')).toBeInTheDocument()
   })
 
+  it('keeps name edits when credential types finish loading after the dialog opens', async () => {
+    const user = userEvent.setup()
+
+    vi.mocked(credentialsClient.useQuery).mockReturnValue({
+      data: undefined,
+      isLoading: true,
+      error: null,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any)
+
+    const { rerender } = render(<CredentialFormModal isOpen onClose={vi.fn()} />, { wrapper })
+
+    await user.type(screen.getByLabelText('Credential name'), 'Typed before types')
+
+    vi.mocked(credentialsClient.useQuery).mockReturnValue({
+      data: { resources: mockTypes },
+      isLoading: false,
+      error: null,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any)
+
+    rerender(<CredentialFormModal isOpen onClose={vi.fn()} />)
+
+    expect(await screen.findByDisplayValue('Typed before types')).toBeInTheDocument()
+    expect(screen.getByLabelText('Credential type')).toHaveTextContent('HTTP Bearer Token')
+  })
+
   it('shows error when types fail to load', () => {
     vi.mocked(credentialsClient.useQuery).mockReturnValue({
       data: undefined,
