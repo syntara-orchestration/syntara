@@ -127,23 +127,24 @@ describe('ImportWorkflowDialog', () => {
     expect(screen.getByRole('button', { name: /^Import workflow$/i })).toBeEnabled()
   })
 
-  // AAP-93572: uploading a workflow JSON file should pre-fill the name field
-  // from the definition's `name` value instead of leaving it empty.
-  it('pre-fills the workflow name field from the uploaded file', async () => {
+  // AAP-93572: uploading a workflow JSON file should prefill the name field
+  // from workflow_definition.name instead of leaving it blank.
+  it('prefills the workflow name field from the uploaded file', async () => {
     const user = userEvent.setup()
     render(<ImportWorkflowDialog {...defaultProps} />)
 
     const validContent = JSON.stringify({
-      name: 'My Imported Workflow',
+      name: 'Imported From File',
       triggers: [{ id: 't1', type: 'webhook' }],
       nodes: [{ id: 'n1', type: 'action' }],
       edges: [{ from: 't1', to: 'n1' }],
     })
     const file = new File([validContent], 'workflow.json', { type: 'application/json' })
+
     await user.upload(getFileUploadInput(), file)
 
     await waitFor(() => {
-      expect(screen.getByLabelText(/Workflow name/i)).toHaveValue('My Imported Workflow')
+      expect(screen.getByLabelText(/Workflow name/i)).toHaveValue('Imported From File')
     })
   })
 

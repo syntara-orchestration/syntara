@@ -88,7 +88,7 @@ export function ImportWorkflowDialog({ isOpen, onClose, onSuccess }: ImportWorkf
       onClose()
     },
   })
-  const { handleSubmit, handleClose, setError, setValue, getFieldState, formState } = form
+  const { handleSubmit, handleClose, setError, getValues, setValue } = form
 
   const onImportSuccess = (
     wfName: string,
@@ -108,21 +108,22 @@ export function ImportWorkflowDialog({ isOpen, onClose, onSuccess }: ImportWorkf
     onSuccess()
   }
 
-  const prefillNameFromFile = async (file: File) => {
-    try {
-      const content = await file.text()
-      const parsed = parseWorkflowFile(content, file.name)
-      const parsedName = typeof parsed.name === 'string' ? parsed.name.trim() : ''
-      if (parsedName && !getFieldState('name', formState).isDirty) {
-        setValue('name', parsedName, { shouldValidate: true })
-      }
-    } catch {
-      // Ignore parse failures here; onSubmit surfaces file validation errors.
-    }
-  }
+  const handleFileChange = (file: File | undefined) => {
+    if (!file) return
 
-  const handleFileSelected = (file: File | undefined) => {
-    if (file) detachPromise(prefillNameFromFile(file))
+    detachPromise(
+      (async () => {
+        try {
+          const content = await file.text()
+          const parsed = parseWorkflowFile(content, file.name)
+          if (typeof parsed.name === 'string' && parsed.name.trim() && !getValues('name')) {
+            setValue('name', parsed.name)
+          }
+        } catch {
+          // Invalid file content is surfaced as a validation error on submit.
+        }
+      })()
+    )
   }
 
   const onSubmit = async (data: ImportWorkflowFormData) => {
@@ -193,7 +194,7 @@ export function ImportWorkflowDialog({ isOpen, onClose, onSuccess }: ImportWorkf
               fieldId="import-file"
               isRequired
               dropzoneProps={{ accept: { 'application/json': ['.json'] } }}
-              onFileSelected={handleFileSelected}
+              onFileChange={handleFileChange}
             />
             <SynTextField
               name="name"

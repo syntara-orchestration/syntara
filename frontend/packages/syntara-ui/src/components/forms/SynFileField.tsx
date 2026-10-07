@@ -19,7 +19,7 @@ type SynFileFieldControlProps<TFieldValues extends FieldValues, TName extends Fi
   dropzoneProps?: FileUploadProps['dropzoneProps']
   hideDefaultPreview: boolean
   isDisabled?: boolean
-  onFileSelected?: (file: File | undefined) => void
+  onFileChange?: (file: File | undefined) => void
 }
 
 function SynFileFieldControl<TFieldValues extends FieldValues, TName extends FieldPath<TFieldValues>>({
@@ -31,7 +31,7 @@ function SynFileFieldControl<TFieldValues extends FieldValues, TName extends Fie
   dropzoneProps,
   hideDefaultPreview,
   isDisabled,
-  onFileSelected,
+  onFileChange,
 }: Readonly<SynFileFieldControlProps<TFieldValues, TName>>) {
   const wrapperRef = useRef<HTMLDivElement>(null)
   const selectedFile = getSelectedFile(field.value)
@@ -52,12 +52,12 @@ function SynFileFieldControl<TFieldValues extends FieldValues, TName extends Fie
 
   const handleFileInputChange = (_event: DropEvent, inputFile: File) => {
     field.onChange(inputFile)
-    onFileSelected?.(inputFile)
+    onFileChange?.(inputFile)
   }
 
   const handleClearClick = () => {
     field.onChange(undefined)
-    onFileSelected?.(undefined)
+    onFileChange?.(undefined)
   }
 
   return (
@@ -121,11 +121,11 @@ export type SynFileFieldProps<
   /** Disables the file upload control. */
   isDisabled?: boolean
   /**
-   * Called with the newly selected file (or `undefined` on clear), in addition to the
-   * RHF field update. Use for cascading effects, such as prefilling another field from
-   * the file's contents.
+   * Called with the selected `File` (or `undefined` on clear) in addition to
+   * the RHF field update. Use for side effects such as deriving another
+   * field's value from the file's contents.
    */
-  onFileSelected?: (file: File | undefined) => void
+  onFileChange?: (file: File | undefined) => void
 }
 
 /**
@@ -161,7 +161,7 @@ export function SynFileField<
   dropzoneProps,
   hideDefaultPreview = true,
   isDisabled,
-  onFileSelected,
+  onFileChange,
 }: Readonly<SynFileFieldProps<TFieldValues, TName>>) {
   const resolvedFieldId = fieldId ?? name
 
@@ -185,7 +185,7 @@ export function SynFileField<
           dropzoneProps={dropzoneProps}
           hideDefaultPreview={hideDefaultPreview}
           isDisabled={isDisabled}
-          onFileSelected={onFileSelected}
+          onFileChange={onFileChange}
         />
       )}
     </SynFormField>
