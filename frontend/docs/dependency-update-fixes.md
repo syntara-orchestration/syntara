@@ -1,9 +1,10 @@
 # Dependency update compatibility fixes
 
 The October 2026 frontend dependency update prevented Vite from loading its
-configuration. The UI requested Vite 8 and React plugin 6, but the root npm
-override still installed Vite 7. React plugin 6 imports `vite/internal`, which
-Vite 7 does not export.
+configuration and exposed a mock API YAML import mismatch on clean install. The
+UI requested Vite 8 and React plugin 6, but the root npm override still
+installed Vite 7. React plugin 6 imports `vite/internal`, which Vite 7 does not
+export.
 
 ## Changes
 
@@ -13,10 +14,14 @@ Vite 7 does not export.
   and unit-test configurations. Declare the Babel peer
   dependencies in the UI workspace.
 - Use Dagre 3's named `Graph` type export in the workflow layout engine.
+- Use `js-yaml` 5's named `load` export in the mock API YAML converter; the
+  package's ESM entry has no default export.
 - Align the root Playwright overrides with `@playwright/test` 1.63.0 and
   regenerate the lockfile. After upgrading Playwright, run
   `npm exec --workspace=@syntara/ui -- playwright install chromium` to install
   its matching browser.
+- Regenerate the lockfile with npm 10.9.2 so `npm ci` installs the updated
+  workspace ESLint ranges in CI.
 - Apply the formatting required by Prettier 3.9 and update the documented
   TypeScript and Vite versions.
 - Set each package's ESLint TypeScript root explicitly so the upgraded parser
@@ -58,6 +63,8 @@ Verified after the runtime fixes:
 - `npm run check` passes: Mermaid validation, TypeScript, ESLint, formatting,
   and Knip. ESLint reports 309 warnings and zero errors; the changed build/test
   configurations and layout engine lint without warnings.
+- A clean install with npm 10.9.2 succeeds, and the mock API YAML conversion
+  tests pass against the installed `js-yaml` 5 package.
 
 Run `npm run check` and `npm test` after installation for the broader static
 analysis and regression checks. These checks need permission to bind local
