@@ -3,9 +3,9 @@ name: CI Backend
 
 on:
   pull_request:
-    branches: [devel, early-access, feature/*]
+    branches: [devel, early-access, 'feature/**']
   merge_group:
-    branches: [devel, early-access]
+    branches: [devel, early-access, 'feature/**']
   push:
     branches: [devel, early-access]
 
@@ -571,7 +571,10 @@ jobs:
   test-compose-e2e:
     name: (Backend) Test Podman Compose E2E
     needs: changes
-    if: needs.changes.outputs.backend == 'true' && github.event_name == 'merge_group'
+    if: >-
+      needs.changes.outputs.backend == 'true' &&
+      (github.event_name == 'merge_group' ||
+      (github.event_name == 'pull_request' && startsWith(github.base_ref, 'feature/')))
     runs-on: ubuntu-latest
     timeout-minutes: 120
     env:
@@ -669,12 +672,7 @@ jobs:
           echo "All services are healthy"
 
       - name: Run E2E tests (excluding global revocation)
-        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3
-        with:
-          timeout_minutes: 20
-          max_attempts: 3
-          retry_wait_seconds: 30
-          command: cd backend && make test-e2e
+        run: cd backend && make test-e2e E2E_ARGS="--tb=short"
         env:
           APP_SCRIPT_NODES_ENABLED: "true"
           APP_BASE_URL: https://localhost:8000

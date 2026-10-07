@@ -20,12 +20,14 @@ from syntara_api_client.models import (
 )
 from syntara_api_client.models.approval_request_status import ApprovalRequestStatus
 from syntara_api_client.models.execution_status import ExecutionStatus
+from syntara_api_client.models.form_prompt_status import FormPromptStatus
 from syntara_api_client.models.workflow_definition import WorkflowDefinition
 from syntara_api_client.types import UnexpectedResponseException
 
 if TYPE_CHECKING:
     from syntara_api_client.api import SyntaraApiRegistry
     from syntara_api_client.models.approval_request_read import ApprovalRequestRead
+    from syntara_api_client.models.form_prompt_list_read import FormPromptListRead
 
 POLL_INTERVAL = 1
 POLL_TIMEOUT = 20
@@ -145,6 +147,42 @@ def poll_for_pending_approval(
             return cast("ApprovalRequestRead", result.resources[0])
     pytest.fail(
         f"No PENDING approval for execution {execution_id} within {timeout}s. "
+        "Check that Temporal is running: make temporal-run"
+    )
+
+
+def poll_for_pending_form_prompt(
+    api: SyntaraApiRegistry,
+    execution_id: UUID,
+    timeout: int = 60,
+    interval: int = 1,
+) -> FormPromptListRead:
+    """Poll until a PENDING form prompt appears for the given execution.
+
+    FormPromptListRead carries no form_definition, so callers that need the
+    resolved form must GET the prompt by id.
+    """
+    elapsed = 0
+    while elapsed < timeout:
+        time.sleep(interval)
+        elapsed += interval
+        response = _retry_api_call(
+            lambda: api.form_prompts.list(
+                execution_id=execution_id,
+                status=FormPromptStatus.PENDING,
+                limit=5,
+            )
+        )
+        try:
+            result = response.assert_and_get()
+        except UnexpectedResponseException as exc:
+            if exc.status_code == 502:
+                pytest.skip("Backend returned 502 Bad Gateway - transient infrastructure issue")
+            raise
+        if result.resources:
+            return cast("FormPromptListRead", result.resources[0])
+    pytest.fail(
+        f"No PENDING form prompt for execution {execution_id} within {timeout}s. "
         "Check that Temporal is running: make temporal-run"
     )
 
