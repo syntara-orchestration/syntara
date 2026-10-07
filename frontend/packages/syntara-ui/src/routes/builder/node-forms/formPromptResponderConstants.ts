@@ -3,7 +3,7 @@ export const FORM_PROMPT_STEP_INTRO_DESCRIPTION =
 
 export const RESPONDER_USERS_LABEL = 'Responder users'
 export const RESPONDER_USERS_PLACEHOLDER = 'Select users'
-export const RESPONDER_USERS_EMPTY = 'No users available'
+export const RESPONDER_USERS_EMPTY = 'No users with permission to submit form prompts'
 export const RESPONDER_USERS_LOADING = 'Loading users...'
 export const RESPONDER_USERS_HELPER_TEXT =
   'Users who can respond to this prompt in Nexus. Leave empty to allow any authorized user.'
