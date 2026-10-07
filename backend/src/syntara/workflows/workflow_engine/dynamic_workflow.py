@@ -18,6 +18,7 @@ from temporalio.exceptions import TimeoutError as TemporalTimeoutError
 
 with workflow.unsafe.imports_passed_through():
     from syntara.core.exceptions import SafeValueError
+    from syntara.workflows.models.activity_execution import ActivityStatus
     from syntara.workflows.workflow_engine.activities.credential_resolution_activity import resolve_workflow_credentials
     from syntara.workflows.workflow_engine.activities.integration_resolution_activity import (
         resolve_workflow_integration,
@@ -191,6 +192,7 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
         # _prepare_retry rather than on first use.
         self._retry_replay_candidates: set[str] = set()
         self._restored_node_timestamps: dict[str, dict[str, str | None]] = {}
+        self._restored_node_statuses: dict[str, str] = {}
         self._retry_source_statuses: dict[str, str] = {}
         if workflow_metadata:
             for ns_key, ns_data in workflow_metadata.items():
@@ -345,10 +347,60 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
                 await self._handle_continued_failure(completed_node_id, node, graph, pending_tasks)
             return
 
+        # A node restored from the source run returns normally, but returning is not
+        # the same as having run: a restored skip or failure must keep its recorded
+        # outcome instead of being republished as a success and having its successors
+        # scheduled. The sync service corrects the stored row from the recorded state;
+        # this is the in-memory half, which routing and downstream expressions read.
+        restored_status = self._restored_node_statuses.get(completed_node_id)
+        if restored_status is not None and restored_status != ActivityStatus.COMPLETED.value:
+            await self._process_restored_terminal_task(
+                completed_node_id,
+                restored_status,
+                graph,
+                pending_tasks,
+            )
+            return
+
         self.resolver.set_namespace(completed_node_id, {**output, "status": "completed"})
         workflow.logger.info(f"Node {completed_node_id} completed, pending: {list(pending_tasks.keys())}")
         await self._schedule_successors(completed_node_id=completed_node_id, graph=graph, pending_tasks=pending_tasks)
         self._cancel_skipped_pending_tasks(pending_tasks)
+
+    async def _process_restored_terminal_task(
+        self,
+        node_id: str,
+        restored_status: str,
+        graph: WorkflowGraph,
+        pending_tasks: dict[str, asyncio.Task[Any]],
+    ) -> None:
+        """Handle a restored node that was skipped or failed in the source run.
+
+        The namespace entry was published by the restore path, carrying the recorded
+        status, so it is left as-is rather than overwritten. Successors are not
+        scheduled for a restored skip: the source run never ran them, and scheduling
+        them would execute work the retry was meant to skip.
+
+        A restored failure propagates the way a live one does, so an unselected
+        failure still suppresses its downstream nodes instead of letting them run
+        against output that no longer exists.
+        """
+        if restored_status == ActivityStatus.SKIPPED.value:
+            workflow.logger.info(
+                f"Node {node_id} restored as skipped, not scheduling successors",
+                pending=list(pending_tasks.keys()),
+            )
+            self._cancel_skipped_pending_tasks(pending_tasks)
+            return
+
+        node = graph.get_node(node_id)
+        message = self.failed_nodes.get(node_id) or f"Restored from a source run that ended {restored_status}"
+        failure = SafeValueError(message)
+        cof = resolve_continue_on_failure(node, self._runtime_settings)
+        self._handle_node_failure(node_id, failure, graph, pending_tasks, continue_on_failure=cof)
+        if cof:
+            self._route_failed_node(node_id, node)
+            await self._handle_continued_failure(node_id, node, graph, pending_tasks)
 
     @staticmethod
     def _find_node_for_task(
