@@ -28,14 +28,21 @@ with workflow.unsafe.imports_passed_through():
 
 logger = structlog.stdlib.get_logger(__name__)
 
-#: Source statuses a retry can restore. Excludes the in-flight ones: the source run
-#: reached a terminal state, so a PENDING/RUNNING/WAITING row is work that never
-#: finished and has nothing to restore.
+#: Source statuses a retry can restore.
+#:
+#: Excludes the in-flight ones — PENDING, RUNNING, WAITING — because the source run
+#: reached a terminal state, so those rows are work that never finished.
+#:
+#: CANCELLED is excluded too, though it is terminal. Cancellation only rewrites
+#: *unfinished* rows: a node that had already completed keeps its real status and
+#: output, and only in-flight ones are marked CANCELLED, with a synthetic
+#: "Workflow was cancelled" error and no output. So there is no recorded state to
+#: replay, and restoring one would report an interrupted node as a failure — which
+#: would set the run's unhandled-failure flag for a node that merely stopped.
 RESTORABLE_SOURCE_STATUSES = (
     ActivityStatus.COMPLETED,
     ActivityStatus.SKIPPED,
     ActivityStatus.FAILED,
-    ActivityStatus.CANCELLED,
 )
 
 
@@ -84,14 +91,16 @@ async def replay_retry_node_activity(
         # the run made each call cost the whole execution. Matching the indexed
         # name returns the one row, and its payload with it.
         #
-        # Every terminal status is returned, not just COMPLETED. A retry has to
+        # Every restorable status is returned, not just COMPLETED. A retry has to
         # reproduce what the source run did: a node that was skipped stays skipped,
         # and a failure the caller did not select stays failed rather than being
         # quietly reported as a clean skip. The status travels with the payload so
         # the workflow can restore the right one.
         #
-        # PENDING, RUNNING and WAITING are not restorable: the source run reached a
-        # terminal state, so any such row belongs to work that was never finished.
+        # See RESTORABLE_SOURCE_STATUSES for why the in-flight and cancelled statuses
+        # are excluded. A node this does not return has no restorable record, so the
+        # caller runs it for real — which is the correct outcome for work that never
+        # finished.
         #
         # The name is matched exactly, with no iteration-suffix stripping. Loop
         # replay is out of scope, and classification already excludes loop nodes

@@ -18,13 +18,13 @@ from syntara.workflows.utils.datetime import ensure_timezone_aware
 from syntara.workflows.workflow_engine.services.activity_sync_types import ExecutionMonitorMetadata
 from syntara.workflows.workflow_engine.utils.credential_scrubber import scrub_credentials
 
-#: Source statuses a restored node may carry. Mirrors what the replay activity will
-#: return; an ordinary node's own event status is never overwritten from this.
+#: Source statuses a restored node may carry. Mirrors the replay activity's
+#: RESTORABLE_SOURCE_STATUSES; an ordinary node's own event status is never
+#: overwritten from this.
 RESTORABLE_SOURCE_STATUSES = (
     ActivityStatus.COMPLETED,
     ActivityStatus.SKIPPED,
     ActivityStatus.FAILED,
-    ActivityStatus.CANCELLED,
 )
 
 
