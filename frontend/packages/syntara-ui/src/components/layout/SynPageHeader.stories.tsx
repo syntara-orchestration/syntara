@@ -30,6 +30,31 @@ const kebabActions = [
   { key: 'delete', title: 'Delete', isDanger: true, onClick: () => {} },
 ]
 
+const LONG_DETAIL_TITLE =
+  'production-openshift-cluster-west-2-integration-with-an-unreasonably-long-automation-name-for-layout-regression'
+
+function LongTitleDetailPageHeader() {
+  const [enabled, setEnabled] = useState(true)
+  return (
+    <SynPageHeader
+      title={LONG_DETAIL_TITLE}
+      breadcrumbs={[{ label: 'Integrations', href: '/configuration/integrations' }, { label: LONG_DETAIL_TITLE }]}
+      toolbar={
+        <>
+          <Switch
+            id="long-title-detail-switch"
+            label="Enabled"
+            isChecked={enabled}
+            onChange={(_event, checked) => setEnabled(checked)}
+          />
+          <Button variant="secondary">Edit</Button>
+          <SynKebabMenu aria-label="More actions" actions={kebabActions} />
+        </>
+      }
+    />
+  )
+}
+
 function DetailPageToolbarHeader() {
   const [enabled, setEnabled] = useState(true)
   return (
@@ -153,6 +178,19 @@ export const WithKebab: Story = {
   args: {
     toolbar: <SynKebabMenu aria-label="More actions" actions={kebabActions} />,
   },
+}
+
+export const LongTitleDetailPage: Story = {
+  name: 'Detail page — long title + toolbar',
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Regression guard for detail pages: a very long resource name should truncate without pushing toolbar controls off-screen or overlapping them.',
+      },
+    },
+  },
+  render: () => <LongTitleDetailPageHeader />,
 }
 
 export const DetailPageToolbar: Story = {
