@@ -173,8 +173,6 @@ async def detect_stalled_activities(
     segment_failure_count = _emit_segment_events(claimed_rows, execution_modes)
 
     # Phase 4: Prometheus metrics (best-effort, independent of audit and Segment).
-    # Only the coordinated scanner updates gauges — see _update_prometheus_gauges
-    # docstring for deployment scraping requirements.
     prometheus_failed = False
     try:
         recorder = get_metrics_recorder()
@@ -265,13 +263,10 @@ async def _update_prometheus_gauges(
     - stalled_workflows_current: count distinct executions with at least one stalled activity
     - stalled_steps_current: count activities with status=RUNNING and stall_alert_at IS NOT NULL
 
-    Only called from the coordinated scanner to avoid conflicting updates across replicas.
-
-    Deployment note: when leadership transfers between replicas, the previous
-    leader retains stale gauge values until its process restarts or re-acquires
-    the lock.  Prometheus should be configured to scrape these gauges from a
-    single target (the current leader) or use ``max()`` aggregation — never
-    ``sum()`` — to avoid double-counting.
+    Called by every replica (``coordinate=False``). Since gauges are set to
+    absolute database-derived values (not increments), concurrent replicas
+    converge to the same result. This matches the existing queue-depth poller
+    pattern and avoids stale/zero gauge values during pod restarts.
 
     Args:
         session_factory: Database session factory.
@@ -312,5 +307,5 @@ def get_stall_detection_worker() -> PeriodicWorker:
         interval_seconds=settings.stall_detection_interval_seconds,
         session_factory=AsyncSessionLocal,
         callback=detect_stalled_activities,
-        coordinate=True,
+        coordinate=False,
     )

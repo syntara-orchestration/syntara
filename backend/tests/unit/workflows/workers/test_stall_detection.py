@@ -903,16 +903,10 @@ class TestDetectStalledActivities:
             mock_session.rollback.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_coordinated_scanner_only_updates_gauges(
+    async def test_every_replica_updates_gauges(
         self,
     ) -> None:
-        """Gauge updates happen only through the coordinated scanner callback path.
-
-        Non-leader replicas never execute the callback (PeriodicWorker skips
-        when the advisory lock is not acquired), so their gauges stay at 0.
-        See the deployment note in _update_prometheus_gauges for scraping
-        requirements.
-        """
+        """Every replica updates gauges to database-derived absolute values."""
         now = datetime.now(UTC)
         activity = _make_activity(
             status=ActivityStatus.RUNNING,
@@ -968,7 +962,7 @@ class TestStallDetectionWorker:
 
             assert worker._name == "stall-detection"
             assert worker._interval_seconds == 30.0
-            assert worker._coordinate is True
+            assert worker._coordinate is False
 
     def test_worker_factory_is_cached(self) -> None:
         """Worker factory should return the same instance when called multiple times."""
