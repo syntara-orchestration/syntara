@@ -13,8 +13,8 @@
 # =============================================================================
 openapi: 3.1.0
 info:
-  title: Orchestrator API
-  version: 1.3.0
+  title: Syntara API
+  version: 1.4.0
   description: A distributed multi-agent workflow orchestration system
 servers:
   - url: /api/v1
@@ -106,7 +106,7 @@ paths:
               - type: 'null'
             title: Credential Id
           description: |
-            Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
+            Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
             If omitted, the selected integration's management credential is used.
             Credential must be of type "Ansible Automation Platform".
         - in: query
@@ -268,7 +268,7 @@ paths:
               - type: 'null'
             title: Credential Id
           description: |
-            Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
+            Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
             If omitted, the selected integration's management credential is used.
             Credential must be of type "Ansible Automation Platform".
         - in: query
@@ -446,7 +446,7 @@ paths:
               - type: 'null'
             title: Credential Id
           description: |
-            Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
+            Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
             If omitted, the selected integration's management credential is used.
             Credential must be of type "Ansible Automation Platform".
         - in: query
@@ -608,7 +608,7 @@ paths:
               - type: 'null'
             title: Credential Id
           description: |
-            Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
+            Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
             If omitted, the selected integration's management credential is used.
             Credential must be of type "Ansible Automation Platform".
         - in: query
@@ -786,7 +786,7 @@ paths:
               - type: 'null'
             title: Credential Id
           description: |
-            Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
+            Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
             If omitted, the selected integration's management credential is used.
             Credential must be of type "Ansible Automation Platform".
         - in: query
@@ -948,7 +948,7 @@ paths:
               - type: 'null'
             title: Credential Id
           description: |
-            Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
+            Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
             If omitted, the selected integration's management credential is used.
             Credential must be of type "Ansible Automation Platform".
         - in: query
@@ -1119,7 +1119,7 @@ paths:
               - type: 'null'
             title: Credential Id
           description: |
-            Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
+            Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
             If omitted, the selected integration's management credential is used.
             Credential must be of type "Ansible Automation Platform".
         - in: query
@@ -1290,7 +1290,7 @@ paths:
               - type: 'null'
             title: Credential Id
           description: |
-            Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
+            Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
             If omitted, the selected integration's management credential is used.
             Credential must be of type "Ansible Automation Platform".
         - in: query
@@ -1452,7 +1452,7 @@ paths:
               - type: 'null'
             title: Credential Id
           description: |
-            Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
+            Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
             If omitted, the selected integration's management credential is used.
             Credential must be of type "Ansible Automation Platform".
         - in: query
@@ -1613,7 +1613,7 @@ paths:
               - type: 'null'
             title: Credential Id
           description: |
-            Optional Orchestrator credential ID for Ansible Automation Platform Controller authentication.
+            Optional Syntara credential ID for Ansible Automation Platform Controller authentication.
             If omitted, the selected integration's management credential is used.
             Credential must be of type "Ansible Automation Platform".
         - in: query
@@ -29598,7 +29598,7 @@ components:
     OIDCClaimMapping:
       type: object
       title: OIDCClaimMapping
-      description: Maps Orchestrator user fields to IdP-specific OIDC claim names.
+      description: Maps Syntara user fields to IdP-specific OIDC claim names.
       additionalProperties: false
       properties:
         subject:
@@ -29625,7 +29625,7 @@ components:
       type: object
       title: OIDCGroupMappingEntry
       description: |-
-        API-facing schema for a single IdP-to-Orchestrator group mapping entry.
+        API-facing schema for a single IdP-to-Syntara group mapping entry.
 
         Used in API requests/responses. Actual storage is in the
         ``idp_group_mapping_entries`` table.
@@ -29762,7 +29762,7 @@ components:
           items:
             $ref: '#/components/schemas/OIDCGroupMappingEntry'
           title: Group Mapping Entries
-          description: IdP-to-Orchestrator group mapping entries
+          description: IdP-to-Syntara group mapping entries
         allow_all_authenticated:
           type: boolean
           default: false
@@ -29890,7 +29890,7 @@ components:
           items:
             $ref: '#/components/schemas/OIDCGroupMappingEntry'
           title: Group Mapping Entries
-          description: IdP-to-Orchestrator group mapping entries
+          description: IdP-to-Syntara group mapping entries
         allow_all_authenticated:
           type: boolean
           default: false
@@ -30030,7 +30030,7 @@ components:
                 $ref: '#/components/schemas/OIDCGroupMappingEntry'
             - type: 'null'
           title: Group Mapping Entries
-          description: IdP-to-Orchestrator group mapping entries (omit to keep existing)
+          description: IdP-to-Syntara group mapping entries (omit to keep existing)
         allow_all_authenticated:
           anyOf:
             - type: boolean
@@ -33819,6 +33819,13 @@ components:
             - type: 'null'
           description: Originating interface (ui or api)
           title: Interface
+        first_stall_detected_at:
+          anyOf:
+            - type: string
+              format: date-time
+            - type: 'null'
+          description: When this execution first entered stalled state (set once, permanent)
+          title: First Stall Detected At
         labels:
           additionalProperties: true
           type: object
@@ -33946,6 +33953,20 @@ components:
             - type: 'null'
           description: Iteration number if activity is within a loop (0-indexed)
           title: Iteration
+        expected_duration:
+          anyOf:
+            - type: integer
+              minimum: 1.0
+            - type: 'null'
+          description: Resolved expected duration in seconds, copied from node settings at dispatch time.
+          title: Expected Duration
+        stall_alert_at:
+          anyOf:
+            - format: date-time
+              type: string
+            - type: 'null'
+          description: Timestamp when stall was first detected by PeriodicWorker. Written once, never cleared.
+          title: Stall Alert At
       required:
         - execution_id
         - activity_name
@@ -34928,7 +34949,7 @@ components:
         - edges
       title: WorkflowDefinition
       description: |-
-        JSON Schema for graph-based workflow definitions in the Orchestrator Workflow Engine v2.
+        JSON Schema for graph-based workflow definitions in the Syntara Workflow Engine v2.
 
         Attributes:
             schema_version: Schema version that this workflow definition conforms to
@@ -35524,7 +35545,7 @@ components:
             - type: string
             - type: 'null'
           title: Credential Id
-          description: Orchestrator credential UUID for Ansible Automation Platform API authentication. Separate from legacy credentials list.
+          description: Syntara credential UUID for Ansible Automation Platform API authentication. Separate from legacy credentials list.
         integration_id:
           anyOf:
             - type: string
@@ -35679,7 +35700,7 @@ components:
             - type: string
             - type: 'null'
           title: Credential Id
-          description: Orchestrator credential UUID for Ansible Automation Platform API authentication. Separate from legacy credentials list.
+          description: Syntara credential UUID for Ansible Automation Platform API authentication. Separate from legacy credentials list.
         integration_id:
           anyOf:
             - type: string
@@ -35800,7 +35821,7 @@ components:
             - type: string
             - type: 'null'
           title: Credential Id
-          description: Orchestrator credential UUID for authentication or Secret URL.
+          description: Syntara credential UUID for authentication or Secret URL.
       type: object
       required:
         - method
@@ -35828,7 +35849,7 @@ components:
             - type: string
             - type: 'null'
           title: Credential Id
-          description: Orchestrator credential UUID for LLM provider authentication
+          description: Syntara credential UUID for LLM provider authentication
         file_ids:
           items:
             type: string
@@ -35882,7 +35903,7 @@ components:
         credential_id:
           type: string
           title: Credential Id
-          description: Orchestrator credential UUID for execution calls (distinct from management credential)
+          description: Syntara credential UUID for execution calls (distinct from management credential)
       type: object
       required:
         - integration_id
@@ -35925,7 +35946,7 @@ components:
             - type: string
             - type: 'null'
           title: Credential Id
-          description: Orchestrator credential UUID
+          description: Syntara credential UUID
         approver_users:
           anyOf:
             - items:
@@ -36168,6 +36189,13 @@ components:
             - type: boolean
             - type: 'null'
           title: Disabled
+        expected_duration:
+          anyOf:
+            - type: integer
+              minimum: 1.0
+            - type: 'null'
+          description: Expected duration in seconds. Nodes running longer are flagged as stalled.
+          title: Expected Duration
         timeout:
           anyOf:
             - type: integer
@@ -36177,7 +36205,7 @@ components:
       additionalProperties: false
       type: object
       title: NodeSettingsNoRetry
-      description: Settings with disabled, continue_on_failure, and timeout (script, agentic, approval).
+      description: Settings with disabled, continue_on_failure, timeout, and expected_duration (script, agentic, approval).
     NodeSettingsFull:
       properties:
         continue_on_failure:
@@ -36190,6 +36218,13 @@ components:
             - type: boolean
             - type: 'null'
           title: Disabled
+        expected_duration:
+          anyOf:
+            - type: integer
+              minimum: 1.0
+            - type: 'null'
+          description: Expected duration in seconds. Nodes running longer are flagged as stalled.
+          title: Expected Duration
         timeout:
           anyOf:
             - type: integer

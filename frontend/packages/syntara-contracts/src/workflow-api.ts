@@ -945,11 +945,10 @@ export interface components {
        */
       interface?: string | null
       /**
-       * Is Stalled
-       * @description Whether any activity in this execution has been flagged as stalled.
-       * @default false
+       * First Stall Detected At
+       * @description When this execution first entered stalled state (set once, permanent)
        */
-      is_stalled?: boolean
+      first_stall_detected_at?: string | null
       /** Labels */
       labels?: {
         [key: string]: unknown

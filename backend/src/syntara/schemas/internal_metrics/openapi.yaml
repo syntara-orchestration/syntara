@@ -369,6 +369,9 @@ components:
         - auth_failure
         - authz_duration_ms
         - opa_request_duration_ms
+        - stalled_workflows_current
+        - stalled_steps_current
+        - stalled_workflows_total
       title: MetricType
       description: "Categories of metrics recorded by Syntara.\n\nEach value corresponds to a specific measurable quantity exposed via the\nmetrics REST API and (where applicable) Prometheus endpoint."
     MetricsCategoryType:

@@ -77,6 +77,8 @@ class ActivityExecution(BaseResource, table=True):
         # Composite indexes for query performance
         Index("ix_activity_execution_execution_activity", "execution_id", "activity_name"),
         Index("ix_activity_execution_execution_iteration", "execution_id", "iteration"),
+        # Stall detection scanner index (AAP-92825)
+        Index("ix_activity_execution_stall_scan", "status", "stall_alert_at", "started_at"),
         # Check constraints for data integrity (T052)
         CheckConstraint(
             "completed_at IS NULL OR started_at IS NULL OR completed_at >= started_at",

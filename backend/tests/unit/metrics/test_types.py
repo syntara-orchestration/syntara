@@ -89,6 +89,10 @@ class TestMetricType:
             # Authorization
             "AUTHZ_DURATION",
             "OPA_REQUEST_DURATION",
+            # Stall Detection (SDP R23/AC-13)
+            "STALLED_WORKFLOWS_CURRENT",
+            "STALLED_STEPS_CURRENT",
+            "STALLED_WORKFLOWS_TOTAL",
         }
         actual = {m.name for m in MetricType}
         assert actual == expected
