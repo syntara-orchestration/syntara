@@ -51,7 +51,7 @@ async def _claim_outbox() -> list[ExecutionPlaneIntegrationSync]:
                     col(ExecutionPlaneIntegrationSync.lease_expires_at) < now,
                 )
             )
-            .order_by(ExecutionPlaneIntegrationSync.created_at)
+            .order_by(col(ExecutionPlaneIntegrationSync.created_at))
             .limit(25)
             .with_for_update(skip_locked=True)
         )
@@ -193,7 +193,7 @@ async def _reconcile_observed_status() -> None:
                     [ExecutionPlaneSyncStatus.PENDING, ExecutionPlaneSyncStatus.ERROR]
                 )
             )
-            .order_by(Integration.updated_at)
+            .order_by(col(Integration.updated_at))
             .limit(50)
         )
         ids = [(integration.id, integration.execution_plane_revision) for integration in result.all()]

@@ -4,7 +4,7 @@ from uuid import UUID
 
 import pytest
 from httpx import AsyncClient
-from sqlmodel import select
+from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from syntara.execution_plane.integration_sync_model import ExecutionPlaneIntegrationSync
@@ -34,7 +34,7 @@ async def _sync_rows(session: AsyncSession, integration_id: UUID) -> list[Execut
     result = await session.exec(
         select(ExecutionPlaneIntegrationSync)
         .where(ExecutionPlaneIntegrationSync.integration_id == integration_id)
-        .order_by(ExecutionPlaneIntegrationSync.source_revision)
+        .order_by(col(ExecutionPlaneIntegrationSync.source_revision))
     )
     return list(result.all())
 

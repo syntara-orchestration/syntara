@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import uuid
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
 
 import structlog
 from temporalio import activity
@@ -29,7 +29,12 @@ from syntara.workflows.workflow_engine.models.workflow_definition import (
     ScriptExecutorParameters,
 )
 
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
 logger = structlog.stdlib.get_logger(__name__)
+
+__all__ = ["activity", "asyncio", "execute_script_activity"]
 
 INITIAL_RETRY_DELAY_SECONDS = 0.5
 MAX_RETRY_DELAY_SECONDS = 10.0
@@ -76,9 +81,14 @@ async def _dispatch_to_ep(  # noqa: C901, PLR0915 - service handoff and Temporal
     """Persist AO's dispatch intent, then idempotently submit it to EP over HTTP."""
     settings = get_settings()
     info = activity.info()
+    workflow_id = info.workflow_id
+    run_id = info.workflow_run_id
+    if workflow_id is None or run_id is None:
+        msg = "Temporal activity context is missing workflow or run identity"
+        raise ApplicationError(msg, type="ContextError", non_retryable=True)
     request_id = _stable_request_id(
-        workflow_id=info.workflow_id,
-        run_id=info.workflow_run_id,
+        workflow_id=workflow_id,
+        run_id=run_id,
         activity_id=info.activity_id,
         namespace=settings.temporal_namespace,
     )
@@ -96,8 +106,8 @@ async def _dispatch_to_ep(  # noqa: C901, PLR0915 - service handoff and Temporal
     payload = await persist_dispatch_binding(
         request_id=request_id,
         project_id=project_id,
-        workflow_id=info.workflow_id,
-        run_id=info.workflow_run_id,
+        workflow_id=workflow_id,
+        run_id=run_id,
         activity_id=info.activity_id,
         activity_attempt=info.attempt,
         task_token=info.task_token,
@@ -193,6 +203,7 @@ async def execute_script_activity(
 
     result = await _dispatch_to_ep(input_config, output_config, project_uuid)
     if result is None:
-        activity.raise_complete_async()
+        raise_complete_async = cast("Callable[[], Any]", activity.raise_complete_async)
+        raise_complete_async()
         return {}
     return result

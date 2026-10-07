@@ -215,7 +215,7 @@ async def mark_dispatch_accepted(request_id: str, work_item_id: UUID, *, termina
 
 
 def _same_event(row: ExecutionPlaneCompletionInbox, event: dict[str, Any]) -> bool:
-    return (
+    return bool(
         row.client_id == event["client_id"]
         and row.project_id == event["project_id"]
         and row.work_item_id == event["work_id"]
@@ -296,7 +296,7 @@ async def persist_completion_event(event: dict[str, Any]) -> None:
 async def _claim_due_events() -> list[ExecutionPlaneCompletionInbox]:
     now = datetime.now(UTC)
     async with AsyncSessionLocal() as session:
-        rows = await session.exec(
+        result = await session.exec(
             select(ExecutionPlaneCompletionInbox)
             .where(col(ExecutionPlaneCompletionInbox.processed_at).is_(None))
             .where(col(ExecutionPlaneCompletionInbox.next_attempt_at) <= now)
@@ -304,11 +304,11 @@ async def _claim_due_events() -> list[ExecutionPlaneCompletionInbox]:
                 (col(ExecutionPlaneCompletionInbox.lease_expires_at).is_(None))
                 | (col(ExecutionPlaneCompletionInbox.lease_expires_at) <= now)
             )
-            .order_by(ExecutionPlaneCompletionInbox.received_at)
+            .order_by(col(ExecutionPlaneCompletionInbox.received_at))
             .limit(50)
             .with_for_update(skip_locked=True)
         )
-        rows = list(rows.all())
+        rows = list(result.all())
         for row in rows:
             row.lease_expires_at = now + timedelta(seconds=CALLBACK_LEASE_SECONDS)
             row.attempts += 1
@@ -331,7 +331,7 @@ async def _claim_bindings_for_status_check() -> list[tuple[str, UUID]]:
                     < now - timedelta(seconds=MISSING_EVENT_RECONCILE_SECONDS)
                 )
             )
-            .order_by(ExecutionPlaneActivityBinding.updated_at)
+            .order_by(col(ExecutionPlaneActivityBinding.updated_at))
             .limit(25)
             .with_for_update(skip_locked=True)
         )
@@ -394,7 +394,7 @@ async def _claim_due_cancellations() -> list[tuple[UUID, UUID, str, int]]:
                 (col(ExecutionPlaneActivityBinding.cancel_lease_expires_at).is_(None))
                 | (col(ExecutionPlaneActivityBinding.cancel_lease_expires_at) <= now)
             )
-            .order_by(ExecutionPlaneActivityBinding.cancel_requested_at)
+            .order_by(col(ExecutionPlaneActivityBinding.cancel_requested_at))
             .limit(50)
             .with_for_update(skip_locked=True)
         )

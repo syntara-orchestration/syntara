@@ -14,7 +14,7 @@ from syntara.execution_plane.client import ExecutionPlaneHttpClient
 async def test_cluster_binding_request_keeps_namespace_as_kubernetes_integration_config() -> None:
     client = object.__new__(ExecutionPlaneHttpClient)
     request = AsyncMock(return_value={"status": "pending"})
-    client._request = request
+    object.__setattr__(client, "_request", request)
 
     await client.upsert_cluster_binding(
         source_integration_id=uuid4(),
@@ -28,6 +28,8 @@ async def test_cluster_binding_request_keeps_namespace_as_kubernetes_integration
         enabled=True,
     )
 
-    body = request.await_args.kwargs["json_body"]
+    await_args = request.await_args
+    assert await_args is not None
+    body = await_args.kwargs["json_body"]
     assert body["namespace"] == "ep-workers"
     assert "placement" not in body
