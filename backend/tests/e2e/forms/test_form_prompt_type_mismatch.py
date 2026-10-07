@@ -9,32 +9,18 @@ from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 import pytest
-from orchestrator_test_sdk.e2e import unique_name
 from orchestrator_test_sdk.e2e.helpers import poll_execution
 from syntara_api_client.api import SyntaraApiRegistry
-from syntara_api_client.models import ExecutionCreate, WorkflowCreate, WorkflowRead
+from syntara_api_client.models import WorkflowCreate, WorkflowRead
 from syntara_api_client.models.execution_status import ExecutionStatus
-from syntara_api_client.types import Response, UnexpectedResponseException
 
-from ._workflows import dynamic_option_field, producer_prompt_consumer_workflow
+from ._helpers import EXECUTION_POLL_TIMEOUT, assert_and_get_with_502_skip, create_form_prompt_execution
+from ._workflows import dynamic_option_field
 
 if TYPE_CHECKING:
     from syntara_api_client.models.activity_data import ActivityData
 
 pytestmark = [pytest.mark.e2e]
-
-_PROMPT_POLL_TIMEOUT = 60
-_EXECUTION_POLL_TIMEOUT = 90
-
-
-def _assert_and_get_with_502_skip[ResponseT](response: Response[ResponseT]) -> ResponseT:
-    """Get a parsed response, skipping only on a transient Bad Gateway."""
-    try:
-        return response.assert_and_get()
-    except UnexpectedResponseException as exc:
-        if exc.status_code == 502:
-            pytest.skip("Backend returned 502 Bad Gateway - transient infrastructure issue")
-        raise
 
 
 def _start(
@@ -47,29 +33,21 @@ def _start(
     continue_on_failure: bool = False,
 ) -> UUID:
     """Create and start a workflow with the requested producer and form fields."""
-    name = unique_name("e2e-form-prompt-type-mismatch")
-    workflow = workflow_factory(
-        WorkflowCreate(
-            name=name,
-            description="E2E: reject incompatible form prompt template values",
-            workflow_definition=producer_prompt_consumer_workflow(
-                name,
-                producer_output=producer_output,
-                form_fields=form_fields,
-                continue_on_failure=continue_on_failure,
-            ),
-            project_id=first_project_id,
-        )
+    return create_form_prompt_execution(
+        syntara_api,
+        workflow_factory,
+        first_project_id,
+        workflow_name_prefix="e2e-form-prompt-type-mismatch",
+        description="E2E: reject incompatible form prompt template values",
+        producer_output=producer_output,
+        form_fields=form_fields,
+        continue_on_failure=continue_on_failure,
     )
-    execution = syntara_api.executions.create(
-        body=ExecutionCreate(workflow_id=workflow.id, trigger_node_id="trigger")
-    ).assert_and_get()
-    return UUID(str(execution.id))
 
 
 def _assert_no_prompt_row(syntara_api: SyntaraApiRegistry, exec_id: UUID) -> None:
     """Verify failed template resolution did not persist a form prompt."""
-    listed = _assert_and_get_with_502_skip(syntara_api.form_prompts.list(execution_id=exec_id, limit=5))
+    listed = assert_and_get_with_502_skip(syntara_api.form_prompts.list(execution_id=exec_id, limit=5))
     assert not listed.resources, (
         f"No form prompt row should be persisted when template resolution fails; found {len(listed.resources)}"
     )
@@ -83,7 +61,7 @@ def _assert_prompt_node_failed(
     expect_field_name: str | None = "environment",
 ) -> None:
     """Assert the form_prompt node fails before any prompt row is created."""
-    final = poll_execution(syntara_api, str(exec_id), timeout=_EXECUTION_POLL_TIMEOUT)
+    final = poll_execution(syntara_api, str(exec_id), timeout=EXECUTION_POLL_TIMEOUT)
     assert final.status == ExecutionStatus.FAILED, (
         f"Expected FAILED on template type mismatch, got {final.status}: {final.error_details}"
     )
@@ -232,7 +210,7 @@ def test_type_mismatch_with_continue_on_failure_routes_to_fallback(
         form_fields=[dynamic_option_field("environment", "${producer.stdout_json.environments}")],
         continue_on_failure=True,
     )
-    final = poll_execution(syntara_api, str(exec_id), timeout=_EXECUTION_POLL_TIMEOUT)
+    final = poll_execution(syntara_api, str(exec_id), timeout=EXECUTION_POLL_TIMEOUT)
     assert final.status == ExecutionStatus.COMPLETED_WITH_ERRORS, (
         f"Expected COMPLETED_WITH_ERRORS, got {final.status}: {final.error_details}"
     )
