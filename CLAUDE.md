@@ -164,4 +164,4 @@ except UnexpectedResponseException as exc:
 
 **Backend**: Python 3.12+, FastAPI, SQLModel, PostgreSQL 15, Temporal, Redis, regopy, uv, Alembic, pytest, mypy, ruff
 
-**Frontend**: React 19, TypeScript 5.9, Vite, PatternFly 6, TanStack Query, Zustand, ReactFlow, Vitest, Playwright, npm workspaces
+**Frontend**: React 19, TypeScript 7, Vite, PatternFly 6, TanStack Query, Zustand, ReactFlow, Vitest, Playwright, npm workspaces

@@ -60,16 +60,6 @@ function findFirstEnabledPath(item: TNavigationItem): string {
   return item.path
 }
 
-function isModifiedClick(event: React.SyntheticEvent | undefined): boolean {
-  if (!event || typeof globalThis.MouseEvent === 'undefined') return false
-
-  const mouseEvent = event.nativeEvent
-  return (
-    mouseEvent instanceof globalThis.MouseEvent &&
-    (mouseEvent.button !== 0 || mouseEvent.metaKey || mouseEvent.ctrlKey || mouseEvent.shiftKey || mouseEvent.altKey)
-  )
-}
-
 /** Items with children that should show a dropdown instead of navigating directly. */
 function hasDropdownChildren(item: TNavigationItem): boolean {
   return (item.children?.length ?? 0) > 1
@@ -118,8 +108,6 @@ function NavDropdownItem({
     const child = enabledChildren.find((c) => c.path === itemId)
     if (child) {
       setFlyoutRef?.(null)
-      if (isModifiedClick(event)) return
-
       event?.preventDefault()
       requestNavigation(child.path)
     }
@@ -386,8 +374,6 @@ export function AppDockedNav() {
               <ToolbarItem>
                 <Nav
                   onSelect={(event, selectedItem) => {
-                    if (isModifiedClick(event)) return
-
                     event.preventDefault()
                     navigateToNavItem(selectedItem.itemId, selectedItem.to, visibleItems, requestNavigation)
                   }}

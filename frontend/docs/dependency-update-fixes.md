@@ -10,7 +10,7 @@ Vite 7 does not export.
 - Align the root Vite override with the UI's Vite 8 dependency.
 - Preserve React Compiler using React plugin 6's documented
   `reactCompilerPreset()` and `@rolldown/plugin-babel` integration in the app,
-  unit-test, and browser-test configurations. Declare the Babel peer
+  and unit-test configurations. Declare the Babel peer
   dependencies in the UI workspace.
 - Use Dagre 3's named `Graph` type export in the workflow layout engine.
 - Align the root Playwright overrides with `@playwright/test` 1.63.0 and
@@ -22,7 +22,10 @@ Vite 7 does not export.
 - Set each package's ESLint TypeScript root explicitly so the upgraded parser
   can lint staged files from multiple packages in one pre-commit invocation.
 - Adapt navigation to the updated PatternFly API and reuse the existing router
-  link adapter for client-side navigation and modified clicks.
+  link adapter for client-side navigation.
+- Remove the unused browser-test configuration and its type shim. The
+  configuration imported an undeclared provider, had no npm script, and had no
+  matching browser-test files.
 - Hold Unicorn at 64.0.0, the effect-analysis plugin at 0.10.2, and the Fast
   Refresh lint plugin at 0.5.4. Their newer releases introduce lint-policy
   changes across existing code, including condition reordering that requires
