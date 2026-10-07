@@ -218,6 +218,21 @@ describe('formDefinitionSchema', () => {
     }
   })
 
+  it('accepts date defaults in year 0001', () => {
+    const data = parseFormDefinition({
+      fields: [
+        {
+          type: FormFieldTypeEnum.DATE,
+          value_name: 'historic',
+          label: 'Historic',
+          default: { date: '0001-06-15' },
+        },
+      ],
+    })
+
+    expect(data.fields[0]?.default).toEqual({ date: '0001-06-15' })
+  })
+
   it('parses the form-prompt-full example form_definition shape', () => {
     const data = parseFormDefinition({
       fields: [

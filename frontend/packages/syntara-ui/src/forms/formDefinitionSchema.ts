@@ -1,6 +1,8 @@
 import type { FormDefinition } from '@syntara/contracts'
 import { z } from 'zod'
 
+import { isValidIsoCalendarDate } from '../utils/isoCalendarDate'
+
 import {
   FORM_DEFINITION_MAX_FIELDS,
   FORM_DEFINITION_MIN_FIELDS,
@@ -95,11 +97,7 @@ const checkboxFieldSchema = formFieldBaseSchema.extend({
 const isoDateSchema = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be an ISO 8601 date in YYYY-MM-DD format')
-  .refine((value) => {
-    const year = Number(value.slice(0, 4))
-    const parsed = new Date(`${value}T00:00:00.000Z`)
-    return year > 0 && !Number.isNaN(parsed.valueOf()) && parsed.toISOString().slice(0, 10) === value
-  }, 'Date must be a valid ISO 8601 calendar date')
+  .refine((value) => isValidIsoCalendarDate(value), 'Date must be a valid ISO 8601 calendar date')
 
 const dateValueSchema = z.object({
   date: isoDateSchema.nullable().optional(),

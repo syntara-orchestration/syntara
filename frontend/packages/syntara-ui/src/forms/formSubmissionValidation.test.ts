@@ -318,6 +318,13 @@ describe('assertValidFormDefinition', () => {
 })
 
 describe('date field submission', () => {
+  it('accepts year 0001 in date component', () => {
+    const definition = dateForm()
+    expect(validateFormSubmission(definition, { start: { date: '0001-01-01' } })).toEqual({
+      start: { date: '0001-01-01' },
+    })
+  })
+
   function dateForm(overrides: Record<string, unknown> = {}) {
     return form(field(FormFieldTypeEnum.DATE, 'start', overrides))
   }

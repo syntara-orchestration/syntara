@@ -9,6 +9,7 @@ import type { WorkflowDefShape } from '../../builder/useActivityNameMap'
 import { ACTIVITY_STATUS } from '../../builder/utils/executionState/executionHelpers'
 import { latestActivityStateForCanvasNode } from '../../workflows/execution/utils/activityState'
 import { useExecutionStore } from '../../workflows/stores/useExecutionStore'
+import { resolveFormPromptActivitySnapshot } from '../formPrompt/formPromptActivityState'
 import {
   canvasNodeIdFromPromptNodeId,
   findFormPromptIndexForLookupKeys,
@@ -79,6 +80,19 @@ function formPromptNotFoundDescription(fetchedCount: number, nodeId: string): st
   if (isCanvasNodeWaitingForPrompt(nodeId)) {
     return 'The form prompt is still being created for this step. Wait a moment and try again.'
   }
+
+  const activity = resolveFormPromptActivitySnapshot(nodeId, useExecutionStore.getState().activityStates)
+  if (activity?.status === ACTIVITY_STATUS.FAILED) {
+    const detail = activity.errorDetails?.trim()
+    if (detail) {
+      return `The form step failed before a prompt could be created: ${detail}`
+    }
+    return 'The form step failed before a prompt could be created. Open the step details or worker logs for the error.'
+  }
+  if (activity?.status === ACTIVITY_STATUS.RUNNING || activity?.status === ACTIVITY_STATUS.RETRYING) {
+    return 'The form step is still starting. Wait a moment and try again.'
+  }
+
   return 'No form prompt was recorded for this step on this run.'
 }
 
