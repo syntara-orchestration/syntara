@@ -1,6 +1,7 @@
 """Shared API and workflow helpers for the form-prompt E2E tests."""
 
 import json
+import time
 from collections.abc import Callable, Mapping
 from http import HTTPStatus
 from typing import Any, cast
@@ -143,6 +144,30 @@ def assert_prompt_not_consumed(
     )
     activities = {activity.activity_id: activity for activity in (execution.activities or [])}
     assert activities.get("consumer") is None or activities["consumer"].status != "completed"
+
+
+def wait_for_form_prompt_paused(
+    syntara_api: SyntaraApiRegistry,
+    exec_id: UUID,
+    *,
+    prompt_node_id: str = "prompt",
+    timeout: int = 60,
+) -> ExecutionRead:
+    """Wait until the execution is paused on the form-prompt activity."""
+    for _ in range(timeout):
+        execution = assert_and_get_with_502_skip(syntara_api.executions.get(execution_id=exec_id, include="activities"))
+        activities = {activity.activity_id: activity for activity in (execution.activities or [])}
+        prompt_activity = activities.get(prompt_node_id)
+        if execution.status == ExecutionStatus.PAUSED and prompt_activity is not None:
+            assert prompt_activity.status == "waiting", (
+                f"Expected {prompt_node_id} activity waiting, got {prompt_activity.status}"
+            )
+            return execution
+        if execution.status in TERMINAL_STATUSES:
+            pytest.fail(f"Execution became terminal before {prompt_node_id} paused: {execution.status}")
+        time.sleep(1)
+
+    pytest.fail(f"Execution {exec_id} did not pause on {prompt_node_id} within {timeout}s")
 
 
 def create_form_prompt_execution(

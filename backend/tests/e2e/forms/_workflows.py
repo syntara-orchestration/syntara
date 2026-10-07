@@ -46,7 +46,7 @@ def producer_prompt_consumer_workflow(
     """Build a trigger, producer, form prompt, consumer, and optional fallback chain.
 
     Optional responder lists restrict which users or group members may submit
-    the form prompt.
+    the form prompt. ``consumer_code`` can inspect the prompt response.
     """
     payload = json.dumps(producer_output)
     consumer_parameters: dict[str, Any] = {"language": "python", "code": consumer_code}
