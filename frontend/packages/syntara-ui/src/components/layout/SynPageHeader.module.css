@@ -2,12 +2,22 @@
    forces the page to overflow horizontally and can push the sidebar off-screen. */
 .header :global(.pf-v6-c-compass__main-header-content) {
   min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
 }
 
 .header :global(.pf-v6-c-compass__main-header-title) {
   min-width: 0;
+  flex: 1 1 auto;
 }
 
+.header :global(.pf-v6-c-compass__main-header-title) :is(h1, .pf-v6-c-title) {
+  overflow-wrap: anywhere;
+}
+
+/* Keep header actions at their natural width; min-width: 0 let the toolbar shrink
+   and crowd switches, buttons, and kebab menus beside long titles. */
 .header :global(.pf-v6-c-compass__main-header-toolbar) {
-  min-width: 0;
+  flex: 0 0 auto;
+  margin-inline-start: auto;
 }
