@@ -477,13 +477,7 @@ describe('Approvals Component', () => {
 
       render(<Approvals />)
 
-      for (const name of [
-        /Approval name/i,
-        /^Workflow$/i,
-        /Approval initiated/i,
-        /Actioned on/i,
-        /^Status$/i,
-      ]) {
+      for (const name of [/Approval name/i, /^Workflow$/i, /Approval initiated/i, /Actioned on/i, /^Status$/i]) {
         const header = screen.getByRole('columnheader', { name })
         expect(within(header).getByRole('button')).toBeInTheDocument()
       }
