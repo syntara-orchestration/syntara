@@ -38,6 +38,10 @@ class WorkflowRetryMixin:
     #: these before waiting on it, so it must be populated before any node runs.
     _retry_replay_candidates: set[str]
     _restored_node_timestamps: dict[str, dict[str, str | None]]
+    #: The source status of a node this retry restored, keyed by node id. Read by the
+    #: completion path so a restored skip or failure is not republished as a success
+    #: and does not have its successors scheduled.
+    _restored_node_statuses: dict[str, str]
     _runtime_settings: dict[str, Any]
     #: Published by the workflow: where a restored failure is recorded, so it reads
     #: the same as one that genuinely failed in this run.
@@ -287,6 +291,7 @@ class WorkflowRetryMixin:
             "status": source_status,
             "error_details": error_details,
         }
+        self._restored_node_statuses[node.id] = source_status
 
         workflow.logger.info(
             "Replayed retry node state",
@@ -315,6 +320,12 @@ class WorkflowRetryMixin:
         Mirrors what a live failure publishes — namespace entry, ``failed_nodes`` or
         ``skipped_nodes`` — so the scheduler and the run view see the same shape as
         for a node that genuinely failed or was genuinely skipped.
+
+        This only records the outcome. The completion path reads
+        ``_restored_node_statuses`` and decides what to do with it, because a task
+        that returns normally is otherwise indistinguishable from one that really
+        succeeded — it would republish the namespace as completed and schedule the
+        successors of a node that was never run.
         """
         if source_status == ActivityStatus.SKIPPED.value:
             self.skipped_nodes.add(node.id)

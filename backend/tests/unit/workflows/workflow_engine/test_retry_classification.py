@@ -877,3 +877,156 @@ class TestReplayedTimestampUpdateHandler:
 
         assert result is None
         assert satisfied_now
+
+
+class TestRestoredTerminalOutcomeInTheCompletionPath:
+    """A restored skip or failure must survive the completion boundary.
+
+    A restored node returns from its task normally, and a task that returns is
+    indistinguishable from one that really succeeded — so the completion path would
+    republish its namespace as completed and schedule its successors. The sync service
+    corrects the stored row, but routing and downstream expressions read the workflow's
+    in-memory state, which is where the damage lands.
+    """
+
+    def setup_method(self) -> None:
+        self.graph = _chain_graph()
+
+    @pytest.mark.asyncio
+    async def test_a_restored_skip_keeps_its_namespace_entry(self, mock_wf: MagicMock) -> None:
+        wf = _make_workflow(_retry("step_3"))
+        wf.retry_context = _retry("step_3")
+        node = ActivityNode(node_id="step_1", node_type="script", parameters={})
+        mock_wf.execute_activity = AsyncMock(
+            return_value={
+                "status": "skipped",
+                "input_data": {},
+                "output_data": {"reason": "branch not taken"},
+                "error_details": None,
+                "started_at": "2026-01-01T00:00:00+00:00",
+                "completed_at": "2026-01-01T00:00:10+00:00",
+            }
+        )
+
+        from .conftest import complete_supplied_node
+
+        result = await wf._maybe_restore_retry_output(node, self.graph)
+        assert result is not None
+        await complete_supplied_node(wf, node, result, self.graph)
+
+        assert wf.resolver.get_namespace("step_1") == {"reason": "branch not taken", "status": "skipped"}
+        assert "step_1" in wf.skipped_nodes
+
+    @pytest.mark.asyncio
+    async def test_a_restored_skip_does_not_schedule_successors(self, mock_wf: MagicMock) -> None:
+        """The source run never ran step_2, so this retry must not either."""
+        import asyncio
+        from unittest.mock import AsyncMock, patch
+
+        wf = _make_workflow(_retry("step_3"))
+        wf.retry_context = _retry("step_3")
+        node = ActivityNode(node_id="step_1", node_type="script", parameters={})
+        mock_wf.execute_activity = AsyncMock(
+            return_value={
+                "status": "skipped",
+                "input_data": {},
+                "output_data": {},
+                "error_details": None,
+                "started_at": None,
+                "completed_at": None,
+            }
+        )
+
+        result = await wf._maybe_restore_retry_output(node, self.graph)
+        assert result is not None
+
+        async def supplied() -> dict[str, Any]:
+            return wf._process_supplied_result(node, result)
+
+        task = asyncio.create_task(supplied())
+        schedule = AsyncMock()
+        with patch.object(wf, "_schedule_successors", new=schedule):
+            await wf._process_completed_task(task, {node.id: task}, self.graph)
+
+        schedule.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_a_restored_failure_propagates_like_a_live_one(self, mock_wf: MagicMock) -> None:
+        """An unselected failure still suppresses what depends on it.
+
+        Its output no longer exists in this run, so a successor that ran against it
+        would be executing against nothing.
+        """
+        import asyncio
+        from unittest.mock import AsyncMock, patch
+
+        wf = _make_workflow(_retry("step_3"))
+        wf.retry_context = _retry("step_3")
+        node = ActivityNode(node_id="step_1", node_type="script", parameters={})
+        mock_wf.execute_activity = AsyncMock(
+            return_value={
+                "status": "failed",
+                "input_data": {},
+                "output_data": {"partial": True},
+                "error_details": "exit code 1",
+                "started_at": None,
+                "completed_at": None,
+            }
+        )
+
+        result = await wf._maybe_restore_retry_output(node, self.graph)
+        assert result is not None
+        assert wf.failed_nodes["step_1"] == "exit code 1"
+
+        async def supplied() -> dict[str, Any]:
+            return wf._process_supplied_result(node, result)
+
+        task = asyncio.create_task(supplied())
+        schedule = AsyncMock()
+        with (
+            patch.object(wf, "_schedule_successors", new=schedule),
+            patch.object(wf, "_mark_downstream_as_skipped"),
+        ):
+            await wf._process_completed_task(task, {node.id: task}, self.graph)
+
+        schedule.assert_not_awaited()
+        # The failure is re-propagated rather than silently swallowed, so the run's
+        # own failure state still sees it.
+        assert "step_1" in wf.failed_nodes
+
+    @pytest.mark.asyncio
+    async def test_a_restored_completion_still_schedules_successors(self, mock_wf: MagicMock) -> None:
+        """The fix must not stop a genuinely restored success from progressing."""
+        import asyncio
+        from unittest.mock import AsyncMock, patch
+
+        wf = _make_workflow(_retry("step_3"))
+        wf.retry_context = _retry("step_3")
+        node = ActivityNode(node_id="step_1", node_type="script", parameters={})
+        mock_wf.execute_activity = AsyncMock(
+            return_value={
+                "status": "completed",
+                "input_data": {},
+                "output_data": {"result": "ok"},
+                "error_details": None,
+                "started_at": None,
+                "completed_at": None,
+            }
+        )
+
+        result = await wf._maybe_restore_retry_output(node, self.graph)
+        assert result is not None
+
+        async def supplied() -> dict[str, Any]:
+            return wf._process_supplied_result(node, result)
+
+        task = asyncio.create_task(supplied())
+        schedule = AsyncMock()
+        with (
+            patch.object(wf, "_schedule_successors", new=schedule),
+            patch.object(wf, "_cancel_skipped_pending_tasks"),
+        ):
+            await wf._process_completed_task(task, {node.id: task}, self.graph)
+
+        schedule.assert_awaited_once()
+        assert wf.resolver.get_namespace("step_1") == {"result": "ok", "status": "completed"}
