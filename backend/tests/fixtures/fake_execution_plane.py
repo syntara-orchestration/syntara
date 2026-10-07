@@ -14,6 +14,10 @@ from uuid import NAMESPACE_URL, uuid5
 class FakeExecutionPlaneHttpClient:
     """Return completed EP responses while running representative scripts in tests."""
 
+    def __init__(self, *, timeout: float | None = None) -> None:
+        """Accept the production client's request timeout configuration."""
+        self.timeout = timeout
+
     async def __aenter__(self) -> Self:
         """Mirror the production client's async context-manager contract."""
         return self
@@ -43,7 +47,8 @@ class FakeExecutionPlaneHttpClient:
 
 async def execute_fixture_script(payload: dict[str, Any]) -> tuple[dict[str, Any], str]:
     """Run a test script as a local stand-in for a separately deployed EP service."""
-    input_config = payload["input_config"]
+    invocation = payload["invocation"]
+    input_config = invocation["inputs"]
     language = input_config.get("language", "python")
     code = input_config["code"]
     command = ["bash", "-c", code] if language == "bash" else [sys.executable, "-c", code]

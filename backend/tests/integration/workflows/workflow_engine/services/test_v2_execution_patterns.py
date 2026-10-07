@@ -15,6 +15,7 @@ Story: AAP-74236 — E2E Testing for V2 Schema
 import asyncio
 from collections.abc import Callable, Sequence
 from typing import Any
+from uuid import uuid4
 
 import pytest
 from temporalio.testing import WorkflowEnvironment
@@ -46,6 +47,7 @@ def _manual_trigger() -> dict[str, Any]:
 
 
 _WORKFLOW_RESULT_TIMEOUT = 30
+_TEST_WORKFLOW_METADATA = {"workflow_context": {"workflow": {"project_id": str(uuid4())}}}
 
 
 async def _run_workflow(
@@ -74,6 +76,7 @@ async def _run_workflow(
             workflow_name="v2-pattern-test",
             trigger_node_id="trigger",
             include_node_results=True,
+            workflow_metadata=_TEST_WORKFLOW_METADATA,
         )
         handle = temporal_env.client.get_workflow_handle(start.temporal_workflow_id)
         raw: dict[str, Any] = await asyncio.wait_for(handle.result(), timeout=_WORKFLOW_RESULT_TIMEOUT)

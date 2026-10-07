@@ -12,6 +12,7 @@ activity to batch-expire pending approval requests via the Approvals API.
 import asyncio
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
+from uuid import uuid4
 
 import pytest
 import yaml
@@ -26,6 +27,7 @@ from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkf
 from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName
 
 _expire_calls: list[tuple[str, str | None]] = []
+_TEST_WORKFLOW_METADATA = {"workflow_context": {"workflow": {"project_id": str(uuid4())}}}
 
 
 @activity.defn(name=ActivityName.APPROVAL)
@@ -173,6 +175,7 @@ edges:
 async def _test_script_activity(
     resolved_parameters: dict[str, Any],
     outputs: dict[str, str] | None = None,
+    project_id: str | None = None,
     **kwargs: object,
 ) -> dict[str, Any]:
     return {"output": {"status": "completed"}}
@@ -257,6 +260,7 @@ class TestApprovalTimeoutIntegration:
                 workflow_def=workflow_def,
                 workflow_name="approval-timeout-test",
                 trigger_node_id="trigger_manual",
+                workflow_metadata=_TEST_WORKFLOW_METADATA,
             )
 
             handle = execution_service.temporal_client.get_workflow_handle(
@@ -306,6 +310,7 @@ class TestApprovalTimeoutIntegration:
                 workflow_def=workflow_def,
                 workflow_name=f"approval-cof-{fallback_decision}-test",
                 trigger_node_id="trigger_manual",
+                workflow_metadata=_TEST_WORKFLOW_METADATA,
             )
 
             handle = execution_service.temporal_client.get_workflow_handle(
@@ -379,6 +384,7 @@ class TestApprovalTimeoutIntegration:
                     workflow_def=workflow_def,
                     workflow_name="multi-approval-completion-test",
                     trigger_node_id="trigger_manual",
+                    workflow_metadata=_TEST_WORKFLOW_METADATA,
                 )
 
                 handle = execution_service.temporal_client.get_workflow_handle(

@@ -11,6 +11,7 @@ import asyncio
 import os
 import signal
 from unittest.mock import patch
+from uuid import uuid4
 
 import pytest
 import yaml
@@ -25,6 +26,8 @@ from syntara.workflows.workflow_engine.activities.runtime_settings_activity impo
 from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkflow
 from syntara.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
 from syntara.workflows.workflow_engine.services.temporal_worker import TemporalWorkerService
+
+TEST_WORKFLOW_METADATA = {"workflow_context": {"workflow": {"project_id": str(uuid4())}}}
 
 
 class MockWorkerService(TemporalWorkerService):
@@ -196,6 +199,7 @@ class TestTemporalWorkerServiceIntegration:
                 workflow_def=workflow_def,
                 workflow_name="worker-integration-test",
                 trigger_node_id="trigger_manual",
+                workflow_metadata=TEST_WORKFLOW_METADATA,
             )
 
             # Wait for workflow to complete
@@ -243,12 +247,14 @@ class TestTemporalWorkerServiceIntegration:
                 workflow_def=workflow_def,
                 workflow_name="worker1-test",
                 trigger_node_id="trigger_manual",
+                workflow_metadata=TEST_WORKFLOW_METADATA,
             )
 
             result2 = await service2.start_workflow(
                 workflow_def=workflow_def,
                 workflow_name="worker2-test",
                 trigger_node_id="trigger_manual",
+                workflow_metadata=TEST_WORKFLOW_METADATA,
             )
 
             # Both workflows should complete
@@ -297,6 +303,7 @@ class TestTemporalWorkerServiceIntegration:
                 workflow_def=workflow_def,
                 workflow_name="long-running-test",
                 trigger_node_id="trigger_manual",
+                workflow_metadata=TEST_WORKFLOW_METADATA,
             )
 
             # Yield control so the worker can pick up the workflow
@@ -348,6 +355,7 @@ class TestWorkerServiceConfiguration:
                 workflow_def=workflow_def,
                 workflow_name="queue-test",
                 trigger_node_id="trigger_manual",
+                workflow_metadata=TEST_WORKFLOW_METADATA,
             )
 
             # Should complete successfully
