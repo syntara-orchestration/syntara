@@ -352,6 +352,7 @@ export default function Credentials() {
                   <Thead>
                     <Tr>
                       <Th
+                        width={10}
                         expand={{
                           areAllExpanded,
                           collapseAllAriaLabel: areAllExpanded ? 'Collapse all' : 'Expand all',
@@ -359,14 +360,20 @@ export default function Credentials() {
                         }}
                         aria-label="Row expansion"
                       />
-                      <Th sort={getSortParams(0)}>Name</Th>
-                      <Th>Type</Th>
-                      <Th>Workflows</Th>
-                      <Th>Integrations</Th>
-                      <Th sort={getSortParams(3)}>Created</Th>
-                      <Th sort={getSortParams(4)}>Last modified</Th>
-                      <Th>State</Th>
-                      <Th screenReaderText="Actions" />
+                      <Th width={10} sort={getSortParams(0)}>
+                        Name
+                      </Th>
+                      <Th width={15}>Type</Th>
+                      <Th width={10}>Workflows</Th>
+                      <Th width={10}>Integrations</Th>
+                      <Th width={20} sort={getSortParams(3)}>
+                        Created
+                      </Th>
+                      <Th width={20} sort={getSortParams(4)}>
+                        Last modified
+                      </Th>
+                      <Th width={10}>State</Th>
+                      <Th width={10} screenReaderText="Actions" />
                     </Tr>
                   </Thead>
                   {isAllProjects && groupedCredentials ? (
