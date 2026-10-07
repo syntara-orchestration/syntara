@@ -3,20 +3,12 @@
 import json
 from collections.abc import Callable
 from http import HTTPStatus
-from typing import Any, cast
+from typing import Any
 from uuid import UUID
 
 import pytest
-from orchestrator_test_sdk.e2e import unique_name
-from orchestrator_test_sdk.e2e.helpers import poll_for_pending_form_prompt
 from syntara_api_client.api import SyntaraApiRegistry
-from syntara_api_client.models import (
-    ExecutionCreate,
-    ExecutionRead,
-    WorkflowCreate,
-    WorkflowDefinition,
-    WorkflowRead,
-)
+from syntara_api_client.models import WorkflowCreate, WorkflowRead
 from syntara_api_client.models.activity_data import ActivityData
 from syntara_api_client.models.activity_data_output_data_type_0 import ActivityDataOutputDataType0
 from syntara_api_client.models.error_data import ErrorData
@@ -26,14 +18,16 @@ from syntara_api_client.models.form_prompt_status import FormPromptStatus
 from syntara_api_client.types import Response
 
 from ._helpers import (
-    PROMPT_POLL_TIMEOUT,
-    assert_and_get_with_502_skip,
     assert_consumer_completed,
     get_form_prompt,
+    start_pending_form_prompt,
     submit_form_prompt,
 )
 
 pytestmark = [pytest.mark.e2e]
+
+_FORM_PROMPT_WORKFLOW_NAME_PREFIX = "e2e-form-prompt-field-validation"
+_FORM_PROMPT_WORKFLOW_DESCRIPTION = "E2E: validate form prompt field types and submissions"
 
 _ALL_FIELDS = [
     {"type": "text", "value_name": "text_value", "label": "Text", "required": True},
@@ -113,71 +107,6 @@ print(json.dumps({
 """
 
 
-def _start_pending_form_prompt(
-    syntara_api: SyntaraApiRegistry,
-    workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
-    first_project_id: UUID,
-    track_execution: Callable[[UUID], None],
-    *,
-    form_fields: list[dict[str, Any]],
-    consumer_code: str = 'print("form prompt submitted")',
-    consumer_environment: dict[str, str] | None = None,
-) -> tuple[UUID, UUID]:
-    """Create a manual trigger → form prompt → consumer workflow and await its prompt."""
-    name = unique_name("e2e-form-prompt-field-validation")
-    workflow = workflow_factory(
-        WorkflowCreate(
-            name=name,
-            description="E2E: validate form prompt field types and submissions",
-            project_id=first_project_id,
-            workflow_definition=WorkflowDefinition.from_dict(
-                {
-                    "name": name,
-                    "schema_version": "2.0.0",
-                    "triggers": [{"id": "trigger", "type": "manual_trigger", "parameters": {}}],
-                    "nodes": [
-                        {
-                            "id": "prompt",
-                            "name": "Collect input",
-                            "type": "form_prompt",
-                            "parameters": {
-                                "message": "Submit the form",
-                                "form_definition": {"fields": form_fields},
-                                "response_window": 600,
-                            },
-                        },
-                        {
-                            "id": "consumer",
-                            "name": "Consumer",
-                            "type": "script",
-                            "parameters": {
-                                "language": "python",
-                                "code": consumer_code,
-                                "environment": consumer_environment or {},
-                            },
-                        },
-                    ],
-                    "edges": [
-                        {"from": "trigger", "to": "prompt"},
-                        {"from": "prompt", "to": "consumer", "from_port": "submitted"},
-                    ],
-                }
-            ),
-        )
-    )
-    execution = cast(
-        "ExecutionRead",
-        assert_and_get_with_502_skip(
-            syntara_api.executions.create(body=ExecutionCreate(workflow_id=workflow.id, trigger_node_id="trigger"))
-        ),
-    )
-    execution_id = UUID(str(execution.id))
-    track_execution(execution_id)
-
-    prompt = poll_for_pending_form_prompt(syntara_api, execution_id, timeout=PROMPT_POLL_TIMEOUT)
-    return execution_id, UUID(str(prompt.id))
-
-
 def _assert_validation_error(
     response: Response[ErrorData | FormPromptRead],
     *,
@@ -220,15 +149,19 @@ def test_all_supported_field_types_resume_and_flow_to_consumer(
     - The form-prompt submission returns 200 and resumes the workflow.
     - Every field reaches the consumer with its submitted JSON type preserved.
     """
-    execution_id, prompt_id = _start_pending_form_prompt(
+    execution_id, prompt = start_pending_form_prompt(
         syntara_api,
         workflow_factory,
         first_project_id,
-        form_prompt_execution_cleanup,
+        workflow_name_prefix=_FORM_PROMPT_WORKFLOW_NAME_PREFIX,
+        description=_FORM_PROMPT_WORKFLOW_DESCRIPTION,
+        track_execution=form_prompt_execution_cleanup,
+        producer_output={},
         form_fields=_ALL_FIELDS,
         consumer_code=_ALL_FIELDS_CONSUMER_CODE,
         consumer_environment=_ALL_FIELDS_ENVIRONMENT,
     )
+    prompt_id = UUID(str(prompt.id))
 
     response = submit_form_prompt(syntara_api, prompt_id, _ALL_FIELDS_SUBMISSION)
     assert response.status_code == HTTPStatus.OK
@@ -254,16 +187,20 @@ def test_required_field_error_leaves_prompt_available_for_valid_response(
     form_prompt_execution_cleanup: Callable[[UUID], None],
 ) -> None:
     """A missing required value is rejected, while an optional number may be omitted."""
-    execution_id, prompt_id = _start_pending_form_prompt(
+    execution_id, prompt = start_pending_form_prompt(
         syntara_api,
         workflow_factory,
         first_project_id,
-        form_prompt_execution_cleanup,
+        workflow_name_prefix=_FORM_PROMPT_WORKFLOW_NAME_PREFIX,
+        description=_FORM_PROMPT_WORKFLOW_DESCRIPTION,
+        track_execution=form_prompt_execution_cleanup,
+        producer_output={},
         form_fields=[
             {"type": "text", "value_name": "required_text", "label": "Required text", "required": True},
             {"type": "number", "value_name": "optional_number", "label": "Optional number", "required": False},
         ],
     )
+    prompt_id = UUID(str(prompt.id))
 
     rejected = submit_form_prompt(syntara_api, prompt_id, {"required_text": ""})
     _assert_validation_error(rejected, field_name="required_text", expected_detail="required")
@@ -271,7 +208,11 @@ def test_required_field_error_leaves_prompt_available_for_valid_response(
 
     accepted = submit_form_prompt(syntara_api, prompt_id, {"required_text": "provided"})
     assert accepted.status_code == HTTPStatus.OK
-    assert_consumer_completed(syntara_api, execution_id)
+
+    final = assert_consumer_completed(syntara_api, execution_id)
+    activities = {activity.activity_id: activity for activity in (final.activities or [])}
+    prompt_output = _activity_output(activities["prompt"])
+    assert prompt_output["response_data"] == {"required_text": "provided"}
 
 
 def test_unparseable_number_string_is_rejected(
@@ -281,17 +222,21 @@ def test_unparseable_number_string_is_rejected(
     form_prompt_execution_cleanup: Callable[[UUID], None],
 ) -> None:
     """A string that cannot represent a number is rejected for a number field."""
-    _, prompt_id = _start_pending_form_prompt(
+    _, prompt = start_pending_form_prompt(
         syntara_api,
         workflow_factory,
         first_project_id,
-        form_prompt_execution_cleanup,
+        workflow_name_prefix=_FORM_PROMPT_WORKFLOW_NAME_PREFIX,
+        description=_FORM_PROMPT_WORKFLOW_DESCRIPTION,
+        track_execution=form_prompt_execution_cleanup,
+        producer_output={},
         form_fields=[
             {"type": "number", "value_name": "number_value", "label": "Number", "required": True},
             {"type": "checkbox", "value_name": "boolean_value", "label": "Boolean", "required": True},
             {"type": "text", "value_name": "string_value", "label": "String", "required": True},
         ],
     )
+    prompt_id = UUID(str(prompt.id))
 
     response = submit_form_prompt(
         syntara_api,
@@ -299,6 +244,7 @@ def test_unparseable_number_string_is_rejected(
         {"number_value": "abc", "boolean_value": True, "string_value": "hello"},
     )
     _assert_validation_error(response, field_name="number_value", expected_detail="number")
+    assert get_form_prompt(syntara_api, prompt_id).status == FormPromptStatus.PENDING
 
 
 def test_numeric_and_boolean_strings_are_coerced_and_flow_downstream(
@@ -308,11 +254,14 @@ def test_numeric_and_boolean_strings_are_coerced_and_flow_downstream(
     form_prompt_execution_cleanup: Callable[[UUID], None],
 ) -> None:
     """Numeric and boolean strings are normalized before downstream execution."""
-    execution_id, prompt_id = _start_pending_form_prompt(
+    execution_id, prompt = start_pending_form_prompt(
         syntara_api,
         workflow_factory,
         first_project_id,
-        form_prompt_execution_cleanup,
+        workflow_name_prefix=_FORM_PROMPT_WORKFLOW_NAME_PREFIX,
+        description=_FORM_PROMPT_WORKFLOW_DESCRIPTION,
+        track_execution=form_prompt_execution_cleanup,
+        producer_output={},
         form_fields=[
             {"type": "number", "value_name": "number_value", "label": "Number", "required": True},
             {"type": "checkbox", "value_name": "boolean_value", "label": "Boolean", "required": True},
@@ -330,6 +279,7 @@ def test_numeric_and_boolean_strings_are_coerced_and_flow_downstream(
             "BOOLEAN_VALUE": "${prompt.response_data.boolean_value}",
         },
     )
+    prompt_id = UUID(str(prompt.id))
 
     response = submit_form_prompt(
         syntara_api,
@@ -356,17 +306,21 @@ def test_native_number_boolean_and_string_types_are_accepted(
     form_prompt_execution_cleanup: Callable[[UUID], None],
 ) -> None:
     """Native JSON types are accepted and the form prompt resumes the workflow."""
-    execution_id, prompt_id = _start_pending_form_prompt(
+    execution_id, prompt = start_pending_form_prompt(
         syntara_api,
         workflow_factory,
         first_project_id,
-        form_prompt_execution_cleanup,
+        workflow_name_prefix=_FORM_PROMPT_WORKFLOW_NAME_PREFIX,
+        description=_FORM_PROMPT_WORKFLOW_DESCRIPTION,
+        track_execution=form_prompt_execution_cleanup,
+        producer_output={},
         form_fields=[
             {"type": "number", "value_name": "number_value", "label": "Number", "required": True},
             {"type": "checkbox", "value_name": "boolean_value", "label": "Boolean", "required": True},
             {"type": "text", "value_name": "string_value", "label": "String", "required": True},
         ],
     )
+    prompt_id = UUID(str(prompt.id))
 
     response = submit_form_prompt(
         syntara_api,
@@ -384,15 +338,19 @@ def test_extra_fields_are_rejected_and_defined_fields_can_be_submitted(
     form_prompt_execution_cleanup: Callable[[UUID], None],
 ) -> None:
     """Unknown keys are rejected, and a later valid response still resumes work."""
-    execution_id, prompt_id = _start_pending_form_prompt(
+    execution_id, prompt = start_pending_form_prompt(
         syntara_api,
         workflow_factory,
         first_project_id,
-        form_prompt_execution_cleanup,
+        workflow_name_prefix=_FORM_PROMPT_WORKFLOW_NAME_PREFIX,
+        description=_FORM_PROMPT_WORKFLOW_DESCRIPTION,
+        track_execution=form_prompt_execution_cleanup,
+        producer_output={},
         form_fields=[{"type": "number", "value_name": "x", "label": "X", "required": True}],
         consumer_code='import json, os\nprint(json.dumps({"x": int(os.environ["X"])}))',
         consumer_environment={"X": "${prompt.response_data.x}"},
     )
+    prompt_id = UUID(str(prompt.id))
 
     rejected = submit_form_prompt(syntara_api, prompt_id, {"x": 42, "y": 3})
     _assert_validation_error(rejected, field_name="y", expected_detail="Unknown field")

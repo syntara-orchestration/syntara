@@ -28,7 +28,7 @@ from syntara_api_client.models.error_data import ErrorData
 from syntara_api_client.models.execution_status import ExecutionStatus
 from syntara_api_client.types import Response, UnexpectedResponseException
 
-from ._workflows import producer_prompt_consumer_workflow
+from ._workflows import DEFAULT_CONSUMER_CODE, producer_prompt_consumer_workflow
 
 PROMPT_POLL_TIMEOUT = 60
 EXECUTION_POLL_TIMEOUT = 90
@@ -108,6 +108,8 @@ def create_form_prompt_execution(
     track_execution: Callable[[UUID], None],
     producer_output: Mapping[str, object],
     form_fields: list[dict[str, Any]],
+    consumer_code: str = DEFAULT_CONSUMER_CODE,
+    consumer_environment: Mapping[str, str] | None = None,
     continue_on_failure: bool = False,
     response_window: int = 600,
 ) -> UUID:
@@ -121,6 +123,8 @@ def create_form_prompt_execution(
                 name,
                 producer_output=producer_output,
                 form_fields=form_fields,
+                consumer_code=consumer_code,
+                consumer_environment=consumer_environment,
                 continue_on_failure=continue_on_failure,
                 response_window=response_window,
             ),
@@ -148,6 +152,8 @@ def start_pending_form_prompt(
     track_execution: Callable[[UUID], None],
     producer_output: Mapping[str, object],
     form_fields: list[dict[str, Any]],
+    consumer_code: str = DEFAULT_CONSUMER_CODE,
+    consumer_environment: Mapping[str, str] | None = None,
     continue_on_failure: bool = False,
     response_window: int = 600,
 ) -> tuple[UUID, FormPromptListRead]:
@@ -161,6 +167,8 @@ def start_pending_form_prompt(
         track_execution=track_execution,
         producer_output=producer_output,
         form_fields=form_fields,
+        consumer_code=consumer_code,
+        consumer_environment=consumer_environment,
         continue_on_failure=continue_on_failure,
         response_window=response_window,
     )

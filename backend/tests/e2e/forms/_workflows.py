@@ -6,6 +6,8 @@ from typing import Any
 
 from syntara_api_client.models import WorkflowDefinition
 
+DEFAULT_CONSUMER_CODE = 'print("submitted path executed")'
+
 
 def dynamic_option_field(
     value_name: str,
@@ -34,11 +36,17 @@ def producer_prompt_consumer_workflow(
     *,
     producer_output: Mapping[str, object],
     form_fields: list[dict[str, Any]],
+    consumer_code: str = DEFAULT_CONSUMER_CODE,
+    consumer_environment: Mapping[str, str] | None = None,
     continue_on_failure: bool = False,
     response_window: int = 600,
 ) -> WorkflowDefinition:
     """Build a form-prompt workflow with a submitted consumer and optional fallback chain."""
     payload = json.dumps(producer_output)
+    consumer_parameters: dict[str, Any] = {"language": "python", "code": consumer_code}
+    if consumer_environment is not None:
+        consumer_parameters["environment"] = dict(consumer_environment)
+
     nodes: list[dict[str, Any]] = [
         {
             "id": "producer",
@@ -61,7 +69,7 @@ def producer_prompt_consumer_workflow(
             "id": "consumer",
             "name": "Consumer Node",
             "type": "script",
-            "parameters": {"language": "bash", "code": 'echo "submitted path executed"'},
+            "parameters": consumer_parameters,
         },
     ]
     edges: list[dict[str, Any]] = [
