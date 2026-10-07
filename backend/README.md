@@ -194,7 +194,7 @@ Create the kind cluster and its workload namespace and ServiceAccount from the
 
 ```bash
 cd ../syntara-execution-plane
-kind create cluster --name ep
+KIND_EXPERIMENTAL_PROVIDER=podman kind create cluster --name ep
 kubectl apply -f docs/feature-branch-assets/execution-plane-init.yaml
 kubectl create token syntara-dispatcher -n execution-plane --duration=48h
 kubectl config view --minify --raw \
@@ -216,7 +216,7 @@ full stack:
 ```bash
 cd ../syntara
 make setup
-export APP_INTEGRATION_URL_ALLOWED_HOSTS='["ep-control-plane"]'
+export APP_INTEGRATION_URL_ALLOWED_HOSTS='["ep-control-plane", "mcp-server"]'
 make -C backend run-all-kind
 ```
 
