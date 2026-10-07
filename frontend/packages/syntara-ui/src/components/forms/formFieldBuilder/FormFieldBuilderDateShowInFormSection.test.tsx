@@ -4,7 +4,7 @@ import { FormProvider, useForm } from 'react-hook-form'
 import { describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
-import { FormFieldTypeEnum, parseFormDefinition } from '../../../forms'
+import { DATE_FIELD_TIME_REQUIRES_TIMEZONE_MESSAGE, FormFieldTypeEnum, parseFormDefinition } from '../../../forms'
 
 import { FormFieldBuilderCommitContext } from './formFieldBuilderCommitContext'
 import { FormFieldBuilderDateShowInFormSection } from './FormFieldBuilderDateShowInFormSection'
@@ -42,6 +42,18 @@ describe('FormFieldBuilderDateShowInFormSection', () => {
     expect(screen.getByRole('checkbox', { name: 'Date' })).toBeChecked()
     expect(screen.getByRole('checkbox', { name: 'Time' })).not.toBeChecked()
     expect(screen.getByRole('checkbox', { name: 'Timezone' })).not.toBeChecked()
+  })
+
+  it('shows how to fix time without timezone', async () => {
+    const user = userEvent.setup()
+    const definition = parseFormDefinition({
+      fields: [{ type: FormFieldTypeEnum.DATE, value_name: 'due', label: 'Due' }],
+    })
+    renderSection(definition)
+
+    await user.click(screen.getByRole('checkbox', { name: 'Time' }))
+
+    expect(screen.getByText(DATE_FIELD_TIME_REQUIRES_TIMEZONE_MESSAGE)).toBeInTheDocument()
   })
 
   it('enables time without selecting timezone', async () => {

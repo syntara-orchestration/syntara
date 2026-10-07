@@ -8,6 +8,7 @@ export {
   isValidFormFieldValueName,
 } from './formConstants'
 export { FormFieldTypeEnum, FORM_FIELD_TYPE_VALUES, type FormFieldType } from './formFieldTypeEnum'
+export { DATE_FIELD_TIME_REQUIRES_TIMEZONE_MESSAGE } from './dateFieldValidationMessages'
 export { prepareFormDefinitionForCommit, sanitizeDateFieldForApi } from './dateFieldUtils'
 export {
   formDefinitionSchema,

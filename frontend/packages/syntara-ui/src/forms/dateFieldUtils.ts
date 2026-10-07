@@ -71,6 +71,14 @@ function pruneDateValueForIncludes(
   return next
 }
 
+export function isDateFieldTimeWithoutTimezone(field: FormField): boolean {
+  if (field.type !== 'date') {
+    return false
+  }
+  const includes = dateIncludesFromField(field)
+  return includes.time && !includes.timezone
+}
+
 export function dateIncludesFromField(field: FormField): Record<DateComponentName, boolean> {
   if (field.type !== 'date') {
     return { date: true, time: false, timezone: false }
