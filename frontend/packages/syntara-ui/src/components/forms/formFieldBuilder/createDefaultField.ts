@@ -68,7 +68,14 @@ export function createDefaultField(
     case FormFieldTypeEnum.CHECKBOX:
       return { ...base, type: FormFieldTypeEnum.CHECKBOX, default: false }
     case FormFieldTypeEnum.DATE:
-      return { ...base, type: FormFieldTypeEnum.DATE, default: null }
+      return {
+        ...base,
+        type: FormFieldTypeEnum.DATE,
+        default: null,
+        include_date: true,
+        include_time: false,
+        include_timezone: false,
+      }
     case FormFieldTypeEnum.DROPDOWN:
       return {
         ...base,

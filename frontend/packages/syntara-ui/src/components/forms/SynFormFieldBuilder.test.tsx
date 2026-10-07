@@ -281,8 +281,47 @@ describe('SynFormFieldBuilder', () => {
       })
       renderBuilder(<SynFormFieldBuilder value={definition} onChange={vi.fn()} />)
       const dateInput = screen.getByRole('textbox', { name: 'Initial answer date' })
-      await user.type(dateInput, '2026-03-15')
-      expect(dateInput).toHaveValue('2026-03-15')
+      await user.clear(dateInput)
+      await user.type(dateInput, '03/15/2026')
+      expect(dateInput).toHaveValue('03/15/2026')
+    })
+
+    it('shows initial answer time when time is enabled in show in form', async () => {
+      const user = userEvent.setup()
+      const definition = parseFormDefinition({
+        fields: [{ type: FormFieldTypeEnum.DATE, value_name: 'due', label: 'Due', default: null }],
+      })
+      renderBuilder(<SynFormFieldBuilder value={definition} onChange={vi.fn()} />)
+
+      expect(screen.queryByLabelText('Initial answer time')).not.toBeInTheDocument()
+      await user.click(screen.getByRole('checkbox', { name: 'Time' }))
+      expect(screen.getByLabelText('Initial answer time')).toBeInTheDocument()
+    })
+
+    it('allows unchecking timezone while date and time stay selected', async () => {
+      const user = userEvent.setup()
+      const definition = parseFormDefinition({
+        fields: [
+          {
+            type: FormFieldTypeEnum.DATE,
+            value_name: 'due',
+            label: 'Due',
+            include_date: true,
+            include_time: true,
+            include_timezone: true,
+            default: null,
+          },
+        ],
+      })
+      renderBuilder(<SynFormFieldBuilder value={definition} onChange={vi.fn()} />)
+
+      const timezoneCheckbox = screen.getByRole('checkbox', { name: 'Timezone' })
+      expect(timezoneCheckbox).toBeChecked()
+      await user.click(timezoneCheckbox)
+
+      expect(screen.getByRole('checkbox', { name: 'Timezone' })).not.toBeChecked()
+      expect(screen.getByRole('checkbox', { name: 'Time' })).toBeChecked()
+      expect(screen.getByRole('checkbox', { name: 'Date' })).toBeChecked()
     })
 
     it('renders checkbox default toggle', async () => {

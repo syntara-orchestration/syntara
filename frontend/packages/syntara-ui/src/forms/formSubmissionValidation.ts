@@ -1,5 +1,7 @@
 import type { FormDefinition, FormField } from '@syntara/contracts'
 
+import { isValidIsoCalendarDate } from '../utils/isoCalendarDate'
+
 import { FormFieldTypeEnum } from './formFieldTypeEnum'
 import type { DateSubmissionValue, FormSubmissionData, FormSubmissionInput } from './formTypes'
 import {
@@ -133,17 +135,10 @@ function includedDateComponents(field: DateFormField): Array<DateComponentName> 
 }
 
 function assertIsoDate(raw: string): void {
-  if (raw.length !== 10 || raw[4] !== '-' || raw[7] !== '-') {
-    throw new Error('date must be a date in YYYY-MM-DD format')
-  }
-  const year = Number(raw.slice(0, 4))
-  const month = Number(raw.slice(5, 7))
-  const day = Number(raw.slice(8, 10))
-  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) {
-    throw new Error('date must be a date in YYYY-MM-DD format')
-  }
-  const parsed = new Date(Date.UTC(year, month - 1, day))
-  if (parsed.getUTCFullYear() !== year || parsed.getUTCMonth() !== month - 1 || parsed.getUTCDate() !== day) {
+  if (!isValidIsoCalendarDate(raw)) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+      throw new Error('date must be a date in YYYY-MM-DD format')
+    }
     throw new Error(`Invalid date: '${raw}'. Use a valid ISO 8601 date in YYYY-MM-DD format.`)
   }
 }

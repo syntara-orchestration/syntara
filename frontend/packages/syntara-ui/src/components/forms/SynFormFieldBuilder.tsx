@@ -58,7 +58,10 @@ export function SynFormFieldBuilder({
   }, [valueKey, methods])
 
   const commit = useCallback(() => {
-    const parsed = safeParseFormDefinition(methods.getValues())
+    const raw = methods.getValues()
+    // Keep builder toggles as the user set them (e.g. time on, timezone off). API repair runs on publish via
+    // prepareFormDefinitionForCommit — do not reset RHF here or checkboxes snap back.
+    const parsed = safeParseFormDefinition(raw)
     if (!parsed.success) {
       return
     }

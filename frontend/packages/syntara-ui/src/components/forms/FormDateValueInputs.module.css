@@ -1,0 +1,18 @@
+.dateTimeRow {
+  display: flex;
+  gap: var(--pf-t--global--spacer--sm);
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.dateInput {
+  flex: 1 1 8rem;
+}
+
+.timeInput {
+  flex: 0 0 9rem;
+}
+
+.timezoneRow {
+  margin-top: var(--pf-t--global--spacer--sm);
+}

@@ -7,6 +7,7 @@ import { SynTextAreaField } from '../SynTextAreaField'
 import { SynTextField } from '../SynTextField'
 
 import { useFormFieldBuilderCommit } from './formFieldBuilderCommitContext'
+import { FormFieldBuilderDateShowInFormSection } from './FormFieldBuilderDateShowInFormSection'
 import { getFormFieldBuilderExamplePlaceholders } from './formFieldBuilderExamplePlaceholders'
 import { FormFieldBuilderFieldDefaultEditor } from './FormFieldBuilderFieldDefaultEditor'
 import { formFieldBuilderLabelHelp } from './formFieldBuilderFieldHelp'
@@ -84,6 +85,12 @@ export function FormFieldBuilderCardFields({
           )}
         />
       </StackItem>
+      {field.type === FormFieldTypeEnum.DATE && (
+        <StackItem>
+          <FormFieldBuilderDateShowInFormSection index={index} idPrefix={idPrefix} isDisabled={isDisabled} />
+        </StackItem>
+      )}
+
       {field.type !== FormFieldTypeEnum.CHECKBOX && (
         <StackItem>
           <SynTextField

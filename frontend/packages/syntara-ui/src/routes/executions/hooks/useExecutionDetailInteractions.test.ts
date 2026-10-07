@@ -6,6 +6,14 @@ import { FlowNodeType } from '../../../constants'
 
 import { useExecutionDetailInteractions } from './useExecutionDetailInteractions'
 
+const activityStates = new Map<string, { status: string }>()
+
+vi.mock('../../workflows/stores/useExecutionStore', () => ({
+  useExecutionStore: Object.assign(vi.fn(), {
+    getState: () => ({ activityStates }),
+  }),
+}))
+
 const mockNavigate = vi.fn()
 const mockHandleNodeClick = vi.fn()
 const mockSelectNode = vi.fn()
@@ -47,6 +55,7 @@ function renderInteractions(historyCardOpen = false) {
 describe('useExecutionDetailInteractions', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    activityStates.clear()
   })
 
   it('opens form prompt panel and closes approval on waiting form prompt click', () => {
@@ -97,7 +106,8 @@ describe('useExecutionDetailInteractions', () => {
     expect(formPromptPanel.close).toHaveBeenCalled()
   })
 
-  it('loads form prompt panel when a form prompt activity row is selected', () => {
+  it('loads form prompt panel when a waiting form prompt activity row is selected', () => {
+    activityStates.set('node-1', { status: 'waiting' })
     const handleActivityRowClick = vi.fn()
     const { result } = renderHook(() =>
       useExecutionDetailInteractions({
@@ -125,6 +135,37 @@ describe('useExecutionDetailInteractions', () => {
     expect(handleActivityRowClick).toHaveBeenCalledWith('node-1')
     expect(formPromptPanel.open).toHaveBeenCalled()
     expect(approvalPanel.close).toHaveBeenCalled()
+  })
+
+  it('does not open form prompt panel when a completed form prompt row is selected', () => {
+    activityStates.set('node-1', { status: 'completed' })
+    const handleActivityRowClick = vi.fn()
+    const { result } = renderHook(() =>
+      useExecutionDetailInteractions({
+        executionId: 'exec-1',
+        historyCardOpen: false,
+        navigate: mockNavigate,
+        nodeClick: {
+          handleNodeClick: mockHandleNodeClick,
+          selectNode: mockSelectNode,
+          handleActivityRowClick,
+        } as never,
+        approval: approvalPanel,
+        formPromptPanel: formPromptPanel,
+        workflowDefinition: {
+          workflow: { activities: [{ id: 'node-1', type: 'form_prompt', name: 'Step one' }] },
+        },
+      })
+    )
+
+    act(() => {
+      result.current.onActivityRowSelect('node-1', 'Step one', 'node-1')
+    })
+
+    expect(mockSelectNode).toHaveBeenCalledWith('node-1', 'Step one')
+    expect(handleActivityRowClick).not.toHaveBeenCalled()
+    expect(formPromptPanel.open).not.toHaveBeenCalled()
+    expect(formPromptPanel.close).toHaveBeenCalled()
   })
 
   it('closes form prompt panel for non-form activity rows', () => {
