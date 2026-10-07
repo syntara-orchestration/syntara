@@ -81,6 +81,15 @@ def responder_env(
     assign_project_role_to_user(admin_api, project_id, user_c_id, reader_role)
     assign_project_role_to_user(admin_api, project_id, user_d_id, submitter_role)
 
+    other_project_id, _ = create_project(admin_api, "form-prompt-other-project")
+    other_project_submitter_role = create_project_role(
+        admin_api,
+        other_project_id,
+        "fp-other-project-submitter",
+        _SUBMIT_POLICIES,
+    )
+    assign_project_role_to_user(admin_api, other_project_id, user_c_id, other_project_submitter_role)
+
     group_x_id, group_x_name = create_group(admin_api, "fp-grp-allowed")
     group_y_id, group_y_name = create_group(admin_api, "fp-grp-other")
     add_to_group(admin_api, group_x_id, user_a_id)
@@ -475,32 +484,36 @@ class TestEmptyResponderLists:
         assert response.status_code == HTTPStatus.OK
         assert_consumer_completed(syntara_api, exec_id)
 
-    def test_second_user_with_submit_permission_can_also_submit(
+    def test_user_with_submit_permission_only_in_another_project_is_forbidden(
         self,
         syntara_api: SyntaraApiRegistry,
         workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
         responder_env: dict[str, Any],
         form_prompt_execution_cleanup: Callable[[UUID], None],
     ) -> None:
-        """A second submit-capable user is not limited by an implicit responder list.
+        """Submit permission assigned to another project does not authorize this prompt.
 
         Procedure:
         1. Start a prompt without responder restrictions.
-        2. Submit a valid response as B, who has submit permission and belongs to group Y.
-        3. Wait for the workflow to finish.
+        2. Submit as C, who has form_prompt:submit on another project but only read here.
+        3. Confirm the prompt remains pending, then submit as A.
 
         Expected:
         - Both persisted responder lists are empty.
-        - The submit returns 200 and the consumer completes.
+        - C receives 403 AUTHORIZATION_DENIED and A can still complete the prompt.
         """
         exec_id, prompt_id = _start(
             syntara_api,
             workflow_factory,
             responder_env,
             form_prompt_execution_cleanup,
-            prefix="empty-responders-user-b",
+            prefix="empty-responders-other-project-role",
         )
-        response = submit_form_prompt(responder_env["user_b_api"], prompt_id, _RESPONSE)
+        response = submit_form_prompt(responder_env["user_c_api"], prompt_id, _RESPONSE)
+        assert_forbidden(response, expected_code="AUTHORIZATION_DENIED")
+        assert_prompt_not_consumed(syntara_api, exec_id, prompt_id)
+
+        response = submit_form_prompt(responder_env["user_a_api"], prompt_id, _RESPONSE)
         assert response.status_code == HTTPStatus.OK
         assert_consumer_completed(syntara_api, exec_id)
 
