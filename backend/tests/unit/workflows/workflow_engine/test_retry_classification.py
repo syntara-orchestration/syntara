@@ -914,6 +914,8 @@ class TestRestoredTerminalOutcomeInTheCompletionPath:
         assert result is not None
         await complete_supplied_node(wf, node, result, self.graph)
 
+        # The restore path published this entry; the completion boundary must not
+        # have replaced it with a success.
         assert wf.resolver.get_namespace("step_1") == {"reason": "branch not taken", "status": "skipped"}
         assert "step_1" in wf.skipped_nodes
 
@@ -990,9 +992,17 @@ class TestRestoredTerminalOutcomeInTheCompletionPath:
             await wf._process_completed_task(task, {node.id: task}, self.graph)
 
         schedule.assert_not_awaited()
-        # The failure is re-propagated rather than silently swallowed, so the run's
-        # own failure state still sees it.
         assert "step_1" in wf.failed_nodes
+        # The partial output the source run produced survives propagation. A live
+        # failure recovers it from the executor's ApplicationError.details; a
+        # restored one has no such exception, so without this it would publish the
+        # node's declared output model and a successor reading
+        # steps.step_1.output.partial would find nothing.
+        published = wf.resolver.get_namespace("step_1")
+        assert published is not None
+        assert published["partial"] is True
+        assert published["status"] == "failed"
+        assert published["error"] == "exit code 1"
 
     @pytest.mark.asyncio
     async def test_a_restored_completion_still_schedules_successors(self, mock_wf: MagicMock) -> None:
@@ -1030,3 +1040,77 @@ class TestRestoredTerminalOutcomeInTheCompletionPath:
 
         schedule.assert_awaited_once()
         assert wf.resolver.get_namespace("step_1") == {"result": "ok", "status": "completed"}
+
+
+@pytest.mark.asyncio
+async def test_a_restored_failure_with_no_output_falls_back_to_the_declared_model(
+    mock_wf: MagicMock,
+) -> None:
+    """A failure with nothing to restore still publishes a usable shape.
+
+    The restored output is the fallback, not the source of truth: a source failure
+    may have produced nothing, and the node's declared output model is what a live
+    failure with no executor output would publish.
+    """
+    import asyncio
+    from unittest.mock import AsyncMock, patch
+
+    wf = _make_workflow(_retry("step_3"))
+    wf.retry_context = _retry("step_3")
+    node = ActivityNode(node_id="step_1", node_type="script", parameters={})
+    mock_wf.execute_activity = AsyncMock(
+        return_value={
+            "status": "failed",
+            "input_data": {},
+            "output_data": None,
+            "error_details": "exit code 2",
+            "started_at": None,
+            "completed_at": None,
+        }
+    )
+
+    result = await wf._maybe_restore_retry_output(node, _chain_graph())
+    assert result is not None
+
+    async def supplied() -> dict[str, Any]:
+        return wf._process_supplied_result(node, result)
+
+    task = asyncio.create_task(supplied())
+    with (
+        patch.object(wf, "_schedule_successors", new=AsyncMock()),
+        patch.object(wf, "_mark_downstream_as_skipped"),
+    ):
+        await wf._process_completed_task(task, {node.id: task}, _chain_graph())
+
+    published = wf.resolver.get_namespace("step_1")
+    assert published is not None
+    assert published["status"] == "failed"
+    assert published["error"] == "exit code 2"
+
+
+@pytest.mark.asyncio
+async def test_a_restored_completion_does_not_stash_its_output_as_failure_fallback(
+    mock_wf: MagicMock,
+) -> None:
+    """Only a node that did not succeed needs its output kept for the failure path.
+
+    A restored completion publishes through the normal path, so stashing its output
+    would grow a map that nothing reads for the whole run.
+    """
+    wf = _make_workflow(_retry("step_3"))
+    wf.retry_context = _retry("step_3")
+    node = ActivityNode(node_id="step_1", node_type="script", parameters={})
+    mock_wf.execute_activity = AsyncMock(
+        return_value={
+            "status": "completed",
+            "input_data": {},
+            "output_data": {"result": "ok"},
+            "error_details": None,
+            "started_at": None,
+            "completed_at": None,
+        }
+    )
+
+    await wf._maybe_restore_retry_output(node, _chain_graph())
+
+    assert "step_1" not in wf._restored_node_outputs

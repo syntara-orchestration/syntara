@@ -42,6 +42,10 @@ class WorkflowRetryMixin:
     #: completion path so a restored skip or failure is not republished as a success
     #: and does not have its successors scheduled.
     _restored_node_statuses: dict[str, str]
+    #: The output a restored node produced before it failed in the source run,
+    #: keyed by node id. Republished by the failure path, so a successor reading it
+    #: sees what the source run produced rather than an empty output model.
+    _restored_node_outputs: dict[str, dict[str, Any]]
     _runtime_settings: dict[str, Any]
     #: Published by the workflow: where a restored failure is recorded, so it reads
     #: the same as one that genuinely failed in this run.
@@ -292,6 +296,10 @@ class WorkflowRetryMixin:
             "error_details": error_details,
         }
         self._restored_node_statuses[node.id] = source_status
+        if source_status != ActivityStatus.COMPLETED.value and output:
+            # Only a node that did not succeed has output worth keeping: a restored
+            # completion publishes its own output through the normal path.
+            self._restored_node_outputs[node.id] = output
 
         workflow.logger.info(
             "Replayed retry node state",
