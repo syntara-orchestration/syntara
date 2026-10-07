@@ -1,5 +1,6 @@
 """Shared API and workflow helpers for the form-prompt E2E tests."""
 
+import json
 from collections.abc import Callable, Mapping
 from http import HTTPStatus
 from typing import Any, cast
@@ -19,6 +20,7 @@ from syntara_api_client.models import (
     ExecutionRead,
     FormPromptListRead,
     FormPromptRead,
+    FormPromptStatus,
     FormPromptSubmitRequest,
     FormPromptSubmitRequestResponseData,
     WorkflowCreate,
@@ -32,7 +34,7 @@ from ._workflows import DEFAULT_CONSUMER_CODE, producer_prompt_consumer_workflow
 
 PROMPT_POLL_TIMEOUT = 60
 EXECUTION_POLL_TIMEOUT = 90
-CANCEL_POLL_TIMEOUT = 30
+CANCEL_POLL_TIMEOUT = 60
 
 
 def assert_consumer_completed(syntara_api: SyntaraApiRegistry, exec_id: UUID) -> ExecutionRead:
@@ -83,6 +85,23 @@ def get_form_prompt(syntara_api: SyntaraApiRegistry, prompt_id: UUID) -> FormPro
     )
 
 
+def assert_responders_configured(
+    prompt: FormPromptRead,
+    *,
+    expected_users: list[str] | None = None,
+    expected_groups: list[str] | None = None,
+) -> None:
+    """Guard against silently dropped responder names.
+
+    The resolver filters out usernames and group names it cannot resolve, so a
+    typo could leave the prompt unrestricted and invert negative assertions.
+    """
+    assert isinstance(prompt.responder_users, list), "Form prompt response omitted responder_users"
+    assert isinstance(prompt.responder_groups, list), "Form prompt response omitted responder_groups"
+    assert sorted(user.username for user in prompt.responder_users) == sorted(expected_users or [])
+    assert sorted(group.name for group in prompt.responder_groups) == sorted(expected_groups or [])
+
+
 def submit_form_prompt(
     syntara_api: SyntaraApiRegistry,
     prompt_id: UUID,
@@ -96,6 +115,34 @@ def submit_form_prompt(
     if response.status_code == HTTPStatus.BAD_GATEWAY:
         pytest.skip("Backend returned 502 Bad Gateway - transient infrastructure issue")
     return response
+
+
+def assert_forbidden(response: Response[Any], *, expected_code: str) -> None:
+    """Assert an RFC 9457 403 carrying a specific error code."""
+    assert response.status_code == HTTPStatus.FORBIDDEN, (
+        f"Expected 403, got {response.status_code}: {response.content!r}"
+    )
+    problem = json.loads(response.content)
+    assert problem["code"] == expected_code, f"Expected code {expected_code}, got {problem}"
+
+
+def assert_prompt_not_consumed(
+    syntara_api: SyntaraApiRegistry,
+    exec_id: UUID,
+    prompt_id: UUID,
+) -> None:
+    """A rejected submission must leave the prompt live and workflow paused."""
+    prompt = get_form_prompt(syntara_api, prompt_id)
+    assert prompt.status == FormPromptStatus.PENDING
+    assert not prompt.response_data
+    assert not prompt.responded_by
+
+    execution = assert_and_get_with_502_skip(syntara_api.executions.get(execution_id=exec_id, include="activities"))
+    assert execution.status not in TERMINAL_STATUSES, (
+        f"Execution must not advance on a rejected submission; got {execution.status}"
+    )
+    activities = {activity.activity_id: activity for activity in (execution.activities or [])}
+    assert activities.get("consumer") is None or activities["consumer"].status != "completed"
 
 
 def create_form_prompt_execution(
@@ -112,6 +159,8 @@ def create_form_prompt_execution(
     consumer_environment: Mapping[str, str] | None = None,
     continue_on_failure: bool = False,
     response_window: int = 600,
+    responder_users: list[str] | None = None,
+    responder_groups: list[str] | None = None,
 ) -> UUID:
     """Create and start a workflow containing a form prompt, returning its execution ID."""
     name = unique_name(workflow_name_prefix)
@@ -127,6 +176,8 @@ def create_form_prompt_execution(
                 consumer_environment=consumer_environment,
                 continue_on_failure=continue_on_failure,
                 response_window=response_window,
+                responder_users=responder_users,
+                responder_groups=responder_groups,
             ),
             project_id=first_project_id,
         )
@@ -156,6 +207,8 @@ def start_pending_form_prompt(
     consumer_environment: Mapping[str, str] | None = None,
     continue_on_failure: bool = False,
     response_window: int = 600,
+    responder_users: list[str] | None = None,
+    responder_groups: list[str] | None = None,
 ) -> tuple[UUID, FormPromptListRead]:
     """Start a workflow and wait until its form prompt is pending."""
     exec_id = create_form_prompt_execution(
@@ -171,6 +224,8 @@ def start_pending_form_prompt(
         consumer_environment=consumer_environment,
         continue_on_failure=continue_on_failure,
         response_window=response_window,
+        responder_users=responder_users,
+        responder_groups=responder_groups,
     )
     prompt = poll_for_pending_form_prompt(syntara_api, exec_id, timeout=PROMPT_POLL_TIMEOUT)
     return exec_id, prompt

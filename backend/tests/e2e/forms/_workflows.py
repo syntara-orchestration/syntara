@@ -40,12 +40,27 @@ def producer_prompt_consumer_workflow(
     consumer_environment: Mapping[str, str] | None = None,
     continue_on_failure: bool = False,
     response_window: int = 600,
+    responder_users: list[str] | None = None,
+    responder_groups: list[str] | None = None,
 ) -> WorkflowDefinition:
-    """Build a form-prompt workflow with a submitted consumer and optional fallback chain."""
+    """Build a trigger, producer, form prompt, consumer, and optional fallback chain.
+
+    Optional responder lists restrict which users or group members may submit
+    the form prompt.
+    """
     payload = json.dumps(producer_output)
     consumer_parameters: dict[str, Any] = {"language": "python", "code": consumer_code}
     if consumer_environment is not None:
         consumer_parameters["environment"] = dict(consumer_environment)
+    prompt_parameters: dict[str, Any] = {
+        "message": "Choose an environment",
+        "form_definition": {"fields": form_fields},
+        "response_window": response_window,
+    }
+    if responder_users:
+        prompt_parameters["responder_users"] = responder_users
+    if responder_groups:
+        prompt_parameters["responder_groups"] = responder_groups
 
     nodes: list[dict[str, Any]] = [
         {
@@ -58,11 +73,7 @@ def producer_prompt_consumer_workflow(
             "id": "prompt",
             "name": "Collect Input",
             "type": "form_prompt",
-            "parameters": {
-                "message": "Choose an environment",
-                "form_definition": {"fields": form_fields},
-                "response_window": response_window,
-            },
+            "parameters": prompt_parameters,
             "settings": {"continue_on_failure": continue_on_failure},
         },
         {
@@ -107,6 +118,14 @@ def producer_prompt_consumer_workflow(
             "edges": edges,
         }
     )
+
+
+APPROVAL_REASON_FIELD: dict[str, Any] = {
+    "type": "text",
+    "value_name": "reason",
+    "label": "Reason",
+    "required": True,
+}
 
 
 ENVIRONMENT_RECORDS = [
