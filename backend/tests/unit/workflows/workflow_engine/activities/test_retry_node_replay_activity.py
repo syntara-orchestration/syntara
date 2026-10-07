@@ -11,7 +11,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from syntara.workflows.models.activity_execution import ActivityStatus
-from syntara.workflows.workflow_engine.activities.retry_node_replay_activity import replay_retry_node_activity
+from syntara.workflows.workflow_engine.activities.retry_node_replay_activity import (
+    RESTORABLE_SOURCE_STATUSES,
+    replay_retry_node_activity,
+)
 
 
 class _Row:
@@ -25,6 +28,7 @@ class _Row:
         input_data: dict[str, Any] | None = None,
         started_at: datetime | None = None,
         completed_at: datetime | None = None,
+        error_details: str | None = None,
     ) -> None:
         self.activity_name = activity_name
         self.status = status
@@ -32,6 +36,7 @@ class _Row:
         self.input_data = input_data
         self.started_at = started_at
         self.completed_at = completed_at
+        self.error_details = error_details
 
 
 def _mock_session(rows: list[Any]) -> AsyncMock:
@@ -44,12 +49,12 @@ def _mock_session(rows: list[Any]) -> AsyncMock:
 
 async def _run(rows: list[Any], node_id: str | None) -> dict[str, Any] | None:
     # The mock session does not execute SQL, so the activity's predicates are
-    # applied here to keep these tests meaningful: the completed-status filter
+    # applied here to keep these tests meaningful: the restorable-status filter
     # and the exact-name match the query performs. The integration test for this
     # activity covers the real query.
     wanted = node_id.strip() if node_id else ""
     session = _mock_session(
-        [row for row in rows if row.status == ActivityStatus.COMPLETED and row.activity_name == wanted]
+        [row for row in rows if row.status in RESTORABLE_SOURCE_STATUSES and row.activity_name == wanted]
     )
 
     async def mock_get_db():  # noqa: ANN202
@@ -68,6 +73,8 @@ async def test_returns_completed_output_for_a_node() -> None:
     rows = [_Row("step_1", ActivityStatus.COMPLETED, {"result": "ok"})]
 
     assert await _run(rows, "step_1") == {
+        "status": "completed",
+        "error_details": None,
         "input_data": {},
         "output_data": {"result": "ok"},
         "started_at": None,
@@ -88,6 +95,8 @@ async def test_only_requested_nodes_are_returned() -> None:
     ]
 
     assert await _run(rows, "step_1") == {
+        "status": "completed",
+        "error_details": None,
         "input_data": {},
         "output_data": {"result": "ok"},
         "started_at": None,
@@ -96,16 +105,17 @@ async def test_only_requested_nodes_are_returned() -> None:
 
 
 @pytest.mark.asyncio
-async def test_node_with_no_completed_activity_is_absent_not_empty() -> None:
-    """Absent distinguishes "never ran" from "ran and produced nothing".
+async def test_a_node_with_no_restorable_record_is_absent_not_empty() -> None:
+    """Absent distinguishes "nothing recorded" from "ran and produced nothing".
 
-    A node that never completed cannot be skipped, because there would be nothing
-    to inject. Returning an empty dict for it would let the caller skip it and
-    leave downstream expressions unresolved.
+    A node with no restorable record cannot be replayed, because there would be
+    nothing to inject. Returning an empty dict for it would let the caller skip it
+    and leave downstream expressions unresolved.
+
+    A FAILED node *is* restorable, so it is used here only as a name that has no row
+    at all — the row list is what decides, not the status.
     """
-    rows = [_Row("step_1", ActivityStatus.FAILED, None)]
-
-    assert await _run(rows, "step_1") is None
+    assert await _run([_Row("step_1", ActivityStatus.FAILED, None)], "never_ran") is None
 
 
 @pytest.mark.asyncio
@@ -114,6 +124,8 @@ async def test_completed_node_with_no_output_returns_empty_dict() -> None:
     rows = [_Row("step_1", ActivityStatus.COMPLETED, None)]
 
     assert await _run(rows, "step_1") == {
+        "status": "completed",
+        "error_details": None,
         "input_data": {},
         "output_data": {},
         "started_at": None,
@@ -213,6 +225,8 @@ async def test_ids_are_whitespace_trimmed() -> None:
     rows = [_Row("step_1", ActivityStatus.COMPLETED, {"result": "ok"})]
 
     assert await _run(rows, "  step_1  ") == {
+        "status": "completed",
+        "error_details": None,
         "input_data": {},
         "output_data": {"result": "ok"},
         "started_at": None,
@@ -260,6 +274,8 @@ async def test_returns_stored_input_alongside_output() -> None:
     result = await _run(rows, "step_1")
 
     assert result == {
+        "status": "completed",
+        "error_details": None,
         "input_data": {"query": "select 1"},
         "output_data": {"result": "ok"},
         "started_at": None,
@@ -301,3 +317,63 @@ async def test_node_with_no_stored_input_returns_empty_not_missing() -> None:
 
     assert result is not None
     assert result["input_data"] == {}
+
+
+@pytest.mark.asyncio
+async def test_a_skipped_node_is_restorable() -> None:
+    """A source SKIPPED node must come back, not be treated as absent.
+
+    Absent means "no restorable record", and the caller then *executes* the node.
+    Filtering to COMPLETED only would turn every source skip into a re-execution,
+    which is both wrong work and a divergence from what the run view reported.
+    """
+    rows = [_Row("skipped_one", ActivityStatus.SKIPPED, {"reason": "not on this branch"})]
+
+    result = await _run(rows, "skipped_one")
+
+    assert result is not None
+    assert result["status"] == "skipped"
+    assert result["output_data"] == {"reason": "not on this branch"}
+
+
+@pytest.mark.asyncio
+async def test_a_failed_node_is_restorable_with_its_error() -> None:
+    """A source failure keeps its recorded reason.
+
+    The caller restores the node as FAILED; without the error details it would
+    report a failure with no explanation, or — if the status were also dropped —
+    report the failure as a clean skip.
+    """
+    rows = [_Row("failed_one", ActivityStatus.FAILED, {"partial": True}, error_details="exit code 1")]
+
+    result = await _run(rows, "failed_one")
+
+    assert result is not None
+    assert result["status"] == "failed"
+    assert result["error_details"] == "exit code 1"
+    assert result["output_data"] == {"partial": True}
+
+
+@pytest.mark.asyncio
+async def test_an_unfinished_node_is_not_restorable() -> None:
+    """PENDING, RUNNING and WAITING have nothing to restore.
+
+    The source run reached a terminal state, so an in-flight row is work that never
+    finished. Returning it would have the caller inject nothing and skip a node that
+    should run.
+    """
+    for status in (ActivityStatus.PENDING, ActivityStatus.RUNNING, ActivityStatus.WAITING):
+        rows = [_Row("unfinished", status, None)]
+
+        assert await _run(rows, "unfinished") is None, status
+
+
+@pytest.mark.asyncio
+async def test_a_cancelled_node_is_restorable() -> None:
+    """CANCELLED is terminal, so it is carried like the others."""
+    rows = [_Row("cancelled_one", ActivityStatus.CANCELLED, None)]
+
+    result = await _run(rows, "cancelled_one")
+
+    assert result is not None
+    assert result["status"] == "cancelled"

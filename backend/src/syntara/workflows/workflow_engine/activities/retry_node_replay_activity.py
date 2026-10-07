@@ -28,6 +28,16 @@ with workflow.unsafe.imports_passed_through():
 
 logger = structlog.stdlib.get_logger(__name__)
 
+#: Source statuses a retry can restore. Excludes the in-flight ones: the source run
+#: reached a terminal state, so a PENDING/RUNNING/WAITING row is work that never
+#: finished and has nothing to restore.
+RESTORABLE_SOURCE_STATUSES = (
+    ActivityStatus.COMPLETED,
+    ActivityStatus.SKIPPED,
+    ActivityStatus.FAILED,
+    ActivityStatus.CANCELLED,
+)
+
 
 @activity.defn(name="replay_retry_node")
 async def replay_retry_node_activity(
@@ -43,13 +53,15 @@ async def replay_retry_node_activity(
             ``ActivityExecution.activity_name``.
 
     Returns:
-        The ``input_data``, ``output_data``, ``started_at`` and ``completed_at`` of
-        that node's ``COMPLETED`` activity in the source run, or None
-        when the source run has no completed record for it. All four are returned
-        so a replayed node is indistinguishable from one that executed: the caller
-        republishes the input into ``node_inputs`` and the output into the
-        execution namespace, and the sync service applies the source timestamps so
-        the node reports when the work happened rather than when it was replayed.
+        The node's ``status``, ``input_data``, ``output_data``, ``error_details``,
+        ``started_at`` and ``completed_at`` from the source run, or None when the
+        source run has no restorable record for it. All six travel together: the
+        caller republishes the input into ``node_inputs``, the output into the
+        execution namespace, and restores the recorded status so a skipped node
+        stays skipped and an unselected failure stays failed. The sync service
+        applies the source timestamps and status, so a restored node reports what
+        happened in the source run rather than what happened to the replay.
+
         Returning None rather than an empty record keeps "nothing ran" distinct
         from "ran and produced nothing" — the caller then executes the node for
         real instead of injecting an empty result.
@@ -68,9 +80,18 @@ async def replay_retry_node_activity(
     stored: dict[str, Any] | None = None
     async for session in get_db():
         # Matched by name in the query rather than by scanning the run's rows in
-        # Python: this is called once per restored node, so loading every completed
-        # row made each call cost the whole execution. Matching the indexed name
-        # returns the one row, and its payload with it.
+        # Python: this is called once per restored node, so loading every row of
+        # the run made each call cost the whole execution. Matching the indexed
+        # name returns the one row, and its payload with it.
+        #
+        # Every terminal status is returned, not just COMPLETED. A retry has to
+        # reproduce what the source run did: a node that was skipped stays skipped,
+        # and a failure the caller did not select stays failed rather than being
+        # quietly reported as a clean skip. The status travels with the payload so
+        # the workflow can restore the right one.
+        #
+        # PENDING, RUNNING and WAITING are not restorable: the source run reached a
+        # terminal state, so any such row belongs to work that was never finished.
         #
         # The name is matched exactly, with no iteration-suffix stripping. Loop
         # replay is out of scope, and classification already excludes loop nodes
@@ -84,15 +105,21 @@ async def replay_retry_node_activity(
                 .where(
                     ActivityExecution.execution_id == source_execution_id,
                     ActivityExecution.activity_name == wanted,
-                    ActivityExecution.status == ActivityStatus.COMPLETED,
+                    col(ActivityExecution.status).in_(RESTORABLE_SOURCE_STATUSES),
                 )
                 .limit(1)
             )
         ).first()
         if activity_row is not None:
             stored = {
+                # The status the source run ended in, so the restored node reports
+                # the same outcome instead of defaulting to a successful replay.
+                "status": activity_row.status.value,
                 "input_data": activity_row.input_data or {},
                 "output_data": activity_row.output_data or {},
+                # Carried so a restored failure keeps the reason it failed, rather
+                # than surfacing as a skip with no explanation.
+                "error_details": activity_row.error_details,
                 # The source row's own timestamps, carried so the replayed
                 # node's row reports when the work ran, not the replay time.
                 "started_at": activity_row.started_at.isoformat() if activity_row.started_at else None,

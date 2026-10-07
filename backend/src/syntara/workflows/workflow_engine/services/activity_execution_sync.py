@@ -18,6 +18,16 @@ from syntara.workflows.utils.datetime import ensure_timezone_aware
 from syntara.workflows.workflow_engine.services.activity_sync_types import ExecutionMonitorMetadata
 from syntara.workflows.workflow_engine.utils.credential_scrubber import scrub_credentials
 
+#: Source statuses a restored node may carry. Mirrors what the replay activity will
+#: return; an ordinary node's own event status is never overwritten from this.
+RESTORABLE_SOURCE_STATUSES = (
+    ActivityStatus.COMPLETED,
+    ActivityStatus.SKIPPED,
+    ActivityStatus.FAILED,
+    ActivityStatus.CANCELLED,
+)
+
+
 logger = structlog.stdlib.get_logger(__name__)
 
 _COMPOSITE_ITER_SEP = "#iter-"
@@ -294,23 +304,48 @@ class ActivityExecutionSyncMixin:
             return None
 
     @staticmethod
-    def _apply_replayed_timestamps(
-        replayed_ts: dict[str, datetime | None] | None,
+    def _apply_replayed_state(
+        replayed_state: dict[str, Any] | None,
         activity_data: dict[str, Any],
     ) -> None:
-        """Swap a replayed node's event times for its source-run timestamps.
+        """Restore a replayed node's recorded outcome over this run's event.
 
-        A replayed node is recorded through the normal event path with this run's
-        event times. These source timestamps are applied over them so the node
-        reports when the work actually ran rather than when it was replayed.
+        A restored node is recorded through the normal event path, so without this
+        the sync service would store the replay activity's own successful
+        completion: a node that was skipped in the source run would be reported as
+        COMPLETED, and a failure the caller did not select would be reported as a
+        success with its reason dropped.
+
+        The status is only overwritten when it is a terminal one the source run
+        recorded. An ordinary completion keeps the status the event reported, so a
+        node that really executed is never re-stamped from the source run.
+
         No-op for a node this retry did not replay.
         """
-        if replayed_ts is None:
+        if replayed_state is None:
             return
-        if replayed_ts.get("started_at") is not None:
-            activity_data["started_at"] = replayed_ts["started_at"]
-        if replayed_ts.get("completed_at") is not None and activity_data.get("status") == ActivityStatus.COMPLETED:
-            activity_data["completed_at"] = replayed_ts["completed_at"]
+
+        source_status = replayed_state.get("status")
+        if source_status in RESTORABLE_SOURCE_STATUSES:
+            try:
+                activity_data["status"] = ActivityStatus(source_status)
+            except ValueError:
+                logger.warning(
+                    "Unrecognised restored status; keeping the event status",
+                    source_status=source_status,
+                    activity_id=activity_data.get("activity_id"),
+                )
+            error_details = replayed_state.get("error_details")
+            if error_details is not None:
+                activity_data["error_details"] = error_details
+
+        if replayed_state.get("started_at") is not None:
+            activity_data["started_at"] = replayed_state["started_at"]
+        # Applied for any terminal status, not just COMPLETED: a restored skip or
+        # failure carries the source time too, and stamping this run's time instead
+        # would report work as having happened now when it happened before.
+        if replayed_state.get("completed_at") is not None:
+            activity_data["completed_at"] = replayed_state["completed_at"]
 
     @staticmethod
     def _collect_terminal_activities(
@@ -516,10 +551,10 @@ class ActivityExecutionSyncMixin:
         if is_new and existing.iteration is not None:
             activity_data["iteration"] = existing.iteration
 
-        # A retry-replayed node is recorded through this normal path with this
-        # run's event times; its source times were resolved before the
-        # transaction opened and are swapped in here.
-        self._apply_replayed_timestamps((replayed_timestamps or {}).get(activity_id), activity_data)
+        # A retry-replayed node is recorded through this normal path, so the event
+        # describes the replay rather than the work. Its recorded status, error and
+        # times were resolved before the transaction opened and are restored here.
+        self._apply_replayed_state((replayed_timestamps or {}).get(activity_id), activity_data)
 
         # Update existing activity and track old values for patch generation
         old_values = self._update_activity_record(

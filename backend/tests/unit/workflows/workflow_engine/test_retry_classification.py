@@ -474,7 +474,13 @@ async def test_restored_output_is_injected_into_the_namespace(mock_wf: MagicMock
     wf = _injectable_workflow()
     wf.retry_context = _retry("step_2")
     node = ActivityNode(node_id="step_1", node_type="script", parameters={})
-    mock_wf.execute_activity = AsyncMock(return_value={"input_data": {}, "output_data": {"result": "from-source"}})
+    mock_wf.execute_activity = AsyncMock(
+        return_value={
+            "status": "completed",
+            "input_data": {},
+            "output_data": {"result": "from-source"},
+        }
+    )
 
     result = await wf._restore_node_output(node)
 
@@ -563,15 +569,21 @@ async def test_restore_dispatches_the_retry_outputs_activity(mock_wf: MagicMock)
 
 
 @pytest.mark.asyncio
-async def test_restore_captures_source_timestamps(mock_wf: MagicMock) -> None:
-    """The source run's timestamps are kept so the replayed row reports when it ran."""
+async def test_restore_captures_source_state(mock_wf: MagicMock) -> None:
+    """The source run's times, status and error are kept for the sync service.
+
+    The sync service writes the row from the replay activity's own completion, so
+    without this the row would report the replay time and a successful status.
+    """
     wf = _injectable_workflow()
     wf.retry_context = _retry("step_2")
     node = ActivityNode(node_id="step_1", node_type="script", parameters={})
     mock_wf.execute_activity = AsyncMock(
         return_value={
+            "status": "completed",
             "input_data": {},
             "output_data": {"result": "ok"},
+            "error_details": None,
             "started_at": "2026-01-01T00:00:00+00:00",
             "completed_at": "2026-01-01T00:05:00+00:00",
         }
@@ -580,6 +592,8 @@ async def test_restore_captures_source_timestamps(mock_wf: MagicMock) -> None:
     await wf._restore_node_output(node)
 
     assert wf._restored_node_timestamps["step_1"] == {
+        "status": "completed",
+        "error_details": None,
         "started_at": "2026-01-01T00:00:00+00:00",
         "completed_at": "2026-01-01T00:05:00+00:00",
     }
@@ -591,7 +605,13 @@ async def test_maybe_restore_delegates_and_returns_the_synthetic_completion(mock
     wf = _injectable_workflow()
     wf.retry_context = _retry("step_2")
     node = ActivityNode(node_id="step_1", node_type="script", parameters={})
-    mock_wf.execute_activity = AsyncMock(return_value={"input_data": {}, "output_data": {"result": "from-source"}})
+    mock_wf.execute_activity = AsyncMock(
+        return_value={
+            "status": "completed",
+            "input_data": {},
+            "output_data": {"result": "from-source"},
+        }
+    )
 
     result = await wf._maybe_restore_retry_output(node, _chain_graph())
 
@@ -664,6 +684,12 @@ class TestLinearChainReplay:
     def _restored(self, wf: OrchestratorWorkflow, node_id: str) -> dict[str, Any] | None:
         return wf._restored_node_timestamps.get(node_id)
 
+    @staticmethod
+    def _times_only(state: dict[str, Any] | None) -> dict[str, Any] | None:
+        if state is None:
+            return None
+        return {"started_at": state.get("started_at"), "completed_at": state.get("completed_at")}
+
     @pytest.mark.asyncio
     async def test_upstream_nodes_replay_in_order_and_record_their_source_times(self, mock_wf: MagicMock) -> None:
         """Each replayed node carries its own input, output and source times.
@@ -681,6 +707,7 @@ class TestLinearChainReplay:
             node_id = str(kwargs["activity_id"])
             node_ids.append(node_id)
             return {
+                "status": "completed",
                 "input_data": {"in": f"{node_id}-input"},
                 "output_data": {"out": f"{node_id}-output"},
                 "started_at": f"2026-01-01T00:0{len(node_ids)}:00+00:00",
@@ -706,11 +733,11 @@ class TestLinearChainReplay:
         assert first["output"] == {"out": "step_1-output"}
 
         # Source times kept, so the row reports when the work ran.
-        assert self._restored(wf, "step_1") == {
+        assert self._times_only(self._restored(wf, "step_1")) == {
             "started_at": "2026-01-01T00:01:00+00:00",
             "completed_at": "2026-01-01T00:01:30+00:00",
         }
-        assert self._restored(wf, "step_2") == {
+        assert self._times_only(self._restored(wf, "step_2")) == {
             "started_at": "2026-01-01T00:02:00+00:00",
             "completed_at": "2026-01-01T00:02:30+00:00",
         }
