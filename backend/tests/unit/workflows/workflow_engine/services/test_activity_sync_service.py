@@ -5980,14 +5980,15 @@ class TestActivitySyncPreservesIoOnQueryFailure:
         assert activity.status == ActivityStatus.RUNNING
 
 
-class TestReplayedNodeTimestampOverride:
-    """Retry-replayed nodes must report their source-run timestamps, not the replay time.
+class TestReplayedNodeStateOverride:
+    """A restored node must report what the source run recorded, not the replay.
 
-    A regular restored node is replayed under its own id, so the normal event
-    path records it node-by-node with this run's event times. As each one
-    completes, the sync service asks the workflow for its source times and
-    applies them over the event times — one activity at a time, through a
-    workflow update that waits for the replay to have stored them.
+    A restored node is replayed under its own id, so the normal event path records
+    it node-by-node from the replay activity's *own* successful completion. As each
+    one completes, the sync service asks the workflow for the recorded state and
+    applies it over the event: the source times, the status the source run ended in,
+    and for a failure the reason it failed. Without the status, a restored skip and
+    an unselected failure would both be written as successful work.
     """
 
     def setup_method(self) -> None:
@@ -6059,8 +6060,9 @@ class TestReplayedNodeTimestampOverride:
     def test_apply_swaps_event_times_for_source_times(self) -> None:
         activity_data = {"status": ActivityStatus.COMPLETED, "started_at": "event", "completed_at": "event"}
 
-        self.service._apply_replayed_timestamps(
+        self.service._apply_replayed_state(
             {
+                "status": "completed",
                 "started_at": datetime(2026, 1, 1, 0, 0, 0, tzinfo=UTC),
                 "completed_at": datetime(2026, 1, 1, 0, 5, 0, tzinfo=UTC),
             },
@@ -6070,25 +6072,89 @@ class TestReplayedNodeTimestampOverride:
         assert activity_data["started_at"] == datetime(2026, 1, 1, 0, 0, 0, tzinfo=UTC)
         assert activity_data["completed_at"] == datetime(2026, 1, 1, 0, 5, 0, tzinfo=UTC)
 
-    def test_apply_keeps_event_time_when_node_did_not_complete(self) -> None:
-        """A source completion time cannot describe a node that has not finished."""
-        activity_data = {"status": ActivityStatus.RUNNING, "started_at": "event", "completed_at": None}
+    def test_apply_restores_a_skipped_node_as_skipped(self) -> None:
+        """A source skip must not be written as a successful replay.
 
-        self.service._apply_replayed_timestamps(
+        The replay activity completes, so the event reports COMPLETED. Writing that
+        would report a node the source run never ran as work this run performed.
+        """
+        activity_data = {
+            "status": ActivityStatus.COMPLETED,
+            "started_at": "event",
+            "completed_at": "event",
+            "error_details": None,
+        }
+
+        self.service._apply_replayed_state(
             {
+                "status": "skipped",
                 "started_at": datetime(2026, 1, 1, 0, 0, 0, tzinfo=UTC),
-                "completed_at": datetime(2026, 1, 1, 0, 5, 0, tzinfo=UTC),
+                "completed_at": datetime(2026, 1, 1, 0, 1, 0, tzinfo=UTC),
             },
             activity_data,
         )
 
-        assert activity_data["started_at"] == datetime(2026, 1, 1, 0, 0, 0, tzinfo=UTC)
+        assert activity_data["status"] == ActivityStatus.SKIPPED
+        assert activity_data["completed_at"] == datetime(2026, 1, 1, 0, 1, 0, tzinfo=UTC)
+
+    def test_apply_restores_an_unselected_failure_with_its_reason(self) -> None:
+        """A failure the caller did not select stays a failure, and keeps its error."""
+        activity_data = {
+            "status": ActivityStatus.COMPLETED,
+            "started_at": "event",
+            "completed_at": "event",
+            "error_details": None,
+        }
+
+        self.service._apply_replayed_state(
+            {
+                "status": "failed",
+                "error_details": "exit code 1",
+                "started_at": datetime(2026, 1, 1, 0, 0, 0, tzinfo=UTC),
+                "completed_at": datetime(2026, 1, 1, 0, 2, 0, tzinfo=UTC),
+            },
+            activity_data,
+        )
+
+        assert activity_data["status"] == ActivityStatus.FAILED
+        assert activity_data["error_details"] == "exit code 1"
+        assert activity_data["completed_at"] == datetime(2026, 1, 1, 0, 2, 0, tzinfo=UTC)
+
+    def test_apply_keeps_the_event_status_for_a_non_terminal_source_state(self) -> None:
+        """Only a terminal source status may overwrite what the event reported.
+
+        A node that really executed in this run must never be re-stamped from the
+        source run, however the recorded state arrives.
+        """
+        activity_data = {"status": ActivityStatus.RUNNING, "started_at": "event", "completed_at": None}
+
+        self.service._apply_replayed_state(
+            {
+                "status": "running",
+                "started_at": datetime(2026, 1, 1, 0, 0, 0, tzinfo=UTC),
+                "completed_at": None,
+            },
+            activity_data,
+        )
+
+        assert activity_data["status"] == ActivityStatus.RUNNING
         assert activity_data["completed_at"] is None
+
+    def test_apply_keeps_the_event_status_for_an_unrecognised_status(self) -> None:
+        """An unknown status must not fail the node's sync."""
+        activity_data = {"status": ActivityStatus.COMPLETED, "started_at": "event", "completed_at": "event"}
+
+        self.service._apply_replayed_state(
+            {"status": "not-a-status", "started_at": None, "completed_at": None},
+            activity_data,
+        )
+
+        assert activity_data["status"] == ActivityStatus.COMPLETED
 
     def test_apply_is_a_no_op_for_an_ordinary_execution(self) -> None:
         activity_data = {"status": ActivityStatus.COMPLETED, "started_at": "event", "completed_at": "event"}
 
-        self.service._apply_replayed_timestamps(None, activity_data)
+        self.service._apply_replayed_state(None, activity_data)
 
         assert activity_data == {
             "status": ActivityStatus.COMPLETED,

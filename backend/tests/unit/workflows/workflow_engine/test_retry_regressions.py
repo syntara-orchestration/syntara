@@ -293,12 +293,23 @@ def test_unrelated_upstream_node_is_still_restorable() -> None:
     assert "prep" in wf._retry_restorable_nodes(graph)
 
 
-def test_unselected_failure_is_skipped_but_shared_selected_descendants_run() -> None:
+def test_an_unselected_failure_is_not_reported_as_skipped() -> None:
+    """The failing node itself stays a failure; only its downstream is skipped.
+
+    Regression guard. Marking the failing node skipped reported a failure as a clean
+    skip and dropped the reason it failed. What has nothing to run against is
+    everything downstream of it, and that is what gets skipped.
+    """
     wf = _wf(_retry("b2"))
     wf._retry_source_statuses = {"b1": "failed", "b2": "failed"}
     graph = _converge_graph()
     wf._classify_unselected_branches(graph)
-    assert "b1" in wf.skipped_nodes
+
+    # b1 failed but was not selected, so it is restored as FAILED by the replay
+    # path rather than declared skipped here.
+    assert "b1" not in wf.skipped_nodes
+    assert wf._should_restore_node("b1", graph)
+    # b2 is the selected point: it runs.
     assert "b2" not in wf.skipped_nodes
     assert "join" not in wf.skipped_nodes
 
@@ -308,7 +319,9 @@ def test_completed_converge_is_retained_after_moot_failed_branch() -> None:
     wf._retry_source_statuses = {"b1": "failed", "b2": "completed", "join": "completed"}
     graph = _converge_graph()
     wf._classify_unselected_branches(graph)
-    assert "b1" in wf.skipped_nodes
+    # b1 is restored as a failure, not skipped; the completed converge downstream of
+    # it keeps its results under R6c either way.
+    assert "b1" not in wf.skipped_nodes
     assert "join" not in wf.skipped_nodes
     assert wf._should_restore_node("join", graph)
     assert not wf._should_skip_successor(

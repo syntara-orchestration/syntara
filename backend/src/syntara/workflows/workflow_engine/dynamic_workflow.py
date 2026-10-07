@@ -1781,22 +1781,24 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
         self,
         activity_id: str,
     ) -> dict[str, str | None] | None:
-        """Wait for a replayed node's source timestamps, or report that there are none.
+        """Wait for a replayed node's recorded state, or report that there is none.
 
         A replayed node is recorded through the normal event path, so Temporal
-        stamps it with this run's times. The sync service asks here when the node
-        completes so the source times can be applied over them, making the node
-        report when the work actually ran rather than when it was replayed.
+        stamps it with this run's times and reports it as completed. The sync
+        service asks here when the node completes so the recorded state can be
+        applied over that: the source times, the status the source run ended in,
+        and for a failure the reason it failed. Without the status a restored skip
+        or an unselected failure would be written as a successful completion.
 
         This is an update rather than a query because the completed event can
-        arrive before this workflow has stored the node's source times — a query
+        arrive before this workflow has stored the node's recorded state — a query
         would return an incomplete map, and since the event is consumed once the
-        node's real times would be lost. The wait condition holds until the
-        timestamps land, or until it is clear the activity is not a replay.
+        node's real outcome would be lost. The wait condition holds until the state
+        lands, or until it is clear the activity is not a replay.
 
-        Returns the source ``started_at``/``completed_at``, or None when this
-        activity was an ordinary execution, meaning the caller should keep
-        Temporal's timestamps.
+        Returns the source ``started_at``, ``completed_at``, ``status`` and
+        ``error_details``, or None when this activity was an ordinary execution,
+        meaning the caller should keep the event's own values.
         """
         await workflow.wait_condition(
             lambda: (activity_id in self._restored_node_timestamps or activity_id not in self._retry_replay_candidates),
