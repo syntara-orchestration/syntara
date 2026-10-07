@@ -240,6 +240,9 @@ export interface components {
       | 'auth_failure'
       | 'authz_duration_ms'
       | 'opa_request_duration_ms'
+      | 'stalled_workflows_current'
+      | 'stalled_steps_current'
+      | 'stalled_workflows_total'
     /**
      * MetricsCategoryType
      * @description Metric category names used to group :class:`MetricType` members.

@@ -16,6 +16,7 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy.sql import Select
 from sqlmodel import and_, col, func, select
 from sqlmodel.ext.asyncio.session import AsyncSession
+from sqlmodel.sql._expression_select_cls import SelectOfScalar
 from temporalio.exceptions import ApplicationError
 
 from syntara.audit.dispatcher import AuditEventDispatcher
@@ -95,12 +96,12 @@ async def count_active_executions(session: "AsyncSession") -> int:
 class ExecutionsEnrichQueryMixin(EnrichQueryMixin):
     """Eager-load workflow and workflow_version relationships so list queries include the name and version number."""
 
-    def enrich(self, query: Select) -> Select:  # type: ignore[type-arg]
+    def enrich(  # type: ignore[override]
+        self, query: Select[tuple[Execution]] | SelectOfScalar[tuple[Execution]]
+    ) -> Select[tuple[Execution]] | SelectOfScalar[tuple[Execution]]:
         """Add selectinload for workflow and workflow_version to the query.
 
         Only applies when the root entity is Execution (skips ActivityExecution queries).
-        Note: is_stalled is computed via Execution.is_stalled column_property (correlated
-        EXISTS subquery evaluated by the DB), not via eager-loading activities.
         """
         if any(c.get("entity") is Execution for c in query.column_descriptions):
             return query.options(
@@ -147,7 +148,7 @@ class ExecutionsConvertResourceMixin(ConvertResourceMixin):
             error_details=resource.error_details,
             labels=resource.labels,
             approval_pending=resource.approval_pending,
-            is_stalled=resource.is_stalled,
+            first_stall_detected_at=resource.first_stall_detected_at,
             mode=resource.mode,
             execution_metadata=resource.execution_metadata,
             retried_from_execution_id=resource.retried_from_execution_id,

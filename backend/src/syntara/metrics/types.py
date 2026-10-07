@@ -106,6 +106,11 @@ class MetricType(StrEnum):
     AUTHZ_DURATION = "authz_duration_ms"
     OPA_REQUEST_DURATION = "opa_request_duration_ms"
 
+    # Stall Detection Metrics (SDP R23/AC-13)
+    STALLED_WORKFLOWS_CURRENT = "stalled_workflows_current"
+    STALLED_STEPS_CURRENT = "stalled_steps_current"
+    STALLED_WORKFLOWS_TOTAL = "stalled_workflows_total"
+
 
 class MetricsCategoryType(StrEnum):
     """Metric category names used to group :class:`MetricType` members."""
@@ -178,6 +183,9 @@ METRIC_CATEGORIES: dict[MetricsCategoryType, list[MetricType]] = {
         MetricType.ACTIVE_WORKFLOWS,
         MetricType.ACTIVITY_EXECUTION_SUCCESS_RATE,
         MetricType.ACTIVITY_DURATION,
+        MetricType.STALLED_WORKFLOWS_CURRENT,
+        MetricType.STALLED_STEPS_CURRENT,
+        MetricType.STALLED_WORKFLOWS_TOTAL,
     ],
     MetricsCategoryType.EXECUTION_SERVICE: [
         MetricType.WORKFLOW_START_LATENCY,
