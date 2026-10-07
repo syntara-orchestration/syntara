@@ -466,8 +466,8 @@ export function validateFormDefinitionDefaults(form: FormDefinition): void {
     } catch (error) {
       const message =
         error instanceof Error
-          ? `Default value is not valid for a '${field.type}' field: ${error.message}`
-          : `Default value is not valid for a '${field.type}' field`
+          ? `Initial answer is not valid for a '${field.type}' field: ${error.message}`
+          : `Initial answer is not valid for a '${field.type}' field`
       errors.push(fieldError(field, 'invalid_default', message))
     }
   }

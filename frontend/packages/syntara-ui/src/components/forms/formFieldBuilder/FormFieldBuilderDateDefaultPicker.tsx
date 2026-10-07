@@ -9,6 +9,10 @@ import { FormFieldError } from '../../FormFieldError'
 
 import { useFormFieldBuilderCommit } from './formFieldBuilderCommitContext'
 import { getFormFieldBuilderExamplePlaceholders } from './formFieldBuilderExamplePlaceholders'
+import {
+  FORM_FIELD_BUILDER_INITIAL_ANSWER_DATE_ARIA_LABEL,
+  FORM_FIELD_BUILDER_INITIAL_ANSWER_LABEL,
+} from './formFieldBuilderInitialAnswerCopy'
 
 type FormFieldBuilderDateDefaultPickerProps = {
   index: number
@@ -29,7 +33,7 @@ export function FormFieldBuilderDateDefaultPicker({
   const dateFieldId = `${idPrefix}-default-date`
 
   return (
-    <FormGroup label="Default value" fieldId={`${idPrefix}-default`} labelHelp={labelHelp}>
+    <FormGroup label={FORM_FIELD_BUILDER_INITIAL_ANSWER_LABEL} fieldId={`${idPrefix}-default`} labelHelp={labelHelp}>
       <Controller
         control={control}
         name={`fields.${index}.default`}
@@ -52,7 +56,7 @@ export function FormFieldBuilderDateDefaultPicker({
                 dateFormat={formatDateYMD}
                 dateParse={parseDateYMD}
                 isDisabled={isDisabled}
-                aria-label="Default date"
+                aria-label={FORM_FIELD_BUILDER_INITIAL_ANSWER_DATE_ARIA_LABEL}
                 inputProps={{
                   id: dateFieldId,
                   placeholder: `e.g. ${examples.defaultValue}`,

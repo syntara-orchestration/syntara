@@ -35,7 +35,7 @@ const EXAMPLES: Record<FormFieldType, FormFieldBuilderExamplePlaceholders> = {
   [FormFieldTypeEnum.CHECKBOX]: {
     placeholder: 'e.g. Not used for checkbox fields',
     helpText: 'e.g. Check this box to confirm you agree',
-    defaultValue: 'e.g. Use “Default to checked” below',
+    defaultValue: 'e.g. Use “Initially checked” below',
   },
   [FormFieldTypeEnum.DATE]: {
     placeholder: 'e.g. Select a date',
@@ -45,12 +45,12 @@ const EXAMPLES: Record<FormFieldType, FormFieldBuilderExamplePlaceholders> = {
   [FormFieldTypeEnum.DROPDOWN]: {
     placeholder: 'e.g. Select an option',
     helpText: 'e.g. Choose the option that best matches your situation',
-    defaultValue: 'e.g. Select a default...',
+    defaultValue: 'e.g. Select an initial answer...',
   },
   [FormFieldTypeEnum.MULTI_SELECT]: {
     placeholder: 'e.g. Select one or more options',
     helpText: 'e.g. You can select more than one option',
-    defaultValue: 'e.g. Select a default...',
+    defaultValue: 'e.g. Select initial answers...',
   },
 }
 
