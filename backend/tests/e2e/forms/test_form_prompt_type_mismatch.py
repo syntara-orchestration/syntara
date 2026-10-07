@@ -11,7 +11,7 @@ from uuid import UUID
 import pytest
 from orchestrator_test_sdk.e2e.helpers import poll_execution
 from syntara_api_client.api import SyntaraApiRegistry
-from syntara_api_client.models import WorkflowCreate, WorkflowRead
+from syntara_api_client.models import ExecutionRead, WorkflowCreate, WorkflowRead
 from syntara_api_client.models.execution_status import ExecutionStatus
 
 from ._helpers import EXECUTION_POLL_TIMEOUT, assert_and_get_with_502_skip, create_form_prompt_execution
@@ -21,6 +21,44 @@ if TYPE_CHECKING:
     from syntara_api_client.models.activity_data import ActivityData
 
 pytestmark = [pytest.mark.e2e]
+
+_INVALID_DYNAMIC_OPTION_CASES = [
+    pytest.param(
+        {"environments": "production"},
+        "${producer.stdout_json.environments}",
+        "expected a list",
+        "environment",
+        id="string-for-array",
+    ),
+    pytest.param(
+        {"environments": None},
+        "${producer.stdout_json.environments}",
+        "expected a list",
+        "environment",
+        id="null-for-array",
+    ),
+    pytest.param(
+        {"environments": {"dev": True}},
+        "${producer.stdout_json.environments}",
+        "expected a list",
+        "environment",
+        id="object-for-array",
+    ),
+    pytest.param(
+        {"environments": ["dev", "staging"]},
+        "${producer.stdout_json.environments}",
+        "must be an object with label key",
+        "environment",
+        id="scalar-elements",
+    ),
+    pytest.param(
+        {"data": {}},
+        "${producer.stdout_json.data.environments}",
+        "not found",
+        None,
+        id="missing-nested-property",
+    ),
+]
 
 
 def _start(
@@ -61,11 +99,13 @@ def _assert_prompt_node_failed(
     *,
     expect_in_error: str,
     expect_field_name: str | None = "environment",
-) -> None:
+    expected_execution_status: ExecutionStatus = ExecutionStatus.FAILED,
+) -> ExecutionRead:
     """Assert the form_prompt node fails before any prompt row is created."""
     final = poll_execution(syntara_api, str(exec_id), timeout=EXECUTION_POLL_TIMEOUT)
-    assert final.status == ExecutionStatus.FAILED, (
-        f"Expected FAILED on template type mismatch, got {final.status}: {final.error_details}"
+    assert final.status == expected_execution_status, (
+        f"Expected {expected_execution_status} after form-prompt resolution failure, "
+        f"got {final.status}: {final.error_details}"
     )
 
     activities = {activity.activity_id: activity for activity in (final.activities or [])}
@@ -82,34 +122,12 @@ def _assert_prompt_node_failed(
         )
 
     _assert_no_prompt_row(syntara_api, exec_id)
+    return final
 
 
 @pytest.mark.parametrize(
     ("producer_output", "expression", "expect_in_error", "expect_field_name"),
-    [
-        ({"environments": "production"}, "${producer.stdout_json.environments}", "expected a list", "environment"),
-        ({"environments": None}, "${producer.stdout_json.environments}", "expected a list", "environment"),
-        ({"environments": {"dev": True}}, "${producer.stdout_json.environments}", "expected a list", "environment"),
-        (
-            {"environments": ["dev", "staging"]},
-            "${producer.stdout_json.environments}",
-            "must be an object with label key",
-            "environment",
-        ),
-        (
-            {"data": {}},
-            "${producer.stdout_json.data.environments}",
-            "not found",
-            None,
-        ),
-    ],
-    ids=[
-        "string-for-array",
-        "null-for-array",
-        "object-for-array",
-        "scalar-elements",
-        "missing-nested-property",
-    ],
+    _INVALID_DYNAMIC_OPTION_CASES,
 )
 def test_invalid_dynamic_options_fail_before_prompt_creation(
     syntara_api: SyntaraApiRegistry,
@@ -147,6 +165,56 @@ def test_invalid_dynamic_options_fail_before_prompt_creation(
         expect_in_error=expect_in_error,
         expect_field_name=expect_field_name,
     )
+
+
+@pytest.mark.parametrize(
+    ("producer_output", "expression", "expect_in_error", "expect_field_name"),
+    _INVALID_DYNAMIC_OPTION_CASES,
+)
+def test_invalid_dynamic_options_continue_on_failure_routes_to_fallback(
+    syntara_api: SyntaraApiRegistry,
+    workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
+    first_project_id: UUID,
+    form_prompt_execution_cleanup: Callable[[UUID], None],
+    producer_output: dict[str, object],
+    expression: str,
+    expect_in_error: str,
+    expect_field_name: str | None,
+) -> None:
+    """Invalid dynamic options follow the configured continue-on-failure path.
+
+    Procedure:
+    1. Emit one of the malformed dynamic-option values.
+    2. Enable continue_on_failure and connect a fallback successor.
+    3. Inspect the failed prompt and the downstream fallback activity.
+
+    Expected:
+    - The execution completes with errors and the prompt node retains its validation error.
+    - The fallback handler and its successor complete without persisting a form-prompt row.
+    """
+    exec_id = _start(
+        syntara_api,
+        workflow_factory,
+        first_project_id,
+        form_prompt_execution_cleanup,
+        producer_output=producer_output,
+        form_fields=[dynamic_option_field("environment", expression)],
+        continue_on_failure=True,
+    )
+
+    final = _assert_prompt_node_failed(
+        syntara_api,
+        exec_id,
+        expect_in_error=expect_in_error,
+        expect_field_name=expect_field_name,
+        expected_execution_status=ExecutionStatus.COMPLETED_WITH_ERRORS,
+    )
+    activities: dict[str, ActivityData] = {activity.activity_id: activity for activity in (final.activities or [])}
+    assert "fallback_handler" in activities, f"Fallback activity missing from activities: {list(activities)}"
+    assert activities["fallback_handler"].status == "completed"
+    assert "fallback_consumer" in activities, f"Fallback successor missing from activities: {list(activities)}"
+    assert activities["fallback_consumer"].status == "completed"
+    assert "consumer" not in activities or activities["consumer"].status != "completed"
 
 
 def test_array_default_on_text_field_fails_definition_validation(
@@ -189,48 +257,3 @@ def test_array_default_on_text_field_fails_definition_validation(
         expect_in_error="version",
         expect_field_name="version",
     )
-
-
-def test_type_mismatch_with_continue_on_failure_routes_to_fallback(
-    syntara_api: SyntaraApiRegistry,
-    workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
-    first_project_id: UUID,
-    form_prompt_execution_cleanup: Callable[[UUID], None],
-) -> None:
-    """A failed prompt node routes to the fallback when continuation is enabled.
-
-    Procedure:
-    1. Create a producer whose output is a string instead of an option array.
-    2. Enable continue_on_failure and connect a fallback script.
-    3. Poll execution to terminal and inspect the activity records.
-
-    Expected:
-    - Execution completes with errors and the fallback handler completes.
-    - The prompt node fails with the option-resolution error.
-    - No form prompt row is created.
-    """
-    exec_id = _start(
-        syntara_api,
-        workflow_factory,
-        first_project_id,
-        form_prompt_execution_cleanup,
-        producer_output={"environments": "production"},
-        form_fields=[dynamic_option_field("environment", "${producer.stdout_json.environments}")],
-        continue_on_failure=True,
-    )
-    final = poll_execution(syntara_api, str(exec_id), timeout=EXECUTION_POLL_TIMEOUT)
-    assert final.status == ExecutionStatus.COMPLETED_WITH_ERRORS, (
-        f"Expected COMPLETED_WITH_ERRORS, got {final.status}: {final.error_details}"
-    )
-
-    activities: dict[str, ActivityData] = {activity.activity_id: activity for activity in (final.activities or [])}
-    assert "fallback_handler" in activities, f"Fallback activity missing from activities: {list(activities)}"
-    assert activities["fallback_handler"].status == "completed"
-    assert "prompt" in activities, f"'prompt' activity missing: {list(activities)}"
-    prompt_activity = activities["prompt"]
-    assert prompt_activity.status == "failed"
-    assert isinstance(prompt_activity.error_details, str)
-    assert "expected a list" in prompt_activity.error_details
-    assert "environment" in prompt_activity.error_details
-
-    _assert_no_prompt_row(syntara_api, exec_id)

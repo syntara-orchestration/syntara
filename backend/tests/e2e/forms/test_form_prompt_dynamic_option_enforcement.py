@@ -194,13 +194,14 @@ def test_multi_select_rejects_partially_invalid_selection(
     Procedure:
     1. Start a multi-select prompt and GET its resolved options.
     2. Submit a selection containing one valid and one invalid value.
-    3. Start a second workflow and submit a selection containing only valid values.
+    3. Confirm the same prompt remains pending, then submit a selection containing only valid values.
 
     Expected:
     - The mixed selection returns 422.
-    - The all-valid selection returns 200 and completes the second execution.
+    - The prompt remains pending after rejection.
+    - The all-valid selection returns 200 and completes the execution.
     """
-    _, first_prompt = _start(
+    exec_id, prompt = _start(
         syntara_api,
         workflow_factory,
         first_project_id,
@@ -209,25 +210,14 @@ def test_multi_select_rejects_partially_invalid_selection(
         field_name="environments",
         response_window=30,
     )
-    first_prompt_id = UUID(str(first_prompt.id))
-    _assert_options_resolved(syntara_api, first_prompt_id, field_name="environments")
+    prompt_id = UUID(str(prompt.id))
+    _assert_options_resolved(syntara_api, prompt_id, field_name="environments")
 
-    rejected = submit_form_prompt(syntara_api, first_prompt_id, {"environments": ["staging", "qa"]})
+    rejected = submit_form_prompt(syntara_api, prompt_id, {"environments": ["staging", "qa"]})
     assert rejected.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
-    first_prompt_after_rejection = get_form_prompt(syntara_api, first_prompt_id)
-    assert first_prompt_after_rejection.status == FormPromptStatus.PENDING
+    prompt_after_rejection = get_form_prompt(syntara_api, prompt_id)
+    assert prompt_after_rejection.status == FormPromptStatus.PENDING
 
-    second_exec_id, second_prompt = _start(
-        syntara_api,
-        workflow_factory,
-        first_project_id,
-        form_prompt_execution_cleanup,
-        field_type="multi_select",
-        field_name="environments",
-    )
-    second_prompt_id = UUID(str(second_prompt.id))
-    _assert_options_resolved(syntara_api, second_prompt_id, field_name="environments")
-
-    accepted = submit_form_prompt(syntara_api, second_prompt_id, {"environments": ["dev", "prod"]})
+    accepted = submit_form_prompt(syntara_api, prompt_id, {"environments": ["dev", "prod"]})
     assert accepted.status_code == HTTPStatus.OK
-    assert_consumer_completed(syntara_api, second_exec_id)
+    assert_consumer_completed(syntara_api, exec_id)

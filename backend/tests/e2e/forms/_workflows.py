@@ -37,7 +37,7 @@ def producer_prompt_consumer_workflow(
     continue_on_failure: bool = False,
     response_window: int = 600,
 ) -> WorkflowDefinition:
-    """Build a trigger, Python producer, form prompt, and downstream consumer."""
+    """Build a form-prompt workflow with a submitted consumer and optional fallback chain."""
     payload = json.dumps(producer_output)
     nodes: list[dict[str, Any]] = [
         {
@@ -79,7 +79,16 @@ def producer_prompt_consumer_workflow(
                 "parameters": {"language": "bash", "code": 'echo "fallback path executed"'},
             }
         )
+        nodes.append(
+            {
+                "id": "fallback_consumer",
+                "name": "Fallback Consumer Node",
+                "type": "script",
+                "parameters": {"language": "bash", "code": 'echo "after fallback path executed"'},
+            }
+        )
         edges.append({"from": "prompt", "to": "fallback_handler", "from_port": "fallback"})
+        edges.append({"from": "fallback_handler", "to": "fallback_consumer"})
 
     return WorkflowDefinition.from_dict(
         {
