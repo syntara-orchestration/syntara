@@ -47,8 +47,11 @@ class FakeExecutionPlaneHttpClient:
 
 async def execute_fixture_script(payload: dict[str, Any]) -> tuple[dict[str, Any], str]:
     """Run a test script as a local stand-in for a separately deployed EP service."""
-    invocation = payload["invocation"]
-    input_config = invocation["inputs"]
+    if "invocation" in payload:
+        invocation = payload["invocation"]
+        input_config = invocation["inputs"]
+    else:
+        input_config = payload["input_config"]
     language = input_config.get("language", "python")
     code = input_config["code"]
     command = ["bash", "-c", code] if language == "bash" else [sys.executable, "-c", code]
