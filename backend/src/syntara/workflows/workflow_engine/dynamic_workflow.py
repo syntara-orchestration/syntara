@@ -194,6 +194,7 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
         self._restored_node_timestamps: dict[str, dict[str, str | None]] = {}
         self._restored_node_statuses: dict[str, str] = {}
         self._restored_node_outputs: dict[str, dict[str, Any]] = {}
+        self._resumed_loop_state: dict[str, dict[str, Any]] = {}
         self._retry_source_statuses: dict[str, str] = {}
         if workflow_metadata:
             for ns_key, ns_data in workflow_metadata.items():
@@ -1335,6 +1336,19 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
         # Initialize iteration results if not exists
         if node_id not in self.loop_iteration_results:
             self.loop_iteration_results[node_id] = {}
+
+        # A retry resuming this loop starts at the iteration that failed and reads the
+        # earlier iterations' results as already accumulated. Seeded before the first
+        # control call so iteration 0 is the resume point, not the first iteration.
+        resumed = self._resumed_loop_state.get(node_id)
+        resume_iteration = resumed.get("resume_iteration") if resumed else None
+        if resume_iteration is not None and not (resumed or {}).get("seeded"):
+            self._seed_resumed_loop(
+                node_id,
+                self.loop_state[node_id],
+                resume_iteration,
+                (resumed or {}).get("iteration_results") or {},
+            )
 
         state = self.loop_state[node_id]
 

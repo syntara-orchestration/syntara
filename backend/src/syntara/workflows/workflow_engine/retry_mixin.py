@@ -51,6 +51,10 @@ class WorkflowRetryMixin:
     #: keyed by node id. Republished by the failure path, so a successor reading it
     #: sees what the source run produced rather than an empty output model.
     _restored_node_outputs: dict[str, dict[str, Any]]
+    #: Loops this retry resumes, keyed by loop node id: the iteration to restart at
+    #: and the per-iteration results for the iterations below it. Seeded when the
+    #: loop first dispatches, so the skipped iterations read as already done.
+    _resumed_loop_state: dict[str, dict[str, Any]]
     _runtime_settings: dict[str, Any]
     #: Published by the workflow: where a restored failure is recorded, so it reads
     #: the same as one that genuinely failed in this run.
@@ -157,6 +161,11 @@ class WorkflowRetryMixin:
         # are excluded here so the set means what it says, instead of relying on
         # _should_restore_node to filter them again at the point of use.
         control = {node.id for node in graph.get_all_nodes() if node.type in _CONTROL_NODE_TYPES}
+        # A loop is replayable only when the source run recorded where to resume it.
+        # Without a resume point there is nothing to skip, so it stays in the control
+        # set and runs from the first iteration exactly as it does today.
+        resumable_loops = set(self._resumed_loop_state)
+        control -= resumable_loops
         loop_bodies = self._loop_body_node_ids(graph)
 
         # Everything downstream of a failure point re-executes, so it cannot be
@@ -236,11 +245,82 @@ class WorkflowRetryMixin:
             return None
         return await self._restore_node_output(node)
 
+    async def _load_resumed_loop_state(self, graph: WorkflowGraph) -> None:
+        """Fetch each loop's resume point once, before any loop dispatches.
+
+        A loop that failed inside its body restarts at the iteration that failed
+        rather than at the first, so the iterations below it are treated as already
+        done — both their results and the loop's own position. Nothing is fetched
+        unless a retry context exists, and a loop with no failed iteration in the
+        source run is simply absent from the result.
+        """
+        self._resumed_loop_state = {}
+        if not self.retry_context:
+            return
+
+        source_execution_id = self.retry_context.get("retry_from_execution_id")
+        loop_ids = [node.id for node in graph.get_all_nodes() if node.type == NodeType.LOOP]
+        if not source_execution_id or not loop_ids:
+            return
+
+        loops = {loop_id: sorted(self._loop_body_node_ids_for(graph, loop_id)) for loop_id in loop_ids}
+        state = await workflow.execute_activity(
+            ActivityName.RETRY_LOOP_STATE,
+            args=[source_execution_id, {k: v for k, v in loops.items() if v}],
+            activity_id="__internal__fetch_retry_loop_state",
+            start_to_close_timeout=timedelta(seconds=DEFAULT_ACTIVITY_TIMEOUT_SECONDS),
+        )
+        self._resumed_loop_state = state or {}
+        if self._resumed_loop_state:
+            workflow.logger.info(
+                "Loaded retry loop resume points",
+                extra={"resumes": {k: v.get("resume_iteration") for k, v in self._resumed_loop_state.items()}},
+            )
+
+    def _loop_body_node_ids_for(self, graph: WorkflowGraph, loop_id: str) -> set[str]:
+        """Body nodes owned by one loop."""
+        bodies = collect_loop_bodies(
+            {node.id: graph.get_successors(node.id) for node in graph.get_all_nodes()},
+            {owner: [n.id for n in graph.get_next_activities_by_port(owner, "iterate")] for owner in [loop_id]},
+        )
+        return set(bodies.get(loop_id, set()))
+
+    def _seed_resumed_loop(
+        self,
+        loop_id: str,
+        loop_state: LoopState,
+        resume_iteration: int,
+        iteration_results: dict[str, list[Any]],
+    ) -> None:
+        """Position a resumed loop and republish the iterations it skips.
+
+        The loop's own ``current_index`` moves to the resume point, so the control
+        activity starts there instead of re-running earlier iterations whose side
+        effects already happened. The per-iteration results are seeded into
+        ``loop_iteration_results`` under the same ``"{node}.{field}"`` keys the
+        engine accumulates, so a body node reading ``loop.iteration_results`` sees
+        the same ragged lists the original run produced.
+        """
+        # Both loop state models carry ``current_index``, so the resume point is set
+        # directly rather than probed for.
+        loop_state.current_index = resume_iteration
+        self._resumed_loop_state.setdefault(loop_id, {})["seeded"] = True
+
+        target = self.loop_iteration_results.setdefault(loop_id, {})
+        for key, values in (iteration_results or {}).items():
+            target.setdefault(key, []).extend(values)
+
     def _should_restore_node(self, node_id: str, graph: WorkflowGraph) -> bool:
         """Whether this node's stored output may be injected instead of running it."""
         if not self.retry_context:
             return False
         node = graph.get_node(node_id)
+        if node is not None and node.type == NodeType.LOOP:
+            # A resumable loop is not restored through the payload path at all: it
+            # is seeded from its resume point when it dispatches. Anything else —
+            # a loop with no resume point, or a loop body node, which is one
+            # execution per iteration — stays excluded.
+            return False
         if node is not None and node.type in _CONTROL_NODE_TYPES:
             return False
         return strip_iteration_suffix(node_id) in self._retry_restorable_nodes(graph)

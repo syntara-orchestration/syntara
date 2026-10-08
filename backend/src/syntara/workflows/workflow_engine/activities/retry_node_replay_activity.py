@@ -182,3 +182,161 @@ async def fetch_retry_source_state_activity(source_execution_id: str) -> dict[st
             if row.activity_name:
                 states[strip_iteration_suffix(row.activity_name)] = row.status.value
     return states
+
+
+#: Statuses a loop's per-iteration rows can carry. FAILED is included because it is
+#: the terminal status that decides where a retry resumes, so the iteration that
+#: stopped the run is in the source data.
+_LOOP_ITERATION_STATUSES = (
+    ActivityStatus.COMPLETED,
+    ActivityStatus.FAILED,
+)
+
+
+@activity.defn(name="fetch_retry_loop_state")
+async def fetch_retry_loop_state_activity(
+    source_execution_id: str,
+    loops: dict[str, list[str]],
+) -> dict[str, dict[str, Any]]:
+    """Fetch the per-iteration state a retry needs to resume a loop mid-run.
+
+    The control plane selects failure points by base node id, so the iteration a
+    loop stopped on is not in the payload. It is recovered from the
+    ``ActivityExecution`` rows the source run already wrote: the sync service creates
+    one row per iteration (``iteration`` column, ``#iter-<n>`` suffix), including the
+    failed one.
+
+    Args:
+        source_execution_id: Execution whose rows hold the loop's iteration state.
+        loops: Map of loop node id to the body node ids inside it. Only these nodes
+            are considered, so an identically-named node elsewhere in the workflow
+            cannot contribute to the resume point.
+
+    Returns:
+        Map of loop node id to its resume state::
+
+            {"loop_1": {"resume_iteration": 2,
+                        "iteration_results": {"body_a.receipt": ["r0"], ...}}}
+
+        ``resume_iteration`` is the iteration the retry restarts *at*, so iterations
+        below it are treated as already done. ``iteration_results`` mirrors the
+        engine's own ``loop_iteration_results`` accumulation for those skipped
+        iterations, and is absent when the loop needs no resume.
+
+    Raises:
+        SafeValueError: If a loop's aggregate serialized size would exceed
+            ``JsonbLimits.MAX_FIELD_BYTES``. Measured across the whole per-loop
+            payload rather than one iteration: the cost is in the aggregate, and
+            iterating a large loop is precisely the case that produces it. Refused
+            rather than truncated, because a truncated iteration list would silently
+            drop results the loop body depends on.
+
+    """
+    if not loops:
+        return {}
+
+    body_to_loop = {body_id: loop_id for loop_id, body_ids in loops.items() for body_id in body_ids}
+    result: dict[str, dict[str, Any]] = {}
+    oversized: str | None = None
+
+    async for session in get_db():
+        rows = (
+            await session.exec(
+                select(ActivityExecution).where(
+                    ActivityExecution.execution_id == source_execution_id,
+                    col(ActivityExecution.status).in_(_LOOP_ITERATION_STATUSES),
+                )
+            )
+        ).all()
+
+        # Per loop: the failed iterations and the completed ones, each as
+        # (iteration, base node id, output).
+        per_loop: dict[str, dict[str, list[tuple[int, str, dict[str, Any]]]]] = {}
+        for row in rows:
+            if not row.activity_name:
+                continue
+            base_id = strip_iteration_suffix(row.activity_name)
+            owner = body_to_loop.get(base_id)
+            if owner is None:
+                continue
+            # ``iteration`` is set to 0 on the original row and N on each
+            # per-iteration row, so it is the authoritative index rather than the
+            # name suffix.
+            index = row.iteration if row.iteration is not None else 0
+            bucket = "failed" if row.status == ActivityStatus.FAILED else "completed"
+            per_loop.setdefault(owner, {"failed": [], "completed": []})[bucket].append(
+                (index, base_id, row.output_data or {})
+            )
+
+        for loop_id, buckets in per_loop.items():
+            failed_rows = buckets["failed"]
+            if not failed_rows:
+                continue
+            # Resume at the *last* failed iteration, not the first.
+            #
+            # A loop body node with continue_on_failure may fail on an early
+            # iteration and the loop carries on to later ones, so the source run can
+            # hold several FAILED rows for one loop. Only the last one stopped the
+            # workflow; every earlier failure was tolerated and its side effects
+            # already happened. Resuming from the earliest of them would re-run those
+            # iterations and repeat their side effects. Resuming from the last one
+            # cannot skip it, because that is the iteration being retried.
+            resume_iteration = max(index for index, _base, _output in failed_rows)
+            iteration_results = _rebuild_iteration_results(buckets["completed"], resume_iteration)
+            if oversized is None and _exceeds_size_limit(iteration_results):
+                oversized = loop_id
+                continue
+            result[loop_id] = {
+                "resume_iteration": resume_iteration,
+                "iteration_results": iteration_results,
+            }
+
+    if oversized is not None:
+        msg = (
+            f"restored loop state for {oversized} exceeds the "
+            f"{JsonbLimits.MAX_FIELD_BYTES} byte maximum. This retry cannot restore the "
+            "iteration results its loop body needs in order to resume."
+        )
+        raise SafeValueError(msg)
+
+    logger.info(
+        "Fetched retry loop state",
+        source_execution_id=source_execution_id,
+        loop_count=len(result),
+        resume_points={loop_id: state["resume_iteration"] for loop_id, state in result.items()},
+    )
+    return result
+
+
+def _exceeds_size_limit(iteration_results: dict[str, list[Any]]) -> bool:
+    """Whether a loop's rebuilt iteration results cross the JSONB field ceiling."""
+    serialized_bytes = len(json.dumps(iteration_results, default=str).encode("utf-8"))
+    return serialized_bytes > JsonbLimits.MAX_FIELD_BYTES
+
+
+def _rebuild_iteration_results(
+    completed: list[tuple[int, str, dict[str, Any]]],
+    resume_iteration: int,
+) -> dict[str, list[Any]]:
+    """Rebuild ``loop_iteration_results`` for the iterations a retry skips.
+
+    Mirrors the engine's own per-iteration accumulation, which appends each field of
+    a body node's namespace entry under ``"{node}.{field}"`` as the iteration
+    finishes. Two details matter for fidelity:
+
+    * The engine's namespace entry is ``{**output, "status": "completed"}``, but
+      ``output_data`` in the database is the bare activity output and never carries
+      that synthetic key. It is re-added here, or the rebuilt aggregation silently
+      lacks ``"{node}.status"`` compared with the original run.
+    * Fields are appended only when the iteration actually produced them, so the
+      lists are ragged and are built per node in iteration order rather than zipped
+      against a fixed range. A node that returns different fields on different
+      iterations stays aligned with the original run's ragged shape.
+    """
+    results: dict[str, list[Any]] = {}
+    for index, base_id, output in sorted(completed, key=lambda item: (item[1], item[0])):
+        if index >= resume_iteration:
+            continue
+        for field, value in {**output, "status": "completed"}.items():
+            results.setdefault(f"{base_id}.{field}", []).append(value)
+    return results
