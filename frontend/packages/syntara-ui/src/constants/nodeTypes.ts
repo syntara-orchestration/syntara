@@ -52,9 +52,3 @@ export const StepMenuCategory = {
 
 /** Union of StepMenuCategory values ('activity' | 'trigger') */
 export type StepMenuCategoryUnion = ValueOf<typeof StepMenuCategory>
-
-/** @deprecated Use StepMenuCategory for feature-level terminology. */
-export const MenuNodeType = StepMenuCategory
-
-/** @deprecated Use StepMenuCategoryUnion. */
-export type MenuNodeTypeUnion = StepMenuCategoryUnion

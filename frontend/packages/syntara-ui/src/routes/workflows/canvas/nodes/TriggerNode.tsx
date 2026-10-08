@@ -178,6 +178,3 @@ function TriggerStepDetails(
     </>
   )
 }
-
-/** @deprecated Use TriggerStepComponent. */
-export const TriggerNodeComponent = TriggerStepComponent

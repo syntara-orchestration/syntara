@@ -10,7 +10,7 @@ import {
 import { useReactFlow } from '@xyflow/react'
 import { createElement, useCallback, type ReactNode } from 'react'
 
-import { type MenuNodeTypeUnion, MenuNodeType } from '../../../../../constants'
+import { type StepMenuCategoryUnion, StepMenuCategory } from '../../../../../constants'
 import { useAlerts } from '../../../../../providers/alerts'
 import { useNodeActions } from '../../../../../routes/builder/NodeActionsContext'
 import { getErrorMessage } from '../../../../../utils/apiErrors'
@@ -18,7 +18,7 @@ import { detachPromise } from '../../../../../utils/detachPromise'
 import { resolveFlowNodeId } from '../../../../../utils/triggerNodeIds'
 
 // Re-export for convenience
-export { MenuNodeType, type MenuNodeTypeUnion } from '../../../../../constants'
+export { StepMenuCategory, type StepMenuCategoryUnion } from '../../../../../constants'
 
 export type NodeMenuAction = {
   id: string
@@ -31,7 +31,7 @@ export type NodeMenuAction = {
 
 type UseNodeMenuActionsOptions = {
   nodeId: string
-  nodeType: MenuNodeTypeUnion
+  nodeType: StepMenuCategoryUnion
   triggerIndex?: number
   disabled?: boolean
   additionalActions?: NodeMenuAction[]
@@ -46,16 +46,16 @@ type BuilderActionHandlers = {
 }
 
 function buildBuilderActions(
-  nodeType: MenuNodeTypeUnion,
+  nodeType: StepMenuCategoryUnion,
   disabled: boolean,
   handlers: BuilderActionHandlers
 ): NodeMenuAction[] {
-  if (nodeType === MenuNodeType.CONTROL_FLOW) {
+  if (nodeType === StepMenuCategory.CONTROL_FLOW) {
     return [{ id: 'replace', label: 'Replace', onClick: handlers.onReplace, icon: createElement(RhUiSyncIcon) }]
   }
 
   const activityActions: NodeMenuAction[] =
-    nodeType === MenuNodeType.ACTIVITY
+    nodeType === StepMenuCategory.ACTIVITY
       ? [
           { id: 'run-step', label: 'Run step', onClick: handlers.onRunStep, icon: createElement(RhUiPlayIcon) },
           {
@@ -94,7 +94,7 @@ function appendDeleteAction(actions: NodeMenuAction[], deleteAction: NodeMenuAct
 
 /**
  * Custom hook for managing the canvas step kebab menu in the workflow builder.
- * Defines menu items per canvas step category (`MenuNodeType`).
+ * Defines menu items per canvas step category (`StepMenuCategory`).
  *
  * Uses React Flow's deleteElements API to ensure proper edge cleanup and ButtonEdge maintenance.
  *
@@ -112,7 +112,7 @@ function appendDeleteAction(actions: NodeMenuAction[], deleteAction: NodeMenuAct
  * // For activity nodes (Task, Condition, Join, Loop, Parallel)
  * const menuActions = useNodeMenuActions({
  *   nodeId: props.data.id,
- *   nodeType: MenuNodeType.ACTIVITY,
+ *   nodeType: StepMenuCategory.ACTIVITY,
  * })
  *
  * @example
@@ -120,7 +120,7 @@ function appendDeleteAction(actions: NodeMenuAction[], deleteAction: NodeMenuAct
  * const triggerIndex = parseInt(props.id.split('-')[1])
  * const menuActions = useNodeMenuActions({
  *   nodeId: props.id,
- *   nodeType: MenuNodeType.TRIGGER,
+ *   nodeType: StepMenuCategory.TRIGGER,
  *   triggerIndex,
  * })
  *
@@ -128,7 +128,7 @@ function appendDeleteAction(actions: NodeMenuAction[], deleteAction: NodeMenuAct
  * // With additional custom actions
  * const menuActions = useNodeMenuActions({
  *   nodeId: props.data.id,
- *   nodeType: MenuNodeType.ACTIVITY,
+ *   nodeType: StepMenuCategory.ACTIVITY,
  *   additionalActions: [
  *     {
  *       id: 'duplicate',
