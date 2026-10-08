@@ -79,8 +79,9 @@ jobs:
             { echo "code=true"; echo "backend=true"; echo "contracts=true"; echo "scripts=true"; echo "frontend=true"; } >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          # Agent skills and Cursor rules are not shipped product code.
-          FILES=$(grep -vE '^(\.claude/skills/|frontend/\.cursor/)' <<< "$FILES" || true)
+          # Synced Cursor rules live under frontend/.cursor* but are not shipped UI;
+          # without this strip they match ^frontend/ and turn on full CI.
+          FILES=$(grep -vE '^frontend/\.cursor' <<< "$FILES" || true)
           # Workflow/action edits that affect this stack, not all of .github/
           # (CODEOWNERS, PR template, etc. used to turn on full frontend CI).
           if grep -qE '^(frontend/|backend/|\.github/workflows/ci-frontend\.yml|\.github/actions/)' <<< "$FILES"; then

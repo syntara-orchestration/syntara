@@ -138,9 +138,10 @@ Konflux pipelines use path filters in `.tekton/`. If those paths did not change,
 the pipeline will not start and the matching Konflux Gate job skips after its
 startup window.
 
-GitHub **CI Frontend** path detection also ignores agent-only edits under
-`.claude/skills/` and `frontend/.cursor/` so skill and Cursor rule PRs do not
-run the full frontend stack or Konflux gates when no product code changed.
+GitHub **CI Frontend** path detection strips `frontend/.cursor*` paths before
+deciding whether to run the full stack (synced Cursor rules are not product
+code). PRs that only touch `.claude/skills/` already skip that stack because
+those paths do not match the `frontend/` filter.
 
 ### Fork PRs
 
