@@ -66,7 +66,7 @@ function optionalNumberFromInput(value: string | number | undefined): number | u
 }
 
 function isPartialNumberInput(value: string): boolean {
-  return value === '' || value === '-' || value.endsWith('.') || value.endsWith('e') || value.endsWith('E')
+  return value === '-' || value.endsWith('.') || value.endsWith('e') || value.endsWith('E')
 }
 
 function numberInputDisplayValue(draft: string | null, fieldValue: unknown): string {
@@ -144,6 +144,11 @@ export function SynTextField<
             value={displayValue}
             onChange={(_event, value) => {
               if (isNumberInput) {
+                if (value === '') {
+                  setNumberDraft('')
+                  field.onChange(undefined)
+                  return
+                }
                 setNumberDraft(value)
                 if (!isPartialNumberInput(value)) {
                   field.onChange(optionalNumberFromInput(value))

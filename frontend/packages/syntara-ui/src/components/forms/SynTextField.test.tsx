@@ -114,6 +114,27 @@ describe('SynTextField', () => {
     expect(onSubmit).toHaveBeenCalledWith({ count: 300 }, expect.anything())
   })
 
+  it('submits undefined when a number input is cleared without blur', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+    const numberSchema = z.object({ count: z.number().optional() })
+
+    renderWithForm({ schema: numberSchema, defaultValues: { count: 300 } }, ({ control, handleSubmit }) => (
+      <>
+        <SynTextField name="count" control={control} label="Count" type="number" />
+        <button type="button" onClick={handleSubmit(onSubmit)}>
+          Submit
+        </button>
+      </>
+    ))
+
+    const input = screen.getByRole('spinbutton', { name: 'Count' })
+    await user.clear(input)
+    await user.click(screen.getByRole('button', { name: 'Submit' }))
+
+    expect(onSubmit).toHaveBeenCalledWith({ count: undefined }, expect.anything())
+  })
+
   it('allows typing decimal values without stripping the decimal point mid-edit', async () => {
     const user = userEvent.setup()
     const numberSchema = z.object({ rate: z.number().positive().optional() })
