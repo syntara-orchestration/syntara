@@ -1,6 +1,9 @@
 import type { FormsAPI } from '@syntara/contracts'
 
+import { executions } from './executions'
 import { mockDate } from './mockDates'
+import { workflows } from './workflows'
+import { mockWorkflowVersionNumber } from '../utils/workflowVersion'
 
 type FormPromptRead = FormsAPI.components['schemas']['FormPromptRead']
 type FormPromptListRead = FormsAPI.components['schemas']['FormPromptListRead']
@@ -60,6 +63,14 @@ const dynamicResolvedFormDefinition: FormsAPI.components['schemas']['FormDefinit
 
 /** Maps a full form prompt record to the list-row shape returned by GET /form_prompts. */
 export function formPromptToListRead(prompt: FormPromptRead): FormPromptListRead {
+  const execution = executions.find((row) => row.id === prompt.execution_id)
+  const workflow = execution?.workflow_id ? workflows.find((row) => row.id === execution.workflow_id) : undefined
+
+  let workflow_name = workflow?.name ?? execution?.workflow_name ?? MOCK_WORKFLOW_CONTEXT.workflow_name
+  if (prompt.id === 'fp-exec-form-prompt-2') {
+    workflow_name = 'Beta rollout workflow'
+  }
+
   return {
     id: prompt.id!,
     created_at: prompt.created_at!,
@@ -71,10 +82,12 @@ export function formPromptToListRead(prompt: FormPromptRead): FormPromptListRead
     timeout_at: prompt.timeout_at ?? null,
     responded_at: prompt.responded_at ?? null,
     responded_by: prompt.responded_by ?? null,
-    workflow_id: MOCK_WORKFLOW_CONTEXT.workflow_id,
-    workflow_version: MOCK_WORKFLOW_CONTEXT.workflow_version,
-    workflow_name:
-      prompt.id === 'fp-exec-form-prompt-2' ? 'Beta rollout workflow' : MOCK_WORKFLOW_CONTEXT.workflow_name,
+    workflow_id: workflow?.id ?? MOCK_WORKFLOW_CONTEXT.workflow_id,
+    workflow_version:
+      (execution as { workflow_version?: number } | undefined)?.workflow_version ??
+      mockWorkflowVersionNumber(workflow) ??
+      MOCK_WORKFLOW_CONTEXT.workflow_version,
+    workflow_name,
   }
 }
 
@@ -142,4 +155,49 @@ export const formPrompts: FormPromptRead[] = [
     responded_at: null,
     responded_by: null,
   },
+  {
+    id: 'fp-alice-sandbox-1',
+    created_at: mockDate.minutesAgo10,
+    updated_at: mockDate.minutesAgo10,
+    labels: {},
+    project_id: 'p-002',
+    execution_id: 'exec-form-prompt-alice',
+    prompt_node_id: 'sandbox_review',
+    name: 'Sandbox access review',
+    message: 'Confirm sandbox access before continuing.',
+    status: 'pending',
+    timeout_at: mockDate.hoursFromNow23,
+    form_definition: sampleFormDefinition,
+    submit_label: 'Submit response',
+    success_message: 'Thank you — the workflow will continue.',
+    responder_users: [{ id: 'user-admin', username: 'admin' }],
+    responder_groups: [],
+    response_data: null,
+    responded_at: null,
+    responded_by: null,
+  },
+  ...Array.from({ length: 8 }, (_, index) => {
+    const n = index + 1
+    return {
+      id: `fp-pagination-seed-${n}`,
+      created_at: mockDate.minutesAgo10,
+      updated_at: mockDate.minutesAgo10,
+      labels: {},
+      project_id: 'p-001',
+      execution_id: 'exec-form-prompt',
+      prompt_node_id: `pagination_prompt_${n}`,
+      name: `Pagination seed prompt ${String(n).padStart(2, '0')}`,
+      message: `Pagination E2E seed row ${n}.`,
+      status: 'pending' as const,
+      timeout_at: mockDate.hoursFromNow23,
+      form_definition: sampleFormDefinition,
+      submit_label: 'Submit response',
+      success_message: 'Thank you — the workflow will continue.',
+      responder_users: [{ id: 'user-admin', username: 'admin' }],
+      responder_groups: [],
+      response_data: null,
+      responded_at: null,
+      responded_by: null,
+    }
+  }),
 ]

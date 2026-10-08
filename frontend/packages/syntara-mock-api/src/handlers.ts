@@ -4,6 +4,7 @@ import { mockDate } from './resources/mockDates'
 import { createMockJwt } from './mockJwt'
 import type * as ApprovalsAPI from '@syntara/contracts/src/approvals-api.js'
 import type * as ExecutionsAPI from '@syntara/contracts/src/executions-api.js'
+import type * as FormsAPI from '@syntara/contracts/src/forms-api.js'
 import type * as ToolManagerAPI from '@syntara/contracts/src/tool-manager.js'
 import type * as WorkflowAPI from '@syntara/contracts/src/workflow-api.js'
 import type { Approval, Tool, WorkflowWithVersion, WorkflowsResponse } from '@syntara/contracts'
@@ -27,6 +28,7 @@ import { settings, settingsCategories } from './resources/settings'
 import { revocationState } from './resources/revocation'
 import { identityProviders, type IdentityProvider } from './resources/identityProviders'
 import { validateGroupJmespathExpression } from './utils/jmespathValidation'
+import { mockWorkflowVersionNumber } from './utils/workflowVersion'
 import { users, userIdentities, type UserRead, type UserIdentityRead } from './resources/users'
 import { groups, userGroupMemberships, type GroupRead } from './resources/groups'
 import {
@@ -1617,7 +1619,7 @@ export const handlers = [
     const workflowMap = new Map(workflows.map((w) => [w.id, w]))
     const enriched = filtered.map((e) => {
       const wf = e.workflow_id ? workflowMap.get(e.workflow_id) : undefined
-      const versionNum = wf?.published_version ?? wf?.current_version ?? 1
+      const versionNum = mockWorkflowVersionNumber(wf)
       const existingVersionId = (e as { workflow_version_id?: string }).workflow_version_id
       return {
         ...e,
@@ -1685,7 +1687,7 @@ export const handlers = [
     }
     const executionId = uuidv4()
     const workflow = workflows.find((w) => w.id === body.workflow_id)
-    const versionNum = workflow?.published_version ?? workflow?.current_version ?? 1
+    const versionNum = mockWorkflowVersionNumber(workflow)
     const existingCount = executions.filter((e) => e.workflow_id === body.workflow_id).length
 
     const definition = workflow?.version?.workflow_definition as
@@ -1700,31 +1702,34 @@ export const handlers = [
     // Synthesize per-node activities so newly created executions are usable in
     // self-contained E2E tests (GET detail / activities list).
     const hasApproval = nodes.some((node) => node.type === 'approval')
+    const hasFormPrompt = nodes.some((node) => node.type === 'form_prompt')
+    const pausesForHumanInput = hasApproval || hasFormPrompt
 
     // Default remains completed for suite-wide stability. Tests that need mixed
     // statuses pass an explicit `status` (mock-only; ignored by the real API).
-    // Approval workflows still default to paused when no override is provided.
-    const status = body.status ?? (hasApproval ? 'paused' : 'completed')
+    // Human-input workflows default to paused when no override is provided.
+    const status = body.status ?? (pausesForHumanInput ? 'paused' : 'completed')
     const timestampCycle = [mockDate.hoursAgo1, mockDate.hoursAgo2, mockDate.hoursAgo3, mockDate.hoursAgo4] as const
     const timestamp = timestampCycle[existingCount % timestampCycle.length]
     const isTerminal = status === 'completed' || status === 'failed' || status === 'cancelled'
     const isPaused = status === 'paused'
+    const approvalPending = isPaused && hasApproval
 
     const activities: ExecutionsAPI.components['schemas']['ActivityExecution'][] = nodes
       .filter((node): node is { id: string; type?: string; name?: string } => typeof node.id === 'string')
       .map((node, index) => {
-        const isApproval = node.type === 'approval'
+        const waitsForHumanInput = node.type === 'approval' || node.type === 'form_prompt'
         return {
           id: `act-${executionId}-${index + 1}`,
           created_at: timestamp,
           updated_at: timestamp,
           execution_id: executionId,
           activity_name: node.id,
-          status: isApproval && isPaused ? ('waiting' as const) : ('completed' as const),
+          status: waitsForHumanInput && isPaused ? ('waiting' as const) : ('completed' as const),
           started_at: timestamp,
-          completed_at: isApproval && isPaused ? null : timestamp,
+          completed_at: waitsForHumanInput && isPaused ? null : timestamp,
           input_data: {},
-          output_data: isApproval && isPaused ? null : {},
+          output_data: waitsForHumanInput && isPaused ? null : {},
           error_details: null,
           retry_count: 0,
           iteration: null,
@@ -1740,7 +1745,7 @@ export const handlers = [
       updated_at: timestamp,
       workflow_id: body.workflow_id,
       status,
-      approval_pending: isPaused,
+      approval_pending: approvalPending,
       started_at: timestamp,
       completed_at: isTerminal ? timestamp : null,
       started_by: 'user-1',
@@ -1794,6 +1799,44 @@ export const handlers = [
           decision_notes: null,
         } as Approval)
       }
+      for (const node of nodes) {
+        if (node.type !== 'form_prompt' || typeof node.id !== 'string') continue
+        const nodeRecord = node as { name?: string; parameters?: Record<string, unknown> }
+        const parameters = nodeRecord.parameters ?? {}
+        const formDefinition = parameters.form_definition as
+          | FormsAPI.components['schemas']['FormDefinition']
+          | undefined
+        formPrompts.push({
+          id: uuidv4(),
+          created_at: timestamp,
+          updated_at: timestamp,
+          labels: {},
+          project_id: workflow?.project_id ?? 'p-001',
+          execution_id: executionId,
+          prompt_node_id: node.id,
+          name: typeof nodeRecord.name === 'string' && nodeRecord.name.length > 0 ? nodeRecord.name : 'Form prompt',
+          message: typeof parameters.message === 'string' ? parameters.message : 'Respond to continue the workflow.',
+          status: 'pending',
+          timeout_at: mockDate.hoursFromNow23,
+          form_definition: formDefinition ?? {
+            fields: [
+              {
+                value_name: 'answer',
+                type: 'text',
+                label: 'Answer',
+                required: true,
+              },
+            ],
+          },
+          submit_label: 'Submit response',
+          success_message: 'Thank you — the workflow will continue.',
+          responder_users: [{ id: 'user-admin', username: 'admin' }],
+          responder_groups: [],
+          response_data: null,
+          responded_at: null,
+          responded_by: null,
+        })
+      }
     }
 
     return HttpResponse.json(execution, { status: 201 })
@@ -1831,7 +1874,11 @@ export const handlers = [
     if (!execution) {
       return createExecutionNotFoundResponse(executionId, 'cancel')
     }
-    if (execution.status !== ExecutionStatusEnum.PENDING && execution.status !== ExecutionStatusEnum.RUNNING) {
+    if (
+      execution.status !== ExecutionStatusEnum.PENDING &&
+      execution.status !== ExecutionStatusEnum.RUNNING &&
+      execution.status !== ExecutionStatusEnum.PAUSED
+    ) {
       return HttpResponse.json(
         {
           type: 'https://api.example.com/errors/invalid-state',
@@ -2162,17 +2209,34 @@ export const handlers = [
   http.get('/api/v1/form_prompts', ({ request }) => {
     const url = new URL(request.url)
     const status = url.searchParams.get('status')
+    const statusIn = url.searchParams.get('status[in]')
     const execution_id = url.searchParams.get('execution_id')
+    const project_id = url.searchParams.get('project_id')
+    const nameContains = url.searchParams.get('name[contains]')
     const cursor = url.searchParams.get('cursor')
     const limitParam = url.searchParams.get('limit')
     const includeTotal = url.searchParams.get('include_total') === 'true'
     const limit = Math.min(Math.max(1, limitParam ? parseInt(limitParam, 10) : 20), 100)
 
     const sort = url.searchParams.get('sort')
+    const statusInValues =
+      statusIn
+        ?.split(',')
+        .map((value) => value.trim())
+        .filter(Boolean) ?? []
 
     const filtered = formPrompts.filter((prompt) => {
-      if (status && prompt.status !== status) return false
+      if (statusInValues.length > 0) {
+        if (!prompt.status || !statusInValues.includes(prompt.status)) return false
+      } else if (status && prompt.status !== status) {
+        return false
+      }
       if (execution_id && prompt.execution_id !== execution_id) return false
+      if (project_id && prompt.project_id !== project_id) return false
+      if (nameContains) {
+        const name = prompt.name ?? ''
+        if (!name.toLowerCase().includes(nameContains.toLowerCase())) return false
+      }
       return true
     })
 
