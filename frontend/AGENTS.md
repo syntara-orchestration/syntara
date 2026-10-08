@@ -419,7 +419,7 @@ The key passed to `useDocLink` must exist in `src/utils/docs/docsUrls.json` (fla
 ### Technical Boundaries
 
 - Node.js 22+ required
-- TypeScript 7
+- TypeScript 6.0
 - React 19
 - Vite build system
 - npm workspaces
