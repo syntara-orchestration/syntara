@@ -316,19 +316,25 @@ def test_an_unselected_failure_is_not_reported_as_skipped() -> None:
     assert "join" not in wf.skipped_nodes
 
 
-def test_completed_converge_is_retained_after_moot_failed_branch() -> None:
+def test_a_completed_converge_is_retained_but_never_restored() -> None:
+    """R6c: the completed converge is not skipped, and it still has to run.
+
+    It is excluded from the restorable set because a converge decides whether it
+    has enough predecessors — restoring one would release its successors without
+    that decision being made. It stays out of ``skipped_nodes`` so the R6c boundary
+    holds and its descendants keep their results.
+    """
     wf = _wf(_retry("unrelated"))
     wf._retry_source_statuses = {"b1": "failed", "b2": "completed", "join": "completed"}
     graph = _converge_graph()
     wf._classify_unselected_branches(graph)
+
     # b1 is restored as a failure, not skipped; the completed converge downstream of
     # it keeps its results under R6c either way.
     assert "b1" not in wf.skipped_nodes
     assert "join" not in wf.skipped_nodes
-    assert wf._should_restore_node("join", graph)
-    assert not wf._should_skip_successor(
-        graph.get_node("join"), "b2", is_loop_iterate=False, pending_tasks={}, graph=graph
-    )
+    # Not restorable: a converge must always evaluate its own gate.
+    assert not wf._should_restore_node("join", graph)
 
 
 def test_definition_validator_and_retry_share_loop_body_membership() -> None:

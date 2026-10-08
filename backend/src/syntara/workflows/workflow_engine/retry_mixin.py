@@ -24,6 +24,11 @@ _CONTROL_NODE_TYPES = frozenset(
         NodeType.SWITCH,
         NodeType.LOOP,
         NodeType.WAIT,
+        # A converge decides whether it has enough predecessors to run, so skipping
+        # it would strand the nodes waiting on it. It is a control node in every
+        # sense that matters here, and leaving it out meant one could be restored —
+        # which then released its successors without the gate ever being evaluated.
+        NodeType.CONVERGE,
     }
 )
 

@@ -883,12 +883,11 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
             return True
 
         if successor.type == NodeType.CONVERGE:
-            if (
-                self.retry_context
-                and self._retry_source_statuses.get(node_id) == "completed"
-                and self._should_restore_node(node_id, graph)
-            ):
-                return False
+            # No retry exception here. A converge's whole job is to decide whether
+            # it has enough predecessors to run, so it must go through its own
+            # strategy gate on every path — including a retry. Returning False
+            # early released its successors on the first arriving predecessor,
+            # before sibling branches had finished restoring.
             return self._handle_converge_successor(node_id, successor, graph, pending_tasks)
 
         return False
