@@ -127,8 +127,8 @@ describe('ImportWorkflowDialog', () => {
     expect(screen.getByRole('button', { name: /^Import workflow$/i })).toBeEnabled()
   })
 
-  // AAP-93572: uploading a workflow JSON file should prefill the name field
-  // from the file's top-level "name" (i.e. workflow_definition.name).
+  // AAP-93572: uploading a workflow JSON file should prefill the "Workflow name"
+  // field from the definition's top-level `name`, instead of leaving it empty.
   it('prefills the workflow name field from the uploaded file', async () => {
     const user = userEvent.setup()
     render(<ImportWorkflowDialog {...defaultProps} />)
