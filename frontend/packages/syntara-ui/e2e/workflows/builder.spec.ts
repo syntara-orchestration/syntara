@@ -156,6 +156,81 @@ test('user can add an Approval node to the canvas', async ({ app }) => {
   }
 })
 
+test('user can add a Form prompt node and select responder users from who_can', async ({ app }) => {
+  const workflowName = buildUniqueName('e2e-builder')
+  await createWorkflowWithTrigger(app, workflowName)
+
+  await app.route('**/api/v1/authz/who_can', async (route) => {
+    const request = route.request()
+    if (request.method() === 'POST') {
+      const body = request.postDataJSON() as { action?: string; resource_type?: string } | null
+      if (body?.action === 'submit' && body?.resource_type === 'form_prompt') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            resources: [
+              { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', username: 'demo' },
+              { id: 'b2c3d4e5-f6a7-8901-bcde-f12345678901', username: 'jdoe' },
+            ],
+            next: null,
+          }),
+        })
+        return
+      }
+    }
+    await route.continue()
+  })
+
+  try {
+    await closeNodeEditorPanel(app)
+    await expect(app.getByText('Manual trigger')).toBeVisible()
+
+    const panel = await clickAddConnectedStep(app)
+    await panel.getByRole('button', { name: 'Human tasks', exact: true }).click()
+    await panel.getByRole('button', { name: 'Form', exact: true }).click()
+
+    await expect(app.getByRole('textbox', { name: 'Name', exact: true })).toBeVisible()
+    await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Intake Form')
+
+    const responderUsersButton = app.getByPlaceholder(/Select users/i)
+    await expect(responderUsersButton).toBeVisible({ timeout: 15_000 })
+    await expect(responderUsersButton).toBeEnabled({ timeout: 15_000 })
+
+    const expectedUsername = 'demo'
+    await responderUsersButton.click()
+
+    const listbox = app.getByRole('listbox')
+    await expect(listbox).toBeVisible({ timeout: 5000 })
+
+    await expect(async () => {
+      const menuItems = app.getByRole('menuitem')
+      const count = await menuItems.count()
+      if (count === 0) {
+        throw new Error('No menu items rendered yet')
+      }
+      const texts = await Promise.all((await menuItems.all()).map((item) => item.textContent()))
+      if (!texts.some((t) => t?.includes(expectedUsername))) {
+        throw new Error(`${expectedUsername} not found. Available: ${texts.join(', ')}`)
+      }
+    }).toPass({ timeout: 15_000 })
+
+    await app.getByRole('menuitem').filter({ hasText: expectedUsername }).click()
+
+    await expect(app.getByRole('button', { name: 'Create', exact: true })).toBeEnabled({ timeout: 15_000 })
+    await app.getByRole('button', { name: 'Create', exact: true }).click()
+
+    await closeNodeEditorPanel(app)
+
+    await expect(
+      app.locator('[role="group"][aria-roledescription="node"]').filter({ hasText: 'Intake Form' })
+    ).toBeVisible({ timeout: 10_000 })
+    await expect(app.getByText('Intake Form')).toBeVisible()
+  } finally {
+    await deleteWorkflow(app, workflowName)
+  }
+})
+
 test('user can add a Logic (Conditional) node to the canvas', async ({ app }) => {
   const workflowName = buildUniqueName('e2e-builder')
   await createWorkflowWithTrigger(app, workflowName)

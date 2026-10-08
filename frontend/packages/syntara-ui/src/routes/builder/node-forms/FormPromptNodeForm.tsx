@@ -39,7 +39,7 @@ import nodeFormStyles from './shared/nodeFormStyles.module.css'
 import { NodeFormTabsLayout } from './shared/NodeFormTabsLayout'
 import { NodeSettingsForm } from './shared/NodeSettingsForm'
 import { useApprovalDecideGroups } from './useApprovalDecideGroups'
-import { useApprovalDecideUsers } from './useApprovalDecideUsers'
+import { useFormPromptSubmitUsers } from './useFormPromptSubmitUsers'
 
 type NodeSettings = Activity['settings']
 
@@ -91,7 +91,7 @@ function ResponderUsersSelect({
 
   let placeholderText = RESPONDER_USERS_PLACEHOLDER
   if (!hasProjectContext) {
-    placeholderText = 'Select a project to load users'
+    placeholderText = 'Select a project to load responder users'
   } else if (isPermissionDenied) {
     placeholderText = 'Type a username and press Enter'
   }
@@ -118,14 +118,14 @@ function ResponderUsersSelect({
       {!hasProjectContext && (
         <StackItem>
           <Alert variant="info" title="Project required" isInline isPlain>
-            Select a project to scope this workflow, or enter usernames manually.
+            Select a project to load responder users, or enter usernames manually.
           </Alert>
         </StackItem>
       )}
       {hasProjectContext && isPermissionDenied && (
         <StackItem>
-          <Alert variant="info" title="User directory" isInline isPlain>
-            User search is not available yet. Enter usernames manually for now.
+          <Alert variant="warning" title="Dropdown unavailable" isInline isPlain>
+            You don&apos;t have permission to list responder users. You can still enter usernames manually.
           </Alert>
         </StackItem>
       )}
@@ -182,7 +182,7 @@ function FormPromptFormFields({
     users,
     isLoading: isLoadingUsers,
     isPermissionDenied: usersPermissionDenied,
-  } = useApprovalDecideUsers(effectiveProjectId)
+  } = useFormPromptSubmitUsers(effectiveProjectId)
   const { groups, isLoading: isLoadingGroups } = useApprovalDecideGroups()
 
   const nameField = useMemo(
