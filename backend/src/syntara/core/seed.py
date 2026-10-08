@@ -22,7 +22,7 @@ from typing import TYPE_CHECKING, Any
 
 import structlog
 
-from syntara.core.seed_context import strict_mode
+from syntara.core.seed_context import strict_mode_context_var
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Coroutine
@@ -153,7 +153,7 @@ async def run_seeders(
 
     logger.info("seed.run.start", seeders=[s.name for s in ordered], strict=strict)
 
-    token = strict_mode.set(strict)
+    token = strict_mode_context_var.set(strict)
     try:
         for seeder in ordered:
             logger.info("seed.run.seeder", name=seeder.name)
@@ -161,7 +161,7 @@ async def run_seeders(
                 await seeder.func(session)
             logger.info("seed.run.seeder.done", name=seeder.name)
     finally:
-        strict_mode.reset(token)
+        strict_mode_context_var.reset(token)
 
     logger.info("seed.run.complete", count=len(ordered))
 
