@@ -4,7 +4,7 @@ import json
 import time
 from collections.abc import Callable, Mapping
 from http import HTTPStatus
-from typing import Any, cast
+from typing import Any, Literal, cast
 from uuid import UUID
 
 import pytest
@@ -185,6 +185,8 @@ def create_form_prompt_execution(
     consumer_environment: Mapping[str, str] | None = None,
     continue_on_failure: bool = False,
     response_window: int = 600,
+    fallback_decision: Literal["submit", "fallback"] | None = None,
+    capture_form_prompt_result: bool = False,
     responder_users: list[str] | None = None,
     responder_groups: list[str] | None = None,
 ) -> UUID:
@@ -202,6 +204,8 @@ def create_form_prompt_execution(
                 consumer_environment=consumer_environment,
                 continue_on_failure=continue_on_failure,
                 response_window=response_window,
+                fallback_decision=fallback_decision,
+                capture_form_prompt_result=capture_form_prompt_result,
                 responder_users=responder_users,
                 responder_groups=responder_groups,
             ),
@@ -233,6 +237,8 @@ def start_pending_form_prompt(
     consumer_environment: Mapping[str, str] | None = None,
     continue_on_failure: bool = False,
     response_window: int = 600,
+    fallback_decision: Literal["submit", "fallback"] | None = None,
+    capture_form_prompt_result: bool = False,
     responder_users: list[str] | None = None,
     responder_groups: list[str] | None = None,
 ) -> tuple[UUID, FormPromptListRead]:
@@ -250,6 +256,8 @@ def start_pending_form_prompt(
         consumer_environment=consumer_environment,
         continue_on_failure=continue_on_failure,
         response_window=response_window,
+        fallback_decision=fallback_decision,
+        capture_form_prompt_result=capture_form_prompt_result,
         responder_users=responder_users,
         responder_groups=responder_groups,
     )
