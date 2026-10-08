@@ -107,6 +107,7 @@ export function SynTextField<
           isDisabled={isDisabled}
           autoComplete={autoComplete}
           aria-label={ariaLabel}
+          aria-required={isRequired ? true : undefined}
         />
       )}
     </SynFormField>
