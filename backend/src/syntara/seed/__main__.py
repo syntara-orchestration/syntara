@@ -104,7 +104,7 @@ def main() -> None:
     try:
         asyncio.run(_main(args))
     except Exception:
-        logger.exception("Seeding failed")
+        logger.exception("Seeding failed", strict=args.strict)
         sys.exit(1)
 
 

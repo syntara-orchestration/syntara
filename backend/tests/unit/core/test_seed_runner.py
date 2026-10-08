@@ -126,3 +126,13 @@ class TestSeedCliExitCode:
         self._run_main([], seen)
 
         assert seen == [False]
+
+    def test_seeding_failed_log_records_strict_flag(self) -> None:
+        """The top-level failure log records whether ``--strict`` was set."""
+        with (
+            patch("syntara.seed.__main__.logger") as mock_logger,
+            pytest.raises(SystemExit),
+        ):
+            self._run_main(["--strict"], [])
+
+        mock_logger.exception.assert_called_once_with("Seeding failed", strict=True)
