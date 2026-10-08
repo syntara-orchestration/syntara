@@ -2,7 +2,7 @@
 
 import json
 import time
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Collection, Mapping
 from http import HTTPStatus
 from typing import Any, Literal, cast
 from uuid import UUID
@@ -29,12 +29,13 @@ from syntara_api_client.models import (
 )
 from syntara_api_client.models.error_data import ErrorData
 from syntara_api_client.models.execution_status import ExecutionStatus
-from syntara_api_client.types import Response, UnexpectedResponseException
+from syntara_api_client.types import Response, UnexpectedResponseException, Unset
 
 from ._workflows import DEFAULT_CONSUMER_CODE, producer_prompt_consumer_workflow
 
 PROMPT_POLL_TIMEOUT = 60
 EXECUTION_POLL_TIMEOUT = 90
+ACTIVITY_OUTPUT_POLL_TIMEOUT = 30
 # Cancellation is accepted before Temporal and the activity monitor reach terminal state.
 CANCEL_POLL_TIMEOUT = 120
 
@@ -79,12 +80,60 @@ def assert_and_get_with_502_skip[ResponseT](response: Response[ResponseT]) -> Re
         raise
 
 
+def wait_for_activity_outputs(
+    syntara_api: SyntaraApiRegistry,
+    exec_id: UUID,
+    activity_ids: Collection[str],
+    *,
+    timeout: int = ACTIVITY_OUTPUT_POLL_TIMEOUT,
+) -> ExecutionRead:
+    """Poll an execution until the requested activities expose output data."""
+    deadline = time.monotonic() + timeout
+    missing = set(activity_ids)
+    while time.monotonic() < deadline:
+        execution = cast(
+            "ExecutionRead",
+            assert_and_get_with_502_skip(syntara_api.executions.get(execution_id=exec_id, include="activities")),
+        )
+        activities = {activity.activity_id: activity for activity in (execution.activities or [])}
+        missing = {
+            activity_id
+            for activity_id in activity_ids
+            if (activity := activities.get(activity_id)) is None
+            or activity.output_data is None
+            or isinstance(activity.output_data, Unset)
+        }
+        if not missing:
+            return execution
+        time.sleep(1)
+
+    pytest.fail(f"Execution {exec_id} did not expose output data for activities: {sorted(missing)} within {timeout}s")
+
+
 def get_form_prompt(syntara_api: SyntaraApiRegistry, prompt_id: UUID) -> FormPromptRead:
     """GET a form prompt, skipping only on a transient Bad Gateway."""
     return cast(
         "FormPromptRead",
         assert_and_get_with_502_skip(syntara_api.form_prompts.get(form_prompt_id=prompt_id)),
     )
+
+
+def wait_for_form_prompt_status(
+    syntara_api: SyntaraApiRegistry,
+    prompt_id: UUID,
+    expected_status: FormPromptStatus,
+    *,
+    timeout: int = CANCEL_POLL_TIMEOUT,
+) -> FormPromptRead:
+    """Poll until a form prompt reaches the expected status."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        prompt = get_form_prompt(syntara_api, prompt_id)
+        if prompt.status == expected_status:
+            return prompt
+        time.sleep(1)
+
+    pytest.fail(f"Form prompt {prompt_id} did not reach {expected_status} within {timeout}s")
 
 
 def assert_responders_configured(
