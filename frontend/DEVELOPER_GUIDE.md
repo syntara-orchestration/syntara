@@ -75,11 +75,11 @@ npm start
 - Type-safe API calls
 - Automatic memoization via React Compiler
 
-The UI uses Vite 8 and `@vitejs/plugin-react` 6. React Compiler runs through
-`@rolldown/plugin-babel` with `reactCompilerPreset()` in the Vite and Vitest
-configurations. Keep the root Vite override aligned with the UI's Vite version;
-the React plugin requires Vite 8. Likewise, the root `playwright` and
-`playwright-core` overrides must match the UI's `@playwright/test` version.
+When upgrading UI dependencies, keep the root overrides in `package.json` in
+sync: `vite` must match the UI's Vite version (`@vitejs/plugin-react` 6 requires
+Vite 8), and `playwright`/`playwright-core` must match `@playwright/test`. React
+Compiler runs through `@rolldown/plugin-babel` with `reactCompilerPreset()` in
+both Vite and Vitest configurations.
 
 ## Updating API Contracts
 
