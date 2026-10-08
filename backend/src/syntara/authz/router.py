@@ -691,6 +691,7 @@ class _WhoCanGateRule:
 
 _WHO_CAN_GATE_RULES: tuple[_WhoCanGateRule, ...] = (
     _WhoCanGateRule("approval", "decide", _can_edit_workflow_in_project),
+    _WhoCanGateRule("form_prompt", "submit", _can_edit_workflow_in_project),
 )
 
 _WHO_CAN_GATE_LOOKUP: dict[tuple[str, str], _WhoCanGateRule] = {
@@ -866,7 +867,7 @@ async def who_can(
     Two-tier authorization model:
     1. resource_project provided — the (resource_type, action) pair must match
        a gate rule, and the user must pass that rule's permission check
-       (e.g. workflow:update for approval:decide queries).
+       (e.g. workflow:update for approval:decide or form_prompt:submit queries).
     2. No resource_project — system-wide query, requires authz:query (admin).
 
     Args:
