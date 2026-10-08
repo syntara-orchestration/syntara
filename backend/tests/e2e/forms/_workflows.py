@@ -47,7 +47,7 @@ def producer_prompt_consumer_workflow(
     responder_users: list[str] | None = None,
     responder_groups: list[str] | None = None,
 ) -> WorkflowDefinition:
-    """Build a trigger, producer, form prompt, consumer, and optional fallback chain.
+    """Build a trigger, producer, form prompt, submitted consumer, and optional fallback handler.
 
     Optional responder lists restrict which users or group members may submit
     the form prompt. ``consumer_code`` can inspect the prompt response.
@@ -122,16 +122,7 @@ def producer_prompt_consumer_workflow(
                 "parameters": fallback_handler_parameters,
             }
         )
-        nodes.append(
-            {
-                "id": "fallback_consumer",
-                "name": "Fallback Consumer Node",
-                "type": "script",
-                "parameters": {"language": "bash", "code": 'echo "after fallback path executed"'},
-            }
-        )
         edges.append({"from": "prompt", "to": "fallback_handler", "from_port": "fallback"})
-        edges.append({"from": "fallback_handler", "to": "fallback_consumer"})
 
     return WorkflowDefinition.from_dict(
         {

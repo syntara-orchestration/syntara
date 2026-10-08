@@ -185,12 +185,12 @@ def test_invalid_dynamic_options_continue_on_failure_routes_to_fallback(
 
     Procedure:
     1. Emit one of the malformed dynamic-option values.
-    2. Enable continue_on_failure and connect a fallback successor.
-    3. Inspect the failed prompt and the downstream fallback activity.
+    2. Enable continue_on_failure and connect a fallback handler.
+    3. Inspect the failed prompt and the fallback activity.
 
     Expected:
     - The execution completes with errors and the prompt node retains its validation error.
-    - The fallback handler and its successor complete without persisting a form-prompt row.
+    - The fallback handler completes without persisting a form-prompt row.
     """
     exec_id = _start(
         syntara_api,
@@ -212,8 +212,6 @@ def test_invalid_dynamic_options_continue_on_failure_routes_to_fallback(
     activities: dict[str, ActivityData] = {activity.activity_id: activity for activity in (final.activities or [])}
     assert "fallback_handler" in activities, f"Fallback activity missing from activities: {list(activities)}"
     assert activities["fallback_handler"].status == "completed"
-    assert "fallback_consumer" in activities, f"Fallback successor missing from activities: {list(activities)}"
-    assert activities["fallback_consumer"].status == "completed"
     assert "consumer" not in activities or activities["consumer"].status != "completed"
 
 

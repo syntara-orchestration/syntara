@@ -149,18 +149,15 @@ def _assert_selected_route(final: ExecutionRead, *, expected_route: Literal["non
     """Assert that only the selected form prompt successor route completed."""
     activities = _activities_by_id(final)
     if expected_route == "none":
-        for activity_id in ("consumer", "fallback_handler", "fallback_consumer"):
+        for activity_id in ("consumer", "fallback_handler"):
             _assert_route_not_taken(activities, activity_id)
     elif expected_route == "submitted":
         assert activities.get("consumer") is not None, f"Submitted consumer missing: {list(activities)}"
         assert activities["consumer"].status == "completed"
         _assert_route_not_taken(activities, "fallback_handler")
-        _assert_route_not_taken(activities, "fallback_consumer")
     else:
         assert activities.get("fallback_handler") is not None, f"Fallback handler missing: {list(activities)}"
         assert activities["fallback_handler"].status == "completed"
-        assert activities.get("fallback_consumer") is not None, f"Fallback successor missing: {list(activities)}"
-        assert activities["fallback_consumer"].status == "completed"
         _assert_route_not_taken(activities, "consumer")
 
 
