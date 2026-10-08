@@ -274,6 +274,25 @@ class TestGetTriggerNodes:
         trigger_ids = {t.id for t in triggers}
         assert trigger_ids == {"trigger1", "trigger2"}
 
+    def test_subworkflow_trigger_recognized(self) -> None:
+        data = _simple_workflow()
+        data["triggers"] = [{"id": "sub_trigger", "type": "subworkflow_trigger", "parameters": {}}]
+        graph = WorkflowGraph.from_dict(data)
+        triggers = graph.get_trigger_nodes()
+        assert len(triggers) == 1
+        assert triggers[0].id == "sub_trigger"
+        assert triggers[0].type == "subworkflow_trigger"
+
+    def test_subworkflow_trigger_alongside_other_triggers(self) -> None:
+        # The engine recognizes a subworkflow_trigger coexisting with another
+        # trigger; no cardinality restriction is imposed at the graph level.
+        data = _simple_workflow()
+        data["triggers"].append({"id": "sub_trigger", "type": "subworkflow_trigger", "parameters": {}})
+        data["edges"].append({"from": "sub_trigger", "to": "script1"})
+        graph = WorkflowGraph.from_dict(data)
+        triggers = graph.get_trigger_nodes()
+        assert {t.id for t in triggers} == {"trigger1", "sub_trigger"}
+
 
 # ---------------------------------------------------------------------------
 # get_node

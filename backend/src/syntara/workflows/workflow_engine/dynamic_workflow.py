@@ -63,6 +63,7 @@ ALLOWED_TRIGGER_TYPES: set[str] = {
     ActivityName.EDA_TRIGGER,
     ActivityName.MANUAL_TRIGGER,
     ActivityName.SCHEDULED_TRIGGER,
+    ActivityName.SUBWORKFLOW_TRIGGER,
     ActivityName.WEBHOOK_TRIGGER,
 }
 

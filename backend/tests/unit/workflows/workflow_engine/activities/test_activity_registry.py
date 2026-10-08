@@ -45,3 +45,15 @@ class TestBackgroundActivityRegistry:
             f"Builtin workflow trigger type(s) {missing} have no matching activity in "
             "BACKGROUND_ACTIVITY_REGISTRY — workflows using these triggers will fail."
         )
+
+
+class TestSubworkflowTriggerRegistration:
+    """The child-side subworkflow trigger activity belongs to the main worker only."""
+
+    def test_in_main_registry(self) -> None:
+        assert "subworkflow_trigger" in ACTIVITY_REGISTRY
+
+    def test_not_in_background_registry(self) -> None:
+        # subworkflow_trigger is user-authored workflow ingress on the main queue,
+        # not a built-in system workflow, so it must stay out of the background set.
+        assert "subworkflow_trigger" not in BACKGROUND_ACTIVITY_REGISTRY
