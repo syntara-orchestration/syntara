@@ -45,6 +45,8 @@ def create_test_metadata(
     pending_sync_event_ids: set[int] | None = None,
     iteration_counters: dict[str, int] | None = None,
     next_activity_index: int | None = None,
+    *,
+    is_retry: bool = True,
 ) -> ExecutionMonitorMetadata:
     """Create ExecutionMonitorMetadata for testing with sensible defaults."""
     updates = pending_activity_updates or {}
@@ -55,6 +57,7 @@ def create_test_metadata(
         activity_definitions_map=activity_definitions_map or {},
         activity_index_map=index_map,
         next_activity_index=next_activity_index if next_activity_index is not None else len(index_map),
+        is_retry=is_retry,
         pending_activity_updates=updates,
         pending_sync_event_ids=pending_sync_event_ids if pending_sync_event_ids is not None else set(updates.keys()),
         iteration_counters=iteration_counters or {},
@@ -6288,19 +6291,46 @@ class TestReplayedTimestampResolution:
         handle.execute_update.assert_awaited_once()
 
     @pytest.mark.asyncio
-    async def test_an_ordinary_run_asks_but_gets_nothing_back(self) -> None:
-        """Every node goes through the same path; a non-replay answers at once.
+    async def test_an_ordinary_run_does_not_ask_at_all(self) -> None:
+        """An ordinary run makes no RPC to the workflow for this.
 
-        The workflow has no replay candidates on an ordinary run, so its wait
-        condition is satisfied immediately and it returns None. The ask costs a
-        request, not a stall.
+        The workflow holds no replay candidates off a retry, so its wait condition
+        is satisfied on the first check and it would answer "not a replay" — but
+        that is still a blocking round trip per completed activity, on a path that
+        made none before. ``is_retry`` is set once per execution from the retry
+        lineage, so gating on it costs a field read and removes the traffic.
         """
         metadata = self._metadata([(1, "script_1", ActivityStatus.COMPLETED)])
         metadata.is_retry = False
         handle = self._handle(None)
 
         assert await self.service._resolve_replayed_timestamps(metadata, handle) == {}
-        handle.execute_update.assert_awaited_once_with("get_replayed_node_timestamps_when_ready", "script_1")
+        handle.execute_update.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_a_retry_still_asks_about_every_completed_node(self) -> None:
+        """The gate must not narrow what a retry asks about.
+
+        Within a retry every node still goes through the same path, so there is one
+        rule rather than two that behave differently — an ordinary run asks nobody,
+        a retry asks every completed node.
+        """
+        metadata = self._metadata(
+            [
+                (1, "script_1", ActivityStatus.COMPLETED),
+                (2, "script_2", ActivityStatus.FAILED),
+                (3, "script_3", ActivityStatus.RUNNING),
+            ]
+        )
+        metadata.is_retry = True
+        handle = self._handle(self.source_times)
+
+        await self.service._resolve_replayed_timestamps(metadata, handle)
+
+        asked = [call.args[1] for call in handle.execute_update.await_args_list]
+        # Only COMPLETED is asked: a node that failed, timed out or was cancelled
+        # has no source completion time to restore.
+        assert asked == ["script_1"]
 
     @pytest.mark.asyncio
     async def test_a_node_the_workflow_does_not_replay_is_left_out_of_the_map(self) -> None:

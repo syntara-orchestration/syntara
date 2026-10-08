@@ -13,7 +13,6 @@ from syntara.workflows.utils.namespace_resolver import NamespaceResolver
 from syntara.workflows.workflow_engine.constants import DEFAULT_ACTIVITY_TIMEOUT_SECONDS
 from syntara.workflows.workflow_engine.graph import ActivityNode, WorkflowGraph
 from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName, LoopState, NodeType
-from syntara.workflows.workflow_engine.node_settings_resolver import resolve_continue_on_failure
 
 #: Node types that decide routing rather than producing an output. A retry never
 #: restores these from a source run: skipping one would strand the graph, so
@@ -116,16 +115,17 @@ class WorkflowRetryMixin:
     def _retry_restorable_nodes(self, graph: WorkflowGraph) -> set[str]:
         """Return the base node ids whose stored output this retry can restore.
 
-        The control plane already validated the selection, so this
-        only re-derives *which upstream nodes may be skipped* — a node qualifies
-        when it is not a retry starting point and nothing downstream of it forced
-        it to re-run.
+        The control plane already validated the selection, so this only re-derives
+        *which upstream nodes may be skipped* — a node qualifies when it is not a
+        retry starting point, not a trigger or control node, not a loop body, and not
+        downstream of a retry point.
 
-        A node that ran downstream of a ``continue_on_failure`` step is excluded:
-        its inputs may depend on the failed node's output, which no longer exists,
-        so restoring it would replay it against stale inputs. The global default
-        for ``workflow_engine.continue_on_failure`` is False, so this set is
-        empty unless an operator opted in per node.
+        R6a's continue_on_failure case is covered by the ``downstream`` subtraction
+        rather than a rule of its own. A failed CoF step is a retry point, so
+        everything downstream of it is downstream of a failure point — which is
+        exactly the set that must re-run, because its inputs may depend on the
+        failed output that no longer exists. A separate walk over the same nodes
+        could only produce a subset of that set, so it is not computed.
         """
         cached = self._retry_restorable_cache
         if cached is not None:
@@ -137,15 +137,6 @@ class WorkflowRetryMixin:
         # selection is already expanded to every failed node by the time it gets
         # here, so reading one would either be absent or a stale duplicate.
         must_run = {strip_iteration_suffix(point) for point in self.retry_context.get("eligible_point_ids", [])}
-
-        # Nodes forced to re-run: everything downstream of a continue_on_failure
-        # step that is itself inside the retried region. Walking from each CoF
-        # node in the region, rather than the whole graph, keeps the walk bounded
-        # to what this retry can actually affect.
-        forced: set[str] = set()
-        for node in graph.get_all_nodes():
-            if node.id in must_run and resolve_continue_on_failure(node, self._runtime_settings):
-                forced |= self._walk_downstream(node.id, graph)
 
         # Trigger nodes are excluded: the retry re-enters the graph at its first
         # eligible point, and the control plane already re-resolved the trigger
@@ -168,13 +159,7 @@ class WorkflowRetryMixin:
             downstream |= self._walk_downstream(node_id, graph)
 
         restorable = (
-            {node.id for node in graph.get_all_nodes()}
-            - must_run
-            - forced
-            - triggers
-            - control
-            - loop_bodies
-            - downstream
+            {node.id for node in graph.get_all_nodes()} - must_run - triggers - control - loop_bodies - downstream
         )
         self._retry_restorable_cache = restorable
         return restorable
