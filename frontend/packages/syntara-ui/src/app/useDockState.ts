@@ -3,18 +3,14 @@ import { createContext, use, useCallback, useEffect, useMemo, useRef, useState }
 
 export type DockState = {
   isDockExpanded: boolean
-  isDockTextExpanded: boolean
-  isDockExpandableExpanded: boolean
+  isDockOverlay: boolean
   isMobile: boolean
   dockedToggleRef: React.RefObject<HTMLButtonElement | null>
   mobileToggleRef: React.RefObject<HTMLButtonElement | null>
   isNavGroupExpanded: (groupId: string) => boolean
   onToggleDock: () => void
   onMobileToggle: () => void
-  onNavToggle: (
-    event: React.MouseEvent<HTMLButtonElement>,
-    result: { groupId: number | string; isExpanded: boolean }
-  ) => void
+  onExpandNavGroup: (event: React.MouseEvent<HTMLButtonElement>, groupId: string, isExpanded: boolean) => void
   onNavSelect: () => void
 }
 
@@ -28,10 +24,9 @@ export function useDockState(): DockState {
 
 /**
  * Manages responsive dock expansion state following the PatternFly Compass
- * docked-nav pattern. On desktop the hamburger toggles `isDockTextExpanded`
- * (icon-only ↔ icon+text). On mobile it toggles `isDockExpanded` (hidden ↔
- * overlay). Focus is transferred between the mobile and docked toggle buttons
- * on open/close to maintain keyboard flow.
+ * docked-nav pattern. `isDockExpanded` controls icon-only vs icon+text on
+ * desktop and visibility on mobile. `isDockOverlay` expands the dock over
+ * content when opening a nav group from the collapsed dock.
  */
 const DOCK_DESKTOP_BREAKPOINT_PX = Number.parseInt(globalBreakpointLg.value) * 16
 const DOCK_STATE_STORAGE_KEY = 'syntara-nav-dock-state'
@@ -42,22 +37,20 @@ const FOCUS_TRANSFER_DELAY_MS = 200
 
 type PersistedDockState = {
   isDockExpanded: boolean
-  isDockTextExpanded: boolean
 }
 
 function readPersistedDockState(): PersistedDockState {
   try {
     const raw = sessionStorage.getItem(DOCK_STATE_STORAGE_KEY)
     if (!raw) {
-      return { isDockExpanded: false, isDockTextExpanded: false }
+      return { isDockExpanded: false }
     }
-    const parsed = JSON.parse(raw) as Partial<PersistedDockState>
+    const parsed = JSON.parse(raw) as Partial<PersistedDockState & { isDockTextExpanded?: boolean }>
     return {
-      isDockExpanded: parsed.isDockExpanded === true,
-      isDockTextExpanded: parsed.isDockTextExpanded === true,
+      isDockExpanded: parsed.isDockExpanded === true || parsed.isDockTextExpanded === true,
     }
   } catch {
-    return { isDockExpanded: false, isDockTextExpanded: false }
+    return { isDockExpanded: false }
   }
 }
 
@@ -68,14 +61,13 @@ function readIsMobileViewport(): boolean {
 }
 
 function readInitialDockState(): PersistedDockState & { isMobile: boolean } {
-  const { isDockExpanded, isDockTextExpanded } = readPersistedDockState()
+  const { isDockExpanded } = readPersistedDockState()
   const isMobile = readIsMobileViewport()
 
-  if (!isMobile && isDockExpanded && !isDockTextExpanded) {
-    return { isDockExpanded: false, isDockTextExpanded: true, isMobile }
+  return {
+    isDockExpanded: isMobile ? false : isDockExpanded,
+    isMobile,
   }
-
-  return { isDockExpanded, isDockTextExpanded, isMobile }
 }
 
 function writePersistedDockState(state: PersistedDockState) {
@@ -89,26 +81,27 @@ function writePersistedDockState(state: PersistedDockState) {
 export function useDockStateProvider(): DockState {
   const [initialDockState] = useState(readInitialDockState)
   const [isDockExpanded, setIsDockExpanded] = useState(initialDockState.isDockExpanded)
-  const [isDockTextExpanded, setIsDockTextExpanded] = useState(initialDockState.isDockTextExpanded)
-  const [isDockExpandableExpanded, setIsDockExpandableExpanded] = useState(false)
+  const [isDockOverlay, setIsDockOverlay] = useState(false)
   const [navGroupExpanded, setNavGroupExpanded] = useState<Record<string, boolean>>({})
   const [isMobile, setIsMobile] = useState(initialDockState.isMobile)
   const dockedToggleRef = useRef<HTMLButtonElement>(null)
   const mobileToggleRef = useRef<HTMLButtonElement>(null)
   const focusTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined)
-  const isDockExpandedRef = useRef(isDockExpanded)
-  const isDockTextExpandedRef = useRef(isDockTextExpanded)
 
   useEffect(() => () => clearTimeout(focusTimerRef.current), [])
 
-  useEffect(() => {
-    isDockExpandedRef.current = isDockExpanded
-    isDockTextExpandedRef.current = isDockTextExpanded
-  }, [isDockExpanded, isDockTextExpanded])
-
-  useEffect(() => {
-    writePersistedDockState({ isDockExpanded, isDockTextExpanded })
-  }, [isDockExpanded, isDockTextExpanded])
+  const setDockExpanded = useCallback(
+    (value: boolean | ((prev: boolean) => boolean)) => {
+      setIsDockExpanded((prev) => {
+        const next = typeof value === 'function' ? value(prev) : value
+        if (!isMobile) {
+          writePersistedDockState({ isDockExpanded: next })
+        }
+        return next
+      })
+    },
+    [isMobile]
+  )
 
   useEffect(() => {
     if (typeof window.matchMedia !== 'function') return
@@ -119,17 +112,14 @@ export function useDockStateProvider(): DockState {
       const nowMobile = e.matches
       if (wasMobile === nowMobile) return
 
-      if (nowMobile) {
-        if (isDockTextExpandedRef.current && !isDockExpandedRef.current) {
-          setIsDockExpanded(true)
-        }
-      } else if (isDockExpandedRef.current) {
-        setIsDockTextExpanded(true)
-        setIsDockExpanded(false)
-      }
-
       wasMobile = nowMobile
       setIsMobile(nowMobile)
+      if (!nowMobile) {
+        setIsDockExpanded((current) => {
+          writePersistedDockState({ isDockExpanded: current })
+          return current
+        })
+      }
     }
 
     mq.addEventListener('change', handler)
@@ -138,18 +128,24 @@ export function useDockStateProvider(): DockState {
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if ((!isMobile && !isDockExpandableExpanded) || (isMobile && !isDockExpanded)) return
+      if (!isDockExpanded) return
+
       const docked = document.getElementById('docked-masthead')
       const mobileTog = document.getElementById('mobile-masthead-toggle')
-      if (docked && !docked.contains(event.target as Node) && !mobileTog?.contains(event.target as Node)) {
-        setIsDockExpandableExpanded(false)
-        setIsDockExpanded(false)
+      if (
+        docked &&
+        !docked.contains(event.target as Node) &&
+        !mobileTog?.contains(event.target as Node) &&
+        (isDockOverlay || isMobile)
+      ) {
+        setIsDockOverlay(false)
+        setDockExpanded(false)
       }
     }
     const handleKeydown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && (isDockExpandableExpanded || isDockExpanded)) {
-        setIsDockExpandableExpanded(false)
-        setIsDockExpanded(false)
+      if (event.key === 'Escape' && isDockExpanded) {
+        setIsDockOverlay(false)
+        setDockExpanded(false)
       }
     }
     window.addEventListener('click', handleClickOutside)
@@ -158,80 +154,71 @@ export function useDockStateProvider(): DockState {
       window.removeEventListener('click', handleClickOutside)
       window.removeEventListener('keydown', handleKeydown)
     }
-  }, [isDockExpandableExpanded, isDockExpanded, isMobile])
+  }, [isDockExpanded, isDockOverlay, isMobile, setDockExpanded])
 
   const onMobileToggle = useCallback(() => {
-    setIsDockExpanded((prev) => !prev)
+    setDockExpanded((prev) => !prev)
     focusTimerRef.current = setTimeout(() => dockedToggleRef.current?.focus(), FOCUS_TRANSFER_DELAY_MS)
-  }, [])
+  }, [setDockExpanded])
 
   const onToggleDock = useCallback(() => {
-    if (isMobile) {
-      setIsDockExpanded((prev) => {
-        if (prev) focusTimerRef.current = setTimeout(() => mobileToggleRef.current?.focus(), FOCUS_TRANSFER_DELAY_MS)
-        return !prev
-      })
-    } else {
-      const nextTextExpanded = !isDockTextExpanded
-      setIsDockTextExpanded(nextTextExpanded)
-      if (!nextTextExpanded) setIsDockExpandableExpanded(false)
-      if (isDockExpandableExpanded) {
-        setIsDockExpandableExpanded(false)
-        setIsDockTextExpanded(false)
+    setDockExpanded((prev) => {
+      const next = !prev
+      if (!next) {
+        setIsDockOverlay(false)
+        if (isMobile) {
+          focusTimerRef.current = setTimeout(() => mobileToggleRef.current?.focus(), FOCUS_TRANSFER_DELAY_MS)
+        }
       }
-    }
-  }, [isMobile, isDockTextExpanded, isDockExpandableExpanded])
+      return next
+    })
+  }, [isMobile, setDockExpanded])
 
   const isNavGroupExpanded = useCallback((groupId: string) => navGroupExpanded[groupId] ?? false, [navGroupExpanded])
 
-  const onNavToggle: DockState['onNavToggle'] = useCallback(
-    (_event, result) => {
-      const groupId = String(result.groupId)
-      setNavGroupExpanded((prev) => ({ ...prev, [groupId]: result.isExpanded }))
-
-      if (!isMobile) {
-        if (!isDockExpandableExpanded && !isDockTextExpanded) {
-          setIsDockExpandableExpanded(true)
-        }
-
-        if (!isDockTextExpanded) {
-          setIsDockTextExpanded(false)
-        }
+  const onExpandNavGroup: DockState['onExpandNavGroup'] = useCallback(
+    (_event, groupId, isExpanded) => {
+      if (!isDockExpanded) {
+        setNavGroupExpanded((prev) => ({ ...prev, [groupId]: true }))
+        setIsDockOverlay(true)
+        setDockExpanded(true)
+      } else {
+        setNavGroupExpanded((prev) => ({ ...prev, [groupId]: isExpanded }))
       }
     },
-    [isMobile, isDockExpandableExpanded, isDockTextExpanded]
+    [isDockExpanded, setDockExpanded]
   )
 
   const onNavSelect = useCallback(() => {
-    setNavGroupExpanded({})
-    setIsDockExpandableExpanded(false)
-    setIsDockTextExpanded(false)
-    setIsDockExpanded(false)
-  }, [])
+    if (isDockExpanded && !isDockOverlay && !isMobile) {
+      return
+    }
+
+    setIsDockOverlay(false)
+    setDockExpanded(false)
+  }, [isDockExpanded, isDockOverlay, isMobile, setDockExpanded])
 
   return useMemo(
     () => ({
       isDockExpanded,
-      isDockTextExpanded,
-      isDockExpandableExpanded,
+      isDockOverlay,
       isMobile,
       dockedToggleRef,
       mobileToggleRef,
       isNavGroupExpanded,
       onToggleDock,
       onMobileToggle,
-      onNavToggle,
+      onExpandNavGroup,
       onNavSelect,
     }),
     [
       isDockExpanded,
-      isDockTextExpanded,
-      isDockExpandableExpanded,
+      isDockOverlay,
       isMobile,
       isNavGroupExpanded,
       onToggleDock,
       onMobileToggle,
-      onNavToggle,
+      onExpandNavGroup,
       onNavSelect,
     ]
   )
