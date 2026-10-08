@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
+import { DATE_FIELD_TIME_REQUIRES_TIMEZONE_MESSAGE } from './dateFieldValidationMessages'
 import { parseFormDefinition, safeParseFormDefinition } from './formDefinitionSchema'
 import { FormFieldTypeEnum } from './formFieldTypeEnum'
 import { FormDefinitionValidationError } from './formValidationErrors'
@@ -231,6 +232,26 @@ describe('formDefinitionSchema', () => {
     })
 
     expect(data.fields[0]?.default).toEqual({ date: '0001-06-15' })
+  })
+
+  it('rejects date fields with time but no timezone using builder-facing copy', () => {
+    const result = safeParseFormDefinition({
+      fields: [
+        {
+          type: FormFieldTypeEnum.DATE,
+          value_name: 'due',
+          label: 'Due',
+          include_date: true,
+          include_time: true,
+          include_timezone: false,
+        },
+      ],
+    })
+
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.errors.some((error) => error.message === DATE_FIELD_TIME_REQUIRES_TIMEZONE_MESSAGE)).toBe(true)
+    }
   })
 
   it('parses the form-prompt-full example form_definition shape', () => {

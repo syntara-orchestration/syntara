@@ -6,6 +6,10 @@
   font-weight: var(--pf-t--global--font--weight--body--bold);
 }
 
+.formGroupLabelError :global(.pf-v6-c-form__label-text) {
+  color: var(--pf-t--global--color--status--danger--default);
+}
+
 .designTab :global(.pf-v6-c-form__group-control) {
   margin-block-start: var(--pf-t--global--spacer--sm);
 }

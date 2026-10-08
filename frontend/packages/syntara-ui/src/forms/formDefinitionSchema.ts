@@ -3,6 +3,7 @@ import { z } from 'zod'
 
 import { isValidIsoCalendarDate } from '../utils/isoCalendarDate'
 
+import { DATE_FIELD_TIME_REQUIRES_TIMEZONE_MESSAGE } from './dateFieldValidationMessages'
 import {
   FORM_DEFINITION_MAX_FIELDS,
   FORM_DEFINITION_MIN_FIELDS,
@@ -150,7 +151,7 @@ const dateFieldSchema = formFieldBaseSchema
     if (included.time && !included.timezone) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: 'include_timezone is required when include_time is true',
+        message: DATE_FIELD_TIME_REQUIRES_TIMEZONE_MESSAGE,
         path: ['include_timezone'],
       })
     }

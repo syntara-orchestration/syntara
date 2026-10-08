@@ -1,4 +1,4 @@
-import { Checkbox, FormGroup, Stack, StackItem } from '@patternfly/react-core'
+import { Checkbox, FormGroup, HelperText, HelperTextItem, Stack, StackItem } from '@patternfly/react-core'
 import type { FormDefinition } from '@syntara/contracts'
 import { useFormContext, useWatch } from 'react-hook-form'
 
@@ -7,12 +7,15 @@ import {
   coerceDateValueShape,
   DATE_COMPONENT_NAMES,
   dateIncludesFromField,
+  isDateFieldTimeWithoutTimezone,
   isSoleIncludedDateComponent,
   nextDateIncludes,
   normalizeDateDefaultForIncludes,
   type DateComponentName,
 } from '../../../forms/dateFieldUtils'
+import { DATE_FIELD_TIME_REQUIRES_TIMEZONE_MESSAGE } from '../../../forms/dateFieldValidationMessages'
 
+import styles from './formFieldBuilder.module.css'
 import { useFormFieldBuilderCommit } from './formFieldBuilderCommitContext'
 import { formFieldBuilderLabelHelp } from './formFieldBuilderFieldHelp'
 
@@ -42,6 +45,7 @@ export function FormFieldBuilderDateShowInFormSection({
   }
 
   const includes = dateIncludesFromField(field)
+  const timeWithoutTimezone = isDateFieldTimeWithoutTimezone(field)
   const showInFormHelp = formFieldBuilderLabelHelp('dateShowInForm', 'Show in form')
 
   const applyIncludes = (next: Record<DateComponentName, boolean>) => {
@@ -71,7 +75,13 @@ export function FormFieldBuilderDateShowInFormSection({
   }
 
   return (
-    <FormGroup label="Show in form" fieldId={`${idPrefix}-show-in-form`} labelHelp={showInFormHelp} isRequired>
+    <FormGroup
+      label="Show in form"
+      fieldId={`${idPrefix}-show-in-form`}
+      labelHelp={showInFormHelp}
+      isRequired
+      className={timeWithoutTimezone ? styles.formGroupLabelError : undefined}
+    >
       <Stack hasGutter>
         {DATE_COMPONENT_NAMES.map((name) => (
           <StackItem key={name}>
@@ -84,6 +94,13 @@ export function FormFieldBuilderDateShowInFormSection({
             />
           </StackItem>
         ))}
+        {timeWithoutTimezone && (
+          <StackItem>
+            <HelperText>
+              <HelperTextItem variant="error">{DATE_FIELD_TIME_REQUIRES_TIMEZONE_MESSAGE}</HelperTextItem>
+            </HelperText>
+          </StackItem>
+        )}
       </Stack>
     </FormGroup>
   )
