@@ -16,6 +16,7 @@ from syntara_api_client.models import (
     WorkflowCreate,
     WorkflowRead,
 )
+from syntara_api_client.models.activity_data_output_data_type_0 import ActivityDataOutputDataType0
 
 from ._helpers import (
     EXECUTION_POLL_TIMEOUT,
@@ -161,7 +162,9 @@ def _assert_downstream_received_no_defaults(
     activities = _activities_by_id(final)
     capture_node_id = "consumer" if expected_route == "submitted" else "fallback_handler"
     capture_activity = activities[capture_node_id]
-    assert capture_activity.output_data is not None, f"{capture_node_id} did not expose output data"
+    assert isinstance(capture_activity.output_data, ActivityDataOutputDataType0), (
+        f"{capture_node_id} did not expose output data: {capture_activity.output_data!r}"
+    )
     output = capture_activity.output_data.to_dict()
     captured_prompt = output.get("stdout_json")
     assert isinstance(captured_prompt, dict), f"Expected JSON form-prompt capture, got {captured_prompt!r}"
@@ -307,7 +310,7 @@ def test_form_prompt_failures_follow_continue_on_failure_routing(
 
     if continue_on_failure:
         assert fallback_decision is not None
-        route = "submitted" if fallback_decision == "submit" else "fallback"
+        route: Literal["submitted", "fallback"] = "submitted" if fallback_decision == "submit" else "fallback"
         _assert_downstream_received_no_defaults(final, expected_route=route)
     else:
         assert prompt_activity.status == "failed"
