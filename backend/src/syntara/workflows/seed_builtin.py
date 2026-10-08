@@ -6,8 +6,9 @@ even in container images that only sync ``*.py`` files (e.g. Skaffold).
 Registered as a **required** seeder — always runs during seeding.
 Built-in workflows cannot be deleted or modified by users.
 
-Operational contract: this seeder must stay idempotent, and re-runs must be
-concurrency-safe. It is expected to be re-run after the initial seed — by a
+Operational contract: this seeder must stay idempotent. Its own work is
+concurrency-safe, but its ``authz`` dependency is not: overlapping runs are
+safe only while the authz data is unchanged. It is expected to be re-run after the initial seed — by a
 deployment hook or operator command, in a process that can reach Temporal
 and runs the current release — because the
 initial seed may run before Temporal exists, in which case the Temporal
@@ -201,6 +202,7 @@ async def seed_builtin_workflows(session: AsyncSession) -> None:
     if not user:
         msg = "No admin user found — cannot seed builtin workflows. Ensure authz seeder runs first."
         raise RuntimeError(msg)
+    user_id = user.id
 
     project_result = await session.exec(
         select(Project).where(
@@ -216,7 +218,7 @@ async def seed_builtin_workflows(session: AsyncSession) -> None:
 
     for workflow_dict in _BUILTIN_DEFINITIONS:
         try:
-            await _seed_one(session, workflow_dict, user.id, project_id)
+            await _seed_one(session, workflow_dict, user_id, project_id)
         except ScheduledTriggerSyncError:
             # Only reaches here in strict mode; fail the whole seed pass.
             # Every definition so far — including this one's DB rows — was

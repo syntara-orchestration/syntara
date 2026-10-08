@@ -13,10 +13,11 @@ Operational contract
 All seeders are **idempotent**: once the initial seed has populated the
 database, the command may be executed again and must converge to the same
 state without creating duplicates or failing on rows that already exist.
-Concurrent execution is seeder-specific: ``builtin_workflows``,
-``settings`` and ``credentials`` tolerate overlapping runs (several
-replicas starting together); ``authz`` and ``audit_metadata`` do not —
-serialize those passes, or retry a run that loses a race. In particular
+Concurrent execution is seeder-specific: ``settings`` and ``credentials``
+tolerate overlapping runs; ``authz`` and ``audit_metadata`` do not
+(check-then-insert, so a race can fail with a unique-constraint error) —
+serialize or retry them. ``builtin_workflows`` includes ``authz``, so
+overlapping runs are safe only while the authz data is unchanged. In particular
 ``--only builtin_workflows`` is expected to be re-run after the initial
 seed, from a process that can reach Temporal, to create the Temporal
 Schedules for built-in scheduled workflows. Two caveats on that re-run:
