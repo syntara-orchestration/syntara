@@ -73,7 +73,7 @@ function ConditionFormFields({
 
       <StackItem>
         <FormGroup
-          label="Conditional expression"
+          label="Condition type"
           labelHelp={<ConditionalExpressionHelp />}
           isRequired
           fieldId="condition-expression"

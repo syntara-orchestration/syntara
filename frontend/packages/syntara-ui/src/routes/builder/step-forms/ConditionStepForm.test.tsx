@@ -2,6 +2,8 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { EXPRESSION_MODE_LABELS } from '../../../components/expressions/expressionBuilderLabels'
+
 import { ConditionStepForm, type ConditionFormData } from './ConditionStepForm'
 import { renderWithHeader } from './test-utils/renderWithHeader'
 
@@ -22,7 +24,7 @@ describe('ConditionStepForm', () => {
     it('renders conditional expression field', () => {
       renderWithHeader(<ConditionStepForm onSubmit={mockOnSubmit} />)
 
-      expect(screen.getByRole('group', { name: /Expression builder/i })).toBeInTheDocument()
+      expect(screen.getByRole('group', { name: /Condition/i })).toBeInTheDocument()
     })
   })
 
@@ -94,8 +96,8 @@ describe('ConditionStepForm', () => {
       await user.paste('Test Condition')
 
       // Switch to raw mode and enter expression
-      await user.click(screen.getByRole('button', { name: /Expression editor mode/i }))
-      await user.click(await screen.findByRole('option', { name: 'Custom expression' }))
+      await user.click(screen.getByRole('button', { name: EXPRESSION_MODE_LABELS.visual }))
+      await user.click(await screen.findByRole('option', { name: 'Freeform text' }))
       const rawInput = screen.getByLabelText(/Raw expression/i)
       await user.click(rawInput)
       await user.paste('${result > 0}')
@@ -119,8 +121,8 @@ describe('ConditionStepForm', () => {
       const nameInput = screen.getByPlaceholderText(/Enter activity name/i)
       await user.click(nameInput)
       await user.paste('Another Condition')
-      await user.click(screen.getByRole('button', { name: /Expression editor mode/i }))
-      await user.click(await screen.findByRole('option', { name: 'Custom expression' }))
+      await user.click(screen.getByRole('button', { name: EXPRESSION_MODE_LABELS.visual }))
+      await user.click(await screen.findByRole('option', { name: 'Freeform text' }))
       const rawInput = screen.getByLabelText(/Raw expression/i)
       await user.click(rawInput)
       await user.paste('${x == 5}')

@@ -2,6 +2,8 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { EXPRESSION_MODE_LABELS } from '../../../components/expressions/expressionBuilderLabels'
+
 import { LoopStepForm, type LoopFormData } from './LoopStepForm'
 import { renderWithHeader } from './test-utils/renderWithHeader'
 
@@ -39,14 +41,14 @@ describe('LoopStepForm', () => {
       renderWithHeader(<LoopStepForm onSubmit={mockOnSubmit} />)
 
       expect(screen.getByRole('spinbutton', { name: /Max iterations/i })).toBeInTheDocument()
-      expect(screen.getByRole('group', { name: /Expression builder/i })).toBeInTheDocument()
+      expect(screen.getByRole('group', { name: /Condition/i })).toBeInTheDocument()
     })
 
     it('renders while fields when type is while', () => {
       renderWithHeader(<LoopStepForm onSubmit={mockOnSubmit} initialData={{ type: 'while' }} />)
 
       expect(screen.getByRole('spinbutton', { name: /Max iterations/i })).toBeInTheDocument()
-      expect(screen.getByRole('group', { name: /Expression builder/i })).toBeInTheDocument()
+      expect(screen.getByRole('group', { name: /Condition/i })).toBeInTheDocument()
     })
 
     it('renders help icons for while loop parameters', () => {
@@ -83,8 +85,8 @@ describe('LoopStepForm', () => {
       renderWithHeader(<LoopStepForm onSubmit={mockOnSubmit} initialData={{ type: 'while' }} />)
 
       await user.type(screen.getByPlaceholderText(/Enter activity name/i), 'Invalid Max Loop')
-      await user.click(screen.getByRole('button', { name: /Expression editor mode/i }))
-      await user.click(await screen.findByRole('option', { name: 'Custom expression' }))
+      await user.click(screen.getByRole('button', { name: EXPRESSION_MODE_LABELS.visual }))
+      await user.click(await screen.findByRole('option', { name: 'Freeform text' }))
       const rawInput = screen.getByLabelText(/Raw expression/i)
       await user.click(rawInput)
       await user.paste('${running}')
@@ -127,7 +129,7 @@ describe('LoopStepForm', () => {
       renderWithHeader(<LoopStepForm onSubmit={mockOnSubmit} />)
 
       // Initially while
-      expect(screen.getByRole('group', { name: /Expression builder/i })).toBeInTheDocument()
+      expect(screen.getByRole('group', { name: /Condition/i })).toBeInTheDocument()
 
       // Switch to forEach
       const toggle = screen.getByRole('button', { name: 'Type' })
@@ -138,7 +140,7 @@ describe('LoopStepForm', () => {
       expect(screen.getByRole('textbox', { name: /Items expression/i })).toBeInTheDocument()
       expect(screen.getByRole('textbox', { name: /Item variable/i })).toBeInTheDocument()
       expect(screen.getByRole('textbox', { name: /Index variable/i })).toBeInTheDocument()
-      expect(screen.queryByRole('group', { name: /Expression builder/i })).not.toBeInTheDocument()
+      expect(screen.queryByRole('group', { name: /Condition/i })).not.toBeInTheDocument()
     })
   })
 
@@ -302,8 +304,8 @@ describe('LoopStepForm', () => {
 
       await user.type(screen.getByRole('spinbutton', { name: /Max iterations/i }), '500')
 
-      await user.click(screen.getByRole('button', { name: /Expression editor mode/i }))
-      await user.click(await screen.findByRole('option', { name: 'Custom expression' }))
+      await user.click(screen.getByRole('button', { name: EXPRESSION_MODE_LABELS.visual }))
+      await user.click(await screen.findByRole('option', { name: 'Freeform text' }))
       const rawInput = screen.getByLabelText(/Raw expression/i)
       await user.click(rawInput)
       await user.paste('${x < 100}')
@@ -328,8 +330,8 @@ describe('LoopStepForm', () => {
 
       await user.type(screen.getByPlaceholderText(/Enter activity name/i), 'Simple While')
 
-      await user.click(screen.getByRole('button', { name: /Expression editor mode/i }))
-      await user.click(await screen.findByRole('option', { name: 'Custom expression' }))
+      await user.click(screen.getByRole('button', { name: EXPRESSION_MODE_LABELS.visual }))
+      await user.click(await screen.findByRole('option', { name: 'Freeform text' }))
       const rawInput = screen.getByLabelText(/Raw expression/i)
       await user.click(rawInput)
       await user.paste('${running}')
@@ -349,8 +351,8 @@ describe('LoopStepForm', () => {
       renderWithHeader(<LoopStepForm onSubmit={mockOnSubmit} initialData={{ type: 'while' }} />)
 
       await user.type(screen.getByPlaceholderText(/Enter activity name/i), 'Clean While')
-      await user.click(screen.getByRole('button', { name: /Expression editor mode/i }))
-      await user.click(await screen.findByRole('option', { name: 'Custom expression' }))
+      await user.click(screen.getByRole('button', { name: EXPRESSION_MODE_LABELS.visual }))
+      await user.click(await screen.findByRole('option', { name: 'Freeform text' }))
       const rawInput = screen.getByLabelText(/Raw expression/i)
       await user.click(rawInput)
       await user.paste('${running}')
