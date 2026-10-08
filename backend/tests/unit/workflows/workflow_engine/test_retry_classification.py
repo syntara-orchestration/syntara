@@ -338,7 +338,7 @@ def test_default_continue_on_failure_is_false_so_upstream_is_restored() -> None:
 
 @pytest.mark.parametrize(
     "node_type",
-    ["condition", "switch", "loop", "wait"],
+    ["condition", "switch", "loop", "wait", "converge"],
 )
 def test_control_nodes_are_never_restored(node_type: str) -> None:
     """Condition/switch/loop/converge/wait decide routing, so they must always run.
@@ -1114,3 +1114,56 @@ async def test_a_restored_completion_does_not_stash_its_output_as_failure_fallba
     await wf._maybe_restore_retry_output(node, _chain_graph())
 
     assert "step_1" not in wf._restored_node_outputs
+
+
+def _converge_fanin_graph() -> WorkflowGraph:
+    """b1 and b2 both feed join (converge, strategy=any, n=2), then step_3."""
+    from syntara.workflows.workflow_engine.graph import WorkflowGraph
+    from syntara.workflows.workflow_engine.graph_backend import InMemoryGraphBackend
+
+    backend = InMemoryGraphBackend()
+    backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
+    backend.add_node("b1", {"id": "b1", "type": "script", "parameters": {}})
+    backend.add_node("b2", {"id": "b2", "type": "script", "parameters": {}})
+    backend.add_node("join", {"id": "join", "type": "converge", "parameters": {"strategy": "any", "n_required": 2}})
+    backend.add_node("step_3", {"id": "step_3", "type": "script", "parameters": {}})
+    for src in ("trigger", "b1", "b2"):
+        backend.add_edge(src, "join", None)
+    backend.add_edge("join", "step_3", None)
+    return WorkflowGraph(backend)
+
+
+class TestConvergeAlwaysGoesThroughItsGate:
+    """A converge decides whether it has enough predecessors, so it must be evaluated.
+
+    Regression guard. `_should_skip_successor` had a retry exception that returned
+    False for a converge whose source row was COMPLETED and restorable, skipping
+    `_handle_converge_successor` entirely. That released the converge on the first
+    arriving predecessor instead of when its strategy was satisfied — so with a
+    fan-in feeding a retry point, the converge published the source run's merged
+    output while sibling branches were still restoring, and an expression at the
+    retry point reading a sibling resolved against an empty namespace.
+    """
+
+    def test_the_retry_exception_no_longer_bypasses_the_gate(self) -> None:
+        wf = _make_workflow(_retry("step_3"))
+        wf.retry_context = _retry("step_3")
+        wf._retry_source_statuses = {"b1": "completed", "b2": "completed", "join": "completed"}
+        graph = _converge_fanin_graph()
+        gate = MagicMock(return_value=True)
+
+        with patch.object(wf, "_handle_converge_successor", gate):
+            wf._should_skip_successor(
+                graph.get_node("join"), "b2", is_loop_iterate=False, pending_tasks={}, graph=graph
+            )
+
+        gate.assert_called_once()
+
+    def test_a_completed_converge_is_not_in_the_restorable_set(self) -> None:
+        """A restored converge would release successors the gate never released."""
+        wf = _make_workflow(_retry("step_3"))
+        wf.retry_context = _retry("step_3")
+        graph = _converge_fanin_graph()
+
+        assert "join" not in wf._retry_restorable_nodes(graph)
+        assert not wf._should_restore_node("join", graph)
