@@ -304,7 +304,7 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
             # Schedule successors of converge nodes that failed with continue_on_failure
             for node_id in list(self._timed_out_converge_nodes):
                 self._timed_out_converge_nodes.discard(node_id)
-                workflow.logger.info(f"Scheduling successors of CoF-failed converge node {node_id}")
+                workflow.logger.info(f"Scheduling successors of CoF-failed node {node_id}")
                 await self._schedule_successors(node_id, graph, pending_tasks)
 
             if not pending_tasks:
@@ -426,6 +426,18 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
         if node.type == NodeType.LOOP:
             self.node_control_data[node_id] = {"next_port": "complete"}
 
+    def _extract_failure_output(
+        self, node_id: str, app_error: ApplicationError | None, graph: WorkflowGraph
+    ) -> dict[str, Any]:
+        """Build the namespace entry for a failed or cancelled node."""
+        if app_error is not None:
+            for detail in app_error.details:
+                if isinstance(detail, dict) and "output" in detail:
+                    return cast("dict[str, Any]", detail["output"])
+        node = graph.get_node(node_id)
+        workflow.logger.debug(f"No output in ApplicationError.details for node {node_id}, using empty model")
+        return self._build_empty_node_output(node)
+
     def _handle_node_failure(
         self,
         node_id: str,
@@ -488,8 +500,63 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
 
         if is_cancellation:
             self._mark_downstream_as_skipped(node_id, graph)
+            return
+
+        self._check_converge_successors(node_id, graph, pending_tasks)
+        if not continue_on_failure:
+            self._propagate_loop_body_failure(node_id, graph, pending_tasks)
+
+    def _propagate_loop_body_failure(
+        self,
+        failed_node_id: str,
+        graph: WorkflowGraph,
+        pending_tasks: dict[str, asyncio.Task[Any]] | None = None,
+    ) -> None:
+        """Mark the parent loop as failed when a body node fails.
+
+        When a body node fails without continue_on_failure the loop cannot
+        complete further iterations.  Marking the loop as failed lets
+        downstream converge nodes see the dead branch instead of waiting
+        indefinitely for the loop to finish iterating.  Recurses upward
+        through nested loops when the parent loop does not absorb the failure.
+
+        Honors the parent loop's own ``continue_on_failure`` setting:
+        when true, the loop is routed to its "complete" port and its
+        successors are scheduled (via ``_timed_out_converge_nodes``)
+        rather than skipped.
+        """
+        parent_loop_id = self.loop_body_map.get(failed_node_id)
+        if parent_loop_id is None or parent_loop_id in self.failed_nodes:
+            return
+
+        loop_node = graph.get_node(parent_loop_id)
+        cof = resolve_continue_on_failure(loop_node, self._runtime_settings)
+
+        error_msg = f"Loop body node '{failed_node_id}' failed"
+        self.failed_nodes[parent_loop_id] = error_msg
+
+        if self.resolver.has_namespace(parent_loop_id):
+            ns = self.resolver.get_namespace(parent_loop_id)
+            if isinstance(ns, dict):
+                ns["status"] = "failed"
+                ns["error"] = error_msg
+
+        if cof:
+            self._cof_failed_nodes.add(parent_loop_id)
+            self.node_control_data[parent_loop_id] = {"next_port": "complete"}
+            self._timed_out_converge_nodes.add(parent_loop_id)
+            workflow.logger.info(
+                f"Loop {parent_loop_id} marked as failed (continue_on_failure) due to body failure: {failed_node_id}"
+            )
         else:
-            self._check_converge_successors(node_id, graph, pending_tasks)
+            if parent_loop_id not in self._converge_branch_nodes:
+                self._has_unhandled_failure = True
+            self._mark_downstream_as_skipped(parent_loop_id, graph)
+            workflow.logger.info(f"Loop {parent_loop_id} marked as failed due to body failure: {failed_node_id}")
+
+        self._check_converge_successors(parent_loop_id, graph, pending_tasks)
+        if not cof:
+            self._propagate_loop_body_failure(parent_loop_id, graph, pending_tasks)
 
     @staticmethod
     def _failure_namespace_entry(
@@ -835,6 +902,8 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
             return
 
         parent_loop_id = self.loop_body_map[completed_node_id]
+        if parent_loop_id in self.failed_nodes:
+            return
         if self._loop_body_complete(parent_loop_id) and not self._loop_has_pending_nodes(parent_loop_id, pending_tasks):
             self._clear_loop_body(parent_loop_id)
             loop_node = graph.get_node(parent_loop_id)
@@ -865,6 +934,33 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
         # No control data = no port-based routing (regular executor node)
         return None
 
+    def _evaluate_predecessor(self, pred_id: str, graph: WorkflowGraph) -> bool | None:
+        """Evaluate a single predecessor for convergence.
+
+        Returns:
+            True if the predecessor counts as completed,
+            False if it is still pending (not yet in a terminal state),
+            None if it should be skipped (already skipped or unreachable).
+
+        """
+        if pred_id in self.skipped_nodes:
+            return None
+
+        if pred_id in self.failed_nodes:
+            if pred_id in self._cof_failed_nodes:
+                return True
+            return None
+
+        if self.resolver.has_namespace(pred_id):
+            return not self._is_loop_still_iterating(pred_id)
+
+        if self._is_unreachable(pred_id, graph):
+            self.skipped_nodes.add(pred_id)
+            workflow.logger.info(f"Node {pred_id} marked as skipped (transitively unreachable)")
+            return None
+
+        return False
+
     def _are_predecessors_complete(self, node_id: str, graph: WorkflowGraph) -> bool:
         """Check if predecessors of a converge node satisfy its convergence strategy.
 
@@ -890,25 +986,17 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
         completed_count = 0
 
         for pred_id in predecessor_ids:
-            if pred_id in self.skipped_nodes:
-                continue
+            if (
+                strategy == ConvergeStrategy.ALL
+                and pred_id in self.failed_nodes
+                and pred_id not in self._cof_failed_nodes
+            ):
+                return False
 
-            if pred_id in self.failed_nodes:
-                if pred_id in self._cof_failed_nodes:
-                    completed_count += 1
-                continue
-
-            if self.resolver.has_namespace(pred_id):
+            result = self._evaluate_predecessor(pred_id, graph)
+            if result is True:
                 completed_count += 1
-                continue
-
-            if self._is_unreachable(pred_id, graph):
-                self.skipped_nodes.add(pred_id)
-                workflow.logger.info(f"Node {pred_id} marked as skipped (transitively unreachable)")
-                continue
-
-            # Predecessor is still running (not yet in a terminal state)
-            if strategy == ConvergeStrategy.ALL:
+            elif result is False and strategy == ConvergeStrategy.ALL:
                 return False
 
         if strategy == ConvergeStrategy.ANY:

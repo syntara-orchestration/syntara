@@ -29,6 +29,15 @@ def init_workflow_runtime(wf: OrchestratorWorkflow) -> None:
     wf._restored_node_statuses = {}
     wf._restored_node_outputs = {}
     wf._retry_source_statuses = {}
+    # Set in __init__ for a real run. A converge reads it to tell whether a loop
+    # predecessor is still iterating, so a workflow built without __init__ needs it
+    # even when the test has nothing to do with retries. Guarded because a test may
+    # pass its own control data in and expect it left alone.
+    if not hasattr(wf, "node_control_data"):
+        wf.node_control_data = {}
+    # Guarded because a real run sets it and some tests construct the workflow by hand.
+    if not hasattr(wf, "_cof_failed_nodes"):
+        wf._cof_failed_nodes = set()
 
 
 async def complete_supplied_node(

@@ -282,6 +282,219 @@ def test_loop_for_each(syntara_api: SyntaraApiRegistry):
     assert activities["loop_body"] == "completed"
 
 
+@pytest.mark.e2e
+def test_loop_and_parallel_branch_converge(syntara_api: SyntaraApiRegistry):
+    """A for_each loop and a parallel branch both feed into a converge node.
+
+    The converge must wait for the loop to finish all iterations — not fire
+    prematurely after the first iteration produces a namespace.
+    """
+    result = create_and_run_workflow(
+        syntara_api,
+        "e2e-loop-converge",
+        {
+            "name": "nodes",
+            "schema_version": "2.0.0",
+            "triggers": [
+                {"id": "trigger", "type": "manual_trigger", "parameters": {}},
+            ],
+            "nodes": [
+                {
+                    "id": "loop",
+                    "name": "Loop Over Items",
+                    "type": "loop",
+                    "parameters": {
+                        "type": "for_each",
+                        "items": '["alpha", "bravo", "charlie"]',
+                    },
+                },
+                {
+                    "id": "loop_body",
+                    "name": "Loop Body",
+                    "type": "script",
+                    "parameters": {"language": "bash", "code": 'echo "Processing item"'},
+                },
+                {
+                    "id": "parallel_step",
+                    "name": "Parallel Step",
+                    "type": "script",
+                    "parameters": {"language": "bash", "code": 'echo "parallel done"'},
+                },
+                {
+                    "id": "join",
+                    "name": "Join",
+                    "type": "converge",
+                    "parameters": {},
+                },
+                {
+                    "id": "final_step",
+                    "name": "Final Step",
+                    "type": "script",
+                    "parameters": {"language": "bash", "code": 'echo "all done"'},
+                },
+            ],
+            "edges": [
+                {"from": "trigger", "to": "loop"},
+                {"from": "trigger", "to": "parallel_step"},
+                {"from": "loop", "to": "loop_body", "from_port": "iterate"},
+                {"from": "loop_body", "to": "loop", "to_port": "iterate"},
+                {"from": "loop", "to": "join", "from_port": "complete"},
+                {"from": "parallel_step", "to": "join"},
+                {"from": "join", "to": "final_step"},
+            ],
+        },
+    )
+
+    assert result.status == ExecutionStatus.COMPLETED, f"Failed: {result.error_details}"
+    activities = {a.activity_id: a.status for a in (result.activities or [])}
+    assert activities["loop"] == "completed"
+    assert activities["loop_body"] == "completed"
+    assert activities["parallel_step"] == "completed"
+    assert activities["join"] == "completed"
+    assert activities["final_step"] == "completed"
+
+
+@pytest.mark.e2e
+def test_empty_loop_converges_with_parallel_branch(syntara_api: SyntaraApiRegistry):
+    """A for_each loop over an empty list completes immediately and satisfies a converge.
+
+    Verifies that the zero-iteration loop (next_port="complete" on first call)
+    is not mistakenly treated as still-iterating by the converge gate.
+    """
+    result = create_and_run_workflow(
+        syntara_api,
+        "e2e-empty-loop-converge",
+        {
+            "name": "nodes",
+            "schema_version": "2.0.0",
+            "triggers": [
+                {"id": "trigger", "type": "manual_trigger", "parameters": {}},
+            ],
+            "nodes": [
+                {
+                    "id": "loop",
+                    "name": "Empty Loop",
+                    "type": "loop",
+                    "parameters": {
+                        "type": "for_each",
+                        "items": "[]",
+                    },
+                },
+                {
+                    "id": "loop_body",
+                    "name": "Loop Body",
+                    "type": "script",
+                    "parameters": {"language": "bash", "code": 'echo "never runs"'},
+                },
+                {
+                    "id": "parallel_step",
+                    "name": "Parallel Step",
+                    "type": "script",
+                    "parameters": {"language": "bash", "code": 'echo "parallel done"'},
+                },
+                {
+                    "id": "join",
+                    "name": "Join",
+                    "type": "converge",
+                    "parameters": {},
+                },
+                {
+                    "id": "final_step",
+                    "name": "Final Step",
+                    "type": "script",
+                    "parameters": {"language": "bash", "code": 'echo "all done"'},
+                },
+            ],
+            "edges": [
+                {"from": "trigger", "to": "loop"},
+                {"from": "trigger", "to": "parallel_step"},
+                {"from": "loop", "to": "loop_body", "from_port": "iterate"},
+                {"from": "loop_body", "to": "loop", "to_port": "iterate"},
+                {"from": "loop", "to": "join", "from_port": "complete"},
+                {"from": "parallel_step", "to": "join"},
+                {"from": "join", "to": "final_step"},
+            ],
+        },
+    )
+
+    assert result.status == ExecutionStatus.COMPLETED, f"Failed: {result.error_details}"
+    activities = {a.activity_id: a.status for a in (result.activities or [])}
+    assert activities["loop"] == "completed"
+    assert activities["parallel_step"] == "completed"
+    assert activities["join"] == "completed"
+    assert activities["final_step"] == "completed"
+    assert "loop_body" not in activities or activities.get("loop_body") != "completed"
+
+
+@pytest.mark.e2e
+def test_loop_body_failure_blocks_converge(syntara_api: SyntaraApiRegistry):
+    """When a loop body fails (no continue_on_failure), converge ALL does not fire.
+
+    The downstream final_step must not execute because the loop never reaches
+    its "complete" port.
+    """
+    result = create_and_run_workflow(
+        syntara_api,
+        "e2e-loop-fail-converge",
+        {
+            "name": "nodes",
+            "schema_version": "2.0.0",
+            "triggers": [
+                {"id": "trigger", "type": "manual_trigger", "parameters": {}},
+            ],
+            "nodes": [
+                {
+                    "id": "loop",
+                    "name": "Loop Over Items",
+                    "type": "loop",
+                    "parameters": {
+                        "type": "for_each",
+                        "items": '["alpha", "bravo"]',
+                    },
+                },
+                {
+                    "id": "failing_body",
+                    "name": "Failing Body",
+                    "type": "script",
+                    "parameters": {"language": "bash", "code": "exit 1"},
+                },
+                {
+                    "id": "parallel_step",
+                    "name": "Parallel Step",
+                    "type": "script",
+                    "parameters": {"language": "bash", "code": 'echo "parallel done"'},
+                },
+                {
+                    "id": "join",
+                    "name": "Join",
+                    "type": "converge",
+                    "parameters": {},
+                },
+                {
+                    "id": "final_step",
+                    "name": "Final Step",
+                    "type": "script",
+                    "parameters": {"language": "bash", "code": 'echo "should not run"'},
+                },
+            ],
+            "edges": [
+                {"from": "trigger", "to": "loop"},
+                {"from": "trigger", "to": "parallel_step"},
+                {"from": "loop", "to": "failing_body", "from_port": "iterate"},
+                {"from": "failing_body", "to": "loop", "to_port": "iterate"},
+                {"from": "loop", "to": "join", "from_port": "complete"},
+                {"from": "parallel_step", "to": "join"},
+                {"from": "join", "to": "final_step"},
+            ],
+        },
+    )
+
+    assert result.status == ExecutionStatus.FAILED, f"Expected FAILED, got: {result.status}"
+    activities = {a.activity_id: a.status for a in (result.activities or [])}
+    assert activities["failing_body"] == "failed"
+    assert activities.get("final_step") != "completed"
+
+
 # ---------------------------------------------------------------------------
 # Converge node (parallel paths)
 # ---------------------------------------------------------------------------
