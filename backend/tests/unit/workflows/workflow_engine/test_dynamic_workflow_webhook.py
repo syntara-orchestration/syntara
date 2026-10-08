@@ -11,5 +11,6 @@ async def test_allowed_trigger_types_are_valid_triggers() -> None:
         ActivityName.SCHEDULED_TRIGGER,
         ActivityName.WEBHOOK_TRIGGER,
         ActivityName.EDA_TRIGGER,
+        ActivityName.SUBWORKFLOW_TRIGGER,
     }
     assert trigger_activity_names >= ALLOWED_TRIGGER_TYPES
