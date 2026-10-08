@@ -106,6 +106,7 @@ function NavExpandableItem({
   isMobile,
   buttonRef,
   location,
+  onExpand,
   requestNavigation,
 }: Readonly<{
   item: TNavigationItem
@@ -114,6 +115,7 @@ function NavExpandableItem({
   isMobile: boolean
   buttonRef?: React.RefObject<HTMLButtonElement | null>
   location: string
+  onExpand: (event: React.MouseEvent<HTMLButtonElement>, isExpanded: boolean) => void
   requestNavigation: (path: string) => void
 }>) {
   const enabledChildren = item.children ?? []
@@ -131,6 +133,7 @@ function NavExpandableItem({
       id={`nav-${item.path.replaceAll('/', '-')}`}
       buttonProps={buttonRef ? { ref: buttonRef } : undefined}
       aria-label={item.label}
+      onExpand={onExpand}
     >
       {enabledChildren.map((child) => (
         <NavItem
@@ -152,13 +155,7 @@ function NavExpandableItem({
   /* v8 ignore stop */
 }
 
-function UserMenuDropdown({
-  isTextExpanded,
-  showTooltip,
-}: Readonly<{
-  isTextExpanded: boolean
-  showTooltip: boolean
-}>) {
+function UserMenuDropdown({ showTooltip }: Readonly<{ showTooltip: boolean }>) {
   const [isOpen, setIsOpen] = useState(false)
   const userMenuRef = useRef<MenuToggleElement>(null)
   const navigate = useNavigate()
@@ -196,7 +193,6 @@ function UserMenuDropdown({
       variant="plain"
       icon={<RhUiProfileFillIcon />}
       isDocked
-      isTextExpanded={isTextExpanded}
       aria-label="User menu"
       onClick={() => setIsOpen(!isOpen)}
     >
@@ -241,17 +237,8 @@ export function AppDockedNav() {
   const { colorScheme, toggleColorScheme } = useColorScheme()
   const brand = useBrand()
   const docsHomeUrl = useDocLink('home')
-  const {
-    isDockExpanded,
-    isDockTextExpanded,
-    isDockExpandableExpanded,
-    isMobile,
-    dockedToggleRef,
-    onToggleDock,
-    isNavGroupExpanded,
-    onNavToggle,
-    onNavSelect,
-  } = useDockState()
+  const { isDockExpanded, isMobile, dockedToggleRef, onToggleDock, isNavGroupExpanded, onExpandNavGroup, onNavSelect } =
+    useDockState()
 
   const filteredItems = useFilteredNavigationItems()
   const visibleItems = useMemo(
@@ -266,7 +253,7 @@ export function AppDockedNav() {
   const expandableRefs = useMemo(() => createExpandableRefs(visibleItems), [visibleItems])
 
   const colorSchemeToggleLabel = colorScheme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'
-  const showTooltips = !isDockTextExpanded && !isDockExpanded && !isDockExpandableExpanded
+  const showTooltips = !isDockExpanded
 
   /* v8 ignore start -- phantom branches from compiled JSX props, ternaries, and map callbacks */
   return (
@@ -280,7 +267,7 @@ export function AppDockedNav() {
               isHamburger
               onClick={onToggleDock}
               aria-label="Global navigation"
-              isExpanded={isDockTextExpanded}
+              isExpanded={isDockExpanded}
             />
           </MastheadToggle>
           <MastheadBrand>
@@ -312,9 +299,7 @@ export function AppDockedNav() {
                     navigateToNavItem(selectedItem.itemId, visibleItems, requestNavigation)
                     onNavSelect()
                   }}
-                  onToggle={onNavToggle}
                   variant="docked"
-                  isTextExpanded={isDockTextExpanded}
                   aria-label="Main navigation"
                 >
                   <NavList>
@@ -335,6 +320,7 @@ export function AppDockedNav() {
                             isMobile={isMobile}
                             buttonRef={expandableRefs[item.path]}
                             location={location}
+                            onExpand={(event, expanded) => onExpandNavGroup(event, getNavGroupId(item.path), expanded)}
                             requestNavigation={requestNavigation}
                           />,
                         ]
@@ -400,7 +386,7 @@ export function AppDockedNav() {
                   </Button>
                 </ToolbarItem>
                 <ToolbarItem>
-                  <UserMenuDropdown isTextExpanded={isDockTextExpanded} showTooltip={showTooltips} />
+                  <UserMenuDropdown showTooltip={showTooltips} />
                 </ToolbarItem>
               </ToolbarGroup>
             </ToolbarContent>

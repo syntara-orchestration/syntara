@@ -50,7 +50,7 @@ describe('useDockStateProvider', () => {
     const { result } = renderHook(() => useDockStateProvider())
 
     expect(result.current.isDockExpanded).toBe(false)
-    expect(result.current.isDockTextExpanded).toBe(false)
+    expect(result.current.isDockOverlay).toBe(false)
     expect(result.current.isMobile).toBe(false)
   })
 
@@ -64,16 +64,17 @@ describe('useDockStateProvider', () => {
     const { result } = renderHook(() => useDockStateProvider())
 
     expect(result.current.isMobile).toBe(true)
+    expect(result.current.isDockExpanded).toBe(false)
   })
 
-  it('onToggleDock toggles isDockTextExpanded on desktop', () => {
+  it('onToggleDock toggles isDockExpanded on desktop', () => {
     const { result } = renderHook(() => useDockStateProvider())
 
     act(() => result.current.onToggleDock())
-    expect(result.current.isDockTextExpanded).toBe(true)
+    expect(result.current.isDockExpanded).toBe(true)
 
     act(() => result.current.onToggleDock())
-    expect(result.current.isDockTextExpanded).toBe(false)
+    expect(result.current.isDockExpanded).toBe(false)
   })
 
   it('onToggleDock toggles isDockExpanded on mobile', () => {
@@ -92,47 +93,75 @@ describe('useDockStateProvider', () => {
     expect(result.current.isDockExpanded).toBe(false)
   })
 
-  it('onNavToggle tracks expandable group state and widens dock in icon-only mode', () => {
+  it('onToggleDock clears overlay when collapsing', () => {
     const { result } = renderHook(() => useDockStateProvider())
 
     act(() =>
-      result.current.onNavToggle({} as React.MouseEvent<HTMLButtonElement>, {
-        groupId: 'nav-expandable-configuration',
-        isExpanded: true,
-      })
+      result.current.onExpandNavGroup({} as React.MouseEvent<HTMLButtonElement>, 'nav-expandable-configuration', true)
+    )
+    expect(result.current.isDockOverlay).toBe(true)
+
+    act(() => result.current.onToggleDock())
+    expect(result.current.isDockExpanded).toBe(false)
+    expect(result.current.isDockOverlay).toBe(false)
+  })
+
+  it('onExpandNavGroup opens overlay when dock is collapsed', () => {
+    const { result } = renderHook(() => useDockStateProvider())
+
+    act(() =>
+      result.current.onExpandNavGroup({} as React.MouseEvent<HTMLButtonElement>, 'nav-expandable-configuration', true)
     )
 
     expect(result.current.isNavGroupExpanded('nav-expandable-configuration')).toBe(true)
-    expect(result.current.isDockExpandableExpanded).toBe(true)
-
-    act(() =>
-      result.current.onNavToggle({} as React.MouseEvent<HTMLButtonElement>, {
-        groupId: 'nav-expandable-configuration',
-        isExpanded: false,
-      })
-    )
-
-    expect(result.current.isNavGroupExpanded('nav-expandable-configuration')).toBe(false)
+    expect(result.current.isDockExpanded).toBe(true)
+    expect(result.current.isDockOverlay).toBe(true)
   })
 
-  it('onNavSelect collapses nav groups and dock states', () => {
+  it('onExpandNavGroup toggles group state when dock is already expanded', () => {
+    const { result } = renderHook(() => useDockStateProvider())
+
+    act(() => result.current.onToggleDock())
+    act(() =>
+      result.current.onExpandNavGroup({} as React.MouseEvent<HTMLButtonElement>, 'nav-expandable-configuration', true)
+    )
+    expect(result.current.isNavGroupExpanded('nav-expandable-configuration')).toBe(true)
+
+    act(() =>
+      result.current.onExpandNavGroup({} as React.MouseEvent<HTMLButtonElement>, 'nav-expandable-configuration', false)
+    )
+    expect(result.current.isNavGroupExpanded('nav-expandable-configuration')).toBe(false)
+    expect(result.current.isDockOverlay).toBe(false)
+  })
+
+  it('onNavSelect collapses overlay and dock states but keeps nav groups expanded', () => {
     const { result } = renderHook(() => useDockStateProvider())
 
     act(() =>
-      result.current.onNavToggle({} as React.MouseEvent<HTMLButtonElement>, {
-        groupId: 'nav-expandable-configuration',
-        isExpanded: true,
-      })
+      result.current.onExpandNavGroup({} as React.MouseEvent<HTMLButtonElement>, 'nav-expandable-configuration', true)
     )
-    act(() => result.current.onToggleDock())
     act(() => result.current.onMobileToggle())
 
     act(() => result.current.onNavSelect())
 
-    expect(result.current.isNavGroupExpanded('nav-expandable-configuration')).toBe(false)
-    expect(result.current.isDockExpandableExpanded).toBe(false)
-    expect(result.current.isDockTextExpanded).toBe(false)
+    expect(result.current.isNavGroupExpanded('nav-expandable-configuration')).toBe(true)
+    expect(result.current.isDockOverlay).toBe(false)
     expect(result.current.isDockExpanded).toBe(false)
+  })
+
+  it('onNavSelect keeps dock and nav groups expanded on desktop when not in overlay mode', () => {
+    const { result } = renderHook(() => useDockStateProvider())
+
+    act(() => result.current.onToggleDock())
+    act(() =>
+      result.current.onExpandNavGroup({} as React.MouseEvent<HTMLButtonElement>, 'nav-expandable-configuration', true)
+    )
+
+    act(() => result.current.onNavSelect())
+
+    expect(result.current.isNavGroupExpanded('nav-expandable-configuration')).toBe(true)
+    expect(result.current.isDockExpanded).toBe(true)
+    expect(result.current.isDockOverlay).toBe(false)
   })
 
   it('onMobileToggle toggles isDockExpanded', () => {
@@ -227,23 +256,25 @@ describe('useDockStateProvider', () => {
     expect(mockFocus).not.toHaveBeenCalled()
   })
 
-  it('persists dock expansion to sessionStorage', () => {
+  it('persists dock expansion to sessionStorage on desktop', () => {
     const { result } = renderHook(() => useDockStateProvider())
 
     act(() => result.current.onToggleDock())
-    expect(sessionStorage.getItem('syntara-nav-dock-state')).toBe(
-      JSON.stringify({ isDockExpanded: false, isDockTextExpanded: true })
-    )
+    expect(sessionStorage.getItem('syntara-nav-dock-state')).toBe(JSON.stringify({ isDockExpanded: true }))
   })
 
   it('restores dock expansion from sessionStorage on mount', () => {
-    sessionStorage.setItem(
-      'syntara-nav-dock-state',
-      JSON.stringify({ isDockExpanded: false, isDockTextExpanded: true })
-    )
+    sessionStorage.setItem('syntara-nav-dock-state', JSON.stringify({ isDockExpanded: true }))
 
     const { result } = renderHook(() => useDockStateProvider())
-    expect(result.current.isDockTextExpanded).toBe(true)
+    expect(result.current.isDockExpanded).toBe(true)
+  })
+
+  it('migrates legacy isDockTextExpanded persistence on mount', () => {
+    sessionStorage.setItem('syntara-nav-dock-state', JSON.stringify({ isDockTextExpanded: true }))
+
+    const { result } = renderHook(() => useDockStateProvider())
+    expect(result.current.isDockExpanded).toBe(true)
   })
 
   it('falls back to collapsed dock state when sessionStorage JSON is invalid', () => {
@@ -251,49 +282,7 @@ describe('useDockStateProvider', () => {
 
     const { result } = renderHook(() => useDockStateProvider())
     expect(result.current.isDockExpanded).toBe(false)
-    expect(result.current.isDockTextExpanded).toBe(false)
-  })
-
-  it('normalizes stale mobile overlay state on desktop mount', () => {
-    sessionStorage.setItem(
-      'syntara-nav-dock-state',
-      JSON.stringify({ isDockExpanded: true, isDockTextExpanded: false })
-    )
-
-    const { result } = renderHook(() => useDockStateProvider())
-    expect(result.current.isMobile).toBe(false)
-    expect(result.current.isDockTextExpanded).toBe(true)
-    expect(result.current.isDockExpanded).toBe(false)
-  })
-
-  it('opens mobile overlay when crossing into mobile with text expanded', () => {
-    const { result } = renderHook(() => useDockStateProvider())
-
-    act(() => result.current.onToggleDock())
-    expect(result.current.isDockTextExpanded).toBe(true)
-
-    act(() => mockMql.trigger(true))
-    expect(result.current.isMobile).toBe(true)
-    expect(result.current.isDockExpanded).toBe(true)
-    expect(result.current.isDockTextExpanded).toBe(true)
-  })
-
-  it('migrates mobile overlay expansion to text expansion when crossing to desktop', () => {
-    mockMql = createMockMatchMedia(true)
-    vi.stubGlobal(
-      'matchMedia',
-      vi.fn(() => mockMql.mql)
-    )
-
-    const { result } = renderHook(() => useDockStateProvider())
-
-    act(() => result.current.onToggleDock())
-    expect(result.current.isDockExpanded).toBe(true)
-
-    act(() => mockMql.trigger(false))
-    expect(result.current.isMobile).toBe(false)
-    expect(result.current.isDockTextExpanded).toBe(true)
-    expect(result.current.isDockExpanded).toBe(false)
+    expect(result.current.isDockOverlay).toBe(false)
   })
 })
 
@@ -305,15 +294,14 @@ describe('useDockState', () => {
   it('returns context value when used within a provider', () => {
     const mockState: DockState = {
       isDockExpanded: false,
-      isDockTextExpanded: true,
-      isDockExpandableExpanded: false,
+      isDockOverlay: false,
       isMobile: false,
       dockedToggleRef: createRef(),
       mobileToggleRef: createRef(),
       onToggleDock: vi.fn(),
       onMobileToggle: vi.fn(),
       isNavGroupExpanded: () => false,
-      onNavToggle: vi.fn(),
+      onExpandNavGroup: vi.fn(),
       onNavSelect: vi.fn(),
     }
     const wrapper = ({ children }: { children: React.ReactNode }) =>

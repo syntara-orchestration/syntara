@@ -14,15 +14,14 @@ import type { DockState } from './useDockState'
 function createMockDockState(overrides: Partial<DockState> = {}): DockState {
   return {
     isDockExpanded: false,
-    isDockTextExpanded: false,
+    isDockOverlay: false,
     isMobile: false,
     dockedToggleRef: { current: null },
     mobileToggleRef: { current: null },
     onToggleDock: mockOnToggleDock,
     onMobileToggle: vi.fn(),
-    isDockExpandableExpanded: false,
     isNavGroupExpanded: () => false,
-    onNavToggle: vi.fn(),
+    onExpandNavGroup: vi.fn(),
     onNavSelect: vi.fn(),
     ...overrides,
   }
@@ -175,7 +174,7 @@ describe('AppDockedNav', () => {
 
   it('opens user menu when Enter is pressed while focused', async () => {
     const user = userEvent.setup()
-    mockUseDockState.mockReturnValue(createMockDockState({ isDockTextExpanded: true }))
+    mockUseDockState.mockReturnValue(createMockDockState({ isDockExpanded: true }))
     renderDockedNav()
 
     const userMenuButton = screen.getByRole('button', { name: 'User menu' })
@@ -245,20 +244,20 @@ describe('AppDockedNav', () => {
     expect(logoLinks[0]).toHaveAttribute('href', '/')
   })
 
-  it('calls onNavToggle when an expandable group is clicked', async () => {
-    const onNavToggle = vi.fn()
-    mockUseDockState.mockReturnValue(createMockDockState({ onNavToggle }))
+  it('calls onExpandNavGroup when an expandable group is clicked', async () => {
+    const onExpandNavGroup = vi.fn()
+    mockUseDockState.mockReturnValue(createMockDockState({ onExpandNavGroup }))
     const user = userEvent.setup()
     renderDockedNav()
 
     await user.click(screen.getByRole('button', { name: 'Configuration' }))
-    expect(onNavToggle).toHaveBeenCalled()
+    expect(onExpandNavGroup).toHaveBeenCalled()
   })
 
   it('shows Configuration child links when the group is expanded', () => {
     mockUseDockState.mockReturnValue(
       createMockDockState({
-        isDockTextExpanded: true,
+        isDockExpanded: true,
         isNavGroupExpanded: () => true,
       })
     )
@@ -275,7 +274,7 @@ describe('AppDockedNav', () => {
   ])('navigates to $linkName when child link is clicked', async ({ linkName, expectedPath }) => {
     mockUseDockState.mockReturnValue(
       createMockDockState({
-        isDockTextExpanded: true,
+        isDockExpanded: true,
         isNavGroupExpanded: () => true,
       })
     )
@@ -289,7 +288,7 @@ describe('AppDockedNav', () => {
   it('shows System Administration child links when the group is expanded', () => {
     mockUseDockState.mockReturnValue(
       createMockDockState({
-        isDockTextExpanded: true,
+        isDockExpanded: true,
         isNavGroupExpanded: () => true,
       })
     )
@@ -304,7 +303,7 @@ describe('AppDockedNav', () => {
     beforeEach(() => {
       mockUseDockState.mockReturnValue(
         createMockDockState({
-          isDockTextExpanded: true,
+          isDockExpanded: true,
           isNavGroupExpanded: () => true,
         })
       )
@@ -432,7 +431,7 @@ describe('AppDockedNav', () => {
       mockLocation = '/configuration/integrations'
       mockUseDockState.mockReturnValue(
         createMockDockState({
-          isDockTextExpanded: true,
+          isDockExpanded: true,
           isNavGroupExpanded: () => true,
         })
       )
@@ -456,7 +455,7 @@ describe('AppDockedNav', () => {
       mockLocation = '/system-administration/access-management'
       mockUseDockState.mockReturnValue(
         createMockDockState({
-          isDockTextExpanded: true,
+          isDockExpanded: true,
           isNavGroupExpanded: () => true,
         })
       )
