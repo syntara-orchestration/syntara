@@ -22,6 +22,7 @@ from ._helpers import (
     get_form_prompt,
     start_pending_form_prompt,
     submit_form_prompt,
+    wait_for_activity_outputs,
 )
 
 pytestmark = [pytest.mark.e2e]
@@ -166,7 +167,8 @@ def test_all_supported_field_types_resume_and_flow_to_consumer(
     response = submit_form_prompt(syntara_api, prompt_id, _ALL_FIELDS_SUBMISSION)
     assert response.status_code == HTTPStatus.OK
 
-    final = assert_consumer_completed(syntara_api, execution_id)
+    assert_consumer_completed(syntara_api, execution_id)
+    final = wait_for_activity_outputs(syntara_api, execution_id, {"prompt", "consumer"})
     activities = {activity.activity_id: activity for activity in (final.activities or [])}
     prompt_output = _activity_output(activities["prompt"])
     consumer_output = _activity_output(activities["consumer"])
@@ -209,7 +211,8 @@ def test_required_field_error_leaves_prompt_available_for_valid_response(
     accepted = submit_form_prompt(syntara_api, prompt_id, {"required_text": "provided"})
     assert accepted.status_code == HTTPStatus.OK
 
-    final = assert_consumer_completed(syntara_api, execution_id)
+    assert_consumer_completed(syntara_api, execution_id)
+    final = wait_for_activity_outputs(syntara_api, execution_id, {"prompt"})
     activities = {activity.activity_id: activity for activity in (final.activities or [])}
     prompt_output = _activity_output(activities["prompt"])
     assert prompt_output["response_data"] == {"required_text": "provided"}
@@ -288,7 +291,8 @@ def test_numeric_and_boolean_strings_are_coerced_and_flow_downstream(
     )
     assert response.status_code == HTTPStatus.OK
 
-    final = assert_consumer_completed(syntara_api, execution_id)
+    assert_consumer_completed(syntara_api, execution_id)
+    final = wait_for_activity_outputs(syntara_api, execution_id, {"prompt", "consumer"})
     activities = {activity.activity_id: activity for activity in (final.activities or [])}
     prompt_output = _activity_output(activities["prompt"])
     consumer_output = _activity_output(activities["consumer"])
@@ -358,7 +362,8 @@ def test_extra_fields_are_rejected_and_defined_fields_can_be_submitted(
 
     accepted = submit_form_prompt(syntara_api, prompt_id, {"x": 42})
     assert accepted.status_code == HTTPStatus.OK
-    final = assert_consumer_completed(syntara_api, execution_id)
+    assert_consumer_completed(syntara_api, execution_id)
+    final = wait_for_activity_outputs(syntara_api, execution_id, {"prompt", "consumer"})
     activities = {activity.activity_id: activity for activity in (final.activities or [])}
     prompt_output = _activity_output(activities["prompt"])
     consumer_output = _activity_output(activities["consumer"])
