@@ -312,6 +312,17 @@ worker-run: check-deps _ensure-secrets _ensure-certs ## Run Temporal workflow wo
 	APP_TOOL_MANAGER_BASE_URL=$(WORKER_BASE_URL) \
 	uv run python -m syntara.workflows.worker
 
+.PHONY: eventstream-consumer-run
+eventstream-consumer-run: check-deps _ensure-secrets _ensure-certs ## Run the event-stream (Kafka) consumer
+	@echo "🔄 Starting event-stream consumer..."
+	@echo "📍 Set APP_EVENTSTREAM_ENABLED=true first; broker URL/topics/token are hardcoded in syntara.eventstreams.static_broker"
+	APP_JWT_PRIVATE_KEY_PATH=.secrets/jwt-primary.pem \
+	APP_SECRET_ENCRYPTION_KEY_PATH=.secrets/encryption-key \
+	$(S2S_TLS_VARS) \
+	APP_S2S_TLS_CERT_PATH=.secrets/certs/worker.crt \
+	APP_S2S_TLS_KEY_PATH=.secrets/certs/worker.key \
+	uv run python -m syntara.eventstreams.consumer_entrypoint
+
 .PHONY: background-worker-run
 background-worker-run: check-deps _ensure-secrets _ensure-certs ## Run Temporal workflow background worker
 	@echo "🔄 Starting Temporal workflow background worker..."
@@ -469,7 +480,7 @@ services-run: _ensure-secrets _ensure-certs ## Start all services (database + ca
 	@echo "📍 Temporal Server: localhost:$${APP_TEMPORAL_PORT:-7233}"
 	@echo "📍 Temporal UI: http://localhost:$${APP_TEMPORAL_UI_PORT:-8081}"
 	@echo "📍 MCP Server: http://localhost:$${MCP_PORT:-8765}/mcp"
-	$(COMPOSE_FINAL_CMD) --profile mcp-scenarios up --build --force-recreate -d database redis temporal temporal-ui temporal-worker temporal-background-worker mcp-server mcp-server-scenarios moto
+	$(COMPOSE_FINAL_CMD) --profile mcp-scenarios --profile eventstream up --build --force-recreate -d database redis temporal temporal-ui temporal-worker temporal-background-worker mcp-server mcp-server-scenarios moto eventstream-consumer
 	@echo "✅ All services started in background"
 	@echo "   Use 'make services-logs' to view logs"
 	@echo "   Use 'make services-stop' to stop services"
