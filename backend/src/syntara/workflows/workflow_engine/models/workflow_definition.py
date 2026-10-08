@@ -138,6 +138,7 @@ class ActivityName(StrEnum):
     HTTP_REQUEST = "execute_http_request_activity"
     INTERNAL_ACTIVITY = "execute_internal_activity"
     SCRIPT = "execute_script_activity"
+    SUB_WORKFLOW = "execute_sub_workflow_activity"
     # Internal
     CREDENTIAL_RESOLUTION = "resolve_workflow_credentials"
     INTEGRATION_RESOLUTION = "resolve_workflow_integration"
@@ -175,6 +176,7 @@ class NodeType(str, Enum):
     HTTP_REQUEST = "http_request"
     INTERNAL_ACTIVITY = "internal_activity"
     SCRIPT = "script"
+    SUB_WORKFLOW = "sub_workflow"
 
 
 def resolve_trigger_node(
