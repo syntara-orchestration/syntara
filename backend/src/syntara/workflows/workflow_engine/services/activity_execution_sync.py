@@ -207,15 +207,23 @@ class ActivityExecutionSyncMixin:
         transaction opens because the update blocks until the workflow can answer
         and a database transaction must not be held across that wait.
 
-        Every node goes through the same path. On an ordinary run the workflow has
-        no replay candidates, so its wait condition is satisfied immediately and
-        it answers "not a replay" without blocking — the round trip costs a
-        request, not a stall.
+        Only a retry asks. On an ordinary run the workflow holds no replay
+        candidates, so its wait condition is satisfied on the first check and it
+        answers "not a replay" — but that is still a blocking round trip to the
+        workflow for every completed activity of every run, on a path that made no
+        RPC before. ``is_retry`` is set once per execution from the retry lineage,
+        so gating on it costs a field read and removes that traffic entirely.
+
+        Within a retry, every node still goes through the same path, so there is one
+        rule rather than two that behave differently.
 
         Only ``COMPLETED`` is asked about. A node that failed, timed out or was
         cancelled has no source times to restore, and asking would wait for
         timestamps that are never coming.
         """
+        if not metadata.is_retry:
+            return {}
+
         resolved: dict[str, dict[str, datetime | None]] = {}
         for event_id in metadata.pending_sync_event_ids:
             activity_data = metadata.pending_activity_updates.get(event_id)

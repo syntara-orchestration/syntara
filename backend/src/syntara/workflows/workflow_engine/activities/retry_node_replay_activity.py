@@ -166,19 +166,26 @@ async def replay_retry_node_activity(
 
 @activity.defn(name="fetch_retry_source_state")
 async def fetch_retry_source_state_activity(source_execution_id: str) -> dict[str, str]:
-    """Return source statuses without carrying output payloads into the plan."""
+    """Return source statuses, projected so no payload is read.
+
+    Only the three columns this needs are selected. ``input_data`` and
+    ``output_data`` are unbounded JSONB, and selecting the whole row deserializes
+    both for every activity in the source execution — on the workflow's critical
+    path, before any node has dispatched. The sibling replay activity projects its
+    own query for the same reason.
+    """
     states: dict[str, str] = {}
     async for session in get_db():
         rows = (
             await session.exec(
-                select(ActivityExecution)
+                select(ActivityExecution.activity_name, ActivityExecution.status)
                 .where(ActivityExecution.execution_id == source_execution_id)
                 .order_by(
                     col(ActivityExecution.iteration), col(ActivityExecution.created_at), col(ActivityExecution.id)
                 )
             )
         ).all()
-        for row in rows:
-            if row.activity_name:
-                states[strip_iteration_suffix(row.activity_name)] = row.status.value
+        for activity_name, status in rows:
+            if activity_name:
+                states[strip_iteration_suffix(activity_name)] = ActivityStatus(status).value
     return states
