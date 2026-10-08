@@ -35,7 +35,8 @@ from ._workflows import DEFAULT_CONSUMER_CODE, producer_prompt_consumer_workflow
 
 PROMPT_POLL_TIMEOUT = 60
 EXECUTION_POLL_TIMEOUT = 90
-CANCEL_POLL_TIMEOUT = 60
+# Cancellation is accepted before Temporal and the activity monitor reach terminal state.
+CANCEL_POLL_TIMEOUT = 120
 
 
 def assert_consumer_completed(syntara_api: SyntaraApiRegistry, exec_id: UUID) -> ExecutionRead:
