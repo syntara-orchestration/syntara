@@ -1,16 +1,15 @@
-import { zodResolver } from '@hookform/resolvers/zod'
 import type { IdentityProvidersAPI } from '@syntara/contracts'
 import { useNavigate } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
 import { useCallback, useMemo, useState } from 'react'
-import { useFieldArray, useForm, type Control, type UseFormReturn } from 'react-hook-form'
+import { useFieldArray, type Control } from 'react-hook-form'
 
 import { breadcrumbsIdentityProviderGroupMappingForm } from '../../../../app/breadcrumbBuilders'
 import type { AppBreadcrumbItem } from '../../../../app/breadcrumbs/appBreadcrumbItem'
 import { identityProvidersClient } from '../../../../client'
 import { useQueryState } from '../../../../components/states/useQueryState'
 import { useDirtyFormGuard } from '../../../../hooks/useDirtyFormGuard'
-import { useMutationErrorHandler } from '../../../../hooks/useMutationErrorHandler'
+import { useSynForm, type UseSynFormReturn } from '../../../../hooks/useSynForm'
 import { useAlerts } from '../../../../providers/alerts'
 import { getErrorStatus } from '../../../../utils/apiErrors'
 import { detachPromise } from '../../../../utils/detachPromise'
@@ -148,7 +147,7 @@ export type UseGroupMappingEditFormArgs = {
 }
 
 export type UseGroupMappingEditFormResult = {
-  form: UseFormReturn<GroupMappingEditFormValues>
+  form: UseSynFormReturn<GroupMappingEditFormValues>
   isSaving: boolean
   onSave: () => void
   onCancel: () => void
@@ -169,10 +168,9 @@ export function useGroupMappingEditForm({
     [groupMappingConfig, defaultExpression]
   )
 
-  const form = useForm<GroupMappingEditFormValues>({
-    resolver: zodResolver(groupMappingEditFormSchema),
+  const form = useSynForm({
+    schema: groupMappingEditFormSchema,
     defaultValues,
-    mode: 'onSubmit',
   })
 
   const { fields, append, remove, replace } = useFieldArray({
@@ -189,7 +187,6 @@ export function useGroupMappingEditForm({
   const [createGroupForIndex, setCreateGroupForIndex] = useState<number | null>(null)
 
   const { showSuccess } = useAlerts()
-  const handleMutationError = useMutationErrorHandler()
 
   const { mutate: patchProvider, isPending: isSaving } = identityProvidersClient.useMutation(
     'patch',
@@ -239,7 +236,7 @@ export function useGroupMappingEditForm({
           dismiss()
           navigateToTab()
         },
-        onError: handleMutationError({ title: 'Failed to save group mapping' }),
+        onError: form.handleError({ title: 'Failed to save group mapping' }),
       }
     )
   })

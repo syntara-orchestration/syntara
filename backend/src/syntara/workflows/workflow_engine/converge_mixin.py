@@ -39,6 +39,7 @@ class WorkflowConvergeMixin:
     failed_nodes: dict[str, str]
     skipped_nodes: set[str]
     resolver: NamespaceResolver
+    node_control_data: dict[str, dict[str, Any]]
     _runtime_settings: dict[str, Any]
     _cof_failed_nodes: set[str]
     _has_unhandled_failure: bool
@@ -210,10 +211,18 @@ class WorkflowConvergeMixin:
             )
             self._fail_converge_node(converge_id, error_msg, graph, pending_tasks)
 
+    def _is_loop_still_iterating(self, node_id: str) -> bool:
+        """Return True if ``node_id`` is a loop whose last routing was ``iterate``."""
+        control = self.node_control_data.get(node_id, {})
+        return control.get("next_port") == "iterate"
+
     def _all_predecessors_terminal(self, predecessor_ids: list[str]) -> bool:
         """Check if every predecessor has reached a terminal state (completed, failed, or skipped)."""
         return all(
-            p in self.skipped_nodes or p in self.failed_nodes or self.resolver.has_namespace(p) for p in predecessor_ids
+            p in self.skipped_nodes
+            or p in self.failed_nodes
+            or (self.resolver.has_namespace(p) and not self._is_loop_still_iterating(p))
+            for p in predecessor_ids
         )
 
     def _count_successful_predecessors(self, predecessor_ids: list[str]) -> int:
@@ -223,6 +232,7 @@ class WorkflowConvergeMixin:
             for p in predecessor_ids
             if p not in self.skipped_nodes
             and self.resolver.has_namespace(p)
+            and not self._is_loop_still_iterating(p)
             and (p not in self.failed_nodes or p in self._cof_failed_nodes)
         )
 
