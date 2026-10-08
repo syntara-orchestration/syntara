@@ -283,10 +283,19 @@ class ActivityExecutionSyncMixin:
 
         if not raw:
             return None
-        return {
+        # The status and error travel with the times: they are what the row has to
+        # report, and dropping them here would write a restored skip or an
+        # unselected failure back as a successful completion. The workflow returns
+        # every field it recorded, so pass all of them through.
+        resolved: dict[str, Any] = {
             "started_at": self._parse_source_timestamp(raw.get("started_at")),
             "completed_at": self._parse_source_timestamp(raw.get("completed_at")),
         }
+        if raw.get("status") is not None:
+            resolved["status"] = raw["status"]
+        if raw.get("error_details") is not None:
+            resolved["error_details"] = raw["error_details"]
+        return resolved
 
     @staticmethod
     def _parse_source_timestamp(value: str | None) -> datetime | None:

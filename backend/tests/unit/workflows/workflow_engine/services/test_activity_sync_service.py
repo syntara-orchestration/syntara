@@ -6007,7 +6007,7 @@ class TestReplayedNodeStateOverride:
     async def test_asks_the_workflow_for_that_one_activity(self) -> None:
         """One update per activity, carrying that activity's id."""
         metadata = create_test_metadata(execution_id=self.execution_id)
-        handle = self._handle(self.source_times)
+        handle = self._handle({**self.source_times, "status": "completed"})
 
         result = await self.service._replayed_node_timestamps(metadata, handle, "script_1")
 
@@ -6015,7 +6015,44 @@ class TestReplayedNodeStateOverride:
         assert result == {
             "started_at": datetime(2026, 1, 1, 0, 0, 0, tzinfo=UTC),
             "completed_at": datetime(2026, 1, 1, 0, 5, 0, tzinfo=UTC),
+            "status": "completed",
         }
+
+    async def test_the_recorded_status_and_error_survive_the_round_trip(self) -> None:
+        """The workflow's status and error must reach the value applied to the row.
+
+        Regression guard. Resolution used to rebuild the workflow's answer into a
+        fresh timestamps-only dict, so ``status`` and ``error_details`` were dropped
+        between the update and ``_apply_replayed_state`` — which then read ``None``
+        for both and left every restored node persisting as COMPLETED. The unit tests
+        for ``_apply_replayed_state`` built their own dicts, so they never exercised
+        this hop; a real restore of a skipped or unselected failure wrote the wrong
+        status to the database while the workflow's in-memory state stayed correct.
+        """
+        for source_status, error_details in (("skipped", None), ("failed", "exit code 1")):
+            metadata = create_test_metadata(execution_id=self.execution_id)
+            handle = self._handle(
+                {
+                    "started_at": "2026-01-01T00:00:00+00:00",
+                    "completed_at": "2026-01-01T00:00:10+00:00",
+                    "status": source_status,
+                    "error_details": error_details,
+                }
+            )
+            metadata.pending_sync_event_ids = {1}
+            metadata.pending_activity_updates = {1: {"activity_id": "script_1", "status": ActivityStatus.COMPLETED}}
+
+            resolved = await self.service._resolve_replayed_timestamps(metadata, handle)
+
+            state = resolved["script_1"]
+            assert state["status"] == source_status, source_status
+            assert state.get("error_details") == error_details, source_status
+
+            activity_data = {"status": ActivityStatus.COMPLETED, "started_at": "event", "completed_at": "event"}
+            self.service._apply_replayed_state(state, activity_data)
+            assert activity_data["status"] == ActivityStatus(source_status), source_status
+            if error_details is not None:
+                assert activity_data["error_details"] == error_details, source_status
 
     async def test_normal_execution_returns_none_so_temporal_times_are_kept(self) -> None:
         """A node the workflow did not replay has no source times to apply."""
