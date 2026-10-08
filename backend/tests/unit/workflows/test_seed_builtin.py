@@ -8,7 +8,7 @@ from uuid import uuid4
 
 import pytest
 
-from syntara.core.seed import strict_mode
+from syntara.core.seed_context import strict_mode
 from syntara.workflows.exceptions import ScheduledTriggerSyncError
 from syntara.workflows.models.workflow import Workflow
 from syntara.workflows.models.workflow_publish_event import WorkflowPublishEvent

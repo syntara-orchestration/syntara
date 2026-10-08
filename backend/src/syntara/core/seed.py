@@ -17,11 +17,12 @@ Usage (CLI)::
 
 from __future__ import annotations
 
-from contextvars import ContextVar
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 import structlog
+
+from syntara.core.seed_context import strict_mode
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Coroutine
@@ -31,10 +32,6 @@ if TYPE_CHECKING:
     SeederFunc = Callable[[AsyncSession], Coroutine[Any, Any, None]]
 
 logger = structlog.stdlib.get_logger(__name__)
-
-# Set by run_seeders for the duration of a seed pass. Seeders that can degrade
-# gracefully (e.g. a Temporal sync) read it to decide whether to raise instead.
-strict_mode: ContextVar[bool] = ContextVar("seed_strict_mode", default=False)
 
 
 @dataclass(frozen=True, slots=True)

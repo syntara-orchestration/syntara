@@ -9,7 +9,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from syntara.core import seed as seed_module
-from syntara.core.seed import SeederRegistration, run_seeders, strict_mode
+from syntara.core.seed import SeederRegistration, run_seeders
+from syntara.core.seed_context import strict_mode
 from syntara.seed.__main__ import _build_parser
 
 if TYPE_CHECKING:

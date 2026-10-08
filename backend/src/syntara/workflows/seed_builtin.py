@@ -28,7 +28,7 @@ from sqlmodel import col, select
 
 from syntara.authz.models import Project
 from syntara.core.models import User
-from syntara.core.seed import strict_mode
+from syntara.core.seed_context import strict_mode
 from syntara.workflows.constants import BUILTIN_PROJECT_NAME
 from syntara.workflows.exceptions import ScheduledTriggerSyncError
 from syntara.workflows.models import Workflow, WorkflowVersion
