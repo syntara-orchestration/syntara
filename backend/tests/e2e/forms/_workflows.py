@@ -2,11 +2,12 @@
 
 import json
 from collections.abc import Mapping
-from typing import Any
+from typing import Any, Literal
 
 from syntara_api_client.models import WorkflowDefinition
 
 DEFAULT_CONSUMER_CODE = 'print("submitted path executed")'
+_FORM_PROMPT_RESULT_CAPTURE_CODE = 'import os\nprint(os.environ["FORM_PROMPT_RESULT"])'
 
 
 def dynamic_option_field(
@@ -40,23 +41,36 @@ def producer_prompt_consumer_workflow(
     consumer_environment: Mapping[str, str] | None = None,
     continue_on_failure: bool = False,
     response_window: int = 600,
+    submit_label: str | None = None,
+    fallback_decision: Literal["submit", "fallback"] | None = None,
+    capture_form_prompt_result: bool = False,
     responder_users: list[str] | None = None,
     responder_groups: list[str] | None = None,
 ) -> WorkflowDefinition:
-    """Build a trigger, producer, form prompt, consumer, and optional fallback chain.
+    """Build a trigger, producer, form prompt, submitted consumer, and optional fallback handler.
 
     Optional responder lists restrict which users or group members may submit
     the form prompt. ``consumer_code`` can inspect the prompt response.
     """
     payload = json.dumps(producer_output)
     consumer_parameters: dict[str, Any] = {"language": "python", "code": consumer_code}
-    if consumer_environment is not None:
+    if capture_form_prompt_result:
+        consumer_parameters["code"] = _FORM_PROMPT_RESULT_CAPTURE_CODE
+        consumer_parameters["environment"] = {
+            **(consumer_environment or {}),
+            "FORM_PROMPT_RESULT": "${prompt}",
+        }
+    elif consumer_environment is not None:
         consumer_parameters["environment"] = dict(consumer_environment)
     prompt_parameters: dict[str, Any] = {
         "message": "Choose an environment",
         "form_definition": {"fields": form_fields},
         "response_window": response_window,
     }
+    if submit_label is not None:
+        prompt_parameters["submit_label"] = submit_label
+    if fallback_decision is not None:
+        prompt_parameters["fallback_decision"] = fallback_decision
     if responder_users:
         prompt_parameters["responder_users"] = responder_users
     if responder_groups:
@@ -90,24 +104,25 @@ def producer_prompt_consumer_workflow(
     ]
 
     if continue_on_failure:
+        fallback_handler_parameters: dict[str, Any] = {
+            "language": "bash",
+            "code": 'echo "fallback path executed"',
+        }
+        if capture_form_prompt_result:
+            fallback_handler_parameters = {
+                "language": "python",
+                "code": _FORM_PROMPT_RESULT_CAPTURE_CODE,
+                "environment": {"FORM_PROMPT_RESULT": "${prompt}"},
+            }
         nodes.append(
             {
                 "id": "fallback_handler",
                 "name": "Fallback Handler",
                 "type": "script",
-                "parameters": {"language": "bash", "code": 'echo "fallback path executed"'},
-            }
-        )
-        nodes.append(
-            {
-                "id": "fallback_consumer",
-                "name": "Fallback Consumer Node",
-                "type": "script",
-                "parameters": {"language": "bash", "code": 'echo "after fallback path executed"'},
+                "parameters": fallback_handler_parameters,
             }
         )
         edges.append({"from": "prompt", "to": "fallback_handler", "from_port": "fallback"})
-        edges.append({"from": "fallback_handler", "to": "fallback_consumer"})
 
     return WorkflowDefinition.from_dict(
         {
