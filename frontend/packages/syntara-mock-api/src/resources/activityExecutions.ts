@@ -4,6 +4,13 @@ import { mockDate } from './mockDates'
 
 type ActivityExecution = ExecutionsAPI.components['schemas']['ActivityExecution']
 
+/** Mock seed rows; handlers may enrich node metadata at read time. */
+export type ActivityExecutionMockSeed = Omit<ActivityExecution, 'node_type' | 'temporal_activity_id' | 'status'> & {
+  node_type?: ActivityExecution['node_type']
+  temporal_activity_id?: string
+  status?: ActivityExecution['status'] | 'paused'
+}
+
 /**
  * Sample activity execution data for mock API.
  * Keyed by execution ID, values are arrays of ActivityExecution for that execution.
@@ -19,7 +26,7 @@ type ActivityExecution = ExecutionsAPI.components['schemas']['ActivityExecution'
  * - exec-10 maps to workflow '4' (parallel-demo): pending (no activities started yet)
  * - exec-approval maps to workflow '52' (deployment-approval): staging_tests (completed), approval_gate (waiting)
  */
-export const activityExecutions: Record<string, ActivityExecution[]> = {
+export const activityExecutions: Record<string, ActivityExecutionMockSeed[]> = {
   'exec-1': [
     {
       id: 'act-1-1',
@@ -329,6 +336,61 @@ export const activityExecutions: Record<string, ActivityExecution[]> = {
       execution_id: 'exec-form-prompt',
       activity_name: 'collect_input',
       status: 'waiting',
+      started_at: mockDate.minutesAgo10,
+      completed_at: null,
+      input_data: {} as Record<string, unknown>,
+      output_data: null,
+      error_details: null,
+      retry_count: 0,
+      iteration: null,
+    },
+  ],
+  'exec-form-prompt-timeout-fail': [
+    {
+      id: 'act-fp-timeout-fail',
+      created_at: mockDate.hoursAgo2,
+      updated_at: mockDate.hoursAgo1,
+      execution_id: 'exec-form-prompt-timeout-fail',
+      activity_name: 'collect_input',
+      node_type: 'form_prompt',
+      temporal_activity_id: 'collect_input-activity',
+      status: 'failed',
+      started_at: mockDate.hoursAgo2,
+      completed_at: mockDate.hoursAgo1,
+      input_data: {} as Record<string, unknown>,
+      output_data: null,
+      error_details: 'Form step response window expired',
+      retry_count: 0,
+      iteration: null,
+    },
+  ],
+  'exec-form-prompt-fallback-continue': [
+    {
+      id: 'act-fp-fallback-expired',
+      created_at: mockDate.hoursAgo2,
+      updated_at: mockDate.hoursAgo1,
+      execution_id: 'exec-form-prompt-fallback-continue',
+      activity_name: 'collect_input',
+      node_type: 'form_prompt',
+      temporal_activity_id: 'collect_input-activity',
+      status: 'failed',
+      started_at: mockDate.hoursAgo2,
+      completed_at: mockDate.hoursAgo1,
+      input_data: {} as Record<string, unknown>,
+      output_data: null,
+      error_details: 'Form step response window expired',
+      retry_count: 0,
+      iteration: null,
+    },
+    {
+      id: 'act-fp-fallback-running',
+      created_at: mockDate.minutesAgo10,
+      updated_at: mockDate.minutesAgo10,
+      execution_id: 'exec-form-prompt-fallback-continue',
+      activity_name: 'continue_with_defaults',
+      node_type: 'script',
+      temporal_activity_id: 'continue_with_defaults-activity',
+      status: 'running',
       started_at: mockDate.minutesAgo10,
       completed_at: null,
       input_data: {} as Record<string, unknown>,
