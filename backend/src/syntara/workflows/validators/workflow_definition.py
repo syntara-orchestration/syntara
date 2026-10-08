@@ -37,6 +37,7 @@ from syntara.workflows.workflow_engine.models.workflow_definition import (
 _SCHEMA_DIR = SCHEMA_DIR / "workflows" / "v2"
 _BASE_URI = "https://automation.example.com/schemas/workflows/v2/"
 _FEEDBACK_PORTS: frozenset[str] = frozenset({"iterate"})
+_FORM_FIELD_TYPE_LOCATION_PARTS = 3
 
 
 def _retrieve_schema(uri: str) -> Resource:
@@ -458,6 +459,7 @@ def _collect_form_prompt_model_findings(
             FormPromptNodeParameters.model_validate(parameters)
         except ValidationError as exc:
             findings.extend(_collect_safe_value_error_findings(exc, node_id))
+            findings.extend(_collect_form_field_type_findings(exc, parameters, node_id))
         except FormDefinitionError as exc:
             findings.extend(_collect_form_definition_error_findings(exc, parameters, node_id))
 
@@ -486,6 +488,63 @@ def _collect_safe_value_error_findings(exc: ValidationError, node_id: str | None
                 field_path=field_path,
             )
         )
+    return findings
+
+
+def _collect_form_field_type_findings(
+    exc: ValidationError,
+    parameters: dict[str, Any],
+    node_id: str | None,
+) -> list[ValidationFinding]:
+    """Convert form-field discriminator errors into safe, field-specific findings.
+
+    The shared workflow JSON Schema validates the broad form field object shape, but it does not
+    enumerate field types. Preserve the model validator's discriminator errors so save-time
+    validation can report an unknown or missing ``type`` without exposing raw Pydantic errors.
+    """
+    form_definition = parameters.get("form_definition")
+    raw_fields = form_definition.get("fields") if isinstance(form_definition, dict) else None
+    if not isinstance(raw_fields, list):
+        return []
+
+    findings: list[ValidationFinding] = []
+    for error in exc.errors():
+        location = error.get("loc", ())
+        if (
+            error.get("type") not in {"union_tag_invalid", "union_tag_not_found"}
+            or len(location) < _FORM_FIELD_TYPE_LOCATION_PARTS
+            or location[0] != "form_definition"
+            or location[1] != "fields"
+            or not isinstance(location[2], int)
+        ):
+            continue
+
+        field_index = location[2]
+        if field_index >= len(raw_fields):
+            continue
+        raw_field = raw_fields[field_index]
+        if not isinstance(raw_field, dict):
+            continue
+
+        error_type = error.get("type")
+        field_type = raw_field.get("type")
+        if error_type == "union_tag_invalid":
+            message = f"Invalid field type {field_type!r} in form prompt field definition"
+        elif error_type == "union_tag_not_found" and "type" not in raw_field:
+            message = "Required property 'type' missing in form prompt field definition"
+        else:
+            continue
+
+        findings.append(
+            ValidationFinding(
+                severity=ValidationSeverity.error,
+                category=ValidationCategory.form_prompt_configuration,
+                message=message,
+                node_id=node_id,
+                field_path=f"parameters.form_definition.fields.{field_index}.type",
+            )
+        )
+
     return findings
 
 
