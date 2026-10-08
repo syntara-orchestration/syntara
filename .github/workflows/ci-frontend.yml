@@ -79,9 +79,12 @@ jobs:
             { echo "code=true"; echo "backend=true"; echo "contracts=true"; echo "scripts=true"; echo "frontend=true"; } >> "$GITHUB_OUTPUT"
             exit 0
           fi
+          # Agent skills and Cursor rules are not shipped UI; exclude them from
+          # product path filters (same idea as narrowing .github/ in #436).
+          CI_FILES=$(grep -vE '^(\.claude/skills/|frontend/\.cursor/)' <<< "$FILES" || true)
           # Workflow/action edits that affect this stack, not all of .github/
           # (CODEOWNERS, PR template, etc. used to turn on full frontend CI).
-          if grep -qE '^(frontend/|backend/|\.github/workflows/ci-frontend\.yml|\.github/actions/)' <<< "$FILES"; then
+          if grep -qE '^(frontend/|backend/|\.github/workflows/ci-frontend\.yml|\.github/actions/)' <<< "$CI_FILES"; then
             echo "code=true" >> "$GITHUB_OUTPUT"
           else
             echo "code=false" >> "$GITHUB_OUTPUT"
@@ -101,7 +104,7 @@ jobs:
           else
             echo "scripts=false" >> "$GITHUB_OUTPUT"
           fi
-          if grep -qE '^(frontend/|\.github/workflows/ci-frontend\.yml)' <<< "$FILES"; then
+          if grep -qE '^(frontend/|\.github/workflows/ci-frontend\.yml)' <<< "$CI_FILES"; then
             echo "frontend=true" >> "$GITHUB_OUTPUT"
           else
             echo "frontend=false" >> "$GITHUB_OUTPUT"
