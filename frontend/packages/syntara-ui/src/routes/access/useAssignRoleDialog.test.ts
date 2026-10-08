@@ -128,7 +128,7 @@ describe('useAssignRoleDialog', () => {
     const { form, onProjectChange } = result.current.formBodyProps
     act(() => {
       form.setValue('roleName', 'admin')
-      onProjectChange()
+      onProjectChange('proj-1')
     })
 
     expect(form.getValues('roleName')).toBe('')

@@ -66,7 +66,8 @@ export function useAssignRoleDialog({ onClose, onSuccess }: UseAssignRoleDialogO
     }
   }
 
-  const onProjectChange = () => {
+  const onProjectChange = (projectId: string) => {
+    setValue('projectId', projectId)
     setValue('roleName', '')
   }
 
