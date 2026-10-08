@@ -190,6 +190,11 @@ describe('AddRoleDialog', () => {
       expect(screen.getByLabelText(/^Name/)).toBeInTheDocument()
     })
 
+    it('marks the name input as required', () => {
+      renderDialog()
+      expect(screen.getByLabelText(/^Name/)).toBeRequired()
+    })
+
     it('renders description input', () => {
       renderDialog()
       expect(screen.getByLabelText(/^Description/)).toBeInTheDocument()

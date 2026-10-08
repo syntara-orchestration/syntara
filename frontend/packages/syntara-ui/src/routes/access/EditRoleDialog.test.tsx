@@ -128,6 +128,11 @@ describe('EditRoleDialog', () => {
       expect(screen.getByLabelText(/^Name/)).toHaveValue('my-custom-role')
     })
 
+    it('marks the name input as required', () => {
+      renderDialog()
+      expect(screen.getByLabelText(/^Name/)).toBeRequired()
+    })
+
     it('pre-fills description input with role description', () => {
       renderDialog()
       expect(screen.getByLabelText(/^Description/)).toHaveValue('A custom role for testing')
