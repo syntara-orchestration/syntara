@@ -120,11 +120,7 @@ export type SynFileFieldProps<
   hideDefaultPreview?: boolean
   /** Disables the file upload control. */
   isDisabled?: boolean
-  /**
-   * Called with the selected `File` (or `undefined` on clear) in addition to
-   * the RHF field update. Use for side effects such as deriving another
-   * field's value from the file's contents.
-   */
+  /** Called with the new file (or `undefined` on clear) whenever the selection changes, after the RHF field is updated. */
   onFileChange?: (file: File | undefined) => void
 }
 

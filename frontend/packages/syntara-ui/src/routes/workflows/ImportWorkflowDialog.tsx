@@ -88,7 +88,7 @@ export function ImportWorkflowDialog({ isOpen, onClose, onSuccess }: ImportWorkf
       onClose()
     },
   })
-  const { handleSubmit, handleClose, setError, getValues, setValue } = form
+  const { handleSubmit, handleClose, setError, setValue } = form
 
   const onImportSuccess = (
     wfName: string,
@@ -108,22 +108,20 @@ export function ImportWorkflowDialog({ isOpen, onClose, onSuccess }: ImportWorkf
     onSuccess()
   }
 
-  const handleFileChange = (file: File | undefined) => {
-    if (!file) return
+  const prefillNameFromFile = async (file: File) => {
+    try {
+      const content = await file.text()
+      const parsed = parseWorkflowFile(content, file.name)
+      if (typeof parsed.name === 'string' && parsed.name.trim()) {
+        setValue('name', parsed.name, { shouldValidate: true, shouldDirty: true })
+      }
+    } catch {
+      // Invalid or unparsable files are surfaced with a validation error on submit.
+    }
+  }
 
-    detachPromise(
-      (async () => {
-        try {
-          const content = await file.text()
-          const parsed = parseWorkflowFile(content, file.name)
-          if (typeof parsed.name === 'string' && parsed.name.trim() && !getValues('name')) {
-            setValue('name', parsed.name)
-          }
-        } catch {
-          // Invalid file content is surfaced as a validation error on submit.
-        }
-      })()
-    )
+  const handleFileChange = (file: File | undefined) => {
+    if (file) detachPromise(prefillNameFromFile(file))
   }
 
   const onSubmit = async (data: ImportWorkflowFormData) => {

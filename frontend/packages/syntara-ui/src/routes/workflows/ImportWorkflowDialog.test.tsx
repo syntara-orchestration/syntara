@@ -128,23 +128,22 @@ describe('ImportWorkflowDialog', () => {
   })
 
   // AAP-93572: uploading a workflow JSON file should prefill the name field
-  // from workflow_definition.name instead of leaving it blank.
+  // from the file's top-level "name" (i.e. workflow_definition.name).
   it('prefills the workflow name field from the uploaded file', async () => {
     const user = userEvent.setup()
     render(<ImportWorkflowDialog {...defaultProps} />)
 
     const validContent = JSON.stringify({
-      name: 'Imported From File',
+      name: 'My Imported Workflow',
       triggers: [{ id: 't1', type: 'webhook' }],
       nodes: [{ id: 'n1', type: 'action' }],
       edges: [{ from: 't1', to: 'n1' }],
     })
     const file = new File([validContent], 'workflow.json', { type: 'application/json' })
-
     await user.upload(getFileUploadInput(), file)
 
     await waitFor(() => {
-      expect(screen.getByLabelText(/Workflow name/i)).toHaveValue('Imported From File')
+      expect(screen.getByLabelText(/Workflow name/i)).toHaveValue('My Imported Workflow')
     })
   })
 
