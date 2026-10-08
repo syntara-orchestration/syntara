@@ -193,6 +193,7 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
         self._retry_replay_candidates: set[str] = set()
         self._restored_node_timestamps: dict[str, dict[str, str | None]] = {}
         self._restored_node_statuses: dict[str, str] = {}
+        self._restored_node_ports: dict[str, str] = {}
         self._restored_node_outputs: dict[str, dict[str, Any]] = {}
         self._retry_source_statuses: dict[str, str] = {}
         if workflow_metadata:

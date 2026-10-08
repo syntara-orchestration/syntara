@@ -1167,3 +1167,152 @@ class TestConvergeAlwaysGoesThroughItsGate:
 
         assert "join" not in wf._retry_restorable_nodes(graph)
         assert not wf._should_restore_node("join", graph)
+
+
+def _branch_graph() -> WorkflowGraph:
+    """Split (condition) -> [true: only_a, false: only_b] -> join -> tail.
+
+    The two branches stay separate all the way to join, so each node is reachable
+    through exactly one port and the branch is inferable from their statuses.
+    """
+    from syntara.workflows.workflow_engine.graph import WorkflowGraph
+    from syntara.workflows.workflow_engine.graph_backend import InMemoryGraphBackend
+
+    backend = InMemoryGraphBackend()
+    backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
+    backend.add_node("split", {"id": "split", "type": "condition", "parameters": {}})
+    backend.add_node("only_a", {"id": "only_a", "type": "script", "parameters": {}})
+    backend.add_node("only_b", {"id": "only_b", "type": "script", "parameters": {}})
+    backend.add_node("join", {"id": "join", "type": "script", "parameters": {}})
+    backend.add_node("tail", {"id": "tail", "type": "script", "parameters": {}})
+    backend.add_edge("trigger", "split", None)
+    backend.add_edge("split", "only_a", {"from_port": "true"})
+    backend.add_edge("split", "only_b", {"from_port": "false"})
+    backend.add_edge("only_a", "join", None)
+    backend.add_edge("only_b", "join", None)
+    backend.add_edge("join", "tail", None)
+    return WorkflowGraph(backend)
+
+
+def _merging_branch_graph() -> WorkflowGraph:
+    """Split -> [true: a, false: b], both reaching shared. No exclusive node."""
+    from syntara.workflows.workflow_engine.graph import WorkflowGraph
+    from syntara.workflows.workflow_engine.graph_backend import InMemoryGraphBackend
+
+    backend = InMemoryGraphBackend()
+    backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
+    backend.add_node("split", {"id": "split", "type": "condition", "parameters": {}})
+    backend.add_node("a", {"id": "a", "type": "script", "parameters": {}})
+    backend.add_node("b", {"id": "b", "type": "script", "parameters": {}})
+    backend.add_node("shared", {"id": "shared", "type": "script", "parameters": {}})
+    backend.add_edge("trigger", "split", None)
+    backend.add_edge("split", "a", {"from_port": "true"})
+    backend.add_edge("split", "b", {"from_port": "false"})
+    backend.add_edge("a", "shared", None)
+    backend.add_edge("b", "shared", None)
+    return WorkflowGraph(backend)
+
+
+class TestControlNodeBranchInference:
+    """A condition or switch is replayed by handing it the branch the source ran.
+
+    Re-evaluating a condition against this retry's namespace would decide on
+    incomplete data — a sibling branch may still be restoring — so the branch the
+    source run recorded is replayed instead. That is already recorded implicitly:
+    `_skip_non_taken_branches` marks the untaken branch SKIPPED and cascades.
+    """
+
+    def test_the_taken_branch_is_inferred_from_which_nodes_ran(self) -> None:
+        wf = _make_workflow(_retry("join"))
+        wf._retry_source_statuses = {"only_a": "skipped", "only_b": "completed", "join": "completed"}
+        graph = _branch_graph()
+
+        assert wf._infer_control_node_branch(graph.get_node("split"), graph) == "false"
+
+    def test_the_other_branch_is_inferred_when_it_was_the_one_that_ran(self) -> None:
+        wf = _make_workflow(_retry("join"))
+        wf._retry_source_statuses = {"only_a": "completed", "only_b": "skipped", "join": "completed"}
+        graph = _branch_graph()
+
+        assert wf._infer_control_node_branch(graph.get_node("split"), graph) == "true"
+
+    def test_a_merged_branch_is_not_inferable(self) -> None:
+        """A node both ports reach records activity either way.
+
+        Its status says nothing about which port fired, so inferring from it would
+        be a coin flip. Returning None means the node reruns and decides for itself.
+        """
+        wf = _make_workflow(_retry("shared"))
+        wf._retry_source_statuses = {"a": "completed", "b": "completed", "shared": "completed"}
+        graph = _merging_branch_graph()
+
+        assert wf._infer_control_node_branch(graph.get_node("split"), graph) is None
+
+    def test_both_branches_running_is_not_inferable(self) -> None:
+        wf = _make_workflow(_retry("join"))
+        wf._retry_source_statuses = {"only_a": "completed", "only_b": "completed", "join": "completed"}
+        graph = _branch_graph()
+
+        assert wf._infer_control_node_branch(graph.get_node("split"), graph) is None
+
+    def test_neither_branch_running_is_not_inferable(self) -> None:
+        wf = _make_workflow(_retry("join"))
+        wf._retry_source_statuses = {"only_a": "skipped", "only_b": "skipped", "join": "completed"}
+        graph = _branch_graph()
+
+        assert wf._infer_control_node_branch(graph.get_node("split"), graph) is None
+
+    def test_an_inferable_condition_is_restorable(self) -> None:
+        wf = _make_workflow(_retry("join"))
+        wf._retry_source_statuses = {"only_a": "skipped", "only_b": "completed", "join": "completed"}
+        graph = _branch_graph()
+
+        assert "split" in wf._retry_restorable_nodes(graph)
+        assert wf._should_restore_node("split", graph)
+
+    def test_an_ambiguous_condition_is_not_restorable(self) -> None:
+        wf = _make_workflow(_retry("shared"))
+        wf._retry_source_statuses = {"a": "completed", "b": "completed", "shared": "completed"}
+        graph = _merging_branch_graph()
+
+        assert "split" not in wf._retry_restorable_nodes(graph)
+
+    def test_loop_wait_and_converge_stay_excluded(self) -> None:
+        """Inference is for condition and switch only."""
+        from syntara.workflows.workflow_engine.models.workflow_definition import NodeType
+
+        wf = _make_workflow(_retry("join"))
+        wf._retry_source_statuses = {"only_a": "skipped", "only_b": "completed", "join": "completed"}
+
+        for node_type in (NodeType.LOOP, NodeType.WAIT, NodeType.CONVERGE):
+            node = ActivityNode(node_id="ctrl", node_type=node_type, parameters={})
+            assert wf._infer_control_node_branch(node, _branch_graph()) is None, node_type
+
+    @pytest.mark.asyncio
+    async def test_restoring_a_condition_publishes_the_branch_and_dispatches_nothing(self, mock_wf: MagicMock) -> None:
+        wf = _make_workflow(_retry("join"))
+        wf.retry_context = _retry("join")
+        wf._retry_source_statuses = {"only_a": "skipped", "only_b": "completed", "join": "completed"}
+        mock_wf.execute_activity = AsyncMock(side_effect=AssertionError("must not dispatch"))
+        graph = _branch_graph()
+
+        result = await wf._maybe_restore_retry_output(graph.get_node("split"), graph)
+
+        assert result == {"output": {}, "control": {"next_port": "false"}}
+        # Published so _determine_output_port follows the same edge the source run
+        # did, and so the node reads as completed to the scheduler.
+        assert wf._restored_node_ports["split"] == "false"
+        assert wf._restored_node_statuses["split"] == "completed"
+        # No activity is dispatched, so nothing will ever ask the sync service for
+        # this node's state; leaving it a candidate would stall for the full wait.
+        assert "split" not in wf._retry_replay_candidates
+
+    @pytest.mark.asyncio
+    async def test_an_uninferable_condition_falls_through_to_execution(self, mock_wf: MagicMock) -> None:
+        wf = _make_workflow(_retry("shared"))
+        wf.retry_context = _retry("shared")
+        wf._retry_source_statuses = {"a": "completed", "b": "completed", "shared": "completed"}
+        mock_wf.execute_activity = AsyncMock(side_effect=AssertionError("must not dispatch"))
+        graph = _merging_branch_graph()
+
+        assert await wf._maybe_restore_retry_output(graph.get_node("split"), graph) is None
