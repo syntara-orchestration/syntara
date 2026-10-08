@@ -1,4 +1,4 @@
-"""E2E coverage for form-prompt timeout and continue-on-failure routing."""
+"""E2E coverage for form-prompt timeouts, option resolution, and form-service activity failures."""
 
 import json
 from collections.abc import Callable
@@ -17,6 +17,8 @@ from syntara_api_client.models import (
     WorkflowRead,
 )
 from syntara_api_client.models.activity_data_output_data_type_0 import ActivityDataOutputDataType0
+
+from syntara.core.constants import FieldLimits
 
 from ._helpers import (
     EXECUTION_POLL_TIMEOUT,
@@ -71,15 +73,6 @@ _FAILURE_CASES = [
     ),
     pytest.param(
         "invalid_dynamic_options",
-        False,
-        None,
-        ExecutionStatus.FAILED,
-        "none",
-        "expected a list",
-        id="invalid-options-cof-disabled",
-    ),
-    pytest.param(
-        "invalid_dynamic_options",
         True,
         "submit",
         ExecutionStatus.COMPLETED_WITH_ERRORS,
@@ -88,13 +81,31 @@ _FAILURE_CASES = [
         id="invalid-options-cof-submit",
     ),
     pytest.param(
-        "invalid_dynamic_options",
+        "form_api_validation",
+        False,
+        None,
+        ExecutionStatus.FAILED,
+        "none",
+        "HTTP 422",
+        id="form-api-422-cof-disabled",
+    ),
+    pytest.param(
+        "form_api_validation",
+        True,
+        "submit",
+        ExecutionStatus.COMPLETED_WITH_ERRORS,
+        "submitted",
+        "HTTP 422",
+        id="form-api-422-cof-submit",
+    ),
+    pytest.param(
+        "form_api_validation",
         True,
         "fallback",
         ExecutionStatus.COMPLETED_WITH_ERRORS,
         "fallback",
-        "expected a list",
-        id="invalid-options-cof-fallback",
+        "HTTP 422",
+        id="form-api-422-cof-fallback",
     ),
 ]
 
@@ -126,11 +137,11 @@ def _assert_failed_prompt_activity(
     return prompt_activity
 
 
-def _assert_not_completed(activities: dict[str, "ActivityData"], activity_id: str) -> None:
-    """Assert that a node on an unselected route did not complete."""
+def _assert_route_not_taken(activities: dict[str, "ActivityData"], activity_id: str) -> None:
+    """Require unselected route nodes to be absent or explicitly skipped/cancelled."""
     activity = activities.get(activity_id)
-    assert activity is None or activity.status != "completed", (
-        f"Node {activity_id!r} should not have completed; got {activity.status}"
+    assert activity is None or activity.status in {"skipped", "cancelled"}, (
+        f"Unselected route node {activity_id!r} should be absent, skipped, or cancelled; got {activity.status}"
     )
 
 
@@ -139,18 +150,18 @@ def _assert_selected_route(final: ExecutionRead, *, expected_route: Literal["non
     activities = _activities_by_id(final)
     if expected_route == "none":
         for activity_id in ("consumer", "fallback_handler", "fallback_consumer"):
-            _assert_not_completed(activities, activity_id)
+            _assert_route_not_taken(activities, activity_id)
     elif expected_route == "submitted":
         assert activities.get("consumer") is not None, f"Submitted consumer missing: {list(activities)}"
         assert activities["consumer"].status == "completed"
-        _assert_not_completed(activities, "fallback_handler")
-        _assert_not_completed(activities, "fallback_consumer")
+        _assert_route_not_taken(activities, "fallback_handler")
+        _assert_route_not_taken(activities, "fallback_consumer")
     else:
         assert activities.get("fallback_handler") is not None, f"Fallback handler missing: {list(activities)}"
         assert activities["fallback_handler"].status == "completed"
         assert activities.get("fallback_consumer") is not None, f"Fallback successor missing: {list(activities)}"
         assert activities["fallback_consumer"].status == "completed"
-        _assert_not_completed(activities, "consumer")
+        _assert_route_not_taken(activities, "consumer")
 
 
 def _assert_downstream_received_no_defaults(
@@ -201,16 +212,20 @@ def _start_failure_case(
     first_project_id: UUID,
     track_execution: Callable[[UUID], None],
     *,
-    failure_kind: Literal["timeout", "invalid_dynamic_options"],
+    failure_kind: Literal["timeout", "invalid_dynamic_options", "form_api_validation"],
     continue_on_failure: bool,
     fallback_decision: Literal["submit", "fallback"] | None,
 ) -> tuple[UUID, UUID | None]:
     """Create the selected failure workflow and return its execution and optional prompt IDs."""
     form_fields = [dict(_DEFAULT_TEXT_FIELD)]
     producer_output: dict[str, object] = {}
+    submit_label: str | None = None
     if failure_kind == "invalid_dynamic_options":
         producer_output = {"environments": "production"}
         form_fields.append(dynamic_option_field("environment", "${producer.stdout_json.environments}"))
+    elif failure_kind == "form_api_validation":
+        producer_output = {"submit_label": "x" * (FieldLimits.FORM_SUBMIT_LABEL_MAX_LENGTH + 1)}
+        submit_label = "${producer.stdout_json.submit_label}"
 
     workflow_name_prefix = f"e2e-form-prompt-failure-{failure_kind}"
     description = "E2E: form prompt failure and continue-on-failure routing"
@@ -226,6 +241,7 @@ def _start_failure_case(
             form_fields=form_fields,
             continue_on_failure=continue_on_failure,
             response_window=1,
+            submit_label=submit_label,
             fallback_decision=fallback_decision,
             capture_form_prompt_result=continue_on_failure,
         )
@@ -243,6 +259,7 @@ def _start_failure_case(
         producer_output=producer_output,
         form_fields=form_fields,
         continue_on_failure=continue_on_failure,
+        submit_label=submit_label,
         fallback_decision=fallback_decision,
         capture_form_prompt_result=continue_on_failure,
     )
@@ -266,19 +283,21 @@ def test_form_prompt_failures_follow_continue_on_failure_routing(
     first_project_id: UUID,
     form_prompt_execution_cleanup: Callable[[UUID], None],
     *,
-    failure_kind: Literal["timeout", "invalid_dynamic_options"],
+    failure_kind: Literal["timeout", "invalid_dynamic_options", "form_api_validation"],
     continue_on_failure: bool,
     fallback_decision: Literal["submit", "fallback"] | None,
     expected_execution_status: ExecutionStatus,
     expected_route: Literal["none", "submitted", "fallback"],
     expected_error_fragment: str,
 ) -> None:
-    """Cover both form prompt failure kinds with all applicable failure settings.
+    """Cover timeout, option-resolution, and form-service failures with applicable settings.
 
     Timeout cases wait for a pending form prompt and intentionally do not submit a
-    response. Invalid dynamic options fail before a prompt row is created. The
-    continue-on-failure route is selected through fallback_decision for either
-    failure kind.
+    response. Invalid dynamic options fail before the form activity is scheduled.
+    An overlong resolved submit label is rejected by the Forms API during the
+    Temporal form-creation activity. Existing type-mismatch E2E cases cover
+    invalid dynamic options with continue-on-failure disabled and fallback
+    routing; this matrix adds the uncovered submitted route.
     """
     exec_id, prompt_id = _start_failure_case(
         syntara_api,

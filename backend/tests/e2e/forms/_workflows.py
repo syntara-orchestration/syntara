@@ -41,6 +41,7 @@ def producer_prompt_consumer_workflow(
     consumer_environment: Mapping[str, str] | None = None,
     continue_on_failure: bool = False,
     response_window: int = 600,
+    submit_label: str | None = None,
     fallback_decision: Literal["submit", "fallback"] | None = None,
     capture_form_prompt_result: bool = False,
     responder_users: list[str] | None = None,
@@ -66,6 +67,8 @@ def producer_prompt_consumer_workflow(
         "form_definition": {"fields": form_fields},
         "response_window": response_window,
     }
+    if submit_label is not None:
+        prompt_parameters["submit_label"] = submit_label
     if fallback_decision is not None:
         prompt_parameters["fallback_decision"] = fallback_decision
     if responder_users:
