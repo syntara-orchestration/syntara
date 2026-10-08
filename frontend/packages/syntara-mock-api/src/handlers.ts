@@ -23,7 +23,13 @@ import { executions } from './resources/executions'
 import { getExecutionDetail } from './resources/executionDetails'
 import { activityExecutions } from './resources/activityExecutions'
 import { approvals } from './resources/approvals'
-import { alignPendingFormPromptClock, formPromptToListRead, formPrompts } from './resources/formPrompts'
+import {
+  alignPendingFormPromptClock,
+  formPromptToListRead,
+  formPrompts,
+  registerFormPromptListWorkflowContext,
+  removeFormPromptsForExecutions,
+} from './resources/formPrompts'
 import { settings, settingsCategories } from './resources/settings'
 import { revocationState } from './resources/revocation'
 import { identityProviders, type IdentityProvider } from './resources/identityProviders'
@@ -1206,12 +1212,15 @@ export const handlers = [
 
     workflows.splice(workflowIndex, 1)
 
-    // Cascade: remove executions associated with the deleted workflow
+    const removedExecutionIds: string[] = []
     for (let i = executions.length - 1; i >= 0; i--) {
       if (executions[i].workflow_id === workflowId) {
+        removedExecutionIds.push(executions[i].id)
+        delete activityExecutions[executions[i].id]
         executions.splice(i, 1)
       }
     }
+    removeFormPromptsForExecutions(removedExecutionIds)
 
     return new HttpResponse(null, { status: 204 })
   }),
@@ -1767,6 +1776,12 @@ export const handlers = [
     }
     executions.push(execution)
 
+    registerFormPromptListWorkflowContext(executionId, {
+      workflow_id: body.workflow_id,
+      workflow_version: versionNum,
+      workflow_name: workflow?.name ?? 'workflow',
+    })
+
     // Self-contained E2E: a paused approval execution must also appear in GET /approvals.
     // The real backend creates that row when Temporal pauses; the mock has no worker.
     if (isPaused) {
@@ -2226,9 +2241,8 @@ export const handlers = [
         .filter(Boolean) ?? []
 
     const filtered = formPrompts.filter((prompt) => {
-      if (statusInValues.length > 0) {
-        if (!prompt.status || !statusInValues.includes(prompt.status)) return false
-      } else if (status && prompt.status !== status) {
+      if (status && prompt.status !== status) return false
+      if (statusInValues.length > 0 && (!prompt.status || !statusInValues.includes(prompt.status))) {
         return false
       }
       if (execution_id && prompt.execution_id !== execution_id) return false

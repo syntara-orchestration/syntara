@@ -13,13 +13,17 @@ import {
 
 import { buildUniqueName } from './workflows'
 
-/** Mock API seed row used by form-responses E2E (see syntara-mock-api formPrompts). */
+/** Mock API seed rows used by form-responses and side-panel E2E (see syntara-mock-api formPrompts). */
 export const MOCK_FORM_RESPONSE_SEED = {
   pendingName: 'Collect operator input',
   submittedName: 'Confirm deployment details',
   pendingId: 'fp-exec-form-prompt-1',
+  dynamicPendingId: 'fp-exec-form-prompt-dynamic',
   executionId: 'exec-form-prompt',
   pendingMessage: 'Provide details required to continue the workflow.',
+  dynamicPendingMessage: 'Choose where to deploy.',
+  customSubmitLabel: 'Submit response',
+  customSuccessMessage: 'Thank you — the workflow will continue.',
   submittedDataSnippet: 'Approved for production rollout',
   defaultProjectName: 'default',
   otherProjectName: 'alice-sandbox',
@@ -37,6 +41,34 @@ const MINIMAL_FORM_DEFINITION = {
     },
   ],
 } as const
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
+function readExecutionIdFromCreateResponse(body: unknown): string {
+  if (!isRecord(body)) {
+    throw new Error('POST /executions returned a non-object body')
+  }
+  const id = body['id']
+  if (typeof id === 'string' && id.length > 0) return id
+  const executionId = body['execution_id']
+  if (typeof executionId === 'string' && executionId.length > 0) return executionId
+  throw new Error('POST /executions did not return an execution ID')
+}
+
+function findFormPromptIdByName(body: unknown, promptName: string): string | undefined {
+  if (!isRecord(body)) return undefined
+  const resources = body['resources']
+  if (!Array.isArray(resources)) return undefined
+  for (const row of resources) {
+    if (!isRecord(row)) continue
+    const name = row['name']
+    const id = row['id']
+    if (name === promptName && typeof id === 'string' && id.length > 0) return id
+  }
+  return undefined
+}
 
 /** Project selector on Tasks (placeholder before selection, labeled textbox after). */
 export function tasksProjectSelector(app: Page): Locator {
@@ -89,11 +121,6 @@ export async function applyFormResponseStatusFilter(app: Page, statusLabel: stri
   ).toBeVisible({ timeout: 15_000 })
 }
 
-/**
- * Create a workflow with a form prompt node and run it to produce a pending list row.
- * On mock: POST /executions synthesizes the form prompt when the run pauses.
- * On real backend: polls for paused execution and list visibility when Temporal is available.
- */
 export async function disposeFormPromptWorkflow(app: Page, workflowId: string, executionId: string): Promise<void> {
   try {
     await cancelExecutionViaApi(app, executionId)
@@ -103,10 +130,21 @@ export async function disposeFormPromptWorkflow(app: Page, workflowId: string, e
   await deleteWorkflowViaApi(app, workflowId)
 }
 
+/**
+ * Create a workflow with a form prompt node and run it to produce a pending list row.
+ * On mock: POST /executions synthesizes the form prompt when the run pauses.
+ * On real backend: polls for paused execution and list visibility when Temporal is available.
+ */
 export async function createPendingFormPromptLight(
   app: Page,
   namePrefix = 'form-prompt'
-): Promise<{ workflowId: string; workflowName: string; executionId: string; promptName: string }> {
+): Promise<{
+  workflowId: string
+  workflowName: string
+  executionId: string
+  promptName: string
+  formPromptId: string
+}> {
   const workflowName = buildUniqueName('e2e-form-response')
   const promptName = buildUniqueName(namePrefix)
   const hasTemporal = !!process.env['SYNTARA_E2E_HAS_TEMPORAL_WORKER']
@@ -139,21 +177,32 @@ export async function createPendingFormPromptLight(
     ],
   })
 
-  await publishWorkflowViaApi(app, workflowId, versionNumber)
+  try {
+    await publishWorkflowViaApi(app, workflowId, versionNumber)
 
-  const runResp = await apiRequest(app, 'post', '/executions', {
-    data: { workflow_id: workflowId, trigger_node_id: 'trigger_1', use_published: true },
-  })
-  const execution = (await runResp.json()) as { id?: string; execution_id?: string }
-  const executionId = execution.id ?? execution.execution_id
-  if (!executionId) throw new Error('POST /executions did not return an execution ID')
+    const runResp = await apiRequest(app, 'post', '/executions', {
+      data: { workflow_id: workflowId, trigger_node_id: 'trigger_1', use_published: true },
+    })
+    const executionId = readExecutionIdFromCreateResponse(await runResp.json())
 
-  if (hasTemporal) {
-    await pollExecutionStatus(app, executionId, ['paused'])
-    await pollFormPromptVisible(app, promptName, { timeout: 45_000 })
-  } else {
-    await pollFormPromptVisible(app, promptName, { timeout: 15_000 })
+    if (hasTemporal) {
+      await pollExecutionStatus(app, executionId, ['paused'])
+      await pollFormPromptVisible(app, promptName, { timeout: 45_000 })
+    } else {
+      await pollFormPromptVisible(app, promptName, { timeout: 15_000 })
+    }
+
+    let formPromptId = ''
+    await expect(async () => {
+      const resp = await apiRequest(app, 'get', `/form_prompts?execution_id=${executionId}&status=pending&limit=100`)
+      const match = findFormPromptIdByName(await resp.json(), promptName)
+      expect(match).toBeTruthy()
+      formPromptId = match ?? ''
+    }).toPass({ timeout: 15_000 })
+
+    return { workflowId, workflowName, executionId, promptName, formPromptId }
+  } catch (error) {
+    await deleteWorkflowViaApi(app, workflowId).catch(() => undefined)
+    throw error
   }
-
-  return { workflowId, workflowName, executionId, promptName }
 }
