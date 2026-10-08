@@ -73,10 +73,19 @@ function getAddModeFormId(
   nodeTypeId: string | null | undefined,
   nodeSubtypeId: string | null | undefined
 ): string | undefined {
+  // Action node subtypes
+  if (nodeTypeId === RegistryNodeId.ACTION && nodeSubtypeId) {
+    const actionFormMap: Record<string, string> = {
+      [RegistryNodeId.ACTION_SCRIPT]: 'action-node-form',
+      [RegistryNodeId.ACTION_API]: 'action-node-form',
+      [RegistryNodeId.SUB_WORKFLOW]: 'sub-workflow-node-form',
+    }
+    return actionFormMap[nodeSubtypeId]
+  }
+
   // Simple node types without subtypes
   const simpleFormMap: Record<string, string> = {
     [RegistryNodeId.TRIGGER]: 'trigger-node-form',
-    [RegistryNodeId.ACTION]: 'action-node-form',
     [RegistryNodeId.AGENT]: 'ai-agent-node-form',
     [RegistryNodeId.APPROVAL]: 'approval-node-form',
   }

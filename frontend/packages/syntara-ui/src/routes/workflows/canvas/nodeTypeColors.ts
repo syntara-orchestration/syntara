@@ -98,6 +98,7 @@ const ADD_PANEL_ACTION_IDS: ReadonlySet<string> = new Set([
   RegistryNodeId.ACTION,
   RegistryNodeId.ACTION_SCRIPT,
   RegistryNodeId.ACTION_API,
+  RegistryNodeId.SUB_WORKFLOW,
 ])
 
 /**

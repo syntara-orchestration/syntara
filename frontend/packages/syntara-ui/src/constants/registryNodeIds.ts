@@ -30,6 +30,7 @@ export const RegistryNodeId = {
   AAP_EXECUTION: 'aap-execution',
   AAP_JOB_TEMPLATE: 'aap-job-template',
   AAP_WORKFLOW_TEMPLATE: 'aap-workflow-template',
+  SUB_WORKFLOW: 'sub-workflow',
   GENERIC: 'generic',
 } as const
 
