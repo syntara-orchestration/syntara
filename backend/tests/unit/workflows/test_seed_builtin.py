@@ -360,6 +360,58 @@ class TestSeedBuiltinWorkflows:
         session.rollback.assert_not_awaited()
 
     @pytest.mark.asyncio
+    async def test_sync_error_fails_strict_rerun_on_unchanged_definition(self) -> None:
+        """``--strict`` also fails the typical re-run: unchanged definitions re-syncing.
+
+        The unchanged branch must still attempt the schedule sync (that is why
+        the re-run exists) and must abort under strict mode when it fails.
+        """
+        first_def = _BUILTIN_DEFINITIONS[0]
+        existing = MagicMock(spec=Workflow)
+        existing.id = uuid4()
+        existing.current_version = 1
+        existing.project_id = uuid4()
+
+        cur_ver = MagicMock(spec=WorkflowVersion)
+        cur_ver.workflow_definition = first_def
+
+        self.mock_scheduler.sync_scheduled_triggers = AsyncMock(
+            side_effect=ScheduledTriggerSyncError("some-workflow-id", 1)
+        )
+        session = _mock_session(
+            _mock_admin(), _mock_project(), existing, cur_ver, *[None] * (len(_BUILTIN_DEFINITIONS) - 1)
+        )
+
+        token = strict_mode_context_var.set(True)
+        try:
+            with pytest.raises(ScheduledTriggerSyncError):
+                await seed_builtin_workflows(session)
+        finally:
+            strict_mode_context_var.reset(token)
+
+        # The unchanged definition was schedule-synced before the abort.
+        synced_ids = {
+            call.kwargs["workflow_id"] for call in self.mock_scheduler.sync_scheduled_triggers.await_args_list
+        }
+        assert str(existing.id) in synced_ids
+
+    @pytest.mark.asyncio
+    async def test_strict_run_succeeds_when_syncs_succeed(self) -> None:
+        """``--strict`` does not alter a fully successful pass."""
+        admin, project = _mock_admin(), _mock_project()
+        session = _mock_session(admin, project, *[None] * len(_BUILTIN_DEFINITIONS))
+
+        token = strict_mode_context_var.set(True)
+        try:
+            await seed_builtin_workflows(session)
+        finally:
+            strict_mode_context_var.reset(token)
+
+        assert session.commit.await_count == len(_BUILTIN_DEFINITIONS)
+        workflows_added = [c[0][0] for c in session.add.call_args_list if isinstance(c[0][0], Workflow)]
+        assert len(workflows_added) == len(_BUILTIN_DEFINITIONS)
+
+    @pytest.mark.asyncio
     async def test_health_check_definition_has_scheduled_trigger(self) -> None:
         """Health check workflow uses a scheduled_trigger, not manual_trigger."""
         hc_def = next(d for d in _BUILTIN_DEFINITIONS if d["name"] == "Integration Health Check")

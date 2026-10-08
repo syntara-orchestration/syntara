@@ -58,6 +58,29 @@ class TestRunSeedersStrict:
 
         assert strict_mode_context_var.get() is False
 
+    @pytest.mark.asyncio
+    async def test_strict_reset_restores_outer_value(self) -> None:
+        """A lenient pass must restore an outer strict value, not just the default.
+
+        Without an outer value set, a post-run ``False`` assertion passes even if
+        ``reset()`` is never called; pinning the restore distinguishes them.
+        """
+        seen: list[bool] = []
+
+        async def probe(_session: AsyncSession) -> None:
+            seen.append(strict_mode_context_var.get())
+
+        registration = SeederRegistration(name="probe", func=probe, description="probe")
+        token = strict_mode_context_var.set(True)
+        try:
+            with patch.object(seed_module, "_SEEDERS", [registration]):
+                await run_seeders(_session_factory(), only=["probe"], strict=False)
+
+            assert seen == [False]
+            assert strict_mode_context_var.get() is True
+        finally:
+            strict_mode_context_var.reset(token)
+
 
 class TestSeedCli:
     """The CLI exposes ``--strict`` and defaults to lenient."""
@@ -136,3 +159,22 @@ class TestSeedCliExitCode:
             self._run_main(["--strict"], [])
 
         mock_logger.exception.assert_called_once_with("Seeding failed", strict=True)
+
+    def test_strict_failure_still_stops_audit_subsystems(self) -> None:
+        """A --strict failure still flushes audit output (stop runs in a finally)."""
+        registration = SeederRegistration(
+            name="probe",
+            func=_strict_contract_probe([]),
+            description="probe",
+        )
+        with (
+            patch.object(seed_module, "_SEEDERS", [registration]),
+            patch("sys.argv", ["syntara.seed", "--only", "probe", "--strict"]),
+            patch("syntara.seed.__main__.start_audit_subsystems"),
+            patch("syntara.seed.__main__.stop_audit_subsystems", new_callable=AsyncMock) as mock_stop,
+            patch("syntara.core.database.session.AsyncSessionLocal", _session_factory()),
+        ):
+            with pytest.raises(SystemExit):
+                main()
+
+        mock_stop.assert_awaited_once()

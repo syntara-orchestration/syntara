@@ -7,8 +7,9 @@ Registered as a **required** seeder — always runs during seeding.
 Built-in workflows cannot be deleted or modified by users.
 
 Operational contract: this seeder must stay idempotent, and re-runs must be
-concurrency-safe. It is expected to be re-run after the initial seed —
-typically at API startup from a process that can reach Temporal — because the
+concurrency-safe. It is expected to be re-run after the initial seed — by a
+deployment hook or operator command, in a process that can reach Temporal
+and runs the current release — because the
 initial seed may run before Temporal exists, in which case the Temporal
 Schedule sync for scheduled built-in workflows degrades to a warning. Runs
 that are expected to reach Temporal pass ``--strict`` so that a failed sync

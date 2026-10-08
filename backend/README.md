@@ -160,12 +160,15 @@ make db-clean
 ```
 
 > **Seeding contract:** `python -m syntara.seed` (and any `--only` subset) must be idempotent, and
-> re-runs after the initial seed must be safe to execute concurrently — from several processes at
-> once — converging without duplicates. `--only builtin_workflows` is expected to be re-run after the
-> initial seed from a process that can reach Temporal, so the Temporal Schedules for built-in
-> scheduled workflows get created even when the first seed ran before Temporal was up. A failed
-> schedule sync is a warning by default; pass `--strict` on runs that are expected to reach Temporal
-> to make it fail the command instead. Keep new seeders within this contract.
+> re-runs after the initial seed must converge without duplicates. Concurrent execution is
+> seeder-specific: `builtin_workflows`, `settings` and `credentials` tolerate overlapping runs
+> (several processes at once); `authz` and `audit_metadata` must be serialized or retried if
+> overlapped. `--only builtin_workflows` is expected to be re-run after the initial seed from a
+> process that can reach Temporal and runs the current release — an older build re-publishes the
+> old definitions as new versions — and it includes its `authz` dependency, which re-asserts the
+> seeded baseline (e.g. a revoked role assignment is recreated). A failed schedule sync is a
+> warning by default; pass `--strict` on runs that are expected to reach Temporal to make it fail
+> the command instead. Keep new seeders within this contract.
 
 > **Schema baseline:** Alembic history was flattened into a single baseline. Databases
 > created with the old revision chain cannot be upgraded in place — run `make db-clean`
