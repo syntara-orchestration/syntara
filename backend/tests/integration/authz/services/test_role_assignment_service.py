@@ -8,11 +8,13 @@ Tests cover:
 - Visibility: admin, own user/group/service_account, project-admin, cross-project
 """
 
+from unittest.mock import patch
 from uuid import UUID, uuid4
 
 import pytest
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from syntara.audit.dispatcher import AuditEventDispatcher
 from syntara.authz.models.project import Project
 from syntara.authz.models.role import Role
 from syntara.authz.seed import seed_authz_data
@@ -827,20 +829,87 @@ async def _create_service_account(
 
 
 @pytest.mark.asyncio
-async def test_assign_service_account_role_project_scoped(seeded_db: AsyncSession, test_user: User) -> None:
+@pytest.mark.parametrize("role_name", ["project-user", "custom-project"])
+async def test_assign_service_account_role_project_scoped(
+    seeded_db: AsyncSession, test_user: User, role_name: str
+) -> None:
     """Assign a project role to a service account."""
     project = await _create_project(seeded_db, name="sa-project")
     sa = await _create_service_account(seeded_db, project, created_by=test_user.id)
+    if role_name == "custom-project":
+        await _create_custom_role(seeded_db, name=role_name, scope="project", project_id=project.id)
     svc = RoleAssignmentService(seeded_db, test_user)
     result = await svc.assign(
         principal_id=sa.id,
-        role_name="project-user",
+        role_name=role_name,
         project_id=project.id,
     )
     assert result["principal_id"] == sa.id
-    assert result["role_name"] == "project-user"
+    assert result["role_name"] == role_name
     assert result["project_id"] == project.id
     assert result["principal_name"] == sa.name
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("role_name", ["admin", "auditor", "custom-system"])
+async def test_assign_service_account_global_role_rejected(
+    seeded_db: AsyncSession, test_user: User, role_name: str
+) -> None:
+    """A service account cannot receive any system role globally."""
+    project = await _create_project(seeded_db)
+    sa = await _create_service_account(seeded_db, project, created_by=test_user.id)
+    if role_name == "custom-system":
+        await _create_custom_role(seeded_db, name=role_name)
+    svc = RoleAssignmentService(seeded_db, test_user)
+
+    with (
+        patch.object(AuditEventDispatcher, "dispatch") as dispatch,
+        pytest.raises(SafeValueError, match="Service accounts can only be assigned roles within their owning project"),
+    ):
+        await svc.assign(principal_id=sa.id, role_name=role_name)
+
+    assert (await svc.list(principal_id=sa.id))["resources"] == []
+    dispatch.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_assign_service_account_other_project_rejected(seeded_db: AsyncSession, test_user: User) -> None:
+    """A valid role in another project cannot be granted to the service account."""
+    project = await _create_project(seeded_db, name="owning-project")
+    other_project = await _create_project(seeded_db, name="other-project")
+    sa = await _create_service_account(seeded_db, project, created_by=test_user.id)
+    svc = RoleAssignmentService(seeded_db, test_user)
+
+    with (
+        patch.object(AuditEventDispatcher, "dispatch") as dispatch,
+        pytest.raises(SafeValueError, match="Service accounts can only be assigned roles within their owning project"),
+    ):
+        await svc.assign(principal_id=sa.id, role_name="project-user", project_id=other_project.id)
+
+    assert (await svc.list(principal_id=sa.id))["resources"] == []
+    dispatch.assert_not_called()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("role_name", ["admin", "auditor", "custom-system"])
+async def test_assign_service_account_system_role_in_owning_project_rejected(
+    seeded_db: AsyncSession, test_user: User, role_name: str
+) -> None:
+    """Matching the owning project does not make a system role valid."""
+    project = await _create_project(seeded_db)
+    sa = await _create_service_account(seeded_db, project, created_by=test_user.id)
+    if role_name == "custom-system":
+        await _create_custom_role(seeded_db, name=role_name)
+    svc = RoleAssignmentService(seeded_db, test_user)
+
+    with (
+        patch.object(AuditEventDispatcher, "dispatch") as dispatch,
+        pytest.raises(SafeValueError, match="is a system role and cannot be assigned to a project"),
+    ):
+        await svc.assign(principal_id=sa.id, role_name=role_name, project_id=project.id)
+
+    assert (await svc.list(principal_id=sa.id))["resources"] == []
+    dispatch.assert_not_called()
 
 
 @pytest.mark.asyncio
