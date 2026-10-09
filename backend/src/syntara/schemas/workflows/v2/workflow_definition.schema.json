@@ -342,6 +342,26 @@
             {
               "properties": {
                 "type": {
+                  "const": "sub_workflow"
+                },
+                "parameters": {
+                  "$ref": "executors/sub_workflow.schema.json#/parameterSchema"
+                },
+                "settings": {
+                  "$ref": "common-definitions.schema.json#/$defs/nodeSettingsNoRetry"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/node_base"
+            },
+            {
+              "properties": {
+                "type": {
                   "const": "internal_activity"
                 },
                 "parameters": {
