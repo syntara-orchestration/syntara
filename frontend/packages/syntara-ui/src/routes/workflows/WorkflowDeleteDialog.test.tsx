@@ -21,7 +21,7 @@ describe('WorkflowDeleteDialog', () => {
     expect(screen.getByText('Deploy app')).toBeInTheDocument()
     expect(
       screen.getByText(
-        /will be deleted and any in-progress runs will stop immediately\. This action cannot be undone\./
+        /will be permanently deleted\. This action cannot be undone\. Deletion cannot proceed while runs are in progress/
       )
     ).toBeInTheDocument()
     expect(screen.queryByText(/dependent workflows|use this one as a step/)).not.toBeInTheDocument()
@@ -41,7 +41,7 @@ describe('WorkflowDeleteDialog', () => {
 
     await user.click(
       within(dialog).getByRole('checkbox', {
-        name: /I understand this workflow will be deleted and any in-progress runs will stop immediately/,
+        name: /I understand this workflow will be permanently deleted/,
       })
     )
 
