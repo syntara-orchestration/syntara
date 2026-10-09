@@ -35,7 +35,7 @@ export type UseSynFormOptions<T extends FieldValues> = {
    */
   mode?: Mode
   /** RHF re-validation mode (e.g. `onChange` for builder node editors). */
-  reValidateMode?: Mode
+  reValidateMode?: UseFormProps<T>['reValidateMode']
   /** Called after `reset()` when `handleClose` is invoked. */
   onClose?: () => void
 }
