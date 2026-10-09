@@ -7,6 +7,8 @@ import {
   DescriptionListGroup,
   DescriptionListTerm,
   Divider,
+  Flex,
+  FlexItem,
   Split,
   Stack,
   StackItem,
@@ -176,6 +178,21 @@ function PendingDecisionForm({
   )
 }
 
+function renderApprovalContext(view: PanelView, approval: Approval, approvalData: Record<string, unknown>) {
+  switch (view) {
+    case 'schema':
+      return <OutputSchemaView data={approvalData} />
+    case 'table':
+      return <OutputTableView data={approvalData} />
+    case 'json':
+      return <SynCodeBlock jsonObject={approval} enableCopy enableExpand expandTitle="Approval context" fillHeight />
+    default: {
+      const _exhaustive: never = view
+      return _exhaustive
+    }
+  }
+}
+
 function ApprovalSummary({
   approvalDisplayName,
   approvalInitiatedAt,
@@ -231,29 +248,6 @@ function ApprovalSummary({
 }
 
 /**
- * Approval context data with Schema/Table/JSON view toggle, matching the pattern
- * used by the builder's input/output panels for reviewing schema-less structured data.
- */
-function ApprovalDataView({ approval }: Readonly<{ approval: Approval }>) {
-  const [view, setView] = useState<PanelView>('json')
-
-  return (
-    <Stack hasGutter className={styles.codeBlockContainer}>
-      <StackItem>
-        <ViewToggle activeView={view} onChange={setView} ariaLabel="Approval data view selection" />
-      </StackItem>
-      <StackItem isFilled>
-        {view === 'schema' && <OutputSchemaView data={approval} />}
-        {view === 'table' && <OutputTableView data={approval} />}
-        {view === 'json' && (
-          <SynCodeBlock jsonObject={approval} enableCopy enableExpand expandTitle="Approval context" fillHeight />
-        )}
-      </StackItem>
-    </Stack>
-  )
-}
-
-/**
  * Reusable approval detail content: decision actions, summary, and context JSON.
  * Used by the execution viewer and builder approval side panels.
  *
@@ -296,6 +290,7 @@ export function ApprovalDetailContent({
   const { handleSubmit: submitNotesForm, reset: resetNotes } = notesForm
 
   const [pendingDecision, setPendingDecision] = useState<'approved' | 'rejected' | undefined>(undefined)
+  const [contextView, setContextView] = useState<PanelView>('json')
 
   const approvalStatus = approval.status ?? 'pending'
   const isPending = approvalStatus === 'pending'
@@ -309,6 +304,7 @@ export function ApprovalDetailContent({
   const notesLabel = getNotesLabel(approvalStatus)
   const isSubmitting = decisionMutation.isPending
   const canSubmit = isPending && Boolean(pendingDecision) && !decisionMutation.isSuccess
+  const approvalContextData: Record<string, unknown> = { ...approval }
 
   const submitDecision = (data: ApprovalNotesOnlyFormData) => {
     if (!pendingDecision || !approval.id || isSubmitting) return
@@ -428,7 +424,18 @@ export function ApprovalDetailContent({
             />
           </StackItem>
           <StackItem>
-            <ApprovalDataView approval={approval} />
+            <Flex alignItems={{ default: 'alignItemsCenter' }} gap={{ default: 'gapMd' }}>
+              <FlexItem>
+                <ViewToggle
+                  activeView={contextView}
+                  onChange={setContextView}
+                  ariaLabel="Approval context view selection"
+                />
+              </FlexItem>
+            </Flex>
+          </StackItem>
+          <StackItem className={styles.codeBlockContainer}>
+            {renderApprovalContext(contextView, approval, approvalContextData)}
           </StackItem>
         </Stack>
       </StackItem>
