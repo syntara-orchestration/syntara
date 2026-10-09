@@ -55,14 +55,12 @@ type MockProjectSelector = {
   projects: { id: string; name: string }[]
   ProjectSelector: null
 }
-const mockUseProjectSelector = vi.fn(
-  (): MockProjectSelector => ({
-    selectedProject: { id: 'proj-default', name: 'Default Project' },
-    isAllProjects: false,
-    projects: [{ id: 'proj-default', name: 'Default Project' }],
-    ProjectSelector: null,
-  })
-)
+const mockUseProjectSelector = vi.fn((): MockProjectSelector => ({
+  selectedProject: { id: 'proj-default', name: 'Default Project' },
+  isAllProjects: false,
+  projects: [{ id: 'proj-default', name: 'Default Project' }],
+  ProjectSelector: null,
+}))
 vi.mock('../../hooks/useProjectSelector', () => ({
   useProjectSelector: () => mockUseProjectSelector(),
 }))

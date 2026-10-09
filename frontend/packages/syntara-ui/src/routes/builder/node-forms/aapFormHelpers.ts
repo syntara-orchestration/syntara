@@ -1,4 +1,4 @@
-import yaml from 'js-yaml'
+import { load } from 'js-yaml'
 import type { UseFormGetValues, UseFormSetValue } from 'react-hook-form'
 
 import type { AAPJobTemplateDetail } from '../../../hooks/useAAPBrowser'
@@ -103,7 +103,7 @@ function applyExtraVarsDefaults(
   if (!detail.ask_variables_on_launch || !detail.extra_vars || (getValues('extra_vars') && !templateChanged)) return
 
   try {
-    const parsed = yaml.load(detail.extra_vars)
+    const parsed = load(detail.extra_vars)
     setValue('extra_vars', JSON.stringify(parsed, null, 2))
   } catch {
     setValue('extra_vars', detail.extra_vars)

@@ -373,7 +373,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ['**/index.tsx', '**/main.tsx', '**/vite.config.ts', '**/vitest.config.ts', '**/vitest.browser.config.ts'],
+    files: ['**/index.tsx', '**/main.tsx', '**/vite.config.ts', '**/vitest.config.ts'],
     rules: {
       'no-console': 'off',
       'no-restricted-exports': 'off',

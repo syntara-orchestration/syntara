@@ -5,7 +5,7 @@ import { FormProvider, useForm } from 'react-hook-form'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
-import { VersionViewProvider } from '../VersionViewContext'
+import { VersionViewProvider } from '../VersionViewProvider'
 
 import { approvalFormSchema, type ApprovalFormData } from './approvalFormSchema'
 import { FallbackDecisionField } from './FallbackDecisionField'

@@ -75,6 +75,12 @@ npm start
 - Type-safe API calls
 - Automatic memoization via React Compiler
 
+When upgrading UI dependencies, keep the root overrides in `package.json` in
+sync: `vite` must match the UI's Vite version (`@vitejs/plugin-react` 6 requires
+Vite 8), and `playwright`/`playwright-core` must match `@playwright/test`. React
+Compiler runs through `@rolldown/plugin-babel` with `reactCompilerPreset()` in
+both Vite and Vitest configurations.
+
 ## Updating API Contracts
 
 The `syntara-contracts` package contains auto-generated TypeScript types from the backend OpenAPI schemas. These must be updated whenever the backend API changes.
