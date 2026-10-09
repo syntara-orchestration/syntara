@@ -19,7 +19,7 @@ type SynFileFieldControlProps<TFieldValues extends FieldValues, TName extends Fi
   dropzoneProps?: FileUploadProps['dropzoneProps']
   hideDefaultPreview: boolean
   isDisabled?: boolean
-  onFileChange?: (file: File) => void
+  onFileChange?: (file: File | undefined) => void
 }
 
 function SynFileFieldControl<TFieldValues extends FieldValues, TName extends FieldPath<TFieldValues>>({
@@ -57,6 +57,7 @@ function SynFileFieldControl<TFieldValues extends FieldValues, TName extends Fie
 
   const handleClearClick = () => {
     field.onChange(undefined)
+    onFileChange?.(undefined)
   }
 
   return (
@@ -119,8 +120,8 @@ export type SynFileFieldProps<
   hideDefaultPreview?: boolean
   /** Disables the file upload control. */
   isDisabled?: boolean
-  /** Called with the selected file after the RHF field value has been updated. */
-  onFileChange?: (file: File) => void
+  /** Called after the selected file changes. */
+  onFileChange?: (file: File | undefined) => void
 }
 
 /**

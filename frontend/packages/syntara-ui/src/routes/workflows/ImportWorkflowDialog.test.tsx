@@ -1,3 +1,4 @@
+// AAP-93572: Reproduces the import form failing to prefill its name from the uploaded workflow JSON.
 import { render, screen, waitFor, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
@@ -127,24 +128,23 @@ describe('ImportWorkflowDialog', () => {
     expect(screen.getByRole('button', { name: /^Import workflow$/i })).toBeEnabled()
   })
 
-  // AAP-93572: uploading a workflow JSON file should prefill the "Workflow name"
-  // field from the definition's top-level `name`, instead of leaving it empty.
-  it('prefills the workflow name field from the uploaded file', async () => {
+  it('prefills the workflow name from the uploaded definition', async () => {
     const user = userEvent.setup()
-    render(<ImportWorkflowDialog {...defaultProps} />)
-
-    const validContent = JSON.stringify({
-      name: 'My Imported Workflow',
+    const importedName = 'Imported workflow from JSON'
+    const definition = {
+      schema_version: '2.0.0',
+      name: importedName,
       triggers: [{ id: 't1', type: 'webhook' }],
       nodes: [{ id: 'n1', type: 'action' }],
       edges: [{ from: 't1', to: 'n1' }],
-    })
-    const file = new File([validContent], 'workflow.json', { type: 'application/json' })
+    }
+
+    render(<ImportWorkflowDialog {...defaultProps} />)
+
+    const file = new File([JSON.stringify(definition)], 'workflow.json', { type: 'application/json' })
     await user.upload(getFileUploadInput(), file)
 
-    await waitFor(() => {
-      expect(screen.getByLabelText(/Workflow name/i)).toHaveValue('My Imported Workflow')
-    })
+    expect(screen.getByLabelText(/Workflow name/i)).toHaveValue(importedName)
   })
 
   it('calls onClose when Cancel is clicked', async () => {
