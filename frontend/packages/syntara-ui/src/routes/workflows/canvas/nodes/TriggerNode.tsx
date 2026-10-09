@@ -13,12 +13,12 @@ import { useIsActiveExecution } from '../../../builder/ActiveExecutionContext'
 import { useIsExecutionView } from '../../../builder/ExecutionViewContext'
 import { useIsVersionView } from '../../../builder/VersionViewContext'
 import type { ActivityStatus } from '../../execution/types'
-import { getNodeTypeColor } from '../nodeTypeColors'
 import { semanticZoomActivityTitle } from '../semanticZoom'
+import { getStepTypeColor } from '../stepTypeColors'
 
-import { MenuNodeType, useNodeMenuActions } from './hooks/useNodeMenuActions'
-import { nodeMetadata } from './nodeMetadata'
-import { renderNodeIcon } from './renderNodeIcon'
+import { StepMenuCategory, useStepMenuActions } from './hooks/useStepMenuActions'
+import { renderStepIcon } from './renderStepIcon'
+import { stepMetadata } from './stepMetadata'
 
 export type TriggerNode = { type: 'trigger' } & Node<{
   name: string
@@ -27,7 +27,7 @@ export type TriggerNode = { type: 'trigger' } & Node<{
   config?: Record<string, unknown>
 }>
 
-export function TriggerNodeComponent(props: NodeProps<TriggerNode>) {
+export function TriggerStepComponent(props: NodeProps<TriggerNode>) {
   const triggerName = props.data.name
   const triggerDetails = props.data.details
   const triggerType = props.data.triggerType
@@ -35,19 +35,19 @@ export function TriggerNodeComponent(props: NodeProps<TriggerNode>) {
   const isWebhook = triggerType === TriggerTypeEnum.WEBHOOK_TRIGGER
   const isEda = triggerType === TriggerTypeEnum.EDA_TRIGGER
 
-  let metadata = nodeMetadata.trigger
+  let metadata = stepMetadata.trigger
   let iconId = 'trigger-manual'
   if (isScheduled) {
-    metadata = nodeMetadata.scheduledTrigger
+    metadata = stepMetadata.scheduledTrigger
     iconId = 'trigger-scheduled'
   } else if (isWebhook) {
-    metadata = nodeMetadata.webhookTrigger
+    metadata = stepMetadata.webhookTrigger
     iconId = 'trigger-webhook'
   } else if (isEda) {
-    metadata = nodeMetadata.edaTrigger
+    metadata = stepMetadata.edaTrigger
     iconId = 'trigger-eda'
   }
-  const iconNode = renderNodeIcon(metadata.icon, iconId)
+  const iconNode = renderStepIcon(metadata.icon, iconId)
   // 75px border-radius is a layout constraint (pill shape), not a spacing value — no semantic token applies
   const triggerStyle: CSSProperties = {
     borderTopLeftRadius: '75px',
@@ -57,9 +57,9 @@ export function TriggerNodeComponent(props: NodeProps<TriggerNode>) {
 
   // Extract trigger index from node id (format: trigger-0, trigger-1, etc.)
   const triggerIndex = parseTriggerIndex(props.id) ?? 0
-  const menuActions = useNodeMenuActions({
+  const menuActions = useStepMenuActions({
     nodeId: props.id,
-    nodeType: MenuNodeType.TRIGGER,
+    stepCategory: StepMenuCategory.TRIGGER,
     triggerIndex,
   })
 
@@ -96,13 +96,13 @@ export function TriggerNodeComponent(props: NodeProps<TriggerNode>) {
       collapsible={false}
       executionState={executionState}
       showExecutionBadge={showExecutionBadge}
-      topBarColor={getNodeTypeColor(FlowNodeType.TRIGGER)}
+      topBarColor={getStepTypeColor(FlowNodeType.TRIGGER)}
       semanticZoomSummary={{
         title: semanticZoomActivityTitle(triggerName, `Untitled ${metadata.label}`),
         typeLabel: triggerTypeLabel,
       }}
     >
-      <TriggerNodeDetails
+      <TriggerStepDetails
         node={props.data}
         icon={iconNode}
         menuActions={menuActions}
@@ -114,7 +114,7 @@ export function TriggerNodeComponent(props: NodeProps<TriggerNode>) {
   )
 }
 
-function TriggerNodeDetails(
+function TriggerStepDetails(
   props: Readonly<{
     node: {
       name: string
@@ -122,7 +122,7 @@ function TriggerNodeDetails(
       config?: Record<string, unknown>
     }
     icon?: React.ReactNode
-    menuActions?: ReturnType<typeof useNodeMenuActions>
+    menuActions?: ReturnType<typeof useStepMenuActions>
     triggerName: string
     triggerDetails: string | null
     triggerKind?: string

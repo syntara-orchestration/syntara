@@ -2,10 +2,10 @@ import { act, renderHook, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { NodeActionsContext, type NodeActionsContextValue } from '../../../../../routes/builder/NodeActionsContext'
+import { StepActionsContext, type StepActionsContextValue } from '../../../../../routes/builder/StepActionsContext'
 import { useWorkflowStore } from '../../../../../stores/useWorkflowStore'
 
-import { StepMenuCategory, useNodeMenuActions } from './useNodeMenuActions'
+import { StepMenuCategory, useStepMenuActions } from './useStepMenuActions'
 
 // Mock useReactFlow
 const mockDeleteElements = vi.fn()
@@ -27,10 +27,10 @@ vi.mock('../../../../../providers/alerts', () => ({
   }),
 }))
 
-// Helper: wrap hook in NodeActionsContext
-function withNodeActions(value: NodeActionsContextValue) {
+// Helper: wrap hook in StepActionsContext
+function withNodeActions(value: StepActionsContextValue) {
   return ({ children }: { children: ReactNode }) => (
-    <NodeActionsContext.Provider value={value}>{children}</NodeActionsContext.Provider>
+    <StepActionsContext.Provider value={value}>{children}</StepActionsContext.Provider>
   )
 }
 
@@ -39,7 +39,7 @@ const mockOnReplace = vi.fn()
 const mockOnDuplicate = vi.fn()
 const mockOnRunStep = vi.fn()
 const mockOnToggleDisabled = vi.fn()
-const defaultNodeActions: NodeActionsContextValue = {
+const defaultNodeActions: StepActionsContextValue = {
   onViewDetails: mockOnViewDetails,
   onReplace: mockOnReplace,
   onDuplicate: mockOnDuplicate,
@@ -47,16 +47,18 @@ const defaultNodeActions: NodeActionsContextValue = {
   onToggleDisabled: mockOnToggleDisabled,
 }
 
-describe('useNodeMenuActions', () => {
+describe('useStepMenuActions', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockDeleteElements.mockResolvedValue(undefined)
     useWorkflowStore.setState({ currentWorkflow: null, workflowVersion: 0, edges: [] })
   })
 
-  describe('without NodeActionsContext (outside builder)', () => {
+  describe('without StepActionsContext (outside builder)', () => {
     it('returns only delete action for activity nodes', () => {
-      const { result } = renderHook(() => useNodeMenuActions({ nodeId: 'task-1', nodeType: StepMenuCategory.ACTIVITY }))
+      const { result } = renderHook(() =>
+        useStepMenuActions({ nodeId: 'task-1', stepCategory: StepMenuCategory.ACTIVITY })
+      )
 
       expect(result.current).toHaveLength(1)
       expect(result.current[0].label).toBe('Delete')
@@ -65,7 +67,7 @@ describe('useNodeMenuActions', () => {
 
     it('returns only delete action for trigger nodes', () => {
       const { result } = renderHook(() =>
-        useNodeMenuActions({ nodeId: 'trigger-0', nodeType: StepMenuCategory.TRIGGER, triggerIndex: 0 })
+        useStepMenuActions({ nodeId: 'trigger-0', stepCategory: StepMenuCategory.TRIGGER, triggerIndex: 0 })
       )
 
       expect(result.current).toHaveLength(1)
@@ -73,7 +75,9 @@ describe('useNodeMenuActions', () => {
     })
 
     it('calls deleteElements with correct node id for activity node', () => {
-      const { result } = renderHook(() => useNodeMenuActions({ nodeId: 'task-1', nodeType: StepMenuCategory.ACTIVITY }))
+      const { result } = renderHook(() =>
+        useStepMenuActions({ nodeId: 'task-1', stepCategory: StepMenuCategory.ACTIVITY })
+      )
 
       act(() => {
         result.current[0].onClick()
@@ -84,7 +88,9 @@ describe('useNodeMenuActions', () => {
 
     it('notifies when deleteElements rejects', async () => {
       mockDeleteElements.mockRejectedValueOnce(new Error('delete failed'))
-      const { result } = renderHook(() => useNodeMenuActions({ nodeId: 'task-1', nodeType: StepMenuCategory.ACTIVITY }))
+      const { result } = renderHook(() =>
+        useStepMenuActions({ nodeId: 'task-1', stepCategory: StepMenuCategory.ACTIVITY })
+      )
 
       act(() => {
         result.current[0].onClick()
@@ -97,7 +103,7 @@ describe('useNodeMenuActions', () => {
 
     it('calls deleteElements with trigger node id format', () => {
       const { result } = renderHook(() =>
-        useNodeMenuActions({ nodeId: 'trigger-0', nodeType: StepMenuCategory.TRIGGER, triggerIndex: 0 })
+        useStepMenuActions({ nodeId: 'trigger-0', stepCategory: StepMenuCategory.TRIGGER, triggerIndex: 0 })
       )
 
       act(() => {
@@ -109,7 +115,7 @@ describe('useNodeMenuActions', () => {
 
     it('uses triggerIndex to construct node id for triggers', () => {
       const { result } = renderHook(() =>
-        useNodeMenuActions({ nodeId: 'some-other-id', nodeType: StepMenuCategory.TRIGGER, triggerIndex: 2 })
+        useStepMenuActions({ nodeId: 'some-other-id', stepCategory: StepMenuCategory.TRIGGER, triggerIndex: 2 })
       )
 
       act(() => {
@@ -120,10 +126,10 @@ describe('useNodeMenuActions', () => {
     })
   })
 
-  describe('with NodeActionsContext (inside builder) — activity nodes', () => {
+  describe('with StepActionsContext (inside builder) — activity nodes', () => {
     it('returns view details, run step, disable, duplicate, replace, delete for activity nodes', () => {
       const { result } = renderHook(
-        () => useNodeMenuActions({ nodeId: 'task-1', nodeType: StepMenuCategory.ACTIVITY }),
+        () => useStepMenuActions({ nodeId: 'task-1', stepCategory: StepMenuCategory.ACTIVITY }),
         {
           wrapper: withNodeActions(defaultNodeActions),
         }
@@ -135,7 +141,7 @@ describe('useNodeMenuActions', () => {
 
     it('calls onViewDetails with the node id', () => {
       const { result } = renderHook(
-        () => useNodeMenuActions({ nodeId: 'task-1', nodeType: StepMenuCategory.ACTIVITY }),
+        () => useStepMenuActions({ nodeId: 'task-1', stepCategory: StepMenuCategory.ACTIVITY }),
         {
           wrapper: withNodeActions(defaultNodeActions),
         }
@@ -152,7 +158,7 @@ describe('useNodeMenuActions', () => {
 
     it('calls onRunStep for run step', () => {
       const { result } = renderHook(
-        () => useNodeMenuActions({ nodeId: 'task-1', nodeType: StepMenuCategory.ACTIVITY }),
+        () => useStepMenuActions({ nodeId: 'task-1', stepCategory: StepMenuCategory.ACTIVITY }),
         {
           wrapper: withNodeActions(defaultNodeActions),
         }
@@ -168,7 +174,7 @@ describe('useNodeMenuActions', () => {
 
     it('calls onReplace with the node id', () => {
       const { result } = renderHook(
-        () => useNodeMenuActions({ nodeId: 'task-1', nodeType: StepMenuCategory.ACTIVITY }),
+        () => useStepMenuActions({ nodeId: 'task-1', stepCategory: StepMenuCategory.ACTIVITY }),
         {
           wrapper: withNodeActions(defaultNodeActions),
         }
@@ -182,9 +188,9 @@ describe('useNodeMenuActions', () => {
       expect(mockOnReplace).toHaveBeenCalledWith('task-1')
     })
 
-    it('duplicate action delegates to nodeActions.onDuplicate', () => {
+    it('duplicate action delegates to stepActions.onDuplicate', () => {
       const { result } = renderHook(
-        () => useNodeMenuActions({ nodeId: 'task-1', nodeType: StepMenuCategory.ACTIVITY }),
+        () => useStepMenuActions({ nodeId: 'task-1', stepCategory: StepMenuCategory.ACTIVITY }),
         {
           wrapper: withNodeActions(defaultNodeActions),
         }
@@ -200,7 +206,7 @@ describe('useNodeMenuActions', () => {
 
     it('delete action is last and has danger variant', () => {
       const { result } = renderHook(
-        () => useNodeMenuActions({ nodeId: 'task-1', nodeType: StepMenuCategory.ACTIVITY }),
+        () => useStepMenuActions({ nodeId: 'task-1', stepCategory: StepMenuCategory.ACTIVITY }),
         {
           wrapper: withNodeActions(defaultNodeActions),
         }
@@ -213,7 +219,7 @@ describe('useNodeMenuActions', () => {
 
     it('inserts a separator before delete when other actions exist', () => {
       const { result } = renderHook(
-        () => useNodeMenuActions({ nodeId: 'task-1', nodeType: StepMenuCategory.ACTIVITY }),
+        () => useStepMenuActions({ nodeId: 'task-1', stepCategory: StepMenuCategory.ACTIVITY }),
         {
           wrapper: withNodeActions(defaultNodeActions),
         }
@@ -227,7 +233,7 @@ describe('useNodeMenuActions', () => {
 
     it('includes an icon on every non-separator action', () => {
       const { result } = renderHook(
-        () => useNodeMenuActions({ nodeId: 'task-1', nodeType: StepMenuCategory.ACTIVITY }),
+        () => useStepMenuActions({ nodeId: 'task-1', stepCategory: StepMenuCategory.ACTIVITY }),
         {
           wrapper: withNodeActions(defaultNodeActions),
         }
@@ -240,10 +246,10 @@ describe('useNodeMenuActions', () => {
     })
   })
 
-  describe('with NodeActionsContext — trigger nodes', () => {
+  describe('with StepActionsContext — trigger nodes', () => {
     it('returns view details and delete but NOT run step, duplicate, or replace for trigger nodes', () => {
       const { result } = renderHook(
-        () => useNodeMenuActions({ nodeId: 'trigger-0', nodeType: StepMenuCategory.TRIGGER, triggerIndex: 0 }),
+        () => useStepMenuActions({ nodeId: 'trigger-0', stepCategory: StepMenuCategory.TRIGGER, triggerIndex: 0 }),
         { wrapper: withNodeActions(defaultNodeActions) }
       )
 
@@ -256,10 +262,10 @@ describe('useNodeMenuActions', () => {
     })
   })
 
-  describe('with NodeActionsContext — control flow nodes', () => {
+  describe('with StepActionsContext — control flow nodes', () => {
     it('returns only replace and delete for control flow nodes', () => {
       const { result } = renderHook(
-        () => useNodeMenuActions({ nodeId: 'condition-1', nodeType: StepMenuCategory.CONTROL_FLOW }),
+        () => useStepMenuActions({ nodeId: 'condition-1', stepCategory: StepMenuCategory.CONTROL_FLOW }),
         { wrapper: withNodeActions(defaultNodeActions) }
       )
 
@@ -269,7 +275,7 @@ describe('useNodeMenuActions', () => {
 
     it('does not include view details, run step, duplicate, or disable for control flow nodes', () => {
       const { result } = renderHook(
-        () => useNodeMenuActions({ nodeId: 'loop-1', nodeType: StepMenuCategory.CONTROL_FLOW }),
+        () => useStepMenuActions({ nodeId: 'loop-1', stepCategory: StepMenuCategory.CONTROL_FLOW }),
         { wrapper: withNodeActions(defaultNodeActions) }
       )
 
@@ -284,7 +290,7 @@ describe('useNodeMenuActions', () => {
   describe('disable toggle', () => {
     it('shows "Disable" label when node is not disabled', () => {
       const { result } = renderHook(
-        () => useNodeMenuActions({ nodeId: 'task-1', nodeType: StepMenuCategory.ACTIVITY, disabled: false }),
+        () => useStepMenuActions({ nodeId: 'task-1', stepCategory: StepMenuCategory.ACTIVITY, disabled: false }),
         { wrapper: withNodeActions(defaultNodeActions) }
       )
 
@@ -294,7 +300,7 @@ describe('useNodeMenuActions', () => {
 
     it('shows "Enable" label when node is disabled', () => {
       const { result } = renderHook(
-        () => useNodeMenuActions({ nodeId: 'task-1', nodeType: StepMenuCategory.ACTIVITY, disabled: true }),
+        () => useStepMenuActions({ nodeId: 'task-1', stepCategory: StepMenuCategory.ACTIVITY, disabled: true }),
         { wrapper: withNodeActions(defaultNodeActions) }
       )
 
@@ -304,7 +310,7 @@ describe('useNodeMenuActions', () => {
 
     it('calls onToggleDisabled with node id when clicked', () => {
       const { result } = renderHook(
-        () => useNodeMenuActions({ nodeId: 'task-1', nodeType: StepMenuCategory.ACTIVITY }),
+        () => useStepMenuActions({ nodeId: 'task-1', stepCategory: StepMenuCategory.ACTIVITY }),
         {
           wrapper: withNodeActions(defaultNodeActions),
         }
@@ -324,9 +330,9 @@ describe('useNodeMenuActions', () => {
       const customAction = { id: 'custom', label: 'Custom', onClick: vi.fn() }
 
       const { result } = renderHook(() =>
-        useNodeMenuActions({
+        useStepMenuActions({
           nodeId: 'task-1',
-          nodeType: StepMenuCategory.ACTIVITY,
+          stepCategory: StepMenuCategory.ACTIVITY,
           additionalActions: [customAction],
         })
       )
@@ -343,9 +349,9 @@ describe('useNodeMenuActions', () => {
       const customAction = { id: 'custom-action', label: 'Custom Action', onClick: customOnClick }
 
       const { result } = renderHook(() =>
-        useNodeMenuActions({
+        useStepMenuActions({
           nodeId: 'task-1',
-          nodeType: StepMenuCategory.ACTIVITY,
+          stepCategory: StepMenuCategory.ACTIVITY,
           additionalActions: [customAction],
         })
       )
@@ -362,9 +368,9 @@ describe('useNodeMenuActions', () => {
       const customAction = { id: 'custom', label: 'Custom', onClick: vi.fn(), icon, variant: 'default' as const }
 
       const { result } = renderHook(() =>
-        useNodeMenuActions({
+        useStepMenuActions({
           nodeId: 'task-1',
-          nodeType: StepMenuCategory.ACTIVITY,
+          stepCategory: StepMenuCategory.ACTIVITY,
           additionalActions: [customAction],
         })
       )
@@ -377,7 +383,7 @@ describe('useNodeMenuActions', () => {
   describe('edge cases', () => {
     it('returns only delete action when additionalActions is empty array', () => {
       const { result } = renderHook(() =>
-        useNodeMenuActions({ nodeId: 'task-1', nodeType: StepMenuCategory.ACTIVITY, additionalActions: [] })
+        useStepMenuActions({ nodeId: 'task-1', stepCategory: StepMenuCategory.ACTIVITY, additionalActions: [] })
       )
 
       expect(result.current).toHaveLength(1)
@@ -392,7 +398,7 @@ describe('useNodeMenuActions', () => {
       ]
 
       const { result } = renderHook(() =>
-        useNodeMenuActions({ nodeId: 'task-1', nodeType: StepMenuCategory.ACTIVITY, additionalActions: actions })
+        useStepMenuActions({ nodeId: 'task-1', stepCategory: StepMenuCategory.ACTIVITY, additionalActions: actions })
       )
 
       // Should have: 3 custom actions, separator, delete
