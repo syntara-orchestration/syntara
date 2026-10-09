@@ -22,6 +22,8 @@ from typing import TYPE_CHECKING, Any
 
 import structlog
 
+from syntara.core.seed_context import strict_mode_context_var
+
 if TYPE_CHECKING:
     from collections.abc import Callable, Coroutine
 
@@ -129,6 +131,7 @@ async def run_seeders(
     *,
     include_optional: bool = False,
     only: list[str] | None = None,
+    strict: bool = False,
 ) -> None:
     """Execute seeders in dependency order.
 
@@ -138,6 +141,8 @@ async def run_seeders(
         session_factory: ``async_sessionmaker`` or compatible callable.
         include_optional: Include optional (dev-only) seeders.
         only: If provided, run only these named seeders (plus dependencies).
+        strict: Make otherwise non-fatal seeding steps (Temporal Schedule sync
+            for built-in workflows) raise instead of logging a warning.
 
     """
     if only:
@@ -146,13 +151,17 @@ async def run_seeders(
     else:
         ordered = get_seeders(include_optional=include_optional)
 
-    logger.info("seed.run.start", seeders=[s.name for s in ordered])
+    logger.info("seed.run.start", seeders=[s.name for s in ordered], strict=strict)
 
-    for seeder in ordered:
-        logger.info("seed.run.seeder", name=seeder.name)
-        async with session_factory() as session:
-            await seeder.func(session)
-        logger.info("seed.run.seeder.done", name=seeder.name)
+    token = strict_mode_context_var.set(strict)
+    try:
+        for seeder in ordered:
+            logger.info("seed.run.seeder", name=seeder.name)
+            async with session_factory() as session:
+                await seeder.func(session)
+            logger.info("seed.run.seeder.done", name=seeder.name)
+    finally:
+        strict_mode_context_var.reset(token)
 
     logger.info("seed.run.complete", count=len(ordered))
 

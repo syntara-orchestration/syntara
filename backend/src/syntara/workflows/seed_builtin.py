@@ -5,6 +5,22 @@ even in container images that only sync ``*.py`` files (e.g. Skaffold).
 
 Registered as a **required** seeder — always runs during seeding.
 Built-in workflows cannot be deleted or modified by users.
+
+Operational contract: this seeder must stay idempotent. Its own work is
+concurrency-safe, but its ``authz`` dependency is not: overlapping runs are
+safe only while the authz data is unchanged. It is expected to be re-run after the initial seed — by a
+deployment hook or operator command, in a process that can reach Temporal
+and runs the current release — because the
+initial seed may run before Temporal exists, in which case the Temporal
+Schedule sync for scheduled built-in workflows degrades to a warning. Runs
+that are expected to reach Temporal pass ``--strict`` so that a failed sync
+fails the command instead. Each definition commits before its Schedule
+sync, so a strict abort mid-batch leaves every processed definition fully
+seeded and no Temporal Schedule can refer to rows a later rollback discards.
+Re-runs against an unchanged definition must not create new workflow
+versions, the schedule sync must remain create-or-update, and concurrent
+invocations (e.g. several replicas starting together) must converge to the
+same state.
 """
 
 from __future__ import annotations
@@ -17,6 +33,7 @@ from sqlmodel import col, select
 
 from syntara.authz.models import Project
 from syntara.core.models import User
+from syntara.core.seed_context import strict_mode_context_var
 from syntara.workflows.constants import BUILTIN_PROJECT_NAME
 from syntara.workflows.exceptions import ScheduledTriggerSyncError
 from syntara.workflows.models import Workflow, WorkflowVersion
@@ -185,6 +202,7 @@ async def seed_builtin_workflows(session: AsyncSession) -> None:
     if not user:
         msg = "No admin user found — cannot seed builtin workflows. Ensure authz seeder runs first."
         raise RuntimeError(msg)
+    user_id = user.id
 
     project_result = await session.exec(
         select(Project).where(
@@ -200,12 +218,20 @@ async def seed_builtin_workflows(session: AsyncSession) -> None:
 
     for workflow_dict in _BUILTIN_DEFINITIONS:
         try:
-            await _seed_one(session, workflow_dict, user.id, project_id)
+            await _seed_one(session, workflow_dict, user_id, project_id)
+        except ScheduledTriggerSyncError:
+            # Only reaches here in strict mode; fail the whole seed pass.
+            # Every definition so far — including this one's DB rows — was
+            # already committed before its Temporal sync, so the abort only
+            # leaves later definitions unseeded.
+            raise
         except Exception:
             logger.exception("Failed to seed builtin workflow", workflow_name=workflow_dict.get("name"))
+            # Discard this definition's partial writes so the next
+            # definition's commit cannot accidentally persist them.
+            await session.rollback()
             continue
 
-    await session.commit()
     logger.info("Builtin workflow seeding complete")
 
 
@@ -232,9 +258,16 @@ async def _sync_builtin_schedules(workflow_id: UUID, workflow_dict: dict[str, An
                 trigger_count=count,
             )
     except ScheduledTriggerSyncError as exc:
-        # Non-fatal: the workflow row itself is still seeded correctly even
-        # if Temporal is unreachable at startup. Mirrors the same
-        # degrade-gracefully behaviour WorkflowService uses on publish.
+        if strict_mode_context_var.get():
+            logger.exception(
+                "Scheduled trigger sync failed for builtin workflow — strict mode aborting seed pass",
+                workflow_name=name,
+                error=str(exc),
+            )
+            raise
+        # Non-fatal by default: the workflow row itself is still seeded
+        # correctly even if Temporal is unreachable at startup. Mirrors the
+        # same degrade-gracefully behaviour WorkflowService uses on publish.
         logger.warning(
             "Scheduled trigger sync failed for builtin workflow — schedule not created/updated",
             workflow_name=name,
@@ -294,6 +327,9 @@ async def _seed_one(
         )
         session.add(publish_event)
         logger.info("Created builtin workflow", workflow_name=name)
+        # Commit before the Temporal sync: the Schedule must never refer to
+        # rows a later strict failure's rollback could discard.
+        await session.commit()
         await _sync_builtin_schedules(workflow.id, workflow_dict, name)
     else:
         current_version_result = await session.exec(
@@ -310,6 +346,9 @@ async def _seed_one(
 
         if current_version and current_version.workflow_definition == workflow_dict:
             logger.info("Builtin workflow unchanged, skipping", workflow_name=name)
+            # Usually a no-op commit (may carry the project fix above);
+            # mirrors the create/update paths before the Temporal sync.
+            await session.commit()
             # Still re-sync schedules even when unchanged (see docstring).
             await _sync_builtin_schedules(existing.id, workflow_dict, name)
             return
@@ -337,4 +376,7 @@ async def _seed_one(
         )
         session.add(publish_event)
         logger.info("Updated builtin workflow", workflow_name=name, new_version=new_version_num)
+        # Commit before the Temporal sync: the Schedule must never refer to
+        # rows a later strict failure's rollback could discard.
+        await session.commit()
         await _sync_builtin_schedules(existing.id, workflow_dict, name)

@@ -159,6 +159,17 @@ make db-run
 make db-clean
 ```
 
+> **Seeding contract:** `python -m syntara.seed` (and any `--only` subset) must be idempotent, and
+> re-runs after the initial seed must converge without duplicates. Concurrent execution is
+> seeder-specific: `settings` and `credentials` tolerate overlapping runs; `authz` and
+> `audit_metadata` must be serialized or retried (check-then-insert, so a race can fail with a
+> unique-constraint error). `builtin_workflows` includes `authz`, so overlapping runs are safe only
+> while the authz data is unchanged. `--only builtin_workflows` is expected
+> to be re-run after the initial seed from a process that can reach Temporal and runs the current
+> release (an older build re-publishes old definitions as new versions); it re-asserts the seeded
+> baseline via `authz`. A failed schedule sync is a warning by default; pass `--strict` to make it
+> fail the command. Keep new seeders within this contract.
+
 > **Schema baseline:** Alembic history was flattened into a single baseline. Databases
 > created with the old revision chain cannot be upgraded in place — run `make db-clean`
 > (or `podman compose down -v` for the full stack), then bring services back up so

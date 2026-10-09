@@ -8,6 +8,7 @@ from uuid import uuid4
 
 import pytest
 
+from syntara.core.seed_context import strict_mode_context_var
 from syntara.workflows.exceptions import ScheduledTriggerSyncError
 from syntara.workflows.models.workflow import Workflow
 from syntara.workflows.models.workflow_publish_event import WorkflowPublishEvent
@@ -151,7 +152,8 @@ class TestSeedBuiltinWorkflows:
         expected_names = {d["name"] for d in _BUILTIN_DEFINITIONS}
         assert created_names == expected_names
 
-        session.commit.assert_awaited_once()
+        # Each definition commits individually (before its Temporal sync).
+        assert session.commit.await_count == len(_BUILTIN_DEFINITIONS)
 
     @pytest.mark.asyncio
     async def test_skips_unchanged_workflow(self) -> None:
@@ -218,6 +220,9 @@ class TestSeedBuiltinWorkflows:
 
         workflows_added = [c[0][0] for c in session.add.call_args_list if isinstance(c[0][0], Workflow)]
         assert len(workflows_added) == len(_BUILTIN_DEFINITIONS) - 1
+        # The failed definition's partial writes were discarded, not left in
+        # the session to be swept into a later definition's commit.
+        session.rollback.assert_awaited_once()
 
     @pytest.mark.asyncio
     async def test_definitions_are_valid(self) -> None:
@@ -292,7 +297,119 @@ class TestSeedBuiltinWorkflows:
 
         workflows_added = [c[0][0] for c in session.add.call_args_list if isinstance(c[0][0], Workflow)]
         assert len(workflows_added) == len(_BUILTIN_DEFINITIONS)
-        session.commit.assert_awaited_once()
+        # Non-fatal sync failures still commit every definition (each one
+        # commits before the sync that then degrades to a warning).
+        assert session.commit.await_count == len(_BUILTIN_DEFINITIONS)
+
+    @pytest.mark.asyncio
+    async def test_sync_error_fails_seeding_when_strict(self) -> None:
+        """Under ``--strict`` the sync error aborts the seed pass.
+
+        Used by seed runs that are expected to reach Temporal: a missing
+        schedule must surface as a non-zero exit, not a warning. The failing
+        definition's own rows were committed before its sync (see module
+        docstring), so the abort must not discard them.
+        """
+        self.mock_scheduler.sync_scheduled_triggers = AsyncMock(
+            side_effect=ScheduledTriggerSyncError("some-workflow-id", 1)
+        )
+        admin, project = _mock_admin(), _mock_project()
+        session = _mock_session(admin, project, *[None] * len(_BUILTIN_DEFINITIONS))
+
+        token = strict_mode_context_var.set(True)
+        try:
+            with pytest.raises(ScheduledTriggerSyncError):
+                await seed_builtin_workflows(session)
+        finally:
+            strict_mode_context_var.reset(token)
+
+        # The first definition committed before its failing sync; the abort
+        # stopped the pass before any later definition was seeded.
+        assert session.commit.await_count == 1
+        assert self.mock_scheduler.sync_scheduled_triggers.await_count == 1
+        workflows_added = [c[0][0] for c in session.add.call_args_list if isinstance(c[0][0], Workflow)]
+        assert len(workflows_added) == 1
+
+    @pytest.mark.asyncio
+    async def test_strict_sync_failure_mid_batch_keeps_earlier_definitions(self) -> None:
+        """A mid-batch strict abort keeps every already-processed definition durable.
+
+        Definition 1 syncs fine; definition 2's sync fails under ``--strict``.
+        Both definitions' rows were committed before their syncs, so the
+        abort discards nothing already written — later definitions are simply
+        left unseeded for the next pass to pick up.
+        """
+        self.mock_scheduler.sync_scheduled_triggers = AsyncMock(
+            side_effect=[0, ScheduledTriggerSyncError("some-workflow-id", 1)]
+        )
+        admin, project = _mock_admin(), _mock_project()
+        session = _mock_session(admin, project, *[None] * len(_BUILTIN_DEFINITIONS))
+
+        token = strict_mode_context_var.set(True)
+        try:
+            with pytest.raises(ScheduledTriggerSyncError):
+                await seed_builtin_workflows(session)
+        finally:
+            strict_mode_context_var.reset(token)
+
+        assert session.commit.await_count == 2
+        assert self.mock_scheduler.sync_scheduled_triggers.await_count == 2
+        workflows_added = [c[0][0] for c in session.add.call_args_list if isinstance(c[0][0], Workflow)]
+        assert len(workflows_added) == 2
+        # Nothing committed is rolled back by the abort.
+        session.rollback.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_sync_error_fails_strict_rerun_on_unchanged_definition(self) -> None:
+        """``--strict`` also fails the typical re-run: unchanged definitions re-syncing.
+
+        The unchanged branch must still attempt the schedule sync (that is why
+        the re-run exists) and must abort under strict mode when it fails.
+        """
+        first_def = _BUILTIN_DEFINITIONS[0]
+        existing = MagicMock(spec=Workflow)
+        existing.id = uuid4()
+        existing.current_version = 1
+        existing.project_id = uuid4()
+
+        cur_ver = MagicMock(spec=WorkflowVersion)
+        cur_ver.workflow_definition = first_def
+
+        self.mock_scheduler.sync_scheduled_triggers = AsyncMock(
+            side_effect=ScheduledTriggerSyncError("some-workflow-id", 1)
+        )
+        session = _mock_session(
+            _mock_admin(), _mock_project(), existing, cur_ver, *[None] * (len(_BUILTIN_DEFINITIONS) - 1)
+        )
+
+        token = strict_mode_context_var.set(True)
+        try:
+            with pytest.raises(ScheduledTriggerSyncError):
+                await seed_builtin_workflows(session)
+        finally:
+            strict_mode_context_var.reset(token)
+
+        # The unchanged definition was schedule-synced before the abort.
+        synced_ids = {
+            call.kwargs["workflow_id"] for call in self.mock_scheduler.sync_scheduled_triggers.await_args_list
+        }
+        assert str(existing.id) in synced_ids
+
+    @pytest.mark.asyncio
+    async def test_strict_run_succeeds_when_syncs_succeed(self) -> None:
+        """``--strict`` does not alter a fully successful pass."""
+        admin, project = _mock_admin(), _mock_project()
+        session = _mock_session(admin, project, *[None] * len(_BUILTIN_DEFINITIONS))
+
+        token = strict_mode_context_var.set(True)
+        try:
+            await seed_builtin_workflows(session)
+        finally:
+            strict_mode_context_var.reset(token)
+
+        assert session.commit.await_count == len(_BUILTIN_DEFINITIONS)
+        workflows_added = [c[0][0] for c in session.add.call_args_list if isinstance(c[0][0], Workflow)]
+        assert len(workflows_added) == len(_BUILTIN_DEFINITIONS)
 
     @pytest.mark.asyncio
     async def test_health_check_definition_has_scheduled_trigger(self) -> None:
