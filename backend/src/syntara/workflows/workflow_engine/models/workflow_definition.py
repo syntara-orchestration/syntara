@@ -780,6 +780,49 @@ class AAPWorkflowJobTemplateExecutorParameters(AAPResourceReferenceMixin, Templa
         return self
 
 
+class SubWorkflowExecutorParameters(TemplateAwareBaseModel):
+    """Parameters for Sub-workflow executor.
+
+    Defines the design-time configuration for invoking a child workflow from
+    a parent workflow. The Sub-workflow step always invokes the latest published
+    version of the target workflow.
+
+    Per ANSTRAT-2347 (updated 2026-10-08): When a workflow has multiple
+    Subworkflow Triggers, the calling step must select a specific trigger to invoke.
+
+    Attributes:
+        workflow_id: UUID of the child workflow to invoke.
+        trigger_node_id: Graph node ID of the Subworkflow Trigger to invoke.
+        input_mapping: Mapping of child workflow input field names to values.
+            Values can be static (string, int, bool, dict, list) or template
+            expressions (${step_id.field.path}).
+
+    """
+
+    workflow_id: str = Field(
+        description="UUID of the child workflow to invoke (latest published version)",
+    )
+    trigger_node_id: str = Field(
+        pattern=r"^[a-zA-Z_][a-zA-Z0-9_]*$",
+        description="Graph node ID of the Subworkflow Trigger to invoke in the child workflow",
+    )
+    input_mapping: dict[str, Any] = Field(
+        default_factory=dict,
+        description=(
+            "Mapping of child workflow input field names to static values or "
+            "template expressions. Keys are child workflow input field names; "
+            "values can be static types (string, int, bool, dict, list) or "
+            "template expression strings (${step_id.field.path})."
+        ),
+    )
+
+    @field_validator("workflow_id")
+    @classmethod
+    def validate_workflow_id_format(cls, v: str) -> str:
+        """Validate that workflow_id is a valid UUID or template expression."""
+        return validate_uuid_or_template(v, "workflow_id")
+
+
 # ---------------------------------------------------------------------------
 # Control node parameters models
 # ---------------------------------------------------------------------------
