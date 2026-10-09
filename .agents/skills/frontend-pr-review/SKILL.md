@@ -1,9 +1,10 @@
 ---
+name: frontend-pr-review
 description: "Comprehensive PR review checklist and validation workflow for frontend code."
 user-invocable: false
 ---
 
-# Claude Skill: Pull Request Review & Self-Review
+# Pull Request Review & Self-Review
 
 Your goal is to review code with high clarity, consistency, and alignment with the repo's standards. This skill serves two purposes:
 
@@ -146,7 +147,7 @@ git diff main...HEAD -- '*.ts' '*.tsx' | grep '^+' | grep -v '^+++' | grep -iE '
 | `@ts-ignore` / `@ts-expect-error`                             | Suppresses a TypeScript error instead of fixing the type. Hides real bugs.                             | Fix the type, add a type guard, or update the contract.                                                                               |
 | `// TODO` / `// FIXME` / `// HACK` / `// XXX`                 | Deferred work buried in source. Invisible to sprint planning and never addressed.                      | Create an issue and reference it inline: `// Workaround until #12345 adds the endpoint`.                                              |
 | `rules: { 'rule-name': { enabled: false } }` in axe config    | Disables an accessibility rule to make a test pass instead of fixing the a11y bug.                     | Fix the component so it passes the axe rule. Only disable with a linked upstream PatternFly issue proving a false positive.           |
-| `useEffect` + `useState` for data that TanStack Query handles | Re-implements caching, dedup, retry, and error handling that `useQuery`/`useMutation` already provide. | Use the library API. See .claude/skills/frontend-coding-standards/SKILL.md "Prefer Library and Native Browser APIs Over Custom Code". |
+| `useEffect` + `useState` for data that TanStack Query handles | Re-implements caching, dedup, retry, and error handling that `useQuery`/`useMutation` already provide. | Use the library API. See .agents/skills/frontend-coding-standards/SKILL.md "Prefer Library and Native Browser APIs Over Custom Code". |
 | Custom deep copy, URL parsing, UUID generation                | Re-implements what `structuredClone`, `URLSearchParams`, `generateUUID` already provide.               | Use the native API or existing project utility.                                                                                       |
 
 **Pre-existing suppressions:** If a suppression appears in the diff context but was not added by the PR (no `+` prefix), ignore it. Only flag new additions.
@@ -157,7 +158,7 @@ git diff main...HEAD -- '*.ts' '*.tsx' | grep '^+' | grep -v '^+++' | grep -iE '
 | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **UI PRs include screenshots**                  | PRs changing visible UI must include screenshots or recordings of key states                                                                                       |
 | **New API endpoints have mock handlers**        | Check `frontend/packages/syntara-mock-api/src/handlers.ts`; note exception if backend not yet merged                                                               |
-| **`useQueryState` object form**                 | Verify `useQueryState(query, { title, onRetry })` -- not bare string form (see .claude/skills/frontend-coding-standards/SKILL.md §2)                               |
+| **`useQueryState` object form**                 | Verify `useQueryState(query, { title, onRetry })` -- not bare string form (see .agents/skills/frontend-coding-standards/SKILL.md §2)                               |
 | **Error handling consistency**                  | Verify `useQueryState` / `useMutationErrorHandler` -- no ad-hoc try/catch with custom error display                                                                |
 | **userEvent regressions**                       | Check if PR replaces existing `userEvent` calls with `fireEvent` -- that is a regression                                                                           |
 | **Unreachable dead code in tests**              | Look for nested `it()` blocks inside other `it()` blocks (after `return` statements)                                                                               |
@@ -301,7 +302,7 @@ When reviewing your own implementation before committing, verify these gates pas
 2. **Implemented incrementally** — happy path first, then edge cases
 3. **Wrote tests concurrently** — tests alongside implementation, not after
 4. **Verified accessibility** — keyboard navigation, ARIA attributes, axe tests
-5. **Library docs consulted** — fetched `llms.txt` URLs from `.claude/skills/frontend-library-references/SKILL.md` for any library used
+5. **Library docs consulted** — fetched `llms.txt` URLs from `.agents/skills/frontend-library-references/SKILL.md` for any library used
 
 ### Quality Gates (All Must Pass)
 
@@ -316,7 +317,7 @@ When reviewing your own implementation before committing, verify these gates pas
 
 ### Independent Review (High-Risk Changes)
 
-For high-risk UI changes (new pages, auth flows, complex state management), run `/frontend-review-pr` from a **fresh chat session** before merging. A fresh context provides a second-pass perspective that catches issues the implementation context may overlook.
+For high-risk UI changes (new pages, auth flows, complex state management), run `frontend-review-pr` from a **fresh chat session** before merging. A fresh context provides a second-pass perspective that catches issues the implementation context may overlook.
 
 ---
 

@@ -1,4 +1,5 @@
 ---
+name: frontend-coding-standards
 description: "Frontend coding standards — PatternFly patterns, API integration, forms, testing, permissions."
 user-invocable: false
 ---
@@ -11,7 +12,7 @@ Detailed code examples and patterns for this project. Referenced from frontend/A
 
 ## Library References
 
-See [`.claude/skills/frontend-library-references/SKILL.md`](../frontend-library-references/SKILL.md) for `llms.txt` URLs and official docs links for all libraries used in this project. Fetch the relevant entry before writing code against a library to ensure you use current APIs.
+See [`.agents/skills/frontend-library-references/SKILL.md`](../frontend-library-references/SKILL.md) for `llms.txt` URLs and official docs links for all libraries used in this project. Fetch the relevant entry before writing code against a library to ensure you use current APIs.
 
 ---
 
@@ -36,7 +37,7 @@ Before writing custom utilities, hooks, or helpers, check whether the library or
 
 **Caveat -- verify browser API availability in all deployment contexts.** Some Web APIs are restricted to secure contexts (HTTPS or localhost). For example, `crypto.randomUUID()` is unavailable over plain HTTP and causes a runtime crash. This app uses `generateUUID()` (`uuid` v4) instead of `crypto.randomUUID()`. When using a native API, check [MDN's "Secure context: required" badge](https://developer.mozilla.org/en-US/docs/Web/Security/Secure_Contexts) and verify the app works over both HTTP and HTTPS.
 
-When reviewing code, flag any pattern that duplicates what a dependency or browser API already exposes. If unsure whether a library covers a use case, check [`.claude/skills/frontend-library-references/SKILL.md`](../frontend-library-references/SKILL.md) and fetch the `llms.txt` URL for that library.
+When reviewing code, flag any pattern that duplicates what a dependency or browser API already exposes. If unsure whether a library covers a use case, check [`.agents/skills/frontend-library-references/SKILL.md`](../frontend-library-references/SKILL.md) and fetch the `llms.txt` URL for that library.
 
 ---
 
@@ -144,7 +145,7 @@ const { register, handleSubmit } = useForm<FormData>({
 1. Create a schema file next to your form: `myNodeFormSchema.ts` — define shape and validation with `z.object()` (use `.superRefine()` for conditional rules, or `z.discriminatedUnion()` for executor-type-style forms). Export the schema and `type MyFormData = z.infer<typeof myNodeFormSchema>`. Import `z` from `'zod'`.
 2. For optional number fields use `optionalNumber` from `src/routes/builder/node-forms/shared/formSchemaUtils` so empty `valueAsNumber` inputs (NaN) validate
 3. In form component: `useForm<MyFormData>({ resolver: zodResolver(myNodeFormSchema, undefined, { mode: 'sync' }), defaultValues })` — import `zodResolver` from `./shared/formSchemaUtils`
-4. Use `useFormMutationErrorHandler(setError)` for API 422 field errors; Zod handles client-side only. See: [`frontend/docs/error-handling.md`](frontend/docs/error-handling.md) - "Client-side validation (Zod + @hookform/resolvers)"
+4. Use `useFormMutationErrorHandler(setError)` for API 422 field errors; Zod handles client-side only. See: [`frontend/docs/error-handling.md`](../../../frontend/docs/error-handling.md) - "Client-side validation (Zod + @hookform/resolvers)"
 
 ---
 
@@ -652,7 +653,7 @@ Before writing a string comparison or assignment:
 
 ## 11. Error Handling with RFC 9457 Problem Details
 
-The application uses RFC 9457 Problem Details for API error responses. See [`frontend/docs/error-handling.md`](frontend/docs/error-handling.md) for complete patterns.
+The application uses RFC 9457 Problem Details for API error responses. See [`frontend/docs/error-handling.md`](../../../frontend/docs/error-handling.md) for complete patterns.
 
 ### Error Format
 
@@ -1487,7 +1488,7 @@ function useCanI(action: string, resourceType: string, options?: UseCanIOptions)
 
 ## 31. Permission Gating Patterns
 
-All CRUD and destructive actions must be gated by permissions. See [`frontend/docs/permissions-rbac.md`](frontend/docs/permissions-rbac.md) for the full architecture.
+All CRUD and destructive actions must be gated by permissions. See [`frontend/docs/permissions-rbac.md`](../../../frontend/docs/permissions-rbac.md) for the full architecture.
 
 ### When to create a domain hook vs inline `useCanI`
 
