@@ -6,6 +6,7 @@ import {
   type FieldValues,
   type Mode,
   type Resolver,
+  type UseFormProps,
   type UseFormReturn,
 } from 'react-hook-form'
 import type { ZodType } from 'zod'
@@ -25,6 +26,8 @@ export type UseSynFormOptions<T extends FieldValues> = {
    * forms that hydrate from a query so fields do not flash empty before reset.
    */
   values?: T
+  /** Passed through to RHF `useForm` when using the `values` prop (e.g. `keepDirtyValues`). */
+  resetOptions?: UseFormProps<T>['resetOptions']
   /**
    * RHF validation trigger mode. Defaults to RHF's own default (`'onSubmit'`).
    * Use `'onBlur'` for forms that should surface field errors as the user tabs
@@ -104,6 +107,7 @@ export function useSynForm<T extends FieldValues>({
   schema,
   defaultValues,
   values,
+  resetOptions,
   mode,
   reValidateMode,
   onClose,
@@ -112,6 +116,7 @@ export function useSynForm<T extends FieldValues>({
     resolver: zodResolver(schema as ZodResolverSchema, undefined, { mode: 'sync' }) as Resolver<T>,
     defaultValues,
     values,
+    ...(resetOptions !== undefined ? { resetOptions } : {}),
     ...(mode !== undefined ? { mode } : {}),
     ...(reValidateMode !== undefined ? { reValidateMode } : {}),
   })
