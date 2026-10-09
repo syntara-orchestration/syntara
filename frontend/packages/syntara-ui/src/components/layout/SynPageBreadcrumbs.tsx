@@ -5,7 +5,9 @@ import { useSyncExternalStore } from 'react'
 
 import type { AppBreadcrumbItem } from '../../app/breadcrumbs/appBreadcrumbItem'
 
+import styles from './SynPageBreadcrumbs.module.css'
 import { SynPageBreadcrumbsCollapsedMiddle } from './SynPageBreadcrumbsCollapsedMiddle'
+import { BreadcrumbCurrentSegment } from './SynPageBreadcrumbsCurrentSegment'
 
 export type { AppBreadcrumbItem }
 
@@ -62,7 +64,7 @@ export function SynPageBreadcrumbs(props: SynPageBreadcrumbsProps) {
   const collapseMiddle = isNarrow && middle.length >= 2
 
   return (
-    <Breadcrumb aria-label="Breadcrumb">
+    <Breadcrumb aria-label="Breadcrumb" className={styles.breadcrumb}>
       {collapseMiddle ? (
         <>
           {first.href ? (
@@ -71,7 +73,9 @@ export function SynPageBreadcrumbs(props: SynPageBreadcrumbsProps) {
             <BreadcrumbItem isActive>{first.label}</BreadcrumbItem>
           )}
           <SynPageBreadcrumbsCollapsedMiddle middleItems={middle} />
-          <BreadcrumbItem isActive>{last.label}</BreadcrumbItem>
+          <BreadcrumbItem isActive>
+            <BreadcrumbCurrentSegment label={last.label} />
+          </BreadcrumbItem>
         </>
       ) : (
         items.map((item, index) => {
@@ -80,7 +84,7 @@ export function SynPageBreadcrumbs(props: SynPageBreadcrumbsProps) {
           if (isLast) {
             return (
               <BreadcrumbItem key={itemKey} isActive>
-                {item.label}
+                <BreadcrumbCurrentSegment label={item.label} />
               </BreadcrumbItem>
             )
           }
