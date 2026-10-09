@@ -111,7 +111,7 @@ def _run_main(
     monkeypatch.setattr(
         check_breaking,
         "get_changelog_entries",
-        lambda *_args, **_kwargs: (changelog_entries if changelog_entries is not None else []),
+        lambda *_args, **_kwargs: changelog_entries if changelog_entries is not None else [],
     )
 
     argv = [

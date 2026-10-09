@@ -11,6 +11,9 @@ import { ROUTE_MANIFEST_COMMENT_KEY, ROUTE_MANIFEST_NOTICE, type RouteManifest }
 import { checkRouteBaseline, updateRouteBaseline } from './run-route-baseline'
 
 describe('route baseline tooling', () => {
+  /** updateRouteBaseline formats via Prettier; allow headroom on loaded CI runners. */
+  const updateBaselineTimeout = 30_000
+
   const tempRoots: string[] = []
 
   afterEach(() => {
@@ -80,7 +83,7 @@ describe('route baseline tooling', () => {
     expect(result.messages.some((line) => line.includes('Next steps:'))).toBe(true)
   })
 
-  it('checkRouteBaseline fails when App.tsx escape hatch path changes', () => {
+  it('checkRouteBaseline fails when App.tsx escape hatch path changes', { timeout: updateBaselineTimeout }, () => {
     const tempRoot = makeFixturePackageRoot()
     updateRouteBaseline(tempRoot)
 
@@ -97,7 +100,7 @@ describe('route baseline tooling', () => {
     expect(result.diff.removed).toContain('/auth/test-signin-callback')
   })
 
-  it('checkRouteBaseline fails when __root not-found target changes', () => {
+  it('checkRouteBaseline fails when __root not-found target changes', { timeout: updateBaselineTimeout }, () => {
     const tempRoot = makeFixturePackageRoot()
     updateRouteBaseline(tempRoot)
 
@@ -109,7 +112,7 @@ describe('route baseline tooling', () => {
     expect(result.diff.changed.some((change) => change.template === '*')).toBe(true)
   })
 
-  it('checkRouteBaseline fails for unmounted createRoute modules', () => {
+  it('checkRouteBaseline fails for unmounted createRoute modules', { timeout: updateBaselineTimeout }, () => {
     const tempRoot = makeFixturePackageRoot()
     updateRouteBaseline(tempRoot)
 
@@ -129,7 +132,7 @@ export const orphanRoutes = [
     expect(result.messages.some((line) => line.includes('Unmounted route modules'))).toBe(true)
   })
 
-  it('updateRouteBaseline refuses to write when parity gaps remain', () => {
+  it('updateRouteBaseline refuses to write when parity gaps remain', { timeout: updateBaselineTimeout }, () => {
     const tempRoot = makeFixturePackageRoot()
 
     const appRoutePath = join(tempRoot, 'src/app/AppRoute.tsx')
@@ -142,17 +145,21 @@ export const orphanRoutes = [
     expect(() => updateRouteBaseline(tempRoot)).toThrow(/Refusing to update route baseline/)
   })
 
-  it('updateRouteBaseline writes a manifest that checkRouteBaseline accepts', () => {
-    const tempRoot = makeFixturePackageRoot()
+  it(
+    'updateRouteBaseline writes a manifest that checkRouteBaseline accepts',
+    { timeout: updateBaselineTimeout },
+    () => {
+      const tempRoot = makeFixturePackageRoot()
 
-    const update = updateRouteBaseline(tempRoot)
-    expect(update.routeCount).toBe(3)
-    expect(readFileSync(update.path, 'utf-8').length).toBeGreaterThan(0)
+      const update = updateRouteBaseline(tempRoot)
+      expect(update.routeCount).toBe(3)
+      expect(readFileSync(update.path, 'utf-8').length).toBeGreaterThan(0)
 
-    const check = checkRouteBaseline(tempRoot)
-    expect(check.ok).toBe(true)
-    expect(check.manifest.routes).toHaveLength(update.routeCount)
-  })
+      const check = checkRouteBaseline(tempRoot)
+      expect(check.ok).toBe(true)
+      expect(check.manifest.routes).toHaveLength(update.routeCount)
+    }
+  )
 
   it('buildRouteManifest output is sorted, unique, and versioned', () => {
     const tempRoot = makeFixturePackageRoot()

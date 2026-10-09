@@ -1,10 +1,10 @@
 ---
 openapi: 3.1.0
 info:
-  title: Orchestrator Settings API
+  title: Syntara Settings API
   version: 1.0.0
   description: |
-    Runtime settings API for the Orchestrator platform.
+    Runtime settings API for the Syntara platform.
 
     Provides endpoints for listing, reading, and updating
     database-backed runtime configuration settings. Settings are identified

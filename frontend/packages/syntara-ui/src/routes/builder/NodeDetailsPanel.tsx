@@ -12,7 +12,7 @@ import type { Node } from '@xyflow/react'
 import type { ReactNode } from 'react'
 import { useState } from 'react'
 
-import { NodeMenu } from '../../components/nodes/NodeMenu'
+import { SynStepMenu } from '../../components/steps/SynStepMenu'
 import { FlowNodeType, RegistryNodeId } from '../../constants'
 import { useAlerts } from '../../providers/alerts'
 import {
@@ -176,13 +176,14 @@ function findActivityInCurrentWorkflow(activityId: string): Activity | undefined
 }
 
 /** Renders the appropriate details component for a given node in edit mode. */
-function renderEditModeContent(
-  node: Node<NodeType['data']>,
-  currentWorkflow: ReturnType<typeof selectCurrentWorkflow>,
-  onClose: () => void,
-  onHeaderContentChange: (content: ReactNode | null) => void,
+function renderEditModeContent(params: {
+  node: Node<NodeType['data']>
+  currentWorkflow: ReturnType<typeof selectCurrentWorkflow>
+  onClose: () => void
+  onHeaderContentChange: (content: ReactNode | null) => void
   projectId?: string
-): ReactNode {
+}): ReactNode {
+  const { node, currentWorkflow, onClose, onHeaderContentChange, projectId } = params
   if (node.type === FlowNodeType.TRIGGER) {
     const triggerIdx = parseTriggerIndex(node.id) ?? 0
     const trigger = currentWorkflow?.triggers?.[triggerIdx]
@@ -346,7 +347,7 @@ export function NodeDetailsPanel(props: NodeDetailsPanelProps) {
     disabled: getNodeDisabledState(node),
   })
   const panelMenuActions = buildPanelMenuActions(mode, node, menuActions, onClose)
-  const headerActions = panelMenuActions.length > 0 ? <NodeMenu menuActions={panelMenuActions} /> : null
+  const headerActions = panelMenuActions.length > 0 ? <SynStepMenu menuActions={panelMenuActions} /> : null
 
   const iconDescriptor =
     mode === 'edit' && node
@@ -473,7 +474,13 @@ export function NodeDetailsPanel(props: NodeDetailsPanelProps) {
     if (!node) return null
     return (
       <Flex key={node.id} direction={{ default: 'column' }} style={{ height: '100%', minHeight: 0 }}>
-        {renderEditModeContent(node, currentWorkflow, onClose, setHeaderContent, projectId)}
+        {renderEditModeContent({
+          node,
+          currentWorkflow,
+          onClose,
+          onHeaderContentChange: setHeaderContent,
+          projectId,
+        })}
       </Flex>
     )
   }

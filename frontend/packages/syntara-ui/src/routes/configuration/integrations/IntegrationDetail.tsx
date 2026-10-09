@@ -254,13 +254,19 @@ function ResourcesFooter({
   )
 }
 
-function getFooterState(
-  isLLM: boolean,
-  modelsState: ReturnType<typeof useIntegrationModelsState>,
-  toolsDirty: boolean,
-  isToolsSaving: boolean,
+function getFooterState({
+  isLLM,
+  modelsState,
+  toolsDirty,
+  isToolsSaving,
+  handleToolsSave,
+}: {
+  isLLM: boolean
+  modelsState: ReturnType<typeof useIntegrationModelsState>
+  toolsDirty: boolean
+  isToolsSaving: boolean
   handleToolsSave: () => void
-) {
+}) {
   if (isLLM) {
     return {
       isDirty: modelsState.isDirty,
@@ -340,7 +346,7 @@ export function IntegrationDetail() {
   // Models state (LLM providers)
   const modelsState = useIntegrationModelsState(integrationId, isLLM)
 
-  const footerState = getFooterState(isLLM, modelsState, toolsDirty, isToolsSaving, handleToolsSave)
+  const footerState = getFooterState({ isLLM, modelsState, toolsDirty, isToolsSaving, handleToolsSave })
 
   const queryState = useQueryState(query, {
     title: 'Error loading integration',

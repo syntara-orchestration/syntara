@@ -46,7 +46,7 @@ class TestRunningToPaused:
         activities = [_make_activity(ActivityStatus.WAITING), _make_activity(ActivityStatus.WAITING)]
         service = _make_service()
 
-        result = await service._maybe_update_execution_paused_status(execution, activities)
+        result = service._maybe_update_execution_paused_status(execution, activities)
 
         assert execution.status == ExecutionStatus.PAUSED
         assert result == ExecutionStatus.PAUSED
@@ -57,7 +57,7 @@ class TestRunningToPaused:
         activities = [_make_activity(ActivityStatus.RUNNING), _make_activity(ActivityStatus.WAITING)]
         service = _make_service()
 
-        result = await service._maybe_update_execution_paused_status(execution, activities)
+        result = service._maybe_update_execution_paused_status(execution, activities)
 
         assert execution.status == ExecutionStatus.RUNNING
         assert result is None
@@ -70,7 +70,7 @@ class TestRunningToPaused:
         activities = [_make_activity(ActivityStatus.PENDING), _make_activity(ActivityStatus.WAITING)]
         service = _make_service()
 
-        result = await service._maybe_update_execution_paused_status(execution, activities)
+        result = service._maybe_update_execution_paused_status(execution, activities)
 
         assert execution.status == ExecutionStatus.PAUSED
         assert result == ExecutionStatus.PAUSED
@@ -82,7 +82,7 @@ class TestRunningToPaused:
         activities = [_make_activity(ActivityStatus.RETRYING), _make_activity(ActivityStatus.WAITING)]
         service = _make_service()
 
-        result = await service._maybe_update_execution_paused_status(execution, activities)
+        result = service._maybe_update_execution_paused_status(execution, activities)
 
         assert execution.status == ExecutionStatus.RUNNING
         assert result is None
@@ -97,7 +97,7 @@ class TestPausedToRunning:
         activities = [_make_activity(ActivityStatus.RUNNING), _make_activity(ActivityStatus.WAITING)]
         service = _make_service()
 
-        result = await service._maybe_update_execution_paused_status(execution, activities)
+        result = service._maybe_update_execution_paused_status(execution, activities)
 
         assert execution.status == ExecutionStatus.RUNNING
         assert result == ExecutionStatus.RUNNING
@@ -109,7 +109,7 @@ class TestPausedToRunning:
         activities = [_make_activity(ActivityStatus.RETRYING), _make_activity(ActivityStatus.WAITING)]
         service = _make_service()
 
-        result = await service._maybe_update_execution_paused_status(execution, activities)
+        result = service._maybe_update_execution_paused_status(execution, activities)
 
         assert execution.status == ExecutionStatus.RUNNING
         assert result == ExecutionStatus.RUNNING
@@ -121,7 +121,7 @@ class TestPausedToRunning:
         activities = [_make_activity(ActivityStatus.RUNNING)]
         service = _make_service()
 
-        result = await service._maybe_update_execution_paused_status(execution, activities)
+        result = service._maybe_update_execution_paused_status(execution, activities)
 
         assert execution.status == ExecutionStatus.RUNNING
         assert result == ExecutionStatus.RUNNING
@@ -136,7 +136,7 @@ class TestNoTransition:
         activities = [_make_activity(ActivityStatus.WAITING)]
         service = _make_service()
 
-        result = await service._maybe_update_execution_paused_status(execution, activities)
+        result = service._maybe_update_execution_paused_status(execution, activities)
 
         assert execution.status == ExecutionStatus.COMPLETED
         assert result is None
@@ -147,7 +147,7 @@ class TestNoTransition:
         activities = [_make_activity(ActivityStatus.COMPLETED), _make_activity(ActivityStatus.FAILED)]
         service = _make_service()
 
-        result = await service._maybe_update_execution_paused_status(execution, activities)
+        result = service._maybe_update_execution_paused_status(execution, activities)
 
         assert execution.status == ExecutionStatus.RUNNING
         assert result is None
@@ -159,7 +159,7 @@ class TestNoTransition:
         activities = [_make_activity(ActivityStatus.PENDING)]
         service = _make_service()
 
-        result = await service._maybe_update_execution_paused_status(execution, activities)
+        result = service._maybe_update_execution_paused_status(execution, activities)
 
         assert execution.status == ExecutionStatus.RUNNING
         assert result is None
@@ -171,7 +171,7 @@ class TestNoTransition:
         activities = [_make_activity(ActivityStatus.WAITING)]
         service = _make_service()
 
-        result = await service._maybe_update_execution_paused_status(execution, activities)
+        result = service._maybe_update_execution_paused_status(execution, activities)
 
         assert execution.status == ExecutionStatus.PAUSED
         assert result is None

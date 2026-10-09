@@ -13,6 +13,10 @@
  * fills the minimum required form fields, submits, and closes the editor.
  */
 
+import {
+  DEFAULT_BUILDER_GROUP_LABEL,
+  EXPRESSION_MODE_LABELS,
+} from '../../src/components/expressions/expressionBuilderLabels'
 import { expect, type Page } from '../fixtures'
 
 import {
@@ -32,6 +36,21 @@ import {
 } from './workflows'
 
 export { ensureLlmCredential, createLlmIntegration, deleteLlmIntegration, selectLlmCredential }
+
+/** Switch one expression builder (Condition group) to raw / freeform mode. */
+async function switchExpressionBuilderToRaw(page: Page, builderIndex = 0) {
+  const builder = page.getByRole('group', { name: DEFAULT_BUILDER_GROUP_LABEL }).nth(builderIndex)
+  const modeToggle = builder.getByRole('button', {
+    name: new RegExp(`^(${EXPRESSION_MODE_LABELS.visual}|${EXPRESSION_MODE_LABELS.raw})$`),
+  })
+  await expect(modeToggle).toBeVisible({ timeout: 15_000 })
+  if ((await modeToggle.textContent())?.trim() === EXPRESSION_MODE_LABELS.raw) {
+    return
+  }
+  await modeToggle.click()
+  await page.getByRole('option', { name: EXPRESSION_MODE_LABELS.raw, exact: true }).click()
+  await expect(builder.getByLabel(/Raw expression/i)).toBeVisible()
+}
 
 // ---------------------------------------------------------------------------
 // Internal helpers
@@ -165,6 +184,7 @@ export async function addAgenticNode(page: Page, name: string, prompt = 'Analyze
   const { name: credName } = await ensureLlmCredential(page)
   await openAddNodePanel(page)
   await selectDirectNodeType(page, 'Task Agent')
+  await expectAiAgentNodeFormReady(page)
   await page.getByRole('textbox', { name: 'Name', exact: true }).fill(name)
   await selectLlmCredential(page, credName, integrationName)
   await page.getByRole('textbox', { name: 'Prompt', exact: true }).fill(prompt)
@@ -307,7 +327,7 @@ export async function addConditionalNode(
   await expect(nameInput).toBeVisible({ timeout: 10_000 })
   await nameInput.fill(name)
 
-  // Fill in Visual expression builder fields
+  // Fill in form builder fields
   const fieldInput = page.getByRole('textbox', { name: 'Field', exact: true })
   await expect(fieldInput).toBeVisible({ timeout: 10_000 })
   await fieldInput.fill(config.field)
@@ -342,12 +362,9 @@ export async function addConditionNode(page: Page, name: string, expression = 't
   await expect(page.getByRole('textbox', { name: 'Name', exact: true })).toBeVisible()
   await page.getByRole('textbox', { name: 'Name', exact: true }).fill(name)
 
-  // Expression builder has two modes: visual builder or raw expression
-  // Switch to raw mode to fill the expression directly
-  const editorModeToggle = page.getByRole('button', { name: /Expression editor mode/i })
-  await expect(editorModeToggle).toBeVisible()
-  await editorModeToggle.click()
-  await page.getByRole('option', { name: 'Custom expression' }).click()
+  // Condition type dropdown: form builder or freeform text
+  // Switch to freeform text to fill the expression directly
+  await switchExpressionBuilderToRaw(page, 0)
 
   // Wait for raw expression input to appear
   const rawExpressionInput = page.getByLabel(/Raw expression/i)
@@ -528,12 +545,7 @@ export async function addSwitchNodeWithCases(page: Page, name: string, cases: Sw
    * the field.
    */
   const fillCase = async (i: number) => {
-    // ExpressionBuilder uses a PatternFly MenuToggle — click to open, then select option
-    await page
-      .getByLabel(/Expression editor mode/i)
-      .nth(i)
-      .click()
-    await page.getByRole('option', { name: 'Custom expression', exact: true }).click()
+    await switchExpressionBuilderToRaw(page, i)
 
     const rawExpression = page.getByLabel(/Raw expression/i).nth(i)
     await rawExpression.fill(cases[i].condition)
@@ -669,4 +681,47 @@ export async function openScheduleTriggerForEditing(page: Page, nodeName: string
   await openSavedNodeForEditing(page, nodeName, async (p) => {
     await expect(p.getByLabel('Schedule expression', { exact: true })).toBeVisible({ timeout: 5_000 })
   })
+}
+
+/** Wait until the Task Agent create/edit form and model control have hydrated. */
+export async function expectAiAgentNodeFormReady(page: Page) {
+  await expect(page.getByTestId('ai-agent-node-form')).toBeVisible({ timeout: 15_000 })
+  await expect(page.getByRole('button', { name: 'Model', exact: true })).toBeEnabled({ timeout: 15_000 })
+}
+
+/** Open Task Agent from the add-node panel and wait for the form. */
+export async function openTaskAgentNodeCreateForm(page: Page) {
+  const panel = await clickAddConnectedStep(page)
+  await panel.getByRole('button', { name: 'Task Agent' }).click()
+  await expectAiAgentNodeFormReady(page)
+}
+
+/** Open a saved Task Agent node on the canvas for editing. */
+export async function openAiAgentNodeForEditing(page: Page, nodeName: string) {
+  await openSavedNodeForEditing(page, nodeName, async (p) => {
+    await expect(p.getByTestId('ai-agent-node-form')).toBeVisible({ timeout: 5_000 })
+    await expect(p.getByRole('button', { name: 'Model', exact: true })).toBeEnabled({ timeout: 5_000 })
+  })
+}
+
+/** Open the model picker (single click — do not toggle again while waiting for options). */
+export async function openAiAgentModelPicker(page: Page) {
+  const modelToggle = page.getByRole('button', { name: 'Model', exact: true })
+  await expect(modelToggle).toBeEnabled({ timeout: 15_000 })
+  await modelToggle.click()
+}
+
+/**
+ * Wait until each integration's group title and at least one model option are visible.
+ * Matches `selectLlmCredential` group scoping; polls without re-opening the picker.
+ */
+export async function expectAiAgentIntegrationGroupsVisible(page: Page, integrationNames: string[]) {
+  await expect(async () => {
+    for (const name of integrationNames) {
+      const groupTitle = page.getByText(name, { exact: true })
+      await expect(groupTitle).toBeVisible({ timeout: 5_000 })
+      const integrationGroup = groupTitle.locator('xpath=..')
+      await expect(integrationGroup.getByRole('option')).not.toHaveCount(0, { timeout: 5_000 })
+    }
+  }).toPass({ timeout: 60_000, intervals: [500, 1_000, 2_000] })
 }

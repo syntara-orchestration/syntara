@@ -82,27 +82,23 @@ export class WorkflowTraversal {
    * When `skipInferenceActivityIds` is provided (copy-to-editor), only IDs in that set
    * may be inferred as skipped. Nodes added after the copy keep no execution status.
    *
-   * @param activityId - The activity ID to check
-   * @param activityStates - Map of activity states from execution store
-   * @param edges - All edges in the workflow
-   * @param visited - Set of visited node IDs to prevent infinite loops
-   * @param skipInferenceActivityIds - Optional allowlist of activity IDs from the copied run
    * @returns true if the node should be marked as skipped
    *
    * @example
    * // Check if a node on a conditional branch should be skipped
-   * const shouldSkip = WorkflowTraversal.shouldMarkAsSkipped(nodeId, states, edges)
+   * const shouldSkip = WorkflowTraversal.shouldMarkAsSkipped({ activityId: nodeId, activityStates: states, edges })
    * if (shouldSkip) {
    *   activity.__executionState = { status: 'skipped' }
    * }
    */
-  static shouldMarkAsSkipped(
-    activityId: string,
-    activityStates: Map<string, ActivityState>,
-    edges: EdgeConnection[],
-    visited: Set<string> = new Set(),
+  static shouldMarkAsSkipped(params: {
+    activityId: string
+    activityStates: Map<string, ActivityState>
+    edges: EdgeConnection[]
+    visited?: Set<string>
     skipInferenceActivityIds?: ReadonlySet<string>
-  ): boolean {
+  }): boolean {
+    const { activityId, activityStates, edges, visited = new Set(), skipInferenceActivityIds } = params
     // Nodes outside the copied-run allowlist must not inherit inferred Skipped status
     if (skipInferenceActivityIds && !skipInferenceActivityIds.has(activityId)) {
       return false
@@ -141,15 +137,13 @@ export class WorkflowTraversal {
 
     // Step 5: Check if all incoming nodes are either skipped or in terminal states
     // This handles cascading skips (parent skipped → children skipped)
-    const allIncomingSkippedOrTerminal = this.areAllIncomingNodesSkippedOrTerminal(
+    return this.areAllIncomingNodesSkippedOrTerminal({
       incomingEdges,
       activityStates,
       edges,
       visited,
-      skipInferenceActivityIds
-    )
-
-    return allIncomingSkippedOrTerminal
+      skipInferenceActivityIds,
+    })
   }
 
   /**
@@ -193,13 +187,14 @@ export class WorkflowTraversal {
    *
    * @private
    */
-  private static areAllIncomingNodesSkippedOrTerminal(
-    incomingEdges: EdgeConnection[],
-    activityStates: Map<string, ActivityState>,
-    edges: EdgeConnection[],
-    visited: Set<string>,
+  private static areAllIncomingNodesSkippedOrTerminal(params: {
+    incomingEdges: EdgeConnection[]
+    activityStates: Map<string, ActivityState>
+    edges: EdgeConnection[]
+    visited: Set<string>
     skipInferenceActivityIds?: ReadonlySet<string>
-  ): boolean {
+  }): boolean {
+    const { incomingEdges, activityStates, edges, visited, skipInferenceActivityIds } = params
     return incomingEdges.every((edge) => {
       const sourceState = activityStates.get(edge.source)
 
@@ -209,7 +204,13 @@ export class WorkflowTraversal {
       }
 
       // If source should be skipped, this counts too (cascading skip)
-      return this.shouldMarkAsSkipped(edge.source, activityStates, edges, new Set(visited), skipInferenceActivityIds)
+      return this.shouldMarkAsSkipped({
+        activityId: edge.source,
+        activityStates,
+        edges,
+        visited: new Set(visited),
+        skipInferenceActivityIds,
+      })
     })
   }
 }
