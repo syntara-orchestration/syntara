@@ -17,3 +17,8 @@
   flex-shrink: 0;
   padding-top: var(--pf-t--global--spacer--md);
 }
+
+/* Scope target for workflow-authored css_override (use global .form-step-response-form). */
+.formStepResponseForm {
+  display: block;
+}

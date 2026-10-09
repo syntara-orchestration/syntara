@@ -10,6 +10,7 @@ import { useCanSubmitFormPrompt } from './hooks/useCanSubmitFormPrompt'
 import { useFormPromptPermissions } from './hooks/useFormPromptPermissions'
 
 const mockMutateAsync = vi.hoisted(() => vi.fn())
+const mockShowSuccess = vi.hoisted(() => vi.fn())
 const mockFormsUseQuery = vi.hoisted(() => vi.fn())
 const mockUseCanSubmitFormPrompt = vi.hoisted(() =>
   vi.fn(() => ({ canSubmit: true, isLoading: false, isError: false }))
@@ -45,11 +46,13 @@ vi.mock('../../components/forms/SynDynamicForm', async () => {
   return {
     SynDynamicForm: ({
       id,
+      definition,
       onSubmit,
       disabledFieldTooltip,
       isReadOnly,
     }: {
       id?: string
+      definition?: { fields?: Array<{ value_name: string; label: string }> }
       onSubmit?: (data: Record<string, unknown>) => void | Promise<void>
       disabledFieldTooltip?: string
       isReadOnly?: boolean
@@ -67,7 +70,13 @@ vi.mock('../../components/forms/SynDynamicForm', async () => {
             event.preventDefault()
             onSubmit?.({ reason: 'approved' })?.catch(() => undefined)
           }}
-        />
+        >
+          {definition?.fields?.map((field) => (
+            <label key={field.value_name} htmlFor={field.value_name}>
+              {field.label}
+            </label>
+          ))}
+        </form>
       </>
     ),
   }
@@ -75,7 +84,7 @@ vi.mock('../../components/forms/SynDynamicForm', async () => {
 
 vi.mock('../../providers/alerts', () => ({
   useAlerts: () => ({
-    showSuccess: vi.fn(),
+    showSuccess: mockShowSuccess,
     showError: vi.fn(),
   }),
 }))
@@ -320,7 +329,7 @@ describe('FormPromptResponseContent', () => {
     const refetch = vi.fn().mockResolvedValue(undefined)
     mockMutateAsync.mockResolvedValue({})
     mockFormsUseQuery.mockReturnValue({
-      data: pendingPrompt,
+      data: { ...pendingPrompt, success_message: 'Saved for this workflow run.' },
       isLoading: false,
       isError: false,
       error: null,
@@ -336,6 +345,10 @@ describe('FormPromptResponseContent', () => {
 
     await user.click(screen.getByRole('button', { name: 'Send' }))
 
+    expect(mockShowSuccess).toHaveBeenCalledWith({
+      title: 'Form submitted',
+      description: 'Saved for this workflow run.',
+    })
     expect(mockMutateAsync).toHaveBeenCalledWith({
       params: { path: { form_prompt_id: 'fp-1' } },
       body: { response_data: { reason: 'approved' } },

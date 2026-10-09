@@ -1,9 +1,27 @@
 import { type Locator } from '@playwright/test'
 
-import { type Page, expect } from '../fixtures'
+import { type Page, expect, toAppUrl } from '../fixtures'
+
+import { waitForUIReady } from './workflows'
 
 /** Locator scoped to the Compass page-header region (h1, status badges, toolbar). */
 export const pageHeader = (page: Page): Locator => page.locator('.pf-v6-c-compass__main-header')
+
+/** Run a published workflow from the Workflows list (kebab → Run published version) and wait for execution detail. */
+export async function runPublishedWorkflowFromList(page: Page, workflowName: string): Promise<void> {
+  await page.goto(toAppUrl('/workflows'))
+  await page.getByPlaceholder('Filter by name').fill(workflowName)
+  await page.getByRole('button', { name: 'Apply filter' }).click()
+
+  const row = page.getByRole('row', { name: new RegExp(workflowName) })
+  await expect(row).toBeVisible({ timeout: 15_000 })
+  await waitForUIReady(page)
+
+  await row.getByRole('button', { name: /Actions|Kebab toggle/i }).click({ force: true })
+  await page.getByRole('menuitem', { name: 'Run published version' }).click()
+  await page.getByRole('button', { name: 'Run now' }).click()
+  await expect(page).toHaveURL(/\/executions\//, { timeout: 30_000 })
+}
 
 /**
  * Click Run in the workflow builder toolbar and wait for navigation to the
