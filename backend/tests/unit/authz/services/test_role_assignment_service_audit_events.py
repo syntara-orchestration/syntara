@@ -9,7 +9,7 @@ by the registered handler.
 
 from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, Mock, patch
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -19,7 +19,10 @@ from syntara.audit.models.audit_event import EventCategory, EventSeverity, Event
 from syntara.authz.audit.role_assignment import RoleAssignmentEvent, RoleAssignmentHandler
 from syntara.authz.models.assignments import RoleAssignment
 from syntara.authz.services.role_assignment_service import RoleAssignmentService
+from syntara.core.exceptions import SafeValueError
 from syntara.core.models import User
+from syntara.core.models.principal import Principal
+from syntara.service_accounts.models.service_account import ServiceAccount
 
 if TYPE_CHECKING:
     from syntara.audit.models.audit_event import AuditEvent
@@ -63,7 +66,7 @@ class TestRoleAssignmentServiceAssignAuditEvents:
                 "_validate_principal_id",
                 new_callable=AsyncMock,
                 return_value=("alice", "user"),
-            ),
+            ) as validate_principal,
             patch.object(service, "_validate_role", new_callable=AsyncMock),
             patch.object(service, "_resolve_project_name", new_callable=AsyncMock, return_value=None),
             patch.object(service, "_enrich_with_role_info", new_callable=AsyncMock),
@@ -73,6 +76,7 @@ class TestRoleAssignmentServiceAssignAuditEvents:
                 role_name="editor",
             )
 
+        validate_principal.assert_awaited_once_with(principal_id, project_id=None)
         assert mock_do_emit.call_count == 1
         event: AuditEvent = mock_do_emit.call_args.args[0]
 
@@ -160,7 +164,9 @@ class TestRoleAssignmentServiceAssignAuditEvents:
         service = RoleAssignmentService(session=mock_session, current_user=test_user)
 
         with (
-            patch.object(service, "_validate_principal_id", new_callable=AsyncMock, return_value=("bob", "user")),
+            patch.object(
+                service, "_validate_principal_id", new_callable=AsyncMock, return_value=("bob", "user")
+            ) as validate_principal,
             patch.object(service, "_validate_role", new_callable=AsyncMock),
             patch.object(service, "_resolve_project_name", new_callable=AsyncMock, return_value="my-project"),
             patch.object(service, "_enrich_with_role_info", new_callable=AsyncMock),
@@ -172,9 +178,48 @@ class TestRoleAssignmentServiceAssignAuditEvents:
                 project_id=project_id,
             )
 
+        validate_principal.assert_awaited_once_with(principal_id, project_id=project_id)
         assert mock_do_emit.call_count == 1
         event: AuditEvent = mock_do_emit.call_args.args[0]
         assert event.structured_data.project_id == str(project_id)
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("project_id", [None, UUID(int=1)], ids=["global", "other-project"])
+    async def test_assign_service_account_outside_owning_project_has_no_side_effects(
+        self, test_user: User, project_id: UUID | None
+    ) -> None:
+        """Reject invalid grants before persistence or success audit dispatch."""
+        principal = Principal(id=uuid4(), principal_type="service_account")
+        sa = ServiceAccount(
+            id=principal.id,
+            name="deploy-bot",
+            client_id="deploy-bot-client",
+            hashed_secret="test-hash",  # noqa: S106
+            project_id=uuid4(),
+            created_by=test_user.id,
+        )
+        session = AsyncMock(spec=AsyncSession)
+        session.get.side_effect = [principal, sa]
+        session.exec.return_value = Mock()
+        session.exec.return_value.first.return_value = None
+        service = RoleAssignmentService(session, test_user)
+
+        with (
+            patch("syntara.core.queries.project_queries.assert_project_alive", new_callable=AsyncMock),
+            patch.object(AuditEventDispatcher, "dispatch") as dispatch,
+            pytest.raises(
+                SafeValueError, match="Service accounts can only be assigned roles within their owning project"
+            ),
+        ):
+            await service.assign(
+                principal_id=sa.id,
+                role_name="admin" if project_id is None else "project-user",
+                project_id=project_id,
+            )
+
+        session.add.assert_not_called()
+        session.commit.assert_not_awaited()
+        dispatch.assert_not_called()
 
 
 class TestRoleAssignmentServiceRevokeAuditEvents:
