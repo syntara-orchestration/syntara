@@ -80,10 +80,11 @@ repos:
 
       - id: frontend-eslint
         name: 'frontend: eslint'
+        # Use the frontend root's pinned ESLint CLI for all workspace files.
         # ESLint 10 resolves eslint.config.js from each linted file's directory
         # (config lookup from file is the default). That lets pre-commit run from
         # the repo root while each frontend package still uses its own config.
-        entry: npx --prefix frontend/packages/syntara-ui eslint --
+        entry: npx --prefix frontend eslint --
         language: system
         pass_filenames: true
         # Type-aware linting (parserOptions.project) loads full TypeScript
