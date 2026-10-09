@@ -1970,6 +1970,13 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
         Returns the source ``started_at``, ``completed_at``, ``status`` and
         ``error_details``, or None when this activity was an ordinary execution,
         meaning the caller should keep the event's own values.
+
+        On timeout this **raises** rather than returning None. An ordinary
+        execution is answered from the second half of the condition and never
+        reaches the timeout, so the two are distinguishable and a raise is the
+        honest signal: it says a node that *is* a replay did not have its state
+        ready. The caller retries once, and failing that keeps Temporal's values —
+        degrading the row's times and status rather than losing the record.
         """
         await workflow.wait_condition(
             lambda: (activity_id in self._restored_node_timestamps or activity_id not in self._retry_replay_candidates),
