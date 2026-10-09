@@ -152,6 +152,7 @@ class ActivityName(StrEnum):
     VALIDATE_NODE_REFERENCES = "validate_node_references"
     RETRY_SOURCE_STATE = "fetch_retry_source_state"
     RETRY_NODE_REPLAY = "replay_retry_node"
+    RETRY_LOOP_STATE = "fetch_retry_loop_state"
 
 
 # Enums

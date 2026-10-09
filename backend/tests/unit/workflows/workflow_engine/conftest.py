@@ -28,6 +28,7 @@ def init_workflow_runtime(wf: OrchestratorWorkflow) -> None:
     wf._restored_node_timestamps = {}
     wf._restored_node_statuses = {}
     wf._restored_node_outputs = {}
+    wf._resumed_loop_state = {}
     wf._retry_source_statuses = {}
     # Set in __init__ for a real run. A converge reads it to tell whether a loop
     # predecessor is still iterating, so a workflow built without __init__ needs it
