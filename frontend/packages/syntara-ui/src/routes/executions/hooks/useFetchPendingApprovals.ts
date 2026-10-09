@@ -30,7 +30,7 @@ type UseFetchPendingApprovalsResult = {
  * This avoids polling — the fetch is triggered on demand when the user clicks
  * a waiting approval node on the canvas or when navigation is needed.
  *
- * Part of the approval hooks architecture. See `useExecutionNodeClick.ts` for the full layering explanation.
+ * Part of the approval hooks architecture. See `useExecutionStepClick.ts` for the full layering explanation.
  */
 export function useFetchPendingApprovals(executionId: string): UseFetchPendingApprovalsResult {
   const [isLoading, setIsLoading] = useState(false)

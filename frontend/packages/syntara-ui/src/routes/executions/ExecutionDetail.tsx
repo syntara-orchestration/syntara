@@ -38,8 +38,8 @@ import { executionDetailHasTitleRowExtras, executionDetailPageHeading } from './
 import { executionRefetchInterval } from './executionPolling'
 import { useApprovalNavigation } from './hooks/useApprovalNavigation'
 import { useExecutionApprovalPanel } from './hooks/useExecutionApprovalPanel'
-import { useExecutionNodeClick } from './hooks/useExecutionNodeClick'
 import { useExecutionRunHistory } from './hooks/useExecutionRunHistory'
+import { useExecutionStepClick } from './hooks/useExecutionStepClick'
 import { useExecutionStreaming, useSyncActivityStore } from './hooks/useExecutionStreaming'
 import { useExecutionWorkflow } from './hooks/useExecutionWorkflow'
 import { useForkWorkflow } from './hooks/useForkWorkflow'
@@ -313,7 +313,7 @@ export default function ExecutionDetail() {
 
   const activityNameMap = useActivityNamesForExecution(execution?.workflow_definition, activities)
 
-  const nodeClick = useExecutionNodeClick(executionId)
+  const nodeClick = useExecutionStepClick(executionId)
   const { approvals, currentIndex, currentApproval, isApprovalLoading, handleNodeClick, navigateToIndex } = nodeClick
   const { selectedNodeId, selectedNodeName, selectNode } = nodeClick
   const approval = useExecutionApprovalPanel(

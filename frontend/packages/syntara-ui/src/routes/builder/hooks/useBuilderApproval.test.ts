@@ -13,7 +13,7 @@ import { EXECUTION_BADGE_DATA_ATTR } from '../components/ExecutionStatusBadge'
 
 import { useBuilderApproval } from './useBuilderApproval'
 
-const mockFetchForNode = vi.fn()
+const mockFetchForStep = vi.fn()
 const mockClear = vi.fn()
 
 const { approvalState } = vi.hoisted(() => ({
@@ -32,7 +32,7 @@ vi.mock('../../executions/hooks/useExecutionApproval', () => {
       handleNodeClick: vi.fn(),
       clearPendingApproval: mockClear,
       setPendingApproval: vi.fn(),
-      fetchForNode: vi.fn(),
+      fetchForStep: vi.fn(),
     }),
   }
 })
@@ -86,7 +86,7 @@ describe('useBuilderApproval', () => {
     approvalState.pending = null
     queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
 
-    vi.mocked(approvalsClient.useQuery).mockReturnValue({ data: undefined, refetch: mockFetchForNode })
+    vi.mocked(approvalsClient.useQuery).mockReturnValue({ data: undefined, refetch: mockFetchForStep })
     vi.mocked(approvalsClient.useMutation).mockReturnValue({ mutate: vi.fn(), isPending: false })
   })
 
