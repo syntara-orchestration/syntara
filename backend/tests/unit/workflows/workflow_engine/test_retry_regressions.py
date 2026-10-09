@@ -364,3 +364,37 @@ def test_definition_validator_and_retry_share_loop_body_membership() -> None:
             "body_c",
         }
     )
+
+
+class TestNoOverwrittenFailureNamespaceEntry:
+    """The failure path must build its namespace exactly once.
+
+    A rebase resolved this region by concatenating both sides of an additive
+    conflict, which left the old assignment immediately above the new one. Nothing
+    failed: the second line wins, so behaviour was correct, and neither mypy nor
+    the rest of the suite could see it — an immediately overwritten local is legal
+    Python and a valid call.
+
+    Pinned here because the symptom it produces is silence. A future conflict
+    resolution that put the surviving line *second* would instead drop
+    ``restored_output`` and quietly return an empty namespace to a restored
+    failure's successors, which is the bug the second line exists to prevent.
+    """
+
+    def test_the_namespace_comes_from_the_restored_output_builder(self) -> None:
+        import inspect
+
+        from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkflow
+
+        source = inspect.getsource(OrchestratorWorkflow._handle_node_failure)
+        assignments = [line.strip() for line in source.splitlines() if line.strip().startswith("namespace_entry =")]
+
+        # Two are correct: the builder, then the empty-model fallback when it
+        # returns nothing. Neither may be the plain extractor.
+        assert "_extract_failure_output" not in source, (
+            "the failure path must not read the plain extractor: it has no "
+            f"restored_output source and overwrites what came before it. Assignments: {assignments}"
+        )
+        assert assignments[0] == "namespace_entry = self._failure_namespace_entry(app_error, restored_output)", (
+            f"the first assignment must be the restored-output builder, got {assignments[0]}"
+        )

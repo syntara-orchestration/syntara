@@ -462,7 +462,6 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
         error_message = self._resolve_failure_message(node_id, error, app_error, graph)
         is_cancellation = app_error is not None and app_error.type == "InvocationCancelledError"
 
-        namespace_entry = self._extract_failure_output(node_id, app_error, graph)
         namespace_entry = self._failure_namespace_entry(app_error, restored_output)
 
         # If no output from executor (e.g. parameters resolution failed), build empty output from model
