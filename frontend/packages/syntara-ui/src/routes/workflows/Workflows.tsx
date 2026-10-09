@@ -246,7 +246,6 @@ export default function Workflows() {
               isPending={workflowsQuery.isPending}
               error={workflowsQuery.error}
               onRetry={() => detachPromise(workflowsQuery.refetch())}
-              isFetching={workflowsQuery.isFetching}
               sortedWorkflows={sortedWorkflows}
               hasActiveFilters={hasActiveFilters}
               filters={filters}

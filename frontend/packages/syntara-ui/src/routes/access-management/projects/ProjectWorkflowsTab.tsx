@@ -58,7 +58,6 @@ export function ProjectWorkflowsTab({ projectId, isBuiltin = false }: Readonly<P
       isPending={workflowsQuery.isPending}
       error={workflowsQuery.error}
       onRetry={() => detachPromise(workflowsQuery.refetch())}
-      isFetching={workflowsQuery.isFetching}
       sortedWorkflows={workflows}
       hasActiveFilters={hasActiveFilters}
       filters={filters}
