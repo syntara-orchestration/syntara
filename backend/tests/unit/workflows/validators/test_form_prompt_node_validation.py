@@ -333,3 +333,54 @@ class TestFormPromptValidationErrorPath:
         workflow_validator = WorkflowValidator()
         with pytest.raises(SafeValueError):
             workflow_validator.validate_workflow_definition(workflow_def)
+
+
+@pytest.mark.parametrize(
+    ("field", "expected_message"),
+    [
+        pytest.param(
+            {"type": "unknown_type", "value_name": "reason", "label": "Reason"},
+            "Invalid field type 'unknown_type'",
+            id="unknown-type",
+        ),
+        pytest.param(
+            {"value_name": "reason", "label": "Reason"},
+            "Required property 'type' missing",
+            id="missing-type",
+        ),
+    ],
+)
+def test_collect_findings_reports_form_prompt_field_type_errors(
+    field: dict[str, str],
+    expected_message: str,
+) -> None:
+    """Unknown or missing field types become safe, node-attributed findings."""
+    workflow_def = {
+        "schema_version": "2.0.0",
+        "name": "invalid-form-field-type",
+        "triggers": [{"id": "trigger", "type": "manual_trigger", "parameters": {}}],
+        "nodes": [
+            {
+                "id": "form_prompt",
+                "type": "form_prompt",
+                "parameters": {
+                    "form_definition": {"fields": [field]},
+                    "response_window": 30,
+                },
+            },
+            {"id": "consumer", "type": "script", "parameters": {"language": "bash", "code": "echo done"}},
+        ],
+        "edges": [
+            {"from": "trigger", "to": "form_prompt"},
+            {"from": "form_prompt", "to": "consumer", "from_port": "submitted"},
+        ],
+    }
+
+    result = WorkflowValidator().collect_findings(workflow_def)
+
+    assert result.is_valid is False
+    finding = next(f for f in result.findings if f.node_id == "form_prompt")
+    assert finding.severity == ValidationSeverity.error
+    assert finding.category == ValidationCategory.form_prompt_configuration
+    assert finding.field_path == "parameters.form_definition.fields.0.type"
+    assert expected_message in finding.message
