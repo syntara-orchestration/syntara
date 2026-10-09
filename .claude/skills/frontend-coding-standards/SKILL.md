@@ -21,7 +21,7 @@ Before writing custom utilities, hooks, or helpers, check whether the library or
 
 **Libraries first:**
 
-- **TanStack Query** provides `select`, `placeholderData`, `enabled`, `retry`, `staleTime` -- do not re-implement data transformation, caching, or conditional fetching with custom hooks wrapping `useEffect` + `useState`
+- **TanStack Query** provides `select`, `placeholderData`, `enabled`, `retry`, `staleTime`, and `refetchInterval` for polling -- do not re-implement data transformation, caching, conditional fetching, or polling with custom hooks wrapping `useEffect` + `useState`
 - **react-hook-form** provides `useFieldArray`, `useWatch`, `setValue`, `reset` -- do not manage dynamic form arrays or field dependencies with manual state
 - **Zod** provides `.transform()`, `.refine()`, `.superRefine()`, `.pipe()` -- do not post-process validated data with separate transformation functions
 - **PatternFly** provides layout components (Stack, Flex, Grid), form components, and design tokens -- do not build custom equivalents
@@ -1386,6 +1386,7 @@ function UserFormFields({ isEdit, control }: Props) {
 | Concern                      | Use this                                                       | Not this                                     |
 | ---------------------------- | -------------------------------------------------------------- | -------------------------------------------- |
 | **Server state (queries)**   | TanStack Query `useQuery` / `useQueries` via typed API clients | Manual `useEffect` + `useState` + `fetch`    |
+| **Query polling**            | TanStack Query `refetchInterval` / `enabled`                   | Component `setInterval` + effect + `refetch()` |
 | **Server state (mutations)** | TanStack Query `useMutation` via typed API clients             | Manual `useEffect` + `Promise` chains        |
 | **Form state**               | `react-hook-form` + Zod `zodResolver`                          | Manual `useState` per field                  |
 | **Client state (global)**    | Zustand stores (workflow builder)                              | React Context with manual reducers           |
@@ -1394,6 +1395,8 @@ function UserFormFields({ isEdit, control }: Props) {
 | **Error handling**           | `useQueryState`, `useMutationErrorHandler`, `SynErrorState`     | Ad-hoc try/catch with custom JSX             |
 | **Pagination**               | `useCursorPagination`                                          | Manual cursor/filter/queryParams state       |
 | **Dialogs**                  | `SynConfirmationDialog` + `useDialogState`                      | Raw `Modal` + manual open/close state        |
+
+For polling, configure `refetchInterval` on the query (and `enabled` when the query should start or stop conditionally) instead of starting a timer in a component effect and calling `refetch()`. TanStack Query's query result object is not referentially stable, so do not put the whole result in an effect dependency array. Prefer query options and render from query state; if an effect is necessary, depend only on the specific values it uses.
 
 ### Browser-Native APIs First
 
@@ -1742,6 +1745,17 @@ Controlled by **`VITE_EXTENDED`** (`true` / `1` = extended; unset = community). 
 - **Empty-state CTAs** like "Go to settings" -- use `<Link>` if it navigates
 - **Breadcrumb-like buttons** that go "back" to a list -- use `<Link>`
 - **Card titles** that open a detail view -- use `<Link>`
+
+### URL Search State
+
+For Router API details, read TanStack's upstream [search-params agent skill](https://github.com/TanStack/router/blob/main/packages/router-core/skills/router-core/search-params/SKILL.md). Follow Syntara's route configuration and existing hooks when applying those patterns.
+
+When state should survive refresh, browser back/forward, or sharing a URL, use TanStack Router as its source of truth:
+
+1. Declare route-owned search parameters in that route's `validateSearch` schema.
+2. Read them with `useSearch` and update them with `useNavigate` (or an existing routing hook such as `useUrlTab`).
+3. For list filters and sorting, use `useCursorPagination` and the existing filter hooks. They synchronize filters and sort with the URL and build the request's `queryParams`; do not add parallel local/URL state or duplicate filter-to-query conversion.
+4. Pass the resulting `queryParams` to the typed API client. Add other route search values to a request only when the endpoint supports them.
 
 ---
 
