@@ -6,7 +6,6 @@ import { FlowNodeType } from '../../../constants'
 
 import type { EdgeConnectionParams } from './edgeConnectionHelpers'
 import { calculateEdgeConnection, applyEdgeConnection, resetPollingConnectionCounter } from './edgeConnectionHelpers'
-import { buildSwitchCasePort } from './switchCaseHelpers'
 
 describe('calculateEdgeConnection', () => {
   const mockReactFlowInstance = {
@@ -181,13 +180,13 @@ describe('calculateEdgeConnection', () => {
       const params: EdgeConnectionParams = {
         sourceId: 'switch-1',
         targetId: 'task-1',
-        sourceHandle: buildSwitchCasePort(0),
+        sourceHandle: 'case_0',
         onAddNode: mockOnAddNode,
       }
 
       const result = calculateEdgeConnection(params, mockReactFlowInstance)
 
-      expect(result.placeholderIdToRemove).toBe(`placeholder-switch-1-${buildSwitchCasePort(0)}`)
+      expect(result.placeholderIdToRemove).toBe('placeholder-switch-1-case_0')
     })
 
     it('uses handle-specific placeholder for switch default handle', () => {
@@ -275,7 +274,7 @@ describe('calculateEdgeConnection', () => {
       const params: EdgeConnectionParams = {
         sourceId: 'switch-1',
         targetId: 'task-1',
-        sourceHandle: buildSwitchCasePort(0),
+        sourceHandle: 'case_0',
         onAddNode: mockOnAddNode,
       }
 
