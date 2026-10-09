@@ -4,6 +4,8 @@ import { useForm, useWatch } from 'react-hook-form'
 import { describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
+import { SynForm } from '../../../../components/forms/SynForm'
+
 import { ScopeFields } from './ScopeFields'
 
 vi.mock('../../../access/useAllProjects', () => {
@@ -33,24 +35,25 @@ function TestWrapper({
   defaultProjectIds?: string[]
   onScopeChange?: (newScope: string) => void
 }) {
-  const { control } = useForm<TestFormValues>({
+  const form = useForm<TestFormValues>({
     defaultValues: {
       scope: defaultScope,
       project_ids: defaultProjectIds,
     },
   })
 
-  const scope = useWatch({ control, name: 'scope' })
+  const scope = useWatch({ control: form.control, name: 'scope' })
 
   return (
-    <ScopeFields<TestFormValues>
-      control={control}
-      scope={scope}
-      scopeName="scope"
-      projectIdsName="project_ids"
-      idPrefix="test"
-      onScopeChange={onScopeChange}
-    />
+    <SynForm form={form}>
+      <ScopeFields<TestFormValues>
+        scope={scope}
+        scopeName="scope"
+        projectIdsName="project_ids"
+        idPrefix="test"
+        onScopeChange={onScopeChange}
+      />
+    </SynForm>
   )
 }
 
@@ -59,6 +62,7 @@ describe('ScopeFields', () => {
     it('renders scope toggle in global state (checked)', () => {
       render(<TestWrapper defaultScope="global" />)
 
+      expect(screen.getByText('Scope')).toBeInTheDocument()
       const toggle = screen.getByRole('switch', { name: /integration scope/i })
       expect(toggle).toBeChecked()
     })

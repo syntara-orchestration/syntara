@@ -40,6 +40,16 @@ describe('SynTextField', () => {
     expect(screen.getByText('*')).toBeInTheDocument()
   })
 
+  it('marks the input as required when isRequired is true', () => {
+    renderWithForm<FormData>({ schema, defaultValues: { name: '', email: '' } }, ({ control }) => (
+      <SynTextField name="name" control={control} label="Group name" isRequired />
+    ))
+
+    const input = screen.getByRole('textbox', { name: 'Group name' })
+    expect(input).toBeRequired()
+    expect(input).toHaveAttribute('aria-required', 'true')
+  })
+
   it('shows hint text when valid', () => {
     renderWithForm<FormData>({ schema, defaultValues: { name: '', email: '' } }, ({ control }) => (
       <SynTextField name="name" control={control} label="Group name" hint="Lowercase letters and hyphens only" />
