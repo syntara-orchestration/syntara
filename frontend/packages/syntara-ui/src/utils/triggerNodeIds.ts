@@ -1,4 +1,4 @@
-import { MenuNodeType, type MenuNodeTypeUnion } from '../constants'
+import { StepMenuCategory, type StepMenuCategoryUnion } from '../constants'
 
 export function buildTriggerNodeId(index: number): string {
   return `trigger-${index}`
@@ -37,13 +37,19 @@ export function toPositionKey(nodeId: string, triggers: Array<{ id: string }>): 
   return nodeId
 }
 
-export function resolveFlowNodeId(params: {
+type ResolveFlowNodeIdParams = {
   nodeId: string
-  nodeType: MenuNodeTypeUnion
   triggerIndex?: number
-}): string {
-  const { nodeId, nodeType, triggerIndex } = params
-  return nodeType === MenuNodeType.TRIGGER ? buildTriggerNodeId(triggerIndex ?? 0) : nodeId
+} & (
+  | { stepCategory: StepMenuCategoryUnion; nodeType?: never }
+  | { nodeType: StepMenuCategoryUnion; stepCategory?: never }
+)
+
+/** Accept both category property names while callers migrate to Step terminology. */
+export function resolveFlowNodeId(params: ResolveFlowNodeIdParams): string {
+  const { nodeId, triggerIndex } = params
+  const category = 'stepCategory' in params ? params.stepCategory : params.nodeType
+  return category === StepMenuCategory.TRIGGER ? buildTriggerNodeId(triggerIndex ?? 0) : nodeId
 }
 
 /**

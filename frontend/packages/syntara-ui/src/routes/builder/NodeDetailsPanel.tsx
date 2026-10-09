@@ -25,8 +25,8 @@ import {
 } from '../../stores/useWorkflowStore'
 import { parseTriggerIndex } from '../../utils/triggerNodeIds'
 import {
-  MenuNodeType,
-  type MenuNodeTypeUnion,
+  StepMenuCategory,
+  type StepMenuCategoryUnion,
   useNodeMenuActions,
 } from '../workflows/canvas/nodes/hooks/useNodeMenuActions'
 import type { NodeType } from '../workflows/canvas/nodes/NodeType'
@@ -157,10 +157,10 @@ const CONTROL_FLOW_TYPES: ReadonlySet<string> = new Set([
   FlowNodeType.WAIT,
 ])
 
-function resolveMenuNodeType(flowNodeType: string | undefined): MenuNodeTypeUnion {
-  if (flowNodeType === FlowNodeType.TRIGGER) return MenuNodeType.TRIGGER
-  if (flowNodeType && CONTROL_FLOW_TYPES.has(flowNodeType)) return MenuNodeType.CONTROL_FLOW
-  return MenuNodeType.ACTIVITY
+function resolveMenuNodeType(flowNodeType: string | undefined): StepMenuCategoryUnion {
+  if (flowNodeType === FlowNodeType.TRIGGER) return StepMenuCategory.TRIGGER
+  if (flowNodeType && CONTROL_FLOW_TYPES.has(flowNodeType)) return StepMenuCategory.CONTROL_FLOW
+  return StepMenuCategory.ACTIVITY
 }
 
 function getNodeDisabledState(node: Node<NodeType['data']> | undefined): boolean {

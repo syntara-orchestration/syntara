@@ -5,7 +5,7 @@ import { axe } from 'vitest-axe'
 
 import { useExecutionStore } from '../../stores/useExecutionStore'
 
-import { LoopNodeComponent } from './LoopNode'
+import { LoopStepComponent } from './LoopNode'
 
 // Mock @xyflow/react
 vi.mock('@xyflow/react', () => ({
@@ -26,7 +26,7 @@ vi.mock('@xyflow/react', () => ({
   },
 }))
 
-describe('LoopNodeComponent', () => {
+describe('LoopStepComponent', () => {
   const baseLoopNode = {
     type: 'loop',
     id: 'loop-1',
@@ -55,13 +55,13 @@ describe('LoopNodeComponent', () => {
 
   describe('Rendering', () => {
     it('renders loop node with name', () => {
-      render(<LoopNodeComponent {...createNodeProps(baseLoopNode)} />)
+      render(<LoopStepComponent {...createNodeProps(baseLoopNode)} />)
 
       expect(screen.getByText('Process Items')).toBeInTheDocument()
     })
 
     it('renders Loop subtitle label', () => {
-      render(<LoopNodeComponent {...createNodeProps(baseLoopNode)} />)
+      render(<LoopStepComponent {...createNodeProps(baseLoopNode)} />)
 
       // "Loop" appears both as subtitle and as branch handle, so look for both
       const loopTexts = screen.getAllByText('Loop')
@@ -69,7 +69,7 @@ describe('LoopNodeComponent', () => {
     })
 
     it('renders Done and Loop branch handles', () => {
-      render(<LoopNodeComponent {...createNodeProps(baseLoopNode)} />)
+      render(<LoopStepComponent {...createNodeProps(baseLoopNode)} />)
 
       expect(screen.getByText('Done')).toBeInTheDocument()
       // Loop appears multiple times
@@ -80,7 +80,7 @@ describe('LoopNodeComponent', () => {
 
   describe('Branch Handles', () => {
     it('renders Done branch handle', () => {
-      render(<LoopNodeComponent {...createNodeProps(baseLoopNode)} />)
+      render(<LoopStepComponent {...createNodeProps(baseLoopNode)} />)
 
       expect(screen.getByText('Done')).toBeInTheDocument()
     })
@@ -97,7 +97,7 @@ describe('LoopNodeComponent', () => {
         },
       } as LoopActivity
 
-      render(<LoopNodeComponent {...createNodeProps(unnamedLoop)} />)
+      render(<LoopStepComponent {...createNodeProps(unnamedLoop)} />)
 
       // Should render without crashing, label should still be present
       const loopTexts = screen.getAllByText('Loop')
@@ -116,7 +116,7 @@ describe('LoopNodeComponent', () => {
         },
       } as LoopActivity
 
-      render(<LoopNodeComponent {...createNodeProps(nodeWithExecution)} />)
+      render(<LoopStepComponent {...createNodeProps(nodeWithExecution)} />)
 
       // Should render without crashing
       expect(screen.getByText('Process Items')).toBeInTheDocument()
@@ -131,7 +131,7 @@ describe('LoopNodeComponent', () => {
         },
       } as LoopActivity
 
-      render(<LoopNodeComponent {...createNodeProps(nodeWithRetry)} />)
+      render(<LoopStepComponent {...createNodeProps(nodeWithRetry)} />)
 
       expect(screen.getByText('Process Items')).toBeInTheDocument()
     })
@@ -139,7 +139,7 @@ describe('LoopNodeComponent', () => {
 
   describe('Node Structure', () => {
     it('renders with correct structure', () => {
-      render(<LoopNodeComponent {...createNodeProps(baseLoopNode)} />)
+      render(<LoopStepComponent {...createNodeProps(baseLoopNode)} />)
 
       expect(screen.getByText('Process Items')).toBeInTheDocument()
     })
@@ -153,7 +153,7 @@ describe('LoopNodeComponent', () => {
     })
 
     it('does not render badge when no execution state', () => {
-      render(<LoopNodeComponent {...createNodeProps(baseLoopNode)} />)
+      render(<LoopStepComponent {...createNodeProps(baseLoopNode)} />)
 
       expect(screen.queryByText(/^\d+$/)).not.toBeInTheDocument()
     })
@@ -174,7 +174,7 @@ describe('LoopNodeComponent', () => {
         })
       })
 
-      render(<LoopNodeComponent {...createNodeProps(baseLoopNode)} />)
+      render(<LoopStepComponent {...createNodeProps(baseLoopNode)} />)
 
       expect(screen.getByText('3')).toBeInTheDocument()
     })
@@ -195,7 +195,7 @@ describe('LoopNodeComponent', () => {
         })
       })
 
-      render(<LoopNodeComponent {...createNodeProps(baseLoopNode)} />)
+      render(<LoopStepComponent {...createNodeProps(baseLoopNode)} />)
 
       expect(screen.getByText('1')).toBeInTheDocument()
       expect(screen.getByText('1 loop iteration')).toBeInTheDocument()
@@ -217,7 +217,7 @@ describe('LoopNodeComponent', () => {
         })
       })
 
-      render(<LoopNodeComponent {...createNodeProps(baseLoopNode)} />)
+      render(<LoopStepComponent {...createNodeProps(baseLoopNode)} />)
 
       expect(screen.getByText('5')).toBeInTheDocument()
       expect(screen.getByText('5 loop iterations')).toBeInTheDocument()
@@ -239,7 +239,7 @@ describe('LoopNodeComponent', () => {
         })
       })
 
-      render(<LoopNodeComponent {...createNodeProps(baseLoopNode)} />)
+      render(<LoopStepComponent {...createNodeProps(baseLoopNode)} />)
 
       expect(screen.getByText('4')).toBeInTheDocument()
     })
@@ -253,7 +253,7 @@ describe('LoopNodeComponent', () => {
         })
       })
 
-      const { container } = render(<LoopNodeComponent {...createNodeProps(baseLoopNode)} />)
+      const { container } = render(<LoopStepComponent {...createNodeProps(baseLoopNode)} />)
 
       expect(await axe(container)).toHaveNoViolations()
     })
@@ -274,7 +274,7 @@ describe('LoopNodeComponent', () => {
         })
       })
 
-      render(<LoopNodeComponent {...createNodeProps(baseLoopNode)} />)
+      render(<LoopStepComponent {...createNodeProps(baseLoopNode)} />)
 
       expect(screen.getByText('5')).toBeInTheDocument()
     })

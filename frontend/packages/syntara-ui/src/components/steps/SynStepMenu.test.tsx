@@ -2,12 +2,12 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 
-import type { NodeMenuAction } from '../../routes/workflows/canvas/nodes/hooks/useNodeMenuActions'
+import type { StepMenuAction } from '../../routes/workflows/canvas/nodes/hooks/useStepMenuActions'
 
 import { SynStepMenu } from './SynStepMenu'
 
 describe('SynStepMenu', () => {
-  const createMenuAction = (overrides: Partial<NodeMenuAction> = {}): NodeMenuAction => ({
+  const createMenuAction = (overrides: Partial<StepMenuAction> = {}): StepMenuAction => ({
     id: 'test-action',
     label: 'Test Action',
     onClick: vi.fn(),
@@ -178,7 +178,7 @@ describe('SynStepMenu', () => {
 
     it('renders separator between items', async () => {
       const user = userEvent.setup()
-      const actions: NodeMenuAction[] = [
+      const actions: StepMenuAction[] = [
         createMenuAction({ id: '1', label: 'Edit' }),
         { id: 'sep', label: '', onClick: vi.fn(), separator: true },
         createMenuAction({ id: '2', label: 'Delete', variant: 'danger' }),

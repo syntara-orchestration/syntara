@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { FlowNodeType } from '../../../../constants'
 
-import { GenericNodeComponent } from './GenericNode'
+import { GenericStepComponent } from './GenericNode'
 
 // Mock @xyflow/react
 vi.mock('@xyflow/react', () => ({
@@ -24,7 +24,7 @@ vi.mock('@xyflow/react', () => ({
   },
 }))
 
-describe('GenericNodeComponent', () => {
+describe('GenericStepComponent', () => {
   const baseGenericNode = {
     type: 'script',
     id: 'generic-1',
@@ -52,14 +52,14 @@ describe('GenericNodeComponent', () => {
   })
 
   describe('Rendering', () => {
-    it('renders default message "Select a node type"', () => {
-      render(<GenericNodeComponent {...createNodeProps(baseGenericNode)} />)
+    it('renders default message "Select a step type"', () => {
+      render(<GenericStepComponent {...createNodeProps(baseGenericNode)} />)
 
-      expect(screen.getByText('Select a node type')).toBeInTheDocument()
+      expect(screen.getByText('Select a step type')).toBeInTheDocument()
     })
 
     it('renders "Click to configure" title by default', () => {
-      render(<GenericNodeComponent {...createNodeProps(baseGenericNode)} />)
+      render(<GenericStepComponent {...createNodeProps(baseGenericNode)} />)
 
       expect(screen.getByText('Click to configure')).toBeInTheDocument()
     })
@@ -74,7 +74,7 @@ describe('GenericNodeComponent', () => {
         },
       } as TaskActivity
 
-      render(<GenericNodeComponent {...createNodeProps(nodeWithCustomMessage)} />)
+      render(<GenericStepComponent {...createNodeProps(nodeWithCustomMessage)} />)
 
       expect(screen.getByText('Configure this step')).toBeInTheDocument()
     })
@@ -87,7 +87,7 @@ describe('GenericNodeComponent', () => {
         },
       } as TaskActivity
 
-      render(<GenericNodeComponent {...createNodeProps(nodeWithCustomMessage)} />)
+      render(<GenericStepComponent {...createNodeProps(nodeWithCustomMessage)} />)
 
       expect(screen.queryByText('Click to configure')).not.toBeInTheDocument()
     })
@@ -100,7 +100,7 @@ describe('GenericNodeComponent', () => {
         },
       } as TaskActivity
 
-      render(<GenericNodeComponent {...createNodeProps(nodeWithLongMessage)} />)
+      render(<GenericStepComponent {...createNodeProps(nodeWithLongMessage)} />)
 
       expect(
         screen.getByText('Configure this step with a long expression ${name_via_ai.analysis.default}')
@@ -117,10 +117,10 @@ describe('GenericNodeComponent', () => {
         },
       } as TaskActivity
 
-      render(<GenericNodeComponent {...createNodeProps(nodeWithReverseHandles)} />)
+      render(<GenericStepComponent {...createNodeProps(nodeWithReverseHandles)} />)
 
       // Should render without crashing
-      expect(screen.getByText('Select a node type')).toBeInTheDocument()
+      expect(screen.getByText('Select a step type')).toBeInTheDocument()
     })
   })
 
@@ -133,23 +133,23 @@ describe('GenericNodeComponent', () => {
         },
       } as TaskActivity
 
-      render(<GenericNodeComponent {...createNodeProps(nodeWithExecution)} />)
+      render(<GenericStepComponent {...createNodeProps(nodeWithExecution)} />)
 
       // Should render without crashing
-      expect(screen.getByText('Select a node type')).toBeInTheDocument()
+      expect(screen.getByText('Select a step type')).toBeInTheDocument()
     })
   })
 
   describe('Node Structure', () => {
     it('renders with correct structure', () => {
-      render(<GenericNodeComponent {...createNodeProps(baseGenericNode)} />)
+      render(<GenericStepComponent {...createNodeProps(baseGenericNode)} />)
 
       expect(screen.getByTestId('generic-flow-node')).toBeInTheDocument()
-      expect(screen.getByText('Select a node type')).toBeInTheDocument()
+      expect(screen.getByText('Select a step type')).toBeInTheDocument()
     })
 
     it('renders with dashed border styling', () => {
-      render(<GenericNodeComponent {...createNodeProps(baseGenericNode)} />)
+      render(<GenericStepComponent {...createNodeProps(baseGenericNode)} />)
 
       const nodeRoot = screen.getByTestId('generic-flow-node')
       expect(nodeRoot).toHaveStyle({ borderStyle: 'dashed' })
@@ -161,9 +161,9 @@ describe('GenericNodeComponent', () => {
       const props = createNodeProps(baseGenericNode)
       props.selected = true
 
-      render(<GenericNodeComponent {...props} />)
+      render(<GenericStepComponent {...props} />)
 
-      expect(screen.getByText('Select a node type')).toBeInTheDocument()
+      expect(screen.getByText('Select a step type')).toBeInTheDocument()
     })
   })
 
@@ -174,9 +174,9 @@ describe('GenericNodeComponent', () => {
         metadata: {},
       } as TaskActivity
 
-      render(<GenericNodeComponent {...createNodeProps(nodeWithEmptyMetadata)} />)
+      render(<GenericStepComponent {...createNodeProps(nodeWithEmptyMetadata)} />)
 
-      expect(screen.getByText('Select a node type')).toBeInTheDocument()
+      expect(screen.getByText('Select a step type')).toBeInTheDocument()
       expect(screen.getByText('Click to configure')).toBeInTheDocument()
     })
   })

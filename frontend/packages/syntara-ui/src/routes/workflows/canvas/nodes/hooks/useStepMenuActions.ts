@@ -12,7 +12,7 @@ import { createElement, useCallback, type ReactNode } from 'react'
 
 import { type StepMenuCategoryUnion, StepMenuCategory } from '../../../../../constants'
 import { useAlerts } from '../../../../../providers/alerts'
-import { useNodeActions } from '../../../../../routes/builder/NodeActionsContext'
+import { useStepActions } from '../../../../../routes/builder/StepActionsContext'
 import { getErrorMessage } from '../../../../../utils/apiErrors'
 import { detachPromise } from '../../../../../utils/detachPromise'
 import { resolveFlowNodeId } from '../../../../../utils/triggerNodeIds'
@@ -20,7 +20,7 @@ import { resolveFlowNodeId } from '../../../../../utils/triggerNodeIds'
 // Re-export for convenience
 export { StepMenuCategory, type StepMenuCategoryUnion } from '../../../../../constants'
 
-export type NodeMenuAction = {
+export type StepMenuAction = {
   id: string
   label: string
   onClick: () => void
@@ -29,12 +29,12 @@ export type NodeMenuAction = {
   separator?: boolean
 }
 
-type UseNodeMenuActionsOptions = {
+type UseStepMenuActionsOptions = {
   nodeId: string
-  nodeType: StepMenuCategoryUnion
+  stepCategory: StepMenuCategoryUnion
   triggerIndex?: number
   disabled?: boolean
-  additionalActions?: NodeMenuAction[]
+  additionalActions?: StepMenuAction[]
 }
 
 type BuilderActionHandlers = {
@@ -46,16 +46,16 @@ type BuilderActionHandlers = {
 }
 
 function buildBuilderActions(
-  nodeType: StepMenuCategoryUnion,
+  stepCategory: StepMenuCategoryUnion,
   disabled: boolean,
   handlers: BuilderActionHandlers
-): NodeMenuAction[] {
-  if (nodeType === StepMenuCategory.CONTROL_FLOW) {
+): StepMenuAction[] {
+  if (stepCategory === StepMenuCategory.CONTROL_FLOW) {
     return [{ id: 'replace', label: 'Replace', onClick: handlers.onReplace, icon: createElement(RhUiSyncIcon) }]
   }
 
-  const activityActions: NodeMenuAction[] =
-    nodeType === StepMenuCategory.ACTIVITY
+  const activityActions: StepMenuAction[] =
+    stepCategory === StepMenuCategory.ACTIVITY
       ? [
           { id: 'run-step', label: 'Run step', onClick: handlers.onRunStep, icon: createElement(RhUiPlayIcon) },
           {
@@ -85,7 +85,7 @@ function buildBuilderActions(
   ]
 }
 
-function appendDeleteAction(actions: NodeMenuAction[], deleteAction: NodeMenuAction): NodeMenuAction[] {
+function appendDeleteAction(actions: StepMenuAction[], deleteAction: StepMenuAction): StepMenuAction[] {
   if (actions.length === 0) {
     return [deleteAction]
   }
@@ -98,7 +98,7 @@ function appendDeleteAction(actions: NodeMenuAction[], deleteAction: NodeMenuAct
  *
  * Uses React Flow's deleteElements API to ensure proper edge cleanup and ButtonEdge maintenance.
  *
- * When rendered inside a NodeActionsContext.Provider (i.e. within BuilderContent),
+ * When rendered inside a StepActionsContext.Provider (i.e. within BuilderContent),
  * additional builder-specific actions are automatically included:
  * - View details (all step types)
  * - Run step (activity steps only — currently a placeholder)
@@ -110,25 +110,25 @@ function appendDeleteAction(actions: NodeMenuAction[], deleteAction: NodeMenuAct
  *
  * @example
  * // For activity nodes (Task, Condition, Join, Loop, Parallel)
- * const menuActions = useNodeMenuActions({
+ * const menuActions = useStepMenuActions({
  *   nodeId: props.data.id,
- *   nodeType: StepMenuCategory.ACTIVITY,
+ *   stepCategory: StepMenuCategory.ACTIVITY,
  * })
  *
  * @example
  * // For trigger nodes
  * const triggerIndex = parseInt(props.id.split('-')[1])
- * const menuActions = useNodeMenuActions({
+ * const menuActions = useStepMenuActions({
  *   nodeId: props.id,
- *   nodeType: StepMenuCategory.TRIGGER,
+ *   stepCategory: StepMenuCategory.TRIGGER,
  *   triggerIndex,
  * })
  *
  * @example
  * // With additional custom actions
- * const menuActions = useNodeMenuActions({
+ * const menuActions = useStepMenuActions({
  *   nodeId: props.data.id,
- *   nodeType: StepMenuCategory.ACTIVITY,
+ *   stepCategory: StepMenuCategory.ACTIVITY,
  *   additionalActions: [
  *     {
  *       id: 'duplicate',
@@ -139,42 +139,42 @@ function appendDeleteAction(actions: NodeMenuAction[], deleteAction: NodeMenuAct
  *   ],
  * })
  */
-export function useNodeMenuActions(options: UseNodeMenuActionsOptions): NodeMenuAction[] {
-  const { nodeId, nodeType, triggerIndex, disabled = false, additionalActions = [] } = options
+export function useStepMenuActions(options: UseStepMenuActionsOptions): StepMenuAction[] {
+  const { nodeId, stepCategory, triggerIndex, disabled = false, additionalActions = [] } = options
   const { deleteElements } = useReactFlow()
   const { showError } = useAlerts()
-  const nodeActions = useNodeActions()
+  const stepActions = useStepActions()
 
   const handleDelete = useCallback(() => {
     // Use React Flow's deleteElements to trigger proper cleanup via onNodesDelete
     // This ensures edges are removed and ButtonEdges are recreated correctly
-    const flowNodeId = resolveFlowNodeId({ nodeId, nodeType, triggerIndex })
+    const flowNodeId = resolveFlowNodeId({ nodeId, stepCategory, triggerIndex })
     detachPromise(deleteElements({ nodes: [{ id: flowNodeId }] }), {
       onReject: (error: unknown) => showError({ title: 'Could not delete step', description: getErrorMessage(error) }),
     })
-  }, [nodeType, nodeId, triggerIndex, deleteElements, showError])
+  }, [stepCategory, nodeId, triggerIndex, deleteElements, showError])
 
   const handleViewDetails = useCallback(() => {
-    nodeActions?.onViewDetails(nodeId)
-  }, [nodeActions, nodeId])
+    stepActions?.onViewDetails(nodeId)
+  }, [stepActions, nodeId])
 
   const handleRunStep = useCallback(() => {
-    nodeActions?.onRunStep(nodeId)
-  }, [nodeActions, nodeId])
+    stepActions?.onRunStep(nodeId)
+  }, [stepActions, nodeId])
 
   const handleDuplicate = useCallback(() => {
-    nodeActions?.onDuplicate(nodeId)
-  }, [nodeActions, nodeId])
+    stepActions?.onDuplicate(nodeId)
+  }, [stepActions, nodeId])
 
   const handleReplace = useCallback(() => {
-    nodeActions?.onReplace(nodeId)
-  }, [nodeActions, nodeId])
+    stepActions?.onReplace(nodeId)
+  }, [stepActions, nodeId])
 
-  const handleToggleDisabled = useCallback(() => {
-    nodeActions?.onToggleDisabled(nodeId)
-  }, [nodeActions, nodeId])
+  const handleToggleStepDisabled = useCallback(() => {
+    stepActions?.onToggleDisabled(nodeId)
+  }, [stepActions, nodeId])
 
-  const deleteAction: NodeMenuAction = {
+  const deleteAction: StepMenuAction = {
     id: 'delete',
     label: 'Delete',
     onClick: handleDelete,
@@ -182,11 +182,11 @@ export function useNodeMenuActions(options: UseNodeMenuActionsOptions): NodeMenu
     icon: createElement(RhUiTrashIcon),
   }
 
-  const builderActions = nodeActions
-    ? buildBuilderActions(nodeType, disabled, {
+  const builderActions = stepActions
+    ? buildBuilderActions(stepCategory, disabled, {
         onViewDetails: handleViewDetails,
         onRunStep: handleRunStep,
-        onToggleDisabled: handleToggleDisabled,
+        onToggleDisabled: handleToggleStepDisabled,
         onDuplicate: handleDuplicate,
         onReplace: handleReplace,
       })

@@ -6,14 +6,14 @@ import { useCallback, useState, type MouseEvent, type ReactNode } from 'react'
 
 import { FlowNodeType } from '../../constants'
 import { ACTIVITY_STATUS } from '../../routes/builder/utils/executionState/executionHelpers'
-import { StandardNodeHeader } from '../../routes/workflows/canvas/nodes/common/StandardNodeHeader'
-import { NODE_TYPE_COLORS } from '../../routes/workflows/canvas/nodeTypeColors'
+import { StandardStepHeader } from '../../routes/workflows/canvas/nodes/common/StandardStepHeader'
+import { STEP_TYPE_COLORS } from '../../routes/workflows/canvas/stepTypeColors'
 
 import { SynStep } from './SynStep'
 import styles from './SynStep.stories.module.css'
 import { SynStepBody } from './SynStepBody'
 
-/** Shared inert actions for stories that demonstrate a node header's action menu. */
+/** Shared inert actions for stories that demonstrate a step header's action menu. */
 export const MENU_ACTIONS = [
   { id: 'run', label: 'Run step', onClick: () => undefined, icon: <RhUiPlayIcon /> },
   { id: 'duplicate', label: 'Duplicate', onClick: () => undefined, icon: <RhUiDuplicateIcon /> },
@@ -74,10 +74,10 @@ export function createNodeProps(options: NodePropsOptions): NodeProps<Node<Story
 }
 
 /** Reusable full node used by the focused Default story and the state inventory. */
-export function FullNodeStoryComposition({ id, description }: Readonly<{ id: string; description: string }>) {
+export function FullStepStoryComposition({ id, description }: Readonly<{ id: string; description: string }>) {
   return (
-    <SynStep nodeProps={createNodeProps({ id })} topBarColor={NODE_TYPE_COLORS.actionScript}>
-      <StandardNodeHeader
+    <SynStep nodeProps={createNodeProps({ id })} topBarColor={STEP_TYPE_COLORS.actionScript}>
+      <StandardStepHeader
         expandable
         menuActions={MENU_ACTIONS}
         subtitle="Script task"
@@ -96,7 +96,7 @@ function stopStoryCanvasNodeSelection(event: MouseEvent) {
   event.stopPropagation()
 }
 
-function StoryCanvasNodeComponent(props: NodeProps<StoryCanvasNode>) {
+function StoryCanvasStepComponent(props: NodeProps<StoryCanvasNode>) {
   const contentRef = useCallback(
     (element: HTMLDivElement | null) => {
       if (!element) return
@@ -113,10 +113,10 @@ function StoryCanvasNodeComponent(props: NodeProps<StoryCanvasNode>) {
   return <div ref={contentRef}>{props.data.content}</div>
 }
 
-const STORY_CANVAS_NODE_TYPES = { storybook: StoryCanvasNodeComponent }
+const STORY_CANVAS_NODE_TYPES = { storybook: StoryCanvasStepComponent }
 
-/** Renders a stable React Flow canvas around node stories so their handles and canvas styles are visible. */
-export function NodeStoryCanvas({
+/** Renders a stable React Flow canvas around step stories so their handles and canvas styles are visible. */
+export function StepStoryCanvas({
   children,
   minimumHeight = 512,
 }: Readonly<{ children: ReactNode; minimumHeight?: number }>) {
@@ -126,7 +126,7 @@ export function NodeStoryCanvas({
     [minimumHeight]
   )
 
-  // StandardNodeHeader uses this flag for menu visibility.
+  // StandardStepHeader uses this flag for menu visibility.
   // onNodeClick keeps nested controls targetable while the layout node stays unselectable.
   return (
     <div className={styles.storyCanvas} style={{ height }}>
@@ -138,7 +138,7 @@ export function NodeStoryCanvas({
             type: 'storybook',
             position: { x: 64, y: 64 },
             data: { content: children, onContentResize },
-            className: styles.storyCanvasNode,
+            className: styles.storyCanvasStep,
             focusable: false,
             selectable: false,
           },
@@ -162,14 +162,14 @@ export function NodeStoryCanvas({
 }
 
 /** Adds a concise visible label to an individual state in a node-story gallery. */
-export function NodeExample({
+export function StepExample({
   label,
   children,
   testId,
 }: Readonly<{ label: string; children: ReactNode; testId?: string }>) {
   return (
-    <div className={styles.nodeExample} data-testid={testId}>
-      <Content component={ContentVariants.small} className={styles.nodeLabel}>
+    <div className={styles.stepExample} data-testid={testId}>
+      <Content component={ContentVariants.small} className={styles.stepLabel}>
         {label}
       </Content>
       {children}
