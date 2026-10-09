@@ -255,39 +255,66 @@ class ActivityExecutionSyncMixin:
         timestamps, so a failure here degrades to a replayed node reporting the
         replay time rather than losing the node's record.
 
-        Asked for every completed activity, not only on a retry: the workflow
-        answers immediately with None when it has no replay candidates, so an
-        ordinary run pays a request and nothing more.
+        Asked for every completed activity **of a retry**, never of an ordinary
+        run: ``is_retry`` is set once per execution from the retry lineage, so an
+        ordinary run makes no RPC here at all. Within a retry an ordinary node is
+        answered from the workflow's second wait-condition branch and returns None
+        without blocking.
+
+        The workflow raises rather than returning None when its wait expires, and
+        that raise is only reachable for a node that *is* a replay — an ordinary
+        node is answered immediately. So it is a retryable signal rather than a
+        verdict, and one retry buys a second wait window. No explicit delay is
+        needed: the retry itself blocks inside the workflow for up to the same
+        period, which is the time the state needed.
         """
-        try:
-            raw = cast(
-                "dict[str, str | None] | None",
-                await handle.execute_update("get_replayed_node_timestamps_when_ready", activity_id),
-            )
-        except RPCError as e:
-            if e.status == RPCStatusCode.NOT_FOUND:
-                # The workflow already closed, so the update was rejected and
-                # there is no handler left to ask. Source times were written
-                # before the node's result was published, so they do exist — but
-                # nothing reads them back now. Keeping Temporal's times still
-                # yields a correct row, only stamped with the replay time.
-                logger.info(
-                    "Workflow closed before replayed node timestamps could be read",
+        raw: dict[str, str | None] | None = None
+        for attempt in (1, 2):
+            try:
+                raw = cast(
+                    "dict[str, str | None] | None",
+                    await handle.execute_update("get_replayed_node_timestamps_when_ready", activity_id),
+                )
+                break
+            except RPCError as e:
+                if e.status == RPCStatusCode.NOT_FOUND:
+                    # The workflow already closed, so the update was rejected and
+                    # there is no handler left to ask. Source times were written
+                    # before the node's result was published, so they do exist — but
+                    # nothing reads them back now. Keeping Temporal's times still
+                    # yields a correct row, only stamped with the replay time.
+                    logger.info(
+                        "Workflow closed before replayed node timestamps could be read",
+                        activity_id=activity_id,
+                        execution_id=metadata.execution_id,
+                    )
+                    return None
+                # An RPC failure is not the timing race this retries for, so it is
+                # not retried.
+                logger.warning(
+                    "Workflow update for replayed node timestamps failed",
+                    activity_id=activity_id,
+                )
+                return None
+            except (ApplicationError, TemporalError, ValueError):
+                if attempt == 1:
+                    logger.info(
+                        "Replayed node state was not ready in time; asking once more",
+                        activity_id=activity_id,
+                        execution_id=metadata.execution_id,
+                    )
+                    continue
+                # The node keeps Temporal's times and this run's status. That is a
+                # row stating when the replay happened rather than when the work did,
+                # so it is logged as the data loss it is rather than as a warning
+                # about the request failing.
+                logger.warning(
+                    "Replayed node state was never read; row will carry this run's "
+                    "times and status instead of the source run's",
                     activity_id=activity_id,
                     execution_id=metadata.execution_id,
                 )
                 return None
-            logger.warning(
-                "Workflow update for replayed node timestamps failed",
-                activity_id=activity_id,
-            )
-            return None
-        except (ApplicationError, TemporalError, ValueError):
-            logger.warning(
-                "Workflow update for replayed node timestamps did not return",
-                activity_id=activity_id,
-            )
-            return None
 
         if not raw:
             return None

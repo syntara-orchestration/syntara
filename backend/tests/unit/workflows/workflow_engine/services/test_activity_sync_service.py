@@ -6210,8 +6210,9 @@ class TestReplayedTimestampResolution:
     it must not be asked about a node that will never have source times, and it
     must not happen while a database transaction is open.
 
-    Every completed node is asked, retry or not. On an ordinary run the workflow
-    has no replay candidates, so it answers immediately with None.
+    Asked only on a retry — ``is_retry`` gates it — and within a retry every
+    completed node is asked. An ordinary node is answered from the workflow's
+    second wait-condition branch without blocking.
     """
 
     def setup_method(self) -> None:
@@ -6239,6 +6240,87 @@ class TestReplayedTimestampResolution:
         handle = Mock()
         handle.execute_update = AsyncMock(return_value=returned)
         return handle
+
+    @pytest.mark.asyncio
+    async def test_a_timeout_is_retried_once_and_can_still_succeed(self) -> None:
+        """The workflow raises when its wait expires; that is a timing race, not a verdict.
+
+        An ordinary node is answered from the second branch of the wait condition
+        and never reaches the timeout, so a raise can only mean a node that *is* a
+        replay did not have its state ready yet. Asking again gives it a second
+        window, and the retry blocks inside the workflow for the same period, which
+        is the time the state needed.
+        """
+        from temporalio.exceptions import ApplicationError
+
+        metadata = self._metadata([(1, "script_1", ActivityStatus.COMPLETED)])
+        handle = self._handle(self.source_times)
+        handle.execute_update = AsyncMock(
+            side_effect=[ApplicationError("timeout"), self.source_times],
+        )
+
+        resolved = await self.service._resolve_replayed_timestamps(metadata, handle)
+
+        assert handle.execute_update.await_count == 2
+        assert resolved == {
+            "script_1": {
+                "started_at": datetime(2026, 1, 1, 0, 0, 0, tzinfo=UTC),
+                "completed_at": datetime(2026, 1, 1, 0, 5, 0, tzinfo=UTC),
+            }
+        }
+
+    @pytest.mark.asyncio
+    async def test_a_second_timeout_gives_up_and_keeps_this_runs_values(self) -> None:
+        """The node must not lose its record because the source state was late.
+
+        Returning None leaves the caller with Temporal's timestamps and this run's
+        status, so the row is still written — it just states when the replay
+        happened rather than when the work did. One retry is the bound; retrying
+        without end would hold the caller's batch open indefinitely.
+        """
+        from temporalio.exceptions import ApplicationError
+
+        metadata = self._metadata([(1, "script_1", ActivityStatus.COMPLETED)])
+        handle = self._handle(None)
+        handle.execute_update = AsyncMock(side_effect=ApplicationError("timeout"))
+
+        resolved = await self.service._resolve_replayed_timestamps(metadata, handle)
+
+        assert handle.execute_update.await_count == 2
+        assert resolved == {}
+
+    @pytest.mark.asyncio
+    async def test_an_rpc_failure_is_not_retried(self) -> None:
+        """An RPC failure is not the timing race the retry is for.
+
+        The workflow is unreachable rather than busy, so a second attempt would
+        fail the same way while holding the batch open.
+        """
+        metadata = self._metadata([(1, "script_1", ActivityStatus.COMPLETED)])
+        handle = self._handle(None)
+        rpc_error = RPCError("unavailable", RPCStatusCode.UNAVAILABLE, b"")
+        handle.execute_update = AsyncMock(side_effect=rpc_error)
+
+        resolved = await self.service._resolve_replayed_timestamps(metadata, handle)
+
+        handle.execute_update.assert_awaited_once()
+        assert resolved == {}
+
+    @pytest.mark.asyncio
+    async def test_an_ordinary_node_is_asked_once_and_not_retried(self) -> None:
+        """None is an answer, not a failure — the second branch of the condition.
+
+        A node that really executed inside a retry has no source state, so the
+        workflow returns None at once. Retrying that would double every ordinary
+        node's round trip for no possible gain.
+        """
+        metadata = self._metadata([(1, "script_1", ActivityStatus.COMPLETED)])
+        handle = self._handle(None)
+
+        resolved = await self.service._resolve_replayed_timestamps(metadata, handle)
+
+        handle.execute_update.assert_awaited_once()
+        assert resolved == {}
 
     @pytest.mark.asyncio
     async def test_asks_once_per_node_for_its_completed_event(self) -> None:
