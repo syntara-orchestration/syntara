@@ -186,7 +186,7 @@ export const LongTitleDetailPage: Story = {
     docs: {
       description: {
         story:
-          'Regression guard for detail pages: a very long resource name should truncate without pushing toolbar controls off-screen or overlapping them.',
+          'Regression guard for detail pages: a very long resource name wraps across lines while toolbar controls keep their natural width and stay visible without overlapping.',
       },
     },
   },
