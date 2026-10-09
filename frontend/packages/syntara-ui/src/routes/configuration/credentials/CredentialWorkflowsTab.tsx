@@ -57,6 +57,7 @@ function WorkflowsTable({
       <Thead>
         <Tr>
           <Th
+            width={10}
             expand={{
               areAllExpanded: allRowsExpanded,
               collapseAllAriaLabel: allRowsExpanded ? 'Collapse all' : 'Expand all',
@@ -64,11 +65,11 @@ function WorkflowsTable({
             }}
             aria-label="Row expansion"
           />
-          <Th>Workflow name</Th>
-          <Th>Created by</Th>
-          <Th>Steps using credential</Th>
-          <Th>Last execution</Th>
-          <Th>Status</Th>
+          <Th width={15}>Workflow name</Th>
+          <Th width={20}>Created by</Th>
+          <Th width={15}>Steps using credential</Th>
+          <Th width={15}>Last execution</Th>
+          <Th width={15}>Status</Th>
         </Tr>
       </Thead>
       {workflows.map((workflow, rowIndex) => {
