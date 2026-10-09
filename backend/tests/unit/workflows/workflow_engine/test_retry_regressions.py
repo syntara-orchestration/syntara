@@ -107,6 +107,10 @@ def _wf(retry_context: dict[str, Any] | None = None) -> OrchestratorWorkflow:
     # A converge reads this to tell whether a loop predecessor is still iterating,
     # so it must exist even on a workflow built without __init__.
     wf.node_control_data = {}
+    # Set in __init__ for a real run and filled by _prepare_retry from the source
+    # execution. The restore path consults it to decide whether a replay is worth
+    # scheduling, so a workflow built by hand needs it too.
+    wf._retry_source_statuses = {}
     return wf
 
 
@@ -198,6 +202,9 @@ async def test_restored_predecessor_counts_toward_converge_gate(mock_wf: MagicMo
     cannot drift from what the engine actually does.
     """
     wf = _wf(_retry("b2"))
+    # The source run recorded b1 as completed, so the restore path schedules a
+    # replay for it; that is what _prepare_retry would have loaded beforehand.
+    wf._retry_source_statuses = {"b1": "completed"}
     mock_wf.execute_activity = AsyncMock(return_value={"b1": {"v": 1}})
     node = ActivityNode(node_id="b1", node_type="script", parameters={})
     result = await wf._restore_node_output(node)
@@ -217,6 +224,9 @@ async def test_restored_predecessor_counts_toward_converge_gate(mock_wf: MagicMo
 async def test_converge_is_not_skipped_when_a_predecessor_was_restored(mock_wf: MagicMock) -> None:
     """The gate holds, so the skip branch must not be reachable."""
     wf = _wf(_retry("b2"))
+    # The source run recorded b1 as completed, so the restore path schedules a
+    # replay for it; that is what _prepare_retry would have loaded beforehand.
+    wf._retry_source_statuses = {"b1": "completed"}
     mock_wf.execute_activity = AsyncMock(return_value={"b1": {"v": 1}})
     node = ActivityNode(node_id="b1", node_type="script", parameters={})
     result = await wf._restore_node_output(node)
