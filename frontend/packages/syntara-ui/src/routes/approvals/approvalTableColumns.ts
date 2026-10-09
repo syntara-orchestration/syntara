@@ -3,6 +3,7 @@ import type { SortableColumn, SortConfig } from '../../types/sorting'
 /** Sortable column definitions for the Approvals list table. */
 export const approvalTableColumns: SortableColumn[] = [
   { field: 'name', label: 'Approval name', isSortable: true },
+  { field: 'workflow_name', label: 'Workflow', isSortable: true },
   { field: 'created_at', label: 'Approval initiated', isSortable: true },
   { field: 'decided_at', label: 'Actioned on', isSortable: true },
   { field: 'status', label: 'Status', isSortable: true },

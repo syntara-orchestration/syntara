@@ -128,6 +128,29 @@ describe('useApprovalsData', () => {
     expect(enriched[0]?.workflowVersion).toBe(3)
   })
 
+  it('forwards workflow_name sort in queryParams to the approvals list API', async () => {
+    const { approvalsClient } = await import('../../client')
+
+    renderHook(
+      () =>
+        useApprovalsData({
+          projectSelectorReady: true,
+          isAllProjects: true,
+          stableProjectId: null,
+          queryParams: { sort: 'workflow_name', limit: 20, include_total: true },
+          projects: mockProjects,
+        }),
+      { wrapper: createWrapper() }
+    )
+
+    expect(approvalsClient.useQuery).toHaveBeenCalledWith(
+      'get',
+      '/approvals',
+      { params: { query: { sort: 'workflow_name', limit: 20, include_total: true } } },
+      { enabled: true }
+    )
+  })
+
   it('uses approval ID as fallback for approvalName when name is missing', async () => {
     const approvalWithoutName = {
       id: 'approval-3',
