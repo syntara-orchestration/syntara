@@ -88,6 +88,16 @@ vi.mock('../client', () => ({
   interfaceTagMiddleware: { onRequest: vi.fn() },
 }))
 
+const mockOpenCommandPalette = vi.fn()
+vi.mock('../components/command-palette/useCommandPalette', () => ({
+  useCommandPalette: () => ({
+    isOpen: false,
+    open: mockOpenCommandPalette,
+    close: vi.fn(),
+    toggle: vi.fn(),
+  }),
+}))
+
 function renderDockedNav() {
   return render(
     <BrandProvider>
@@ -144,6 +154,16 @@ describe('AppDockedNav', () => {
   it('renders documentation button', () => {
     renderDockedNav()
     expect(screen.getByRole('button', { name: 'Documentation (opens in a new tab)' })).toBeInTheDocument()
+  })
+
+  it('renders a search button that opens the command palette', async () => {
+    const user = userEvent.setup()
+    renderDockedNav()
+
+    const searchButton = screen.getByRole('button', { name: /Search \(/ })
+    expect(searchButton).toBeInTheDocument()
+    await user.click(searchButton)
+    expect(mockOpenCommandPalette).toHaveBeenCalled()
   })
 
   it('renders color scheme toggle when in dark mode', () => {
@@ -416,6 +436,7 @@ describe('AppDockedNav', () => {
 
     it('shows label text for color scheme and documentation buttons', () => {
       renderDockedNav()
+      expect(screen.getByText('Search')).toBeInTheDocument()
       expect(screen.getByText('Light mode')).toBeInTheDocument()
       expect(screen.getByText('Documentation')).toBeInTheDocument()
     })
@@ -441,6 +462,7 @@ describe('AppDockedNav', () => {
 
     it('shows label text for docked actions when mobile overlay is expanded', () => {
       renderDockedNav()
+      expect(screen.getByText('Search')).toBeInTheDocument()
       expect(screen.getByText('Light mode')).toBeInTheDocument()
       expect(screen.getByText('Documentation')).toBeInTheDocument()
     })

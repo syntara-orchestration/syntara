@@ -1,6 +1,7 @@
 import { Compass, CompassContent } from '@patternfly/react-core'
 import { useRef } from 'react'
 
+import { CommandPaletteProvider } from '../components/command-palette/CommandPaletteProvider'
 import { SessionTimeoutWarning } from '../components/session/SessionTimeoutWarning'
 import { useRouteChangeFocus } from '../hooks/useRouteChangeFocus'
 import { UnsavedChangesProvider } from '../providers/unsaved-changes/UnsavedChangesProvider'
@@ -27,20 +28,22 @@ export function AppShell({ children }: Readonly<{ children: React.ReactNode }>) 
     <UnsavedChangesProvider>
       <AppLogin>
         <SessionTimeoutWarning />
-        <DockStateContext.Provider value={dockState}>
-          <Compass
-            className={`pf-m-no-screen-warning ${styles.compass}`}
-            isDockExpanded={dockState.isDockExpanded}
-            isDockTextExpanded={dockState.isDockTextExpanded}
-            masthead={<AppMobileMasthead />}
-            dock={<AppDockedNav />}
-            main={
-              <CompassContent ref={mainRef} role="main" tabIndex={-1} className={styles.mainContent}>
-                {children}
-              </CompassContent>
-            }
-          />
-        </DockStateContext.Provider>
+        <CommandPaletteProvider>
+          <DockStateContext.Provider value={dockState}>
+            <Compass
+              className={`pf-m-no-screen-warning ${styles.compass}`}
+              isDockExpanded={dockState.isDockExpanded}
+              isDockTextExpanded={dockState.isDockTextExpanded}
+              masthead={<AppMobileMasthead />}
+              dock={<AppDockedNav />}
+              main={
+                <CompassContent ref={mainRef} role="main" tabIndex={-1} className={styles.mainContent}>
+                  {children}
+                </CompassContent>
+              }
+            />
+          </DockStateContext.Provider>
+        </CommandPaletteProvider>
       </AppLogin>
     </UnsavedChangesProvider>
   )
