@@ -31,6 +31,20 @@ _CONTROL_NODE_TYPES = frozenset(
     }
 )
 
+#: A control node needs at least two output ports before a branch means anything.
+_MIN_BRANCHES_FOR_INFERENCE = 2
+
+#: Control nodes whose taken branch can be inferred from a source run's node
+#: statuses, so replaying them is possible even when the run predates persisted
+#: control state. LOOP and WAIT are absent: a loop's position is a per-iteration
+#: question, and a wait node emits no control data at all.
+_INFERABLE_CONTROL_NODE_TYPES = frozenset(
+    {
+        NodeType.CONDITION,
+        NodeType.SWITCH,
+    }
+)
+
 
 class WorkflowRetryMixin:
     """Retry policy and restoration; state is initialized by the workflow."""
@@ -46,6 +60,11 @@ class WorkflowRetryMixin:
     #: completion path so a restored skip or failure is not republished as a success
     #: and does not have its successors scheduled.
     _restored_node_statuses: dict[str, str]
+    #: The branch a restored control node took, keyed by node id. Published into
+    #: ``node_control_data`` so the scheduler follows the same edge the source run
+    #: did instead of re-evaluating a condition against a namespace this retry has
+    #: only partly rebuilt.
+    _restored_node_ports: dict[str, str]
     #: The output a restored node produced before it failed in the source run,
     #: keyed by node id. Republished by the failure path, so a successor reading it
     #: sees what the source run produced rather than an empty output model.
@@ -158,11 +177,94 @@ class WorkflowRetryMixin:
         for node_id in must_run:
             downstream |= self._walk_downstream(node_id, graph)
 
+        # A control node is normally excluded because it decides routing rather
+        # than producing a value. CONDITION and SWITCH are the exception when their
+        # branch is inferable: the retry can hand them the branch the source run
+        # took, so they need not re-decide against a half-rebuilt namespace. LOOP,
+        # WAIT and CONVERGE stay excluded unconditionally.
+        control = control - {node.id for node in graph.get_all_nodes() if self._infer_control_node_branch(node, graph)}
+
         restorable = (
             {node.id for node in graph.get_all_nodes()} - must_run - triggers - control - loop_bodies - downstream
         )
         self._retry_restorable_cache = restorable
         return restorable
+
+    def _infer_control_node_branch(self, node: ActivityNode, graph: WorkflowGraph) -> str | None:
+        """Which output port a control node took in the source run, or None.
+
+        A control node re-evaluates its own condition against the namespace this
+        retry has rebuilt, and that namespace is incomplete while sibling branches
+        are still restoring. So a restored control node is given the branch the
+        source run recorded rather than being asked to decide again.
+
+        The source run already records it implicitly: ``_skip_non_taken_branches``
+        marks the untaken branch SKIPPED and cascades, so the branch that has
+        activity is the one that ran.
+
+        Only branch-exclusive nodes count. A node reachable from more than one port
+        records activity whichever branch fired, so its status says nothing about
+        the choice — a graph whose branches merge cannot be inferred, and returns
+        None so the caller reruns the node.
+
+        Returns:
+            The port name, or None when it is not inferable: fewer than two ports,
+            no branch has activity, more than one does, or no port is exclusive.
+
+        """
+        if node.type not in _INFERABLE_CONTROL_NODE_TYPES:
+            return None
+
+        ports = sorted({edge["from_port"] for edge in graph.get_outgoing_edges(node.id) if edge.get("from_port")})
+        if len(ports) < _MIN_BRANCHES_FOR_INFERENCE:
+            return None
+
+        # Everything reachable through each port, so exclusivity can be computed by
+        # set difference rather than a separate traversal per candidate pair.
+        reach = {port: self._walk_from_port(node.id, port, graph) for port in ports}
+
+        taken: list[str] = []
+        for port in ports:
+            others: set[str] = set()
+            for other in ports:
+                if other != port:
+                    others |= reach[other]
+            exclusive = reach[port] - others
+            if any(
+                self._retry_source_statuses.get(node_id) not in (None, ActivityStatus.SKIPPED.value)
+                for node_id in exclusive
+            ):
+                taken.append(port)
+
+        if len(taken) != 1:
+            # No branch ran, or both did. Either way the recorded state does not
+            # identify one branch, and guessing would send the retry down the wrong
+            # edge.
+            return None
+        return taken[0]
+
+    @staticmethod
+    def _walk_from_port(node_id: str, port: str, graph: WorkflowGraph) -> set[str]:
+        """Every node reachable from ``node_id`` through ``port``, exclusive.
+
+        Plain adjacency from the port's immediate successors. A loop body is not
+        followed through its owner: a node inside a loop is one execution per
+        iteration, so its status cannot say which branch entered it.
+        """
+        seen: set[str] = set()
+        queue = collections.deque(successor.id for successor in graph.get_next_activities_by_port(node_id, port))
+        while queue:
+            current = queue.popleft()
+            if current in seen:
+                continue
+            seen.add(current)
+            node = graph.get_node(current)
+            if node is not None and node.type == NodeType.LOOP:
+                # Stop at a loop: its iterations are per-iteration records and say
+                # nothing about which branch reached it.
+                continue
+            queue.extend(graph.get_successors(current))
+        return seen
 
     @staticmethod
     def _loop_body_node_ids(graph: WorkflowGraph) -> set[str]:
@@ -219,6 +321,8 @@ class WorkflowRetryMixin:
         """
         if not self.retry_context or not self._should_restore_node(node.id, graph):
             return None
+        if node.type in _INFERABLE_CONTROL_NODE_TYPES:
+            return self._restored_control_result(node, graph)
         return await self._restore_node_output(node)
 
     def _should_restore_node(self, node_id: str, graph: WorkflowGraph) -> bool:
@@ -227,8 +331,35 @@ class WorkflowRetryMixin:
             return False
         node = graph.get_node(node_id)
         if node is not None and node.type in _CONTROL_NODE_TYPES:
-            return False
+            if node.type not in _INFERABLE_CONTROL_NODE_TYPES:
+                return False
+            if self._infer_control_node_branch(node, graph) is None:
+                return False
         return strip_iteration_suffix(node_id) in self._retry_restorable_nodes(graph)
+
+    def _restored_control_result(self, node: ActivityNode, graph: WorkflowGraph) -> dict[str, Any] | None:
+        """Restore a condition or switch by replaying the branch the source run took.
+
+        No payload and no fetch: what a control node needs is the routing decision,
+        and that is already recorded by the branch's own node statuses. The branch is
+        published into ``node_control_data`` so ``_determine_output_port`` follows
+        the same edge, and the node counts as completed so the scheduler advances.
+
+        Returns None when the branch cannot be inferred, so the caller falls through
+        to real execution — which re-evaluates the condition rather than assuming one.
+        """
+        port = self._infer_control_node_branch(node, graph)
+        if port is None:
+            return None
+
+        self._restored_node_ports[node.id] = port
+        self._restored_node_statuses[node.id] = ActivityStatus.COMPLETED.value
+        # No activity is dispatched for this node, so no completion event will ask
+        # the workflow for its state. Leaving it in the candidate set would make
+        # the sync service wait out the full timeout on a row that never arrives.
+        self._retry_replay_candidates.discard(node.id)
+        workflow.logger.info("Restored control node branch from source run", extra={"node_id": node.id, "port": port})
+        return {"output": {}, "control": {"next_port": port}}
 
     async def _restore_node_output(self, node: ActivityNode) -> dict[str, Any] | None:
         """Replay this node's recorded outcome from its source run, or None.
