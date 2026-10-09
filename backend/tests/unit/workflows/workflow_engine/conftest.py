@@ -24,7 +24,14 @@ def init_workflow_runtime(wf: OrchestratorWorkflow) -> None:
     # a workflow built for a non-retry test behaves as one.
     wf.retry_context = {}
     wf._retry_restorable_cache = None
-    wf._restored_nodes = set()
+    # One set per thing the restore path records, matching what the mixin declares.
+    # ``_restored_nodes`` was an earlier single-set shape, since split so the source
+    # times, the source status and the output can each be read independently.
+    wf._retry_replay_candidates = set()
+    wf._restored_node_timestamps = {}
+    wf._restored_node_statuses = {}
+    wf._restored_node_outputs = {}
+    wf._retry_source_statuses = {}
     # Set in __init__ for a real run. Guarded because some tests build the workflow
     # by hand, and a converge reads it to tell whether a loop predecessor is still
     # iterating, so it must exist even on a workflow with nothing to do with retries.
