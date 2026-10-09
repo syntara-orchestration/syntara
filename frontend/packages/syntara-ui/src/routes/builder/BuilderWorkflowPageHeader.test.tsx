@@ -79,8 +79,8 @@ describe('BuilderWorkflowPageHeader', () => {
     publishedVersionId: null as string | null,
 
     isPublishing: false,
-    isAddNodePanelOpen: false,
-    hasNoWorkflowNodes: false,
+    isAddStepPanelOpen: false,
+    hasNoWorkflowSteps: false,
     ProjectSelector: <span>Project</span>,
     dispatch: vi.fn(),
     markDirty: vi.fn(),

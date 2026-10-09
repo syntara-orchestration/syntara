@@ -81,8 +81,8 @@ function createSidePanelState(overrides: Partial<VersionSidePanelState> = {}): V
 }
 
 describe('VersionHistorySidePanel', () => {
-  it('renders VersionHistoryPanel when show is true and node editor is closed', () => {
-    render(<VersionHistorySidePanel sidePanel={createSidePanelState()} isNodeEditorOpen={false} />)
+  it('renders VersionHistoryPanel when show is true and step editor is closed', () => {
+    render(<VersionHistorySidePanel sidePanel={createSidePanelState()} isStepEditorOpen={false} />)
 
     expect(screen.getByTestId('version-history-panel')).toBeInTheDocument()
   })
@@ -99,7 +99,7 @@ describe('VersionHistorySidePanel', () => {
         onPerPageChange: vi.fn(),
       },
     })
-    render(<VersionHistorySidePanel sidePanel={sidePanel} isNodeEditorOpen={false} />)
+    render(<VersionHistorySidePanel sidePanel={sidePanel} isStepEditorOpen={false} />)
 
     const panel = screen.getByTestId('version-history-panel')
     expect(panel).toHaveAttribute('data-page', '2')
@@ -107,13 +107,13 @@ describe('VersionHistorySidePanel', () => {
   })
 
   it('does not render VersionHistoryPanel when show is false', () => {
-    render(<VersionHistorySidePanel sidePanel={createSidePanelState({ show: false })} isNodeEditorOpen={false} />)
+    render(<VersionHistorySidePanel sidePanel={createSidePanelState({ show: false })} isStepEditorOpen={false} />)
 
     expect(screen.queryByTestId('version-history-panel')).not.toBeInTheDocument()
   })
 
-  it('does not render VersionHistoryPanel when node editor is open', () => {
-    render(<VersionHistorySidePanel sidePanel={createSidePanelState()} isNodeEditorOpen={true} />)
+  it('does not render VersionHistoryPanel when step editor is open', () => {
+    render(<VersionHistorySidePanel sidePanel={createSidePanelState()} isStepEditorOpen={true} />)
 
     expect(screen.queryByTestId('version-history-panel')).not.toBeInTheDocument()
   })
@@ -122,7 +122,7 @@ describe('VersionHistorySidePanel', () => {
     const sidePanel = createSidePanelState({
       publishDialog: { isOpen: true, onClose: vi.fn(), onPublish: vi.fn() },
     })
-    render(<VersionHistorySidePanel sidePanel={sidePanel} isNodeEditorOpen={false} />)
+    render(<VersionHistorySidePanel sidePanel={sidePanel} isStepEditorOpen={false} />)
 
     expect(screen.getByTestId('publish-dialog')).toBeInTheDocument()
   })
@@ -136,7 +136,7 @@ describe('VersionHistorySidePanel', () => {
         onCancel: vi.fn(),
       },
     })
-    render(<VersionHistorySidePanel sidePanel={sidePanel} isNodeEditorOpen={false} />)
+    render(<VersionHistorySidePanel sidePanel={sidePanel} isStepEditorOpen={false} />)
 
     expect(screen.getByTestId('save-before-view-dialog')).toBeInTheDocument()
   })
@@ -151,7 +151,7 @@ describe('VersionHistorySidePanel', () => {
         onConfirm: vi.fn(),
       },
     })
-    render(<VersionHistorySidePanel sidePanel={sidePanel} isNodeEditorOpen={false} />)
+    render(<VersionHistorySidePanel sidePanel={sidePanel} isStepEditorOpen={false} />)
 
     expect(screen.getByText('Restore version from May 19, 2026?')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Restore version' })).toBeInTheDocument()
@@ -169,7 +169,7 @@ describe('VersionHistorySidePanel', () => {
         onConfirm,
       },
     })
-    render(<VersionHistorySidePanel sidePanel={sidePanel} isNodeEditorOpen={false} />)
+    render(<VersionHistorySidePanel sidePanel={sidePanel} isStepEditorOpen={false} />)
 
     await user.click(screen.getByRole('button', { name: 'Restore version' }))
 
@@ -187,13 +187,13 @@ describe('VersionHistorySidePanel', () => {
         initialDescription: 'First release',
       },
     })
-    render(<VersionHistorySidePanel sidePanel={sidePanel} isNodeEditorOpen={false} />)
+    render(<VersionHistorySidePanel sidePanel={sidePanel} isStepEditorOpen={false} />)
 
     expect(screen.getByText('Edit version name and description')).toBeInTheDocument()
   })
 
   it('does not render EditVersionDialog when editDialog is closed', () => {
-    render(<VersionHistorySidePanel sidePanel={createSidePanelState()} isNodeEditorOpen={false} />)
+    render(<VersionHistorySidePanel sidePanel={createSidePanelState()} isStepEditorOpen={false} />)
 
     expect(screen.queryByText('Edit version name and description')).not.toBeInTheDocument()
   })
@@ -209,7 +209,7 @@ describe('VersionHistorySidePanel', () => {
           onConfirm: vi.fn(),
         },
       })
-      const { container } = render(<VersionHistorySidePanel sidePanel={sidePanel} isNodeEditorOpen={false} />)
+      const { container } = render(<VersionHistorySidePanel sidePanel={sidePanel} isStepEditorOpen={false} />)
       expect(await axe(container)).toHaveNoViolations()
     })
   })

@@ -1,6 +1,6 @@
 import type { FilterFieldDefinition } from '../../types/filters'
 import { FilterOperatorEnum, FilterTypeEnum } from '../../types/filters'
-import { executorMetadata, nodeMetadata } from '../workflows/canvas/nodes/nodeMetadata'
+import { executorMetadata, stepMetadata } from '../workflows/canvas/nodes/stepMetadata'
 
 import { activityStatusDisplayLabels } from './executionStatusConstants'
 
@@ -21,7 +21,7 @@ const ACTIVITY_EXECUTOR_TYPES = [
 ] as const
 
 const NODE_TYPE_OPTIONS = [
-  ...ACTIVITY_NODE_TYPES.map((key) => ({ value: key, label: nodeMetadata[key].label })),
+  ...ACTIVITY_NODE_TYPES.map((key) => ({ value: key, label: stepMetadata[key].label })),
   ...ACTIVITY_EXECUTOR_TYPES.map((key) => ({ value: key, label: executorMetadata[key].label })),
 ]
 

@@ -24,12 +24,12 @@ import { parseTriggerIndex } from '../../../utils/triggerNodeIds'
 import type { WorkflowMetadata } from '../types/workflowMetadata'
 import { useIsVersionView } from '../VersionViewContext'
 
-import { useUpstreamNodes, type UpstreamNodeInfo } from './hooks/useUpstreamNodes'
+import { useUpstreamSteps, type UpstreamStepInfo } from './hooks/useUpstreamSteps'
 import { InputEmptyState } from './InputEmptyState'
-import { InputNodeContent, InputPanelNodeSection } from './InputNodeContent'
+import { InputStepContent, InputPanelStepSection } from './InputStepContent'
 import { MockDataEditor } from './MockDataEditor'
 import styles from './panels.module.css'
-import { getUpstreamNodeDisplayName } from './utils/getUpstreamNodeDisplayName'
+import { getUpstreamStepDisplayName } from './utils/getUpstreamStepDisplayName'
 import { buildMockJsonSkeleton } from './utils/mockDataUtils'
 import { getTriggerInputSchemaFields } from './utils/triggerSchemaUtils'
 import { VariablesAndContextTree } from './VariablesAndContextTree'
@@ -46,12 +46,12 @@ type InputPanelProps = {
 
 /** Compute the effective upstream nodes, falling back to source ancestors when direct upstream is empty. */
 function computeEffectiveUpstream(params: {
-  upstreamNodes: UpstreamNodeInfo[]
+  upstreamNodes: UpstreamStepInfo[]
   sourceNodeId: string | null | undefined
-  sourceAncestors: UpstreamNodeInfo[]
+  sourceAncestors: UpstreamStepInfo[]
   activities: { id: string; name?: string; type: string }[] | undefined
   triggers: { id: string; name?: string; type: string }[] | undefined
-}): UpstreamNodeInfo[] {
+}): UpstreamStepInfo[] {
   const { upstreamNodes, sourceNodeId, sourceAncestors, activities, triggers } = params
   if (upstreamNodes.length > 0) return upstreamNodes
   if (!sourceNodeId) return []
@@ -83,7 +83,7 @@ function computeEffectiveUpstream(params: {
  */
 function computeMergedExecutionData(
   executionData: Record<string, Record<string, unknown>> | null | undefined,
-  effectiveUpstream: UpstreamNodeInfo[],
+  effectiveUpstream: UpstreamStepInfo[],
   nodeInputMocks: Record<string, Record<string, unknown>> | undefined,
   upstreamOutputMocks: Record<string, Record<string, unknown>>
 ): Record<string, Record<string, unknown>> | null {
@@ -106,7 +106,7 @@ function computeMergedExecutionData(
 
 function getInputMockSkeleton(
   predecessorId: string,
-  effectiveUpstream: UpstreamNodeInfo[],
+  effectiveUpstream: UpstreamStepInfo[],
   triggers: { id: string; parameters?: Record<string, unknown> }[] | undefined
 ): string {
   const node = effectiveUpstream.find((n) => n.id === predecessorId)
@@ -115,7 +115,7 @@ function getInputMockSkeleton(
 }
 
 /** Track which upstream node sections are expanded, syncing when the upstream set changes. */
-function useExpandedSections(effectiveUpstream: UpstreamNodeInfo[]) {
+function useExpandedSections(effectiveUpstream: UpstreamStepInfo[]) {
   const upstreamIdsSerialized = effectiveUpstream.map((n) => n.id).join(',')
 
   const [state, setState] = useState(() => ({
@@ -153,7 +153,7 @@ type InputPanelMockControlsProps = {
   setIsSetMockDropdownOpen: (open: boolean) => void
   isUnpinDropdownOpen: boolean
   setIsUnpinDropdownOpen: (open: boolean) => void
-  effectiveUpstream: UpstreamNodeInfo[]
+  effectiveUpstream: UpstreamStepInfo[]
   handleSetMockData: (predecessorId: string) => void
   handleUnpinSingle: (predecessorId: string) => void
   unpinAllInputMocks: (nodeId: string) => void
@@ -206,7 +206,7 @@ function InputPanelMockControls({
             <DropdownList>
               {effectiveUpstream.map((node) => (
                 <DropdownItem key={node.id} onClick={() => handleSetMockData(node.id)}>
-                  {getUpstreamNodeDisplayName(node)}
+                  {getUpstreamStepDisplayName(node)}
                 </DropdownItem>
               ))}
             </DropdownList>
@@ -240,7 +240,7 @@ function InputPanelMockControls({
                         setIsUnpinDropdownOpen(false)
                       }}
                     >
-                      {getUpstreamNodeDisplayName(node)}
+                      {getUpstreamStepDisplayName(node)}
                     </DropdownItem>
                   ))}
                 <DropdownItem isDanger onClick={() => unpinAllInputMocks(nodeId)}>
@@ -263,8 +263,8 @@ export function InputPanel({
   workflowId,
   onRunPreviousSteps,
 }: Readonly<InputPanelProps>) {
-  const upstreamNodes = useUpstreamNodes(nodeId)
-  const sourceAncestors = useUpstreamNodes(sourceNodeId ?? '')
+  const upstreamNodes = useUpstreamSteps(nodeId)
+  const sourceAncestors = useUpstreamSteps(sourceNodeId ?? '')
   const activities = useWorkflowStore(selectActivities)
   const triggers = useWorkflowStore(selectTriggers)
 
@@ -331,7 +331,7 @@ export function InputPanel({
 
     return (
       <MockDataEditor
-        predecessorName={getUpstreamNodeDisplayName(editingNode ?? { id: editingPredecessorId, type: 'unknown' })}
+        predecessorName={getUpstreamStepDisplayName(editingNode ?? { id: editingPredecessorId, type: 'unknown' })}
         initialJson={initialJson}
         onPin={(parsed) => {
           pinInputMock(nodeId, editingPredecessorId, parsed)
@@ -410,7 +410,7 @@ export function InputPanel({
                 return (
                   <ExpandableSection
                     key={upstreamNode.id}
-                    toggleText={getUpstreamNodeDisplayName(upstreamNode)}
+                    toggleText={getUpstreamStepDisplayName(upstreamNode)}
                     isIndented
                     isExpanded={isExpanded}
                     onToggle={(_event, expanded) =>
@@ -418,12 +418,12 @@ export function InputPanel({
                     }
                     className={styles.sectionToggleText}
                   >
-                    <InputPanelNodeSection
+                    <InputPanelStepSection
                       upstreamNode={upstreamNode}
                       hasPinnedMock={hasPinnedMock}
                       handleUnpinSingle={handleUnpinSingle}
                     >
-                      <InputNodeContent
+                      <InputStepContent
                         upstreamNode={upstreamNode}
                         hasData={hasData}
                         mergedExecutionData={mergedExecutionData}
@@ -433,7 +433,7 @@ export function InputPanel({
                         onRunPreviousSteps={onRunPreviousSteps}
                         workflowId={workflowId}
                       />
-                    </InputPanelNodeSection>
+                    </InputPanelStepSection>
                   </ExpandableSection>
                 )
               })}

@@ -9,20 +9,20 @@ import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { approvalsClient, executionsClient, workflowClient } from '../../client'
 import { AlertProvider } from '../../providers/alerts'
 
-vi.mock('./components/NodeEditorOverlay', () => ({
-  NodeEditorOverlay: ({ isOpen }: { isOpen: boolean }) => (isOpen ? <div data-testid="node-editor-overlay" /> : null),
+vi.mock('./components/StepEditorOverlay', () => ({
+  StepEditorOverlay: ({ isOpen }: { isOpen: boolean }) => (isOpen ? <div data-testid="node-editor-overlay" /> : null),
 }))
 
 let shouldAutoSelectNode = false
 
-vi.mock('./AddNodePanel', () => {
+vi.mock('./AddStepPanel', () => {
   return {
-    AddNodePanel: ({ onSelectNode }: { onSelectNode: (nodeTypeId: string, nodeSubtypeId?: string | null) => void }) => {
+    AddStepPanel: ({ onSelectStep }: { onSelectStep: (stepTypeId: string, stepSubtypeId?: string | null) => void }) => {
       React.useEffect(() => {
         if (shouldAutoSelectNode) {
-          onSelectNode('action', null)
+          onSelectStep('action', null)
         }
-      }, [onSelectNode])
+      }, [onSelectStep])
       return <div>Add step</div>
     },
   }
@@ -168,7 +168,7 @@ describe('BuilderContent overlay', () => {
     })
   })
 
-  it('renders node editor overlay after selecting a node to add', async () => {
+  it('renders step editor overlay after selecting a node to add', async () => {
     const user = userEvent.setup()
     shouldAutoSelectNode = true
 

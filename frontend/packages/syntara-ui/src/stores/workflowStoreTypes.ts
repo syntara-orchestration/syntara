@@ -41,7 +41,7 @@ export type WorkflowDefinition = Omit<WorkflowDefinitionBase, 'triggers' | 'node
  * listed properties are allowed. Do NOT add a catch-all index signature
  * like `[key: string]: unknown` as it would allow arbitrary metadata
  * injection that could bypass type safety in security-sensitive code
- * paths (e.g., executor type detection in detectTaskNodeType).
+ * paths (e.g., executor type detection in detectTaskExecutorType).
  */
 export type ActivityMetadata = {
   __isGeneric?: boolean
@@ -50,7 +50,7 @@ export type ActivityMetadata = {
   /**
    * Executor type override for display purposes only.
    * SECURITY: Type-restricted to allowlist for compile-time safety.
-   * Runtime validation also exists in detectTaskNodeType().
+   * Runtime validation also exists in detectTaskExecutorType().
    */
   __executorType?: ApiExecutorType
   /**
