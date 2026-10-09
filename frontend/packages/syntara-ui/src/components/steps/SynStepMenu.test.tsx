@@ -211,6 +211,35 @@ describe('SynStepMenu', () => {
       expect(parentClickHandler).not.toHaveBeenCalled()
     })
 
+    it('stops menu item click propagation to the parent step', async () => {
+      const user = userEvent.setup()
+      const parentClickHandler = vi.fn()
+      const actionHandler = vi.fn()
+      const actions = [createMenuAction({ label: 'Replace', onClick: actionHandler })]
+
+      render(
+        <div
+          role="button"
+          aria-label="Step node"
+          tabIndex={0}
+          onClick={parentClickHandler}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              parentClickHandler()
+            }
+          }}
+        >
+          <SynStepMenu menuActions={actions} />
+        </div>
+      )
+
+      await user.click(screen.getByRole('button', { name: /step actions menu/i }))
+      await user.click(await screen.findByRole('menuitem', { name: 'Replace' }))
+
+      expect(actionHandler).toHaveBeenCalledTimes(1)
+      expect(parentClickHandler).not.toHaveBeenCalled()
+    })
+
     it('stops mousedown propagation', async () => {
       const user = userEvent.setup()
       const parentMouseDownHandler = vi.fn()
