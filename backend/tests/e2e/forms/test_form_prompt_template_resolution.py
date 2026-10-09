@@ -18,6 +18,7 @@ from ._helpers import (
     get_form_prompt,
     start_pending_form_prompt,
     submit_form_prompt,
+    wait_for_activity_outputs,
 )
 from ._workflows import ENVIRONMENT_RECORDS, dynamic_option_field
 
@@ -143,7 +144,8 @@ def test_submit_resolved_value_resumes_workflow(
     response = submit_form_prompt(syntara_api, UUID(str(prompt_row.id)), submitted)
     assert response.status_code == HTTPStatus.OK
 
-    final = assert_consumer_completed(syntara_api, exec_id)
+    assert_consumer_completed(syntara_api, exec_id)
+    final = wait_for_activity_outputs(syntara_api, exec_id, {"prompt"})
     activities = {activity.activity_id: activity for activity in (final.activities or [])}
     prompt_activity = activities["prompt"]
     assert isinstance(prompt_activity.output_data, ActivityDataOutputDataType0)

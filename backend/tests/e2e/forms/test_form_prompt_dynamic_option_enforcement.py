@@ -18,6 +18,7 @@ from ._helpers import (
     get_form_prompt,
     start_pending_form_prompt,
     submit_form_prompt,
+    wait_for_form_prompt_paused,
 )
 from ._workflows import ENVIRONMENT_RECORDS, dynamic_option_field
 
@@ -132,6 +133,7 @@ def test_prompt_remains_pending_after_rejected_submission(
     )
     prompt_id = UUID(str(prompt_row.id))
     _assert_options_resolved(syntara_api, prompt_id)
+    wait_for_form_prompt_paused(syntara_api, exec_id)
 
     rejected = submit_form_prompt(syntara_api, prompt_id, {"environment": "qa"})
     assert rejected.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
@@ -144,7 +146,7 @@ def test_prompt_remains_pending_after_rejected_submission(
     assert prompt_data.get("responded_by") is None
 
     execution = assert_and_get_with_502_skip(syntara_api.executions.get(execution_id=exec_id, include="activities"))
-    assert execution.status == ExecutionStatus.RUNNING
+    assert execution.status == ExecutionStatus.PAUSED
     activities = {activity.activity_id: activity for activity in (execution.activities or [])}
     assert "consumer" not in activities or activities["consumer"].status != "completed"
 

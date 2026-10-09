@@ -43,6 +43,7 @@ from ._helpers import (
     get_form_prompt,
     start_pending_form_prompt,
     submit_form_prompt,
+    wait_for_activity_outputs,
 )
 from ._workflows import APPROVAL_REASON_FIELD
 
@@ -175,7 +176,8 @@ class TestResponderUsers:
         response = submit_form_prompt(responder_env["user_a_api"], prompt_id, _RESPONSE)
         assert response.status_code == HTTPStatus.OK
 
-        final = assert_consumer_completed(syntara_api, exec_id)
+        assert_consumer_completed(syntara_api, exec_id)
+        final = wait_for_activity_outputs(syntara_api, exec_id, {"prompt"})
         activities = {activity.activity_id: activity for activity in (final.activities or [])}
         prompt_activity = activities["prompt"]
         assert isinstance(prompt_activity.output_data, ActivityDataOutputDataType0)
