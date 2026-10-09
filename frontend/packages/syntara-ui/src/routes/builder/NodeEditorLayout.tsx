@@ -1,5 +1,5 @@
 import { Alert, Button, Flex, FlexItem, Stack, StackItem } from '@patternfly/react-core'
-import { RhUiExternalLinkIcon } from '@patternfly/react-icons'
+import { RhUiInformationIcon } from '@patternfly/react-icons'
 import type { Node } from '@xyflow/react'
 import type { ReactNode } from 'react'
 
@@ -15,7 +15,7 @@ function DocumentationButton({ href }: Readonly<{ href: string }>) {
   return (
     <Button
       variant="link"
-      icon={<RhUiExternalLinkIcon />}
+      icon={<RhUiInformationIcon />}
       iconPosition="end"
       component="a"
       href={href}
