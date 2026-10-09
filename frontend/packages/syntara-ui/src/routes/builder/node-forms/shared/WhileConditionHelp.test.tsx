@@ -18,7 +18,7 @@ describe('WhileConditionHelp', () => {
     await user.click(screen.getByRole('button', { name: /more info/i }))
 
     expect(screen.getByText(/loop body always runs at least once/i)).toBeInTheDocument()
-    expect(screen.getAllByText(/Visual expression builder/i).length).toBeGreaterThanOrEqual(1)
+    expect(screen.getAllByText(/Form builder/i).length).toBeGreaterThanOrEqual(1)
   })
 
   it('has no accessibility violations', async () => {

@@ -214,7 +214,7 @@ Form submit and cancel buttons live in a **pinned footer at the bottom of the co
 - Cancel button uses `variant="link"` (per UX design system)
 - `SynPanel.module.css` normalizes footer padding (`--spacer--md`), widens button spacing, and adds a visible divider border
 - **Applies to:** Create/Edit User, Configure Integration, Edit Group Mapping, Settings tabs, Integration Tools, Approval Detail
-- **Does NOT apply to:** Builder forms (use node editor panel footer), modals/dialogs (buttons inside modal footer)
+- **Does NOT apply to:** Builder forms (use step editor panel footer), modals/dialogs (buttons inside modal footer)
 - **Does NOT apply to:** Check Access / Who Can forms — these are inline query forms inside a tab panel with no header buttons to move
 
 **`SynListPanel` — canonical list page implementation:**
@@ -254,6 +254,7 @@ Use `SynPageBreadcrumbs` for detail and form page navigation.
 - Last item is the current page (rendered as non-link text)
 - Middle segments collapse to a dropdown at ≤768px viewport width
 - Use PF6 default breadcrumb styling (dashed underline) — no CSS overrides
+- **Detail-page tabs:** Tabs describe views within the current resource; they are not breadcrumb hierarchy. Keep the resource name as the final, non-link breadcrumb on every tab. Add a segment after the resource only for a distinct route, such as Edit or a subordinate form.
 
 For live examples:
 
@@ -333,8 +334,8 @@ Filter bar is visible when data exists or when filters are active; hidden only w
   - Destructive items use `isDanger: true` (e.g., "Delete credential" renders in red)
   - Action order: non-destructive actions first (e.g., "Edit credential", "Duplicate workflow", "Disable credential"), then a divider, then destructive actions last (e.g., "Delete credential", "Remove integration")
   - On the **details page header**, the same actions appear in a kebab menu. Frequently used actions (e.g., Edit) are promoted to direct buttons in the header — primary button with icon for the most common action (e.g., `RhUiEditIcon` + "Edit credential"), remaining actions stay in the kebab.
+- **Column widths** — tune per table; there is no shared width map. PatternFly `<Th width={…}>` accepts `10 | 15 | 20 | … | 100` (percent of table width). Set widths inline on each `<Th>` after checking the table at full width and at the minimum supported viewport (~1024px). Values act as relative weights — the total need not equal 100; the browser normalizes when it exceeds 100. Use `modifier="nowrap"` on columns that must not wrap (dates, badges, actions). Wrap variable-length cell text in `<Truncate>` (see below). Default is `table-layout: fixed` via `SynScrollableTableContainer`; opt out with `useFixedLayout={false}` only when a specific table needs it (e.g. column-heavy tables where auto layout plus inline widths looks better). Sortable header labels may truncate at narrow widths — verify some label text remains visible, not only the sort control.
 - **Text truncation** — All text-heavy columns (names, descriptions, emails, URLs) must use PatternFly's `<Truncate>` component. Long values show ellipsis with the full text in a tooltip on hover.
-  - `SynScrollableTableContainer` uses `table-layout: fixed` for equal column distribution — do not opt out with `useFixedLayout={false}`
   - Wrap cell text in `<Truncate content={value} />` for any column that may contain user-generated or variable-length content
   - `LinkCell` children support `<Truncate>` — the link button constrains overflow automatically
 - **`SynKebabMenu` component** — Use `SynKebabMenu` (from `frontend/packages/syntara-ui/src/components/SynKebabMenu.tsx`) for table row actions and contextual overflow menus. API:
@@ -366,7 +367,7 @@ Filter bar is visible when data exists or when filters are active; hidden only w
   - Use PatternFly's [Validated component](https://www.patternfly.org/components/forms/form/#validated) for general form validation
   - Use PatternFly's [Number Input component](https://www.patternfly.org/components/number-input/#numberinput) for number input fields
   - Use PatternFly's [DatePicker](https://www.patternfly.org/components/date-and-time/date-picker) for date inputs — never use native `<TextInput type="date">`. DatePicker provides a consistent cross-browser calendar popover, date validation via the `validators` prop, and proper formatting/parsing via `dateFormat`/`dateParse`. Use `appendTo={() => document.body}` for correct popover positioning. Pass validation state through `inputProps={{ validated: ... }}`.
-  - Use PatternFly's [popover help text](https://www.patternfly.org/components/popover/design-guidelines) on form field labels. In the workflow builder, use the shared `FieldHelpPopover` component (`components/FieldHelpPopover.tsx`, wrapping PF6 `FormGroupLabelHelp` + `Popover`) rather than inline `Popover` JSX per field, fed from a central copy registry (`routes/builder/node-forms/shared/nodeFieldHelp.tsx`) so help text is defined once and reused across node forms instead of duplicated per component.
+  - Use PatternFly's [popover help text](https://www.patternfly.org/components/popover/design-guidelines) on form field labels. In the workflow builder, use the shared `FieldHelpPopover` component (`components/FieldHelpPopover.tsx`, wrapping PF6 `FormGroupLabelHelp` + `Popover`) rather than inline `Popover` JSX per field, fed from a central copy registry (`routes/builder/node-forms/shared/nodeFieldHelp.tsx`) so help text is defined once and reused across step forms instead of duplicated per component.
   - Use PatternFly's [`HelperText`](https://www.patternfly.org/components/forms/helper-text) / `HelperTextItem` below form inputs to provide brief, contextual guidance (e.g., accepted formats, valid ranges, constraints). The help popover icon on the field label is for longer explanatory descriptions. When both are present, inline helper text gives at-a-glance guidance while the popover provides full context. Validation errors (`validated="error"`) take priority — replace the helper text with the error message when the field is invalid.
   - **`autoComplete` on sensitive create-form fields** — Browsers aggressively offer saved-credential autofill on username/password-shaped inputs even on "Create new resource" forms, where that's semantically wrong (there's no existing account to autofill). Set `autoComplete="off"` on username-shaped fields and `autoComplete="new-password"` on password/secret fields for any create-account or create-credential form.
 - **Dropdowns:** Never use native `<select>` or PatternFly's legacy `FormSelect` / `FormSelectOption` — this is enforced by a `no-restricted-imports` ESLint rule (`eslint.config.js`) that errors on any `FormSelect`/`FormSelectOption` import. Always use `SynSelect` (not raw PatternFly `Select`) with `MenuToggle` + `SelectList` + `SelectOption`. Enforced by `syntara/prefer-syn-select`. Inside modals, use `popperProps={{ appendTo: 'inline' }}` for correct dropdown positioning — **except** for long menus (see "Long menus" below), which should not use `appendTo: 'inline'`. Add `shouldFocusToggleOnSelect` for keyboard accessibility after selection. When dropdown options represent policies or modes where the label alone isn't self-explanatory, use the `description` prop on `SelectOption` to provide inline context (e.g., "Skip" with description "Only one run at a time; skip if the previous run is still in progress").
@@ -485,7 +486,7 @@ Each empty state scenario maps to a specific icon, optional `status` prop, and s
 
 - Use the `status` prop (`danger`, `warning`, `success`, `info`) for status-driven empty states — PatternFly applies the correct icon color automatically
 - For non-status empty states (no data, no results, configuration, no access), icons render in **gray by default** — do not manually set a color
-- Variant sizing: `sm` inside tables, modals, or wizards; `lg` for full-page empty states; `xl` for getting started or full-page success; `xs` (with `headingLevel="h3"`) for narrow, height-constrained panel-embedded contexts, e.g. builder side panels (step Input/Output panels) or node execution detail panels, where even `sm` is too tall
+- Variant sizing: `sm` inside tables, modals, or wizards; `lg` for full-page empty states; `xl` for getting started or full-page success; `xs` (with `headingLevel="h3"`) for narrow, height-constrained panel-embedded contexts, e.g. builder side panels (step Input/Output panels) or step execution detail panels, where even `sm` is too tall
 - **CTA deduplication:** When the empty state includes a primary create/configure CTA button, **hide the page-header primary button** to avoid duplicate CTAs. The empty state CTA is sufficient — the header button reappears once data exists.
 - **Tab-level empty states:** Use the shared `SynEmptyStateNoData` component (not ad-hoc `EmptyState`) with the correct heading level (`h2` inside tabs) and `isFullHeight` prop
 - **Three-state list page pattern:** Every list page must handle three states in this order:
@@ -1331,7 +1332,7 @@ onCreateWorkflow={permissions.canCreate ? handler : undefined}
 When a user can view but not edit a workflow:
 
 1. **Info banner** — `Alert variant="info" isInline` explaining read-only mode
-2. **Hide editing affordances** — Add Node panel hidden, toolbar actions disabled
+2. **Hide editing affordances** — Add Step panel hidden, toolbar actions disabled
 3. **Canvas lockdown** — `nodesDraggable={false}`, `nodesConnectable={false}`, `deleteKeyCode={null}`
 4. **Toolbar actions** — Save/Publish disabled via `DisabledWithTooltip`; Run has its own `canRun` check
 
@@ -1368,7 +1369,7 @@ When a list page shows an empty state with a CTA (e.g., "Create credential"), th
 
 Apply this pattern to every component that accepts an `addData` or action callback prop for empty states: `SynEmptyStateNoData`, custom empty states, and `EmptyState` with action buttons.
 
-**The same permission-aware branching applies inline, inside an open form** — not just at the page-empty-state level. When a form field's usefulness depends on another resource existing (e.g., an AI Agent node's "Tools" field is only useful once an MCP integration exists), and no such resource exists yet, show a disabled placeholder plus helper text that includes an actionable link to create one **only if** the current user has permission to create that resource; otherwise show plain, non-actionable helper text. Don't render an actionable link the user can't actually follow through on.
+**The same permission-aware branching applies inline, inside an open form** — not just at the page-empty-state level. When a form field's usefulness depends on another resource existing (e.g., an AI Agent step's "Tools" field is only useful once an MCP integration exists), and no such resource exists yet, show a disabled placeholder plus helper text that includes an actionable link to create one **only if** the current user has permission to create that resource; otherwise show plain, non-actionable helper text. Don't render an actionable link the user can't actually follow through on.
 
 ### Hide-Until-Confirmed for Gated UI During Loading
 
@@ -1422,6 +1423,10 @@ For panels that display structured data (input/output panels in the workflow bui
 ## 17. Workflow Builder
 
 The automation builder experience is based on [React Flow](https://reactflow.dev/) as the underlying graph/canvas foundation, with PatternFly as the visual wrapper. The canvas is built **left to right**.
+
+### Step Terminology
+
+Use **step** in user-facing copy and UX guidance: for example, "Add step", "Run step", and "Step settings". Reserve **node** for technical identifiers and implementation concepts such as React Flow APIs, data fields, component names, and hooks. This keeps the operator-facing vocabulary consistent without obscuring the underlying graph model for contributors.
 
 ### Builder Toolbar Action Hierarchy
 
@@ -1528,7 +1533,7 @@ The version history side panel lets users browse, compare, and manage published 
   - **Draft** (grey label) — unpublished working copy
 - **Kebab actions per version:** Restore, Export, Publish (contextual based on version state)
 - **Mutual exclusivity:** History panel, approval panel, and add-step panel cannot be open simultaneously — opening one closes the others
-- **Read-only mode:** When viewing a historical version, the canvas is non-editable — toolbar save/publish buttons are disabled, node interactions are view-only
+- **Read-only mode:** When viewing a historical version, the canvas is non-editable — toolbar save/publish buttons are disabled, step interactions are view-only
 - **Row layout:** Pin the row kebab to a fixed position (`flex-shrink: 0`) so it doesn't shift when variable-length status badges wrap onto a separate line below it. Use `PaginationFooter` (see Table Component in §3) under the `SimpleList` once the version count can exceed a page — it isn't table-only.
 
 ### Add Step
@@ -1572,7 +1577,7 @@ Trigger configuration supports two scheduling types:
 - **Single trigger** — Plain "Run" button in the builder toolbar
 - **Multiple triggers** — "Run" button becomes a dropdown, letting the user select which trigger to start from
 - Run flow:
-  1. Confirmation dialog ("Run [workflow name]?") with a "Don't show again" checkbox
+  1. Confirmation dialog titled "Run workflow?" with a "Don't show again" checkbox. Name the workflow in the body (for example, "You are about to manually run the workflow **{name}**.") so the title stays predictable while the affected resource remains clear.
   2. `RunWorkflowModal` — JSON code editor for providing mock trigger output data; validates against the trigger's `input_schema` when defined
 - After run, the execution visualizer panel opens showing real-time results
 
@@ -1602,7 +1607,7 @@ Trigger configuration supports two scheduling types:
 - **Feedback:** Success toast "Execution cancellation requested"; error toast "Failed to cancel execution" + API message
 - **Loading state:** Button shows spinner and disables while mutation is pending
 
-**Same pattern as a table kebab action:** "Cancel run" is also available as a danger-styled kebab item on the executions table (matching the header behavior above) — it fires immediately with no confirmation, then self-disables and shows an "Cancellation in progress…" tooltip until the execution's status changes. Generalize this as its own reusable pattern for any kebab action that triggers a slow, one-shot async operation: immediate-fire + self-disabling in-progress tooltip, distinct from both the no-confirm-toggle pattern (Node Disable/Enable) and the confirmation-dialog tiers (§6).
+**Same pattern as a table kebab action:** "Cancel run" is also available as a danger-styled kebab item on the executions table (matching the header behavior above) — it fires immediately with no confirmation, then self-disables and shows an "Cancellation in progress…" tooltip until the execution's status changes. Generalize this as its own reusable pattern for any kebab action that triggers a slow, one-shot async operation: immediate-fire + self-disabling in-progress tooltip, distinct from both the no-confirm-toggle pattern (Step Disable/Enable) and the confirmation-dialog tiers (§6).
 
 ### Canvas Controls
 
@@ -1624,10 +1629,10 @@ Verify validates the entire workflow graph against the backend and surfaces erro
 - **Trigger:** Kebab action "Verify workflow" with `RhUiCheckCircleIcon`
 - **API:** `POST /workflows/validate` — returns an array of `ValidationError` objects with `nodeId`, message, and severity
 - **Loading state:** Toolbar shows a "Verifying..." button with spinner during the API call
-- **`ValidationBanner`:** Expandable inline `Alert` rendered above the canvas; dismissing the banner clears all node badges
-- **Per-node error badges:** Failed nodes show a circular warning badge (bottom-right, matching execution badge positioning) via `data.__validationError` on the node
-- **Clickable node links:** Node-specific errors in the banner are inline links (`Button variant="link" isInline`) that navigate to the node editor panel via `useNodePanelNavigation`. Fallback label "Go to step" when name is unparseable; global errors (`nodeId: null`) stay as plain text
-- **Grouped/humanized errors:** `parseValidationMessage()` / `humanizeValidationMessage()` extract node names and error lists; the banner uses compact horizontal `DescriptionList` (`isCompact isFluid isHorizontal`) — term = node name link, description = comma-separated messages. Display key "Workflow" for global errors
+- **`ValidationBanner`:** Expandable inline `Alert` rendered above the canvas; dismissing the banner clears all step badges
+- **Per-step error badges:** Failed steps show a circular warning badge (bottom-right, matching execution badge positioning) via `data.__validationError` on their graph representation
+- **Clickable step links:** Step-specific errors in the banner are inline links (`Button variant="link" isInline`) that navigate to the step editor panel via `useNodePanelNavigation`. Fallback label "Go to step" when name is unparseable; global errors (`nodeId: null`) stay as plain text
+- **Grouped/humanized errors:** `parseValidationMessage()` / `humanizeValidationMessage()` extract step names and error lists; the banner uses compact horizontal `DescriptionList` (`isCompact isFluid isHorizontal`) — term = step name link, description = comma-separated messages. Display key "Workflow" for global errors
 
 ### Two-Tier Validation Severity
 
@@ -1638,7 +1643,7 @@ Validation findings have two severity levels that drive different UI behavior:
 | **Error** (`severity: 'error'`) | Save still succeeds; issues are surfaced inline | Always blocks publish | `danger` |
 | **Warning** (`severity: 'warning'`) | Save succeeds | Does not block publish | `warning` |
 
-**Save flow (`useBuilderSaveWorkflow`) — single request, no retry:** Save is always one request. The save response includes `has_validation_issues: boolean` plus an inline `validation_result` with the findings. When `has_validation_issues` is true, `reportSaveValidationIssues()` extracts the findings from `validation_result` and calls `onSaveWithValidationIssues` / `onValidationFindings` for node-level display — there is no second request, no `force_save` query parameter, and no retry loop. (This replaces an earlier two-request `force_save=true` retry flow, which was removed; `ImportWorkflowDialog`'s corresponding "Save anyway" retry option was removed at the same time since there's no longer a save-rejection case for warnings.)
+**Save flow (`useBuilderSaveWorkflow`) — single request, no retry:** Save is always one request. The save response includes `has_validation_issues: boolean` plus an inline `validation_result` with the findings. When `has_validation_issues` is true, `reportSaveValidationIssues()` extracts the findings from `validation_result` and calls `onSaveWithValidationIssues` / `onValidationFindings` for step-level display — there is no second request, no `force_save` query parameter, and no retry loop. (This replaces an earlier two-request `force_save=true` retry flow, which was removed; `ImportWorkflowDialog`'s corresponding "Save anyway" retry option was removed at the same time since there's no longer a save-rejection case for warnings.)
 
 **ValidationBanner variant logic:**
 
@@ -1654,61 +1659,63 @@ Validation findings have two severity levels that drive different UI behavior:
 - Permission gating: `DisabledWithTooltip` when `!canEdit`
 - Auto re-verify: `BuilderContent` silently re-verifies on load when the workflow has existing validation issues
 
-### Node Settings
+### Step Settings
 
-Every activity node form uses `NodeFormTabsLayout` to split configuration into **Parameters** and **Settings** tabs.
+Every activity step form uses `NodeFormTabsLayout` to split configuration into **Parameters** and **Settings** tabs.
 
-- **Parameters tab:** Node-specific configuration fields (the existing form)
+- **Parameters tab:** Step-specific configuration fields (the existing form)
 - **Settings tab:** Shared `NodeSettingsForm` component for:
   - **Continue on failure:** Three-way select (System default / On / Off) via `COF_OPTIONS`
   - **Timeout:** `DurationInput` component
   - **Retry policy:** Retry count + delay configuration
 - **System defaults:** Live placeholders from `GET /settings?category=workflow_execution` via `useWorkflowEngineDefaults` — e.g., "System default — 30m"
-- **Hidden for control flow:** `hideSettingsTab` is set for Condition, Switch, and trigger nodes (they have no configurable execution settings)
+- **Hidden for control flow:** `hideSettingsTab` is set for Condition, Switch, and trigger steps (they have no configurable execution settings)
 
-### Explaining Non-Obvious Node Semantics
+### Explaining Non-Obvious Step Semantics
 
-For node types whose purpose is easy to misread (e.g., a Converge node can look "unnecessary" at first glance, since edges can be dragged directly between other steps), add a collapsed-by-default, expandable info `Alert` (`variant="info" isInline isExpandable`) at the top of the node's Parameters tab explaining when the step is and isn't needed. This is distinct from the always-visible trigger "activation" alerts described in Schedule Trigger Form, which explain *publish timing*, not *step purpose* — don't conflate the two; a purpose-explainer stays collapsed by default since it's reference material, not a warning.
+For step types whose purpose is easy to misread (e.g., a Converge step can look "unnecessary" at first glance, since edges can be dragged directly between other steps), add a collapsed-by-default, expandable info `Alert` (`variant="info" isInline isExpandable`) at the top of the step's Parameters tab explaining when the step is and isn't needed. This is distinct from the always-visible trigger "activation" alerts described in Schedule Trigger Form, which explain *publish timing*, not *step purpose* — don't conflate the two; a purpose-explainer stays collapsed by default since it's reference material, not a warning.
 
-### Three-Column Node Editor Layout
+### Three-Column Step Editor Layout
 
-When a node is opened for editing, the builder can display a three-column layout for advanced node types:
+When a step is opened for editing, the builder can display a three-column layout for advanced step types:
 
 | Column | Content | Panel style |
 | ------ | ------- | ----------- |
 | **Left** | Input data (upstream output / trigger data) | Default `SynPanel` |
-| **Center** | Node parameters (the form) | `SynPanel variant="raised"` — visually elevated to signal "this is where you edit" |
+| **Center** | Step parameters (the form) | `SynPanel variant="raised"` — visually elevated to signal "this is where you edit" |
 | **Right** | Output data (downstream preview / schema) | Default `SynPanel` |
 
 - Input/Output panels support Schema / Table / JSON view toggle (see Data Panel View Modes)
-- **Branching nodes** (Condition, Switch): The center column header includes a branch-handle dropdown (`MenuToggle` with branch icon) for selecting which output path to inspect in the Output panel
+- **Branching steps** (Condition, Switch): The center column header includes a branch-handle dropdown (`MenuToggle` with branch icon) for selecting which output path to inspect in the Output panel
 - Columns use `ResizableDivider` for user-adjustable widths
 - Center panel uses `variant="raised"` to maintain visual hierarchy — Input/Output panels stay flat
+- **Contextual documentation:** Resolve documentation from the selected step type and show the external Documentation link only when a matching destination exists. Omit the control when there is no step-specific documentation; do not show a disabled "Coming soon" affordance.
 
-### Node Panel Navigation
+### Step Panel Navigation
 
-The node editor panel provides **Previous/Next arrow controls** for navigating connected steps in graph order.
+The step editor panel provides **Previous/Next arrow controls** for navigating connected steps in graph order.
 
 - **Single upstream/downstream:** Plain icon button with tooltip showing the connected step name
-- **Multiple targets:** Dropdown menu on the arrow listing all connected steps
+- **Multiple targets:** Dropdown menu on the arrow listing all connected steps. Each item includes the step-type icon and display name so users can distinguish similarly named targets at a glance.
 - **Components:** `NodePanelNavigationArrow`, `useNodePanelNavigation`, `useAdjacentNodes`, `getAdjacentNodesFromFlow`
 - **Icons:** `RhUiCaretLeftIcon` (previous) / `RhUiCaretRightIcon` (next)
 - **Positioning:** Tab-style arrows on panel edges via CSS module (`NodePanelNavigationArrow.module.css`)
 
-### Node Disable/Enable
+### Step Disable/Enable
 
-Activity nodes (Task, Approval) support toggling their enabled state directly from the canvas kebab menu.
+Activity steps (Task, Approval) support toggling their enabled state directly from the canvas kebab menu.
 
 - **Kebab actions:** "Disable step" / "Enable step" — **no confirmation dialog** (immediate toggle)
-- **Visual treatment:** Disabled nodes show dashed gray border + 50% opacity (matches skipped execution state)
-- **Persistence:** State stored in `settings.disabled` on the node definition
-- **Control flow nodes** (Loop, Condition, Switch, Converge, Wait) use `MenuNodeType.CONTROL_FLOW` and show only **Replace** and **Delete** in their kebab — no disable/enable option
+- **Visual treatment:** Disabled steps show dashed gray border + 50% opacity (matches skipped execution state)
+- **Persistence:** State stored in `settings.disabled` on the underlying step definition
+- **Control flow steps** (Loop, Condition, Switch, Converge, Wait) use `MenuNodeType.CONTROL_FLOW` and show only **Replace** and **Delete** in their kebab — no disable/enable option
 - **CSS note:** Use individual border-side CSS properties (`borderTopStyle`, `borderRightStyle`, etc.) instead of shorthand `border` for dashed/solid toggling — avoids React diffing issues
 
-### Switch Node Expression Builder
+### Switch Step Expression Builder
 
-Switch node paths share the same `ExpressionBuilderCore` used by Condition nodes, providing visual AND/OR expression groups with a custom expression mode toggle.
+Switch step paths share the same `ExpressionBuilderCore` used by Condition steps, providing visual AND/OR expression groups with a custom expression mode toggle.
 
+- **Mode copy:** Label the selector "Condition type". Its options are "Form builder" and "Freeform text"; the editor group defaults to the accessible label "Condition". Keep visible and accessible labels in one shared constants module so they cannot drift.
 - **Expression groups:** Level-0 groups have no border; nested groups get a left accent border for visual hierarchy
 - **Path reordering:** Drag-reorder paths via `@dnd-kit/sortable` with inline `RhUiGripVerticalFillIcon` grip handle, `DragOverlay`, and `restrictToVerticalAxis`
 - **Path identity:** Each path uses `caseId` (not `id`) for stable edge remapping during reorder
@@ -1727,8 +1734,8 @@ Payload-validation UI for webhook and event-driven (EDA) triggers uses a **Simpl
 Pending approval review happens inline in the execution viewer rather than on a dedicated full-page route.
 
 - **Layout:** Right-side `SynPanel isFullHeight` + `SidePanelHeader` + scrollable `ApprovalDetailContent`; mirrors `WorkflowHistoryCard` layout pattern
-- **Mutual exclusivity:** History panel and approval panel cannot be open simultaneously
-- **Auto-open:** `useAutoApprovalDetection` automatically opens the panel when a pending approval is detected on the current execution
+- **Mutual exclusivity:** History panel and approval panel cannot be open simultaneously. Auto-detection must not replace an open history panel; preserve the user's current context and let them open the approval panel explicitly.
+- **Auto-open:** `useAutoApprovalDetection` automatically opens the panel when a pending approval is detected on the current execution, unless the user is viewing run history
 - **Components:** `ApprovalSidePanel`, `useExecutionApprovalPanel`, `ApprovalDetailContent`
 
 **Multi-approval navigation (`ApprovalNavigationHeader`):**
@@ -1736,19 +1743,19 @@ Pending approval review happens inline in the execution viewer rather than on a 
 When an execution contains multiple approval steps (pending or completed), the panel provides sequential navigation:
 
 - **Header:** "Approval 2 of 5" counter with Previous/Next arrow buttons
-- **Navigation:** `RhUiCaretLeftIcon` / `RhUiCaretRightIcon` buttons cycle through approval nodes in graph order
+- **Navigation:** `RhUiCaretLeftIcon` / `RhUiCaretRightIcon` buttons cycle through approval steps in graph order
 - **Keyboard support:** Arrow-key navigation for accessibility
 - **Auto-focus:** Panel auto-scrolls to the first pending approval on open
-- **Canvas sync:** Navigating approvals highlights the corresponding node on the canvas
+- **Canvas sync:** Navigating approvals highlights the corresponding step on the canvas
 
-### Wait Node Canvas Countdown
+### Wait Step Canvas Countdown
 
-During active execution, Wait nodes display a live countdown timer on the canvas.
+During active execution, Wait steps display a live countdown timer on the canvas.
 
 - **Format:** `HH:MM:SS` for durations under 24h; `Xd HH:MM:SS` for longer durations
 - **Implementation:** `useWaitCountdown` hook with 1-second interval, calculating remaining time from `started_at` + configured duration
-- **Visibility:** Only shown when node execution status is `waiting` or `running`; clears on terminal status
-- **Display:** Rendered as a detail row below the static duration label on the canvas node
+- **Visibility:** Only shown when step execution status is `waiting` or `running`; clears on terminal status
+- **Display:** Rendered as a detail row below the static duration label on the canvas step
 
 ### Import Workflow Confirmation
 
@@ -1764,15 +1771,16 @@ Importing a workflow into an existing saved builder shows a choice dialog before
 
 ### Conditional Settings Visibility
 
-Node settings sections should only show controls that are relevant to the current node type. Use a `supportsRetryPolicy` prop (or similar capability flag) to hide settings that have no effect on a given node type. For example, retry policy settings are hidden for AI Agent nodes, script action nodes, and approval nodes — only HTTP request action nodes show them. This prevents user confusion about settings that would be silently ignored.
+Step settings sections should only show controls that are relevant to the current step type. Use a `supportsRetryPolicy` prop (or similar capability flag) to hide settings that have no effect on a given step type. For example, retry policy settings are hidden for AI Agent steps, script action steps, and approval steps — only HTTP request action steps show them. This prevents user confusion about settings that would be silently ignored.
 
 ### Canvas Auto-Layout
 
-The canvas layout engine uses unified spacing constants shared between auto-layout (`layoutEngine.ts`) and manual positioning (`useNodePositioning.ts`) to ensure consistent spacing regardless of how nodes are placed.
+The canvas layout engine uses unified spacing constants shared between auto-layout (`layoutEngine.ts`) and manual positioning (`useNodePositioning.ts`) to ensure consistent spacing regardless of how steps are placed.
 
 - **Unified constants:** `LOOP_BODY_SPACING` from `layoutConstants.ts` — `horizontal` (80px), `vertical` (100px), `nodeGap` (40px). Never use magic numbers for loop body positioning.
-- **Branch ordering:** Branching nodes (condition, approval, switch, loop) use edge weight-based ordering via `buildBranchNodeOrdering()`. Higher-weight branches render first (leftmost/topmost): true/approved branches get weight 2, false/rejected get weight 1. Switch cases use descending weights (case_0=50, case_1=49, ..., default=1).
+- **Branch ordering:** Branching steps (condition, approval, switch, loop) use edge weight-based ordering via `buildBranchNodeOrdering()`. Higher-weight branches render first (leftmost/topmost): true/approved branches get weight 2, false/rejected get weight 1. Switch cases use descending weights (case_0=50, case_1=49, ..., default=1).
 - **Layout algorithm:** Uses `network-simplex` ranker with `nodesep: 90` for proper horizontal spacing between branch targets.
+- **Loop-group drag:** Dragging a loop moves every step in its body by the same offset and persists their positions together. Moving the loop must preserve the body layout rather than leaving its contained steps behind.
 
 ### Execution View Panels
 
@@ -1782,11 +1790,12 @@ The canvas layout engine uses unified spacing constants shared between auto-layo
 - Panels may use a `ResizableDivider` to allow users to resize panel split areas
 - The most recent run details can display inline in the editor after workflow execution
 - **Activity filtering:** The execution details panel includes a `FilterBar` toolbar (role="search", aria-label="Filters") for filtering activities by name. Filter state persists across Overview/Details tab switches. When no activities match, show `SynEmptyStateFilter` with a "Clear all filters" button.
-- **Human-readable error messages:** Execution error messages must resolve internal activity IDs to human-readable node names. Use a name map (`Map<activityId, nodeName>`) and `resolveErrorDetails()` to replace IDs in error strings before displaying them to users. Never show raw activity IDs in user-facing error alerts.
+- **Initial details selection:** When the user opens Details with no activity selected, select the first currently visible activity and synchronize the row, canvas, and detail pane. Do not replace a selection the user has already made.
+- **Human-readable error messages:** Execution error messages must resolve internal activity IDs to human-readable step names. Use a name map (`Map<activityId, nodeName>`) and `resolveErrorDetails()` to replace IDs in error strings before displaying them to users. Never show raw activity IDs in user-facing error alerts.
 
 ### AI Agent Reasoning Trace ("Agent Steps")
 
-Agentic node execution details use a second tab, alongside the standard Input/Output tabs, specifically for inspecting how the agent arrived at its result:
+Agentic step execution details use a second tab, alongside the standard Input/Output tabs, specifically for inspecting how the agent arrived at its result:
 
 - **Tab:** "Agent steps" — only shown for agentic-type activities
 - **Header:** A stats strip (model, tokens used, trace time, tool-call count)
@@ -2066,7 +2075,7 @@ What are you building?
 │   ├── Left-to-right layout
 │   ├── Canvas controls at bottom-left (SynPanel variant="raised")
 │   ├── Side panel for step details (not modal)
-│   ├── Three-column node editor: Input | Parameters (raised) | Output
+│   ├── Three-column step editor: Input | Parameters (raised) | Output
 │   ├── Version history panel: SimpleList grouped by date, view-only mode
 │   └── Input/Output panels with Schema/Table/JSON view toggle
 │
