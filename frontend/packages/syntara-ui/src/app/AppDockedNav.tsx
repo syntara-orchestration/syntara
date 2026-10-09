@@ -59,6 +59,26 @@ function findFirstEnabledPath(item: TNavigationItem): string {
   return item.path
 }
 
+type RouterNavLinkProps = React.AnchorHTMLAttributes<HTMLAnchorElement>
+
+function RouterNavLink({ href, children, ...rest }: RouterNavLinkProps) {
+  return (
+    <Link to={href ?? '/'} {...(rest as Omit<React.ComponentProps<typeof Link>, 'to' | 'children'>)}>
+      {children}
+    </Link>
+  )
+}
+
+function isModifiedClick(event: React.SyntheticEvent | undefined): boolean {
+  if (!event || typeof globalThis.MouseEvent === 'undefined') return false
+
+  const mouseEvent = event.nativeEvent
+  return (
+    mouseEvent instanceof globalThis.MouseEvent &&
+    (mouseEvent.button !== 0 || mouseEvent.metaKey || mouseEvent.ctrlKey || mouseEvent.shiftKey || mouseEvent.altKey)
+  )
+}
+
 /** Items with children that should show a dropdown instead of navigating directly. */
 function hasDropdownChildren(item: TNavigationItem): boolean {
   return (item.children?.length ?? 0) > 1
@@ -74,9 +94,15 @@ function createNavItemRefs(items: TNavigationItem[]) {
 
 function navigateToNavItem(
   itemId: string | number,
+  to: string | undefined,
   visibleItems: TNavigationItem[],
   requestNavigation: (path: string) => void
 ) {
+  if (to) {
+    requestNavigation(to)
+    return
+  }
+
   const item = visibleItems.find((navItem) => navItem.path === itemId)
   if (item) requestNavigation(findFirstEnabledPath(item))
 }
@@ -97,10 +123,13 @@ function NavDropdownItem({
   const enabledChildren = item.children ?? []
   const { setFlyoutRef } = use(NavContext)
 
-  const onMenuSelect = (_event: React.MouseEvent | undefined, itemId: string | number | undefined) => {
+  const onMenuSelect = (event: React.MouseEvent | undefined, itemId: string | number | undefined) => {
     const child = enabledChildren.find((c) => c.path === itemId)
     if (child) {
       setFlyoutRef?.(null)
+      if (isModifiedClick(event)) return
+
+      event?.preventDefault()
       requestNavigation(child.path)
     }
   }
@@ -123,8 +152,8 @@ function NavDropdownItem({
                 key={child.path}
                 icon={child.icon}
                 itemId={child.path}
+                to={child.path}
                 className={styles.flyoutMenuItem}
-                onClick={(e: React.MouseEvent) => e.preventDefault()}
               >
                 {child.label}
               </MenuItem>
@@ -143,12 +172,10 @@ function NavExpandableItem({
   item,
   isActive,
   location,
-  requestNavigation,
 }: Readonly<{
   item: TNavigationItem
   isActive: boolean
   location: string
-  requestNavigation: (path: string) => void
 }>) {
   const enabledChildren = item.children ?? []
 
@@ -170,13 +197,12 @@ function NavExpandableItem({
       {enabledChildren.map((child) => (
         <NavItem
           key={child.path}
-          preventDefault
           id={`nav-${child.path.replaceAll('/', '-')}`}
           itemId={child.path}
-          href={child.path}
+          to={child.path}
+          component={RouterNavLink}
           isActive={location.startsWith(child.path)}
           icon={child.icon}
-          onClick={() => requestNavigation(child.path)}
         >
           {child.label}
         </NavItem>
@@ -368,9 +394,12 @@ export function AppDockedNav() {
             <ToolbarContent>
               <ToolbarItem>
                 <Nav
-                  onSelect={(_event, selectedItem) =>
-                    navigateToNavItem(selectedItem.itemId, visibleItems, requestNavigation)
-                  }
+                  onSelect={(event, selectedItem) => {
+                    if (isModifiedClick(event)) return
+
+                    event.preventDefault()
+                    navigateToNavItem(selectedItem.itemId, selectedItem.to, visibleItems, requestNavigation)
+                  }}
                   variant="docked"
                   aria-label="Main navigation"
                   className={!isDockShowingLabels ? styles.iconDockNav : undefined}
@@ -386,13 +415,7 @@ export function AppDockedNav() {
                         return [
                           separator,
                           isDockShowingLabels ? (
-                            <NavExpandableItem
-                              key={item.path}
-                              item={item}
-                              isActive={isActive}
-                              location={location}
-                              requestNavigation={requestNavigation}
-                            />
+                            <NavExpandableItem key={item.path} item={item} isActive={isActive} location={location} />
                           ) : (
                             <NavDropdownItem
                               key={item.path}
@@ -407,10 +430,10 @@ export function AppDockedNav() {
                         separator,
                         <NavItem
                           key={item.path}
-                          preventDefault
                           id={`nav-${item.path.replaceAll('/', '-')}`}
                           itemId={item.path}
-                          href={findFirstEnabledPath(item)}
+                          to={findFirstEnabledPath(item)}
+                          component={RouterNavLink}
                           isActive={isActive}
                           icon={item.icon}
                           aria-label={item.label}
