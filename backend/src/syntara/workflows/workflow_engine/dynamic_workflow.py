@@ -1647,7 +1647,7 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         if node_type in self._EXECUTOR_ACTIVITY_MAP:
             extra_args: list[Any] | None = None
             if node_type == NodeType.SCRIPT:
-                extra_args = [self._project_id]
+                extra_args = [self.execution_id]
             elif node_type in self._AAP_NODE_TYPES:
                 extra_args = [self.execution_id, self._created_by_user_id]
             elif node_type == NodeType.AGENTIC:

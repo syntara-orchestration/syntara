@@ -63,7 +63,6 @@ async def session_app(
     with (
         patch("syntara.core.database.session.engine", test_db_engine),
         patch("syntara.core.database.session.AsyncSessionLocal", test_session_factory),
-        patch("syntara.execution_plane.bridge.AsyncSessionLocal", test_session_factory),
         patch("syntara.api.main.engine", test_db_engine),
         patch("syntara.api.main.AsyncSessionLocal", test_session_factory),
         patch("syntara.audit.outbox.worker.AsyncSessionLocal", test_session_factory),

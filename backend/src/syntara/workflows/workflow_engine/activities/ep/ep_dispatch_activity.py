@@ -3,21 +3,22 @@
 from __future__ import annotations
 
 import asyncio
-import hashlib
 import uuid
 from typing import TYPE_CHECKING, Any, cast
 
 import structlog
+from sqlmodel import select
 from temporalio import activity
 from temporalio.exceptions import ApplicationError
 
 from syntara.core.config.base import get_settings
-from syntara.execution_plane.bridge import mark_dispatch_accepted, persist_dispatch_binding
+from syntara.core.database.session import AsyncSessionLocal
 from syntara.execution_plane.client import (
     ExecutionPlaneHttpClient,
     ExecutionPlaneRejectedError,
     ExecutionPlaneUnavailableError,
 )
+from syntara.workflows.models.activity_execution import ActivityExecution
 from syntara.workflows.workflow_engine.activities.common import HEARTBEAT_STOP_MONITOR
 from syntara.workflows.workflow_engine.constants import (
     DEFAULT_MAX_OUTPUT_BYTES,
@@ -40,11 +41,6 @@ INITIAL_RETRY_DELAY_SECONDS = 0.5
 MAX_RETRY_DELAY_SECONDS = 10.0
 _NODE_TYPE = "script"
 _DEFAULT_TIMEOUT_SECONDS = 300
-
-
-def _stable_request_id(*, workflow_id: str, run_id: str, activity_id: str, namespace: str) -> str:
-    identity = f"{namespace}:{workflow_id}:{run_id}:{activity_id}:generation:1"
-    return hashlib.sha256(identity.encode("utf-8")).hexdigest()
 
 
 def _build_invocation(input_config: dict[str, Any], settings: Any, info: Any) -> dict[str, Any]:  # noqa: ANN401
@@ -73,10 +69,26 @@ def _build_invocation(input_config: dict[str, Any], settings: Any, info: Any) ->
     }
 
 
+async def _lookup_activity_execution_id(execution_id: uuid.UUID, temporal_activity_id: str) -> uuid.UUID:
+    """Look up ActivityExecution.id by execution_id and temporal_activity_id."""
+    async with AsyncSessionLocal() as session:
+        row = (
+            await session.exec(
+                select(ActivityExecution)
+                .where(ActivityExecution.execution_id == execution_id)
+                .where(ActivityExecution.temporal_activity_id == temporal_activity_id)
+            )
+        ).first()
+    if row is None:
+        msg = f"ActivityExecution not found for execution_id={execution_id} activity_id={temporal_activity_id}"
+        raise ApplicationError(msg, type="ContextError", non_retryable=True)
+    return row.id
+
+
 async def _dispatch_to_ep(  # noqa: C901, PLR0915 - service handoff and Temporal retry policy
     input_config: dict[str, Any],
     output_config: dict[str, str] | None,
-    project_id: uuid.UUID,
+    execution_id: uuid.UUID,
 ) -> dict[str, Any] | None:
     """Persist AO's dispatch intent, then idempotently submit it to EP over HTTP."""
     settings = get_settings()
@@ -86,13 +98,9 @@ async def _dispatch_to_ep(  # noqa: C901, PLR0915 - service handoff and Temporal
     if workflow_id is None or run_id is None:
         msg = "Temporal activity context is missing workflow or run identity"
         raise ApplicationError(msg, type="ContextError", non_retryable=True)
-    request_id = _stable_request_id(
-        workflow_id=workflow_id,
-        run_id=run_id,
-        activity_id=info.activity_id,
-        namespace=settings.temporal_namespace,
-    )
-    work_correlation_id = uuid.uuid5(uuid.NAMESPACE_URL, request_id)
+
+    work_item_id = await _lookup_activity_execution_id(execution_id, info.activity_id)
+
     image = settings.node_container_images.get(_NODE_TYPE)
     if not image:
         msg = f"No Execution Plane container image configured for node type '{_NODE_TYPE}'"
@@ -103,17 +111,6 @@ async def _dispatch_to_ep(  # noqa: C901, PLR0915 - service handoff and Temporal
         "output_config": output_config,
     }
 
-    payload = await persist_dispatch_binding(
-        request_id=request_id,
-        project_id=project_id,
-        workflow_id=workflow_id,
-        run_id=run_id,
-        activity_id=info.activity_id,
-        activity_attempt=info.attempt,
-        task_token=info.task_token,
-        payload=payload,
-    )
-
     timeout_seconds = float(input_config.get(ENGINE_TIMEOUT_SECONDS_KEY, 300))
     loop = asyncio.get_running_loop()
     deadline = loop.time() + timeout_seconds
@@ -122,15 +119,13 @@ async def _dispatch_to_ep(  # noqa: C901, PLR0915 - service handoff and Temporal
     while True:
         remaining = deadline - loop.time()
         if remaining <= 0:
-            msg = f"Execution Plane did not accept the script before its deadline (request {request_id})"
+            msg = f"Execution Plane did not accept the script before its deadline (work_item_id={work_item_id})"
             raise ApplicationError(msg, type="ExecutionPlaneUnavailable")
 
         try:
             async with ExecutionPlaneHttpClient(timeout=min(settings.ep_request_timeout_seconds, remaining)) as client:
                 response = await client.submit_work_item(
-                    project_id=project_id,
-                    request_id=request_id,
-                    work_correlation_id=work_correlation_id,
+                    item_id=work_item_id,
                     payload=payload,
                 )
         except ExecutionPlaneRejectedError as exc:
@@ -138,24 +133,18 @@ async def _dispatch_to_ep(  # noqa: C901, PLR0915 - service handoff and Temporal
         except ExecutionPlaneUnavailableError as exc:
             remaining = deadline - loop.time()
             if remaining <= 0:
-                msg = f"Execution Plane remained unavailable until the script deadline (request {request_id})"
+                msg = f"Execution Plane remained unavailable until the script deadline (work_item_id={work_item_id})"
                 raise ApplicationError(msg, type="ExecutionPlaneUnavailable") from exc
             delay = min(retry_delay, remaining)
             activity.logger.warning(
-                "Execution Plane unavailable; retrying with the same request ID in %.1fs",
+                "Execution Plane unavailable; retrying with the same work_item_id in %.1fs",
                 delay,
             )
             await asyncio.sleep(delay)
             retry_delay = min(retry_delay * 2, MAX_RETRY_DELAY_SECONDS)
             continue
 
-        work_item_id = uuid.UUID(str(response["id"]))
         state = str(response["status"])
-        await mark_dispatch_accepted(
-            request_id,
-            work_item_id,
-            terminal=state in {"completed", "failed", "cancelled"},
-        )
         if state == "completed":
             result = response.get("result")
             return result if isinstance(result, dict) else {}
@@ -177,7 +166,7 @@ async def _dispatch_to_ep(  # noqa: C901, PLR0915 - service handoff and Temporal
             msg = f"Execution Plane returned unsupported work state '{state}'"
             raise ApplicationError(msg, type="ExecutionPlaneProtocolError", non_retryable=True)
 
-        activity.logger.info("Script accepted by Execution Plane work_id=%s request_id=%s", work_item_id, request_id)
+        activity.logger.info("Script accepted by Execution Plane work_item_id=%s", work_item_id)
         return None
 
 
@@ -185,7 +174,7 @@ async def _dispatch_to_ep(  # noqa: C901, PLR0915 - service handoff and Temporal
 async def execute_script_activity(
     input_config: dict[str, Any],
     output_config: dict[str, str] | None,
-    project_id: str,
+    execution_id: str,
 ) -> dict[str, Any]:
     """Validate and submit a script, then await AO-owned callback completion."""
     activity.heartbeat({HEARTBEAT_STOP_MONITOR: True})
@@ -196,12 +185,12 @@ async def execute_script_activity(
 
     try:
         ScriptExecutorParameters.model_validate(input_config)
-        project_uuid = uuid.UUID(project_id)
+        execution_uuid = uuid.UUID(execution_id)
     except Exception:  # noqa: BLE001
-        msg = "Script activity configuration or project scope is invalid"
+        msg = "Script activity configuration or execution ID is invalid"
         raise ApplicationError(msg, type="ConfigError", non_retryable=True) from None
 
-    result = await _dispatch_to_ep(input_config, output_config, project_uuid)
+    result = await _dispatch_to_ep(input_config, output_config, execution_uuid)
     if result is None:
         raise_complete_async = cast("Callable[[], Any]", activity.raise_complete_async)
         raise_complete_async()

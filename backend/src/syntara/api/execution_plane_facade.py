@@ -1,25 +1,18 @@
-"""Execution Plane API endpoints."""
+"""Execution Plane read proxy: AO-authorized endpoints that front the EP service."""
 
 from __future__ import annotations
 
-import asyncio
 from datetime import datetime  # noqa: TC003 — Pydantic resolves model annotations at runtime
 from typing import Annotated, Literal
 from uuid import UUID  # noqa: TC003 — Pydantic resolves model annotations at runtime
 
 import structlog
-from fastapi import Depends, HTTPException, Query, Request, status
+from fastapi import Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
 from syntara.authz.dependencies import ProjectScopeFilter
 from syntara.authz.engine import AllowedProjectsResult  # noqa: TC001 — FastAPI resolves dependency annotations
-from syntara.core.config.base import get_settings
-from syntara.core.syntara_router import NO_PERMISSION, SyntaraRouter
-from syntara.execution_plane.bridge import (
-    CompletionBindingNotFoundError,
-    CompletionEventConflictError,
-    persist_completion_event,
-)
+from syntara.core.syntara_router import SyntaraRouter
 from syntara.execution_plane.client import ExecutionPlaneHttpClient, ExecutionPlaneUnavailableError
 
 logger = structlog.stdlib.get_logger(__name__)
@@ -85,29 +78,11 @@ class WorkItemFacadeRead(BaseModel):
     """Safe work state; internal tokens and storage metadata stay private."""
 
     id: UUID
-    project_id: UUID
-    request_id: str
-    work_correlation_id: UUID
     status: str
     result: dict[str, object] | None = None
     created_at: datetime
     claimed_at: datetime | None = None
     completed_at: datetime | None = None
-
-
-class EPCompletionEvent(BaseModel):
-    """Authenticated result event delivered by the independent EP service."""
-
-    event_id: UUID
-    event_schema_version: Literal[1]
-    client_id: str
-    project_id: UUID
-    work_id: UUID
-    request_id: str
-    state_revision: int
-    status: Literal["completed", "failed", "cancelled"]
-    result: dict[str, object]
-    completed_at: datetime
 
 
 @router.get(
@@ -123,7 +98,7 @@ async def list_execution_targets(
     """Read registered execution targets from EP after AO permission checks."""
     try:
         async with ExecutionPlaneHttpClient() as client:
-            items = await _list_in_authorized_projects(
+            items = await _list_ep_resources(
                 client,
                 operation="execution_targets",
                 allowed_projects=allowed_projects,
@@ -151,7 +126,7 @@ async def list_work_items(
     """Read work-item state from EP after AO permission checks."""
     try:
         async with ExecutionPlaneHttpClient() as client:
-            items = await _list_in_authorized_projects(
+            items = await _list_ep_resources(
                 client,
                 operation="work_items",
                 allowed_projects=allowed_projects,
@@ -166,63 +141,16 @@ async def list_work_items(
     return WorkItemListResponse(resources=[WorkItemFacadeRead.model_validate(item) for item in items])
 
 
-async def _list_in_authorized_projects(
+async def _list_ep_resources(
     client: ExecutionPlaneHttpClient,
     *,
     operation: Literal["execution_targets", "work_items"],
     allowed_projects: AllowedProjectsResult,
     limit: int,
 ) -> list[dict[str, object]]:
-    """List EP resources only within AO's resolved project access scope."""
-    if allowed_projects.all_projects:
-        return await _run_list_operation(client, operation, all_projects=True, limit=limit)
-    if not allowed_projects.project_ids:
+    """List EP resources after AO permission checks. EP has no project scope."""
+    if not allowed_projects.all_projects and not allowed_projects.project_ids:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No project-scoped access to EP resources")
-    pages = await asyncio.gather(
-        *(
-            _run_list_operation(client, operation, project_id=project_id, limit=limit)
-            for project_id in allowed_projects.project_ids
-        )
-    )
-    resources = [item for page in pages for item in page]
-    resources.sort(key=lambda item: str(item.get("created_at", "")), reverse=True)
-    return resources[:limit]
-
-
-async def _run_list_operation(
-    client: ExecutionPlaneHttpClient,
-    operation: Literal["execution_targets", "work_items"],
-    *,
-    limit: int,
-    project_id: UUID | None = None,
-    all_projects: bool = False,
-) -> list[dict[str, object]]:
-    """Invoke one supported project-scoped list method on the shared transport."""
     if operation == "work_items":
-        return await client.list_work_items(project_id=project_id, all_projects=all_projects, limit=limit)
-    return await client.list_execution_targets(project_id=project_id, all_projects=all_projects, limit=limit)
-
-
-@router.post(
-    "/events",
-    status_code=status.HTTP_202_ACCEPTED,
-    dependencies=[NO_PERMISSION],
-    operation_id="accept_execution_plane_event",
-    summary="Accept an Execution Plane completion event",
-)
-async def accept_execution_plane_event(request: Request, event: EPCompletionEvent) -> dict[str, str]:
-    """Persist an EP callback before acknowledging delivery to the producer."""
-    settings = get_settings()
-    if (
-        not getattr(request.state, "is_cert_authenticated", False)
-        or getattr(request.state, "cert_cn", None) != settings.ep_callback_service_cn
-    ):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Execution Plane service identity required")
-    try:
-        await persist_completion_event(event.model_dump())
-    except CompletionBindingNotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="No matching AO dispatch is recorded") from exc
-    except CompletionEventConflictError as exc:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
-    logger.info("Persisted Execution Plane completion event", event_id=str(event.event_id))
-    return {"status": "accepted"}
+        return await client.list_work_items(limit=limit)
+    return await client.list_execution_targets(limit=limit)

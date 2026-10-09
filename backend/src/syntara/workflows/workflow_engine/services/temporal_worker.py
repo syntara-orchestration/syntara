@@ -19,7 +19,6 @@ from syntara.core.config.base import get_encryption_key, get_settings
 from syntara.core.database.session import AsyncSessionLocal
 from syntara.core.lib.encryption import key_from_string
 from syntara.core.tls.temporal import build_temporal_tls_config
-from syntara.execution_plane.bridge import run_completion_bridge
 from syntara.execution_plane.integration_sync import run_integration_sync_bridge
 from syntara.telemetry.client import flush_telemetry, initialize_telemetry
 from syntara.workflows.services.activity_update_publisher import ActivityUpdatePublisher
@@ -89,7 +88,6 @@ class TemporalWorkerService:
         self.client: Client | None = None
         self.worker: Worker | None = None
         self._worker_task: asyncio.Task[None] | None = None
-        self._ep_completion_task: asyncio.Task[None] | None = None
         self._ep_integration_sync_task: asyncio.Task[None] | None = None
         self.activity_sync_service: ActivitySyncService | None = None
 
@@ -186,10 +184,6 @@ class TemporalWorkerService:
 
             # Start worker in background task
             self._worker_task = asyncio.create_task(self.worker.run())
-            self._ep_completion_task = asyncio.create_task(
-                run_completion_bridge(self.client),
-                name="ep-completion-bridge",
-            )
             self._ep_integration_sync_task = asyncio.create_task(
                 run_integration_sync_bridge(),
                 name="ep-integration-sync-bridge",
@@ -207,13 +201,6 @@ class TemporalWorkerService:
 
         Waits for in-progress tasks to complete before shutting down.
         """
-        if self._ep_completion_task is not None:
-            self._ep_completion_task.cancel()
-            try:
-                await self._ep_completion_task
-            except asyncio.CancelledError:
-                logger.info("Execution Plane completion bridge stopped")
-            self._ep_completion_task = None
         if self._ep_integration_sync_task is not None:
             self._ep_integration_sync_task.cancel()
             try:

@@ -80,7 +80,7 @@ paths:
       tags:
         - Execution Plane
       summary: Accept an Execution Plane completion event
-      description: Persist an EP callback before acknowledging delivery to the producer.
+      description: Complete the AO async activity named by an EP completion callback; EP retries until 2xx.
       operationId: accept_execution_plane_event
       requestBody:
         content:
@@ -122,17 +122,10 @@ components:
         client_id:
           type: string
           title: Client Id
-        project_id:
-          type: string
-          format: uuid
-          title: Project Id
         work_id:
           type: string
           format: uuid
           title: Work Id
-        request_id:
-          type: string
-          title: Request Id
         state_revision:
           type: integer
           title: State Revision
@@ -142,6 +135,7 @@ components:
             - completed
             - failed
             - cancelled
+            - reconciliation_required
           title: Status
         result:
           additionalProperties: true
@@ -156,9 +150,7 @@ components:
         - event_id
         - event_schema_version
         - client_id
-        - project_id
         - work_id
-        - request_id
         - state_revision
         - status
         - result
@@ -345,17 +337,6 @@ components:
           type: string
           format: uuid
           title: Id
-        project_id:
-          type: string
-          format: uuid
-          title: Project Id
-        request_id:
-          type: string
-          title: Request Id
-        work_correlation_id:
-          type: string
-          format: uuid
-          title: Work Correlation Id
         status:
           type: string
           title: Status
@@ -384,9 +365,6 @@ components:
       type: object
       required:
         - id
-        - project_id
-        - request_id
-        - work_correlation_id
         - status
         - created_at
       title: WorkItemFacadeRead

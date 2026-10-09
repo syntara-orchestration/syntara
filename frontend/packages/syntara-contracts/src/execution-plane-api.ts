@@ -55,7 +55,7 @@ export interface paths {
     put?: never
     /**
      * Accept an Execution Plane completion event
-     * @description Persist an EP callback before acknowledging delivery to the producer.
+     * @description Complete the AO async activity named by an EP completion callback; EP retries until 2xx.
      */
     post: operations['accept_execution_plane_event']
     delete?: never
@@ -86,24 +86,17 @@ export interface components {
       /** Client Id */
       client_id: string
       /**
-       * Project Id
-       * Format: uuid
-       */
-      project_id: string
-      /**
        * Work Id
        * Format: uuid
        */
       work_id: string
-      /** Request Id */
-      request_id: string
       /** State Revision */
       state_revision: number
       /**
        * Status
        * @enum {string}
        */
-      status: 'completed' | 'failed' | 'cancelled'
+      status: 'completed' | 'failed' | 'cancelled' | 'reconciliation_required'
       /** Result */
       result: {
         [key: string]: unknown
@@ -227,18 +220,6 @@ export interface components {
        * Format: uuid
        */
       id: string
-      /**
-       * Project Id
-       * Format: uuid
-       */
-      project_id: string
-      /** Request Id */
-      request_id: string
-      /**
-       * Work Correlation Id
-       * Format: uuid
-       */
-      work_correlation_id: string
       /** Status */
       status: string
       /** Result */

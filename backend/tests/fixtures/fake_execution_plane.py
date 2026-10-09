@@ -8,7 +8,6 @@ import json
 import os
 import sys
 from typing import Any, Self
-from uuid import NAMESPACE_URL, uuid5
 
 
 class FakeExecutionPlaneHttpClient:
@@ -28,18 +27,13 @@ class FakeExecutionPlaneHttpClient:
     async def submit_work_item(
         self,
         *,
-        project_id: object,
-        request_id: str,
-        work_correlation_id: object,
+        item_id: object,
         payload: dict[str, Any],
     ) -> dict[str, Any]:
         """Execute the submitted fixture payload and return the public EP response shape."""
         result, status = await execute_fixture_script(payload)
         return {
-            "id": str(uuid5(NAMESPACE_URL, request_id)),
-            "project_id": str(project_id),
-            "request_id": request_id,
-            "work_correlation_id": str(work_correlation_id),
+            "id": str(item_id),
             "status": status,
             "result": result,
         }
