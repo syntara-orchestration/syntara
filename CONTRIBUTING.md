@@ -111,6 +111,7 @@ checked when the API changes; aggregated by `(Frontend) Required Checks`):
 | `(Frontend) Generate Contracts` | Regenerated contracts when needed |
 | `(Frontend) Checks` | Lint / typecheck / static analysis |
 | `(Frontend) Unit Tests` | Unit tests (sharded) |
+| `(Frontend) Route Baseline` | Committed UI route manifest matches the current route sources; enforced by the required-check aggregate |
 | `(Frontend) Coverage Report` | Coverage merge/report |
 | `(Frontend) Storybook Build` | Storybook build |
 | `(Frontend) Test Container Build` | UI / mock-API image build (no push) |

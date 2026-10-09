@@ -13,7 +13,10 @@ npm run route-baseline:update
 ```
 
 **CI:** `(Frontend) Route Baseline` in `ci-frontend.yml` runs `route-baseline:check`.
-That job is the single contract gate.
+The job is included in `(Frontend) Required Checks`, the required status check for
+frontend CI. When the route-baseline job runs, a failure makes the aggregate
+check fail and blocks the pull request from merging. Change detection skips the
+job when neither frontend code nor contracts changed.
 
 **Layout:** tooling, docs, and `manifest.gen.json` all live in this directory
 (`scripts/route-baseline/`).
