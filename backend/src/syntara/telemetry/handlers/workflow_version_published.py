@@ -38,7 +38,6 @@ class WorkflowVersionPublishedTelemetryHandler(AuditEventHandler[WorkflowVersion
                 WorkflowVersionPublishedTelemetryEvent(
                     workflow_id=event.workflow_id,
                     version=event.version,
-                    workflow_name=event.workflow_name,
                     published_version_id=event.published_version_id,
                     project_id=event.project_id,
                     user_id_hash=user_id_hash,
