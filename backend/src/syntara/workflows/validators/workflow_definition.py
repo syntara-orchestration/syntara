@@ -512,7 +512,10 @@ def _collect_form_field_type_findings(
         location = error.get("loc", ())
         if (
             error.get("type") not in {"union_tag_invalid", "union_tag_not_found"}
-            or len(location) < _FORM_FIELD_TYPE_LOCATION_PARTS
+            # The outer FormField discriminator is located at the field item
+            # itself. Nested discriminators, such as OptionsSource.source,
+            # include additional path parts and must keep their own location.
+            or len(location) != _FORM_FIELD_TYPE_LOCATION_PARTS
             or location[0] != "form_definition"
             or location[1] != "fields"
             or not isinstance(location[2], int)
