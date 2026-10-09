@@ -6,10 +6,12 @@ from typing import Any
 
 from temporalio import workflow
 
+from syntara.core.exceptions import SafeValueError
 from syntara.workflows.models.activity_execution import ActivityStatus
 from syntara.workflows.utils.loop_body_nodes import collect_loop_bodies
 from syntara.workflows.utils.loop_iteration_names import strip_iteration_suffix
 from syntara.workflows.utils.namespace_resolver import NamespaceResolver
+from syntara.workflows.workflow_engine.activities.retry_node_replay_activity import RESTORABLE_SOURCE_STATUSES
 from syntara.workflows.workflow_engine.constants import DEFAULT_ACTIVITY_TIMEOUT_SECONDS
 from syntara.workflows.workflow_engine.graph import ActivityNode, WorkflowGraph
 from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName, LoopState, NodeType
@@ -17,12 +19,25 @@ from syntara.workflows.workflow_engine.models.workflow_definition import Activit
 #: Node types that decide routing rather than producing an output. A retry never
 #: restores these from a source run: skipping one would strand the graph, so
 #: they always execute.
+#: The same set the replay activity filters its query by, as plain strings so it
+#: can be tested against ``_retry_source_statuses`` without an enum conversion per
+#: node. One definition: the workflow and the query must agree on what a retry can
+#: restore, or the workflow skips a replay the activity would have performed.
+_RESTORABLE_SOURCE_STATUS_VALUES = frozenset(status.value for status in RESTORABLE_SOURCE_STATUSES)
+
 _CONTROL_NODE_TYPES = frozenset(
     {
         NodeType.CONDITION,
         NodeType.SWITCH,
         NodeType.LOOP,
         NodeType.WAIT,
+        # An approval routes too, on an approved/rejected port, and a restored one
+        # carries no control data — so ``get_next_activities_by_port(node, None)``
+        # hands back *both* branches and the retry runs the approved and the
+        # rejected path together. An approval gates a human decision, so that is
+        # worse than merely re-prompting: it must execute, like every other
+        # routing node here.
+        NodeType.APPROVAL,
         # A converge decides whether it has enough predecessors to run, so skipping
         # it would strand the nodes waiting on it. It is a control node in every
         # sense that matters here, and leaving it out meant one could be restored —
@@ -258,7 +273,21 @@ class WorkflowRetryMixin:
         which is what writes the row: without them the sync records the replay
         activity's own successful completion and every restored node would be
         reported as COMPLETED.
+
+        The replay is not scheduled at all when the source run has no restorable
+        record for this node. It runs under the node's own activity id, so the
+        event it emits is consumed as *this node's* execution and marks the row
+        terminal; a real execution afterwards is then refused by the sync
+        service's terminal-status guard, leaving the row showing the replay's
+        output and times instead of the real run's. Deciding up front costs
+        nothing: ``_prepare_retry`` already read every source status, so this is
+        a lookup rather than a query, and it saves an activity and a history
+        event for every node that was never replayable.
         """
+        if self._retry_source_statuses.get(node.id) not in _RESTORABLE_SOURCE_STATUS_VALUES:
+            self._retry_replay_candidates.discard(node.id)
+            return None
+
         record = await workflow.execute_activity(
             ActivityName.RETRY_NODE_REPLAY,
             args=[self.retry_context.get("retry_from_execution_id"), node.id],
@@ -266,12 +295,17 @@ class WorkflowRetryMixin:
             start_to_close_timeout=timedelta(seconds=DEFAULT_ACTIVITY_TIMEOUT_SECONDS),
         )
         if record is None:
-            # Nothing to replay, so this node will really execute. Drop it from
-            # the candidates: the sync service waits on a candidate's timestamp,
-            # and waiting here would stall for the full timeout on a node that
-            # is going to report its real execution time anyway.
-            self._retry_replay_candidates.discard(node.id)
-            return None
+            # The status map said this node was restorable but the row is gone —
+            # deleted between _prepare_retry and here. Rare, but the replay event
+            # has already been emitted under the node's id and will be persisted
+            # as this node's execution, so the real run that follows would be
+            # refused by the sync service's terminal-status guard. There is no
+            # safe recovery once it has fired: skipping the node would leave it
+            # never executed, and letting it run would corrupt its row. Raised so
+            # the failure is visible instead of leaving a plausible-looking row
+            # that reports the replay's output forever.
+            msg = f"source record for retry node {node.id} disappeared between classification and replay"
+            raise SafeValueError(msg)
 
         source_status = str(record.get("status") or ActivityStatus.COMPLETED.value)
         output = record.get("output_data") or {}
