@@ -33,12 +33,13 @@ import { SynSelect } from '../SynSelect'
 import { HelpPopover } from './HelpPopover'
 
 const MAX_VARIABLE_LENGTH = 256
-const VARIABLE_PATTERN = /^[a-zA-Z_][a-zA-Z0-9_.]*$/
+const VARIABLE_PATTERN = /^[a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*|\[-?\d+\])*$/
 const RESERVED_NAMES = ['__proto__', 'constructor', 'prototype']
 
 function isValidVariableRef(value: string): boolean {
   if (value.length > MAX_VARIABLE_LENGTH || !VARIABLE_PATTERN.test(value)) return false
-  return !value.split('.').some((part) => RESERVED_NAMES.includes(part))
+  const pathSegments = value.match(/[a-zA-Z_][a-zA-Z0-9_]*/g) ?? []
+  return !pathSegments.some((part) => RESERVED_NAMES.includes(part))
 }
 
 const FieldHelp = () => (
@@ -133,7 +134,9 @@ export function ExpressionCondition(props: ExpressionConditionProps) {
     setIsFieldFocused(false)
     const stripped = editingValue.replace(/^\$\{/, '').replace(/\}$/, '')
     if (stripped && !isValidVariableRef(stripped)) {
-      setLocalFieldError('Invalid variable name. Use letters, numbers, dots, and underscores (e.g. trigger.age).')
+      setLocalFieldError(
+        'Invalid variable name. Use dotted fields and bracketed integers, e.g. trigger.impactedEntities[0].name.'
+      )
       return
     }
     setLocalFieldError(null)
