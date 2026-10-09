@@ -20,7 +20,6 @@ export type WorkflowsListViewProps = Readonly<{
   isPending: boolean
   error: unknown
   onRetry: () => void
-  isFetching?: boolean
   sortedWorkflows: Workflow[]
   hasActiveFilters: boolean
   filterFieldDefinitions: FilterFieldDefinition[]
@@ -46,7 +45,6 @@ export function WorkflowsListView({
   isPending,
   error,
   onRetry,
-  isFetching,
   sortedWorkflows,
   hasActiveFilters,
   filterFieldDefinitions,
@@ -74,7 +72,7 @@ export function WorkflowsListView({
       tabKey={tabKey}
       tabLabel={tabLabel}
       isPending={isPending}
-      isFetching={isFetching}
+      // Omit isFetching: workflows table does not skeleton on refetch; dimming the filter bar flickers on nav.
       error={error}
       errorTitle="Error loading workflows"
       onRetry={onRetry}
