@@ -201,6 +201,7 @@ export function ExtraVariablesField({ editorRef }: ExtraVariablesFieldProps) {
               code={field.value ?? ''}
               onCodeChange={field.onChange}
               onBlur={field.onBlur}
+              onDropText={(text) => editorRef.current?.insertAtCursor(text)}
               language="json"
               height="150px"
               modalTitle="Edit extra variables"
