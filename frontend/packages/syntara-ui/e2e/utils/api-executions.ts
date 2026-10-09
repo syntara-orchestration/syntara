@@ -5,6 +5,17 @@ import { expect, type Page } from '../fixtures'
 
 import { apiRequest, getAuthToken } from './api-core'
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
+function pendingListIncludesName(body: unknown, name: string): boolean {
+  if (!isRecord(body)) return false
+  const resources = body['resources']
+  if (!Array.isArray(resources)) return false
+  return resources.some((row) => isRecord(row) && row['name'] === name)
+}
+
 /**
  * Poll an execution's status via the API until it matches one of the expected values.
  * Retries every 1s until timeout (default 90s). Used to wait for Temporal state
@@ -56,9 +67,7 @@ export async function pollFormPromptVisible(
   const token = options?.token ?? (await getAuthToken(app)) ?? undefined
   await expect(async () => {
     const resp = await apiRequest(app, 'get', '/form_prompts?status=pending&limit=100', { token })
-    const body = (await resp.json()) as { resources?: Array<{ name: string }> }
-    const found = body.resources?.some((r) => r.name === promptName)
-    expect(found).toBe(true)
+    expect(pendingListIncludesName(await resp.json(), promptName)).toBe(true)
   }).toPass({ timeout: options?.timeout ?? 45_000, intervals: [1_000] })
 }
 
