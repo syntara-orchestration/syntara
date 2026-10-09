@@ -1,7 +1,7 @@
 import { Divider, Dropdown, DropdownItem, DropdownList, MenuToggle } from '@patternfly/react-core'
 import type { DropdownProps, MenuToggleElement } from '@patternfly/react-core'
 import { RhUiEllipsisVerticalFillIcon } from '@patternfly/react-icons'
-import { isValidElement, useState } from 'react'
+import { isValidElement, useState, type MouseEvent } from 'react'
 
 import type { NodeMenuAction } from '../../routes/workflows/canvas/nodes/hooks/useNodeMenuActions'
 import { IconLabel } from '../IconLabel'
@@ -69,10 +69,14 @@ export function SynStepMenu(props: Readonly<SynStepMenuProps>) {
               <DropdownItem
                 data-testid={`node-menu-item-${action.id}`}
                 key={action.id}
-                onClick={() => {
+                onClick={(event: MouseEvent) => {
+                  // The menu is portaled to document.body, but the click still bubbles
+                  // through the React tree to the canvas node and opens the step editor.
+                  event.stopPropagation()
                   action.onClick()
                   setIsMenuOpen(false)
                 }}
+                onMouseDown={(event: MouseEvent) => event.stopPropagation()}
                 isDanger={action.variant === 'danger'}
               >
                 {isValidElement(action.icon) ? <IconLabel icon={action.icon}>{action.label}</IconLabel> : action.label}

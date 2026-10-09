@@ -194,6 +194,44 @@ describe('SynStepMenu', () => {
   })
 
   describe('event propagation', () => {
+    it('stops click propagation from a menu item so the parent node is not activated', async () => {
+      const user = userEvent.setup()
+      const parentClickHandler = vi.fn()
+      const itemClickHandler = vi.fn()
+      const actions = [createMenuAction({ label: 'Delete', onClick: itemClickHandler })]
+
+      render(
+        // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions
+        <div onClick={parentClickHandler}>
+          <SynStepMenu menuActions={actions} />
+        </div>
+      )
+
+      await user.click(screen.getByRole('button', { name: /step actions menu/i }))
+      await user.click(await screen.findByRole('menuitem', { name: 'Delete' }))
+
+      expect(itemClickHandler).toHaveBeenCalledTimes(1)
+      expect(parentClickHandler).not.toHaveBeenCalled()
+    })
+
+    it('stops mousedown propagation from a menu item', async () => {
+      const user = userEvent.setup()
+      const parentMouseDownHandler = vi.fn()
+      const actions = [createMenuAction({ label: 'Delete' })]
+
+      render(
+        // eslint-disable-next-line jsx-a11y/no-static-element-interactions
+        <div onMouseDown={parentMouseDownHandler}>
+          <SynStepMenu menuActions={actions} />
+        </div>
+      )
+
+      await user.click(screen.getByRole('button', { name: /step actions menu/i }))
+      await user.click(await screen.findByRole('menuitem', { name: 'Delete' }))
+
+      expect(parentMouseDownHandler).not.toHaveBeenCalled()
+    })
+
     it('stops click propagation', async () => {
       const user = userEvent.setup()
       const parentClickHandler = vi.fn()
