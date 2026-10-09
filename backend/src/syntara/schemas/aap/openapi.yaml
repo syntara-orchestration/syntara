@@ -656,6 +656,7 @@ components:
   schemas:
     AAPOrganization:
       type: object
+      additionalProperties: false
       title: AAPOrganization
       description: Ansible Automation Platform organization resource.
       required:
@@ -671,6 +672,7 @@ components:
 
     AAPJobTemplate:
       type: object
+      additionalProperties: false
       title: AAPJobTemplate
       description: Ansible Automation Platform job template resource.
       required:
@@ -691,6 +693,7 @@ components:
 
     AAPWorkflowJobTemplate:
       type: object
+      additionalProperties: false
       title: AAPWorkflowJobTemplate
       description: Ansible Automation Platform workflow job template resource.
       required:
@@ -711,6 +714,7 @@ components:
 
     AAPSummaryField:
       type: object
+      additionalProperties: false
       title: AAPSummaryField
       description: Summary field with id and name from Ansible Automation Platform summary_fields.
       required:
@@ -734,6 +738,7 @@ components:
 
     AAPJobTemplateDetail:
       type: object
+      additionalProperties: false
       title: AAPJobTemplateDetail
       description: Ansible Automation Platform job template with prompt-on-launch capabilities and default values.
       required:
@@ -923,6 +928,7 @@ components:
 
     AAPWorkflowJobTemplateDetail:
       type: object
+      additionalProperties: false
       title: AAPWorkflowJobTemplateDetail
       description: Ansible Automation Platform workflow job template with prompt-on-launch capabilities and default values.
       required:
@@ -1032,6 +1038,7 @@ components:
 
     AAPInventory:
       type: object
+      additionalProperties: false
       title: AAPInventory
       description: Ansible Automation Platform inventory resource.
       required:
@@ -1052,6 +1059,7 @@ components:
 
     AAPExecutionEnvironment:
       type: object
+      additionalProperties: false
       title: AAPExecutionEnvironment
       description: Ansible Automation Platform execution environment resource.
       required:
@@ -1072,6 +1080,7 @@ components:
 
     AAPCredential:
       type: object
+      additionalProperties: false
       title: AAPCredential
       description: |-
         Ansible Automation Platform credential resource.
@@ -1091,6 +1100,7 @@ components:
 
     AAPInstanceGroup:
       type: object
+      additionalProperties: false
       title: AAPInstanceGroup
       description: Ansible Automation Platform instance group resource.
       required:
@@ -1106,6 +1116,7 @@ components:
 
     AAPLabel:
       type: object
+      additionalProperties: false
       title: AAPLabel
       description: Ansible Automation Platform label resource.
       required:
@@ -1126,6 +1137,7 @@ components:
 
     AAPListResponse_AAPOrganization_:
       type: object
+      additionalProperties: false
       title: "AAPListResponse[AAPOrganization]"
       required:
         - count
@@ -1142,6 +1154,7 @@ components:
 
     AAPListResponse_AAPJobTemplate_:
       type: object
+      additionalProperties: false
       title: "AAPListResponse[AAPJobTemplate]"
       required:
         - count
@@ -1158,6 +1171,7 @@ components:
 
     AAPListResponse_AAPWorkflowJobTemplate_:
       type: object
+      additionalProperties: false
       title: "AAPListResponse[AAPWorkflowJobTemplate]"
       required:
         - count
@@ -1174,6 +1188,7 @@ components:
 
     AAPListResponse_AAPInventory_:
       type: object
+      additionalProperties: false
       title: "AAPListResponse[AAPInventory]"
       required:
         - count
@@ -1190,6 +1205,7 @@ components:
 
     AAPListResponse_AAPExecutionEnvironment_:
       type: object
+      additionalProperties: false
       title: "AAPListResponse[AAPExecutionEnvironment]"
       required:
         - count
@@ -1206,6 +1222,7 @@ components:
 
     AAPListResponse_AAPCredential_:
       type: object
+      additionalProperties: false
       title: "AAPListResponse[AAPCredential]"
       required:
         - count
@@ -1222,6 +1239,7 @@ components:
 
     AAPListResponse_AAPInstanceGroup_:
       type: object
+      additionalProperties: false
       title: "AAPListResponse[AAPInstanceGroup]"
       required:
         - count
@@ -1238,6 +1256,7 @@ components:
 
     AAPListResponse_AAPLabel_:
       type: object
+      additionalProperties: false
       title: "AAPListResponse[AAPLabel]"
       required:
         - count

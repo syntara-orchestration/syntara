@@ -347,6 +347,7 @@ components:
               type: integer
               title: Version
 
+          additionalProperties: false
     SettingUpdate:
       type: object
       title: SettingUpdate
@@ -361,6 +362,7 @@ components:
             - type: integer
             - type: "null"
           title: Expected Version
+      additionalProperties: false
 
     SettingBulkUpdateItem:
       type: object
@@ -380,6 +382,7 @@ components:
             - type: integer
             - type: "null"
           title: Expected Version
+      additionalProperties: false
 
     SettingBulkUpdateRequest:
       type: object
@@ -394,6 +397,7 @@ components:
           title: Updates
           items:
             $ref: "#/components/schemas/SettingBulkUpdateItem"
+      additionalProperties: false
 
     SettingCategoryRead:
       type: object
@@ -425,6 +429,7 @@ components:
           items:
             type: string
           title: Group Names
+      additionalProperties: false
 
     SettingsListResponse:
       allOf:
@@ -447,6 +452,7 @@ components:
         - next: eyJpZCI6Im5leHQifQ
           prev: eyJpZCI6InByZXYifQ
 
+          additionalProperties: false
     CategoriesListResponse:
       type: object
       title: CategoriesListResponse
@@ -459,3 +465,4 @@ components:
           title: Resources
           items:
             $ref: "#/components/schemas/SettingCategoryRead"
+      additionalProperties: false

@@ -460,6 +460,7 @@ components:
               description: Error if the workflow signal failed after a decision. Only present in the decide response; null on subsequent reads.
               title: Signal Delivery Error
 
+          additionalProperties: false
     ApprovalRequestStatus:
       type: string
       title: ApprovalRequestStatus
@@ -592,6 +593,7 @@ components:
             - type: "null"
           title: Approver Group Ids
           description: Group IDs whose members can approve
+      additionalProperties: false
 
     WorkflowContext:
       type: object
@@ -633,6 +635,7 @@ components:
             - $ref: "#/components/schemas/PreviousStepContext"
             - type: 'null'
           description: Previous step context and output
+      additionalProperties: false
 
     PreviousStepContext:
       type: object
@@ -666,6 +669,7 @@ components:
             - type: "null"
           title: Output
           description: Output from the activity (structure varies per activity type)
+      additionalProperties: false
 
     ApprovalDecisionStatus:
       type: string
@@ -702,6 +706,7 @@ components:
             - type: "null"
           title: Notes
           description: Optional notes explaining the decision. Accepts either `notes` or `decision_notes` (the key returned in responses) as the request field name.
+      additionalProperties: false
 
     BatchApprovalDecisionStatus:
       type: string
@@ -739,6 +744,7 @@ components:
             - type: "null"
           title: Notes
           description: Optional notes explaining the decision. Accepts either `notes` or `decision_notes` (the key returned in responses) as the request field name.
+      additionalProperties: false
 
     BatchApprovalRequest:
       type: object
@@ -755,6 +761,7 @@ components:
           items:
             $ref: "#/components/schemas/BatchApprovalDecision"
           description: List of approval decisions to submit
+      additionalProperties: false
 
     BatchApprovalResult:
       type: object
@@ -803,6 +810,7 @@ components:
             - type: "null"
           title: Error
           description: Error message if the decision failed
+      additionalProperties: false
 
     BatchApprovalResponse:
       type: object
@@ -829,6 +837,7 @@ components:
           minimum: 0.0
           title: Total Failed
           description: Number of failed decisions
+      additionalProperties: false
 
     ApprovalListResponse:
       type: object
@@ -868,6 +877,7 @@ components:
             $ref: "#/components/schemas/ApprovalRequestRead"
           title: Resources
           description: Array of resources in current page
+      additionalProperties: false
 
     UserReference:
       $ref: "../base/shared-resources.openapi.yaml#/components/schemas/UserReference"
@@ -893,6 +903,7 @@ components:
           type: string
           description: User's username
           title: Username
+      additionalProperties: false
 
     ApproverGroupSummary:
       type: object
@@ -915,6 +926,7 @@ components:
           type: string
           description: Group's name
           title: Name
+      additionalProperties: false
 
   securitySchemes:
     bearerAuth:

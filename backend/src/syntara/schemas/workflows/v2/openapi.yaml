@@ -914,6 +914,7 @@ components:
           title: Expected Version
           description: >-
             Version the client was editing. If the server's current_version is higher, returns 409 Conflict.
+      additionalProperties: false
     WorkflowVersionUpdate:
       type: object
       title: WorkflowVersionUpdate
@@ -933,6 +934,7 @@ components:
             - type: 'null'
           title: Change Description
           description: Description of changes
+      additionalProperties: false
     WorkflowVersionListResponse:
       type: object
       title: WorkflowVersionListResponse
@@ -971,6 +973,7 @@ components:
           total: 150
         - next: eyJpZCI6Im5leHQifQ
           prev: eyJpZCI6InByZXYifQ
+      additionalProperties: false
     WorkflowListResponse:
       type: object
       required:
@@ -1009,6 +1012,7 @@ components:
           total: 150
         - next: eyJpZCI6Im5leHQifQ
           prev: eyJpZCI6InByZXYifQ
+      additionalProperties: false
     # Note: Approval schemas are in src/syntara/schemas/approvals/openapi.yaml
     WorkflowCreate:
       $ref: ./shared-schemas.yaml#/components/schemas/WorkflowCreate
@@ -1117,6 +1121,7 @@ components:
           type: string
           title: Message
           description: Human-readable status message
+      additionalProperties: false
     WorkflowValidateRequest:
       type: object
       title: WorkflowValidateRequest

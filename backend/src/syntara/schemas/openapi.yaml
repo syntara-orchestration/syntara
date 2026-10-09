@@ -27421,6 +27421,7 @@ components:
             - /invocations/550e8400-e29b-41d4-a716-446655440000
     AAPOrganization:
       type: object
+      additionalProperties: false
       title: AAPOrganization
       description: Ansible Automation Platform organization resource.
       required:
@@ -27435,6 +27436,7 @@ components:
           title: Name
     AAPJobTemplate:
       type: object
+      additionalProperties: false
       title: AAPJobTemplate
       description: Ansible Automation Platform job template resource.
       required:
@@ -27454,6 +27456,7 @@ components:
           title: Description
     AAPWorkflowJobTemplate:
       type: object
+      additionalProperties: false
       title: AAPWorkflowJobTemplate
       description: Ansible Automation Platform workflow job template resource.
       required:
@@ -27473,6 +27476,7 @@ components:
           title: Description
     AAPSummaryField:
       type: object
+      additionalProperties: false
       title: AAPSummaryField
       description: Summary field with id and name from Ansible Automation Platform summary_fields.
       required:
@@ -27494,6 +27498,7 @@ components:
         - check
     AAPJobTemplateDetail:
       type: object
+      additionalProperties: false
       title: AAPJobTemplateDetail
       description: Ansible Automation Platform job template with prompt-on-launch capabilities and default values.
       required:
@@ -27682,6 +27687,7 @@ components:
           description: Default extra variables (YAML format, max 1MB)
     AAPWorkflowJobTemplateDetail:
       type: object
+      additionalProperties: false
       title: AAPWorkflowJobTemplateDetail
       description: Ansible Automation Platform workflow job template with prompt-on-launch capabilities and default values.
       required:
@@ -27790,6 +27796,7 @@ components:
           description: Default extra variables (YAML format, max 1MB)
     AAPInventory:
       type: object
+      additionalProperties: false
       title: AAPInventory
       description: Ansible Automation Platform inventory resource.
       required:
@@ -27809,6 +27816,7 @@ components:
           title: Description
     AAPExecutionEnvironment:
       type: object
+      additionalProperties: false
       title: AAPExecutionEnvironment
       description: Ansible Automation Platform execution environment resource.
       required:
@@ -27828,6 +27836,7 @@ components:
           title: Description
     AAPCredential:
       type: object
+      additionalProperties: false
       title: AAPCredential
       description: |-
         Ansible Automation Platform credential resource.
@@ -27846,6 +27855,7 @@ components:
           title: Name
     AAPInstanceGroup:
       type: object
+      additionalProperties: false
       title: AAPInstanceGroup
       description: Ansible Automation Platform instance group resource.
       required:
@@ -27860,6 +27870,7 @@ components:
           title: Name
     AAPLabel:
       type: object
+      additionalProperties: false
       title: AAPLabel
       description: Ansible Automation Platform label resource.
       required:
@@ -27879,6 +27890,7 @@ components:
           title: Organization
     AAPListResponse_AAPOrganization_:
       type: object
+      additionalProperties: false
       title: AAPListResponse[AAPOrganization]
       required:
         - count
@@ -27894,6 +27906,7 @@ components:
             $ref: '#/components/schemas/AAPOrganization'
     AAPListResponse_AAPJobTemplate_:
       type: object
+      additionalProperties: false
       title: AAPListResponse[AAPJobTemplate]
       required:
         - count
@@ -27909,6 +27922,7 @@ components:
             $ref: '#/components/schemas/AAPJobTemplate'
     AAPListResponse_AAPWorkflowJobTemplate_:
       type: object
+      additionalProperties: false
       title: AAPListResponse[AAPWorkflowJobTemplate]
       required:
         - count
@@ -27924,6 +27938,7 @@ components:
             $ref: '#/components/schemas/AAPWorkflowJobTemplate'
     AAPListResponse_AAPInventory_:
       type: object
+      additionalProperties: false
       title: AAPListResponse[AAPInventory]
       required:
         - count
@@ -27939,6 +27954,7 @@ components:
             $ref: '#/components/schemas/AAPInventory'
     AAPListResponse_AAPExecutionEnvironment_:
       type: object
+      additionalProperties: false
       title: AAPListResponse[AAPExecutionEnvironment]
       required:
         - count
@@ -27954,6 +27970,7 @@ components:
             $ref: '#/components/schemas/AAPExecutionEnvironment'
     AAPListResponse_AAPCredential_:
       type: object
+      additionalProperties: false
       title: AAPListResponse[AAPCredential]
       required:
         - count
@@ -27969,6 +27986,7 @@ components:
             $ref: '#/components/schemas/AAPCredential'
     AAPListResponse_AAPInstanceGroup_:
       type: object
+      additionalProperties: false
       title: AAPListResponse[AAPInstanceGroup]
       required:
         - count
@@ -27984,6 +28002,7 @@ components:
             $ref: '#/components/schemas/AAPInstanceGroup'
     AAPListResponse_AAPLabel_:
       type: object
+      additionalProperties: false
       title: AAPListResponse[AAPLabel]
       required:
         - count
@@ -28001,6 +28020,7 @@ components:
       type: object
       title: GlobalRevocationTimestampRead
       description: Response schema for reading the global revocation timestamp.
+      additionalProperties: false
       properties:
         revoked_before:
           anyOf:
@@ -28023,6 +28043,7 @@ components:
       type: object
       title: RevocationResponse
       description: Response schema for revocation operations.
+      additionalProperties: false
       required:
         - message
       properties:
@@ -28309,6 +28330,7 @@ components:
             - type: 'null'
           title: Approver Group Ids
           description: Group IDs whose members can approve
+      additionalProperties: false
     WorkflowContext:
       type: object
       title: WorkflowContext
@@ -28349,6 +28371,7 @@ components:
             - $ref: '#/components/schemas/PreviousStepContext'
             - type: 'null'
           description: Previous step context and output
+      additionalProperties: false
     PreviousStepContext:
       type: object
       title: PreviousStepContext
@@ -28381,6 +28404,7 @@ components:
             - type: 'null'
           title: Output
           description: Output from the activity (structure varies per activity type)
+      additionalProperties: false
     ApprovalDecisionStatus:
       type: string
       title: ApprovalDecisionStatus
@@ -28415,6 +28439,7 @@ components:
             - type: 'null'
           title: Notes
           description: Optional notes explaining the decision. Accepts either `notes` or `decision_notes` (the key returned in responses) as the request field name.
+      additionalProperties: false
     BatchApprovalDecisionStatus:
       type: string
       title: BatchApprovalDecisionStatus
@@ -28450,6 +28475,7 @@ components:
             - type: 'null'
           title: Notes
           description: Optional notes explaining the decision. Accepts either `notes` or `decision_notes` (the key returned in responses) as the request field name.
+      additionalProperties: false
     BatchApprovalRequest:
       type: object
       title: BatchApprovalRequest
@@ -28465,6 +28491,7 @@ components:
           items:
             $ref: '#/components/schemas/BatchApprovalDecision'
           description: List of approval decisions to submit
+      additionalProperties: false
     BatchApprovalResult:
       type: object
       title: BatchApprovalResult
@@ -28512,6 +28539,7 @@ components:
             - type: 'null'
           title: Error
           description: Error message if the decision failed
+      additionalProperties: false
     BatchApprovalResponse:
       type: object
       title: BatchApprovalResponse
@@ -28537,6 +28565,7 @@ components:
           minimum: 0.0
           title: Total Failed
           description: Number of failed decisions
+      additionalProperties: false
     ApprovalListResponse:
       type: object
       title: ApprovalListResponse
@@ -28575,6 +28604,7 @@ components:
             $ref: '#/components/schemas/ApprovalRequestRead'
           title: Resources
           description: Array of resources in current page
+      additionalProperties: false
     ApproverUserSummary:
       type: object
       title: ApproverUserSummary
@@ -28596,6 +28626,7 @@ components:
           type: string
           description: User's username
           title: Username
+      additionalProperties: false
     ApproverGroupSummary:
       type: object
       title: ApproverGroupSummary
@@ -28617,10 +28648,12 @@ components:
           type: string
           description: Group's name
           title: Name
+      additionalProperties: false
     LoginRequest:
       type: object
       title: LoginRequest
       description: Login request with username and password.
+      additionalProperties: false
       required:
         - username
         - password
@@ -28638,6 +28671,7 @@ components:
       type: object
       title: AccessTokenResponse
       description: Access token response (refresh token is sent via HttpOnly cookie).
+      additionalProperties: false
       required:
         - access_token
         - expires_in
@@ -28659,6 +28693,7 @@ components:
       type: object
       title: CsrfTokenResponse
       description: CSRF form token response.
+      additionalProperties: false
       required:
         - csrf_token
       properties:
@@ -28670,6 +28705,7 @@ components:
       type: object
       title: WebSocketTicketResponse
       description: Response for the WebSocket ticket exchange endpoint.
+      additionalProperties: false
       required:
         - ticket
         - expires_in
@@ -28686,6 +28722,7 @@ components:
       type: object
       title: UserInfo
       description: Current user information derived from access token claims.
+      additionalProperties: false
       required:
         - id
         - username
@@ -28719,6 +28756,7 @@ components:
       type: object
       title: AuthProviderInfo
       description: Public identity provider info for the login page.
+      additionalProperties: false
       required:
         - id
         - name
@@ -28746,6 +28784,7 @@ components:
       type: object
       title: AuthProvidersResponse
       description: Response for the public providers listing endpoint.
+      additionalProperties: false
       properties:
         resources:
           type: array
@@ -28756,6 +28795,7 @@ components:
     Body_token:
       type: object
       title: Body_token
+      additionalProperties: false
       required:
         - grant_type
       properties:
@@ -28816,6 +28856,7 @@ components:
           default: false
           description: |
             When true, allow if the user has the permission in any project (project-scoped policies match without a concrete resource_project). Mutually exclusive with a non-empty resource_project. Default false preserves strict project matching — empty resource_project alone is never a wildcard.
+      additionalProperties: false
     CanIResponse:
       type: object
       title: Can I Response
@@ -28847,6 +28888,7 @@ components:
           type: string
           title: Denied By
           description: Name of the deny policy (empty if allowed)
+      additionalProperties: false
     WhoCanRequest:
       type: object
       title: WhoCanRequest
@@ -28910,6 +28952,7 @@ components:
           description: Project scope of the resource (project name or UUID)
           default: ''
           x-query-param: true
+      additionalProperties: false
     WhoCanUser:
       type: object
       title: WhoCanUser
@@ -28925,6 +28968,7 @@ components:
         username:
           type: string
           title: Username
+      additionalProperties: false
     WhoCanResponse:
       type: object
       title: WhoCanResponse
@@ -28963,6 +29007,7 @@ components:
           total: 150
         - next: eyJpZCI6Im5leHQifQ
           prev: eyJpZCI6InByZXYifQ
+      additionalProperties: false
     PermissionEntry:
       type: object
       title: PermissionEntry
@@ -28992,6 +29037,7 @@ components:
           default: ''
           title: Project
           description: Project scope (empty for system-level)
+      additionalProperties: false
     WhatCanIRequest:
       type: object
       title: WhatCanIRequest
@@ -29022,6 +29068,7 @@ components:
           title: Include Total
           description: Include total count in response (expensive)
           default: false
+      additionalProperties: false
     WhatCanIResponse:
       type: object
       title: WhatCanIResponse
@@ -29060,6 +29107,7 @@ components:
           maxItems: 100
           title: Resources
           description: Array of resources in current page
+      additionalProperties: false
     ResourceActionsResponse:
       type: object
       title: Resource Actions Response
@@ -29075,6 +29123,7 @@ components:
             type: array
             items:
               type: string
+      additionalProperties: false
     ValidateNameResponse:
       type: object
       title: ValidateNameResponse
@@ -29787,6 +29836,7 @@ components:
         - project_id
       title: CredentialCreate
       type: object
+      additionalProperties: false
     CredentialUpdate:
       description: Schema for partially updating a credential. $encrypted$ preserves existing values.
       properties:
@@ -29829,6 +29879,7 @@ components:
           title: Project Id
       title: CredentialUpdate
       type: object
+      additionalProperties: false
     CredentialRead:
       description: Schema for credential API responses. Secret fields masked as $encrypted$.
       additionalProperties: false
@@ -30057,6 +30108,7 @@ components:
       type: object
       title: FileStorageStatusResponse
       description: Response model for GET /files/storage_status endpoint.
+      additionalProperties: false
       required:
         - status
       properties:
@@ -30069,6 +30121,7 @@ components:
       type: object
       title: UploadFilesBody
       description: Request body for POST /files endpoint.
+      additionalProperties: false
       required:
         - files
         - project_id
@@ -30090,6 +30143,7 @@ components:
       type: object
       title: FileUploadResponse
       description: Response model for POST /api/v1/files endpoint.
+      additionalProperties: false
       required:
         - file_ids
         - files
@@ -30118,6 +30172,7 @@ components:
         Security Note:
             file_path is intentionally excluded from this model to prevent
             exposing internal filesystem paths in API responses.
+      additionalProperties: false
       required:
         - file_id
         - filename
@@ -30163,6 +30218,7 @@ components:
       type: object
       title: FileDetailResponse
       description: Response model for GET /api/v1/files/{file_id} endpoint.
+      additionalProperties: false
       required:
         - file_id
         - filename
@@ -30215,6 +30271,7 @@ components:
       type: object
       title: FilesMetadataResponse
       description: Response model for GET /files/metadata endpoint.
+      additionalProperties: false
       required:
         - files
       properties:
@@ -30724,6 +30781,7 @@ components:
               oidc: '#/components/schemas/OIDCConfiguration'
           oneOf:
             - $ref: '#/components/schemas/OIDCConfiguration'
+      additionalProperties: false
     IdentityProviderUpdate:
       type: object
       title: IdentityProviderUpdate
@@ -30841,6 +30899,7 @@ components:
         - configuration
       type: object
     IdentityProviderListResponse:
+      additionalProperties: false
       title: IdentityProviderListResponse
       description: Paginated list response for identity providers.
       properties:
@@ -30908,6 +30967,7 @@ components:
               oidc: '#/components/schemas/OIDCConfiguration'
           oneOf:
             - $ref: '#/components/schemas/OIDCConfiguration'
+      additionalProperties: false
     OIDCTestResult:
       type: object
       title: OIDCTestResult
@@ -30949,6 +31009,7 @@ components:
           type: boolean
           default: false
           title: End Session Endpoint Supported
+      additionalProperties: false
     AAPOIDCSetupRequest:
       type: object
       title: AAPOIDCSetupRequest
@@ -31040,6 +31101,7 @@ components:
           type: string
           format: date-time
           title: Created At
+      additionalProperties: false
     IntegrationProjectAssignmentListResponse:
       properties:
         next:
@@ -31078,6 +31140,7 @@ components:
           prev: eyJpZCI6InByZXYifQ
       title: IntegrationProjectAssignmentListResponse
       description: Paginated response for listing project assignments.
+      additionalProperties: false
     IntegrationListResponse:
       title: IntegrationListResponse
       description: Paginated list response for integrations.
@@ -31116,6 +31179,7 @@ components:
           total: 150
         - next: eyJpZCI6Im5leHQifQ
           prev: eyJpZCI6InByZXYifQ
+      additionalProperties: false
     IntegrationCreate:
       description: Schema for creating a new integration.
       additionalProperties: false
@@ -31229,6 +31293,7 @@ components:
         - name
       title: InitialToolSelection
       type: object
+      additionalProperties: false
     InitialModelSelection:
       description: A model from the discover step with the user's enabled/disabled choice.
       properties:
@@ -31266,6 +31331,7 @@ components:
         - name
       title: InitialModelSelection
       type: object
+      additionalProperties: false
     IntegrationUpdate:
       description: Schema for partially updating an integration (user-facing).
       additionalProperties: false
@@ -31657,6 +31723,7 @@ components:
         - name
       title: DiscoveredLLMModel
       type: object
+      additionalProperties: false
     DiscoveredToolParameter:
       description: A parameter belonging to a discovered tool.
       properties:
@@ -31679,6 +31746,7 @@ components:
         - name
       title: DiscoveredToolParameter
       type: object
+      additionalProperties: false
     DiscoveredTool:
       description: |-
         A tool discovered from an MCP server.
@@ -31705,6 +31773,7 @@ components:
         - name
       title: DiscoveredTool
       type: object
+      additionalProperties: false
     HealthCheckErrorType:
       description: Classification of health check failures.
       type: string
@@ -31742,6 +31811,7 @@ components:
         - checked_at
       title: ValidateResult
       type: object
+      additionalProperties: false
     DiscoverResult:
       description: |-
         Result of a resource-discovery operation (discover endpoint).
@@ -31784,6 +31854,7 @@ components:
         - checked_at
       title: DiscoverResult
       type: object
+      additionalProperties: false
     IntegrationRefreshStatus:
       type: string
       enum:
@@ -31828,6 +31899,7 @@ components:
         - missing_count
       title: RefreshResult
       type: object
+      additionalProperties: false
     LLMModelListResponse:
       title: LLMModelListResponse
       description: Paginated response for LLM models.
@@ -31866,6 +31938,7 @@ components:
           total: 150
         - next: eyJpZCI6Im5leHQifQ
           prev: eyJpZCI6InByZXYifQ
+      additionalProperties: false
     LLMModelRead:
       type: object
       title: LLMModelRead
@@ -31926,6 +31999,7 @@ components:
               format: date-time
             - type: 'null'
           title: Updated At
+      additionalProperties: false
     ModelCapabilityProfile:
       type: object
       title: ModelCapabilityProfile
@@ -32061,6 +32135,7 @@ components:
             - type: boolean
             - type: 'null'
           title: Temperature
+      additionalProperties: false
     LLMModelUpdate:
       type: object
       title: LLMModelUpdate
@@ -32076,6 +32151,7 @@ components:
             - type: boolean
             - type: 'null'
           title: Is Default
+      additionalProperties: false
     LLMModelBulkUpdate:
       type: object
       title: LLMModelBulkUpdate
@@ -32095,6 +32171,7 @@ components:
           type: boolean
           title: Enabled
           description: New enabled state
+      additionalProperties: false
     LLMModelBulkUpdateResponse:
       type: object
       title: LLMModelBulkUpdateResponse
@@ -32117,7 +32194,9 @@ components:
           format: date-time
           title: Updated At
           description: Timestamp of the update
+      additionalProperties: false
     ToolListResponse:
+      additionalProperties: false
       title: ToolListResponse
       description: Paginated list response for tools.
       examples:
@@ -32344,6 +32423,7 @@ components:
         - updated_count
         - skipped_count
         - updated_at
+      additionalProperties: false
     ComponentKPISummary:
       properties:
         component:
@@ -32422,6 +32502,7 @@ components:
         - metric_type
         - value
       title: MetricRecord
+      additionalProperties: false
     MetricType:
       type: string
       enum:
@@ -32645,6 +32726,7 @@ components:
           default: {}
           additionalProperties: true
           title: Labels
+      additionalProperties: false
     ProjectUpdate:
       type: object
       title: ProjectUpdate
@@ -32669,6 +32751,7 @@ components:
               additionalProperties: true
             - type: 'null'
           title: Labels
+      additionalProperties: false
     ProjectRead:
       title: ProjectRead
       description: Response body for a project.
@@ -32728,6 +32811,7 @@ components:
     ProjectListResponse:
       title: ProjectListResponse
       description: Paginated list response for projects.
+      additionalProperties: false
       properties:
         next:
           anyOf:
@@ -32793,6 +32877,7 @@ components:
           additionalProperties:
             type: string
           title: Labels
+      additionalProperties: false
     ProjectPolicyCreate:
       type: object
       title: ProjectPolicyCreate
@@ -32823,6 +32908,7 @@ components:
           additionalProperties:
             type: string
           title: Labels
+      additionalProperties: false
     WorkflowListResponse:
       type: object
       required:
@@ -32861,6 +32947,7 @@ components:
           total: 150
         - next: eyJpZCI6Im5leHQifQ
           prev: eyJpZCI6InByZXYifQ
+      additionalProperties: false
     ProjectCredentialCreate:
       type: object
       title: ProjectCredentialCreate
@@ -32898,6 +32985,7 @@ components:
             type: string
           title: Labels
           description: Key-value labels
+      additionalProperties: false
     ServiceAccountCreate:
       properties:
         name:
@@ -32924,6 +33012,7 @@ components:
         - project_id
       title: ServiceAccountCreate
       description: Schema for creating a new service account.
+      additionalProperties: false
     ServiceAccountListResponse:
       properties:
         next:
@@ -32967,6 +33056,7 @@ components:
           total: 150
         - next: eyJpZCI6Im5leHQifQ
           prev: eyJpZCI6InByZXYifQ
+      additionalProperties: false
     ServiceAccountRead:
       properties:
         id:
@@ -33035,6 +33125,7 @@ components:
         - updated_at
       title: ServiceAccountRead
       description: Schema for service account responses.
+      additionalProperties: false
     ServiceAccountStatus:
       type: string
       enum:
@@ -33069,6 +33160,7 @@ components:
       type: object
       title: ServiceAccountUpdate
       description: Schema for updating a service account (PATCH).
+      additionalProperties: false
     ServiceAccountCredentialType:
       type: string
       enum:
@@ -33106,6 +33198,7 @@ components:
         - credential_type
       title: ServiceAccountCredentialCreate
       description: Schema for creating a new service account credential.
+      additionalProperties: false
     ServiceAccountCredentialRead:
       properties:
         id:
@@ -33178,6 +33271,7 @@ components:
         - updated_at
       title: ServiceAccountCredentialRead
       description: Schema for credential responses (excludes secrets).
+      additionalProperties: false
     ServiceAccountCredentialCreateResponse:
       properties:
         id:
@@ -33256,6 +33350,7 @@ components:
         - updated_at
       title: ServiceAccountCredentialCreateResponse
       description: Schema for the create response — includes one-time plaintext secret(s).
+      additionalProperties: false
     ServiceAccountCredentialRotateRequest:
       properties:
         grace_period_seconds:
@@ -33269,6 +33364,7 @@ components:
       type: object
       title: ServiceAccountCredentialRotateRequest
       description: Schema for rotating a credential's secret.
+      additionalProperties: false
     ServiceAccountCredentialRotateResponse:
       properties:
         id:
@@ -33347,6 +33443,7 @@ components:
         - updated_at
       title: ServiceAccountCredentialRotateResponse
       description: Schema for the rotate response — same shape as create response.
+      additionalProperties: false
     ServiceAccountCredentialListResponse:
       properties:
         next:
@@ -33400,6 +33497,7 @@ components:
           total: 150
         - next: eyJpZCI6Im5leHQifQ
           prev: eyJpZCI6InByZXYifQ
+      additionalProperties: false
     SettingValueType:
       type: string
       title: SettingValueType
@@ -33532,6 +33630,7 @@ components:
             - type: integer
             - type: 'null'
           title: Expected Version
+      additionalProperties: false
     SettingBulkUpdateItem:
       type: object
       title: SettingBulkUpdateItem
@@ -33550,6 +33649,7 @@ components:
             - type: integer
             - type: 'null'
           title: Expected Version
+      additionalProperties: false
     SettingBulkUpdateRequest:
       type: object
       title: SettingBulkUpdateRequest
@@ -33563,6 +33663,7 @@ components:
           title: Updates
           items:
             $ref: '#/components/schemas/SettingBulkUpdateItem'
+      additionalProperties: false
     SettingCategoryRead:
       type: object
       title: SettingCategoryRead
@@ -33593,6 +33694,7 @@ components:
           items:
             type: string
           title: Group Names
+      additionalProperties: false
     SettingsListResponse:
       title: SettingsListResponse
       description: Paginated list response for runtime settings.
@@ -33601,6 +33703,7 @@ components:
           total: 150
         - next: eyJpZCI6Im5leHQifQ
           prev: eyJpZCI6InByZXYifQ
+          additionalProperties: false
       properties:
         next:
           anyOf:
@@ -33643,6 +33746,7 @@ components:
           title: Resources
           items:
             $ref: '#/components/schemas/SettingCategoryRead'
+      additionalProperties: false
     ToolStatus:
       type: string
       title: ToolStatus
@@ -33752,6 +33856,7 @@ components:
       additionalProperties: false
     UserCreate:
       type: object
+      additionalProperties: false
       title: UserCreate
       description: |-
         Schema for creating a new local user (POST /users).
@@ -33811,6 +33916,7 @@ components:
           title: Group Names
     UserUpdate:
       type: object
+      additionalProperties: false
       title: UserUpdate
       description: |-
         Schema for updating a user (PATCH /users/{id}).
@@ -33872,6 +33978,7 @@ components:
       description: Authentication type for users.
     UserRead:
       type: object
+      additionalProperties: false
       title: UserRead
       description: |-
         Schema for user response (GET /users/{id}).
@@ -33975,6 +34082,7 @@ components:
           prev: eyJpZCI6InByZXYifQ
     UserGroupsSet:
       type: object
+      additionalProperties: false
       title: UserGroupsSet
       description: |-
         Schema for declaratively setting a user's group memberships (PUT /users/{id}/groups).
@@ -33991,6 +34099,7 @@ components:
           title: Group Ids
     UserIdentityRead:
       type: object
+      additionalProperties: false
       title: UserIdentityRead
       description: Schema for user identity response.
       required:
@@ -34040,6 +34149,7 @@ components:
           title: Provider Name
     UserIdentityListResponse:
       type: object
+      additionalProperties: false
       title: UserIdentityListResponse
       description: Paginated list of user identities.
       required:
@@ -34078,6 +34188,7 @@ components:
           prev: eyJpZCI6InByZXYifQ
     UserIdentityAttach:
       type: object
+      additionalProperties: false
       title: UserIdentityAttach
       description: Schema for attaching an identity to a user.
       required:
@@ -34089,6 +34200,7 @@ components:
           title: Identity Id
     GroupCreate:
       type: object
+      additionalProperties: false
       title: GroupCreate
       description: Schema for creating a new group (POST /groups).
       required:
@@ -34109,6 +34221,7 @@ components:
           title: Description
     GroupUpdate:
       type: object
+      additionalProperties: false
       title: GroupUpdate
       description: |-
         Schema for updating a group (PATCH /groups/{id}).
@@ -34202,6 +34315,7 @@ components:
       type: object
     MembershipSource:
       type: object
+      additionalProperties: false
       title: MembershipSource
       description: Describes how a user got membership in a group.
       required:
@@ -34299,6 +34413,7 @@ components:
       type: object
     GroupMemberRead:
       type: object
+      additionalProperties: false
       title: GroupMemberRead
       description: User response with membership source info for a specific group.
       required:
@@ -34481,6 +34596,7 @@ components:
           prev: eyJpZCI6InByZXYifQ
     GroupMemberAdd:
       type: object
+      additionalProperties: false
       title: GroupMemberAdd
       description: Schema for adding a member to a group (POST /groups/{id}/members).
       required:
@@ -34493,6 +34609,7 @@ components:
           title: User Id
     GroupMemberAddResponse:
       type: object
+      additionalProperties: false
       title: GroupMemberAddResponse
       description: Response schema for adding a member to a group.
       properties:
@@ -34503,6 +34620,7 @@ components:
           title: Message
     UserDirectoryEntry:
       type: object
+      additionalProperties: false
       title: UserDirectoryEntry
       description: Lightweight user record for directory lookups.
       required:
@@ -34518,6 +34636,7 @@ components:
           title: Username
     GroupDirectoryEntry:
       type: object
+      additionalProperties: false
       title: GroupDirectoryEntry
       description: Lightweight group record for directory lookups.
       required:
@@ -34533,6 +34652,7 @@ components:
           title: Name
     ResourcesResponse_UserDirectoryEntry_:
       type: object
+      additionalProperties: false
       title: ResourcesResponse[UserDirectoryEntry]
       examples:
         - next: eyJpZCI6InV1aWQifQ
@@ -34570,6 +34690,7 @@ components:
           maxItems: 100
     ResourcesResponse_GroupDirectoryEntry_:
       type: object
+      additionalProperties: false
       title: ResourcesResponse[GroupDirectoryEntry]
       examples:
         - next: eyJpZCI6InV1aWQifQ
@@ -35587,6 +35708,7 @@ components:
             - type: 'null'
           title: Expected Version
           description: Version the client was editing. If the server's current_version is higher, returns 409 Conflict.
+      additionalProperties: false
     WorkflowVersionUpdate:
       type: object
       title: WorkflowVersionUpdate
@@ -35606,6 +35728,7 @@ components:
             - type: 'null'
           title: Change Description
           description: Description of changes
+      additionalProperties: false
     WorkflowVersionListResponse:
       type: object
       title: WorkflowVersionListResponse
@@ -35644,6 +35767,7 @@ components:
           total: 150
         - next: eyJpZCI6Im5leHQifQ
           prev: eyJpZCI6InByZXYifQ
+      additionalProperties: false
     WorkflowCreate:
       type: object
       title: WorkflowCreate
@@ -37224,6 +37348,7 @@ components:
           type: string
           title: Message
           description: Human-readable status message
+      additionalProperties: false
     WorkflowValidateRequest:
       type: object
       title: WorkflowValidateRequest

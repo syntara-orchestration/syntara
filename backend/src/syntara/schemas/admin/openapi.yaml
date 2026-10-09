@@ -182,6 +182,7 @@ components:
       type: object
       title: GlobalRevocationTimestampRead
       description: Response schema for reading the global revocation timestamp.
+      additionalProperties: false
       properties:
         revoked_before:
           anyOf:
@@ -205,6 +206,7 @@ components:
       type: object
       title: RevocationResponse
       description: Response schema for revocation operations.
+      additionalProperties: false
       required:
         - message
       properties:

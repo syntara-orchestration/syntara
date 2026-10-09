@@ -291,6 +291,7 @@ components:
             Mutually exclusive with a non-empty resource_project.
             Default false preserves strict project matching — empty
             resource_project alone is never a wildcard.
+      additionalProperties: false
 
     CanIResponse:
       type: object
@@ -323,6 +324,7 @@ components:
           type: string
           title: Denied By
           description: Name of the deny policy (empty if allowed)
+      additionalProperties: false
 
     WhoCanRequest:
       type: object
@@ -387,6 +389,7 @@ components:
           description: Project scope of the resource (project name or UUID)
           default: ''
           x-query-param: true
+      additionalProperties: false
 
     WhoCanUser:
       type: object
@@ -403,6 +406,7 @@ components:
         username:
           type: string
           title: Username
+      additionalProperties: false
 
     WhoCanResponse:
       type: object
@@ -442,6 +446,7 @@ components:
           total: 150
         - next: eyJpZCI6Im5leHQifQ
           prev: eyJpZCI6InByZXYifQ
+      additionalProperties: false
 
     PermissionEntry:
       type: object
@@ -472,6 +477,7 @@ components:
           default: ""
           title: Project
           description: Project scope (empty for system-level)
+      additionalProperties: false
 
     WhatCanIRequest:
       type: object
@@ -503,6 +509,7 @@ components:
           title: Include Total
           description: Include total count in response (expensive)
           default: false
+      additionalProperties: false
 
     WhatCanIResponse:
       type: object
@@ -542,6 +549,7 @@ components:
           maxItems: 100
           title: Resources
           description: Array of resources in current page
+      additionalProperties: false
 
     ResourceActionsResponse:
       type: object
@@ -558,6 +566,7 @@ components:
             type: array
             items:
               type: string
+      additionalProperties: false
 
     ValidateNameResponse:
       type: object

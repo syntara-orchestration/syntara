@@ -802,6 +802,7 @@ components:
               oidc: '#/components/schemas/OIDCConfiguration'
           oneOf:
             - $ref: '#/components/schemas/OIDCConfiguration'
+      additionalProperties: false
 
     IdentityProviderUpdate:
       type: object
@@ -879,6 +880,7 @@ components:
               description: Identity provider configuration
 
     IdentityProviderListResponse:
+      additionalProperties: false
       allOf:
         - $ref: "../base/shared-resources.openapi.yaml#/components/schemas/ResourcesResponseBase"
         - type: object
@@ -922,6 +924,7 @@ components:
               oidc: '#/components/schemas/OIDCConfiguration'
           oneOf:
             - $ref: '#/components/schemas/OIDCConfiguration'
+      additionalProperties: false
 
     OIDCTestResult:
       type: object
@@ -964,6 +967,7 @@ components:
           type: boolean
           default: false
           title: End Session Endpoint Supported
+      additionalProperties: false
 
     AAPOIDCSetupRequest:
       type: object
