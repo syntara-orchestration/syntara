@@ -4,11 +4,11 @@ import { useCallback, useState } from 'react'
 import { approvalsClient } from '../../../client'
 import { findApprovalForCanvasNode } from '../../approvals/approvalNodeId'
 
-type UseFetchApprovalForNodeResult = {
+type UseFetchApprovalForStepResult = {
   /** Whether a fetch is currently in progress. */
   isLoading: boolean
-  /** Fetch the pending approval for the given node. Returns the approval if found. */
-  fetchForNode: (approvalNodeId: string) => Promise<Approval | null>
+  /** Fetch the pending approval for the given step. Returns the approval if found. */
+  fetchForStep: (approvalNodeId: string) => Promise<Approval | null>
   /** Reset loading state (e.g., when closing the review view). */
   clear: () => void
 }
@@ -18,9 +18,9 @@ type UseFetchApprovalForNodeResult = {
  * then filters client-side by approval_node_id to find the matching approval.
  *
  * This avoids polling — the fetch is triggered on demand when the user clicks
- * a waiting approval node on the canvas.
+ * a waiting approval step on the canvas.
  */
-export function useFetchApprovalForNode(executionId: string): UseFetchApprovalForNodeResult {
+export function useFetchApprovalForStep(executionId: string): UseFetchApprovalForStepResult {
   const [isLoading, setIsLoading] = useState(false)
 
   const { refetch } = approvalsClient.useQuery('get', '/approvals', {
@@ -33,7 +33,7 @@ export function useFetchApprovalForNode(executionId: string): UseFetchApprovalFo
     enabled: false, // Only fetch on demand
   })
 
-  const fetchForNode = useCallback(
+  const fetchForStep = useCallback(
     async (approvalNodeId: string): Promise<Approval | null> => {
       if (!executionId) return null
       setIsLoading(true)
@@ -54,5 +54,5 @@ export function useFetchApprovalForNode(executionId: string): UseFetchApprovalFo
     setIsLoading(false)
   }, [])
 
-  return { isLoading, fetchForNode, clear }
+  return { isLoading, fetchForStep, clear }
 }

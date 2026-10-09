@@ -4,7 +4,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest'
 
 import { FlowNodeType } from '../../../constants'
 
-import { useExecutionNodeClick } from './useExecutionNodeClick'
+import { useExecutionStepClick } from './useExecutionStepClick'
 
 // Mock useExecutionApprovals
 const mockHandleApprovalClick = vi.fn()
@@ -49,19 +49,19 @@ function makeNode(
   }
 }
 
-describe('useExecutionNodeClick', () => {
+describe('useExecutionStepClick', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
   it('returns null selectedNodeId initially', () => {
-    const { result } = renderHook(() => useExecutionNodeClick('exec-1'))
+    const { result } = renderHook(() => useExecutionStepClick('exec-1'))
     expect(result.current.selectedNodeId).toBeNull()
     expect(result.current.selectedNodeName).toBeNull()
   })
 
   it('delegates approval node clicks to useExecutionApprovals', () => {
-    const { result } = renderHook(() => useExecutionNodeClick('exec-1'))
+    const { result } = renderHook(() => useExecutionStepClick('exec-1'))
     const approvalNode = makeNode('approval-1', 'waiting', { type: FlowNodeType.APPROVAL })
 
     act(() => {
@@ -74,7 +74,7 @@ describe('useExecutionNodeClick', () => {
   })
 
   it('selects a completed node on click', () => {
-    const { result } = renderHook(() => useExecutionNodeClick('exec-1'))
+    const { result } = renderHook(() => useExecutionStepClick('exec-1'))
     const node = makeNode('step-1', 'completed', { name: 'Run Script' })
 
     act(() => {
@@ -86,7 +86,7 @@ describe('useExecutionNodeClick', () => {
   })
 
   it('selects a failed node on click', () => {
-    const { result } = renderHook(() => useExecutionNodeClick('exec-1'))
+    const { result } = renderHook(() => useExecutionStepClick('exec-1'))
     const node = makeNode('step-2', 'failed', { name: 'Deploy' })
 
     act(() => {
@@ -98,7 +98,7 @@ describe('useExecutionNodeClick', () => {
   })
 
   it('keeps selection when clicking the same node again', () => {
-    const { result } = renderHook(() => useExecutionNodeClick('exec-1'))
+    const { result } = renderHook(() => useExecutionStepClick('exec-1'))
     const node = makeNode('step-1', 'completed', { name: 'Run Script' })
 
     act(() => {
@@ -114,7 +114,7 @@ describe('useExecutionNodeClick', () => {
   })
 
   it('switches selection when clicking a different node', () => {
-    const { result } = renderHook(() => useExecutionNodeClick('exec-1'))
+    const { result } = renderHook(() => useExecutionStepClick('exec-1'))
     const node1 = makeNode('step-1', 'completed', { name: 'First' })
     const node2 = makeNode('step-2', 'completed', { name: 'Second' })
 
@@ -131,7 +131,7 @@ describe('useExecutionNodeClick', () => {
   })
 
   it('ignores clicks on pending/running nodes', () => {
-    const { result } = renderHook(() => useExecutionNodeClick('exec-1'))
+    const { result } = renderHook(() => useExecutionStepClick('exec-1'))
 
     act(() => {
       result.current.handleNodeClick(fakeEvent, makeNode('step-1', 'pending'))
@@ -145,7 +145,7 @@ describe('useExecutionNodeClick', () => {
   })
 
   it('uses node id as name when data.name is not a string', () => {
-    const { result } = renderHook(() => useExecutionNodeClick('exec-1'))
+    const { result } = renderHook(() => useExecutionStepClick('exec-1'))
     const node = {
       id: 'step-no-name',
       data: { __executionState: { status: 'completed' } },
@@ -160,7 +160,7 @@ describe('useExecutionNodeClick', () => {
   })
 
   it('deselectNode clears selectedNodeId and selectedNodeName', () => {
-    const { result } = renderHook(() => useExecutionNodeClick('exec-1'))
+    const { result } = renderHook(() => useExecutionStepClick('exec-1'))
     const node = makeNode('step-1', 'completed', { name: 'Run Script' })
 
     act(() => {
@@ -176,7 +176,7 @@ describe('useExecutionNodeClick', () => {
   })
 
   it('exposes clearApprovals from useExecutionApprovals', () => {
-    const { result } = renderHook(() => useExecutionNodeClick('exec-1'))
+    const { result } = renderHook(() => useExecutionStepClick('exec-1'))
 
     act(() => {
       result.current.clearApprovals()

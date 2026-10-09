@@ -11,7 +11,7 @@ import { useElapsedTime } from '../../hooks/useElapsedTime'
 import type { FilterConfig } from '../../types/filters'
 import { formatElapsedTime } from '../../utils/dateUtils'
 import { detachPromise } from '../../utils/detachPromise'
-import { NodeExecutionDetailsPanel } from '../executions/NodeExecutionDetailsPanel'
+import { StepExecutionDetailsPanel } from '../executions/StepExecutionDetailsPanel'
 import type { ActivityState } from '../workflows/execution/types'
 import {
   useExecutionStore,
@@ -63,7 +63,7 @@ type ThreePanelLayoutProps = {
   onFilterChange: (filters: FilterConfig[]) => void
   selectedNodeId: string | null
   detailNodeId: string | null
-  displayNodeName: string | null
+  displayStepName: string | null
   executionId: string
   selectedNodeState?: ActivityState
   selectedNodeType?: string
@@ -86,7 +86,7 @@ function ThreePanelLayout({
   onFilterChange,
   selectedNodeId,
   detailNodeId,
-  displayNodeName,
+  displayStepName,
   executionId,
   selectedNodeState,
   selectedNodeType,
@@ -158,11 +158,11 @@ function ThreePanelLayout({
 
         <Divider orientation={{ default: 'vertical' }} />
 
-        <FlexItem flex={{ default: 'flex_1' }} className={styles.nodeDetailsPane}>
-          {detailNodeId && displayNodeName ? (
-            <NodeExecutionDetailsPanel
+        <FlexItem flex={{ default: 'flex_1' }} className={styles.stepDetailsPane}>
+          {detailNodeId && displayStepName ? (
+            <StepExecutionDetailsPanel
               nodeId={detailNodeId}
-              nodeName={displayNodeName}
+              nodeName={displayStepName}
               executionId={executionId}
               nodeState={selectedNodeState}
               nodeType={selectedNodeType}
@@ -358,7 +358,7 @@ export function ExecutionDetailsPanel({
   const hasFilteredOutActivities = hasActiveFilters && activityOrder.length > 0
   const showFilters = activityOrder.length > 0 || hasActiveFilters
 
-  const { resolvedNodeId, effectiveKey, displayNodeName, selectedNodeState, selectedNodeType, handleRowClick } =
+  const { resolvedNodeId, effectiveKey, displayStepName, selectedNodeState, selectedNodeType, handleRowClick } =
     useSelectedActivity({
       selectedNodeId,
       selectedNodeNameProp,
@@ -402,7 +402,7 @@ export function ExecutionDetailsPanel({
         onFilterChange={handleFilterChange}
         selectedNodeId={resolvedNodeId}
         detailNodeId={effectiveKey}
-        displayNodeName={displayNodeName}
+        displayStepName={displayStepName}
         executionId={executionId}
         selectedNodeState={selectedNodeState}
         selectedNodeType={selectedNodeType}
