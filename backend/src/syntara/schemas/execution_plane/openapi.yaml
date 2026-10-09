@@ -142,6 +142,7 @@ components:
             - completed
             - failed
             - cancelled
+            - reconciliation_required
           title: Status
         result:
           additionalProperties: true

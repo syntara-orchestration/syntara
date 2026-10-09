@@ -103,7 +103,7 @@ export interface components {
        * Status
        * @enum {string}
        */
-      status: 'completed' | 'failed' | 'cancelled'
+      status: 'completed' | 'failed' | 'cancelled' | 'reconciliation_required'
       /** Result */
       result: {
         [key: string]: unknown

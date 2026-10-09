@@ -105,7 +105,7 @@ class EPCompletionEvent(BaseModel):
     work_id: UUID
     request_id: str
     state_revision: int
-    status: Literal["completed", "failed", "cancelled"]
+    status: Literal["completed", "failed", "cancelled", "reconciliation_required"]
     result: dict[str, object]
     completed_at: datetime
 
