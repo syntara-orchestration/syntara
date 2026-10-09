@@ -262,8 +262,8 @@ export const NAV_ITEMS: TNavigationItem[] = [
         requiredPermissions: [{ action: 'read', resourceType: 'setting' }],
         children: [
           {
-            label: 'Settings Tab',
-            path: AppRoute.SystemAdministration.SettingsTab,
+            label: 'Settings Category',
+            path: AppRoute.SystemAdministration.SettingsCategory,
             hidden: true,
           },
         ],
