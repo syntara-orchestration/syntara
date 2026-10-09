@@ -104,6 +104,9 @@ def _wf(retry_context: dict[str, Any] | None = None) -> OrchestratorWorkflow:
     wf.loop_body_map = {}
     wf.loop_iteration_results = {}
     wf.node_inputs = {}
+    # A converge reads this to tell whether a loop predecessor is still iterating,
+    # so it must exist even on a workflow built without __init__.
+    wf.node_control_data = {}
     return wf
 
 
