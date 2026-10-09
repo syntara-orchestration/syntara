@@ -12,9 +12,9 @@ from syntara.workflows.models.activity_execution import ActivityStatus
 from syntara.workflows.models.execution import ExecutionStatus
 from syntara.workflows.services.retry_validation import (
     collect_downstream_node_ids,
-    strip_iteration_suffix,
     validate_retry_from_failure,
 )
+from syntara.workflows.utils.loop_iteration_names import strip_iteration_suffix
 
 TRIGGERS: list[dict[str, Any]] = [{"id": "trigger_1", "type": "manual_trigger", "parameters": {}}]
 NODES: list[dict[str, Any]] = [

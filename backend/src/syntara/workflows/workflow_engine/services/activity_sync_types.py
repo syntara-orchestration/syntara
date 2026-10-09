@@ -57,6 +57,7 @@ class ExecutionMonitorMetadata:
         mode: Execution mode of the run (standard, test, debug)
         workflow_version: Version number of the workflow definition used by this run
         used_published: Whether the run used the workflow's published version
+        is_retry: Whether this run is a retry from a prior execution's failure point
 
     """
 
@@ -76,6 +77,7 @@ class ExecutionMonitorMetadata:
     mode: ExecutionMode | None = None
     workflow_version: int | None = None
     used_published: bool | None = None
+    is_retry: bool = False
 
 
 type QueueItem = HistoryEvent | SyntheticActivityStarted | SyntheticPartialOutput | None
