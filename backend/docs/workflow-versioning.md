@@ -335,9 +335,9 @@ Segment telemetry tracks feature adoption and usage patterns.
 |-------|---------|------------|
 | `workflow_version_created` | New version saved | `workflow_id`, `version` |
 | `workflow_version_restored` | Version restored | `workflow_id`, `restored_from_version`, `new_version` |
-| `workflow_version_published` | Version published | `workflow_id`, `version`, `workflow_name`, `project_id`, `error_type` |
-| `workflow_version_unpublished` | Workflow unpublished | `workflow_id`, `version`, `workflow_name`, `project_id`, `error_type` |
-| `workflow_version_exported` | Version exported | `workflow_id`, `version`, `workflow_name` |
+| `workflow_version_published` | Version published | `workflow_id`, `version`, `project_id`, `error_type` |
+| `workflow_version_unpublished` | Workflow unpublished | `workflow_id`, `version`, `project_id`, `error_type` |
+| `workflow_version_exported` | Version exported | `workflow_id`, `version` |
 
 All events include `entitlement_id` from the telemetry registry.
 

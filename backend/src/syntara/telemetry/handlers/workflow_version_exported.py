@@ -37,7 +37,6 @@ class WorkflowVersionExportedTelemetryHandler(AuditEventHandler[WorkflowVersionE
                 WorkflowVersionExportedTelemetryEvent(
                     workflow_id=event.workflow_id,
                     version=event.version,
-                    workflow_name=event.workflow_name,
                     entitlement_id=registry.entitlement_id,
                 )
             )

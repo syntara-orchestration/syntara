@@ -13,7 +13,6 @@ from sqlmodel import Field
 
 from syntara.telemetry.events.base import BaseTelemetryEvent
 
-_WORKFLOW_NAME_DESC = "Human-readable workflow name"
 _WORKFLOW_ID_DESC = "Unique workflow identifier (UUID v4)"
 _USER_ID_HASH_DESC = "HMAC-SHA256 digest of the acting user's UUID (per-installation salt)"
 
@@ -53,7 +52,6 @@ class WorkflowVersionPublishedEvent(BaseTelemetryEvent):
 
     workflow_id: UUID = Field(description=_WORKFLOW_ID_DESC)
     version: int = Field(ge=1, description="Version number published")
-    workflow_name: str = Field(description=_WORKFLOW_NAME_DESC)
     published_version_id: UUID | None = Field(
         default=None, description="Published workflow version identifier (UUID v4)"
     )
@@ -67,7 +65,6 @@ class WorkflowVersionUnpublishedEvent(BaseTelemetryEvent):
 
     workflow_id: UUID = Field(description=_WORKFLOW_ID_DESC)
     version: int = Field(ge=1, description="Version number that was unpublished")
-    workflow_name: str = Field(description=_WORKFLOW_NAME_DESC)
     project_id: UUID | None = Field(default=None, description="Project identifier")
     error_type: str | None = Field(default=None, description="Error type if operation failed")
 
@@ -77,4 +74,3 @@ class WorkflowVersionExportedEvent(BaseTelemetryEvent):
 
     workflow_id: UUID = Field(description=_WORKFLOW_ID_DESC)
     version: int = Field(ge=1, description="Version number exported")
-    workflow_name: str = Field(description=_WORKFLOW_NAME_DESC)
