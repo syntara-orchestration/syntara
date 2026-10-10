@@ -1,3 +1,4 @@
+// AAP-93572: Reproduces the import form failing to prefill its name from the uploaded workflow JSON.
 import { render, screen, waitFor, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
@@ -125,6 +126,25 @@ describe('ImportWorkflowDialog', () => {
     await user.upload(getFileUploadInput(), file)
 
     expect(screen.getByRole('button', { name: /^Import workflow$/i })).toBeEnabled()
+  })
+
+  it('prefills the workflow name from the uploaded definition', async () => {
+    const user = userEvent.setup()
+    const importedName = 'Imported workflow from JSON'
+    const definition = {
+      schema_version: '2.0.0',
+      name: importedName,
+      triggers: [{ id: 't1', type: 'webhook' }],
+      nodes: [{ id: 'n1', type: 'action' }],
+      edges: [{ from: 't1', to: 'n1' }],
+    }
+
+    render(<ImportWorkflowDialog {...defaultProps} />)
+
+    const file = new File([JSON.stringify(definition)], 'workflow.json', { type: 'application/json' })
+    await user.upload(getFileUploadInput(), file)
+
+    expect(screen.getByLabelText(/Workflow name/i)).toHaveValue(importedName)
   })
 
   it('calls onClose when Cancel is clicked', async () => {
