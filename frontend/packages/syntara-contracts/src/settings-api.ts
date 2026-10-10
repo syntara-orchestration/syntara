@@ -177,7 +177,8 @@ export interface components {
      *     }
      * @example {
      *       "next": "eyJpZCI6Im5leHQifQ",
-     *       "prev": "eyJpZCI6InByZXYifQ"
+     *       "prev": "eyJpZCI6InByZXYifQ",
+     *       "additionalProperties": false
      *     }
      */
     SettingsListResponse: components['schemas']['ResourcesResponseBase'] & {

@@ -38874,6 +38874,7 @@
       },
       "AAPOrganization": {
         "type": "object",
+        "additionalProperties": false,
         "title": "AAPOrganization",
         "description": "Ansible Automation Platform organization resource.",
         "required": [
@@ -38893,6 +38894,7 @@
       },
       "AAPJobTemplate": {
         "type": "object",
+        "additionalProperties": false,
         "title": "AAPJobTemplate",
         "description": "Ansible Automation Platform job template resource.",
         "required": [
@@ -38923,6 +38925,7 @@
       },
       "AAPWorkflowJobTemplate": {
         "type": "object",
+        "additionalProperties": false,
         "title": "AAPWorkflowJobTemplate",
         "description": "Ansible Automation Platform workflow job template resource.",
         "required": [
@@ -38953,6 +38956,7 @@
       },
       "AAPSummaryField": {
         "type": "object",
+        "additionalProperties": false,
         "title": "AAPSummaryField",
         "description": "Summary field with id and name from Ansible Automation Platform summary_fields.",
         "required": [
@@ -38981,6 +38985,7 @@
       },
       "AAPJobTemplateDetail": {
         "type": "object",
+        "additionalProperties": false,
         "title": "AAPJobTemplateDetail",
         "description": "Ansible Automation Platform job template with prompt-on-launch capabilities and default values.",
         "required": [
@@ -39279,6 +39284,7 @@
       },
       "AAPWorkflowJobTemplateDetail": {
         "type": "object",
+        "additionalProperties": false,
         "title": "AAPWorkflowJobTemplateDetail",
         "description": "Ansible Automation Platform workflow job template with prompt-on-launch capabilities and default values.",
         "required": [
@@ -39451,6 +39457,7 @@
       },
       "AAPInventory": {
         "type": "object",
+        "additionalProperties": false,
         "title": "AAPInventory",
         "description": "Ansible Automation Platform inventory resource.",
         "required": [
@@ -39481,6 +39488,7 @@
       },
       "AAPExecutionEnvironment": {
         "type": "object",
+        "additionalProperties": false,
         "title": "AAPExecutionEnvironment",
         "description": "Ansible Automation Platform execution environment resource.",
         "required": [
@@ -39511,6 +39519,7 @@
       },
       "AAPCredential": {
         "type": "object",
+        "additionalProperties": false,
         "title": "AAPCredential",
         "description": "Ansible Automation Platform credential resource.\n\nOnly ``id`` and ``name`` are exposed — descriptions are omitted to avoid\nleaking infrastructure details (e.g. \"prod-aws-root-key\") to all users.",
         "required": [
@@ -39530,6 +39539,7 @@
       },
       "AAPInstanceGroup": {
         "type": "object",
+        "additionalProperties": false,
         "title": "AAPInstanceGroup",
         "description": "Ansible Automation Platform instance group resource.",
         "required": [
@@ -39549,6 +39559,7 @@
       },
       "AAPLabel": {
         "type": "object",
+        "additionalProperties": false,
         "title": "AAPLabel",
         "description": "Ansible Automation Platform label resource.",
         "required": [
@@ -39579,6 +39590,7 @@
       },
       "AAPListResponse_AAPOrganization_": {
         "type": "object",
+        "additionalProperties": false,
         "title": "AAPListResponse[AAPOrganization]",
         "required": [
           "count",
@@ -39600,6 +39612,7 @@
       },
       "AAPListResponse_AAPJobTemplate_": {
         "type": "object",
+        "additionalProperties": false,
         "title": "AAPListResponse[AAPJobTemplate]",
         "required": [
           "count",
@@ -39621,6 +39634,7 @@
       },
       "AAPListResponse_AAPWorkflowJobTemplate_": {
         "type": "object",
+        "additionalProperties": false,
         "title": "AAPListResponse[AAPWorkflowJobTemplate]",
         "required": [
           "count",
@@ -39642,6 +39656,7 @@
       },
       "AAPListResponse_AAPInventory_": {
         "type": "object",
+        "additionalProperties": false,
         "title": "AAPListResponse[AAPInventory]",
         "required": [
           "count",
@@ -39663,6 +39678,7 @@
       },
       "AAPListResponse_AAPExecutionEnvironment_": {
         "type": "object",
+        "additionalProperties": false,
         "title": "AAPListResponse[AAPExecutionEnvironment]",
         "required": [
           "count",
@@ -39684,6 +39700,7 @@
       },
       "AAPListResponse_AAPCredential_": {
         "type": "object",
+        "additionalProperties": false,
         "title": "AAPListResponse[AAPCredential]",
         "required": [
           "count",
@@ -39705,6 +39722,7 @@
       },
       "AAPListResponse_AAPInstanceGroup_": {
         "type": "object",
+        "additionalProperties": false,
         "title": "AAPListResponse[AAPInstanceGroup]",
         "required": [
           "count",
@@ -39726,6 +39744,7 @@
       },
       "AAPListResponse_AAPLabel_": {
         "type": "object",
+        "additionalProperties": false,
         "title": "AAPListResponse[AAPLabel]",
         "required": [
           "count",
@@ -39749,6 +39768,7 @@
         "type": "object",
         "title": "GlobalRevocationTimestampRead",
         "description": "Response schema for reading the global revocation timestamp.",
+        "additionalProperties": false,
         "properties": {
           "revoked_before": {
             "anyOf": [
@@ -39791,6 +39811,7 @@
         "type": "object",
         "title": "RevocationResponse",
         "description": "Response schema for revocation operations.",
+        "additionalProperties": false,
         "required": [
           "message"
         ],
@@ -40193,7 +40214,8 @@
             "title": "Approver Group Ids",
             "description": "Group IDs whose members can approve"
           }
-        }
+        },
+        "additionalProperties": false
       },
       "WorkflowContext": {
         "type": "object",
@@ -40251,7 +40273,8 @@
             ],
             "description": "Previous step context and output"
           }
-        }
+        },
+        "additionalProperties": false
       },
       "PreviousStepContext": {
         "type": "object",
@@ -40291,7 +40314,8 @@
             "title": "Output",
             "description": "Output from the activity (structure varies per activity type)"
           }
-        }
+        },
+        "additionalProperties": false
       },
       "ApprovalDecisionStatus": {
         "type": "string",
@@ -40327,7 +40351,8 @@
             "title": "Notes",
             "description": "Optional notes explaining the decision. Accepts either `notes` or `decision_notes` (the key returned in responses) as the request field name."
           }
-        }
+        },
+        "additionalProperties": false
       },
       "BatchApprovalDecisionStatus": {
         "type": "string",
@@ -40372,7 +40397,8 @@
             "title": "Notes",
             "description": "Optional notes explaining the decision. Accepts either `notes` or `decision_notes` (the key returned in responses) as the request field name."
           }
-        }
+        },
+        "additionalProperties": false
       },
       "BatchApprovalRequest": {
         "type": "object",
@@ -40392,7 +40418,8 @@
             },
             "description": "List of approval decisions to submit"
           }
-        }
+        },
+        "additionalProperties": false
       },
       "BatchApprovalResult": {
         "type": "object",
@@ -40474,7 +40501,8 @@
             "title": "Error",
             "description": "Error message if the decision failed"
           }
-        }
+        },
+        "additionalProperties": false
       },
       "BatchApprovalResponse": {
         "type": "object",
@@ -40506,7 +40534,8 @@
             "title": "Total Failed",
             "description": "Number of failed decisions"
           }
-        }
+        },
+        "additionalProperties": false
       },
       "ApprovalListResponse": {
         "type": "object",
@@ -40572,7 +40601,8 @@
             "title": "Resources",
             "description": "Array of resources in current page"
           }
-        }
+        },
+        "additionalProperties": false
       },
       "ApproverUserSummary": {
         "type": "object",
@@ -40594,7 +40624,8 @@
             "description": "User's username",
             "title": "Username"
           }
-        }
+        },
+        "additionalProperties": false
       },
       "ApproverGroupSummary": {
         "type": "object",
@@ -40616,12 +40647,14 @@
             "description": "Group's name",
             "title": "Name"
           }
-        }
+        },
+        "additionalProperties": false
       },
       "LoginRequest": {
         "type": "object",
         "title": "LoginRequest",
         "description": "Login request with username and password.",
+        "additionalProperties": false,
         "required": [
           "username",
           "password"
@@ -40644,6 +40677,7 @@
         "type": "object",
         "title": "AccessTokenResponse",
         "description": "Access token response (refresh token is sent via HttpOnly cookie).",
+        "additionalProperties": false,
         "required": [
           "access_token",
           "expires_in"
@@ -40671,6 +40705,7 @@
         "type": "object",
         "title": "CsrfTokenResponse",
         "description": "CSRF form token response.",
+        "additionalProperties": false,
         "required": [
           "csrf_token"
         ],
@@ -40686,6 +40721,7 @@
         "type": "object",
         "title": "WebSocketTicketResponse",
         "description": "Response for the WebSocket ticket exchange endpoint.",
+        "additionalProperties": false,
         "required": [
           "ticket",
           "expires_in"
@@ -40707,6 +40743,7 @@
         "type": "object",
         "title": "UserInfo",
         "description": "Current user information derived from access token claims.",
+        "additionalProperties": false,
         "required": [
           "id",
           "username"
@@ -40754,6 +40791,7 @@
         "type": "object",
         "title": "AuthProviderInfo",
         "description": "Public identity provider info for the login page.",
+        "additionalProperties": false,
         "required": [
           "id",
           "name",
@@ -40793,6 +40831,7 @@
         "type": "object",
         "title": "AuthProvidersResponse",
         "description": "Response for the public providers listing endpoint.",
+        "additionalProperties": false,
         "properties": {
           "resources": {
             "type": "array",
@@ -40807,6 +40846,7 @@
       "Body_token": {
         "type": "object",
         "title": "Body_token",
+        "additionalProperties": false,
         "required": [
           "grant_type"
         ],
@@ -40881,7 +40921,8 @@
             "default": false,
             "description": "When true, allow if the user has the permission in any project (project-scoped policies match without a concrete resource_project). Mutually exclusive with a non-empty resource_project. Default false preserves strict project matching — empty resource_project alone is never a wildcard.\n"
           }
-        }
+        },
+        "additionalProperties": false
       },
       "CanIResponse": {
         "type": "object",
@@ -40920,7 +40961,8 @@
             "title": "Denied By",
             "description": "Name of the deny policy (empty if allowed)"
           }
-        }
+        },
+        "additionalProperties": false
       },
       "WhoCanRequest": {
         "type": "object",
@@ -41007,7 +41049,8 @@
             "default": "",
             "x-query-param": true
           }
-        }
+        },
+        "additionalProperties": false
       },
       "WhoCanUser": {
         "type": "object",
@@ -41027,7 +41070,8 @@
             "type": "string",
             "title": "Username"
           }
-        }
+        },
+        "additionalProperties": false
       },
       "WhoCanResponse": {
         "type": "object",
@@ -41093,7 +41137,8 @@
             "next": "eyJpZCI6Im5leHQifQ",
             "prev": "eyJpZCI6InByZXYifQ"
           }
-        ]
+        ],
+        "additionalProperties": false
       },
       "PermissionEntry": {
         "type": "object",
@@ -41131,7 +41176,8 @@
             "title": "Project",
             "description": "Project scope (empty for system-level)"
           }
-        }
+        },
+        "additionalProperties": false
       },
       "WhatCanIRequest": {
         "type": "object",
@@ -41177,7 +41223,8 @@
             "description": "Include total count in response (expensive)",
             "default": false
           }
-        }
+        },
+        "additionalProperties": false
       },
       "WhatCanIResponse": {
         "type": "object",
@@ -41243,7 +41290,8 @@
             "title": "Resources",
             "description": "Array of resources in current page"
           }
-        }
+        },
+        "additionalProperties": false
       },
       "ResourceActionsResponse": {
         "type": "object",
@@ -41264,7 +41312,8 @@
               }
             }
           }
-        }
+        },
+        "additionalProperties": false
       },
       "ValidateNameResponse": {
         "type": "object",
@@ -42423,7 +42472,8 @@
           "project_id"
         ],
         "title": "CredentialCreate",
-        "type": "object"
+        "type": "object",
+        "additionalProperties": false
       },
       "CredentialUpdate": {
         "description": "Schema for partially updating a credential. $encrypted$ preserves existing values.",
@@ -42504,7 +42554,8 @@
           }
         },
         "title": "CredentialUpdate",
-        "type": "object"
+        "type": "object",
+        "additionalProperties": false
       },
       "CredentialRead": {
         "description": "Schema for credential API responses. Secret fields masked as $encrypted$.",
@@ -42827,6 +42878,7 @@
         "type": "object",
         "title": "FileStorageStatusResponse",
         "description": "Response model for GET /files/storage_status endpoint.",
+        "additionalProperties": false,
         "required": [
           "status"
         ],
@@ -42844,6 +42896,7 @@
         "type": "object",
         "title": "UploadFilesBody",
         "description": "Request body for POST /files endpoint.",
+        "additionalProperties": false,
         "required": [
           "files",
           "project_id"
@@ -42871,6 +42924,7 @@
         "type": "object",
         "title": "FileUploadResponse",
         "description": "Response model for POST /api/v1/files endpoint.",
+        "additionalProperties": false,
         "required": [
           "file_ids",
           "files"
@@ -42904,6 +42958,7 @@
         "type": "object",
         "title": "FileUploadInfo",
         "description": "Response model for individual file upload information.\n\nSecurity Note:\n    file_path is intentionally excluded from this model to prevent\n    exposing internal filesystem paths in API responses.",
+        "additionalProperties": false,
         "required": [
           "file_id",
           "filename",
@@ -42967,6 +43022,7 @@
         "type": "object",
         "title": "FileDetailResponse",
         "description": "Response model for GET /api/v1/files/{file_id} endpoint.",
+        "additionalProperties": false,
         "required": [
           "file_id",
           "filename",
@@ -43039,6 +43095,7 @@
         "type": "object",
         "title": "FilesMetadataResponse",
         "description": "Response model for GET /files/metadata endpoint.",
+        "additionalProperties": false,
         "required": [
           "files"
         ],
@@ -43786,7 +43843,8 @@
               }
             ]
           }
-        }
+        },
+        "additionalProperties": false
       },
       "IdentityProviderUpdate": {
         "type": "object",
@@ -43966,6 +44024,7 @@
         "type": "object"
       },
       "IdentityProviderListResponse": {
+        "additionalProperties": false,
         "title": "IdentityProviderListResponse",
         "description": "Paginated list response for identity providers.",
         "properties": {
@@ -44075,7 +44134,8 @@
               }
             ]
           }
-        }
+        },
+        "additionalProperties": false
       },
       "OIDCTestResult": {
         "type": "object",
@@ -44144,7 +44204,8 @@
             "default": false,
             "title": "End Session Endpoint Supported"
           }
-        }
+        },
+        "additionalProperties": false
       },
       "AAPOIDCSetupRequest": {
         "type": "object",
@@ -44271,7 +44332,8 @@
             "format": "date-time",
             "title": "Created At"
           }
-        }
+        },
+        "additionalProperties": false
       },
       "IntegrationProjectAssignmentListResponse": {
         "properties": {
@@ -44337,7 +44399,8 @@
           }
         ],
         "title": "IntegrationProjectAssignmentListResponse",
-        "description": "Paginated response for listing project assignments."
+        "description": "Paginated response for listing project assignments.",
+        "additionalProperties": false
       },
       "IntegrationListResponse": {
         "title": "IntegrationListResponse",
@@ -44403,7 +44466,8 @@
             "next": "eyJpZCI6Im5leHQifQ",
             "prev": "eyJpZCI6InByZXYifQ"
           }
-        ]
+        ],
+        "additionalProperties": false
       },
       "IntegrationCreate": {
         "description": "Schema for creating a new integration.",
@@ -44579,7 +44643,8 @@
           "name"
         ],
         "title": "InitialToolSelection",
-        "type": "object"
+        "type": "object",
+        "additionalProperties": false
       },
       "InitialModelSelection": {
         "description": "A model from the discover step with the user's enabled/disabled choice.",
@@ -44629,7 +44694,8 @@
           "name"
         ],
         "title": "InitialModelSelection",
-        "type": "object"
+        "type": "object",
+        "additionalProperties": false
       },
       "IntegrationUpdate": {
         "description": "Schema for partially updating an integration (user-facing).",
@@ -45242,7 +45308,8 @@
           "name"
         ],
         "title": "DiscoveredLLMModel",
-        "type": "object"
+        "type": "object",
+        "additionalProperties": false
       },
       "DiscoveredToolParameter": {
         "description": "A parameter belonging to a discovered tool.",
@@ -45271,7 +45338,8 @@
           "name"
         ],
         "title": "DiscoveredToolParameter",
-        "type": "object"
+        "type": "object",
+        "additionalProperties": false
       },
       "DiscoveredTool": {
         "description": "A tool discovered from an MCP server.\n\nCarries parameter information so that _sync_mcp_tools() can do a full\nupsert without re-fetching from MCP.",
@@ -45310,7 +45378,8 @@
           "name"
         ],
         "title": "DiscoveredTool",
-        "type": "object"
+        "type": "object",
+        "additionalProperties": false
       },
       "HealthCheckErrorType": {
         "description": "Classification of health check failures.",
@@ -45363,7 +45432,8 @@
           "checked_at"
         ],
         "title": "ValidateResult",
-        "type": "object"
+        "type": "object",
+        "additionalProperties": false
       },
       "DiscoverResult": {
         "description": "Result of a resource-discovery operation (discover endpoint).\n\nReturned by the unsaved-connection test (POST /integrations/discover)\nand used internally by refresh_resources() to drive tool sync.",
@@ -45432,7 +45502,8 @@
           "checked_at"
         ],
         "title": "DiscoverResult",
-        "type": "object"
+        "type": "object",
+        "additionalProperties": false
       },
       "IntegrationRefreshStatus": {
         "type": "string",
@@ -45483,7 +45554,8 @@
           "missing_count"
         ],
         "title": "RefreshResult",
-        "type": "object"
+        "type": "object",
+        "additionalProperties": false
       },
       "LLMModelListResponse": {
         "title": "LLMModelListResponse",
@@ -45549,7 +45621,8 @@
             "next": "eyJpZCI6Im5leHQifQ",
             "prev": "eyJpZCI6InByZXYifQ"
           }
-        ]
+        ],
+        "additionalProperties": false
       },
       "LLMModelRead": {
         "type": "object",
@@ -45648,7 +45721,8 @@
             ],
             "title": "Updated At"
           }
-        }
+        },
+        "additionalProperties": false
       },
       "ModelCapabilityProfile": {
         "type": "object",
@@ -45941,7 +46015,8 @@
             ],
             "title": "Temperature"
           }
-        }
+        },
+        "additionalProperties": false
       },
       "LLMModelUpdate": {
         "type": "object",
@@ -45970,7 +46045,8 @@
             ],
             "title": "Is Default"
           }
-        }
+        },
+        "additionalProperties": false
       },
       "LLMModelBulkUpdate": {
         "type": "object",
@@ -45995,7 +46071,8 @@
             "title": "Enabled",
             "description": "New enabled state"
           }
-        }
+        },
+        "additionalProperties": false
       },
       "LLMModelBulkUpdateResponse": {
         "type": "object",
@@ -46023,9 +46100,11 @@
             "title": "Updated At",
             "description": "Timestamp of the update"
           }
-        }
+        },
+        "additionalProperties": false
       },
       "ToolListResponse": {
+        "additionalProperties": false,
         "title": "ToolListResponse",
         "description": "Paginated list response for tools.",
         "examples": [
@@ -46357,7 +46436,8 @@
           "updated_count",
           "skipped_count",
           "updated_at"
-        ]
+        ],
+        "additionalProperties": false
       },
       "ProjectCreate": {
         "type": "object",
@@ -46391,7 +46471,8 @@
             "additionalProperties": true,
             "title": "Labels"
           }
-        }
+        },
+        "additionalProperties": false
       },
       "ProjectUpdate": {
         "type": "object",
@@ -46435,7 +46516,8 @@
             ],
             "title": "Labels"
           }
-        }
+        },
+        "additionalProperties": false
       },
       "ProjectRead": {
         "title": "ProjectRead",
@@ -46514,6 +46596,7 @@
       "ProjectListResponse": {
         "title": "ProjectListResponse",
         "description": "Paginated list response for projects.",
+        "additionalProperties": false,
         "properties": {
           "next": {
             "anyOf": [
@@ -46619,7 +46702,8 @@
             },
             "title": "Labels"
           }
-        }
+        },
+        "additionalProperties": false
       },
       "ProjectPolicyCreate": {
         "type": "object",
@@ -46663,7 +46747,8 @@
             },
             "title": "Labels"
           }
-        }
+        },
+        "additionalProperties": false
       },
       "WorkflowListResponse": {
         "type": "object",
@@ -46729,7 +46814,8 @@
             "next": "eyJpZCI6Im5leHQifQ",
             "prev": "eyJpZCI6InByZXYifQ"
           }
-        ]
+        ],
+        "additionalProperties": false
       },
       "ProjectCredentialCreate": {
         "type": "object",
@@ -46780,7 +46866,8 @@
             "title": "Labels",
             "description": "Key-value labels"
           }
-        }
+        },
+        "additionalProperties": false
       },
       "ServiceAccountCreate": {
         "properties": {
@@ -46817,7 +46904,8 @@
           "project_id"
         ],
         "title": "ServiceAccountCreate",
-        "description": "Schema for creating a new service account."
+        "description": "Schema for creating a new service account.",
+        "additionalProperties": false
       },
       "ServiceAccountListResponse": {
         "properties": {
@@ -46889,7 +46977,8 @@
             "next": "eyJpZCI6Im5leHQifQ",
             "prev": "eyJpZCI6InByZXYifQ"
           }
-        ]
+        ],
+        "additionalProperties": false
       },
       "ServiceAccountRead": {
         "properties": {
@@ -46998,7 +47087,8 @@
           "updated_at"
         ],
         "title": "ServiceAccountRead",
-        "description": "Schema for service account responses."
+        "description": "Schema for service account responses.",
+        "additionalProperties": false
       },
       "ServiceAccountStatus": {
         "type": "string",
@@ -47054,7 +47144,8 @@
         },
         "type": "object",
         "title": "ServiceAccountUpdate",
-        "description": "Schema for updating a service account (PATCH)."
+        "description": "Schema for updating a service account (PATCH).",
+        "additionalProperties": false
       },
       "ServiceAccountCredentialType": {
         "type": "string",
@@ -47106,7 +47197,8 @@
           "credential_type"
         ],
         "title": "ServiceAccountCredentialCreate",
-        "description": "Schema for creating a new service account credential."
+        "description": "Schema for creating a new service account credential.",
+        "additionalProperties": false
       },
       "ServiceAccountCredentialRead": {
         "properties": {
@@ -47219,7 +47311,8 @@
           "updated_at"
         ],
         "title": "ServiceAccountCredentialRead",
-        "description": "Schema for credential responses (excludes secrets)."
+        "description": "Schema for credential responses (excludes secrets).",
+        "additionalProperties": false
       },
       "ServiceAccountCredentialCreateResponse": {
         "properties": {
@@ -47344,7 +47437,8 @@
           "updated_at"
         ],
         "title": "ServiceAccountCredentialCreateResponse",
-        "description": "Schema for the create response — includes one-time plaintext secret(s)."
+        "description": "Schema for the create response — includes one-time plaintext secret(s).",
+        "additionalProperties": false
       },
       "ServiceAccountCredentialRotateRequest": {
         "properties": {
@@ -47365,7 +47459,8 @@
         },
         "type": "object",
         "title": "ServiceAccountCredentialRotateRequest",
-        "description": "Schema for rotating a credential's secret."
+        "description": "Schema for rotating a credential's secret.",
+        "additionalProperties": false
       },
       "ServiceAccountCredentialRotateResponse": {
         "properties": {
@@ -47490,7 +47585,8 @@
           "updated_at"
         ],
         "title": "ServiceAccountCredentialRotateResponse",
-        "description": "Schema for the rotate response — same shape as create response."
+        "description": "Schema for the rotate response — same shape as create response.",
+        "additionalProperties": false
       },
       "ServiceAccountCredentialListResponse": {
         "properties": {
@@ -47574,7 +47670,8 @@
             "next": "eyJpZCI6Im5leHQifQ",
             "prev": "eyJpZCI6InByZXYifQ"
           }
-        ]
+        ],
+        "additionalProperties": false
       },
       "SettingValueType": {
         "type": "string",
@@ -47772,7 +47869,8 @@
             ],
             "title": "Expected Version"
           }
-        }
+        },
+        "additionalProperties": false
       },
       "SettingBulkUpdateItem": {
         "type": "object",
@@ -47801,7 +47899,8 @@
             ],
             "title": "Expected Version"
           }
-        }
+        },
+        "additionalProperties": false
       },
       "SettingBulkUpdateRequest": {
         "type": "object",
@@ -47819,7 +47918,8 @@
               "$ref": "#/components/schemas/SettingBulkUpdateItem"
             }
           }
-        }
+        },
+        "additionalProperties": false
       },
       "SettingCategoryRead": {
         "type": "object",
@@ -47863,7 +47963,8 @@
             },
             "title": "Group Names"
           }
-        }
+        },
+        "additionalProperties": false
       },
       "SettingsListResponse": {
         "title": "SettingsListResponse",
@@ -47875,7 +47976,8 @@
           },
           {
             "next": "eyJpZCI6Im5leHQifQ",
-            "prev": "eyJpZCI6InByZXYifQ"
+            "prev": "eyJpZCI6InByZXYifQ",
+            "additionalProperties": false
           }
         ],
         "properties": {
@@ -47946,7 +48048,8 @@
               "$ref": "#/components/schemas/SettingCategoryRead"
             }
           }
-        }
+        },
+        "additionalProperties": false
       },
       "ToolStatus": {
         "type": "string",
@@ -48077,6 +48180,7 @@
       },
       "UserCreate": {
         "type": "object",
+        "additionalProperties": false,
         "title": "UserCreate",
         "description": "Schema for creating a new local user (POST /users).\n\nExcludes auto-generated fields: id, created_at, updated_at, last_login, preferences.",
         "required": [
@@ -48164,6 +48268,7 @@
       },
       "UserUpdate": {
         "type": "object",
+        "additionalProperties": false,
         "title": "UserUpdate",
         "description": "Schema for updating a user (PATCH /users/{id}).\n\nAll fields are optional for partial updates.",
         "properties": {
@@ -48262,6 +48367,7 @@
       },
       "UserRead": {
         "type": "object",
+        "additionalProperties": false,
         "title": "UserRead",
         "description": "Schema for user response (GET /users/{id}).\n\nIncludes all user fields except sensitive data (password_hash, preferences).",
         "required": [
@@ -48421,6 +48527,7 @@
       },
       "UserGroupsSet": {
         "type": "object",
+        "additionalProperties": false,
         "title": "UserGroupsSet",
         "description": "Schema for declaratively setting a user's group memberships (PUT /users/{id}/groups).\n\nThe provided list replaces all current memberships. An empty list removes\nthe user from all groups.",
         "properties": {
@@ -48437,6 +48544,7 @@
       },
       "UserIdentityRead": {
         "type": "object",
+        "additionalProperties": false,
         "title": "UserIdentityRead",
         "description": "Schema for user identity response.",
         "required": [
@@ -48503,6 +48611,7 @@
       },
       "UserIdentityListResponse": {
         "type": "object",
+        "additionalProperties": false,
         "title": "UserIdentityListResponse",
         "description": "Paginated list of user identities.",
         "required": [
@@ -48569,6 +48678,7 @@
       },
       "UserIdentityAttach": {
         "type": "object",
+        "additionalProperties": false,
         "title": "UserIdentityAttach",
         "description": "Schema for attaching an identity to a user.",
         "required": [
@@ -48584,6 +48694,7 @@
       },
       "GroupCreate": {
         "type": "object",
+        "additionalProperties": false,
         "title": "GroupCreate",
         "description": "Schema for creating a new group (POST /groups).",
         "required": [
@@ -48614,6 +48725,7 @@
       },
       "GroupUpdate": {
         "type": "object",
+        "additionalProperties": false,
         "title": "GroupUpdate",
         "description": "Schema for updating a group (PATCH /groups/{id}).\n\nAll fields are optional for partial updates.",
         "properties": {
@@ -48740,6 +48852,7 @@
       },
       "MembershipSource": {
         "type": "object",
+        "additionalProperties": false,
         "title": "MembershipSource",
         "description": "Describes how a user got membership in a group.",
         "required": [
@@ -48880,6 +48993,7 @@
       },
       "GroupMemberRead": {
         "type": "object",
+        "additionalProperties": false,
         "title": "GroupMemberRead",
         "description": "User response with membership source info for a specific group.",
         "required": [
@@ -49179,6 +49293,7 @@
       },
       "GroupMemberAdd": {
         "type": "object",
+        "additionalProperties": false,
         "title": "GroupMemberAdd",
         "description": "Schema for adding a member to a group (POST /groups/{id}/members).",
         "required": [
@@ -49195,6 +49310,7 @@
       },
       "GroupMemberAddResponse": {
         "type": "object",
+        "additionalProperties": false,
         "title": "GroupMemberAddResponse",
         "description": "Response schema for adding a member to a group.",
         "properties": {
@@ -49208,6 +49324,7 @@
       },
       "UserDirectoryEntry": {
         "type": "object",
+        "additionalProperties": false,
         "title": "UserDirectoryEntry",
         "description": "Lightweight user record for directory lookups.",
         "required": [
@@ -49228,6 +49345,7 @@
       },
       "GroupDirectoryEntry": {
         "type": "object",
+        "additionalProperties": false,
         "title": "GroupDirectoryEntry",
         "description": "Lightweight group record for directory lookups.",
         "required": [
@@ -49248,6 +49366,7 @@
       },
       "ResourcesResponse_UserDirectoryEntry_": {
         "type": "object",
+        "additionalProperties": false,
         "title": "ResourcesResponse[UserDirectoryEntry]",
         "examples": [
           {
@@ -49313,6 +49432,7 @@
       },
       "ResourcesResponse_GroupDirectoryEntry_": {
         "type": "object",
+        "additionalProperties": false,
         "title": "ResourcesResponse[GroupDirectoryEntry]",
         "examples": [
           {
@@ -50850,7 +50970,8 @@
             "title": "Expected Version",
             "description": "Version the client was editing. If the server's current_version is higher, returns 409 Conflict."
           }
-        }
+        },
+        "additionalProperties": false
       },
       "WorkflowVersionUpdate": {
         "type": "object",
@@ -50883,7 +51004,8 @@
             "title": "Change Description",
             "description": "Description of changes"
           }
-        }
+        },
+        "additionalProperties": false
       },
       "WorkflowVersionListResponse": {
         "type": "object",
@@ -50949,7 +51071,8 @@
             "next": "eyJpZCI6Im5leHQifQ",
             "prev": "eyJpZCI6InByZXYifQ"
           }
-        ]
+        ],
+        "additionalProperties": false
       },
       "WorkflowCreate": {
         "type": "object",
@@ -53539,7 +53662,8 @@
             "title": "Message",
             "description": "Human-readable status message"
           }
-        }
+        },
+        "additionalProperties": false
       },
       "WorkflowValidateRequest": {
         "type": "object",

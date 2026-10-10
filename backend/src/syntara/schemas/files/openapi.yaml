@@ -330,6 +330,7 @@ components:
       type: object
       title: FileStorageStatusResponse
       description: Response model for GET /files/storage_status endpoint.
+      additionalProperties: false
       required:
         - status
       properties:
@@ -345,6 +346,7 @@ components:
       type: object
       title: UploadFilesBody
       description: Request body for POST /files endpoint.
+      additionalProperties: false
       required:
         - files
         - project_id
@@ -367,6 +369,7 @@ components:
       type: object
       title: FileUploadResponse
       description: Response model for POST /api/v1/files endpoint.
+      additionalProperties: false
       required:
         - file_ids
         - files
@@ -396,6 +399,7 @@ components:
         Security Note:
             file_path is intentionally excluded from this model to prevent
             exposing internal filesystem paths in API responses.
+      additionalProperties: false
       required:
         - file_id
         - filename
@@ -444,6 +448,7 @@ components:
       type: object
       title: FileDetailResponse
       description: Response model for GET /api/v1/files/{file_id} endpoint.
+      additionalProperties: false
       required:
         - file_id
         - filename
@@ -501,6 +506,7 @@ components:
       type: object
       title: FilesMetadataResponse
       description: Response model for GET /files/metadata endpoint.
+      additionalProperties: false
       required:
         - files
       properties:

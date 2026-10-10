@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING, Any, TypeVar, cast
 from uuid import UUID
 
 from attrs import define as _attrs_define
-from attrs import field as _attrs_field
 from dateutil.parser import isoparse
 
 from ..models.service_account_status import ServiceAccountStatus
@@ -51,7 +50,6 @@ class ServiceAccountRead:
     created_by: None | Unset | UserReference = UNSET
     updated_by: None | Unset | UserReference = UNSET
     labels: ServiceAccountReadLabels | Unset = UNSET
-    additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         from ..models.user_reference import UserReference
@@ -109,7 +107,7 @@ class ServiceAccountRead:
             labels = self.labels.to_dict()
 
         field_dict: dict[str, Any] = {}
-        field_dict.update(self.additional_properties)
+
         field_dict.update(
             {
                 "id": id,
@@ -244,21 +242,4 @@ class ServiceAccountRead:
             labels=labels,
         )
 
-        service_account_read.additional_properties = d
         return service_account_read
-
-    @property
-    def additional_keys(self) -> list[str]:
-        return list(self.additional_properties.keys())
-
-    def __getitem__(self, key: str) -> Any:
-        return self.additional_properties[key]
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        self.additional_properties[key] = value
-
-    def __delitem__(self, key: str) -> None:
-        del self.additional_properties[key]
-
-    def __contains__(self, key: str) -> bool:
-        return key in self.additional_properties

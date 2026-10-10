@@ -1060,6 +1060,7 @@ components:
           type: string
           format: date-time
           title: Created At
+      additionalProperties: false
 
     IntegrationProjectAssignmentListResponse:
       allOf:
@@ -1076,6 +1077,7 @@ components:
                 $ref: "#/components/schemas/IntegrationProjectAssignmentRead"
               title: Resources
 
+          additionalProperties: false
     IntegrationListResponse:
       allOf:
         - $ref: "../base/shared-resources.openapi.yaml#/components/schemas/ResourcesResponseBase"
@@ -1089,6 +1091,7 @@ components:
                 $ref: '#/components/schemas/IntegrationRead'
               title: Resources
               description: Array of resources in current page
+          additionalProperties: false
       title: IntegrationListResponse
       description: Paginated list response for integrations.
 
@@ -1206,6 +1209,7 @@ components:
         - name
       title: InitialToolSelection
       type: object
+      additionalProperties: false
 
     InitialModelSelection:
       description: A model from the discover step with the user's enabled/disabled choice.
@@ -1244,6 +1248,7 @@ components:
         - name
       title: InitialModelSelection
       type: object
+      additionalProperties: false
 
     IntegrationUpdate:
       description: "Schema for partially updating an integration (user-facing)."
@@ -1457,6 +1462,7 @@ components:
               title: Enabled Model Count
               description: Number of enabled models linked to this integration
 
+          additionalProperties: false
     MCPServerConfigurationInput:
       description: Admin-provided fields for MCP server integrations (used by create/patch).
       additionalProperties: false
@@ -1597,6 +1603,7 @@ components:
         - name
       title: DiscoveredLLMModel
       type: object
+      additionalProperties: false
 
     DiscoveredToolParameter:
       description: A parameter belonging to a discovered tool.
@@ -1620,6 +1627,7 @@ components:
         - name
       title: DiscoveredToolParameter
       type: object
+      additionalProperties: false
 
     DiscoveredTool:
       description: |-
@@ -1647,6 +1655,7 @@ components:
         - name
       title: DiscoveredTool
       type: object
+      additionalProperties: false
 
     HealthCheckErrorType:
       description: Classification of health check failures.
@@ -1686,6 +1695,7 @@ components:
         - checked_at
       title: ValidateResult
       type: object
+      additionalProperties: false
 
     DiscoverResult:
       description: |-
@@ -1729,6 +1739,7 @@ components:
         - checked_at
       title: DiscoverResult
       type: object
+      additionalProperties: false
 
     IntegrationRefreshStatus:
       type: string
@@ -1775,6 +1786,7 @@ components:
         - missing_count
       title: RefreshResult
       type: object
+      additionalProperties: false
 
     LLMModelListResponse:
       allOf:
@@ -1789,6 +1801,7 @@ components:
                 $ref: '#/components/schemas/LLMModelRead'
               description: Array of resources in current page
               title: Resources
+          additionalProperties: false
       title: LLMModelListResponse
       description: Paginated response for LLM models.
 
@@ -1852,6 +1865,7 @@ components:
               format: date-time
             - type: 'null'
           title: Updated At
+      additionalProperties: false
 
     ModelCapabilityProfile:
       type: object
@@ -1988,6 +2002,7 @@ components:
             - type: boolean
             - type: 'null'
           title: Temperature
+      additionalProperties: false
 
     LLMModelUpdate:
       type: object
@@ -2004,6 +2019,7 @@ components:
             - type: boolean
             - type: 'null'
           title: Is Default
+      additionalProperties: false
 
     LLMModelBulkUpdate:
       type: object
@@ -2024,6 +2040,7 @@ components:
           type: boolean
           title: Enabled
           description: New enabled state
+      additionalProperties: false
     LLMModelBulkUpdateResponse:
       type: object
       title: LLMModelBulkUpdateResponse
@@ -2046,6 +2063,7 @@ components:
           format: date-time
           title: Updated At
           description: Timestamp of the update
+      additionalProperties: false
 
     ToolListResponse:
       $ref: '../tool_manager/openapi.yaml#/components/schemas/ToolListResponse'

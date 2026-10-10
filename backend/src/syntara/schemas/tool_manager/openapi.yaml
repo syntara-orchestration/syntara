@@ -154,6 +154,7 @@ paths:
 components:
   schemas:
     ToolListResponse:
+      additionalProperties: false
       allOf:
         - $ref: "../base/shared-resources.openapi.yaml#/components/schemas/ResourcesResponseBase"
         - type: object
@@ -400,3 +401,4 @@ components:
         - updated_count
         - skipped_count
         - updated_at
+      additionalProperties: false

@@ -1367,6 +1367,7 @@ components:
     # ── User schemas ────────────────────────────────────────────────
     UserCreate:
       type: object
+      additionalProperties: false
       title: UserCreate
       description: |-
         Schema for creating a new local user (POST /users).
@@ -1427,6 +1428,7 @@ components:
 
     UserUpdate:
       type: object
+      additionalProperties: false
       title: UserUpdate
       description: |-
         Schema for updating a user (PATCH /users/{id}).
@@ -1490,6 +1492,7 @@ components:
 
     UserRead:
       type: object
+      additionalProperties: false
       title: UserRead
       description: |-
         Schema for user response (GET /users/{id}).
@@ -1572,6 +1575,7 @@ components:
 
     UserGroupsSet:
       type: object
+      additionalProperties: false
       title: UserGroupsSet
       description: |-
         Schema for declaratively setting a user's group memberships (PUT /users/{id}/groups).
@@ -1590,6 +1594,7 @@ components:
     # ── User Identity schemas ─────────────────────────────────────────
     UserIdentityRead:
       type: object
+      additionalProperties: false
       title: UserIdentityRead
       description: Schema for user identity response.
       required:
@@ -1640,6 +1645,7 @@ components:
 
     UserIdentityListResponse:
       type: object
+      additionalProperties: false
       title: UserIdentityListResponse
       description: Paginated list of user identities.
       required:
@@ -1679,6 +1685,7 @@ components:
 
     UserIdentityAttach:
       type: object
+      additionalProperties: false
       title: UserIdentityAttach
       description: Schema for attaching an identity to a user.
       required:
@@ -1692,6 +1699,7 @@ components:
     # ── Group schemas ───────────────────────────────────────────────
     GroupCreate:
       type: object
+      additionalProperties: false
       title: GroupCreate
       description: |-
         Schema for creating a new group (POST /groups).
@@ -1714,6 +1722,7 @@ components:
 
     GroupUpdate:
       type: object
+      additionalProperties: false
       title: GroupUpdate
       description: |-
         Schema for updating a group (PATCH /groups/{id}).
@@ -1780,6 +1789,7 @@ components:
 
     MembershipSource:
       type: object
+      additionalProperties: false
       title: MembershipSource
       description: Describes how a user got membership in a group.
       required:
@@ -1850,6 +1860,7 @@ components:
 
     GroupMemberRead:
       type: object
+      additionalProperties: false
       title: GroupMemberRead
       description: User response with membership source info for a specific group.
       required:
@@ -1967,6 +1978,7 @@ components:
 
     GroupMemberAdd:
       type: object
+      additionalProperties: false
       title: GroupMemberAdd
       description: Schema for adding a member to a group (POST /groups/{id}/members).
       required:
@@ -1980,6 +1992,7 @@ components:
 
     GroupMemberAddResponse:
       type: object
+      additionalProperties: false
       title: GroupMemberAddResponse
       description: Response schema for adding a member to a group.
       properties:
@@ -1992,6 +2005,7 @@ components:
     # ── Directory schemas ──────────────────────────────────────────
     UserDirectoryEntry:
       type: object
+      additionalProperties: false
       title: UserDirectoryEntry
       description: Lightweight user record for directory lookups.
       required:
@@ -2008,6 +2022,7 @@ components:
 
     GroupDirectoryEntry:
       type: object
+      additionalProperties: false
       title: GroupDirectoryEntry
       description: Lightweight group record for directory lookups.
       required:
@@ -2024,6 +2039,7 @@ components:
 
     ResourcesResponse_UserDirectoryEntry_:
       type: object
+      additionalProperties: false
       title: ResourcesResponse[UserDirectoryEntry]
       examples:
         - next: eyJpZCI6InV1aWQifQ
@@ -2062,6 +2078,7 @@ components:
 
     ResourcesResponse_GroupDirectoryEntry_:
       type: object
+      additionalProperties: false
       title: ResourcesResponse[GroupDirectoryEntry]
       examples:
         - next: eyJpZCI6InV1aWQifQ

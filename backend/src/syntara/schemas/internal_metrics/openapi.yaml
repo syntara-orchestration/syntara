@@ -321,6 +321,7 @@ components:
         - metric_type
         - value
       title: MetricRecord
+      additionalProperties: false
     MetricType:
       type: string
       enum:

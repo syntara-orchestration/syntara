@@ -522,6 +522,7 @@ components:
       type: object
       title: LoginRequest
       description: Login request with username and password.
+      additionalProperties: false
       required:
         - username
         - password
@@ -540,6 +541,7 @@ components:
       type: object
       title: AccessTokenResponse
       description: Access token response (refresh token is sent via HttpOnly cookie).
+      additionalProperties: false
       required:
         - access_token
         - expires_in
@@ -562,6 +564,7 @@ components:
       type: object
       title: CsrfTokenResponse
       description: CSRF form token response.
+      additionalProperties: false
       required:
         - csrf_token
       properties:
@@ -574,6 +577,7 @@ components:
       type: object
       title: WebSocketTicketResponse
       description: Response for the WebSocket ticket exchange endpoint.
+      additionalProperties: false
       required:
         - ticket
         - expires_in
@@ -591,6 +595,7 @@ components:
       type: object
       title: UserInfo
       description: Current user information derived from access token claims.
+      additionalProperties: false
       required:
         - id
         - username
@@ -625,6 +630,7 @@ components:
       type: object
       title: AuthProviderInfo
       description: Public identity provider info for the login page.
+      additionalProperties: false
       required:
         - id
         - name
@@ -653,6 +659,7 @@ components:
       type: object
       title: AuthProvidersResponse
       description: Response for the public providers listing endpoint.
+      additionalProperties: false
       properties:
         resources:
           type: array
@@ -664,6 +671,7 @@ components:
     Body_token:
       type: object
       title: Body_token
+      additionalProperties: false
       required:
         - grant_type
       properties:

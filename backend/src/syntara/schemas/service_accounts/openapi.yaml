@@ -796,6 +796,7 @@ components:
         - project_id
       title: ServiceAccountCreate
       description: Schema for creating a new service account.
+      additionalProperties: false
     ServiceAccountListResponse:
       properties:
         next:
@@ -839,6 +840,7 @@ components:
           total: 150
         - next: eyJpZCI6Im5leHQifQ
           prev: eyJpZCI6InByZXYifQ
+      additionalProperties: false
     ServiceAccountRead:
       properties:
         id:
@@ -907,6 +909,7 @@ components:
         - updated_at
       title: ServiceAccountRead
       description: Schema for service account responses.
+      additionalProperties: false
     ServiceAccountStatus:
       type: string
       enum:
@@ -941,6 +944,7 @@ components:
       type: object
       title: ServiceAccountUpdate
       description: Schema for updating a service account (PATCH).
+      additionalProperties: false
     ServiceAccountCredentialType:
       type: string
       enum:
@@ -978,6 +982,7 @@ components:
         - credential_type
       title: ServiceAccountCredentialCreate
       description: Schema for creating a new service account credential.
+      additionalProperties: false
     ServiceAccountCredentialRead:
       properties:
         id:
@@ -1050,6 +1055,7 @@ components:
         - updated_at
       title: ServiceAccountCredentialRead
       description: Schema for credential responses (excludes secrets).
+      additionalProperties: false
     ServiceAccountCredentialCreateResponse:
       properties:
         id:
@@ -1128,6 +1134,7 @@ components:
         - updated_at
       title: ServiceAccountCredentialCreateResponse
       description: Schema for the create response — includes one-time plaintext secret(s).
+      additionalProperties: false
     ServiceAccountCredentialRotateRequest:
       properties:
         grace_period_seconds:
@@ -1141,6 +1148,7 @@ components:
       type: object
       title: ServiceAccountCredentialRotateRequest
       description: Schema for rotating a credential's secret.
+      additionalProperties: false
     ServiceAccountCredentialRotateResponse:
       properties:
         id:
@@ -1219,6 +1227,7 @@ components:
         - updated_at
       title: ServiceAccountCredentialRotateResponse
       description: Schema for the rotate response — same shape as create response.
+      additionalProperties: false
     ServiceAccountCredentialListResponse:
       properties:
         next:
@@ -1272,3 +1281,4 @@ components:
           total: 150
         - next: eyJpZCI6Im5leHQifQ
           prev: eyJpZCI6InByZXYifQ
+      additionalProperties: false

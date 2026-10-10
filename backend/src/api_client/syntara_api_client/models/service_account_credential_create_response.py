@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING, Any, TypeVar, cast
 from uuid import UUID
 
 from attrs import define as _attrs_define
-from attrs import field as _attrs_field
 from dateutil.parser import isoparse
 
 from ..models.service_account_credential_status import ServiceAccountCredentialStatus
@@ -55,7 +54,6 @@ class ServiceAccountCredentialCreateResponse:
     created_by: None | Unset | UserReference = UNSET
     updated_by: None | Unset | UserReference = UNSET
     client_secret: None | str | Unset = UNSET
-    additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         from ..models.user_reference import UserReference
@@ -123,7 +121,7 @@ class ServiceAccountCredentialCreateResponse:
             client_secret = self.client_secret
 
         field_dict: dict[str, Any] = {}
-        field_dict.update(self.additional_properties)
+
         field_dict.update(
             {
                 "id": id,
@@ -283,21 +281,4 @@ class ServiceAccountCredentialCreateResponse:
             client_secret=client_secret,
         )
 
-        service_account_credential_create_response.additional_properties = d
         return service_account_credential_create_response
-
-    @property
-    def additional_keys(self) -> list[str]:
-        return list(self.additional_properties.keys())
-
-    def __getitem__(self, key: str) -> Any:
-        return self.additional_properties[key]
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        self.additional_properties[key] = value
-
-    def __delitem__(self, key: str) -> None:
-        del self.additional_properties[key]
-
-    def __contains__(self, key: str) -> bool:
-        return key in self.additional_properties

@@ -1538,6 +1538,7 @@ components:
           default: {}
           additionalProperties: true
           title: Labels
+      additionalProperties: false
 
     ProjectUpdate:
       type: object
@@ -1563,6 +1564,7 @@ components:
               additionalProperties: true
             - type: "null"
           title: Labels
+      additionalProperties: false
 
     ProjectRead:
       title: ProjectRead
@@ -1596,6 +1598,7 @@ components:
     ProjectListResponse:
       title: ProjectListResponse
       description: Paginated list response for projects.
+      additionalProperties: false
       allOf:
         - $ref: "../base/shared-resources.openapi.yaml#/components/schemas/ResourcesResponseBase"
         - type: object
@@ -1640,6 +1643,7 @@ components:
           additionalProperties:
             type: string
           title: Labels
+      additionalProperties: false
 
     ProjectPolicyCreate:
       type: object
@@ -1671,6 +1675,7 @@ components:
           additionalProperties:
             type: string
           title: Labels
+      additionalProperties: false
 
     PolicyStatementSchema:
       $ref: "../authz/policy.openapi.yaml#/components/schemas/PolicyStatementSchema"
@@ -1742,6 +1747,7 @@ components:
             type: string
           title: Labels
           description: Key-value labels
+      additionalProperties: false
 
     CredentialRead:
       $ref: "../credentials/openapi.yaml#/components/schemas/CredentialRead"
