@@ -59,7 +59,7 @@ sequenceDiagram
 
 ### Pre-Resolved Nodes: How Mocking Works
 
-For the mechanics of how pre-resolved nodes are skipped during execution and how control-flow routing works with mock data, see [Execution Runtime](execution-runtime.md). The key points specific to test executions:
+For the mechanics of how pre-resolved nodes are skipped during execution and how control-flow routing works with mock data, see [Execution Runtime](../execution-runtime.md). The key points specific to test executions:
 
 - `_validate_pre_resolved_nodes()` enforces that control-flow nodes (condition, loop, approval) include `control.next_port` in their mock data
 - `execute_target=false` adds the target node itself to `pre_resolved_outputs` with empty data — useful for populating upstream data without running an expensive or side-effect-producing node

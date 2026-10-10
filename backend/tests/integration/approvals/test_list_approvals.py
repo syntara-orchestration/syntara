@@ -273,6 +273,24 @@ class TestListApprovalsContract:
         # Should be in descending order
         assert created_ats == sorted(created_ats, reverse=True)
 
+        # Act & Assert - Test sort by workflow_name ascending
+        response = await auth_client.get("/api/v1/approvals?sort=workflow_name")
+        assert response.status_code == 200
+        data = response.json()
+
+        workflow_names = [item["workflow_context"]["workflow_name"] for item in data["resources"]]
+        assert len(workflow_names) == 5
+        assert workflow_names == sorted(workflow_names)
+
+        # Act & Assert - Test sort by workflow_name descending
+        response = await auth_client.get("/api/v1/approvals?sort=-workflow_name")
+        assert response.status_code == 200
+        data = response.json()
+
+        workflow_names = [item["workflow_context"]["workflow_name"] for item in data["resources"]]
+        assert len(workflow_names) == 5
+        assert workflow_names == sorted(workflow_names, reverse=True)
+
     @pytest.mark.asyncio
     async def test_list_approvals_filter_parameters(
         self,

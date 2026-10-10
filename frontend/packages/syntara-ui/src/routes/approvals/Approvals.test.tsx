@@ -472,18 +472,15 @@ describe('Approvals Component', () => {
       )
     })
 
-    it('renders sortable headers for name, initiated, actioned, and status', () => {
+    it('renders sortable headers for name, workflow, initiated, actioned, and status', () => {
       mockApprovalsQuery(mockApprovals)
 
       render(<Approvals />)
 
-      for (const name of [/Approval name/i, /Approval initiated/i, /Actioned on/i, /^Status$/i]) {
+      for (const name of [/Approval name/i, /^Workflow$/i, /Approval initiated/i, /Actioned on/i, /^Status$/i]) {
         const header = screen.getByRole('columnheader', { name })
         expect(within(header).getByRole('button')).toBeInTheDocument()
       }
-
-      const workflowHeader = screen.getByRole('columnheader', { name: /^Workflow$/i })
-      expect(within(workflowHeader).queryByRole('button')).not.toBeInTheDocument()
     })
 
     it('writes sort URL param when a column header is clicked', async () => {
@@ -525,6 +522,20 @@ describe('Approvals Component', () => {
 
       await waitFor(() => {
         assertUrlParam(mockSetSearchParams, 'sort', 'name')
+      })
+    })
+
+    it('can sort by workflow_name via the Workflow column', async () => {
+      const user = userEvent.setup()
+      mockApprovalsQuery(mockApprovals)
+
+      render(<Approvals />)
+
+      const workflowHeader = screen.getByRole('columnheader', { name: /^Workflow$/i })
+      await user.click(within(workflowHeader).getByRole('button'))
+
+      await waitFor(() => {
+        assertUrlParam(mockSetSearchParams, 'sort', 'workflow_name')
       })
     })
   })
