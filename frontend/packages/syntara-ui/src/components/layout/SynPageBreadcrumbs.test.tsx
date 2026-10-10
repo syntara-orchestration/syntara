@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
@@ -112,14 +112,22 @@ describe('SynPageBreadcrumbs', () => {
     expect(toggle).toHaveAttribute('aria-expanded', 'false')
   })
 
-  it('renders very long labels so entity names remain available in the DOM', () => {
-    const longLabel = `Project ${'x'.repeat(400)}`
+  it('truncates the current-page label and shows the full name in a tooltip', async () => {
+    const user = userEvent.setup()
+    const longLabel = `Project ${'x'.repeat(200)}`
 
     render(
       <SynPageBreadcrumbs items={[{ label: 'Access management', href: '/access-management' }, { label: longLabel }]} />
     )
 
-    expect(screen.getByText(longLabel)).toBeInTheDocument()
+    const currentSegment = screen.getByTestId('breadcrumb-current-segment')
+    expect(currentSegment).toHaveTextContent(longLabel)
+
+    await user.hover(currentSegment)
+
+    await waitFor(() => {
+      expect(screen.getByRole('tooltip')).toHaveTextContent(longLabel)
+    })
   })
 
   it('renders a non-link middle segment in the full trail (wide viewport)', () => {

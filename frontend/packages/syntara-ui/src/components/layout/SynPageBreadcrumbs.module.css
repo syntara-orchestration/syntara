@@ -1,0 +1,26 @@
+.breadcrumb {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.breadcrumb :global(.pf-v6-c-breadcrumb__list) {
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+/* Let the current-page crumb shrink so earlier links stay visible. */
+.breadcrumb :global(.pf-v6-c-breadcrumb__item:last-child) {
+  min-width: 0;
+  max-width: 100%;
+  flex: 1 1 auto;
+  overflow: hidden;
+}
+
+.currentSegment {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
