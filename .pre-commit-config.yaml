@@ -77,6 +77,7 @@ repos:
         language: system
         pass_filenames: true
         files: ^frontend/.*\.(ts|tsx|js|jsx|json|yml|yaml|md|css)$
+        exclude: ^frontend/packages/syntara-mock-api/src/examples/
 
       - id: frontend-eslint
         name: 'frontend: eslint'
