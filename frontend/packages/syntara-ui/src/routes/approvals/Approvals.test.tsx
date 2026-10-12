@@ -538,6 +538,23 @@ describe('Approvals Component', () => {
         assertUrlParam(mockSetSearchParams, 'sort', 'workflow_name')
       })
     })
+
+    it('keeps sortable headers on screen while a background refetch is in flight', () => {
+      vi.mocked(approvalsClient.useQuery).mockReturnValue({
+        data: { resources: mockApprovals, next: null, prev: null, total: mockApprovals.length },
+        isPending: false,
+        isFetching: true,
+        error: null,
+        isError: false,
+        refetch: vi.fn(),
+      })
+
+      render(<Approvals />)
+
+      const workflowHeader = screen.getByRole('columnheader', { name: /^Workflow$/i })
+      expect(within(workflowHeader).getByRole('button')).toBeInTheDocument()
+      expect(screen.queryByTestId('loading-state')).not.toBeInTheDocument()
+    })
   })
 
   describe('Row Expansion', () => {
