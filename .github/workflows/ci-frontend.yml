@@ -5,7 +5,7 @@ name: CI Frontend
 
 on:
   pull_request:
-    branches: [devel, early-access]
+    branches: [devel, early-access, 'feature/*', 'feature/**/*']
   merge_group:
     branches: [devel, early-access]
   push:
@@ -527,6 +527,7 @@ jobs:
 
   # E2E UI tests run conditionally to reduce CI costs:
   # - Always run in merge queue (final safety check)
+  # - On pull_request when the base branch matches feature/* or feature/**/* (informational; does not gate Required Checks)
   # - Daily scheduled run with Currents reporting (2 AM UTC)
   # - Manual trigger via /run-e2e-ui-tests comment (OWNER/MEMBER only)
   test-compose-e2e:
@@ -549,7 +550,12 @@ jobs:
           ) &&
           (
             github.event_name == 'merge_group' ||
-            github.event_name == 'workflow_dispatch'
+            github.event_name == 'workflow_dispatch' ||
+            (
+              github.event_name == 'pull_request' &&
+              startsWith(github.base_ref, 'feature/') &&
+              (needs.changes.outputs.code == 'true' || needs.changes.outputs.contracts == 'true')
+            )
           )
         )
       )
@@ -846,6 +852,9 @@ jobs:
       - test-compose-e2e
     steps:
       - name: Check required jobs passed
+        env:
+          # Compose E2E runs on feature-base PRs for signal only; failures must not block merge.
+          FEATURE_BASE_PR: ${{ github.event_name == 'pull_request' && startsWith(github.base_ref, 'feature/') }}
         run: |
           if [[ "${{ needs.changes.result }}" != "success" ]]; then
             echo "::error::Detect Changes job did not succeed: ${{ needs.changes.result }}"
@@ -870,6 +879,12 @@ jobs:
               shared-checks-gate)      result="${{ needs.shared-checks-gate.result }}" ;;
             esac
             echo "$job: $result"
+            if [[ "$job" == "test-compose-e2e" && "$FEATURE_BASE_PR" == "true" ]]; then
+              if [[ "$result" == "failure" ]]; then
+                echo "::warning::test-compose-e2e failed on a feature-base PR (informational only)"
+              fi
+              continue
+            fi
             if [[ ! "$result" =~ ^($ok)$ ]]; then
               echo "::error::Required job '$job' has result '$result'"
               exit 1
