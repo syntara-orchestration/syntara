@@ -6341,29 +6341,28 @@ class TestReplayedTimestampResolution:
         handle.execute_update.assert_awaited_once()
 
     @pytest.mark.asyncio
-    async def test_an_ordinary_run_does_not_ask_at_all(self) -> None:
-        """An ordinary run makes no RPC to the workflow for this.
+    async def test_an_ordinary_run_still_asks_and_gets_nothing_back(self) -> None:
+        """Every completed activity asks, retry or not.
 
-        The workflow holds no replay candidates off a retry, so its wait condition
-        is satisfied on the first check and it would answer "not a replay" — but
-        that is still a blocking round trip per completed activity, on a path that
-        made none before. ``is_retry`` is set once per execution from the retry
-        lineage, so gating on it costs a field read and removes the traffic.
+        A gate on ``is_retry`` would skip this entirely and remove a request per
+        node from every ordinary run, but it would also make two behaviours out of
+        one path. The workflow answers immediately off a retry — it holds no replay
+        candidates, so the second branch of its wait condition is satisfied — which
+        makes the ask a request rather than a stall.
         """
         metadata = self._metadata([(1, "script_1", ActivityStatus.COMPLETED)])
         metadata.is_retry = False
         handle = self._handle(None)
 
         assert await self.service._resolve_replayed_timestamps(metadata, handle) == {}
-        handle.execute_update.assert_not_awaited()
+        handle.execute_update.assert_awaited_once_with("get_replayed_node_timestamps_when_ready", "script_1")
 
     @pytest.mark.asyncio
-    async def test_a_retry_still_asks_about_every_completed_node(self) -> None:
-        """The gate must not narrow what a retry asks about.
+    async def test_every_completed_node_is_asked_about(self) -> None:
+        """One rule for both kinds of run: ask each completed node once.
 
         Within a retry every node still goes through the same path, so there is one
-        rule rather than two that behave differently — an ordinary run asks nobody,
-        a retry asks every completed node.
+        rule rather than two that behave differently.
         """
         metadata = self._metadata(
             [
