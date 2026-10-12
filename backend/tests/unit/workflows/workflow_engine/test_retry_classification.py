@@ -13,10 +13,15 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from syntara.core.exceptions import SafeValueError
 from syntara.workflows.utils.namespace_resolver import NamespaceResolver
 from syntara.workflows.workflow_engine.dynamic_workflow import PRE_RESOLVED_MARKER, OrchestratorWorkflow
 from syntara.workflows.workflow_engine.graph import ActivityNode, WorkflowGraph
 from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName
+from syntara.workflows.workflow_engine.retry_mixin import (
+    _CONTROL_NODE_TYPES_FOR_RETRY,
+    WorkflowRetryMixin,
+)
 
 from .conftest import init_workflow_runtime
 
@@ -338,7 +343,7 @@ def test_default_continue_on_failure_is_false_so_upstream_is_restored() -> None:
 
 @pytest.mark.parametrize(
     "node_type",
-    ["condition", "switch", "loop", "wait", "converge"],
+    ["condition", "switch", "loop", "converge"],
 )
 def test_control_nodes_are_never_restored(node_type: str) -> None:
     """Condition/switch/loop/converge/wait decide routing, so they must always run.
@@ -1211,17 +1216,41 @@ def _approval_graph() -> WorkflowGraph:
     return WorkflowGraph(backend)
 
 
-def test_an_approval_node_is_never_restored() -> None:
-    """An approval routes on a port, and a restored one has no port to route on.
+def test_an_approval_node_is_restored_and_routes_on_its_recorded_decision() -> None:
+    """An approval is restored rather than re-prompted, and follows its own decision.
 
-    Replay returns no control data, so ``get_next_activities_by_port(node, None)``
-    hands back every successor — which for an approval is both the approved and the
-    rejected branch. The retry would run both paths of a human decision.
+    Re-running an approval asks a human for a decision they already made. What a
+    restored approval must *not* do is return no port: with one, the scheduler
+    gets both successors and runs the approved and the rejected path together.
+    So the restore carries the recorded decision as the port, which is what a live
+    approval returns too.
     """
     wf = _make_workflow(_retry("failed_step"))
     graph = _approval_graph()
 
-    assert "approval" not in wf._retry_restorable_nodes(graph)
+    assert "approval" in wf._retry_restorable_nodes(graph)
+
+    control = wf._restored_approval_control({"decision": "approved"})
+    assert control == {"next_port": "approved"}
+    assert control is not None
+
+
+def test_a_restored_approval_never_returns_no_port() -> None:
+    """The guard against the both-branches bug, stated directly.
+
+    With ``control`` absent, ``get_next_activities_by_port(node, None)`` documents
+    that it returns every successor. This pins that the approval path always
+    produces a real port, whatever the recorded decision was.
+    """
+    for decision in ("approved", "rejected"):
+        control = WorkflowRetryMixin._restored_approval_control({"decision": decision})
+        assert control is not None
+        assert control["next_port"] == decision
+
+    with pytest.raises(SafeValueError):
+        WorkflowRetryMixin._restored_approval_control({"decision": "maybe"})
+    with pytest.raises(SafeValueError):
+        WorkflowRetryMixin._restored_approval_control({})
 
 
 def test_a_restored_approval_would_schedule_both_of_its_branches() -> None:
@@ -1240,16 +1269,18 @@ def test_a_restored_approval_would_schedule_both_of_its_branches() -> None:
     assert len(graph.get_next_activities_by_port(approval.id, None)) == 2
 
 
-def test_approval_is_not_restored_even_when_upstream_and_unselected() -> None:
-    """The exclusion holds regardless of where the retry point sits.
+def test_a_wait_node_is_restored_rather_than_rerun() -> None:
+    """A re-run wait restarts a wait the source run already sat through.
 
-    An approval before the failure point is the common case, but a retry from
-    further upstream still must not restore it.
+    Its duration is measured against the clock, so re-running would either wait
+    the full window again or skip it entirely depending on how far the clock has
+    moved since. Restoring keeps what actually happened.
     """
-    wf = _make_workflow(_retry("approved_path"))
-    graph = _approval_graph()
+    from syntara.workflows.workflow_engine.models.workflow_definition import NodeType
 
-    assert "approval" not in wf._retry_restorable_nodes(graph)
+    assert NodeType.WAIT not in _CONTROL_NODE_TYPES_FOR_RETRY
+    assert NodeType.APPROVAL not in _CONTROL_NODE_TYPES_FOR_RETRY
+    assert NodeType.CONVERGE in _CONTROL_NODE_TYPES_FOR_RETRY
 
 
 def test_a_restored_completion_upstream_of_an_approval_still_works() -> None:
@@ -1265,8 +1296,7 @@ def test_a_restored_completion_upstream_of_an_approval_still_works() -> None:
     # The trigger is never restorable either — the retry re-enters at its first
     # eligible point — but the approval's two branches, being upstream of the
     # failure, are what actually have to survive the exclusion.
-    assert wf._retry_restorable_nodes(graph) == {"approved_path", "rejected_path"}
-    assert "approval" not in wf._retry_restorable_nodes(graph)
+    assert wf._retry_restorable_nodes(graph) == {"approval", "approved_path", "rejected_path"}
 
 
 @pytest.mark.asyncio
@@ -1289,3 +1319,72 @@ async def test_a_record_vanishing_after_classification_is_loud(mock_wf: MagicMoc
 
     with pytest.raises(SafeValueError, match="disappeared between classification and replay"):
         await wf._restore_node_output(node)
+
+
+@pytest.mark.asyncio
+async def test_restoring_an_approval_returns_the_port_the_scheduler_needs(mock_wf: MagicMock) -> None:
+    """Drives the real restore path, so the port has to be wired at the call site.
+
+    Testing ``_restored_approval_control`` alone would pass even if the restore
+    stopped calling it — and a restored approval with no port is exactly the bug
+    that made a retry run both branches of a human decision.
+    """
+    wf = _injectable_workflow(source_statuses={"approval": "completed"})
+    wf.retry_context = _retry("failed_step")
+    node = ActivityNode(node_id="approval", node_type="approval", parameters={})
+    mock_wf.execute_activity = AsyncMock(
+        return_value={
+            "status": "completed",
+            "input_data": {},
+            "output_data": {"decision": "approved", "decided_by": "someone"},
+            "error_details": None,
+        }
+    )
+
+    result = await wf._restore_node_output(node)
+
+    assert result is not None
+    assert result["control"] == {"next_port": "approved"}
+    # The port has to be a real one, or get_next_activities_by_port returns every
+    # successor and the rejected path runs alongside the approved one.
+    assert result["control"]["next_port"] in ("approved", "rejected")
+
+
+@pytest.mark.asyncio
+async def test_a_completed_approval_with_no_decision_stops_the_retry(mock_wf: MagicMock) -> None:
+    """A completed approval always recorded a decision, so a missing one is corruption.
+
+    Guessing a branch would run a human decision the operator never chose, so the
+    retry stops instead. The approval activity rejects any other value, so this
+    combination cannot come from a real run.
+    """
+    wf = _injectable_workflow(source_statuses={"approval": "completed"})
+    wf.retry_context = _retry("failed_step")
+    node = ActivityNode(node_id="approval", node_type="approval", parameters={})
+    mock_wf.execute_activity = AsyncMock(
+        return_value={"status": "completed", "input_data": {}, "output_data": {}, "error_details": None}
+    )
+
+    with pytest.raises(SafeValueError, match="no usable decision"):
+        await wf._restore_node_output(node)
+
+
+@pytest.mark.asyncio
+async def test_a_failed_approval_does_not_try_to_route(mock_wf: MagicMock) -> None:
+    """Only a completed approval routes; a failed one suppresses successors outright.
+
+    A source failure never carries a decision, so asking for one would reject a
+    perfectly restorable node. The terminal path handles it instead.
+    """
+    wf = _injectable_workflow(source_statuses={"approval": "failed"})
+    wf.retry_context = _retry("failed_step")
+    node = ActivityNode(node_id="approval", node_type="approval", parameters={})
+    mock_wf.execute_activity = AsyncMock(
+        return_value={"status": "failed", "input_data": {}, "output_data": {}, "error_details": "denied"}
+    )
+
+    result = await wf._restore_node_output(node)
+
+    assert result is not None
+    assert result["control"] is None
+    assert "approval" in wf.failed_nodes

@@ -6242,41 +6242,15 @@ class TestReplayedTimestampResolution:
         return handle
 
     @pytest.mark.asyncio
-    async def test_a_timeout_is_retried_once_and_can_still_succeed(self) -> None:
-        """The workflow raises when its wait expires; that is a timing race, not a verdict.
+    async def test_the_update_is_asked_exactly_once(self) -> None:
+        """A second ask cannot help, so there is no second ask.
 
-        An ordinary node is answered from the second branch of the wait condition
-        and never reaches the timeout, so a raise can only mean a node that *is* a
-        replay did not have its state ready yet. Asking again gives it a second
-        window, and the retry blocks inside the workflow for the same period, which
-        is the time the state needed.
-        """
-        from temporalio.exceptions import ApplicationError
-
-        metadata = self._metadata([(1, "script_1", ActivityStatus.COMPLETED)])
-        handle = self._handle(self.source_times)
-        handle.execute_update = AsyncMock(
-            side_effect=[ApplicationError("timeout"), self.source_times],
-        )
-
-        resolved = await self.service._resolve_replayed_timestamps(metadata, handle)
-
-        assert handle.execute_update.await_count == 2
-        assert resolved == {
-            "script_1": {
-                "started_at": datetime(2026, 1, 1, 0, 0, 0, tzinfo=UTC),
-                "completed_at": datetime(2026, 1, 1, 0, 5, 0, tzinfo=UTC),
-            }
-        }
-
-    @pytest.mark.asyncio
-    async def test_a_second_timeout_gives_up_and_keeps_this_runs_values(self) -> None:
-        """The node must not lose its record because the source state was late.
-
-        Returning None leaves the caller with Temporal's timestamps and this run's
-        status, so the row is still written — it just states when the replay
-        happened rather than when the work did. One retry is the bound; retrying
-        without end would hold the caller's batch open indefinitely.
+        If the update does not return, the fault is in the path that answers it: a
+        closed workflow cannot be asked again, an unreachable one is equally
+        unreachable, and a wait that expired expired because the state was not
+        there — an immediate retry would wait out the same timeout for the same
+        reason. The row keeps this run's times, so the node reports when it was
+        replayed rather than when the work ran.
         """
         from temporalio.exceptions import ApplicationError
 
@@ -6286,20 +6260,15 @@ class TestReplayedTimestampResolution:
 
         resolved = await self.service._resolve_replayed_timestamps(metadata, handle)
 
-        assert handle.execute_update.await_count == 2
+        handle.execute_update.assert_awaited_once()
         assert resolved == {}
 
     @pytest.mark.asyncio
     async def test_an_rpc_failure_is_not_retried(self) -> None:
-        """An RPC failure is not the timing race the retry is for.
-
-        The workflow is unreachable rather than busy, so a second attempt would
-        fail the same way while holding the batch open.
-        """
+        """An unreachable workflow is equally unreachable on the second ask."""
         metadata = self._metadata([(1, "script_1", ActivityStatus.COMPLETED)])
         handle = self._handle(None)
-        rpc_error = RPCError("unavailable", RPCStatusCode.UNAVAILABLE, b"")
-        handle.execute_update = AsyncMock(side_effect=rpc_error)
+        handle.execute_update = AsyncMock(side_effect=RPCError("unavailable", RPCStatusCode.UNAVAILABLE, b""))
 
         resolved = await self.service._resolve_replayed_timestamps(metadata, handle)
 
@@ -6307,12 +6276,11 @@ class TestReplayedTimestampResolution:
         assert resolved == {}
 
     @pytest.mark.asyncio
-    async def test_an_ordinary_node_is_asked_once_and_not_retried(self) -> None:
+    async def test_an_ordinary_node_is_asked_once(self) -> None:
         """None is an answer, not a failure — the second branch of the condition.
 
         A node that really executed inside a retry has no source state, so the
-        workflow returns None at once. Retrying that would double every ordinary
-        node's round trip for no possible gain.
+        workflow returns None at once.
         """
         metadata = self._metadata([(1, "script_1", ActivityStatus.COMPLETED)])
         handle = self._handle(None)

@@ -16,32 +16,32 @@ from syntara.workflows.workflow_engine.constants import DEFAULT_ACTIVITY_TIMEOUT
 from syntara.workflows.workflow_engine.graph import ActivityNode, WorkflowGraph
 from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName, LoopState, NodeType
 
-#: Node types that decide routing rather than producing an output. A retry never
-#: restores these from a source run: skipping one would strand the graph, so
-#: they always execute.
+#: Node types a retry executes rather than restores from the source run.
+#:
+#: Not named simply ``_CONTROL_NODE_TYPES`` because "control node" means different
+#: things for different purposes; this is the retry-specific reading. A node listed
+#: here is one whose routing a restored output cannot stand in for, so the retry
+#: runs it again instead of replaying a decision against a half-rebuilt namespace.
+#:
+#: WAIT and APPROVAL are deliberately absent. Re-running either is wrong: a wait's
+#: duration is measured against the clock, so re-running restarts a wait the
+#: source run already sat through, and an approval re-prompts a human for a
+#: decision that was already made. Both are restored instead and route on what the
+#: source run recorded — a wait has a single successor, and an approval routes on
+#: its recorded decision.
 #: The same set the replay activity filters its query by, as plain strings so it
 #: can be tested against ``_retry_source_statuses`` without an enum conversion per
 #: node. One definition: the workflow and the query must agree on what a retry can
 #: restore, or the workflow skips a replay the activity would have performed.
 _RESTORABLE_SOURCE_STATUS_VALUES = frozenset(status.value for status in RESTORABLE_SOURCE_STATUSES)
 
-_CONTROL_NODE_TYPES = frozenset(
+_CONTROL_NODE_TYPES_FOR_RETRY = frozenset(
     {
         NodeType.CONDITION,
         NodeType.SWITCH,
         NodeType.LOOP,
-        NodeType.WAIT,
-        # An approval routes too, on an approved/rejected port, and a restored one
-        # carries no control data — so ``get_next_activities_by_port(node, None)``
-        # hands back *both* branches and the retry runs the approved and the
-        # rejected path together. An approval gates a human decision, so that is
-        # worse than merely re-prompting: it must execute, like every other
-        # routing node here.
-        NodeType.APPROVAL,
-        # A converge decides whether it has enough predecessors to run, so skipping
-        # it would strand the nodes waiting on it. It is a control node in every
-        # sense that matters here, and leaving it out meant one could be restored —
-        # which then released its successors without the gate ever being evaluated.
+        # A converge decides whether it has enough predecessors to run, so restoring
+        # one would release its successors without the gate ever being evaluated.
         NodeType.CONVERGE,
     }
 )
@@ -78,6 +78,34 @@ class WorkflowRetryMixin:
     node_inputs: dict[str, dict[str, Any]]
     loop_state: dict[str, LoopState]
     loop_iteration_results: dict[str, dict[str, list[Any]]]
+
+    def init_state(self, workflow_metadata: dict[str, Any] | None) -> None:
+        """Declare the retry state this mixin needs, before any node runs.
+
+        Called from the workflow's own initializer rather than inlined there, so
+        the set of retry attributes lives with the policy that uses them instead of
+        being split across two files.
+
+        Ordering matters and is why this is a separate call. ``retry_context`` is
+        control-plane state, not expression data: a user expression must not be
+        able to read ``eligible_point_ids`` or the input overrides. The caller
+        therefore has to assign it before walking the namespace, so that the loop
+        which registers each entry can skip the ``retry`` key rather than popping
+        it afterwards.
+        """
+        self.retry_context = dict(workflow_metadata.get("retry", {})) if workflow_metadata else {}
+        # Memoised restorable set: derived from the graph and the retry context,
+        # neither of which changes during a run.
+        self._retry_restorable_cache: set[str] | None = None
+        # Nodes this retry may replay, and the source state for the ones it did.
+        # The sync service consults the candidate set to tell a replayed activity
+        # from an ordinary one before waiting on it, so these are filled during
+        # _prepare_retry rather than on first use.
+        self._retry_replay_candidates: set[str] = set()
+        self._restored_node_timestamps: dict[str, dict[str, str | None]] = {}
+        self._restored_node_statuses: dict[str, str] = {}
+        self._restored_node_outputs: dict[str, dict[str, Any]] = {}
+        self._retry_source_statuses: dict[str, str] = {}
 
     def _create_loop_state_for_type(self, loop_type: str, node: ActivityNode) -> LoopState: ...  # type: ignore[empty-body]
 
@@ -162,7 +190,7 @@ class WorkflowRetryMixin:
         # and a loop body is not one node but one execution per iteration. Both
         # are excluded here so the set means what it says, instead of relying on
         # _should_restore_node to filter them again at the point of use.
-        control = {node.id for node in graph.get_all_nodes() if node.type in _CONTROL_NODE_TYPES}
+        control = {node.id for node in graph.get_all_nodes() if node.type in _CONTROL_NODE_TYPES_FOR_RETRY}
         loop_bodies = self._loop_body_node_ids(graph)
 
         # Everything downstream of a failure point re-executes, so it cannot be
@@ -241,7 +269,7 @@ class WorkflowRetryMixin:
         if not self.retry_context:
             return False
         node = graph.get_node(node_id)
-        if node is not None and node.type in _CONTROL_NODE_TYPES:
+        if node is not None and node.type in _CONTROL_NODE_TYPES_FOR_RETRY:
             return False
         return strip_iteration_suffix(node_id) in self._retry_restorable_nodes(graph)
 
@@ -335,10 +363,41 @@ class WorkflowRetryMixin:
             },
         )
 
-        if source_status == ActivityStatus.COMPLETED.value:
-            return {"output": output, "control": None}
+        if source_status != ActivityStatus.COMPLETED.value:
+            return self._restored_terminal_result(node, source_status, output, error_details)
 
-        return self._restored_terminal_result(node, source_status, output, error_details)
+        # A completed approval is the one restored node that must still route.
+        # Everything else that is completed publishes a plain completion, leaving
+        # the scheduler to follow the node's ordinary successors.
+        if node.type == NodeType.APPROVAL:
+            return {"output": output, "control": self._restored_approval_control(output)}
+
+        return {"output": output, "control": None}
+
+    @staticmethod
+    def _restored_approval_control(output: dict[str, Any]) -> dict[str, str] | None:
+        """Route a restored approval by the decision the source run recorded.
+
+        A live approval returns ``control: {next_port: decision}`` — the decision
+        doubles as the port. Restoring one has to do the same, or
+        ``get_next_activities_by_port`` is handed no port and returns *both* the
+        approved and the rejected branch, running a human decision twice.
+
+        Only a completed approval routes. A skipped or failed one never reaches
+        here: it takes the terminal path, which suppresses successors outright.
+
+        Raises:
+            SafeValueError: If a completed approval carries no usable decision.
+                That combination cannot arise from a real run — the approval
+                activity rejects any other value — so it means the stored output
+                is corrupt, and guessing a branch would be worse than stopping.
+
+        """
+        decision = output.get("decision")
+        if decision not in ("approved", "rejected"):
+            msg = f"restored approval has no usable decision to route on: {decision!r}"
+            raise SafeValueError(msg)
+        return {"next_port": str(decision)}
 
     def _restored_terminal_result(
         self,

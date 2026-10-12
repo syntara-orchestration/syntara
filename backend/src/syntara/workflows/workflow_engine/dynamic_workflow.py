@@ -178,23 +178,10 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
 
         self._project_id: str = ""
         self._created_by_user_id: str = ""
-        # The retry block is control-plane state, not expression data: a user
-        # expression must not be able to read eligible_point_ids or the input
-        # overrides. Pulled out before the namespace loop so it is never
-        # registered, rather than popped afterwards.
-        self.retry_context: dict[str, Any] = dict(workflow_metadata.get("retry", {})) if workflow_metadata else {}
-        # Memoised restorable set: derived from the graph and the retry context,
-        # neither of which changes during a run.
-        self._retry_restorable_cache: set[str] | None = None
-        # Nodes this retry may replay, and the source times for the ones it did.
-        # The sync service consults the candidate set to tell a replayed activity
-        # from an ordinary one before waiting on it, so it is filled during
-        # _prepare_retry rather than on first use.
-        self._retry_replay_candidates: set[str] = set()
-        self._restored_node_timestamps: dict[str, dict[str, str | None]] = {}
-        self._restored_node_statuses: dict[str, str] = {}
-        self._restored_node_outputs: dict[str, dict[str, Any]] = {}
-        self._retry_source_statuses: dict[str, str] = {}
+        # Declared before the namespace loop below, which registers every metadata
+        # key except "retry" — see WorkflowRetryMixin.init_state for why that
+        # ordering is load-bearing.
+        self.init_state(workflow_metadata)
         if workflow_metadata:
             for ns_key, ns_data in workflow_metadata.items():
                 if ns_key == "retry":
