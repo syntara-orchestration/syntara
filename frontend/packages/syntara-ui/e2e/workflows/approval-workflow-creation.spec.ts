@@ -32,7 +32,7 @@ async function selectCategoryAndStepType(page: Page, category: string, subtype: 
  * All tests are self-contained with try-finally cleanup.
  */
 test.describe('Approval Workflow Creation', () => {
-  test('create workflow with trigger, approval node, and script on approved path', async ({ app }) => {
+  test('create workflow with trigger, approval step, and script on approved path', async ({ app }) => {
     const workflowName = buildUniqueName('E2E Approval Workflow')
     let workflowId: string | undefined
 

@@ -25,8 +25,8 @@ function canvasNode(app: Page, name: string) {
   return app.locator('[role="group"][aria-roledescription="node"]').filter({ hasText: name })
 }
 
-test.describe('AI Agent Node @pr-check', () => {
-  test('can create AI Agent node with model and credential', async ({ app }) => {
+test.describe('AI Agent Step @pr-check', () => {
+  test('can create AI Agent step with model and credential', async ({ app }) => {
     const integrationName = buildUniqueName('e2e-llm-integ')
     let integration: SeededLlmIntegration | undefined
     try {
@@ -49,7 +49,7 @@ test.describe('AI Agent Node @pr-check', () => {
     }
   })
 
-  test('AI Agent node persists prompt after save/reload', async ({ app }) => {
+  test('AI Agent step persists prompt after save/reload', async ({ app }) => {
     test.setTimeout(90_000)
     const integrationName = buildUniqueName('e2e-llm-integ')
     const workflowName = buildUniqueName('e2e-agent-prompt')
@@ -107,7 +107,7 @@ test.describe('AI Agent Node @pr-check', () => {
     }
   })
 
-  test('AI Agent node with response schema persists after save/reload', async ({ app }) => {
+  test('AI Agent step with response schema persists after save/reload', async ({ app }) => {
     test.setTimeout(90_000)
     const integrationName = buildUniqueName('e2e-llm-integ')
     const workflowName = buildUniqueName('e2e-agent-schema')
@@ -150,7 +150,7 @@ test.describe('AI Agent Node @pr-check', () => {
     }
   })
 
-  test('AI Agent node with tool selection and response schema persists after save/reload', async ({ app }) => {
+  test('AI Agent step with tool selection and response schema persists after save/reload', async ({ app }) => {
     test.setTimeout(90_000)
     const llmIntegrationName = buildUniqueName('e2e-llm-integ')
     const mcpIntegrationName = buildUniqueName('e2e-mcp-integ')
@@ -223,7 +223,7 @@ test.describe('AI Agent Node @pr-check', () => {
     }
   })
 
-  test('AI Agent node can be edited after creation', async ({ app }) => {
+  test('AI Agent step can be edited after creation', async ({ app }) => {
     test.setTimeout(120_000)
     const integrationName = buildUniqueName('e2e-llm-integ')
     const workflowName = buildUniqueName('e2e-agent-edit')
@@ -274,7 +274,7 @@ test.describe('AI Agent Node @pr-check', () => {
     }
   })
 
-  test('multiple AI Agent nodes in same workflow', async ({ app }) => {
+  test('multiple AI Agent steps in same workflow', async ({ app }) => {
     const integrationName = buildUniqueName('e2e-llm-integ')
     const workflowName = buildUniqueName('e2e-multi-agent')
     let integration: SeededLlmIntegration | undefined

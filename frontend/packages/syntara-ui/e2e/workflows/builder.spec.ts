@@ -25,7 +25,7 @@ import {
 // Add Nodes from Catalog
 // ========================================
 
-test('catalog panel shows available node types organized by category', async ({ app }) => {
+test('catalog panel shows available step types organized by category', async ({ app }) => {
   const workflowName = buildUniqueName('e2e-builder')
   await createWorkflowWithTrigger(app, workflowName)
 
@@ -46,7 +46,7 @@ test('catalog panel shows available node types organized by category', async ({ 
   }
 })
 
-test('user can add a Script action node to the canvas', async ({ app }) => {
+test('user can add a Script action step to the canvas', async ({ app }) => {
   const workflowName = buildUniqueName('e2e-builder')
   await createWorkflowWithTrigger(app, workflowName)
 
@@ -61,7 +61,7 @@ test('user can add a Script action node to the canvas', async ({ app }) => {
   }
 })
 
-test('user can add an Approval node to the canvas', async ({ app }) => {
+test('user can add an Approval step to the canvas', async ({ app }) => {
   const workflowName = buildUniqueName('e2e-builder')
   await createWorkflowWithTrigger(app, workflowName)
 
@@ -157,7 +157,7 @@ test('user can add an Approval node to the canvas', async ({ app }) => {
   }
 })
 
-test('user can add a Logic (Conditional) node to the canvas', async ({ app }) => {
+test('user can add a Logic (Conditional) step to the canvas', async ({ app }) => {
   const workflowName = buildUniqueName('e2e-builder')
   await createWorkflowWithTrigger(app, workflowName)
 
@@ -200,7 +200,7 @@ test('user can add a Logic (Conditional) node to the canvas', async ({ app }) =>
   }
 })
 
-test('multiple nodes can be added sequentially', async ({ app }) => {
+test('multiple steps can be added sequentially', async ({ app }) => {
   const workflowName = buildUniqueName('e2e-builder')
   await createWorkflowWithTrigger(app, workflowName)
 
@@ -368,7 +368,7 @@ test('multiple nodes can be added sequentially', async ({ app }) => {
   }
 })
 
-test('added nodes are visible and interactive on the canvas', async ({ app }) => {
+test('added steps are visible and interactive on the canvas', async ({ app }) => {
   const workflowName = buildUniqueName('e2e-builder')
   await createWorkflowWithTrigger(app, workflowName)
 
@@ -406,7 +406,7 @@ test('nodes are positioned on the canvas after layout', async ({ app }) => {
   }
 })
 
-test('catalog panel can be closed without adding a node', async ({ app }) => {
+test('catalog panel can be closed without adding a step', async ({ app }) => {
   const workflowName = buildUniqueName('e2e-builder')
   await createWorkflowWithTrigger(app, workflowName)
 

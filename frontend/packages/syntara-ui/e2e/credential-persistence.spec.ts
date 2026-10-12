@@ -57,7 +57,7 @@ async function openApiNodeAfterReload(app: Page, nodeName: string) {
 }
 
 test.describe('Credential Persistence', () => {
-  test.skip('Task Agent node credential persists after save/reload', async ({ app }) => {
+  test.skip('Task Agent step credential persists after save/reload', async ({ app }) => {
     const credName = buildUniqueName('e2e-persist-llm')
     const workflowName = buildUniqueName('e2e-persist-ai')
     const integrationName = buildUniqueName('e2e-llm-integ')
@@ -102,7 +102,7 @@ test.describe('Credential Persistence', () => {
     }
   })
 
-  test('REST API node credential persists after save/reload', async ({ app }) => {
+  test('REST API step credential persists after save/reload', async ({ app }) => {
     const credName = buildUniqueName('e2e-persist-http')
     const workflowName = buildUniqueName('e2e-persist-api')
 
@@ -141,7 +141,7 @@ test.describe('Credential Persistence', () => {
 
   // TODO: AAP credential persistence fails — buildAAPConfig writes credentialId (camelCase)
   // but AAPStepForm reads credential_id (snake_case). Same class of bug as PR #561.
-  test.fixme('AAP node credential persists after save/reload', async ({ app }) => {
+  test.fixme('AAP step credential persists after save/reload', async ({ app }) => {
     const credName = buildUniqueName('e2e-persist-aap')
     const workflowName = buildUniqueName('e2e-persist-aap-wf')
 

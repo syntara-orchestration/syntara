@@ -28,7 +28,7 @@ const undoButton = (app: Page) => undoRedoToolbar(app).getByRole('button', { nam
 /** Locate the Redo button inside the toolbar. */
 const redoButton = (app: Page) => undoRedoToolbar(app).getByRole('button', { name: 'Redo' })
 
-test('undo/redo add node via toolbar buttons', async ({ app }) => {
+test('undo/redo add step via toolbar buttons', async ({ app }) => {
   const workflowName = buildUniqueName('e2e-undo-toolbar')
   const { id } = await createBasicWorkflowViaApi(app, workflowName, 'Initial action')
 
@@ -49,7 +49,7 @@ test('undo/redo add node via toolbar buttons', async ({ app }) => {
   }
 })
 
-test('undo/redo add node via keyboard shortcuts', async ({ app }) => {
+test('undo/redo add step via keyboard shortcuts', async ({ app }) => {
   const workflowName = buildUniqueName('e2e-undo-keyboard')
   const { id } = await createBasicWorkflowViaApi(app, workflowName, 'Initial action')
 

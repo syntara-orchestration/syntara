@@ -16,7 +16,7 @@ import { addManualTrigger, ensureLlmCredential, selectLlmCredential } from './he
 import { addStepPanel, buildUniqueName, fillCodeEditor } from './helpers/workflows'
 
 test.describe('Task Agent Structured Output', () => {
-  test('schema editor renders on Task Agent node', async ({ app }) => {
+  test('schema editor renders on Task Agent step', async ({ app }) => {
     await app.goto(toAppUrl('/workflow-builder/new'))
     await addManualTrigger(app)
 

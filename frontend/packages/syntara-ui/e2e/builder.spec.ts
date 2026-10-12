@@ -10,7 +10,7 @@ import {
   selectProjectIfRequired,
 } from './helpers/workflows'
 
-test('user creates and saves a multi-node workflow', async ({ app }) => {
+test('user creates and saves a multi-step workflow', async ({ app }) => {
   const workflowName = buildUniqueName('e2e-multi-node')
   await app.goto(toAppUrl('/workflow-builder/new'))
   await expect(app.getByRole('heading', { name: 'Select a trigger step' })).toBeVisible()

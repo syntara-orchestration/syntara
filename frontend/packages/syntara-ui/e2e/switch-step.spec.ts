@@ -77,9 +77,9 @@ function expectSwitchStepConfig(
 // Test suite
 // ---------------------------------------------------------------------------
 
-test.describe('Switch Node — UI-15', () => {
+test.describe('Switch Step — UI-15', () => {
   test.describe('Catalog', () => {
-    test('Switch node is available under the Logic category', async ({ app }) => {
+    test('Switch step is available under the Logic category', async ({ app }) => {
       await app.goto(toAppUrl('/workflow-builder/new'))
       await addManualTrigger(app, 'Manual trigger')
 
@@ -115,7 +115,7 @@ test.describe('Switch Node — UI-15', () => {
       }
     })
 
-    test('Cancelling the Switch form does not add the node to the canvas', async ({ app }) => {
+    test('Cancelling the Switch form does not add the step to the canvas', async ({ app }) => {
       await app.goto(toAppUrl('/workflow-builder/new'))
       await addManualTrigger(app, 'Manual trigger')
 
@@ -136,7 +136,7 @@ test.describe('Switch Node — UI-15', () => {
   // -------------------------------------------------------------------------
 
   test.describe('Case configuration and payload', () => {
-    test('Create switch node with two cases and verify saved payload', async ({ app }) => {
+    test('Create switch step with two cases and verify saved payload', async ({ app }) => {
       const wfName = buildUniqueName('switch-two-cases')
 
       await ensureProject(app)
@@ -203,7 +203,7 @@ test.describe('Switch Node — UI-15', () => {
       }
     })
 
-    test('Switch node with a single case saves correctly', async ({ app }) => {
+    test('Switch step with a single case saves correctly', async ({ app }) => {
       const wfName = buildUniqueName('switch-one-case')
 
       await ensureProject(app)
@@ -231,7 +231,7 @@ test.describe('Switch Node — UI-15', () => {
       }
     })
 
-    test('Switch node with three cases saves all cases', async ({ app }) => {
+    test('Switch step with three cases saves all cases', async ({ app }) => {
       const wfName = buildUniqueName('switch-three-cases')
 
       await ensureProject(app)
@@ -354,7 +354,7 @@ test.describe('Switch Node — UI-15', () => {
   // -------------------------------------------------------------------------
 
   test.describe('Round-trip persistence', () => {
-    test('Reopening a saved switch node shows the saved case configuration', async ({ app }) => {
+    test('Reopening a saved switch step shows the saved case configuration', async ({ app }) => {
       const wfName = buildUniqueName('switch-roundtrip')
 
       await ensureProject(app)
@@ -388,7 +388,7 @@ test.describe('Switch Node — UI-15', () => {
       }
     })
 
-    test('Editing a switch node updates the saved case configuration', async ({ app }) => {
+    test('Editing a switch step updates the saved case configuration', async ({ app }) => {
       const wfName = buildUniqueName('switch-edit')
 
       await ensureProject(app)
@@ -432,7 +432,7 @@ test.describe('Switch Node — UI-15', () => {
   // -------------------------------------------------------------------------
 
   test.describe('Canvas display', () => {
-    test('Switch node is visible on the canvas after saving', async ({ app }) => {
+    test('Switch step is visible on the canvas after saving', async ({ app }) => {
       const wfName = buildUniqueName('switch-canvas')
 
       await ensureProject(app)
@@ -459,7 +459,7 @@ test.describe('Switch Node — UI-15', () => {
       }
     })
 
-    test('Clicking the switch node on canvas opens the three-panel editor', async ({ app }) => {
+    test('Clicking the switch step on canvas opens the three-panel editor', async ({ app }) => {
       const wfName = buildUniqueName('switch-panel-open')
 
       await ensureProject(app)

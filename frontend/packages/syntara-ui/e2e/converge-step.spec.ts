@@ -19,9 +19,9 @@ import {
   triggerLayout,
 } from './helpers/workflows'
 
-test.describe('Converge Node - E2E Tests', () => {
+test.describe('Converge Step - E2E Tests', () => {
   test.describe('Catalog', () => {
-    test('Select converge node from Logic category', async ({ app }) => {
+    test('Select converge step from Logic category', async ({ app }) => {
       try {
         await app.goto(toAppUrl('/workflow-builder/new'))
         await addManualTrigger(app, 'Manual trigger')
@@ -56,7 +56,7 @@ test.describe('Converge Node - E2E Tests', () => {
       }
     })
 
-    test('Cancel adding converge node', async ({ app }) => {
+    test('Cancel adding converge step', async ({ app }) => {
       await openConvergeStepFormOnNewWorkflow(app)
 
       await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Test Converge')
@@ -73,7 +73,7 @@ test.describe('Converge Node - E2E Tests', () => {
   })
 
   test.describe('Wait for all branches', () => {
-    test('Create converge node with "all" strategy (default)', async ({ app }) => {
+    test('Create converge step with "all" strategy (default)', async ({ app }) => {
       const wfName = await createWorkflowWithBranchesForConverge(app)
 
       try {
@@ -95,7 +95,7 @@ test.describe('Converge Node - E2E Tests', () => {
       }
     })
 
-    test('Edit existing converge node with "all" strategy', async ({ app }) => {
+    test('Edit existing converge step with "all" strategy', async ({ app }) => {
       const wfName = await createWorkflowWithBranchesForConverge(app)
 
       try {
@@ -171,7 +171,7 @@ test.describe('Converge Node - E2E Tests', () => {
   })
 
   test.describe('Wait for N of M branches', () => {
-    test('Create converge node with "any" strategy and valid N', async ({ app }) => {
+    test('Create converge step with "any" strategy and valid N', async ({ app }) => {
       const wfName = await createWorkflowWithBranchesForConverge(app)
 
       try {
@@ -192,7 +192,7 @@ test.describe('Converge Node - E2E Tests', () => {
       }
     })
 
-    test('Edit converge node with "any" strategy', async ({ app }) => {
+    test('Edit converge step with "any" strategy', async ({ app }) => {
       const wfName = await createWorkflowWithBranchesForConverge(app)
 
       try {
@@ -334,7 +334,7 @@ test.describe('Converge Node - E2E Tests', () => {
       }
     })
 
-    test('Edit existing converge node with timeout', async ({ app }) => {
+    test('Edit existing converge step with timeout', async ({ app }) => {
       const wfName = await createWorkflowWithBranchesForConverge(app)
 
       try {

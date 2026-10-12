@@ -185,7 +185,7 @@ test.describe('Validation error panel', () => {
     }
   })
 
-  test('clicking node name in error panel opens node editor', async ({ app }) => {
+  test('clicking step name in error panel opens step editor', async ({ app }) => {
     const workflowName = buildUniqueName('e2e-error-goto')
     const stepName = 'Goto step'
 
@@ -222,8 +222,8 @@ test.describe('Validation error panel', () => {
   })
 })
 
-test.describe('Error indicators on canvas nodes', () => {
-  test('validation error badge appears on nodes with errors', async ({ app }) => {
+test.describe('Error indicators on canvas steps', () => {
+  test('validation error badge appears on steps with errors', async ({ app }) => {
     const workflowName = buildUniqueName('e2e-error-badge')
 
     try {

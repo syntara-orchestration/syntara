@@ -150,7 +150,7 @@ test.describe('Step editor panels', () => {
     await expect(app.getByText('No output data')).not.toBeVisible()
   })
 
-  test('output data flows through a 4-node chain', async ({ app }) => {
+  test('output data flows through a 4-step chain', async ({ app }) => {
     const workflowName = buildUniqueName('e2e-chain')
 
     // Build: Trigger → Gather Info → Process Data → Send Alert
@@ -676,7 +676,7 @@ test.describe('Step editor panels', () => {
     await expect(app.getByText('T status')).toBeVisible()
   })
 
-  test.skip('input panel expandable sections switch between upstream nodes', async ({ app }) => {
+  test.skip('input panel expandable sections switch between upstream steps', async ({ app }) => {
     const workflowName = buildUniqueName('e2e-selector')
     await app.goto(toAppUrl('/workflow-builder/new'))
     await selectProjectIfRequired(app)
