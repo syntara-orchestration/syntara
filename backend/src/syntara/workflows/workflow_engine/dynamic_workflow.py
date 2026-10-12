@@ -179,9 +179,9 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
         self._project_id: str = ""
         self._created_by_user_id: str = ""
         # Declared before the namespace loop below, which registers every metadata
-        # key except "retry" — see WorkflowRetryMixin.init_state for why that
-        # ordering is load-bearing.
-        self.init_state(workflow_metadata)
+        # key except "retry" — see WorkflowRetryMixin._initialize_state for why
+        # that ordering is load-bearing.
+        super()._initialize_state(workflow_metadata)
         if workflow_metadata:
             for ns_key, ns_data in workflow_metadata.items():
                 if ns_key == "retry":

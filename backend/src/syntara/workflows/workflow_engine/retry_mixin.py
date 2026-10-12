@@ -79,7 +79,7 @@ class WorkflowRetryMixin:
     loop_state: dict[str, LoopState]
     loop_iteration_results: dict[str, dict[str, list[Any]]]
 
-    def init_state(self, workflow_metadata: dict[str, Any] | None) -> None:
+    def _initialize_state(self, workflow_metadata: dict[str, Any] | None) -> None:
         """Declare the retry state this mixin needs, before any node runs.
 
         Called from the workflow's own initializer rather than inlined there, so
