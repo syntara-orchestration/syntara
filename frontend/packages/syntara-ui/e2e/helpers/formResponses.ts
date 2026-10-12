@@ -42,6 +42,36 @@ const MINIMAL_FORM_DEFINITION = {
   ],
 } as const
 
+export const MULTI_FIELD_FORM_DEFINITION = {
+  fields: [
+    {
+      value_name: 'summary',
+      type: 'text',
+      label: 'Summary',
+      required: true,
+      placeholder: 'Describe the change',
+    },
+    {
+      value_name: 'score',
+      type: 'number',
+      label: 'Score',
+      required: false,
+      placeholder: 'Optional score',
+    },
+  ],
+} as const
+
+export type FormStepNodeParameters = {
+  message?: string
+  form_definition?: typeof MINIMAL_FORM_DEFINITION | typeof MULTI_FIELD_FORM_DEFINITION
+  submit_label?: string
+  success_message?: string
+  css_override?: string
+  response_window?: number
+  responder_users?: string[]
+  responder_groups?: string[]
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
 }
@@ -121,11 +151,21 @@ export async function applyFormResponseStatusFilter(app: Page, statusLabel: stri
   ).toBeVisible({ timeout: 15_000 })
 }
 
-export async function disposeFormPromptWorkflow(app: Page, workflowId: string, executionId: string): Promise<void> {
-  try {
-    await cancelExecutionViaApi(app, executionId)
-  } catch {
-    // Best-effort: mock may already be terminal
+export function executionIdFromPageUrl(app: Page): string {
+  const match = new URL(app.url()).pathname.match(/\/executions\/([^/]+)/)
+  if (!match?.[1]) {
+    throw new Error('Expected execution detail URL after running a workflow')
+  }
+  return match[1]
+}
+
+export async function disposeFormPromptWorkflow(app: Page, workflowId: string, executionId?: string): Promise<void> {
+  if (executionId) {
+    try {
+      await cancelExecutionViaApi(app, executionId)
+    } catch {
+      // Best-effort: mock may already be terminal
+    }
   }
   await deleteWorkflowViaApi(app, workflowId)
 }
@@ -135,9 +175,9 @@ export async function disposeFormPromptWorkflow(app: Page, workflowId: string, e
  * On mock: POST /executions synthesizes the form prompt when the run pauses.
  * On real backend: polls for paused execution and list visibility when Temporal is available.
  */
-export async function createPendingFormPromptLight(
+export async function createPendingFormStepWorkflow(
   app: Page,
-  namePrefix = 'form-prompt'
+  options?: { namePrefix?: string; parameters?: FormStepNodeParameters; runAfterPublish?: boolean }
 ): Promise<{
   workflowId: string
   workflowName: string
@@ -145,9 +185,18 @@ export async function createPendingFormPromptLight(
   promptName: string
   formPromptId: string
 }> {
-  const workflowName = buildUniqueName('e2e-form-response')
-  const promptName = buildUniqueName(namePrefix)
+  const workflowName = buildUniqueName('e2e-form-step')
+  const promptName = buildUniqueName(options?.namePrefix ?? 'form-step')
+  const runAfterPublish = options?.runAfterPublish ?? true
   const hasTemporal = !!process.env['SYNTARA_E2E_HAS_TEMPORAL_WORKER']
+  const nodeParameters: FormStepNodeParameters = {
+    message: 'E2E form step rendering test',
+    form_definition: MINIMAL_FORM_DEFINITION,
+    response_window: 600,
+    responder_users: [],
+    responder_groups: [],
+    ...options?.parameters,
+  }
 
   const { id: workflowId, versionNumber } = await createWorkflowViaApi({
     app,
@@ -158,11 +207,7 @@ export async function createPendingFormPromptLight(
         id: 'form_prompt_1',
         type: 'form_prompt',
         name: promptName,
-        parameters: {
-          message: 'E2E form response list test',
-          form_definition: MINIMAL_FORM_DEFINITION,
-          response_window: 600,
-        },
+        parameters: nodeParameters,
       },
       {
         id: 'script_1',
@@ -179,6 +224,10 @@ export async function createPendingFormPromptLight(
 
   try {
     await publishWorkflowViaApi(app, workflowId, versionNumber)
+
+    if (!runAfterPublish) {
+      return { workflowId, workflowName, executionId: '', promptName, formPromptId: '' }
+    }
 
     const runResp = await apiRequest(app, 'post', '/executions', {
       data: { workflow_id: workflowId, trigger_node_id: 'trigger_1', use_published: true },
@@ -204,5 +253,28 @@ export async function createPendingFormPromptLight(
   } catch (error) {
     await deleteWorkflowViaApi(app, workflowId).catch(() => undefined)
     throw error
+  }
+}
+
+export async function createPendingFormPromptLight(
+  app: Page,
+  namePrefix = 'form-prompt'
+): Promise<{
+  workflowId: string
+  workflowName: string
+  executionId: string
+  promptName: string
+  formPromptId: string
+}> {
+  const created = await createPendingFormStepWorkflow(app, {
+    namePrefix,
+    parameters: { message: 'E2E form response list test' },
+  })
+  return {
+    workflowId: created.workflowId,
+    workflowName: created.workflowName,
+    executionId: created.executionId,
+    promptName: created.promptName,
+    formPromptId: created.formPromptId,
   }
 }

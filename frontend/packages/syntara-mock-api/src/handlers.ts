@@ -181,6 +181,40 @@ function approvalCreatedAt(a: Approval): string | undefined {
   return row.created_at ?? row.createdAt
 }
 
+function mockFormPromptResponderUsers(param: unknown): Array<{ id: string; username: string }> {
+  if (!Array.isArray(param) || param.length === 0) {
+    return []
+  }
+  return param.map((entry) => {
+    if (typeof entry === 'string') {
+      return { id: `user-${entry}`, username: entry }
+    }
+    if (typeof entry === 'object' && entry !== null) {
+      const row = entry as { id?: string; username?: string }
+      const username = row.username ?? 'unknown'
+      return { id: row.id ?? `user-${username}`, username }
+    }
+    return { id: 'user-unknown', username: 'unknown' }
+  })
+}
+
+function mockFormPromptResponderGroups(param: unknown): Array<{ id: string; name: string }> {
+  if (!Array.isArray(param) || param.length === 0) {
+    return []
+  }
+  return param.map((entry) => {
+    if (typeof entry === 'string') {
+      return { id: `group-${entry}`, name: entry }
+    }
+    if (typeof entry === 'object' && entry !== null) {
+      const row = entry as { id?: string; name?: string }
+      const name = row.name ?? 'unknown'
+      return { id: row.id ?? `group-${name}`, name }
+    }
+    return { id: 'group-unknown', name: 'unknown' }
+  })
+}
+
 function getUsernameFromRequest(request: Request): string {
   const auth = request.headers.get('Authorization') ?? ''
 
@@ -1701,10 +1735,17 @@ export const handlers = [
 
     const definition = workflow?.version?.workflow_definition as
       | {
-          nodes?: Array<{ id?: string; type?: string; name?: string }>
-          triggers?: Array<{ id?: string; type?: string; name?: string }>
+          nodes?: Array<{ id?: string; type?: string; name?: string; parameters?: Record<string, unknown> }>
+          triggers?: Array<{ id?: string; type?: string; name?: string; parameters?: Record<string, unknown> }>
         }
       | undefined
+    const formPromptParametersByNodeId = new Map<string, Record<string, unknown>>()
+    for (const authoredNode of definition?.nodes ?? []) {
+      if (typeof authoredNode.id !== 'string') continue
+      if (authoredNode.parameters && typeof authoredNode.parameters === 'object') {
+        formPromptParametersByNodeId.set(authoredNode.id, authoredNode.parameters)
+      }
+    }
     // Include triggers so mock activity lists match real-backend executions.
     const nodes = [...(definition?.triggers ?? []), ...(definition?.nodes ?? [])]
 
@@ -1817,10 +1858,22 @@ export const handlers = [
       for (const node of nodes) {
         if (node.type !== 'form_prompt' || typeof node.id !== 'string') continue
         const nodeRecord = node as { name?: string; parameters?: Record<string, unknown> }
-        const parameters = nodeRecord.parameters ?? {}
+        const parameters = formPromptParametersByNodeId.get(node.id) ?? nodeRecord.parameters ?? {}
         const formDefinition = parameters.form_definition as
           | FormsAPI.components['schemas']['FormDefinition']
           | undefined
+        const submitLabel =
+          typeof parameters.submit_label === 'string' && parameters.submit_label.length > 0
+            ? parameters.submit_label
+            : 'Submit response'
+        const successMessage =
+          typeof parameters.success_message === 'string' && parameters.success_message.length > 0
+            ? parameters.success_message
+            : 'Thank you — the workflow will continue.'
+        const cssOverride =
+          typeof parameters.css_override === 'string' && parameters.css_override.trim().length > 0
+            ? parameters.css_override.trim()
+            : undefined
         formPrompts.push({
           id: uuidv4(),
           created_at: timestamp,
@@ -1843,10 +1896,13 @@ export const handlers = [
               },
             ],
           },
-          submit_label: 'Submit response',
-          success_message: 'Thank you — the workflow will continue.',
-          responder_users: [{ id: 'user-admin', username: 'admin' }],
-          responder_groups: [],
+          submit_label: submitLabel,
+          success_message: successMessage,
+          ...(cssOverride ? { css_override: cssOverride } : {}),
+          responder_users: Array.isArray(parameters.responder_users)
+            ? mockFormPromptResponderUsers(parameters.responder_users)
+            : [{ id: 'user-admin', username: 'admin' }],
+          responder_groups: mockFormPromptResponderGroups(parameters.responder_groups),
           response_data: null,
           responded_at: null,
           responded_by: null,

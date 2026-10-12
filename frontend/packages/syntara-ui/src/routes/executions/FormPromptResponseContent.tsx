@@ -17,7 +17,6 @@ import { useEffect, useState } from 'react'
 import { formsClient } from '../../client'
 import { SynCodeBlock } from '../../components/details/SynCodeBlock'
 import { DisabledWithTooltip } from '../../components/DisabledWithTooltip'
-import { SynDynamicForm } from '../../components/forms/SynDynamicForm'
 import { SynEmptyStateAccessDenied } from '../../components/states/SynEmptyStateAccessDenied'
 import { useQueryState } from '../../components/states/useQueryState'
 import { formDefinitionHasUnresolvedDynamicOptions } from '../../forms/formPromptDynamicOptions'
@@ -32,6 +31,7 @@ import {
   lookupMapByPromptNodeId,
   resolveFormPromptWaitingStartedAt,
 } from './formPrompt/formPromptNodeId'
+import { FormPromptPendingResponseForm } from './formPrompt/FormPromptPendingResponseForm'
 import { formPromptClosedStatusLabel, isFormPromptResponsePending } from './formPrompt/formPromptResponseState'
 import { FormPromptUnresolvedDynamicOptionsAlert } from './formPrompt/FormPromptUnresolvedDynamicOptionsAlert'
 import type { WorkflowDefinitionLike } from './formPrompt/resolveCanvasNodeType'
@@ -209,14 +209,14 @@ function FormPromptResponseBody({
           {isPending ? (
             <StackItem>
               {hasUnresolvedDynamicOptions ? <FormPromptUnresolvedDynamicOptionsAlert /> : null}
-              <SynDynamicForm
-                id={responseFormId}
+              <FormPromptPendingResponseForm
+                cssOverrideSource={prompt.css_override}
+                responseFormId={responseFormId}
                 definition={prompt.form_definition}
                 submitLabel={submitLabel}
                 isDisabled={submitMutation.isPending}
                 isReadOnly={!canSubmit}
                 disabledFieldTooltip={disabledFieldTooltip}
-                hideSubmitButton
                 onSubmit={onSubmit}
               />
             </StackItem>
