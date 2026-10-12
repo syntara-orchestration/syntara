@@ -1668,7 +1668,7 @@ function WorkflowsPage() {
 
 `SynPageHeader` renders the `docLink` as an external link icon next to the page title.
 
-For the workflow builder's node editor panel, pass `docLink` as a prop to `StepEditorLayout`, which enables its "Documentation" button (previously disabled with "Coming soon").
+For the workflow builder's step editor panel, pass `docLink` as a prop to `StepEditorLayout`, which enables its "Documentation" button (previously disabled with "Coming soon").
 
 The sidebar help icon (`AppDockedNav`) uses the `home` key. In community mode that is the same README URL as every other key; in extended mode it resolves to the configured product landing page.
 

@@ -1,15 +1,15 @@
 /**
  * E2E Tests: Workflow Verification — Missing Required Configuration (UI-32)
  *
- * Objective: Verify that validation catches nodes with missing required configuration.
+ * Objective: Verify that validation catches steps with missing required configuration.
  *
  * Test Procedure:
- * 1. Add an AAP Job Template node with no job template selected
+ * 1. Add an AAP Job Template step with no job template selected
  * 2. Trigger verification and check for validation errors
  *
  * Expected Results:
- * - Validation identifies the unconfigured node
- * - The error message specifies which node and which field is missing
+ * - Validation identifies the unconfigured step
+ * - The error message specifies which step and which field is missing
  */
 
 import { test, expect, toAppUrl, type Page } from '../fixtures'
@@ -28,11 +28,11 @@ const VERIFY_BANNER_TIMEOUT = 20_000
 const ERROR_BADGE_TIMEOUT = 10_000
 
 /**
- * Add an AAP job template node WITHOUT providing the required job template ID.
+ * Add an AAP job template step WITHOUT providing the required job template ID.
  * AAP is a category button that leads to a subcategory panel; "Launch AAP job template"
  * must be selected before the step form appears.
  */
-async function addIncompleteAapNode(page: Page, name: string) {
+async function addIncompleteAapStep(page: Page, name: string) {
   await openAddStepPanel(page)
   // AAP is a category — click it to reveal the subcategory panel, then pick the subtype
   const panel = addStepPanel(page)
@@ -58,7 +58,7 @@ async function addIncompleteAapNode(page: Page, name: string) {
 }
 
 test.describe('UI-32: Workflow Verification — Missing Required Configuration', { tag: '@pr-check' }, () => {
-  test('unconfigured AAP node triggers verification error', async ({ app }) => {
+  test('unconfigured AAP step triggers verification error', async ({ app }) => {
     // Builds the workflow through the UI before verifying — the default budget is
     // too tight for that plus a verify retry on a loaded cluster.
     test.setTimeout(90_000)
@@ -71,7 +71,7 @@ test.describe('UI-32: Workflow Verification — Missing Required Configuration',
 
     try {
       await addManualTrigger(app, 'Start workflow')
-      await addIncompleteAapNode(app, 'Incomplete AAP Node')
+      await addIncompleteAapStep(app, 'Incomplete AAP Step')
 
       // Save and capture the workflow ID for reliable API-based cleanup
       await selectProjectIfRequired(app)

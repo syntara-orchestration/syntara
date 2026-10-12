@@ -1,11 +1,11 @@
 /**
- * E2E Tests: Conditional Node Configuration [UI-14]
+ * E2E Tests: Conditional Step Configuration [UI-14]
  *
  * Critical paths covered:
- * - Adding a Conditional node to the workflow canvas
+ * - Adding a Conditional step to the workflow canvas
  * - Configuring if/else-if/else branching conditions
  * - Saving and verifying configuration persistence
- * - Reopening saved nodes to verify data persists
+ * - Reopening saved steps to verify data persists
  *
  * Edge cases:
  * - Default else branch exists without explicit configuration
@@ -28,20 +28,20 @@ import {
   waitForUIReady,
 } from '../helpers/workflows'
 
-test('user adds Conditional node and saves workflow', async ({ app }) => {
+test('user adds Conditional step and saves workflow', async ({ app }) => {
   const workflowName = buildUniqueName('e2e-conditional')
 
   try {
     // Arrange - Create a workflow with manual trigger
     await startWorkflowWithTrigger(app)
 
-    // Act - Add Conditional node
+    // Act - Add Conditional step
     await addConditionalStep(app, 'Check status', {
       field: 'status',
       value: 'success',
     })
 
-    // Assert - Verify the Conditional node appears on canvas
+    // Assert - Verify the Conditional step appears on canvas
     await verifyStepVisible(app, 'Check status')
 
     // Save the workflow
@@ -50,21 +50,21 @@ test('user adds Conditional node and saves workflow', async ({ app }) => {
     // Assert - Verify workflow is persisted
     await expect(app.getByPlaceholder('Workflow name')).toHaveValue(workflowName)
 
-    // Verify the node is still visible after save
+    // Verify the step is still visible after save
     await verifyStepVisible(app, 'Check status')
   } finally {
     await deleteWorkflow(app, workflowName)
   }
 })
 
-test('user reopens Conditional node to verify configuration persists', async ({ app }) => {
+test('user reopens Conditional step to verify configuration persists', async ({ app }) => {
   const workflowName = buildUniqueName('e2e-conditional-edit')
 
   try {
-    // Arrange - Create a workflow with a Conditional node
+    // Arrange - Create a workflow with a Conditional step
     await startWorkflowWithTrigger(app)
 
-    // Add Conditional node with custom operator — use expression syntax
+    // Add Conditional step with custom operator — use expression syntax
     // since the field input normalizes bare words to ${...}
     await addConditionalStep(app, 'Initial condition', {
       field: '${input.score}',
@@ -75,7 +75,7 @@ test('user reopens Conditional node to verify configuration persists', async ({ 
     // Save workflow
     await saveWorkflow(app, workflowName)
 
-    // Act - Reopen the Conditional node to verify configuration persists
+    // Act - Reopen the Conditional step to verify configuration persists
     await verifyStepVisible(app, 'Initial condition')
     await openStepForEditing(app, 'Initial condition')
 
@@ -99,21 +99,21 @@ test('user reopens Conditional node to verify configuration persists', async ({ 
     await waitForUIReady(app)
     await closeStepEditorPanel(app)
 
-    // Verify the node is still on the canvas after reopening and closing
+    // Verify the step is still on the canvas after reopening and closing
     await verifyStepVisible(app, 'Initial condition')
   } finally {
     await deleteWorkflow(app, workflowName)
   }
 })
 
-test('user configures Conditional node with if/else-if/else branches', async ({ app }) => {
+test('user configures Conditional step with if/else-if/else branches', async ({ app }) => {
   const workflowName = buildUniqueName('e2e-conditional-else-if')
 
   try {
     // Arrange - Create a workflow with manual trigger
     await startWorkflowWithTrigger(app)
 
-    // Act - Add Conditional node with initial condition
+    // Act - Add Conditional step with initial condition
     // Note: We partially use the helper then manually add else-if branch
     const panel = await clickAddConnectedStep(app)
     await panel.getByRole('button', { name: 'Logic', exact: true }).click()
@@ -123,7 +123,7 @@ test('user configures Conditional node with if/else-if/else branches', async ({ 
     // Wait for the form to load
     await expect(app.getByRole('textbox', { name: 'Name', exact: true })).toBeVisible({ timeout: 10000 })
 
-    // Configure node name
+    // Configure step name
     await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Multi-branch conditional')
 
     // Configure the IF condition with an expression
@@ -169,7 +169,7 @@ test('user configures Conditional node with if/else-if/else branches', async ({ 
     await expect(app.getByRole('button', { name: 'Create' })).not.toBeAttached({ timeout: 15000 })
     await waitForUIReady(app)
 
-    // Assert - Verify the Conditional node appears on canvas
+    // Assert - Verify the Conditional step appears on canvas
     await verifyStepVisible(app, 'Multi-branch conditional')
 
     // Save the workflow
@@ -186,7 +186,7 @@ test('user configures Conditional node with if/else-if/else branches', async ({ 
     await expect(outputHandles).not.toHaveCount(1, { timeout: 10_000 })
     await expect(app.getByPlaceholder('Workflow name')).toHaveValue(workflowName)
 
-    // Reopen the node to verify branches persisted
+    // Reopen the step to verify branches persisted
     await openStepForEditing(app, 'Multi-branch conditional')
 
     // Verify both conditions (if + else-if) are still present
@@ -218,7 +218,7 @@ test('user adds condition group to create complex conditional logic', async ({ a
     // Arrange - Create a workflow with manual trigger
     await startWorkflowWithTrigger(app)
 
-    // Act - Add Conditional node with initial condition
+    // Act - Add Conditional step with initial condition
     // Note: We partially use the helper then manually add group
     const panel = await clickAddConnectedStep(app)
     await panel.getByRole('button', { name: 'Logic', exact: true }).click()
@@ -228,7 +228,7 @@ test('user adds condition group to create complex conditional logic', async ({ a
     // Wait for the form to load
     await expect(app.getByRole('textbox', { name: 'Name', exact: true })).toBeVisible({ timeout: 10000 })
 
-    // Configure node name
+    // Configure step name
     await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Complex conditional')
 
     // Configure the first condition
@@ -265,7 +265,7 @@ test('user adds condition group to create complex conditional logic', async ({ a
     await expect(app.getByRole('button', { name: 'Create' })).not.toBeAttached({ timeout: 15000 })
     await waitForUIReady(app)
 
-    // Assert - Verify the Conditional node appears on canvas
+    // Assert - Verify the Conditional step appears on canvas
     await verifyStepVisible(app, 'Complex conditional')
 
     // Save the workflow

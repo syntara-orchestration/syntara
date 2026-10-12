@@ -1,12 +1,12 @@
 /**
- * E2E Tests: Loop Node Configuration [UI-16]
+ * E2E Tests: Loop Step Configuration [UI-16]
  *
- * Covers Loop (While) and Loop (For Each) node configuration:
- * - Adding and configuring loop nodes
+ * Covers Loop (While) and Loop (For Each) step configuration:
+ * - Adding and configuring loop steps
  * - Custom item/index variables
  * - Max iterations
  * - Loop type switching
- * - Child node connections for loop body
+ * - Child step connections for loop body
  * - Configuration persistence across saves and edits
  */
 
@@ -33,8 +33,8 @@ import {
   waitForUIReady,
 } from '../helpers/workflows'
 
-test.describe('Loop Node Configuration [UI-16]', () => {
-  test('adds Loop (While) node with condition', async ({ app }) => {
+test.describe('Loop Step Configuration [UI-16]', () => {
+  test('adds Loop (While) step with condition', async ({ app }) => {
     const workflowName = buildUniqueName('e2e-loop-while')
 
     try {
@@ -55,7 +55,7 @@ test.describe('Loop Node Configuration [UI-16]', () => {
     }
   })
 
-  test('adds Loop (For Each) node with items expression', async ({ app }) => {
+  test('adds Loop (For Each) step with items expression', async ({ app }) => {
     const workflowName = buildUniqueName('e2e-loop-foreach')
 
     try {
@@ -209,7 +209,7 @@ test.describe('Loop Node Configuration [UI-16]', () => {
           condition: '${counter} < 5',
         }),
       workflowPrefix: 'e2e-loop-while-body',
-      loopNodeName: 'While with body',
+      loopStepName: 'While with body',
       scriptName: 'Loop body action',
       scriptCode: 'print("loop iteration")',
     },
@@ -221,25 +221,25 @@ test.describe('Loop Node Configuration [UI-16]', () => {
           items: '${input.items}',
         }),
       workflowPrefix: 'e2e-loop-foreach-body',
-      loopNodeName: 'For each with body',
+      loopStepName: 'For each with body',
       scriptName: 'Process each item',
       scriptCode: 'print(item)',
     },
   ] as const
 
   for (const testCase of loopBodyTestCases) {
-    test(`connects child node to Loop (${testCase.type}) body`, async ({ app }) => {
+    test(`connects child step to Loop (${testCase.type}) body`, async ({ app }) => {
       const workflowName = buildUniqueName(testCase.workflowPrefix)
 
       try {
         await startWorkflowWithTrigger(app)
         await testCase.addLoop(app)
-        await verifyStepVisible(app, testCase.loopNodeName)
+        await verifyStepVisible(app, testCase.loopStepName)
 
-        await addChildScriptToLoopStep(app, testCase.scriptName, testCase.scriptCode, testCase.loopNodeName)
+        await addChildScriptToLoopStep(app, testCase.scriptName, testCase.scriptCode, testCase.loopStepName)
         await waitForUIReady(app)
 
-        await verifyStepVisible(app, testCase.loopNodeName)
+        await verifyStepVisible(app, testCase.loopStepName)
         await verifyStepVisible(app, testCase.scriptName)
 
         await saveWorkflow(app, workflowName)

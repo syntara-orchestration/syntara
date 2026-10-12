@@ -1,11 +1,11 @@
 /**
- * E2E Tests: Wait Node Configuration [UI-17]
+ * E2E Tests: Wait Step Configuration [UI-17]
  *
  * Critical paths covered:
- * - Adding a Wait node to the workflow canvas
+ * - Adding a Wait step to the workflow canvas
  * - Configuring duration-based wait with time units (seconds, minutes, hours, days)
  * - Saving and verifying configuration persistence
- * - Reopening saved nodes to verify data persists
+ * - Reopening saved steps to verify data persists
  *
  * Edge cases:
  * - Different time units (seconds, minutes, hours, days)
@@ -28,14 +28,14 @@ import {
   verifyStepVisible,
 } from '../helpers/workflows'
 
-test.describe('Wait Node Configuration', () => {
-  test('adds Wait node with duration and verifies persistence', async ({ app }) => {
+test.describe('Wait Step Configuration', () => {
+  test('adds Wait step with duration and verifies persistence', async ({ app }) => {
     const workflowName = buildUniqueName('e2e-wait')
 
     try {
       await startWorkflowWithTrigger(app)
 
-      // Add Wait node with 30 seconds
+      // Add Wait step with 30 seconds
       await addWaitStep(app, 'Wait 30s', { seconds: 30 })
       await verifyStepVisible(app, 'Wait 30s')
 
@@ -52,13 +52,13 @@ test.describe('Wait Node Configuration', () => {
     }
   })
 
-  test('configures Wait node with multiple time units', async ({ app }) => {
+  test('configures Wait step with multiple time units', async ({ app }) => {
     const workflowName = buildUniqueName('e2e-wait-multi')
 
     try {
       await startWorkflowWithTrigger(app)
 
-      // Add Wait node with hours and minutes
+      // Add Wait step with hours and minutes
       await addWaitStep(app, 'Wait 1h 30m', { hours: 1, minutes: 30 })
       await saveWorkflow(app, workflowName)
 
@@ -72,13 +72,13 @@ test.describe('Wait Node Configuration', () => {
     }
   })
 
-  test('configures Wait node with all time units combined', async ({ app }) => {
+  test('configures Wait step with all time units combined', async ({ app }) => {
     const workflowName = buildUniqueName('e2e-wait-all')
 
     try {
       await startWorkflowWithTrigger(app)
 
-      // Add Wait node with all four time units
+      // Add Wait step with all four time units
       await addWaitStep(app, 'Wait all units', {
         days: 1,
         hours: 2,
@@ -99,17 +99,17 @@ test.describe('Wait Node Configuration', () => {
     }
   })
 
-  test('edits Wait node duration via Update button', async ({ app }) => {
+  test('edits Wait step duration via Update button', async ({ app }) => {
     const workflowName = buildUniqueName('e2e-wait-edit')
 
     try {
       await startWorkflowWithTrigger(app)
 
-      // Add Wait node with minimal duration
-      await addWaitStep(app, 'Wait node', { seconds: 1 })
+      // Add Wait step with minimal duration
+      await addWaitStep(app, 'Wait step', { seconds: 1 })
 
       // Edit the duration
-      await openStepForEditing(app, 'Wait node')
+      await openStepForEditing(app, 'Wait step')
       await app.getByLabel('Seconds').fill('30')
       await app.getByLabel('Minutes').fill('10')
 
@@ -121,7 +121,7 @@ test.describe('Wait Node Configuration', () => {
       await closeStepEditorPanel(app)
 
       // Verify the edit persisted
-      await openStepForEditing(app, 'Wait node')
+      await openStepForEditing(app, 'Wait step')
       await expect(app.getByLabel('Minutes')).toHaveValue('10')
       await expect(app.getByLabel('Seconds')).toHaveValue('30')
       await closeStepEditorPanel(app)

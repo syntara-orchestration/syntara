@@ -1,7 +1,7 @@
 /**
- * E2E Tests: AAP Node Wiring in Workflow Builder (Test 17)
+ * E2E Tests: AAP Step Wiring in Workflow Builder (Test 17)
  *
- * Verifies that AAP Job Template and Workflow Template nodes can be wired
+ * Verifies that AAP Job Template and Workflow Template steps can be wired
  * to a configured AAP Gateway integration and that job/workflow templates
  * are browsable via the resource pickers.
  */
@@ -50,8 +50,8 @@ async function createAAPIntegration(app: Page, name: string): Promise<{ integrat
   return { integrationId: integration.id, credentialId: cred.id }
 }
 
-test.describe('AAP Node Wiring', () => {
-  test('AAP Job Template node shows only AAP integrations and enables resource browsing', async ({ app }) => {
+test.describe('AAP Step Wiring', () => {
+  test('AAP Job Template step shows only AAP integrations and enables resource browsing', async ({ app }) => {
     const aapName = buildUniqueName('e2e-aap-t17')
     const llmName = buildUniqueName('e2e-llm-t17')
     let aapIds: { integrationId: string; credentialId: string } | undefined
@@ -92,14 +92,14 @@ test.describe('AAP Node Wiring', () => {
       const llmIntegration = (await llmResp.json()) as { id: string }
       llmIntegrationId = llmIntegration.id
 
-      // Open workflow builder and add an AAP Job Template node
+      // Open workflow builder and add an AAP Job Template step
       await startWorkflowWithTrigger(app)
 
       const panel = await clickAddConnectedStep(app)
       await panel.getByRole('button', { name: 'AAP Execution' }).click()
       await panel.getByRole('button', { name: 'Launch AAP job template' }).click()
 
-      // Fill in the node name
+      // Fill in the step name
       await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Deploy App')
 
       // Open the integration selector

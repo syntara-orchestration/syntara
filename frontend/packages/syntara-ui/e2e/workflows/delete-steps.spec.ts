@@ -1,11 +1,11 @@
 /**
- * E2E Tests: Workflow Builder - Delete Nodes and Edges
+ * E2E Tests: Workflow Builder - Delete Steps and Edges
  *
- * Objective: Verify that nodes and edges can be deleted from the canvas.
+ * Objective: Verify that steps and edges can be deleted from the canvas.
  *
  * Test coverage:
- * - Delete a middle node and verify connected edges are removed
- * - Delete first/last nodes in a sequence and verify remaining nodes stay on canvas
+ * - Delete a middle step and verify connected edges are removed
+ * - Delete first/last steps in a sequence and verify remaining steps stay on canvas
  */
 
 import { test, expect } from '../fixtures'
@@ -19,7 +19,7 @@ import {
   triggerLayout,
 } from '../helpers/workflows'
 
-test('delete a middle node removes the node and its connected edges', async ({ app }) => {
+test('delete a middle step removes the step and its connected edges', async ({ app }) => {
   const workflowName = buildUniqueName('e2e-delete')
   await createWorkflowWithTrigger(app, workflowName)
 
@@ -27,19 +27,19 @@ test('delete a middle node removes the node and its connected edges', async ({ a
     await closeStepEditorPanel(app)
     await expect(app.getByText('Manual trigger')).toBeVisible()
 
-    // Add three connected nodes: Manual trigger → Node A → Node B → Node C
-    await addScriptStep(app, 'Node A', 'print("A")')
-    await addScriptStep(app, 'Node B', 'print("B")')
-    await addScriptStep(app, 'Node C', 'print("C")')
+    // Add three connected steps: Manual trigger → Step A → Step B → Step C
+    await addScriptStep(app, 'Step A', 'print("A")')
+    await addScriptStep(app, 'Step B', 'print("B")')
+    await addScriptStep(app, 'Step C', 'print("C")')
 
-    // Layout to position nodes
+    // Layout to position steps
     await triggerLayout(app)
 
-    // Verify all nodes are visible
+    // Verify all steps are visible
     await verifyStepVisible(app, 'Manual trigger')
-    await verifyStepVisible(app, 'Node A')
-    await verifyStepVisible(app, 'Node B')
-    await verifyStepVisible(app, 'Node C')
+    await verifyStepVisible(app, 'Step A')
+    await verifyStepVisible(app, 'Step B')
+    await verifyStepVisible(app, 'Step C')
 
     // ReactFlow edges have no ARIA role — CSS is the only way to count them.
     // count() is a snapshot so wrap in toPass() to retry until the DOM settles.
@@ -50,11 +50,11 @@ test('delete a middle node removes the node and its connected edges', async ({ a
       expect(initialEdgeCount).toBeGreaterThanOrEqual(3)
     }).toPass()
 
-    // Delete Node B using its kebab menu
-    const nodeB = app.locator('[role="group"][aria-roledescription="node"]').filter({ hasText: 'Node B' })
+    // Delete Step B using its kebab menu
+    const nodeB = app.locator('[role="group"][aria-roledescription="node"]').filter({ hasText: 'Step B' })
     await expect(nodeB).toBeVisible()
 
-    // Hover first so the node is settled before interacting with it
+    // Hover first so the step is settled before interacting with it
     await nodeB.hover()
     const kebabButton = nodeB.getByLabel('Step actions menu')
     await expect(kebabButton).toBeVisible()
@@ -65,19 +65,19 @@ test('delete a middle node removes the node and its connected edges', async ({ a
     await expect(deleteMenuItem).toBeVisible()
     await deleteMenuItem.click()
 
-    // Verify Node B is removed from canvas
+    // Verify Step B is removed from canvas
     await expect(nodeB).not.toBeAttached()
 
-    // Verify edges connected to Node B are removed.
+    // Verify edges connected to Step B are removed.
     await expect(async () => {
       const finalEdgeCount = await edges.count()
       expect(finalEdgeCount).toBeLessThan(initialEdgeCount)
     }).toPass()
 
-    // Verify Node A and Node C remain on the canvas
+    // Verify Step A and Step C remain on the canvas
     await verifyStepVisible(app, 'Manual trigger')
-    await verifyStepVisible(app, 'Node A')
-    await verifyStepVisible(app, 'Node C')
+    await verifyStepVisible(app, 'Step A')
+    await verifyStepVisible(app, 'Step C')
   } finally {
     await deleteWorkflow(app, workflowName)
   }
@@ -86,20 +86,20 @@ test('delete a middle node removes the node and its connected edges', async ({ a
 const deletePositionCases = [
   {
     position: 'first',
-    nodes: ['First', 'Second', 'Third'],
-    deleteNode: 'First',
-    remainingNodes: ['Second', 'Third'],
+    steps: ['First', 'Second', 'Third'],
+    deleteStep: 'First',
+    remainingSteps: ['Second', 'Third'],
   },
   {
     position: 'last',
-    nodes: ['Start', 'Middle', 'End'],
-    deleteNode: 'End',
-    remainingNodes: ['Start', 'Middle'],
+    steps: ['Start', 'Middle', 'End'],
+    deleteStep: 'End',
+    remainingSteps: ['Start', 'Middle'],
   },
 ]
 
-for (const { position, nodes, deleteNode, remainingNodes } of deletePositionCases) {
-  test(`delete ${position} node in a sequence keeps other nodes`, async ({ app }) => {
+for (const { position, steps, deleteStep, remainingSteps } of deletePositionCases) {
+  test(`delete ${position} step in a sequence keeps other steps`, async ({ app }) => {
     const workflowName = buildUniqueName('e2e-delete')
     await createWorkflowWithTrigger(app, workflowName)
 
@@ -107,23 +107,23 @@ for (const { position, nodes, deleteNode, remainingNodes } of deletePositionCase
       await closeStepEditorPanel(app)
       await expect(app.getByText('Manual trigger')).toBeVisible()
 
-      // Add nodes
-      for (const nodeName of nodes) {
-        await addScriptStep(app, nodeName, `print("${nodeName}")`)
+      // Add steps
+      for (const stepName of steps) {
+        await addScriptStep(app, stepName, `print("${stepName}")`)
       }
 
       await triggerLayout(app)
 
-      // Verify all nodes visible
-      for (const nodeName of nodes) {
-        await verifyStepVisible(app, nodeName)
+      // Verify all steps visible
+      for (const stepName of steps) {
+        await verifyStepVisible(app, stepName)
       }
 
-      // Delete the specified node using kebab menu
-      const targetNode = app.locator('[role="group"][aria-roledescription="node"]').filter({ hasText: deleteNode })
+      // Delete the specified step using kebab menu
+      const targetNode = app.locator('[role="group"][aria-roledescription="node"]').filter({ hasText: deleteStep })
       await expect(targetNode).toBeVisible()
 
-      // Hover first so the node is settled before interacting with it
+      // Hover first so the step is settled before interacting with it
       await targetNode.hover()
       const kebabButton = targetNode.getByLabel('Step actions menu')
       await expect(kebabButton).toBeVisible()
@@ -131,13 +131,13 @@ for (const { position, nodes, deleteNode, remainingNodes } of deletePositionCase
 
       await app.getByRole('menuitem', { name: 'Delete' }).click()
 
-      // Verify deleted node is removed from the DOM
+      // Verify deleted step is removed from the DOM
       await expect(targetNode).not.toBeAttached({ timeout: 10000 })
 
-      // Verify remaining nodes are still visible
+      // Verify remaining steps are still visible
       await verifyStepVisible(app, 'Manual trigger')
-      for (const nodeName of remainingNodes) {
-        await verifyStepVisible(app, nodeName)
+      for (const stepName of remainingSteps) {
+        await verifyStepVisible(app, stepName)
       }
     } finally {
       await deleteWorkflow(app, workflowName)

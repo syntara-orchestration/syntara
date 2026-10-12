@@ -79,7 +79,7 @@ async function openNodeKebabMenu(app: Page, nodeText: string) {
   await waitForUIReady(app)
   const node = app.locator('[role="group"][aria-roledescription="node"]').filter({ hasText: nodeText })
   await expect(node).toBeVisible({ timeout: 15_000 })
-  // Hover so the node is settled before interacting (same pattern as delete-nodes E2E)
+  // Hover so the node is settled before interacting (same pattern as delete-steps E2E)
   await node.hover()
 
   // Ensure node is expanded so the kebab is reachable

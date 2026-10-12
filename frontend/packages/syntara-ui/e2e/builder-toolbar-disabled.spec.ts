@@ -1,9 +1,9 @@
 /**
- * E2E Tests: Builder toolbar buttons disabled while node editor is open
+ * E2E Tests: Builder toolbar buttons disabled while step editor is open
  *
  * Critical paths covered:
- * - Save, Run, and Publish buttons are disabled when a node editor panel is open
- * - Buttons re-enable after closing the node editor
+ * - Save, Run, and Publish buttons are disabled when a step editor panel is open
+ * - Buttons re-enable after closing the step editor
  * - Tooltips show the correct "finish editing" message when disabled
  */
 
@@ -18,7 +18,7 @@ import {
 } from './helpers/workflows'
 
 test.describe('builder toolbar disabled while editing', () => {
-  test('Save, Run, and Publish are disabled when a node editor is open', async ({ app }) => {
+  test('Save, Run, and Publish are disabled when a step editor is open', async ({ app }) => {
     const workflowName = buildUniqueName('e2e-toolbar-disabled')
     const { id } = await createBasicWorkflowViaApi(app, workflowName, 'Toolbar test action')
 
@@ -34,7 +34,7 @@ test.describe('builder toolbar disabled while editing', () => {
 
       await openStepForEditing(app, 'Toolbar test action')
 
-      // Wait for the node editor to fully open (cancel button appears inside the panel)
+      // Wait for the step editor to fully open (cancel button appears inside the panel)
       const cancelBtn = app.getByRole('button', { name: 'Cancel without saving' })
       await expect(cancelBtn).toBeVisible({ timeout: 10_000 })
 
@@ -49,7 +49,7 @@ test.describe('builder toolbar disabled while editing', () => {
       const publishBtn = app.getByRole('button', { name: /Publish workflow/i })
       await expect(publishBtn).toHaveAttribute('aria-disabled', 'true')
 
-      // Close the node editor
+      // Close the step editor
       await closeStepEditorPanel(app)
 
       // Buttons should re-enable

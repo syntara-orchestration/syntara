@@ -499,7 +499,7 @@ export const builderInteractivePages: CanvasPageEntry[] = [
   },
   {
     section: 'workflows',
-    name: 'builder-edit-verify-node-errors',
+    name: 'builder-edit-verify-step-errors',
     path: AppRoute.WorkflowBuilder.Edit.replace(':workflowId', MOCK_WORKFLOW_ID),
     perceptual: true,
     waitFor: async (page) => {
