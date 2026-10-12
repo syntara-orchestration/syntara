@@ -41,6 +41,8 @@ with workflow.unsafe.imports_passed_through():
     )
     from syntara.workflows.workflow_engine.utils.credential_scrubber import scrub_credential_values, scrub_credentials
     from syntara.workflows.workflow_engine.utils.timeout_messages import build_timeout_error_message
+
+from syntara.workflows.utils.loop_iteration_names import strip_iteration_suffix
 from syntara.workflows.utils.namespace_resolver import NamespaceResolver
 from syntara.workflows.workflow_engine.approval_mixin import WorkflowApprovalMixin
 from syntara.workflows.workflow_engine.converge_mixin import WorkflowConvergeMixin
@@ -1384,6 +1386,71 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
             ),
         )
 
+    async def _replayed_loop_control(
+        self,
+        node_id: str,
+        state: LoopState,
+    ) -> dict[str, Any] | None:
+        """Route a loop being replayed, or None to execute it as usual.
+
+        The question during a replay is not "what did the loop decide" but "did
+        the next iteration happen" — a fact the source run already recorded.
+        Asking the database that, rather than re-deriving the decision, is what
+        makes the replay correct under ``continue_on_failure``, where a failed body
+        node does not mean the loop exited and so cannot be mapped back to a port.
+
+        Replaying stops at the retry point: once the loop reaches the iteration
+        holding the node this retry is resuming from, that node executes for real
+        and the loop resumes normal execution around it.
+
+        Returns None when this loop is not being replayed, or when it has reached
+        the retry point and must run for real from there on.
+        """
+        if not self.retry_context or node_id not in self._loop_bodies:
+            return None
+
+        body_ids = sorted(self._loop_bodies.get(node_id, set()))
+        current = state.current_index
+
+        # Once the loop reaches the iteration this retry resumes from, the retry is
+        # under way: run the loop normally so the failing node really executes.
+        # The retry point lives inside this loop's body: stop replaying and let the
+        # loop run for real from the iteration that holds it.
+        retry_points = {strip_iteration_suffix(p) for p in self.retry_context.get("eligible_point_ids", [])}
+        if retry_points & set(body_ids):
+            return None
+
+        reached = await workflow.execute_activity(
+            ActivityName.RETRY_LOOP_ITERATION_PROBE,
+            args=[self.retry_context.get("retry_from_execution_id"), body_ids, current],
+            activity_id=f"__internal__probe_retry_loop_{node_id}_{current}",
+            start_to_close_timeout=timedelta(seconds=DEFAULT_ACTIVITY_TIMEOUT_SECONDS),
+        )
+        next_port = "iterate" if reached else "complete"
+        next_index = current + 1 if reached else current
+
+        # Remember which iteration this loop is replaying, so each body node's own
+        # replay can ask for the row for *this* iteration rather than the first.
+        self._active_loop_iteration[node_id] = current
+
+        workflow.logger.info(
+            "Replayed loop iteration routing",
+            extra={
+                "loop_id": node_id,
+                "current_index": current,
+                "reached_in_source": reached,
+                "next_port": next_port,
+            },
+        )
+        return {
+            "output": {"iteration_count": current, "iteration_results": None},
+            "control": {
+                "next_port": next_port,
+                "next_index": next_index,
+                "current_index": current,
+            },
+        }
+
     async def _execute_loop_node(
         self,
         node_id: str,
@@ -1456,17 +1523,21 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
             msg = f"Loop {node_id} exceeded max_iterations ({max_iter})"
             raise ApplicationError(msg, type="MaxIterationsError", non_retryable=True)
 
-        loop_result = cast(
-            "dict[str, Any]",
-            await workflow.execute_activity(
-                ActivityName.LOOP,
-                args=[loop_parameters, node.outputs, self.loop_iteration_results[node_id]],
-                activity_id=loop_control_activity_id(
-                    node_id, state.current_index, self.loop_body_map, self.node_control_data
+        replayed = await self._replayed_loop_control(node_id, state)
+        if replayed is not None:
+            loop_result = replayed
+        else:
+            loop_result = cast(
+                "dict[str, Any]",
+                await workflow.execute_activity(
+                    ActivityName.LOOP,
+                    args=[loop_parameters, node.outputs, self.loop_iteration_results[node_id]],
+                    activity_id=loop_control_activity_id(
+                        node_id, state.current_index, self.loop_body_map, self.node_control_data
+                    ),
+                    start_to_close_timeout=timedelta(seconds=timeout_seconds),
                 ),
-                start_to_close_timeout=timedelta(seconds=timeout_seconds),
-            ),
-        )
+            )
 
         # Update loop state from control data for next iteration
         control_data = loop_result.get("control", {})

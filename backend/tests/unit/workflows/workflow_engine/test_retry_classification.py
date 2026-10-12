@@ -48,6 +48,8 @@ def _make_workflow(retry_context: dict[str, Any] | None = None) -> OrchestratorW
     wf.loop_state = {}
     wf.loop_body_map = {}
     wf.loop_iteration_results = {}
+    wf._loop_bodies = {}
+    wf._active_loop_iteration = {}
     wf._timeout_tasks = {}
     wf._timed_out_converge_nodes = set()
     wf._detached_nodes = set()
@@ -343,7 +345,7 @@ def test_default_continue_on_failure_is_false_so_upstream_is_restored() -> None:
 
 @pytest.mark.parametrize(
     "node_type",
-    ["condition", "switch", "loop", "converge"],
+    ["condition", "switch", "converge"],
 )
 def test_control_nodes_are_never_restored(node_type: str) -> None:
     """Condition/switch/loop/converge/wait decide routing, so they must always run.
@@ -422,48 +424,66 @@ def _loop_graph() -> WorkflowGraph:
     return WorkflowGraph(backend)
 
 
-def test_loop_body_nodes_are_not_restored() -> None:
-    """A loop body cannot be restored as a single stored output.
+def test_loop_body_nodes_are_restored_per_iteration() -> None:
+    """A body is restored once per iteration, not once per node.
 
-    The body is not one node: it runs once per iteration, and the loop aggregates
-    a list of results across them. Injecting the last stored body output and
-    skipping the body would hand the loop a scalar where it expects a list, and
-    would leave every body-node reference downstream unresolved.
-    """
-    wf = _make_workflow(_retry("step_2"))
-
-    restorable = wf._retry_restorable_nodes(_loop_graph())
-
-    assert "body_a" not in restorable
-    assert "body_b" not in restorable
-
-
-def test_loop_node_itself_is_not_restored() -> None:
-    """The loop control node always runs: it has to iterate to completion.
-
-    The loop stays in the upstream region — it is upstream and a later PR will
-    want to replay it — but the scheduling-time decision refuses it, because a
-    restored loop would release its body without ever iterating.
+    The body is not one node: it runs once per iteration and the loop aggregates a
+    list across them. So the row asked for has to be the one for the iteration the
+    loop is currently replaying — otherwise every iteration would restore
+    iteration 0's output and the list would be the same value N times.
     """
     wf = _make_workflow(_retry("step_2"))
     graph = _loop_graph()
+    wf._loop_bodies = {"loop_1": {"body_a", "body_b"}}
 
-    assert wf._should_restore_node("loop_1", graph) is False
+    assert {"body_a", "body_b"} <= wf._retry_restorable_nodes(graph)
+
+    # Nothing replaying yet, so a body restores under its own id.
+    assert wf._replay_source_name("body_a") == "body_a"
+
+    # Iteration 0 is stored under the plain name; later ones get a suffix.
+    wf._active_loop_iteration["loop_1"] = 0
+    assert wf._replay_source_name("body_a") == "body_a"
+    wf._active_loop_iteration["loop_1"] = 2
+    assert wf._replay_source_name("body_a") == "body_a#iter-2"
+
+    # A node outside any loop is unaffected.
+    wf._active_loop_iteration["loop_1"] = 5
+    assert wf._replay_source_name("step_2") == "step_2"
+
+
+def test_a_loop_node_is_restored_not_executed() -> None:
+    """A replayed loop routes from what the source recorded, not by re-deriving.
+
+    Executing the loop control would re-evaluate the loop expression against a
+    namespace this retry is still rebuilding, so the loop is restored and asked
+    whether each next iteration happened instead.
+    """
+    from syntara.workflows.workflow_engine.models.workflow_definition import NodeType
+    from syntara.workflows.workflow_engine.retry_mixin import _CONTROL_NODE_TYPES_FOR_RETRY
+
+    wf = _make_workflow(_retry("step_2"))
+    graph = _loop_graph()
+
+    assert wf._should_restore_node("loop_1", graph) is True
+    assert NodeType.LOOP not in _CONTROL_NODE_TYPES_FOR_RETRY
+    assert NodeType.WAIT not in _CONTROL_NODE_TYPES_FOR_RETRY
 
 
 def test_non_loop_successors_of_a_loop_stay_restorable() -> None:
     """Excluding the body must not over-reach past the loop's ``complete`` port."""
-    # Retrying from inside the body: body_b is the starting point, body_a is
-    # loop-body so it never restores, but step_2 is an ordinary node downstream
+    # Retrying from inside the body: body_b is the starting point, body_a is a
+    # loop body and restores per iteration, but step_2 is an ordinary node downstream
     # of the loop and is still eligible for restoration.
     downstream = _make_workflow(_retry("body_b"))
     graph = _loop_graph()
     restorable = downstream._retry_restorable_nodes(graph)
 
     assert downstream._should_restore_node("step_2", graph) is True
-    assert downstream._should_restore_node("loop_1", graph) is False
-    assert downstream._should_restore_node("body_a", graph) is False
-    assert {"step_2", "loop_1"} <= restorable, "the region holds both; the decision separates them"
+    assert downstream._should_restore_node("loop_1", graph) is True
+    assert downstream._should_restore_node("body_a", graph) is True
+    assert downstream._should_restore_node("body_b", graph) is False
+    assert restorable == {"body_a", "loop_1", "step_2"}
 
 
 # ---------------------------------------------------------------------------

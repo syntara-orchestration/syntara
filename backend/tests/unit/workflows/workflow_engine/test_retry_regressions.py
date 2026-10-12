@@ -119,6 +119,8 @@ def _wf(retry_context: dict[str, Any] | None = None) -> OrchestratorWorkflow:
     # execution. The restore path consults it to decide whether a replay is worth
     # scheduling, so a workflow built by hand needs it too.
     wf._retry_source_statuses = {}
+    wf._loop_bodies = {}
+    wf._active_loop_iteration = {}
     return wf
 
 
@@ -158,7 +160,7 @@ def test_loop_body_does_not_include_nodes_after_the_loop() -> None:
     assert "loop_1" not in body
 
 
-def test_multi_node_body_is_not_restorable() -> None:
+def test_multi_node_body_is_restored_per_iteration() -> None:
     """A multi-node loop body is not restorable.
 
     Regression guard: body_b and body_c were classified restorable and injected
@@ -168,7 +170,8 @@ def test_multi_node_body_is_not_restorable() -> None:
 
     restorable = wf._retry_restorable_nodes(_loop_body_graph())
 
-    assert restorable.isdisjoint({"body_a", "body_b", "body_c"})
+    # Bodies restore per iteration now, so they are eligible rather than excluded.
+    assert {"body_a", "body_b", "body_c"} <= restorable
 
 
 # ---------------------------------------------------------------------------
