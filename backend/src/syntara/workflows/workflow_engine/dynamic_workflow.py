@@ -1972,6 +1972,38 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
         return self._restored_node_timestamps.get(activity_id)
 
     @workflow.query
+    def get_replayed_node_timestamps_if_ready(
+        self,
+        activity_id: str,
+    ) -> dict[str, str | None] | None:
+        """Return the recorded state for a replayed node, when it is already available.
+
+        The same answer as ``get_replayed_node_timestamps_when_ready`` without the
+        wait, so the caller can read it without writing to Temporal's history. The
+        sync service asks this first and falls back to the update only when it
+        returns None — which is the node whose state has not landed yet, and the one
+        case where waiting is what makes the answer correct.
+        """
+        if activity_id not in self._retry_replay_candidates:
+            return None
+        return self._restored_node_timestamps.get(activity_id)
+
+    @workflow.query
+    def is_retry_from_failure(self) -> bool:
+        """Whether this run is a retry from a failure point, rather than a whole-run retry.
+
+        A query and not the execution's ``retried_from_execution_id`` lineage: a
+        whole-execution retry carries that lineage too but has no replayed nodes to
+        ask about, so the sync service would keep issuing updates that record
+        nothing.
+
+        Queried rather than updated because an update is written to Temporal's
+        history. Asking once here, before any node completes, keeps ordinary runs
+        and whole-execution retries from writing a history event per node.
+        """
+        return bool(self.retry_context)
+
+    @workflow.query
     def get_pre_resolved_nodes(self) -> list[str]:
         """Query to get list of pre-resolved node IDs.
 
