@@ -1,12 +1,12 @@
 /**
- * E2E Tests: Approval Node Configuration [UI-13]
+ * E2E Tests: Approval Step Configuration [UI-13]
  *
  * Critical paths covered:
- * - Adding an Approval node to the workflow canvas
+ * - Adding an Approval step to the workflow canvas
  * - Verifying approver users and approver groups fields exist
  * - Configuring message, decision window, and fallback decision fields
  * - Saving and verifying configuration persistence
- * - Reopening saved nodes to verify data persists
+ * - Reopening saved steps to verify data persists
  *
  * Edge cases:
  * - Fallback decision options: approve, reject
@@ -46,9 +46,9 @@ async function openApprovalStepForm(page: Page) {
 }
 
 /**
- * Helper to configure Approval node fields in an open form.
+ * Helper to configure Approval step fields in an open form.
  */
-async function configureApprovalNode(
+async function configureApprovalStep(
   page: Page,
   config: {
     name?: string
@@ -108,7 +108,7 @@ async function configureApprovalNode(
 }
 
 /**
- * Composite helper: Add an Approval node with full configuration in one step.
+ * Composite helper: Add an Approval step with full configuration in one step.
  */
 async function addApprovalStepWithConfig(
   page: Page,
@@ -120,12 +120,12 @@ async function addApprovalStepWithConfig(
   }
 ) {
   await openApprovalStepForm(page)
-  await configureApprovalNode(page, config)
+  await configureApprovalStep(page, config)
   await saveAndCloseStepForm(page, false, config.name)
 }
 
-test.describe('Approval Node Configuration', () => {
-  test('user configures Approval node with message, decision window, and fallback decision', async ({ app }) => {
+test.describe('Approval Step Configuration', () => {
+  test('user configures Approval step with message, decision window, and fallback decision', async ({ app }) => {
     test.slow()
     const workflowName = buildUniqueName('e2e-approval')
 
@@ -133,7 +133,7 @@ test.describe('Approval Node Configuration', () => {
       // Arrange - Create a workflow with manual trigger
       await startWorkflowWithTrigger(app)
 
-      // Act - Add Approval node with full configuration
+      // Act - Add Approval step with full configuration
       await addApprovalStepWithConfig(app, {
         name: 'Approval step',
         message: 'Please approve this deployment to production',
@@ -141,7 +141,7 @@ test.describe('Approval Node Configuration', () => {
         fallbackDecision: 'reject',
       })
 
-      // Assert - Verify the Approval node appears on canvas
+      // Assert - Verify the Approval step appears on canvas
       await verifyStepVisible(app, 'Approval step')
 
       // Save the workflow
@@ -150,7 +150,7 @@ test.describe('Approval Node Configuration', () => {
       // Assert - Verify workflow is persisted
       await expect(app.getByPlaceholder('Workflow name')).toHaveValue(workflowName)
 
-      // Verify the node is still visible after save
+      // Verify the step is still visible after save
       await verifyStepVisible(app, 'Approval step')
     } finally {
       // Cleanup
@@ -158,15 +158,15 @@ test.describe('Approval Node Configuration', () => {
     }
   })
 
-  test('user edits Approval node to verify configuration persistence', async ({ app }) => {
+  test('user edits Approval step to verify configuration persistence', async ({ app }) => {
     test.slow()
     const workflowName = buildUniqueName('e2e-approval-edit')
 
     try {
-      // Arrange - Create a workflow with an Approval node
+      // Arrange - Create a workflow with an Approval step
       await startWorkflowWithTrigger(app)
 
-      // Add Approval node with initial configuration
+      // Add Approval step with initial configuration
       await addApprovalStepWithConfig(app, {
         name: 'Initial approval',
         message: 'Please review this change',
@@ -177,7 +177,7 @@ test.describe('Approval Node Configuration', () => {
       // Save workflow
       await saveWorkflow(app, workflowName)
 
-      // Act - Reopen the Approval node to verify configuration persists
+      // Act - Reopen the Approval step to verify configuration persists
       await verifyStepVisible(app, 'Initial approval')
       await openStepForEditing(app, 'Initial approval')
 
@@ -191,13 +191,13 @@ test.describe('Approval Node Configuration', () => {
       // When editing (vs creating), the step details panel must close before the editor drawer
       const closeButtons = app.getByRole('button', { name: 'Close' })
       if ((await closeButtons.count()) > 1) {
-        // Multiple Close buttons - close the inner panel first (node details)
+        // Multiple Close buttons - close the inner panel first (step details)
         await closeButtons.last().click()
         await expect(closeButtons).toHaveCount(1, { timeout: 5000 })
       }
       await closeStepEditorPanel(app)
 
-      // Verify the node is still on the canvas after reopening and closing
+      // Verify the step is still on the canvas after reopening and closing
       await verifyStepVisible(app, 'Initial approval')
     } finally {
       // Cleanup
@@ -205,14 +205,14 @@ test.describe('Approval Node Configuration', () => {
     }
   })
 
-  test('user configures Approval node with both fallback decision options', async ({ app }) => {
+  test('user configures Approval step with both fallback decision options', async ({ app }) => {
     test.slow()
     const fallbackDecisions: Array<'approve' | 'reject'> = ['approve', 'reject']
     const workflowNames: string[] = []
 
     try {
       // Test each fallback decision option in a separate workflow to avoid
-      // non-deterministic openAddStepPanel().first() with multiple Approval nodes
+      // non-deterministic openAddStepPanel().first() with multiple Approval steps
       for (const decision of fallbackDecisions) {
         const workflowName = buildUniqueName(`e2e-approval-fallback-${decision}`)
         workflowNames.push(workflowName)
@@ -220,7 +220,7 @@ test.describe('Approval Node Configuration', () => {
         // Create a fresh workflow with manual trigger
         await startWorkflowWithTrigger(app)
 
-        // Add Approval node with specific fallback decision
+        // Add Approval step with specific fallback decision
         await addApprovalStepWithConfig(app, {
           name: `Approval fallback ${decision}`,
           message: `Test ${decision} fallback`,
@@ -228,7 +228,7 @@ test.describe('Approval Node Configuration', () => {
           fallbackDecision: decision,
         })
 
-        // Verify the node appears on canvas
+        // Verify the step appears on canvas
         await verifyStepVisible(app, `Approval fallback ${decision}`)
 
         // Save the workflow
@@ -245,7 +245,7 @@ test.describe('Approval Node Configuration', () => {
     }
   })
 
-  test('user adds Approval node, clicks to open details panel, configures, and saves', async ({ app }) => {
+  test('user adds Approval step, clicks to open details panel, configures, and saves', async ({ app }) => {
     test.slow()
     const workflowName = buildUniqueName('e2e-approval-click-edit')
 
@@ -253,26 +253,26 @@ test.describe('Approval Node Configuration', () => {
       // Arrange - Create a workflow with manual trigger
       await startWorkflowWithTrigger(app)
 
-      // Step 1: Add an Approval node to the canvas with minimal configuration
+      // Step 1: Add an Approval step to the canvas with minimal configuration
       await openApprovalStepForm(app)
-      await configureApprovalNode(app, { name: 'Approval node' })
-      await saveAndCloseStepForm(app, false, 'Approval node')
+      await configureApprovalStep(app, { name: 'Approval step' })
+      await saveAndCloseStepForm(app, false, 'Approval step')
 
-      // Step 2: Click the node to open the details panel
-      await openStepForEditing(app, 'Approval node')
+      // Step 2: Click the step to open the details panel
+      await openStepForEditing(app, 'Approval step')
 
       // Step 3: Configure message, decision window, and fallback decision
-      await configureApprovalNode(app, {
+      await configureApprovalStep(app, {
         message: 'Please approve this deployment',
         decisionWindowSeconds: 1800,
         fallbackDecision: 'approve',
       })
 
       // Step 4: Save the configuration (using Update button since we're editing)
-      await saveAndCloseStepForm(app, true, 'Approval node')
+      await saveAndCloseStepForm(app, true, 'Approval step')
 
-      // Verify the configuration saved by reopening the node
-      await openStepForEditing(app, 'Approval node')
+      // Verify the configuration saved by reopening the step
+      await openStepForEditing(app, 'Approval step')
 
       // Assert - Verify all configured values are present
       await expect(app.getByRole('textbox', { name: 'Message' })).toHaveValue('Please approve this deployment')
@@ -290,7 +290,7 @@ test.describe('Approval Node Configuration', () => {
     }
   })
 
-  test('user verifies Parameters panel displays all Approval node fields', async ({ app }) => {
+  test('user verifies Parameters panel displays all Approval step fields', async ({ app }) => {
     test.slow()
     // Arrange - Create a workflow with manual trigger
     await startWorkflowWithTrigger(app)

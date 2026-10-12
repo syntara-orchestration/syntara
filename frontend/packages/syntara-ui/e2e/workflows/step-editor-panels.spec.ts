@@ -24,13 +24,13 @@ async function clickMenuItemWhenVisible(app: Page, itemName: string) {
   await item.click()
 }
 
-test.describe('Node editor panels', () => {
-  test('three-panel layout renders with empty states on node click', async ({ app }) => {
+test.describe('Step editor panels', () => {
+  test('three-panel layout renders with empty states on step click', async ({ app }) => {
     const workflowName = buildUniqueName('e2e-panels')
     const { id } = await createBasicWorkflowViaApi(app, workflowName, 'Process data')
     await openWorkflowInBuilder(app, workflowName, id)
 
-    // Open the script node editor
+    // Open the script step editor
     await clickNode(app, 'Process data')
 
     // Verify three-panel layout — Input and Output headings
@@ -50,12 +50,12 @@ test.describe('Node editor panels', () => {
     await expect(app.getByRole('heading', { name: 'Input', exact: true })).not.toBeVisible()
   })
 
-  test('node editor can be opened, closed, and reopened', async ({ app }) => {
+  test('step editor can be opened, closed, and reopened', async ({ app }) => {
     const workflowName = buildUniqueName('e2e-reopen')
     const { id } = await createBasicWorkflowViaApi(app, workflowName, 'My action')
     await openWorkflowInBuilder(app, workflowName, id)
 
-    // Click the script node to open the editor
+    // Click the script step to open the editor
     await clickNode(app, 'My action')
 
     // Verify the editor is open
@@ -66,11 +66,11 @@ test.describe('Node editor panels', () => {
     await closeStepEditorPanel(app)
     await expect(app.getByRole('heading', { name: 'Input', exact: true })).not.toBeVisible()
 
-    // Click the trigger node — triggers do NOT show the Input panel
+    // Click the trigger step — triggers do NOT show the Input panel
     await clickNode(app, 'Manual trigger')
     await expect(app.getByRole('heading', { name: 'Output', exact: true })).toBeVisible({ timeout: 10_000 })
 
-    // Close and reopen the script node
+    // Close and reopen the script step
     await closeStepEditorPanel(app)
     await clickNode(app, 'My action')
     await expect(app.getByRole('heading', { name: 'Input', exact: true })).toBeVisible({ timeout: 10_000 })
@@ -1138,7 +1138,7 @@ test.describe('Node editor panels', () => {
     await expect(app.getByRole('button', { name: 'Pin data', exact: true })).not.toBeVisible()
   })
 
-  test('pinned data persists across node editor reopens', async ({ app }) => {
+  test('pinned data persists across step editor reopens', async ({ app }) => {
     const workflowName = buildUniqueName('e2e-mock-persist')
     await app.goto(toAppUrl('/workflow-builder/new'))
     await selectProjectIfRequired(app)

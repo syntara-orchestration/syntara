@@ -59,10 +59,10 @@ export async function triggerLayout(page: Page) {
 export { clickNode, layoutCanvas } from './canvas-interaction'
 
 export async function closeStepEditorPanel(page: Page) {
-  // The node editor cancel button has different aria-labels depending on mode:
+  // The step editor cancel button has different aria-labels depending on mode:
   //   edit mode  → "Cancel without saving"
   //   add mode   → "Cancel step creation"
-  //   read-only  → "Close node editor"
+  //   read-only  → "Close step editor"
   // Try each in order.
   const cancelEditButton = page.getByRole('button', { name: 'Cancel without saving' })
   if ((await cancelEditButton.count()) > 0) {
@@ -80,7 +80,7 @@ export async function closeStepEditorPanel(page: Page) {
   }
   // Scope the "Close" button query to the drawer panel to avoid matching alert close buttons
   const drawer = page.getByRole('dialog').or(page.locator('[class*="drawer"]'))
-  const closeButton = drawer.getByRole('button', { name: 'Close node editor' })
+  const closeButton = drawer.getByRole('button', { name: 'Close step editor' })
   if ((await closeButton.count()) > 0) {
     await expect(closeButton).toBeVisible()
     await closeButton.click()
