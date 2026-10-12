@@ -392,7 +392,6 @@ class WorkflowRetryMixin:
             if node.type in _INFERABLE_CONTROL_NODE_TYPES and self._infer_control_node_branch(node, graph):
                 return strip_iteration_suffix(node_id) in self._retry_restorable_nodes(graph)
             return False
->>>>>>> 09b708c12 (feat(AAP-92821): replay a condition or switch by the branch the source run took)
         return strip_iteration_suffix(node_id) in self._retry_restorable_nodes(graph)
 
     def _restored_control_result(self, node: ActivityNode, graph: WorkflowGraph) -> dict[str, Any] | None:
