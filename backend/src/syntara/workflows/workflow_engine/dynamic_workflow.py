@@ -163,7 +163,7 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
             await self._cancel_agentic_invocations()
             raise
 
-    def _initialize_state(
+    def _initialize_state(  # type: ignore[override]
         self,
         execution_id: str,
         request_id: str | None = None,
