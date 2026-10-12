@@ -34,7 +34,7 @@ describe('LogicStepForm', () => {
       )
 
       // Verify ConditionStepForm is rendered by checking for its unique elements
-      expect(screen.getByRole('group', { name: /Expression builder/i })).toBeInTheDocument()
+      expect(screen.getByRole('group', { name: 'Condition' })).toBeInTheDocument()
       expect(screen.getByPlaceholderText(/Enter activity name/i)).toHaveValue('Test Condition')
     })
 
