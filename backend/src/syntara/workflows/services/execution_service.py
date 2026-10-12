@@ -41,7 +41,11 @@ from syntara.workflows.exceptions import (
     WorkflowNotPublishedError,
 )
 from syntara.workflows.json_schema_validation import apply_schema_defaults
-from syntara.workflows.models.activity_execution import ActivityExecution, ActivityExecutionListResponse
+from syntara.workflows.models.activity_execution import (
+    ActivityExecution,
+    ActivityExecutionListResponse,
+    ActivityExecutionRead,
+)
 from syntara.workflows.models.execution import (
     TERMINAL_EXECUTION_STATUSES,
     ActivityData,
@@ -95,7 +99,7 @@ async def count_active_executions(session: "AsyncSession") -> int:
 class ExecutionsEnrichQueryMixin(EnrichQueryMixin):
     """Eager-load workflow and workflow_version relationships so list queries include the name and version number."""
 
-    def enrich(self, query: Select) -> Select:  # type: ignore[type-arg]
+    def enrich(self, query: Select) -> Select:
         """Add selectinload for workflow and workflow_version to the query.
 
         Only applies when the root entity is Execution (skips ActivityExecution queries).
@@ -974,12 +978,12 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
         if query_params_items:
             execution_filter.extend(query_params_items)
 
-        # Pass identity converter — the service's default mixin converts to ExecutionRead,
-        # but ActivityExecution is used directly as the response model.
+        # Convert through the public read model so internal persistence fields are
+        # never included in REST responses.
         return await self.list_resources(
             model=ActivityExecution,
             response_type=ActivityExecutionListResponse,
-            response_type_converter=lambda a: a,
+            response_type_converter=ActivityExecutionRead.model_validate,
             limit=limit,
             cursor=cursor,
             sort=sort or "-created_at",

@@ -164,6 +164,11 @@ class ActivityExecution(BaseResource, table=True):
     output_data: dict[str, Any] | None = Field(
         default=None, sa_column=Column(JSONB), description="Activity results (if completed)"
     )
+    control_data: dict[str, Any] | None = Field(
+        default=None,
+        sa_column=Column(JSONB, nullable=True),
+        description="Internal activity routing data",
+    )
     error_details: str | None = Field(
         None,
         sa_type=Text(),  # type: ignore[call-overload]
@@ -177,5 +182,22 @@ class ActivityExecution(BaseResource, table=True):
     iteration: int | None = Field(None, description="Iteration number if activity is within a loop (0-indexed)")
 
 
-class ActivityExecutionListResponse(ResourcesResponse[ActivityExecution]):
+class ActivityExecutionRead(BaseResource):
+    """Public activity response model that intentionally excludes control data."""
+
+    execution_id: UUID
+    activity_name: str
+    node_type: NodeType
+    temporal_activity_id: str
+    status: ActivityStatus
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    input_data: dict[str, Any] = Field(default_factory=dict)
+    output_data: dict[str, Any] | None = None
+    error_details: str | None = None
+    retry_count: int = 0
+    iteration: int | None = None
+
+
+class ActivityExecutionListResponse(ResourcesResponse[ActivityExecutionRead]):
     """Paginated list response for activity executions."""

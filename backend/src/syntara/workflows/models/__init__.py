@@ -23,7 +23,7 @@ Usage:
     from syntara.workflows.models import ActivityData, ExecutionSnapshotMessage, ActivityPatchMessage
 """
 
-from .activity_execution import ActivityExecution, ActivityExecutionListResponse, ActivityStatus
+from .activity_execution import ActivityExecution, ActivityExecutionListResponse, ActivityExecutionRead, ActivityStatus
 from .execution import (
     TERMINAL_EXECUTION_STATUSES,
     ActivityData,
@@ -82,6 +82,7 @@ __all__ = [
     "ActivityData",
     "ActivityExecution",
     "ActivityExecutionListResponse",
+    "ActivityExecutionRead",
     "ActivityListParams",
     "ActivityPatchMessage",
     "ActivitySignalPayload",
