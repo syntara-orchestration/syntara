@@ -99,7 +99,7 @@ async def count_active_executions(session: "AsyncSession") -> int:
 class ExecutionsEnrichQueryMixin(EnrichQueryMixin):
     """Eager-load workflow and workflow_version relationships so list queries include the name and version number."""
 
-    def enrich(self, query: Select) -> Select:
+    def enrich(self, query: Select) -> Select:  # type: ignore[type-arg]
         """Add selectinload for workflow and workflow_version to the query.
 
         Only applies when the root entity is Execution (skips ActivityExecution queries).

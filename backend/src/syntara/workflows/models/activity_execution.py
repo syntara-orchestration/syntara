@@ -185,18 +185,26 @@ class ActivityExecution(BaseResource, table=True):
 class ActivityExecutionRead(BaseResource):
     """Public activity response model that intentionally excludes control data."""
 
-    execution_id: UUID
-    activity_name: str
-    node_type: NodeType
-    temporal_activity_id: str
-    status: ActivityStatus
-    started_at: datetime | None = None
-    completed_at: datetime | None = None
-    input_data: dict[str, Any] = Field(default_factory=dict)
-    output_data: dict[str, Any] | None = None
-    error_details: str | None = None
-    retry_count: int = 0
-    iteration: int | None = None
+    execution_id: UUID = Field(description="Parent execution ID")
+    activity_name: str = Field(
+        min_length=1,
+        max_length=255,
+        description="Activity ID from workflow definition",
+    )
+    node_type: NodeType = Field(description="Node type from workflow definition")
+    temporal_activity_id: str = Field(
+        min_length=1,
+        max_length=255,
+        description="Temporal activity execution ID",
+    )
+    status: ActivityStatus = Field(description="Current activity status")
+    started_at: datetime | None = Field(default=None, description="When activity started execution")
+    completed_at: datetime | None = Field(default=None, description="When activity completed/failed")
+    input_data: dict[str, Any] = Field(default_factory=dict, description="Runtime input parameters")
+    output_data: dict[str, Any] | None = Field(default=None, description="Activity results (if completed)")
+    error_details: str | None = Field(default=None, description="Error information if failed")
+    retry_count: int = Field(default=0, description="Number of retry attempts")
+    iteration: int | None = Field(default=None, description="Iteration number if activity is within a loop (0-indexed)")
 
 
 class ActivityExecutionListResponse(ResourcesResponse[ActivityExecutionRead]):

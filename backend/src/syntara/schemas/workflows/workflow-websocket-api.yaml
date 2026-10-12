@@ -229,8 +229,8 @@ components:
     # Core domain objects (imported from shared schemas)
     Execution:
       $ref: ./shared-schemas.yaml#/components/schemas/Execution
-    ActivityExecution:
-      $ref: ./shared-schemas.yaml#/components/schemas/ActivityExecution
+    ActivityExecutionRead:
+      $ref: ./shared-schemas.yaml#/components/schemas/ActivityExecutionRead
     Approval:
       $ref: ./shared-schemas.yaml#/components/schemas/Approval
     ExecutionStatus:
