@@ -153,6 +153,7 @@ class ActivityName(StrEnum):
     RETRY_SOURCE_STATE = "fetch_retry_source_state"
     RETRY_NODE_REPLAY = "replay_retry_node"
     RETRY_CONTROL_PORTS = "retry_control_ports"
+    RETRY_LOOP_ITERATION_PROBE = "probe_retry_loop_iteration"
 
 
 # Enums

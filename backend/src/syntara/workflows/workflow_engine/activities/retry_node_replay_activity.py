@@ -16,7 +16,7 @@ import json
 from typing import Any
 
 import structlog
-from sqlmodel import col, select
+from sqlmodel import and_, col, or_, select
 from temporalio import activity, workflow
 
 from syntara.workflows.workflow_engine.constants import RESTORABLE_SOURCE_STATUSES
@@ -26,7 +26,7 @@ with workflow.unsafe.imports_passed_through():
     from syntara.core.database.session import get_db
     from syntara.core.exceptions import SafeValueError
     from syntara.workflows.models.activity_execution import ActivityExecution, ActivityStatus
-    from syntara.workflows.utils.loop_iteration_names import strip_iteration_suffix
+    from syntara.workflows.utils.loop_iteration_names import LOOP_ITERATION_SEP, strip_iteration_suffix
     from syntara.workflows.workflow_engine.utils.loop_iteration_ids import strip_loop_iteration_suffixes
 
 logger = structlog.stdlib.get_logger(__name__)
@@ -230,3 +230,62 @@ async def retry_control_ports(source_execution_id: str) -> dict[str, str]:
             if port:
                 ports[strip_loop_iteration_suffixes(activity_name)] = str(port)
     return ports
+
+
+@activity.defn
+async def probe_retry_loop_iteration(
+    source_execution_id: str,
+    body_node_ids: list[str],
+    index: int,
+) -> bool:
+    """Whether the source run actually reached ``index`` of this loop's body.
+
+    The routing question during a loop replay is not "what did the loop decide"
+    but "did the next iteration happen" — a fact the source run already recorded.
+    Asking that instead of re-deriving it is what makes the replay correct under
+    ``continue_on_failure``, where a failed body node does not stop the loop and
+    so cannot be mapped back to a port.
+
+    Body nodes are keyed per iteration: the first run of a node is its own
+    ``activity_name``, and each later run becomes ``{node}#iter-{n}`` once the
+    previous row has reached a terminal status. Both spellings are therefore
+    checked, rather than assuming one convention.
+
+    A loop control node itself is *not* usable for this. Its row is a single
+    record reused across iterations — the sync service lets a COMPLETED loop
+    control row update precisely so the next iteration can reuse it — so it holds
+    only the last iteration's state, not a per-iteration history.
+
+    Args:
+        source_execution_id: Execution whose rows hold the loop's history.
+        body_node_ids: Nodes inside the loop body, as canvas ids.
+        index: Iteration number being tested, zero-based.
+
+    Returns:
+        True when the source run recorded that iteration, False otherwise.
+
+    """
+    if not body_node_ids:
+        return False
+
+    later_runs = [
+        ActivityExecution.activity_name == f"{node_id}{LOOP_ITERATION_SEP}{index}" for node_id in body_node_ids
+    ]
+
+    async for session in get_db():
+        found = await session.exec(
+            select(ActivityExecution.id)
+            .where(
+                ActivityExecution.execution_id == source_execution_id,
+                or_(
+                    and_(
+                        col(ActivityExecution.activity_name).in_(body_node_ids),
+                        col(ActivityExecution.iteration) == index,
+                    ),
+                    *later_runs,
+                ),
+            )
+            .limit(1)
+        )
+        return found.first() is not None
+    return False
