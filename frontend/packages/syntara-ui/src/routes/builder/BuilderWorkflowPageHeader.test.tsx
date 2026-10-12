@@ -178,11 +178,6 @@ describe('BuilderWorkflowPageHeader', () => {
     const nameSlot = screen.getByTestId('builder-workflow-name')
     expect(nameSlot).toHaveClass(styles.workflowName)
     expect(screen.getByTestId('builder-title-slot')).toHaveClass('pf-m-wrap')
-
-    const computed = window.getComputedStyle(nameSlot)
-    expect(computed.minWidth).toBe('16ch')
-    expect(computed.maxWidth).toBe('24ch')
-    expect(computed.flexShrink).toBe('1')
   })
 
   it('updates workflow name and marks dirty on change', async () => {

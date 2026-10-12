@@ -1,8 +1,8 @@
 import { ActionGroup, Button } from '@patternfly/react-core'
 import type { MutableRefObject } from 'react'
 import { useLayoutEffect } from 'react'
-import { FormProvider } from 'react-hook-form'
 
+import { SynForm } from '../../../../components/forms/SynForm'
 import { SynPage, SynPageBody } from '../../../../components/layout/SynPage'
 import { SynPageHeader } from '../../../../components/layout/SynPageHeader'
 import { SynPanel } from '../../../../components/layout/SynPanel'
@@ -40,7 +40,7 @@ function GroupMappingFormEditorContent({
   }, [editForm.openTestSignIn, openTestSignInRef])
 
   return (
-    <FormProvider {...editForm.form}>
+    <SynForm form={editForm.form}>
       <SynPage>
         <SynPageHeader title={pageTitle} breadcrumbs={breadcrumbs} docLink={mappingDocLink} />
         <SynPageBody>
@@ -68,7 +68,7 @@ function GroupMappingFormEditorContent({
           </SynPanel>
         </SynPageBody>
       </SynPage>
-    </FormProvider>
+    </SynForm>
   )
 }
 

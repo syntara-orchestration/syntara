@@ -37,7 +37,6 @@ class WorkflowVersionUnpublishedTelemetryHandler(AuditEventHandler[WorkflowVersi
                 WorkflowVersionUnpublishedTelemetryEvent(
                     workflow_id=event.workflow_id,
                     version=event.version,
-                    workflow_name=event.workflow_name,
                     project_id=event.project_id,
                     error_type=event.error_type,
                     entitlement_id=registry.entitlement_id,

@@ -42,7 +42,7 @@
     "@patternfly/react-table": "^6.6.0",
     "@syntara/contracts": "file:../syntara-contracts",
     "@tanstack/react-query": "^5.100.11",
-    "@tanstack/react-router": "^1.170.15",
+    "@tanstack/react-router": "^1.170.40",
     "@xyflow/react": "^12.10.2",
     "date-fns": "^4.2.1",
     "fuse.js": "^7.3.0",

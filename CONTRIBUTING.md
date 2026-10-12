@@ -111,6 +111,7 @@ checked when the API changes; aggregated by `(Frontend) Required Checks`):
 | `(Frontend) Generate Contracts` | Regenerated contracts when needed |
 | `(Frontend) Checks` | Lint / typecheck / static analysis |
 | `(Frontend) Unit Tests` | Unit tests (sharded) |
+| `(Frontend) Route Baseline` | Committed UI route manifest matches the current route sources; enforced by the required-check aggregate |
 | `(Frontend) Coverage Report` | Coverage merge/report |
 | `(Frontend) Storybook Build` | Storybook build |
 | `(Frontend) Test Container Build` | UI / mock-API image build (no push) |
@@ -137,6 +138,11 @@ classification for GitHub Actions is documented in
 Konflux pipelines use path filters in `.tekton/`. If those paths did not change,
 the pipeline will not start and the matching Konflux Gate job skips after its
 startup window.
+
+GitHub **CI Frontend** path detection strips `frontend/.cursor*` paths before
+deciding whether to run the full stack (synced Cursor rules are not product
+code). PRs that only touch `.claude/skills/` already skip that stack because
+those paths do not match the `frontend/` filter.
 
 ### Fork PRs
 

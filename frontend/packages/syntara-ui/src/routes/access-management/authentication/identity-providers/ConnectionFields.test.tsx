@@ -21,7 +21,7 @@ function Wrapper({
   })
   return (
     <FormProvider {...methods}>
-      <ConnectionFields control={methods.control} autoDiscovery={autoDiscovery} isEdit={isEdit} />
+      <ConnectionFields autoDiscovery={autoDiscovery} isEdit={isEdit} />
     </FormProvider>
   )
 }

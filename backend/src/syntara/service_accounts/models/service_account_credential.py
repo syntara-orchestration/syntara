@@ -140,6 +140,8 @@ class ServiceAccountCredential(UserOwnedResource, table=True):
         dict.fromkeys(
             [
                 *UserOwnedResource.__sortable_fields__,
+                "identifier",
+                "status",
                 "last_used_at",
                 "expires_at",
             ]

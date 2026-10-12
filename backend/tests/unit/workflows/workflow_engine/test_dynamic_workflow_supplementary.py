@@ -71,6 +71,7 @@ def _make_workflow(
     wf._timed_out_converge_nodes = set()
     wf._detached_nodes = set()
     wf._converge_branch_nodes = {}
+    wf._cof_failed_nodes = set()
     init_workflow_runtime(wf)
     wf.execution_id = "test-execution-id"
     wf._created_by_user_id = ""
@@ -573,6 +574,77 @@ class TestLoopBodyCompleteEdgeCases:
         assert wf._loop_body_complete("outer_loop") is True
 
 
+class TestCheckLoopBodyCompletionGuard:
+    """Failed parent loops must not be re-iterated.
+
+    When a loop body has parallel nodes and one fails, _propagate_loop_body_failure
+    marks the parent loop as failed and schedules its successors. However the body
+    entries remain in loop_body_map. If the other parallel body node completes
+    afterward, _check_loop_body_completion must NOT re-execute the loop.
+    """
+
+    def test_failed_parent_loop_not_reiterated(self) -> None:
+        """Completing a sibling body node after another failed must not re-execute the loop."""
+        backend = InMemoryGraphBackend()
+        backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
+        backend.add_node(
+            "loop_node",
+            {"id": "loop_node", "type": "loop", "parameters": {"type": "for_each", "items": ["a"]}},
+        )
+        backend.add_node("body_a", {"id": "body_a", "type": "script", "parameters": {}})
+        backend.add_node("body_b", {"id": "body_b", "type": "script", "parameters": {}})
+        backend.add_edge("trigger", "loop_node")
+        backend.add_edge("loop_node", "body_a", {"from_port": "iterate"})
+        backend.add_edge("loop_node", "body_b", {"from_port": "iterate"})
+        backend.add_edge("body_a", "loop_node", {"to_port": "iterate"})
+        backend.add_edge("body_b", "loop_node", {"to_port": "iterate"})
+        graph = WorkflowGraph(backend)
+
+        wf = _make_workflow()
+        wf.loop_body_map["body_a"] = "loop_node"
+        wf.loop_body_map["body_b"] = "loop_node"
+
+        # body_a failed → parent loop marked failed
+        wf.failed_nodes["loop_node"] = "Loop body node 'body_a' failed"
+        wf.resolver.set_namespace("body_a", {"status": "failed", "error": "boom"})
+
+        # body_b completes afterward — both namespaces now populated
+        wf.resolver.set_namespace("body_b", {"status": "completed", "result": "ok"})
+        pending: dict[str, asyncio.Task[Any]] = {}
+
+        wf._check_loop_body_completion("body_b", graph, pending)
+
+        assert "loop_node" not in pending, "Failed loop must not be re-executed"
+
+    @pytest.mark.asyncio
+    async def test_healthy_loop_still_reiterates(self) -> None:
+        """A non-failed loop whose body is complete should still be re-scheduled."""
+        backend = InMemoryGraphBackend()
+        backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
+        backend.add_node(
+            "loop_node",
+            {"id": "loop_node", "type": "loop", "parameters": {"type": "for_each", "items": ["a", "b"]}},
+        )
+        backend.add_node("body", {"id": "body", "type": "script", "parameters": {}})
+        backend.add_edge("trigger", "loop_node")
+        backend.add_edge("loop_node", "body", {"from_port": "iterate"})
+        backend.add_edge("body", "loop_node", {"to_port": "iterate"})
+        graph = WorkflowGraph(backend)
+
+        wf = _make_workflow()
+        wf.loop_body_map["body"] = "loop_node"
+        wf.resolver.set_namespace("body", {"status": "completed"})
+        pending: dict[str, asyncio.Task[Any]] = {}
+
+        with patch.object(wf, "_execute_node", new_callable=AsyncMock):
+            wf._check_loop_body_completion("body", graph, pending)
+
+        for task in pending.values():
+            task.cancel()
+
+        assert "loop_node" in pending, "Healthy loop should be re-scheduled"
+
+
 class TestClearLoopBodyEdgeCases:
     """Additional edge cases for clearing loop body state."""
 
@@ -622,6 +694,143 @@ class TestClearLoopBodyEdgeCases:
         assert "unrelated" in wf.loop_body_map
         assert wf.loop_iteration_results["loop_1"]["body_a.x"] == [1]
         assert wf.loop_iteration_results["loop_1"]["body_b.y"] == [2]
+
+
+class TestLoopStillIteratingConverge:
+    """A loop routing to 'iterate' must not count as terminal or successful."""
+
+    def test_is_loop_still_iterating_true(self) -> None:
+        wf = _make_workflow()
+        wf.node_control_data["loop_1"] = {"next_port": "iterate"}
+        assert wf._is_loop_still_iterating("loop_1") is True
+
+    def test_is_loop_still_iterating_false_on_complete(self) -> None:
+        wf = _make_workflow()
+        wf.node_control_data["loop_1"] = {"next_port": "complete"}
+        assert wf._is_loop_still_iterating("loop_1") is False
+
+    def test_is_loop_still_iterating_false_no_control_data(self) -> None:
+        wf = _make_workflow()
+        assert wf._is_loop_still_iterating("node_x") is False
+
+    def test_all_predecessors_terminal_excludes_iterating_loop(self) -> None:
+        wf = _make_workflow()
+        wf.resolver.set_namespace("loop_1", {"status": "completed"})
+        wf.node_control_data["loop_1"] = {"next_port": "iterate"}
+        assert wf._all_predecessors_terminal(["loop_1"]) is False
+
+    def test_all_predecessors_terminal_includes_completed_loop(self) -> None:
+        wf = _make_workflow()
+        wf.resolver.set_namespace("loop_1", {"status": "completed"})
+        wf.node_control_data["loop_1"] = {"next_port": "complete"}
+        assert wf._all_predecessors_terminal(["loop_1"]) is True
+
+    def test_count_successful_excludes_iterating_loop(self) -> None:
+        wf = _make_workflow()
+        wf.resolver.set_namespace("loop_1", {"status": "completed"})
+        wf.node_control_data["loop_1"] = {"next_port": "iterate"}
+        wf.resolver.set_namespace("step_a", {"result": "ok"})
+        assert wf._count_successful_predecessors(["loop_1", "step_a"]) == 1
+
+    def test_count_successful_includes_completed_loop(self) -> None:
+        wf = _make_workflow()
+        wf.resolver.set_namespace("loop_1", {"status": "completed"})
+        wf.node_control_data["loop_1"] = {"next_port": "complete"}
+        wf.resolver.set_namespace("step_a", {"result": "ok"})
+        assert wf._count_successful_predecessors(["loop_1", "step_a"]) == 2
+
+
+class TestPropagateLoopBodyFailure:
+    """Body failure must propagate to parent loop and downstream converge."""
+
+    def test_marks_parent_loop_as_failed(self) -> None:
+        backend = InMemoryGraphBackend()
+        backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
+        backend.add_node(
+            "loop_node", {"id": "loop_node", "type": "loop", "parameters": {"type": "for_each", "items": ["a"]}}
+        )
+        backend.add_node("body", {"id": "body", "type": "script", "parameters": {}})
+        backend.add_node("join", {"id": "join", "type": "converge", "parameters": {}})
+        backend.add_edge("trigger", "loop_node")
+        backend.add_edge("loop_node", "body", {"from_port": "iterate"})
+        backend.add_edge("body", "loop_node", {"to_port": "iterate"})
+        backend.add_edge("loop_node", "join", {"from_port": "complete"})
+        graph = WorkflowGraph(backend)
+
+        wf = _make_workflow()
+        wf.loop_body_map["body"] = "loop_node"
+        wf.resolver.set_namespace("loop_node", {"status": "completed"})
+        wf.node_control_data["loop_node"] = {"next_port": "iterate"}
+        wf._build_converge_branch_nodes_index(graph)
+
+        wf._propagate_loop_body_failure("body", graph)
+
+        assert "loop_node" in wf.failed_nodes
+        ns = wf.resolver.get_namespace("loop_node")
+        assert ns["status"] == "failed"
+
+    def test_no_op_when_node_not_in_loop(self) -> None:
+        graph = _build_chain_graph()
+        wf = _make_workflow()
+
+        wf._propagate_loop_body_failure("node_a", graph)
+
+        assert not wf.failed_nodes
+
+    def test_no_op_when_loop_already_failed(self) -> None:
+        graph = _build_chain_graph()
+        wf = _make_workflow(failed_nodes={"loop_1": "already failed"})
+        wf.loop_body_map["body"] = "loop_1"
+
+        wf._propagate_loop_body_failure("body", graph)
+
+        assert wf.failed_nodes["loop_1"] == "already failed"
+
+    def test_loop_continue_on_failure_routes_through_cof(self) -> None:
+        """Loop with continue_on_failure=True: body failure adds loop to _cof_failed_nodes.
+
+        Verifies that a CoF loop does not break downstream ALL converge nodes.
+        """
+        backend = InMemoryGraphBackend()
+        backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
+        backend.add_node(
+            "loop_node",
+            {
+                "id": "loop_node",
+                "type": "loop",
+                "parameters": {"type": "for_each", "items": ["a", "b"]},
+                "settings": {"continue_on_failure": True},
+            },
+        )
+        backend.add_node("body", {"id": "body", "type": "script", "parameters": {}})
+        backend.add_node("other", {"id": "other", "type": "script", "parameters": {}})
+        backend.add_node("join", {"id": "join", "type": "converge", "parameters": {"strategy": "all"}})
+        backend.add_node("downstream", {"id": "downstream", "type": "script", "parameters": {}})
+        backend.add_edge("trigger", "loop_node")
+        backend.add_edge("trigger", "other")
+        backend.add_edge("loop_node", "body", {"from_port": "iterate"})
+        backend.add_edge("body", "loop_node", {"to_port": "iterate"})
+        backend.add_edge("loop_node", "join", {"from_port": "complete"})
+        backend.add_edge("other", "join")
+        backend.add_edge("join", "downstream")
+        graph = WorkflowGraph(backend)
+
+        wf = _make_workflow()
+        wf.loop_body_map["body"] = "loop_node"
+        wf.resolver.set_namespace("loop_node", {"status": "completed"})
+        wf.node_control_data["loop_node"] = {"next_port": "iterate"}
+        wf._build_converge_branch_nodes_index(graph)
+
+        wf._propagate_loop_body_failure("body", graph)
+
+        assert "loop_node" in wf.failed_nodes
+        assert "loop_node" in wf._cof_failed_nodes
+        assert wf.node_control_data["loop_node"]["next_port"] == "complete"
+        assert "loop_node" in wf._timed_out_converge_nodes
+        assert wf._has_unhandled_failure is False
+        assert "join" not in wf.failed_nodes
+        assert "join" not in wf.skipped_nodes
+        assert "downstream" not in wf.skipped_nodes
 
 
 class TestScheduleSuccessorsSkipBehavior:
@@ -1045,3 +1254,232 @@ class TestResolveAndInjectUniqueActivityIds:
         assert "__internal__resolve_credentials_aap_1" in activity_ids
         assert "__internal__resolve_credentials_aap_2" in activity_ids
         assert len(set(activity_ids)) == 2
+
+
+class TestExtractFailureOutput:
+    """Tests for _extract_failure_output — extracts output from ApplicationError or falls back."""
+
+    def test_extracts_output_from_app_error_details(self) -> None:
+        """When app_error.details contains an 'output' dict, return it."""
+        wf = _make_workflow()
+        graph = _build_chain_graph()
+        app_error = ApplicationError("boom", {"output": {"response_code": 500, "body": "err"}}, type="TaskError")
+
+        result = wf._extract_failure_output("node_a", app_error, graph)
+
+        assert result == {"response_code": 500, "body": "err"}
+
+    def test_returns_empty_model_when_no_app_error(self) -> None:
+        """When app_error is None, fall back to _build_empty_node_output."""
+        wf = _make_workflow()
+        graph = _build_chain_graph()
+
+        result = wf._extract_failure_output("node_a", None, graph)
+
+        assert isinstance(result, dict)
+
+    def test_returns_empty_model_when_details_lack_output_key(self) -> None:
+        """When app_error.details has no 'output' key, fall back to empty model."""
+        wf = _make_workflow()
+        graph = _build_chain_graph()
+        app_error = ApplicationError("boom", {"error": "some error"}, type="TaskError")
+
+        result = wf._extract_failure_output("node_a", app_error, graph)
+
+        assert isinstance(result, dict)
+        assert "response_code" not in result
+
+
+class TestEvaluatePredecessor:
+    """Tests for _evaluate_predecessor — all return paths."""
+
+    def test_skipped_predecessor_returns_none(self) -> None:
+        wf = _make_workflow(skipped_nodes={"node_a"})
+        graph = _build_chain_graph()
+
+        assert wf._evaluate_predecessor("node_a", graph) is None
+
+    def test_cof_failed_predecessor_returns_true(self) -> None:
+        wf = _make_workflow(failed_nodes={"node_a": "error"})
+        wf._cof_failed_nodes.add("node_a")
+        graph = _build_chain_graph()
+
+        assert wf._evaluate_predecessor("node_a", graph) is True
+
+    def test_failed_non_cof_predecessor_returns_none(self) -> None:
+        wf = _make_workflow(failed_nodes={"node_a": "error"})
+        graph = _build_chain_graph()
+
+        assert wf._evaluate_predecessor("node_a", graph) is None
+
+    def test_completed_predecessor_returns_true(self) -> None:
+        wf = _make_workflow()
+        wf.resolver.set_namespace("node_a", {"status": "completed"})
+        graph = _build_chain_graph()
+
+        assert wf._evaluate_predecessor("node_a", graph) is True
+
+    def test_iterating_loop_predecessor_returns_false(self) -> None:
+        wf = _make_workflow()
+        wf.resolver.set_namespace("node_a", {"status": "iterating"})
+        wf.node_control_data["node_a"] = {"next_port": "iterate"}
+        graph = _build_chain_graph()
+
+        assert wf._evaluate_predecessor("node_a", graph) is False
+
+    def test_unreachable_predecessor_marked_skipped_returns_none(self) -> None:
+        graph = _build_chain_graph()
+        wf = _make_workflow(skipped_nodes={"node_a"})
+
+        result = wf._evaluate_predecessor("node_b", graph)
+
+        assert result is None
+        assert "node_b" in wf.skipped_nodes
+
+    def test_pending_predecessor_returns_false(self) -> None:
+        wf = _make_workflow()
+        graph = _build_chain_graph()
+        wf.resolver.set_namespace("trigger", {"status": "completed"})
+
+        assert wf._evaluate_predecessor("node_a", graph) is False
+
+
+class TestPropagateLoopBodyFailureExtended:
+    """Extended coverage: nested recursion and no-namespace edge case."""
+
+    def test_nested_loop_failure_propagates_to_outer_loop(self) -> None:
+        """Inner body fails → inner loop marked failed → recursion marks outer loop failed."""
+        backend = InMemoryGraphBackend()
+        backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
+        backend.add_node(
+            "outer_loop",
+            {"id": "outer_loop", "type": "loop", "parameters": {"type": "for_each", "items": ["a"]}},
+        )
+        backend.add_node(
+            "inner_loop",
+            {"id": "inner_loop", "type": "loop", "parameters": {"type": "for_each", "items": ["x"]}},
+        )
+        backend.add_node("inner_body", {"id": "inner_body", "type": "script", "parameters": {}})
+        backend.add_edge("trigger", "outer_loop")
+        backend.add_edge("outer_loop", "inner_loop", {"from_port": "iterate"})
+        backend.add_edge("inner_loop", "inner_body", {"from_port": "iterate"})
+        backend.add_edge("inner_body", "inner_loop", {"to_port": "iterate"})
+        backend.add_edge("inner_loop", "outer_loop", {"to_port": "iterate"})
+        graph = WorkflowGraph(backend)
+
+        wf = _make_workflow()
+        wf.loop_body_map["inner_body"] = "inner_loop"
+        wf.loop_body_map["inner_loop"] = "outer_loop"
+        wf.resolver.set_namespace("outer_loop", {"status": "iterating"})
+        wf.resolver.set_namespace("inner_loop", {"status": "iterating"})
+        wf.node_control_data["outer_loop"] = {"next_port": "iterate"}
+        wf.node_control_data["inner_loop"] = {"next_port": "iterate"}
+        wf._build_converge_branch_nodes_index(graph)
+
+        wf._propagate_loop_body_failure("inner_body", graph)
+
+        assert "inner_loop" in wf.failed_nodes
+        assert "outer_loop" in wf.failed_nodes
+
+    def test_propagation_when_parent_loop_has_no_namespace(self) -> None:
+        """Parent loop has no namespace yet — failure still marks it without crashing."""
+        backend = InMemoryGraphBackend()
+        backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
+        backend.add_node(
+            "loop_node",
+            {"id": "loop_node", "type": "loop", "parameters": {"type": "for_each", "items": ["a"]}},
+        )
+        backend.add_node("body", {"id": "body", "type": "script", "parameters": {}})
+        backend.add_edge("trigger", "loop_node")
+        backend.add_edge("loop_node", "body", {"from_port": "iterate"})
+        backend.add_edge("body", "loop_node", {"to_port": "iterate"})
+        graph = WorkflowGraph(backend)
+
+        wf = _make_workflow()
+        wf.loop_body_map["body"] = "loop_node"
+        wf._build_converge_branch_nodes_index(graph)
+
+        wf._propagate_loop_body_failure("body", graph)
+
+        assert "loop_node" in wf.failed_nodes
+
+
+class TestHandleNodeFailureLoopPropagation:
+    """Verify _handle_node_failure respects cancellation/CoF guards for loop propagation."""
+
+    def _build_loop_with_body(self) -> tuple[WorkflowGraph, OrchestratorWorkflow]:
+        backend = InMemoryGraphBackend()
+        backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
+        backend.add_node(
+            "loop_node",
+            {"id": "loop_node", "type": "loop", "parameters": {"type": "for_each", "items": ["a"]}},
+        )
+        backend.add_node("body", {"id": "body", "type": "script", "parameters": {}})
+        backend.add_edge("trigger", "loop_node")
+        backend.add_edge("loop_node", "body", {"from_port": "iterate"})
+        backend.add_edge("body", "loop_node", {"to_port": "iterate"})
+        graph = WorkflowGraph(backend)
+
+        wf = _make_workflow()
+        wf.loop_body_map["body"] = "loop_node"
+        wf.resolver.set_namespace("loop_node", {"status": "iterating"})
+        wf.node_control_data["loop_node"] = {"next_port": "iterate"}
+        wf._build_converge_branch_nodes_index(graph)
+        return graph, wf
+
+    def test_cancelled_body_node_does_not_propagate_to_parent_loop(self) -> None:
+        """Cancellation should NOT mark the parent loop as failed."""
+        graph, wf = self._build_loop_with_body()
+        error = ApplicationError("cancelled", type="InvocationCancelledError")
+
+        wf._handle_node_failure("body", error, graph)
+
+        assert "loop_node" not in wf.failed_nodes
+
+    def test_cof_body_failure_does_not_propagate_to_parent_loop(self) -> None:
+        """Body node with continue_on_failure=True should NOT propagate failure to parent loop."""
+        graph, wf = self._build_loop_with_body()
+        error = Exception("body failed")
+
+        wf._handle_node_failure("body", error, graph, continue_on_failure=True)
+
+        assert "loop_node" not in wf.failed_nodes
+        assert "body" in wf._cof_failed_nodes
+
+    def test_non_cof_body_failure_propagates_to_parent_loop(self) -> None:
+        """Body node failure without CoF DOES propagate failure to parent loop."""
+        graph, wf = self._build_loop_with_body()
+        error = Exception("body failed")
+
+        wf._handle_node_failure("body", error, graph)
+
+        assert "loop_node" in wf.failed_nodes
+
+
+class TestArePredecessorsCompleteAnyStrategy:
+    """ANY strategy with failed non-CoF predecessor still converges when n_required met."""
+
+    def test_any_strategy_converges_despite_failed_non_cof_predecessor(self) -> None:
+        """A failed non-CoF predecessor should not block ANY convergence."""
+        backend = InMemoryGraphBackend()
+        backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
+        backend.add_node("node_a", {"id": "node_a", "type": "script", "parameters": {}})
+        backend.add_node("node_b", {"id": "node_b", "type": "script", "parameters": {}})
+        backend.add_node("node_c", {"id": "node_c", "type": "script", "parameters": {}})
+        backend.add_node(
+            "converge",
+            {"id": "converge", "type": "converge", "parameters": {"strategy": "any", "n_required": 1}},
+        )
+        backend.add_edge("trigger", "node_a")
+        backend.add_edge("trigger", "node_b")
+        backend.add_edge("trigger", "node_c")
+        backend.add_edge("node_a", "converge")
+        backend.add_edge("node_b", "converge")
+        backend.add_edge("node_c", "converge")
+        graph = WorkflowGraph(backend)
+
+        wf = _make_workflow(failed_nodes={"node_b": "error"})
+        wf.resolver.set_namespace("node_a", {"status": "completed"})
+        wf.resolver.set_namespace("node_b", {"status": "failed"})
+
+        assert wf._are_predecessors_complete("converge", graph) is True

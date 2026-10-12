@@ -95,6 +95,10 @@ def tls_pg_container(
 ) -> Generator[dict[str, object], None, None]:
     """Start a TLS-enabled PostgreSQL container and yield connection info."""
     dc = DockerClient()
+    try:
+        dc.client.images.pull(_PG_IMAGE)
+    except Exception:
+        pytest.skip(f"Cannot pull Docker image {_PG_IMAGE!r} — skipping TLS tests")
     container = dc.client.containers.run(
         _PG_IMAGE,
         detach=True,
