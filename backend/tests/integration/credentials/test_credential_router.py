@@ -187,7 +187,7 @@ class TestListCredentials:
     ) -> None:
         # Create two credentials
         for i in range(2):
-            await auth_client.post(
+            r = await auth_client.post(
                 "/api/v1/credentials",
                 json={
                     "name": f"List Test {i} {uuid4().hex[:8]}",
@@ -196,11 +196,12 @@ class TestListCredentials:
                     "inputs": {"token": f"secret-{i}"},
                 },
             )
+            assert r.status_code == 201, r.text
 
         resp = await auth_client.get("/api/v1/credentials")
         assert resp.status_code == 200
         body = resp.json()
-        assert len(body["resources"]) >= 2
+        assert len(body["resources"]) >= 2, f"Expected >=2 credentials, got: {body}"
         # All inputs should be masked
         for resource in body["resources"]:
             if resource["inputs"]:
@@ -886,12 +887,14 @@ class TestEnabledFilter:
                 "inputs": {"token": "ghi"},
             },
         )
+        assert create_resp.status_code == 201, create_resp.text
         cred_id = create_resp.json()["id"]
-        await auth_client.patch(f"/api/v1/credentials/{cred_id}", json={"enabled": False})
+        patch_resp = await auth_client.patch(f"/api/v1/credentials/{cred_id}", json={"enabled": False})
+        assert patch_resp.status_code == 200, patch_resp.text
 
         resp = await auth_client.get("/api/v1/credentials?enabled=false")
         assert resp.status_code == 200
-        assert len(resp.json()["resources"]) >= 1
+        assert len(resp.json()["resources"]) >= 1, f"Expected >=1 disabled credential, got: {resp.json()}"
         for resource in resp.json()["resources"]:
             assert resource["enabled"] is False
 
