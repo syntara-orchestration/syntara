@@ -327,6 +327,14 @@ background-worker-run: check-deps _ensure-secrets _ensure-certs ## Run Temporal 
 	APP_TOOL_MANAGER_BASE_URL=$(WORKER_BASE_URL) \
 	uv run python -m syntara.workflows.background_worker
 
+.PHONY: eventstream-consumer-run
+eventstream-consumer-run: check-deps _ensure-secrets ## Run the native FastStream event-stream consumer (POC)
+	@echo "🔄 Starting FastStream event-stream consumer..."
+	APP_JWT_PRIVATE_KEY_PATH=.secrets/jwt-primary.pem \
+	APP_SECRET_ENCRYPTION_KEY_PATH=.secrets/encryption-key \
+	APP_EVENTSTREAM_ENABLED=true \
+	uv run python -m syntara.eventstreams.consumer_entrypoint
+
 
 # Database
 # ========================================================
