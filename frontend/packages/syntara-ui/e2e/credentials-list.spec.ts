@@ -15,6 +15,7 @@
 import { test, expect } from './fixtures'
 import { APP_TITLE } from './helpers/appTitle'
 import {
+  clickCredentialsListNameSort,
   createTestCredential,
   deleteCredentialByName,
   filterCredentialByName,
@@ -118,16 +119,9 @@ test.describe('Table Display and Sorting', () => {
       await expect(table.getByRole('columnheader', { name: 'Last modified' })).toBeVisible()
       await expect(table.getByRole('columnheader', { name: 'State' })).toBeVisible()
 
-      const nameHeader = table.getByRole('columnheader', { name: 'Name' })
-      await nameHeader.scrollIntoViewIfNeeded()
-      const sortButton = nameHeader.getByRole('button')
-
       // Default list sort is Created (desc); first Name click should sort ascending.
-      await sortButton.click()
-      await expect(nameHeader).toHaveAttribute('aria-sort', 'ascending', { timeout: 15_000 })
-
-      await sortButton.click()
-      await expect(nameHeader).toHaveAttribute('aria-sort', 'descending', { timeout: 15_000 })
+      await clickCredentialsListNameSort(app, 'ascending')
+      await clickCredentialsListNameSort(app, 'descending')
     } finally {
       for (const name of credNames) {
         await deleteCredentialByName(app, name)

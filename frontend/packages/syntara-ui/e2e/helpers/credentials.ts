@@ -9,6 +9,7 @@ import {
   listCredentialsByName,
 } from '../utils/api'
 
+import { filterChipGroup } from './patternfly'
 import { buildUniqueName, selectFirstProject } from './workflows'
 
 /**
@@ -273,10 +274,64 @@ export const isCredentialsResponse = (resp: Response) =>
   resp.url().includes('for_action=use') &&
   resp.status() === 200
 
-/** Filter the credentials list by keyword. */
+/** Successful GET on the credentials collection (list page), not detail or credential_types. */
+export function isCredentialsListResponse(resp: Response): boolean {
+  if (resp.request().method() !== 'GET' || resp.status() !== 200) {
+    return false
+  }
+  try {
+    const { pathname, searchParams } = new URL(resp.url())
+    if (!pathname.endsWith('/credentials')) {
+      return false
+    }
+    if (searchParams.has('for_action')) {
+      return false
+    }
+    return true
+  } catch {
+    return false
+  }
+}
+
+function credentialsListMatchesFilter(resp: Response, keyword: string): boolean {
+  if (!isCredentialsListResponse(resp)) {
+    return false
+  }
+  const { searchParams } = new URL(resp.url())
+  return searchParams.get('name[contains]') === keyword
+}
+
+function credentialsListMatchesSort(resp: Response, sortParam: string): boolean {
+  if (!isCredentialsListResponse(resp)) {
+    return false
+  }
+  return new URL(resp.url()).searchParams.get('sort') === sortParam
+}
+
+/** Filter the credentials list by keyword and wait for the filtered list request to finish. */
 export async function filterCredentialByName(app: Page, name: string) {
+  const filteredList = app.waitForResponse((resp) => credentialsListMatchesFilter(resp, name))
   await app.getByPlaceholder('Filter by keyword').fill(name)
   await app.getByRole('button', { name: 'Apply filter' }).click()
+  await filteredList
+
+  const keywordChips = filterChipGroup(app, 'Keyword')
+  await expect(keywordChips.getByText(name)).toBeVisible({ timeout: 15_000 })
+}
+
+/**
+ * Click the credentials list Name column sort control and wait for the matching list GET.
+ */
+export async function clickCredentialsListNameSort(app: Page, direction: 'ascending' | 'descending') {
+  const sortParam = direction === 'ascending' ? 'name' : '-name'
+  const table = app.getByRole('grid', { name: 'Credentials table' })
+  const nameHeader = table.getByRole('columnheader', { name: 'Name' })
+  await nameHeader.scrollIntoViewIfNeeded()
+
+  const sortedList = app.waitForResponse((resp) => credentialsListMatchesSort(resp, sortParam))
+  await nameHeader.getByRole('button').click()
+  await sortedList
+  await expect(nameHeader).toHaveAttribute('aria-sort', direction, { timeout: 15_000 })
 }
 
 /**
@@ -285,9 +340,7 @@ export async function filterCredentialByName(app: Page, name: string) {
  */
 export async function navigateToCredentialDetail(app: Page, credentialName: string) {
   await goToCredentialsList(app)
-
-  await app.getByPlaceholder('Filter by keyword').fill(credentialName)
-  await app.getByRole('button', { name: 'Apply filter' }).click()
+  await filterCredentialByName(app, credentialName)
 
   const table = app.getByRole('grid', { name: 'Credentials table' })
   await table.getByRole('link', { name: credentialName, exact: true }).click()
