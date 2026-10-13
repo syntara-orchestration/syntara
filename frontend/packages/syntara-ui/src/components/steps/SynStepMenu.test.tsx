@@ -201,8 +201,17 @@ describe('SynStepMenu', () => {
       const actions = [createMenuAction({ label: 'Delete', onClick: itemClickHandler })]
 
       render(
-        // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions
-        <div onClick={parentClickHandler}>
+        <div
+          role="button"
+          aria-label="Step node"
+          tabIndex={0}
+          onClick={parentClickHandler}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              parentClickHandler()
+            }
+          }}
+        >
           <SynStepMenu menuActions={actions} />
         </div>
       )
@@ -220,8 +229,7 @@ describe('SynStepMenu', () => {
       const actions = [createMenuAction({ label: 'Delete' })]
 
       render(
-        // eslint-disable-next-line jsx-a11y/no-static-element-interactions
-        <div onMouseDown={parentMouseDownHandler}>
+        <div role="button" aria-label="Step node" tabIndex={0} onMouseDown={parentMouseDownHandler}>
           <SynStepMenu menuActions={actions} />
         </div>
       )
