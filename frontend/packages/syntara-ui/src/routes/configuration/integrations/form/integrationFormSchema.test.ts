@@ -320,9 +320,49 @@ describe('integrationFormSchema', () => {
       const mcpResult = integrationFormSchema.safeParse({ ...validMcpBase, name: '' })
       const llmResult = integrationFormSchema.safeParse({ ...validLlmBase, name: '' })
       const aapResult = integrationFormSchema.safeParse({ ...validAapBase, name: '' })
+      const kafkaResult = integrationFormSchema.safeParse({
+        integration_type: 'kafka' as const,
+        name: '',
+        configuration: {
+          integration_type: 'kafka' as const,
+          bootstrap_servers: 'broker.example.com:9093',
+          sasl_mechanism: 'SCRAM-SHA-256' as const,
+          ...securityDefaults,
+        },
+        scope: 'global' as const,
+      })
       expect(mcpResult.success).toBe(false)
       expect(llmResult.success).toBe(false)
       expect(aapResult.success).toBe(false)
+      expect(kafkaResult.success).toBe(false)
+    })
+
+    it('accepts a Kafka cluster and rejects a broker without a port', () => {
+      const accepted = integrationFormSchema.safeParse({
+        integration_type: 'kafka' as const,
+        name: 'Production Kafka',
+        configuration: {
+          integration_type: 'kafka' as const,
+          bootstrap_servers: 'broker.example.com:9093\n[2001:db8::1]:9092',
+          sasl_mechanism: 'SCRAM-SHA-256' as const,
+          ...securityDefaults,
+        },
+        scope: 'global' as const,
+      })
+      expect(accepted.success).toBe(true)
+
+      const rejected = integrationFormSchema.safeParse({
+        integration_type: 'kafka' as const,
+        name: 'Production Kafka',
+        configuration: {
+          integration_type: 'kafka' as const,
+          bootstrap_servers: 'broker.example.com',
+          sasl_mechanism: 'SCRAM-SHA-256' as const,
+          ...securityDefaults,
+        },
+        scope: 'global' as const,
+      })
+      expect(rejected.success).toBe(false)
     })
   })
 
@@ -380,6 +420,13 @@ describe('integrationFormSchema', () => {
       }
     })
 
+    it('returns name and bootstrap servers for Kafka', () => {
+      const fields = getStep1Fields(IntegrationTypeEnum.KAFKA)
+      expect(fields).toContain('name')
+      expect(fields).toContain('configuration.bootstrap_servers')
+      expect(fields).not.toContain('configuration.base_url')
+    })
+
     it('returns only name for unknown integration type', () => {
       const fields = getStep1Fields('unknown_type')
       expect(fields).toEqual(['name'])
@@ -425,6 +472,15 @@ describe('integrationFormSchema', () => {
         },
       ],
       [IntegrationTypeEnum.MCP_SERVER, { integration_type: 'mcp_server', base_url: '', ...expectedSecurityDefaults }],
+      [
+        IntegrationTypeEnum.KAFKA,
+        {
+          integration_type: 'kafka',
+          bootstrap_servers: '',
+          sasl_mechanism: 'SCRAM-SHA-256',
+          ...expectedSecurityDefaults,
+        },
+      ],
     ])('returns correct defaults for %s', (integrationType, expected) => {
       expect(getDefaultConfiguration(integrationType)).toEqual(expected)
     })
