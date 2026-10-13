@@ -5,6 +5,7 @@ import { axe } from 'vitest-axe'
 import { z } from 'zod'
 
 import { renderWithForm } from '../../test/renderWithForm'
+import { detachPromise } from '../../utils/detachPromise'
 
 import { SynTextField } from './SynTextField'
 
@@ -122,7 +123,7 @@ describe('SynTextField', () => {
 
     renderWithForm({ schema: numberSchema, defaultValues: { count: 300 } }, ({ control, handleSubmit }) => {
       submitWhileFocused = () => {
-        void handleSubmit(onSubmit)()
+        detachPromise(Promise.resolve(handleSubmit(onSubmit)()))
       }
       return <SynTextField name="count" control={control} label="Count" type="number" />
     })
