@@ -2,7 +2,8 @@ import { act, render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
-import type { NodeType } from '../workflows/canvas/nodes/NodeType'
+import { FlowNodeType } from '../../constants'
+import { type ButtonEdgePlaceholderNode, type NodeType } from '../workflows/canvas/nodes/NodeType'
 
 import { BuilderFlowCanvas } from './BuilderFlowCanvas'
 import type { EdgeType } from './utils/workflowToGraph'
@@ -65,6 +66,14 @@ vi.mock('./builderFlowConfig', () => ({
 
 const nodes = [{ id: 'task-1', position: { x: 0, y: 0 }, data: {} }] as NodeType[]
 const multipleNodes = [...nodes, { id: 'task-2', position: { x: 100, y: 0 }, data: {} }] as NodeType[]
+const placeholderNode: ButtonEdgePlaceholderNode = {
+  id: 'placeholder-1',
+  type: FlowNodeType.PLACEHOLDER,
+  position: { x: 50, y: 0 },
+  data: {},
+}
+const nodesWithPlaceholder = [...nodes, placeholderNode]
+const placeholderOnlyNodes = [placeholderNode]
 const edges = [{ id: 'e1', source: 'trigger-0', target: 'task-1' }] as EdgeType[]
 
 const defaultProps = {
@@ -131,12 +140,47 @@ describe('BuilderFlowCanvas', () => {
     expect(flowStore.updateNodeInternals).toHaveBeenLastCalledWith(['task-1', 'task-2'])
   })
 
+  it('excludes placeholder nodes from the batched internals update', () => {
+    flowStore.state = { transform: [0, 0, 0.5], nodes: nodesWithPlaceholder }
+
+    render(<BuilderFlowCanvas {...defaultProps} nodes={nodesWithPlaceholder} />)
+
+    expect(flowStore.updateNodeInternals).toHaveBeenCalledOnce()
+    expect(flowStore.updateNodeInternals).toHaveBeenCalledWith(['task-1'])
+  })
+
+  it('does not update internals when the canvas has only placeholder nodes', () => {
+    flowStore.state = { transform: [0, 0, 0.5], nodes: placeholderOnlyNodes }
+
+    render(<BuilderFlowCanvas {...defaultProps} nodes={placeholderOnlyNodes} />)
+
+    expect(flowStore.updateNodeInternals).not.toHaveBeenCalled()
+  })
+
   it('does not update internals again when only measured dimensions change', () => {
     flowStore.state = { transform: [0, 0, 0.5], nodes: multipleNodes }
     render(<BuilderFlowCanvas {...defaultProps} nodes={multipleNodes} />)
     const measuredNodes = multipleNodes.map((node) => ({ ...node, measured: { width: 200, height: 100 } }))
 
     act(() => updateFlowStore({ nodes: measuredNodes }))
+
+    expect(flowStore.updateNodeInternals).toHaveBeenCalledOnce()
+  })
+
+  it('does not update internals when zooming stays above the semantic zoom threshold', () => {
+    flowStore.state = { transform: [0, 0, 0.75], nodes: multipleNodes }
+    render(<BuilderFlowCanvas {...defaultProps} nodes={multipleNodes} />)
+
+    act(() => updateFlowStore({ transform: [0, 0, 0.7] }))
+
+    expect(flowStore.updateNodeInternals).not.toHaveBeenCalled()
+  })
+
+  it('does not update internals again when zooming stays within semantic zoom', () => {
+    flowStore.state = { transform: [0, 0, 0.5], nodes: multipleNodes }
+    render(<BuilderFlowCanvas {...defaultProps} nodes={multipleNodes} />)
+
+    act(() => updateFlowStore({ transform: [0, 0, 0.4] }))
 
     expect(flowStore.updateNodeInternals).toHaveBeenCalledOnce()
   })
@@ -149,6 +193,15 @@ describe('BuilderFlowCanvas', () => {
 
     expect(flowStore.updateNodeInternals).toHaveBeenCalledTimes(2)
     expect(flowStore.updateNodeInternals).toHaveBeenLastCalledWith(['task-1', 'task-2'])
+  })
+
+  it('does not update internals again when a placeholder is added during semantic zoom', () => {
+    flowStore.state = { transform: [0, 0, 0.5], nodes: multipleNodes }
+    render(<BuilderFlowCanvas {...defaultProps} nodes={multipleNodes} />)
+
+    act(() => updateFlowStore({ nodes: [...multipleNodes, placeholderNode] }))
+
+    expect(flowStore.updateNodeInternals).toHaveBeenCalledOnce()
   })
 
   it('shows the execution spinner when status is running', () => {
