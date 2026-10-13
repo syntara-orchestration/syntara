@@ -734,6 +734,15 @@ export interface components {
       ca_certificate?: string | null
     }
     /**
+     * KafkaSaslMechanism
+     * @description SASL mechanism used with the Kafka-connection username and password.
+     *
+     *     Cloud brokers such as Aiven use SCRAM-SHA-256. PLAIN remains available
+     *     for clusters that authenticate that way.
+     * @enum {string}
+     */
+    KafkaSaslMechanism: 'PLAIN' | 'SCRAM-SHA-256' | 'SCRAM-SHA-512'
+    /**
      * KafkaConfiguration
      * @description Configuration for a Kafka cluster integration.
      *
@@ -752,12 +761,10 @@ export interface components {
        */
       bootstrap_servers: string[]
       /**
-       * Sasl Mechanism
        * @description SASL mechanism for the username and password on the linked credential.
        * @default SCRAM-SHA-256
-       * @enum {string}
        */
-      sasl_mechanism?: 'PLAIN' | 'SCRAM-SHA-256' | 'SCRAM-SHA-512'
+      sasl_mechanism?: components['schemas']['KafkaSaslMechanism']
       /**
        * Allow Http
        * @description Allow HTTP (unencrypted) connections. Loopback addresses are always permitted over HTTP.
