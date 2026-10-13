@@ -15,6 +15,7 @@ if TYPE_CHECKING:
     from ..models.initial_model_selection import InitialModelSelection
     from ..models.initial_tool_selection import InitialToolSelection
     from ..models.integration_create_labels import IntegrationCreateLabels
+    from ..models.kafka_configuration import KafkaConfiguration
     from ..models.llm_provider_configuration import LLMProviderConfiguration
     from ..models.mcp_server_configuration_input import MCPServerConfigurationInput
 
@@ -29,8 +30,8 @@ class IntegrationCreate:
     Attributes:
         name (str): Human-readable name for the integration
         integration_type (IntegrationType): Type of external integration.
-        configuration (AAPConfiguration | LLMProviderConfiguration | MCPServerConfigurationInput): Integration-specific
-            configuration
+        configuration (AAPConfiguration | KafkaConfiguration | LLMProviderConfiguration | MCPServerConfigurationInput):
+            Integration-specific configuration
         description (None | str | Unset): Detailed description of the integration
         management_credential_id (None | Unset | UUID): Optional credential for admin operations
         enabled (bool | Unset): Whether the integration is active Default: True.
@@ -44,7 +45,7 @@ class IntegrationCreate:
 
     name: str
     integration_type: IntegrationType
-    configuration: AAPConfiguration | LLMProviderConfiguration | MCPServerConfigurationInput
+    configuration: AAPConfiguration | KafkaConfiguration | LLMProviderConfiguration | MCPServerConfigurationInput
     description: None | str | Unset = UNSET
     management_credential_id: None | Unset | UUID = UNSET
     enabled: bool | Unset = True
@@ -54,6 +55,7 @@ class IntegrationCreate:
     discovered_models: list[InitialModelSelection] | None | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
+        from ..models.aap_configuration import AAPConfiguration
         from ..models.llm_provider_configuration import LLMProviderConfiguration
         from ..models.mcp_server_configuration_input import MCPServerConfigurationInput
 
@@ -65,6 +67,8 @@ class IntegrationCreate:
         if isinstance(self.configuration, MCPServerConfigurationInput):
             configuration = self.configuration.to_dict()
         elif isinstance(self.configuration, LLMProviderConfiguration):
+            configuration = self.configuration.to_dict()
+        elif isinstance(self.configuration, AAPConfiguration):
             configuration = self.configuration.to_dict()
         else:
             configuration = self.configuration.to_dict()
@@ -149,6 +153,7 @@ class IntegrationCreate:
         from ..models.initial_model_selection import InitialModelSelection
         from ..models.initial_tool_selection import InitialToolSelection
         from ..models.integration_create_labels import IntegrationCreateLabels
+        from ..models.kafka_configuration import KafkaConfiguration
         from ..models.llm_provider_configuration import LLMProviderConfiguration
         from ..models.mcp_server_configuration_input import MCPServerConfigurationInput
 
@@ -159,7 +164,7 @@ class IntegrationCreate:
 
         def _parse_configuration(
             data: object,
-        ) -> AAPConfiguration | LLMProviderConfiguration | MCPServerConfigurationInput:
+        ) -> AAPConfiguration | KafkaConfiguration | LLMProviderConfiguration | MCPServerConfigurationInput:
             try:
                 if not isinstance(data, dict):
                     raise TypeError()
@@ -176,11 +181,19 @@ class IntegrationCreate:
                 return configuration_type_1
             except (TypeError, ValueError, AttributeError, KeyError):
                 pass
+            try:
+                if not isinstance(data, dict):
+                    raise TypeError()
+                configuration_type_2 = AAPConfiguration.from_dict(data)
+
+                return configuration_type_2
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
             if not isinstance(data, dict):
                 raise TypeError()
-            configuration_type_2 = AAPConfiguration.from_dict(data)
+            configuration_type_3 = KafkaConfiguration.from_dict(data)
 
-            return configuration_type_2
+            return configuration_type_3
 
         configuration = _parse_configuration(d.pop("configuration"))
 
