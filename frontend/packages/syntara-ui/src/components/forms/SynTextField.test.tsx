@@ -116,6 +116,7 @@ describe('SynTextField', () => {
   })
 
   it('submits undefined when a number input is cleared without blur', async () => {
+    // Invokes handleSubmit directly while the input stays focused (no submit button click / blur).
     const user = userEvent.setup()
     const onSubmit = vi.fn()
     const numberSchema = z.object({ count: z.number().optional() })
