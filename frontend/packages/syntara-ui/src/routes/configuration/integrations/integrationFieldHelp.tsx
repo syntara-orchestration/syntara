@@ -13,6 +13,8 @@ export const integrationHelp = {
   apiUrl: createFieldHelp('API URL', T.API_URL_HELP),
   /** Same form label for AAP integrations; body is gateway-specific. */
   aapUrl: createFieldHelp('API URL', T.AAP_URL_HELP),
+  kafkaBootstrapServers: createFieldHelp('Bootstrap servers', T.KAFKA_BOOTSTRAP_SERVERS_HELP),
+  kafkaSaslMechanism: createFieldHelp('SASL mechanism', T.KAFKA_SASL_MECHANISM_HELP),
   scope: createFieldHelp('Scope', T.SCOPE_HELP),
   projects: createFieldHelp('Projects', T.PROJECTS_HELP),
   healthCheckCredential: createFieldHelp('Health check credential', T.HEALTH_CHECK_CREDENTIAL_HELP),
