@@ -1,0 +1,292 @@
+import { describe, expect, it } from 'vitest'
+
+import { DATE_FIELD_TIME_REQUIRES_TIMEZONE_MESSAGE } from './dateFieldValidationMessages'
+import { parseFormDefinition, safeParseFormDefinition } from './formDefinitionSchema'
+import { FormFieldTypeEnum } from './formFieldTypeEnum'
+import { FormDefinitionValidationError } from './formValidationErrors'
+
+const staticOptions = {
+  source: 'static' as const,
+  values: [
+    { display_label: 'A', value: 'a' },
+    { display_label: 'B', value: 'b' },
+  ],
+}
+
+const resolvedOptions = {
+  source: 'dynamic_resolved' as const,
+  values: [
+    { display_label: 'One', value: 1 },
+    { display_label: 'Two', value: 2 },
+  ],
+}
+
+describe('formDefinitionSchema', () => {
+  it('parses a valid multi-field definition', () => {
+    const data = parseFormDefinition({
+      fields: [
+        { type: FormFieldTypeEnum.TEXT, value_name: 'name', label: 'Name' },
+        { type: FormFieldTypeEnum.NUMBER, value_name: 'age', label: 'Age' },
+        {
+          type: FormFieldTypeEnum.DROPDOWN,
+          value_name: 'env',
+          label: 'Environment',
+          options: staticOptions,
+        },
+      ],
+    })
+
+    expect(data.fields).toHaveLength(3)
+  })
+
+  it('requires non-empty label and value keys for dynamic options', () => {
+    const missingKeys = safeParseFormDefinition({
+      fields: [
+        {
+          type: FormFieldTypeEnum.DROPDOWN,
+          value_name: 'region',
+          label: 'Region',
+          options: { source: 'dynamic', expression: '${trigger.regions}' },
+        },
+      ],
+    })
+    expect(missingKeys.success).toBe(false)
+
+    const emptyKeys = safeParseFormDefinition({
+      fields: [
+        {
+          type: FormFieldTypeEnum.DROPDOWN,
+          value_name: 'region',
+          label: 'Region',
+          options: {
+            source: 'dynamic',
+            expression: '${trigger.regions}',
+            label_key: '',
+            value_key: 'id',
+          },
+        },
+      ],
+    })
+    expect(emptyKeys.success).toBe(false)
+
+    const valid = parseFormDefinition({
+      fields: [
+        {
+          type: FormFieldTypeEnum.DROPDOWN,
+          value_name: 'region',
+          label: 'Region',
+          options: {
+            source: 'dynamic',
+            expression: '${trigger.regions}',
+            label_key: 'name',
+            value_key: 'id',
+          },
+        },
+      ],
+    })
+    expect(valid.fields).toHaveLength(1)
+  })
+
+  it('rejects duplicate value_name entries', () => {
+    const result = safeParseFormDefinition({
+      fields: [
+        { type: FormFieldTypeEnum.TEXT, value_name: 'dup', label: 'One' },
+        { type: FormFieldTypeEnum.TEXT, value_name: 'dup', label: 'Two' },
+      ],
+    })
+
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.errors[0]?.message).toContain('Duplicate field names')
+    }
+  })
+
+  it('rejects dropdown default not in static options', () => {
+    expect(() =>
+      parseFormDefinition({
+        fields: [
+          {
+            type: FormFieldTypeEnum.DROPDOWN,
+            value_name: 'choice',
+            label: 'Choice',
+            options: staticOptions,
+            default: 'missing',
+          },
+        ],
+      })
+    ).toThrow(FormDefinitionValidationError)
+  })
+
+  it('rejects multi-select default values not in static options', () => {
+    const result = safeParseFormDefinition({
+      fields: [
+        {
+          type: FormFieldTypeEnum.MULTI_SELECT,
+          value_name: 'tags',
+          label: 'Tags',
+          options: staticOptions,
+          default: ['a', 'z'],
+        },
+      ],
+    })
+
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.errors[0]?.message).toContain('default values')
+    }
+  })
+
+  it('parses resolved options while preserving typed values', () => {
+    const data = parseFormDefinition({
+      fields: [
+        {
+          type: FormFieldTypeEnum.DROPDOWN,
+          value_name: 'count',
+          label: 'Count',
+          options: resolvedOptions,
+          default: 2,
+        },
+      ],
+    })
+
+    const field = data.fields[0]
+    expect(field?.type).toBe(FormFieldTypeEnum.DROPDOWN)
+    if (field?.type === FormFieldTypeEnum.DROPDOWN && field.options.source === 'dynamic_resolved') {
+      expect(field.options.values.map((option) => option.value)).toEqual([1, 2])
+      expect(field.default).toBe(2)
+    }
+  })
+
+  it('rejects an empty resolved option list', () => {
+    const result = safeParseFormDefinition({
+      fields: [
+        {
+          type: FormFieldTypeEnum.DROPDOWN,
+          value_name: 'count',
+          label: 'Count',
+          options: { source: 'dynamic_resolved', values: [] },
+        },
+      ],
+    })
+
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.errors[0]?.field).toBe('fields[0].options.values')
+      expect(result.errors[0]?.message).toMatch(/>=1/)
+    }
+  })
+
+  it('rejects typed values on authored static options', () => {
+    const result = safeParseFormDefinition({
+      fields: [
+        {
+          type: FormFieldTypeEnum.DROPDOWN,
+          value_name: 'count',
+          label: 'Count',
+          options: {
+            source: 'static',
+            values: [{ display_label: 'One', value: 1 }],
+          },
+        },
+      ],
+    })
+
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.errors[0]?.field).toBe('fields[0].options.values.0.value')
+      expect(result.errors[0]?.message).toMatch(/expected string/i)
+    }
+  })
+
+  it('returns parsed data from safeParseFormDefinition on success', () => {
+    const result = safeParseFormDefinition({
+      fields: [{ type: FormFieldTypeEnum.TEXT, value_name: 'name', label: 'Name' }],
+    })
+
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.fields[0]?.value_name).toBe('name')
+    }
+  })
+
+  it('returns structured errors from safeParseFormDefinition when fields are invalid', () => {
+    const result = safeParseFormDefinition({ fields: [] })
+
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.errors.length).toBeGreaterThan(0)
+      expect(result.errors[0]?.code).toBe('invalid_default')
+    }
+  })
+
+  it('accepts date defaults in year 0001', () => {
+    const data = parseFormDefinition({
+      fields: [
+        {
+          type: FormFieldTypeEnum.DATE,
+          value_name: 'historic',
+          label: 'Historic',
+          default: { date: '0001-06-15' },
+        },
+      ],
+    })
+
+    expect(data.fields[0]?.default).toEqual({ date: '0001-06-15' })
+  })
+
+  it('rejects date fields with time but no timezone using builder-facing copy', () => {
+    const result = safeParseFormDefinition({
+      fields: [
+        {
+          type: FormFieldTypeEnum.DATE,
+          value_name: 'due',
+          label: 'Due',
+          include_date: true,
+          include_time: true,
+          include_timezone: false,
+        },
+      ],
+    })
+
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.errors.some((error) => error.message === DATE_FIELD_TIME_REQUIRES_TIMEZONE_MESSAGE)).toBe(true)
+    }
+  })
+
+  it('parses the form-prompt-full example form_definition shape', () => {
+    const data = parseFormDefinition({
+      fields: [
+        {
+          type: FormFieldTypeEnum.DROPDOWN,
+          value_name: 'environment',
+          label: 'Environment',
+          required: true,
+          options: {
+            source: 'static',
+            values: [
+              { display_label: 'Development', value: 'dev' },
+              { display_label: 'Staging', value: 'staging' },
+              { display_label: 'Production', value: 'production' },
+            ],
+          },
+        },
+        {
+          type: FormFieldTypeEnum.TEXT,
+          value_name: 'version',
+          label: 'Version',
+          required: true,
+          placeholder: 'v1.0.0',
+        },
+        {
+          type: FormFieldTypeEnum.CHECKBOX,
+          value_name: 'confirmation',
+          label: 'I confirm this deployment',
+          required: true,
+        },
+      ],
+    })
+
+    expect(data.fields.map((f) => f.value_name)).toEqual(['environment', 'version', 'confirmation'])
+  })
+})

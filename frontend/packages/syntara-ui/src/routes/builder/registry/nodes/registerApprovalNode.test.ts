@@ -32,15 +32,15 @@ describe('registerApprovalNode', () => {
     expect(registration).toBeDefined()
     expect(registration?.id).toBe(RegistryNodeId.APPROVAL)
     expect(registration?.label).toBe('Approval')
-    expect(registration?.category).toBe('logic')
+    expect(registration?.category).toBe('human_tasks')
     expect(registration?.description).toBe('Wait for approval or human input before continuing')
   })
 
-  it('registers with enabled=true', () => {
+  it('registers with enabled=false (add panel uses Human tasks parent)', () => {
     registerApprovalNode()
 
     const registration = NodeRegistry.get(RegistryNodeId.APPROVAL)
-    expect(registration?.enabled).toBe(true)
+    expect(registration?.enabled).toBe(false)
   })
 
   it('registers with correct order', () => {

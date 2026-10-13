@@ -18,6 +18,7 @@ from referencing.jsonschema import DRAFT202012
 
 from syntara.core.constants import JsonbLimits
 from syntara.core.exceptions import SafeValueError
+from syntara.forms.exceptions import FormDefinitionError
 from syntara.schemas import SCHEMA_DIR
 from syntara.workflows.models.validation_finding import (
     ValidationCategory,
@@ -27,11 +28,16 @@ from syntara.workflows.models.validation_finding import (
 )
 from syntara.workflows.validators.template_expressions import check_template_expressions
 from syntara.workflows.workflow_engine.graph_backend import InMemoryGraphBackend
-from syntara.workflows.workflow_engine.models.workflow_definition import NodeType, ScheduledTriggerConfig
+from syntara.workflows.workflow_engine.models.workflow_definition import (
+    FormPromptNodeParameters,
+    NodeType,
+    ScheduledTriggerConfig,
+)
 
 _SCHEMA_DIR = SCHEMA_DIR / "workflows" / "v2"
 _BASE_URI = "https://automation.example.com/schemas/workflows/v2/"
 _FEEDBACK_PORTS: frozenset[str] = frozenset({"iterate"})
+_FORM_FIELD_TYPE_LOCATION_PARTS = 3
 
 
 def _retrieve_schema(uri: str) -> Resource:
@@ -259,6 +265,61 @@ def _check_converge_node_findings(
     return findings
 
 
+def _check_required_output_port(
+    workflow_definition: dict[str, Any],
+    *,
+    node_type: str,
+    required_port: str,
+    category: ValidationCategory,
+    branch_label: str,
+) -> list[ValidationFinding]:
+    """Check that nodes of a given type have a required output port connected.
+
+    Shared helper for approval and form_prompt nodes, and any future gated node types.
+
+    Args:
+        workflow_definition: Workflow definition dict with nodes and edges.
+        node_type: Node type to check (e.g., "approval", "form_prompt").
+        required_port: Port name that must have a connection (e.g., "approved", "submitted").
+        category: ValidationCategory for the finding.
+        branch_label: Human-readable branch name for the error message (e.g., "Approved", "Submitted").
+
+    Returns:
+        List of validation findings (one error per node missing the required port).
+
+    """
+    findings: list[ValidationFinding] = []
+
+    # Build map of node_id → set of outgoing port names
+    outgoing_ports: dict[str, set[str]] = defaultdict(set)
+    for edge in workflow_definition.get("edges", []):
+        from_port = edge.get("from_port")
+        if from_port is not None:
+            outgoing_ports[edge["from"]].add(from_port)
+
+    # Check each node of the target type
+    for node in workflow_definition.get("nodes", []):
+        if node.get("type") != node_type:
+            continue
+        node_id = node.get("id")
+        if node_id is None:
+            continue
+        node_name = node.get("name") or node_id
+
+        if required_port not in outgoing_ports.get(node_id, set()):
+            node_label = node_type.replace("_", " ").title()
+            findings.append(
+                ValidationFinding(
+                    severity=ValidationSeverity.error,
+                    category=category,
+                    message=f"{node_label} \"{node_name}\" is missing a connection from the '{branch_label}' branch",
+                    node_id=node_id,
+                ),
+            )
+
+    return findings
+
+
 def _check_approval_node_findings(
     workflow_definition: dict[str, Any],
     *,
@@ -272,14 +333,16 @@ def _check_approval_node_findings(
     - A warning when ``fallback_decision`` is ``approve`` without an effective
       ``continue_on_failure`` (the fallback would have no effect).
     """
-    findings: list[ValidationFinding] = []
+    # Check for missing "approved" port using shared helper
+    findings: list[ValidationFinding] = _check_required_output_port(
+        workflow_definition,
+        node_type="approval",
+        required_port="approved",
+        category=ValidationCategory.approval_configuration,
+        branch_label="Approved",
+    )
 
-    outgoing_ports: dict[str, set[str]] = defaultdict(set)
-    for edge in workflow_definition.get("edges", []):
-        from_port = edge.get("from_port")
-        if from_port is not None:
-            outgoing_ports[edge["from"]].add(from_port)
-
+    # Check approval-specific fallback_decision warning
     for node in workflow_definition.get("nodes", []):
         if node.get("type") != "approval":
             continue
@@ -287,16 +350,6 @@ def _check_approval_node_findings(
         if node_id is None:
             continue
         node_name = node.get("name") or node_id
-
-        if "approved" not in outgoing_ports.get(node_id, set()):
-            findings.append(
-                ValidationFinding(
-                    severity=ValidationSeverity.error,
-                    category=ValidationCategory.approval_configuration,
-                    message=f"Approval \"{node_name}\" is missing a connection from the 'Approved' branch",
-                    node_id=node_id,
-                ),
-            )
 
         params = node.get("parameters", {})
         settings = node.get("settings") or {}
@@ -317,6 +370,220 @@ def _check_approval_node_findings(
                     field_path="parameters.fallback_decision",
                 ),
             )
+    return findings
+
+
+def _check_form_prompt_node_findings(
+    workflow_definition: dict[str, Any],
+) -> list[ValidationFinding]:
+    """Check form prompt node configuration against the workflow graph structure.
+
+    Emits:
+    - An error when a ``form_prompt`` node has no successor on the ``submitted``
+      output port.
+    - An error when a ``fallback`` successor exists but ``continue_on_failure`` is
+      disabled (unreachable branch - configuration mismatch).
+    """
+    # Check for missing "submitted" port using shared helper
+    findings: list[ValidationFinding] = _check_required_output_port(
+        workflow_definition,
+        node_type="form_prompt",
+        required_port="submitted",
+        category=ValidationCategory.form_prompt_configuration,
+        branch_label="Submitted",
+    )
+
+    # Build outgoing ports map for form_prompt-specific fallback check
+    outgoing_ports: dict[str, set[str]] = defaultdict(set)
+    for edge in workflow_definition.get("edges", []):
+        from_port = edge.get("from_port")
+        if from_port is not None:
+            outgoing_ports[edge["from"]].add(from_port)
+
+    # Check form_prompt-specific unreachable fallback branch
+    for node in workflow_definition.get("nodes", []):
+        if node.get("type") != "form_prompt":
+            continue
+        node_id = node.get("id")
+        if node_id is None:
+            continue
+        node_name = node.get("name") or node_id
+
+        ports = outgoing_ports.get(node_id, set())
+        settings = node.get("settings", {})
+        continue_on_failure = settings.get("continue_on_failure")
+
+        # Error: fallback port exists but continue_on_failure is False (unreachable branch)
+        if continue_on_failure is False and "fallback" in ports:
+            findings.append(
+                ValidationFinding(
+                    severity=ValidationSeverity.error,
+                    category=ValidationCategory.form_prompt_configuration,
+                    message=(
+                        f"Form \"{node_name}\" has a 'Fallback' branch connected, "
+                        f"but Continue on failure is disabled. "
+                        f"The fallback branch will never execute. Remove the fallback connection "
+                        f"or enable Continue on failure in node settings."
+                    ),
+                    node_id=node_id,
+                    field_path="settings.continue_on_failure",
+                ),
+            )
+
+    return findings
+
+
+def _collect_form_prompt_model_findings(
+    workflow_definition: dict[str, Any],
+) -> list[ValidationFinding]:
+    """Collect form model validation errors omitted by the generated JSON Schema.
+
+    JSON Schema covers the shape of form values, but it cannot represent custom
+    Pydantic validators such as calendar-date validation or checks that a default
+    can be submitted. Request models may retain the raw workflow dictionary when
+    typed parsing fails, so run the form parameter model here as part of the
+    shared verify/save/publish validation path.
+    """
+    findings: list[ValidationFinding] = []
+    for node in workflow_definition.get("nodes", []):
+        if not isinstance(node, dict) or node.get("type") != NodeType.FORM_PROMPT:
+            continue
+
+        raw_node_id = node.get("id")
+        node_id = raw_node_id if isinstance(raw_node_id, str) else None
+        parameters = node.get("parameters")
+        if not isinstance(parameters, dict):
+            continue
+
+        try:
+            FormPromptNodeParameters.model_validate(parameters)
+        except ValidationError as exc:
+            findings.extend(_collect_safe_value_error_findings(exc, node_id))
+            findings.extend(_collect_form_field_type_findings(exc, parameters, node_id))
+        except FormDefinitionError as exc:
+            findings.extend(_collect_form_definition_error_findings(exc, parameters, node_id))
+
+    return findings
+
+
+def _collect_safe_value_error_findings(exc: ValidationError, node_id: str | None) -> list[ValidationFinding]:
+    """Convert safe Pydantic value errors into workflow findings."""
+    findings: list[ValidationFinding] = []
+    for error in exc.errors():
+        context = error.get("ctx")
+        safe_error = context.get("error") if isinstance(context, dict) else None
+        if not isinstance(safe_error, SafeValueError):
+            continue
+
+        location = error.get("loc", ())
+        field_path = "parameters"
+        if location:
+            field_path += "." + ".".join(str(part) for part in location)
+        findings.append(
+            ValidationFinding(
+                severity=ValidationSeverity.error,
+                category=ValidationCategory.form_prompt_configuration,
+                message=str(safe_error),
+                node_id=node_id,
+                field_path=field_path,
+            )
+        )
+    return findings
+
+
+def _collect_form_field_type_findings(
+    exc: ValidationError,
+    parameters: dict[str, Any],
+    node_id: str | None,
+) -> list[ValidationFinding]:
+    """Convert form-field discriminator errors into safe, field-specific findings.
+
+    The shared workflow JSON Schema validates the broad form field object shape, but it does not
+    enumerate field types. Preserve the model validator's discriminator errors so save-time
+    validation can report an unknown or missing ``type`` without exposing raw Pydantic errors.
+    """
+    form_definition = parameters.get("form_definition")
+    raw_fields = form_definition.get("fields") if isinstance(form_definition, dict) else None
+    if not isinstance(raw_fields, list):
+        return []
+
+    findings: list[ValidationFinding] = []
+    for error in exc.errors():
+        location = error.get("loc", ())
+        if (
+            error.get("type") not in {"union_tag_invalid", "union_tag_not_found"}
+            # The outer FormField discriminator is located at the field item
+            # itself. Nested discriminators, such as OptionsSource.source,
+            # include additional path parts and must keep their own location.
+            or len(location) != _FORM_FIELD_TYPE_LOCATION_PARTS
+            or location[0] != "form_definition"
+            or location[1] != "fields"
+            or not isinstance(location[2], int)
+        ):
+            continue
+
+        field_index = location[2]
+        if field_index >= len(raw_fields):
+            continue
+        raw_field = raw_fields[field_index]
+        if not isinstance(raw_field, dict):
+            continue
+
+        error_type = error.get("type")
+        field_type = raw_field.get("type")
+        if error_type == "union_tag_invalid":
+            message = f"Invalid field type {field_type!r} in form prompt field definition"
+        elif error_type == "union_tag_not_found" and "type" not in raw_field:
+            message = "Required property 'type' missing in form prompt field definition"
+        else:
+            continue
+
+        findings.append(
+            ValidationFinding(
+                severity=ValidationSeverity.error,
+                category=ValidationCategory.form_prompt_configuration,
+                message=message,
+                node_id=node_id,
+                field_path=f"parameters.form_definition.fields.{field_index}.type",
+            )
+        )
+
+    return findings
+
+
+def _collect_form_definition_error_findings(
+    exc: FormDefinitionError,
+    parameters: dict[str, Any],
+    node_id: str | None,
+) -> list[ValidationFinding]:
+    """Convert invalid form defaults into findings with field paths."""
+    form_definition = parameters.get("form_definition")
+    raw_fields = form_definition.get("fields", []) if isinstance(form_definition, dict) else []
+    if not isinstance(raw_fields, list):
+        raw_fields = []
+
+    findings: list[ValidationFinding] = []
+    for field_error in exc.errors:
+        field_index = next(
+            (
+                index
+                for index, field in enumerate(raw_fields)
+                if isinstance(field, dict) and field.get("value_name") == field_error.field
+            ),
+            None,
+        )
+        field_path = "parameters.form_definition.fields"
+        if field_index is not None:
+            field_path += f".{field_index}.default"
+        findings.append(
+            ValidationFinding(
+                severity=ValidationSeverity.error,
+                category=ValidationCategory.form_prompt_configuration,
+                message=field_error.message,
+                node_id=node_id,
+                field_path=field_path,
+            )
+        )
     return findings
 
 
@@ -671,8 +938,10 @@ class WorkflowValidator:
                     system_continue_on_failure=system_continue_on_failure,
                 )
             )
+            findings.extend(_check_form_prompt_node_findings(workflow_definition))
             findings.extend(check_template_expressions(workflow_definition, node_ids))
 
+        findings.extend(_collect_form_prompt_model_findings(workflow_definition))
         findings.extend(collect_scheduled_trigger_config_findings(workflow_definition))
 
         return findings

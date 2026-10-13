@@ -7,6 +7,7 @@ import { useWorkflowStore } from '../../stores/useWorkflowStore'
 import { getErrorMessage } from '../../utils/apiErrors'
 
 import type { BuilderAction, ValidationError, ValidationSeverity } from './builderReducer'
+import { useWorkflowEngineDefaults } from './hooks/useWorkflowEngineDefaults'
 import { validateWorkflow } from './utils/validation'
 import { formatValidationFindingMessage } from './utils/validation/formatValidationFindingMessage'
 import { validateMinimumWorkflow } from './utils/validation/rules/validateMinimumWorkflow'
@@ -99,6 +100,13 @@ export function extractValidationErrorsFromUnknown(error: unknown): ValidationEr
   return null
 }
 
+export function getWorkflowValidationFailureDescription(error: unknown): string | undefined {
+  const findings = extractValidationErrorsFromUnknown(error)
+  if (!findings?.length) return undefined
+
+  return `Workflow validation failed:\n• ${findings.map((finding) => finding.message).join('\n• ')}`
+}
+
 type ValidateResponse = {
   data?: { is_valid?: boolean; findings?: ValidationFinding[] }
   error?: unknown
@@ -154,6 +162,7 @@ type UseWorkflowVerificationOptions = Readonly<{
 
 export function useWorkflowVerification({ dispatch }: UseWorkflowVerificationOptions) {
   const { showError, showSuccess } = useAlerts()
+  const { defaults } = useWorkflowEngineDefaults()
   const [isVerifying, setIsVerifying] = useState(false)
   const validationErrorCount = useWorkflowStore((state) => state.validationErrorCount)
 
@@ -194,7 +203,10 @@ export function useWorkflowVerification({ dispatch }: UseWorkflowVerificationOpt
 
       dispatch({ type: 'CLEAR_VALIDATION_ERRORS' })
 
-      const frontendResult = validateWorkflow(activities, edges, { triggers })
+      const frontendResult = validateWorkflow(activities, edges, {
+        triggers,
+        systemContinueOnFailure: defaults?.continueOnFailure ?? false,
+      })
       const minimumErrors = validateMinimumWorkflow(activities, edges, triggers)
       const allFrontendErrors: ValidationError[] = [...frontendResult.errors, ...minimumErrors].map((e) => ({
         message: e.message,
@@ -227,7 +239,7 @@ export function useWorkflowVerification({ dispatch }: UseWorkflowVerificationOpt
         })
         .finally(() => setIsVerifying(false))
     },
-    [dispatch, showError, showSuccess]
+    [dispatch, showError, showSuccess, defaults?.continueOnFailure]
   )
 
   const handleVerifySilent = useCallback(

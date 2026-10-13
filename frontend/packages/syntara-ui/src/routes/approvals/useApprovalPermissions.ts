@@ -40,7 +40,12 @@ export function useApprovalPermissions(projectId?: string | null) {
   const canReadGlobalQuery = useCanI('read', 'approval')
   const canDecideGlobalQuery = useCanI('decide', 'approval')
 
-  const { canDecideProjectNames, canReadProjectNames, isLoading: isLoadingProjectPerms } = useApprovalDecideProjects()
+  const {
+    canDecideProjectNames,
+    canReadProjectNames,
+    isLoading: isLoadingProjectPerms,
+    error,
+  } = useApprovalDecideProjects()
 
   return useMemo(() => {
     const hasProjectDecide = projectId ? canDecideProjectNames.has(projectId) : false
@@ -53,6 +58,7 @@ export function useApprovalPermissions(projectId?: string | null) {
       canRead,
       canDecide,
       isChecking: canReadGlobalQuery.isChecking || canDecideGlobalQuery.isChecking || isLoadingProjectPerms,
+      isError: Boolean(canReadGlobalQuery.isError || canDecideGlobalQuery.isError || error),
       tooltips: {
         decide: permissionTooltip('decide on approvals', 'approval:decide'),
       },
@@ -60,8 +66,11 @@ export function useApprovalPermissions(projectId?: string | null) {
   }, [
     canReadGlobalQuery.allowed,
     canReadGlobalQuery.isChecking,
+    canReadGlobalQuery.isError,
     canDecideGlobalQuery.allowed,
     canDecideGlobalQuery.isChecking,
+    canDecideGlobalQuery.isError,
+    error,
     canDecideProjectNames,
     canReadProjectNames,
     isLoadingProjectPerms,

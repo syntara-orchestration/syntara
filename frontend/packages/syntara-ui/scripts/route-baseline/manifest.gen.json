@@ -9,9 +9,10 @@
       "template": "*"
     },
     {
-      "kind": "page",
+      "kind": "redirect",
       "parameters": [],
-      "sources": ["appRoute", "navigation", "router"],
+      "redirectTo": "/tasks/approvals",
+      "sources": ["appRoute", "router"],
       "template": "/approvals"
     },
     {
@@ -278,6 +279,19 @@
       "parameters": ["category"],
       "sources": ["appRoute", "navigation", "router"],
       "template": "/system-administration/settings/$category"
+    },
+    {
+      "kind": "redirect",
+      "parameters": [],
+      "redirectTo": "/tasks/approvals",
+      "sources": ["appRoute", "router"],
+      "template": "/tasks"
+    },
+    {
+      "kind": "page",
+      "parameters": ["tab"],
+      "sources": ["appRoute", "router"],
+      "template": "/tasks/$tab"
     },
     {
       "kind": "page",

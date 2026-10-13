@@ -72,6 +72,8 @@ export function getValidSourceHandles(activityType: Activity['type']): Set<strin
       return new Set([EdgeHandleEnum.LOOP, EdgeHandleEnum.DONE])
     case ActivityTypeEnum.APPROVAL:
       return new Set([EdgeHandleEnum.APPROVED, EdgeHandleEnum.REJECTED])
+    case ActivityTypeEnum.FORM_PROMPT:
+      return new Set([EdgeHandleEnum.SUBMITTED, EdgeHandleEnum.FALLBACK])
     case ActivityTypeEnum.SWITCH:
       // Returns only the static DEFAULT handle. Dynamic case_N handles are
       // managed by SwitchNodeDetails.handleSubmit during edit-mode updates.
@@ -110,6 +112,8 @@ export function reorderActivities(activities: Activity[], edges: EdgeConnection[
       edge.sourceHandle === EdgeHandleEnum.FALSE ||
       edge.sourceHandle === EdgeHandleEnum.APPROVED ||
       edge.sourceHandle === EdgeHandleEnum.REJECTED ||
+      edge.sourceHandle === EdgeHandleEnum.SUBMITTED ||
+      edge.sourceHandle === EdgeHandleEnum.FALLBACK ||
       isSwitchBranchEdge
     const isLoopBackEdge = edge.targetHandle === EdgeHandleEnum.END
     const isSequentialEdge = !isBranchEdge && !isLoopBackEdge

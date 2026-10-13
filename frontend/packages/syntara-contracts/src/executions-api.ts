@@ -363,6 +363,7 @@ export interface components {
       | 'aap_workflow_job_template'
       | 'agentic'
       | 'approval'
+      | 'form_prompt'
       | 'http_request'
       | 'internal_activity'
       | 'script'
@@ -1152,6 +1153,481 @@ export interface components {
       [key: string]: unknown
     }
     /**
+     * TextField
+     * @description Text field.
+     */
+    TextField: {
+      /** Value Name */
+      value_name: string
+      /** Label */
+      label: string
+      /** Placeholder */
+      placeholder?: string | null
+      /** Help Text */
+      help_text?: string | null
+      /**
+       * Required
+       * @default false
+       */
+      required?: boolean
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'text'
+      /** Default */
+      default?: string | null
+    }
+    /**
+     * TextAreaField
+     * @description Text area field.
+     */
+    TextAreaField: {
+      /** Value Name */
+      value_name: string
+      /** Label */
+      label: string
+      /** Placeholder */
+      placeholder?: string | null
+      /** Help Text */
+      help_text?: string | null
+      /**
+       * Required
+       * @default false
+       */
+      required?: boolean
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'textarea'
+      /** Default */
+      default?: string | null
+    }
+    /**
+     * MaskedTextField
+     * @description Masked text field.
+     */
+    MaskedTextField: {
+      /** Value Name */
+      value_name: string
+      /** Label */
+      label: string
+      /** Placeholder */
+      placeholder?: string | null
+      /** Help Text */
+      help_text?: string | null
+      /**
+       * Required
+       * @default false
+       */
+      required?: boolean
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'masked_text'
+      /** Default */
+      default?: string | null
+    }
+    /**
+     * EmailField
+     * @description Email field.
+     */
+    EmailField: {
+      /** Value Name */
+      value_name: string
+      /** Label */
+      label: string
+      /** Placeholder */
+      placeholder?: string | null
+      /** Help Text */
+      help_text?: string | null
+      /**
+       * Required
+       * @default false
+       */
+      required?: boolean
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'email'
+      /** Default */
+      default?: string | null
+    }
+    /**
+     * NumberField
+     * @description Numeric field supporting int or float.
+     */
+    NumberField: {
+      /** Value Name */
+      value_name: string
+      /** Label */
+      label: string
+      /** Placeholder */
+      placeholder?: string | null
+      /** Help Text */
+      help_text?: string | null
+      /**
+       * Required
+       * @default false
+       */
+      required?: boolean
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'number'
+      /** Default */
+      default?: number | null
+    }
+    /**
+     * CheckboxField
+     * @description Boolean checkbox field.
+     */
+    CheckboxField: {
+      /** Value Name */
+      value_name: string
+      /** Label */
+      label: string
+      /** Placeholder */
+      placeholder?: string | null
+      /** Help Text */
+      help_text?: string | null
+      /**
+       * Required
+       * @description When true the checkbox must be checked to submit, for example a terms of service or acknowledgment. An unchecked required checkbox fails with error code 'must_be_checked'.
+       * @default false
+       */
+      required?: boolean
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'checkbox'
+      /**
+       * Default
+       * @default false
+       */
+      default?: boolean
+    }
+    /**
+     * DateValue
+     * @description The date, time, and timezone components of a date field value.
+     */
+    DateValue: {
+      /**
+       * Date
+       * @description ISO 8601 calendar date in YYYY-MM-DD format.
+       */
+      date?: string | null
+      /**
+       * Time
+       * @description 24-hour time in HH:MM format.
+       */
+      time?: string | null
+      /**
+       * Timezone
+       * @description IANA timezone name, such as America/New_York.
+       */
+      timezone?: string | null
+    }
+    /**
+     * DateField
+     * @description Date field collecting any combination of date, time, and timezone.
+     */
+    DateField: {
+      /** Value Name */
+      value_name: string
+      /** Label */
+      label: string
+      /** Placeholder */
+      placeholder?: string | null
+      /** Help Text */
+      help_text?: string | null
+      /**
+       * Required
+       * @default false
+       */
+      required?: boolean
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'date'
+      /**
+       * Include Date
+       * @description Collect a calendar date.
+       * @default true
+       */
+      include_date?: boolean
+      /**
+       * Include Time
+       * @description Collect a 24-hour time. Requires include_timezone.
+       * @default false
+       */
+      include_time?: boolean
+      /**
+       * Include Timezone
+       * @description Collect an IANA timezone name.
+       * @default false
+       */
+      include_timezone?: boolean
+      /** @description Default value used when the responder submits nothing. Must supply exactly the included components. */
+      default?: components['schemas']['DateValue'] | null
+    }
+    /**
+     * StaticOption
+     * @description A single static option for dropdown or multi-select.
+     */
+    StaticOption: {
+      /** Display Label */
+      display_label: string
+      /** Value */
+      value: string
+    }
+    /**
+     * StaticOptions
+     * @description Static option list for dropdown or multi-select.
+     */
+    StaticOptions: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      source: 'static'
+      /** Values */
+      values: components['schemas']['StaticOption'][]
+    }
+    /**
+     * DynamicOptions
+     * @description Dynamic option list resolved from a non-empty array of upstream objects.
+     *
+     *     Each object must contain a string label and scalar value at the required
+     *     ``label_key`` and ``value_key``.
+     */
+    DynamicOptions: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      source: 'dynamic'
+      /**
+       * Expression
+       * @description Template expression resolving to a non-empty array of objects. Each object must contain a string label and scalar value at the required 'label_key' and 'value_key'.
+       */
+      expression: string
+      /**
+       * Value Key
+       * @description Required object key containing the typed option value.
+       */
+      value_key: string
+      /**
+       * Label Key
+       * @description Required object key containing the option label.
+       */
+      label_key: string
+    }
+    /**
+     * ResolvedOption
+     * @description An option materialized from upstream output while preserving its scalar type.
+     *
+     *     Python set membership considers ``1``, ``1.0``, and ``True`` equal. That
+     *     behavior is used by the backend's de-duplication and membership checks.
+     *     Static options remain strings because they are authored by a user.
+     */
+    ResolvedOption: {
+      /** Display Label */
+      display_label: string
+      /** Value */
+      value: string | number | boolean
+    }
+    /**
+     * ResolvedOptions
+     * @description Dynamic options materialized into a concrete list at prompt creation.
+     *
+     *     Produced only by the workflow engine, never authored. A form prompt is
+     *     persisted with this shape so the responder view and submission membership
+     *     validation operate on the same snapshot.
+     */
+    ResolvedOptions: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      source: 'dynamic_resolved'
+      /** Values */
+      values: components['schemas']['ResolvedOption'][]
+    }
+    /**
+     * DropdownField
+     * @description Dropdown field.
+     */
+    DropdownField: {
+      /** Value Name */
+      value_name: string
+      /** Label */
+      label: string
+      /** Placeholder */
+      placeholder?: string | null
+      /** Help Text */
+      help_text?: string | null
+      /**
+       * Required
+       * @default false
+       */
+      required?: boolean
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'dropdown'
+      /** Options */
+      options:
+        | components['schemas']['StaticOptions']
+        | components['schemas']['DynamicOptions']
+        | components['schemas']['ResolvedOptions']
+      /** Default */
+      default?: string | number | boolean | null
+    }
+    /**
+     * MultiSelectField
+     * @description Multi-select field.
+     */
+    MultiSelectField: {
+      /** Value Name */
+      value_name: string
+      /** Label */
+      label: string
+      /** Placeholder */
+      placeholder?: string | null
+      /** Help Text */
+      help_text?: string | null
+      /**
+       * Required
+       * @default false
+       */
+      required?: boolean
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'multi_select'
+      /** Options */
+      options:
+        | components['schemas']['StaticOptions']
+        | components['schemas']['DynamicOptions']
+        | components['schemas']['ResolvedOptions']
+      /** Default */
+      default?: (string | number | boolean)[] | null
+    }
+    /**
+     * FormDefinition
+     * @description Complete form definition with fields and metadata.
+     */
+    FormDefinition: {
+      /** Fields */
+      fields: (
+        | components['schemas']['TextField']
+        | components['schemas']['TextAreaField']
+        | components['schemas']['MaskedTextField']
+        | components['schemas']['EmailField']
+        | components['schemas']['NumberField']
+        | components['schemas']['CheckboxField']
+        | components['schemas']['DateField']
+        | components['schemas']['DropdownField']
+        | components['schemas']['MultiSelectField']
+      )[]
+    }
+    /**
+     * FormPromptNodeParameters
+     * @description Parameters for form prompt nodes.
+     */
+    FormPromptNodeParameters: {
+      /**
+       * Message
+       * @description Message shown above the form. Supports ${...} template expressions.
+       */
+      message?: string | null
+      /** @description Form definition describing the fields shown to responders. */
+      form_definition: components['schemas']['FormDefinition']
+      /**
+       * Responder Users
+       * @description Usernames allowed to respond. Empty/omitted = any user with form_prompt:submit.
+       */
+      responder_users?: string[] | null
+      /**
+       * Responder Groups
+       * @description Group names whose members may respond. Empty/omitted = any user with form_prompt:submit.
+       */
+      responder_groups?: string[] | null
+      /**
+       * Response Window
+       * @description Seconds the responder has before the prompt expires. Falls back to workflow_engine.form_prompt_response_window_seconds.
+       */
+      response_window?: number | null
+      /**
+       * Fallback Decision
+       * @description Decision when form prompt times out with continue_on_failure enabled
+       */
+      fallback_decision?: ('submit' | 'fallback') | null
+      /**
+       * Submit Label
+       * @description Submit button label.
+       */
+      submit_label?: string | null
+      /**
+       * Success Message
+       * @description Shown after submission.
+       */
+      success_message?: string | null
+      /**
+       * Css Override
+       * @description Custom CSS applied to the form view.
+       */
+      css_override?: string | null
+    }
+    /**
+     * FormPromptNode
+     * @description Form prompt node — pauses execution to collect structured user input.
+     */
+    FormPromptNode: {
+      /**
+       * Id
+       * @description Unique identifier for the node within the workflow
+       */
+      id: string
+      /**
+       * Name
+       * @description Human-readable name for the node
+       */
+      name?: string | null
+      /**
+       * Description
+       * @description Human-readable description of the node purpose
+       */
+      description?: string | null
+      /**
+       * Outputs
+       * @description Output extraction mapping
+       */
+      outputs?: {
+        [key: string]: string
+      } | null
+      /** @description Optional UI position hint */
+      position?: components['schemas']['NodePosition'] | null
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'form_prompt'
+      parameters: components['schemas']['FormPromptNodeParameters']
+      settings?: components['schemas']['NodeSettingsNoRetry'] | null
+    } & {
+      [key: string]: unknown
+    }
+    /**
      * ConditionNodeParameters
      * @description Parameters for condition (if/then/else) control nodes.
      */
@@ -1684,6 +2160,7 @@ export interface components {
         | components['schemas']['AgenticNode']
         | components['schemas']['ScriptNode']
         | components['schemas']['ApprovalNode']
+        | components['schemas']['FormPromptNode']
         | components['schemas']['ConditionNode']
         | components['schemas']['SwitchNode']
         | components['schemas']['LoopNode']

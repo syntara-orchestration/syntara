@@ -76,6 +76,10 @@ export function getCanvasNodeIconDescriptor(
     return { icon: executorMetadata.approval.icon, id: RegistryNodeId.APPROVAL }
   }
 
+  if (node.type === 'form_prompt') {
+    return { icon: nodeMetadata.form_prompt.icon, id: RegistryNodeId.FORM_PROMPT }
+  }
+
   if (node.type === 'wait') {
     return { icon: nodeMetadata.wait.icon, id: RegistryNodeId.LOGIC_WAIT }
   }

@@ -33,6 +33,52 @@ export function parseDateYMD(val: string): Date {
 }
 
 /**
+ * Format a Date as MM/dd/yyyy for US-style DatePicker inputs (form date fields).
+ * Wire values in definitions and submissions remain ISO YYYY-MM-DD.
+ */
+export function formatDateMDY(date: Date): string {
+  return format(date, 'MM/dd/yyyy')
+}
+
+/**
+ * Parse MM/dd/yyyy (or M/d/yyyy) into a local Date. Returns current date for unparseable input.
+ */
+export function parseDateMDY(val: string): Date {
+  const trimmed = val.trim()
+  const match = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(trimmed)
+  if (!match) {
+    return new Date()
+  }
+  const month = Number(match[1])
+  const day = Number(match[2])
+  const year = Number(match[3])
+  const d = new Date(year, month - 1, day)
+  return Number.isNaN(d.getTime()) ? new Date() : d
+}
+
+/** Convert a stored ISO YYYY-MM-DD value to a Date for US DatePicker formatters. */
+export function isoYmdToLocalDate(iso: string): Date {
+  const year = Number(iso.slice(0, 4))
+  const month = Number(iso.slice(5, 7))
+  const day = Number(iso.slice(8, 10))
+  return new Date(year, month - 1, day)
+}
+
+/**
+ * Normalize a DatePicker onChange value to ISO YYYY-MM-DD for storage.
+ * Accepts either MM/dd/yyyy (US display) or YYYY-MM-DD.
+ */
+export function normalizePickerDateToIsoYmd(displayOrIso: string): string {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(displayOrIso)) {
+    return displayOrIso
+  }
+  if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(displayOrIso.trim())) {
+    return formatDateYMD(parseDateMDY(displayOrIso))
+  }
+  return displayOrIso
+}
+
+/**
  * Format an ISO date string for display (e.g. "Jan 15, 2024").
  * Returns empty string for invalid or empty input.
  *

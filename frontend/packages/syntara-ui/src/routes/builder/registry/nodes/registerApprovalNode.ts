@@ -17,12 +17,12 @@ export default function registerApprovalNode() {
     id: RegistryNodeId.APPROVAL,
     label: 'Approval',
     icon: RhUiUserCheckIcon,
-    category: 'logic',
+    category: 'human_tasks',
     description: 'Wait for approval or human input before continuing',
     keywords: ['approve', 'approval', 'review', 'manual', 'gate', 'checkpoint'],
     order: 50,
     formComponent: ApprovalNodeForm,
-    enabled: true,
+    enabled: false,
     onSubmit: (data, onSuccess, onError) => {
       try {
         // Create approval activity with workflow store helper

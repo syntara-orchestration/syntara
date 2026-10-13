@@ -33,6 +33,7 @@ import { NodeFormContainer } from './shared/NodeFormContainer'
 import nodeFormStyles from './shared/nodeFormStyles.module.css'
 import { NodeFormTabsLayout } from './shared/NodeFormTabsLayout'
 import { NodeSettingsForm } from './shared/NodeSettingsForm'
+import { persistNodeSettings } from './shared/nodeSettingsSchema'
 import { useApprovalDecideGroups } from './useApprovalDecideGroups'
 import { useApprovalDecideUsers } from './useApprovalDecideUsers'
 
@@ -322,7 +323,7 @@ export function ApprovalNodeForm(props: ApprovalNodeFormProps) {
       prompt: data.prompt?.trim() || '',
       fallback_decision: data.fallback_decision,
       decision_window: data.decision_window,
-      settings: data.settings,
+      settings: persistNodeSettings(data.settings),
     })
   }
 

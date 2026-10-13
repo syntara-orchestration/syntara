@@ -5,6 +5,17 @@ import { expect, type Page } from '../fixtures'
 
 import { apiRequest, getAuthToken } from './api-core'
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
+function pendingListIncludesName(body: unknown, name: string): boolean {
+  if (!isRecord(body)) return false
+  const resources = body['resources']
+  if (!Array.isArray(resources)) return false
+  return resources.some((row) => isRecord(row) && row['name'] === name)
+}
+
 /**
  * Poll an execution's status via the API until it matches one of the expected values.
  * Retries every 1s until timeout (default 90s). Used to wait for Temporal state
@@ -42,4 +53,37 @@ export async function pollApprovalVisible(
     const found = body.resources?.some((r) => r.name === approvalName)
     expect(found).toBe(true)
   }).toPass({ timeout: options?.timeout ?? 30_000, intervals: [1_000] })
+}
+
+/**
+ * Poll the form prompts API until a pending prompt with the given name is listed.
+ * Use after `pollExecutionStatus` reaches "paused" on real backends when Temporal is available.
+ */
+export async function pollFormPromptVisible(
+  app: Page,
+  promptName: string,
+  options?: { token?: string; timeout?: number }
+): Promise<void> {
+  const token = options?.token ?? (await getAuthToken(app)) ?? undefined
+  await expect(async () => {
+    const resp = await apiRequest(app, 'get', '/form_prompts?status=pending&limit=100', { token })
+    expect(pendingListIncludesName(await resp.json(), promptName)).toBe(true)
+  }).toPass({ timeout: options?.timeout ?? 45_000, intervals: [1_000] })
+}
+
+const TERMINAL_EXECUTION_STATUSES = ['completed', 'failed', 'cancelled', 'completed_with_errors'] as const
+
+/** Request cancellation and wait until the execution reaches a terminal status. */
+export async function cancelExecutionViaApi(
+  app: Page,
+  executionId: string,
+  options?: { token?: string; timeout?: number }
+): Promise<void> {
+  const token = options?.token ?? (await getAuthToken(app)) ?? undefined
+  const resp = await apiRequest(app, 'post', `/executions/${executionId}/cancel`, { token })
+  expect(resp.ok() || resp.status() === 202, `cancel execution ${executionId} failed: ${resp.status()}`).toBeTruthy()
+  await pollExecutionStatus(app, executionId, [...TERMINAL_EXECUTION_STATUSES], {
+    token,
+    timeout: options?.timeout ?? 90_000,
+  })
 }

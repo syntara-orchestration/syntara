@@ -7,7 +7,11 @@ import { expectStringContaining } from '../../../test/test-helpers'
 import { detachPromise } from '../../../utils/detachPromise'
 
 import type { UseBuilderSaveWorkflowParams } from './useBuilderSaveWorkflow'
-import { useBuilderSaveWorkflow } from './useBuilderSaveWorkflow'
+import { shouldBlockWorkflowActionAfterSave, useBuilderSaveWorkflow } from './useBuilderSaveWorkflow'
+
+vi.mock('./useWorkflowEngineDefaults', () => ({
+  useWorkflowEngineDefaults: () => ({ defaults: { continueOnFailure: false }, isLoading: false }),
+}))
 
 type CreateWorkflow = UseBuilderSaveWorkflowParams['createWorkflow']
 type UpdateWorkflow = UseBuilderSaveWorkflowParams['updateWorkflow']
@@ -46,6 +50,29 @@ function createResponse(overrides: Partial<CreateResponse> = {}): CreateResponse
 function updateResponse(overrides: Partial<UpdateResponse> = {}): UpdateResponse {
   return { ...baseUpdateResponse, ...overrides }
 }
+
+describe('shouldBlockWorkflowActionAfterSave', () => {
+  it('does not block when has_validation_issues is set without validation_result findings', () => {
+    expect(shouldBlockWorkflowActionAfterSave(updateResponse({ has_validation_issues: true }), true)).toBe(false)
+  })
+
+  it('blocks when validation_result includes an error', () => {
+    expect(
+      shouldBlockWorkflowActionAfterSave(
+        updateResponse({
+          has_validation_issues: true,
+          validation_result: {
+            is_valid: false,
+            error_count: 1,
+            warning_count: 0,
+            findings: [{ severity: 'error', category: 'schema_violation', message: 'Bad' }],
+          },
+        }),
+        true
+      )
+    ).toBe(true)
+  })
+})
 
 function minimalWorkflow(overrides: Partial<WorkflowDefinition> = {}): WorkflowDefinition {
   return {
@@ -298,7 +325,20 @@ describe('useBuilderSaveWorkflow', () => {
     const showWarning = vi.fn()
     const onVersionUpdated = vi.fn()
     const updateWorkflow = vi.fn((...args: Parameters<UpdateWorkflow>) => {
-      detachPromise(args[1]?.onSuccess?.(updateResponse({ has_validation_issues: true, current_version: 5 })))
+      detachPromise(
+        args[1]?.onSuccess?.(
+          updateResponse({
+            has_validation_issues: true,
+            current_version: 5,
+            validation_result: {
+              is_valid: false,
+              error_count: 0,
+              warning_count: 1,
+              findings: [{ severity: 'warning', category: 'orphaned_node', message: 'Minor issue' }],
+            },
+          })
+        )
+      )
     }) as MockedFunction<UpdateWorkflow>
 
     const { result } = renderHook(() =>

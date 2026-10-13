@@ -7,6 +7,7 @@ import { useAlerts } from '../../../providers/alerts'
 import { useWorkflowStore } from '../../../stores/useWorkflowStore'
 import { extractVersionConflictInfo, getErrorMessage, isWorkflowVersionConflictError } from '../../../utils/apiErrors'
 import { detachPromise } from '../../../utils/detachPromise'
+import { getWorkflowValidationFailureDescription } from '../useWorkflowVerification'
 import { buildWorkflowDefinition } from '../utils/workflowDefinitionBuilder'
 import type { ConflictInfo } from '../VersionConflictDialog'
 
@@ -103,7 +104,10 @@ export function usePublishWorkflow({
               onConflict(extractVersionConflictInfo(error))
               return
             }
-            showError({ title: 'Failed to publish workflow', description: getErrorMessage(error) })
+            showError({
+              title: 'Failed to publish workflow',
+              description: getWorkflowValidationFailureDescription(error) ?? getErrorMessage(error),
+            })
           },
           onSettled,
         }

@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from ..models.approval_node import ApprovalNode
     from ..models.condition_node import ConditionNode
     from ..models.converge_node import ConvergeNode
+    from ..models.form_prompt_node import FormPromptNode
     from ..models.http_request_node import HTTPRequestNode
     from ..models.loop_node import LoopNode
     from ..models.script_node import ScriptNode
@@ -45,8 +46,8 @@ class WorkflowDefinition:
                 contain at least one trigger. Trigger nodes must be graph entry points (no incoming edges) — enforced by
                 application-level validation.
             nodes (list[AAPJobTemplateNode | AAPWorkflowJobTemplateNode | AgenticNode | ApprovalNode | ConditionNode |
-                ConvergeNode | HTTPRequestNode | LoopNode | ScriptNode | SwitchNode | WaitNode]): Execution and control nodes in
-                the workflow graph
+                ConvergeNode | FormPromptNode | HTTPRequestNode | LoopNode | ScriptNode | SwitchNode | WaitNode]): Execution and
+                control nodes in the workflow graph
             edges (list[WorkflowDefinitionEdgesItem]): List of directed edges connecting triggers and nodes in the workflow
                 graph
             description (None | str | Unset): Human-readable description of the workflow's purpose
@@ -62,6 +63,7 @@ class WorkflowDefinition:
         | ApprovalNode
         | ConditionNode
         | ConvergeNode
+        | FormPromptNode
         | HTTPRequestNode
         | LoopNode
         | ScriptNode
@@ -78,6 +80,7 @@ class WorkflowDefinition:
         from ..models.approval_node import ApprovalNode
         from ..models.condition_node import ConditionNode
         from ..models.converge_node import ConvergeNode
+        from ..models.form_prompt_node import FormPromptNode
         from ..models.http_request_node import HTTPRequestNode
         from ..models.loop_node import LoopNode
         from ..models.script_node import ScriptNode
@@ -106,6 +109,8 @@ class WorkflowDefinition:
             elif isinstance(nodes_item_data, ScriptNode):
                 nodes_item = nodes_item_data.to_dict()
             elif isinstance(nodes_item_data, ApprovalNode):
+                nodes_item = nodes_item_data.to_dict()
+            elif isinstance(nodes_item_data, FormPromptNode):
                 nodes_item = nodes_item_data.to_dict()
             elif isinstance(nodes_item_data, ConditionNode):
                 nodes_item = nodes_item_data.to_dict()
@@ -155,6 +160,7 @@ class WorkflowDefinition:
         from ..models.approval_node import ApprovalNode
         from ..models.condition_node import ConditionNode
         from ..models.converge_node import ConvergeNode
+        from ..models.form_prompt_node import FormPromptNode
         from ..models.http_request_node import HTTPRequestNode
         from ..models.loop_node import LoopNode
         from ..models.script_node import ScriptNode
@@ -190,6 +196,7 @@ class WorkflowDefinition:
                 | ApprovalNode
                 | ConditionNode
                 | ConvergeNode
+                | FormPromptNode
                 | HTTPRequestNode
                 | LoopNode
                 | ScriptNode
@@ -247,7 +254,7 @@ class WorkflowDefinition:
                 try:
                     if not isinstance(data, dict):
                         raise TypeError()
-                    nodes_item_type_6 = ConditionNode.from_dict(data)
+                    nodes_item_type_6 = FormPromptNode.from_dict(data)
 
                     return nodes_item_type_6
                 except (TypeError, ValueError, AttributeError, KeyError):
@@ -255,7 +262,7 @@ class WorkflowDefinition:
                 try:
                     if not isinstance(data, dict):
                         raise TypeError()
-                    nodes_item_type_7 = SwitchNode.from_dict(data)
+                    nodes_item_type_7 = ConditionNode.from_dict(data)
 
                     return nodes_item_type_7
                 except (TypeError, ValueError, AttributeError, KeyError):
@@ -263,7 +270,7 @@ class WorkflowDefinition:
                 try:
                     if not isinstance(data, dict):
                         raise TypeError()
-                    nodes_item_type_8 = LoopNode.from_dict(data)
+                    nodes_item_type_8 = SwitchNode.from_dict(data)
 
                     return nodes_item_type_8
                 except (TypeError, ValueError, AttributeError, KeyError):
@@ -271,16 +278,24 @@ class WorkflowDefinition:
                 try:
                     if not isinstance(data, dict):
                         raise TypeError()
-                    nodes_item_type_9 = ConvergeNode.from_dict(data)
+                    nodes_item_type_9 = LoopNode.from_dict(data)
 
                     return nodes_item_type_9
                 except (TypeError, ValueError, AttributeError, KeyError):
                     pass
+                try:
+                    if not isinstance(data, dict):
+                        raise TypeError()
+                    nodes_item_type_10 = ConvergeNode.from_dict(data)
+
+                    return nodes_item_type_10
+                except (TypeError, ValueError, AttributeError, KeyError):
+                    pass
                 if not isinstance(data, dict):
                     raise TypeError()
-                nodes_item_type_10 = WaitNode.from_dict(data)
+                nodes_item_type_11 = WaitNode.from_dict(data)
 
-                return nodes_item_type_10
+                return nodes_item_type_11
 
             nodes_item = _parse_nodes_item(nodes_item_data)
 

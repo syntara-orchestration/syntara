@@ -4,6 +4,7 @@ import { mockDate } from './resources/mockDates'
 import { createMockJwt } from './mockJwt'
 import type * as ApprovalsAPI from '@syntara/contracts/src/approvals-api.js'
 import type * as ExecutionsAPI from '@syntara/contracts/src/executions-api.js'
+import type * as FormsAPI from '@syntara/contracts/src/forms-api.js'
 import type * as ToolManagerAPI from '@syntara/contracts/src/tool-manager.js'
 import type * as WorkflowAPI from '@syntara/contracts/src/workflow-api.js'
 import type { Approval, Tool, WorkflowWithVersion, WorkflowsResponse } from '@syntara/contracts'
@@ -22,10 +23,18 @@ import { executions } from './resources/executions'
 import { getExecutionDetail } from './resources/executionDetails'
 import { activityExecutions } from './resources/activityExecutions'
 import { approvals } from './resources/approvals'
+import {
+  alignPendingFormPromptClock,
+  formPromptToListRead,
+  formPrompts,
+  registerFormPromptListWorkflowContext,
+  removeFormPromptsForExecutions,
+} from './resources/formPrompts'
 import { settings, settingsCategories } from './resources/settings'
 import { revocationState } from './resources/revocation'
 import { identityProviders, type IdentityProvider } from './resources/identityProviders'
 import { validateGroupJmespathExpression } from './utils/jmespathValidation'
+import { mockWorkflowVersionNumber } from './utils/workflowVersion'
 import { users, userIdentities, type UserRead, type UserIdentityRead } from './resources/users'
 import { groups, userGroupMemberships, type GroupRead } from './resources/groups'
 import {
@@ -170,6 +179,40 @@ function userReferenceName(value: { name?: string } | string | null | undefined)
 function approvalCreatedAt(a: Approval): string | undefined {
   const row = a as ApprovalTimestamps
   return row.created_at ?? row.createdAt
+}
+
+function mockFormPromptResponderUsers(param: unknown): Array<{ id: string; username: string }> {
+  if (!Array.isArray(param) || param.length === 0) {
+    return []
+  }
+  return param.map((entry) => {
+    if (typeof entry === 'string') {
+      return { id: `user-${entry}`, username: entry }
+    }
+    if (typeof entry === 'object' && entry !== null) {
+      const row = entry as { id?: string; username?: string }
+      const username = row.username ?? 'unknown'
+      return { id: row.id ?? `user-${username}`, username }
+    }
+    return { id: 'user-unknown', username: 'unknown' }
+  })
+}
+
+function mockFormPromptResponderGroups(param: unknown): Array<{ id: string; name: string }> {
+  if (!Array.isArray(param) || param.length === 0) {
+    return []
+  }
+  return param.map((entry) => {
+    if (typeof entry === 'string') {
+      return { id: `group-${entry}`, name: entry }
+    }
+    if (typeof entry === 'object' && entry !== null) {
+      const row = entry as { id?: string; name?: string }
+      const name = row.name ?? 'unknown'
+      return { id: row.id ?? `group-${name}`, name }
+    }
+    return { id: 'group-unknown', name: 'unknown' }
+  })
 }
 
 function getUsernameFromRequest(request: Request): string {
@@ -1202,12 +1245,15 @@ export const handlers = [
 
     workflows.splice(workflowIndex, 1)
 
-    // Cascade: remove executions associated with the deleted workflow
+    const removedExecutionIds: string[] = []
     for (let i = executions.length - 1; i >= 0; i--) {
       if (executions[i].workflow_id === workflowId) {
+        removedExecutionIds.push(executions[i].id)
+        delete activityExecutions[executions[i].id]
         executions.splice(i, 1)
       }
     }
+    removeFormPromptsForExecutions(removedExecutionIds)
 
     return new HttpResponse(null, { status: 204 })
   }),
@@ -1615,7 +1661,7 @@ export const handlers = [
     const workflowMap = new Map(workflows.map((w) => [w.id, w]))
     const enriched = filtered.map((e) => {
       const wf = e.workflow_id ? workflowMap.get(e.workflow_id) : undefined
-      const versionNum = wf?.published_version ?? wf?.current_version ?? 1
+      const versionNum = mockWorkflowVersionNumber(wf)
       const existingVersionId = (e as { workflow_version_id?: string }).workflow_version_id
       return {
         ...e,
@@ -1683,46 +1729,56 @@ export const handlers = [
     }
     const executionId = uuidv4()
     const workflow = workflows.find((w) => w.id === body.workflow_id)
-    const versionNum = workflow?.published_version ?? workflow?.current_version ?? 1
+    const versionNum = mockWorkflowVersionNumber(workflow)
     const existingCount = executions.filter((e) => e.workflow_id === body.workflow_id).length
 
     const definition = workflow?.version?.workflow_definition as
       | {
-          nodes?: Array<{ id?: string; type?: string; name?: string }>
-          triggers?: Array<{ id?: string; type?: string; name?: string }>
+          nodes?: Array<{ id?: string; type?: string; name?: string; parameters?: Record<string, unknown> }>
+          triggers?: Array<{ id?: string; type?: string; name?: string; parameters?: Record<string, unknown> }>
         }
       | undefined
+    const formPromptParametersByNodeId = new Map<string, Record<string, unknown>>()
+    for (const authoredNode of definition?.nodes ?? []) {
+      if (typeof authoredNode.id !== 'string') continue
+      if (authoredNode.parameters && typeof authoredNode.parameters === 'object') {
+        formPromptParametersByNodeId.set(authoredNode.id, authoredNode.parameters)
+      }
+    }
     // Include triggers so mock activity lists match real-backend executions.
     const nodes = [...(definition?.triggers ?? []), ...(definition?.nodes ?? [])]
 
     // Synthesize per-node activities so newly created executions are usable in
     // self-contained E2E tests (GET detail / activities list).
     const hasApproval = nodes.some((node) => node.type === 'approval')
+    const hasFormPrompt = nodes.some((node) => node.type === 'form_prompt')
+    const pausesForHumanInput = hasApproval || hasFormPrompt
 
     // Default remains completed for suite-wide stability. Tests that need mixed
     // statuses pass an explicit `status` (mock-only; ignored by the real API).
-    // Approval workflows still default to paused when no override is provided.
-    const status = body.status ?? (hasApproval ? 'paused' : 'completed')
+    // Human-input workflows default to paused when no override is provided.
+    const status = body.status ?? (pausesForHumanInput ? 'paused' : 'completed')
     const timestampCycle = [mockDate.hoursAgo1, mockDate.hoursAgo2, mockDate.hoursAgo3, mockDate.hoursAgo4] as const
     const timestamp = timestampCycle[existingCount % timestampCycle.length]
     const isTerminal = status === 'completed' || status === 'failed' || status === 'cancelled'
     const isPaused = status === 'paused'
+    const approvalPending = isPaused && hasApproval
 
     const activities: ExecutionsAPI.components['schemas']['ActivityExecution'][] = nodes
       .filter((node): node is { id: string; type?: string; name?: string } => typeof node.id === 'string')
       .map((node, index) => {
-        const isApproval = node.type === 'approval'
+        const waitsForHumanInput = node.type === 'approval' || node.type === 'form_prompt'
         return {
           id: `act-${executionId}-${index + 1}`,
           created_at: timestamp,
           updated_at: timestamp,
           execution_id: executionId,
           activity_name: node.id,
-          status: isApproval && isPaused ? ('waiting' as const) : ('completed' as const),
+          status: waitsForHumanInput && isPaused ? ('waiting' as const) : ('completed' as const),
           started_at: timestamp,
-          completed_at: isApproval && isPaused ? null : timestamp,
+          completed_at: waitsForHumanInput && isPaused ? null : timestamp,
           input_data: {},
-          output_data: isApproval && isPaused ? null : {},
+          output_data: waitsForHumanInput && isPaused ? null : {},
           error_details: null,
           retry_count: 0,
           iteration: null,
@@ -1738,7 +1794,7 @@ export const handlers = [
       updated_at: timestamp,
       workflow_id: body.workflow_id,
       status,
-      approval_pending: isPaused,
+      approval_pending: approvalPending,
       started_at: timestamp,
       completed_at: isTerminal ? timestamp : null,
       started_by: 'user-1',
@@ -1759,6 +1815,12 @@ export const handlers = [
       project_id: workflow?.project_id ?? null,
     }
     executions.push(execution)
+
+    registerFormPromptListWorkflowContext(executionId, {
+      workflow_id: body.workflow_id,
+      workflow_version: versionNum,
+      workflow_name: workflow?.name ?? 'workflow',
+    })
 
     // Self-contained E2E: a paused approval execution must also appear in GET /approvals.
     // The real backend creates that row when Temporal pauses; the mock has no worker.
@@ -1791,6 +1853,58 @@ export const handlers = [
           decided_at: null,
           decision_notes: null,
         } as Approval)
+      }
+      for (const node of nodes) {
+        if (node.type !== 'form_prompt' || typeof node.id !== 'string') continue
+        const nodeRecord = node as { name?: string; parameters?: Record<string, unknown> }
+        const parameters = formPromptParametersByNodeId.get(node.id) ?? nodeRecord.parameters ?? {}
+        const formDefinition = parameters.form_definition as
+          FormsAPI.components['schemas']['FormDefinition'] | undefined
+        const submitLabel =
+          typeof parameters.submit_label === 'string' && parameters.submit_label.length > 0
+            ? parameters.submit_label
+            : 'Submit response'
+        const successMessage =
+          typeof parameters.success_message === 'string' && parameters.success_message.length > 0
+            ? parameters.success_message
+            : 'Thank you — the workflow will continue.'
+        const cssOverride =
+          typeof parameters.css_override === 'string' && parameters.css_override.trim().length > 0
+            ? parameters.css_override.trim()
+            : undefined
+        formPrompts.push({
+          id: uuidv4(),
+          created_at: timestamp,
+          updated_at: timestamp,
+          labels: {},
+          project_id: workflow?.project_id ?? 'p-001',
+          execution_id: executionId,
+          prompt_node_id: node.id,
+          name: typeof nodeRecord.name === 'string' && nodeRecord.name.length > 0 ? nodeRecord.name : 'Form prompt',
+          message: typeof parameters.message === 'string' ? parameters.message : 'Respond to continue the workflow.',
+          status: 'pending',
+          timeout_at: mockDate.hoursFromNow23,
+          form_definition: formDefinition ?? {
+            fields: [
+              {
+                value_name: 'answer',
+                type: 'text',
+                label: 'Answer',
+                required: true,
+              },
+            ],
+          },
+          submit_label: submitLabel,
+          success_message: successMessage,
+          ...(cssOverride ? { css_override: cssOverride } : {}),
+          responder_users: Array.isArray(parameters.responder_users)
+            ? mockFormPromptResponderUsers(parameters.responder_users)
+            : [{ id: 'user-admin', username: 'admin' }],
+          responder_groups: mockFormPromptResponderGroups(parameters.responder_groups),
+          response_data: null,
+          responded_at: null,
+          responded_by: null,
+        })
       }
     }
 
@@ -1829,7 +1943,11 @@ export const handlers = [
     if (!execution) {
       return createExecutionNotFoundResponse(executionId, 'cancel')
     }
-    if (execution.status !== ExecutionStatusEnum.PENDING && execution.status !== ExecutionStatusEnum.RUNNING) {
+    if (
+      execution.status !== ExecutionStatusEnum.PENDING &&
+      execution.status !== ExecutionStatusEnum.RUNNING &&
+      execution.status !== ExecutionStatusEnum.PAUSED
+    ) {
       return HttpResponse.json(
         {
           type: 'https://api.example.com/errors/invalid-state',
@@ -2161,6 +2279,131 @@ export const handlers = [
       total_success: results.filter((r) => r.success).length,
       total_failed: results.filter((r) => !r.success).length,
     })
+  }),
+
+  http.get('/api/v1/form_prompts', ({ request }) => {
+    const url = new URL(request.url)
+    const status = url.searchParams.get('status')
+    const statusIn = url.searchParams.get('status[in]')
+    const execution_id = url.searchParams.get('execution_id')
+    const project_id = url.searchParams.get('project_id')
+    const nameContains = url.searchParams.get('name[contains]')
+    const cursor = url.searchParams.get('cursor')
+    const limitParam = url.searchParams.get('limit')
+    const includeTotal = url.searchParams.get('include_total') === 'true'
+    const limit = Math.min(Math.max(1, limitParam ? parseInt(limitParam, 10) : 20), 100)
+
+    const sort = url.searchParams.get('sort')
+    const statusInValues =
+      statusIn
+        ?.split(',')
+        .map((value) => value.trim())
+        .filter(Boolean) ?? []
+
+    const filtered = formPrompts.filter((prompt) => {
+      if (status && prompt.status !== status) return false
+      if (statusInValues.length > 0 && (!prompt.status || !statusInValues.includes(prompt.status))) {
+        return false
+      }
+      if (execution_id && prompt.execution_id !== execution_id) return false
+      if (project_id && prompt.project_id !== project_id) return false
+      if (nameContains) {
+        const name = prompt.name ?? ''
+        if (!name.toLowerCase().includes(nameContains.toLowerCase())) return false
+      }
+      return true
+    })
+
+    const summaries = filtered.map((prompt) => formPromptToListRead(alignPendingFormPromptClock(prompt)))
+
+    if (sort) {
+      const isDesc = sort.startsWith('-')
+      const field = isDesc ? sort.slice(1) : sort
+      summaries.sort((a, b) => {
+        let aVal: string | number = ''
+        let bVal: string | number = ''
+        switch (field) {
+          case 'name':
+            aVal = a.name ?? ''
+            bVal = b.name ?? ''
+            break
+          case 'workflow_name':
+            aVal = a.workflow_name ?? ''
+            bVal = b.workflow_name ?? ''
+            break
+          case 'created_at':
+            aVal = a.created_at ? new Date(a.created_at).getTime() : 0
+            bVal = b.created_at ? new Date(b.created_at).getTime() : 0
+            break
+          case 'responded_at':
+            aVal = a.responded_at ? new Date(a.responded_at).getTime() : 0
+            bVal = b.responded_at ? new Date(b.responded_at).getTime() : 0
+            break
+          case 'timeout_at':
+            aVal = a.timeout_at ? new Date(a.timeout_at).getTime() : 0
+            bVal = b.timeout_at ? new Date(b.timeout_at).getTime() : 0
+            break
+          case 'status':
+            aVal = a.status ?? ''
+            bVal = b.status ?? ''
+            break
+          case 'id':
+            aVal = a.id ?? ''
+            bVal = b.id ?? ''
+            break
+          default:
+            return 0
+        }
+        const cmp =
+          typeof aVal === 'string' && typeof bVal === 'string'
+            ? aVal.localeCompare(bVal)
+            : (aVal as number) - (bVal as number)
+        if (cmp !== 0) {
+          return isDesc ? -cmp : cmp
+        }
+        return isDesc ? (b.id ?? '').localeCompare(a.id ?? '') : (a.id ?? '').localeCompare(b.id ?? '')
+      })
+    }
+
+    const body = paginate(summaries, cursor, limit, includeTotal)
+    return HttpResponse.json(body)
+  }),
+
+  http.get('/api/v1/form_prompts/:formPromptId', (request) => {
+    const formPromptId = request.params.formPromptId
+    const body = formPrompts.find((p) => p.id === formPromptId)
+    if (!body) {
+      return HttpResponse.json(
+        {
+          type: 'https://api.example.com/errors/not-found',
+          title: 'Not Found',
+          detail: 'Form prompt not found',
+          code: 'NOT_FOUND',
+          retryable: false,
+          instance: `/api/v1/form_prompts/${String(formPromptId)}`,
+        },
+        { status: 404 }
+      )
+    }
+    return HttpResponse.json(alignPendingFormPromptClock(body))
+  }),
+
+  http.post('/api/v1/form_prompts/:formPromptId/submit', async (request) => {
+    const formPromptId = request.params.formPromptId
+    const prompt = formPrompts.find((p) => p.id === formPromptId)
+    if (!prompt) {
+      return HttpResponse.json({ title: 'Not Found', detail: 'Form prompt not found' }, { status: 404 })
+    }
+    if (prompt.status !== 'pending') {
+      return HttpResponse.json({ title: 'Conflict', detail: 'Form prompt is not pending' }, { status: 409 })
+    }
+    const body = (await request.request.json()) as { response_data?: Record<string, unknown> }
+    prompt.status = 'submitted'
+    prompt.response_data = body.response_data ?? {}
+    prompt.responded_at = mockDate.now
+    prompt.responded_by = { id: 'user-admin', name: 'admin', type: 'user' }
+    prompt.updated_at = mockDate.now
+    return HttpResponse.json(prompt)
   }),
 
   // Auth providers (public endpoint for login page)
@@ -5314,6 +5557,7 @@ export const handlers = [
       'test',
       'run',
       'decide',
+      'submit',
       'rotate_secret',
       'disable',
       'enable',
@@ -5329,6 +5573,7 @@ export const handlers = [
       execution: new Set(['read', 'run']),
       credential: new Set(['read', 'create', 'update', 'delete', 'use']),
       approval: new Set(['read', 'decide']),
+      form_prompt: new Set(['read', 'submit']),
     }
 
     const projectUserGrants: Record<string, Set<string>> = {
@@ -5339,12 +5584,20 @@ export const handlers = [
       execution: new Set(['read', 'run']),
       credential: new Set(['read', 'create', 'update', 'use']),
       approval: new Set(['read', 'decide']),
+      form_prompt: new Set(['read', 'submit']),
     }
 
     let allowed = true
 
     if (username === 'viewer') {
-      const readableResources = new Set(['workflow', 'execution', 'approval', 'credential', 'integration'])
+      const readableResources = new Set([
+        'workflow',
+        'execution',
+        'approval',
+        'form_prompt',
+        'credential',
+        'integration',
+      ])
       if (readableResources.has(resourceType)) {
         allowed = action === 'read'
       } else {

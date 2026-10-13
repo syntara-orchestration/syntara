@@ -1,6 +1,7 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "project": ["src/**/*.{ts,tsx}"],
+  "entry": ["src/forms/index.ts"],
   "treatConfigHintsAsErrors": false,
   "ignoreDependencies": ["babel-plugin-react-compiler", "eslint", "prettier", "nyc", "tsx", "pngjs", "@types/pngjs"],
   "ignoreBinaries": ["concurrently", "vitest", "playwright", "tsc", "knip", "eslint", "nyc", "vite", "storybook"],

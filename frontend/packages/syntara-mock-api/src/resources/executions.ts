@@ -13,7 +13,22 @@ const LOOP_DEMO = workflowIdByName['loop-demo']
 const PARALLEL_DEMO = workflowIdByName['parallel-demo']
 const DEPLOYMENT_APPROVAL = workflowIdByName['deployment-approval']
 
-export const executions: Execution[] = [
+/** Mock seed rows; handlers enrich version/project/temporal fields at read time. */
+type ExecutionMockSeed = Omit<
+  Execution,
+  'workflow_version_id' | 'project_id' | 'temporal_workflow_id' | 'error_details'
+> & {
+  workflow_version_id?: string
+  project_id?: string | null
+  temporal_workflow_id?: string
+  error_details?: string | null
+  /** Legacy seed field; UI uses created_at when absent on API responses. */
+  started_at?: string | null
+  /** Legacy seed user id (not ExecutionRead.created_by). */
+  started_by?: string
+}
+
+export const executions: ExecutionMockSeed[] = [
   {
     id: 'exec-1',
     created_at: mockDate.daysAgo2,
@@ -168,6 +183,89 @@ export const executions: Execution[] = [
     input_data: {},
   },
   // Execution for deployment-approval — waiting at approval gate
+  {
+    id: 'exec-form-prompt',
+    created_at: mockDate.minutesAgo10,
+    updated_at: mockDate.minutesAgo10,
+    workflow_id: HELLO_WORLD,
+    workflow_name: workflowNames[HELLO_WORLD],
+    status: 'paused',
+    started_at: mockDate.minutesAgo10,
+    completed_at: null,
+    started_by: 'user-1',
+    input_data: {},
+    current_activities: [
+      {
+        activity_name: 'collect_input',
+        temporal_activity_id: 'collect_input-activity',
+        iteration: null,
+      },
+    ],
+  },
+  {
+    id: 'exec-form-prompt-submitted',
+    created_at: mockDate.daysAgo2,
+    updated_at: mockDate.daysAgo1,
+    workflow_id: HELLO_WORLD,
+    workflow_name: workflowNames[HELLO_WORLD],
+    status: 'completed',
+    started_at: mockDate.daysAgo2,
+    completed_at: mockDate.daysAgo1,
+    started_by: 'user-1',
+    input_data: {},
+  },
+  {
+    id: 'exec-form-prompt-alice',
+    created_at: mockDate.minutesAgo10,
+    updated_at: mockDate.minutesAgo10,
+    workflow_id: HELLO_WORLD,
+    workflow_name: workflowNames[HELLO_WORLD],
+    status: 'paused',
+    started_at: mockDate.minutesAgo10,
+    completed_at: null,
+    started_by: 'user-1',
+    input_data: {},
+    current_activities: [
+      {
+        activity_name: 'sandbox_review',
+        temporal_activity_id: 'sandbox_review-activity',
+        iteration: null,
+      },
+    ],
+  },
+  {
+    id: 'exec-form-prompt-timeout-fail',
+    created_at: mockDate.hoursAgo2,
+    updated_at: mockDate.hoursAgo1,
+    workflow_id: HELLO_WORLD,
+    workflow_name: workflowNames[HELLO_WORLD],
+    status: 'failed',
+    started_at: mockDate.hoursAgo2,
+    completed_at: mockDate.hoursAgo1,
+    started_by: 'user-1',
+    input_data: {},
+    error_details: 'Form step response window expired',
+    current_activities: [],
+  },
+  {
+    id: 'exec-form-prompt-fallback-continue',
+    created_at: mockDate.hoursAgo2,
+    updated_at: mockDate.minutesAgo10,
+    workflow_id: HELLO_WORLD,
+    workflow_name: workflowNames[HELLO_WORLD],
+    status: 'running',
+    started_at: mockDate.hoursAgo2,
+    completed_at: null,
+    started_by: 'user-1',
+    input_data: {},
+    current_activities: [
+      {
+        activity_name: 'continue_with_defaults',
+        temporal_activity_id: 'continue_with_defaults-activity',
+        iteration: null,
+      },
+    ],
+  },
   {
     id: 'exec-approval',
     created_at: mockDate.minutesAgo10,
