@@ -155,8 +155,8 @@ test.describe('Execution URL unification', () => {
       // Go back to builder
       await openWorkflowInBuilder(app, workflowName, id)
 
-      // Make the workflow dirty by adding a node
-      await addScriptStep(app, 'Dirty node')
+      // Make the workflow dirty by adding a step
+      await addScriptStep(app, 'Dirty step')
 
       // Open run history via kebab menu
       await app.getByLabel('Workflow actions').click()

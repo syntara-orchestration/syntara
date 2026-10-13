@@ -22,19 +22,19 @@ export async function layoutCanvas(page: Page) {
 }
 
 /**
- * Click a React Flow node by its visible text label and wait for its editor to open.
+ * Click a workflow step on the React Flow canvas by its visible label and wait for its editor to open.
  *
  * Retrying the open matches {@link openStepForEditing} in `workflows.ts`: under CI load
  * the click can land while the viewport is still transforming. The success condition is
- * the editor showing this node — the Name field carries the clicked node's name.
+ * the editor showing this step — the Name field carries the clicked step's name.
  */
-export async function clickNode(page: Page, nodeText: string) {
+export async function clickStep(page: Page, stepName: string) {
   await layoutCanvas(page)
-  const node = page.locator('[role="group"][aria-roledescription="node"]').filter({ hasText: nodeText })
+  const node = page.locator('[role="group"][aria-roledescription="node"]').filter({ hasText: stepName })
   const nameInput = page.getByRole('textbox', { name: 'Name', exact: true })
   await expect(async () => {
     await expect(node).toBeVisible({ timeout: 5_000 })
     await node.click({ timeout: 5_000 })
-    await expect(nameInput).toHaveValue(nodeText, { timeout: 5_000 })
+    await expect(nameInput).toHaveValue(stepName, { timeout: 5_000 })
   }).toPass({ timeout: 30_000, intervals: [500, 1_000, 2_000] })
 }

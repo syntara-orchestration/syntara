@@ -88,7 +88,7 @@ test.describe('Task Agent Structured Output', () => {
       // Verify the Create button is no longer attached (panel closed successfully)
       await expect(app.getByRole('button', { name: 'Create' })).not.toBeAttached({ timeout: 15_000 })
 
-      // Verify the agent node appears on canvas
+      // Verify the agent step appears on canvas
       await expect(
         app.locator('[role="group"][aria-roledescription="node"]').filter({ hasText: 'TestAgent' })
       ).toBeVisible()

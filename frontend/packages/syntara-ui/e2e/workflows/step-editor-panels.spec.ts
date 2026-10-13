@@ -4,7 +4,7 @@ import { addAgenticStep, addManualTrigger, addScriptStep } from '../helpers/v2-s
 import {
   buildUniqueName,
   clickAddConnectedStep,
-  clickNode,
+  clickStep,
   closeStepEditorPanel,
   createBasicWorkflowViaApi,
   openWorkflowInBuilder,
@@ -31,7 +31,7 @@ test.describe('Step editor panels', () => {
     await openWorkflowInBuilder(app, workflowName, id)
 
     // Open the script step editor
-    await clickNode(app, 'Process data')
+    await clickStep(app, 'Process data')
 
     // Verify three-panel layout — Input and Output headings
     await expect(app.getByRole('heading', { name: 'Input', exact: true })).toBeVisible({ timeout: 10_000 })
@@ -56,7 +56,7 @@ test.describe('Step editor panels', () => {
     await openWorkflowInBuilder(app, workflowName, id)
 
     // Click the script step to open the editor
-    await clickNode(app, 'My action')
+    await clickStep(app, 'My action')
 
     // Verify the editor is open
     await expect(app.getByRole('heading', { name: 'Input', exact: true })).toBeVisible({ timeout: 10_000 })
@@ -67,12 +67,12 @@ test.describe('Step editor panels', () => {
     await expect(app.getByRole('heading', { name: 'Input', exact: true })).not.toBeVisible()
 
     // Click the trigger step — triggers do NOT show the Input panel
-    await clickNode(app, 'Manual trigger')
+    await clickStep(app, 'Manual trigger')
     await expect(app.getByRole('heading', { name: 'Output', exact: true })).toBeVisible({ timeout: 10_000 })
 
     // Close and reopen the script step
     await closeStepEditorPanel(app)
-    await clickNode(app, 'My action')
+    await clickStep(app, 'My action')
     await expect(app.getByRole('heading', { name: 'Input', exact: true })).toBeVisible({ timeout: 10_000 })
     await expect(app.getByRole('heading', { name: 'Output', exact: true })).toBeVisible()
   })
@@ -140,7 +140,7 @@ test.describe('Step editor panels', () => {
     })
 
     // Click the script node
-    await clickNode(app, 'Run script')
+    await clickStep(app, 'Run script')
 
     // Verify output panel shows execution data instead of empty state
     await expect(app.getByRole('heading', { name: 'Output', exact: true })).toBeVisible({ timeout: 10_000 })
@@ -297,7 +297,7 @@ test.describe('Step editor panels', () => {
     })
 
     // Node 1: Gather Info — output has server diagnostics
-    await clickNode(app, 'Gather Info')
+    await clickStep(app, 'Gather Info')
     await expect(app.getByLabel('Search json output')).toBeVisible({ timeout: 10_000 })
     await expect(outputPanel.getByText('"stdout_json"')).toBeVisible()
     await expect(outputPanel.getByText('"web-01"')).toBeVisible()
@@ -305,7 +305,7 @@ test.describe('Step editor panels', () => {
 
     // Node 2: Process Data — output has alert analysis (different from node 1)
     await closeStepEditorPanel(app)
-    await clickNode(app, 'Process Data')
+    await clickStep(app, 'Process Data')
     await expect(app.getByLabel('Search json output')).toBeVisible({ timeout: 10_000 })
     await expect(outputPanel.getByText('"alert_level"')).toBeVisible()
     await expect(outputPanel.getByText('"warning"')).toBeVisible()
@@ -313,7 +313,7 @@ test.describe('Step editor panels', () => {
 
     // Node 3: Send Alert — output has notification result (different from nodes 1 and 2)
     await closeStepEditorPanel(app)
-    await clickNode(app, 'Send Alert')
+    await clickStep(app, 'Send Alert')
     await expect(app.getByLabel('Search json output')).toBeVisible({ timeout: 10_000 })
     await expect(outputPanel.getByText('"notification_sent"')).toBeVisible()
     await expect(outputPanel.getByText('"#ops-alerts"')).toBeVisible()
@@ -332,7 +332,7 @@ test.describe('Step editor panels', () => {
     await addScriptStep(app, 'Analyze', 'print("analyzing")')
 
     // Click the last node in the chain — its upstream is a script node
-    await clickNode(app, 'Analyze')
+    await clickStep(app, 'Analyze')
 
     // Verify the schema preview appears (not the empty state)
     await expect(app.getByRole('heading', { name: 'Input', exact: true })).toBeVisible({ timeout: 10_000 })
@@ -372,7 +372,7 @@ test.describe('Step editor panels', () => {
     const analyzeNodeId = await analyzeNode.getAttribute('data-id')
 
     // --- Phase 1: Before execution — schema preview shows field names ---
-    await clickNode(app, 'Analyze')
+    await clickStep(app, 'Analyze')
     await expect(app.getByRole('heading', { name: 'Input', exact: true })).toBeVisible({ timeout: 10_000 })
     await expect(app.getByText('Expected output fields')).toBeVisible({ timeout: 10_000 })
     await expect(app.getByText('T stdout', { exact: true })).toBeVisible()
@@ -501,7 +501,7 @@ test.describe('Step editor panels', () => {
     )
 
     // --- Phase 4: Click Analyze node — input should now show REAL values ---
-    await clickNode(app, 'Analyze')
+    await clickStep(app, 'Analyze')
     await expect(app.getByRole('heading', { name: 'Input', exact: true })).toBeVisible({ timeout: 10_000 })
 
     // The view toggle proves real data loaded (schema preview doesn't have it)
@@ -524,19 +524,19 @@ test.describe('Step editor panels', () => {
     await addScriptStep(app, 'Script A', 'print("hello")')
     await addScriptStep(app, 'Script B', 'print("world")')
 
-    await clickNode(app, 'Script B')
+    await clickStep(app, 'Script B')
     await expect(app.getByRole('heading', { name: 'Input', exact: true })).toBeVisible({ timeout: 10_000 })
 
     // Schema preview should be visible (upstream node section is expanded by default)
     await expect(app.getByText('Expected output fields')).toBeVisible({ timeout: 10_000 })
 
     // Collapse the upstream node section via the ExpandableSection toggle
-    const nodeToggle = app.getByRole('button', { name: 'Script A', exact: true })
-    await nodeToggle.click()
+    const stepToggle = app.getByRole('button', { name: 'Script A', exact: true })
+    await stepToggle.click()
     await expect(app.getByText('Expected output fields')).not.toBeVisible()
 
     // Expand it again
-    await nodeToggle.click()
+    await stepToggle.click()
     await expect(app.getByText('Expected output fields')).toBeVisible()
 
     // Variables and context section — starts collapsed
@@ -648,7 +648,7 @@ test.describe('Step editor panels', () => {
     )
 
     // Click Analyze node to see Fetch's output as input
-    await clickNode(app, 'Analyze')
+    await clickStep(app, 'Analyze')
     await expect(app.getByRole('heading', { name: 'Input', exact: true })).toBeVisible({ timeout: 10_000 })
 
     // Scope to Input view toggle to avoid ambiguity with Output view toggle
@@ -782,7 +782,7 @@ test.describe('Step editor panels', () => {
     })
 
     // Click Step C — it has Step B, Step A, and Trigger as upstream ancestors
-    await clickNode(app, 'Step C')
+    await clickStep(app, 'Step C')
     await expect(app.getByRole('heading', { name: 'Input', exact: true })).toBeVisible({ timeout: 10_000 })
 
     // View toggle should be visible (execution data exists)
@@ -876,7 +876,7 @@ test.describe('Step editor panels', () => {
     ).toBeVisible({ timeout: 15_000 })
 
     // Click the script node to open the editor
-    await clickNode(app, 'Run script')
+    await clickStep(app, 'Run script')
     await expect(app.getByRole('heading', { name: 'Output', exact: true })).toBeVisible({ timeout: 10_000 })
 
     // Scope to Output view toggle to avoid ambiguity with Input view toggle
@@ -910,7 +910,7 @@ test.describe('Step editor panels', () => {
     const { id } = await createBasicWorkflowViaApi(app, workflowName, 'Run script')
     await openWorkflowInBuilder(app, workflowName, id)
 
-    await clickNode(app, 'Run script')
+    await clickStep(app, 'Run script')
 
     await expect(app.getByRole('heading', { name: 'Input', exact: true })).toBeVisible({ timeout: 10_000 })
 
@@ -950,7 +950,7 @@ test.describe('Step editor panels', () => {
     await app.getByRole('button', { name: 'Save workflow' }).click()
     await expect(app).toHaveURL(/workflow-builder\/(?!new)/, { timeout: 15_000 })
 
-    await clickNode(app, 'Script B')
+    await clickStep(app, 'Script B')
     await expect(app.getByRole('heading', { name: 'Input', exact: true })).toBeVisible({ timeout: 15_000 })
 
     const inputPanel = app.locator('[class*="panelContainer"]').filter({
@@ -1007,7 +1007,7 @@ test.describe('Step editor panels', () => {
     await app.getByRole('button', { name: 'Save workflow' }).click()
     await expect(app).toHaveURL(/workflow-builder\/(?!new)/, { timeout: 15_000 })
 
-    await clickNode(app, 'Script B')
+    await clickStep(app, 'Script B')
     await expect(app.getByRole('heading', { name: 'Input', exact: true })).toBeVisible({ timeout: 15_000 })
 
     const inputPanel = app.locator('[class*="panelContainer"]').filter({
@@ -1060,7 +1060,7 @@ test.describe('Step editor panels', () => {
     await app.getByRole('button', { name: 'Save workflow' }).click()
     await expect(app).toHaveURL(/workflow-builder\/(?!new)/, { timeout: 15_000 })
 
-    await clickNode(app, 'Script B')
+    await clickStep(app, 'Script B')
     await expect(app.getByRole('heading', { name: 'Input', exact: true })).toBeVisible({ timeout: 10_000 })
 
     const inputPanel = app.locator('[class*="panelContainer"]').filter({
@@ -1109,7 +1109,7 @@ test.describe('Step editor panels', () => {
     await app.getByRole('button', { name: 'Save workflow' }).click()
     await expect(app).toHaveURL(/workflow-builder\/(?!new)/, { timeout: 15_000 })
 
-    await clickNode(app, 'Script B')
+    await clickStep(app, 'Script B')
     await expect(app.getByRole('heading', { name: 'Input', exact: true })).toBeVisible({ timeout: 10_000 })
 
     await expect(app.getByText('Expected output fields')).toBeVisible({ timeout: 10_000 })
@@ -1123,7 +1123,7 @@ test.describe('Step editor panels', () => {
     const { id } = await createBasicWorkflowViaApi(app, workflowName, 'Run script')
     await openWorkflowInBuilder(app, workflowName, id)
 
-    await clickNode(app, 'Run script')
+    await clickStep(app, 'Run script')
     await expect(app.getByRole('heading', { name: 'Output', exact: true })).toBeVisible({ timeout: 10_000 })
 
     const setMockButtons = app.getByRole('button', { name: 'Set mock data' })
@@ -1167,7 +1167,7 @@ test.describe('Step editor panels', () => {
     await app.getByRole('button', { name: 'Save workflow' }).click()
     await expect(app).toHaveURL(/workflow-builder\/(?!new)/, { timeout: 15_000 })
 
-    await clickNode(app, 'Script B')
+    await clickStep(app, 'Script B')
     await expect(app.getByRole('heading', { name: 'Input', exact: true })).toBeVisible({ timeout: 10_000 })
 
     const inputPanel = app.locator('[class*="panelContainer"]').filter({
@@ -1187,7 +1187,7 @@ test.describe('Step editor panels', () => {
     // Nav arrows unmount with the editor; wait so the next canvas click cannot hit them.
     await expect(app.getByRole('button', { name: /Go to previous step:/ })).toHaveCount(0)
 
-    await clickNode(app, 'Script B')
+    await clickStep(app, 'Script B')
     await expect(app.getByRole('heading', { name: 'Input', exact: true })).toBeVisible({ timeout: 10_000 })
     // Confirm Script B reopened (its predecessor section is Script A, not the trigger).
     await expect(app.getByRole('button', { name: 'Script A', exact: true })).toBeVisible({ timeout: 10_000 })
@@ -1205,7 +1205,7 @@ test.describe('Step editor panels', () => {
     await addScriptStep(app, 'Script A', 'print("hello")')
     await addScriptStep(app, 'Script B', 'print("world")')
 
-    await clickNode(app, 'Script B')
+    await clickStep(app, 'Script B')
     await expect(app.getByRole('heading', { name: 'Input', exact: true })).toBeVisible({ timeout: 10_000 })
     await expect(app.getByText('Expected output fields')).toBeVisible({ timeout: 10_000 })
 
@@ -1235,8 +1235,8 @@ test.describe('Step editor panels', () => {
     await addScriptStep(app, 'Script A', 'print("hello")')
     await addAgenticStep(app, 'Agent B', 'initial-prompt')
 
-    // clickNode reopens the editor after addAgenticStep closes it
-    await clickNode(app, 'Agent B')
+    // clickStep reopens the editor after addAgenticStep closes it
+    await clickStep(app, 'Agent B')
     await expect(app.getByRole('heading', { name: 'Input', exact: true })).toBeVisible({ timeout: 10_000 })
     await expect(app.getByText('Expected output fields')).toBeVisible({ timeout: 10_000 })
 

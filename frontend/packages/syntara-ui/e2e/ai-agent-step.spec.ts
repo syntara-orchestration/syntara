@@ -372,7 +372,7 @@ test.describe('AI Agent Step @pr-check', () => {
       })
       expect(mcpIntegration, 'Failed to create MCP integration via API').toBeTruthy()
 
-      // Open workflow builder and add an Agent node
+      // Open workflow builder and add an Agent step
       await startWorkflowWithTrigger(app)
       await openTaskAgentStepCreateForm(app)
 

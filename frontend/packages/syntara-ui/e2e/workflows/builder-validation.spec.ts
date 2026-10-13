@@ -1,14 +1,14 @@
 /**
  * E2E Tests: Workflow Builder Validation (UI-31)
  *
- * Covers: verification error banner when a workflow contains a disconnected node.
+ * Covers: verification error banner when a workflow contains a disconnected step.
  */
 import { test, expect } from '../fixtures'
 import { buildUniqueName, createWorkflowWithTrigger, addScriptStepUnconnected } from '../helpers/workflows'
 import { apiRequest } from '../utils/api'
 
 test.describe('UI-31: Workflow Verification — Pre-Execution Validation', () => {
-  test('verification error shown for a disconnected node', async ({ app }) => {
+  test('verification error shown for a disconnected step', async ({ app }) => {
     const workflowName = buildUniqueName('e2e-validation')
 
     // Create a workflow with just a trigger (saves successfully, gives us a workflow ID)
@@ -16,7 +16,7 @@ test.describe('UI-31: Workflow Verification — Pre-Execution Validation', () =>
     const workflowId = app.url().match(/workflow-builder\/([a-f0-9-]{36})/)?.[1]
 
     try {
-      // Add a script node that is NOT connected to anything (dangling/orphaned)
+      // Add a script step that is NOT connected to anything (dangling/orphaned)
       await addScriptStepUnconnected(app, 'Orphaned Step', 'echo "orphan"')
 
       // Trigger verification via the kebab menu (Save does not run validation — verification is a separate action)

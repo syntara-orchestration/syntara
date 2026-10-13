@@ -22,7 +22,7 @@ test('user creates and saves a multi-step workflow', async ({ app }) => {
     await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Manual trigger')
     await app.getByRole('button', { name: 'Create' }).click()
 
-    // Act - Add connected action node
+    // Act - Add connected action step
     const firstPanel = await clickAddConnectedStep(app)
     await firstPanel.getByRole('button', { name: 'Action', exact: true }).click()
     await firstPanel.getByRole('button', { name: 'Script', exact: true }).click()
@@ -31,7 +31,7 @@ test('user creates and saves a multi-step workflow', async ({ app }) => {
     await app.getByRole('button', { name: 'Create' }).click()
     await closeStepEditorPanel(app)
 
-    // Act - Add another connected action node
+    // Act - Add another connected action step
     const secondPanel = await clickAddConnectedStep(app)
     await secondPanel.getByRole('button', { name: 'Action', exact: true }).click()
     await secondPanel.getByRole('button', { name: 'Script', exact: true }).click()

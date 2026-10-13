@@ -1,5 +1,5 @@
 /**
- * Advanced loop and wait node helpers for v2 workflow E2E tests.
+ * Advanced loop and wait step helpers for v2 workflow E2E tests.
  * Extracted from v2-steps.ts to keep file sizes within lint limits.
  */
 
@@ -10,12 +10,12 @@ import { openAddStepPanel, selectCategoryAndStepType } from './v2-steps'
 import { addStepPanel, closeStepEditorPanel, fillCodeEditor, openStepForEditing } from './workflows'
 
 /**
- * Configure Loop node fields in an open form.
+ * Configure Loop step fields in an open form.
  * Supports both While and For Each loop types with all optional fields.
  *
  * @param page - Playwright page object
  * @param config - Loop configuration fields
- * @param config.name - Loop node name
+ * @param config.name - Loop step name
  * @param config.type - Loop type (while or forEach) - switches between loop modes
  * @param config.condition - While loop condition expression (only applied when type='while' is also set)
  * @param config.items - For Each items expression
@@ -112,7 +112,7 @@ export async function configureLoopStep(
 }
 
 /**
- * Save and close a node editor form.
+ * Save and close a step editor form.
  * Automatically detects "Create" (new nodes) or "Update" (editing) button.
  */
 export async function saveAndCloseStepForm(page: Page) {
@@ -130,7 +130,7 @@ export async function saveAndCloseStepForm(page: Page) {
 }
 
 /**
- * Add a Loop (While) node with full configuration.
+ * Add a Loop (While) step with full configuration.
  */
 export async function addWhileLoopStep(
   page: Page,
@@ -152,7 +152,7 @@ export async function addWhileLoopStep(
 }
 
 /**
- * Add a Loop (For Each) node with full configuration.
+ * Add a Loop (For Each) step with full configuration.
  */
 export async function addForEachLoopStep(
   page: Page,
@@ -176,12 +176,12 @@ export async function addForEachLoopStep(
 }
 
 /**
- * Add a script node as a child of an existing loop.
+ * Add a script step as a child of an existing loop.
  * Uses the editor "Add step… → In loop" path because the canvas loop-body stub
  * (`add-node-button-loop`) is often missing next to unused loop `done` stubs.
  */
-export async function addChildScriptToLoopStep(page: Page, scriptName: string, code: string, loopNodeName: string) {
-  await openStepForEditing(page, loopNodeName)
+export async function addChildScriptToLoopStep(page: Page, scriptName: string, code: string, loopStepName: string) {
+  await openStepForEditing(page, loopStepName)
   await page.getByRole('button', { name: 'Add step…' }).click()
   await page.getByRole('menuitem', { name: 'In loop' }).click()
   await expect(addStepPanel(page)).toHaveCount(1)
@@ -197,7 +197,7 @@ export async function addChildScriptToLoopStep(page: Page, scriptName: string, c
 }
 
 /**
- * Add a wait node (v2 type: "wait") with duration configuration.
+ * Add a wait step (v2 type: "wait") with duration configuration.
  * Uses exact label strings ('Days', 'Hours', 'Minutes', 'Seconds') per UI-17.
  */
 export async function addWaitStep(

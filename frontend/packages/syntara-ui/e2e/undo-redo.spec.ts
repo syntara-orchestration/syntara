@@ -2,8 +2,8 @@
  * E2E Tests: Undo/Redo in the Workflow Builder
  *
  * Critical paths covered:
- * - Undo/redo add-node via toolbar buttons
- * - Undo/redo add-node via keyboard shortcuts (Ctrl/Cmd+Z, Ctrl/Cmd+Shift+Z)
+ * - Undo/redo add-step via toolbar buttons
+ * - Undo/redo add-step via keyboard shortcuts (Ctrl/Cmd+Z, Ctrl/Cmd+Shift+Z)
  * - Undo/redo buttons disabled on fresh workflow load
  * - History resets when navigating away from the builder
  * - Undo/redo becomes disabled when entering execution view
@@ -32,18 +32,18 @@ test('undo/redo add step via toolbar buttons', async ({ app }) => {
   const workflowName = buildUniqueName('e2e-undo-toolbar')
   const { id } = await createBasicWorkflowViaApi(app, workflowName, 'Initial action')
 
-  const nodeName = 'Toolbar undo node'
+  const stepName = 'Toolbar undo step'
 
   try {
     await openWorkflowInBuilder(app, workflowName, id)
-    await addScriptStep(app, nodeName)
-    await expect(app.getByText(nodeName)).toBeVisible()
+    await addScriptStep(app, stepName)
+    await expect(app.getByText(stepName)).toBeVisible()
 
     await undoButton(app).click()
-    await expect(app.getByText(nodeName)).not.toBeVisible()
+    await expect(app.getByText(stepName)).not.toBeVisible()
 
     await redoButton(app).click()
-    await expect(app.getByText(nodeName)).toBeVisible()
+    await expect(app.getByText(stepName)).toBeVisible()
   } finally {
     await deleteWorkflow(app, workflowName)
   }
@@ -53,18 +53,18 @@ test('undo/redo add step via keyboard shortcuts', async ({ app }) => {
   const workflowName = buildUniqueName('e2e-undo-keyboard')
   const { id } = await createBasicWorkflowViaApi(app, workflowName, 'Initial action')
 
-  const nodeName = 'Keyboard undo node'
+  const stepName = 'Keyboard undo step'
 
   try {
     await openWorkflowInBuilder(app, workflowName, id)
-    await addScriptStep(app, nodeName)
-    await expect(app.getByText(nodeName)).toBeVisible()
+    await addScriptStep(app, stepName)
+    await expect(app.getByText(stepName)).toBeVisible()
 
     await app.keyboard.press('ControlOrMeta+z')
-    await expect(app.getByText(nodeName)).not.toBeVisible()
+    await expect(app.getByText(stepName)).not.toBeVisible()
 
     await app.keyboard.press('ControlOrMeta+Shift+z')
-    await expect(app.getByText(nodeName)).toBeVisible()
+    await expect(app.getByText(stepName)).toBeVisible()
   } finally {
     await deleteWorkflow(app, workflowName)
   }
@@ -88,11 +88,11 @@ test('undo history resets when navigating away from the builder', async ({ app }
   const workflowName = buildUniqueName('e2e-undo-nav-reset')
   const { id } = await createBasicWorkflowViaApi(app, workflowName, 'Initial action')
 
-  const nodeName = 'Nav reset node'
+  const stepName = 'Nav reset step'
 
   try {
     await openWorkflowInBuilder(app, workflowName, id)
-    await addScriptStep(app, nodeName)
+    await addScriptStep(app, stepName)
     await expect(undoButton(app)).toBeEnabled()
 
     await app.goto(toAppUrl('/workflows'))

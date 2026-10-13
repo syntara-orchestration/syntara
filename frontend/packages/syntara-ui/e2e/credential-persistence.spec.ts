@@ -4,13 +4,13 @@
  * Regression tests for credential selection persisting in workflow nodes
  * after save/reload. PR #561 accidentally reverted snake_case field naming
  * in workflowFactories.ts, causing credential_id to be written as
- * credentialId (camelCase) while node details components read credential_id
+ * credentialId (camelCase) while step details components read credential_id
  * (snake_case). The credential selection was silently lost.
  *
  * Critical paths covered:
- * - Task Agent node: credential persists after save/reload
- * - REST API node: credential persists after save/reload
- * - AAP node: credential persists after save/reload
+ * - Task Agent step: credential persists after save/reload
+ * - REST API step: credential persists after save/reload
+ * - AAP step: credential persists after save/reload
  */
 
 import { type Page } from './fixtures'
@@ -50,9 +50,9 @@ async function expectAuthenticationCredential(app: Page, credName: string) {
   await expect(credToggle).toContainText(credName, { timeout: 30_000 })
 }
 
-async function openApiNodeAfterReload(app: Page, nodeName: string) {
+async function openApiStepAfterReload(app: Page, stepName: string) {
   const credentialsLoaded = app.waitForResponse(isCredentialsResponse)
-  await openStepForEditing(app, nodeName)
+  await openStepForEditing(app, stepName)
   await credentialsLoaded
 }
 
@@ -131,7 +131,7 @@ test.describe('Credential Persistence', () => {
       await saveWorkflow(app, workflowName)
 
       await openWorkflowInBuilder(app, workflowName)
-      await openApiNodeAfterReload(app, 'Test REST API')
+      await openApiStepAfterReload(app, 'Test REST API')
       await expectAuthenticationCredential(app, credName)
     } finally {
       await deleteWorkflow(app, workflowName)
@@ -184,7 +184,7 @@ test.describe('Credential Persistence', () => {
       await saveWorkflow(app, workflowName)
 
       await openWorkflowInBuilder(app, workflowName)
-      await openApiNodeAfterReload(app, 'Test AAP Job')
+      await openApiStepAfterReload(app, 'Test AAP Job')
       await expectAuthenticationCredential(app, credName)
     } finally {
       await deleteWorkflow(app, workflowName)

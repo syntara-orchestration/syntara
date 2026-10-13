@@ -1,5 +1,5 @@
 /**
- * Converge node helpers for v2 workflow E2E tests.
+ * Converge step helpers for v2 workflow E2E tests.
  * Extracted from v2-steps.ts to keep file sizes within lint limits.
  */
 
@@ -11,27 +11,27 @@ import { buildUniqueName, closeStepEditorPanel, triggerLayout } from './workflow
 const convergeStrategySelect = (page: Page) => page.getByRole('button', { name: 'Continue when criteria', exact: true })
 
 /**
- * Open a saved converge node for editing on the canvas.
+ * Open a saved converge step for editing on the canvas.
  *
  * Retries layout + click while the editor hydrates. Under CI load the click can
  * land during a React Flow viewport transform and be lost, so callers must not
- * use a bare `getByText(nodeName).click()`.
+ * use a bare `getByText(stepName).click()`.
  */
-export async function openConvergeStepForEditing(page: Page, nodeName: string) {
+export async function openConvergeStepForEditing(page: Page, stepName: string) {
   await triggerLayout(page)
-  const node = page.locator('[role="group"][aria-roledescription="node"]').filter({ hasText: nodeName })
+  const node = page.locator('[role="group"][aria-roledescription="node"]').filter({ hasText: stepName })
   const nameInput = page.getByRole('textbox', { name: 'Name', exact: true })
   await expect(async () => {
     await expect(node).toBeVisible({ timeout: 5_000 })
     await node.click({ timeout: 5_000 })
-    await expect(nameInput).toHaveValue(nodeName, { timeout: 5_000 })
+    await expect(nameInput).toHaveValue(stepName, { timeout: 5_000 })
     await expect(convergeStrategySelect(page)).toBeVisible({ timeout: 5_000 })
   }).toPass({ timeout: 30_000, intervals: [500, 1_000, 2_000] })
 }
 
-/** Open a saved converge node and wait for the Parameters tab (timeout fields). */
-export async function openConvergeStepParameters(page: Page, nodeName: string) {
-  await openConvergeStepForEditing(page, nodeName)
+/** Open a saved converge step and wait for the Parameters tab (timeout fields). */
+export async function openConvergeStepParameters(page: Page, stepName: string) {
+  await openConvergeStepForEditing(page, stepName)
   await expect(page.getByRole('tab', { name: 'Parameters' })).toBeVisible()
 }
 
@@ -47,7 +47,7 @@ export async function openConvergeStepFormOnNewWorkflow(page: Page) {
   await selectCategoryAndStepType(page, 'Logic', 'Converge')
 }
 
-/** Add a converge node (v2 type: "converge"). */
+/** Add a converge step (v2 type: "converge"). */
 export async function addConvergeStep(page: Page, name: string, sourceHandle?: string) {
   await openAddStepPanel(page, sourceHandle)
   await selectCategoryAndStepType(page, 'Logic', 'Converge')
@@ -57,7 +57,7 @@ export async function addConvergeStep(page: Page, name: string, sourceHandle?: s
 }
 
 /**
- * Add a converge node with 'all' strategy (wait for all branches).
+ * Add a converge step with 'all' strategy (wait for all branches).
  * V2 type: "converge", strategy: "all"
  */
 export async function addConvergeStepWithAllStrategy(page: Page, name: string) {
@@ -70,7 +70,7 @@ export async function addConvergeStepWithAllStrategy(page: Page, name: string) {
 }
 
 /**
- * Add a converge node with 'any' strategy (wait for N of M branches).
+ * Add a converge step with 'any' strategy (wait for N of M branches).
  * V2 type: "converge", strategy: "any", requiredPathCount: number
  */
 export async function addConvergeStepWithAnyStrategy(page: Page, name: string, requiredPathCount: number) {
@@ -94,7 +94,7 @@ export async function addConvergeStepWithAnyStrategy(page: Page, name: string, r
 }
 
 /**
- * Add a converge node with wait_duration configuration.
+ * Add a converge step with wait_duration configuration.
  * V2 type: "converge", wait_duration stored in config (Parameters tab).
  * The `action` param is accepted for API compatibility but ignored — on_timeout
  * no longer exists; use the Settings tab continue_on_failure instead.
@@ -146,7 +146,7 @@ export async function addConvergeStepWithTimeout(
 }
 
 /**
- * Create a workflow with trigger and condition node (2 branches), ready for converge node testing.
+ * Create a workflow with a trigger and condition step (2 branches), ready for converge step testing.
  * Returns the unique workflow name.
  */
 export async function createWorkflowWithBranchesForConverge(page: Page): Promise<string> {
@@ -158,14 +158,14 @@ export async function createWorkflowWithBranchesForConverge(page: Page): Promise
   // Add manual trigger
   await addManualTrigger(page, 'Manual trigger')
 
-  // Add condition node with branch (creates 2 branches: true and false)
+  // Add a condition step with branch (creates 2 branches: true and false)
   await addConditionStepWithBranch(page, 'Condition', 'true')
 
   return workflowName
 }
 
 /**
- * Verify converge node configuration in saved V2 workflow payload.
+ * Verify converge step configuration in saved V2 workflow payload.
  * Uses snake_case field names as they appear in the API payload.
  */
 export function expectConvergeStepConfig(

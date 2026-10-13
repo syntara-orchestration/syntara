@@ -350,10 +350,10 @@ test.describe('V2 Workflow Schema Migration', () => {
       // Navigate to the workflow in the builder
       await app.goto(toAppUrl('/workflow-builder/' + workflowId))
 
-      // Every node should be present on the canvas after loading.
+      // Every step should be present on the canvas after loading.
       // Use accessible group names (not getByText) since React Flow may
       // not render text labels at small zoom levels with many nodes.
-      const nodeNames = [
+      const stepNames = [
         'Start workflow',
         'Validate input',
         'Fetch API data',
@@ -364,10 +364,10 @@ test.describe('V2 Workflow Schema Migration', () => {
         'Process items',
         'Merge results',
       ]
-      for (const nodeName of nodeNames) {
+      for (const stepName of stepNames) {
         await expect(
-          app.locator('.react-flow').getByRole('button', { name: new RegExp(`^${nodeName}(,|$)`) }),
-          `node "${nodeName}" should be present after reload`
+          app.locator('.react-flow').getByRole('button', { name: new RegExp(`^${stepName}(,|$)`) }),
+          `step "${stepName}" should be present after reload`
         ).toBeAttached({ timeout: 15_000 })
       }
     } finally {
@@ -462,9 +462,9 @@ test.describe('V2 Workflow Schema Migration', () => {
 
       // Both original and added nodes should be in the definition
       expect(editedDef.nodes.length).toBeGreaterThanOrEqual(2)
-      const nodeNames = editedDef.nodes.map((n) => n.name)
-      expect(nodeNames).toContain('Original script')
-      expect(nodeNames).toContain('Added script')
+      const stepNames = editedDef.nodes.map((n) => n.name)
+      expect(stepNames).toContain('Original script')
+      expect(stepNames).toContain('Added script')
 
       // Edges should connect trigger → original → added
       expect(editedDef.edges.length).toBeGreaterThanOrEqual(2)

@@ -1,5 +1,5 @@
 /**
- * Helper functions for adding each v2 workflow node type via the builder UI.
+ * Helper functions for adding each v2 workflow step type via the builder UI.
  *
  * V2 node types:
  *   Trigger:      manual, webhook, eda, scheduled
@@ -66,7 +66,7 @@ export async function selectCategoryAndStepType(page: Page, category: string, su
 }
 
 /** Select a direct (non-category) button in the add-step panel. */
-async function selectDirectNodeType(page: Page, label: string | RegExp) {
+async function selectDirectStepType(page: Page, label: string | RegExp) {
   const panel = addStepPanel(page)
   const btn = panel.getByRole('button', { name: label })
   await expect(btn).toBeVisible({ timeout: 5_000 })
@@ -148,7 +148,7 @@ export async function addEdaTrigger(page: Page, name: string, webhookPath: strin
 // Executor nodes
 // ---------------------------------------------------------------------------
 
-/** Add a script node (v2 type: "script"). */
+/** Add a script step (v2 type: "script"). */
 export async function addScriptStep(page: Page, name: string, code = 'print("hello")') {
   await openAddStepPanel(page)
   await selectCategoryAndStepType(page, 'Action', 'Script')
@@ -161,7 +161,7 @@ export async function addScriptStep(page: Page, name: string, code = 'print("hel
   await closeStepEditorPanel(page)
 }
 
-/** Add an HTTP request node (v2 type: "http_request"). */
+/** Add an HTTP request step (v2 type: "http_request"). */
 export async function addHttpRequestStep(page: Page, name: string, url = 'https://api.example.com/data') {
   await openAddStepPanel(page)
   await selectCategoryAndStepType(page, 'Action', 'REST API')
@@ -172,7 +172,7 @@ export async function addHttpRequestStep(page: Page, name: string, url = 'https:
 }
 
 /**
- * Add a Task Agent node (v2 type: "agentic").
+ * Add a Task Agent step (v2 type: "agentic").
  * Caller must call `createLlmIntegration()` before using this helper
  * so the model dropdown has selectable options.
  *
@@ -183,7 +183,7 @@ export async function addHttpRequestStep(page: Page, name: string, url = 'https:
 export async function addAgenticStep(page: Page, name: string, prompt = 'Analyze the data', integrationName?: string) {
   const { name: credName } = await ensureLlmCredential(page)
   await openAddStepPanel(page)
-  await selectDirectNodeType(page, 'Task Agent')
+  await selectDirectStepType(page, 'Task Agent')
   await expectAiAgentStepFormReady(page)
   await page.getByRole('textbox', { name: 'Name', exact: true }).fill(name)
   await selectLlmCredential(page, credName, integrationName)
@@ -193,7 +193,7 @@ export async function addAgenticStep(page: Page, name: string, prompt = 'Analyze
 }
 
 /**
- * Add an AAP job template node (v2 type: "aap_job_template").
+ * Add an AAP job template step (v2 type: "aap_job_template").
  *
  * Creates an AAP integration+credential via the API, then fills the
  * Integration/Organization/Job template dropdowns in the step form.
@@ -225,7 +225,7 @@ export async function addAapStep(page: Page, name: string) {
   )
 
   await openAddStepPanel(page)
-  await selectDirectNodeType(page, /AAP/i)
+  await selectDirectStepType(page, /AAP/i)
   const jobTemplateBtn = addStepPanel(page).getByRole('button', { name: 'Launch AAP job template' })
   await expect(jobTemplateBtn).toBeVisible({ timeout: 5_000 })
   await jobTemplateBtn.click()
@@ -272,10 +272,10 @@ export async function addAapStep(page: Page, name: string) {
   await page.unroute(jtRoute)
 }
 
-/** Add an approval node (v2 type: "approval") without completing branches. */
+/** Add an approval step (v2 type: "approval") without completing branches. */
 export async function addApprovalStep(page: Page, name: string) {
   await openAddStepPanel(page)
-  await selectDirectNodeType(page, 'Approval')
+  await selectDirectStepType(page, 'Approval')
   const nameInput = page.getByRole('textbox', { name: 'Name', exact: true })
   await expect(nameInput).toBeVisible({ timeout: 10_000 })
   await nameInput.fill(name)
@@ -284,7 +284,7 @@ export async function addApprovalStep(page: Page, name: string) {
 }
 
 /**
- * Add an approval node with a script node on the "approved" branch.
+ * Add an approval step with a script step on the "approved" branch.
  * This creates a valid workflow that can be saved.
  * The "rejected" branch is optional per validation rules.
  *
@@ -302,9 +302,9 @@ export async function addApprovalStepWithBranch(page: Page, name: string) {
 // ---------------------------------------------------------------------------
 
 /**
- * Add a conditional node (v2 type: "condition") using the visual expression builder.
+ * Add a conditional step (v2 type: "condition") using the visual expression builder.
  * @param page - Playwright page object
- * @param name - Node name
+ * @param name - Step name
  * @param config - Condition configuration
  * @param config.field - Field name to compare (e.g., "status")
  * @param config.operator - Comparison operator (default: "is equal to")
@@ -353,7 +353,7 @@ export async function addConditionalStep(
   await closeStepEditorPanel(page)
 }
 
-/** Add a condition node (v2 type: "condition") without completing branches. */
+/** Add a condition step (v2 type: "condition") without completing branches. */
 export async function addConditionStep(page: Page, name: string, expression = 'true') {
   await openAddStepPanel(page)
   await selectCategoryAndStepType(page, 'Logic', 'Conditional')
@@ -380,19 +380,19 @@ export async function addConditionStep(page: Page, name: string, expression = 't
 }
 
 /**
- * Add a condition node with a script node on the "true" branch.
+ * Add a condition step with a script step on the "true" branch.
  * This creates a valid workflow that can be saved.
  * The "false" branch is optional per validation rules.
  */
 export async function addConditionStepWithBranch(page: Page, name: string, expression = 'true') {
   await addConditionStep(page, name, expression)
 
-  // Add a node on the "true" branch to satisfy validation
+  // Add a step on the "true" branch to satisfy validation
   // The "false" branch is optional
   await addScriptStepOnHandle(page, 'true', `${name} - true action`, 'print("condition is true")')
 }
 
-/** Add a Script node from a specific edge stub (e.g. unused condition `false`). */
+/** Add a Script step from a specific edge stub (e.g. unused condition `false`). */
 export async function addScriptStepOnHandle(page: Page, handle: string, name: string, code: string) {
   await openAddStepPanel(page, handle)
   await selectCategoryAndStepType(page, 'Action', 'Script')
@@ -405,7 +405,7 @@ export async function addScriptStepOnHandle(page: Page, handle: string, name: st
   await closeStepEditorPanel(page)
 }
 
-/** Add a loop node (v2 type: "loop") without completing the loop body. Defaults to "For each" loop. */
+/** Add a loop step (v2 type: "loop") without completing the loop body. Defaults to "For each" loop. */
 /** Helper to select a loop type option with fallback handling */
 async function selectLoopTypeOption(page: Page) {
   const allOptions = page.getByRole('option')
@@ -476,7 +476,7 @@ export async function addLoopStep(page: Page, name: string, items = '${trigger.i
 }
 
 /**
- * Add a loop node with a script node in the loop body.
+ * Add a loop step with a script step in the loop body.
  * This creates a valid workflow that can be saved.
  */
 export async function addLoopStepWithBody(page: Page, name: string, items = '${trigger.items}') {
@@ -497,7 +497,7 @@ export async function addLoopStepWithBody(page: Page, name: string, items = '${t
 }
 
 // ---------------------------------------------------------------------------
-// Switch node
+// Switch step
 // ---------------------------------------------------------------------------
 
 type SwitchCase = {
@@ -506,7 +506,7 @@ type SwitchCase = {
 }
 
 /**
- * Add a switch node with the given cases.
+ * Add a switch step with the given cases.
  *
  * The form opens with 2 default cases. This helper:
  * - Fills conditions from index 0 up to cases.length (adding extra paths as needed)
@@ -579,7 +579,7 @@ export async function addSwitchStepWithCases(page: Page, name: string, cases: Sw
 }
 
 /**
- * Open a saved canvas node for editing and wait until a type-specific editor field is ready.
+ * Open a saved canvas step for editing and wait until a type-specific editor field is ready.
  *
  * Retries layout + click while the editor hydrates. Under CI load the click can
  * land during a React Flow viewport transform and be lost, so callers must not
@@ -597,7 +597,7 @@ async function openSavedStepForEditing(page: Page, stepName: string, editorReady
   }).toPass({ timeout: 30_000, intervals: [500, 1_000, 2_000] })
 }
 
-/** Open a saved switch node on the canvas for editing. */
+/** Open a saved switch step on the canvas for editing. */
 export async function openSwitchStepForEditing(page: Page, stepName: string) {
   await openSavedStepForEditing(page, stepName, async (p) => {
     await expect(p.getByLabel('Path 1 name')).toBeVisible({ timeout: 5_000 })

@@ -2,7 +2,7 @@
  * E2E Tests: Switch Node — UI-15 (AAP-70970)
  *
  * Critical paths covered:
- * - Switch node is discoverable under the Logic catalog category
+ * - Switch step is discoverable under the Logic catalog category
  * - N-way case configuration: multiple conditions, custom path labels
  * - "Add path" button appends a new case; "Remove path" deletes it
  * - "Fallback path" section is always visible (unmatched route)
@@ -11,7 +11,7 @@
  * - Round-trip persistence: saved values reload correctly into the form
  *
  * Edge cases:
- * - Cancelling without saving does not persist the node to the canvas
+ * - Cancelling without saving does not persist the step to the canvas
  * - Attempting to save without filling a condition shows a validation error
  * - The form enforces a minimum of 1 path (Remove button hidden at minimum)
  */
@@ -474,7 +474,7 @@ test.describe('Switch Step — UI-15', () => {
         await app.getByRole('button', { name: 'Save workflow' }).click()
         await expect(app).toHaveURL(/workflow-builder\/(?!new\b).+/)
 
-        // Click the node to open the editor
+        // Click the step to open the editor
         await app.locator('[role="group"][aria-roledescription="node"]').filter({ hasText: 'Panel Switch' }).click()
 
         // Three-panel layout must be visible
