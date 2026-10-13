@@ -8,8 +8,9 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any, ClassVar
 from uuid import UUID
 
-from sqlalchemy import Column, String, UniqueConstraint, text
+from sqlalchemy import Column, String, UniqueConstraint, func, text
 from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.orm import column_property
 from sqlmodel import DateTime, Field, Relationship
 
 from syntara.approvals.models.api_models import (
@@ -168,6 +169,7 @@ class ApprovalRequest(BaseApprovalRequest, table=True):
     __sortable_fields__: ClassVar[list[str]] = [
         *BaseResource.__sortable_fields__,
         "name",
+        "workflow_name",
         "timeout_at",
         "decided_at",
         "status",
@@ -208,6 +210,14 @@ class ApprovalRequest(BaseApprovalRequest, table=True):
         link_model=ApprovalApproverGroup,
         sa_relationship_kwargs={"viewonly": True},
     )
+
+
+ApprovalRequest.workflow_name = column_property(
+    func.coalesce(
+        ApprovalRequest.__table__.c.workflow_context["workflow_name"].astext,  # type: ignore[attr-defined]
+        "",
+    )
+)
 
 
 class ApprovalRequestRead(UserReferenceFieldsMixin, BaseApprovalRequest, table=False):

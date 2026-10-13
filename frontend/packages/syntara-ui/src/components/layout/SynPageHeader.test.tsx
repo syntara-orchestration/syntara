@@ -99,6 +99,35 @@ describe('SynPageHeader', () => {
     expect(screen.queryByRole('link', { name: /View documentation/i })).not.toBeInTheDocument()
   })
 
+  it('keeps toolbar actions visible when the title is long', () => {
+    const longTitle = 'Production MCP integration with an intentionally long name that should wrap in the header'
+
+    render(
+      <SynPageHeader
+        title={longTitle}
+        docLink="https://docs.example.com/integrations"
+        breadcrumbs={[
+          { label: 'Configuration', href: '/configuration' },
+          { label: 'Integrations', href: '/configuration/integrations' },
+          { label: longTitle },
+        ]}
+        toolbar={
+          <>
+            <button type="button">Enabled</button>
+            <button type="button">Edit integration</button>
+            <button type="button" aria-label="Integration actions">
+              More
+            </button>
+          </>
+        }
+      />
+    )
+
+    expect(screen.getByRole('heading', { level: 1, name: longTitle })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Edit integration' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Integration actions' })).toBeVisible()
+  })
+
   it('has no accessibility violations with breadcrumbs', async () => {
     const { container } = render(
       <SynPageHeader

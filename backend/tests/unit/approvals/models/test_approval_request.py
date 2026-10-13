@@ -131,6 +131,7 @@ class TestApprovalRequestValidation:
             "created_at",
             "updated_at",
             "name",
+            "workflow_name",
             "timeout_at",
             "decided_at",
             "status",

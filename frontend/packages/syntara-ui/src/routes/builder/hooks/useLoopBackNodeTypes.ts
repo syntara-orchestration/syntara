@@ -17,8 +17,7 @@ export function applyLoopBackNodeTypes(nodes: NodeType[], loopBackNodeIds: Set<s
 
     if (node.type === FlowNodeType.GENERIC) {
       const currentReverseHandles = (node.data as ActivityWithMetadata).metadata?.__reverseHandles as
-        | boolean
-        | undefined
+        boolean | undefined
 
       if (shouldBeReversed && !currentReverseHandles) {
         hasChanges = true

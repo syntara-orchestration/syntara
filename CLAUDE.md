@@ -40,7 +40,9 @@ Upstream AI agent policy (no executable hooks; private local settings; who may
 change `.claude/`) is documented in
 [`.github/AI_AGENT_POLICY.md`](.github/AI_AGENT_POLICY.md).
 
-Skills live in `.claude/skills/` at the repo root, prefixed by workspace:
+Canonical skill files live in `.agents/skills/` at the repo root, prefixed by
+workspace. `.claude/skills/` contains tracked relative symlinks to those
+directories for Claude Code:
 
 - **`frontend-*`** — Frontend-specific skills (coding standards, PR review, PatternFly UX, testing, Playwright E2E, library references, a11y audit)
 - **`backend-*`** — Backend-specific skills (API spec drift detection)
@@ -164,4 +166,4 @@ except UnexpectedResponseException as exc:
 
 **Backend**: Python 3.12+, FastAPI, SQLModel, PostgreSQL 15, Temporal, Redis, regopy, uv, Alembic, pytest, mypy, ruff
 
-**Frontend**: React 19, TypeScript 5.9, Vite, PatternFly 6, TanStack Query, Zustand, ReactFlow, Vitest, Playwright, npm workspaces
+**Frontend**: React 19, Vite, PatternFly 6, TanStack Query, Zustand, ReactFlow, Vitest, Playwright, npm workspaces

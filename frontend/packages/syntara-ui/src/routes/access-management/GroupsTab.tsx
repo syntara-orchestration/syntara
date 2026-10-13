@@ -164,12 +164,18 @@ export function GroupsTab() {
             <SynListPanelTable caption="Groups table" footer={getFooterProps(data)}>
               <Thead>
                 <Tr>
-                  <Th sort={getSortParams(0)}>Name</Th>
-                  <Th>Description</Th>
-                  <Th>Members</Th>
-                  <Th sort={getSortParams(3)}>Created</Th>
-                  <Th sort={getSortParams(4)}>Updated</Th>
-                  <Th screenReaderText="Actions" />
+                  <Th width={20} sort={getSortParams(0)}>
+                    Name
+                  </Th>
+                  <Th width={25}>Description</Th>
+                  <Th width={10}>Members</Th>
+                  <Th width={15} sort={getSortParams(3)}>
+                    Created
+                  </Th>
+                  <Th width={15} sort={getSortParams(4)}>
+                    Updated
+                  </Th>
+                  <Th width={10} screenReaderText="Actions" />
                 </Tr>
               </Thead>
               <Tbody>

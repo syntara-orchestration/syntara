@@ -529,8 +529,7 @@ export const handlers = [
     const integrationId = uuidv4()
 
     const discoveredTools = body.discovered_tools as
-      | Array<{ name: string; description?: string; enabled?: boolean }>
-      | undefined
+      Array<{ name: string; description?: string; enabled?: boolean }> | undefined
     let enabledToolCount = 0
     if (discoveredTools && discoveredTools.length > 0) {
       for (const dt of discoveredTools) {
@@ -1985,6 +1984,12 @@ export const handlers = [
         } else if (field === 'status') {
           aVal = a.status || ''
           bVal = b.status || ''
+        } else if (field === 'workflow_name') {
+          aVal = a.workflow_context?.workflow_name || ''
+          bVal = b.workflow_context?.workflow_name || ''
+        } else if (field === 'decided_at') {
+          aVal = (a as { decided_at?: string }).decided_at || ''
+          bVal = (b as { decided_at?: string }).decided_at || ''
         }
         const cmp =
           typeof aVal === 'string' && typeof bVal === 'string'

@@ -62,7 +62,7 @@ import { createAddStepHandler } from './utils/panelActions'
 import { buildWorkflowDefinition, transformNodeParameters } from './utils/workflowDefinitionBuilder'
 import { ValidationBanner } from './ValidationBanner'
 import { VersionInfoCard } from './VersionInfoCard'
-import { VersionViewProvider } from './VersionViewContext'
+import { VersionViewProvider } from './VersionViewProvider'
 
 type WorkflowVersion = WorkflowAPI.components['schemas']['WorkflowVersionRead']
 /* eslint-disable max-lines */

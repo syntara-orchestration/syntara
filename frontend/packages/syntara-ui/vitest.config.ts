@@ -1,31 +1,19 @@
-import react from '@vitejs/plugin-react'
+import babel from '@rolldown/plugin-babel'
+import react, { reactCompilerPreset } from '@vitejs/plugin-react'
 import { defineConfig } from 'vitest/config'
 
 const isShardedCoverage = process.env.CI === 'true' && Boolean(process.env.VITEST_COVERAGE_DIR)
 
 // https://vitest.dev/config/
 export default defineConfig({
-  plugins: [
-    react({
-      babel: {
-        plugins: [['babel-plugin-react-compiler']],
-      },
-    }),
-  ],
+  plugins: [react(), babel({ presets: [reactCompilerPreset()] })],
   test: {
     globals: true,
     environment: 'happy-dom',
     setupFiles: './src/test/setup.ts',
     css: true,
     mockReset: true,
-    exclude: [
-      '**/node_modules/**',
-      '**/dist/**',
-      '**/e2e/**',
-      '**/playwright.config.ts',
-      '**/*.browser.test.{ts,tsx}',
-      '**/.tmp-xfail-int-*/**',
-    ],
+    exclude: ['**/node_modules/**', '**/dist/**', '**/e2e/**', '**/playwright.config.ts', '**/.tmp-xfail-int-*/**'],
     coverage: {
       provider: 'v8',
       reportsDirectory: process.env.VITEST_COVERAGE_DIR ?? 'coverage',

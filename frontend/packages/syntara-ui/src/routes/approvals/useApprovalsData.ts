@@ -8,8 +8,7 @@ import type { ApprovalWithDetails } from './Approvals'
 
 const getApprovalDetails = (approval: ApprovalWithDetails) => {
   const wfCtx = approval.workflow_context as
-    | { workflow_name?: string; workflow_id?: string; workflow_version?: number }
-    | undefined
+    { workflow_name?: string; workflow_id?: string; workflow_version?: number } | undefined
   return {
     approvalName: approval.name || approval.id,
     workflowName: wfCtx?.workflow_name || 'Unknown',

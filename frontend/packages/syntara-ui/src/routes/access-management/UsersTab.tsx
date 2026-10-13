@@ -401,13 +401,21 @@ export function UsersTab() {
             <SynListPanelTable caption="Users" footer={getFooterProps(data)}>
               <Thead>
                 <Tr>
-                  <Th sort={getSortParams(0)}>Username</Th>
-                  <Th sort={getSortParams(1)}>Name</Th>
-                  <Th sort={getSortParams(3)}>Email</Th>
-                  <Th>Authentication</Th>
-                  <Th sort={getSortParams(4)}>Last login</Th>
-                  <Th>State</Th>
-                  <Th screenReaderText="Actions" />
+                  <Th width={15} sort={getSortParams(0)}>
+                    Username
+                  </Th>
+                  <Th width={15} sort={getSortParams(1)}>
+                    Name
+                  </Th>
+                  <Th width={15} sort={getSortParams(3)}>
+                    Email
+                  </Th>
+                  <Th width={15}>Authentication</Th>
+                  <Th width={15} sort={getSortParams(4)}>
+                    Last login
+                  </Th>
+                  <Th width={15}>State</Th>
+                  <Th width={10} screenReaderText="Actions" />
                 </Tr>
               </Thead>
               <Tbody>
