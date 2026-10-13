@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react'
+import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
@@ -118,21 +118,25 @@ describe('SynTextField', () => {
     const user = userEvent.setup()
     const onSubmit = vi.fn()
     const numberSchema = z.object({ count: z.number().optional() })
+    let submitWhileFocused: (() => void) | undefined
 
-    renderWithForm({ schema: numberSchema, defaultValues: { count: 300 } }, ({ control, handleSubmit }) => (
-      <>
-        <SynTextField name="count" control={control} label="Count" type="number" />
-        <button type="button" onClick={handleSubmit(onSubmit)}>
-          Submit
-        </button>
-      </>
-    ))
+    renderWithForm({ schema: numberSchema, defaultValues: { count: 300 } }, ({ control, handleSubmit }) => {
+      submitWhileFocused = () => {
+        void handleSubmit(onSubmit)()
+      }
+      return <SynTextField name="count" control={control} label="Count" type="number" />
+    })
 
     const input = screen.getByRole('spinbutton', { name: 'Count' })
     await user.clear(input)
-    await user.click(screen.getByRole('button', { name: 'Submit' }))
+    expect(input).toHaveFocus()
 
-    expect(onSubmit).toHaveBeenCalledWith({ count: undefined }, expect.anything())
+    submitWhileFocused?.()
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalled()
+      expect(onSubmit.mock.calls[0]?.[0]).toEqual({ count: undefined })
+    })
   })
 
   it('allows typing decimal values without stripping the decimal point mid-edit', async () => {

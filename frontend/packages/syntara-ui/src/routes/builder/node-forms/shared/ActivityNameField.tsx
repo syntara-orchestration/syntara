@@ -3,6 +3,8 @@ import type { Control, FieldValues, Path } from 'react-hook-form'
 import { SynTextField } from '../../../../components/forms/SynTextField'
 import { useIsVersionView } from '../../VersionViewContext'
 
+import styles from './ActivityNameField.module.css'
+
 type ActivityNameFieldProps<T extends FieldValues & { name?: string }> = {
   fieldId: string
   placeholder?: string
@@ -27,7 +29,7 @@ export function ActivityNameField<T extends FieldValues & { name?: string }>({
   const label = ariaLabel ?? placeholder
 
   return (
-    <div style={{ width: '18rem', maxWidth: '100%' }}>
+    <div className={styles.root}>
       <SynTextField
         name={'name' as Path<T>}
         control={control}
