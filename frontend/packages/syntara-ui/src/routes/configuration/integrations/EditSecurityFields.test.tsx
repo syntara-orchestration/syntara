@@ -10,6 +10,8 @@ import { SynForm } from '../../../components/forms/SynForm'
 import type { EditIntegrationFormValues } from './editIntegrationFormSchema'
 import { EditSecurityFields } from './EditSecurityFields'
 
+const CA_CERTIFICATE_FIELD_NAME = 'CA certificate'
+
 function TestWrapper({
   defaultValues,
   formRef,
@@ -56,7 +58,7 @@ describe('EditSecurityFields', () => {
 
     expect(screen.getByRole('checkbox', { name: /allow http connections/i })).toBeInTheDocument()
     expect(screen.getByRole('checkbox', { name: /disable tls certificate verification/i })).toBeInTheDocument()
-    expect(screen.getByRole('textbox', { name: /ca certificate/i })).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: CA_CERTIFICATE_FIELD_NAME })).toBeInTheDocument()
   })
 
   it('collapses when toggled again', async () => {
@@ -105,7 +107,7 @@ describe('EditSecurityFields', () => {
     render(<TestWrapper />)
 
     await user.click(screen.getByText('Security'))
-    const textarea = screen.getByRole('textbox', { name: /ca certificate/i })
+    const textarea = screen.getByRole('textbox', { name: CA_CERTIFICATE_FIELD_NAME })
     expect(textarea).toHaveValue('')
 
     await user.type(textarea, 'cert-data')
@@ -118,7 +120,7 @@ describe('EditSecurityFields', () => {
     render(<TestWrapper defaultValues={{ ca_certificate: 'existing-cert' }} formRef={formRef} />)
 
     await user.click(screen.getByText('Security'))
-    const textarea = screen.getByRole('textbox', { name: /ca certificate/i })
+    const textarea = screen.getByRole('textbox', { name: CA_CERTIFICATE_FIELD_NAME })
     expect(textarea).toHaveValue('existing-cert')
 
     await user.clear(textarea)
@@ -132,7 +134,7 @@ describe('EditSecurityFields', () => {
 
     await user.click(screen.getByText('Security'))
 
-    const textarea = screen.getByRole('textbox', { name: /ca certificate/i })
+    const textarea = screen.getByRole('textbox', { name: CA_CERTIFICATE_FIELD_NAME })
     expect(textarea).toHaveValue('')
   })
 
@@ -142,7 +144,7 @@ describe('EditSecurityFields', () => {
 
     await user.click(screen.getByText('Security'))
 
-    const textarea = screen.getByRole('textbox', { name: /ca certificate/i })
+    const textarea = screen.getByRole('textbox', { name: CA_CERTIFICATE_FIELD_NAME })
     expect(textarea).toHaveValue('my-cert-value')
   })
 
@@ -170,10 +172,10 @@ describe('EditSecurityFields', () => {
     render(<TestWrapper />)
 
     await user.click(screen.getByText('Security'))
-    expect(screen.getByRole('textbox', { name: /ca certificate/i })).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: CA_CERTIFICATE_FIELD_NAME })).toBeInTheDocument()
 
     await user.click(screen.getByRole('checkbox', { name: /disable tls certificate verification/i }))
-    expect(screen.queryByRole('textbox', { name: /ca certificate/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('textbox', { name: CA_CERTIFICATE_FIELD_NAME })).not.toBeInTheDocument()
     expect(screen.queryByText(/PEM-encoded CA certificate/)).not.toBeInTheDocument()
   })
 
@@ -194,10 +196,10 @@ describe('EditSecurityFields', () => {
 
     await user.click(screen.getByText('Security'))
     await user.click(screen.getByRole('checkbox', { name: /disable tls certificate verification/i }))
-    expect(screen.queryByRole('textbox', { name: /ca certificate/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('textbox', { name: CA_CERTIFICATE_FIELD_NAME })).not.toBeInTheDocument()
 
     await user.click(screen.getByRole('checkbox', { name: /disable tls certificate verification/i }))
-    expect(screen.getByRole('textbox', { name: /ca certificate/i })).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: CA_CERTIFICATE_FIELD_NAME })).toBeInTheDocument()
     expect(screen.queryByText(/will not be verified/)).not.toBeInTheDocument()
   })
 
@@ -206,7 +208,7 @@ describe('EditSecurityFields', () => {
     render(<TestWrapper defaultValues={{ insecure_skip_tls_verify: true }} />)
 
     await user.click(screen.getByText('Security'))
-    expect(screen.queryByRole('textbox', { name: /ca certificate/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('textbox', { name: CA_CERTIFICATE_FIELD_NAME })).not.toBeInTheDocument()
     expect(screen.getByText(/will not be verified/)).toBeInTheDocument()
   })
 
@@ -214,13 +216,13 @@ describe('EditSecurityFields', () => {
     const formRef: { current: UseFormReturn<EditIntegrationFormValues> | undefined } = { current: undefined }
     render(<TestWrapper formRef={formRef} />)
 
-    expect(screen.queryByRole('textbox', { name: /ca certificate/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('textbox', { name: CA_CERTIFICATE_FIELD_NAME })).not.toBeInTheDocument()
 
     act(() => {
       formRef.current!.setError('ca_certificate', { type: 'server', message: 'Invalid PEM format' })
     })
 
-    await screen.findByRole('textbox', { name: /ca certificate/i })
+    await screen.findByRole('textbox', { name: CA_CERTIFICATE_FIELD_NAME })
     expect(screen.getByText('Invalid PEM format')).toBeInTheDocument()
   })
 
@@ -233,11 +235,11 @@ describe('EditSecurityFields', () => {
       formRef.current!.setError('ca_certificate', { type: 'server', message: 'Invalid PEM format' })
     })
 
-    await screen.findByRole('textbox', { name: /ca certificate/i })
+    await screen.findByRole('textbox', { name: CA_CERTIFICATE_FIELD_NAME })
 
     await user.click(screen.getByText('Security'))
 
-    expect(screen.getByRole('textbox', { name: /ca certificate/i })).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: CA_CERTIFICATE_FIELD_NAME })).toBeInTheDocument()
   })
 
   it('collapses automatically when ca_certificate error is cleared', async () => {
@@ -248,14 +250,14 @@ describe('EditSecurityFields', () => {
       formRef.current!.setError('ca_certificate', { type: 'server', message: 'Invalid PEM format' })
     })
 
-    await screen.findByRole('textbox', { name: /ca certificate/i })
+    await screen.findByRole('textbox', { name: CA_CERTIFICATE_FIELD_NAME })
 
     act(() => {
       formRef.current!.clearErrors('ca_certificate')
     })
 
     await waitFor(() => {
-      expect(screen.queryByRole('textbox', { name: /ca certificate/i })).not.toBeInTheDocument()
+      expect(screen.queryByRole('textbox', { name: CA_CERTIFICATE_FIELD_NAME })).not.toBeInTheDocument()
     })
     expect(screen.queryByText('Invalid PEM format')).not.toBeInTheDocument()
   })
