@@ -150,6 +150,8 @@ class ActivityName(StrEnum):
     COMPLETE_WAIT = "complete_wait"
     FETCH_RUNTIME_SETTINGS = "fetch_workflow_runtime_settings"
     VALIDATE_NODE_REFERENCES = "validate_node_references"
+    RETRY_SOURCE_STATE = "fetch_retry_source_state"
+    RETRY_NODE_REPLAY = "replay_retry_node"
 
 
 # Enums
