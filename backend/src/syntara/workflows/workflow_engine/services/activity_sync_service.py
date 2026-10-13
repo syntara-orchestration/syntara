@@ -437,10 +437,12 @@ class ActivitySyncService(
                 raise RuntimeError(msg)
 
             # Extract needed fields from execution
+            is_retry = execution.retried_from_execution_id is not None
             workflow_id = execution.workflow_id
             workflow_version_id = execution.workflow_version_id
             last_processed_event_id = execution.last_processed_event_id
             mode = execution.mode
+            temporal_workflow_id = execution.temporal_workflow_id
 
             # Load workflow name for audit events
             workflow_result = await session.exec(select(Workflow).where(Workflow.id == workflow_id))
@@ -480,6 +482,12 @@ class ActivitySyncService(
 
         terminal_activity_ids = await self._load_terminal_activity_ids(execution_id)
 
+        # Asked once here rather than per activity: every replayed node consults
+        # this flag, and an update write lands in Temporal's history permanently.
+        # A run that replays nothing must not pay that per node.
+        handle = self.temporal_client.get_workflow_handle(temporal_workflow_id)
+        is_retry_from_failure = await self._is_retry_from_failure(handle, execution_id)
+
         return ExecutionMonitorMetadata(
             execution_id=execution_id,
             last_processed_event_id=last_processed_event_id,
@@ -495,6 +503,8 @@ class ActivitySyncService(
             mode=mode,
             workflow_version=workflow_version,
             used_published=used_published,
+            is_retry=is_retry,
+            is_retry_from_failure=is_retry_from_failure,
         )
 
     async def _build_activity_index_map(self, execution_id: UUID) -> dict[str, int]:
