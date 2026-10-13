@@ -16,9 +16,11 @@ import {
 } from '@patternfly/react-core'
 import { RhUiErrorIcon } from '@patternfly/react-icons'
 import React, { type ReactNode, use, useEffect, useMemo, useState } from 'react'
-import { Controller, FormProvider, useForm, useFormContext, useWatch } from 'react-hook-form'
+import { Controller, useFormContext, useWatch } from 'react-hook-form'
 
+import { SynForm } from '../../../components/forms/SynForm'
 import { SynSelect } from '../../../components/SynSelect'
+import { useSynForm } from '../../../hooks/useSynForm'
 import { NodeEditorAutoSubmitContext, useRegisterAutoSubmit } from '../hooks/useNodeEditorAutoSubmit'
 import { useWorkflowEngineDefaults } from '../hooks/useWorkflowEngineDefaults'
 import { formatDuration } from '../utils/timeUtils'
@@ -28,7 +30,6 @@ import { convergeFormSchema, type ConvergeFormData, type ConvergeStrategy } from
 import { ActivityNameField } from './shared/ActivityNameField'
 import { ContinueWhenCriteriaHelp } from './shared/ContinueWhenCriteriaHelp'
 import { DurationInput } from './shared/DurationInput'
-import { zodResolver } from './shared/formSchemaUtils'
 import { nodeHelp } from './shared/nodeFieldHelp'
 import { NodeFormContainer } from './shared/NodeFormContainer'
 import { NodeFormTabsLayout } from './shared/NodeFormTabsLayout'
@@ -126,8 +127,8 @@ function ConvergeFormFields({
   }, [errors.strategy])
 
   const nameField = useMemo(
-    () => <ActivityNameField register={register} fieldId="converge-name" ariaLabel="Name" />,
-    [register]
+    () => <ActivityNameField control={control} fieldId="converge-name" ariaLabel="Name" />,
+    [control]
   )
 
   useEffect(() => {
@@ -139,7 +140,7 @@ function ConvergeFormFields({
 
   const parametersContent = (
     <Stack hasGutter>
-      {!onHeaderContentChange && <ActivityNameField register={register} fieldId="converge-name" />}
+      {!onHeaderContentChange && <ActivityNameField fieldId="converge-name" />}
 
       <StackItem>
         <Alert
@@ -283,23 +284,23 @@ export function ConvergeNodeForm(props: ConvergeNodeFormProps) {
     props.onSubmit(cleanedData)
   }
 
-  const methods = useForm<ConvergeFormData>({
-    resolver: zodResolver(convergeFormSchema, undefined, { mode: 'sync' }),
+  const form = useSynForm({
+    schema: convergeFormSchema,
     defaultValues,
   })
 
   const autoSubmitRef = use(NodeEditorAutoSubmitContext)
-  useRegisterAutoSubmit(autoSubmitRef, methods, handleSubmit)
+  useRegisterAutoSubmit(autoSubmitRef, form, handleSubmit)
 
   const {
     formState: { errors },
-  } = methods
+  } = form
 
   return (
-    <FormProvider {...methods}>
-      <NodeFormContainer formId="converge-node-form" onSubmit={methods.handleSubmit(handleSubmit)}>
+    <NodeFormContainer formId="converge-node-form" onSubmit={form.handleSubmit(handleSubmit)}>
+      <SynForm form={form}>
         <ConvergeFormFields onHeaderContentChange={props.onHeaderContentChange} validationErrors={errors} />
-      </NodeFormContainer>
-    </FormProvider>
+      </SynForm>
+    </NodeFormContainer>
   )
 }
