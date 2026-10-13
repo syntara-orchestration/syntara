@@ -79,12 +79,25 @@ class WorkflowRetryMixin:
     loop_state: dict[str, LoopState]
     loop_iteration_results: dict[str, dict[str, list[Any]]]
 
-    def _initialize_state(self, workflow_metadata: dict[str, Any] | None) -> None:
+    def _initialize_state(
+        self,
+        execution_id: str,  # noqa: ARG002
+        request_id: str | None = None,  # noqa: ARG002
+        pre_resolved_outputs: dict[str, dict[str, Any]] | None = None,  # noqa: ARG002
+        stop_after_nodes: list[str] | None = None,  # noqa: ARG002
+        workflow_metadata: dict[str, Any] | None = None,
+    ) -> None:
         """Declare the retry state this mixin needs, before any node runs.
 
         Called from the workflow's own initializer rather than inlined there, so
         the set of retry attributes lives with the policy that uses them instead of
         being split across two files.
+
+        The signature matches the workflow's own ``_initialize_state`` exactly, as
+        cooperative ``super()`` initialization requires — the child drives the order
+        and each mixin declares only the slice it owns. ``execution_id``,
+        ``request_id``, ``pre_resolved_outputs`` and ``stop_after_nodes`` are
+        accepted to keep that contract and are deliberately unused here.
 
         Ordering matters and is why this is a separate call. ``retry_context`` is
         control-plane state, not expression data: a user expression must not be

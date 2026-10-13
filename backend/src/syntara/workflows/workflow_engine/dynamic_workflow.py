@@ -163,7 +163,7 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
             await self._cancel_agentic_invocations()
             raise
 
-    def _initialize_state(  # type: ignore[override]
+    def _initialize_state(
         self,
         execution_id: str,
         request_id: str | None = None,
@@ -181,7 +181,9 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
         # Declared before the namespace loop below, which registers every metadata
         # key except "retry" — see WorkflowRetryMixin._initialize_state for why
         # that ordering is load-bearing.
-        super()._initialize_state(workflow_metadata)
+        super()._initialize_state(
+            execution_id, request_id, pre_resolved_outputs, stop_after_nodes, workflow_metadata
+        )
         if workflow_metadata:
             for ns_key, ns_data in workflow_metadata.items():
                 if ns_key == "retry":
