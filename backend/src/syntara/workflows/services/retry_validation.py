@@ -83,6 +83,7 @@ from syntara.workflows.exceptions import ExecutionNotFoundError
 from syntara.workflows.models.activity_execution import ActivityExecution, ActivityStatus
 from syntara.workflows.models.execution import Execution, ExecutionStatus
 from syntara.workflows.models.workflow_version import WorkflowVersion
+from syntara.workflows.utils.loop_iteration_names import LOOP_ITERATION_SEP, strip_iteration_suffix
 from syntara.workflows.utils.template_refs import FieldPath, find_template_refs, paths_overlap
 from syntara.workflows.workflow_engine.utils.credential_scrubber import REDACTED
 
@@ -94,10 +95,6 @@ if TYPE_CHECKING:
 #: Statuses a retry may start from. Mirrors the story scope; anything else is
 #: rejected with a reason (never silently).
 RETRYABLE_FROM_FAILURE_STATUSES = frozenset({ExecutionStatus.FAILED, ExecutionStatus.COMPLETED_WITH_ERRORS})
-
-#: Separator for loop-iteration activity names (``<node>#iter-<n>``). Must match
-#: ``_COMPOSITE_ITER_SEP`` in activity_sync_service.py.
-LOOP_ITERATION_SEP = "#iter-"
 
 
 @dataclass(frozen=True)
@@ -112,12 +109,6 @@ class RetryValidation:
     sanitized_replacements: dict[str, list[str]] = field(default_factory=dict)
     step_count_by_eligible_point: dict[str, int] = field(default_factory=dict)
     total_step_count: int = 0
-
-
-def strip_iteration_suffix(activity_name: str) -> str:
-    """Normalize a loop-iteration activity name to its base node id."""
-    base, _, _ = activity_name.rpartition(LOOP_ITERATION_SEP)
-    return base or activity_name
 
 
 def definition_nodes(definition: dict[str, Any]) -> list[dict[str, Any]]:
