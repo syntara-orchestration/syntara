@@ -162,6 +162,7 @@ class TestSeedBuiltinWorkflows:
     @pytest.mark.asyncio
     async def test_skips_unchanged_workflow(self) -> None:
         first_def = _BUILTIN_DEFINITIONS[0]
+        project = _mock_project()
 
         existing = MagicMock(spec=Workflow)
         existing.id = uuid4()
@@ -172,15 +173,22 @@ class TestSeedBuiltinWorkflows:
         cur_ver.workflow_definition = first_def
 
         # admin, project, existing workflow, current version, then remaining defs as new
-        session = _mock_session(
-            _mock_admin(), _mock_project(), existing, cur_ver, *[None] * (len(_BUILTIN_DEFINITIONS) - 1)
-        )
+        session = _mock_session(_mock_admin(), project, existing, cur_ver, *[None] * (len(_BUILTIN_DEFINITIONS) - 1))
 
         await seed_builtin_workflows(session)
 
         # Only the remaining (non-first) definitions should create new workflows
         workflows_added = [c[0][0] for c in session.add.call_args_list if isinstance(c[0][0], Workflow)]
         assert len(workflows_added) == len(_BUILTIN_DEFINITIONS) - 1
+        versions_added = [c[0][0] for c in session.add.call_args_list if isinstance(c[0][0], WorkflowVersion)]
+        events_added = [c[0][0] for c in session.add.call_args_list if isinstance(c[0][0], WorkflowPublishEvent)]
+        assert len(versions_added) == len(_BUILTIN_DEFINITIONS) - 1
+        assert len(events_added) == len(_BUILTIN_DEFINITIONS) - 1
+        assert all(v.workflow_id != existing.id for v in versions_added)
+        assert all(e.workflow_id != existing.id for e in events_added)
+        existing.increment_version.assert_not_called()
+        assert existing.project_id == project.id
+        assert session.commit.await_count == len(_BUILTIN_DEFINITIONS)
 
     @pytest.mark.asyncio
     async def test_updates_changed_workflow(self) -> None:

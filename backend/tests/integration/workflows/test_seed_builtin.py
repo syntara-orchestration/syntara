@@ -1,4 +1,4 @@
-"""PostgreSQL durability checks for a fail-fast built-in seed pass."""
+"""PostgreSQL durability and unchanged-rerun checks for built-in seeding."""
 
 from __future__ import annotations
 
@@ -9,6 +9,7 @@ from uuid import UUID
 import pytest
 from sqlmodel import col, select
 
+from syntara.authz.models.project import Project
 from syntara.authz.seed import seed_authz_data
 from syntara.core.seed_context import strict_mode_context_var
 from syntara.workflows.exceptions import ScheduledTriggerSyncError
@@ -26,7 +27,7 @@ if TYPE_CHECKING:
 
 @pytest.fixture(autouse=True)
 def mock_schedule_sync() -> Generator[AsyncMock, None, None]:
-    """Keep Temporal external to the real-database durability test."""
+    """Keep Temporal external to the real-database seeding tests."""
     with patch("syntara.workflows.seed_builtin.ScheduledTriggerService") as service:
         sync = AsyncMock(return_value=0)
         service.return_value.sync_scheduled_triggers = sync
@@ -111,3 +112,50 @@ async def test_strict_sync_abort_preserves_committed_definitions(
                 )
             ).all()
             assert len(events) == expected_version
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("repair_project", [False, True], ids=["unchanged", "project-correction"])
+async def test_identical_rerun_preserves_workflows_versions_and_events(
+    test_db_session: AsyncSession,
+    test_db_session_factory: async_sessionmaker[AsyncSession],
+    mock_schedule_sync: AsyncMock,
+    *,
+    repair_project: bool,
+) -> None:
+    """An identical rerun creates no rows and durably repairs a project's assignment."""
+    await seed_authz_data(test_db_session)
+    workflow_state = select(
+        Workflow.id, Workflow.current_version, Workflow.published_version_id, Workflow.project_id
+    ).where(col(Workflow.is_builtin) == True)  # noqa: E712
+    async with test_db_session_factory() as session:
+        await seed_builtin_workflows(session)
+        before_workflows = set((await session.exec(workflow_state)).all())
+        before_versions = set((await session.exec(select(WorkflowVersion.id))).all())
+        before_events = set((await session.exec(select(WorkflowPublishEvent.id))).all())
+        assert len(before_workflows) == len(_BUILTIN_DEFINITIONS)
+        assert len(before_versions) == len(_BUILTIN_DEFINITIONS)
+        assert len(before_events) == len(_BUILTIN_DEFINITIONS)
+
+        if repair_project:
+            # Use the final definition so no later definition's commit can
+            # accidentally persist its correction if the unchanged commit is missing.
+            workflow = (
+                await session.exec(select(Workflow).where(col(Workflow.name) == _BUILTIN_DEFINITIONS[-1]["name"]))
+            ).one()
+            default_project = (await session.exec(select(Project).where(col(Project.name) == "default"))).one()
+            assert workflow.project_id != default_project.id
+            workflow.project_id = default_project.id
+            await session.commit()
+
+    mock_schedule_sync.reset_mock()
+    async with test_db_session_factory() as session:
+        await seed_builtin_workflows(session)
+
+    # Compare identities and publication state from a fresh session after the
+    # rerun session closes, including the corrected built-in project assignment.
+    async with test_db_session_factory() as reader:
+        assert set((await reader.exec(workflow_state)).all()) == before_workflows
+        assert set((await reader.exec(select(WorkflowVersion.id))).all()) == before_versions
+        assert set((await reader.exec(select(WorkflowPublishEvent.id))).all()) == before_events
+    assert mock_schedule_sync.await_count == len(_BUILTIN_DEFINITIONS)
