@@ -90,3 +90,11 @@ class WorkflowExecutionCompletedEvent(BaseTelemetryEvent):
         description="Whether the run executed the workflow's published version",
     )
     is_retry: bool = Field(default=False, description="Whether this run was started as a retry")
+
+
+class WorkflowRetryRequestedEvent(BaseTelemetryEvent):
+    """Anonymized retry invocation, without node IDs, user IDs or output data."""
+
+    execution_mode: str = "retry"
+    node_count: int = Field(ge=0)
+    failed_step_types: list[str]

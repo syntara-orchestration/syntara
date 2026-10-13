@@ -10,8 +10,9 @@ from sqlalchemy.exc import InterfaceError, OperationalError
 from sqlalchemy.exc import TimeoutError as SATimeoutError
 from temporalio.api.enums.v1 import EventType
 from temporalio.api.history.v1 import HistoryEvent
-from temporalio.client import WorkflowHandle
+from temporalio.client import WorkflowHandle, WorkflowQueryFailedError, WorkflowQueryRejectedError
 from temporalio.exceptions import TemporalError
+from temporalio.service import RPCError
 
 from syntara.audit.context_managers import actor_context
 from syntara.workflows.workflow_engine.models.workflow_definition import NodeType
@@ -54,6 +55,30 @@ class ActivitySyncMonitorMixin:
     _process_activity_failed: Any
     _process_activity_timed_out: Any
     _process_activity_canceled: Any
+
+    async def _is_retry_from_failure(
+        self,
+        handle: WorkflowHandle[Any, Any],
+        execution_id: UUID,
+    ) -> bool:
+        """Ask the workflow once whether it is replaying from a failure point.
+
+        Defaults to False when the query cannot be answered — a workflow that has
+        already closed, or one predating the query. Either way no node will be
+        replayed, so skipping the per-activity updates is the safe answer rather
+        than a guess.
+        """
+        try:
+            return bool(await handle.query("is_retry_from_failure"))
+        except (RPCError, WorkflowQueryFailedError, WorkflowQueryRejectedError) as exc:
+            # A closed workflow, one that predates the query, or one that rejected
+            # it. All mean nothing will be replayed.
+            logger.info(
+                "Could not determine retry-from-failure status; assuming not a retry",
+                execution_id=execution_id,
+                error=str(exc),
+            )
+            return False
 
     async def _handle_event_post_processing(
         self,
