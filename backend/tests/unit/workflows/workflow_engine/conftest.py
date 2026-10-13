@@ -1,7 +1,10 @@
 """Shared test helpers for workflow engine unit tests."""
 
+from typing import Any
+
 from syntara.settings.catalog import SETTINGS_CATALOG
 from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkflow
+from syntara.workflows.workflow_engine.graph import ActivityNode, WorkflowGraph
 
 
 def make_workflow_runtime_settings() -> dict[str, object]:
@@ -17,5 +20,45 @@ def init_workflow_runtime(wf: OrchestratorWorkflow) -> None:
     """
     wf._runtime_settings = make_workflow_runtime_settings()
     wf._has_unhandled_failure = False
+    # Retry-from-failure state. Set in __init__ for a real run; defaulted here so
+    # a workflow built for a non-retry test behaves as one.
+    wf.retry_context = {}
+    wf._retry_restorable_cache = None
+    # One set per thing the restore path records, matching what the mixin declares.
+    # ``_restored_nodes`` was an earlier single-set shape, since split so the source
+    # times, the source status and the output can each be read independently.
+    wf._retry_replay_candidates = set()
+    wf._restored_node_timestamps = {}
+    wf._restored_node_statuses = {}
+    wf._restored_node_outputs = {}
+    wf._retry_source_statuses = {}
+    # Set in __init__ for a real run. Guarded because some tests build the workflow
+    # by hand, and a converge reads it to tell whether a loop predecessor is still
+    # iterating, so it must exist even on a workflow with nothing to do with retries.
+    if not hasattr(wf, "node_control_data"):
+        wf.node_control_data = {}
     if not hasattr(wf, "_cof_failed_nodes"):
         wf._cof_failed_nodes = set()
+    wf._retry_replay_candidates = set()
+    wf._restored_node_timestamps = {}
+    wf._restored_node_statuses = {}
+    wf._restored_node_outputs = {}
+    wf._retry_source_statuses = {}
+
+
+async def complete_supplied_node(
+    wf: OrchestratorWorkflow, node: ActivityNode, result: dict[str, Any], graph: WorkflowGraph
+) -> None:
+    """Drive supplied output through the same completion boundary as a live task."""
+    import asyncio
+    from unittest.mock import AsyncMock, patch
+
+    async def supplied() -> dict[str, Any]:
+        return wf._process_supplied_result(node, result)
+
+    task = asyncio.create_task(supplied())
+    with (
+        patch.object(wf, "_schedule_successors", new_callable=AsyncMock),
+        patch.object(wf, "_cancel_skipped_pending_tasks"),
+    ):
+        await wf._process_completed_task(task, {node.id: task}, graph)
