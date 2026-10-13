@@ -14,8 +14,19 @@ from syntara.telemetry.events.workflow_emitters import emit_activities
 from syntara.telemetry.events.workflow_error import TimedOutComponent
 from syntara.workflows.audit.execution_error import WorkflowExecutionErrorEvent
 from syntara.workflows.models.activity_execution import TERMINAL_ACTIVITY_STATUSES, ActivityExecution, ActivityStatus
+from syntara.workflows.utils.datetime import ensure_timezone_aware
 from syntara.workflows.workflow_engine.services.activity_sync_types import ExecutionMonitorMetadata
 from syntara.workflows.workflow_engine.utils.credential_scrubber import scrub_credentials
+
+#: Source statuses a restored node may carry. Mirrors the replay activity's
+#: RESTORABLE_SOURCE_STATUSES; an ordinary node's own event status is never
+#: overwritten from this.
+RESTORABLE_SOURCE_STATUSES = (
+    ActivityStatus.COMPLETED,
+    ActivityStatus.SKIPPED,
+    ActivityStatus.FAILED,
+)
+
 
 logger = structlog.stdlib.get_logger(__name__)
 
@@ -225,6 +236,201 @@ class ActivityExecutionSyncMixin:
 
         return old_values
 
+    async def _resolve_replayed_timestamps(
+        self,
+        metadata: ExecutionMonitorMetadata,
+        handle: WorkflowHandle[Any, Any],
+    ) -> dict[str, dict[str, datetime | None]]:
+        """Collect source timestamps for the replayed nodes finishing in this batch.
+
+        One workflow update per completed activity, asked before the sync
+        transaction opens because the update blocks until the workflow can answer
+        and a database transaction must not be held across that wait.
+
+        Gated on the workflow's own answer to ``is_retry_from_failure``, read once
+        at monitor start. A whole-execution retry has no replayed nodes, so asking
+        it would issue an update per node that records nothing — and an update is
+        written to Temporal's history, so that is permanent, per-node history on
+        runs that replay nothing.
+
+        Within a retry-from-failure the ask goes query-first, the same shape used to
+        read a completed activity's input and output: most nodes answer from state
+        the workflow already holds, and only a node whose state is genuinely still
+        arriving needs the update to wait for it.
+
+        Only ``COMPLETED`` is asked about. A node that failed, timed out or was
+        cancelled has no source times to restore, and asking would wait for
+        timestamps that are never coming.
+        """
+        if not metadata.is_retry_from_failure:
+            return {}
+
+        resolved: dict[str, dict[str, datetime | None]] = {}
+        for event_id in metadata.pending_sync_event_ids:
+            activity_data = metadata.pending_activity_updates.get(event_id)
+            if not activity_data or activity_data.get("status") != ActivityStatus.COMPLETED:
+                continue
+            activity_id = activity_data["activity_id"]
+            if activity_id in resolved:
+                continue
+            replayed_ts = await self._replayed_node_timestamps(metadata, handle, activity_id)
+            if replayed_ts is not None:
+                resolved[activity_id] = replayed_ts
+        return resolved
+
+    async def _replayed_node_timestamps(
+        self,
+        metadata: ExecutionMonitorMetadata,
+        handle: WorkflowHandle[Any, Any],
+        activity_id: str,
+    ) -> dict[str, datetime | None] | None:
+        """Ask the workflow for one replayed node's source-run times, or None.
+
+        Called when the node completes, which is the moment its row is written.
+        The workflow update blocks until it can say whether this activity is a
+        replay and, if so, has the source times ready — a plain query would race
+        the event and lose them, since the event is only processed once.
+
+        Returns None when the activity was an ordinary execution, or when the
+        workflow cannot answer in time. Either way the caller keeps Temporal's
+        timestamps, so a failure here degrades to a replayed node reporting the
+        replay time rather than losing the node's record.
+
+        Asked for every completed activity **of a retry**, never of an ordinary
+        run: ``is_retry`` is set once per execution from the retry lineage, so an
+        ordinary run makes no RPC here at all. Within a retry an ordinary node is
+        answered from the workflow's second wait-condition branch and returns None
+        without blocking.
+
+        Asked once. If the update does not return, retrying it would not help: the
+        failure is in the path that answers, not in the answer. A workflow that
+        closed cannot be asked again, an unreachable one is equally unreachable,
+        and a wait that expired expired because the state was genuinely not there —
+        an immediate second call would wait out the same timeout for the same
+        reason.
+        """
+        # Query first: it answers from state the workflow already has and records
+        # no history. The update is the fallback, for the node whose recorded state
+        # has not landed yet — which is the whole reason the update waits.
+        try:
+            raw = cast(
+                "dict[str, str | None] | None",
+                await handle.query("get_replayed_node_timestamps_if_ready", activity_id),
+            )
+        except (RPCError, TemporalError, ValueError):
+            raw = None
+
+        if raw is None:
+            try:
+                raw = cast(
+                    "dict[str, str | None] | None",
+                    await handle.execute_update("get_replayed_node_timestamps_when_ready", activity_id),
+                )
+            except RPCError as e:
+                if e.status == RPCStatusCode.NOT_FOUND:
+                    # The workflow already closed, so the update was rejected and
+                    # there is no handler left to ask. Source times were written
+                    # before the node's result was published, so they do exist — but
+                    # nothing reads them back now. Keeping Temporal's times still
+                    # yields a correct row, only stamped with the replay time.
+                    logger.info(
+                        "Workflow closed before replayed node timestamps could be read",
+                        activity_id=activity_id,
+                        execution_id=metadata.execution_id,
+                    )
+                    return None
+                logger.warning(
+                    "Workflow update for replayed node timestamps failed",
+                    activity_id=activity_id,
+                )
+                return None
+            except (ApplicationError, TemporalError, ValueError):
+                # Includes the workflow's own wait expiring. Asked once on purpose: see
+                # the note above. The row keeps this run's times, so the node reports
+                # when it was replayed rather than when the work ran.
+                logger.warning(
+                    "Replayed node state was never read; row will carry this run's times and status "
+                    "instead of the source run's",
+                    activity_id=activity_id,
+                    execution_id=metadata.execution_id,
+                )
+                return None
+
+        if not raw:
+            return None
+        # The status and error travel with the times: they are what the row has to
+        # report, and dropping them here would write a restored skip or an
+        # unselected failure back as a successful completion. The workflow returns
+        # every field it recorded, so pass all of them through.
+        resolved: dict[str, Any] = {
+            "started_at": self._parse_source_timestamp(raw.get("started_at")),
+            "completed_at": self._parse_source_timestamp(raw.get("completed_at")),
+        }
+        if raw.get("status") is not None:
+            resolved["status"] = raw["status"]
+        if raw.get("error_details") is not None:
+            resolved["error_details"] = raw["error_details"]
+        return resolved
+
+    @staticmethod
+    def _parse_source_timestamp(value: str | None) -> datetime | None:
+        """Parse an ISO timestamp from the replay activity, or None.
+
+        Never raises. A timestamp is not worth failing a node's sync over, and
+        ``TypeError`` is caught alongside ``ValueError`` because a value that is
+        not a string at all would otherwise escape a caller expecting None.
+        """
+        if not value:
+            return None
+        try:
+            return ensure_timezone_aware(datetime.fromisoformat(value))
+        except (TypeError, ValueError):
+            return None
+
+    @staticmethod
+    def _apply_replayed_state(
+        replayed_state: dict[str, Any] | None,
+        activity_data: dict[str, Any],
+    ) -> None:
+        """Restore a replayed node's recorded outcome over this run's event.
+
+        A restored node is recorded through the normal event path, so without this
+        the sync service would store the replay activity's own successful
+        completion: a node that was skipped in the source run would be reported as
+        COMPLETED, and a failure the caller did not select would be reported as a
+        success with its reason dropped.
+
+        The status is only overwritten when it is a terminal one the source run
+        recorded. An ordinary completion keeps the status the event reported, so a
+        node that really executed is never re-stamped from the source run.
+
+        No-op for a node this retry did not replay.
+        """
+        if replayed_state is None:
+            return
+
+        source_status = replayed_state.get("status")
+        if source_status in RESTORABLE_SOURCE_STATUSES:
+            try:
+                activity_data["status"] = ActivityStatus(source_status)
+            except ValueError:
+                logger.warning(
+                    "Unrecognised restored status; keeping the event status",
+                    source_status=source_status,
+                    activity_id=activity_data.get("activity_id"),
+                )
+            error_details = replayed_state.get("error_details")
+            if error_details is not None:
+                activity_data["error_details"] = error_details
+
+        if replayed_state.get("started_at") is not None:
+            activity_data["started_at"] = replayed_state["started_at"]
+        # Applied for any terminal status, not just COMPLETED: a restored skip or
+        # failure carries the source time too, and stamping this run's time instead
+        # would report work as having happened now when it happened before.
+        if replayed_state.get("completed_at") is not None:
+            activity_data["completed_at"] = replayed_state["completed_at"]
+
     @staticmethod
     def _collect_terminal_activities(
         metadata: ExecutionMonitorMetadata,
@@ -348,6 +554,7 @@ class ActivityExecutionSyncMixin:
         activity_data: dict[str, Any],
         existing_activities: dict[str, ActivityExecution],
         session: AsyncSession,
+        replayed_timestamps: dict[str, dict[str, datetime | None]] | None = None,
     ) -> tuple[ActivityExecution, dict[str, Any], bool] | None:
         """Process a single activity update for database sync.
 
@@ -361,6 +568,8 @@ class ActivityExecutionSyncMixin:
             activity_data: Activity update data from Temporal events
             existing_activities: Map of activity_name to existing ActivityExecution records
             session: Database session for creating new records
+            replayed_timestamps: Source timestamps resolved before this call, keyed
+                by activity id. Empty for an ordinary execution.
 
         Returns:
             Tuple of (activity, old_values, is_new) if updated, None if skipped.
@@ -435,6 +644,11 @@ class ActivityExecutionSyncMixin:
         # For per-iteration records, set the iteration number in activity_data
         if is_new and existing.iteration is not None:
             activity_data["iteration"] = existing.iteration
+
+        # A retry-replayed node is recorded through this normal path, so the event
+        # describes the replay rather than the work. Its recorded status, error and
+        # times were resolved before the transaction opened and are restored here.
+        self._apply_replayed_state((replayed_timestamps or {}).get(activity_id), activity_data)
 
         # Update existing activity and track old values for patch generation
         old_values = self._update_activity_record(
