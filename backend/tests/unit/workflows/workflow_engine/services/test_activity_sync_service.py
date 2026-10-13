@@ -4748,6 +4748,13 @@ class TestInitializeMonitoringWorkflowLookup:
     def setup_method(self) -> None:
         """Set up test fixtures."""
         self.mock_temporal_client = AsyncMock()
+        # `get_workflow_handle` is synchronous on the real Temporal client, so an
+        # AsyncMock would hand back a coroutine. `_initialize_monitoring` asks the
+        # workflow once whether it is replaying, so it needs a real handle whose
+        # `query` is awaitable.
+        handle = Mock()
+        handle.query = AsyncMock(return_value=False)
+        self.mock_temporal_client.get_workflow_handle = Mock(return_value=handle)
         self.mock_session_factory = Mock()
         self.service = ActivitySyncService(self.mock_temporal_client, self.mock_session_factory)
         self.execution_id = uuid4()
@@ -6509,3 +6516,102 @@ class TestReplayedTimestampResolution:
 
         assert order[0] == "workflow-update", f"transaction opened first: {order}"
         assert "session-open" in order
+
+
+class TestInitializeMonitoringSetsRetryFlag:
+    """The real `_initialize_monitoring`, with nothing stubbed at its boundary.
+
+    Every other test in this module mocks `_initialize_monitoring` wholesale and
+    hand-builds `ExecutionMonitorMetadata` with `is_retry_from_failure=True`.
+    That leaves the wiring between the monitor and the flag untested, which is how
+    a defined-but-never-called query helper shipped with the feature inert: the gate
+    in `_resolve_replayed_timestamps` read the field's default `False` on every run.
+    """
+
+    @staticmethod
+    def _session_factory(execution: Execution, workflow: Mock, version: int | None) -> tuple[Mock, AsyncMock]:
+        """Session whose three `exec` calls answer Execution, Workflow, version."""
+        results = []
+        for value in (execution, workflow, version):
+            row = Mock()
+            row.one_or_none.return_value = value
+            results.append(row)
+
+        session = AsyncMock()
+        session.exec = AsyncMock(side_effect=results)
+        session_ctx = AsyncMock()
+        session_ctx.__aenter__ = AsyncMock(return_value=session)
+        session_ctx.__aexit__ = AsyncMock(return_value=False)
+
+        factory = Mock()
+        factory.return_value = session_ctx
+        return factory, session
+
+    @staticmethod
+    def _service(execution: Execution, query_result: object) -> tuple[ActivitySyncService, Mock]:
+        workflow = Mock()
+        workflow.name = "wf"
+        workflow.published_version_id = execution.workflow_version_id
+        session_factory, _ = TestInitializeMonitoringSetsRetryFlag._session_factory(execution, workflow, 7)
+
+        client = Mock()
+        handle = Mock()
+        handle.query = AsyncMock(return_value=query_result)
+        client.get_workflow_handle = Mock(return_value=handle)
+
+        service = ActivitySyncService(client, session_factory)
+        for name, value in (
+            ("_fetch_activity_definitions_map", AsyncMock(return_value={})),
+            ("_create_all_activities_upfront", AsyncMock(return_value=None)),
+            ("_build_activity_index_map", AsyncMock(return_value={})),
+            ("_load_terminal_activity_ids", AsyncMock(return_value=set())),
+        ):
+            setattr(service, name, value)
+        return service, client
+
+    @staticmethod
+    def _execution() -> Execution:
+        return Execution(
+            id=uuid4(),
+            workflow_id=uuid4(),
+            workflow_version_id=uuid4(),
+            temporal_workflow_id="temporal-exec-1",
+            status=ExecutionStatus.RUNNING,
+            created_by=uuid4(),
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
+        )
+
+    async def test_flag_true_when_workflow_reports_retry(self) -> None:
+        service, _ = self._service(self._execution(), query_result=True)
+
+        metadata = await service._initialize_monitoring(uuid4())
+
+        assert metadata.is_retry_from_failure is True, "retry must not restore nothing"
+
+    async def test_flag_false_for_an_ordinary_run(self) -> None:
+        service, _ = self._service(self._execution(), query_result=False)
+
+        metadata = await service._initialize_monitoring(uuid4())
+
+        assert metadata.is_retry_from_failure is False
+
+    async def test_flag_defaults_false_when_the_query_cannot_be_answered(self) -> None:
+        """A closed or pre-query workflow must not be treated as a retry."""
+        service, client = self._service(self._execution(), query_result=True)
+        client.get_workflow_handle().query = AsyncMock(
+            side_effect=WorkflowQueryRejectedError(RuntimeError("workflow closed"))
+        )
+
+        metadata = await service._initialize_monitoring(uuid4())
+
+        assert metadata.is_retry_from_failure is False
+
+    async def test_query_is_asked_once_not_per_node(self) -> None:
+        """The ask writes to Temporal history, so it must not scale with node count."""
+        service, client = self._service(self._execution(), query_result=True)
+        handle = client.get_workflow_handle()
+
+        await service._initialize_monitoring(uuid4())
+
+        handle.query.assert_awaited_once_with("is_retry_from_failure")
