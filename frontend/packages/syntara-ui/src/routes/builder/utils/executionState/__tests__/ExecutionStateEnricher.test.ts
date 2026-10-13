@@ -113,7 +113,15 @@ describe('ExecutionStateEnricher', () => {
       }
       const activityStates = new Map<string, ActivityState>([
         // Carried over from the source run, which predates the retry execution.
-        ['task-1', { activityId: 'task-1', status: 'completed', startedAt: '2024-01-01T00:00:00Z', completedAt: '2024-01-01T00:01:00Z' }],
+        [
+          'task-1',
+          {
+            activityId: 'task-1',
+            status: 'completed',
+            startedAt: '2024-01-01T00:00:00Z',
+            completedAt: '2024-01-01T00:01:00Z',
+          },
+        ],
       ])
 
       const result = enricher.enrichActivity({

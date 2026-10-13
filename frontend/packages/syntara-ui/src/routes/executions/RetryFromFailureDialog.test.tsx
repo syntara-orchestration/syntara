@@ -33,12 +33,16 @@ describe('RetryFromFailureDialog', () => {
 
     expect(screen.getByText('Retry from failure?')).toBeInTheDocument()
     expect(
-      screen.getByText('Retrying will resume at 2 failure points and re-run 5 steps. Steps that already completed keep their output.')
+      screen.getByText(
+        'Retrying will resume at 2 failure points and re-run 5 steps. Steps that already completed keep their output.'
+      )
     ).toBeInTheDocument()
   })
 
   it('surfaces the backend rejection reason and blocks confirming', () => {
-    renderDialog({ preview: preview({ eligible: false, reason: 'Execution is still running.', eligible_point_ids: [] }) })
+    renderDialog({
+      preview: preview({ eligible: false, reason: 'Execution is still running.', eligible_point_ids: [] }),
+    })
 
     expect(screen.getByTestId('retry-rejected')).toBeInTheDocument()
     expect(screen.getByText('Execution is still running.')).toBeInTheDocument()
@@ -90,7 +94,9 @@ describe('RetryFromFailureDialog', () => {
   })
 
   it('has no accessibility violations when rejected', async () => {
-    const { container } = renderDialog({ preview: preview({ eligible: false, reason: 'Nope.', eligible_point_ids: [] }) })
+    const { container } = renderDialog({
+      preview: preview({ eligible: false, reason: 'Nope.', eligible_point_ids: [] }),
+    })
     const results = await axe(container)
     expect(results).toHaveNoViolations()
   })

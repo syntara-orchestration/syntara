@@ -93,7 +93,9 @@ export function ExecutionDetailHeaderToolbar({
           projectId={execution.project_id}
         />
       )}
-      {showRetryFromFailure && execution && <RetryFromFailureButton executionId={executionId} projectId={execution.project_id} />}
+      {showRetryFromFailure && execution && (
+        <RetryFromFailureButton executionId={executionId} projectId={execution.project_id} />
+      )}
       <Button variant="secondary" onClick={onCopyToEditor}>
         Copy to editor
       </Button>

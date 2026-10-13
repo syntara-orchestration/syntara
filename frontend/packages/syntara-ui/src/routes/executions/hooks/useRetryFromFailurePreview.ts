@@ -15,9 +15,14 @@ type UseRetryFromFailurePreviewParams = {
  */
 export function useRetryFromFailurePreview({ executionId, enabled }: UseRetryFromFailurePreviewParams) {
   /* v8 ignore start -- v8 emits phantom branches from the compiled generic useQuery call */
-  const previewQuery = executionsClient.useQuery('get', '/executions/{execution_id}/retry-from-failure-preview', {
-    params: { path: { execution_id: executionId } },
-  }, { enabled, retry: false })
+  const previewQuery = executionsClient.useQuery(
+    'get',
+    '/executions/{execution_id}/retry-from-failure-preview',
+    {
+      params: { path: { execution_id: executionId } },
+    },
+    { enabled, retry: false }
+  )
   /* v8 ignore stop */
 
   return {

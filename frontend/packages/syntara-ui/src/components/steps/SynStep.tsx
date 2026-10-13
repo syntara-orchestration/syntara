@@ -83,10 +83,7 @@ function ValidationErrorBadge() {
  * exclusive: a step replayed from a previous run carries real recorded output,
  * so the mock-pinned marker would be misleading.
  */
-function StepBottomBadge({
-  mockDataPinned,
-  replayed,
-}: Readonly<{ mockDataPinned: boolean; replayed: boolean }>) {
+function StepBottomBadge({ mockDataPinned, replayed }: Readonly<{ mockDataPinned: boolean; replayed: boolean }>) {
   if (mockDataPinned) {
     return (
       <div style={NODE_BOTTOM_BADGE_STYLE}>

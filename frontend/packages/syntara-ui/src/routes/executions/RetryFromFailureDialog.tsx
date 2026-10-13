@@ -43,12 +43,7 @@ export function RetryFromFailureDialog({
     )
   } else if (isPreviewError) {
     bodyContent = (
-      <Alert
-        isInline
-        variant="danger"
-        title="Could not check retry options"
-        data-testid="retry-preview-error"
-      >
+      <Alert isInline variant="danger" title="Could not check retry options" data-testid="retry-preview-error">
         The retry preview could not be loaded. Close this dialog and try again.
       </Alert>
     )

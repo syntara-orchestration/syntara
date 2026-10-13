@@ -23,10 +23,7 @@ const RETRY_FROM_FAILURE_STATUSES: ReadonlySet<ExecutionStatus> = new Set([
  * both the preview and the retry call, so a `true` here never promises the
  * retry will be accepted.
  */
-export function isRetryFromFailureEligible(
-  status: ExecutionStatus | null | undefined,
-  mode?: string | null
-): boolean {
+export function isRetryFromFailureEligible(status: ExecutionStatus | null | undefined, mode?: string | null): boolean {
   if (!status) return false
   if (mode === 'test') return false
   return RETRY_FROM_FAILURE_STATUSES.has(status)

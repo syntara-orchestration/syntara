@@ -8,9 +8,7 @@ type MockQueryResult = {
   isError: boolean
 }
 
-const mockUseQuery = vi.fn<
-  (method: unknown, path: unknown, params: unknown, options: unknown) => MockQueryResult
->()
+const mockUseQuery = vi.fn<(method: unknown, path: unknown, params: unknown, options: unknown) => MockQueryResult>()
 
 vi.mock('../../../client', () => ({
   executionsClient: {
