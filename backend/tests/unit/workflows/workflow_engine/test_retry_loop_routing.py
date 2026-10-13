@@ -126,3 +126,69 @@ async def test_an_ordinary_run_never_replays_a_loop(patched_workflow) -> None:
 
     assert result is None
     patched_workflow.execute_activity.assert_not_awaited()
+
+
+# --- which source row a body node replays from ---
+
+
+def test_an_ordinary_node_replays_under_its_own_id() -> None:
+    """A node outside every loop body has no iteration to qualify."""
+    wf = _wf(retry_points=["step_2"], bodies={"loop_1": {"body_a"}})
+    wf._active_loop_iteration["loop_1"] = 3
+
+    assert wf._replay_source_name("step_2") == "step_2"
+
+
+def test_iteration_zero_keeps_the_plain_node_name() -> None:
+    """The first iteration's row is stored unsuffixed, so it must replay unsuffixed."""
+    wf = _wf(retry_points=["step_2"], bodies={"loop_1": {"body_a"}})
+    wf._active_loop_iteration["loop_1"] = 0
+
+    assert wf._replay_source_name("body_a") == "body_a"
+
+
+def test_a_later_iteration_replays_its_own_suffixed_row() -> None:
+    """Iteration n restores the row the sync service wrote as ``{node}#iter-{n}``."""
+    wf = _wf(retry_points=["step_2"], bodies={"loop_1": {"body_a"}})
+    wf._active_loop_iteration["loop_1"] = 2
+
+    assert wf._replay_source_name("body_a") == "body_a#iter-2"
+
+
+def test_a_body_whose_loop_is_not_replaying_keeps_the_plain_name() -> None:
+    """No active iteration means the loop is running normally, not being replayed."""
+    wf = _wf(retry_points=["step_2"], bodies={"loop_1": {"body_a"}})
+
+    assert wf._active_loop_iteration == {}
+    assert wf._replay_source_name("body_a") == "body_a"
+
+
+def test_each_body_uses_its_own_loops_iteration() -> None:
+    """Two loops replaying at different indices must not borrow each other's number."""
+    wf = _wf(retry_points=["step_2"], bodies={"loop_1": {"body_a"}, "loop_2": {"body_b"}})
+    wf._active_loop_iteration["loop_1"] = 1
+    wf._active_loop_iteration["loop_2"] = 4
+
+    assert wf._replay_source_name("body_a") == "body_a#iter-1"
+    assert wf._replay_source_name("body_b") == "body_b#iter-4"
+
+
+# --- which loop a body node belongs to ---
+
+
+def test_enclosing_loop_finds_the_owning_loop() -> None:
+    wf = _wf(retry_points=["step_2"], bodies={"loop_1": {"body_a", "body_b"}})
+
+    assert wf._enclosing_loop("body_a") == "loop_1"
+
+
+def test_enclosing_loop_is_none_for_an_ordinary_node() -> None:
+    wf = _wf(retry_points=["step_2"], bodies={"loop_1": {"body_a"}})
+
+    assert wf._enclosing_loop("step_2") is None
+
+
+def test_enclosing_loop_is_none_when_no_loops_exist() -> None:
+    wf = _wf(retry_points=["step_2"], bodies={})
+
+    assert wf._enclosing_loop("body_a") is None
