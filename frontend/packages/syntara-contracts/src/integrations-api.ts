@@ -310,7 +310,7 @@ export interface components {
      * @description Type of external integration.
      * @enum {string}
      */
-    IntegrationType: 'mcp_server' | 'llm_provider' | 'ansible_automation_platform'
+    IntegrationType: 'mcp_server' | 'llm_provider' | 'ansible_automation_platform' | 'kafka'
     /**
      * IntegrationStatus
      * @description Validation status of an integration.
@@ -381,6 +381,7 @@ export interface components {
         | components['schemas']['MCPServerConfigurationInput']
         | components['schemas']['LLMProviderConfiguration']
         | components['schemas']['AAPConfiguration']
+        | components['schemas']['KafkaConfiguration']
       /**
        * Management Credential Id
        * @description Optional credential for admin operations
@@ -503,6 +504,7 @@ export interface components {
             | components['schemas']['MCPServerConfigurationInput']
             | components['schemas']['LLMProviderConfiguration']
             | components['schemas']['AAPConfiguration']
+            | components['schemas']['KafkaConfiguration']
           )
         | null
       /**
@@ -540,6 +542,7 @@ export interface components {
         | components['schemas']['MCPServerConfigurationInput']
         | components['schemas']['LLMProviderConfiguration']
         | components['schemas']['AAPConfiguration']
+        | components['schemas']['KafkaConfiguration']
       /**
        * Credential Id
        * @description Credential to use for the connection test
@@ -576,6 +579,7 @@ export interface components {
         | components['schemas']['MCPServerConfigurationInput']
         | components['schemas']['LLMProviderConfiguration']
         | components['schemas']['AAPConfiguration']
+        | components['schemas']['KafkaConfiguration']
       /** Last Validated At */
       last_validated_at?: string | null
       /** Management Credential Id */
@@ -711,6 +715,49 @@ export interface components {
        * @description URL of the Ansible Automation Platform
        */
       base_url: string
+      /**
+       * Allow Http
+       * @description Allow HTTP (unencrypted) connections. Loopback addresses are always permitted over HTTP.
+       * @default false
+       */
+      allow_http?: boolean
+      /**
+       * Insecure Skip Tls Verify
+       * @description Disable TLS certificate verification for connections to this integration.
+       * @default false
+       */
+      insecure_skip_tls_verify?: boolean
+      /**
+       * Ca Certificate
+       * @description PEM-encoded CA certificate to trust for this integration's TLS connections.
+       */
+      ca_certificate?: string | null
+    }
+    /**
+     * KafkaConfiguration
+     * @description Configuration for a Kafka cluster integration.
+     *
+     *     Broker addresses live here. The username and password stay on the
+     *     linked Kafka-connection credential.
+     */
+    KafkaConfiguration: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      integration_type: 'kafka'
+      /**
+       * Bootstrap Servers
+       * @description Kafka bootstrap servers as host:port (or [ipv6]:port) values.
+       */
+      bootstrap_servers: string[]
+      /**
+       * Sasl Mechanism
+       * @description SASL mechanism for the username and password on the linked credential.
+       * @default SCRAM-SHA-256
+       * @enum {string}
+       */
+      sasl_mechanism?: 'PLAIN' | 'SCRAM-SHA-256' | 'SCRAM-SHA-512'
       /**
        * Allow Http
        * @description Allow HTTP (unencrypted) connections. Loopback addresses are always permitted over HTTP.

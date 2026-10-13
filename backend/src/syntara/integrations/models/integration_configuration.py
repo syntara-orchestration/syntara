@@ -121,6 +121,92 @@ class LLMProviderConfiguration(IntegrationSecurityMixin):
         return self
 
 
+_MAX_BOOTSTRAP_SERVERS = 20
+_MIN_TCP_PORT = 1
+_MAX_TCP_PORT = 65535
+
+
+class KafkaSaslMechanism(StrEnum):
+    """SASL mechanism used with the Kafka-connection username and password.
+
+    Cloud brokers such as Aiven use SCRAM-SHA-256. PLAIN remains available
+    for clusters that authenticate that way.
+    """
+
+    PLAIN = "PLAIN"
+    SCRAM_SHA_256 = "SCRAM-SHA-256"
+    SCRAM_SHA_512 = "SCRAM-SHA-512"
+
+
+def parse_bootstrap_server(raw: str) -> str:
+    """Validate one Kafka bootstrap server as ``host:port`` or ``[ipv6]:port``."""
+    value = raw.strip()
+    if not value:
+        msg = "A bootstrap server must not be empty."
+        raise ValueError(msg)
+    if any(char in value for char in ("/", "?", "#", "@", " ")):
+        msg = f"Bootstrap server '{value}' must be host:port with no path, query, or userinfo."
+        raise ValueError(msg)
+
+    if value.startswith("["):
+        end = value.find("]")
+        port_suffix = value[end + 1 :] if end >= 0 else ""
+        host = value[1:end] if end > 0 else ""
+        if not host or not port_suffix.startswith(":"):
+            msg = f"Bootstrap server '{value}' must use [ipv6]:port."
+            raise ValueError(msg)
+        port_text = port_suffix[1:]
+        normalized_host = f"[{host}]"
+    else:
+        if value.count(":") != 1:
+            msg = f"Bootstrap server '{value}' must be host:port."
+            raise ValueError(msg)
+        host, port_text = value.split(":", 1)
+        normalized_host = host
+
+    if not host:
+        msg = f"Bootstrap server '{value}' is missing a host."
+        raise ValueError(msg)
+    try:
+        port = int(port_text)
+    except ValueError as exc:
+        msg = f"Bootstrap server '{value}' has a non-numeric port."
+        raise ValueError(msg) from exc
+    if port < _MIN_TCP_PORT or port > _MAX_TCP_PORT:
+        msg = f"Bootstrap server '{value}' has a port outside 1-65535."
+        raise ValueError(msg)
+    return f"{normalized_host}:{port}"
+
+
+class KafkaConfiguration(IntegrationSecurityMixin):
+    """Configuration for a Kafka cluster integration.
+
+    Broker addresses live here. The username and password stay on the
+    linked Kafka-connection credential.
+    """
+
+    integration_type: Literal["kafka"] = "kafka"
+
+    bootstrap_servers: list[str] = Field(
+        min_length=1,
+        max_length=_MAX_BOOTSTRAP_SERVERS,
+        description="Kafka bootstrap servers as host:port (or [ipv6]:port) values.",
+    )
+
+    sasl_mechanism: KafkaSaslMechanism = Field(
+        default=KafkaSaslMechanism.SCRAM_SHA_256,
+        description="SASL mechanism for the username and password on the linked credential.",
+    )
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")  # type: ignore[assignment]
+
+    @model_validator(mode="after")
+    def validate_bootstrap_servers(self) -> Self:
+        """Normalize each broker address. DNS and SSRF checks run later, at connect time."""
+        self.bootstrap_servers = [parse_bootstrap_server(server) for server in self.bootstrap_servers]
+        return self
+
+
 class AAPConfiguration(IntegrationSecurityMixin):
     """Configuration for Ansible Automation Platform integrations."""
 
@@ -142,7 +228,9 @@ class AAPConfiguration(IntegrationSecurityMixin):
 
 
 # Configuration types (used by DB model, read schema, and create/patch)
-IntegrationConfigurationTypes = MCPServerConfigurationInput | LLMProviderConfiguration | AAPConfiguration
+IntegrationConfigurationTypes = (
+    MCPServerConfigurationInput | LLMProviderConfiguration | AAPConfiguration | KafkaConfiguration
+)
 IntegrationConfiguration = Annotated[
     IntegrationConfigurationTypes,
     Field(discriminator="integration_type"),
