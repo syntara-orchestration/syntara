@@ -9,7 +9,7 @@ from temporalio import workflow
 from syntara.core.exceptions import SafeValueError
 from syntara.workflows.models.activity_execution import ActivityStatus
 from syntara.workflows.utils.loop_body_nodes import collect_loop_bodies
-from syntara.workflows.utils.loop_iteration_names import strip_iteration_suffix
+from syntara.workflows.utils.loop_iteration_names import LOOP_ITERATION_SEP, strip_iteration_suffix
 from syntara.workflows.utils.namespace_resolver import NamespaceResolver
 from syntara.workflows.workflow_engine.activities.retry_node_replay_activity import RESTORABLE_SOURCE_STATUSES
 from syntara.workflows.workflow_engine.constants import DEFAULT_ACTIVITY_TIMEOUT_SECONDS
@@ -39,7 +39,6 @@ _CONTROL_NODE_TYPES_FOR_RETRY = frozenset(
     {
         NodeType.CONDITION,
         NodeType.SWITCH,
-        NodeType.LOOP,
         # A converge decides whether it has enough predecessors to run, so restoring
         # one would release its successors without the gate ever being evaluated.
         NodeType.CONVERGE,
@@ -78,6 +77,13 @@ class WorkflowRetryMixin:
     node_inputs: dict[str, dict[str, Any]]
     loop_state: dict[str, LoopState]
     loop_iteration_results: dict[str, dict[str, list[Any]]]
+    #: Body nodes per loop, derived from the graph during _prepare_retry. Cached
+    #: because the loop control needs them on every iteration and the graph does
+    #: not change during a run.
+    _loop_bodies: dict[str, set[str]]
+    #: Which iteration each loop is currently replaying, so a body node's own replay
+    #: can ask for the row for that iteration rather than the first.
+    _active_loop_iteration: dict[str, int]
 
     def _initialize_state(
         self,
@@ -119,6 +125,10 @@ class WorkflowRetryMixin:
         self._restored_node_statuses: dict[str, str] = {}
         self._restored_node_outputs: dict[str, dict[str, Any]] = {}
         self._retry_source_statuses: dict[str, str] = {}
+        # Filled from the graph by _prepare_retry; a loop body replays per iteration,
+        # and the control node needs the body set on every iteration.
+        self._loop_bodies: dict[str, set[str]] = {}
+        self._active_loop_iteration: dict[str, int] = {}
 
     def _create_loop_state_for_type(self, loop_type: str, node: ActivityNode) -> LoopState: ...  # type: ignore[empty-body]
 
@@ -126,6 +136,16 @@ class WorkflowRetryMixin:
         """Load source state once and exclude branches not selected for retry."""
         if not self.retry_context:
             return
+        self._loop_bodies = {
+            owner: set(nodes)
+            for owner, nodes in collect_loop_bodies(
+                {node.id: graph.get_successors(node.id) for node in graph.get_all_nodes()},
+                {
+                    owner: [node.id for node in graph.get_next_activities_by_port(owner, "iterate")]
+                    for owner in [n.id for n in graph.get_all_nodes() if n.type == NodeType.LOOP]
+                },
+            ).items()
+        }
         self._retry_source_statuses = await workflow.execute_activity(
             ActivityName.RETRY_SOURCE_STATE,
             args=[self.retry_context["retry_from_execution_id"]],
@@ -204,7 +224,6 @@ class WorkflowRetryMixin:
         # are excluded here so the set means what it says, instead of relying on
         # _should_restore_node to filter them again at the point of use.
         control = {node.id for node in graph.get_all_nodes() if node.type in _CONTROL_NODE_TYPES_FOR_RETRY}
-        loop_bodies = self._loop_body_node_ids(graph)
 
         # Everything downstream of a failure point re-executes, so it cannot be
         # restored: a restored downstream node would never re-run to consume the
@@ -214,9 +233,7 @@ class WorkflowRetryMixin:
         for node_id in must_run:
             downstream |= self._walk_downstream(node_id, graph)
 
-        restorable = (
-            {node.id for node in graph.get_all_nodes()} - must_run - triggers - control - loop_bodies - downstream
-        )
+        restorable = {node.id for node in graph.get_all_nodes()} - must_run - triggers - control - downstream
         self._retry_restorable_cache = restorable
         return restorable
 
@@ -329,9 +346,14 @@ class WorkflowRetryMixin:
             self._retry_replay_candidates.discard(node.id)
             return None
 
+        # A loop body is one execution per iteration, so the row asked for is the
+        # one for the iteration this loop is replaying — not the node's first. The
+        # base name is what iteration 0 is stored under.
+        source_name = self._replay_source_name(node.id)
+
         record = await workflow.execute_activity(
             ActivityName.RETRY_NODE_REPLAY,
-            args=[self.retry_context.get("retry_from_execution_id"), node.id],
+            args=[self.retry_context.get("retry_from_execution_id"), source_name],
             activity_id=node.id,
             start_to_close_timeout=timedelta(seconds=DEFAULT_ACTIVITY_TIMEOUT_SECONDS),
         )
@@ -386,6 +408,30 @@ class WorkflowRetryMixin:
             return {"output": output, "control": self._restored_approval_control(output)}
 
         return {"output": output, "control": None}
+
+    def _replay_source_name(self, node_id: str) -> str:
+        """Resolve the stored activity name to replay for ``node_id`` on this pass.
+
+        An ordinary node restores under its own id. A loop body restores per
+        iteration, so it needs the row for the iteration its loop is replaying —
+        which the sync service names ``{node}#iter-{n}`` once the previous row
+        reached a terminal status. Iteration 0 keeps the plain node name, so the
+        first iteration needs no suffix.
+        """
+        loop_id = self._enclosing_loop(node_id)
+        if loop_id is None:
+            return node_id
+        index = self._active_loop_iteration.get(loop_id)
+        if index is None:
+            return node_id
+        return node_id if index == 0 else f"{node_id}{LOOP_ITERATION_SEP}{index}"
+
+    def _enclosing_loop(self, node_id: str) -> str | None:
+        """Find the loop whose body ``node_id`` sits in, or None if it is not a body."""
+        for loop_id, body in self._loop_bodies.items():
+            if node_id in body:
+                return loop_id
+        return None
 
     @staticmethod
     def _restored_approval_control(output: dict[str, Any]) -> dict[str, str] | None:
