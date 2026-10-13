@@ -14,6 +14,7 @@
 import type { ExecutionsAPI } from '@syntara/contracts'
 import { create } from 'zustand'
 
+import { resolveRetryReplayBaseline } from '../../builder/utils/replayedNodes'
 import type {
   Execution,
   ExecutionStatus,
@@ -390,6 +391,7 @@ export const useExecutionStore = create<ExecutionStore>((set, get) => ({
       createdAt: execution.created_at,
       startedAt: execution.created_at,
       completedAt: execution.completed_at,
+      retriedFromExecutionId: execution.retried_from_execution_id ?? null,
     }
 
     // Extract execution metadata for test runs (mode, pre_resolved_nodes, etc.)
@@ -595,6 +597,15 @@ export const selectError = (state: ExecutionStore) => state.error
  * Select whether execution is loaded
  */
 export const selectIsLoaded = (state: ExecutionStore) => state.visualization !== null
+
+/**
+ * Select the timestamp replayed steps predate, or `null` when this execution is
+ * not a retry. Returns a primitive so the selector stays referentially stable.
+ *
+ * @see resolveRetryReplayBaseline
+ */
+export const selectRetryReplayBaseline = (state: ExecutionStore): string | null =>
+  resolveRetryReplayBaseline(state.visualization?.createdAt, state.visualization?.retriedFromExecutionId)
 
 // ============================================================================
 // Action Accessors - Use these to access actions without subscribing to state

@@ -115,4 +115,45 @@ describe('ExecutionStatusBadge', () => {
     const results = await axe(container)
     expect(results).toHaveNoViolations()
   })
+
+  describe('replayed steps', () => {
+    it('says in text that the step reused a previous run', () => {
+      render(<ExecutionStatusBadge status="completed" replayed />)
+
+      expect(screen.getByLabelText('Success — reused output from a previous run')).toBeInTheDocument()
+    })
+
+    it('marks the badge as replayed for styling and tests', () => {
+      render(<ExecutionStatusBadge status="completed" replayed />)
+
+      expect(screen.getByLabelText(/reused output/)).toHaveAttribute('data-replayed')
+    })
+
+    it('draws a dashed ring so the distinction is not colour-only', () => {
+      render(<ExecutionStatusBadge status="completed" replayed />)
+
+      const style = screen.getByLabelText(/reused output/).getAttribute('style') ?? ''
+      expect(style).toContain('border-style: dashed')
+    })
+
+    it('keeps the retry count alongside the reused-output suffix', () => {
+      render(<ExecutionStatusBadge status="completed" retryCount={2} replayed />)
+
+      expect(screen.getByLabelText('Success (2 retries) — reused output from a previous run')).toBeInTheDocument()
+    })
+
+    it('leaves ordinary steps unmarked', () => {
+      render(<ExecutionStatusBadge status="completed" />)
+
+      const badge = screen.getByLabelText('Success')
+      expect(badge).not.toHaveAttribute('data-replayed')
+      expect(badge.getAttribute('style') ?? '').toContain('border-style: solid')
+    })
+
+    it('has no accessibility violations when replayed', async () => {
+      const { container } = render(<ExecutionStatusBadge status="completed" replayed />)
+      const results = await axe(container)
+      expect(results).toHaveNoViolations()
+    })
+  })
 })
