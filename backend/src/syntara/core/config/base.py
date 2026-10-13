@@ -1929,6 +1929,28 @@ class AuthzSettings(BaseSettings):
 
 
 # =============================================================================
+# Event Stream (Kafka consumer) Configuration
+# =============================================================================
+
+
+class EventStreamSettings(BaseSettings):
+    """Event-stream consumer process configuration.
+
+    Only the process-level on/off toggle lives here. The broker URL, topics, and
+    auth token are intentionally NOT settings — they are hardcoded for now in
+    :mod:`syntara.eventstreams.static_broker` (a temporary stand-in) and will move
+    to a user-created Integration + Credential (ADR-0001; ANSTRAT-1934).
+
+    Note: This class should not be instantiated directly. Use Settings via get_settings().
+    """
+
+    eventstream_enabled: bool = Field(
+        default=True,
+        description="Enable the event-stream consumer worker.",
+    )
+
+
+# =============================================================================
 # Main Settings
 # =============================================================================
 
@@ -1965,6 +1987,7 @@ class Settings(
     MetricsSettings,
     AuthzSettings,
     OpenTelemetrySettings,
+    EventStreamSettings,
 ):
     """Application-wide settings.
 
