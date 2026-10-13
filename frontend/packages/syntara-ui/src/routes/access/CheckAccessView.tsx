@@ -139,12 +139,13 @@ export function CheckAccessView({ resourceTypes, actionsByResource }: Readonly<R
   const canIMutation = accessClient.useMutation('post', '/authz/can_i')
 
   const onSubmit = handleSubmit((formData) => {
+    const project = formData.project?.trim()
     canIMutation.mutate({
       body: {
         action: formData.action.trim(),
         resource_type: formData.resourceType.trim(),
         ...(formData.resourceId?.trim() && { resource_id: formData.resourceId.trim() }),
-        ...(formData.project?.trim() && { resource_project: formData.project.trim() }),
+        ...(project ? { resource_project: project } : { check_any_project: true }),
       },
     })
   })
