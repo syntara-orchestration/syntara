@@ -6,10 +6,10 @@ activity references and invalid namespace scopes.
 """
 
 import re
-from collections import deque
 from typing import Any
 
 from syntara.workflows.models.validation_finding import ValidationCategory, ValidationFinding, ValidationSeverity
+from syntara.workflows.utils.loop_body_nodes import collect_loop_bodies
 
 TEMPLATE_PATTERN = re.compile(r"\$\{([^}]+)\}")
 
@@ -39,28 +39,19 @@ def _identify_loop_body_nodes(workflow_definition: dict[str, Any]) -> dict[str, 
 
     adjacency: dict[str, list[str]] = {}
     iterate_successors: dict[str, list[str]] = {}
-    feedback_edges: set[tuple[str, str]] = set()
 
     for edge in workflow_definition.get("edges", []):
         src, dst = edge["from"], edge["to"]
         if edge.get("to_port") == "iterate":
-            feedback_edges.add((src, dst))
             continue
         adjacency.setdefault(src, []).append(dst)
         if src in loop_node_ids and edge.get("from_port") == "iterate":
             iterate_successors.setdefault(src, []).append(dst)
 
     loop_body_map: dict[str, str] = {}
-    for loop_id, seeds in iterate_successors.items():
-        queue: deque[str] = deque(seeds)
-        while queue:
-            nid = queue.popleft()
-            if nid in loop_body_map or nid == loop_id:
-                continue
-            loop_body_map[nid] = loop_id
-            for successor in adjacency.get(nid, []):
-                if (nid, successor) not in feedback_edges:
-                    queue.append(successor)
+    for loop_id, body in collect_loop_bodies(adjacency, iterate_successors).items():
+        for node_id in body:
+            loop_body_map.setdefault(node_id, loop_id)
     return loop_body_map
 
 

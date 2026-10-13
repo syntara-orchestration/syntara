@@ -57,6 +57,10 @@ class ExecutionMonitorMetadata:
         mode: Execution mode of the run (standard, test, debug)
         workflow_version: Version number of the workflow definition used by this run
         used_published: Whether the run used the workflow's published version
+        is_retry: Whether this run is a retry from a prior execution's failure point
+        is_retry_from_failure: Whether the workflow itself reports a retry-from-failure.
+            Queried once at monitor start, because the lineage flag above is also true
+            for a whole-execution retry, which has no replayed nodes to ask about.
 
     """
 
@@ -76,6 +80,8 @@ class ExecutionMonitorMetadata:
     mode: ExecutionMode | None = None
     workflow_version: int | None = None
     used_published: bool | None = None
+    is_retry: bool = False
+    is_retry_from_failure: bool = False
 
 
 type QueueItem = HistoryEvent | SyntheticActivityStarted | SyntheticPartialOutput | None
