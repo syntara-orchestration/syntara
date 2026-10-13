@@ -18,7 +18,7 @@ See [backend/README.md](backend/README.md) and [frontend/README.md](frontend/REA
 ## Prerequisites
 
 - **Python 3.12+** and [uv](https://docs.astral.sh/uv/) (backend)
-- **Node.js 22+** and npm (frontend)
+- **Node.js 22.18+** and npm (frontend)
 - **Podman** or Docker (container-based development)
 - **Make** (orchestration)
 

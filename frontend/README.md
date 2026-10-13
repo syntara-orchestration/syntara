@@ -17,7 +17,7 @@ Syntara UI is a cutting-edge React application designed for building and managin
 
 ### Prerequisites
 
-- Node.js 22+ (recommended)
+- Node.js 22.18+ (recommended)
 - npm 10+
 
 ### Installation
@@ -92,7 +92,7 @@ npm run gen
 
 ### Troubleshooting
 
-- Ensure you're using Node.js 22+
+- Ensure you're using Node.js 22.18+
 - Run `npm ci` instead of `npm install`
 - Check that all dependencies are installed correctly
 - Refer to the [Frontend contributor guide](../docs/frontend-contributing.md) for contribution guidelines
@@ -132,7 +132,7 @@ frontend/
 
 ### Tooling
 
-- Node.js 22+ (see package.json for exact requirements)
+- Node.js 22.18+
 - npm (comes with Node.js)
 
 ### Available Commands

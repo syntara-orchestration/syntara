@@ -44,3 +44,7 @@ dist-ssr
 storybook-static/
 
 .eslintcache
+
+# Local Stryker audit output
+/mutation-reports/
+**/.stryker-tmp/

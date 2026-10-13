@@ -6,14 +6,19 @@ import { z } from 'zod'
 import baseDocsConfig from './docsConfig.json' with { type: 'json' }
 import baseDocsUrls from './docsUrls.json' with { type: 'json' }
 
+// Stryker disable all: Vite needs static glob arguments before test transforms run.
 const overlayConfigModules = import.meta.glob('./docsConfig.overlay.json', {
   eager: true,
   import: 'default',
 })
+// Stryker restore all
+
+// Stryker disable all: Vite needs static glob arguments before test transforms run.
 const overlayUrlsModules = import.meta.glob('./docsUrls.overlay.json', {
   eager: true,
   import: 'default',
 })
+// Stryker restore all
 
 /** Overlay may set product base / version only — never communityBaseUrl. */
 const docsConfigOverlaySchema = z

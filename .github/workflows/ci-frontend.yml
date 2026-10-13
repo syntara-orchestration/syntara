@@ -46,7 +46,7 @@ concurrency:
 
 # Scoped to this file only — other workflows pin their own.
 env:
-  NODE_VERSION: '22.13.0'
+  NODE_VERSION: '22.18.0'
 
 jobs:
   changes:
