@@ -11,6 +11,7 @@ from uuid import UUID, uuid4
 import pytest
 from temporalio.api.enums.v1 import EventType
 from temporalio.client import WorkflowExecutionStatus, WorkflowQueryRejectedError
+from temporalio.exceptions import ApplicationError
 from temporalio.service import RPCError, RPCStatusCode
 
 from syntara.core.exceptions import SafeValueError
@@ -487,7 +488,7 @@ class TestActivityEventProcessing:
         assert update["activity_id"] == "loop-node"
         assert update["_is_loop_iteration"] is True
         assert update["_is_loop_control"] is True
-        assert update["_is_control_node"] is True
+        assert update["_has_control_data"] is True
         assert update["iteration"] == 0
 
     def test_process_activity_scheduled_extracts_iteration_number(self) -> None:
@@ -517,7 +518,7 @@ class TestActivityEventProcessing:
         assert update["activity_id"] == "action-1"
         assert update["_is_loop_iteration"] is False
         assert update["_is_loop_control"] is False
-        assert update["_is_control_node"] is False
+        assert update["_has_control_data"] is False
         assert update["iteration"] is None
 
     def test_process_activity_scheduled_loop_iteration_for_re_executed_body_node(self) -> None:
@@ -552,7 +553,7 @@ class TestActivityEventProcessing:
         assert update["activity_id"] == "approval-node"
         assert update["_is_loop_iteration"] is True
         assert update["_is_loop_control"] is False
-        assert update["_is_control_node"] is True
+        assert update["_has_control_data"] is True
         assert update["iteration"] == 1
 
     def test_process_activity_scheduled_nested_approval_iter_suffix_is_not_loop_control(self) -> None:
@@ -5872,11 +5873,25 @@ class TestResolveActivityControl:
             "condition-1",
             {"status": ActivityStatus.COMPLETED},
             self._existing(),
-            is_control_node=True,
         )
 
         assert result == {"next_port": "true"}
         handle.query.assert_awaited_once_with("get_activity_control", "condition-1")
+        handle.execute_update.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_control_query_failure_returns_no_control(self) -> None:
+        handle = AsyncMock()
+        handle.query.side_effect = ValueError("query unavailable")
+
+        result = await self.service._resolve_activity_control(
+            handle,
+            "condition-1",
+            {"status": ActivityStatus.COMPLETED},
+            self._existing(),
+        )
+
+        assert result is None
         handle.execute_update.assert_not_awaited()
 
     @pytest.mark.asyncio
@@ -5892,14 +5907,32 @@ class TestResolveActivityControl:
             "loop-1",
             {"status": ActivityStatus.COMPLETED},
             self._existing(previous),
-            is_control_node=True,
-            is_loop_control=True,
         )
 
         assert result == current
         handle.execute_update.assert_awaited_once_with(
             "get_activity_control_when_ready",
             args=["loop-1", previous],
+        )
+
+    @pytest.mark.asyncio
+    async def test_terminal_query_race_waits_for_completed_control_node(self) -> None:
+        current = {"next_port": "false"}
+        handle = AsyncMock()
+        handle.query.return_value = None
+        handle.execute_update.return_value = current
+
+        result = await self.service._resolve_activity_control(
+            handle,
+            "condition-1",
+            {"status": ActivityStatus.COMPLETED},
+            self._existing(),
+        )
+
+        assert result == current
+        handle.execute_update.assert_awaited_once_with(
+            "get_activity_control_when_ready",
+            args=["condition-1", None],
         )
 
     @pytest.mark.asyncio
@@ -5912,8 +5945,6 @@ class TestResolveActivityControl:
             "loop-1",
             {"status": ActivityStatus.RUNNING},
             self._existing(previous),
-            is_control_node=True,
-            is_loop_control=True,
         )
 
         assert result == previous
@@ -5932,10 +5963,82 @@ class TestResolveActivityControl:
 
         result = await self.service._resolve_activity_control(
             handle,
-            "condition-1",
+            "loop-1",
             {"status": ActivityStatus.COMPLETED},
             self._existing({"next_port": "false"}),
-            is_control_node=True,
+        )
+
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_non_loop_control_does_not_wait_for_missing_control(self) -> None:
+        handle = AsyncMock()
+        handle.query.return_value = None
+
+        result = await self.service._resolve_activity_control(
+            handle,
+            "condition-1",
+            {"status": ActivityStatus.FAILED},
+            self._existing(),
+        )
+
+        assert result is None
+        handle.query.assert_awaited_once_with("get_activity_control", "condition-1")
+        handle.execute_update.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_missing_control_update_failure_does_not_raise(self) -> None:
+        handle = AsyncMock()
+        handle.query.return_value = None
+        handle.execute_update.side_effect = RPCError(
+            "workflow not found",
+            RPCStatusCode.NOT_FOUND,
+            b"",
+        )
+
+        result = await self.service._resolve_activity_control(
+            handle,
+            "loop-1",
+            {"status": ActivityStatus.COMPLETED},
+            self._existing({"next_port": "false"}),
+        )
+
+        assert result is None
+        assert handle.query.await_count == 2
+        handle.query.assert_any_await("get_activity_control", "loop-1")
+
+    @pytest.mark.asyncio
+    async def test_control_update_not_found_retries_query(self) -> None:
+        handle = AsyncMock()
+        handle.query.side_effect = [None, {"next_port": "true"}]
+        handle.execute_update.side_effect = RPCError(
+            "workflow execution not found",
+            RPCStatusCode.NOT_FOUND,
+            b"",
+        )
+
+        result = await self.service._resolve_activity_control(
+            handle,
+            "condition-1",
+            {"status": ActivityStatus.COMPLETED},
+            self._existing(),
+        )
+
+        assert result == {"next_port": "true"}
+        assert handle.query.await_count == 2
+        handle.query.assert_any_await("get_activity_control", "condition-1")
+
+    @pytest.mark.asyncio
+    async def test_control_update_timeout_returns_no_control(self) -> None:
+        handle = AsyncMock()
+        handle.query.return_value = None
+        handle.execute_update.side_effect = ApplicationError("control data timeout")
+
+        result = await self.service._resolve_activity_control(
+            handle,
+            "condition-1",
+            {"status": ActivityStatus.COMPLETED},
+            self._existing(),
         )
 
         assert result is None

@@ -12,7 +12,7 @@ info:
     ```
     BaseResource (id, labels, created_at, updated_at)
     +-- Execution (+ workflow execution fields)
-    +-- ActivityExecutionRead (+ activity execution fields)
+    +-- ActivityExecution (+ activity execution fields)
     ```
 
     Note: Approval resources are in a separate API. See `/api/v1/approvals`.
@@ -366,8 +366,8 @@ components:
     ExecutionRead:
       $ref: ./shared-schemas.yaml#/components/schemas/ExecutionRead
 
-    ActivityExecutionRead:
-      $ref: ./shared-schemas.yaml#/components/schemas/ActivityExecutionRead
+    ActivityExecution:
+      $ref: ./shared-schemas.yaml#/components/schemas/ActivityExecution
 
     ActivityData:
       $ref: ./shared-schemas.yaml#/components/schemas/ActivityData

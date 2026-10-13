@@ -44,7 +44,6 @@ from syntara.workflows.json_schema_validation import apply_schema_defaults
 from syntara.workflows.models.activity_execution import (
     ActivityExecution,
     ActivityExecutionListResponse,
-    ActivityExecutionRead,
 )
 from syntara.workflows.models.execution import (
     TERMINAL_EXECUTION_STATUSES,
@@ -978,12 +977,12 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
         if query_params_items:
             execution_filter.extend(query_params_items)
 
-        # Convert through the public read model so internal persistence fields are
-        # never included in REST responses.
+        # The internal control_data field is excluded from the public model schema
+        # and serialization.
         return await self.list_resources(
             model=ActivityExecution,
             response_type=ActivityExecutionListResponse,
-            response_type_converter=ActivityExecutionRead.model_validate,
+            response_type_converter=lambda activity: activity,
             limit=limit,
             cursor=cursor,
             sort=sort or "-created_at",

@@ -49643,7 +49643,7 @@
           }
         }
       },
-      "ActivityExecutionRead": {
+      "ActivityExecution": {
         "properties": {
           "id": {
             "type": "string",
@@ -49795,8 +49795,8 @@
           "status"
         ],
         "type": "object",
-        "title": "ActivityExecutionRead",
-        "description": "Public activity response model that intentionally excludes control data.",
+        "title": "ActivityExecution",
+        "description": "Database model for activity executions.\n\nPersists activity execution state to enable querying after Temporal's retention\nperiod expires. Data is synced from Temporal events and cached in database.\n\nThis model serves both as the database table and the API response schema.\nActivities are read-only from the API - they're created/updated by syncing from Temporal.\n\nInherits from BaseResource:\n    id: UUID primary key\n    created_at: Creation timestamp\n    updated_at: Last update timestamp\n    labels: Optional key-value metadata",
         "additionalProperties": false
       },
       "ActivityData": {
@@ -50061,7 +50061,7 @@
           "resources": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/ActivityExecutionRead"
+              "$ref": "#/components/schemas/ActivityExecution"
             },
             "maxItems": 100,
             "title": "Resources",

@@ -43,7 +43,7 @@ class ActivitySyncEventProcessorMixin:
         # heuristic so tests without a definitions map still pass.
         activity_type = metadata.activity_definitions_map.get(base_activity_id, {}).get("type")
         is_loop_control = has_iter_suffix and activity_type in (None, NodeType.LOOP)
-        is_control_node = is_loop_control or activity_type in (
+        has_control_data = is_loop_control or activity_type in (
             NodeType.CONDITION,
             NodeType.APPROVAL,
             NodeType.SWITCH,
@@ -59,7 +59,7 @@ class ActivitySyncEventProcessorMixin:
             "activity_name": base_activity_id,
             "_is_loop_iteration": is_loop_iteration,
             "_is_loop_control": is_loop_control,
-            "_is_control_node": is_control_node,
+            "_has_control_data": has_control_data,
             "status": ActivityStatus.PENDING,
             "started_at": None,
             "completed_at": None,

@@ -88,10 +88,18 @@ class ActivityExecutionSyncMixin:
             )
         except RPCError as e:
             if e.status == RPCStatusCode.NOT_FOUND:
+                # Workflow already completed before the update was accepted;
+                # query the final workflow state for the stored control data.
                 try:
-                    return cast("dict[str, Any] | None", await handle.query("get_activity_control", activity_id))
+                    return cast(
+                        "dict[str, Any] | None",
+                        await handle.query("get_activity_control", activity_id),
+                    )
                 except (TemporalError, ValueError):
-                    logger.warning("Could not query completed activity control", activity_id=activity_id)
+                    logger.warning(
+                        "Could not query completed activity control",
+                        activity_id=activity_id,
+                    )
                     raise
             logger.warning("Workflow update for activity control failed", activity_id=activity_id)
             return None
@@ -398,13 +406,15 @@ class ActivityExecutionSyncMixin:
             return None
 
         input_data, output_data = await self._resolve_activity_io(handle, activity_id, activity_data, existing)
-        control_data = await self._resolve_activity_control(
-            handle,
-            activity_id,
-            activity_data,
-            existing,
-            is_control_node=bool(activity_data.get("_is_control_node")),
-            is_loop_control=is_loop_control,
+        control_data = (
+            await self._resolve_activity_control(
+                handle,
+                activity_id,
+                activity_data,
+                existing,
+            )
+            if activity_data.get("_has_control_data")
+            else None
         )
 
         # Loop control nodes: keep the node "running" between iterations so the UI
@@ -489,9 +499,6 @@ class ActivityExecutionSyncMixin:
         activity_id: str,
         activity_data: dict[str, Any],
         existing: ActivityExecution,
-        *,
-        is_control_node: bool = False,
-        is_loop_control: bool = False,
     ) -> dict[str, Any] | None:
         """Resolve the effective control data used for routing without changing output data."""
         if activity_data.get("status") not in TERMINAL_ACTIVITY_STATUSES:
@@ -503,8 +510,11 @@ class ActivityExecutionSyncMixin:
             logger.warning("Could not query activity control data", activity_id=activity_id)
             return None
 
-        if result is None and is_control_node:
-            previous = existing.control_data if is_loop_control and isinstance(existing.control_data, dict) else None
+        # The query can race with workflow result processing for every control
+        # node, not only loops. Failed/cancelled/skipped activities do not
+        # produce control data, so they must not wait for the update.
+        if result is None and activity_data.get("status") == ActivityStatus.COMPLETED:
+            previous = existing.control_data if isinstance(existing.control_data, dict) else None
             result = await self._fetch_completed_activity_control(handle, activity_id, previous)
 
         if isinstance(result, dict):
