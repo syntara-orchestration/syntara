@@ -3,7 +3,7 @@ name: CI Backend
 
 on:
   pull_request:
-    branches: [devel, early-access]
+    branches: [devel, early-access, feature/**]
   merge_group:
     branches: [devel, early-access]
   push:
