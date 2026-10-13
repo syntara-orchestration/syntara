@@ -178,6 +178,8 @@ __all__ = (
     "IntegrationType",
     "IntegrationUpdate",
     "IntegrationUpdateLabelsType0",
+    "KafkaConfiguration",
+    "KafkaSaslMechanism",
     "KPIDashboard",
     "ListRoleAssignmentsPrincipalTypeType0",
     "ListRoleAssignmentsScopeType0",
