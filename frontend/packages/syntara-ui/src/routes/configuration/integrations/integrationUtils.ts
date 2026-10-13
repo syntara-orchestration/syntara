@@ -8,6 +8,7 @@ const integrationTypeSchema = z.discriminatedUnion('integration_type', [
   z.object({ integration_type: z.literal(IntegrationTypeEnum.MCP_SERVER) }),
   z.object({ integration_type: z.literal(IntegrationTypeEnum.LLM_PROVIDER) }),
   z.object({ integration_type: z.literal(IntegrationTypeEnum.ANSIBLE_AUTOMATION_PLATFORM) }),
+  z.object({ integration_type: z.literal(IntegrationTypeEnum.KAFKA) }),
 ])
 
 const PROVIDER_DEFAULT_URLS: Record<string, string> = {
@@ -25,6 +26,9 @@ export function getBaseUrl(integration: IntegrationRead): string {
       return PROVIDER_DEFAULT_URLS[config.provider_hint] ?? ''
     }
     return ''
+  }
+  if ('bootstrap_servers' in config && Array.isArray(config.bootstrap_servers)) {
+    return config.bootstrap_servers.join(', ')
   }
   return ''
 }
