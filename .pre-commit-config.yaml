@@ -73,7 +73,7 @@ repos:
     hooks:
       - id: frontend-prettier
         name: 'frontend: prettier format'
-        entry: npx --prefix frontend prettier --write --
+        entry: npx --prefix frontend prettier --ignore-path=frontend/.prettierignore --write --
         language: system
         pass_filenames: true
         files: ^frontend/.*\.(ts|tsx|js|jsx|json|yml|yaml|md|css)$
