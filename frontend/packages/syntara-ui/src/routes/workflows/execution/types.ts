@@ -153,6 +153,8 @@ export type ExecutionVisualization = {
   startedAt?: string | null
   /** When execution completed */
   completedAt?: string | null
+  /** Set when this execution was created by retrying another one. */
+  retriedFromExecutionId?: string | null
 }
 
 // ============================================================================

@@ -11,6 +11,8 @@ import { ApprovalActionButtons } from './ApprovalActionButtons'
 import { CancelExecutionButton } from './CancelExecutionButton'
 import { isExecutionRetryable } from './executionRetryable'
 import { RetryExecutionButton } from './RetryExecutionButton'
+import { isRetryFromFailureEligible } from './retryFromFailure'
+import { RetryFromFailureButton } from './RetryFromFailureButton'
 
 type Execution = ExecutionsAPI.components['schemas']['ExecutionRead']
 
@@ -69,6 +71,7 @@ export function ExecutionDetailHeaderToolbar({
   execution,
 }: ExecutionDetailHeaderToolbarProps) {
   const isRetryable = isExecutionRetryable(execution?.status, execution?.mode)
+  const showRetryFromFailure = isRetryFromFailureEligible(execution?.status, execution?.mode)
 
   return (
     <>
@@ -90,6 +93,7 @@ export function ExecutionDetailHeaderToolbar({
           projectId={execution.project_id}
         />
       )}
+      {showRetryFromFailure && execution && <RetryFromFailureButton executionId={executionId} projectId={execution.project_id} />}
       <Button variant="secondary" onClick={onCopyToEditor}>
         Copy to editor
       </Button>

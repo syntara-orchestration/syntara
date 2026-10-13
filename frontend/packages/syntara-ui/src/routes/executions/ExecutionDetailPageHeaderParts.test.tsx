@@ -20,6 +20,11 @@ vi.mock('../../client', () => ({
       mutate: vi.fn(),
       isPending: false,
     })),
+    useQuery: vi.fn(() => ({
+      data: null,
+      isPending: false,
+      isError: false,
+    })),
   },
   workflowClient: {
     useQuery: vi.fn(() => ({
@@ -353,6 +358,71 @@ describe('ExecutionDetailPageHeaderParts', () => {
       </QueryClientProvider>
     )
     expect(screen.getByRole('button', { name: 'Retry run' })).toBeInTheDocument()
+  })
+
+  it.each([
+    ['failed' as const, true],
+    ['completed_with_errors' as const, true],
+    ['cancelled' as const, false],
+    ['completed' as const, false],
+    ['running' as const, false],
+  ])('shows retry from failure for %s: %s', (status, expected) => {
+    const queryClient = new QueryClient()
+    const execution = {
+      id: 'exec-status',
+      workflow_id: 'wf-1',
+      workflow_version_id: 'wfv-1',
+      project_id: 'proj-1',
+      status,
+      mode: 'standard',
+    } as never
+    render(
+      <QueryClientProvider client={queryClient}>
+        <ExecutionDetailHeaderToolbar
+          showApprovalActionStrip={false}
+          isApprovalLoading={false}
+          onReviewClick={() => {}}
+          historyCardOpen={false}
+          onToggleHistory={() => {}}
+          onBackToEditor={() => {}}
+          onCopyToEditor={() => {}}
+          isCancellable={false}
+          executionId="exec-status"
+          execution={execution}
+        />
+      </QueryClientProvider>
+    )
+    const button = screen.queryByRole('button', { name: 'Retry from failure' })
+    expect(Boolean(button)).toBe(expected)
+  })
+
+  it('does not render retry from failure for a failed test execution', () => {
+    const queryClient = new QueryClient()
+    const execution = {
+      id: 'exec-test',
+      workflow_id: 'wf-1',
+      workflow_version_id: 'wfv-1',
+      project_id: 'proj-1',
+      status: 'failed' as const,
+      mode: 'test',
+    } as never
+    render(
+      <QueryClientProvider client={queryClient}>
+        <ExecutionDetailHeaderToolbar
+          showApprovalActionStrip={false}
+          isApprovalLoading={false}
+          onReviewClick={() => {}}
+          historyCardOpen={false}
+          onToggleHistory={() => {}}
+          onBackToEditor={() => {}}
+          onCopyToEditor={() => {}}
+          isCancellable={false}
+          executionId="exec-test"
+          execution={execution}
+        />
+      </QueryClientProvider>
+    )
+    expect(screen.queryByRole('button', { name: 'Retry from failure' })).not.toBeInTheDocument()
   })
 
   it('does not render retry button for running execution', () => {

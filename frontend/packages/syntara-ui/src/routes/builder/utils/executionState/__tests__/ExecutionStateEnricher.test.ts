@@ -100,7 +100,74 @@ describe('ExecutionStateEnricher', () => {
         started_at: '2024-01-01T00:00:00Z',
         completed_at: undefined,
         error_details: undefined,
+        replayed: false,
       })
+    })
+
+    it('flags a step as replayed when it started before the retry baseline', () => {
+      const activity: Activity = {
+        id: 'task-1',
+        name: 'Task 1',
+        type: 'script',
+        parameters: { language: 'python', code: '' },
+      }
+      const activityStates = new Map<string, ActivityState>([
+        // Carried over from the source run, which predates the retry execution.
+        ['task-1', { activityId: 'task-1', status: 'completed', startedAt: '2024-01-01T00:00:00Z', completedAt: '2024-01-01T00:01:00Z' }],
+      ])
+
+      const result = enricher.enrichActivity({
+        activity: activity,
+        executionStatus: 'running',
+        activityStates: activityStates,
+        edges: [],
+        options: { replayBaselineAt: '2024-01-02T00:00:00Z' },
+      })
+
+      expect(result.__executionState?.replayed).toBe(true)
+    })
+
+    it('does not flag a step that started inside the retry window', () => {
+      const activity: Activity = {
+        id: 'task-1',
+        name: 'Task 1',
+        type: 'script',
+        parameters: { language: 'python', code: '' },
+      }
+      const activityStates = new Map<string, ActivityState>([
+        ['task-1', { activityId: 'task-1', status: 'running', startedAt: '2024-01-02T00:00:05Z', completedAt: null }],
+      ])
+
+      const result = enricher.enrichActivity({
+        activity: activity,
+        executionStatus: 'running',
+        activityStates: activityStates,
+        edges: [],
+        options: { replayBaselineAt: '2024-01-02T00:00:00Z' },
+      })
+
+      expect(result.__executionState?.replayed).toBe(false)
+    })
+
+    it('never flags a replayed step on an execution with no retry baseline', () => {
+      const activity: Activity = {
+        id: 'task-1',
+        name: 'Task 1',
+        type: 'script',
+        parameters: { language: 'python', code: '' },
+      }
+      const activityStates = new Map<string, ActivityState>([
+        ['task-1', { activityId: 'task-1', status: 'completed', startedAt: '2020-01-01T00:00:00Z', completedAt: null }],
+      ])
+
+      const result = enricher.enrichActivity({
+        activity: activity,
+        executionStatus: 'running',
+        activityStates: activityStates,
+        edges: [],
+      })
+
+      expect(result.__executionState?.replayed).toBe(false)
     })
 
     it('uses backend status for loop node', () => {
