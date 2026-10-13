@@ -14,7 +14,7 @@
 openapi: 3.1.0
 info:
   title: Syntara API
-  version: 1.3.1
+  version: 1.4.0
   description: A distributed multi-agent workflow orchestration system
 servers:
   - url: /api/v1
@@ -30357,6 +30357,7 @@ components:
         - mcp_server
         - llm_provider
         - ansible_automation_platform
+        - kafka
       title: IntegrationType
       description: Type of external integration.
     IntegrationStatus:
@@ -30496,12 +30497,14 @@ components:
             - $ref: '#/components/schemas/MCPServerConfigurationInput'
             - $ref: '#/components/schemas/LLMProviderConfiguration'
             - $ref: '#/components/schemas/AAPConfiguration'
+            - $ref: '#/components/schemas/KafkaConfiguration'
           title: Configuration
           description: Integration-specific configuration
           discriminator:
             propertyName: integration_type
             mapping:
               ansible_automation_platform: '#/components/schemas/AAPConfiguration'
+              kafka: '#/components/schemas/KafkaConfiguration'
               llm_provider: '#/components/schemas/LLMProviderConfiguration'
               mcp_server: '#/components/schemas/MCPServerConfigurationInput'
         management_credential_id:
@@ -30646,10 +30649,12 @@ components:
                 - $ref: '#/components/schemas/MCPServerConfigurationInput'
                 - $ref: '#/components/schemas/LLMProviderConfiguration'
                 - $ref: '#/components/schemas/AAPConfiguration'
+                - $ref: '#/components/schemas/KafkaConfiguration'
               discriminator:
                 propertyName: integration_type
                 mapping:
                   ansible_automation_platform: '#/components/schemas/AAPConfiguration'
+                  kafka: '#/components/schemas/KafkaConfiguration'
                   llm_provider: '#/components/schemas/LLMProviderConfiguration'
                   mcp_server: '#/components/schemas/MCPServerConfigurationInput'
             - type: 'null'
@@ -30698,10 +30703,12 @@ components:
               mcp_server: '#/components/schemas/MCPServerConfigurationInput'
               llm_provider: '#/components/schemas/LLMProviderConfiguration'
               ansible_automation_platform: '#/components/schemas/AAPConfiguration'
+              kafka: '#/components/schemas/KafkaConfiguration'
           oneOf:
             - $ref: '#/components/schemas/MCPServerConfigurationInput'
             - $ref: '#/components/schemas/LLMProviderConfiguration'
             - $ref: '#/components/schemas/AAPConfiguration'
+            - $ref: '#/components/schemas/KafkaConfiguration'
           title: Configuration
         credential_id:
           anyOf:
@@ -30797,12 +30804,14 @@ components:
             - $ref: '#/components/schemas/MCPServerConfigurationInput'
             - $ref: '#/components/schemas/LLMProviderConfiguration'
             - $ref: '#/components/schemas/AAPConfiguration'
+            - $ref: '#/components/schemas/KafkaConfiguration'
           title: Configuration
           description: Integration-specific configuration
           discriminator:
             propertyName: integration_type
             mapping:
               ansible_automation_platform: '#/components/schemas/AAPConfiguration'
+              kafka: '#/components/schemas/KafkaConfiguration'
               llm_provider: '#/components/schemas/LLMProviderConfiguration'
               mcp_server: '#/components/schemas/MCPServerConfigurationInput'
         last_validated_at:
@@ -30992,6 +31001,63 @@ components:
       required:
         - base_url
       title: AAPConfiguration
+      type: object
+    KafkaSaslMechanism:
+      type: string
+      title: KafkaSaslMechanism
+      description: |-
+        SASL mechanism used with the Kafka-connection username and password.
+
+        Cloud brokers such as Aiven use SCRAM-SHA-256. PLAIN remains available
+        for clusters that authenticate that way.
+      enum:
+        - PLAIN
+        - SCRAM-SHA-256
+        - SCRAM-SHA-512
+    KafkaConfiguration:
+      description: |-
+        Configuration for a Kafka cluster integration.
+
+        Broker addresses live here. The username and password stay on the
+        linked Kafka-connection credential.
+      additionalProperties: false
+      properties:
+        integration_type:
+          type: string
+          const: kafka
+          default: kafka
+          title: Integration Type
+        bootstrap_servers:
+          type: array
+          items:
+            type: string
+          minItems: 1
+          maxItems: 20
+          title: Bootstrap Servers
+          description: Kafka bootstrap servers as host:port (or [ipv6]:port) values.
+        sasl_mechanism:
+          $ref: '#/components/schemas/KafkaSaslMechanism'
+          description: SASL mechanism for the username and password on the linked credential.
+          default: SCRAM-SHA-256
+        allow_http:
+          type: boolean
+          title: Allow Http
+          description: Allow HTTP (unencrypted) connections. Loopback addresses are always permitted over HTTP.
+          default: false
+        insecure_skip_tls_verify:
+          type: boolean
+          title: Insecure Skip Tls Verify
+          description: Disable TLS certificate verification for connections to this integration.
+          default: false
+        ca_certificate:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Ca Certificate
+          description: PEM-encoded CA certificate to trust for this integration's TLS connections.
+      required:
+        - bootstrap_servers
+      title: KafkaConfiguration
       type: object
     DiscoveredLLMModel:
       description: A model discovered from an LLM provider.

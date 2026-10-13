@@ -17,6 +17,7 @@ if TYPE_CHECKING:
 from sqlmodel import col, or_, select
 
 import syntara.integrations.adapters.aap
+import syntara.integrations.adapters.kafka  # register Kafka adapter
 import syntara.integrations.adapters.llm_provider
 import syntara.integrations.adapters.mcp_server  # noqa: F401 — register MCP adapter
 from syntara.core.config.base import get_settings
