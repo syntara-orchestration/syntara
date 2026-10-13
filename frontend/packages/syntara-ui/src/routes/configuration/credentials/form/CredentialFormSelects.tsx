@@ -6,6 +6,7 @@ import { SynSelect } from '../../../../components/SynSelect'
 export function ProjectSelect({
   value,
   onChange,
+  onBlur,
   projects,
   isDisabled,
   isLoading,
@@ -13,6 +14,7 @@ export function ProjectSelect({
 }: {
   value: string
   onChange: (value: string) => void
+  onBlur?: () => void
   projects: Array<{ id?: string; name: string }>
   isDisabled?: boolean
   isLoading?: boolean
@@ -35,6 +37,7 @@ export function ProjectSelect({
         <MenuToggle
           ref={toggleRef}
           onClick={() => setIsOpen((prev) => !prev)}
+          onBlur={onBlur}
           isExpanded={isOpen}
           isFullWidth
           isDisabled={isDisabled}
