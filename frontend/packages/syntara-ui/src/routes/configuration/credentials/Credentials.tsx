@@ -360,7 +360,7 @@ export default function Credentials() {
                         }}
                         aria-label="Row expansion"
                       />
-                      <Th width={10} sort={getSortParams(0)}>
+                      <Th width={15} sort={getSortParams(0)}>
                         Name
                       </Th>
                       <Th width={15}>Type</Th>

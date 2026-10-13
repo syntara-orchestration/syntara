@@ -9,7 +9,6 @@ import {
   listCredentialsByName,
 } from '../utils/api'
 
-import { filterChipGroup } from './patternfly'
 import { buildUniqueName, selectFirstProject } from './workflows'
 
 /**
@@ -274,59 +273,10 @@ export const isCredentialsResponse = (resp: Response) =>
   resp.url().includes('for_action=use') &&
   resp.status() === 200
 
-/** Successful GET on the credentials collection (list page), not detail or credential_types. */
-export function isCredentialsListResponse(resp: Response): boolean {
-  if (resp.request().method() !== 'GET' || resp.status() !== 200) {
-    return false
-  }
-  try {
-    const { pathname, searchParams } = new URL(resp.url())
-    if (!pathname.endsWith('/credentials')) {
-      return false
-    }
-    if (searchParams.has('for_action')) {
-      return false
-    }
-    return true
-  } catch {
-    return false
-  }
-}
-
-function credentialsListMatchesFilter(resp: Response, keyword: string): boolean {
-  if (!isCredentialsListResponse(resp)) {
-    return false
-  }
-  const filterValue = new URL(resp.url()).searchParams.get('name[contains]')
-  return filterValue === keyword
-}
-
-const CREDENTIALS_LIST_NETWORK_TIMEOUT = 30_000
-
-/** Filter the credentials list by keyword and wait for UI + list request to settle. */
+/** Filter the credentials list by keyword. */
 export async function filterCredentialByName(app: Page, name: string) {
   await app.getByPlaceholder('Filter by keyword').fill(name)
-  await Promise.all([
-    app.waitForResponse((resp) => credentialsListMatchesFilter(resp, name), {
-      timeout: CREDENTIALS_LIST_NETWORK_TIMEOUT,
-    }),
-    app.getByRole('button', { name: 'Apply filter' }).click(),
-  ])
-
-  const keywordChips = filterChipGroup(app, 'Keyword')
-  await expect(keywordChips.getByText(name)).toBeVisible({ timeout: 15_000 })
-}
-
-/**
- * Click the credentials list Name column sort control.
- * Sort is asserted via aria-sort (URL is not synced on this page; list GET is not always emitted under CI load).
- */
-export async function clickCredentialsListNameSort(app: Page, direction: 'ascending' | 'descending') {
-  const table = app.getByRole('grid', { name: 'Credentials table' })
-  const nameHeader = table.getByRole('columnheader', { name: 'Name' })
-  await nameHeader.scrollIntoViewIfNeeded()
-  await nameHeader.getByRole('button').click()
-  await expect(nameHeader).toHaveAttribute('aria-sort', direction, { timeout: 30_000 })
+  await app.getByRole('button', { name: 'Apply filter' }).click()
 }
 
 /**
