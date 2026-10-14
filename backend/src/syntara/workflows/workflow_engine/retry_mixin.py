@@ -400,15 +400,12 @@ class WorkflowRetryMixin:
         Returns None when the branch cannot be inferred, so the caller falls through
         to real execution — which re-evaluates the condition rather than assuming one.
         """
-        port = self._infer_control_node_branch(node, graph)
-        if port is None:
-            return None
-
-        # The branch is the only thing inferred. The node's *output* is whatever
-        # the source run recorded — CONDITION writes ``evaluated_result``, SWITCH
-        # writes ``matched_port`` — and downstream expressions read those. Reading
-        # it back from the source row is what stops the synthetic completion from
-        # publishing an empty namespace and silently dropping them.
+        # The source run's own row is read first, because it answers both questions.
+        # Its ``control_data`` carries the routing decision the sync layer persisted,
+        # so for any run recorded since that landed the port is read directly rather
+        # than re-derived from branch statuses. Inference stays as the fallback for
+        # runs that predate the column — and for any control data that carries no
+        # ``next_port``.
         record = await workflow.execute_activity(
             ActivityName.RETRY_NODE_REPLAY,
             args=[self.retry_context.get("retry_from_execution_id"), node.id],
@@ -417,6 +414,12 @@ class WorkflowRetryMixin:
         )
         source_output = (record or {}).get("output_data") or {}
         source_status = str((record or {}).get("status") or ActivityStatus.COMPLETED.value)
+        stored_control = (record or {}).get("control_data") or {}
+        recorded_port = stored_control.get("next_port") if isinstance(stored_control, dict) else None
+
+        port = str(recorded_port) if recorded_port else self._infer_control_node_branch(node, graph)
+        if port is None:
+            return None
 
         self.node_inputs[node.id] = (record or {}).get("input_data") or {}
         self._restored_node_statuses[node.id] = source_status

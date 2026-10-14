@@ -307,7 +307,10 @@ async def test_restored_control_result_is_none_when_inference_fails(mock_wf: Mag
     node = _node(graph, "cond_1")
 
     assert await wf._restored_control_result(node, graph) is None
-    mock_wf.execute_activity.assert_not_awaited(), "no source row is read when the branch is unknown"
+    # The source row is read before inference, because it is also where
+    # control_data comes from. So an ambiguous branch still costs one read; that
+    # is the price of taking the persisted port when there is one.
+    assert mock_wf.execute_activity.await_count == 1
 
 
 # --- how this reaches the restorable set ---
@@ -389,3 +392,118 @@ async def test_restoring_a_condition_needs_no_manually_initialised_retry_state(
     assert result is not None
     assert result["control"] == {"next_port": "true"}
     assert result["output"] == {"evaluated_result": True}
+
+
+# --- control_data is read directly; inference is only the fallback ---
+
+
+@pytest.mark.asyncio
+async def test_port_is_read_from_persisted_control_data(mock_wf: MagicMock) -> None:
+    """A run recorded since control data landed needs no inference at all."""
+    wf = _make_workflow()
+    graph = _condition_graph()
+    node = _node(graph, "cond_1")
+    # Deliberately ambiguous statuses: if inference were consulted it would fail
+    # and the node would rerun, so this only passes on the direct read.
+    wf._retry_source_statuses = {ActivityStatus.SKIPPED.value: ActivityStatus.SKIPPED.value}
+    mock_wf.execute_activity.return_value = {
+        "output_data": {"evaluated_result": True},
+        "status": "completed",
+        "control_data": {"next_port": "true"},
+    }
+    inference = MagicMock(return_value=None)
+    wf._infer_control_node_branch = inference  # type: ignore[method-assign]
+
+    result = await wf._restored_control_result(node, graph)
+
+    assert result is not None
+    assert result["control"] == {"next_port": "true"}
+    inference.assert_not_called()  # control_data is authoritative; inference must not run
+
+
+@pytest.mark.asyncio
+async def test_persisted_port_wins_over_an_ambiguous_inference(mock_wf: MagicMock) -> None:
+    """The recorded decision outranks anything re-derived from branch statuses."""
+    wf = _make_workflow()
+    graph = _condition_graph()
+    node = _node(graph, "cond_1")
+    wf._retry_source_statuses = {
+        "step_true": ActivityStatus.COMPLETED.value,
+        "step_false": ActivityStatus.COMPLETED.value,
+    }
+    mock_wf.execute_activity.return_value = {
+        "output_data": {"matched_port": "fallback"},
+        "status": "completed",
+        "control_data": {"next_port": "fallback"},
+    }
+    wf._infer_control_node_branch = MagicMock(return_value="true")  # type: ignore[method-assign]
+
+    result = await wf._restored_control_result(node, graph)
+
+    assert result is not None
+    assert result["control"] == {"next_port": "fallback"}
+
+
+@pytest.mark.asyncio
+async def test_falls_back_to_inference_when_control_data_is_absent(mock_wf: MagicMock) -> None:
+    """Runs predating the column still replay, via the inference path."""
+    wf = _make_workflow()
+    graph = _condition_graph()
+    node = _node(graph, "cond_1")
+    wf._retry_source_statuses = {
+        "step_true": ActivityStatus.COMPLETED.value,
+        "step_false": ActivityStatus.SKIPPED.value,
+    }
+    mock_wf.execute_activity.return_value = {"output_data": {}, "status": "completed"}
+    inference = MagicMock(return_value="true")
+    wf._infer_control_node_branch = inference  # type: ignore[method-assign]
+
+    result = await wf._restored_control_result(node, graph)
+
+    assert result is not None
+    assert result["control"] == {"next_port": "true"}
+    inference.assert_called_once()  # no control data to read, so inference must run
+
+
+@pytest.mark.asyncio
+async def test_falls_back_when_control_data_has_no_next_port(mock_wf: MagicMock) -> None:
+    """Control data present but carrying no port is not enough to route."""
+    wf = _make_workflow()
+    graph = _condition_graph()
+    node = _node(graph, "cond_1")
+    wf._retry_source_statuses = {
+        "step_true": ActivityStatus.COMPLETED.value,
+        "step_false": ActivityStatus.SKIPPED.value,
+    }
+    mock_wf.execute_activity.return_value = {
+        "output_data": {},
+        "status": "completed",
+        "control_data": {"something_else": 1},
+    }
+    inference = MagicMock(return_value="false")
+    wf._infer_control_node_branch = inference  # type: ignore[method-assign]
+
+    result = await wf._restored_control_result(node, graph)
+
+    assert result is not None
+    assert result["control"] == {"next_port": "false"}
+    inference.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_null_control_data_is_treated_as_absent(mock_wf: MagicMock) -> None:
+    """The column is nullable, so a null must not raise or short-circuit."""
+    wf = _make_workflow()
+    graph = _condition_graph()
+    node = _node(graph, "cond_1")
+    wf._retry_source_statuses = {
+        "step_true": ActivityStatus.COMPLETED.value,
+        "step_false": ActivityStatus.SKIPPED.value,
+    }
+    mock_wf.execute_activity.return_value = {"output_data": {}, "status": "completed", "control_data": None}
+    wf._infer_control_node_branch = MagicMock(return_value="true")  # type: ignore[method-assign]
+
+    result = await wf._restored_control_result(node, graph)
+
+    assert result is not None
+    assert result["control"] == {"next_port": "true"}
