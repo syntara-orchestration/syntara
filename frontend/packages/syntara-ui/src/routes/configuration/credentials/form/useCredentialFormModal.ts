@@ -192,7 +192,12 @@ export function useCredentialFormModal({
   }, [])
 
   const onSubmit = (formData: CredentialFormData) => {
-    if (!validateAllDynamicFields({ typeInputs, inputs, visibleFields, isEditMode, touchedSecrets }, setError)) {
+    if (
+      !validateAllDynamicFields(
+        { typeInputs, inputs: formData.inputs, visibleFields, isEditMode, touchedSecrets },
+        setError
+      )
+    ) {
       return
     }
 

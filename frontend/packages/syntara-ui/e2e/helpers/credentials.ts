@@ -66,17 +66,17 @@ export async function ensureInlineCredentialProjectSelected(modal: Locator, page
   await expect(projectToggle).toBeVisible()
   await expect(projectToggle).not.toContainText('Loading projects', { timeout: 20_000 })
 
+  if (projectName) {
+    await projectToggle.click()
+    await page.getByRole('option', { name: projectName, exact: true }).click()
+    await expect(projectToggle).toContainText(projectName, { timeout: 15_000 })
+    return
+  }
+
   const label = (await projectToggle.textContent()) ?? ''
   if (!label.includes('Select a project')) return
 
   await projectToggle.click()
-  if (projectName) {
-    const named = page.getByRole('option', { name: projectName, exact: true })
-    if ((await named.count()) > 0) {
-      await named.click()
-      return
-    }
-  }
 
   const preferred = page.getByRole('option', { name: /^default(\s|$)/ })
   if ((await preferred.count()) > 0) {

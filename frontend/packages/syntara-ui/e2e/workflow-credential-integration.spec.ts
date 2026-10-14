@@ -257,6 +257,7 @@ test.describe('Inline Credential Creation', () => {
     await modal.getByRole('textbox', { name: 'Credential name' }).fill('inline-validation-test')
     await modal.getByRole('button', { name: 'Create credential' }).click()
 
+    await expect(modal).toBeVisible()
     await expect(modal.getByText('Token is required', { exact: true })).toBeVisible({ timeout: 20_000 })
   })
 
