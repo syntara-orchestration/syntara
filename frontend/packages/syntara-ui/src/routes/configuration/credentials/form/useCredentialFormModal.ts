@@ -191,16 +191,34 @@ export function useCredentialFormModal({
   }, [])
 
   const onSubmit = (formData: CredentialFormData) => {
+    const submitType = allTypes.find((t) => t.id === formData.credential_type_id)
+    const submitTypeInputs = submitType ? getTypeInputs(submitType) : typeInputs
+    const submitVisibleFields = submitTypeInputs
+      ? getVisibleFields(submitTypeInputs, activeGroupIndex)
+      : visibleFields
+    const latestInputs = getValues('inputs') ?? formData.inputs ?? {}
+
+    if (!submitTypeInputs) {
+      setError('credential_type_id', { message: 'Credential type is required' })
+      return
+    }
+
     if (
       !validateAllDynamicFields(
-        { typeInputs, inputs: formData.inputs, visibleFields, isEditMode, touchedSecrets },
+        {
+          typeInputs: submitTypeInputs,
+          inputs: latestInputs,
+          visibleFields: submitVisibleFields,
+          isEditMode,
+          touchedSecrets,
+        },
         setError
       )
     ) {
       return
     }
 
-    const cleanedInputs = stripHiddenGroupFields(formData.inputs, typeInputs, visibleFields)
+    const cleanedInputs = stripHiddenGroupFields(latestInputs, submitTypeInputs, submitVisibleFields)
 
     if (isEditMode && credentialToEdit) {
       patchCredential(
@@ -209,7 +227,7 @@ export function useCredentialFormModal({
           body: {
             name: formData.name,
             description: formData.description || null,
-            inputs: buildEditInputs(cleanedInputs, typeInputs, touchedSecrets),
+            inputs: buildEditInputs(cleanedInputs, submitTypeInputs, touchedSecrets),
           },
         },
         {

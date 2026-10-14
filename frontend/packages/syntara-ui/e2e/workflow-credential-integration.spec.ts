@@ -253,12 +253,11 @@ test.describe('Inline Credential Creation', () => {
     await selectCredentialType(modal, 'HTTP Bearer Token')
     await waitForCredentialFormTypesReady(modal, 'Token')
 
-    // Fill name so Zod passes and dynamic field validation runs (same as credential-dynamic-forms).
-    await modal.getByRole('textbox', { name: 'Credential name' }).fill('inline-validation-test')
+    await modal.getByRole('textbox', { name: 'Credential name' }).fill(buildUniqueName('e2e-inline-validation'))
     await modal.getByRole('button', { name: 'Create credential' }).click()
 
     await expect(modal).toBeVisible()
-    await expect(modal.getByText('Token is required', { exact: true })).toBeVisible({ timeout: 20_000 })
+    await expect(modal.getByText('Token is required')).toBeVisible({ timeout: 20_000 })
   })
 
   test('newly created credential is available in selector', async ({ app }) => {

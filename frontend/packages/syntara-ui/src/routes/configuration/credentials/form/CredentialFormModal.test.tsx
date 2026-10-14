@@ -268,6 +268,17 @@ describe('CredentialFormModal', () => {
     expect(screen.getByText('Name is required')).toBeInTheDocument()
   })
 
+  it('validates required dynamic token field after name is filled', async () => {
+    const user = userEvent.setup()
+    render(<CredentialFormModal isOpen onClose={vi.fn()} defaultProjectId="proj-1" />, { wrapper })
+
+    await user.type(screen.getByLabelText('Credential name'), 'validation-test')
+    await user.click(screen.getByRole('button', { name: 'Create credential' }))
+
+    expect(screen.getByText('Token is required')).toBeInTheDocument()
+    expect(mockMutate).not.toHaveBeenCalled()
+  })
+
   it('auto-selects first credential type in create mode', () => {
     render(<CredentialFormModal isOpen onClose={vi.fn()} />, { wrapper })
 
