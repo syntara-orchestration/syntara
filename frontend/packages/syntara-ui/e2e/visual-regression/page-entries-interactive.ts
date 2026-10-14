@@ -339,7 +339,9 @@ export const builderInteractivePages: CanvasPageEntry[] = [
     },
     setup: async (page) => {
       await page.getByRole('button', { name: /Add Step/i }).click()
-      const panel = page.getByRole('region', { name: /add step|select a node/i })
+      const panel = page.getByRole('region', {
+        name: /add step|select an action step|select a trigger step|select a logic step|select an aap execution step/i,
+      })
       await expect(panel).toBeVisible()
       // panel.toBeVisible() fires when the slide-in starts — wait for a rendered child
       // so the screenshot doesn't capture a mid-animation state

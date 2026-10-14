@@ -231,8 +231,8 @@ test('multiple steps can be added sequentially', async ({ app }) => {
     await closeStepEditorPanel(app)
     await expect(app.getByText('Manual trigger')).toBeVisible()
 
-    // Add first node - Script action
-    await addScriptStep(app, 'Script Node 1', 'print("node1")')
+    // Add first step - Script action
+    await addScriptStep(app, 'Script Step 1', 'print("node1")')
 
     // Wait for UI to stabilize after first node
     await waitForUIReady(app)
@@ -258,7 +258,7 @@ test('multiple steps can be added sequentially', async ({ app }) => {
     }).toPass({ timeout: 20000, intervals: [500, 1000] })
 
     const nameInput = app.getByRole('textbox', { name: 'Name', exact: true })
-    await nameInput.fill('Approval Node 1')
+    await nameInput.fill('Approval Step 1')
 
     // Open the approver users dropdown and select a user
     // Wait for the dropdown to be ready (loads from /authz/who_can)
@@ -303,9 +303,9 @@ test('multiple steps can be added sequentially', async ({ app }) => {
     // Wait for panel to close
     await expect(panel).toHaveCount(0, { timeout: 15000 })
 
-    // Wait for canvas to render the new node
+    // Wait for canvas to render the new step
     await expect(
-      app.locator('[role="group"][aria-roledescription="node"]').filter({ hasText: 'Approval Node 1' })
+      app.locator('[role="group"][aria-roledescription="node"]').filter({ hasText: 'Approval Step 1' })
     ).toBeVisible({
       timeout: 10000,
     })
@@ -343,7 +343,7 @@ test('multiple steps can be added sequentially', async ({ app }) => {
     }).toPass({ timeout: 20000, intervals: [500, 1000] })
 
     const logicNameInput = app.getByRole('textbox', { name: 'Name', exact: true })
-    await logicNameInput.fill('Logic Node 1')
+    await logicNameInput.fill('Logic Step 1')
 
     await app.getByRole('button', { name: EXPRESSION_MODE_LABELS.visual, exact: true }).click()
     await app.getByRole('option', { name: EXPRESSION_MODE_LABELS.raw }).click()
@@ -356,13 +356,13 @@ test('multiple steps can be added sequentially', async ({ app }) => {
     // Wait for panel to close
     await expect(panel).toHaveCount(0, { timeout: 15000 })
 
-    // Wait for canvas to render the new node
+    // Wait for canvas to render the new step
     await expect(
-      app.locator('[role="group"][aria-roledescription="node"]').filter({ hasText: 'Logic Node 1' })
+      app.locator('[role="group"][aria-roledescription="node"]').filter({ hasText: 'Logic Step 1' })
     ).toBeVisible({ timeout: 10000 })
-    await verifyStepVisible(app, 'Script Node 1')
-    await verifyStepVisible(app, 'Approval Node 1')
-    await verifyStepVisible(app, 'Logic Node 1')
+    await verifyStepVisible(app, 'Script Step 1')
+    await verifyStepVisible(app, 'Approval Step 1')
+    await verifyStepVisible(app, 'Logic Step 1')
   } finally {
     await deleteWorkflow(app, workflowName)
   }
@@ -496,19 +496,19 @@ test('multiple edges can be created sequentially', async ({ app }) => {
     await closeStepEditorPanel(app)
     await expect(app.getByText('Manual trigger')).toBeVisible()
 
-    // Add three nodes
-    await addScriptStep(app, 'Node 1', 'print("1")')
-    await addScriptStep(app, 'Node 2', 'print("2")')
-    await addScriptStep(app, 'Node 3', 'print("3")')
+    // Add three steps
+    await addScriptStep(app, 'Step 1', 'print("1")')
+    await addScriptStep(app, 'Step 2', 'print("2")')
+    await addScriptStep(app, 'Step 3', 'print("3")')
 
     // Layout to position nodes
     await triggerLayout(app)
 
-    // Verify all nodes are visible — three successful addScriptStep calls prove
+    // Verify all steps are visible — three successful addScriptStep calls prove
     // three edges were sequentially created (each call clicks an edge overlay button).
-    await verifyStepVisible(app, 'Node 1')
-    await verifyStepVisible(app, 'Node 2')
-    await verifyStepVisible(app, 'Node 3')
+    await verifyStepVisible(app, 'Step 1')
+    await verifyStepVisible(app, 'Step 2')
+    await verifyStepVisible(app, 'Step 3')
   } finally {
     await deleteWorkflow(app, workflowName)
   }
