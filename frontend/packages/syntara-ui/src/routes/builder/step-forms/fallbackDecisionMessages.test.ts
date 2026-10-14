@@ -7,11 +7,11 @@ import {
 } from './shared/stepFieldHelpText'
 
 describe('getFallbackDecisionDisabledMessage', () => {
-  it('returns explicit-stop copy when the node setting is stop', () => {
+  it('returns explicit-stop copy when the step setting is stop', () => {
     expect(getFallbackDecisionDisabledMessage('node-explicit')).toBe(APPROVAL_FALLBACK_DISABLED_EXPLICIT_STOP)
   })
 
-  it('returns system-default copy when the node uses system default', () => {
+  it('returns system-default copy when the step uses the system default', () => {
     expect(getFallbackDecisionDisabledMessage('admin-default')).toBe(APPROVAL_FALLBACK_DISABLED_SYSTEM_DEFAULT)
     expect(getFallbackDecisionDisabledMessage('system-fallback')).toBe(APPROVAL_FALLBACK_DISABLED_SYSTEM_DEFAULT)
   })

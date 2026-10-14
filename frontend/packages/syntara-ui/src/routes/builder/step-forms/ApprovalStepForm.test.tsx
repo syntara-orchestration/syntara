@@ -715,7 +715,7 @@ describe('ApprovalStepForm', () => {
   })
 
   describe('retry policy visibility', () => {
-    it('hides retry policy for approval nodes', async () => {
+    it('hides retry policy for approval steps', async () => {
       const user = userEvent.setup()
       renderWithHeader(<ApprovalStepForm onSubmit={mockOnSubmit} />)
 

@@ -296,7 +296,7 @@ describe('LogicStepForm', () => {
           onSubmit={mockOnSubmit}
           initialData={{
             logicType: ActivityTypeEnum.CONVERGE,
-            name: 'Converge Node',
+            name: 'Converge Step',
           }}
         />
       )
@@ -328,13 +328,13 @@ describe('LogicStepForm', () => {
           onSubmit={mockOnSubmit}
           initialData={{
             logicType: ActivityTypeEnum.CONDITION,
-            name: 'Condition Node',
+            name: 'Condition Step',
             condition: '${value > 10}',
           }}
         />
       )
 
-      expect(screen.getByPlaceholderText(/Enter activity name/i)).toHaveValue('Condition Node')
+      expect(screen.getByPlaceholderText(/Enter activity name/i)).toHaveValue('Condition Step')
     })
 
     it('maps all loop fields from initialData', () => {
@@ -343,7 +343,7 @@ describe('LogicStepForm', () => {
           onSubmit={mockOnSubmit}
           initialData={{
             logicType: ActivityTypeEnum.LOOP,
-            name: 'Loop Node',
+            name: 'Loop Step',
             type: 'while',
             condition: '${count < 5}',
             maxIterations: 100,
@@ -353,7 +353,7 @@ describe('LogicStepForm', () => {
         />
       )
 
-      expect(screen.getByPlaceholderText(/Enter activity name/i)).toHaveValue('Loop Node')
+      expect(screen.getByPlaceholderText(/Enter activity name/i)).toHaveValue('Loop Step')
       expect(screen.getByRole('button', { name: 'Type' })).toHaveTextContent('While')
     })
 
@@ -363,13 +363,13 @@ describe('LogicStepForm', () => {
           onSubmit={mockOnSubmit}
           initialData={{
             logicType: ActivityTypeEnum.WAIT,
-            name: 'Wait Node',
+            name: 'Wait Step',
             duration: 184545,
           }}
         />
       )
 
-      expect(screen.getByPlaceholderText(/Enter activity name/i)).toHaveValue('Wait Node')
+      expect(screen.getByPlaceholderText(/Enter activity name/i)).toHaveValue('Wait Step')
       expect(screen.getByRole('spinbutton', { name: /Days/i })).toHaveValue(2)
       expect(screen.getByRole('spinbutton', { name: /Hours/i })).toHaveValue(3)
       expect(screen.getByRole('spinbutton', { name: /Minutes/i })).toHaveValue(15)
@@ -382,7 +382,7 @@ describe('LogicStepForm', () => {
           onSubmit={mockOnSubmit}
           initialData={{
             logicType: ActivityTypeEnum.CONVERGE,
-            name: 'Converge Node',
+            name: 'Converge Step',
             strategy: 'any',
             settings: { timeout: 3930, continue_on_failure: false },
             requiredPathCount: 2,
@@ -390,7 +390,7 @@ describe('LogicStepForm', () => {
         />
       )
 
-      expect(screen.getByPlaceholderText(/Enter activity name/i)).toHaveValue('Converge Node')
+      expect(screen.getByPlaceholderText(/Enter activity name/i)).toHaveValue('Converge Step')
       expect(screen.getByRole('button', { name: 'Continue when criteria' })).toHaveTextContent(
         'Any branches reach this step'
       )

@@ -82,7 +82,7 @@ function getAddModeFormId(
   }
   if (stepTypeId && stepTypeId in simpleFormMap) return simpleFormMap[stepTypeId]
 
-  // Logic node subtypes
+  // Logic step subtypes
   if (stepTypeId === RegistryStepId.LOGIC && stepSubtypeId) {
     const logicFormMap: Record<string, string> = {
       [RegistryStepId.LOGIC_CONDITION]: 'condition-step-form',
@@ -94,7 +94,7 @@ function getAddModeFormId(
     return logicFormMap[stepSubtypeId]
   }
 
-  // AAP Execution node subtypes
+  // AAP Execution step subtypes
   if (stepTypeId === RegistryStepId.AAP_EXECUTION && stepSubtypeId) {
     const aapFormMap: Record<string, string> = {
       [RegistryStepId.AAP_JOB_TEMPLATE]: 'aap-job-template-form',
@@ -357,27 +357,27 @@ export function StepDetailsPanel(props: StepDetailsPanelProps) {
 
   const renderContent = () => {
     if (mode === 'add') {
-      const selectedNode = stepTypeId ? StepRegistry.get(stepTypeId) : null
-      const selectedSubtype = selectedNode?.subtypes?.find((subtype) => subtype.id === stepSubtypeId) ?? null
+      const selectedStepType = stepTypeId ? StepRegistry.get(stepTypeId) : null
+      const selectedStepSubtype = selectedStepType?.subtypes?.find((stepSubtype) => stepSubtype.id === stepSubtypeId) ?? null
 
-      if (!selectedNode) return null
+      if (!selectedStepType) return null
 
       const initialData = {
-        ...(selectedSubtype?.initialData ?? {}),
+        ...(selectedStepSubtype?.initialData ?? {}),
       } as Record<string, unknown>
 
       initialData.name ??= getStepDisplayName(
         getDefaultStepBaseName({
-          stepTypeId: selectedNode.id,
-          stepSubtypeId: selectedSubtype?.id,
+          stepTypeId: selectedStepType.id,
+          stepSubtypeId: selectedStepSubtype?.id,
           initialData,
-          label: selectedSubtype?.label ?? selectedNode.label,
+          label: selectedStepSubtype?.label ?? selectedStepType.label,
         })
       )
 
       // For nodes with subtypes, use the subtype's form component
-      const FormComponent = selectedSubtype?.formComponent ?? selectedNode.formComponent
-      const subtypeFormProps = selectedSubtype?.formProps ?? {}
+      const FormComponent = selectedStepSubtype?.formComponent ?? selectedStepType.formComponent
+      const subtypeFormProps = selectedStepSubtype?.formProps ?? {}
       const submitButtonText = 'Add step'
 
       /** Returns true if replacement succeeded, false if lookup failed. */
@@ -418,7 +418,7 @@ export function StepDetailsPanel(props: StepDetailsPanelProps) {
             resolve(ok)
           }
           try {
-            selectedNode.onSubmit(
+            selectedStepType.onSubmit(
               data,
               (newStepId?: string) => {
                 if (replacementNodeId) {

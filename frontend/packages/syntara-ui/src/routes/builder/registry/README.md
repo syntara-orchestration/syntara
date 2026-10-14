@@ -1,4 +1,4 @@
-# Node Registry System
+# Step Registry System
 
 A plugin-based architecture for registering and managing **workflow step types** (what users add from the **Add step** panel). Code still uses React Flow **nodes** on the canvas; `StepRegistry` holds metadata, forms, and submit handlers per step type.
 
@@ -7,9 +7,9 @@ A plugin-based architecture for registering and managing **workflow step types**
 ```text
 registry/
 ├── StepRegistry.ts          # Core registry singleton
-├── helpers/                 # Node template helpers
+├── helpers/                 # Step template helpers
 │   └── stepTemplates.ts
-├── nodes/                   # Step type registrations (register*.ts)
+├── steps/                   # Step type registrations (register*.ts)
 │   ├── index.ts            # Auto-discovery entry point
 │   ├── registerAAPStep.ts
 │   ├── registerActionStep.ts
@@ -23,7 +23,7 @@ registry/
 
 ## Key Concepts
 
-### 1. Node Registry
+### 1. Step Registry
 
 - **Singleton pattern** - Single source of truth for all step types in the Add panel
 - **Type-safe** - Full TypeScript support
@@ -87,7 +87,7 @@ import type { MyCustomFormData } from '../../step-forms/MyCustomForm'
 
 export default function registerMyStep() {
   StepRegistry.register<MyCustomFormData>({
-    id: 'my-node',
+    id: 'my-step',
     label: 'My Custom Step',
     icon: RhUiMyIcon,
     category: 'action',
@@ -145,14 +145,14 @@ registerAllSteps() // Auto-discovers and registers all step types
 ```typescript
 import { StepRegistry } from './registry/StepRegistry'
 
-describe('MyNode', () => {
+describe('MyStep', () => {
   beforeEach(() => {
     StepRegistry.clear()
     registerMyStep()
   })
 
   it('should be registered', () => {
-    expect(StepRegistry.get('my-node')).toBeDefined()
+    expect(StepRegistry.get('my-step')).toBeDefined()
   })
 })
 ```
@@ -225,10 +225,10 @@ const renderForm = () => {
 
 ```typescript
 // AddStepPanel.tsx - decoupled
-const allNodeTypes = StepRegistry.getAll()
+const allStepTypes = StepRegistry.getAll()
 
-const selectedNode = StepRegistry.get(selectedNodeType)
-const FormComponent = selectedNode.formComponent
+const selectedStepType = StepRegistry.get(stepTypeId)
+const FormComponent = selectedStepType.formComponent
 return <FormComponent ... />
 ```
 

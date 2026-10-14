@@ -11,7 +11,7 @@ const positiveWholeNumber = optionalNumber
 
 /**
  * Zod schema for the Converge step form.
- * continue_on_failure lives in node settings (Settings tab).
+ * continue_on_failure lives in step settings (Settings tab).
  * wait_duration is a config field shown on the Parameters tab.
  */
 const convergeFormSchemaBase = z.object({

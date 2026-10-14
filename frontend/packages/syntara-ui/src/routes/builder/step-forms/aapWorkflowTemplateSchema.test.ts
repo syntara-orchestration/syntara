@@ -67,7 +67,7 @@ describe('aapWorkflowTemplateSchema', () => {
     }
   })
 
-  it('accepts missing organization_name (permissive schema for incomplete nodes)', () => {
+  it('accepts missing organization_name (permissive schema for incomplete steps)', () => {
     const data = {
       name: 'Deploy Workflow',
       workflow_job_template_name: 'Deploy Application',
@@ -77,7 +77,7 @@ describe('aapWorkflowTemplateSchema', () => {
     expect(result.success).toBe(true)
   })
 
-  it('accepts missing workflow_job_template fields (permissive schema for incomplete nodes)', () => {
+  it('accepts missing workflow_job_template fields (permissive schema for incomplete steps)', () => {
     const data = {
       name: 'Deploy Workflow',
       organization_name: 'Engineering',
@@ -106,7 +106,7 @@ describe('aapWorkflowTemplateSchema', () => {
   })
 
   it('accepts use_input_variables without a workflow template id', () => {
-    const result = aapWorkflowTemplateSchema.safeParse({ name: 'Incomplete Node', use_input_variables: true })
+    const result = aapWorkflowTemplateSchema.safeParse({ name: 'Incomplete Step', use_input_variables: true })
     expect(result.success).toBe(true)
   })
 
@@ -199,7 +199,7 @@ describe('aapWorkflowTemplateSchema', () => {
   })
 
   it('accepts data with only the required name field', () => {
-    const result = aapWorkflowTemplateSchema.safeParse({ name: 'Incomplete Node' })
+    const result = aapWorkflowTemplateSchema.safeParse({ name: 'Incomplete Step' })
     expect(result.success).toBe(true)
   })
 })

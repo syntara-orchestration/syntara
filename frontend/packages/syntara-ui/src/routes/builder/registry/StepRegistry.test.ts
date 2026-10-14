@@ -83,14 +83,14 @@ describe('StepRegistry', () => {
       expect(StepRegistry.get('remove-me')).toBeUndefined()
     })
 
-    it('should return false when removing non-existent node', () => {
+    it('should return false when removing a non-existent step', () => {
       const result = StepRegistry.unregister('non-existent')
       expect(result).toBe(false)
     })
   })
 
   describe('get', () => {
-    it('should return undefined for non-existent node', () => {
+    it('should return undefined for non-existent step', () => {
       const result = StepRegistry.get('non-existent')
       expect(result).toBeUndefined()
     })
@@ -98,35 +98,35 @@ describe('StepRegistry', () => {
     it('should return the correct step type', () => {
       StepRegistry.register({
         id: 'specific',
-        label: 'Specific Node',
+        label: 'Specific Step',
         icon: RhUiPlayIcon,
         formComponent: MockForm,
         onSubmit: () => {},
       })
 
       const result = StepRegistry.get('specific')
-      expect(result?.label).toBe('Specific Node')
+      expect(result?.label).toBe('Specific Step')
     })
   })
 
   describe('getAll', () => {
-    it('should return empty array when no nodes registered', () => {
+    it('should return empty array when no steps registered', () => {
       const result = StepRegistry.getAll()
       expect(result).toEqual([])
     })
 
-    it('should return all enabled nodes', () => {
+    it('should return all enabled steps', () => {
       StepRegistry.register({
-        id: 'node1',
-        label: 'Node 1',
+        id: 'step1',
+        label: 'Step 1',
         icon: RhUiPlayIcon,
         formComponent: MockForm,
         onSubmit: () => {},
       })
 
       StepRegistry.register({
-        id: 'node2',
-        label: 'Node 2',
+        id: 'step2',
+        label: 'Step 2',
         icon: RhUiPlayIcon,
         formComponent: MockForm,
         onSubmit: () => {},
@@ -135,10 +135,10 @@ describe('StepRegistry', () => {
 
       const result = StepRegistry.getAll()
       expect(result).toHaveLength(1)
-      expect(result[0].id).toBe('node1')
+      expect(result[0].id).toBe('step1')
     })
 
-    it('should sort nodes by order', () => {
+    it('should sort steps by order', () => {
       StepRegistry.register({
         id: 'third',
         label: 'Third',
@@ -203,7 +203,7 @@ describe('StepRegistry', () => {
       })
     })
 
-    it('should return nodes in specified category', () => {
+    it('should return steps in specified category', () => {
       const triggers = StepRegistry.getByCategory('trigger')
       expect(triggers).toHaveLength(2)
       expect(triggers.every((n) => n.category === 'trigger')).toBe(true)
@@ -236,19 +236,19 @@ describe('StepRegistry', () => {
       })
     })
 
-    it('should find nodes by label', () => {
+    it('should find steps by label', () => {
       const result = StepRegistry.search('api')
       expect(result).toHaveLength(1)
       expect(result[0].id).toBe('api-call')
     })
 
-    it('should find nodes by keyword', () => {
+    it('should find steps by keyword', () => {
       const result = StepRegistry.search('python')
       expect(result).toHaveLength(1)
       expect(result[0].id).toBe('python-script')
     })
 
-    it('should find nodes by id', () => {
+    it('should find steps by id', () => {
       const result = StepRegistry.search('script')
       expect(result).toHaveLength(1)
       expect(result[0].id).toBe('python-script')
@@ -265,25 +265,25 @@ describe('StepRegistry', () => {
       expect(result).toEqual([])
     })
 
-    it('should return all nodes for empty query', () => {
+    it('should return all steps for empty query', () => {
       const result = StepRegistry.search('')
       expect(result).toHaveLength(2)
     })
   })
 
   describe('clear', () => {
-    it('should remove all registered nodes', () => {
+    it('should remove all registered steps', () => {
       StepRegistry.register({
-        id: 'node1',
-        label: 'Node 1',
+        id: 'step1',
+        label: 'Step 1',
         icon: RhUiPlayIcon,
         formComponent: MockForm,
         onSubmit: () => {},
       })
 
       StepRegistry.register({
-        id: 'node2',
-        label: 'Node 2',
+        id: 'step2',
+        label: 'Step 2',
         icon: RhUiPlayIcon,
         formComponent: MockForm,
         onSubmit: () => {},

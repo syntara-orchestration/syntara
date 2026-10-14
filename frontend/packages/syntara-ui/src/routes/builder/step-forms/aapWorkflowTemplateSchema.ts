@@ -8,7 +8,7 @@ import { stepSettingsSchema } from './shared/stepSettingsSchema'
  * Zod schema for the AAP (Ansible Automation Platform) workflow template step form.
  * Uses snake_case to match API contract.
  *
- * All fields are optional to allow adding incomplete nodes.
+ * All fields are optional to allow adding incomplete steps.
  * When extra_vars is provided, it must be valid JSON object format.
  *
  * Workflow templates do NOT support job-specific fields:
@@ -37,7 +37,7 @@ export const aapWorkflowTemplateSchema = z
     skip_tags: z.string().optional(),
     labels: z.array(z.string()).optional(),
     settings: stepSettingsSchema.optional(),
-    // Local UI mode: persisted in node parameters so reopen restores the toggle
+    // Local UI mode: persisted in step parameters so reopen restores the toggle
     use_input_variables: z.boolean().optional(),
   })
   .superRefine((data, ctx) => {
