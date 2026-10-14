@@ -543,6 +543,7 @@ class TestAllowedTriggerTypes:
             ActivityName.MANUAL_TRIGGER,
             ActivityName.EDA_TRIGGER,
             ActivityName.SCHEDULED_TRIGGER,
+            ActivityName.SUBWORKFLOW_TRIGGER,
             ActivityName.WEBHOOK_TRIGGER,
         } == ALLOWED_TRIGGER_TYPES
 

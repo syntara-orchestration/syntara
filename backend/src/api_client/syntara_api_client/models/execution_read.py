@@ -57,7 +57,7 @@ class ExecutionRead:
             execution_metadata (ExecutionReadExecutionMetadataType0 | None | Unset):
             retried_from_execution_id (None | Unset | UUID):
             trigger_type (None | str | Unset): Trigger node type (manual_trigger, scheduled_trigger, webhook_trigger,
-                eda_trigger)
+                eda_trigger, subworkflow_trigger)
             interface (None | str | Unset): Originating interface (ui or api)
             labels (ExecutionReadLabels | Unset):
             approval_pending (bool | Unset):  Default: False.

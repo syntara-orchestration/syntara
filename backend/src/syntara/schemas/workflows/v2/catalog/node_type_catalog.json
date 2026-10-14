@@ -78,6 +78,17 @@
       "since": "2.0.0"
     },
     {
+      "type": "subworkflow_trigger",
+      "name": "Subworkflow Trigger",
+      "description": "Workflow entry point marking the workflow as eligible to be invoked as a sub-workflow (Reference mode)",
+      "labels": {
+        "category": "trigger"
+      },
+      "schema_ref": "../triggers/subworkflow.schema.json",
+      "deprecated": false,
+      "since": "2.0.0"
+    },
+    {
       "type": "aap_job_template",
       "name": "Ansible Automation Platform Job Template",
       "description": "Launch Ansible Automation Platform job templates",

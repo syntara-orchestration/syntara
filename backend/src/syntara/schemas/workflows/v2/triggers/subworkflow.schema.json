@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://automation.example.com/schemas/workflows/v2/triggers/subworkflow",
+  "title": "Subworkflow Trigger Node",
+  "description": "Workflow entry point marking the workflow as eligible to be invoked as a sub-workflow (Reference mode)",
+  "parameterSchema": {
+    "type": "object",
+    "properties": {
+      "input_schema": {
+        "type": "object",
+        "description": "JSON Schema defining the structure and validation rules for inputs passed to the workflow when invoked as a sub-workflow",
+        "additionalProperties": true
+      }
+    },
+    "additionalProperties": false
+  },
+  "resultSchema": {
+    "description": "Trigger result is the invocation input data passed through directly",
+    "oneOf": [
+      {
+        "title": "Completed Result",
+        "type": "object",
+        "description": "Pass-through of sub-workflow invocation input data",
+        "additionalProperties": true
+      },
+      {
+        "title": "Failed Result",
+        "type": "object",
+        "description": "Trigger failure output for reporting purposes",
+        "required": ["status", "error"],
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "failed"
+          },
+          "error": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    ],
+    "discriminator": {
+      "propertyName": "status"
+    }
+  }
+}

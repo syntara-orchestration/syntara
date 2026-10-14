@@ -208,6 +208,23 @@
               }
             }
           ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/node_base"
+            },
+            {
+              "properties": {
+                "type": {
+                  "const": "subworkflow_trigger"
+                },
+                "parameters": {
+                  "$ref": "triggers/subworkflow.schema.json#/parameterSchema"
+                }
+              }
+            }
+          ]
         }
       ]
     },

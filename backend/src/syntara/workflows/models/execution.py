@@ -234,7 +234,9 @@ class Execution(UserOwnedResource, table=True):
         max_length=50,
         sa_type=String(50),  # type: ignore[call-overload]
         index=True,
-        description="Trigger node type (manual_trigger, scheduled_trigger, webhook_trigger, eda_trigger)",
+        description=(
+            "Trigger node type (manual_trigger, scheduled_trigger, webhook_trigger, eda_trigger, subworkflow_trigger)"
+        ),
     )
 
     interface: str | None = Field(
@@ -477,7 +479,9 @@ class ExecutionRead(UserReferenceFieldsMixin, SQLModel):
     retried_from_execution_id: UUID | None = None
     trigger_type: str | None = Field(
         default=None,
-        description="Trigger node type (manual_trigger, scheduled_trigger, webhook_trigger, eda_trigger)",
+        description=(
+            "Trigger node type (manual_trigger, scheduled_trigger, webhook_trigger, eda_trigger, subworkflow_trigger)"
+        ),
     )
     interface: str | None = Field(
         default=None,

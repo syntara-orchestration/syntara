@@ -601,3 +601,78 @@ async def test_validate_webhook_empty_service_accounts_rejected(jwt_client: Asyn
     ]
     assert len(sa_errors) == 1
     assert sa_errors[0]["node_id"] == "snow_trigger"
+
+
+@pytest.mark.asyncio
+async def test_validate_subworkflow_trigger_definition(jwt_client: AsyncClient) -> None:
+    """A child workflow whose entry point is a subworkflow_trigger passes validation.
+
+    Guards the child-side Subworkflow Trigger registration: a definition using the
+    dedicated subworkflow_trigger must pass the normal workflow validation path
+    (POST /workflows/validate) rather than being rejected as an unknown trigger type.
+    """
+    payload = {
+        "workflow_definition": {
+            "schema_version": "2.0.0",
+            "name": "child-workflow",
+            "description": "Child workflow eligible for sub-workflow invocation",
+            "triggers": [{"id": "sub_trigger", "type": "subworkflow_trigger", "parameters": {}}],
+            "nodes": [
+                {
+                    "id": "task1",
+                    "name": "Task 1",
+                    "type": "script",
+                    "parameters": {"language": "python", "code": "print('hi')"},
+                },
+            ],
+            "edges": [{"from": "sub_trigger", "to": "task1"}],
+        },
+    }
+
+    response = await jwt_client.post("/api/v1/workflows/validate", json=payload)
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["is_valid"] is True
+    assert data["findings"] == []
+    assert data["error_count"] == 0
+
+
+@pytest.mark.asyncio
+async def test_validate_subworkflow_trigger_with_input_schema(jwt_client: AsyncClient) -> None:
+    """A subworkflow_trigger carrying an input_schema parameter validates successfully."""
+    payload = {
+        "workflow_definition": {
+            "schema_version": "2.0.0",
+            "name": "child-workflow-typed",
+            "description": "Child workflow with a typed sub-workflow input schema",
+            "triggers": [
+                {
+                    "id": "sub_trigger",
+                    "type": "subworkflow_trigger",
+                    "parameters": {
+                        "input_schema": {
+                            "type": "object",
+                            "properties": {"target": {"type": "string"}},
+                        },
+                    },
+                },
+            ],
+            "nodes": [
+                {
+                    "id": "task1",
+                    "name": "Task 1",
+                    "type": "script",
+                    "parameters": {"language": "python", "code": "print('hi')"},
+                },
+            ],
+            "edges": [{"from": "sub_trigger", "to": "task1"}],
+        },
+    }
+
+    response = await jwt_client.post("/api/v1/workflows/validate", json=payload)
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["is_valid"] is True
+    assert data["error_count"] == 0

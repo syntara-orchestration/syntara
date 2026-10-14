@@ -49582,7 +49582,7 @@
                 "type": "null"
               }
             ],
-            "description": "Trigger node type (manual_trigger, scheduled_trigger, webhook_trigger, eda_trigger)",
+            "description": "Trigger node type (manual_trigger, scheduled_trigger, webhook_trigger, eda_trigger, subworkflow_trigger)",
             "title": "Trigger Type"
           },
           "interface": {
@@ -49900,6 +49900,7 @@
           "scheduled_trigger",
           "webhook_trigger",
           "eda_trigger",
+          "subworkflow_trigger",
           "condition",
           "converge",
           "loop",

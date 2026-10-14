@@ -224,7 +224,7 @@ export interface components {
       retried_from_execution_id?: string | null
       /**
        * Trigger Type
-       * @description Trigger node type (manual_trigger, scheduled_trigger, webhook_trigger, eda_trigger)
+       * @description Trigger node type (manual_trigger, scheduled_trigger, webhook_trigger, eda_trigger, subworkflow_trigger)
        */
       trigger_type?: string | null
       /**
@@ -354,6 +354,7 @@ export interface components {
       | 'scheduled_trigger'
       | 'webhook_trigger'
       | 'eda_trigger'
+      | 'subworkflow_trigger'
       | 'condition'
       | 'converge'
       | 'loop'

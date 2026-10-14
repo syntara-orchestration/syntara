@@ -36,6 +36,7 @@ from syntara.workflows.workflow_engine.activities.manual_trigger import manual_t
 from syntara.workflows.workflow_engine.activities.runtime_settings_activity import fetch_workflow_runtime_settings
 from syntara.workflows.workflow_engine.activities.scheduled_trigger import scheduled_trigger
 from syntara.workflows.workflow_engine.activities.script_activity import execute_script_activity
+from syntara.workflows.workflow_engine.activities.subworkflow_trigger import subworkflow_trigger
 from syntara.workflows.workflow_engine.activities.switch import switch
 from syntara.workflows.workflow_engine.activities.wait_activity import complete_wait, wait
 from syntara.workflows.workflow_engine.activities.webhook_trigger import webhook_trigger
@@ -65,6 +66,7 @@ _TEMPORAL_ACTIVITIES: list[Callable[..., Any]] = [
     loop,
     manual_trigger,
     scheduled_trigger,
+    subworkflow_trigger,
     execute_script_activity,
     wait,
     complete_wait,

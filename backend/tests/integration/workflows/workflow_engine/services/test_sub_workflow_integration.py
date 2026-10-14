@@ -1,0 +1,301 @@
+"""Integration test for Sub-workflow Reference Mode parent→child→parent lifecycle.
+
+Proves the full Temporal lifecycle through a real WorkflowEnvironment:
+parent starts, dispatches a sub_workflow node, which calls the setup activity
+(with mocked DB), starts a child OrchestratorWorkflow via execute_child_workflow,
+the child runs subworkflow_trigger → script, completes, and the parent receives
+the child result and completes.
+
+Story: AAP-94069 — Sub-workflow Reference Mode POC
+"""
+
+from __future__ import annotations
+
+import asyncio
+import contextlib
+from types import SimpleNamespace
+from typing import TYPE_CHECKING, Any
+from uuid import uuid4, uuid5
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncIterator, Callable, Sequence
+
+import pytest
+from temporalio.worker import Worker
+
+from syntara.workflows.workflow_engine.activities.manual_trigger import manual_trigger
+from syntara.workflows.workflow_engine.activities.runtime_settings_activity import (
+    fetch_workflow_runtime_settings,
+)
+from syntara.workflows.workflow_engine.activities.script_activity import (
+    execute_script_activity,
+)
+from syntara.workflows.workflow_engine.activities.sub_workflow_setup_activity import (
+    _SUB_WORKFLOW_NAMESPACE,
+    SubWorkflowSetupActivity,
+)
+from syntara.workflows.workflow_engine.activities.subworkflow_trigger import (
+    subworkflow_trigger,
+)
+from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkflow
+from syntara.workflows.workflow_engine.services.temporal_execution_service import (
+    TemporalExecutionService,
+)
+
+_CHILD_WF_ID = uuid4()
+_CHILD_VERSION_ID = uuid4()
+_CHILD_PROJECT_ID = uuid4()
+_CHILD_CREATED_BY = uuid4()
+_PARENT_EXECUTION_ID = str(uuid4())
+_PARENT_USER_ID = str(uuid4())
+
+_TASK_QUEUE = "sub-wf-integration"
+_WORKFLOW_RESULT_TIMEOUT = 30
+
+_CHILD_WORKFLOW_DEF: dict[str, Any] = {
+    "schema_version": "2.0.0",
+    "triggers": [
+        {"id": "child_trigger", "type": "subworkflow_trigger", "parameters": {}},
+    ],
+    "nodes": [
+        {
+            "id": "child_script",
+            "type": "script",
+            "parameters": {"language": "bash", "code": "echo child_executed"},
+        },
+    ],
+    "edges": [
+        {"from": "child_trigger", "to": "child_script"},
+    ],
+}
+
+
+def _parent_workflow_def() -> dict[str, Any]:
+    """Build the parent workflow definition with a sub_workflow node."""
+    return {
+        "schema_version": "2.0.0",
+        "triggers": [
+            {"id": "trigger", "type": "manual_trigger", "parameters": {}},
+        ],
+        "nodes": [
+            {
+                "id": "sub_wf_node",
+                "type": "sub_workflow",
+                "parameters": {
+                    "workflow_id": str(_CHILD_WF_ID),
+                    "trigger_node_id": "child_trigger",
+                    "input_mapping": {"greeting": "hello from parent"},
+                },
+            },
+        ],
+        "edges": [
+            {"from": "trigger", "to": "sub_wf_node"},
+        ],
+    }
+
+
+class _MockExecResult:
+    """Mock for SQLModel exec() return value."""
+
+    def __init__(self, value: object) -> None:
+        self._value = value
+
+    def first(self) -> object:
+        """Return the stored value."""
+        return self._value
+
+
+class _MockSession:
+    """Mock async DB session supporting exec/get/add/commit."""
+
+    def __init__(
+        self,
+        exec_results: list[object] | None = None,
+    ) -> None:
+        self._exec_results = list(exec_results or [])
+        self._exec_idx = 0
+
+    async def exec(self, _query: object) -> _MockExecResult:
+        """Return next pre-configured result."""
+        if self._exec_idx < len(self._exec_results):
+            val = self._exec_results[self._exec_idx]
+            self._exec_idx += 1
+            return _MockExecResult(val)
+        return _MockExecResult(None)
+
+    async def get(self, _model: type, _id: object) -> None:
+        """Always return None (no existing record)."""
+        return
+
+    def add(self, _obj: object) -> None:
+        """No-op."""
+
+    async def commit(self) -> None:
+        """No-op."""
+
+
+def _parent_workflow_metadata() -> dict[str, Any]:
+    """Build workflow_metadata so the parent populates _created_by_user_id."""
+    return {
+        "workflow_context": {
+            "workflow": {
+                "name": "parent-wf",
+                "id": str(uuid4()),
+                "version": 1,
+                "published": True,
+                "author": "test-author",
+                "project_id": str(_CHILD_PROJECT_ID),
+            },
+            "execution": {
+                "id": _PARENT_EXECUTION_ID,
+                "mode": "manual",
+                "created_by": _PARENT_USER_ID,
+                "created_by_user_id": _PARENT_USER_ID,
+                "created_at": "2026-01-01T00:00:00Z",
+                "workflow_version_id": str(uuid4()),
+            },
+        },
+    }
+
+
+def _mock_session_factory() -> Callable[..., contextlib.AbstractAsyncContextManager[_MockSession]]:
+    """Build a session factory that returns mock sessions for the setup activity.
+
+    Each call produces fresh sessions so Temporal retries don't exhaust the iterator.
+    Odd calls: session for Workflow/Version query + User query.
+    Even calls: session for Execution idempotency check + create.
+    """
+    mock_workflow = SimpleNamespace(
+        id=_CHILD_WF_ID,
+        name="test-child-workflow",
+        project_id=_CHILD_PROJECT_ID,
+        created_by=_CHILD_CREATED_BY,
+        published_version_id=_CHILD_VERSION_ID,
+        is_enabled=True,
+    )
+    mock_version = SimpleNamespace(
+        id=_CHILD_VERSION_ID,
+        version=1,
+        workflow_definition=_CHILD_WORKFLOW_DEF,
+    )
+
+    call_count = 0
+
+    @contextlib.asynccontextmanager
+    async def factory() -> AsyncIterator[_MockSession]:
+        nonlocal call_count
+        call_count += 1
+        if call_count % 2 == 1:
+            yield _MockSession(exec_results=[(mock_workflow, mock_version), None])
+        else:
+            yield _MockSession()
+
+    return factory
+
+
+def _build_activities() -> Sequence[Callable[..., Any]]:
+    """Create all activities needed for the parent→child lifecycle."""
+    setup = SubWorkflowSetupActivity(
+        session_factory=_mock_session_factory(),
+        task_queue=_TASK_QUEUE,
+    )
+    return [
+        manual_trigger,
+        subworkflow_trigger,
+        execute_script_activity,
+        fetch_workflow_runtime_settings,
+        setup.run,
+    ]
+
+
+async def _run_parent_workflow(
+    temporal_env: object,
+) -> dict[str, Any]:
+    """Start the parent workflow and return its raw result."""
+    from temporalio.testing import WorkflowEnvironment
+
+    assert isinstance(temporal_env, WorkflowEnvironment)
+    activities = _build_activities()
+    async with Worker(
+        temporal_env.client,
+        task_queue=_TASK_QUEUE,
+        workflows=[OrchestratorWorkflow],
+        activities=activities,
+    ):
+        svc = TemporalExecutionService(
+            temporal_client=temporal_env.client,
+            task_queue=_TASK_QUEUE,
+        )
+        start = await svc.start_workflow(
+            workflow_def=_parent_workflow_def(),
+            workflow_name="sub-wf-integration",
+            trigger_node_id="trigger",
+            include_node_results=True,
+            execution_id=_PARENT_EXECUTION_ID,
+            workflow_metadata=_parent_workflow_metadata(),
+        )
+        handle = temporal_env.client.get_workflow_handle(start.temporal_workflow_id)
+        raw: dict[str, Any] = await asyncio.wait_for(handle.result(), timeout=_WORKFLOW_RESULT_TIMEOUT)
+        return raw
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+class TestSubWorkflowLifecycle:
+    """Prove the parent→child→parent lifecycle through real Temporal."""
+
+    async def test_parent_completes_after_child(self, temporal_env: object) -> None:
+        """Full lifecycle: parent triggers child via sub_workflow node, child runs, parent completes."""
+        result = await _run_parent_workflow(temporal_env)
+
+        assert result["status"] == "completed"
+
+    async def test_sub_workflow_node_in_completed_activities(self, temporal_env: object) -> None:
+        """The sub_workflow node appears in parent's completed_activities list."""
+        result = await _run_parent_workflow(temporal_env)
+
+        assert "sub_wf_node" in result["completed_activities"]
+
+    async def test_child_execution_id_is_deterministic(self, temporal_env: object) -> None:
+        """Child execution ID is UUID5(namespace, parent_exec:node_id)."""
+        result = await _run_parent_workflow(temporal_env)
+
+        sub_wf_output = result["activity_outputs"]["sub_wf_node"]
+        expected_child_id = str(uuid5(_SUB_WORKFLOW_NAMESPACE, f"{_PARENT_EXECUTION_ID}:sub_wf_node"))
+        assert sub_wf_output["child_execution_id"] == expected_child_id
+
+    async def test_child_status_is_completed(self, temporal_env: object) -> None:
+        """Parent reports child_status as 'completed'."""
+        result = await _run_parent_workflow(temporal_env)
+
+        sub_wf_output = result["activity_outputs"]["sub_wf_node"]
+        assert sub_wf_output["child_status"] == "completed"
+
+    async def test_child_workflow_metadata_in_output(self, temporal_env: object) -> None:
+        """Parent output includes child workflow identity fields."""
+        result = await _run_parent_workflow(temporal_env)
+
+        sub_wf_output = result["activity_outputs"]["sub_wf_node"]
+        assert sub_wf_output["child_workflow_id"] == str(_CHILD_WF_ID)
+        assert sub_wf_output["child_workflow_name"] == "test-child-workflow"
+        assert sub_wf_output["child_workflow_version"] == 1
+
+    async def test_trigger_in_completed_activities(self, temporal_env: object) -> None:
+        """The manual trigger node appears in completed_activities."""
+        result = await _run_parent_workflow(temporal_env)
+
+        assert "trigger" in result["completed_activities"]
+
+    async def test_result_structure_matches_build_result(self, temporal_env: object) -> None:
+        """Result dict has all keys produced by _build_result."""
+        result = await _run_parent_workflow(temporal_env)
+
+        assert set(result.keys()) == {
+            "status",
+            "execution_id",
+            "activity_outputs",
+            "activity_inputs",
+            "completed_activities",
+            "failed_activities",
+        }
+        assert result["failed_activities"] == {}

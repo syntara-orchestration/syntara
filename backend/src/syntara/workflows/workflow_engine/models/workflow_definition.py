@@ -124,6 +124,7 @@ class ActivityName(StrEnum):
     SCHEDULED_TRIGGER = "scheduled_trigger"
     WEBHOOK_TRIGGER = "webhook_trigger"
     EDA_TRIGGER = "eda_trigger"
+    SUBWORKFLOW_TRIGGER = "subworkflow_trigger"
     # Control nodes
     CONDITION = "condition"
     CONVERGE = "converge"
@@ -138,6 +139,7 @@ class ActivityName(StrEnum):
     HTTP_REQUEST = "execute_http_request_activity"
     INTERNAL_ACTIVITY = "execute_internal_activity"
     SCRIPT = "execute_script_activity"
+    SUB_WORKFLOW = "setup_sub_workflow_execution"
     # Internal
     CREDENTIAL_RESOLUTION = "resolve_workflow_credentials"
     INTEGRATION_RESOLUTION = "resolve_workflow_integration"
@@ -161,6 +163,7 @@ class NodeType(str, Enum):
     SCHEDULED_TRIGGER = "scheduled_trigger"
     WEBHOOK_TRIGGER = "webhook_trigger"
     EDA_TRIGGER = "eda_trigger"
+    SUBWORKFLOW_TRIGGER = "subworkflow_trigger"
     # Control nodes
     CONDITION = "condition"
     CONVERGE = "converge"
@@ -175,6 +178,7 @@ class NodeType(str, Enum):
     HTTP_REQUEST = "http_request"
     INTERNAL_ACTIVITY = "internal_activity"
     SCRIPT = "script"
+    SUB_WORKFLOW = "sub_workflow"
 
 
 def resolve_trigger_node(
@@ -1022,6 +1026,14 @@ class WaitOutput(NodeOutput):
     """Output model for wait control nodes."""
 
 
+class SubWorkflowOutput(NodeOutput):
+    """Output model for sub-workflow executor nodes (POC)."""
+
+    child_execution_id: str | None = None
+    child_workflow_id: str | None = None
+    child_status: str | None = None
+
+
 NODE_OUTPUT_MODELS: dict[str, type[NodeOutput]] = {
     NodeType.SCRIPT: ScriptOutput,
     NodeType.HTTP_REQUEST: HttpRequestOutput,
@@ -1034,6 +1046,7 @@ NODE_OUTPUT_MODELS: dict[str, type[NodeOutput]] = {
     NodeType.CONVERGE: ConvergeOutput,
     NodeType.LOOP: LoopOutput,
     NodeType.WAIT: WaitOutput,
+    NodeType.SUB_WORKFLOW: SubWorkflowOutput,
 }
 
 
