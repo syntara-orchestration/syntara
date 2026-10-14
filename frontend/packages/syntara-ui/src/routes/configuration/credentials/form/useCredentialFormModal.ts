@@ -54,7 +54,6 @@ export function useCredentialFormModal({
   const { handleSubmit, handleError, handleClose, reset, setValue, setError, getValues, control } = form
 
   const selectedTypeId = useWatch({ control, name: 'credential_type_id' }) ?? ''
-  const inputs = useWatch({ control, name: 'inputs' }) ?? {}
 
   const typesQuery = credentialsClient.useQuery('get', '/credential_types')
   const allTypes = useMemo(() => typesQuery.data?.resources ?? [], [typesQuery.data])
