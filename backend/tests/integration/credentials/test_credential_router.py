@@ -218,11 +218,25 @@ class TestListCredentials:
         # Direct DB count — tells us whether the issue is DB isolation or list visibility
         db_rows = (await test_db_session.exec(sa_select(Credential))).all()
 
+        # Verify the authz override is in place and returns allowed_projects
+        from syntara.api.main import app as _app
+        from syntara.authz.dependencies import get_authz_evaluator as _get_authz_evaluator
+
+        override_present = _get_authz_evaluator in _app.dependency_overrides
+        if override_present:
+            _mock_eval = _app.dependency_overrides[_get_authz_evaluator]()
+            _mock_result = _mock_eval.evaluate({})
+        else:
+            _mock_result = None
+
         resp = await auth_client.get("/api/v1/credentials")
         assert resp.status_code == 200
         body = resp.json()
         assert len(body["resources"]) >= 2, (
-            f"DB has {len(db_rows)} credential(s), individual GETs succeeded for {created_ids}, list returned: {body}"
+            f"DB has {len(db_rows)} credential(s), "
+            f"individual GETs succeeded for {created_ids}, "
+            f"authz override present={override_present}, mock_eval_result={_mock_result}, "
+            f"list returned: {body}"
         )
         # All inputs should be masked
         for resource in body["resources"]:
