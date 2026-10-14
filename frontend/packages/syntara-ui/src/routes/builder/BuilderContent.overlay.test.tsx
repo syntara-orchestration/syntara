@@ -10,16 +10,16 @@ import { approvalsClient, executionsClient, workflowClient } from '../../client'
 import { AlertProvider } from '../../providers/alerts'
 
 vi.mock('./components/StepEditorOverlay', () => ({
-  StepEditorOverlay: ({ isOpen }: { isOpen: boolean }) => (isOpen ? <div data-testid="node-editor-overlay" /> : null),
+  StepEditorOverlay: ({ isOpen }: { isOpen: boolean }) => (isOpen ? <div data-testid="step-editor-overlay" /> : null),
 }))
 
-let shouldAutoSelectNode = false
+let shouldAutoSelectStep = false
 
 vi.mock('./AddStepPanel', () => {
   return {
     AddStepPanel: ({ onSelectStep }: { onSelectStep: (stepTypeId: string, stepSubtypeId?: string | null) => void }) => {
       React.useEffect(() => {
-        if (shouldAutoSelectNode) {
+        if (shouldAutoSelectStep) {
           onSelectStep('action', null)
         }
       }, [onSelectStep])
@@ -91,7 +91,7 @@ describe('BuilderContent overlay', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     queryClient.clear()
-    shouldAutoSelectNode = false
+    shouldAutoSelectStep = false
 
     vi.mocked(approvalsClient.useQuery).mockReturnValue({ data: undefined, refetch: vi.fn() })
     vi.mocked(approvalsClient.useMutation).mockReturnValue({ mutate: vi.fn(), isPending: false })
@@ -168,16 +168,16 @@ describe('BuilderContent overlay', () => {
     })
   })
 
-  it('renders step editor overlay after selecting a node to add', async () => {
+  it('renders step editor overlay after selecting a step to add', async () => {
     const user = userEvent.setup()
-    shouldAutoSelectNode = true
+    shouldAutoSelectStep = true
 
     renderBuilder({ workflow: undefined, isNew: true, workflowId: null })
 
     await user.click(screen.getByRole('button', { name: /add step/i }))
 
     await waitFor(() => {
-      expect(screen.getByTestId('node-editor-overlay')).toBeInTheDocument()
+      expect(screen.getByTestId('step-editor-overlay')).toBeInTheDocument()
     })
   })
 })

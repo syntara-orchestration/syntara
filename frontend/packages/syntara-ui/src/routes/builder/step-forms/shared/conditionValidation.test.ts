@@ -124,7 +124,7 @@ describe('conditionValidationRules', () => {
 
   describe('Parsed expression validation', () => {
     it('accepts valid comparison that parses successfully', () => {
-      // This should parse into a condition node and pass validation
+      // This should parse into a condition step and pass validation
       const result = conditionValidationRules.validate('${trigger.age} >= 18')
       expect(result).toBe(true)
     })

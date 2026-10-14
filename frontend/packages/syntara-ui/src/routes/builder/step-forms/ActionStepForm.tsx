@@ -190,7 +190,7 @@ function ScriptEnvironmentVariables({ isDisabled }: Readonly<{ isDisabled: boole
   )
 }
 
-/** Script + API form fields (Stack content) for action step. */
+/** Script + API form fields (Stack content) for an action step. */
 type ActionParametersContentProps = Readonly<{
   errors: { code?: { message?: string } }
   executor: ActionFormValues['executor']

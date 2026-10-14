@@ -3,7 +3,7 @@ import type { ComponentType } from 'react'
 export type StepCategory = 'trigger' | 'action' | 'logic' | 'integration' | 'approval' | 'other'
 
 /**
- * Metadata for a node category
+ * Metadata for a step category
  */
 export type CategoryMetadata = {
   /** Unique category identifier */

@@ -4,16 +4,16 @@ import type { BaseStepFormProps } from '../registry/StepRegistry'
 
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
 type GenericStepFormData = {
-  // No data needed - this form just triggers the node to be added
+  // No data needed - this form just triggers the step to be added
 }
 
 /**
- * Form component for Generic placeholder nodes
- * This is a minimal form that immediately succeeds to add the generic node to canvas
+ * Form component for generic placeholder steps
+ * This is a minimal form that immediately succeeds to add the generic step to the canvas
  */
 export function GenericStepForm({ onSubmit, onCancel, submitButtonText }: BaseStepFormProps<GenericStepFormData>) {
   // Automatically submit when form is shown
-  // This creates the generic node on canvas immediately
+  // This creates the generic step on the canvas immediately
   const handleSubmit = () => {
     onSubmit({})
   }

@@ -912,7 +912,7 @@ describe('AIAgentStepForm', () => {
   })
 
   describe('retry policy visibility', () => {
-    it('hides retry policy for AI agent nodes', async () => {
+    it('hides retry policy for AI agent steps', async () => {
       const user = userEvent.setup()
       renderWithHeader(<AIAgentStepForm onSubmit={mockOnSubmit} />)
 

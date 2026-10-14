@@ -35,7 +35,7 @@ export default function registerAAPStep() {
         description: 'Execute Ansible Automation Platform jobs and workflows',
         keywords: ['ansible', 'aap', 'workflow', 'playbook', 'job', 'template'],
         order: 40,
-        selectionTitle: 'Select an AAP execution node',
+        selectionTitle: 'Select an AAP execution step',
         // Category node with subtypes - form component not used, subtypes provide their own forms
         formComponent: AAPJobTemplateForm,
         subtypes: [

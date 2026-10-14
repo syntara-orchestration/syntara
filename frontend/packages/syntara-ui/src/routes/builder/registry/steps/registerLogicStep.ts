@@ -87,7 +87,7 @@ export default function registerLogicStep() {
           'timer',
         ],
         order: 50,
-        selectionTitle: 'Select a logic node',
+        selectionTitle: 'Select a logic step',
         formComponent: LogicStepForm,
         subtypes: [
           {

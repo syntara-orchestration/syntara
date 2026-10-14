@@ -24,7 +24,7 @@ export default function registerActionStep() {
         description: 'Execute scripts or make API calls',
         keywords: ['script', 'api', 'http', 'python', 'javascript', 'bash', 'rest'],
         order: 30,
-        selectionTitle: 'Select an action node',
+        selectionTitle: 'Select an action step',
         subtypes: [
           {
             id: RegistryStepId.ACTION_SCRIPT,

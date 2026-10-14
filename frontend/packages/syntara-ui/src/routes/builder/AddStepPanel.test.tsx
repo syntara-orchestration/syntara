@@ -161,43 +161,43 @@ describe('AddStepPanelHeader', () => {
 
 describe('AddStepPanel Component', () => {
   const mockOnClose = vi.fn()
-  const mockOnSelectNode = vi.fn()
+  const mockOnSelectStep = vi.fn()
 
   beforeEach(() => {
     vi.clearAllMocks()
     mockStepRegistryGetAll.mockReturnValue(mockStepTypes)
-    mockStepRegistryGet.mockImplementation((id: string) => mockStepTypes.find((node) => node.id === id) as never)
+    mockStepRegistryGet.mockImplementation((id: string) => mockStepTypes.find((stepType) => stepType.id === id) as never)
   })
 
   it('renders the panel with title and close button', () => {
-    render(<AddStepPanel onClose={mockOnClose} onSelectStep={mockOnSelectNode} />)
+    render(<AddStepPanel onClose={mockOnClose} onSelectStep={mockOnSelectStep} />)
 
     expect(screen.getByText('Add step')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Close add step panel/i })).toBeInTheDocument()
   })
 
-  it('calls onSelectStep when a base node is selected', async () => {
+  it('calls onSelectStep when a base step type is selected', async () => {
     const user = userEvent.setup()
-    render(<AddStepPanel onClose={mockOnClose} onSelectStep={mockOnSelectNode} />)
+    render(<AddStepPanel onClose={mockOnClose} onSelectStep={mockOnSelectStep} />)
 
     await user.click(screen.getByRole('button', { name: 'Action' }))
 
-    expect(mockOnSelectNode).toHaveBeenCalledWith('action', null)
+    expect(mockOnSelectStep).toHaveBeenCalledWith('action', null)
   })
 
   it('shows subtypes and calls onSelectStep with subtype', async () => {
     const user = userEvent.setup()
-    render(<AddStepPanel onClose={mockOnClose} onSelectStep={mockOnSelectNode} />)
+    render(<AddStepPanel onClose={mockOnClose} onSelectStep={mockOnSelectStep} />)
 
     await user.click(screen.getByRole('button', { name: 'Trigger' }))
     await user.click(screen.getByRole('button', { name: 'Manual' }))
 
-    expect(mockOnSelectNode).toHaveBeenCalledWith('trigger', 'trigger-manual')
+    expect(mockOnSelectStep).toHaveBeenCalledWith('trigger', 'trigger-manual')
   })
 
   it('shows back button for subtype list and returns to main list', async () => {
     const user = userEvent.setup()
-    render(<AddStepPanel onClose={mockOnClose} onSelectStep={mockOnSelectNode} />)
+    render(<AddStepPanel onClose={mockOnClose} onSelectStep={mockOnSelectStep} />)
 
     await user.click(screen.getByRole('button', { name: 'Trigger' }))
 
@@ -209,28 +209,28 @@ describe('AddStepPanel Component', () => {
   })
 
   it('filters to trigger types when the canvas has no workflow steps yet', () => {
-    render(<AddStepPanel onClose={mockOnClose} onSelectStep={mockOnSelectNode} hasNoWorkflowSteps />)
+    render(<AddStepPanel onClose={mockOnClose} onSelectStep={mockOnSelectStep} hasNoWorkflowSteps />)
 
     expect(screen.getByRole('button', { name: 'Manual' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Action' })).not.toBeInTheDocument()
   })
 
   it('hides close and back buttons when the canvas has no workflow steps yet', () => {
-    render(<AddStepPanel onClose={mockOnClose} onSelectStep={mockOnSelectNode} hasNoWorkflowSteps />)
+    render(<AddStepPanel onClose={mockOnClose} onSelectStep={mockOnSelectStep} hasNoWorkflowSteps />)
 
     expect(screen.queryByRole('button', { name: /Close add step panel/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Back/i })).not.toBeInTheDocument()
   })
 
   it('filters out triggers when adding from edge', () => {
-    render(<AddStepPanel onClose={mockOnClose} onSelectStep={mockOnSelectNode} sourceNodeId="node-123" />)
+    render(<AddStepPanel onClose={mockOnClose} onSelectStep={mockOnSelectStep} sourceNodeId="node-123" />)
 
     expect(screen.queryByRole('button', { name: 'Trigger' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Action' })).toBeInTheDocument()
   })
 
   it('filters out triggers when replacing a generic step', () => {
-    render(<AddStepPanel onClose={mockOnClose} onSelectStep={mockOnSelectNode} replacementNodeId="node-456" />)
+    render(<AddStepPanel onClose={mockOnClose} onSelectStep={mockOnSelectStep} replacementNodeId="node-456" />)
 
     expect(screen.queryByRole('button', { name: 'Trigger' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Action' })).toBeInTheDocument()

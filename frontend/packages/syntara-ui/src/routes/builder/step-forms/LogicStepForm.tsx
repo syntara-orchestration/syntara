@@ -11,7 +11,7 @@ import { WaitStepForm, type WaitFormData } from './WaitStepForm'
 export type { ConvergeStrategy } from './ConvergeStepForm'
 
 /**
- * Combined form data type for logic nodes.
+ * Combined form data type for logic steps.
  * This is a union of all specialized form types plus the logicType discriminator.
  */
 export type LogicFormData = {
@@ -34,7 +34,7 @@ export type LogicFormData = {
   // Converge fields
   strategy?: 'all' | 'any'
   requiredPathCount?: number
-  // Wait node fields
+  // Wait step fields
   duration?: number
   // Converge fields
   wait_duration?: number
@@ -60,11 +60,11 @@ type LogicStepFormProps = Readonly<{
  * Note: This wrapper exists to maintain the subtype pattern in registerLogicStep.
  * For editing existing steps, use the specialized forms directly via StepDetails components.
  */
-// eslint-disable-next-line complexity -- dispatch function for 4 distinct logic node subtypes; each branch has its own data-shaping and submit handler; splitting further would scatter tightly-related logic
+// eslint-disable-next-line complexity -- dispatch function for 4 distinct logic step subtypes; each branch has its own data-shaping and submit handler; splitting further would scatter tightly-related logic
 export function LogicStepForm({ onSubmit, initialData, onHeaderContentChange }: LogicStepFormProps) {
   const logicType = initialData?.logicType
 
-  // Handle Condition node
+  // Handle Condition step
   if (logicType === ActivityTypeEnum.CONDITION) {
     const conditionData: Partial<ConditionFormData> = {
       name: initialData?.name,
@@ -87,7 +87,7 @@ export function LogicStepForm({ onSubmit, initialData, onHeaderContentChange }: 
     )
   }
 
-  // Handle Loop node
+  // Handle Loop step
   if (logicType === ActivityTypeEnum.LOOP) {
     const loopData: Partial<LoopFormData> = {
       name: initialData?.name,
@@ -111,7 +111,7 @@ export function LogicStepForm({ onSubmit, initialData, onHeaderContentChange }: 
     )
   }
 
-  // Handle Converge node
+  // Handle Converge step
   if (logicType === ActivityTypeEnum.CONVERGE) {
     const convergeSource = {
       name: initialData?.name,
@@ -140,7 +140,7 @@ export function LogicStepForm({ onSubmit, initialData, onHeaderContentChange }: 
     )
   }
 
-  // Handle Switch node
+  // Handle Switch step
   if (logicType === ActivityTypeEnum.SWITCH) {
     const switchData: Partial<SwitchFormData> = {
       name: initialData?.name,
@@ -163,7 +163,7 @@ export function LogicStepForm({ onSubmit, initialData, onHeaderContentChange }: 
     )
   }
 
-  // Handle Wait node
+  // Handle Wait step
   if (logicType === ActivityTypeEnum.WAIT) {
     const waitData: Partial<WaitFormData> = {
       name: initialData?.name,

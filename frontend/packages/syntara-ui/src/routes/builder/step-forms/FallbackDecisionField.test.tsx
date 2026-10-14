@@ -87,7 +87,7 @@ describe('FallbackDecisionField', () => {
     expect(screen.getByRole('button', { name: APPROVAL_FALLBACK_ENABLE_LINK })).toBeInTheDocument()
   })
 
-  it('disables fallback decision when the node is set to stop the workflow', () => {
+  it('disables fallback decision when the step is set to stop the workflow', () => {
     renderField({ continueOnFailure: false, adminDefault: true })
 
     expect(fallbackToggle()).toBeDisabled()
@@ -97,7 +97,7 @@ describe('FallbackDecisionField', () => {
     expect(screen.getByRole('button', { name: APPROVAL_FALLBACK_ENABLE_LINK })).toBeInTheDocument()
   })
 
-  it('enables fallback decision when the node continue on failure is true', () => {
+  it('enables fallback decision when continue on failure is true for the step', () => {
     renderField({ continueOnFailure: true, adminDefault: false })
 
     expect(fallbackToggle()).toBeEnabled()

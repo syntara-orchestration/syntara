@@ -36,17 +36,17 @@ describe('aapJobTemplateSchema', () => {
     expect(result.success).toBe(true)
   })
 
-  it('accepts empty organization (permissive schema for incomplete nodes)', () => {
+  it('accepts empty organization (permissive schema for incomplete steps)', () => {
     const result = aapJobTemplateSchema.safeParse({ ...validBase, organization_name: '' })
     expect(result.success).toBe(true)
   })
 
-  it('accepts whitespace-only organization (permissive schema for incomplete nodes)', () => {
+  it('accepts whitespace-only organization (permissive schema for incomplete steps)', () => {
     const result = aapJobTemplateSchema.safeParse({ ...validBase, organization_name: '   ' })
     expect(result.success).toBe(true)
   })
 
-  it('accepts empty jobTemplateName (permissive schema for incomplete nodes)', () => {
+  it('accepts empty jobTemplateName (permissive schema for incomplete steps)', () => {
     const result = aapJobTemplateSchema.safeParse({ ...validBase, job_template_name: '' })
     expect(result.success).toBe(true)
   })
@@ -108,12 +108,12 @@ describe('aapJobTemplateSchema', () => {
   })
 
   it('accepts data with only the required name field', () => {
-    const result = aapJobTemplateSchema.safeParse({ name: 'Incomplete Node' })
+    const result = aapJobTemplateSchema.safeParse({ name: 'Incomplete Step' })
     expect(result.success).toBe(true)
   })
 
   it('accepts use_input_variables without a job template id', () => {
-    const result = aapJobTemplateSchema.safeParse({ name: 'Incomplete Node', use_input_variables: true })
+    const result = aapJobTemplateSchema.safeParse({ name: 'Incomplete Step', use_input_variables: true })
     expect(result.success).toBe(true)
   })
 })

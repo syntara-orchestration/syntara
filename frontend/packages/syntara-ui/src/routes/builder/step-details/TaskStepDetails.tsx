@@ -512,7 +512,7 @@ export function TaskStepDetails({
   // In v2, activity.type IS the executor directly
   const executor = taskData.type
 
-  // Detect the actual node type - handles disguised AAP/connector nodes
+  // Detect the executor type, including AAP and connector tasks.
   const { actualExecutor, detectedExecutorType } = detectTaskExecutorType(taskData as TaskActivity)
 
   // In v2, parameters are at activity.parameters (not activity.task.parameters)
