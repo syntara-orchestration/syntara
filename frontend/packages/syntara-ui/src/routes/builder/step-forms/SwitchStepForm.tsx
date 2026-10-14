@@ -49,12 +49,12 @@ import { StepEditorAutoSubmitContext, useRegisterAutoSubmit } from '../hooks/use
 import { useIsVersionView } from '../VersionViewContext'
 
 import { ActivityNameField } from './shared/ActivityNameField'
+import { PathExpressionHelp } from './shared/PathExpressionHelp'
 import { stepHelp } from './shared/stepFieldHelp'
 import { SWITCH_FALLBACK_HELP } from './shared/stepFieldHelpText'
 import { StepFormContainer } from './shared/StepFormContainer'
 import stepFormStyles from './shared/stepFormStyles.module.css'
 import { StepFormTabsLayout } from './shared/StepFormTabsLayout'
-import { PathExpressionHelp } from './shared/PathExpressionHelp'
 import { switchFormSchema, type SwitchFormData, type SwitchCaseData } from './switchFormSchema'
 import styles from './SwitchStepForm.module.css'
 

@@ -23,9 +23,9 @@ import {
   type CodeLanguage,
   type ExpandableCodeEditorHandle,
 } from '../components/ExpandableCodeEditor'
-import type { ActionFormData as RegistryActionFormData } from '../stepFormTypes'
 import { StepEditorAutoSubmitContext, useRegisterAutoSubmit } from '../hooks/useStepEditorAutoSubmit'
 import { DroppableField } from '../panels/fields/DroppableField'
+import type { ActionFormData as RegistryActionFormData } from '../stepFormTypes'
 import { useIsVersionView } from '../VersionViewContext'
 
 import { actionFormSchema, type ActionFormData, type ActionFormValues } from './actionFormSchema'
