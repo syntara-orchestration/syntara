@@ -19,7 +19,7 @@
 
 ## Overview
 
-Kafka Subscribe starts a workflow for each valid eligible Kafka message. Filtering sits before workflow handoff, outbound Publish connects workflow actions to Kafka. Subscribe references a Kafka Integration and runtime Credential; consumer connections live outside the API process.
+Kafka Subscribe starts a workflow for each valid eligible Kafka message. Filtering sits before workflow handoff, outbound Publish connects workflow actions to Kafka. Subscribe references a Kafka Integration and an optional **runtime credential override** (otherwise the integration management credential); consumer connections live outside the API process.
 
 The consumer worker uses `AIOKafkaConsumer` directly. Kafka manages partition assignment and group membership. Syntara manages subscriptions, configuration reconciliation, execution handoff and recovery across Kafka, Redis, PostgreSQL, and Temporal.
 
@@ -36,7 +36,7 @@ The important decisions are:
 | Resolution | Commit only after a durable scheduled, filtered, or rejected outcome |
 | Duplicate protection | Redis claims/markers keyed by Workflow ID + Subscription ID + TPO, scoped to connector/source; stable Temporal workflow ID |
 | Initial position | PostgreSQL stores the first partition boundary; Kafka committed group offsets govern subsequent resumption |
-| Execution identity | A project service account explicitly bound to the trigger |
+| Execution identity | Project **service account** on the trigger; **enabling actor** on `EventSubscription.enabled_by` (see [Execution identity and permission gates](#execution-identity-and-permission-gates)) |
 
 Filtering, Visibility, and Publish remain **TBD** for now (will revisit in Milestone 2) and appear only as layer boundaries below.
 
@@ -66,7 +66,7 @@ Consumer groups coordinate current partition ownership; they do not eliminate re
 ## User flow and scope
 
 1. An integration administrator creates a Kafka Integration, supplies bootstrap addresses and security settings, and tests it with a management credential.
-2. A workflow designer adds a Kafka Subscribe trigger, selects the integration, runtime credential, service account, exact topic, and optional filter/input schema.
+2. A workflow designer adds a Kafka Subscribe trigger, selects the integration, **optional** runtime credential override (else connector management credential), **execution service account**, exact topic, and optional filter/input schema.
 3. Publishing validates these references and records desired subscriptions atomically with the published version. The response can say activation is pending; broker readiness is asynchronous.
 4. Each matching message starts one execution. Downstream steps can read `${trigger.payload}` and `${trigger.metadata}` through the selected trigger's normal namespace.
 5. Visibility receives subscription and processing outcomes.
@@ -288,15 +288,73 @@ We will create verified SSL contexts regardless of whether a custom CA exists. F
 
 The Kafka Integration adapter implements `validate()` with bounded metadata/connectivity I/O and `discover()` with a connection result and no resource creation. We will map failures to the existing health error types using sanitized codes. Topic errors belong to subscription health even when the overall connector is reachable.
 
+### Effective runtime credential (broker listener)
+
+Step parameters may omit `credential_id`. At publish/sync, resolve and persist the credential the consumer uses:
+
+```text
+effective_runtime_credential_id = parameters.credential_id ?? integration.management_credential_id
+```
+
+The **runtime credential** authenticates the Kafka consumer to the customer cluster. It is independent of the **execution service account** (workflow execution ownership). Connector `validate()` uses the management credential; subscription `/test` and consumption use the **effective** runtime credential.
+
 ### Execution identity and permission gates
 
-We will require `service_account_id` on Kafka Subscribe. It names an active ServiceAccount in the workflow's project and provides the execution principal. The worker's infrastructure identity permits it to operate the runtime; it is not the accountable owner of every customer workflow. No service-account token needs to be stored on the trigger or Kafka message.
+#### Three identities (do not conflate)
 
-At publish/enable, we will validate workflow update permission, project-scoped `execution:run`, integration visibility, `credential:use`, and authorization to bind the selected service account. The current publish route checks workflow update only; the execution route separately authorizes `execution:run`. Kafka must add that execution gate to the enabling operation. We are proposing a scoped `service_account:bind-trigger` permission for binding. We will seed it into the intended project roles and cover it in authorization compliance tests.
+| Identity | Role |
+| --- | --- |
+| **Broker / runtime credential** | Kafka SASL/TLS identity for the consumer (and future publisher) |
+| **Execution service account** | Customer **machine principal** that owns each workflow execution — not a human login |
+| **Enabling actor** | Principal who passed activation checks; stored as `EventSubscription.enabled_by` and in lifecycle audit |
 
-At admission, recheck the account's active state, project-scoped `execution:run` and `credential:use`, connector enablement/visibility, and credential availability. Recheck revocation before scheduling an admitted execution as well. Account revocation or loss of standing permission blocks the subscription without discarding messages; it is a configuration/authorization failure, not invalid message content. Already scheduled executions follow ordinary execution cancellation policy.
+The event-stream **worker process** uses an internal **service principal** (mTLS) to run consumers and call platform services. That identity is **not** the accountable owner of customer workflow executions.
 
-Execution `created_by`/`updated_by` reference the service-account principal. Metadata records the enabling human, subscription, trigger node, source position, and published version. Quotas and the existing workflow concurrency limit still apply. Broker metadata cannot select another principal, integration, credential, or workflow.
+We require `service_account_id` on Kafka Subscribe (active `ServiceAccount` in the workflow's project). No service-account bearer token is stored on the trigger or in Kafka messages; `prepare_execution` / admission loads the SA as the execution principal.
+
+#### Enable-time authorization (publication transaction)
+
+| Phase | Permission / validation |
+| --- | --- |
+| Edit workflow definition (draft), including Subscribe on draft | `workflow:update` (project); integration **visibility** in scope |
+| **Activate** standing consumption (sync subscriptions on publish, `desired_enabled`, resume/retry) | **`subscription:enable` (project)** — *preferred, pending product confirmation* — or **`execution:run` (project)** as fallback |
+| Execution SA | Exists, **active**, in workflow **project** (same class as webhook SA binding on publish) |
+| `credential:use` for the **enabling principal** | Only when the trigger sets explicit `credential_id`; **not** required when the effective credential is the connector management credential only |
+
+If publish succeeds but the principal lacks the **activation** permission, the workflow version may be published while **subscriptions remain inactive** (`desired_enabled` false) — no split-brain activation.
+
+Optional scoped `service_account:bind-trigger` remains **under review**; default is project-scoped SA validation without a separate bind permission.
+
+Extend trigger credential extraction so publish validation includes Subscribe parameters (today node extraction may exclude triggers).
+
+#### Admission-time authorization (`prepare_execution` / revision lock)
+
+Revalidate **runtime state** on each delivery attempt. **Do not** re-evaluate the enabling principal's `workflow:update`, `subscription:enable` / `execution:run`, or OPA **`credential:use`** on every record.
+
+| Check | On failure |
+| --- | --- |
+| Subscription **`desired_enabled`**, not **`paused`** or **`retired`**; workflow **published**; workflow **`is_enabled`** per existing publish pointer | Hold / block; configuration failure (not invalid message content) |
+| Execution SA **active**, in **project** | Hold; Visibility / optional sparse security audit |
+| Integration in scope; **effective runtime credential** **enabled** and resolvable | Hold; subscription/integration health |
+| **`configuration_revision`** frozen under publication lock (see [Configuration race boundary](#configuration-race-boundary)) | Re-evaluate or hold |
+| **`max_concurrent_workflows`** during preparation | Backpressure / hold |
+
+Account or credential revocation after enable **blocks new admissions** and holds offsets; already accepted Temporal runs follow ordinary execution policy.
+
+#### Execution attribution, quotas, and logs
+
+- `Execution.created_by`, `Execution.updated_by`, and `workflow_context.execution.created_by_user_id` → **execution service account** UUID (not the enabling human).
+- Lifecycle: `WorkflowPublishEvent.actor_id`, `workflows.created_by`, `enabled_by`, Redis claim fields — **who enabled** standing consumption.
+- **Quotas:** existing `max_concurrent_workflows` during preparation; no second quota model.
+- **Logs:** message payloads and secrets never in Redis markers, diagnostic surfaces, or security audit ([audit.md](audit.md)). High-volume receipt/filter outcomes → **Trigger Activity Log** (Visibility — TBD). Security audit: subscription lifecycle, authorization denials, accountable firings via **`workflow_execution_started`** (extend with `trigger_type` / Kafka context). See [Visibility](#visibility).
+
+**Known limitation:** execution SA attribution is defined here; **service-account-scoped authorization for every workflow step** at runtime is not fully enforced today (credential/integration activities remain largely project-scoped).
+
+#### Design decisions (authorization)
+
+- **Execution identity:** runs as the configured service account; the enabling human is recorded separately for audit — not the message publisher and not the platform worker principal alone.
+- **Two-phase authorization:** enable-time RBAC vs admission-time runtime state checks — not full RBAC on every message.
+- **Broker credential:** inherit the connector management credential by default; an explicit override requires `credential:use` for the enabler at enable time.
 
 ## Subscription persistence and lifecycle
 
@@ -504,7 +562,7 @@ Deletion closes activation under the lifecycle lock and refuses non-terminal exe
 We will extend workflow trigger sync with a Kafka service sharing the publication session:
 
 1. Lock the workflow and affected subscription rows in a consistent order.
-2. We will validate decided Kafka parameters and authorization, without broker I/O inside the transaction.
+2. We will validate decided Kafka parameters and **enable-time** authorization (workflow update, activation permission, SA binding, conditional `credential:use` — see [Execution identity and permission gates](#execution-identity-and-permission-gates)), without broker I/O inside the transaction.
 3. Diff triggers in the target **published** definition. We will create, update, disable, or retire subscriptions and increment configuration revisions.
 4. We will persist desired state atomically with publication; hand lifecycle outcomes to the visibility boundary.
 5. After commit, send an optional Redis change hint. Workers reconcile even if this hint is lost.
@@ -530,6 +588,20 @@ The platform currently derives workflow enabled state from the published-version
 Admission locks the same subscription/workflow rows used by publication and verifies the expected revision. If publication wins the lock, evaluate under the new configuration before preparing an execution. If admission wins, its version, inputs, identity, and filter outcome remain frozen through retry. We will not re-resolve the latest published version after an ambiguous Temporal start.
 
 An unpublish/disable response closes **new admission**. Work already durably admitted may finish scheduling after the response, and scheduled executions may continue running. We will expose the draining state until that work resolves. Revocation is stricter: hold unscheduled admissions while authority is invalid. Deletion must acquire the same lifecycle lock and refuse unresolved admissions. An explicit authorized retirement operation can resolve unscheduled work as `cancelled_by_lifecycle`, after checking that an ambiguous Temporal start has not already been accepted; this deliberate cancellation is outside the valid-active-subscription guarantee. We will not delete the recovery rows first and hope that consumer shutdown has completed.
+
+**Admission allowed** (evaluated under revision lock in `prepare_execution`, not per-message RBAC for the enabling principal):
+
+```text
+subscription.desired_enabled
+  AND NOT subscription.paused
+  AND NOT subscription.retired
+  AND workflow has published version pointer
+  AND workflow.is_enabled (existing publish-pointer semantics)
+  AND execution service account active in project
+  AND integration in scope with resolvable effective_runtime_credential_id
+```
+
+Failure is a **configuration/authorization hold**, not invalid message content; offsets remain uncommitted until resolved or terminal rejection applies.
 
 ## Step schemas and API surface
 
@@ -558,7 +630,7 @@ Step/API boundaries validate against the concrete transport parameter variants, 
 
 The step's flat parameter shape is independent of persistence. `EventSubscriptionSource` still holds typed transport-specific configuration. Its projector builds `KafkaSourceConfiguration` from the Kafka subtype and adds the generated group ID and verified source identity; callers cannot provide those system-managed fields. Other transports define their own addressing fields rather than inheriting `topic` from the common base.
 
-Illustrative Subscribe configuration:
+Illustrative Subscribe configuration (`credential_id` omitted when the connector management credential is used):
 
 ```json
 {
@@ -566,7 +638,6 @@ Illustrative Subscribe configuration:
   "type": "event_subscribe",
   "parameters": {
     "integration_id": "00000000-0000-4000-8000-000000000001",
-    "credential_id": "00000000-0000-4000-8000-000000000002",
     "service_account_id": "00000000-0000-4000-8000-000000000003",
     "transport": "kafka",
     "topic": "infra.alerts",
@@ -593,10 +664,10 @@ Recovery dispatches to the stored transport's adapter. The Kafka recovery body c
 |---|---|
 | `GET /workflows/{id}/event-subscriptions` | Published subscription configuration/source references; workflow read and project scope |
 | `GET /workflows/{id}/event-subscriptions/{sid}` | Desired configuration and source/initialization metadata; workflow read |
-| `POST /workflows/{id}/event-subscriptions/test` | Unsaved Subscribe connectivity/reference test; workflow update, integration visibility, credential use and permitted account reference; no consumption |
+| `POST /workflows/{id}/event-subscriptions/test` | Unsaved Subscribe connectivity/reference test; `workflow:update`, integration visibility, **effective** runtime credential resolution; `credential:use` only when body includes explicit `credential_id`; SA reference validation; no consumption |
 | `POST /workflows/{id}/event-subscriptions/{sid}/pause` | Close new processing and drain; scoped workflow control authorization |
-| `POST /workflows/{id}/event-subscriptions/{sid}/resume` | Clear pause while published; workflow update/run, credential use and account-binding authorization |
-| `POST /workflows/{id}/event-subscriptions/{sid}/retry` | Re-open a blocked circuit after correction; same execution-causing checks as resume |
+| `POST /workflows/{id}/event-subscriptions/{sid}/resume` | Clear pause while published; **`subscription:enable` or `execution:run` (project)** plus `workflow:update` where applicable; conditional `credential:use` if override cred; SA still active in project |
+| `POST /workflows/{id}/event-subscriptions/{sid}/retry` | Re-open a blocked circuit after correction; same **activation** checks as resume (not a substitute for publish-time subscription sync) |
 | `POST /workflows/{id}/event-subscriptions/{sid}/recover` | Acknowledge a known gap and chosen recovery boundary; recovery grant plus normal scope checks |
 | `POST /workflows/{id}/event-subscriptions/{sid}/retire` | Retire source and drain/resolve prepared work; restricted lifecycle authorization and ambiguous-start checks |
 
@@ -612,7 +683,7 @@ We will use existing list/SQLModel/RFC 9457 conventions for configuration/contro
 |---|---|---|
 | Publication | Workflow/version pointer, subscription/source desired state | Optional Redis hint; consumers reconcile later |
 | Partition initialization | Unique initial boundary and activation confirmation | Seek/commit initial Kafka position while assigned |
-| Prepare delivery | Revision/authority/capacity checks; deterministic pending Execution with frozen input/context | Token-fenced Redis claim; no Temporal start before preparation commits |
+| Prepare delivery | Revision lock, [admission allowed](#configuration-race-boundary) state checks, capacity; deterministic pending Execution with frozen input/context (execution principal = trigger SA) | Token-fenced Redis claim; no Temporal start before preparation commits |
 | Finalize scheduling | Confirm ordinary Execution/run metadata without regressing execution status | Mark Redis scheduled after Temporal acceptance; resolve in memory and commit Kafka while assigned |
 | No-trigger resolution | Configuration/revision validation; visibility integration is TBD | Record the terminal Redis decision, then advance eligible Kafka offsets |
 | Gap recovery | Explicit acknowledged boundary and recovery revision | Drain conflicting claims and verify administrative Kafka commit |
@@ -811,7 +882,14 @@ We will recognize CloudEvents structured content type `application/cloudevents+j
 
 ## Visibility
 
-**TBD.** A visibility layer receives subscription lifecycle, connection, processing, scheduling, and error outcomes from the consumer flow. Diagnostic, audit, health, metric, storage, retention, and presentation designs are yet to be decided.
+**TBD** for full product presentation, APIs, and retention. Split high-volume diagnostics from security audit:
+
+| Stream | Content | Notes |
+| --- | --- | --- |
+| **Trigger Activity Log** (M1 minimum) | High-volume per-message outcomes — received, filtered, rejected, scheduled, held | No message payloads or secrets; subscription/partition/offset identity only |
+| **Security audit** ([audit.md](audit.md)) | Subscription lifecycle (enable/disable/retire), authorization denials at enable, accountable workflow starts | Extend **`workflow_execution_started`** with `trigger_type` / Kafka subscription context; **not** one audit row per Kafka record |
+
+A visibility layer still receives connection health, circuit/blocked reasons, and operator-facing subscription status from the consumer flow. Diagnostic APIs, metrics dashboards, and activity-log retention remain **TBD**.
 
 ## Deployment and configuration
 
@@ -884,13 +962,13 @@ We will document broker history/group-offset-retention prerequisites, supported 
 
 | Source problem | Design coverage |
 |---|---|
-| P1: resources/security/identity | Integration/Credential models, service-account binding, scoped run/use checks, transactional subscription configuration |
+| P1: resources/security/identity | Integration/Credential models, effective runtime credential, execution service account, enable-time activation gates, admission state checks, transactional subscription configuration |
 | P2: consumption/lifecycle | Redis scoped claims, stable Temporal ID, Kafka committed offsets, PostgreSQL initial metadata, backlog/gap policy and frozen Execution recovery |
 | P3: decoding | JSON/envelope contract and consumer resolution boundary; Visibility reporting is TBD |
 | P4: long-lived workers | Independent aiokafka worker, reconciliation, group replicas, partition ownership and bounded shutdown |
 | P5: filtering | Filtering layer after decoding and before handoff; **TBD** |
 | P6: publishing | Outbound workflow-to-Kafka layer; **TBD** |
-| P7: diagnosis/audit | Visibility receives lifecycle/processing outcomes; **TBD** |
+| P7: diagnosis/audit | Activity log vs security audit; lifecycle + accountable starts in audit; per-message telemetry in activity log; presentation/retention **TBD** |
 | P8: consumer scale/latency | Persistence-enabled consumer/deduplication tests and whole-fleet benchmarks; other layer profiles TBD |
 
 ### Delivery sequence
@@ -909,7 +987,7 @@ The following consumer decisions and validation items will guide implementation:
 | Store ownership | Redis claims/markers; PostgreSQL configuration/initial metadata and ordinary Executions; Kafka ongoing committed offsets |
 | Claim lease and retention | Separate short renewable ownership from retained terminal evidence; validate lease timing and supported redelivery window |
 | Message limit | 256 KiB value and 1 MiB inline envelope under consideration, subject to full encoded workflow argument validation |
-| Execution identity | Project service account with explicit binding/run/credential-use authorization |
+| Execution identity | Runs as trigger **service account**; enabling actor on `enabled_by` + audit; enable-time activation permission + conditional `credential:use`; admission = runtime state checks only |
 | Worker topology | Shared control-plane worker pool; finalize consumer placement and validate memory/connections without a pod-per-subscription assumption |
 | Scaling and fan-out scope | Administrator-controlled CRD replicas; autoscaling excluded; fan-out documented as emergent without committed topologies/tests/SLOs |
 | Deployment/recovery | Redis durable/no-eviction capacity plus consistent cross-store recovery; operator/CI provisioning must ship with the consumer |
