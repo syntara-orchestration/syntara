@@ -1,7 +1,9 @@
 import { Button, Form, Modal, ModalBody, ModalFooter, ModalHeader } from '@patternfly/react-core'
 import { RhUiAddIcon } from '@patternfly/react-icons'
+import { useCallback } from 'react'
 
 import { useSynForm } from '../../../../hooks/useSynForm'
+import { detachPromise } from '../../../../utils/detachPromise'
 import type { Credential } from '../credentialConstants'
 
 import { CredentialFormModalFields } from './CredentialFormModalFields'
@@ -21,6 +23,8 @@ type CredentialFormModalProps = {
   onCreated?: (credentialId: string) => void
   /** When provided, pre-selects the project in the Project dropdown */
   defaultProjectId?: string
+  /** Limits credential types when opened from a filtered CredentialSelector */
+  compatibleTypeNames?: string[]
 }
 
 export function CredentialFormModal({
@@ -31,6 +35,7 @@ export function CredentialFormModal({
   preSelectedTypeId,
   onCreated,
   defaultProjectId,
+  compatibleTypeNames,
 }: Readonly<CredentialFormModalProps>) {
   const isEditMode = Boolean(credentialToEdit)
   const title = isEditMode && credentialToEdit ? `Edit ${credentialToEdit.name}` : 'Create credential'
@@ -60,6 +65,7 @@ export function CredentialFormModal({
           preSelectedTypeId={preSelectedTypeId}
           onCreated={onCreated}
           defaultProjectId={defaultProjectId}
+          compatibleTypeNames={compatibleTypeNames}
           onSuccess={onSuccess}
         />
       )}
@@ -75,6 +81,7 @@ type CredentialFormModalContentProps = {
   preSelectedTypeId?: string
   onCreated?: (credentialId: string) => void
   defaultProjectId?: string
+  compatibleTypeNames?: string[]
   onSuccess?: () => void
 }
 
@@ -86,6 +93,7 @@ function CredentialFormModalContent({
   preSelectedTypeId,
   onCreated,
   defaultProjectId,
+  compatibleTypeNames,
   onSuccess,
 }: Readonly<CredentialFormModalContentProps>) {
   const modalState = useCredentialFormModal({
@@ -95,11 +103,18 @@ function CredentialFormModalContent({
     isEditMode,
     preSelectedTypeId,
     defaultProjectId,
+    compatibleTypeNames,
     onCreated,
     onSuccess,
   })
 
   const { handleSubmit, handleClose, onSubmit, isSubmitting } = modalState
+
+  // Explicit click submit (not form= association) so create works inside the builder
+  // action-node-form without the outer form swallowing the footer submit.
+  const handlePrimaryClick = useCallback(() => {
+    detachPromise(handleSubmit(onSubmit)())
+  }, [handleSubmit, onSubmit])
 
   return (
     <>
@@ -111,8 +126,8 @@ function CredentialFormModalContent({
       <ModalFooter>
         <Button
           variant="primary"
-          type="submit"
-          form={CREDENTIAL_FORM_ID}
+          type="button"
+          onClick={handlePrimaryClick}
           isDisabled={isSubmitting}
           isLoading={isSubmitting}
           icon={isEditMode ? undefined : <RhUiAddIcon />}

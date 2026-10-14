@@ -311,13 +311,12 @@ describe('CredentialFormModal', () => {
     expect(screen.getByDisplayValue('Edited name')).toBeInTheDocument()
   })
 
-  it('associates the footer submit button with the credential form for keyboard submit', async () => {
+  it('submits create from the footer button click and Enter on the focused button', async () => {
     const user = userEvent.setup({ delay: null })
     render(<CredentialFormModal isOpen onClose={vi.fn()} defaultProjectId="proj-1" />, { wrapper })
 
     const submitButton = screen.getByRole('button', { name: 'Create credential' })
-    expect(submitButton).toHaveAttribute('type', 'submit')
-    expect(submitButton).toHaveAttribute('form', 'credential-form-modal')
+    expect(submitButton).toHaveAttribute('type', 'button')
 
     await user.type(screen.getByLabelText('Credential name'), 'New Token')
     await user.type(screen.getByLabelText('Token', { selector: 'input' }), 'my-secret-token')
@@ -444,6 +443,29 @@ describe('CredentialFormModal', () => {
     render(<CredentialFormModal isOpen onClose={vi.fn()} defaultProjectId="proj-1" />, { wrapper })
 
     expect(screen.getByRole('button', { name: 'Credential project' })).toHaveTextContent('Project Alpha')
+  })
+
+  it('limits credential types and default selection when compatibleTypeNames is provided', async () => {
+    const user = userEvent.setup()
+    render(
+      <CredentialFormModal
+        isOpen
+        onClose={vi.fn()}
+        defaultProjectId="proj-1"
+        compatibleTypeNames={['HTTP Bearer Token', 'HTTP Basic Auth']}
+      />,
+      { wrapper }
+    )
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Token')).toBeInTheDocument()
+    })
+
+    await user.click(screen.getByLabelText('Credential type'))
+    const listbox = screen.getByRole('listbox', { name: 'Credential type options' })
+    expect(within(listbox).getByRole('option', { name: 'HTTP Bearer Token' })).toBeInTheDocument()
+    expect(within(listbox).getByRole('option', { name: 'HTTP Basic Auth' })).toBeInTheDocument()
+    expect(within(listbox).queryByRole('option', { name: 'Ansible Automation Platform' })).not.toBeInTheDocument()
   })
 
   it('shows placeholder when no defaultProjectId is provided', () => {

@@ -29,6 +29,8 @@ type UseCredentialFormModalOptions = {
   isEditMode: boolean
   preSelectedTypeId?: string
   defaultProjectId?: string
+  /** When set (e.g. inline create from CredentialSelector), limits type list and default type. */
+  compatibleTypeNames?: string[]
   onCreated?: (credentialId: string) => void
   onSuccess?: () => void
 }
@@ -41,6 +43,7 @@ export function useCredentialFormModal({
   isEditMode,
   preSelectedTypeId,
   defaultProjectId,
+  compatibleTypeNames,
   onCreated,
   onSuccess,
 }: UseCredentialFormModalOptions) {
@@ -54,7 +57,11 @@ export function useCredentialFormModal({
   const inputs = useWatch({ control, name: 'inputs' }) ?? {}
 
   const typesQuery = credentialsClient.useQuery('get', '/credential_types')
-  const types = useMemo(() => typesQuery.data?.resources ?? [], [typesQuery.data])
+  const allTypes = useMemo(() => typesQuery.data?.resources ?? [], [typesQuery.data])
+  const types = useMemo(() => {
+    if (!compatibleTypeNames?.length) return allTypes
+    return allTypes.filter((t) => compatibleTypeNames.includes(t.name))
+  }, [allTypes, compatibleTypeNames])
 
   const selectedType = useMemo(() => types.find((t) => t.id === selectedTypeId), [types, selectedTypeId])
   const typeInputs = useMemo(() => (selectedType ? getTypeInputs(selectedType) : null), [selectedType])
@@ -65,7 +72,7 @@ export function useCredentialFormModal({
   const resetKey = isOpen ? (credentialToEdit?.id ?? preSelectedTypeId ?? 'create') : 'closed'
 
   const credentialSeedRef = useRef<Credential | null | undefined>(null)
-  const createDefaultsRef = useRef({ defaultProjectId, preSelectedTypeId })
+  const createDefaultsRef = useRef({ defaultProjectId, preSelectedTypeId, compatibleTypeNames })
   const prevResetKeyRef = useRef<string | null>(null)
 
   const loadedTypesKey = types.map((t) => t.id).join(',')
@@ -76,8 +83,8 @@ export function useCredentialFormModal({
     setTouchedSecrets(new Set())
     setActiveGroupIndex(0)
     credentialSeedRef.current = credentialToEdit ?? null
-    createDefaultsRef.current = { defaultProjectId, preSelectedTypeId }
-  }, [resetKey, credentialToEdit, defaultProjectId, preSelectedTypeId])
+    createDefaultsRef.current = { defaultProjectId, preSelectedTypeId, compatibleTypeNames }
+  }, [resetKey, credentialToEdit, defaultProjectId, preSelectedTypeId, compatibleTypeNames])
 
   useEffect(() => {
     if (!isOpen) return
@@ -103,6 +110,15 @@ export function useCredentialFormModal({
       inputs: {},
     })
   }, [isOpen, resetKey, reset])
+
+  // Builder project can populate after the modal opens (new workflow header selection).
+  useEffect(() => {
+    if (!isOpen || isEditMode || !defaultProjectId) return
+    const currentProjectId = getValues('project_id')
+    if (currentProjectId !== defaultProjectId) {
+      setValue('project_id', defaultProjectId, { shouldValidate: false })
+    }
+  }, [isOpen, isEditMode, defaultProjectId, getValues, setValue])
 
   useEffect(() => {
     if (!isOpen || types.length === 0) return
@@ -223,7 +239,7 @@ export function useCredentialFormModal({
           onSuccess?.()
           handleClose()
         },
-        onError: handleError({ title: 'Failed to update credential' }),
+        onError: handleError({ title: 'Failed to create credential' }),
       }
     )
   }
