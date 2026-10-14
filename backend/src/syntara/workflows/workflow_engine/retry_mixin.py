@@ -75,11 +75,6 @@ class WorkflowRetryMixin:
     #: completion path so a restored skip or failure is not republished as a success
     #: and does not have its successors scheduled.
     _restored_node_statuses: dict[str, str]
-    #: The branch a restored control node took, keyed by node id. Published into
-    #: ``node_control_data`` so the scheduler follows the same edge the source run
-    #: did instead of re-evaluating a condition against a namespace this retry has
-    #: only partly rebuilt.
-    _restored_node_ports: dict[str, str]
     #: The output a restored node produced before it failed in the source run,
     #: keyed by node id. Republished by the failure path, so a successor reading it
     #: sees what the source run produced rather than an empty output model.
@@ -378,7 +373,7 @@ class WorkflowRetryMixin:
         if not self.retry_context or not self._should_restore_node(node.id, graph):
             return None
         if node.type in _INFERABLE_CONTROL_NODE_TYPES:
-            return self._restored_control_result(node, graph)
+            return await self._restored_control_result(node, graph)
         return await self._restore_node_output(node)
 
     def _should_restore_node(self, node_id: str, graph: WorkflowGraph) -> bool:
@@ -394,7 +389,7 @@ class WorkflowRetryMixin:
             return False
         return strip_iteration_suffix(node_id) in self._retry_restorable_nodes(graph)
 
-    def _restored_control_result(self, node: ActivityNode, graph: WorkflowGraph) -> dict[str, Any] | None:
+    async def _restored_control_result(self, node: ActivityNode, graph: WorkflowGraph) -> dict[str, Any] | None:
         """Restore a condition or switch by replaying the branch the source run took.
 
         No payload and no fetch: what a control node needs is the routing decision,
@@ -409,14 +404,35 @@ class WorkflowRetryMixin:
         if port is None:
             return None
 
-        self._restored_node_ports[node.id] = port
-        self._restored_node_statuses[node.id] = ActivityStatus.COMPLETED.value
-        # No activity is dispatched for this node, so no completion event will ask
-        # the workflow for its state. Leaving it in the candidate set would make
-        # the sync service wait out the full timeout on a row that never arrives.
-        self._retry_replay_candidates.discard(node.id)
+        # The branch is the only thing inferred. The node's *output* is whatever
+        # the source run recorded — CONDITION writes ``evaluated_result``, SWITCH
+        # writes ``matched_port`` — and downstream expressions read those. Reading
+        # it back from the source row is what stops the synthetic completion from
+        # publishing an empty namespace and silently dropping them.
+        record = await workflow.execute_activity(
+            ActivityName.RETRY_NODE_REPLAY,
+            args=[self.retry_context.get("retry_from_execution_id"), node.id],
+            activity_id=node.id,
+            start_to_close_timeout=timedelta(seconds=DEFAULT_ACTIVITY_TIMEOUT_SECONDS),
+        )
+        source_output = (record or {}).get("output_data") or {}
+        source_status = str((record or {}).get("status") or ActivityStatus.COMPLETED.value)
+
+        self.node_inputs[node.id] = (record or {}).get("input_data") or {}
+        self._restored_node_statuses[node.id] = source_status
+        self._restored_node_timestamps[node.id] = {
+            "started_at": (record or {}).get("started_at"),
+            "completed_at": (record or {}).get("completed_at"),
+            # The source run's own status and times, so the row this node ends up
+            # with reports what actually happened rather than the replay's success.
+            "status": source_status,
+            "error_details": (record or {}).get("error_details"),
+        }
+
         workflow.logger.info("Restored control node branch from source run", extra={"node_id": node.id, "port": port})
-        return {"output": {}, "control": {"next_port": port}}
+        # The inferred port travels as control data, which is what the scheduler
+        # reads; the output is the source run's own and must not be replaced.
+        return {"output": source_output, "control": {"next_port": port}}
 
     async def _restore_node_output(self, node: ActivityNode) -> dict[str, Any] | None:
         """Replay this node's recorded outcome from its source run, or None.

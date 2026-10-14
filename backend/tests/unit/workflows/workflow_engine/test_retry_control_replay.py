@@ -9,7 +9,7 @@ that branch instead of being asked to decide again.
 
 from collections.abc import Generator
 from typing import Any
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -38,6 +38,8 @@ def mock_wf() -> Generator[MagicMock, None, None]:
         patch("syntara.workflows.workflow_engine.retry_mixin.workflow", patched),
     ):
         patched.logger = MagicMock()
+        # execute_activity is awaited on the real workflow module.
+        patched.execute_activity = AsyncMock(return_value={"output_data": {}, "status": "completed"})
         yield patched
 
 
@@ -64,7 +66,7 @@ def _make_workflow(retry_context: dict[str, Any] | None = None) -> OrchestratorW
     wf.request_id = None
     wf.pre_resolved_outputs = {}
     wf.stop_after_nodes = set()
-    wf.retry_context = retry_context or {"source_execution_id": "src-1"}
+    wf.retry_context = retry_context or {"retry_from_execution_id": "src-1"}
     return wf
 
 
@@ -235,8 +237,9 @@ def test_shared_downstream_does_not_count_as_exclusive() -> None:
 # --- the restored result the scheduler consumes ---
 
 
-def test_restored_control_result_publishes_the_port_and_marks_completed(mock_wf: MagicMock) -> None:
-    """A restored control node carries its routing decision and no payload."""
+@pytest.mark.asyncio
+async def test_restored_control_result_publishes_the_inferred_port(mock_wf: MagicMock) -> None:
+    """The inferred branch travels as control data, which is what the scheduler reads."""
     wf = _make_workflow()
     graph = _condition_graph()
     wf._retry_source_statuses = {
@@ -244,17 +247,18 @@ def test_restored_control_result_publishes_the_port_and_marks_completed(mock_wf:
         "step_false": ActivityStatus.SKIPPED.value,
     }
     node = _node(graph, "cond_1")
-    wf._retry_replay_candidates = {"cond_1"}
+    mock_wf.execute_activity.return_value = {"output_data": {"evaluated_result": True}, "status": "completed"}
 
-    result = wf._restored_control_result(node, graph)
+    result = await wf._restored_control_result(node, graph)
 
-    assert result == {"output": {}, "control": {"next_port": "true"}}
-    assert wf._restored_node_ports["cond_1"] == "true"
+    assert result is not None
+    assert result["control"] == {"next_port": "true"}
     assert wf._restored_node_statuses["cond_1"] == ActivityStatus.COMPLETED.value
 
 
-def test_restored_control_result_leaves_no_candidate_to_wait_on(mock_wf: MagicMock) -> None:
-    """No activity is dispatched, so the sync service must not wait for one."""
+@pytest.mark.asyncio
+async def test_restored_control_result_keeps_the_source_run_output(mock_wf: MagicMock) -> None:
+    """CONDITION's evaluated_result must survive, not be replaced by an empty dict."""
     wf = _make_workflow()
     graph = _condition_graph()
     wf._retry_source_statuses = {
@@ -262,23 +266,48 @@ def test_restored_control_result_leaves_no_candidate_to_wait_on(mock_wf: MagicMo
         "step_false": ActivityStatus.SKIPPED.value,
     }
     node = _node(graph, "cond_1")
-    wf._retry_replay_candidates = {"cond_1", "step_2"}
+    mock_wf.execute_activity.return_value = {
+        "output_data": {"evaluated_result": True},
+        "status": "completed",
+        "input_data": {"left": 2, "right": 2},
+    }
 
-    wf._restored_control_result(node, graph)
+    result = await wf._restored_control_result(node, graph)
 
-    assert "cond_1" not in wf._retry_replay_candidates
-    assert "step_2" in wf._retry_replay_candidates, "other candidates are untouched"
+    assert result is not None
+    assert result["output"] == {"evaluated_result": True}, "the source output must not be fabricated away"
+    assert result["control"] == {"next_port": "true"}, "the inferred port is control, not output"
+    assert wf.node_inputs["cond_1"] == {"left": 2, "right": 2}, "the source input is republished too"
 
 
-def test_restored_control_result_is_none_when_inference_fails(mock_wf: MagicMock) -> None:
+@pytest.mark.asyncio
+async def test_restored_control_result_reads_the_replay_under_the_node_id(mock_wf: MagicMock) -> None:
+    """The source row is fetched under this node's own id, like any restored node."""
+    wf = _make_workflow()
+    graph = _condition_graph()
+    wf._retry_source_statuses = {
+        "step_true": ActivityStatus.COMPLETED.value,
+        "step_false": ActivityStatus.SKIPPED.value,
+    }
+    node = _node(graph, "cond_1")
+    mock_wf.execute_activity.return_value = {"output_data": {}, "status": "completed"}
+
+    await wf._restored_control_result(node, graph)
+
+    assert mock_wf.execute_activity.await_args.kwargs["activity_id"] == "cond_1"
+    assert mock_wf.execute_activity.await_args.kwargs["args"] == ["src-1", "cond_1"], "the node id names the source row"
+
+
+@pytest.mark.asyncio
+async def test_restored_control_result_is_none_when_inference_fails(mock_wf: MagicMock) -> None:
     """The caller must fall through to real execution rather than assume a branch."""
     wf = _make_workflow()
     graph = _condition_graph()
     wf._retry_source_statuses = {"step_true": ActivityStatus.SKIPPED.value, "step_false": ActivityStatus.SKIPPED.value}
     node = _node(graph, "cond_1")
 
-    assert wf._restored_control_result(node, graph) is None
-    assert "cond_1" not in wf._restored_node_ports
+    assert await wf._restored_control_result(node, graph) is None
+    mock_wf.execute_activity.assert_not_awaited(), "no source row is read when the branch is unknown"
 
 
 # --- how this reaches the restorable set ---
@@ -318,3 +347,45 @@ def test_loop_body_statuses_do_not_imply_a_branch() -> None:
     wf._retry_source_statuses = {"body_a": ActivityStatus.COMPLETED.value}
 
     assert wf._infer_control_node_branch(_node(graph, "cond_1"), graph) is None
+
+
+@pytest.mark.asyncio
+async def test_restoring_a_condition_needs_no_manually_initialised_retry_state(
+    mock_wf: MagicMock,
+) -> None:
+    """Nothing on the restore path may depend on a field only the fixtures set.
+
+    Every other test here builds through ``init_workflow_runtime``, which seeds a
+    pile of ``_restored_*`` dictionaries. That hid a real crash: an attribute
+    assigned by the restore path but never initialised in production raised
+    ``AttributeError`` on the first inferable condition in a real retry, while all
+    of these tests passed. This one builds the workflow the way ``__init__`` does
+    — nothing seeded by hand — so an uninitialised field fails loudly here.
+    """
+    from syntara.workflows.utils.namespace_resolver import NamespaceResolver
+
+    wf = OrchestratorWorkflow.__new__(OrchestratorWorkflow)
+    wf.retry_context = {"retry_from_execution_id": "src-1", "eligible_point_ids": ["step_true"]}
+    wf.resolver = NamespaceResolver()
+    wf.node_inputs = {}
+    wf.node_control_data = {}
+    wf._runtime_settings = {}
+    wf._has_unhandled_failure = False
+    # Deliberately NOT calling init_workflow_runtime: only _initialize_retry_state
+    # and _initialize_state exist in production, and both are exercised elsewhere.
+    graph = _condition_graph()
+    wf._retry_source_statuses = {
+        "step_true": ActivityStatus.COMPLETED.value,
+        "step_false": ActivityStatus.SKIPPED.value,
+    }
+    wf._retry_replay_candidates = set()
+    wf._restored_node_timestamps = {}
+    wf._restored_node_statuses = {}
+    wf._restored_node_outputs = {}
+    mock_wf.execute_activity.return_value = {"output_data": {"evaluated_result": True}, "status": "completed"}
+
+    result = await wf._restored_control_result(_node(graph, "cond_1"), graph)
+
+    assert result is not None
+    assert result["control"] == {"next_port": "true"}
+    assert result["output"] == {"evaluated_result": True}
