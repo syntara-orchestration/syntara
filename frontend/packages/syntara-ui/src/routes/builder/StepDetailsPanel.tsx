@@ -358,7 +358,8 @@ export function StepDetailsPanel(props: StepDetailsPanelProps) {
   const renderContent = () => {
     if (mode === 'add') {
       const selectedStepType = stepTypeId ? StepRegistry.get(stepTypeId) : null
-      const selectedStepSubtype = selectedStepType?.subtypes?.find((stepSubtype) => stepSubtype.id === stepSubtypeId) ?? null
+      const selectedStepSubtype =
+        selectedStepType?.subtypes?.find((stepSubtype) => stepSubtype.id === stepSubtypeId) ?? null
 
       if (!selectedStepType) return null
 

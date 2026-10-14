@@ -445,18 +445,18 @@ describe('builderReducer', () => {
       const stateWithNode: BuilderState = {
         ...initialState,
         selectedNode: { id: 'node-to-delete' } as Node<NodeType['data']>,
-        nodeEditorMode: 'edit',
-        nodeEditorNodeTypeId: 'script',
-        nodeEditorNodeSubtypeId: 'shell',
+        stepEditorMode: 'edit',
+        stepEditorStepTypeId: 'script',
+        stepEditorStepSubtypeId: 'shell',
       }
 
       const action: BuilderAction = { type: 'CLEAR_SELECTED_IF_DELETED', payload: ['node-to-delete', 'other-node'] }
       const result = builderReducer(stateWithNode, action)
 
       expect(result.selectedNode).toBeNull()
-      expect(result.nodeEditorMode).toBeNull()
-      expect(result.nodeEditorNodeTypeId).toBeNull()
-      expect(result.nodeEditorNodeSubtypeId).toBeNull()
+      expect(result.stepEditorMode).toBeNull()
+      expect(result.stepEditorStepTypeId).toBeNull()
+      expect(result.stepEditorStepSubtypeId).toBeNull()
     })
 
     it('keeps the open editor when a different step is deleted', () => {
@@ -464,24 +464,24 @@ describe('builderReducer', () => {
       const stateWithNode: BuilderState = {
         ...initialState,
         selectedNode: node,
-        nodeEditorMode: 'edit',
-        nodeEditorNodeTypeId: 'script',
+        stepEditorMode: 'edit',
+        stepEditorStepTypeId: 'script',
       }
 
       const action: BuilderAction = { type: 'CLEAR_SELECTED_IF_DELETED', payload: ['node-1', 'node-2'] }
       const result = builderReducer(stateWithNode, action)
 
       expect(result.selectedNode).toBe(node)
-      expect(result.nodeEditorMode).toBe('edit')
-      expect(result.nodeEditorNodeTypeId).toBe('script')
+      expect(result.stepEditorMode).toBe('edit')
+      expect(result.stepEditorStepTypeId).toBe('script')
     })
 
     it('leaves create mode alone when no step is selected', () => {
       const addState: BuilderState = {
         ...initialState,
-        nodeEditorMode: 'add',
-        nodeEditorNodeTypeId: 'script',
-        nodeEditorNodeSubtypeId: 'shell',
+        stepEditorMode: 'add',
+        stepEditorStepTypeId: 'script',
+        stepEditorStepSubtypeId: 'shell',
       }
       const action: BuilderAction = { type: 'CLEAR_SELECTED_IF_DELETED', payload: ['node-1'] }
       const result = builderReducer(addState, action)

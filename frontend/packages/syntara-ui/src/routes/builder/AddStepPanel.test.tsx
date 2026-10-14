@@ -166,7 +166,9 @@ describe('AddStepPanel Component', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockStepRegistryGetAll.mockReturnValue(mockStepTypes)
-    mockStepRegistryGet.mockImplementation((id: string) => mockStepTypes.find((stepType) => stepType.id === id) as never)
+    mockStepRegistryGet.mockImplementation(
+      (id: string) => mockStepTypes.find((stepType) => stepType.id === id) as never
+    )
   })
 
   it('renders the panel with title and close button', () => {

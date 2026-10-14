@@ -456,9 +456,9 @@ export function builderReducer(state: BuilderState, action: BuilderAction): Buil
         return {
           ...state,
           selectedNode: null,
-          nodeEditorMode: null,
-          nodeEditorNodeTypeId: null,
-          nodeEditorNodeSubtypeId: null,
+          stepEditorMode: null,
+          stepEditorStepTypeId: null,
+          stepEditorStepSubtypeId: null,
         }
       }
       return state

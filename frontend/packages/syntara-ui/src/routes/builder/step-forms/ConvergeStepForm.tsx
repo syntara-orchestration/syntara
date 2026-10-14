@@ -30,11 +30,11 @@ import { convergeFormSchema, type ConvergeFormData, type ConvergeStrategy } from
 import { ActivityNameField } from './shared/ActivityNameField'
 import { ContinueWhenCriteriaHelp } from './shared/ContinueWhenCriteriaHelp'
 import { DurationInput } from './shared/DurationInput'
+import { RequiredBranchCountHelp } from './shared/RequiredBranchCountHelp'
 import { stepHelp } from './shared/stepFieldHelp'
 import { StepFormContainer } from './shared/StepFormContainer'
 import { StepFormTabsLayout } from './shared/StepFormTabsLayout'
 import { StepSettingsForm } from './shared/StepSettingsForm'
-import { RequiredBranchCountHelp } from './shared/RequiredBranchCountHelp'
 
 export type { ConvergeFormData, ConvergeStrategy }
 
