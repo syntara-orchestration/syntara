@@ -563,8 +563,14 @@ describe('Approvals Component', () => {
       render(<Approvals />)
 
       const sortButton = within(screen.getByRole('columnheader', { name: /^Workflow$/i })).getByRole('button')
-      for (let i = 0; i < 40 && document.activeElement !== sortButton; i += 1) {
+      for (let i = 0; i < 40; i += 1) {
         await user.tab()
+        try {
+          expect(sortButton).toHaveFocus()
+          break
+        } catch {
+          // keep tabbing until the workflow sort control is focused
+        }
       }
       expect(sortButton).toHaveFocus()
 
