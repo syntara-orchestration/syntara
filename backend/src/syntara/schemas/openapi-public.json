@@ -35249,7 +35249,7 @@
         }
       }
     },
-    "/executions/{execution_id}/retry-from-failure-preview": {
+    "/executions/{execution_id}/retry_from_failure_preview": {
       "get": {
         "summary": "Preview retry from failure",
         "description": "Report whether an execution can be retried from its failure points, and what would re-run. Returns the eligible retry points, the re-run step count for each of them, and the deduplicated total across all of them. Purely informational: the failure-point selection and any input parameter overrides are supplied to the retry endpoint, which re-validates them independently and rejects anything unusable. Never mutates any state.",
@@ -35430,7 +35430,7 @@
         }
       }
     },
-    "/executions/{execution_id}/retry-from-failure": {
+    "/executions/{execution_id}/retry_from_failure": {
       "post": {
         "summary": "Retry from failure",
         "description": "Retry a failed execution from the given failure points, optionally overriding input parameters of the starting nodes for this run only. Independently repeats all validation checks, then creates a new execution linked to the source and triggers a Temporal run carrying retry context.",
@@ -50502,7 +50502,7 @@
       "RetryFailureRequest": {
         "type": "object",
         "title": "RetryFailureRequest",
-        "description": "Request body for POST /executions/{id}/retry-from-failure.",
+        "description": "Request body for POST /executions/{id}/retry_from_failure.",
         "properties": {
           "retry_point_ids": {
             "type": "array",
@@ -50526,7 +50526,7 @@
       "RetryFromFailureValidationResponse": {
         "type": "object",
         "title": "RetryFromFailureValidationResponse",
-        "description": "Retry preview (GET /executions/{id}/retry-from-failure-preview).",
+        "description": "Retry preview (GET /executions/{id}/retry_from_failure_preview).",
         "required": [
           "eligible"
         ],
