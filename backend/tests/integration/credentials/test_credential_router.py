@@ -183,9 +183,18 @@ class TestListCredentials:
 
     @pytest.mark.asyncio
     async def test_list_returns_masked_metadata(
-        self, auth_client: AsyncClient, bearer_type: CredentialType, test_project_id: str
+        self,
+        auth_client: AsyncClient,
+        bearer_type: CredentialType,
+        test_project_id: str,
+        test_db_session: AsyncSession,
     ) -> None:
+        from sqlmodel import select as sa_select
+
+        from syntara.credentials.models.credential import Credential
+
         # Create two credentials
+        created_ids = []
         for i in range(2):
             r = await auth_client.post(
                 "/api/v1/credentials",
@@ -197,11 +206,24 @@ class TestListCredentials:
                 },
             )
             assert r.status_code == 201, r.text
+            created_ids.append(r.json()["id"])
+
+        # Check each credential is reachable individually (different code path from list)
+        for cred_id in created_ids:
+            get_resp = await auth_client.get(f"/api/v1/credentials/{cred_id}")
+            assert get_resp.status_code == 200, (
+                f"Individual GET {cred_id} returned {get_resp.status_code}: {get_resp.text}"
+            )
+
+        # Direct DB count — tells us whether the issue is DB isolation or list visibility
+        db_rows = (await test_db_session.exec(sa_select(Credential))).all()
 
         resp = await auth_client.get("/api/v1/credentials")
         assert resp.status_code == 200
         body = resp.json()
-        assert len(body["resources"]) >= 2, f"Expected >=2 credentials, got: {body}"
+        assert len(body["resources"]) >= 2, (
+            f"DB has {len(db_rows)} credential(s), individual GETs succeeded for {created_ids}, list returned: {body}"
+        )
         # All inputs should be masked
         for resource in body["resources"]:
             if resource["inputs"]:
