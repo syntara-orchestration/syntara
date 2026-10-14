@@ -252,15 +252,12 @@ test.describe('Inline Credential Creation', () => {
     await ensureInlineCredentialProjectSelected(modal, app, project?.name)
     await selectCredentialType(modal, 'HTTP Bearer Token')
     await waitForCredentialFormTypesReady(modal, 'Token')
-    await modal.getByRole('textbox', { name: 'Credential name' }).click()
+
+    // Fill name so Zod passes and dynamic field validation runs (same as credential-dynamic-forms).
+    await modal.getByRole('textbox', { name: 'Credential name' }).fill('inline-validation-test')
     await modal.getByRole('button', { name: 'Create credential' }).click()
 
-    await expect(
-      modal
-        .getByRole('textbox', { name: 'Credential name' })
-        .locator('xpath=ancestor::div[contains(@class,"form__group")]')
-        .getByText('Name is required', { exact: true })
-    ).toBeVisible({ timeout: 20_000 })
+    await expect(modal.getByText('Token is required', { exact: true })).toBeVisible({ timeout: 20_000 })
   })
 
   test('newly created credential is available in selector', async ({ app }) => {
