@@ -16,7 +16,7 @@ import { type Page, expect } from '../fixtures'
 
 const addNodePanel = (page: Page) =>
   page.getByRole('region', {
-    name: /add step|select an action node|select a trigger node|select a logic node|select an aap execution node/i,
+    name: /add step|select an action node|select a trigger step type|select a logic node|select an aap execution step type/i,
   })
 
 /**

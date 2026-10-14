@@ -46,7 +46,7 @@ test.describe('Schedule Trigger — UI-19', () => {
     test('Schedule trigger button is visible in trigger selection', async ({ app }) => {
       await app.goto(toAppUrl('/workflow-builder/new'))
 
-      await expect(app.getByRole('heading', { name: /select a trigger node/i })).toBeVisible({
+      await expect(app.getByRole('heading', { name: /select a trigger step type/i })).toBeVisible({
         timeout: 15_000,
       })
       await expect(app.getByRole('button', { name: 'Schedule trigger' })).toBeVisible()
@@ -55,7 +55,7 @@ test.describe('Schedule Trigger — UI-19', () => {
     test('Clicking Schedule trigger opens the schedule configuration form', async ({ app }) => {
       await app.goto(toAppUrl('/workflow-builder/new'))
 
-      await expect(app.getByRole('heading', { name: /select a trigger node/i })).toBeVisible({
+      await expect(app.getByRole('heading', { name: /select a trigger step type/i })).toBeVisible({
         timeout: 15_000,
       })
       await app.getByRole('button', { name: 'Schedule trigger' }).click()
@@ -73,7 +73,7 @@ test.describe('Schedule Trigger — UI-19', () => {
   test.describe('Schedule type modes', () => {
     test('Visual schedule builder renders required fields', async ({ app }) => {
       await app.goto(toAppUrl('/workflow-builder/new'))
-      await expect(app.getByRole('heading', { name: /select a trigger node/i })).toBeVisible({
+      await expect(app.getByRole('heading', { name: /select a trigger step type/i })).toBeVisible({
         timeout: 15_000,
       })
       await app.getByRole('button', { name: 'Schedule trigger' }).click()
@@ -91,7 +91,7 @@ test.describe('Schedule Trigger — UI-19', () => {
 
     test('Custom cron expression mode hides the schedule builder fields', async ({ app }) => {
       await app.goto(toAppUrl('/workflow-builder/new'))
-      await expect(app.getByRole('heading', { name: /select a trigger node/i })).toBeVisible({
+      await expect(app.getByRole('heading', { name: /select a trigger step type/i })).toBeVisible({
         timeout: 15_000,
       })
       await app.getByRole('button', { name: 'Schedule trigger' }).click()
@@ -111,7 +111,7 @@ test.describe('Schedule Trigger — UI-19', () => {
 
     test('Frequency options include Daily, Weekly, Monthly, Yearly', async ({ app }) => {
       await app.goto(toAppUrl('/workflow-builder/new'))
-      await expect(app.getByRole('heading', { name: /select a trigger node/i })).toBeVisible({
+      await expect(app.getByRole('heading', { name: /select a trigger step type/i })).toBeVisible({
         timeout: 15_000,
       })
       await app.getByRole('button', { name: 'Schedule trigger' }).click()
@@ -128,7 +128,7 @@ test.describe('Schedule Trigger — UI-19', () => {
 
     test('Custom cron expression mode is available', async ({ app }) => {
       await app.goto(toAppUrl('/workflow-builder/new'))
-      await expect(app.getByRole('heading', { name: /select a trigger node/i })).toBeVisible({
+      await expect(app.getByRole('heading', { name: /select a trigger step type/i })).toBeVisible({
         timeout: 15_000,
       })
       await app.getByRole('button', { name: 'Schedule trigger' }).click()

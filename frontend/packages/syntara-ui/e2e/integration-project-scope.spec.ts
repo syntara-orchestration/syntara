@@ -24,7 +24,7 @@ import { apiRequest, ensureProject, getAuthToken } from './utils/api'
  */
 async function openAgentToolSelector(app: Page, projectName: string) {
   await app.goto(toAppUrl('/workflow-builder/new'))
-  await expect(app.getByRole('heading', { name: 'Select a trigger node' })).toBeVisible()
+  await expect(app.getByRole('heading', { name: 'Select a trigger step type' })).toBeVisible()
 
   const projectToggle = app.getByPlaceholder(/All projects|Select a project/)
   await projectToggle.click()

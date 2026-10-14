@@ -35,7 +35,7 @@ test.describe('Visual regression — PF6 token migration', { tag: '@local-only' 
 
   test('trigger node on canvas', async ({ app }) => {
     await app.goto(toAppUrl('/workflow-builder/new'))
-    await expect(app.getByRole('heading', { name: 'Select a trigger node' })).toBeVisible()
+    await expect(app.getByRole('heading', { name: 'Select a trigger step type' })).toBeVisible()
 
     // Add a manual trigger so a TriggerNode renders on the canvas
     await app.getByRole('button', { name: 'Manual trigger' }).click()
@@ -50,7 +50,7 @@ test.describe('Visual regression — PF6 token migration', { tag: '@local-only' 
 
   test('condition node with expression group', async ({ app }) => {
     await app.goto(toAppUrl('/workflow-builder/new'))
-    await expect(app.getByRole('heading', { name: 'Select a trigger node' })).toBeVisible()
+    await expect(app.getByRole('heading', { name: 'Select a trigger step type' })).toBeVisible()
 
     // Add manual trigger first
     await app.getByRole('button', { name: 'Manual trigger' }).click()
@@ -75,7 +75,7 @@ test.describe('Visual regression — PF6 token migration', { tag: '@local-only' 
 
   test('scheduled trigger with schedule builder', async ({ app }) => {
     await app.goto(toAppUrl('/workflow-builder/new'))
-    await expect(app.getByRole('heading', { name: 'Select a trigger node' })).toBeVisible()
+    await expect(app.getByRole('heading', { name: 'Select a trigger step type' })).toBeVisible()
 
     // Add a scheduled trigger
     await app.getByRole('button', { name: 'Schedule trigger' }).click()
