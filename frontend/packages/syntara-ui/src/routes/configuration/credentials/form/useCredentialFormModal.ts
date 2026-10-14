@@ -193,9 +193,7 @@ export function useCredentialFormModal({
   const onSubmit = (formData: CredentialFormData) => {
     const submitType = allTypes.find((t) => t.id === formData.credential_type_id)
     const submitTypeInputs = submitType ? getTypeInputs(submitType) : typeInputs
-    const submitVisibleFields = submitTypeInputs
-      ? getVisibleFields(submitTypeInputs, activeGroupIndex)
-      : visibleFields
+    const submitVisibleFields = submitTypeInputs ? getVisibleFields(submitTypeInputs, activeGroupIndex) : visibleFields
     const latestInputs = getValues('inputs') ?? formData.inputs ?? {}
 
     if (!submitTypeInputs) {
