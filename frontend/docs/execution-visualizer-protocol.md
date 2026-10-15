@@ -314,6 +314,9 @@ interface Execution {
   created_at: string
   started_at: string | null
   completed_at: string | null
+  error: string | null // Mirrors ExecutionRead.error: same value as error_details when
+  // status is 'failed' or 'completed_with_errors', null otherwise
+  // (even if error_details is stale from a prior state)
   activities: ActivityData[]
 }
 
