@@ -137,6 +137,59 @@ describe('SynDynamicForm', () => {
     })
   })
 
+  it('keeps a number field empty after clearing and blurring it', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+
+    const definition = parseFormDefinition({
+      fields: [
+        { type: FormFieldTypeEnum.NUMBER, value_name: 'count', label: 'Count' },
+        { type: FormFieldTypeEnum.TEXT, value_name: 'name', label: 'Name', required: true },
+      ],
+    })
+
+    renderWithQueryClient(<SynDynamicForm definition={definition} onSubmit={onSubmit} submitLabel="Send" />)
+
+    const count = screen.getByRole('spinbutton', { name: 'Count' })
+    expect(count).toHaveValue(null)
+
+    await user.type(count, '5')
+    expect(count).toHaveValue(5)
+
+    await user.clear(count)
+    await user.tab()
+    expect(count).toHaveValue(null)
+
+    await user.type(screen.getByRole('textbox', { name: 'Name' }), 'Ada')
+    await user.click(screen.getByRole('button', { name: 'Send' }))
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith({ name: 'Ada' })
+    })
+  })
+
+  it('accepts a negative number typed into a number field', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+
+    const definition = parseFormDefinition({
+      fields: [{ type: FormFieldTypeEnum.NUMBER, value_name: 'offset', label: 'Offset', default: 0 }],
+    })
+
+    renderWithQueryClient(<SynDynamicForm definition={definition} onSubmit={onSubmit} submitLabel="Send" />)
+
+    const offset = screen.getByRole('spinbutton', { name: 'Offset' })
+    await user.clear(offset)
+    await user.type(offset, '-12')
+    expect(offset).toHaveValue(-12)
+
+    await user.click(screen.getByRole('button', { name: 'Send' }))
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith({ offset: -12 })
+    })
+  })
+
   it('preserves other date components when a component changes', async () => {
     const user = userEvent.setup()
     const onSubmit = vi.fn()
