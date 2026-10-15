@@ -29,7 +29,7 @@ export function PolicyJsonModal({ isOpen, policy, onClose }: Readonly<PolicyJson
     >
       <ModalHeader title={title} labelId={`policy-json-modal-title-${policy.id}`} />
       <ModalBody id="policy-json-modal-body">
-        <SynCodeBlock jsonObject={policyJson} noMaxHeight enableCopy />
+        <SynCodeBlock jsonObject={policyJson} language="json" noMaxHeight enableCopy />
       </ModalBody>
       <ModalFooter>
         <Button variant="primary" onClick={onClose} aria-label="Close policy definition">

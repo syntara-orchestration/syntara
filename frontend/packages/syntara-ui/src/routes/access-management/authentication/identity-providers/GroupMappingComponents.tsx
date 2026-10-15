@@ -10,8 +10,6 @@ import {
   FormHelperText,
   HelperText,
   HelperTextItem,
-  CodeBlock,
-  CodeBlockCode,
   Split,
   SplitItem,
   Stack,
@@ -23,6 +21,7 @@ import { Tbody } from '@patternfly/react-table'
 import { useCallback, useMemo, useState } from 'react'
 import type { Control, FieldError, FieldErrors } from 'react-hook-form'
 
+import { SynCodeBlock } from '../../../../components/details/SynCodeBlock'
 import { FilterBar } from '../../../../components/filters/FilterBar'
 import { FormFieldHintOrError } from '../../../../components/FormFieldError'
 import { SynFormField } from '../../../../components/forms/SynFormField'
@@ -163,9 +162,9 @@ export function AdvancedSection({ control, defaultExpression, idpType, rawClaims
           {rawClaims && (
             <StackItem>
               <FormGroup label="Raw token claims" fieldId="raw-claims">
-                <CodeBlock>
-                  <CodeBlockCode id="raw-claims">{rawClaims}</CodeBlockCode>
-                </CodeBlock>
+                <SynCodeBlock codeId="raw-claims" language="json">
+                  {rawClaims}
+                </SynCodeBlock>
                 <FormHelperText>
                   <HelperText>
                     <HelperTextItem>Full token claims from the last group discovery</HelperTextItem>
