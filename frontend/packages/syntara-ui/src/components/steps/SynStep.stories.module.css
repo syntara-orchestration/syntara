@@ -9,7 +9,7 @@
   pointer-events: none !important;
 }
 
-.storyCanvasNode {
+.storyCanvasStep {
   width: calc(100% - 9rem);
 }
 
@@ -21,14 +21,14 @@
   align-items: start;
 }
 
-.nodeExample {
+.stepExample {
   display: flex;
   flex-direction: column;
   gap: var(--pf-t--global--spacer--sm);
   min-width: 0;
 }
 
-.nodeLabel {
+.stepLabel {
   color: var(--pf-t--global--text--color--subtle);
 }
 

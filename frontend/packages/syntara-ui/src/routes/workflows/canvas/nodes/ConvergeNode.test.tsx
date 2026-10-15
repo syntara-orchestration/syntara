@@ -4,14 +4,14 @@ import { ReactFlowProvider } from '@xyflow/react'
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 import { axe } from 'vitest-axe'
 
-import { NodeActionsContext, type NodeActionsContextValue } from '../../../builder/NodeActionsContext'
+import { StepActionsContext, type StepActionsContextValue } from '../../../builder/StepActionsContext'
 
-import { ConvergeNodeComponent } from './ConvergeNode'
-import type { NodeMenuAction } from './hooks/useNodeMenuActions'
-import { useNodeMenuActions } from './hooks/useNodeMenuActions'
+import { ConvergeStepComponent } from './ConvergeNode'
+import type { StepMenuAction } from './hooks/useStepMenuActions'
+import { useStepMenuActions } from './hooks/useStepMenuActions'
 
-// Mock useNodeMenuActions hook for menu actions tests
-const mockMenuActions: NodeMenuAction[] = [
+// Mock useStepMenuActions hook for menu actions tests
+const mockMenuActions: StepMenuAction[] = [
   {
     id: 'run-step',
     label: 'Run step',
@@ -35,9 +35,9 @@ const mockMenuActions: NodeMenuAction[] = [
   },
 ]
 
-vi.mock('./hooks/useNodeMenuActions', () => ({
-  useNodeMenuActions: vi.fn(),
-  MenuNodeType: {
+vi.mock('./hooks/useStepMenuActions', () => ({
+  useStepMenuActions: vi.fn(),
+  StepMenuCategory: {
     ACTIVITY: 'activity',
     CONTROL_FLOW: 'control-flow',
     TRIGGER: 'trigger',
@@ -45,7 +45,7 @@ vi.mock('./hooks/useNodeMenuActions', () => ({
 }))
 
 // Get reference to the mocked function
-const mockUseNodeMenuActions = vi.mocked(useNodeMenuActions)
+const mockUseStepMenuActions = vi.mocked(useStepMenuActions)
 
 // Test data and helpers - moved to top level to share between test suites
 const baseConvergeNode = {
@@ -92,16 +92,16 @@ vi.mock('@xyflow/react', () => ({
   },
 }))
 
-describe('ConvergeNodeComponent', () => {
+describe('ConvergeStepComponent', () => {
   describe('Rendering', () => {
     it('renders converge node with name', () => {
-      render(<ConvergeNodeComponent {...createNodeProps(baseConvergeNode)} />)
+      render(<ConvergeStepComponent {...createNodeProps(baseConvergeNode)} />)
 
       expect(screen.getByText('Wait for All')).toBeInTheDocument()
     })
 
     it('renders Converge label', () => {
-      render(<ConvergeNodeComponent {...createNodeProps(baseConvergeNode)} />)
+      render(<ConvergeStepComponent {...createNodeProps(baseConvergeNode)} />)
 
       expect(screen.getByText('Converge')).toBeInTheDocument()
     })
@@ -109,7 +109,7 @@ describe('ConvergeNodeComponent', () => {
 
   describe('Strategy Display', () => {
     it('renders "All" for strategy all', () => {
-      render(<ConvergeNodeComponent {...createNodeProps(baseConvergeNode)} />)
+      render(<ConvergeStepComponent {...createNodeProps(baseConvergeNode)} />)
 
       expect(screen.getByText('Type')).toBeInTheDocument()
       expect(screen.getByText('All')).toBeInTheDocument()
@@ -123,7 +123,7 @@ describe('ConvergeNodeComponent', () => {
         parameters: {},
       } as ConvergeActivity
 
-      render(<ConvergeNodeComponent {...createNodeProps(noStrategyConverge)} />)
+      render(<ConvergeStepComponent {...createNodeProps(noStrategyConverge)} />)
 
       expect(screen.getByText('All')).toBeInTheDocument()
     })
@@ -135,7 +135,7 @@ describe('ConvergeNodeComponent', () => {
         name: 'No Config',
       } as ConvergeActivity
 
-      render(<ConvergeNodeComponent {...createNodeProps(noConfig)} />)
+      render(<ConvergeStepComponent {...createNodeProps(noConfig)} />)
 
       expect(screen.getByText('All')).toBeInTheDocument()
     })
@@ -150,7 +150,7 @@ describe('ConvergeNodeComponent', () => {
         },
       } as ConvergeActivity
 
-      render(<ConvergeNodeComponent {...createNodeProps(explicitStrategyConverge)} />)
+      render(<ConvergeStepComponent {...createNodeProps(explicitStrategyConverge)} />)
 
       expect(screen.getByText('Type')).toBeInTheDocument()
       expect(screen.getByText('All')).toBeInTheDocument()
@@ -167,7 +167,7 @@ describe('ConvergeNodeComponent', () => {
         },
       } as unknown as ConvergeActivity
 
-      render(<ConvergeNodeComponent {...createNodeProps(anyConverge)} />)
+      render(<ConvergeStepComponent {...createNodeProps(anyConverge)} />)
 
       expect(screen.getByText('Any')).toBeInTheDocument()
     })
@@ -184,7 +184,7 @@ describe('ConvergeNodeComponent', () => {
         },
       } as unknown as ConvergeActivity
 
-      render(<ConvergeNodeComponent {...createNodeProps(anyNConverge)} />)
+      render(<ConvergeStepComponent {...createNodeProps(anyNConverge)} />)
 
       expect(screen.getByText('Any 3')).toBeInTheDocument()
     })
@@ -200,7 +200,7 @@ describe('ConvergeNodeComponent', () => {
         },
       } as ConvergeActivity
 
-      render(<ConvergeNodeComponent {...createNodeProps(unnamedConverge)} />)
+      render(<ConvergeStepComponent {...createNodeProps(unnamedConverge)} />)
 
       // Should render without crashing, label should still be present
       expect(screen.getByText('Converge')).toBeInTheDocument()
@@ -217,7 +217,7 @@ describe('ConvergeNodeComponent', () => {
         },
       } as ConvergeActivity
 
-      render(<ConvergeNodeComponent {...createNodeProps(nodeWithExecution)} />)
+      render(<ConvergeStepComponent {...createNodeProps(nodeWithExecution)} />)
 
       // Should render without crashing
       expect(screen.getByText('Wait for All')).toBeInTheDocument()
@@ -233,7 +233,7 @@ describe('ConvergeNodeComponent', () => {
         },
       } as ConvergeActivity
 
-      render(<ConvergeNodeComponent {...createNodeProps(nodeWithExecution)} />)
+      render(<ConvergeStepComponent {...createNodeProps(nodeWithExecution)} />)
 
       expect(screen.getByText('Wait for All')).toBeInTheDocument()
     })
@@ -241,22 +241,22 @@ describe('ConvergeNodeComponent', () => {
 
   describe('Node Structure', () => {
     it('renders with correct structure', () => {
-      render(<ConvergeNodeComponent {...createNodeProps(baseConvergeNode)} />)
+      render(<ConvergeStepComponent {...createNodeProps(baseConvergeNode)} />)
 
       expect(screen.getByTestId('converge-node')).toBeInTheDocument()
     })
 
     it('renders details section', () => {
-      render(<ConvergeNodeComponent {...createNodeProps(baseConvergeNode)} />)
+      render(<ConvergeStepComponent {...createNodeProps(baseConvergeNode)} />)
 
-      expect(screen.getByTestId('converge-node-details')).toBeInTheDocument()
+      expect(screen.getByTestId('converge-step-details')).toBeInTheDocument()
     })
   })
 })
 
 // Additional test suite for menu actions functionality
 describe('ConvergeNode Menu Actions', () => {
-  function createMockNodeActionsContext(): NodeActionsContextValue {
+  function createMockNodeActionsContext(): StepActionsContextValue {
     return {
       onRunStep: vi.fn(),
       onViewDetails: vi.fn(),
@@ -268,8 +268,8 @@ describe('ConvergeNode Menu Actions', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
-    // Set default return value for useNodeMenuActions mock
-    mockUseNodeMenuActions.mockReturnValue(mockMenuActions)
+    // Set default return value for useStepMenuActions mock
+    mockUseStepMenuActions.mockReturnValue(mockMenuActions)
   })
 
   afterEach(() => {
@@ -277,34 +277,34 @@ describe('ConvergeNode Menu Actions', () => {
   })
 
   describe('Hook Integration', () => {
-    it('calls useNodeMenuActions with correct node ID and activity type', () => {
+    it('calls useStepMenuActions with correct node ID and step category', () => {
       // Arrange
       const mockProps = createNodeProps(baseConvergeNode)
 
       // Act
       render(
         <ReactFlowProvider>
-          <ConvergeNodeComponent {...mockProps} />
+          <ConvergeStepComponent {...mockProps} />
         </ReactFlowProvider>
       )
 
       // Assert
-      expect(mockUseNodeMenuActions).toHaveBeenCalledWith({
+      expect(mockUseStepMenuActions).toHaveBeenCalledWith({
         nodeId: baseConvergeNode.id,
-        nodeType: 'control-flow',
+        stepCategory: 'control-flow',
       })
     })
 
-    it('handles missing useNodeMenuActions gracefully', () => {
+    it('handles missing useStepMenuActions gracefully', () => {
       // Arrange
-      mockUseNodeMenuActions.mockReturnValue([])
+      mockUseStepMenuActions.mockReturnValue([])
       const mockProps = createNodeProps(baseConvergeNode)
 
       // Act & Assert - Should not throw
       expect(() => {
         render(
           <ReactFlowProvider>
-            <ConvergeNodeComponent {...mockProps} />
+            <ConvergeStepComponent {...mockProps} />
           </ReactFlowProvider>
         )
       }).not.toThrow()
@@ -312,7 +312,7 @@ describe('ConvergeNode Menu Actions', () => {
   })
 
   describe('Menu Rendering', () => {
-    it('renders with menu actions when NodeActionsContext is provided', () => {
+    it('renders with menu actions when StepActionsContext is provided', () => {
       // Arrange
       const mockNodeActions = createMockNodeActionsContext()
       const mockProps = createNodeProps(baseConvergeNode)
@@ -320,29 +320,29 @@ describe('ConvergeNode Menu Actions', () => {
       // Act
       render(
         <ReactFlowProvider>
-          <NodeActionsContext.Provider value={mockNodeActions}>
-            <ConvergeNodeComponent {...mockProps} />
-          </NodeActionsContext.Provider>
+          <StepActionsContext.Provider value={mockNodeActions}>
+            <ConvergeStepComponent {...mockProps} />
+          </StepActionsContext.Provider>
         </ReactFlowProvider>
       )
 
       // Assert - Should render without errors and call hook
-      expect(mockUseNodeMenuActions).toHaveBeenCalledWith({
+      expect(mockUseStepMenuActions).toHaveBeenCalledWith({
         nodeId: baseConvergeNode.id,
-        nodeType: 'control-flow',
+        stepCategory: 'control-flow',
       })
       expect(screen.getByText('Wait for All')).toBeInTheDocument()
     })
 
     it('renders without menu actions when context is absent', () => {
       // Arrange
-      mockUseNodeMenuActions.mockReturnValue([]) // No menu actions when no context
+      mockUseStepMenuActions.mockReturnValue([]) // No menu actions when no context
       const mockProps = createNodeProps(baseConvergeNode)
 
       // Act
       render(
         <ReactFlowProvider>
-          <ConvergeNodeComponent {...mockProps} />
+          <ConvergeStepComponent {...mockProps} />
         </ReactFlowProvider>
       )
 
@@ -365,7 +365,7 @@ describe('ConvergeNode Menu Actions', () => {
         },
       }
 
-      mockUseNodeMenuActions.mockReturnValue([mockRunStepAction, ...mockMenuActions.slice(1)])
+      mockUseStepMenuActions.mockReturnValue([mockRunStepAction, ...mockMenuActions.slice(1)])
 
       const mockNodeActions = createMockNodeActionsContext()
       mockNodeActions.onRunStep = mockOnRunStep
@@ -373,9 +373,9 @@ describe('ConvergeNode Menu Actions', () => {
 
       render(
         <ReactFlowProvider>
-          <NodeActionsContext.Provider value={mockNodeActions}>
-            <ConvergeNodeComponent {...mockProps} />
-          </NodeActionsContext.Provider>
+          <StepActionsContext.Provider value={mockNodeActions}>
+            <ConvergeStepComponent {...mockProps} />
+          </StepActionsContext.Provider>
         </ReactFlowProvider>
       )
 
@@ -404,13 +404,13 @@ describe('ConvergeNode Menu Actions', () => {
         { id: 'delete', label: 'Delete', onClick: vi.fn(), variant: 'danger' as const },
       ]
 
-      mockUseNodeMenuActions.mockReturnValue(mockMenuActionsWithCallbacks)
+      mockUseStepMenuActions.mockReturnValue(mockMenuActionsWithCallbacks)
 
       render(
         <ReactFlowProvider>
-          <NodeActionsContext.Provider value={mockNodeActions}>
-            <ConvergeNodeComponent {...mockProps} />
-          </NodeActionsContext.Provider>
+          <StepActionsContext.Provider value={mockNodeActions}>
+            <ConvergeStepComponent {...mockProps} />
+          </StepActionsContext.Provider>
         </ReactFlowProvider>
       )
 
@@ -434,9 +434,9 @@ describe('ConvergeNode Menu Actions', () => {
 
       const { container } = render(
         <ReactFlowProvider>
-          <NodeActionsContext.Provider value={mockNodeActions}>
-            <ConvergeNodeComponent {...mockProps} />
-          </NodeActionsContext.Provider>
+          <StepActionsContext.Provider value={mockNodeActions}>
+            <ConvergeStepComponent {...mockProps} />
+          </StepActionsContext.Provider>
         </ReactFlowProvider>
       )
 
@@ -449,12 +449,12 @@ describe('ConvergeNode Menu Actions', () => {
 
     it('has no accessibility violations without menu actions', async () => {
       // Arrange
-      mockUseNodeMenuActions.mockReturnValue([])
+      mockUseStepMenuActions.mockReturnValue([])
       const mockProps = createNodeProps(baseConvergeNode)
 
       const { container } = render(
         <ReactFlowProvider>
-          <ConvergeNodeComponent {...mockProps} />
+          <ConvergeStepComponent {...mockProps} />
         </ReactFlowProvider>
       )
 
@@ -476,7 +476,7 @@ describe('ConvergeNode Menu Actions', () => {
       expect(() => {
         render(
           <ReactFlowProvider>
-            <ConvergeNodeComponent {...malformedProps} />
+            <ConvergeStepComponent {...malformedProps} />
           </ReactFlowProvider>
         )
       }).not.toThrow()
@@ -496,7 +496,7 @@ describe('ConvergeNode Menu Actions', () => {
       // Act & Assert - Should not throw and should default to 'All'
       render(
         <ReactFlowProvider>
-          <ConvergeNodeComponent {...mockProps} />
+          <ConvergeStepComponent {...mockProps} />
         </ReactFlowProvider>
       )
 

@@ -6,15 +6,15 @@ import { SynDetail } from '../../../../components/details/SynDetail'
 import { SynDetailList } from '../../../../components/details/SynDetailList'
 import { SynStep } from '../../../../components/steps/SynStep'
 import { SynStepBody } from '../../../../components/steps/SynStepBody'
-import { RegistryNodeId } from '../../../../constants'
+import { RegistryStepId } from '../../../../constants'
 import type { ActivityStatus } from '../../execution/types'
-import { getNodeTypeColor } from '../nodeTypeColors'
 import { semanticZoomActivityTitle } from '../semanticZoom'
+import { getStepTypeColor } from '../stepTypeColors'
 
-import { StandardNodeHeader } from './common/StandardNodeHeader'
-import { MenuNodeType, useNodeMenuActions } from './hooks/useNodeMenuActions'
-import { nodeMetadata } from './nodeMetadata'
-import { renderNodeIcon } from './renderNodeIcon'
+import { StandardStepHeader } from './common/StandardStepHeader'
+import { StepMenuCategory, useStepMenuActions } from './hooks/useStepMenuActions'
+import { renderStepIcon } from './renderStepIcon'
+import { stepMetadata } from './stepMetadata'
 
 function getStrategyLabel(strategy?: 'all' | 'any', nRequired?: number): string {
   if (strategy !== 'any') return 'All'
@@ -23,17 +23,17 @@ function getStrategyLabel(strategy?: 'all' | 'any', nRequired?: number): string 
 
 export type ConvergeNode = { type: 'converge' } & Node<ConvergeActivity>
 
-export function ConvergeNodeComponent(props: NodeProps<ConvergeNode>) {
-  const metadata = nodeMetadata.converge
-  const iconNode = renderNodeIcon(
+export function ConvergeStepComponent(props: NodeProps<ConvergeNode>) {
+  const metadata = stepMetadata.converge
+  const iconNode = renderStepIcon(
     metadata.icon,
-    RegistryNodeId.LOGIC_CONVERGE,
+    RegistryStepId.LOGIC_CONVERGE,
     'canvas',
-    getNodeTypeColor(ActivityTypeEnum.CONVERGE)
+    getStepTypeColor(ActivityTypeEnum.CONVERGE)
   )
-  const menuActions = useNodeMenuActions({
+  const menuActions = useStepMenuActions({
     nodeId: props.data.id,
-    nodeType: MenuNodeType.CONTROL_FLOW,
+    stepCategory: StepMenuCategory.CONTROL_FLOW,
   })
   const config = (props.data.parameters ?? {}) as { strategy?: 'all' | 'any'; n_required?: number }
   const strategyLabel = getStrategyLabel(config.strategy, config.n_required)
@@ -53,14 +53,14 @@ export function ConvergeNodeComponent(props: NodeProps<ConvergeNode>) {
       className={metadata.className}
       nodeProps={props}
       executionState={executionState}
-      topBarColor={getNodeTypeColor('converge')}
+      topBarColor={getStepTypeColor('converge')}
       rootTestId="converge-node"
       semanticZoomSummary={{
         title: semanticZoomActivityTitle(props.data.name, `Untitled ${metadata.label}`),
         typeLabel: metadata.label,
       }}
     >
-      <StandardNodeHeader
+      <StandardStepHeader
         icon={iconNode}
         title={props.data.name}
         subtitle={metadata.label}
@@ -69,7 +69,7 @@ export function ConvergeNodeComponent(props: NodeProps<ConvergeNode>) {
       />
       <Flex justifyContent={{ default: 'justifyContentFlexStart' }} style={{ overflow: 'hidden' }}>
         <SynStepBody>
-          <SynDetailList data-testid="converge-node-details">
+          <SynDetailList data-testid="converge-step-details">
             <SynDetail label="Type">{strategyLabel}</SynDetail>
           </SynDetailList>
         </SynStepBody>

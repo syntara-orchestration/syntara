@@ -4,19 +4,19 @@ import { ReactFlowProvider } from '@xyflow/react'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { axe } from 'vitest-axe'
 
-import { useNodeMenuActions } from './hooks/useNodeMenuActions'
-import { WaitNodeComponent } from './WaitNode'
+import { useStepMenuActions } from './hooks/useStepMenuActions'
+import { WaitStepComponent } from './WaitNode'
 
-vi.mock('./hooks/useNodeMenuActions', () => ({
-  useNodeMenuActions: vi.fn(),
-  MenuNodeType: {
+vi.mock('./hooks/useStepMenuActions', () => ({
+  useStepMenuActions: vi.fn(),
+  StepMenuCategory: {
     ACTIVITY: 'activity',
     CONTROL_FLOW: 'control-flow',
     TRIGGER: 'trigger',
   },
 }))
 
-const mockUseNodeMenuActions = vi.mocked(useNodeMenuActions)
+const mockUseStepMenuActions = vi.mocked(useStepMenuActions)
 
 vi.mock('@xyflow/react', () => ({
   useReactFlow: () => ({
@@ -61,17 +61,17 @@ const createNodeProps = (data: WaitActivity) => ({
   draggable: true,
 })
 
-describe('WaitNodeComponent', () => {
+describe('WaitStepComponent', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockUseNodeMenuActions.mockReturnValue([])
+    mockUseStepMenuActions.mockReturnValue([])
   })
 
   describe('Rendering', () => {
     it('renders wait node with name', () => {
       render(
         <ReactFlowProvider>
-          <WaitNodeComponent {...createNodeProps(baseWaitNode)} />
+          <WaitStepComponent {...createNodeProps(baseWaitNode)} />
         </ReactFlowProvider>
       )
 
@@ -81,7 +81,7 @@ describe('WaitNodeComponent', () => {
     it('renders Wait label', () => {
       render(
         <ReactFlowProvider>
-          <WaitNodeComponent {...createNodeProps(baseWaitNode)} />
+          <WaitStepComponent {...createNodeProps(baseWaitNode)} />
         </ReactFlowProvider>
       )
 
@@ -97,7 +97,7 @@ describe('WaitNodeComponent', () => {
 
       render(
         <ReactFlowProvider>
-          <WaitNodeComponent {...createNodeProps(unnamed)} />
+          <WaitStepComponent {...createNodeProps(unnamed)} />
         </ReactFlowProvider>
       )
 
@@ -109,7 +109,7 @@ describe('WaitNodeComponent', () => {
     it('renders non-zero duration parts only', () => {
       render(
         <ReactFlowProvider>
-          <WaitNodeComponent {...createNodeProps(baseWaitNode)} />
+          <WaitStepComponent {...createNodeProps(baseWaitNode)} />
         </ReactFlowProvider>
       )
 
@@ -124,7 +124,7 @@ describe('WaitNodeComponent', () => {
 
       render(
         <ReactFlowProvider>
-          <WaitNodeComponent {...createNodeProps(multiDuration)} />
+          <WaitStepComponent {...createNodeProps(multiDuration)} />
         </ReactFlowProvider>
       )
 
@@ -139,7 +139,7 @@ describe('WaitNodeComponent', () => {
 
       render(
         <ReactFlowProvider>
-          <WaitNodeComponent {...createNodeProps(noDuration)} />
+          <WaitStepComponent {...createNodeProps(noDuration)} />
         </ReactFlowProvider>
       )
 
@@ -155,7 +155,7 @@ describe('WaitNodeComponent', () => {
 
       render(
         <ReactFlowProvider>
-          <WaitNodeComponent {...createNodeProps(noConfig)} />
+          <WaitStepComponent {...createNodeProps(noConfig)} />
         </ReactFlowProvider>
       )
 
@@ -170,7 +170,7 @@ describe('WaitNodeComponent', () => {
 
       render(
         <ReactFlowProvider>
-          <WaitNodeComponent {...createNodeProps(withSeconds)} />
+          <WaitStepComponent {...createNodeProps(withSeconds)} />
         </ReactFlowProvider>
       )
 
@@ -185,7 +185,7 @@ describe('WaitNodeComponent', () => {
 
       render(
         <ReactFlowProvider>
-          <WaitNodeComponent {...createNodeProps(secondsOnly)} />
+          <WaitStepComponent {...createNodeProps(secondsOnly)} />
         </ReactFlowProvider>
       )
 
@@ -200,7 +200,7 @@ describe('WaitNodeComponent', () => {
 
       render(
         <ReactFlowProvider>
-          <WaitNodeComponent {...createNodeProps(allParts)} />
+          <WaitStepComponent {...createNodeProps(allParts)} />
         </ReactFlowProvider>
       )
 
@@ -220,7 +220,7 @@ describe('WaitNodeComponent', () => {
 
       render(
         <ReactFlowProvider>
-          <WaitNodeComponent {...createNodeProps(nodeWithExecution)} />
+          <WaitStepComponent {...createNodeProps(nodeWithExecution)} />
         </ReactFlowProvider>
       )
 
@@ -241,7 +241,7 @@ describe('WaitNodeComponent', () => {
 
       render(
         <ReactFlowProvider>
-          <WaitNodeComponent {...createNodeProps(nodeWithExecution)} />
+          <WaitStepComponent {...createNodeProps(nodeWithExecution)} />
         </ReactFlowProvider>
       )
 
@@ -263,7 +263,7 @@ describe('WaitNodeComponent', () => {
 
       render(
         <ReactFlowProvider>
-          <WaitNodeComponent {...createNodeProps(nodeWithCompletion)} />
+          <WaitStepComponent {...createNodeProps(nodeWithCompletion)} />
         </ReactFlowProvider>
       )
 
@@ -276,7 +276,7 @@ describe('WaitNodeComponent', () => {
     it('has no accessibility violations', async () => {
       const { container } = render(
         <ReactFlowProvider>
-          <WaitNodeComponent {...createNodeProps(baseWaitNode)} />
+          <WaitStepComponent {...createNodeProps(baseWaitNode)} />
         </ReactFlowProvider>
       )
 

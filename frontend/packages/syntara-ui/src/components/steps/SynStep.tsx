@@ -8,8 +8,8 @@ import { FlowNodeType } from '../../constants'
 import { ExecutionStatusBadge } from '../../routes/builder/components/ExecutionStatusBadge'
 import { targetHandleStyle, sourceHandleStyle } from '../../routes/workflows/canvas/nodes/common/handleStyle'
 import { useSemanticZoom } from '../../routes/workflows/canvas/nodes/hooks/useSemanticZoom'
-import { NODE_TYPE_COLORS } from '../../routes/workflows/canvas/nodeTypeColors'
 import type { SemanticZoomBranchSource } from '../../routes/workflows/canvas/semanticZoomTypes'
+import { STEP_TYPE_COLORS } from '../../routes/workflows/canvas/stepTypeColors'
 import type { ActivityStatus } from '../../routes/workflows/execution/types'
 import { SynPanel } from '../layout/SynPanel'
 
@@ -129,7 +129,7 @@ export function SynStep(props: {
   const hasSemanticZoomSummary = props.semanticZoomSummary !== undefined
   const isSemanticZoom = useSemanticZoom(props.nodeProps.id, hasSemanticZoomSummary)
 
-  const semanticFillColor = props.topBarColor ?? NODE_TYPE_COLORS.generic
+  const semanticFillColor = props.topBarColor ?? STEP_TYPE_COLORS.generic
 
   const barRadiusStyle = useMemo(() => {
     const s = props.style
