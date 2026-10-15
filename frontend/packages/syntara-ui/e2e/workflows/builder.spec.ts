@@ -171,7 +171,7 @@ test('user can add a Logic (Conditional) node to the canvas', async ({ app }) =>
     await expect(logicButton).toBeVisible()
     await logicButton.click()
 
-    await expect(app.getByRole('heading', { name: 'Select a logic node' })).toBeVisible()
+    await expect(app.getByRole('heading', { name: 'Select a logic step' })).toBeVisible()
     await app.getByText('Conditional', { exact: true }).click()
 
     await expect(app.getByRole('textbox', { name: 'Name', exact: true })).toBeVisible()

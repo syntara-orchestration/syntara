@@ -12,8 +12,8 @@ function renderWithProvider(ui: React.ReactElement) {
 }
 
 const mockUseUpstreamNodes = vi.fn<(...args: unknown[]) => { id: string; name: string; type: string }[]>()
-vi.mock('./hooks/useUpstreamNodes', () => ({
-  useUpstreamNodes: (...args: unknown[]) =>
+vi.mock('./hooks/useUpstreamSteps', () => ({
+  useUpstreamSteps: (...args: unknown[]) =>
     mockUseUpstreamNodes(...args) as { id: string; name: string; type: string }[],
 }))
 
@@ -157,7 +157,7 @@ describe('InputPanel', () => {
     expect(screen.getByRole('heading', { name: 'Input' })).toBeInTheDocument()
   })
 
-  it('passes the nodeId to useUpstreamNodes', () => {
+  it('passes the nodeId to useUpstreamSteps', () => {
     mockUseUpstreamNodes.mockReturnValue([])
 
     render(<InputPanel nodeId="test-node-42" />)
