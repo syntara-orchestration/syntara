@@ -32,7 +32,7 @@ export const AppRoute = {
   SystemAdministration: {
     Root: '/system-administration',
     Settings: '/system-administration/settings',
-    SettingsCategory: '/system-administration/settings/:category',
+    SettingsTab: '/system-administration/settings/:category',
     Authentication: {
       Root: '/system-administration/authentication',
       AddIdentityProvider: '/system-administration/authentication/identity-providers/add',

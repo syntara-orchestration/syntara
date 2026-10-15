@@ -263,7 +263,7 @@ export const NAV_ITEMS: TNavigationItem[] = [
         children: [
           {
             label: 'Settings Tab',
-            path: AppRoute.SystemAdministration.SettingsCategory,
+            path: AppRoute.SystemAdministration.SettingsTab,
             hidden: true,
           },
         ],
