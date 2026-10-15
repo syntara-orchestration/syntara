@@ -213,7 +213,7 @@ export default function Settings() {
         <FileStorageAlert />
         <SynPanel
           isFullHeight
-          panelMainBodyProps={{ style: { flex: 1, minHeight: 0 } }}
+          isScrollable
           footer={
             canWrite ? (
               <ActionGroup>
@@ -239,7 +239,7 @@ export default function Settings() {
               readOnly: !canWrite,
             }}
           >
-            <Stack hasGutter style={{ flex: 1, minHeight: 0, height: '100%' }}>
+            <Stack hasGutter>
               <StackItem>
                 <SynUrlTabs
                   basePath={basePath}
