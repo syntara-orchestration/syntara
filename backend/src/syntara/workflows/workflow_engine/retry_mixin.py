@@ -68,12 +68,13 @@ class WorkflowRetryMixin:
 
     retry_context: dict[str, Any]
     _retry_restorable_cache: set[str] | None
-    #: Nodes this retry will replay, decided up front in ``_prepare_retry``. The sync
-    #: service asks the workflow whether a completing activity is one of these
-    #: before waiting on it, so it must be populated before any node runs. It is
-    #: narrower than the restorable region: a node listed here and then not
-    #: replayed costs the service a serial 5s wait for a timestamp that never
-    #: arrives, so it holds only what ``_should_restore_node`` will accept.
+    #: The upstream region, decided up front in ``_prepare_retry``. The sync service
+    #: asks the workflow whether a completing activity is one of these before
+    #: waiting on it, so it must be populated before any node runs. Nothing is
+    #: pre-subtracted, not even a control node this retry cannot replay, because
+    #: the set is expected to grow into replaying every control node. A node
+    #: listed here and then rerun costs the service a 5s wait for a timestamp that
+    #: never arrives, which it degrades from by keeping Temporal's values.
     _retry_replay_candidates: set[str]
     _restored_node_timestamps: dict[str, dict[str, str | None]]
     #: The source status of a node this retry restored, keyed by node id. Read by the
@@ -137,7 +138,7 @@ class WorkflowRetryMixin:
         # Memoised restorable set: derived from the graph and the retry context,
         # neither of which changes during a run.
         self._retry_restorable_cache: set[str] | None = None
-        # Nodes this retry may replay, and the source state for the ones it did.
+        # The upstream region, and the source state for the nodes it restored.
         # The sync service consults the candidate set to tell a replayed activity
         # from an ordinary one before waiting on it, so these are filled during
         # _prepare_retry rather than on first use.
@@ -217,7 +218,7 @@ class WorkflowRetryMixin:
                 pending.extend(graph.get_successors(current))
 
     def _retry_restorable_nodes(self, graph: WorkflowGraph) -> set[str]:
-        """Return the base node ids whose stored output this retry can restore.
+        """Return the base node ids in this retry's upstream region.
 
         The control plane already validated the selection, so this only re-derives
         *which upstream nodes may be skipped* — a node qualifies when it is not a
