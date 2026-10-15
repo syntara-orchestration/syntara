@@ -5,7 +5,7 @@ name: CI Frontend
 
 on:
   pull_request:
-    branches: [devel, early-access, 'feature/*', 'feature/**/*']
+    branches: [devel, early-access, 'feature/*', 'feature/**/*', 'feat/*', 'feat/**/*']
   merge_group:
     branches: [devel, early-access]
   push:
@@ -848,7 +848,7 @@ jobs:
       - name: Check required jobs passed
         env:
           # Konflux UI tests run on feature-base PRs for signal; failures do not block merge.
-          FEATURE_BASE_PR: ${{ github.event_name == 'pull_request' && startsWith(github.base_ref, 'feature/') }}
+          FEATURE_BASE_PR: ${{ github.event_name == 'pull_request' && (startsWith(github.base_ref, 'feature/') || startsWith(github.base_ref, 'feat/')) }}
         run: |
           if [[ "${{ needs.changes.result }}" != "success" ]]; then
             echo "::error::Detect Changes job did not succeed: ${{ needs.changes.result }}"

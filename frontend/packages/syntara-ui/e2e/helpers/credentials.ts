@@ -28,6 +28,69 @@ export async function selectCredentialType(container: Locator, typeName: string)
   await option.click()
 }
 
+/** Secret fields use `aria-label` on the input (password role is not always `textbox`). */
+export function credentialSecretInput(modal: Locator, fieldLabel: string) {
+  return modal.locator(`input[aria-label="${fieldLabel}"]`)
+}
+
+/** Per-field show/hide control labels include the field name (e.g. "Show Token secret"). */
+export function credentialSecretToggle(modal: Locator, fieldLabel: string) {
+  return modal.getByRole('button', {
+    name: new RegExp(`Show ${fieldLabel} secret|Hide ${fieldLabel} secret`),
+  })
+}
+
+/** Wait until `/credential_types` has loaded and the type select is interactive. */
+export async function waitForCredentialTypeSelectReady(modal: Locator) {
+  const typeToggle = modal.getByRole('button', { name: 'Credential type', exact: true })
+  await expect(typeToggle).toBeVisible()
+  await expect(typeToggle).toBeEnabled({ timeout: 15_000 })
+}
+
+/** Wait until dynamic inputs for the selected type are rendered. */
+export async function waitForCredentialFormTypesReady(modal: Locator, fieldLabel = 'Token') {
+  await waitForCredentialTypeSelectReady(modal)
+  await expect(credentialSecretInput(modal, fieldLabel)).toBeVisible({ timeout: 15_000 })
+}
+
+/** Fill a dynamic secret field (password inputs are not `textbox` role). */
+export async function fillCredentialSecret(modal: Locator, fieldLabel: string, value: string) {
+  const input = credentialSecretInput(modal, fieldLabel)
+  await input.click()
+  await input.fill(value)
+}
+
+/** Ensure inline create modal has a project (UI label can lag behind defaultProjectId). */
+export async function ensureInlineCredentialProjectSelected(modal: Locator, page: Page, projectName?: string) {
+  const projectToggle = modal.getByRole('button', { name: 'Credential project', exact: true })
+  await expect(projectToggle).toBeVisible()
+  await expect(projectToggle).not.toContainText('Loading projects', { timeout: 20_000 })
+
+  if (projectName) {
+    await projectToggle.click()
+    await page.getByRole('option', { name: projectName, exact: true }).click()
+    await expect(projectToggle).toContainText(projectName, { timeout: 15_000 })
+    return
+  }
+
+  const label = (await projectToggle.textContent()) ?? ''
+  if (!label.includes('Select a project')) return
+
+  await projectToggle.click()
+
+  const preferred = page.getByRole('option', { name: /^default(\s|$)/ })
+  if ((await preferred.count()) > 0) {
+    await preferred.click()
+    return
+  }
+
+  const realOptions = page.getByRole('option').filter({ hasNotText: /Create project|View more/i })
+  await realOptions.first().waitFor({ state: 'visible', timeout: 15_000 })
+  await realOptions.first().click()
+
+  await expect(projectToggle).not.toContainText('Select a project', { timeout: 15_000 })
+}
+
 /** Open the Create Credential modal and return the dialog locator. */
 export async function openCreateModal(app: Page) {
   await goToCredentialsList(app, { ensureCreateEnabled: true })

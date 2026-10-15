@@ -1,7 +1,7 @@
 import { FormGroup, MenuToggle, type MenuToggleElement, SelectList, SelectOption } from '@patternfly/react-core'
-import { useState, useCallback } from 'react'
+import { useMemo, useState, useCallback } from 'react'
 
-import { FormLabelWithHelp } from '../../../../components/FormLabelWithHelp'
+import { createFieldHelp } from '../../../../components/createFieldHelp'
 import { SynSelect } from '../../../../components/SynSelect'
 
 import type { ExclusiveGroup } from './credentialFormUtils'
@@ -53,10 +53,10 @@ export function AuthMethodSelector({ groups, activeIndex, onChange, helpText }: 
     [isOpen, handleToggle, groups, activeIndex]
   )
 
-  const label = helpText ? <FormLabelWithHelp label="Auth method" helpText={helpText} /> : 'Auth method'
+  const labelHelp = useMemo(() => (helpText ? createFieldHelp('Auth method', helpText) : undefined), [helpText])
 
   return (
-    <FormGroup label={label} fieldId="auth-method" isRequired>
+    <FormGroup label="Auth method" fieldId="auth-method" isRequired labelHelp={labelHelp}>
       <SynSelect
         id="auth-method"
         isOpen={isOpen}

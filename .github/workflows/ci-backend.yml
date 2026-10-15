@@ -3,7 +3,7 @@ name: CI Backend
 
 on:
   pull_request:
-    branches: [devel, early-access, 'feature/*', 'feature/**/*']
+    branches: [devel, early-access, 'feature/*', 'feature/**/*', 'feat/*', 'feat/**/*']
   merge_group:
     branches: [devel, early-access]
   push:
@@ -1010,7 +1010,7 @@ jobs:
       - name: Check required jobs passed
         env:
           # Konflux API tests run on feature-base PRs for signal; failures do not block merge.
-          FEATURE_BASE_PR: ${{ github.event_name == 'pull_request' && startsWith(github.base_ref, 'feature/') }}
+          FEATURE_BASE_PR: ${{ github.event_name == 'pull_request' && (startsWith(github.base_ref, 'feature/') || startsWith(github.base_ref, 'feat/')) }}
         run: |
           # If no backend changes, pass immediately
           if [[ "${{ needs.changes.outputs.backend }}" == "false" ]]; then
