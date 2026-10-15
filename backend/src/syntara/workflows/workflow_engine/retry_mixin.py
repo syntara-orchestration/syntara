@@ -84,6 +84,10 @@ class WorkflowRetryMixin:
     #: keyed by node id. Read once during ``_prepare_retry`` so the synchronous
     #: classification paths can honour it without awaiting anything.
     _restored_control_ports: dict[str, str]
+    #: The port each control node resolved to, keyed by node id. Memoised because
+    #: the resolver is reached from candidate construction and again when the node
+    #: is scheduled, and workflow code must reach the same answer both times.
+    _resolved_control_port_cache: dict[str, str | None]
     #: The output a restored node produced before it failed in the source run,
     #: keyed by node id. Republished by the failure path, so a successor reading it
     #: sees what the source run produced rather than an empty output model.
@@ -142,6 +146,7 @@ class WorkflowRetryMixin:
         self._restored_node_statuses: dict[str, str] = {}
         self._restored_node_outputs: dict[str, dict[str, Any]] = {}
         self._restored_control_ports: dict[str, str] = {}
+        self._resolved_control_port_cache: dict[str, str | None] = {}
         self._retry_source_statuses: dict[str, str] = {}
 
     def _create_loop_state_for_type(self, loop_type: str, node: ActivityNode) -> LoopState: ...  # type: ignore[empty-body]
@@ -167,18 +172,19 @@ class WorkflowRetryMixin:
             start_to_close_timeout=timedelta(seconds=DEFAULT_ACTIVITY_TIMEOUT_SECONDS),
         )
         self._classify_unselected_branches(graph)
-        # The restorable region says which nodes *may* be restored; this set says
-        # which ones *will* be, and only the sync service reads it. A control node
-        # the decision refuses runs for real and produces no synthetic state, so
-        # listing it would make the service wait out its 5s timeout for a
-        # timestamp that is never written — once per node, serially, in the
-        # monitor's sync loop. Decided here rather than on first use: the sync
-        # service consults it the moment an activity completes, so a node
-        # discovered mid-graph would look like an ordinary execution and never get
-        # its source times.
-        self._retry_replay_candidates = {
-            node_id for node_id in self._retry_restorable_nodes(graph) if self._should_restore_node(node_id, graph)
-        }
+        # The upstream region, control nodes included: the set is expected to grow
+        # into replaying every control node, so nothing is pre-subtracted here and
+        # the replay-or-rerun choice is made when the node is scheduled. Decided
+        # here rather than on first use because the sync service consults it the
+        # moment an activity completes, so a node discovered mid-graph would look
+        # like an ordinary execution and never get its source times.
+        #
+        # A control node that is rerun rather than replayed stays in this set, so
+        # the service waits out its 5s timeout for a timestamp that is never
+        # written before degrading to Temporal's values. That is the cost of
+        # holding the set open for control nodes 826 does not yet replay, and it
+        # is paid serially in the monitor's sync loop.
+        self._retry_replay_candidates = set(self._retry_restorable_nodes(graph))
 
     def _classify_unselected_branches(self, graph: WorkflowGraph) -> None:
         """Skip unselected failures without suppressing shared selected descendants.
@@ -280,10 +286,12 @@ class WorkflowRetryMixin:
         dispatch an activity, so an unconsulted record would be rejected before the
         branch was ever read.
         """
+        if node.id in self._resolved_control_port_cache:
+            return self._resolved_control_port_cache[node.id]
         recorded = self._restored_control_ports.get(node.id)
-        if recorded:
-            return str(recorded)
-        return self._infer_control_node_branch(node, graph)
+        resolved = str(recorded) if recorded else self._infer_control_node_branch(node, graph)
+        self._resolved_control_port_cache[node.id] = resolved
+        return resolved
 
     def _infer_control_node_branch(self, node: ActivityNode, graph: WorkflowGraph) -> str | None:
         """Which output port a control node took in the source run, or None.

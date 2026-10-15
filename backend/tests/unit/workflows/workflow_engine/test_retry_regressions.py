@@ -99,6 +99,7 @@ def _wf(retry_context: dict[str, Any] | None = None) -> OrchestratorWorkflow:
     # recorded, so every control node falls back to inference — the pre-existing
     # behaviour for these tests.
     wf._restored_control_ports = {}
+    wf._resolved_control_port_cache = {}
     # Branch inference reads it; empty means no control node is inferable, which is
     # the pre-existing behaviour for these tests.
     wf._retry_source_statuses = {}

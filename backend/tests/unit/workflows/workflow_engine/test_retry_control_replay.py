@@ -63,6 +63,7 @@ def _make_workflow(retry_context: dict[str, Any] | None = None) -> OrchestratorW
     wf._converge_branch_nodes = {}
     init_workflow_runtime(wf)
     wf._restored_control_ports = {}
+    wf._resolved_control_port_cache = {}
     wf.execution_id = "test-execution-id"
     wf._created_by_user_id = ""
     wf.request_id = None
@@ -388,6 +389,7 @@ async def test_restoring_a_condition_needs_no_manually_initialised_retry_state(
     wf._restored_node_statuses = {}
     wf._restored_node_outputs = {}
     wf._restored_control_ports = {}
+    wf._resolved_control_port_cache = {}
     mock_wf.execute_activity.return_value = {"output_data": {"evaluated_result": True}, "status": "completed"}
 
     result = await wf._restored_control_result(_node(graph, "cond_1"), graph)
@@ -576,15 +578,16 @@ async def test_no_prefetched_port_still_falls_back_to_inference(mock_wf: MagicMo
 # the set through _prepare_retry, which is what populates it.
 
 
-async def test_a_loop_runs_normally_and_is_not_a_replay_candidate(
+async def test_a_loop_is_a_candidate_but_is_still_never_replayed(
     mock_wf: MagicMock,
 ) -> None:
-    """A refused control node must not be advertised to the sync service.
+    """The candidate set holds every upstream node, including ones that rerun.
 
-    The loop stays in the restorable region — it is upstream, and a later PR will
-    want to replay it. What matters here is that it is not in the candidate set,
-    because the service would otherwise block on it in the monitor's serial sync
-    loop for every execution of the retry.
+    The set is expected to grow into replaying every control node, so nothing is
+    pre-subtracted. A loop 826 cannot replay stays in it, which costs the sync
+    service a bounded 5s wait per such node before it degrades to Temporal's
+    values. That is the accepted cost of not pre-subtracting, and the decision
+    that keeps the node from being restored is still made at scheduling time.
     """
     wf = _make_workflow({"retry_from_execution_id": "src-1", "eligible_point_ids": ["step_2"]})
     graph = _loop_after_condition_graph()
@@ -592,9 +595,47 @@ async def test_a_loop_runs_normally_and_is_not_a_replay_candidate(
 
     await wf._prepare_retry(graph)
 
-    assert "loop_1" in wf._retry_restorable_nodes(graph), "the region still holds it"
-    assert wf._should_restore_node("loop_1", graph) is False, "but the decision refuses it"
-    assert "loop_1" not in wf._retry_replay_candidates, "so the service never waits on it"
+    assert "loop_1" in wf._retry_replay_candidates
+    assert wf._should_restore_node("loop_1", graph) is False, "…but it is never replayed"
+
+
+async def test_the_resolver_runs_once_per_node(mock_wf: MagicMock) -> None:
+    """Inference is memoised: candidate construction and scheduling must agree.
+
+    Workflow code has to reach the same answer wherever it is asked, and
+    re-deriving the branch is both redundant work and a way for the two call
+    sites to disagree.
+    """
+    wf = _make_workflow({"retry_from_execution_id": "src-1", "eligible_point_ids": ["step_true"]})
+    graph = _condition_graph()
+    wf._retry_source_statuses = {
+        "step_true": ActivityStatus.COMPLETED.value,
+        "step_false": ActivityStatus.SKIPPED.value,
+    }
+
+    inference = MagicMock(return_value="true")
+    wf._infer_control_node_branch = inference  # type: ignore[method-assign]
+
+    node = _node(graph, "cond_1")
+    first = wf._resolved_control_port(node, graph)
+    second = wf._resolved_control_port(node, graph)
+
+    assert first == second == "true"
+    inference.assert_called_once()  # the second call is served from the cache
+
+
+async def test_a_refused_node_is_not_re_resolved(mock_wf: MagicMock) -> None:
+    """None is a real answer, so it is cached too rather than re-inferred."""
+    wf = _make_workflow({"retry_from_execution_id": "src-1", "eligible_point_ids": ["step_true"]})
+    graph = _condition_graph(merge_branches=True)
+    inference = MagicMock(return_value=None)
+    wf._infer_control_node_branch = inference  # type: ignore[method-assign]
+
+    node = _node(graph, "cond_1")
+    assert wf._resolved_control_port(node, graph) is None
+    assert wf._resolved_control_port(node, graph) is None
+
+    inference.assert_called_once()
 
 
 async def test_a_restored_condition_is_a_candidate_so_the_service_asks_about_it(
