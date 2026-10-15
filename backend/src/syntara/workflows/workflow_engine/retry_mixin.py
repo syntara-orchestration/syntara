@@ -72,9 +72,9 @@ class WorkflowRetryMixin:
     #: asks the workflow whether a completing activity is one of these before
     #: waiting on it, so it must be populated before any node runs. Nothing is
     #: pre-subtracted, not even a control node this retry cannot replay, because
-    #: the set is expected to grow into replaying every control node. A node
-    #: listed here and then rerun costs the service a 5s wait for a timestamp that
-    #: never arrives, which it degrades from by keeping Temporal's values.
+    #: the set is expected to grow into replaying every control node. A node that
+    #: is a candidate when it is scheduled but turns out to rerun is discarded
+    #: then, before it completes, so the service never waits on it.
     _retry_replay_candidates: set[str]
     _restored_node_timestamps: dict[str, dict[str, str | None]]
     #: The source status of a node this retry restored, keyed by node id. Read by the
@@ -180,11 +180,10 @@ class WorkflowRetryMixin:
         # moment an activity completes, so a node discovered mid-graph would look
         # like an ordinary execution and never get its source times.
         #
-        # A control node that is rerun rather than replayed stays in this set, so
-        # the service waits out its 5s timeout for a timestamp that is never
-        # written before degrading to Temporal's values. That is the cost of
-        # holding the set open for control nodes 826 does not yet replay, and it
-        # is paid serially in the monitor's sync loop.
+        # Control nodes are included even though 826 cannot replay all of them.
+        # _maybe_restore_retry_output discards one the moment it decides to rerun
+        # it, so the set can stay open to the control nodes a later PR will add
+        # without the sync service ever waiting on one that will not replay.
         self._retry_replay_candidates = set(self._retry_restorable_nodes(graph))
 
     def _classify_unselected_branches(self, graph: WorkflowGraph) -> None:
@@ -423,7 +422,19 @@ class WorkflowRetryMixin:
         misstate the source run, and a failure reported as a skip would drop the
         reason it failed.
         """
-        if not self.retry_context or not self._should_restore_node(node.id, graph):
+        if not self.retry_context:
+            return None
+        if not self._should_restore_node(node.id, graph):
+            # This node is about to run for real, so it must stop looking like a
+            # replay candidate before it completes. The sync service asks the
+            # workflow whether a completing activity is one it should expect a
+            # replay for, and a candidate that never replays costs it a 5s wait
+            # for a timestamp that is never written. Discarding here — at the
+            # moment the decision is made, and before the node runs — is what
+            # lets the candidate set start out holding every upstream node
+            # without paying for the ones that turn out to rerun. A no-op for a
+            # node that was never a candidate.
+            self._retry_replay_candidates.discard(node.id)
             return None
         if node.type in _INFERABLE_CONTROL_NODE_TYPES:
             return await self._restored_control_result(node, graph)

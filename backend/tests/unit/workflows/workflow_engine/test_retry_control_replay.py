@@ -599,6 +599,43 @@ async def test_a_loop_is_a_candidate_but_is_still_never_replayed(
     assert wf._should_restore_node("loop_1", graph) is False, "…but it is never replayed"
 
 
+async def test_a_control_node_is_dropped_from_the_candidates_when_it_must_rerun(
+    mock_wf: MagicMock,
+) -> None:
+    """The set starts open and narrows as nodes are scheduled.
+
+    A loop 826 cannot replay is a candidate from the start, so the set can grow
+    into every control node. Once traversal reaches it and decides to rerun, it
+    is discarded — before it completes, so the sync service is never asked about
+    it and never waits out its timeout.
+    """
+    wf = _make_workflow({"retry_from_execution_id": "src-1", "eligible_point_ids": ["step_2"]})
+    graph = _loop_after_condition_graph()
+    wf._retry_source_statuses = {"step_2": ActivityStatus.FAILED.value}
+    await wf._prepare_retry(graph)
+    assert "loop_1" in wf._retry_replay_candidates, "it starts as a candidate"
+
+    assert await wf._maybe_restore_retry_output(_node(graph, "loop_1"), graph) is None
+    assert "loop_1" not in wf._retry_replay_candidates, "and is gone once it reruns"
+
+
+async def test_a_restored_control_node_stays_a_candidate(mock_wf: MagicMock) -> None:
+    """The other direction: a node that does replay must keep its candidate slot."""
+    wf = _make_workflow({"retry_from_execution_id": "src-1", "eligible_point_ids": ["step_2"]})
+    graph = _condition_graph()
+
+    async def _activity(name: str, **kwargs: object) -> object:
+        if name == ActivityName.RETRY_CONTROL_PORTS:
+            return {"cond_1": "true"}
+        return {"step_true": ActivityStatus.COMPLETED.value, "step_2": ActivityStatus.FAILED.value}
+
+    mock_wf.execute_activity.side_effect = _activity
+    await wf._prepare_retry(graph)
+
+    assert await wf._maybe_restore_retry_output(_node(graph, "cond_1"), graph) is not None
+    assert "cond_1" in wf._retry_replay_candidates
+
+
 async def test_the_resolver_runs_once_per_node(mock_wf: MagicMock) -> None:
     """Inference is memoised: candidate construction and scheduling must agree.
 
