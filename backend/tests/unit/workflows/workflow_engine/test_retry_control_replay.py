@@ -17,6 +17,7 @@ from syntara.workflows.models.activity_execution import ActivityStatus
 from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkflow
 from syntara.workflows.workflow_engine.graph import ActivityNode, WorkflowGraph
 from syntara.workflows.workflow_engine.graph_backend import InMemoryGraphBackend
+from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName
 from syntara.workflows.workflow_engine.retry_mixin import (
     _INFERABLE_CONTROL_NODE_TYPES,
     _MIN_BRANCHES_FOR_INFERENCE,
@@ -338,9 +339,9 @@ def test_condition_is_not_restorable_when_the_branch_is_unknown() -> None:
     graph = _condition_graph()
     wf._retry_source_statuses = {"step_true": ActivityStatus.SKIPPED.value, "step_false": ActivityStatus.SKIPPED.value}
 
-    restorable = wf._retry_restorable_nodes(graph)
-
-    assert "cond_1" not in restorable
+    # The condition stays in the upstream region; it is the scheduling-time
+    # decision that refuses it, because no branch can be recovered for it.
+    assert "cond_1" in wf._retry_restorable_nodes(graph)
     assert wf._should_restore_node("cond_1", graph) is False
 
 
@@ -564,3 +565,58 @@ async def test_no_prefetched_port_still_falls_back_to_inference(mock_wf: MagicMo
 
     assert wf._resolved_control_port(_node(graph, "cond_1"), graph) == "true"
     inference.assert_called_once()
+
+
+# --- the candidate set the sync service gates on ----------------------------
+#
+# _retry_replay_candidates is read by the sync service the moment an activity
+# completes: it asks the workflow whether this node is one it should expect a
+# replay for, and waits if so. A node listed but never replayed costs the
+# monitor a serial 5s wait for a timestamp that is never written. These assert
+# the set through _prepare_retry, which is what populates it.
+
+
+async def test_a_loop_runs_normally_and_is_not_a_replay_candidate(
+    mock_wf: MagicMock,
+) -> None:
+    """A refused control node must not be advertised to the sync service.
+
+    The loop stays in the restorable region — it is upstream, and a later PR will
+    want to replay it. What matters here is that it is not in the candidate set,
+    because the service would otherwise block on it in the monitor's serial sync
+    loop for every execution of the retry.
+    """
+    wf = _make_workflow({"retry_from_execution_id": "src-1", "eligible_point_ids": ["step_2"]})
+    graph = _loop_after_condition_graph()
+    wf._retry_source_statuses = {"step_2": ActivityStatus.FAILED.value}
+
+    await wf._prepare_retry(graph)
+
+    assert "loop_1" in wf._retry_restorable_nodes(graph), "the region still holds it"
+    assert wf._should_restore_node("loop_1", graph) is False, "but the decision refuses it"
+    assert "loop_1" not in wf._retry_replay_candidates, "so the service never waits on it"
+
+
+async def test_a_restored_condition_is_a_candidate_so_the_service_asks_about_it(
+    mock_wf: MagicMock,
+) -> None:
+    """The other direction: a replayed control node must be advertised.
+
+    Dropping it from the set would make the service treat the replay as an
+    ordinary execution and keep Temporal's timestamps, losing the source times
+    the replay is supposed to restore.
+    """
+    wf = _make_workflow({"retry_from_execution_id": "src-1", "eligible_point_ids": ["step_2"]})
+    graph = _condition_graph()
+
+    async def _activity(name: str, **kwargs: object) -> object:
+        if name == ActivityName.RETRY_CONTROL_PORTS:
+            return {"cond_1": "true"}
+        return {"step_true": ActivityStatus.COMPLETED.value, "step_2": ActivityStatus.FAILED.value}
+
+    mock_wf.execute_activity.side_effect = _activity
+
+    await wf._prepare_retry(graph)
+
+    assert wf._should_restore_node("cond_1", graph) is True
+    assert "cond_1" in wf._retry_replay_candidates

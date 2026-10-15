@@ -439,12 +439,16 @@ def test_loop_body_nodes_are_not_restored() -> None:
 
 
 def test_loop_node_itself_is_not_restored() -> None:
-    """The loop control node always runs: it has to iterate to completion."""
+    """The loop control node always runs: it has to iterate to completion.
+
+    The loop stays in the upstream region — it is upstream and a later PR will
+    want to replay it — but the scheduling-time decision refuses it, because a
+    restored loop would release its body without ever iterating.
+    """
     wf = _make_workflow(_retry("step_2"))
+    graph = _loop_graph()
 
-    restorable = wf._retry_restorable_nodes(_loop_graph())
-
-    assert "loop_1" not in restorable
+    assert wf._should_restore_node("loop_1", graph) is False
 
 
 def test_non_loop_successors_of_a_loop_stay_restorable() -> None:
@@ -456,7 +460,10 @@ def test_non_loop_successors_of_a_loop_stay_restorable() -> None:
     graph = _loop_graph()
     restorable = downstream._retry_restorable_nodes(graph)
 
-    assert restorable == {"step_2"}
+    assert downstream._should_restore_node("step_2", graph) is True
+    assert downstream._should_restore_node("loop_1", graph) is False
+    assert downstream._should_restore_node("body_a", graph) is False
+    assert {"step_2", "loop_1"} <= restorable, "the region holds both; the decision separates them"
 
 
 # ---------------------------------------------------------------------------
@@ -1193,7 +1200,6 @@ class TestConvergeAlwaysGoesThroughItsGate:
         wf.retry_context = _retry("step_3")
         graph = _converge_fanin_graph()
 
-        assert "join" not in wf._retry_restorable_nodes(graph)
         assert not wf._should_restore_node("join", graph)
 
 

@@ -68,9 +68,12 @@ class WorkflowRetryMixin:
 
     retry_context: dict[str, Any]
     _retry_restorable_cache: set[str] | None
-    #: Nodes this retry may replay, decided up front in ``_prepare_retry``.
-    #: The sync service asks the workflow whether a completing activity is one of
-    #: these before waiting on it, so it must be populated before any node runs.
+    #: Nodes this retry will replay, decided up front in ``_prepare_retry``. The sync
+    #: service asks the workflow whether a completing activity is one of these
+    #: before waiting on it, so it must be populated before any node runs. It is
+    #: narrower than the restorable region: a node listed here and then not
+    #: replayed costs the service a serial 5s wait for a timestamp that never
+    #: arrives, so it holds only what ``_should_restore_node`` will accept.
     _retry_replay_candidates: set[str]
     _restored_node_timestamps: dict[str, dict[str, str | None]]
     #: The source status of a node this retry restored, keyed by node id. Read by the
@@ -164,10 +167,18 @@ class WorkflowRetryMixin:
             start_to_close_timeout=timedelta(seconds=DEFAULT_ACTIVITY_TIMEOUT_SECONDS),
         )
         self._classify_unselected_branches(graph)
-        # Decided here rather than on first use: the sync service consults this set
-        # the moment an activity completes, so a node discovered mid-graph would
-        # otherwise look like an ordinary execution and never get its source times.
-        self._retry_replay_candidates = set(self._retry_restorable_nodes(graph))
+        # The restorable region says which nodes *may* be restored; this set says
+        # which ones *will* be, and only the sync service reads it. A control node
+        # the decision refuses runs for real and produces no synthetic state, so
+        # listing it would make the service wait out its 5s timeout for a
+        # timestamp that is never written — once per node, serially, in the
+        # monitor's sync loop. Decided here rather than on first use: the sync
+        # service consults it the moment an activity completes, so a node
+        # discovered mid-graph would look like an ordinary execution and never get
+        # its source times.
+        self._retry_replay_candidates = {
+            node_id for node_id in self._retry_restorable_nodes(graph) if self._should_restore_node(node_id, graph)
+        }
 
     def _classify_unselected_branches(self, graph: WorkflowGraph) -> None:
         """Skip unselected failures without suppressing shared selected descendants.
@@ -204,8 +215,15 @@ class WorkflowRetryMixin:
 
         The control plane already validated the selection, so this only re-derives
         *which upstream nodes may be skipped* — a node qualifies when it is not a
-        retry starting point, not a trigger or control node, not a loop body, and not
+        retry starting point, not a trigger node, not a loop body, and not
         downstream of a retry point.
+
+        Control nodes stay in this set. Whether one is actually replayed is decided
+        when traversal reaches it, not here: a condition or switch whose branch is
+        recoverable is restored, and one whose branch cannot be recovered runs
+        normally. Excluding them here and re-admitting them at the point of use
+        encodes the same rule in two places that have to keep agreeing, and it
+        leaves out the control nodes a later PR will want to replay.
 
         R6a's continue_on_failure case is covered by the ``downstream`` subtraction
         rather than a rule of its own. A failed CoF step is a retry point, so
@@ -230,11 +248,10 @@ class WorkflowRetryMixin:
         # input, so there is no source output to restore for one.
         triggers = {node.id for node in graph.get_trigger_nodes()}
 
-        # Control nodes decide routing rather than producing a value to inject,
-        # and a loop body is not one node but one execution per iteration. Both
-        # are excluded here so the set means what it says, instead of relying on
-        # _should_restore_node to filter them again at the point of use.
-        control = {node.id for node in graph.get_all_nodes() if node.type in _CONTROL_NODE_TYPES_FOR_RETRY}
+        # A loop body is not one node but one execution per iteration, so it is
+        # excluded here rather than at the point of use. Control nodes are not:
+        # they are restored or re-run depending on what is recoverable, which is
+        # only knowable once traversal reaches them.
         loop_bodies = self._loop_body_node_ids(graph)
 
         # Everything downstream of a failure point re-executes, so it cannot be
@@ -245,16 +262,7 @@ class WorkflowRetryMixin:
         for node_id in must_run:
             downstream |= self._walk_downstream(node_id, graph)
 
-        # A control node is normally excluded because it decides routing rather
-        # than producing a value. CONDITION and SWITCH are the exception when their
-        # branch is inferable: the retry can hand them the branch the source run
-        # took, so they need not re-decide against a half-rebuilt namespace. LOOP,
-        # WAIT and CONVERGE stay excluded unconditionally.
-        control = control - {node.id for node in graph.get_all_nodes() if self._resolved_control_port(node, graph)}
-
-        restorable = (
-            {node.id for node in graph.get_all_nodes()} - must_run - triggers - control - loop_bodies - downstream
-        )
+        restorable = {node.id for node in graph.get_all_nodes()} - must_run - triggers - loop_bodies - downstream
         self._retry_restorable_cache = restorable
         return restorable
 
@@ -413,17 +421,23 @@ class WorkflowRetryMixin:
         return await self._restore_node_output(node)
 
     def _should_restore_node(self, node_id: str, graph: WorkflowGraph) -> bool:
-        """Whether this node's stored output may be injected instead of running it."""
+        """Whether this node's stored output may be injected instead of running it.
+
+        Membership decides it, for every node type. A control node in the set is
+        then held to the extra test of whether the branch it took is recoverable:
+        a condition or switch is restored when it is, and re-decides normally when
+        it is not. A loop and a converge are never restored — they gate their
+        successors rather than producing a value to inject, so replaying one would
+        release the graph without the gate being evaluated.
+        """
         if not self.retry_context:
+            return False
+        if strip_iteration_suffix(node_id) not in self._retry_restorable_nodes(graph):
             return False
         node = graph.get_node(node_id)
         if node is not None and node.type in _CONTROL_NODE_TYPES_FOR_RETRY:
-            # A condition or switch may still be restored when the branch the
-            # source run took is recoverable — see _infer_control_node_branch.
-            if node.type in _INFERABLE_CONTROL_NODE_TYPES and self._resolved_control_port(node, graph):
-                return strip_iteration_suffix(node_id) in self._retry_restorable_nodes(graph)
-            return False
-        return strip_iteration_suffix(node_id) in self._retry_restorable_nodes(graph)
+            return node.type in _INFERABLE_CONTROL_NODE_TYPES and bool(self._resolved_control_port(node, graph))
+        return True
 
     async def _restored_control_result(self, node: ActivityNode, graph: WorkflowGraph) -> dict[str, Any] | None:
         """Restore a condition or switch by replaying the branch the source run took.
