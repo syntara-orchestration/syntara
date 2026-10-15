@@ -12,10 +12,10 @@ import pytest
 
 from syntara.workflows.models.activity_execution import ActivityStatus
 from syntara.workflows.workflow_engine.activities.retry_node_replay_activity import (
-    RESTORABLE_SOURCE_STATUSES,
     replay_retry_node_activity,
     retry_control_ports,
 )
+from syntara.workflows.workflow_engine.constants import RESTORABLE_SOURCE_STATUSES
 
 
 class _Row:

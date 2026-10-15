@@ -19,6 +19,8 @@ import structlog
 from sqlmodel import col, select
 from temporalio import activity, workflow
 
+from syntara.workflows.workflow_engine.constants import RESTORABLE_SOURCE_STATUSES
+
 with workflow.unsafe.imports_passed_through():
     from syntara.core.constants import JsonbLimits
     from syntara.core.database.session import get_db
@@ -28,6 +30,7 @@ with workflow.unsafe.imports_passed_through():
     from syntara.workflows.workflow_engine.utils.loop_iteration_ids import strip_loop_iteration_suffixes
 
 logger = structlog.stdlib.get_logger(__name__)
+
 
 #: Source statuses a retry can restore.
 #:
@@ -40,13 +43,6 @@ logger = structlog.stdlib.get_logger(__name__)
 #: "Workflow was cancelled" error and no output. So there is no recorded state to
 #: replay, and restoring one would report an interrupted node as a failure — which
 #: would set the run's unhandled-failure flag for a node that merely stopped.
-RESTORABLE_SOURCE_STATUSES = (
-    ActivityStatus.COMPLETED,
-    ActivityStatus.SKIPPED,
-    ActivityStatus.FAILED,
-)
-
-
 @activity.defn(name="replay_retry_node")
 async def replay_retry_node_activity(
     source_execution_id: str,

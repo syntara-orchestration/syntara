@@ -11,8 +11,10 @@ from syntara.workflows.models.activity_execution import ActivityStatus
 from syntara.workflows.utils.loop_body_nodes import collect_loop_bodies
 from syntara.workflows.utils.loop_iteration_names import strip_iteration_suffix
 from syntara.workflows.utils.namespace_resolver import NamespaceResolver
-from syntara.workflows.workflow_engine.activities.retry_node_replay_activity import RESTORABLE_SOURCE_STATUSES
-from syntara.workflows.workflow_engine.constants import DEFAULT_ACTIVITY_TIMEOUT_SECONDS
+from syntara.workflows.workflow_engine.constants import (
+    DEFAULT_ACTIVITY_TIMEOUT_SECONDS,
+    RESTORABLE_SOURCE_STATUSES,
+)
 from syntara.workflows.workflow_engine.graph import ActivityNode, WorkflowGraph
 from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName, LoopState, NodeType
 
