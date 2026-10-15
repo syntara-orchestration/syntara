@@ -5,7 +5,7 @@ import type { ReactNode } from 'react'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { axe } from 'vitest-axe'
 
-import { NodeExecutionDetailsPanel } from './NodeExecutionDetailsPanel'
+import { StepExecutionDetailsPanel } from './StepExecutionDetailsPanel'
 
 const mockActivityData = {
   resources: [
@@ -38,10 +38,10 @@ const wrapper = ({ children }: { children: ReactNode }) => (
 )
 
 const defaultProps = {
-  nodeId: 'run_aap_vm',
-  nodeName: 'Run AAP VM',
+  stepId: 'run_aap_vm',
+  stepName: 'Run AAP VM',
   executionId: 'exec-123',
-  nodeState: {
+  stepState: {
     activityId: 'run_aap_vm',
     status: 'completed' as const,
     startedAt: '2024-01-01T10:00:00Z',
@@ -49,40 +49,40 @@ const defaultProps = {
   },
 }
 
-describe('NodeExecutionDetailsPanel', () => {
+describe('StepExecutionDetailsPanel', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockUseQuery.mockReturnValue({ data: mockActivityData, isLoading: false, error: null, refetch: vi.fn() })
   })
 
-  it('renders the node name in the header', () => {
-    render(<NodeExecutionDetailsPanel {...defaultProps} />, { wrapper })
+  it('renders the step name in the header', () => {
+    render(<StepExecutionDetailsPanel {...defaultProps} />, { wrapper })
 
     expect(screen.getByRole('heading', { name: 'Run AAP VM' })).toBeInTheDocument()
   })
 
-  it('renders node status in the header', () => {
-    render(<NodeExecutionDetailsPanel {...defaultProps} />, { wrapper })
+  it('renders step status in the header', () => {
+    render(<StepExecutionDetailsPanel {...defaultProps} />, { wrapper })
 
     expect(screen.getByText('Successful')).toBeInTheDocument()
   })
 
   it('renders Input and Output panes side by side', () => {
-    render(<NodeExecutionDetailsPanel {...defaultProps} />, { wrapper })
+    render(<StepExecutionDetailsPanel {...defaultProps} />, { wrapper })
 
     expect(screen.getByText('Parameters')).toBeInTheDocument()
     expect(screen.getByText('Output')).toBeInTheDocument()
   })
 
   it('shows input data in the input pane by default (JSON view)', () => {
-    render(<NodeExecutionDetailsPanel {...defaultProps} />, { wrapper })
+    render(<StepExecutionDetailsPanel {...defaultProps} />, { wrapper })
 
     expect(screen.getByText(/"host"/)).toBeInTheDocument()
     expect(screen.getByText(/"10.0.0.1"/)).toBeInTheDocument()
   })
 
   it('shows output data in the output pane by default (JSON view)', () => {
-    render(<NodeExecutionDetailsPanel {...defaultProps} />, { wrapper })
+    render(<StepExecutionDetailsPanel {...defaultProps} />, { wrapper })
 
     expect(screen.getByText(/"stdout"/)).toBeInTheDocument()
     expect(screen.getByText(/"VM provisioned successfully"/)).toBeInTheDocument()
@@ -90,7 +90,7 @@ describe('NodeExecutionDetailsPanel', () => {
 
   it('renders schema view when switching to Schema', async () => {
     const user = userEvent.setup()
-    render(<NodeExecutionDetailsPanel {...defaultProps} />, { wrapper })
+    render(<StepExecutionDetailsPanel {...defaultProps} />, { wrapper })
 
     const schemaButtons = screen.getAllByRole('button', { name: 'Schema' })
     await user.click(schemaButtons[0])
@@ -100,7 +100,7 @@ describe('NodeExecutionDetailsPanel', () => {
 
   it('renders table view when switching to Table', async () => {
     const user = userEvent.setup()
-    render(<NodeExecutionDetailsPanel {...defaultProps} />, { wrapper })
+    render(<StepExecutionDetailsPanel {...defaultProps} />, { wrapper })
 
     const tableButtons = screen.getAllByRole('button', { name: 'Table' })
     await user.click(tableButtons[0])
@@ -110,7 +110,7 @@ describe('NodeExecutionDetailsPanel', () => {
 
   it('shows loading spinner when data is loading', () => {
     mockUseQuery.mockReturnValue({ data: null, isLoading: true, error: null, refetch: vi.fn() })
-    render(<NodeExecutionDetailsPanel {...defaultProps} />, { wrapper })
+    render(<StepExecutionDetailsPanel {...defaultProps} />, { wrapper })
 
     expect(screen.getByRole('progressbar')).toBeInTheDocument()
   })
@@ -122,7 +122,7 @@ describe('NodeExecutionDetailsPanel', () => {
       error: null,
       refetch: vi.fn(),
     })
-    render(<NodeExecutionDetailsPanel {...defaultProps} />, { wrapper })
+    render(<StepExecutionDetailsPanel {...defaultProps} />, { wrapper })
 
     expect(screen.getByText('No output data')).toBeInTheDocument()
   })
@@ -134,13 +134,13 @@ describe('NodeExecutionDetailsPanel', () => {
       error: null,
       refetch: vi.fn(),
     })
-    render(<NodeExecutionDetailsPanel {...defaultProps} />, { wrapper })
+    render(<StepExecutionDetailsPanel {...defaultProps} />, { wrapper })
 
     expect(screen.getByText('No parameters data')).toBeInTheDocument()
   })
 
   it('passes activity_name as query parameter for server-side filtering', () => {
-    render(<NodeExecutionDetailsPanel {...defaultProps} />, { wrapper })
+    render(<StepExecutionDetailsPanel {...defaultProps} />, { wrapper })
 
     expect(mockUseQuery).toHaveBeenCalledWith(
       'get',
@@ -157,7 +157,7 @@ describe('NodeExecutionDetailsPanel', () => {
   })
 
   it('has no accessibility violations', async () => {
-    const { container } = render(<NodeExecutionDetailsPanel {...defaultProps} />, { wrapper })
+    const { container } = render(<StepExecutionDetailsPanel {...defaultProps} />, { wrapper })
 
     let results: Awaited<ReturnType<typeof axe>>
     await act(async () => {
@@ -168,7 +168,7 @@ describe('NodeExecutionDetailsPanel', () => {
 
   it('has no accessibility violations in loading state', async () => {
     mockUseQuery.mockReturnValue({ data: null, isLoading: true, error: null, refetch: vi.fn() })
-    const { container } = render(<NodeExecutionDetailsPanel {...defaultProps} />, { wrapper })
+    const { container } = render(<StepExecutionDetailsPanel {...defaultProps} />, { wrapper })
 
     let results: Awaited<ReturnType<typeof axe>>
     await act(async () => {
@@ -186,7 +186,7 @@ describe('NodeExecutionDetailsPanel', () => {
       refetch,
     })
 
-    render(<NodeExecutionDetailsPanel {...defaultProps} />, { wrapper })
+    render(<StepExecutionDetailsPanel {...defaultProps} />, { wrapper })
 
     expect(screen.getByText('Error loading activity data')).toBeInTheDocument()
     expect(screen.queryByRole('progressbar')).not.toBeInTheDocument()
@@ -199,18 +199,18 @@ describe('NodeExecutionDetailsPanel', () => {
     const error = Object.assign(new Error('Network error'), { retryable: true })
     mockUseQuery.mockReturnValue({ data: null, isLoading: false, error, refetch })
 
-    render(<NodeExecutionDetailsPanel {...defaultProps} />, { wrapper })
+    render(<StepExecutionDetailsPanel {...defaultProps} />, { wrapper })
 
     await user.click(screen.getByRole('button', { name: 'Retry' }))
     expect(refetch).toHaveBeenCalledOnce()
   })
 
-  it('renders without elapsed time when node has not started', () => {
+  it('renders without elapsed time when step has not started', () => {
     const propsWithoutStart = {
       ...defaultProps,
-      nodeState: undefined,
+      stepState: undefined,
     }
-    render(<NodeExecutionDetailsPanel {...propsWithoutStart} />, { wrapper })
+    render(<StepExecutionDetailsPanel {...propsWithoutStart} />, { wrapper })
 
     expect(screen.queryByText(/Elapsed time:/)).not.toBeInTheDocument()
     expect(screen.queryByText(/2024-01-01/)).not.toBeInTheDocument()
@@ -221,7 +221,7 @@ describe('NodeExecutionDetailsPanel', () => {
     const scrollIntoView = vi.fn()
     Element.prototype.scrollIntoView = scrollIntoView
 
-    render(<NodeExecutionDetailsPanel {...defaultProps} />, { wrapper })
+    render(<StepExecutionDetailsPanel {...defaultProps} />, { wrapper })
 
     const searchInputs = screen.getAllByPlaceholderText('Search')
     await user.type(searchInputs[0], 'host')
@@ -236,7 +236,7 @@ describe('NodeExecutionDetailsPanel', () => {
     const scrollIntoView = vi.fn()
     Element.prototype.scrollIntoView = scrollIntoView
 
-    render(<NodeExecutionDetailsPanel {...defaultProps} />, { wrapper })
+    render(<StepExecutionDetailsPanel {...defaultProps} />, { wrapper })
 
     const searchInputs = screen.getAllByPlaceholderText('Search')
     await user.type(searchInputs[0], 'host')
@@ -247,7 +247,7 @@ describe('NodeExecutionDetailsPanel', () => {
 
   it('clears search term when clear button is clicked', async () => {
     const user = userEvent.setup()
-    render(<NodeExecutionDetailsPanel {...defaultProps} />, { wrapper })
+    render(<StepExecutionDetailsPanel {...defaultProps} />, { wrapper })
 
     const searchInputs = screen.getAllByPlaceholderText('Search')
     await user.type(searchInputs[0], 'host')
@@ -262,14 +262,14 @@ describe('NodeExecutionDetailsPanel', () => {
   it('renders running status with elapsed time updating', () => {
     const propsWithRunning = {
       ...defaultProps,
-      nodeState: {
+      stepState: {
         activityId: 'run_aap_vm',
         status: 'running' as const,
         startedAt: new Date(Date.now() - 5000).toISOString(),
         completedAt: undefined,
       },
     }
-    render(<NodeExecutionDetailsPanel {...propsWithRunning} />, { wrapper })
+    render(<StepExecutionDetailsPanel {...propsWithRunning} />, { wrapper })
 
     expect(screen.getByText('Running')).toBeInTheDocument()
     expect(screen.getByText(/Elapsed time:/)).toBeInTheDocument()
@@ -278,20 +278,20 @@ describe('NodeExecutionDetailsPanel', () => {
   it('renders failed status with error styling on output', () => {
     const propsWithFailed = {
       ...defaultProps,
-      nodeState: {
+      stepState: {
         activityId: 'run_aap_vm',
         status: 'failed' as const,
         startedAt: '2024-01-01T10:00:00Z',
         completedAt: '2024-01-01T10:01:30Z',
       },
     }
-    render(<NodeExecutionDetailsPanel {...propsWithFailed} />, { wrapper })
+    render(<StepExecutionDetailsPanel {...propsWithFailed} />, { wrapper })
 
     expect(screen.getByText('Failed')).toBeInTheDocument()
   })
 
-  it('renders timestamp range when node has both start and end times', () => {
-    render(<NodeExecutionDetailsPanel {...defaultProps} />, { wrapper })
+  it('renders timestamp range when step has both start and end times', () => {
+    render(<StepExecutionDetailsPanel {...defaultProps} />, { wrapper })
 
     // Start and end render as two separate <time> elements (via PatternFly Timestamp)
     // joined by " - ". Timestamps render in local timezone, so just verify the date
@@ -302,12 +302,12 @@ describe('NodeExecutionDetailsPanel', () => {
   it('renders only start timestamp when completion time is missing', () => {
     const propsWithoutCompletedAt = {
       ...defaultProps,
-      nodeState: {
-        ...defaultProps.nodeState,
+      stepState: {
+        ...defaultProps.stepState,
         completedAt: undefined,
       },
     }
-    render(<NodeExecutionDetailsPanel {...propsWithoutCompletedAt} />, { wrapper })
+    render(<StepExecutionDetailsPanel {...propsWithoutCompletedAt} />, { wrapper })
 
     expect(screen.getAllByText(/Jan.*1.*2024/i)).toHaveLength(1)
     expect(screen.queryByText(/ - /)).not.toBeInTheDocument()
@@ -315,7 +315,7 @@ describe('NodeExecutionDetailsPanel', () => {
 
   it('switches between different view modes for input pane', async () => {
     const user = userEvent.setup()
-    render(<NodeExecutionDetailsPanel {...defaultProps} />, { wrapper })
+    render(<StepExecutionDetailsPanel {...defaultProps} />, { wrapper })
 
     // Start in JSON view
     expect(screen.getByText(/"host"/)).toBeInTheDocument()
@@ -335,7 +335,7 @@ describe('NodeExecutionDetailsPanel', () => {
 
   it('switches between different view modes for output pane', async () => {
     const user = userEvent.setup()
-    render(<NodeExecutionDetailsPanel {...defaultProps} />, { wrapper })
+    render(<StepExecutionDetailsPanel {...defaultProps} />, { wrapper })
 
     // Switch output to Schema view
     const schemaButtons = screen.getAllByRole('button', { name: 'Schema' })
@@ -365,7 +365,7 @@ describe('NodeExecutionDetailsPanel', () => {
 
     it('renders approval audit strip when output contains approval data', () => {
       mockUseQuery.mockReturnValue({ data: approvalOutputData, isLoading: false, error: null, refetch: vi.fn() })
-      render(<NodeExecutionDetailsPanel {...defaultProps} />, { wrapper })
+      render(<StepExecutionDetailsPanel {...defaultProps} />, { wrapper })
 
       expect(screen.getByText('Decision')).toBeInTheDocument()
       expect(screen.getByText('Approved')).toBeInTheDocument()
@@ -377,7 +377,7 @@ describe('NodeExecutionDetailsPanel', () => {
     })
 
     it('does not render approval audit strip for non-approval output', () => {
-      render(<NodeExecutionDetailsPanel {...defaultProps} />, { wrapper })
+      render(<StepExecutionDetailsPanel {...defaultProps} />, { wrapper })
 
       expect(screen.queryByText('Decision')).not.toBeInTheDocument()
       expect(screen.queryByText('Decided by')).not.toBeInTheDocument()
@@ -400,7 +400,7 @@ describe('NodeExecutionDetailsPanel', () => {
         ],
       }
       mockUseQuery.mockReturnValue({ data: dataWithoutNotes, isLoading: false, error: null, refetch: vi.fn() })
-      render(<NodeExecutionDetailsPanel {...defaultProps} />, { wrapper })
+      render(<StepExecutionDetailsPanel {...defaultProps} />, { wrapper })
 
       expect(screen.getByText('Rejected')).toBeInTheDocument()
       expect(screen.queryByText('Notes')).not.toBeInTheDocument()
@@ -423,7 +423,7 @@ describe('NodeExecutionDetailsPanel', () => {
         ],
       }
       mockUseQuery.mockReturnValue({ data: dataWithUnknownDecision, isLoading: false, error: null, refetch: vi.fn() })
-      render(<NodeExecutionDetailsPanel {...defaultProps} />, { wrapper })
+      render(<StepExecutionDetailsPanel {...defaultProps} />, { wrapper })
 
       expect(screen.getByText('Deferred')).toBeInTheDocument()
       expect(screen.getByText('Decided by')).toBeInTheDocument()
@@ -432,7 +432,7 @@ describe('NodeExecutionDetailsPanel', () => {
 
     it('has no accessibility violations with approval audit displayed', async () => {
       mockUseQuery.mockReturnValue({ data: approvalOutputData, isLoading: false, error: null, refetch: vi.fn() })
-      const { container } = render(<NodeExecutionDetailsPanel {...defaultProps} />, { wrapper })
+      const { container } = render(<StepExecutionDetailsPanel {...defaultProps} />, { wrapper })
 
       let results: Awaited<ReturnType<typeof axe>>
       await act(async () => {
@@ -460,7 +460,7 @@ describe('NodeExecutionDetailsPanel', () => {
         refetch: vi.fn(),
       })
 
-      render(<NodeExecutionDetailsPanel {...defaultProps} nodeType="aap_job_template" />, { wrapper })
+      render(<StepExecutionDetailsPanel {...defaultProps} stepType="aap_job_template" />, { wrapper })
 
       const link = screen.getByRole('link', { name: /View job in AAP/i })
       expect(link).toHaveAttribute('href', 'https://aap.example.com/jobs/123')
@@ -469,13 +469,13 @@ describe('NodeExecutionDetailsPanel', () => {
     })
 
     it('does not show AAP link for non-AAP step types', () => {
-      render(<NodeExecutionDetailsPanel {...defaultProps} nodeType="script" />, { wrapper })
+      render(<StepExecutionDetailsPanel {...defaultProps} stepType="script" />, { wrapper })
 
       expect(screen.queryByRole('link', { name: /View job in AAP/i })).not.toBeInTheDocument()
     })
 
-    it('does not show AAP link when nodeType is undefined', () => {
-      render(<NodeExecutionDetailsPanel {...defaultProps} />, { wrapper })
+    it('does not show AAP link when stepType is undefined', () => {
+      render(<StepExecutionDetailsPanel {...defaultProps} />, { wrapper })
 
       expect(screen.queryByRole('link', { name: /View job in AAP/i })).not.toBeInTheDocument()
     })
@@ -497,18 +497,18 @@ describe('NodeExecutionDetailsPanel', () => {
         refetch: vi.fn(),
       })
 
-      render(<NodeExecutionDetailsPanel {...defaultProps} nodeType="aap_job_template" />, { wrapper })
+      render(<StepExecutionDetailsPanel {...defaultProps} stepType="aap_job_template" />, { wrapper })
 
       expect(screen.queryByRole('link', { name: /View job in AAP/i })).not.toBeInTheDocument()
     })
   })
 
-  describe('agentic node', () => {
+  describe('agentic step', () => {
     const agenticProps = {
       ...defaultProps,
-      nodeId: 'triage_agent',
-      nodeName: 'AI Agent',
-      nodeType: 'agentic',
+      stepId: 'triage_agent',
+      stepName: 'AI Agent',
+      stepType: 'agentic',
     }
 
     const mockAgenticActivityData = {
@@ -564,13 +564,13 @@ describe('NodeExecutionDetailsPanel', () => {
         refetch: vi.fn(),
       })
 
-      render(<NodeExecutionDetailsPanel {...agenticProps} />, { wrapper })
+      render(<StepExecutionDetailsPanel {...agenticProps} />, { wrapper })
 
       expect(screen.getByRole('tab', { name: /Input\/Output/i })).toBeInTheDocument()
       expect(screen.getByRole('tab', { name: /Agent steps/i })).toBeInTheDocument()
     })
 
-    it('does not render tab bar for non-agentic nodes', () => {
+    it('does not render tab bar for non-agentic steps', () => {
       mockUseQuery.mockReturnValue({
         data: mockActivityData,
         isLoading: false,
@@ -578,7 +578,7 @@ describe('NodeExecutionDetailsPanel', () => {
         refetch: vi.fn(),
       })
 
-      render(<NodeExecutionDetailsPanel {...defaultProps} nodeType="script" />, { wrapper })
+      render(<StepExecutionDetailsPanel {...defaultProps} stepType="script" />, { wrapper })
 
       expect(screen.queryByRole('tab')).not.toBeInTheDocument()
     })
@@ -592,7 +592,7 @@ describe('NodeExecutionDetailsPanel', () => {
         refetch: vi.fn(),
       })
 
-      render(<NodeExecutionDetailsPanel {...agenticProps} />, { wrapper })
+      render(<StepExecutionDetailsPanel {...agenticProps} />, { wrapper })
 
       await user.click(screen.getByRole('tab', { name: /Agent steps/i }))
 
@@ -608,7 +608,7 @@ describe('NodeExecutionDetailsPanel', () => {
         refetch: vi.fn(),
       })
 
-      render(<NodeExecutionDetailsPanel {...agenticProps} />, { wrapper })
+      render(<StepExecutionDetailsPanel {...agenticProps} />, { wrapper })
 
       await user.click(screen.getByRole('tab', { name: /Agent steps/i }))
       expect(screen.getByText('Analyzing the incident logs')).toBeInTheDocument()
@@ -636,7 +636,7 @@ describe('NodeExecutionDetailsPanel', () => {
         refetch: vi.fn(),
       })
 
-      render(<NodeExecutionDetailsPanel {...agenticProps} />, { wrapper })
+      render(<StepExecutionDetailsPanel {...agenticProps} />, { wrapper })
 
       await user.click(screen.getByRole('tab', { name: /Agent steps/i }))
 
@@ -651,7 +651,7 @@ describe('NodeExecutionDetailsPanel', () => {
         refetch: vi.fn(),
       })
 
-      render(<NodeExecutionDetailsPanel {...agenticProps} />, { wrapper })
+      render(<StepExecutionDetailsPanel {...agenticProps} />, { wrapper })
 
       expect(screen.getByRole('tab', { name: /Input\/Output/i, selected: true })).toBeInTheDocument()
       expect(screen.getByRole('tab', { name: /Agent steps/i, selected: false })).toBeInTheDocument()
@@ -683,7 +683,7 @@ describe('NodeExecutionDetailsPanel', () => {
         refetch: vi.fn(),
       })
 
-      render(<NodeExecutionDetailsPanel {...agenticProps} />, { wrapper })
+      render(<StepExecutionDetailsPanel {...agenticProps} />, { wrapper })
 
       expect(screen.getByText('Tools used')).toBeInTheDocument()
       expect(screen.getByText('search (2), fetch (1)')).toBeInTheDocument()

@@ -8,11 +8,11 @@ When a workflow execution reaches an approval node, the execution visualizer dis
 
 ## Architecture
 
-The execution-side approval hooks follow a **4-layer architecture** (documented in `useExecutionNodeClick.ts`):
+The execution-side approval hooks follow a **4-layer architecture** (documented in `useExecutionStepClick.ts`):
 
-1. **Data** (Layer 1): `useFetchPendingApprovals`, `useFetchApprovalForNode`, `useFetchApprovalForUrlParam` — fetch approval data lazily on demand
+1. **Data** (Layer 1): `useFetchPendingApprovals`, `useFetchApprovalForStep`, `useFetchApprovalForUrlParam` — fetch approval data lazily on demand
 2. **State** (Layer 2): `useExecutionApprovals` — manages multi-approval array and navigation index
-3. **Interaction** (Layer 3): `useExecutionNodeClick` — routes approval vs. details clicks on the canvas
+3. **Interaction** (Layer 3): `useExecutionStepClick` — routes approval vs. details clicks on the canvas
 4. **UI** (Layer 4): `useExecutionApprovalPanel` — panel open/close, URL deep linking, auto-detection
 
 **Deep linking**: Users can link directly to an approval via `/executions/{id}?approval={approvalId}`. The `useFetchApprovalForUrlParam` hook reads the URL param, and `useExecutionApprovalPanel` opens the panel automatically.
@@ -21,16 +21,16 @@ The execution-side approval hooks follow a **4-layer architecture** (documented 
 
 ## Fetching Approvals
 
-### Hook: `useFetchApprovalForNode`
+### Hook: `useFetchApprovalForStep`
 
-**Location**: `packages/syntara-ui/src/routes/executions/hooks/useFetchApprovalForNode.ts`
+**Location**: `packages/syntara-ui/src/routes/executions/hooks/useFetchApprovalForStep.ts`
 
 **Signature**:
 
 ```typescript
-function useFetchApprovalForNode(executionId: string): {
+function useFetchApprovalForStep(executionId: string): {
   isLoading: boolean
-  fetchForNode: (approvalNodeId: string) => Promise<Approval | null>
+  fetchForStep: (approvalNodeId: string) => Promise<Approval | null>
   clear: () => void
 }
 ```
@@ -41,17 +41,17 @@ function useFetchApprovalForNode(executionId: string): {
 
 - Uses `approvalsClient.useQuery('get', '/approvals', ...)` with `enabled: false` to disable automatic fetching
 - Query params: `execution_id` and `status: 'pending'`
-- `fetchForNode(approvalNodeId)` calls `refetch()`, then filters the returned list by canvas `approval_node_id` (pending first, else latest `loop_iteration_path`). Legacy `{nodeId}_iter_{n}` suffixes are a fallback only.
+- `fetchForStep(approvalNodeId)` calls `refetch()`, then filters the returned list by canvas `approval_node_id` (pending first, else latest `loop_iteration_path`). Legacy `{nodeId}_iter_{n}` suffixes are a fallback only.
 - Returns `null` if no matching approval is found
 - `clear()` resets the loading state (e.g., when closing the review view)
 
 **Usage Example**:
 
 ```typescript
-const { fetchForNode, isLoading, clear } = useFetchApprovalForNode(executionId)
+const { fetchForStep, isLoading, clear } = useFetchApprovalForStep(executionId)
 
 const handleNodeClick = async (nodeId: string) => {
-  const approval = await fetchForNode(nodeId)
+  const approval = await fetchForStep(nodeId)
   if (approval) {
     // Show review view
   }
@@ -328,7 +328,7 @@ When writing E2E tests for approval-execution integration:
 
 The approval-execution integration provides:
 
-- **Lazy fetching**: On-demand approval loading via `useFetchApprovalForNode(executionId)`
+- **Lazy fetching**: On-demand approval loading via `useFetchApprovalForStep(executionId)`
 - **Review interface**: Full-page form with next steps preview and context display
 - **Two-tier permissions**: RBAC + approver list checks (both required)
 - **Decision submission**: PATCH mutation with query invalidation
