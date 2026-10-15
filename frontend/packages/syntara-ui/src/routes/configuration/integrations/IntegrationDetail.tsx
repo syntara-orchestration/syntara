@@ -125,7 +125,9 @@ function IntegrationDetailsTab({
               {PROVIDER_HINT_LABELS[getProviderHint(integration)] ?? getProviderHint(integration)}
             </SynDetail>
           )}
-          <SynDetail label="URL">{getBaseUrl(integration) || '—'}</SynDetail>
+          <SynDetail label={integration.integration_type === IntegrationTypeEnum.KAFKA ? 'Bootstrap servers' : 'URL'}>
+            {getBaseUrl(integration) || '—'}
+          </SynDetail>
           <SynDetail label="Connection credential">
             {!credentialId || !credentialName ? (
               <>None</>

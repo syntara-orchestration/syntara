@@ -16,6 +16,8 @@ const STEP_DESCRIPTION: Record<string, string> = {
     'This credential is used to verify that the LLM provider is reachable and the API key is valid. Workflow credentials are configured separately in the workflow builder.',
   [IntegrationTypeEnum.ANSIBLE_AUTOMATION_PLATFORM]:
     'This credential is used to verify that the Ansible Automation Platform is reachable and the token is valid. Workflow credentials are configured separately in the workflow builder.',
+  [IntegrationTypeEnum.KAFKA]:
+    'This credential is the Kafka-connection login used to verify that the brokers are reachable. Workflow credentials are configured separately in the workflow builder.',
 }
 
 type CredentialStepProps = Readonly<{

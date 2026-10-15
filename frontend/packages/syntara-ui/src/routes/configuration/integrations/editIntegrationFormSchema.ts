@@ -2,6 +2,9 @@ import type { IntegrationsAPI } from '@syntara/contracts'
 import { IntegrationTypeEnum } from '@syntara/contracts'
 import { z } from 'zod'
 
+import { bootstrapServersFieldError, parseBootstrapServers } from './kafkaBootstrapServers'
+import { DEFAULT_KAFKA_SASL_MECHANISM } from './kafkaSasl'
+
 function isLoopback(hostname: string): boolean {
   return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1' || hostname === '[::1]'
 }
@@ -34,6 +37,8 @@ export function buildEditSchema(requiresBaseUrl: boolean) {
       description: z.string(),
       integration_type: z.string(),
       base_url: z.string().optional(),
+      bootstrap_servers: z.string().optional(),
+      sasl_mechanism: z.enum(['PLAIN', 'SCRAM-SHA-256', 'SCRAM-SHA-512']).optional(),
       allow_http: z.boolean(),
       insecure_skip_tls_verify: z.boolean(),
       ca_certificate: z.string().optional().nullable(),
@@ -73,6 +78,10 @@ export function buildEditSchema(requiresBaseUrl: boolean) {
         })
         if (err) ctx.addIssue({ code: z.ZodIssueCode.custom, message: err, path: ['base_url'] })
       }
+      if (data.integration_type === IntegrationTypeEnum.KAFKA) {
+        const err = bootstrapServersFieldError(data.bootstrap_servers ?? '')
+        if (err) ctx.addIssue({ code: z.ZodIssueCode.custom, message: err, path: ['bootstrap_servers'] })
+      }
     })
 }
 
@@ -92,6 +101,14 @@ function securityFields(values: EditIntegrationFormValues) {
 }
 
 export function buildConfiguration(integrationType: string, values: EditIntegrationFormValues, providerHint?: string) {
+  if (integrationType === IntegrationTypeEnum.KAFKA) {
+    return {
+      integration_type: IntegrationTypeEnum.KAFKA,
+      bootstrap_servers: parseBootstrapServers(values.bootstrap_servers ?? ''),
+      sasl_mechanism: values.sasl_mechanism ?? DEFAULT_KAFKA_SASL_MECHANISM,
+      ...securityFields(values),
+    }
+  }
   if (integrationType === IntegrationTypeEnum.ANSIBLE_AUTOMATION_PLATFORM) {
     return {
       integration_type: IntegrationTypeEnum.ANSIBLE_AUTOMATION_PLATFORM,

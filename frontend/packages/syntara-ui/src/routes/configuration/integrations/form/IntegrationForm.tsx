@@ -38,6 +38,7 @@ import {
   integrationFormSchema,
   getStep1Fields,
   getDefaultConfiguration,
+  toApiConfiguration,
   type IntegrationFormData,
 } from './integrationFormSchema'
 import { useCreateIntegration } from './useCreateIntegration'
@@ -215,7 +216,7 @@ function useDiscoverConnection(getValues: () => IntegrationFormData) {
       {
         body: {
           integration_type: values.integration_type,
-          configuration: values.configuration,
+          configuration: toApiConfiguration(values.configuration),
           credential_id: credId ?? undefined,
         },
       },
@@ -338,6 +339,13 @@ export function IntegrationForm() {
       if (errors.name) messages.push(errors.name.message ?? 'Name is invalid')
       if (errors.configuration && 'base_url' in errors.configuration && errors.configuration.base_url) {
         messages.push(errors.configuration.base_url.message ?? 'Base URL is invalid')
+      }
+      if (
+        errors.configuration &&
+        'bootstrap_servers' in errors.configuration &&
+        errors.configuration.bootstrap_servers
+      ) {
+        messages.push(errors.configuration.bootstrap_servers.message ?? 'Bootstrap servers are invalid')
       }
       if (messages.length > 0) {
         showAlert({

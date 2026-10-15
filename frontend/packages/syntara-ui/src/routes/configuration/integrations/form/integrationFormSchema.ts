@@ -1,7 +1,9 @@
-import { IntegrationTypeEnum, LLMProviderHintEnum } from '@syntara/contracts'
+import { IntegrationTypeEnum, LLMProviderHintEnum, type IntegrationsAPI } from '@syntara/contracts'
 import { z } from 'zod'
 
 import { PROVIDERS_REQUIRING_BASE_URL } from '../integrationFilters'
+import { bootstrapServersFieldError, parseBootstrapServers } from '../kafkaBootstrapServers'
+import { DEFAULT_KAFKA_SASL_MECHANISM } from '../kafkaSasl'
 
 const securityFields = {
   allow_http: z.boolean(),
@@ -72,6 +74,24 @@ const aapSchema = z.object({
     }),
 })
 
+const kafkaSchema = z.object({
+  ...sharedFields,
+  integration_type: z.literal(IntegrationTypeEnum.KAFKA),
+  configuration: z
+    .object({
+      integration_type: z.literal(IntegrationTypeEnum.KAFKA),
+      bootstrap_servers: z.string(),
+      sasl_mechanism: z.enum(['PLAIN', 'SCRAM-SHA-256', 'SCRAM-SHA-512']),
+      ...securityFields,
+    })
+    .superRefine((data, ctx) => {
+      const error = bootstrapServersFieldError(data.bootstrap_servers)
+      if (error) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: error, path: ['bootstrap_servers'] })
+      }
+    }),
+})
+
 const llmProviderSchema = z.object({
   ...sharedFields,
   integration_type: z.literal(IntegrationTypeEnum.LLM_PROVIDER),
@@ -106,7 +126,7 @@ const llmProviderSchema = z.object({
  * Backend 422 errors are still applied via useFormMutationErrorHandler.
  */
 export const integrationFormSchema = z
-  .discriminatedUnion('integration_type', [mcpServerSchema, aapSchema, llmProviderSchema])
+  .discriminatedUnion('integration_type', [mcpServerSchema, aapSchema, llmProviderSchema, kafkaSchema])
   .superRefine((data, ctx) => {
     if (data.scope === 'project' && data.project_ids.length === 0) {
       ctx.addIssue({
@@ -136,6 +156,8 @@ export function getStep1Fields(integrationType: string, scope?: string): string[
       return [...shared, 'configuration.base_url']
     case IntegrationTypeEnum.LLM_PROVIDER:
       return [...shared, 'configuration.provider_hint', 'configuration.base_url']
+    case IntegrationTypeEnum.KAFKA:
+      return [...shared, 'configuration.bootstrap_servers']
     default:
       return shared
   }
@@ -156,6 +178,13 @@ export function getDefaultConfiguration(integrationType: string): IntegrationFor
         base_url: '',
         ...SECURITY_DEFAULTS,
       }
+    case IntegrationTypeEnum.KAFKA:
+      return {
+        integration_type: 'kafka' as const,
+        bootstrap_servers: '',
+        sasl_mechanism: DEFAULT_KAFKA_SASL_MECHANISM,
+        ...SECURITY_DEFAULTS,
+      }
     default:
       return { integration_type: 'mcp_server' as const, base_url: '', ...SECURITY_DEFAULTS }
   }
@@ -165,6 +194,7 @@ export const INTEGRATION_TYPE_OPTIONS = [
   { value: IntegrationTypeEnum.MCP_SERVER, label: 'MCP Server' },
   { value: IntegrationTypeEnum.ANSIBLE_AUTOMATION_PLATFORM, label: 'Ansible Automation Platform' },
   { value: IntegrationTypeEnum.LLM_PROVIDER, label: 'LLM Provider' },
+  { value: IntegrationTypeEnum.KAFKA, label: 'Kafka' },
 ] as const
 
 export const PROVIDER_HINT_OPTIONS = [
@@ -172,3 +202,20 @@ export const PROVIDER_HINT_OPTIONS = [
   { value: LLMProviderHintEnum.OPENAI, label: 'OpenAI' },
   { value: LLMProviderHintEnum.CUSTOM, label: 'Custom' },
 ] as const
+
+type ApiConfiguration = NonNullable<IntegrationsAPI.components['schemas']['IntegrationCreate']['configuration']>
+
+/** Map form configuration to the API shape. Kafka brokers are a list, not the textarea string. */
+export function toApiConfiguration(configuration: IntegrationFormData['configuration']): ApiConfiguration {
+  if (configuration.integration_type === IntegrationTypeEnum.KAFKA) {
+    return {
+      integration_type: IntegrationTypeEnum.KAFKA,
+      bootstrap_servers: parseBootstrapServers(configuration.bootstrap_servers),
+      sasl_mechanism: configuration.sasl_mechanism,
+      allow_http: configuration.allow_http,
+      insecure_skip_tls_verify: configuration.insecure_skip_tls_verify,
+      ca_certificate: configuration.ca_certificate,
+    }
+  }
+  return configuration
+}
