@@ -233,8 +233,7 @@ describe('BuilderContent - Duplicate Workflow', () => {
     await waitFor(() => expect(mockDuplicateMutate).toHaveBeenCalled())
 
     const callArgs = mockDuplicateMutate.mock.calls[0]?.[0] as
-      | { body: { name: string; description: string; project_id: string; labels: Record<string, string> } }
-      | undefined
+      { body: { name: string; description: string; project_id: string; labels: Record<string, string> } } | undefined
     expect(callArgs).toBeDefined()
     expect(callArgs?.body.name).toContain('Test Workflow - duplicate-')
     expect(callArgs?.body.description).toBe('Test Description')

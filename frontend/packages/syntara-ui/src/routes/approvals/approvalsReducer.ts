@@ -1,6 +1,5 @@
 export type ApprovalsAction =
-  | { type: 'SET_EXPANDED_ROWS'; payload: Set<string> }
-  | { type: 'TOGGLE_ROW'; payload: string }
+  { type: 'SET_EXPANDED_ROWS'; payload: Set<string> } | { type: 'TOGGLE_ROW'; payload: string }
 
 export function approvalsReducer(state: { expandedRows: Set<string> }, action: ApprovalsAction) {
   switch (action.type) {

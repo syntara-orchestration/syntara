@@ -1,6 +1,6 @@
 import { WorkflowVersionStatusEnum, type WorkflowAPI } from '@syntara/contracts'
 import { readFileSync } from 'fs'
-import yaml from 'js-yaml'
+import { load } from 'js-yaml'
 import { basename, isAbsolute, relative, resolve } from 'path'
 
 import { mockDate } from '../resources/mockDates'
@@ -189,8 +189,8 @@ export function convertYamlToWorkflow(
   const createdByRef = { id: MOCK_SEED_USER_ID, name: createdBy, type: 'user' as const }
   const resolvedPath = assertPathWithinBase(yamlFilePath, allowedBaseDir)
   const yamlContent = readFileSync(resolvedPath, 'utf-8')
-  // js-yaml 4 rejects unsafe tags (e.g. !!js/function) by default; safeLoad was removed.
-  const parsedDefinition = parseYamlWorkflowDefinition(yaml.load(yamlContent), yamlFilePath)
+  // The default schema rejects unsafe tags (e.g. !!js/function) when loading YAML.
+  const parsedDefinition = parseYamlWorkflowDefinition(load(yamlContent), yamlFilePath)
   const workflowDefinition = normalizeWorkflowDefinition(parsedDefinition)
 
   const filename = basename(yamlFilePath, '.yaml')

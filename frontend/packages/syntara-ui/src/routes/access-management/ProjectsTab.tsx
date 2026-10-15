@@ -126,11 +126,17 @@ function ProjectsTable({
     <>
       <Thead>
         <Tr>
-          <Th sort={getSortParams(0)}>Name</Th>
-          <Th>Description</Th>
-          <Th sort={getSortParams(2)}>Created</Th>
-          <Th sort={getSortParams(3)}>Updated</Th>
-          <Th screenReaderText="Actions" />
+          <Th width={20} sort={getSortParams(0)}>
+            Name
+          </Th>
+          <Th width={25}>Description</Th>
+          <Th width={20} sort={getSortParams(2)}>
+            Created
+          </Th>
+          <Th width={20} sort={getSortParams(3)}>
+            Updated
+          </Th>
+          <Th width={10} screenReaderText="Actions" />
         </Tr>
       </Thead>
       <Tbody>

@@ -3,7 +3,7 @@ name: CI Backend
 
 on:
   pull_request:
-    branches: [devel, early-access]
+    branches: [devel, early-access, 'feature/*', 'feature/**/*', 'feat/*', 'feat/**/*']
   merge_group:
     branches: [devel, early-access]
   push:
@@ -1008,6 +1008,9 @@ jobs:
     if: always()
     steps:
       - name: Check required jobs passed
+        env:
+          # Konflux API tests run on feature-base PRs for signal; failures do not block merge.
+          FEATURE_BASE_PR: ${{ github.event_name == 'pull_request' && (startsWith(github.base_ref, 'feature/') || startsWith(github.base_ref, 'feat/')) }}
         run: |
           # If no backend changes, pass immediately
           if [[ "${{ needs.changes.outputs.backend }}" == "false" ]]; then
@@ -1047,6 +1050,12 @@ jobs:
               snyk-sca)              result="${{ needs.snyk-sca.result }}" ;;
             esac
             echo "$job: $result"
+            if [[ "$FEATURE_BASE_PR" == "true" && "$job" == "konflux-api-tests-gate" ]]; then
+              if [[ "$result" == "failure" ]]; then
+                echo "::warning::konflux-api-tests-gate failed on a feature-base PR (informational only)"
+              fi
+              continue
+            fi
             if [[ ! "$result" =~ ^($ok)$ ]]; then
               echo "::error::Required job '$job' has result '$result'"
               exit 1

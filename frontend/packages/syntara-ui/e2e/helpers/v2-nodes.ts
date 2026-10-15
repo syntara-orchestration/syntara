@@ -683,10 +683,23 @@ export async function openScheduleTriggerForEditing(page: Page, nodeName: string
   })
 }
 
-/** Wait until the Task Agent create/edit form and model control have hydrated. */
+/**
+ * Wait until the Task Agent create form model selector finished loading integrations/models.
+ * Create flow only — editing with a pre-selected model does not show the empty placeholder.
+ */
+export async function expectAiAgentModelSelectorReady(page: Page) {
+  const form = page.getByTestId('ai-agent-node-form')
+  await expect(form).toBeVisible({ timeout: 15_000 })
+  const modelToggle = form.getByRole('button', { name: 'Model', exact: true })
+  await expect(modelToggle).toBeEnabled({ timeout: 15_000 })
+  await expect(async () => {
+    await expect(form.getByPlaceholder('Select a model')).toBeVisible({ timeout: 5_000 })
+  }).toPass({ timeout: 60_000, intervals: [500, 1_000, 2_000] })
+}
+
+/** Wait until the Task Agent create form and model control have hydrated. */
 export async function expectAiAgentNodeFormReady(page: Page) {
-  await expect(page.getByTestId('ai-agent-node-form')).toBeVisible({ timeout: 15_000 })
-  await expect(page.getByRole('button', { name: 'Model', exact: true })).toBeEnabled({ timeout: 15_000 })
+  await expectAiAgentModelSelectorReady(page)
 }
 
 /** Open Task Agent from the add-node panel and wait for the form. */

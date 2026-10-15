@@ -35,10 +35,10 @@ describe('ApprovalsTableHead', () => {
 
     expect(await axe(container)).toHaveNoViolations()
     expect(getSortParams).toHaveBeenCalledWith('name')
+    expect(getSortParams).toHaveBeenCalledWith('workflow_name')
     expect(getSortParams).toHaveBeenCalledWith('created_at')
     expect(getSortParams).toHaveBeenCalledWith('decided_at')
     expect(getSortParams).toHaveBeenCalledWith('status')
-    expect(getSortParams).not.toHaveBeenCalledWith('workflowName')
   })
 
   it('renders the expand-all toggle when hasExpandableRows is true (default)', () => {

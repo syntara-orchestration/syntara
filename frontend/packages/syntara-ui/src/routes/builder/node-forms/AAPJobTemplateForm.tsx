@@ -51,7 +51,7 @@ function AAPFormFields({
   projectId?: string
 }>) {
   const isVersionView = useIsVersionView()
-  const { register, getValues, setValue } = useFormContext<AAPJobTemplateFormData>()
+  const { control, setValue, getValues } = useFormContext<AAPJobTemplateFormData>()
 
   const expressionMode = Boolean(useWatch({ name: 'use_input_variables' }))
 
@@ -66,8 +66,8 @@ function AAPFormFields({
   )
 
   const nameField = useMemo(
-    () => <ActivityNameField register={register} fieldId="aap-name" ariaLabel="Name" />,
-    [register]
+    () => <ActivityNameField control={control} fieldId="aap-name" ariaLabel="Name" />,
+    [control]
   )
 
   useEffect(() => {

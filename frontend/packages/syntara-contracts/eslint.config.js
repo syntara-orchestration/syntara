@@ -8,5 +8,6 @@ export default tseslint.config(
     ignores: ['src/*-api.ts', 'src/tool-manager.ts', 'src/node-output-schemas.ts'],
   },
   js.configs.recommended,
-  ...tseslint.configs.recommended
+  ...tseslint.configs.recommended,
+  { languageOptions: { parserOptions: { tsconfigRootDir: import.meta.dirname } } }
 )

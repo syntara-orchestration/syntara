@@ -6,6 +6,8 @@ import { useForm } from 'react-hook-form'
 import { describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
+import { SynForm } from '../../../../components/forms/SynForm'
+
 import { CredentialStep } from './CredentialStep'
 import type { IntegrationFormData } from './integrationFormSchema'
 
@@ -31,15 +33,20 @@ vi.mock('../../../builder/components/CredentialSelector', () => ({
   ),
 }))
 
-function TestWrapper(props: Omit<Parameters<typeof CredentialStep>[0], 'control' | 'setValue'>) {
-  const { control, setValue } = useForm<IntegrationFormData>({
+function TestWrapper(props: Omit<Parameters<typeof CredentialStep>[0], 'setValue'>) {
+  const form = useForm<IntegrationFormData>({
     defaultValues: {
       management_credential_id: null,
       integration_type: 'mcp_server',
       configuration: { integration_type: 'mcp_server', base_url: '' },
     },
   })
-  return <CredentialStep control={control} setValue={setValue} {...props} />
+  const { setValue } = form
+  return (
+    <SynForm form={form}>
+      <CredentialStep setValue={setValue} {...props} />
+    </SynForm>
+  )
 }
 
 describe('CredentialStep', () => {
@@ -244,15 +251,20 @@ describe('CredentialStep', () => {
   })
 
   describe('Dynamic credential types', () => {
-    function LLMTestWrapper(props: Omit<Parameters<typeof CredentialStep>[0], 'control' | 'setValue'>) {
-      const { control, setValue } = useForm<IntegrationFormData>({
+    function LLMTestWrapper(props: Omit<Parameters<typeof CredentialStep>[0], 'setValue'>) {
+      const form = useForm<IntegrationFormData>({
         defaultValues: {
           management_credential_id: null,
           integration_type: 'llm_provider',
           configuration: { integration_type: 'llm_provider', provider_hint: 'red_hat_ai', base_url: '' },
         },
       })
-      return <CredentialStep control={control} setValue={setValue} {...props} />
+      const { setValue } = form
+      return (
+        <SynForm form={form}>
+          <CredentialStep setValue={setValue} {...props} />
+        </SynForm>
+      )
     }
 
     it('passes LLM Provider credential types when integration type is llm_provider', () => {

@@ -11,9 +11,10 @@ import {
   StackItem,
 } from '@patternfly/react-core'
 import { useCallback, useState, type ReactElement, type Ref } from 'react'
-import { Controller, useFormContext } from 'react-hook-form'
+import { useFormContext } from 'react-hook-form'
 
 import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
+import { SynFormField } from '../../../components/forms/SynFormField'
 import { SynSelect } from '../../../components/SynSelect'
 import { useEffectiveContinueOnFailure } from '../hooks/useEffectiveContinueOnFailure'
 import { useIsVersionView } from '../VersionViewContext'
@@ -155,7 +156,7 @@ function FallbackDecisionSelect({ value, onChange, isDisabled, tooltip }: Fallba
  */
 export function FallbackDecisionField() {
   const isVersionView = useIsVersionView()
-  const { control, setValue } = useFormContext<ApprovalFormData>()
+  const { setValue } = useFormContext<ApprovalFormData>()
   const { isEffectivelyEnabled, source } = useEffectiveContinueOnFailure()
 
   const disabledMessage = getFallbackDecisionDisabledMessage(source)
@@ -171,18 +172,16 @@ export function FallbackDecisionField() {
     <FormGroup label="Fallback decision" labelHelp={nodeHelp.approvalFallback} fieldId="approval-fallback-decision">
       <Stack hasGutter>
         <StackItem>
-          <Controller
-            control={control}
-            name="fallback_decision"
-            render={({ field }) => (
+          <SynFormField name="fallback_decision" label="Fallback decision" hideFormGroupLabel hideFooter>
+            {({ field }) => (
               <FallbackDecisionSelect
-                value={field.value ?? 'reject'}
+                value={typeof field.value === 'string' ? field.value : 'reject'}
                 onChange={field.onChange}
                 isDisabled={isDisabled}
                 tooltip={disabledGuidance}
               />
             )}
-          />
+          </SynFormField>
         </StackItem>
         <StackItem>
           <HelperText isLiveRegion id={FALLBACK_HELPER_ID}>

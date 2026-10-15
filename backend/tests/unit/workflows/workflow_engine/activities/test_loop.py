@@ -20,7 +20,6 @@ class TestForEachIteration:
         config: dict[str, Any] = {"type": "for_each", "items": ["a", "b", "c"], "current_index": 0}
         result = await loop(config, None, {})
         assert result["control"]["next_port"] == "iterate"
-        assert result["control"]["current_item"] == "a"
         assert result["control"]["next_index"] == 1
 
     @pytest.mark.asyncio
@@ -28,7 +27,6 @@ class TestForEachIteration:
         config: dict[str, Any] = {"type": "for_each", "items": ["a", "b", "c"], "current_index": 1}
         result = await loop(config, None, {})
         assert result["control"]["next_port"] == "iterate"
-        assert result["control"]["current_item"] == "b"
         assert result["control"]["next_index"] == 2
 
     @pytest.mark.asyncio
@@ -47,7 +45,6 @@ class TestForEachCompletion:
         iteration_results: dict[str, list[Any]] = {"results": [1, 2]}
         result = await loop(config, None, iteration_results)
         assert result["control"]["next_port"] == "complete"
-        assert result["control"]["current_item"] is None
         assert result["control"]["next_index"] == 2
 
     @pytest.mark.asyncio
@@ -72,7 +69,6 @@ class TestForEachEmptyItems:
         config: dict[str, Any] = {"type": "for_each", "items": [], "current_index": 0}
         result = await loop(config, None, {})
         assert result["control"]["next_port"] == "complete"
-        assert result["control"]["current_item"] is None
 
 
 # ---------------------------------------------------------------------------
@@ -150,15 +146,15 @@ class TestLoopOutputMapping:
 
 
 class TestLoopControlData:
-    """Control data contains next_port and next_index."""
+    """Control data contains routing and iteration indexes, not loop items."""
 
     @pytest.mark.asyncio
-    async def test_for_each_control_has_items_and_current_item(self) -> None:
+    async def test_for_each_control_excludes_items_and_current_item(self) -> None:
         config: dict[str, Any] = {"type": "for_each", "items": ["x", "y"], "current_index": 0}
         result = await loop(config, None, {})
         ctrl = result["control"]
-        assert ctrl["items"] == ["x", "y"]
-        assert ctrl["current_item"] == "x"
+        assert "items" not in ctrl
+        assert "current_item" not in ctrl
         assert ctrl["current_index"] == 0
 
     @pytest.mark.asyncio
@@ -199,7 +195,6 @@ class TestLoopConfigDefaults:
         config: dict[str, Any] = {"items": ["a"], "current_index": 0}
         result = await loop(config, None, {})
         assert result["control"]["next_port"] == "iterate"
-        assert result["control"]["current_item"] == "a"
 
     @pytest.mark.asyncio
     async def test_missing_items_defaults_to_empty_list(self) -> None:
@@ -211,7 +206,6 @@ class TestLoopConfigDefaults:
     async def test_missing_current_index_defaults_to_zero(self) -> None:
         config: dict[str, Any] = {"type": "for_each", "items": ["x"]}
         result = await loop(config, None, {})
-        assert result["control"]["current_item"] == "x"
         assert result["control"]["next_index"] == 1
 
 
