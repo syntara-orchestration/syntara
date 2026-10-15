@@ -95,6 +95,10 @@ def _wf(retry_context: dict[str, Any] | None = None) -> OrchestratorWorkflow:
     wf._restored_node_timestamps = {}
     wf._restored_node_statuses = {}
     wf._restored_node_outputs = {}
+    # Persisted routing, read before classification. Empty means nothing was
+    # recorded, so every control node falls back to inference — the pre-existing
+    # behaviour for these tests.
+    wf._restored_control_ports = {}
     # Branch inference reads it; empty means no control node is inferable, which is
     # the pre-existing behaviour for these tests.
     wf._retry_source_statuses = {}

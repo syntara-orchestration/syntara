@@ -61,6 +61,7 @@ def _make_workflow(retry_context: dict[str, Any] | None = None) -> OrchestratorW
     wf._detached_nodes = set()
     wf._converge_branch_nodes = {}
     init_workflow_runtime(wf)
+    wf._restored_control_ports = {}
     wf.execution_id = "test-execution-id"
     wf._created_by_user_id = ""
     wf.request_id = None
@@ -385,6 +386,7 @@ async def test_restoring_a_condition_needs_no_manually_initialised_retry_state(
     wf._restored_node_timestamps = {}
     wf._restored_node_statuses = {}
     wf._restored_node_outputs = {}
+    wf._restored_control_ports = {}
     mock_wf.execute_activity.return_value = {"output_data": {"evaluated_result": True}, "status": "completed"}
 
     result = await wf._restored_control_result(_node(graph, "cond_1"), graph)
@@ -412,7 +414,7 @@ async def test_port_is_read_from_persisted_control_data(mock_wf: MagicMock) -> N
         "control_data": {"next_port": "true"},
     }
     inference = MagicMock(return_value=None)
-    wf._infer_control_node_branch = inference  # type: ignore[method-assign]
+    wf._infer_control_node_branch = inference  # type: ignore[method-assign]  # type: ignore[method-assign]
 
     result = await wf._restored_control_result(node, graph)
 
@@ -456,7 +458,7 @@ async def test_falls_back_to_inference_when_control_data_is_absent(mock_wf: Magi
     }
     mock_wf.execute_activity.return_value = {"output_data": {}, "status": "completed"}
     inference = MagicMock(return_value="true")
-    wf._infer_control_node_branch = inference  # type: ignore[method-assign]
+    wf._infer_control_node_branch = inference  # type: ignore[method-assign]  # type: ignore[method-assign]
 
     result = await wf._restored_control_result(node, graph)
 
@@ -481,7 +483,7 @@ async def test_falls_back_when_control_data_has_no_next_port(mock_wf: MagicMock)
         "control_data": {"something_else": 1},
     }
     inference = MagicMock(return_value="false")
-    wf._infer_control_node_branch = inference  # type: ignore[method-assign]
+    wf._infer_control_node_branch = inference  # type: ignore[method-assign]  # type: ignore[method-assign]
 
     result = await wf._restored_control_result(node, graph)
 
@@ -507,3 +509,58 @@ async def test_null_control_data_is_treated_as_absent(mock_wf: MagicMock) -> Non
 
     assert result is not None
     assert result["control"] == {"next_port": "true"}
+
+
+# --- the prefetched ports, which is what classification actually reads -------
+
+
+@pytest.mark.asyncio
+async def test_prefetched_port_makes_a_node_restorable_without_inference(mock_wf: MagicMock) -> None:
+    """Restorable classification must honour the persisted port on its own.
+
+    Classification runs before any node can dispatch an activity, so it can only
+    consult what ``_prepare_retry`` prefetched. If it fell back to inference here
+    an ambiguous-but-recorded node would be rejected before its branch was read.
+    """
+    wf = _make_workflow()
+    graph = _condition_graph()
+    # Ambiguous on purpose: inference would decline, so only the prefetch can pass.
+    wf._retry_source_statuses = {ActivityStatus.SKIPPED.value: ActivityStatus.SKIPPED.value}
+    wf._restored_control_ports = {"cond_1": "true"}
+
+    assert "cond_1" in wf._retry_restorable_nodes(graph)
+    assert wf._should_restore_node("cond_1", graph) is True
+    mock_wf.execute_activity.assert_not_awaited(), "classification must not dispatch to learn a port"
+
+
+@pytest.mark.asyncio
+async def test_prefetched_port_wins_over_a_contradicting_inference(mock_wf: MagicMock) -> None:
+    """A recorded port outranks anything inference would conclude."""
+    wf = _make_workflow()
+    graph = _condition_graph()
+    wf._retry_source_statuses = {
+        "step_true": ActivityStatus.COMPLETED.value,
+        "step_false": ActivityStatus.COMPLETED.value,
+    }
+    wf._restored_control_ports = {"cond_1": "false"}
+    inference = MagicMock(return_value="true")
+    wf._infer_control_node_branch = inference  # type: ignore[method-assign]
+
+    assert wf._resolved_control_port(_node(graph, "cond_1"), graph) == "false"
+    inference.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_no_prefetched_port_still_falls_back_to_inference(mock_wf: MagicMock) -> None:
+    """Runs predating the column keep the inference path."""
+    wf = _make_workflow()
+    graph = _condition_graph()
+    wf._retry_source_statuses = {
+        "step_true": ActivityStatus.COMPLETED.value,
+        "step_false": ActivityStatus.SKIPPED.value,
+    }
+    inference = MagicMock(return_value="true")
+    wf._infer_control_node_branch = inference  # type: ignore[method-assign]
+
+    assert wf._resolved_control_port(_node(graph, "cond_1"), graph) == "true"
+    inference.assert_called_once()

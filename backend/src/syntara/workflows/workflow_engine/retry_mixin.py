@@ -75,6 +75,10 @@ class WorkflowRetryMixin:
     #: completion path so a restored skip or failure is not republished as a success
     #: and does not have its successors scheduled.
     _restored_node_statuses: dict[str, str]
+    #: The routing decision each restorable control node's source run recorded,
+    #: keyed by node id. Read once during ``_prepare_retry`` so the synchronous
+    #: classification paths can honour it without awaiting anything.
+    _restored_control_ports: dict[str, str]
     #: The output a restored node produced before it failed in the source run,
     #: keyed by node id. Republished by the failure path, so a successor reading it
     #: sees what the source run produced rather than an empty output model.
@@ -132,6 +136,7 @@ class WorkflowRetryMixin:
         self._restored_node_timestamps: dict[str, dict[str, str | None]] = {}
         self._restored_node_statuses: dict[str, str] = {}
         self._restored_node_outputs: dict[str, dict[str, Any]] = {}
+        self._restored_control_ports: dict[str, str] = {}
         self._retry_source_statuses: dict[str, str] = {}
 
     def _create_loop_state_for_type(self, loop_type: str, node: ActivityNode) -> LoopState: ...  # type: ignore[empty-body]
@@ -144,6 +149,16 @@ class WorkflowRetryMixin:
             ActivityName.RETRY_SOURCE_STATE,
             args=[self.retry_context["retry_from_execution_id"]],
             activity_id="__internal__fetch_retry_source_state",
+            start_to_close_timeout=timedelta(seconds=DEFAULT_ACTIVITY_TIMEOUT_SECONDS),
+        )
+        # Persisted routing, read before anything classifies. Restorable-node
+        # selection and _should_restore_node are both synchronous, so the branch a
+        # source run recorded has to be known already — otherwise both would fall
+        # back to inference and reject a node whose branch is sitting in the row.
+        self._restored_control_ports = await workflow.execute_activity(
+            ActivityName.RETRY_CONTROL_PORTS,
+            args=[self.retry_context["retry_from_execution_id"]],
+            activity_id="__internal__fetch_retry_control_ports",
             start_to_close_timeout=timedelta(seconds=DEFAULT_ACTIVITY_TIMEOUT_SECONDS),
         )
         self._classify_unselected_branches(graph)
@@ -233,13 +248,32 @@ class WorkflowRetryMixin:
         # branch is inferable: the retry can hand them the branch the source run
         # took, so they need not re-decide against a half-rebuilt namespace. LOOP,
         # WAIT and CONVERGE stay excluded unconditionally.
-        control = control - {node.id for node in graph.get_all_nodes() if self._infer_control_node_branch(node, graph)}
+        control = control - {node.id for node in graph.get_all_nodes() if self._resolved_control_port(node, graph)}
 
         restorable = (
             {node.id for node in graph.get_all_nodes()} - must_run - triggers - control - loop_bodies - downstream
         )
         self._retry_restorable_cache = restorable
         return restorable
+
+    def _resolved_control_port(self, node: ActivityNode, graph: WorkflowGraph) -> str | None:
+        """Resolve the port this control node is routed by, or None to rerun.
+
+        Resolved once per node, in the order the branch is actually known:
+
+        1. what the source run persisted in ``control_data``,
+        2. failing that, the branch inferred from the source run's statuses,
+        3. failing that, rerun the node for real.
+
+        The persisted value has to win in the synchronous paths too — restorable
+        classification and ``_should_restore_node`` both run before any node can
+        dispatch an activity, so an unconsulted record would be rejected before the
+        branch was ever read.
+        """
+        recorded = self._restored_control_ports.get(node.id)
+        if recorded:
+            return str(recorded)
+        return self._infer_control_node_branch(node, graph)
 
     def _infer_control_node_branch(self, node: ActivityNode, graph: WorkflowGraph) -> str | None:
         """Which output port a control node took in the source run, or None.
@@ -384,7 +418,7 @@ class WorkflowRetryMixin:
         if node is not None and node.type in _CONTROL_NODE_TYPES_FOR_RETRY:
             # A condition or switch may still be restored when the branch the
             # source run took is recoverable — see _infer_control_node_branch.
-            if node.type in _INFERABLE_CONTROL_NODE_TYPES and self._infer_control_node_branch(node, graph):
+            if node.type in _INFERABLE_CONTROL_NODE_TYPES and self._resolved_control_port(node, graph):
                 return strip_iteration_suffix(node_id) in self._retry_restorable_nodes(graph)
             return False
         return strip_iteration_suffix(node_id) in self._retry_restorable_nodes(graph)
@@ -417,7 +451,7 @@ class WorkflowRetryMixin:
         stored_control = (record or {}).get("control_data") or {}
         recorded_port = stored_control.get("next_port") if isinstance(stored_control, dict) else None
 
-        port = str(recorded_port) if recorded_port else self._infer_control_node_branch(node, graph)
+        port = str(recorded_port) if recorded_port else self._resolved_control_port(node, graph)
         if port is None:
             return None
 

@@ -31,6 +31,7 @@ def init_workflow_runtime(wf: OrchestratorWorkflow) -> None:
     wf._restored_node_timestamps = {}
     wf._restored_node_statuses = {}
     wf._restored_node_outputs = {}
+    wf._restored_control_ports = {}
     wf._retry_source_statuses = {}
     # Set in __init__ for a real run. Guarded because some tests build the workflow
     # by hand, and a converge reads it to tell whether a loop predecessor is still
