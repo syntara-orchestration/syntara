@@ -1,4 +1,3 @@
-import { zodResolver } from '@hookform/resolvers/zod'
 import {
   ActionGroup,
   Button,
@@ -8,25 +7,23 @@ import {
   Divider,
   Form,
   FormGroup,
-  FormHelperText,
-  HelperText,
-  HelperTextItem,
-  TextArea,
-  TextInput,
   Title,
 } from '@patternfly/react-core'
-import { RhUiErrorIcon } from '@patternfly/react-icons'
 import type { IntegrationsAPI } from '@syntara/contracts'
 import { IntegrationTypeEnum } from '@syntara/contracts'
 import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useParams } from '@tanstack/react-router'
 import { useEffect, useMemo, useRef } from 'react'
-import { Controller, useForm, useWatch, type Resolver } from 'react-hook-form'
+import { useFormContext, useFormState, useWatch, type UseFormSetValue } from 'react-hook-form'
 
 import { AppRoute } from '../../../app/AppRoute'
 import { breadcrumbsIntegrationEdit } from '../../../app/breadcrumbBuilders'
 import { integrationsClient } from '../../../client'
 import { SynDetail } from '../../../components/details/SynDetail'
+import { SynForm } from '../../../components/forms/SynForm'
+import { SynFormField } from '../../../components/forms/SynFormField'
+import { SynTextAreaField } from '../../../components/forms/SynTextAreaField'
+import { SynTextField } from '../../../components/forms/SynTextField'
 import { SynPage, SynPageBody } from '../../../components/layout/SynPage'
 import { SynPageHeader } from '../../../components/layout/SynPageHeader'
 import { SynPanel } from '../../../components/layout/SynPanel'
@@ -34,7 +31,7 @@ import { SynErrorState } from '../../../components/states/SynErrorState'
 import { useQueryState } from '../../../components/states/useQueryState'
 import { SynPageTitle } from '../../../components/SynPageTitle'
 import { useDirtyFormGuard } from '../../../hooks/useDirtyFormGuard'
-import { useFormMutationErrorHandler } from '../../../hooks/useFormMutationErrorHandler'
+import { useSynForm } from '../../../hooks/useSynForm'
 import { useAlerts } from '../../../providers/alerts'
 import { detachPromise } from '../../../utils/detachPromise'
 import { useDocLink } from '../../../utils/docs/useDocLink'
@@ -43,6 +40,8 @@ import { CredentialSelector } from '../../builder/components/CredentialSelector'
 import styles from './EditIntegrationForm.module.css'
 import type { EditIntegrationFormValues, IntegrationRead } from './editIntegrationFormSchema'
 import { buildConfiguration, buildEditSchema, editIntegrationSchema } from './editIntegrationFormSchema'
+import { EditKafkaFields } from './editKafkaFields'
+import { editFormRequiresBaseUrl, shouldHideBaseUrl, usesServiceName } from './editKafkaForm'
 import { EditSecurityFields } from './EditSecurityFields'
 import { ScopeFields } from './form/ScopeFields'
 import { integrationHelp } from './integrationFieldHelp'
@@ -51,10 +50,10 @@ import {
   CREDENTIAL_TYPES_BY_INTEGRATION,
   INTEGRATION_TYPE_LABELS,
   PROVIDER_HINT_LABELS,
-  PROVIDERS_HIDING_BASE_URL,
-  PROVIDERS_REQUIRING_BASE_URL,
 } from './integrationFilters'
 import { getProviderHint, isLLMProvider } from './integrationUtils'
+import { formatBootstrapServers } from './kafkaBootstrapServers'
+import { DEFAULT_KAFKA_SASL_MECHANISM } from './kafkaSasl'
 import { useEditTestConnection } from './useEditTestConnection'
 import { useProjectAssignmentSync } from './useProjectAssignmentSync'
 
@@ -65,23 +64,21 @@ const CREDENTIAL_DESCRIPTION: Record<string, string> = {
     'This credential is used to verify the connection to this integration and perform periodic health checks. Workflow credentials are configured separately in the workflow builder.',
   [IntegrationTypeEnum.ANSIBLE_AUTOMATION_PLATFORM]:
     'This credential is used to verify the connection to the Ansible Automation Platform. Workflow credentials are configured separately in the workflow builder.',
+  [IntegrationTypeEnum.KAFKA]:
+    'This credential is the Kafka-connection login used to verify that the brokers are reachable. Workflow credentials are configured separately in the workflow builder.',
 }
 
 type FormFieldsProps = Readonly<{
   integration: IntegrationRead
-  control: ReturnType<typeof useForm<EditIntegrationFormValues>>['control']
-  errors: ReturnType<typeof useForm<EditIntegrationFormValues>>['formState']['errors']
   scope: string
   credentialId: string | null | undefined
   isTesting: boolean
-  setValue: ReturnType<typeof useForm<EditIntegrationFormValues>>['setValue']
+  setValue: UseFormSetValue<EditIntegrationFormValues>
   onTestConnection: () => void
 }>
 
 function EditIntegrationFormFields({
   integration,
-  control,
-  errors,
   scope,
   credentialId,
   isTesting,
@@ -91,8 +88,12 @@ function EditIntegrationFormFields({
   const isCredentialRequired = CREDENTIAL_REQUIRED_TYPES.has(integration.integration_type ?? '')
   const isTestDisabled = (isCredentialRequired && !credentialId) || isTesting
   const isAnsibleAutomationPlatform = integration.integration_type === IntegrationTypeEnum.ANSIBLE_AUTOMATION_PLATFORM
+  const isKafka = integration.integration_type === IntegrationTypeEnum.KAFKA
   const isLLM = isLLMProvider(integration)
-  const hideBaseUrl = isLLM && PROVIDERS_HIDING_BASE_URL.has(getProviderHint(integration))
+  const hideBaseUrl = shouldHideBaseUrl(integration)
+  const nameUsesServiceLabel = usesServiceName(isLLM, integration.integration_type)
+  const { control } = useFormContext<EditIntegrationFormValues>()
+  const { errors } = useFormState({ control })
 
   const credentialDescription =
     CREDENTIAL_DESCRIPTION[integration.integration_type ?? ''] ?? CREDENTIAL_DESCRIPTION[IntegrationTypeEnum.MCP_SERVER]
@@ -114,83 +115,35 @@ function EditIntegrationFormFields({
         )}
       </DescriptionList>
 
-      <FormGroup
-        label={isLLM ? 'Name' : 'Server name / ID'}
-        isRequired
+      <SynTextField<EditIntegrationFormValues, 'name'>
+        name="name"
+        label={nameUsesServiceLabel ? 'Name' : 'Server name / ID'}
         fieldId="edit-name"
-        labelHelp={isLLM ? integrationHelp.name : integrationHelp.serverName}
-      >
-        <Controller
-          name="name"
-          control={control}
-          render={({ field }) => (
-            <TextInput id="edit-name" isRequired validated={errors.name ? 'error' : 'default'} {...field} />
-          )}
-        />
-        {errors.name && (
-          <FormHelperText>
-            <HelperText>
-              <HelperTextItem icon={<RhUiErrorIcon />} variant="error">
-                {errors.name.message}
-              </HelperTextItem>
-            </HelperText>
-          </FormHelperText>
-        )}
-      </FormGroup>
+        isRequired
+        labelHelp={nameUsesServiceLabel ? integrationHelp.name : integrationHelp.serverName}
+      />
 
-      <FormGroup label="Description" fieldId="edit-description">
-        <Controller
-          name="description"
-          control={control}
-          render={({ field }) => (
-            <TextArea
-              id="edit-description"
-              aria-label="Description"
-              resizeOrientation="vertical"
-              value={field.value ?? ''}
-              onChange={(_event, value) => field.onChange(value)}
-              onBlur={field.onBlur}
-              name={field.name}
-            />
-          )}
-        />
-      </FormGroup>
+      <SynTextAreaField<EditIntegrationFormValues, 'description'>
+        name="description"
+        label="Description"
+        fieldId="edit-description"
+        resizeOrientation="vertical"
+      />
 
       {!hideBaseUrl && (
-        <FormGroup
+        <SynTextField<EditIntegrationFormValues, 'base_url'>
+          name="base_url"
           label="API URL"
-          isRequired={!isLLM}
           fieldId="edit-base-url"
+          isRequired={!isLLM}
           labelHelp={isAnsibleAutomationPlatform ? integrationHelp.aapUrl : integrationHelp.apiUrl}
-        >
-          <Controller
-            name="base_url"
-            control={control}
-            render={({ field }) => (
-              <TextInput
-                id="edit-base-url"
-                isRequired={!isLLM}
-                validated={errors.base_url ? 'error' : 'default'}
-                {...field}
-              />
-            )}
-          />
-          {errors.base_url && (
-            <FormHelperText>
-              <HelperText>
-                <HelperTextItem icon={<RhUiErrorIcon />} variant="error">
-                  {errors.base_url.message}
-                </HelperTextItem>
-              </HelperText>
-            </FormHelperText>
-          )}
-        </FormGroup>
+        />
       )}
+      {isKafka && <EditKafkaFields control={control} errorMessage={errors.bootstrap_servers?.message} />}
 
-      <EditSecurityFields control={control} errors={errors} />
+      <EditSecurityFields />
 
-      <ScopeFields
-        control={control}
+      <ScopeFields<EditIntegrationFormValues>
         scope={scope}
         scopeName="scope"
         projectIdsName="project_ids"
@@ -211,10 +164,16 @@ function EditIntegrationFormFields({
         </Content>
       </div>
 
-      <Controller
+      <SynFormField<EditIntegrationFormValues, 'management_credential_id'>
         name="management_credential_id"
-        control={control}
-        render={({ field }) => (
+        label="Health check credential"
+        fieldId="edit-credential-select"
+        isRequired={isCredentialRequired}
+        labelHelp={integrationHelp.healthCheckCredential}
+        hideFormGroupLabel
+        hideFooter
+      >
+        {({ field }) => (
           <CredentialSelector
             value={field.value ?? undefined}
             onChange={(id) => setValue('management_credential_id', id ?? null)}
@@ -229,7 +188,7 @@ function EditIntegrationFormFields({
             labelHelp={integrationHelp.healthCheckCredential}
           />
         )}
-      />
+      </SynFormField>
 
       <FormGroup fieldId="test-connection">
         <Button
@@ -295,10 +254,7 @@ export function EditIntegrationForm() {
 
   const schema = useMemo(() => {
     if (!integration) return editIntegrationSchema
-    const requiresBaseUrl = isLLMProvider(integration)
-      ? PROVIDERS_REQUIRING_BASE_URL.has(getProviderHint(integration))
-      : true
-    return buildEditSchema(requiresBaseUrl)
+    return buildEditSchema(editFormRequiresBaseUrl(integration))
   }, [integration])
 
   useEffect(() => {
@@ -315,6 +271,12 @@ export function EditIntegrationForm() {
       description: integration.description ?? '',
       integration_type: integration.integration_type ?? IntegrationTypeEnum.MCP_SERVER,
       base_url: 'base_url' in config ? String(config.base_url ?? '') : '',
+      bootstrap_servers:
+        'bootstrap_servers' in config && Array.isArray(config.bootstrap_servers)
+          ? formatBootstrapServers(config.bootstrap_servers)
+          : '',
+      sasl_mechanism:
+        'sasl_mechanism' in config && config.sasl_mechanism ? config.sasl_mechanism : DEFAULT_KAFKA_SASL_MECHANISM,
       allow_http: 'allow_http' in config ? Boolean(config.allow_http) : false,
       insecure_skip_tls_verify: 'insecure_skip_tls_verify' in config ? Boolean(config.insecure_skip_tls_verify) : false,
       ca_certificate: 'ca_certificate' in config ? (config.ca_certificate ?? null) : null,
@@ -324,22 +286,15 @@ export function EditIntegrationForm() {
     }
   }, [integration, initialProjectIds])
 
-  // zodResolver + superRefine → ZodEffects type divergence; known @hookform/resolvers limitation.
-  const {
-    control,
-    handleSubmit,
-    setError,
-    setValue,
-    getValues,
-    reset,
-    formState: { errors, isDirty },
-  } = useForm<EditIntegrationFormValues>({
-    resolver: zodResolver(schema, undefined, { mode: 'sync' }) as Resolver<EditIntegrationFormValues>,
+  const form = useSynForm({
+    schema,
     defaultValues: {
       name: '',
       description: '',
       integration_type: '',
       base_url: '',
+      bootstrap_servers: '',
+      sasl_mechanism: DEFAULT_KAFKA_SASL_MECHANISM,
       allow_http: false,
       insecure_skip_tls_verify: false,
       ca_certificate: null,
@@ -350,6 +305,15 @@ export function EditIntegrationForm() {
     values: formValues,
     resetOptions: { keepDirtyValues: true },
   })
+  const {
+    control,
+    handleSubmit,
+    handleError,
+    setValue,
+    getValues,
+    reset,
+    formState: { isDirty },
+  } = form
 
   const scope = useWatch({ control, name: 'scope' })
   const credentialId = useWatch({ control, name: 'management_credential_id' })
@@ -360,8 +324,6 @@ export function EditIntegrationForm() {
     title: 'Discard unsaved changes?',
     body: 'You have unsaved changes to this integration. Your changes will be lost if you leave.',
   })
-
-  const handleError = useFormMutationErrorHandler<EditIntegrationFormValues>(setError)
 
   const { mutateAsync: patchIntegration, isPending: isSaving } = integrationsClient.useMutation(
     'patch',
@@ -460,16 +422,16 @@ export function EditIntegrationForm() {
               detachPromise(handleSubmit(onSubmit)())
             }}
           >
-            <EditIntegrationFormFields
-              integration={integration}
-              control={control}
-              errors={errors}
-              scope={scope}
-              credentialId={credentialId}
-              isTesting={isTesting}
-              setValue={setValue}
-              onTestConnection={handleTestConnection}
-            />
+            <SynForm form={form}>
+              <EditIntegrationFormFields
+                integration={integration}
+                scope={scope}
+                credentialId={credentialId}
+                isTesting={isTesting}
+                setValue={setValue}
+                onTestConnection={handleTestConnection}
+              />
+            </SynForm>
           </Form>
         </SynPanel>
       </SynPageBody>

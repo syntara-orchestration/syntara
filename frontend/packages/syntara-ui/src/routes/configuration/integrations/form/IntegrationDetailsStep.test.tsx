@@ -6,6 +6,8 @@ import { useForm } from 'react-hook-form'
 import { describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
+import { SynForm } from '../../../../components/forms/SynForm'
+
 import { IntegrationDetailsStep } from './IntegrationDetailsStep'
 import type { IntegrationFormData } from './integrationFormSchema'
 
@@ -58,7 +60,8 @@ function TestWrapper({
           project_ids: [],
         }
 
-  const { control, setValue } = useForm<IntegrationFormData>({ defaultValues })
+  const form = useForm<IntegrationFormData>({ defaultValues })
+  const { setValue } = form
 
   const onTypeChange = useCallback(
     (newType: string) => {
@@ -94,7 +97,11 @@ function TestWrapper({
     [setValue, onTypeChangeProp]
   )
 
-  return <IntegrationDetailsStep control={control} setValue={setValue} onTypeChange={onTypeChange} />
+  return (
+    <SynForm form={form}>
+      <IntegrationDetailsStep setValue={setValue} onTypeChange={onTypeChange} />
+    </SynForm>
+  )
 }
 
 describe('IntegrationDetailsStep', () => {
@@ -194,7 +201,7 @@ describe('IntegrationDetailsStep', () => {
 
   describe('LLM Provider type', () => {
     function LLMTestWrapper() {
-      const { control, setValue } = useForm<IntegrationFormData>({
+      const form = useForm<IntegrationFormData>({
         defaultValues: {
           name: '',
           description: '',
@@ -209,7 +216,12 @@ describe('IntegrationDetailsStep', () => {
           scope: 'global',
         },
       })
-      return <IntegrationDetailsStep control={control} setValue={setValue} onTypeChange={vi.fn()} />
+      const { setValue } = form
+      return (
+        <SynForm form={form}>
+          <IntegrationDetailsStep setValue={setValue} onTypeChange={vi.fn()} />
+        </SynForm>
+      )
     }
 
     it('shows provider hint dropdown when LLM Provider is selected', () => {

@@ -18,6 +18,7 @@ from syntara.integrations.models.integration import (
 )
 from syntara.integrations.models.integration_configuration import (
     AAPConfiguration,
+    KafkaConfiguration,
     LLMProviderConfiguration,
     MCPServerConfiguration,
 )
@@ -435,6 +436,28 @@ class TestIntegrationCreateDiscoveredModels:
         assert data.discovered_models == []
 
 
+class TestKafkaConfiguration:
+    """Kafka broker address validation."""
+
+    def test_normalizes_host_port(self) -> None:
+        config = KafkaConfiguration(bootstrap_servers=[" broker.example.com:9093 ", "other.example.com:9092"])
+        assert config.bootstrap_servers == ["broker.example.com:9093", "other.example.com:9092"]
+        assert config.integration_type == "kafka"
+        assert config.sasl_mechanism == "SCRAM-SHA-256"
+
+    def test_accepts_plain_mechanism(self) -> None:
+        config = KafkaConfiguration(bootstrap_servers=["broker.example.com:9093"], sasl_mechanism="PLAIN")
+        assert config.sasl_mechanism == "PLAIN"
+
+    def test_rejects_missing_port(self) -> None:
+        with pytest.raises(ValidationError, match="host:port"):
+            KafkaConfiguration(bootstrap_servers=["broker.example.com"])
+
+    def test_rejects_empty_list(self) -> None:
+        with pytest.raises(ValidationError):
+            KafkaConfiguration(bootstrap_servers=[])
+
+
 class TestIntegrationEnums:
     """Tests for integration enum values."""
 
@@ -442,6 +465,7 @@ class TestIntegrationEnums:
         assert IntegrationType.MCP_SERVER.value == "mcp_server"
         assert IntegrationType.LLM_PROVIDER.value == "llm_provider"
         assert IntegrationType.ANSIBLE_AUTOMATION_PLATFORM.value == "ansible_automation_platform"
+        assert IntegrationType.KAFKA.value == "kafka"
 
     def test_integration_status_values(self) -> None:
         assert IntegrationStatus.UNKNOWN.value == "unknown"

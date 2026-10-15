@@ -441,29 +441,52 @@ describe('builderReducer', () => {
   })
 
   describe('CLEAR_SELECTED_IF_DELETED action', () => {
-    it('clears selectedNode if its ID is in deleted list', () => {
+    it('clears selectedNode and closes the step editor if its ID is in deleted list', () => {
       const stateWithNode: BuilderState = {
         ...initialState,
         selectedNode: { id: 'node-to-delete' } as Node<NodeType['data']>,
+        nodeEditorMode: 'edit',
+        nodeEditorNodeTypeId: 'script',
+        nodeEditorNodeSubtypeId: 'shell',
       }
 
       const action: BuilderAction = { type: 'CLEAR_SELECTED_IF_DELETED', payload: ['node-to-delete', 'other-node'] }
       const result = builderReducer(stateWithNode, action)
 
       expect(result.selectedNode).toBeNull()
+      expect(result.nodeEditorMode).toBeNull()
+      expect(result.nodeEditorNodeTypeId).toBeNull()
+      expect(result.nodeEditorNodeSubtypeId).toBeNull()
     })
 
-    it('keeps selectedNode if its ID is not in deleted list', () => {
+    it('keeps the open editor when a different step is deleted', () => {
       const node = { id: 'node-to-keep' } as Node<NodeType['data']>
       const stateWithNode: BuilderState = {
         ...initialState,
         selectedNode: node,
+        nodeEditorMode: 'edit',
+        nodeEditorNodeTypeId: 'script',
       }
 
       const action: BuilderAction = { type: 'CLEAR_SELECTED_IF_DELETED', payload: ['node-1', 'node-2'] }
       const result = builderReducer(stateWithNode, action)
 
       expect(result.selectedNode).toBe(node)
+      expect(result.nodeEditorMode).toBe('edit')
+      expect(result.nodeEditorNodeTypeId).toBe('script')
+    })
+
+    it('leaves create mode alone when no step is selected', () => {
+      const addState: BuilderState = {
+        ...initialState,
+        nodeEditorMode: 'add',
+        nodeEditorNodeTypeId: 'script',
+        nodeEditorNodeSubtypeId: 'shell',
+      }
+      const action: BuilderAction = { type: 'CLEAR_SELECTED_IF_DELETED', payload: ['node-1'] }
+      const result = builderReducer(addState, action)
+
+      expect(result).toBe(addState)
     })
 
     it('returns state unchanged if no node is selected', () => {

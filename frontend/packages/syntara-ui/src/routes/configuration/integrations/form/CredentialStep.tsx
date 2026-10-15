@@ -1,7 +1,8 @@
 import { Button, Content, ContentVariants, Form, FormGroup, Title } from '@patternfly/react-core'
 import { IntegrationTypeEnum } from '@syntara/contracts'
-import { Controller, type Control, type UseFormSetValue } from 'react-hook-form'
+import type { UseFormSetValue } from 'react-hook-form'
 
+import { SynFormField } from '../../../../components/forms/SynFormField'
 import { CredentialSelector } from '../../../builder/components/CredentialSelector'
 import { integrationHelp } from '../integrationFieldHelp'
 import { CREDENTIAL_REQUIRED_TYPES, CREDENTIAL_TYPES_BY_INTEGRATION } from '../integrationFilters'
@@ -16,10 +17,11 @@ const STEP_DESCRIPTION: Record<string, string> = {
     'This credential is used to verify that the LLM provider is reachable and the API key is valid. Workflow credentials are configured separately in the workflow builder.',
   [IntegrationTypeEnum.ANSIBLE_AUTOMATION_PLATFORM]:
     'This credential is used to verify that the Ansible Automation Platform is reachable and the token is valid. Workflow credentials are configured separately in the workflow builder.',
+  [IntegrationTypeEnum.KAFKA]:
+    'This credential is the Kafka-connection login used to verify that the brokers are reachable. Workflow credentials are configured separately in the workflow builder.',
 }
 
 type CredentialStepProps = Readonly<{
-  control: Control<IntegrationFormData>
   setValue: UseFormSetValue<IntegrationFormData>
   credentialId: string | null | undefined
   integrationTypeValue: string
@@ -29,7 +31,6 @@ type CredentialStepProps = Readonly<{
 }>
 
 export function CredentialStep({
-  control,
   setValue,
   credentialId,
   integrationTypeValue,
@@ -49,10 +50,16 @@ export function CredentialStep({
         {STEP_DESCRIPTION[integrationTypeValue] ?? STEP_DESCRIPTION[IntegrationTypeEnum.MCP_SERVER]}
       </Content>
       <Form className={styles.stepForm}>
-        <Controller
+        <SynFormField<IntegrationFormData, 'management_credential_id'>
           name="management_credential_id"
-          control={control}
-          render={({ field }) => (
+          label="Health check credential"
+          fieldId="credential-select"
+          isRequired={isRequired}
+          labelHelp={integrationHelp.healthCheckCredential}
+          hideFormGroupLabel
+          hideFooter
+        >
+          {({ field }) => (
             <CredentialSelector
               value={field.value ?? undefined}
               onChange={(id) => {
@@ -68,7 +75,7 @@ export function CredentialStep({
               labelHelp={integrationHelp.healthCheckCredential}
             />
           )}
-        />
+        </SynFormField>
         <FormGroup fieldId="test-connection">
           <Button
             variant="secondary"

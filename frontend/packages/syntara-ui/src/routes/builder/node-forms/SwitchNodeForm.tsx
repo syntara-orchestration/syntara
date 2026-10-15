@@ -37,17 +37,18 @@ import {
 import type { ReactNode } from 'react'
 import { useCallback, use, useEffect, useMemo, useRef, useState } from 'react'
 import type { Control } from 'react-hook-form'
-import { Controller, FormProvider, useFieldArray, useForm, useFormContext } from 'react-hook-form'
+import { Controller, useFieldArray, useFormContext } from 'react-hook-form'
 
 import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
 import { ExpressionBuilderCore as ExpressionBuilder } from '../../../components/expressions/ExpressionBuilderCore'
+import { SynForm } from '../../../components/forms/SynForm'
+import { useSynForm } from '../../../hooks/useSynForm'
 import type { Expression } from '../../../utils/expressions/types'
 import { generateUUID } from '../../../utils/generateUUID'
 import { NodeEditorAutoSubmitContext, useRegisterAutoSubmit } from '../hooks/useNodeEditorAutoSubmit'
 import { useIsVersionView } from '../VersionViewContext'
 
 import { ActivityNameField } from './shared/ActivityNameField'
-import { zodResolver } from './shared/formSchemaUtils'
 import { nodeHelp } from './shared/nodeFieldHelp'
 import { SWITCH_FALLBACK_HELP } from './shared/nodeFieldHelpText'
 import { NodeFormContainer } from './shared/NodeFormContainer'
@@ -288,7 +289,7 @@ function SwitchCaseItem({
 
 function SwitchFormFields({ onHeaderContentChange }: { onHeaderContentChange?: (content: ReactNode | null) => void }) {
   const isVersionView = useIsVersionView()
-  const { register, control } = useFormContext<SwitchFormData>()
+  const { control } = useFormContext<SwitchFormData>()
 
   const { fields, append, remove, move } = useFieldArray({ control, name: 'cases' })
   const [expandedPaths, setExpandedPaths] = useState<Record<string, boolean>>({})
@@ -318,8 +319,8 @@ function SwitchFormFields({ onHeaderContentChange }: { onHeaderContentChange?: (
   const activeIndex = useMemo(() => (activeId ? fields.findIndex((f) => f.id === activeId) : -1), [activeId, fields])
 
   const nameField = useMemo(
-    () => <ActivityNameField register={register} fieldId="switch-name" ariaLabel="Name" />,
-    [register]
+    () => <ActivityNameField control={control} fieldId="switch-name" ariaLabel="Name" />,
+    [control]
   )
 
   useEffect(() => {
@@ -345,7 +346,7 @@ function SwitchFormFields({ onHeaderContentChange }: { onHeaderContentChange?: (
     <Stack hasGutter>
       {!onHeaderContentChange && (
         <StackItem>
-          <ActivityNameField register={register} fieldId="switch-name" />
+          <ActivityNameField fieldId="switch-name" />
         </StackItem>
       )}
 
@@ -457,24 +458,24 @@ export function SwitchNodeForm(props: SwitchNodeFormProps) {
     cases: defaultCases,
   }
 
-  const methods = useForm<SwitchFormData>({
-    resolver: zodResolver(switchFormSchema, undefined, { mode: 'sync' }),
+  const form = useSynForm({
+    schema: switchFormSchema,
     defaultValues,
   })
 
   const autoSubmitRef = use(NodeEditorAutoSubmitContext)
-  useRegisterAutoSubmit(autoSubmitRef, methods, props.onSubmit)
+  useRegisterAutoSubmit(autoSubmitRef, form, props.onSubmit)
 
   useEffect(() => {
-    methods.reset(defaultValues)
+    form.reset(defaultValues)
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reset when initialData identity changes
   }, [props.initialData])
 
   return (
-    <FormProvider {...methods}>
-      <NodeFormContainer formId="switch-node-form" onSubmit={methods.handleSubmit(props.onSubmit)}>
+    <NodeFormContainer formId="switch-node-form" onSubmit={form.handleSubmit(props.onSubmit)}>
+      <SynForm form={form}>
         <SwitchFormFields onHeaderContentChange={props.onHeaderContentChange} />
-      </NodeFormContainer>
-    </FormProvider>
+      </SynForm>
+    </NodeFormContainer>
   )
 }

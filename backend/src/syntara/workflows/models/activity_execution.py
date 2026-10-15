@@ -164,6 +164,12 @@ class ActivityExecution(BaseResource, table=True):
     output_data: dict[str, Any] | None = Field(
         default=None, sa_column=Column(JSONB), description="Activity results (if completed)"
     )
+    control_data: dict[str, Any] | None = Field(
+        default=None,
+        sa_column=Column(JSONB, nullable=True),
+        description="Internal activity routing data",
+        exclude=True,
+    )
     error_details: str | None = Field(
         None,
         sa_type=Text(),  # type: ignore[call-overload]

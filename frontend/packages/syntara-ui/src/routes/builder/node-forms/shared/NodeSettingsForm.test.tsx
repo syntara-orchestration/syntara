@@ -26,22 +26,37 @@ vi.mock('../../hooks/useWorkflowEngineDefaults', () => ({
 const testSchema = z.object({ settings: nodeSettingsSchema })
 type TestFormData = z.infer<typeof testSchema>
 
-function Wrapper({ children, defaultValues }: { children: React.ReactNode; defaultValues?: Partial<TestFormData> }) {
+function Wrapper({
+  children,
+  defaultValues,
+  onValid,
+}: {
+  children: React.ReactNode
+  defaultValues?: Partial<TestFormData>
+  onValid?: (data: TestFormData) => void
+}) {
   const methods = useForm<TestFormData>({
     resolver: zodResolver(testSchema),
     defaultValues: { settings: {}, ...defaultValues },
   })
   return (
     <FormProvider {...methods}>
-      <form>{children}</form>
+      <form onSubmit={methods.handleSubmit((data) => onValid?.(data))}>
+        {children}
+        {onValid ? <button type="submit">Save settings</button> : null}
+      </form>
     </FormProvider>
   )
 }
 
-function setup(props: React.ComponentProps<typeof NodeSettingsForm> = {}, defaultValues?: Partial<TestFormData>) {
+function setup(
+  props: React.ComponentProps<typeof NodeSettingsForm> = {},
+  defaultValues?: Partial<TestFormData>,
+  onValid?: (data: TestFormData) => void
+) {
   const user = userEvent.setup()
   const view = render(
-    <Wrapper defaultValues={defaultValues}>
+    <Wrapper defaultValues={defaultValues} onValid={onValid}>
       <NodeSettingsForm {...props} />
     </Wrapper>
   )
@@ -117,10 +132,13 @@ describe('NodeSettingsForm', () => {
     })
 
     it('clears timeout to undefined when the seconds input is emptied', async () => {
-      const { user } = setup({ timeoutFormat: 'seconds' }, { settings: { timeout: 30 } })
+      const onValid = vi.fn()
+      const { user } = setup({ timeoutFormat: 'seconds' }, { settings: { timeout: 30 } }, onValid)
       const input = screen.getByRole('spinbutton', { name: 'Timeout (seconds)' })
-      await user.clear(input)
-      expect(input).toHaveValue(null)
+      await user.click(input)
+      await user.keyboard('{Control>}a{/Control}{Backspace}')
+      await user.click(screen.getByRole('button', { name: 'Save settings' }))
+      await waitFor(() => expect(onValid).toHaveBeenCalledWith({ settings: {} }))
     })
   })
 

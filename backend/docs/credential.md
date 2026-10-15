@@ -39,19 +39,21 @@ graph TD
 - **Router** (`src/syntara/credentials/router.py`) — HTTP endpoints with RBAC enforcement via PermissionChecker
 - **CredentialService** (`src/syntara/credentials/services/credential_service.py`) — business logic, input validation, secret masking
 - **SecretService** (`src/syntara/core/services/secret_service.py`) — encryption/decryption via SecretEncryptor (AES-256-GCM)
-- **Preseed** (`src/syntara/credentials/lib/preseed.py`) — upserts 5 GA managed credential types at startup
+- **Preseed** (`src/syntara/credentials/lib/preseed.py`) — upserts the GA managed credential types at startup
 
 ## Credential Types
 
-Credential types define the field schema and injector templates for credentials. GA ships with 5 managed (preseeded) types:
+Credential types define the field schema and injector templates for credentials. GA ships with these managed (preseeded) types:
 
 | Type | Fields | Auth Type | Purpose |
 |------|--------|-----------|---------|
+| Kafka-connection | username, password(secret) | kafka_connection | Username and password for a Kafka connection |
 | HTTP Bearer Token | token(secret) | bearer | Bearer token API authentication |
 | HTTP Basic Auth | username, password(secret) | basic | Username/password API authentication |
 | Ansible Automation Platform | username, password(secret), oauth_token(secret) | aap | AAP Controller connectivity |
 | LLM Provider | api_key(secret) | api_key | LLM service authentication |
 | SSH Key | username, ssh_private_key(secret, multiline) | ssh | SSH key authentication (non-passphrase-protected) |
+| Secret URL | url(secret) | url | URL stored as an encrypted secret |
 
 ### Schema Structure
 

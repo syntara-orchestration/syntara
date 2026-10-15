@@ -8,6 +8,7 @@ from syntara.integrations.lib.url_validation import (
     validate_integration_configuration_no_ssrf,
     validate_integration_url_no_ssrf,
 )
+from syntara.integrations.models.integration_configuration import KafkaConfiguration
 
 
 def _mock_getaddrinfo(ip: str) -> list[tuple[None, None, None, None, tuple[str, int]]]:
@@ -151,3 +152,24 @@ class TestValidateConfigurationNoSsrf:
         # allow_http=True: the same URL is accepted, proving the flag reached the validator.
         allowed = type("C", (), {"base_url": f"http://{_PUBLIC_IP}", "allow_http": True})()
         validate_integration_configuration_no_ssrf(allowed)
+
+    @pytest.mark.ssrf_enforced
+    def test_kafka_public_broker_accepted(self) -> None:
+        """Each Kafka broker is checked as an https URL when allow_http is false."""
+        config = KafkaConfiguration(bootstrap_servers=["broker.example.com:9093"])
+        with patch(_PATCH_GETADDRINFO, return_value=_mock_getaddrinfo(_PUBLIC_IP)):
+            validate_integration_configuration_no_ssrf(config)
+
+    @pytest.mark.ssrf_enforced
+    def test_kafka_private_broker_rejected(self) -> None:
+        """A private broker address is rejected before any connection is opened."""
+        config = KafkaConfiguration(bootstrap_servers=["192.168.1.10:9092"], allow_http=True)
+        with pytest.raises(ValueError, match="SSRF blocked"):
+            validate_integration_configuration_no_ssrf(config)
+
+    @pytest.mark.ssrf_enforced
+    def test_kafka_metadata_broker_rejected(self) -> None:
+        """Cloud metadata is blocked for a broker address."""
+        config = KafkaConfiguration(bootstrap_servers=["169.254.169.254:9092"], allow_http=True)
+        with pytest.raises(ValueError, match="SSRF blocked"):
+            validate_integration_configuration_no_ssrf(config)

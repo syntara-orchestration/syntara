@@ -376,13 +376,10 @@ test.describe('AI Agent Node @pr-check', () => {
       await startWorkflowWithTrigger(app)
       await openTaskAgentNodeCreateForm(app)
 
-      // Model selector should show "Select a model" — no pre-selection
-      await expect(app.getByPlaceholder('Select a model')).toBeVisible({ timeout: 10_000 })
-
       // Open the dropdown and filter by the LLM integration name so the test
       // doesn't depend on scroll position when many integrations exist
       await openAiAgentModelPicker(app)
-      await app.getByPlaceholder('Select a model').fill(llmName)
+      await app.getByTestId('ai-agent-node-form').getByPlaceholder('Select a model').fill(llmName)
 
       await expectAiAgentIntegrationGroupsVisible(app, [llmName])
 

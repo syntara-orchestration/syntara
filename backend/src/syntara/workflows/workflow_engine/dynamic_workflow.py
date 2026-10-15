@@ -40,7 +40,6 @@ with workflow.unsafe.imports_passed_through():
     )
     from syntara.workflows.workflow_engine.utils.credential_scrubber import scrub_credential_values, scrub_credentials
     from syntara.workflows.workflow_engine.utils.timeout_messages import build_timeout_error_message
-
 from syntara.workflows.utils.namespace_resolver import NamespaceResolver
 from syntara.workflows.workflow_engine.approval_mixin import WorkflowApprovalMixin
 from syntara.workflows.workflow_engine.converge_mixin import WorkflowConvergeMixin
@@ -722,9 +721,15 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
     def _setup_loop_namespace(self, loop_node_id: str) -> None:
         """Set up the loop namespace with current iteration data."""
         control_data = self.node_control_data.get(loop_node_id, {})
-        loop_data: dict[str, Any] = {"index": control_data.get("current_index")}
-        if control_data.get("current_item") is not None:
-            loop_data["item"] = control_data["current_item"]
+        current_index = control_data.get("current_index")
+        loop_data: dict[str, Any] = {"index": current_index}
+        loop_state = self.loop_state.get(loop_node_id)
+        if (
+            isinstance(loop_state, ForEachLoopState)
+            and isinstance(current_index, int)
+            and 0 <= current_index < len(loop_state.items)
+        ):
+            loop_data["item"] = loop_state.items[current_index]
 
         if not self.resolver.has_namespace("loop"):
             self.resolver.set_namespace("loop", {})
@@ -1755,6 +1760,24 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         if data is None:
             return None
         return self._scrub_data(data)
+
+    @workflow.query
+    def get_activity_control(self, activity_id: str) -> dict[str, Any] | None:
+        """Query the effective control data used for activity routing, if present."""
+        return self.node_control_data.get(activity_id)
+
+    @workflow.update
+    async def get_activity_control_when_ready(
+        self,
+        activity_id: str,
+        previous_control: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Wait until an activity's effective routing control is stored or advanced."""
+        await workflow.wait_condition(
+            lambda: (activity_id in self.node_control_data and self.node_control_data[activity_id] != previous_control),
+            timeout=timedelta(seconds=30),
+        )
+        return self.node_control_data[activity_id]
 
     @workflow.update
     async def get_activity_output_when_ready(self, activity_id: str) -> dict[str, Any]:
