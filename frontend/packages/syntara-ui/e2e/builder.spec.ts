@@ -4,13 +4,13 @@ import {
   buildUniqueName,
   clickAddConnectedStep,
   clickSaveAndWait,
-  closeNodeEditorPanel,
+  closeStepEditorPanel,
   createBasicWorkflowViaApi,
   fillCodeEditor,
   selectProjectIfRequired,
 } from './helpers/workflows'
 
-test('user creates and saves a multi-node workflow', async ({ app }) => {
+test('user creates and saves a multi-step workflow', async ({ app }) => {
   const workflowName = buildUniqueName('e2e-multi-node')
   await app.goto(toAppUrl('/workflow-builder/new'))
   await expect(app.getByRole('heading', { name: 'Select a trigger step' })).toBeVisible()
@@ -22,16 +22,16 @@ test('user creates and saves a multi-node workflow', async ({ app }) => {
     await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Manual trigger')
     await app.getByRole('button', { name: 'Create' }).click()
 
-    // Act - Add connected action node
+    // Act - Add connected action step
     const firstPanel = await clickAddConnectedStep(app)
     await firstPanel.getByRole('button', { name: 'Action', exact: true }).click()
     await firstPanel.getByRole('button', { name: 'Script', exact: true }).click()
     await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Send email')
     await fillCodeEditor(app, { value: 'print("hello from Playwright")' })
     await app.getByRole('button', { name: 'Create' }).click()
-    await closeNodeEditorPanel(app)
+    await closeStepEditorPanel(app)
 
-    // Act - Add another connected action node
+    // Act - Add another connected action step
     const secondPanel = await clickAddConnectedStep(app)
     await secondPanel.getByRole('button', { name: 'Action', exact: true }).click()
     await secondPanel.getByRole('button', { name: 'Script', exact: true }).click()

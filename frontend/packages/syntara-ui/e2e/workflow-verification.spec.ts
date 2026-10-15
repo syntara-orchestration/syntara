@@ -17,8 +17,8 @@ import { test, expect } from './fixtures'
 import { WCAG_TAGS } from './fixtures/accessibility'
 import { triggerVerifyWorkflow, VALIDATE_ROUTE } from './helpers/workflow-verify'
 import {
-  addScriptNode,
-  addScriptNodeUnconnected,
+  addScriptStep,
+  addScriptStepUnconnected,
   buildUniqueName,
   clickSaveAndWait,
   createBasicWorkflowViaApi,
@@ -185,7 +185,7 @@ test.describe('Validation error panel', () => {
     }
   })
 
-  test('clicking node name in error panel opens node editor', async ({ app }) => {
+  test('clicking step name in error panel opens step editor', async ({ app }) => {
     const workflowName = buildUniqueName('e2e-error-goto')
     const stepName = 'Goto step'
 
@@ -222,8 +222,8 @@ test.describe('Validation error panel', () => {
   })
 })
 
-test.describe('Error indicators on canvas nodes', () => {
-  test('validation error badge appears on nodes with errors', async ({ app }) => {
+test.describe('Error indicators on canvas steps', () => {
+  test('validation error badge appears on steps with errors', async ({ app }) => {
     const workflowName = buildUniqueName('e2e-error-badge')
 
     try {
@@ -331,7 +331,7 @@ test.describe('Save with warnings', () => {
 })
 
 test.describe('Variable reference validation', () => {
-  test('reference to nonexistent node shows validation error', async ({ app }) => {
+  test('reference to nonexistent step shows validation error', async ({ app }) => {
     test.setTimeout(90_000)
     const workflowName = buildUniqueName('e2e-varref-invalid')
 
@@ -339,7 +339,7 @@ test.describe('Variable reference validation', () => {
     const workflowId = getWorkflowIdFromUrl(app)
 
     try {
-      await addScriptNode(app, 'Ref step', 'echo ${nonexistent_node.result}')
+      await addScriptStep(app, 'Ref step', 'echo ${nonexistent_node.result}')
 
       await clickSaveAndWait(app)
 
@@ -354,7 +354,7 @@ test.describe('Variable reference validation', () => {
     }
   })
 
-  test.skip('reference to existing node that is not upstream shows validation error', async ({ app }) => {
+  test.skip('reference to existing step that is not upstream shows validation error', async ({ app }) => {
     test.setTimeout(90_000)
     const workflowName = buildUniqueName('e2e-varref-upstream')
 
@@ -362,14 +362,14 @@ test.describe('Variable reference validation', () => {
     const workflowId = getWorkflowIdFromUrl(app)
 
     try {
-      await addScriptNode(app, 'Upstream step', 'echo hello')
+      await addScriptStep(app, 'Upstream step', 'echo hello')
 
       const upstreamNode = app
         .locator('[role="group"][aria-roledescription="node"]')
         .filter({ hasText: 'Upstream step' })
       const upstreamNodeId = await upstreamNode.getAttribute('data-id')
 
-      await addScriptNodeUnconnected(app, 'Isolated step', `echo \${${upstreamNodeId}.result}`)
+      await addScriptStepUnconnected(app, 'Isolated step', `echo \${${upstreamNodeId}.result}`)
 
       await clickSaveAndWait(app)
 
@@ -392,7 +392,7 @@ test.describe('Variable reference validation', () => {
     const workflowId = getWorkflowIdFromUrl(app)
 
     try {
-      await addScriptNode(app, 'Field ref step', 'echo ${trigger.missing_field}')
+      await addScriptStep(app, 'Field ref step', 'echo ${trigger.missing_field}')
 
       await clickSaveAndWait(app)
 

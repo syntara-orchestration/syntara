@@ -1,15 +1,15 @@
 /**
- * Helper functions for adding each v2 workflow node type via the builder UI.
+ * Helper functions for adding each v2 workflow step type via the builder UI.
  *
  * V2 node types:
  *   Trigger:      manual, webhook, eda, scheduled
  *   Executors:    script, http_request, agentic, aap_job_template, approval
  *   Control flow: condition, loop (basic)
  *
- * Converge helpers live in v2-nodes-converge.ts.
- * Advanced loop and wait helpers live in v2-nodes-loop.ts.
+ * Converge helpers live in v2-steps-converge.ts.
+ * Advanced loop and wait helpers live in v2-steps-loop.ts.
  *
- * Each helper opens the add-node panel, selects the correct category/type,
+ * Each helper opens the add-step panel, selects the correct category/type,
  * fills the minimum required form fields, submits, and closes the editor.
  */
 
@@ -27,11 +27,11 @@ import {
   selectLlmCredential,
 } from './llm-helpers'
 import {
-  addNodePanel,
+  addStepPanel,
   clickAddConnectedStep,
-  closeNodeEditorPanel,
+  closeStepEditorPanel,
   fillCodeEditor,
-  openNodeForEditing,
+  openStepForEditing,
   triggerLayout,
 } from './workflows'
 
@@ -56,18 +56,18 @@ async function switchExpressionBuilderToRaw(page: Page, builderIndex = 0) {
 // Internal helpers
 // ---------------------------------------------------------------------------
 
-/** Select a category then a subtype within the add-node panel. */
-export async function selectCategoryAndType(page: Page, category: string, subtype: string) {
-  const panel = addNodePanel(page)
+/** Select a category then a subtype within the add-step panel. */
+export async function selectCategoryAndStepType(page: Page, category: string, subtype: string) {
+  const panel = addStepPanel(page)
   await panel.getByRole('button', { name: category, exact: true }).click()
   const subtypeBtn = panel.getByRole('button', { name: subtype, exact: true })
   await expect(subtypeBtn).toBeVisible({ timeout: 5_000 })
   await subtypeBtn.click()
 }
 
-/** Select a direct (non-category) button in the add-node panel. */
-async function selectDirectNodeType(page: Page, label: string | RegExp) {
-  const panel = addNodePanel(page)
+/** Select a direct (non-category) button in the add-step panel. */
+async function selectDirectStepType(page: Page, label: string | RegExp) {
+  const panel = addStepPanel(page)
   const btn = panel.getByRole('button', { name: label })
   await expect(btn).toBeVisible({ timeout: 5_000 })
   await btn.click()
@@ -77,8 +77,8 @@ async function selectDirectNodeType(page: Page, label: string | RegExp) {
 // Trigger
 // ---------------------------------------------------------------------------
 
-/** Click "Add connected step" on an edge and wait for the add-node panel. */
-export async function openAddNodePanel(page: Page, preferredHandle?: string) {
+/** Click "Add connected step" on an edge and wait for the add-step panel. */
+export async function openAddStepPanel(page: Page, preferredHandle?: string) {
   await clickAddConnectedStep(page, preferredHandle)
 }
 
@@ -148,31 +148,31 @@ export async function addEdaTrigger(page: Page, name: string, webhookPath: strin
 // Executor nodes
 // ---------------------------------------------------------------------------
 
-/** Add a script node (v2 type: "script"). */
-export async function addScriptNode(page: Page, name: string, code = 'print("hello")') {
-  await openAddNodePanel(page)
-  await selectCategoryAndType(page, 'Action', 'Script')
+/** Add a script step (v2 type: "script"). */
+export async function addScriptStep(page: Page, name: string, code = 'print("hello")') {
+  await openAddStepPanel(page)
+  await selectCategoryAndStepType(page, 'Action', 'Script')
   const nameInput = page.getByRole('textbox', { name: 'Name', exact: true })
   await expect(nameInput).toBeVisible({ timeout: 10_000 })
   await expect(nameInput).toBeEditable({ timeout: 5_000 })
   await nameInput.fill(name)
   await fillCodeEditor(page, { value: code })
   await page.getByRole('button', { name: 'Create', exact: true }).click()
-  await closeNodeEditorPanel(page)
+  await closeStepEditorPanel(page)
 }
 
-/** Add an HTTP request node (v2 type: "http_request"). */
-export async function addHttpRequestNode(page: Page, name: string, url = 'https://api.example.com/data') {
-  await openAddNodePanel(page)
-  await selectCategoryAndType(page, 'Action', 'REST API')
+/** Add an HTTP request step (v2 type: "http_request"). */
+export async function addHttpRequestStep(page: Page, name: string, url = 'https://api.example.com/data') {
+  await openAddStepPanel(page)
+  await selectCategoryAndStepType(page, 'Action', 'REST API')
   await page.getByRole('textbox', { name: 'Name', exact: true }).fill(name)
   await page.getByRole('textbox', { name: 'URL', exact: true }).fill(url)
   await page.getByRole('button', { name: 'Create', exact: true }).click()
-  await closeNodeEditorPanel(page)
+  await closeStepEditorPanel(page)
 }
 
 /**
- * Add a Task Agent node (v2 type: "agentic").
+ * Add a Task Agent step (v2 type: "agentic").
  * Caller must call `createLlmIntegration()` before using this helper
  * so the model dropdown has selectable options.
  *
@@ -180,25 +180,25 @@ export async function addHttpRequestNode(page: Page, name: string, url = 'https:
  * model picker waits for that integration's options instead of racing a
  * two-second timeout against a stale or empty dropdown.
  */
-export async function addAgenticNode(page: Page, name: string, prompt = 'Analyze the data', integrationName?: string) {
+export async function addAgenticStep(page: Page, name: string, prompt = 'Analyze the data', integrationName?: string) {
   const { name: credName } = await ensureLlmCredential(page)
-  await openAddNodePanel(page)
-  await selectDirectNodeType(page, 'Task Agent')
-  await expectAiAgentNodeFormReady(page)
+  await openAddStepPanel(page)
+  await selectDirectStepType(page, 'Task Agent')
+  await expectAiAgentStepFormReady(page)
   await page.getByRole('textbox', { name: 'Name', exact: true }).fill(name)
   await selectLlmCredential(page, credName, integrationName)
   await page.getByRole('textbox', { name: 'Prompt', exact: true }).fill(prompt)
   await page.getByRole('button', { name: 'Create', exact: true }).click()
-  await closeNodeEditorPanel(page)
+  await closeStepEditorPanel(page)
 }
 
 /**
- * Add an AAP job template node (v2 type: "aap_job_template").
+ * Add an AAP job template step (v2 type: "aap_job_template").
  *
  * Creates an AAP integration+credential via the API, then fills the
- * Integration/Organization/Job template dropdowns in the node form.
+ * Integration/Organization/Job template dropdowns in the step form.
  */
-export async function addAapNode(page: Page, name: string) {
+export async function addAapStep(page: Page, name: string) {
   const { name: integrationName, credName } = await ensureAapIntegration(page)
 
   // Intercept AAP browse endpoints so the form works without a real AAP server.
@@ -224,9 +224,9 @@ export async function addAapNode(page: Page, name: string) {
     })
   )
 
-  await openAddNodePanel(page)
-  await selectDirectNodeType(page, /AAP/i)
-  const jobTemplateBtn = addNodePanel(page).getByRole('button', { name: 'Launch AAP job template' })
+  await openAddStepPanel(page)
+  await selectDirectStepType(page, /AAP/i)
+  const jobTemplateBtn = addStepPanel(page).getByRole('button', { name: 'Launch AAP job template' })
   await expect(jobTemplateBtn).toBeVisible({ timeout: 5_000 })
   await jobTemplateBtn.click()
   await page.getByRole('textbox', { name: 'Name', exact: true }).fill(name)
@@ -266,35 +266,35 @@ export async function addAapNode(page: Page, name: string) {
   await deployOption.click()
 
   await page.getByRole('button', { name: 'Create', exact: true }).click()
-  await closeNodeEditorPanel(page)
+  await closeStepEditorPanel(page)
 
   await page.unroute(orgRoute)
   await page.unroute(jtRoute)
 }
 
-/** Add an approval node (v2 type: "approval") without completing branches. */
-export async function addApprovalNode(page: Page, name: string) {
-  await openAddNodePanel(page)
-  await selectDirectNodeType(page, 'Approval')
+/** Add an approval step (v2 type: "approval") without completing branches. */
+export async function addApprovalStep(page: Page, name: string) {
+  await openAddStepPanel(page)
+  await selectDirectStepType(page, 'Approval')
   const nameInput = page.getByRole('textbox', { name: 'Name', exact: true })
   await expect(nameInput).toBeVisible({ timeout: 10_000 })
   await nameInput.fill(name)
   await page.getByRole('button', { name: 'Create', exact: true }).click()
-  await closeNodeEditorPanel(page)
+  await closeStepEditorPanel(page)
 }
 
 /**
- * Add an approval node with a script node on the "approved" branch.
+ * Add an approval step with a script step on the "approved" branch.
  * This creates a valid workflow that can be saved.
  * The "rejected" branch is optional per validation rules.
  *
- * Uses `addScriptOnHandle` (layout + fit-view retries) instead of `getByText`
+ * Uses `addScriptStepOnHandle` (layout + fit-view retries) instead of `getByText`
  * on the canvas label — React Flow semantic zoom hides node text once the
  * graph is large enough that fit-view drops below SEMANTIC_ZOOM_MAX_SCALE.
  */
-export async function addApprovalNodeWithBranch(page: Page, name: string) {
-  await addApprovalNode(page, name)
-  await addScriptOnHandle(page, 'approved', `${name} - approved action`, 'print("approved")')
+export async function addApprovalStepWithBranch(page: Page, name: string) {
+  await addApprovalStep(page, name)
+  await addScriptStepOnHandle(page, 'approved', `${name} - approved action`, 'print("approved")')
 }
 
 // ---------------------------------------------------------------------------
@@ -302,15 +302,15 @@ export async function addApprovalNodeWithBranch(page: Page, name: string) {
 // ---------------------------------------------------------------------------
 
 /**
- * Add a conditional node (v2 type: "condition") using the visual expression builder.
+ * Add a conditional step (v2 type: "condition") using the visual expression builder.
  * @param page - Playwright page object
- * @param name - Node name
+ * @param name - Step name
  * @param config - Condition configuration
  * @param config.field - Field name to compare (e.g., "status")
  * @param config.operator - Comparison operator (default: "is equal to")
  * @param config.value - Value to compare against
  */
-export async function addConditionalNode(
+export async function addConditionalStep(
   page: Page,
   name: string,
   config: {
@@ -319,8 +319,8 @@ export async function addConditionalNode(
     value: string
   }
 ) {
-  await openAddNodePanel(page)
-  await selectCategoryAndType(page, 'Logic', 'Conditional')
+  await openAddStepPanel(page)
+  await selectCategoryAndStepType(page, 'Logic', 'Conditional')
 
   // Wait for the form to load
   const nameInput = page.getByRole('textbox', { name: 'Name', exact: true })
@@ -350,13 +350,13 @@ export async function addConditionalNode(
   await expect(saveButton).toBeEnabled({ timeout: 10_000 })
   await saveButton.click()
 
-  await closeNodeEditorPanel(page)
+  await closeStepEditorPanel(page)
 }
 
-/** Add a condition node (v2 type: "condition") without completing branches. */
-export async function addConditionNode(page: Page, name: string, expression = 'true') {
-  await openAddNodePanel(page)
-  await selectCategoryAndType(page, 'Logic', 'Conditional')
+/** Add a condition step (v2 type: "condition") without completing branches. */
+export async function addConditionStep(page: Page, name: string, expression = 'true') {
+  await openAddStepPanel(page)
+  await selectCategoryAndStepType(page, 'Logic', 'Conditional')
 
   // Wait for the form to load
   await expect(page.getByRole('textbox', { name: 'Name', exact: true })).toBeVisible()
@@ -376,36 +376,36 @@ export async function addConditionNode(page: Page, name: string, expression = 't
   await expect(closeButton).toBeVisible()
   await closeButton.click()
 
-  await closeNodeEditorPanel(page)
+  await closeStepEditorPanel(page)
 }
 
 /**
- * Add a condition node with a script node on the "true" branch.
+ * Add a condition step with a script step on the "true" branch.
  * This creates a valid workflow that can be saved.
  * The "false" branch is optional per validation rules.
  */
-export async function addConditionNodeWithBranch(page: Page, name: string, expression = 'true') {
-  await addConditionNode(page, name, expression)
+export async function addConditionStepWithBranch(page: Page, name: string, expression = 'true') {
+  await addConditionStep(page, name, expression)
 
-  // Add a node on the "true" branch to satisfy validation
+  // Add a step on the "true" branch to satisfy validation
   // The "false" branch is optional
-  await addScriptOnHandle(page, 'true', `${name} - true action`, 'print("condition is true")')
+  await addScriptStepOnHandle(page, 'true', `${name} - true action`, 'print("condition is true")')
 }
 
-/** Add a Script node from a specific edge stub (e.g. unused condition `false`). */
-export async function addScriptOnHandle(page: Page, handle: string, name: string, code: string) {
-  await openAddNodePanel(page, handle)
-  await selectCategoryAndType(page, 'Action', 'Script')
+/** Add a Script step from a specific edge stub (e.g. unused condition `false`). */
+export async function addScriptStepOnHandle(page: Page, handle: string, name: string, code: string) {
+  await openAddStepPanel(page, handle)
+  await selectCategoryAndStepType(page, 'Action', 'Script')
   const nameInput = page.getByRole('textbox', { name: 'Name', exact: true })
   await expect(nameInput).toBeVisible({ timeout: 10_000 })
   await expect(nameInput).toBeEditable({ timeout: 5_000 })
   await nameInput.fill(name)
   await fillCodeEditor(page, { value: code })
   await page.getByRole('button', { name: 'Create', exact: true }).click()
-  await closeNodeEditorPanel(page)
+  await closeStepEditorPanel(page)
 }
 
-/** Add a loop node (v2 type: "loop") without completing the loop body. Defaults to "For each" loop. */
+/** Add a loop step (v2 type: "loop") without completing the loop body. Defaults to "For each" loop. */
 /** Helper to select a loop type option with fallback handling */
 async function selectLoopTypeOption(page: Page) {
   const allOptions = page.getByRole('option')
@@ -440,9 +440,9 @@ async function selectLoopTypeOption(page: Page) {
   }
 }
 
-export async function addLoopNode(page: Page, name: string, items = '${trigger.items}') {
-  await openAddNodePanel(page)
-  await selectCategoryAndType(page, 'Logic', 'Loop')
+export async function addLoopStep(page: Page, name: string, items = '${trigger.items}') {
+  await openAddStepPanel(page)
+  await selectCategoryAndStepType(page, 'Logic', 'Loop')
 
   // Wait for the form to be fully loaded
   const nameInput = page.getByRole('textbox', { name: 'Name', exact: true })
@@ -472,32 +472,32 @@ export async function addLoopNode(page: Page, name: string, items = '${trigger.i
   }
 
   await page.getByRole('button', { name: 'Create', exact: true }).click()
-  await closeNodeEditorPanel(page)
+  await closeStepEditorPanel(page)
 }
 
 /**
- * Add a loop node with a script node in the loop body.
+ * Add a loop step with a script step in the loop body.
  * This creates a valid workflow that can be saved.
  */
-export async function addLoopNodeWithBody(page: Page, name: string, items = '${trigger.items}') {
-  await addLoopNode(page, name, items)
+export async function addLoopStepWithBody(page: Page, name: string, items = '${trigger.items}') {
+  await addLoopStep(page, name, items)
 
   // The loop-body stub (`add-node-button-loop`) is often missing from the a11y tree
   // next to unused condition `false` and loop `done` stubs, which makes a generic
   // "Add connected step" click fail strict mode. Add via the editor instead.
-  await openNodeForEditing(page, name)
+  await openStepForEditing(page, name)
   await page.getByRole('button', { name: 'Add step…' }).click()
   await page.getByRole('menuitem', { name: 'In loop' }).click()
-  await expect(addNodePanel(page)).toHaveCount(1)
-  await selectCategoryAndType(page, 'Action', 'Script')
+  await expect(addStepPanel(page)).toHaveCount(1)
+  await selectCategoryAndStepType(page, 'Action', 'Script')
   await page.getByRole('textbox', { name: 'Name', exact: true }).fill(`${name} - loop body`)
   await fillCodeEditor(page, { value: 'print("processing item")' })
   await page.getByRole('button', { name: 'Create', exact: true }).click()
-  await closeNodeEditorPanel(page)
+  await closeStepEditorPanel(page)
 }
 
 // ---------------------------------------------------------------------------
-// Switch node
+// Switch step
 // ---------------------------------------------------------------------------
 
 type SwitchCase = {
@@ -506,20 +506,20 @@ type SwitchCase = {
 }
 
 /**
- * Add a switch node with the given cases.
+ * Add a switch step with the given cases.
  *
  * The form opens with 2 default cases. This helper:
  * - Fills conditions from index 0 up to cases.length (adding extra paths as needed)
  * - Removes surplus default cases if cases.length < 2
  *
  * Each case switches the ExpressionBuilder to raw mode before filling the condition
- * string, matching the pattern used by addConditionNode.
+ * string, matching the pattern used by addConditionStep.
  */
-export async function addSwitchNodeWithCases(page: Page, name: string, cases: SwitchCase[]) {
-  if (cases.length === 0) throw new Error('addSwitchNodeWithCases requires at least one case')
+export async function addSwitchStepWithCases(page: Page, name: string, cases: SwitchCase[]) {
+  if (cases.length === 0) throw new Error('addSwitchStepWithCases requires at least one case')
 
-  await openAddNodePanel(page)
-  await selectCategoryAndType(page, 'Logic', 'Switch')
+  await openAddStepPanel(page)
+  await selectCategoryAndStepType(page, 'Logic', 'Switch')
 
   const nameInput = page.getByRole('textbox', { name: 'Name', exact: true })
   await expect(nameInput).toBeVisible({ timeout: 10_000 })
@@ -575,31 +575,31 @@ export async function addSwitchNodeWithCases(page: Page, name: string, cases: Sw
   }
 
   await page.getByRole('button', { name: 'Create', exact: true }).click()
-  await closeNodeEditorPanel(page)
+  await closeStepEditorPanel(page)
 }
 
 /**
- * Open a saved canvas node for editing and wait until a type-specific editor field is ready.
+ * Open a saved canvas step for editing and wait until a type-specific editor field is ready.
  *
  * Retries layout + click while the editor hydrates. Under CI load the click can
  * land during a React Flow viewport transform and be lost, so callers must not
- * use a bare `getByText(nodeName).click()`.
+ * use a bare `getByText(stepName).click()`.
  */
-async function openSavedNodeForEditing(page: Page, nodeName: string, editorReady: (p: Page) => Promise<void>) {
+async function openSavedStepForEditing(page: Page, stepName: string, editorReady: (p: Page) => Promise<void>) {
   await triggerLayout(page)
-  const node = page.locator('[role="group"][aria-roledescription="node"]').filter({ hasText: nodeName })
+  const node = page.locator('[role="group"][aria-roledescription="node"]').filter({ hasText: stepName })
   const nameInput = page.getByRole('textbox', { name: 'Name', exact: true })
   await expect(async () => {
     await expect(node).toBeVisible({ timeout: 5_000 })
     await node.click({ timeout: 5_000 })
-    await expect(nameInput).toHaveValue(nodeName, { timeout: 5_000 })
+    await expect(nameInput).toHaveValue(stepName, { timeout: 5_000 })
     await editorReady(page)
   }).toPass({ timeout: 30_000, intervals: [500, 1_000, 2_000] })
 }
 
-/** Open a saved switch node on the canvas for editing. */
-export async function openSwitchNodeForEditing(page: Page, nodeName: string) {
-  await openSavedNodeForEditing(page, nodeName, async (p) => {
+/** Open a saved switch step on the canvas for editing. */
+export async function openSwitchStepForEditing(page: Page, stepName: string) {
+  await openSavedStepForEditing(page, stepName, async (p) => {
     await expect(p.getByLabel('Path 1 name')).toBeVisible({ timeout: 5_000 })
   })
 }
@@ -673,12 +673,12 @@ export async function addScheduleTrigger(page: Page, name: string, config?: Sche
   }
 
   await page.getByRole('button', { name: 'Create', exact: true }).click()
-  await closeNodeEditorPanel(page)
+  await closeStepEditorPanel(page)
 }
 
 /** Open a saved schedule trigger on the canvas for editing. */
-export async function openScheduleTriggerForEditing(page: Page, nodeName: string) {
-  await openSavedNodeForEditing(page, nodeName, async (p) => {
+export async function openScheduleTriggerForEditing(page: Page, stepName: string) {
+  await openSavedStepForEditing(page, stepName, async (p) => {
     await expect(p.getByLabel('Schedule expression', { exact: true })).toBeVisible({ timeout: 5_000 })
   })
 }
@@ -688,7 +688,7 @@ export async function openScheduleTriggerForEditing(page: Page, nodeName: string
  * Create flow only — editing with a pre-selected model does not show the empty placeholder.
  */
 export async function expectAiAgentModelSelectorReady(page: Page) {
-  const form = page.getByTestId('ai-agent-node-form')
+  const form = page.getByTestId('ai-agent-step-form')
   await expect(form).toBeVisible({ timeout: 15_000 })
   const modelToggle = form.getByRole('button', { name: 'Model', exact: true })
   await expect(modelToggle).toBeEnabled({ timeout: 15_000 })
@@ -697,22 +697,22 @@ export async function expectAiAgentModelSelectorReady(page: Page) {
   }).toPass({ timeout: 60_000, intervals: [500, 1_000, 2_000] })
 }
 
-/** Wait until the Task Agent create form and model control have hydrated. */
-export async function expectAiAgentNodeFormReady(page: Page) {
+/** Wait until the Task Agent create form and model selector have hydrated. */
+export async function expectAiAgentStepFormReady(page: Page) {
   await expectAiAgentModelSelectorReady(page)
 }
 
-/** Open Task Agent from the add-node panel and wait for the form. */
-export async function openTaskAgentNodeCreateForm(page: Page) {
+/** Open Task Agent from the add-step panel and wait for the form. */
+export async function openTaskAgentStepCreateForm(page: Page) {
   const panel = await clickAddConnectedStep(page)
   await panel.getByRole('button', { name: 'Task Agent' }).click()
-  await expectAiAgentNodeFormReady(page)
+  await expectAiAgentStepFormReady(page)
 }
 
 /** Open a saved Task Agent node on the canvas for editing. */
-export async function openAiAgentNodeForEditing(page: Page, nodeName: string) {
-  await openSavedNodeForEditing(page, nodeName, async (p) => {
-    await expect(p.getByTestId('ai-agent-node-form')).toBeVisible({ timeout: 5_000 })
+export async function openAiAgentStepForEditing(page: Page, stepName: string) {
+  await openSavedStepForEditing(page, stepName, async (p) => {
+    await expect(p.getByTestId('ai-agent-step-form')).toBeVisible({ timeout: 5_000 })
     await expect(p.getByRole('button', { name: 'Model', exact: true })).toBeEnabled({ timeout: 5_000 })
   })
 }
