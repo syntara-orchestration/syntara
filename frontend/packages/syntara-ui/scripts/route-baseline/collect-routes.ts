@@ -115,7 +115,7 @@ export function parseCreateRouteBlocks(
   source: string,
   options: ParseCreateRouteBlocksOptions = {}
 ): ParsedCreateRoute[] {
-  const results: ParsedCreateRoute[] = []
+  const results: { route: ParsedCreateRoute; binding?: string; parent?: string }[] = []
   const startRegex = /createRoute\s*\(\s*\{/g
 
   for (const match of source.matchAll(startRegex)) {
@@ -131,10 +131,24 @@ export function parseCreateRouteBlocks(
     const parsed = parsedCreateRouteSchema.safeParse(
       redirectTo ? { path, kind: 'redirect', redirectTo } : { path, kind: 'page' }
     )
-    if (parsed.success) results.push(parsed.data)
+    if (parsed.success) {
+      const binding = source.slice(0, match.index).match(/\bconst\s+(\w+)\s*=\s*$/)?.[1]
+      const parent = body.match(/\bgetParentRoute:\s*\(\)\s*=>\s*(\w+)/)?.[1]
+      results.push({ route: parsed.data, binding, parent })
+    }
   }
 
-  return results
+  const routesByBinding = new Map(results.filter((entry) => entry.binding).map((entry) => [entry.binding, entry]))
+  const resolvePath = (entry: (typeof results)[number], ancestors: Set<string> = new Set()): string => {
+    const parent = entry.parent ? routesByBinding.get(entry.parent) : undefined
+    if (!parent) return entry.route.path
+    if (entry.parent && ancestors.has(entry.parent)) throw new Error('Cyclic route parent reference')
+    const nextAncestors = new Set(ancestors)
+    if (entry.parent) nextAncestors.add(entry.parent)
+    return `${resolvePath(parent, nextAncestors).replace(/\/$/, '')}/${entry.route.path.replace(/^\//, '')}`
+  }
+
+  return results.map((entry) => ({ ...entry.route, path: resolvePath(entry) }))
 }
 
 /**

@@ -18,6 +18,27 @@ import {
 } from './collect-routes'
 
 describe('parseCreateRouteBlocks', () => {
+  it('resolves nested child paths even when the parent is declared later', () => {
+    const source = `
+const fieldRoute = createRoute({ getParentRoute: () => categoryRoute, path: '/$field' })
+const categoryRoute = createRoute({ getParentRoute: () => settingsRoute, path: '/$category' })
+const settingsRoute = createRoute({ getParentRoute: () => rootRoute, path: '/system-administration/settings' })
+`
+    expect(parseCreateRouteBlocks(source)).toStrictEqual([
+      { path: '/system-administration/settings/$category/$field', kind: 'page' },
+      { path: '/system-administration/settings/$category', kind: 'page' },
+      { path: '/system-administration/settings', kind: 'page' },
+    ])
+  })
+
+  it('rejects cyclic route parents instead of overflowing the stack', () => {
+    const source = `
+const firstRoute = createRoute({ getParentRoute: () => secondRoute, path: '/first' })
+const secondRoute = createRoute({ getParentRoute: () => firstRoute, path: '/second' })
+`
+    expect(() => parseCreateRouteBlocks(source)).toThrow('Cyclic route parent reference')
+  })
+
   it('extracts page routes', () => {
     const source = `
 export const routes = [
