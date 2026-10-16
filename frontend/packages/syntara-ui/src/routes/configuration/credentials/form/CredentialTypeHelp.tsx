@@ -9,6 +9,9 @@ export const CREDENTIAL_TYPE_HELP = (
     </Content>
     <Content component="ul">
       <Content component="li">
+        <strong>Kafka</strong> &ndash; SASL username and password for connector validation and listener runtime
+      </Content>
+      <Content component="li">
         <strong>HTTP Bearer Token</strong> &ndash; For APIs using bearer token authentication
       </Content>
       <Content component="li">

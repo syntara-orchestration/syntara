@@ -79,6 +79,32 @@ const mockTypes = [
     injectors: {},
     managed: true,
   },
+  {
+    id: 'type-kafka',
+    name: 'Kafka',
+    description: 'SASL username and password for connector validation and listener runtime',
+    inputs: {
+      fields: [
+        {
+          id: 'username',
+          label: 'Username',
+          type: 'string',
+          secret: false,
+          help_text: 'SASL username used for connector validation and listener runtime.',
+        },
+        {
+          id: 'password',
+          label: 'Password',
+          type: 'string',
+          secret: true,
+          help_text: 'Kafka SASL password. Encrypted at rest.',
+        },
+      ],
+      required: ['username', 'password'],
+    },
+    injectors: {},
+    managed: true,
+  },
 ]
 
 const mockProjects = [
@@ -628,6 +654,125 @@ describe('CredentialFormModal', () => {
       const { container } = render(<CredentialFormModal isOpen onClose={vi.fn()} />, { wrapper })
 
       await selectAAPType(user)
+
+      expect(await axe(container)).toHaveNoViolations()
+    })
+  })
+
+  describe('Kafka', () => {
+    const kafkaCredential = {
+      id: 'cred-kafka',
+      name: 'Kafka Cluster',
+      description: '',
+      credential_type_id: 'type-kafka',
+      inputs: { username: 'listener', password: '$encrypted$' },
+      enabled: true,
+      labels: {},
+      created_by: { id: '550e8400-e29b-41d4-a716-446655440001', name: 'user-1', type: 'user' },
+      project_id: 'proj-1',
+      created_at: '2026-03-01T00:00:00Z',
+      updated_at: '2026-03-01T00:00:00Z',
+    } as const
+
+    async function selectKafkaType(user: ReturnType<typeof userEvent.setup>) {
+      await user.click(screen.getByLabelText('Credential type'))
+      await user.click(screen.getByRole('option', { name: 'Kafka' }))
+    }
+
+    it('renders username and password fields', async () => {
+      const user = userEvent.setup()
+      render(<CredentialFormModal isOpen onClose={vi.fn()} />, { wrapper })
+
+      await selectKafkaType(user)
+
+      expect(screen.getByLabelText('Username', { selector: 'input' })).toBeInTheDocument()
+      expect(screen.getByLabelText('Password', { selector: 'input' })).toHaveAttribute('type', 'password')
+    })
+
+    it('explains that the type is the SASL login for validation and listener runtime', async () => {
+      const user = userEvent.setup()
+      render(<CredentialFormModal isOpen onClose={vi.fn()} />, { wrapper })
+
+      await user.click(screen.getByRole('button', { name: 'Credential type help' }))
+
+      expect(
+        screen.getByText(/SASL username and password for connector validation and listener runtime/)
+      ).toBeInTheDocument()
+    })
+
+    it('requires username and password', async () => {
+      const user = userEvent.setup()
+      render(<CredentialFormModal isOpen onClose={vi.fn()} defaultProjectId="proj-1" />, { wrapper })
+
+      await selectKafkaType(user)
+      await user.type(screen.getByLabelText('Credential name'), 'Kafka Cluster')
+      await user.click(screen.getByRole('button', { name: 'Create credential' }))
+
+      expect(screen.getByText('Username is required')).toBeInTheDocument()
+      expect(screen.getByText('Password is required')).toBeInTheDocument()
+      expect(mockMutate).not.toHaveBeenCalled()
+    })
+
+    it('keeps the stored password out of the readable field', () => {
+      render(<CredentialFormModal isOpen onClose={vi.fn()} credentialToEdit={kafkaCredential} />, { wrapper })
+
+      const password = screen.getByLabelText('Password', { selector: 'input' })
+      expect(password).toHaveAttribute('type', 'password')
+      expect(password).toHaveValue('')
+      expect(screen.queryByDisplayValue('listener-secret')).not.toBeInTheDocument()
+    })
+
+    it('preserves the masked password when the username changes', async () => {
+      const user = userEvent.setup()
+      render(<CredentialFormModal isOpen onClose={vi.fn()} credentialToEdit={kafkaCredential} />, { wrapper })
+
+      const username = screen.getByLabelText('Username', { selector: 'input' })
+      await user.clear(username)
+      await user.type(username, 'updated-listener')
+      await user.click(screen.getByRole('button', { name: 'Save credential' }))
+
+      await waitFor(() => expect(mockMutate).toHaveBeenCalled())
+      const callArgs = mockMutate.mock.calls[0][0] as { body: { inputs: Record<string, string> } }
+      expect(callArgs.body.inputs).toEqual({ username: 'updated-listener', password: '$encrypted$' })
+    })
+
+    it('sends the username and password in the create payload', async () => {
+      const user = userEvent.setup()
+      render(<CredentialFormModal isOpen onClose={vi.fn()} defaultProjectId="proj-1" />, { wrapper })
+
+      await selectKafkaType(user)
+      await user.type(screen.getByLabelText('Credential name'), 'Kafka Cluster')
+      await user.type(screen.getByLabelText('Username', { selector: 'input' }), 'listener')
+      await user.type(screen.getByLabelText('Password', { selector: 'input' }), 'listener-secret')
+      await user.click(screen.getByRole('button', { name: 'Create credential' }))
+
+      await waitFor(() => expect(mockMutate).toHaveBeenCalled())
+      const callArgs = mockMutate.mock.calls[0][0] as { body: { inputs: Record<string, string> } }
+      expect(callArgs.body.inputs).toEqual({ username: 'listener', password: 'listener-secret' })
+      expect(callArgs.body).toHaveProperty('credential_type_id', 'type-kafka')
+    })
+
+    it('supports keyboard access to the username and password fields', async () => {
+      const user = userEvent.setup()
+      render(<CredentialFormModal isOpen onClose={vi.fn()} defaultProjectId="proj-1" />, { wrapper })
+
+      await selectKafkaType(user)
+      const username = screen.getByLabelText('Username', { selector: 'input' })
+      username.focus()
+      await user.keyboard('listener')
+      await user.tab()
+      expect(screen.getByRole('button', { name: 'Password help' })).toHaveFocus()
+      await user.tab()
+
+      expect(screen.getByLabelText('Password', { selector: 'input' })).toHaveFocus()
+      expect(username).toHaveValue('listener')
+    })
+
+    it('has no accessibility violations', async () => {
+      const user = userEvent.setup()
+      const { container } = render(<CredentialFormModal isOpen onClose={vi.fn()} />, { wrapper })
+
+      await selectKafkaType(user)
 
       expect(await axe(container)).toHaveNoViolations()
     })
