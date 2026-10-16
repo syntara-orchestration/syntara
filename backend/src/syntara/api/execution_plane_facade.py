@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 
 from syntara.authz.dependencies import ProjectScopeFilter
 from syntara.authz.engine import AllowedProjectsResult  # noqa: TC001 — FastAPI resolves dependency annotations
+from syntara.core.models.base import BaseListParams  # noqa: TC001 — FastAPI resolves dependency annotations
 from syntara.core.syntara_router import SyntaraRouter
 from syntara.execution_plane.client import ExecutionPlaneHttpClient, ExecutionPlaneUnavailableError
 
@@ -93,7 +94,7 @@ class WorkItemFacadeRead(BaseModel):
 )
 async def list_execution_targets(
     allowed_projects: Annotated[AllowedProjectsResult, Depends(_target_scope)],
-    limit: int = Query(default=20, ge=1, le=100),
+    params: Annotated[BaseListParams, Query()],
 ) -> ExecutionTargetListResponse:
     """Read registered execution targets from EP after AO permission checks."""
     try:
@@ -102,15 +103,16 @@ async def list_execution_targets(
                 client,
                 operation="execution_targets",
                 allowed_projects=allowed_projects,
-                limit=limit,
+                limit=params.limit,
             )
     except ExecutionPlaneUnavailableError as exc:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Execution Plane unavailable",
         ) from exc
-    logger.info("Listed execution targets", count=len(items))
-    return ExecutionTargetListResponse(resources=[ExecutionTargetFacadeRead.model_validate(item) for item in items])
+    resources = [ExecutionTargetFacadeRead.model_validate(item) for item in items]
+    logger.info("Listed execution targets", count=len(resources))
+    return ExecutionTargetListResponse(resources=resources)
 
 
 @router.get(
@@ -121,7 +123,7 @@ async def list_execution_targets(
 )
 async def list_work_items(
     allowed_projects: Annotated[AllowedProjectsResult, Depends(_work_item_scope)],
-    limit: int = Query(default=20, ge=1, le=100),
+    params: Annotated[BaseListParams, Query()],
 ) -> WorkItemListResponse:
     """Read work-item state from EP after AO permission checks."""
     try:
@@ -130,15 +132,16 @@ async def list_work_items(
                 client,
                 operation="work_items",
                 allowed_projects=allowed_projects,
-                limit=limit,
+                limit=params.limit,
             )
     except ExecutionPlaneUnavailableError as exc:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Execution Plane unavailable",
         ) from exc
-    logger.info("Listed work items", count=len(items))
-    return WorkItemListResponse(resources=[WorkItemFacadeRead.model_validate(item) for item in items])
+    resources = [WorkItemFacadeRead.model_validate(item) for item in items]
+    logger.info("Listed work items", count=len(resources))
+    return WorkItemListResponse(resources=resources)
 
 
 async def _list_ep_resources(

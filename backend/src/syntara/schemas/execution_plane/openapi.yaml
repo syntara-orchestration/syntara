@@ -21,9 +21,41 @@ paths:
           schema:
             type: integer
             maximum: 100
-            minimum: 1
+            exclusiveMinimum: 0
+            description: Maximum number of results per page
             default: 20
             title: Limit
+          description: Maximum number of results per page
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+              - type: 'null'
+            description: Pagination cursor from previous response
+            title: Cursor
+          description: Pagination cursor from previous response
+        - name: sort
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+                pattern: ^-?[a-z][a-z0-9_]*$
+              - type: 'null'
+            description: Sort parameter (e.g., 'name', '-created_at')
+            title: Sort
+          description: Sort parameter (e.g., 'name', '-created_at')
+        - name: include_total
+          in: query
+          required: false
+          schema:
+            type: boolean
+            description: Include total count in response (expensive)
+            default: false
+            title: Include Total
+          description: Include total count in response (expensive)
       responses:
         '200':
           description: Successful Response
@@ -56,9 +88,41 @@ paths:
           schema:
             type: integer
             maximum: 100
-            minimum: 1
+            exclusiveMinimum: 0
+            description: Maximum number of results per page
             default: 20
             title: Limit
+          description: Maximum number of results per page
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+              - type: 'null'
+            description: Pagination cursor from previous response
+            title: Cursor
+          description: Pagination cursor from previous response
+        - name: sort
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+                pattern: ^-?[a-z][a-z0-9_]*$
+              - type: 'null'
+            description: Sort parameter (e.g., 'name', '-created_at')
+            title: Sort
+          description: Sort parameter (e.g., 'name', '-created_at')
+        - name: include_total
+          in: query
+          required: false
+          schema:
+            type: boolean
+            description: Include total count in response (expensive)
+            default: false
+            title: Include Total
+          description: Include total count in response (expensive)
       responses:
         '200':
           description: Successful Response
