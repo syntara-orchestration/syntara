@@ -505,7 +505,7 @@ async def test_restored_output_is_injected_into_the_namespace(mock_wf: MagicMock
         }
     )
 
-    result = await wf._restore_node_output(node)
+    result = await wf._restore_node_state(node, _chain_graph())
 
     assert result == {"output": {"result": "from-source"}, "control": None}
     assert not wf.resolver.has_namespace("step_1")
@@ -535,7 +535,7 @@ async def test_restored_input_survives_supplied_result_handling(mock_wf: MagicMo
         return_value={"input_data": {"query": "select 1"}, "output_data": {"result": "ok"}}
     )
 
-    result = await wf._restore_node_output(node)
+    result = await wf._restore_node_state(node, _chain_graph())
     assert result is not None
     wf._process_supplied_result(node, result)
 
@@ -555,7 +555,7 @@ async def test_missing_output_falls_through_to_execution(mock_wf: MagicMock) -> 
     node = ActivityNode(node_id="step_1", node_type="script", parameters={})
     mock_wf.execute_activity = AsyncMock(return_value=None)
 
-    assert await wf._restore_node_output(node) is None
+    assert await wf._restore_node_state(node, _chain_graph()) is None
     assert "step_1" not in wf.skipped_nodes
     # Not merely None: the replay is never scheduled, so no event is emitted under
     # the node's id that the real execution would then be refused by.
@@ -571,7 +571,7 @@ async def test_empty_activity_result_falls_through(mock_wf: MagicMock) -> None:
     node = ActivityNode(node_id="step_1", node_type="script", parameters={})
     mock_wf.execute_activity = AsyncMock(return_value=None)
 
-    assert await wf._restore_node_output(node) is None
+    assert await wf._restore_node_state(node, _chain_graph()) is None
     mock_wf.execute_activity.assert_not_awaited()
 
 
@@ -587,7 +587,7 @@ async def test_restore_dispatches_the_retry_outputs_activity(mock_wf: MagicMock)
     node = ActivityNode(node_id="step_1", node_type="script", parameters={})
     mock_wf.execute_activity = AsyncMock(return_value={"input_data": {}, "output_data": {"result": "ok"}})
 
-    await wf._restore_node_output(node)
+    await wf._restore_node_state(node, _chain_graph())
 
     call = mock_wf.execute_activity.call_args
     assert call[0][0] == ActivityName.RETRY_NODE_REPLAY
@@ -616,7 +616,7 @@ async def test_restore_captures_source_state(mock_wf: MagicMock) -> None:
         }
     )
 
-    await wf._restore_node_output(node)
+    await wf._restore_node_state(node, _chain_graph())
 
     assert wf._restored_node_timestamps["step_1"] == {
         "status": "completed",
@@ -1324,7 +1324,7 @@ async def test_a_record_vanishing_after_classification_is_loud(mock_wf: MagicMoc
     mock_wf.execute_activity = AsyncMock(return_value=None)
 
     with pytest.raises(SafeValueError, match="disappeared between classification and replay"):
-        await wf._restore_node_output(node)
+        await wf._restore_node_state(node, _chain_graph())
 
 
 @pytest.mark.asyncio
@@ -1347,7 +1347,7 @@ async def test_restoring_an_approval_returns_the_port_the_scheduler_needs(mock_w
         }
     )
 
-    result = await wf._restore_node_output(node)
+    result = await wf._restore_node_state(node, _chain_graph())
 
     assert result is not None
     assert result["control"] == {"next_port": "approved"}
@@ -1372,7 +1372,7 @@ async def test_a_completed_approval_with_no_decision_stops_the_retry(mock_wf: Ma
     )
 
     with pytest.raises(SafeValueError, match="no usable decision"):
-        await wf._restore_node_output(node)
+        await wf._restore_node_state(node, _chain_graph())
 
 
 @pytest.mark.asyncio
@@ -1389,7 +1389,7 @@ async def test_a_failed_approval_does_not_try_to_route(mock_wf: MagicMock) -> No
         return_value={"status": "failed", "input_data": {}, "output_data": {}, "error_details": "denied"}
     )
 
-    result = await wf._restore_node_output(node)
+    result = await wf._restore_node_state(node, _chain_graph())
 
     assert result is not None
     assert result["control"] is None

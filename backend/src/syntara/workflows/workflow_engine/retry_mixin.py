@@ -193,7 +193,7 @@ class WorkflowRetryMixin:
         retain their results under R6c, even if a different predecessor failed.
 
         A failure the caller did not select is restored as a failure by
-        ``_restore_node_output``, from its own recorded error. What this suppresses
+        ``_restore_node_state``, from its own recorded error. What this suppresses
         is everything *downstream* of such a failure — those nodes have nothing to
         run against, and the source run never produced results for them either. The
         failing node itself is deliberately not added here: marking it skipped would
@@ -436,9 +436,7 @@ class WorkflowRetryMixin:
             # node that was never a candidate.
             self._retry_replay_candidates.discard(node.id)
             return None
-        if node.type in _INFERABLE_CONTROL_NODE_TYPES:
-            return await self._restored_control_result(node, graph)
-        return await self._restore_node_output(node)
+        return await self._restore_node_state(node, graph)
 
     def _should_restore_node(self, node_id: str, graph: WorkflowGraph) -> bool:
         """Whether this node's stored output may be injected instead of running it.
@@ -459,94 +457,45 @@ class WorkflowRetryMixin:
             return node.type in _INFERABLE_CONTROL_NODE_TYPES and bool(self._resolved_control_port(node, graph))
         return True
 
-    async def _restored_control_result(self, node: ActivityNode, graph: WorkflowGraph) -> dict[str, Any] | None:
-        """Restore a condition or switch by replaying the branch the source run took.
-
-        No payload and no fetch: what a control node needs is the routing decision,
-        and that is already recorded by the branch's own node statuses. The branch is
-        published into ``node_control_data`` so ``_determine_output_port`` follows
-        the same edge, and the node counts as completed so the scheduler advances.
-
-        Returns None when the branch cannot be inferred, so the caller falls through
-        to real execution — which re-evaluates the condition rather than assuming one.
-        """
-        # The source run's own row is read first, because it answers both questions.
-        # Its ``control_data`` carries the routing decision the sync layer persisted,
-        # so for any run recorded since that landed the port is read directly rather
-        # than re-derived from branch statuses. Inference stays as the fallback for
-        # runs that predate the column — and for any control data that carries no
-        # ``next_port``.
-        record = await workflow.execute_activity(
-            ActivityName.RETRY_NODE_REPLAY,
-            args=[self.retry_context.get("retry_from_execution_id"), node.id],
-            activity_id=node.id,
-            start_to_close_timeout=timedelta(seconds=DEFAULT_ACTIVITY_TIMEOUT_SECONDS),
-        )
-        source_output = (record or {}).get("output_data") or {}
-        source_status = str((record or {}).get("status") or ActivityStatus.COMPLETED.value)
-        stored_control = (record or {}).get("control_data") or {}
-        recorded_port = stored_control.get("next_port") if isinstance(stored_control, dict) else None
-
-        port = str(recorded_port) if recorded_port else self._resolved_control_port(node, graph)
-        if port is None:
-            return None
-
-        self.node_inputs[node.id] = (record or {}).get("input_data") or {}
-        self._restored_node_statuses[node.id] = source_status
-        self._restored_node_timestamps[node.id] = {
-            "started_at": (record or {}).get("started_at"),
-            "completed_at": (record or {}).get("completed_at"),
-            # The source run's own status and times, so the row this node ends up
-            # with reports what actually happened rather than the replay's success.
-            "status": source_status,
-            "error_details": (record or {}).get("error_details"),
-        }
-
-        workflow.logger.info("Restored control node branch from source run", extra={"node_id": node.id, "port": port})
-        # The inferred port travels as control data, which is what the scheduler
-        # reads; the output is the source run's own and must not be replaced.
-        return {"output": source_output, "control": {"next_port": port}}
-
-    async def _restore_node_output(self, node: ActivityNode) -> dict[str, Any] | None:
+    async def _restore_node_state(self, node: ActivityNode, graph: WorkflowGraph) -> dict[str, Any] | None:
         """Replay this node's recorded outcome from its source run, or None.
 
-        Returns None when the source run has no restorable record for the node, so
-        the caller falls through to normal execution. A node that never reached a
-        terminal state cannot be restored, because there would be nothing to
-        reproduce.
+        One path for both node kinds. The replay fetch is the same, and so is the
+        state it publishes — the recorded input, status and times — so only the
+        result differs: a control node routes on the branch the source run took,
+        an ordinary node publishes the output it recorded.
 
-        The replay activity runs under the node's own id — not an
-        ``__internal__`` id — so the normal event-driven sync records it
-        node-by-node: the sync service maps it to this node, writes its row, and
-        emits a per-node WebSocket delta exactly as for an executed node. Both
-        halves are republished: the output into the execution namespace, and the
-        input into ``node_inputs`` (what ``get_activity_input`` reads), so a
-        restored node shows the same input and output on drill-down as one that
-        executed.
+        The recorded status and times are kept for the sync service, which is what
+        writes the row: without them the sync records the replay activity's own
+        successful completion and every restored node would be reported COMPLETED.
+        The input goes to ``node_inputs`` (what ``get_activity_input`` reads), so a
+        restored node shows the same input on drill-down as one that executed.
 
-        The recorded status decides what this returns. COMPLETED publishes a normal
-        completion, so the scheduler treats the node as done and its successors run.
-        SKIPPED and FAILED publish the failure namespace and record the node
-        accordingly, so the scheduler treats them as terminal without executing
-        them — a restored skip must not schedule downstream work, and a restored
-        failure must not read as a success.
+        Two differences from the ordinary path are deliberate and kept rather than
+        unified. A control node carries no status guard and tolerates a vanished
+        record, because it can still be restored from a recorded port; an ordinary
+        node cannot, so it skips the replay entirely and raises if the row is gone.
 
-        Either way the recorded status and times are kept for the sync service,
-        which is what writes the row: without them the sync records the replay
-        activity's own successful completion and every restored node would be
-        reported as COMPLETED.
+        The replay activity runs under the node's own id — not an ``__internal__``
+        id — so the normal event-driven sync records it node-by-node: the service
+        maps it to this node, writes its row, and emits a per-node WebSocket delta
+        exactly as for an executed node.
 
-        The replay is not scheduled at all when the source run has no restorable
-        record for this node. It runs under the node's own activity id, so the
-        event it emits is consumed as *this node's* execution and marks the row
-        terminal; a real execution afterwards is then refused by the sync
-        service's terminal-status guard, leaving the row showing the replay's
-        output and times instead of the real run's. Deciding up front costs
-        nothing: ``_prepare_retry`` already read every source status, so this is
-        a lookup rather than a query, and it saves an activity and a history
-        event for every node that was never replayable.
+        Returns:
+            The synthetic completion for a node that qualified, or None to fall
+            through to normal execution. A node that never reached a terminal state
+            cannot be restored, because there would be nothing to reproduce.
+
         """
-        if self._retry_source_statuses.get(node.id) not in _RESTORABLE_SOURCE_STATUS_VALUES:
+        is_control = node.type in _CONTROL_NODE_TYPES_FOR_RETRY
+
+        # Decided up front rather than after the fetch: the replay runs under the
+        # node's own activity id, so the event it emits is consumed as *this node's*
+        # execution and marks the row terminal; a real execution afterwards is then
+        # refused by the sync service's terminal-status guard, leaving the row
+        # showing the replay's output and times. This costs a lookup rather than a
+        # query, because ``_prepare_retry`` already read every source status.
+        if not is_control and self._retry_source_statuses.get(node.id) not in _RESTORABLE_SOURCE_STATUS_VALUES:
             self._retry_replay_candidates.discard(node.id)
             return None
 
@@ -556,7 +505,7 @@ class WorkflowRetryMixin:
             activity_id=node.id,
             start_to_close_timeout=timedelta(seconds=DEFAULT_ACTIVITY_TIMEOUT_SECONDS),
         )
-        if record is None:
+        if not is_control and record is None:
             # The status map said this node was restorable but the row is gone —
             # deleted between _prepare_retry and here. Rare, but the replay event
             # has already been emitted under the node's id and will be persisted
@@ -569,22 +518,41 @@ class WorkflowRetryMixin:
             msg = f"source record for retry node {node.id} disappeared between classification and replay"
             raise SafeValueError(msg)
 
-        source_status = str(record.get("status") or ActivityStatus.COMPLETED.value)
-        output = record.get("output_data") or {}
-        error_details = record.get("error_details")
-        self.node_inputs[node.id] = record.get("input_data") or {}
+        output = (record or {}).get("output_data") or {}
+        source_status = str((record or {}).get("status") or ActivityStatus.COMPLETED.value)
+        error_details = (record or {}).get("error_details")
+        self.node_inputs[node.id] = (record or {}).get("input_data") or {}
+        self._restored_node_statuses[node.id] = source_status
         self._restored_node_timestamps[node.id] = {
-            "started_at": record.get("started_at"),
-            "completed_at": record.get("completed_at"),
-            # The status and error travel to the sync service so the row reports
-            # what the source run recorded rather than the replay's own success.
+            "started_at": (record or {}).get("started_at"),
+            "completed_at": (record or {}).get("completed_at"),
+            # The source run's own status and times, so the row this node ends up
+            # with reports what actually happened rather than the replay's success.
             "status": source_status,
             "error_details": error_details,
         }
-        self._restored_node_statuses[node.id] = source_status
+
+        if is_control:
+            # A control node needs the routing decision, not a payload, and the
+            # source row already carries it. The persisted ``control_data`` wins,
+            # because the sync layer records the branch the run actually took;
+            # inference stays the fallback for runs predating that column and for
+            # control data with no ``next_port``. The output is the source run's own
+            # and must not be replaced — only the port travels as control data,
+            # which is what the scheduler reads to pick the edge.
+            stored_control = (record or {}).get("control_data") or {}
+            recorded_port = stored_control.get("next_port") if isinstance(stored_control, dict) else None
+            port = str(recorded_port) if recorded_port else self._resolved_control_port(node, graph)
+            if port is None:
+                return None
+            workflow.logger.info(
+                "Restored control node branch from source run", extra={"node_id": node.id, "port": port}
+            )
+            return {"output": output, "control": {"next_port": port}}
+
+        # Only a node that did not succeed has output worth keeping: a restored
+        # completion publishes its own output through the normal path.
         if source_status != ActivityStatus.COMPLETED.value and output:
-            # Only a node that did not succeed has output worth keeping: a restored
-            # completion publishes its own output through the normal path.
             self._restored_node_outputs[node.id] = output
 
         workflow.logger.info(
@@ -597,6 +565,10 @@ class WorkflowRetryMixin:
             },
         )
 
+        # SKIPPED and FAILED publish the failure namespace and record the node
+        # accordingly, so the scheduler treats them as terminal without executing
+        # them: a restored skip must not schedule downstream work, and a restored
+        # failure must not read as a success.
         if source_status != ActivityStatus.COMPLETED.value:
             return self._restored_terminal_result(node, source_status, output, error_details)
 

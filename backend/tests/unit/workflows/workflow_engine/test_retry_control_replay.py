@@ -13,6 +13,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from syntara.core.exceptions import SafeValueError
 from syntara.workflows.models.activity_execution import ActivityStatus
 from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkflow
 from syntara.workflows.workflow_engine.graph import ActivityNode, WorkflowGraph
@@ -31,7 +32,7 @@ from .conftest import init_workflow_runtime
 def mock_wf() -> Generator[MagicMock, None, None]:
     """Patch the Temporal workflow module so its logger is callable outside a run.
 
-    ``_restored_control_result`` logs when it restores a branch, and
+    ``_restore_node_state`` logs when it restores a branch, and
     ``workflow.logger`` refuses to emit unless a workflow event loop is active.
     """
     with (
@@ -252,7 +253,7 @@ async def test_restored_control_result_publishes_the_inferred_port(mock_wf: Magi
     node = _node(graph, "cond_1")
     mock_wf.execute_activity.return_value = {"output_data": {"evaluated_result": True}, "status": "completed"}
 
-    result = await wf._restored_control_result(node, graph)
+    result = await wf._restore_node_state(node, graph)
 
     assert result is not None
     assert result["control"] == {"next_port": "true"}
@@ -275,7 +276,7 @@ async def test_restored_control_result_keeps_the_source_run_output(mock_wf: Magi
         "input_data": {"left": 2, "right": 2},
     }
 
-    result = await wf._restored_control_result(node, graph)
+    result = await wf._restore_node_state(node, graph)
 
     assert result is not None
     assert result["output"] == {"evaluated_result": True}, "the source output must not be fabricated away"
@@ -295,7 +296,7 @@ async def test_restored_control_result_reads_the_replay_under_the_node_id(mock_w
     node = _node(graph, "cond_1")
     mock_wf.execute_activity.return_value = {"output_data": {}, "status": "completed"}
 
-    await wf._restored_control_result(node, graph)
+    await wf._restore_node_state(node, graph)
 
     assert mock_wf.execute_activity.await_args.kwargs["activity_id"] == "cond_1"
     assert mock_wf.execute_activity.await_args.kwargs["args"] == ["src-1", "cond_1"], "the node id names the source row"
@@ -309,7 +310,7 @@ async def test_restored_control_result_is_none_when_inference_fails(mock_wf: Mag
     wf._retry_source_statuses = {"step_true": ActivityStatus.SKIPPED.value, "step_false": ActivityStatus.SKIPPED.value}
     node = _node(graph, "cond_1")
 
-    assert await wf._restored_control_result(node, graph) is None
+    assert await wf._restore_node_state(node, graph) is None
     # The source row is read before inference, because it is also where
     # control_data comes from. So an ambiguous branch still costs one read; that
     # is the price of taking the persisted port when there is one.
@@ -392,7 +393,7 @@ async def test_restoring_a_condition_needs_no_manually_initialised_retry_state(
     wf._resolved_control_port_cache = {}
     mock_wf.execute_activity.return_value = {"output_data": {"evaluated_result": True}, "status": "completed"}
 
-    result = await wf._restored_control_result(_node(graph, "cond_1"), graph)
+    result = await wf._restore_node_state(_node(graph, "cond_1"), graph)
 
     assert result is not None
     assert result["control"] == {"next_port": "true"}
@@ -419,7 +420,7 @@ async def test_port_is_read_from_persisted_control_data(mock_wf: MagicMock) -> N
     inference = MagicMock(return_value=None)
     wf._infer_control_node_branch = inference  # type: ignore[method-assign]  # type: ignore[method-assign]
 
-    result = await wf._restored_control_result(node, graph)
+    result = await wf._restore_node_state(node, graph)
 
     assert result is not None
     assert result["control"] == {"next_port": "true"}
@@ -443,7 +444,7 @@ async def test_persisted_port_wins_over_an_ambiguous_inference(mock_wf: MagicMoc
     }
     wf._infer_control_node_branch = MagicMock(return_value="true")  # type: ignore[method-assign]
 
-    result = await wf._restored_control_result(node, graph)
+    result = await wf._restore_node_state(node, graph)
 
     assert result is not None
     assert result["control"] == {"next_port": "fallback"}
@@ -463,7 +464,7 @@ async def test_falls_back_to_inference_when_control_data_is_absent(mock_wf: Magi
     inference = MagicMock(return_value="true")
     wf._infer_control_node_branch = inference  # type: ignore[method-assign]  # type: ignore[method-assign]
 
-    result = await wf._restored_control_result(node, graph)
+    result = await wf._restore_node_state(node, graph)
 
     assert result is not None
     assert result["control"] == {"next_port": "true"}
@@ -488,7 +489,7 @@ async def test_falls_back_when_control_data_has_no_next_port(mock_wf: MagicMock)
     inference = MagicMock(return_value="false")
     wf._infer_control_node_branch = inference  # type: ignore[method-assign]  # type: ignore[method-assign]
 
-    result = await wf._restored_control_result(node, graph)
+    result = await wf._restore_node_state(node, graph)
 
     assert result is not None
     assert result["control"] == {"next_port": "false"}
@@ -508,7 +509,7 @@ async def test_null_control_data_is_treated_as_absent(mock_wf: MagicMock) -> Non
     mock_wf.execute_activity.return_value = {"output_data": {}, "status": "completed", "control_data": None}
     wf._infer_control_node_branch = MagicMock(return_value="true")  # type: ignore[method-assign]
 
-    result = await wf._restored_control_result(node, graph)
+    result = await wf._restore_node_state(node, graph)
 
     assert result is not None
     assert result["control"] == {"next_port": "true"}
@@ -698,3 +699,36 @@ async def test_a_restored_condition_is_a_candidate_so_the_service_asks_about_it(
 
     assert wf._should_restore_node("cond_1", graph) is True
     assert "cond_1" in wf._retry_replay_candidates
+
+
+async def test_a_vanished_record_does_not_raise_for_a_control_node(
+    mock_wf: MagicMock,
+) -> None:
+    """A control node tolerates a missing record; an ordinary one does not.
+
+    The two paths differ here on purpose. The replay runs under the node's own
+    activity id, so an ordinary node whose row disappeared raises rather than
+    let a real execution follow and be refused by the sync service's terminal
+    guard. A control node still has a recorded port, so it restores from that
+    and the vanished row costs it nothing.
+    """
+    wf = _make_workflow({"retry_from_execution_id": "src-1", "eligible_point_ids": ["step_2"]})
+    graph = _condition_graph()
+    wf._restored_control_ports = {"cond_1": "true"}
+    mock_wf.execute_activity = AsyncMock(return_value=None)
+
+    result = await wf._restore_node_state(_node(graph, "cond_1"), graph)
+
+    assert result is not None, "the recorded port still restores it"
+    assert result["control"] == {"next_port": "true"}
+
+
+async def test_a_vanished_record_raises_for_an_ordinary_node(mock_wf: MagicMock) -> None:
+    """The other half of the difference, so the guard above is not accidental."""
+    wf = _make_workflow({"retry_from_execution_id": "src-1", "eligible_point_ids": ["step_2"]})
+    graph = _condition_graph()
+    wf._retry_source_statuses = {"step_true": ActivityStatus.COMPLETED.value}
+    mock_wf.execute_activity = AsyncMock(return_value=None)
+
+    with pytest.raises(SafeValueError, match="disappeared"):
+        await wf._restore_node_state(_node(graph, "step_true"), graph)
