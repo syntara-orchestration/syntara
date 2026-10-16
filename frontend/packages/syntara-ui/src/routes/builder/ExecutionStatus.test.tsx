@@ -92,4 +92,30 @@ describe('ActivityStatusLabel', () => {
     // Should capitalize first letter as fallback
     expect(screen.getByText('Unknown_status')).toBeInTheDocument()
   })
+
+  it('renders both "Running" and "Stalled" badges when RUNNING with stallAlertAt set', () => {
+    render(<ActivityStatusLabel status="running" stallAlertAt="2026-09-15T12:00:00Z" />)
+    expect(screen.getByText('Running')).toBeInTheDocument()
+    expect(screen.getByText('Stalled')).toBeInTheDocument()
+  })
+
+  it('renders only "Running" when RUNNING without stallAlertAt', () => {
+    render(<ActivityStatusLabel status="running" />)
+    expect(screen.getByText('Running')).toBeInTheDocument()
+    expect(screen.queryByText('Stalled')).not.toBeInTheDocument()
+  })
+
+  it('renders only "Running" when RUNNING with null stallAlertAt', () => {
+    render(<ActivityStatusLabel status="running" stallAlertAt={null} />)
+    expect(screen.getByText('Running')).toBeInTheDocument()
+    expect(screen.queryByText('Stalled')).not.toBeInTheDocument()
+  })
+
+  it.each(['completed', 'failed', 'cancelled', 'skipped', 'pending'] as const)(
+    'renders normal %s label without "Stalled" when stallAlertAt is set but status is not running',
+    (status) => {
+      render(<ActivityStatusLabel status={status} stallAlertAt="2026-09-15T12:00:00Z" />)
+      expect(screen.queryByText('Stalled')).not.toBeInTheDocument()
+    }
+  )
 })

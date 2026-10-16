@@ -9,7 +9,19 @@ import { CompactActivityList } from './CompactActivityList'
 import type { ActivityOrderItem } from './ExecutionActivityTable'
 
 vi.mock('./ExecutionStatus', () => ({
-  ActivityStatusLabel: ({ status }: { status: string }) => <span>{status}</span>,
+  ActivityStatusLabel: ({
+    status,
+    stallAlertAt,
+  }: {
+    status: string
+    nodeType?: string
+    stallAlertAt?: string | null
+  }) => (
+    <span>
+      {status}
+      {stallAlertAt && ' (stalled)'}
+    </span>
+  ),
 }))
 
 function state(id: string, overrides: Partial<ActivityState> = {}): [string, ActivityState] {
@@ -88,5 +100,33 @@ describe('CompactActivityList', () => {
     const { container } = render(<CompactActivityList activityStates={states} activityOrder={order} />)
     const results = await axe(container)
     expect(results).toHaveNoViolations()
+  })
+
+  it('passes stallAlertAt to ActivityStatusLabel for stalled activities', () => {
+    const stalledStates = new Map([
+      state('task-1', {
+        status: 'running',
+        startedAt: '2024-01-01T00:00:00Z',
+        stallAlertAt: '2024-01-01T00:15:00Z',
+      }),
+    ])
+
+    render(<CompactActivityList activityStates={stalledStates} activityOrder={[{ id: 'task-1' }]} />)
+
+    expect(screen.getByText('running (stalled)')).toBeInTheDocument()
+  })
+
+  it('does not show stalled indicator when stallAlertAt is not set', () => {
+    const runningStates = new Map([
+      state('task-1', {
+        status: 'running',
+        startedAt: '2024-01-01T00:00:00Z',
+      }),
+    ])
+
+    render(<CompactActivityList activityStates={runningStates} activityOrder={[{ id: 'task-1' }]} />)
+
+    expect(screen.getByText('running')).toBeInTheDocument()
+    expect(screen.queryByText('running (stalled)')).not.toBeInTheDocument()
   })
 })

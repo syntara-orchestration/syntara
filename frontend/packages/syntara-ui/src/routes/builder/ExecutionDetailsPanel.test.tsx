@@ -39,6 +39,8 @@ const WORKFLOW_DEF_MIXED: WorkflowDefShape = {
   },
 }
 
+const noStallTimestamp: string | null = null
+
 const EXECUTION = {
   data: {
     id: 'exec-123',
@@ -47,6 +49,7 @@ const EXECUTION = {
     temporal_workflow_id: 'temporal-123',
     status: 'running',
     created_at: '2024-01-01T00:00:00Z',
+    first_stall_detected_at: noStallTimestamp,
     updated_at: '2024-01-01T00:00:00Z',
     created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'user-1', type: 'user' },
     updated_by: null,
@@ -111,6 +114,23 @@ describe('ExecutionDetailsPanel', () => {
 
       expect(screen.getByText('Current run details')).toBeInTheDocument()
       expect(screen.getByTestId('status-label')).toHaveTextContent('running')
+    })
+
+    it('shows the live Delayed badge when the panel query has not received the stall timestamp yet', () => {
+      vi.mocked(executionsClient.useQuery).mockReturnValue({
+        ...EXECUTION,
+        data: { ...EXECUTION.data, first_stall_detected_at: null },
+      })
+
+      render(
+        <ExecutionDetailsPanel
+          executionId="exec-123"
+          workflowDefinition={WORKFLOW_DEF}
+          liveExecution={{ first_stall_detected_at: '2026-10-16T13:00:00Z' }}
+        />
+      )
+
+      expect(screen.getByText('Delayed')).toBeInTheDocument()
     })
 
     it('shows a start/completed timestamp range when the execution has finished', () => {
@@ -397,6 +417,59 @@ describe('ExecutionDetailsPanel', () => {
       const activityList = screen.getByRole('grid', { name: 'Activity list' })
       expect(within(activityList).getByText('Process data')).toBeInTheDocument()
       expect(within(activityList).queryByText('Send notification')).not.toBeInTheDocument()
+    })
+  })
+
+  describe('"Delayed" badge in header', () => {
+    it('shows "Delayed" badge when first_stall_detected_at is non-null', () => {
+      const mockedClient = vi.mocked(executionsClient)
+      mockedClient.useQuery.mockReturnValue({
+        ...EXECUTION,
+        data: {
+          ...EXECUTION.data,
+          first_stall_detected_at: '2024-01-01T00:05:00Z',
+        },
+        refetch: vi.fn(),
+      })
+
+      renderPanel(WORKFLOW_DEF)
+
+      expect(screen.getByText('Delayed')).toBeInTheDocument()
+    })
+
+    it('does not show "Delayed" badge when first_stall_detected_at is null', () => {
+      const mockedClient = vi.mocked(executionsClient)
+      mockedClient.useQuery.mockReturnValue({
+        ...EXECUTION,
+        data: {
+          ...EXECUTION.data,
+          first_stall_detected_at: null,
+        },
+        refetch: vi.fn(),
+      })
+
+      renderPanel(WORKFLOW_DEF)
+
+      expect(screen.queryByText('Delayed')).not.toBeInTheDocument()
+    })
+
+    it('shows "Delayed" badge alongside status and approval badges', () => {
+      const mockedClient = vi.mocked(executionsClient)
+      mockedClient.useQuery.mockReturnValue({
+        ...EXECUTION,
+        data: {
+          ...EXECUTION.data,
+          first_stall_detected_at: '2024-01-01T00:05:00Z',
+          approval_pending: true,
+        },
+        refetch: vi.fn(),
+      })
+
+      renderPanel(WORKFLOW_DEF)
+
+      expect(screen.getByTestId('status-label')).toHaveTextContent('running')
+      expect(screen.getByText('Delayed')).toBeInTheDocument()
+      expect(screen.getByText('Pending approval')).toBeInTheDocument()
     })
   })
 

@@ -2343,6 +2343,8 @@ export interface components {
       started_at?: string | null
       /** Completed At */
       completed_at?: string | null
+      /** Stall Alert At */
+      stall_alert_at?: string | null
     }
   }
   responses: {

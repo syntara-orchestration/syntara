@@ -33,13 +33,14 @@ class ActivitySyncPublisherMixin:
             ("error_details", activity.error_details),
             ("output_data", activity.output_data),
             ("iteration", activity.iteration),
+            ("stall_alert_at", activity.stall_alert_at.isoformat() if activity.stall_alert_at else None),
         ]
 
         for field_name, new_value in fields_to_check:
             old_value = old_values.get(field_name)
             if field_name == "status" and old_value is not None:
                 old_value = old_value.value
-            elif field_name in ("started_at", "completed_at") and old_value is not None:
+            elif field_name in ("started_at", "completed_at", "stall_alert_at") and old_value is not None:
                 old_value = old_value.isoformat()
             if old_value != new_value:
                 ops.append({"op": "replace", "path": f"/activities/{activity_idx}/{field_name}", "value": new_value})
@@ -69,6 +70,7 @@ class ActivitySyncPublisherMixin:
                 error_details=activity.error_details,
                 output_data=activity.output_data,
                 iteration=activity.iteration,
+                stall_alert_at=activity.stall_alert_at,
             )
             ops.append({"op": "add", "path": "/activities/-", "value": data.model_dump(mode="json")})
 

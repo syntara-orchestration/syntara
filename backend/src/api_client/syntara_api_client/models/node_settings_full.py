@@ -21,12 +21,15 @@ class NodeSettingsFull:
     Attributes:
         continue_on_failure (bool | None | Unset):
         disabled (bool | None | Unset):
+        expected_duration (int | None | Unset): Expected duration in seconds. Nodes running longer are flagged as
+            stalled.
         timeout (int | None | Unset):
         retry_policy (None | RetryPolicyParameters | Unset):
     """
 
     continue_on_failure: bool | None | Unset = UNSET
     disabled: bool | None | Unset = UNSET
+    expected_duration: int | None | Unset = UNSET
     timeout: int | None | Unset = UNSET
     retry_policy: None | RetryPolicyParameters | Unset = UNSET
 
@@ -44,6 +47,12 @@ class NodeSettingsFull:
             disabled = UNSET
         else:
             disabled = self.disabled
+
+        expected_duration: int | None | Unset
+        if isinstance(self.expected_duration, Unset):
+            expected_duration = UNSET
+        else:
+            expected_duration = self.expected_duration
 
         timeout: int | None | Unset
         if isinstance(self.timeout, Unset):
@@ -66,6 +75,8 @@ class NodeSettingsFull:
             field_dict["continue_on_failure"] = continue_on_failure
         if disabled is not UNSET:
             field_dict["disabled"] = disabled
+        if expected_duration is not UNSET:
+            field_dict["expected_duration"] = expected_duration
         if timeout is not UNSET:
             field_dict["timeout"] = timeout
         if retry_policy is not UNSET:
@@ -97,6 +108,15 @@ class NodeSettingsFull:
 
         disabled = _parse_disabled(d.pop("disabled", UNSET))
 
+        def _parse_expected_duration(data: object) -> int | None | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(int | None | Unset, data)
+
+        expected_duration = _parse_expected_duration(d.pop("expected_duration", UNSET))
+
         def _parse_timeout(data: object) -> int | None | Unset:
             if data is None:
                 return data
@@ -126,6 +146,7 @@ class NodeSettingsFull:
         node_settings_full = cls(
             continue_on_failure=continue_on_failure,
             disabled=disabled,
+            expected_duration=expected_duration,
             timeout=timeout,
             retry_policy=retry_policy,
         )

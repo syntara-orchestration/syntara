@@ -55,6 +55,10 @@ class ActivityExecution:
             error_details (None | str | Unset): Error information if failed
             retry_count (int | Unset): Number of retry attempts Default: 0.
             iteration (int | None | Unset): Iteration number if activity is within a loop (0-indexed)
+            expected_duration (int | None | Unset): Resolved expected duration in seconds, copied from node settings at
+                dispatch time.
+            stall_alert_at (datetime.datetime | None | Unset): Timestamp when stall was first detected by PeriodicWorker.
+                Written once, never cleared.
     """
 
     execution_id: UUID
@@ -73,6 +77,8 @@ class ActivityExecution:
     error_details: None | str | Unset = UNSET
     retry_count: int | Unset = 0
     iteration: int | None | Unset = UNSET
+    expected_duration: int | None | Unset = UNSET
+    stall_alert_at: datetime.datetime | None | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         from ..models.activity_execution_output_data_type_0 import ActivityExecutionOutputDataType0
@@ -145,6 +151,20 @@ class ActivityExecution:
         else:
             iteration = self.iteration
 
+        expected_duration: int | None | Unset
+        if isinstance(self.expected_duration, Unset):
+            expected_duration = UNSET
+        else:
+            expected_duration = self.expected_duration
+
+        stall_alert_at: None | str | Unset
+        if isinstance(self.stall_alert_at, Unset):
+            stall_alert_at = UNSET
+        elif isinstance(self.stall_alert_at, datetime.datetime):
+            stall_alert_at = self.stall_alert_at.isoformat()
+        else:
+            stall_alert_at = self.stall_alert_at
+
         field_dict: dict[str, Any] = {}
 
         field_dict.update(
@@ -178,6 +198,10 @@ class ActivityExecution:
             field_dict["retry_count"] = retry_count
         if iteration is not UNSET:
             field_dict["iteration"] = iteration
+        if expected_duration is not UNSET:
+            field_dict["expected_duration"] = expected_duration
+        if stall_alert_at is not UNSET:
+            field_dict["stall_alert_at"] = stall_alert_at
 
         return field_dict
 
@@ -304,6 +328,32 @@ class ActivityExecution:
 
         iteration = _parse_iteration(d.pop("iteration", UNSET))
 
+        def _parse_expected_duration(data: object) -> int | None | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(int | None | Unset, data)
+
+        expected_duration = _parse_expected_duration(d.pop("expected_duration", UNSET))
+
+        def _parse_stall_alert_at(data: object) -> datetime.datetime | None | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            try:
+                if not isinstance(data, str):
+                    raise TypeError()
+                stall_alert_at_type_0 = isoparse(data)
+
+                return stall_alert_at_type_0
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            return cast(datetime.datetime | None | Unset, data)
+
+        stall_alert_at = _parse_stall_alert_at(d.pop("stall_alert_at", UNSET))
+
         activity_execution = cls(
             execution_id=execution_id,
             activity_name=activity_name,
@@ -321,6 +371,8 @@ class ActivityExecution:
             error_details=error_details,
             retry_count=retry_count,
             iteration=iteration,
+            expected_duration=expected_duration,
+            stall_alert_at=stall_alert_at,
         )
 
         return activity_execution

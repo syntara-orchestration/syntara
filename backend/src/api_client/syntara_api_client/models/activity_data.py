@@ -29,6 +29,7 @@ class ActivityData:
         output_data (ActivityDataOutputDataType0 | None | Unset):
         started_at (datetime.datetime | None | Unset):
         completed_at (datetime.datetime | None | Unset):
+        stall_alert_at (datetime.datetime | None | Unset):
     """
 
     activity_id: str
@@ -38,6 +39,7 @@ class ActivityData:
     output_data: ActivityDataOutputDataType0 | None | Unset = UNSET
     started_at: datetime.datetime | None | Unset = UNSET
     completed_at: datetime.datetime | None | Unset = UNSET
+    stall_alert_at: datetime.datetime | None | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -83,6 +85,14 @@ class ActivityData:
         else:
             completed_at = self.completed_at
 
+        stall_alert_at: None | str | Unset
+        if isinstance(self.stall_alert_at, Unset):
+            stall_alert_at = UNSET
+        elif isinstance(self.stall_alert_at, datetime.datetime):
+            stall_alert_at = self.stall_alert_at.isoformat()
+        else:
+            stall_alert_at = self.stall_alert_at
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -101,6 +111,8 @@ class ActivityData:
             field_dict["started_at"] = started_at
         if completed_at is not UNSET:
             field_dict["completed_at"] = completed_at
+        if stall_alert_at is not UNSET:
+            field_dict["stall_alert_at"] = stall_alert_at
 
         return field_dict
 
@@ -182,6 +194,23 @@ class ActivityData:
 
         completed_at = _parse_completed_at(d.pop("completed_at", UNSET))
 
+        def _parse_stall_alert_at(data: object) -> datetime.datetime | None | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            try:
+                if not isinstance(data, str):
+                    raise TypeError()
+                stall_alert_at_type_0 = isoparse(data)
+
+                return stall_alert_at_type_0
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            return cast(datetime.datetime | None | Unset, data)
+
+        stall_alert_at = _parse_stall_alert_at(d.pop("stall_alert_at", UNSET))
+
         activity_data = cls(
             activity_id=activity_id,
             status=status,
@@ -190,6 +219,7 @@ class ActivityData:
             output_data=output_data,
             started_at=started_at,
             completed_at=completed_at,
+            stall_alert_at=stall_alert_at,
         )
 
         activity_data.additional_properties = d

@@ -228,6 +228,7 @@ function ExecutionDetailContent({
           <SynPanelStackItem style={{ height: `${String(panelHeight)}px` }}>
             <ExecutionDetailsPanel
               executionId={executionId}
+              liveExecution={execution ? { first_stall_detected_at: execution.first_stall_detected_at } : undefined}
               workflowDefinition={workflow?.version.workflow_definition}
               selectedNodeId={selectedNodeId}
               selectedNodeName={selectedNodeName}

@@ -73,7 +73,13 @@ const activityStatusIcons: Record<ActivityStatus, React.ComponentType<{ classNam
   cancelled: RhUiStopCircleFillIcon,
 }
 
-export function ActivityStatusLabel({ status, nodeType }: Readonly<{ status: ActivityStatus; nodeType?: string }>) {
+export function ActivityStatusLabel({
+  status,
+  nodeType,
+  stallAlertAt,
+}: Readonly<{ status: ActivityStatus; nodeType?: string; stallAlertAt?: string | null }>) {
+  const isStalled = status === 'running' && !!stallAlertAt
+
   if (nodeType === ActivityTypeEnum.WAIT && status === 'waiting') {
     return (
       <SynLabel variant="outline" status="custom" icon={<RhUiSyncIcon />}>
@@ -85,6 +91,19 @@ export function ActivityStatusLabel({ status, nodeType }: Readonly<{ status: Act
   const IconComponent = activityStatusIcons[status] ?? RhUiEllipsisHorizontalFillIcon
   const variant = activityStatusVariant[status] ?? 'custom'
   const displayLabel = activityStatusDisplayLabels[status] ?? capitalize(status)
+
+  if (isStalled) {
+    return (
+      <>
+        <SynLabel variant="outline" status={variant} icon={<IconComponent />}>
+          {displayLabel}
+        </SynLabel>{' '}
+        <SynLabel variant="outline" status="warning" icon={<RhUiWarningFillIcon />}>
+          Stalled
+        </SynLabel>
+      </>
+    )
+  }
 
   return (
     <SynLabel variant="outline" status={variant} icon={<IconComponent />}>

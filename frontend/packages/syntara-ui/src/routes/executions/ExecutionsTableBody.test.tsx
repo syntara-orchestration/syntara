@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
 import { useCanI } from '../../hooks/useCanI'
@@ -473,6 +473,100 @@ describe('ExecutionsTableBody - Cancel Run Action', () => {
   it('has no accessibility violations for a running execution with kebab', async () => {
     const { container } = renderTable([
       { id: 'exec-1', workflow_id: 'wf-1', status: 'running', completed_at: null, project_id: 'project-1' },
+    ])
+
+    const results = await axe(container)
+    expect(results).toHaveNoViolations()
+  })
+})
+
+describe('ExecutionsTableBody — Delayed Badge', () => {
+  it('shows "Delayed" badge when first_stall_detected_at is non-null', () => {
+    renderTable([
+      {
+        id: 'exec-stalled',
+        workflow_id: 'wf-1',
+        status: 'running',
+        first_stall_detected_at: '2026-10-07T12:00:00Z',
+        completed_at: null,
+        project_id: 'project-1',
+      },
+    ])
+
+    expect(screen.getByText('Delayed')).toBeInTheDocument()
+  })
+
+  it('does not show "Delayed" badge when first_stall_detected_at is null', () => {
+    renderTable([
+      {
+        id: 'exec-ok',
+        workflow_id: 'wf-1',
+        status: 'running',
+        first_stall_detected_at: null,
+        completed_at: null,
+        project_id: 'project-1',
+      },
+    ])
+
+    expect(screen.queryByText('Delayed')).not.toBeInTheDocument()
+  })
+
+  it('does not show "Delayed" badge when first_stall_detected_at is undefined', () => {
+    renderTable([
+      {
+        id: 'exec-undef',
+        workflow_id: 'wf-1',
+        status: 'running',
+        completed_at: null,
+        project_id: 'project-1',
+      },
+    ])
+
+    expect(screen.queryByText('Delayed')).not.toBeInTheDocument()
+  })
+
+  it('shows "Delayed" badge alongside running status', () => {
+    renderTable([
+      {
+        id: 'exec-stalled-running',
+        workflow_id: 'wf-1',
+        status: 'running',
+        first_stall_detected_at: '2026-10-07T12:00:00Z',
+        completed_at: null,
+        project_id: 'project-1',
+      },
+    ])
+
+    expect(screen.getByText('Running')).toBeInTheDocument()
+    expect(screen.getByText('Delayed')).toBeInTheDocument()
+  })
+
+  it('shows "Delayed" badge for non-running status (historical marker)', () => {
+    renderTable([
+      {
+        id: 'exec-paused-delayed',
+        workflow_id: 'wf-1',
+        status: 'paused',
+        first_stall_detected_at: '2026-10-07T12:00:00Z',
+        completed_at: null,
+        project_id: 'project-1',
+      },
+    ])
+
+    expect(screen.getByText('Paused')).toBeInTheDocument()
+    expect(screen.getByText('Delayed')).toBeInTheDocument()
+  })
+
+  it('has no accessibility violations with "Delayed" badge', async () => {
+    const { container } = renderTable([
+      {
+        id: 'exec-stalled-a11y',
+        workflow_id: 'wf-1',
+        status: 'running',
+        first_stall_detected_at: '2026-10-07T12:00:00Z',
+        completed_at: null,
+        project_id: 'project-1',
+      },
     ])
 
     const results = await axe(container)

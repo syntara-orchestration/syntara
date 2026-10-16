@@ -17,6 +17,7 @@ import type { ExecutionsAPI } from '@syntara/contracts'
 import type React from 'react'
 
 import { ApprovalPendingBadge } from '../../components/labels/ApprovalPendingBadge'
+import { ExecutionDelayedBadge } from '../../components/labels/ExecutionDelayedBadge'
 import { SynPanel } from '../../components/layout/SynPanel'
 import { ExecutionTimestamp } from '../../components/table/ExecutionTimestamp'
 
@@ -33,6 +34,7 @@ type HeaderMetadataProps = {
     completed_at?: string | null
     status?: ExecutionStatus | null
     approval_pending?: boolean
+    first_stall_detected_at?: string | null
   }
   elapsedLabel?: string
   isRunning: boolean
@@ -105,6 +107,11 @@ export function HeaderMetadata({
                 {execution.approval_pending && (
                   <FlexItem>
                     <ApprovalPendingBadge approvalPending={execution.approval_pending} />
+                  </FlexItem>
+                )}
+                {execution.first_stall_detected_at != null && (
+                  <FlexItem>
+                    <ExecutionDelayedBadge />
                   </FlexItem>
                 )}
               </Flex>

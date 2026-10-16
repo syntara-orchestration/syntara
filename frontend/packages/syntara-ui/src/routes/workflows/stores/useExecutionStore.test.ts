@@ -1135,5 +1135,35 @@ describe('useExecutionStore', () => {
       // Key iteration order must be preserved from original insertion
       expect(Array.from(useExecutionStore.getState().activityStates.keys())).toEqual(['task-a', 'task-b', 'task-c'])
     })
+
+    it('preserves non-null stallAlertAt when same-status refresh omits the field', () => {
+      const execution = createMockExecution({
+        activities: [
+          {
+            activity_id: 'http_req',
+            status: 'running',
+            error_details: null,
+            started_at: '2026-10-07T11:00:00Z',
+            completed_at: null,
+            stall_alert_at: '2026-10-07T12:00:00Z',
+          },
+        ],
+      })
+      useExecutionStore.getState().setExecution(execution)
+
+      // REST re-fetch with same status but stall_alert_at absent (undefined → null)
+      useExecutionStore.getState().setActivityExecutions([
+        {
+          activity_id: 'http_req',
+          status: 'running',
+          error_details: null,
+          started_at: '2026-10-07T11:00:00Z',
+          completed_at: null,
+        },
+      ])
+
+      const state = useExecutionStore.getState().activityStates.get('http_req')
+      expect(state?.stallAlertAt).toBe('2026-10-07T12:00:00Z')
+    })
   })
 })

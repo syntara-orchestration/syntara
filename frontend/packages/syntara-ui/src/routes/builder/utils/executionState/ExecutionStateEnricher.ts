@@ -15,6 +15,7 @@ export type ExecutionState = {
   started_at?: string
   completed_at?: string
   error_details?: string
+  stall_alert_at?: string
 }
 
 function isConvergeSource(edge: { source: string }, activities?: Activity[]): boolean {
@@ -217,6 +218,7 @@ export class ExecutionStateEnricher {
           started_at: activityState.startedAt ?? undefined,
           completed_at: activityState.completedAt ?? undefined,
           error_details: activityState.errorDetails ?? undefined,
+          stall_alert_at: activityState.stallAlertAt ?? undefined,
         },
       }
 

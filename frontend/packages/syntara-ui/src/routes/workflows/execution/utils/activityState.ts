@@ -89,6 +89,9 @@ function applyFieldUpdate(activity: ActivityState, field: string, value: unknown
     case 'iteration':
       updated.iteration = value as number | null
       break
+    case 'stall_alert_at':
+      updated.stallAlertAt = value as string | null
+      break
     default:
       throw new Error(`Unsupported field for activity update: ${field}`)
   }
@@ -214,6 +217,7 @@ function applyAppendOperation(activities: Map<string, ActivityState>, value: unk
     startedAt: typeof data.started_at === 'string' ? data.started_at : null,
     completedAt: typeof data.completed_at === 'string' ? data.completed_at : null,
     iteration: typeof data.iteration === 'number' ? data.iteration : null,
+    stallAlertAt: typeof data.stall_alert_at === 'string' ? data.stall_alert_at : null,
   })
 }
 
@@ -338,6 +342,7 @@ export function buildActivityStateMap(
     started_at?: string | null
     completed_at?: string | null
     iteration?: number | null
+    stall_alert_at?: string | null
   }>
 ): Map<string, ActivityState> {
   const map = new Map<string, ActivityState>()
@@ -351,6 +356,7 @@ export function buildActivityStateMap(
       startedAt: activity.started_at,
       completedAt: activity.completed_at,
       iteration: activity.iteration,
+      stallAlertAt: activity.stall_alert_at,
     })
   }
 

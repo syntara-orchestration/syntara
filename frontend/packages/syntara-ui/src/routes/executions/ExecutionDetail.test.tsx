@@ -29,12 +29,16 @@ vi.mock('@tanstack/react-router', async () => {
 })
 
 // Mock the workflow client with execution query that includes workflow_definition
+function noStallTimestamp(): string | null {
+  return null
+}
 const mockExecutionQuery = {
   data: {
     id: 'exec-123',
     workflow_id: 'wf-456',
     workflow_version_id: 'version-789',
     status: 'running',
+    first_stall_detected_at: noStallTimestamp(),
     started_at: '2024-01-01T00:00:00Z',
     project_id: 'project-1',
     activities: [
@@ -185,9 +189,16 @@ vi.mock('../builder/ExecutionViewContent', () => ({
 
 // Mock ExecutionDetailsPanel component
 vi.mock('../builder/ExecutionDetailsPanel', () => ({
-  ExecutionDetailsPanel: ({ executionId }: { executionId: string }) => (
+  ExecutionDetailsPanel: ({
+    executionId,
+    liveExecution,
+  }: {
+    executionId: string
+    liveExecution?: { first_stall_detected_at?: string | null }
+  }) => (
     <div data-testid="execution-details-panel">
       <div>Execution ID: {executionId}</div>
+      <div>Panel stall timestamp: {liveExecution?.first_stall_detected_at ?? 'none'}</div>
     </div>
   ),
 }))
@@ -305,6 +316,7 @@ vi.mock('./hooks/useExecutionNodeClick', () => ({
 describe('ExecutionDetail', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockExecutionQuery.data = { ...mockExecutionQuery.data, first_stall_detected_at: noStallTimestamp() }
     mockNavigate.mockClear()
     vi.mocked(useParams).mockReturnValue({ executionId: 'exec-123' })
     vi.mocked(useRouterState).mockReturnValue('' as never)
@@ -359,6 +371,29 @@ describe('ExecutionDetail', () => {
 
     expect(screen.getByTestId('execution-details-panel')).toBeInTheDocument()
     expect(screen.getByText('Execution ID: exec-123')).toBeInTheDocument()
+  })
+
+  it('passes the refreshed execution stall timestamp to the details panel without remounting the page', () => {
+    const queryClient = new QueryClient()
+    const { rerender } = render(
+      <QueryClientProvider client={queryClient}>
+        <ExecutionDetail />
+      </QueryClientProvider>
+    )
+
+    expect(screen.getByText('Panel stall timestamp: none')).toBeInTheDocument()
+
+    const firstStallDetectedAt = '2026-10-16T13:00:00Z'
+    mockExecutionQuery.data = { ...mockExecutionQuery.data, first_stall_detected_at: firstStallDetectedAt }
+
+    rerender(
+      <QueryClientProvider client={queryClient}>
+        <ExecutionDetail />
+      </QueryClientProvider>
+    )
+
+    expect(screen.getByText(`Panel stall timestamp: ${firstStallDetectedAt}`)).toBeInTheDocument()
+    mockExecutionQuery.data = { ...mockExecutionQuery.data, first_stall_detected_at: noStallTimestamp() }
   })
 
   it('fetches execution with workflow_definition and activities included', () => {

@@ -7,7 +7,19 @@ import type { ActivityState } from '../workflows/execution/types'
 import { ExecutionActivityTable, type ActivityOrderItem } from './ExecutionActivityTable'
 
 vi.mock('./ExecutionStatus', () => ({
-  ActivityStatusLabel: ({ status }: { status: string }) => <div data-testid="activity-status-label">{status}</div>,
+  ActivityStatusLabel: ({
+    status,
+    stallAlertAt,
+  }: {
+    status: string
+    nodeType?: string
+    stallAlertAt?: string | null
+  }) => (
+    <div data-testid="activity-status-label">
+      {status}
+      {stallAlertAt && ' (stalled)'}
+    </div>
+  ),
 }))
 
 const T0 = '2024-01-01T00:00:00Z'
@@ -79,6 +91,37 @@ describe('ExecutionActivityTable', () => {
       const labels = screen.getAllByTestId('activity-status-label')
       expect(labels[0]).toHaveTextContent('completed')
       expect(labels[1]).toHaveTextContent('failed')
+    })
+
+    it('passes stallAlertAt to ActivityStatusLabel for stalled running activities', () => {
+      renderTable({
+        states: new Map([
+          state('task-1', {
+            status: 'running',
+            startedAt: T0,
+            stallAlertAt: '2024-01-01T00:15:00Z',
+          }),
+        ]),
+        order: [{ id: 'task-1', name: 'Stalled Task' }],
+      })
+
+      expect(screen.getByTestId('activity-status-label')).toHaveTextContent('running (stalled)')
+    })
+
+    it('does not show stalled indicator for running activities without stallAlertAt', () => {
+      renderTable({
+        states: new Map([
+          state('task-1', {
+            status: 'running',
+            startedAt: T0,
+          }),
+        ]),
+        order: [{ id: 'task-1', name: 'Normal Running Task' }],
+      })
+
+      const label = screen.getByTestId('activity-status-label')
+      expect(label).toHaveTextContent('running')
+      expect(label).not.toHaveTextContent('stalled')
     })
   })
 

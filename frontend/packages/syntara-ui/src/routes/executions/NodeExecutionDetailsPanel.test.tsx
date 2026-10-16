@@ -67,6 +67,59 @@ describe('NodeExecutionDetailsPanel', () => {
     expect(screen.getByText('Successful')).toBeInTheDocument()
   })
 
+  it('renders both Running and Stalled badges when activity is running with stallAlertAt', () => {
+    const stalledProps = {
+      ...defaultProps,
+      nodeState: {
+        activityId: 'run_aap_vm',
+        status: 'running' as const,
+        startedAt: '2024-01-01T10:00:00Z',
+        completedAt: null,
+        stallAlertAt: '2024-01-01T10:15:00Z',
+      },
+    }
+
+    render(<NodeExecutionDetailsPanel {...stalledProps} />, { wrapper })
+
+    expect(screen.getByText('Running')).toBeInTheDocument()
+    expect(screen.getByText('Stalled')).toBeInTheDocument()
+  })
+
+  it('renders only Running badge when activity is running without stallAlertAt', () => {
+    const runningProps = {
+      ...defaultProps,
+      nodeState: {
+        activityId: 'run_aap_vm',
+        status: 'running' as const,
+        startedAt: '2024-01-01T10:00:00Z',
+        completedAt: null,
+      },
+    }
+
+    render(<NodeExecutionDetailsPanel {...runningProps} />, { wrapper })
+
+    expect(screen.getByText('Running')).toBeInTheDocument()
+    expect(screen.queryByText('Stalled')).not.toBeInTheDocument()
+  })
+
+  it('does not render Stalled badge for completed activities even with stallAlertAt', () => {
+    const completedStalledProps = {
+      ...defaultProps,
+      nodeState: {
+        activityId: 'run_aap_vm',
+        status: 'completed' as const,
+        startedAt: '2024-01-01T10:00:00Z',
+        completedAt: '2024-01-01T10:01:30Z',
+        stallAlertAt: '2024-01-01T10:15:00Z',
+      },
+    }
+
+    render(<NodeExecutionDetailsPanel {...completedStalledProps} />, { wrapper })
+
+    expect(screen.getByText('Successful')).toBeInTheDocument()
+    expect(screen.queryByText('Stalled')).not.toBeInTheDocument()
+  })
+
   it('renders Input and Output panes side by side', () => {
     render(<NodeExecutionDetailsPanel {...defaultProps} />, { wrapper })
 

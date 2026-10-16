@@ -59,6 +59,8 @@ class ExecutionRead:
             trigger_type (None | str | Unset): Trigger node type (manual_trigger, scheduled_trigger, webhook_trigger,
                 eda_trigger)
             interface (None | str | Unset): Originating interface (ui or api)
+            first_stall_detected_at (datetime.datetime | None | Unset): When this execution first entered stalled state (set
+                once, permanent)
             labels (ExecutionReadLabels | Unset):
             approval_pending (bool | Unset):  Default: False.
             current_activities (list[CurrentActivity] | Unset): Currently executing activities
@@ -91,6 +93,7 @@ class ExecutionRead:
     retried_from_execution_id: None | Unset | UUID = UNSET
     trigger_type: None | str | Unset = UNSET
     interface: None | str | Unset = UNSET
+    first_stall_detected_at: datetime.datetime | None | Unset = UNSET
     labels: ExecutionReadLabels | Unset = UNSET
     approval_pending: bool | Unset = False
     current_activities: list[CurrentActivity] | Unset = UNSET
@@ -210,6 +213,14 @@ class ExecutionRead:
         else:
             interface = self.interface
 
+        first_stall_detected_at: None | str | Unset
+        if isinstance(self.first_stall_detected_at, Unset):
+            first_stall_detected_at = UNSET
+        elif isinstance(self.first_stall_detected_at, datetime.datetime):
+            first_stall_detected_at = self.first_stall_detected_at.isoformat()
+        else:
+            first_stall_detected_at = self.first_stall_detected_at
+
         labels: dict[str, Any] | Unset = UNSET
         if not isinstance(self.labels, Unset):
             labels = self.labels.to_dict()
@@ -284,6 +295,8 @@ class ExecutionRead:
             field_dict["trigger_type"] = trigger_type
         if interface is not UNSET:
             field_dict["interface"] = interface
+        if first_stall_detected_at is not UNSET:
+            field_dict["first_stall_detected_at"] = first_stall_detected_at
         if labels is not UNSET:
             field_dict["labels"] = labels
         if approval_pending is not UNSET:
@@ -494,6 +507,23 @@ class ExecutionRead:
 
         interface = _parse_interface(d.pop("interface", UNSET))
 
+        def _parse_first_stall_detected_at(data: object) -> datetime.datetime | None | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            try:
+                if not isinstance(data, str):
+                    raise TypeError()
+                first_stall_detected_at_type_0 = isoparse(data)
+
+                return first_stall_detected_at_type_0
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            return cast(datetime.datetime | None | Unset, data)
+
+        first_stall_detected_at = _parse_first_stall_detected_at(d.pop("first_stall_detected_at", UNSET))
+
         _labels = d.pop("labels", UNSET)
         labels: ExecutionReadLabels | Unset
         if isinstance(_labels, Unset):
@@ -575,6 +605,7 @@ class ExecutionRead:
             retried_from_execution_id=retried_from_execution_id,
             trigger_type=trigger_type,
             interface=interface,
+            first_stall_detected_at=first_stall_detected_at,
             labels=labels,
             approval_pending=approval_pending,
             current_activities=current_activities,

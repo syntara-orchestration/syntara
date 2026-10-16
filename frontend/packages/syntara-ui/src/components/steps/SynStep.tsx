@@ -23,6 +23,7 @@ type ExecutionState = {
   completed_at?: string
   error_details?: string
   retry_count?: number
+  stall_alert_at?: string
 }
 
 const DEFAULT_NODE_WIDTH = 240
@@ -266,6 +267,9 @@ export function SynStep(props: {
             status={props.executionState?.status ?? 'pending'}
             retryCount={props.executionState?.retry_count}
             nodeType={props.nodeProps.type}
+            stallAlertAt={props.executionState?.stall_alert_at}
+            startedAt={props.executionState?.started_at}
+            completedAt={props.executionState?.completed_at}
           />
         )}
         {!isSemanticZoom && mockDataPinned && (

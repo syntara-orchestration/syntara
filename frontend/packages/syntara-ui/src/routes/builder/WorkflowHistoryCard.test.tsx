@@ -563,4 +563,45 @@ describe('ExecutionHistoryRow', () => {
 
     expect(screen.getByText('Retried from: abcdef12')).toBeInTheDocument()
   })
+
+  it('renders Delayed badge when execution has first_stall_detected_at', () => {
+    renderRow({
+      ...baseExecution,
+      status: 'running',
+      first_stall_detected_at: '2024-01-15T09:00:00Z',
+    })
+
+    expect(screen.getByText('Delayed')).toBeInTheDocument()
+  })
+
+  it('does not render Delayed badge when first_stall_detected_at is null', () => {
+    renderRow({
+      ...baseExecution,
+      status: 'running',
+      first_stall_detected_at: null,
+    })
+
+    expect(screen.queryByText('Delayed')).not.toBeInTheDocument()
+  })
+
+  it('does not render Delayed badge when first_stall_detected_at is undefined', () => {
+    renderRow(baseExecution)
+
+    expect(screen.queryByText('Delayed')).not.toBeInTheDocument()
+  })
+
+  it('renders status, approval, delayed, and test badges together', () => {
+    renderRow({
+      ...baseExecution,
+      status: 'running',
+      approval_pending: true,
+      first_stall_detected_at: '2024-01-15T09:00:00Z',
+      execution_metadata: { mode: 'test' },
+    })
+
+    expect(screen.getByTestId('status-label')).toHaveTextContent('running')
+    expect(screen.getByTestId('approval-pending-badge')).toBeInTheDocument()
+    expect(screen.getByText('Delayed')).toBeInTheDocument()
+    expect(screen.getByText('Test run')).toBeInTheDocument()
+  })
 })

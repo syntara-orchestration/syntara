@@ -88,6 +88,7 @@ function mergeActivityStates(
           completedAt: existingState.completedAt ?? incomingState.completedAt,
           errorDetails: existingState.errorDetails ?? incomingState.errorDetails,
           iteration: incomingState.iteration ?? existingState.iteration,
+          stallAlertAt: existingState.stallAlertAt ?? incomingState.stallAlertAt,
         })
       }
     }
@@ -265,6 +266,7 @@ function activityInputToState(activity: ActivityInput): ActivityState {
     startedAt: activity.started_at,
     completedAt: activity.completed_at,
     iteration: activity.iteration ?? undefined,
+    stallAlertAt: activity.stall_alert_at,
   }
 }
 
@@ -370,6 +372,7 @@ export const useExecutionStore = create<ExecutionStore>((set, get) => ({
       started_at: activity.started_at,
       completed_at: activity.completed_at,
       iteration: activity.iteration,
+      stall_alert_at: activity.stall_alert_at,
     }))
     const activityStateMap = buildActivityStateMap(activities)
 

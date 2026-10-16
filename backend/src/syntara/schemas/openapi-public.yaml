@@ -34032,6 +34032,12 @@ components:
               format: date-time
             - type: 'null'
           title: Completed At
+        stall_alert_at:
+          anyOf:
+            - type: string
+              format: date-time
+            - type: 'null'
+          title: Stall Alert At
     ActivityStatus:
       type: string
       title: ActivityStatus

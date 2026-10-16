@@ -422,4 +422,24 @@ export const activityExecutions: Record<string, ActivityExecution[]> = {
       iteration: null,
     },
   ],
+  'exec-stalled': [
+    {
+      id: 'act-stalled-1',
+      created_at: mockDate.minutesAgo45,
+      updated_at: mockDate.minutesAgo15,
+      execution_id: 'exec-stalled',
+      activity_name: 'check_temperature',
+      status: 'running',
+      started_at: mockDate.minutesAgo45,
+      completed_at: null,
+      input_data: {
+        temp: 28,
+      } as Record<string, unknown>,
+      output_data: null,
+      error_details: null,
+      retry_count: 0,
+      iteration: null,
+      stall_alert_at: mockDate.minutesAgo15,
+    },
+  ],
 }

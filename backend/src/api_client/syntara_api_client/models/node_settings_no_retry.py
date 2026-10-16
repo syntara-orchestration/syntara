@@ -12,16 +12,19 @@ T = TypeVar("T", bound="NodeSettingsNoRetry")
 
 @_attrs_define
 class NodeSettingsNoRetry:
-    """Settings with disabled, continue_on_failure, and timeout (script, agentic, approval).
+    """Settings with disabled, continue_on_failure, timeout, and expected_duration (script, agentic, approval).
 
     Attributes:
         continue_on_failure (bool | None | Unset):
         disabled (bool | None | Unset):
+        expected_duration (int | None | Unset): Expected duration in seconds. Nodes running longer are flagged as
+            stalled.
         timeout (int | None | Unset):
     """
 
     continue_on_failure: bool | None | Unset = UNSET
     disabled: bool | None | Unset = UNSET
+    expected_duration: int | None | Unset = UNSET
     timeout: int | None | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
@@ -37,6 +40,12 @@ class NodeSettingsNoRetry:
         else:
             disabled = self.disabled
 
+        expected_duration: int | None | Unset
+        if isinstance(self.expected_duration, Unset):
+            expected_duration = UNSET
+        else:
+            expected_duration = self.expected_duration
+
         timeout: int | None | Unset
         if isinstance(self.timeout, Unset):
             timeout = UNSET
@@ -50,6 +59,8 @@ class NodeSettingsNoRetry:
             field_dict["continue_on_failure"] = continue_on_failure
         if disabled is not UNSET:
             field_dict["disabled"] = disabled
+        if expected_duration is not UNSET:
+            field_dict["expected_duration"] = expected_duration
         if timeout is not UNSET:
             field_dict["timeout"] = timeout
 
@@ -77,6 +88,15 @@ class NodeSettingsNoRetry:
 
         disabled = _parse_disabled(d.pop("disabled", UNSET))
 
+        def _parse_expected_duration(data: object) -> int | None | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(int | None | Unset, data)
+
+        expected_duration = _parse_expected_duration(d.pop("expected_duration", UNSET))
+
         def _parse_timeout(data: object) -> int | None | Unset:
             if data is None:
                 return data
@@ -89,6 +109,7 @@ class NodeSettingsNoRetry:
         node_settings_no_retry = cls(
             continue_on_failure=continue_on_failure,
             disabled=disabled,
+            expected_duration=expected_duration,
             timeout=timeout,
         )
 

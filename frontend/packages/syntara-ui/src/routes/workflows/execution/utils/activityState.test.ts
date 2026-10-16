@@ -721,6 +721,7 @@ describe('applyOperation — append', () => {
       startedAt: '2026-07-01T10:00:00Z',
       completedAt: null,
       iteration: 1,
+      stallAlertAt: null,
     })
   })
 
@@ -951,5 +952,58 @@ describe('buildLatestIterationMap', () => {
     // Loop B at iteration 1: both at max → keep real status
     expect(result.get('B1')?.status).toBe('completed')
     expect(result.get('B2')?.status).toBe('running')
+  })
+})
+
+describe('stall_alert_at field support', () => {
+  const STALL_TIMESTAMP = '2026-09-15T12:00:00Z'
+
+  it('buildActivityStateMap includes stallAlertAt', () => {
+    const map = buildActivityStateMap([
+      { activity_id: 'a1', status: 'running', stall_alert_at: STALL_TIMESTAMP },
+      { activity_id: 'a2', status: 'running', stall_alert_at: null },
+      { activity_id: 'a3', status: 'completed' },
+    ])
+
+    expect(map.get('a1')?.stallAlertAt).toBe(STALL_TIMESTAMP)
+    expect(map.get('a2')?.stallAlertAt).toBeNull()
+    expect(map.get('a3')?.stallAlertAt).toBeUndefined()
+  })
+
+  it('applyOperation handles stall_alert_at field update', () => {
+    const activities = new Map<string, ActivityState>([['a1', { activityId: 'a1', status: 'running' }]])
+
+    applyOperation(activities, { op: 'replace', path: '/activities/a1/stall_alert_at', value: STALL_TIMESTAMP })
+
+    expect(activities.get('a1')?.stallAlertAt).toBe(STALL_TIMESTAMP)
+  })
+
+  it('applyOperation append includes stallAlertAt from incoming data', () => {
+    const activities = new Map<string, ActivityState>()
+
+    applyOperation(activities, {
+      op: 'add',
+      path: '/activities/-',
+      value: {
+        activity_id: 'new-activity',
+        status: 'running',
+        stall_alert_at: STALL_TIMESTAMP,
+        started_at: '2026-09-15T11:00:00Z',
+      },
+    })
+
+    expect(activities.get('new-activity')?.stallAlertAt).toBe(STALL_TIMESTAMP)
+  })
+
+  it('applyOperation append sets null stallAlertAt when absent', () => {
+    const activities = new Map<string, ActivityState>()
+
+    applyOperation(activities, {
+      op: 'add',
+      path: '/activities/-',
+      value: { activity_id: 'fresh', status: 'running' },
+    })
+
+    expect(activities.get('fresh')?.stallAlertAt).toBeNull()
   })
 })

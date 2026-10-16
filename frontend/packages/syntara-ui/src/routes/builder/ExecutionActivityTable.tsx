@@ -117,7 +117,7 @@ function ActivityRow({
         <Td dataLabel="Ended">{state?.completedAt ? <ExecutionTimestamp dateString={state.completedAt} /> : DASH}</Td>
         <Td dataLabel="Elapsed time">{elapsedMs === undefined ? DASH : formatElapsedTime(elapsedMs)}</Td>
         <Td dataLabel="Status" modifier="nowrap">
-          <ActivityStatusLabel status={state?.status ?? 'pending'} nodeType={type} />
+          <ActivityStatusLabel status={state?.status ?? 'pending'} nodeType={type} stallAlertAt={state?.stallAlertAt} />
         </Td>
         {hasAAPColumn && <Td dataLabel="AAP Job">{jobUrl ? <AAPJobLink url={jobUrl} /> : null}</Td>}
       </Tr>

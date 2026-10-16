@@ -402,4 +402,36 @@ describe('ExecutionDetailPageHeaderParts', () => {
     render(<ExecutionDetailTitleRowAddons execution={execution} />)
     expect(screen.getByText('Pending approval')).toBeInTheDocument()
   })
+
+  it('renders Delayed badge when execution has first_stall_detected_at', () => {
+    const execution = {
+      status: 'running' as const,
+      first_stall_detected_at: '2024-01-15T10:00:00.000Z',
+    } as never
+    render(<ExecutionDetailTitleRowAddons execution={execution} />)
+    expect(screen.getByText('Delayed')).toBeInTheDocument()
+  })
+
+  it('does not render Delayed badge when first_stall_detected_at is null', () => {
+    const execution = {
+      status: 'running' as const,
+      first_stall_detected_at: null,
+    } as never
+    render(<ExecutionDetailTitleRowAddons execution={execution} />)
+    expect(screen.queryByText('Delayed')).not.toBeInTheDocument()
+  })
+
+  it('renders status, approval, and delayed badges together', () => {
+    const execution = {
+      status: 'running' as const,
+      approval_pending: true,
+      first_stall_detected_at: '2024-01-15T10:00:00.000Z',
+      created_at: '2024-01-15T09:00:00.000Z',
+    } as never
+    render(<ExecutionDetailTitleRowAddons execution={execution} />)
+    expect(screen.getByText('Running')).toBeInTheDocument()
+    expect(screen.getByText('Pending approval')).toBeInTheDocument()
+    expect(screen.getByText('Delayed')).toBeInTheDocument()
+    expect(screen.getByText(/Viewing run:/)).toBeInTheDocument()
+  })
 })

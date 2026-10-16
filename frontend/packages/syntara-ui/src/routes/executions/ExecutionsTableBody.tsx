@@ -9,6 +9,7 @@ import { useState } from 'react'
 import { AppRoute } from '../../app/AppRoute'
 import { IconLabel } from '../../components/IconLabel'
 import { ApprovalPendingBadge } from '../../components/labels/ApprovalPendingBadge'
+import { ExecutionDelayedBadge } from '../../components/labels/ExecutionDelayedBadge'
 import { ProjectGroupHeaderRow } from '../../components/ProjectGroupHeaderRow'
 import type { KebabAction } from '../../components/SynKebabMenu'
 import { SynKebabMenu } from '../../components/SynKebabMenu'
@@ -47,6 +48,7 @@ type Execution = {
   created_at?: string
   updated_at?: string
   project_id: string
+  first_stall_detected_at?: string | null
 }
 
 type ExecutionRowProps = {
@@ -184,6 +186,11 @@ function ExecutionRow({ execution }: Readonly<ExecutionRowProps>) {
           {execution.approval_pending && (
             <FlexItem>
               <ApprovalPendingBadge approvalPending={execution.approval_pending} />
+            </FlexItem>
+          )}
+          {execution.first_stall_detected_at != null && (
+            <FlexItem>
+              <ExecutionDelayedBadge />
             </FlexItem>
           )}
         </Flex>

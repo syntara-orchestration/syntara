@@ -1,0 +1,38 @@
+/**
+ * Styling for activity execution status badge displayed on workflow steps (canvas).
+ */
+
+.wrapper {
+  position: absolute;
+  bottom: -20px;
+  right: -20px;
+  width: 48px;
+}
+
+.badge {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background-color: var(--pf-t--global--background--color--primary--default);
+  border-width: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+.counter {
+  position: absolute;
+  /* 48px badge height + 2px gap */
+  top: 50px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: var(--pf-t--global--text--color--regular);
+  font-weight: var(--pf-t--global--font--weight--body--bold);
+  font-size: var(--pf-t--global--font--size--xs);
+  font-variant-numeric: tabular-nums;
+  margin: 0;
+  white-space: nowrap;
+  z-index: 10;
+}

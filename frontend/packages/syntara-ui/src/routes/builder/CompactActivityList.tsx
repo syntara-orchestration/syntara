@@ -54,7 +54,11 @@ export function CompactActivityList({
                 </Stack>
               </Td>
               <Td dataLabel="Status" modifier="nowrap" className={styles.statusCell}>
-                <ActivityStatusLabel status={state?.status ?? ACTIVITY_STATUS.PENDING} nodeType={type} />
+                <ActivityStatusLabel
+                  status={state?.status ?? ACTIVITY_STATUS.PENDING}
+                  nodeType={type}
+                  stallAlertAt={state?.stallAlertAt}
+                />
               </Td>
             </Tr>
           )

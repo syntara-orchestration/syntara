@@ -128,6 +128,8 @@ export type ActivityState = {
   completedAt?: string | null
   /** Loop iteration number (0-indexed), null for non-loop activities */
   iteration?: number | null
+  /** Permanent stall marker — set once when the worker detects a stall, never cleared */
+  stallAlertAt?: string | null
 }
 
 /**

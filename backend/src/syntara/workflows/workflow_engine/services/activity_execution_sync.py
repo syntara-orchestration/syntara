@@ -208,6 +208,7 @@ class ActivityExecutionSyncMixin:
             "retry_count": existing.retry_count,
             "output_data": existing.output_data,
             "iteration": existing.iteration,
+            "stall_alert_at": existing.stall_alert_at,
         }
 
         existing.status = activity_data["status"]

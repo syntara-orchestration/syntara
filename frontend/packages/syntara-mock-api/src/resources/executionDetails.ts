@@ -16,6 +16,7 @@ function toActivityData(activity: ActivityExecution): ActivityData {
     output_data: activity.output_data,
     started_at: activity.started_at,
     completed_at: activity.completed_at,
+    stall_alert_at: activity.stall_alert_at,
   }
 }
 
