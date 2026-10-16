@@ -117,7 +117,7 @@ test('user configures Conditional node with if/else-if/else branches', async ({ 
     // Note: We partially use the helper then manually add else-if branch
     const panel = await clickAddConnectedStep(app)
     await panel.getByRole('button', { name: 'Logic', exact: true }).click()
-    await expect(panel.getByRole('heading', { name: /select a logic node/i })).toBeVisible({ timeout: 10000 })
+    await expect(panel.getByRole('heading', { name: /select a logic step/i })).toBeVisible({ timeout: 10000 })
     await panel.getByRole('button', { name: 'Conditional', exact: true }).click()
 
     // Wait for the form to load
@@ -222,7 +222,7 @@ test('user adds condition group to create complex conditional logic', async ({ a
     // Note: We partially use the helper then manually add group
     const panel = await clickAddConnectedStep(app)
     await panel.getByRole('button', { name: 'Logic', exact: true }).click()
-    await expect(panel.getByRole('heading', { name: /select a logic node/i })).toBeVisible({ timeout: 10000 })
+    await expect(panel.getByRole('heading', { name: /select a logic step/i })).toBeVisible({ timeout: 10000 })
     await panel.getByRole('button', { name: 'Conditional', exact: true }).click()
 
     // Wait for the form to load

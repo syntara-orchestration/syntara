@@ -46,7 +46,7 @@ export type RunWorkflowSectionProps = Readonly<{
   validationErrorCount: number
   dispatch: Dispatch<BuilderAction>
   builderPermissions: BuilderPermissions
-  isNodeEditorOpen?: boolean
+  isStepEditorOpen?: boolean
 }>
 
 const NO_TRIGGERS_TOOLTIP = 'At least one trigger step needs to be placed on the canvas for this workflow to run'
@@ -59,7 +59,7 @@ export function RunWorkflowSection({
   validationErrorCount,
   dispatch,
   builderPermissions,
-  isNodeEditorOpen,
+  isStepEditorOpen,
 }: RunWorkflowSectionProps) {
   const [isRunDropdownOpen, setIsRunDropdownOpen] = useState(false)
   const hasTriggers = (triggers?.length ?? 0) > 0
@@ -67,12 +67,12 @@ export function RunWorkflowSection({
   const hasValidationErrors = validationErrorCount > 0
 
   const isRunDisabled =
-    !builderPermissions.canRun || !!isNodeEditorOpen || !hasTriggers || !isSaved || hasValidationErrors
+    !builderPermissions.canRun || !!isStepEditorOpen || !hasTriggers || !isSaved || hasValidationErrors
 
   let runTooltipContent = ''
   if (!builderPermissions.canRun) {
     runTooltipContent = builderPermissions.tooltips.run
-  } else if (isNodeEditorOpen) {
+  } else if (isStepEditorOpen) {
     runTooltipContent = NODE_EDITOR_TOOLTIP
   } else if (!isSaved) {
     runTooltipContent = SAVE_FIRST_TOOLTIP

@@ -4,10 +4,10 @@ import type { WorkflowDefinition } from '../../../stores/workflowStoreTypes'
 
 export function useBuilderDerivedUiFlags(
   currentWorkflow: WorkflowDefinition | null,
-  addNodePanelOpen: boolean,
-  nodeEditorMode: 'add' | 'edit' | null
+  addStepPanelOpen: boolean,
+  stepEditorMode: 'add' | 'edit' | null
 ) {
-  const hasNoWorkflowNodes = useMemo(() => {
+  const hasNoWorkflowSteps = useMemo(() => {
     if (!currentWorkflow) {
       return false
     }
@@ -16,8 +16,8 @@ export function useBuilderDerivedUiFlags(
     return triggers.length === 0 && activities.length === 0
   }, [currentWorkflow])
 
-  const isAddNodePanelOpen = addNodePanelOpen || hasNoWorkflowNodes
-  const isNodeEditorOpen = nodeEditorMode !== null
+  const isAddStepPanelOpen = addStepPanelOpen || hasNoWorkflowSteps
+  const isStepEditorOpen = stepEditorMode !== null
 
-  return { hasNoWorkflowNodes, isAddNodePanelOpen, isNodeEditorOpen }
+  return { hasNoWorkflowSteps, isAddStepPanelOpen, isStepEditorOpen }
 }

@@ -17,7 +17,7 @@ vi.mock('../../../client', () => ({
   interfaceTagMiddleware: { onRequest: vi.fn() },
 }))
 
-vi.mock('../node-forms/useMaxWaitDuration', () => ({
+vi.mock('../step-forms/useMaxWaitDuration', () => ({
   DEFAULT_MAX_WAIT_SECONDS: 2_592_000,
   fetchMaxWaitDuration: () => Promise.resolve(2_592_000),
 }))
