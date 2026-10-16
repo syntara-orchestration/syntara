@@ -2,7 +2,7 @@ import type { ConditionActivity } from '@syntara/contracts'
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
-import { ConditionNodeComponent, ConditionNodeDetails } from './ConditionNode'
+import { ConditionStepComponent, ConditionStepDetails } from './ConditionNode'
 
 // Mock @xyflow/react
 vi.mock('@xyflow/react', () => ({
@@ -23,7 +23,7 @@ vi.mock('@xyflow/react', () => ({
   },
 }))
 
-describe('ConditionNodeComponent', () => {
+describe('ConditionStepComponent', () => {
   const baseConditionNode = {
     type: 'condition',
     id: 'condition-1',
@@ -49,26 +49,26 @@ describe('ConditionNodeComponent', () => {
 
   describe('Rendering', () => {
     it('renders condition node with name', () => {
-      render(<ConditionNodeComponent {...createNodeProps(baseConditionNode)} />)
+      render(<ConditionStepComponent {...createNodeProps(baseConditionNode)} />)
 
       expect(screen.getByText('Check Status')).toBeInTheDocument()
     })
 
     it('renders condition label', () => {
-      render(<ConditionNodeComponent {...createNodeProps(baseConditionNode)} />)
+      render(<ConditionStepComponent {...createNodeProps(baseConditionNode)} />)
 
       expect(screen.getByText('Condition')).toBeInTheDocument()
     })
 
     it('renders True and False branch handles', () => {
-      render(<ConditionNodeComponent {...createNodeProps(baseConditionNode)} />)
+      render(<ConditionStepComponent {...createNodeProps(baseConditionNode)} />)
 
       expect(screen.getByText('True')).toBeInTheDocument()
       expect(screen.getByText('False')).toBeInTheDocument()
     })
 
     it('does not render expand/collapse toggle', () => {
-      render(<ConditionNodeComponent {...createNodeProps(baseConditionNode)} />)
+      render(<ConditionStepComponent {...createNodeProps(baseConditionNode)} />)
 
       expect(screen.queryByTestId('node-expand-toggle')).not.toBeInTheDocument()
       expect(
@@ -85,7 +85,7 @@ describe('ConditionNodeComponent', () => {
         parameters: { condition: 'x > 0' },
       } as ConditionActivity
 
-      render(<ConditionNodeComponent {...createNodeProps(unnamedCondition)} />)
+      render(<ConditionStepComponent {...createNodeProps(unnamedCondition)} />)
 
       expect(screen.getByText('Untitled Condition')).toBeInTheDocument()
     })
@@ -93,7 +93,7 @@ describe('ConditionNodeComponent', () => {
 
   describe('Branch Handles', () => {
     it('renders handles in correct order (true first, then false)', () => {
-      render(<ConditionNodeComponent {...createNodeProps(baseConditionNode)} />)
+      render(<ConditionStepComponent {...createNodeProps(baseConditionNode)} />)
 
       const handles = screen.getAllByText(/True|False/)
       expect(handles[0]).toHaveTextContent('True')
@@ -111,7 +111,7 @@ describe('ConditionNodeComponent', () => {
         },
       } as ConditionActivity
 
-      render(<ConditionNodeComponent {...createNodeProps(nodeWithExecution)} />)
+      render(<ConditionStepComponent {...createNodeProps(nodeWithExecution)} />)
 
       // Should render without crashing
       expect(screen.getByText('Check Status')).toBeInTheDocument()
@@ -119,7 +119,7 @@ describe('ConditionNodeComponent', () => {
   })
 })
 
-describe('ConditionNodeDetails', () => {
+describe('ConditionStepDetails', () => {
   const baseConditionActivity = {
     type: 'condition',
     id: 'condition-1',
@@ -128,7 +128,7 @@ describe('ConditionNodeDetails', () => {
   } as ConditionActivity
 
   it('renders condition name as title', () => {
-    render(<ConditionNodeDetails conditionActivity={baseConditionActivity} />)
+    render(<ConditionStepDetails conditionActivity={baseConditionActivity} />)
 
     expect(screen.getByText('Test Condition')).toBeInTheDocument()
   })
@@ -140,23 +140,23 @@ describe('ConditionNodeDetails', () => {
       parameters: { condition: 'y < 10' },
     } as ConditionActivity
 
-    render(<ConditionNodeDetails conditionActivity={unnamed} />)
+    render(<ConditionStepDetails conditionActivity={unnamed} />)
 
     expect(screen.getByText('Untitled Condition')).toBeInTheDocument()
   })
 
   it('renders custom icon when provided', () => {
     const icon = <svg data-testid="custom-icon" />
-    render(<ConditionNodeDetails conditionActivity={baseConditionActivity} icon={icon} />)
+    render(<ConditionStepDetails conditionActivity={baseConditionActivity} icon={icon} />)
 
     expect(screen.getByTestId('custom-icon')).toBeInTheDocument()
   })
 
   it('renders children (branch handles)', () => {
     render(
-      <ConditionNodeDetails conditionActivity={baseConditionActivity}>
+      <ConditionStepDetails conditionActivity={baseConditionActivity}>
         <div data-testid="branch-handles">Branch Handles</div>
-      </ConditionNodeDetails>
+      </ConditionStepDetails>
     )
 
     expect(screen.getByTestId('branch-handles')).toBeInTheDocument()
@@ -168,19 +168,19 @@ describe('ConditionNodeDetails', () => {
       outputs: { result: { type: 'string' }, evaluated: { type: 'string' } },
     } as unknown as ConditionActivity
 
-    render(<ConditionNodeDetails conditionActivity={conditionWithOutputs} />)
+    render(<ConditionStepDetails conditionActivity={conditionWithOutputs} />)
 
     expect(screen.getByText('Outputs')).toBeInTheDocument()
   })
 
   it('renders JSON when showJson is true', () => {
-    render(<ConditionNodeDetails conditionActivity={baseConditionActivity} showJson />)
+    render(<ConditionStepDetails conditionActivity={baseConditionActivity} showJson />)
 
     expect(screen.getByText('Full Definition')).toBeInTheDocument()
   })
 
   it('does not render JSON when showJson is false', () => {
-    render(<ConditionNodeDetails conditionActivity={baseConditionActivity} showJson={false} />)
+    render(<ConditionStepDetails conditionActivity={baseConditionActivity} showJson={false} />)
 
     expect(screen.queryByText('Full Definition')).not.toBeInTheDocument()
   })

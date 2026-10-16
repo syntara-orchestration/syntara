@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { FlowNodeType } from '../../../../constants'
 
-import { TaskReversedNodeComponent } from './TaskReversedNode'
+import { TaskReversedStepComponent } from './TaskReversedNode'
 
 vi.mock('./hooks/useCredentialName', () => ({
   useCredentialName: () => ({ name: undefined, isPending: false }),
@@ -28,7 +28,7 @@ vi.mock('@xyflow/react', () => ({
   },
 }))
 
-describe('TaskReversedNodeComponent', () => {
+describe('TaskReversedStepComponent', () => {
   const baseTaskNode = {
     type: 'script',
     id: 'task-reversed-1',
@@ -57,13 +57,13 @@ describe('TaskReversedNodeComponent', () => {
 
   describe('Rendering', () => {
     it('renders task reversed node with name', () => {
-      render(<TaskReversedNodeComponent {...createNodeProps(baseTaskNode)} />)
+      render(<TaskReversedStepComponent {...createNodeProps(baseTaskNode)} />)
 
       expect(screen.getByText('Loop Back Task')).toBeInTheDocument()
     })
 
     it('renders executor type label', () => {
-      render(<TaskReversedNodeComponent {...createNodeProps(baseTaskNode)} />)
+      render(<TaskReversedStepComponent {...createNodeProps(baseTaskNode)} />)
 
       // Script executor label
       expect(screen.getByText('Script')).toBeInTheDocument()
@@ -82,7 +82,7 @@ describe('TaskReversedNodeComponent', () => {
         },
       } as TaskActivity
 
-      render(<TaskReversedNodeComponent {...createNodeProps(agenticTask)} />)
+      render(<TaskReversedStepComponent {...createNodeProps(agenticTask)} />)
 
       expect(screen.getByText('AI Task')).toBeInTheDocument()
       expect(screen.getByText('Task Agent')).toBeInTheDocument()
@@ -99,7 +99,7 @@ describe('TaskReversedNodeComponent', () => {
         },
       } as TaskActivity
 
-      render(<TaskReversedNodeComponent {...createNodeProps(httpTask)} />)
+      render(<TaskReversedStepComponent {...createNodeProps(httpTask)} />)
 
       expect(screen.getByText('API Call')).toBeInTheDocument()
     })
@@ -115,7 +115,7 @@ describe('TaskReversedNodeComponent', () => {
         },
       } as TaskActivity
 
-      render(<TaskReversedNodeComponent {...createNodeProps(nodeWithExecution)} />)
+      render(<TaskReversedStepComponent {...createNodeProps(nodeWithExecution)} />)
 
       // Should render without crashing
       expect(screen.getByText('Loop Back Task')).toBeInTheDocument()
@@ -131,7 +131,7 @@ describe('TaskReversedNodeComponent', () => {
         },
       } as TaskActivity
 
-      render(<TaskReversedNodeComponent {...createNodeProps(nodeWithExecution)} />)
+      render(<TaskReversedStepComponent {...createNodeProps(nodeWithExecution)} />)
 
       expect(screen.getByText('Loop Back Task')).toBeInTheDocument()
     })
@@ -146,7 +146,7 @@ describe('TaskReversedNodeComponent', () => {
         },
       } as TaskActivity
 
-      render(<TaskReversedNodeComponent {...createNodeProps(nodeWithError)} />)
+      render(<TaskReversedStepComponent {...createNodeProps(nodeWithError)} />)
 
       expect(screen.getByText('Loop Back Task')).toBeInTheDocument()
     })
@@ -154,7 +154,7 @@ describe('TaskReversedNodeComponent', () => {
 
   describe('Node Structure', () => {
     it('renders with correct structure', () => {
-      render(<TaskReversedNodeComponent {...createNodeProps(baseTaskNode)} />)
+      render(<TaskReversedStepComponent {...createNodeProps(baseTaskNode)} />)
 
       expect(screen.getByText('Loop Back Task')).toBeInTheDocument()
     })
@@ -165,7 +165,7 @@ describe('TaskReversedNodeComponent', () => {
       const props = createNodeProps(baseTaskNode)
       props.selected = true
 
-      render(<TaskReversedNodeComponent {...props} />)
+      render(<TaskReversedStepComponent {...props} />)
 
       expect(screen.getByText('Loop Back Task')).toBeInTheDocument()
     })

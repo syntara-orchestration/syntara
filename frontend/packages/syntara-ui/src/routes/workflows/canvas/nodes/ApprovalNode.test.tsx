@@ -2,7 +2,7 @@ import type { ApprovalActivity as ApprovalNodeType } from '@syntara/contracts'
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
-import { ApprovalNodeComponent } from './ApprovalNode'
+import { ApprovalStepComponent } from './ApprovalNode'
 
 // Mock @xyflow/react
 vi.mock('@xyflow/react', () => ({
@@ -23,7 +23,7 @@ vi.mock('@xyflow/react', () => ({
   },
 }))
 
-describe('ApprovalNodeComponent', () => {
+describe('ApprovalStepComponent', () => {
   const baseApprovalNode = {
     type: 'approval',
     id: 'approval-1',
@@ -51,7 +51,7 @@ describe('ApprovalNodeComponent', () => {
 
   describe('Rendering', () => {
     it('renders approval node with all key elements', () => {
-      render(<ApprovalNodeComponent {...createNodeProps(baseApprovalNode)} />)
+      render(<ApprovalStepComponent {...createNodeProps(baseApprovalNode)} />)
 
       expect(screen.getByText('Approval')).toBeInTheDocument()
       expect(screen.getByText('Timeout')).toBeInTheDocument()
@@ -70,7 +70,7 @@ describe('ApprovalNodeComponent', () => {
         parameters: {},
       } as ApprovalNodeType
 
-      render(<ApprovalNodeComponent {...createNodeProps(noTimeoutNode)} />)
+      render(<ApprovalStepComponent {...createNodeProps(noTimeoutNode)} />)
 
       expect(screen.queryByText('Timeout')).not.toBeInTheDocument()
     })
@@ -78,7 +78,7 @@ describe('ApprovalNodeComponent', () => {
 
   describe('Branch Handles', () => {
     it('renders handles in correct order (approved first, then rejected)', () => {
-      render(<ApprovalNodeComponent {...createNodeProps(baseApprovalNode)} />)
+      render(<ApprovalStepComponent {...createNodeProps(baseApprovalNode)} />)
 
       const handles = screen.getAllByText(/Approved|Rejected/)
       expect(handles[0]).toHaveTextContent('Approved')
@@ -88,13 +88,13 @@ describe('ApprovalNodeComponent', () => {
 
   describe('Node Structure', () => {
     it('renders with correct structure', () => {
-      render(<ApprovalNodeComponent {...createNodeProps(baseApprovalNode)} />)
+      render(<ApprovalStepComponent {...createNodeProps(baseApprovalNode)} />)
 
       expect(screen.getByText('Approval')).toBeInTheDocument()
     })
 
     it('does not render expand/collapse toggle', () => {
-      render(<ApprovalNodeComponent {...createNodeProps(baseApprovalNode)} />)
+      render(<ApprovalStepComponent {...createNodeProps(baseApprovalNode)} />)
 
       expect(screen.queryByTestId('node-expand-toggle')).not.toBeInTheDocument()
       expect(
