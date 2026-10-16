@@ -52,7 +52,7 @@ export default function registerActionNode() {
             description: 'Call another published workflow and receive its output.',
             formTitle: 'Configure Sub-workflow',
             formComponent: SubWorkflowNodeForm as React.ComponentType<
-              BaseNodeFormProps<SubWorkflowFormData> & Record<string, unknown>
+              BaseNodeFormProps<ActionFormData | SubWorkflowFormData> & Record<string, unknown>
             >,
           },
         ],
