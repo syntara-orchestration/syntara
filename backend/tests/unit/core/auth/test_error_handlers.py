@@ -53,6 +53,12 @@ class TestAuthenticationRequiredHandler:
         data = _parse_body(response)
         assert data["detail"] == "Custom message"
 
+    def test_includes_www_authenticate_header(self) -> None:
+        # AAP-87669: RFC 7235 Section 3.1 requires a 401 response to include
+        # a WWW-Authenticate header naming the applicable auth scheme.
+        response = authentication_required_handler(_mock_request(), AuthenticationRequiredError())
+        assert response.headers.get("www-authenticate") == 'Bearer realm="automation-orchestrator"'
+
 
 class TestTokenExpiredHandler:
     """Tests for token_expired_handler."""
