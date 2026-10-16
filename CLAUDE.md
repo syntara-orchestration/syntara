@@ -132,14 +132,14 @@ For a known flaky test that needs temporary quarantine from the pipeline, see
 
 **Key Konflux constraints:**
 - Does **not** set `CI=true` — guards like `test.skip(!!process.env.CI, ...)` have no effect.
-- The Temporal worker runs in a separate network namespace; it may not reach external URLs (e.g. httpbin.org) even when the test runner can.
+- The Temporal worker runs in a separate network namespace; it may not reach external URLs even when the test runner can. E2E HTTP Request tests therefore use the in-cluster httpbin Service (`http://httpbin:8080`) that [aap-dev](https://github.com/ansible/aap-dev) deploys next to AO. `HTTPBIN_URL` defaults to that URL when `KUBERNETES_SERVICE_HOST` is set; local and GitHub CI still default to `https://httpbin.org`.
+- That in-cluster URL is HTTP because aap-dev's go-httpbin Service has no TLS. That is an accepted trade-off for ephemeral CI: the cluster is torn down after the run, traffic stays on the cluster overlay, and credentials sent to httpbin are synthetic E2E fixtures, not production secrets. Do not add TLS or NetworkPolicies just for this test fixture.
+- `http://httpbin:8080` resolves to a ClusterIP. Workflow HTTP Request nodes SSRF-block private IPs unless `httpbin` is on `spec.workflowHttpRequestAllowedHosts` (`APP_WORKFLOW_HTTP_REQUEST_ALLOWED_HOSTS` on the worker). aap-dev's AO CR already lists it. A Konflux `configure-ao` step that replaces that list with only `myao-backend` produces `error: "SSRF blocked: private IP range"` (no `status_code`) and must not be treated as a connectivity skip.
 - Cluster load causes 30-second timeouts and transient 502 Bad Gateway responses.
 
 #### Backend pytest skip patterns (`backend/tests/e2e/`)
 
-**`@requires_httpbin` class marker**: Applied at class level when all tests in a class call httpbin. Skip fires if httpbin is unreachable from the *test runner*. This does not handle the case where the backend Temporal worker can't reach httpbin.
-
-**Graceful skip for backend connectivity failures**: When the Temporal worker can't reach an external URL, the execution completes with `status == FAILED` but the activity output contains no `status_code` (only an `error: "HTTP request failed: ReadTimeout"` key). Add a skip guard:
+**Graceful skip for backend connectivity failures**: When the Temporal worker can't reach an external URL, the execution completes with `status == FAILED` but the activity output contains no `status_code` (only an `error: "HTTP request failed: ReadTimeout"` key). Add a skip guard. If `error` is `"SSRF blocked: private IP range"`, that is an allowlist misconfiguration (`httpbin` missing from `workflowHttpRequestAllowedHosts`), not a connectivity skip — fix CI rather than skipping.
 
 ```python
 if execution.status == ExecutionStatus.FAILED:

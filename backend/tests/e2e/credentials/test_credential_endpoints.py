@@ -33,7 +33,7 @@ if not os.environ.get("APP_BASE_URL"):
     pytest.skip("APP_BASE_URL not set — full stack required", allow_module_level=True)
 
 from orchestrator_test_sdk.e2e import unique_name
-from orchestrator_test_sdk.e2e.helpers import HTTPBIN_URL, create_and_run_workflow, poll_execution, requires_httpbin
+from orchestrator_test_sdk.e2e.helpers import HTTPBIN_URL, create_and_run_workflow, poll_execution
 from orchestrator_test_sdk.factories import get_basic_auth_type_id, get_bearer_token_type_id
 from syntara_api_client.models.credential_create import CredentialCreate
 from syntara_api_client.models.credential_create_inputs import CredentialCreateInputs
@@ -148,7 +148,16 @@ def _get_activity_output(execution: ExecutionRead, activity_id: str) -> dict[str
     return result
 
 
-@requires_httpbin
+def _httpbin_auth_succeeded(body: dict[str, Any]) -> bool:
+    """Return True if an httpbin auth endpoint reported success.
+
+    python-httpbin / httpbin.org uses ``authenticated``; go-httpbin <= 2.20
+    uses ``authorized``; later go-httpbin returns both. CI environments
+    (Konflux in particular) may hit either implementation.
+    """
+    return body.get("authenticated") is True or body.get("authorized") is True
+
+
 class TestWorkflowWithValidCredential:
     """Verify credential resolution succeeds at runtime (ANSTRAT-1901)."""
 
@@ -176,11 +185,13 @@ class TestWorkflowWithValidCredential:
             syntara_api, workflow_name, definition, timeout=30, project_id=first_project_id
         )
 
-        assert execution.status == ExecutionStatus.COMPLETED, f"Unexpected status: {execution.status}"
+        assert execution.status == ExecutionStatus.COMPLETED, (
+            f"Unexpected status: {execution.status}: {execution.error_details}"
+        )
         output = _get_activity_output(execution, "api_call")
         assert output.get("status_code") == 200
         body = output.get("body", {})
-        assert body.get("authenticated") is True
+        assert _httpbin_auth_succeeded(body), f"Expected httpbin auth success, got: {body}"
 
     def test_basic_auth_credential_resolves(
         self,
@@ -216,7 +227,7 @@ class TestWorkflowWithValidCredential:
         output = _get_activity_output(execution, "api_call")
         assert output.get("status_code") == 200
         body = output.get("body", {})
-        assert body.get("authenticated") is True
+        assert _httpbin_auth_succeeded(body), f"Expected httpbin auth success, got: {body}"
         assert body.get("user") == "admin"
 
     def test_no_credential_returns_401(
@@ -258,7 +269,6 @@ class TestWorkflowWithValidCredential:
 # ===================================================================
 
 
-@requires_httpbin
 class TestWorkflowWithDisabledCredential:
     """Verify disabled credentials fail with clear error (ANSTRAT-1901)."""
 
@@ -307,7 +317,9 @@ class TestWorkflowWithDisabledCredential:
             syntara_api, workflow_name, definition, timeout=30, project_id=first_project_id
         )
 
-        assert execution.status == ExecutionStatus.COMPLETED, f"Unexpected status after re-enable: {execution.status}"
+        assert execution.status == ExecutionStatus.COMPLETED, (
+            f"Unexpected status after re-enable: {execution.status}: {execution.error_details}"
+        )
         output = _get_activity_output(execution, "api_call")
         assert output.get("status_code") == 200
 
@@ -317,7 +329,6 @@ class TestWorkflowWithDisabledCredential:
 # ===================================================================
 
 
-@requires_httpbin
 class TestWorkflowWithDeletedCredential:
     """Verify deleted credentials fail with clear error (ANSTRAT-1901)."""
 
@@ -372,7 +383,6 @@ class TestWorkflowWithDeletedCredential:
 # ===================================================================
 
 
-@requires_httpbin
 class TestCredentialScrubbing:
     """Verify secret values are scrubbed from execution history (AAP-79021)."""
 
