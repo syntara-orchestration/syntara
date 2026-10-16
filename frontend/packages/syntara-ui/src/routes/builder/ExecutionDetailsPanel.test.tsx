@@ -1,6 +1,6 @@
 import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it, vi, beforeEach } from 'vitest'
+import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 import { axe } from 'vitest-axe'
 
 import { executionsClient } from '../../client'
@@ -397,6 +397,48 @@ describe('ExecutionDetailsPanel', () => {
       const activityList = screen.getByRole('grid', { name: 'Activity list' })
       expect(within(activityList).getByText('Process data')).toBeInTheDocument()
       expect(within(activityList).queryByText('Send notification')).not.toBeInTheDocument()
+    })
+  })
+
+  describe('pinned mock data (AAP-89682)', () => {
+    // AAP-89682: a node whose run used pinned mock data (surfaced via
+    // execution_metadata.pre_resolved_nodes, the same field the canvas uses to
+    // badge mock-driven nodes) should show those pinned values in the node
+    // details panel instead of the live/runtime activity output.
+    function mockQueryWithPreResolved(preResolvedOutput: Record<string, unknown>) {
+      // Stable references: ExecutionDetailsPanel's effect depends on `activities`
+      // and `executionMetadata`, so a fresh object literal per render call here
+      // would re-trigger that effect on every render and loop forever.
+      const executionData = {
+        ...EXECUTION.data,
+        execution_metadata: { pre_resolved_nodes: { 'task-2': { output: preResolvedOutput } } },
+      }
+      const liveActivityData = {
+        resources: [{ activity_name: 'task-2', input_data: {}, output_data: { result: 'live_value' }, status: 'completed' }],
+      }
+      return (_method: string, path: string) => {
+        if (path === '/executions/{execution_id}/activities') {
+          return { data: liveActivityData, isLoading: false, error: null, refetch: vi.fn() }
+        }
+        return { data: executionData, isLoading: false, error: null, refetch: vi.fn() }
+      }
+    }
+
+    afterEach(() => {
+      vi.mocked(executionsClient.useQuery).mockImplementation(() => ({ ...EXECUTION, refetch: vi.fn() }))
+    })
+
+    it('shows the pinned mock output that was active during the run, not the live runtime output', async () => {
+      const user = userEvent.setup()
+      vi.mocked(executionsClient.useQuery).mockImplementation(mockQueryWithPreResolved({ result: 'mocked_value' }))
+
+      renderPanel(WORKFLOW_DEF)
+
+      await user.click(screen.getByRole('tab', { name: 'Details' }))
+      const activityList = screen.getByRole('grid', { name: 'Activity list' })
+      await user.click(within(activityList).getByText('Send notification'))
+
+      expect(await screen.findByText(/mocked_value/)).toBeInTheDocument()
     })
   })
 

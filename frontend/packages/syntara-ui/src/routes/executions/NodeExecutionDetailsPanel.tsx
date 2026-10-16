@@ -55,6 +55,8 @@ type NodeExecutionDetailsPanelProps = {
   nodeState?: ActivityState
   /** Node type from workflow definition (e.g. 'aap_job_template'). */
   nodeType?: string
+  /** Pinned mock output that was in effect for this node's run, from execution_metadata.pre_resolved_nodes. */
+  pinnedMockOutput?: Record<string, unknown> | null
 }
 
 function NoDataState({ label }: Readonly<{ label: string }>) {
@@ -250,20 +252,29 @@ function NodeDetailsHeader({
   nodeCompleted,
   nodeElapsedLabel,
   status,
+  mockDataPinned,
 }: Readonly<{
   nodeName: string
   nodeStarted: string | null
   nodeCompleted: string | null
   nodeElapsedLabel?: string
   status?: ActivityState['status']
+  mockDataPinned?: boolean
 }>) {
   return (
     <StackItem className={styles.headerRow}>
       <Flex justifyContent={{ default: 'justifyContentSpaceBetween' }} alignItems={{ default: 'alignItemsCenter' }}>
         <FlexItem>
-          <Title headingLevel="h2" size={TitleSizes.md} style={{ margin: 0 }}>
-            {nodeName}
-          </Title>
+          <Flex gap={{ default: 'gapSm' }} alignItems={{ default: 'alignItemsCenter' }}>
+            <Title headingLevel="h2" size={TitleSizes.md} style={{ margin: 0 }}>
+              {nodeName}
+            </Title>
+            {mockDataPinned && (
+              <SynLabel color="purple" aria-label="Mock data pinned">
+                Mock data pinned
+              </SynLabel>
+            )}
+          </Flex>
         </FlexItem>
         <FlexItem>
           <Flex gap={{ default: 'gapMd' }} alignItems={{ default: 'alignItemsCenter' }}>
@@ -367,14 +378,22 @@ export function NodeExecutionDetailsPanel({
   executionId,
   nodeState,
   nodeType,
+  pinnedMockOutput,
 }: Readonly<NodeExecutionDetailsPanelProps>) {
   const [activeTab, setActiveTab] = useState<'io' | 'agent-steps'>('io')
   const isAgenticNode = nodeType === ActivityTypeEnum.AGENTIC
-  const { inputData, outputData, isLoading, error, refetch } = useNodeExecutionDetails(
-    nodeId,
-    executionId,
-    nodeState?.status
-  )
+  const {
+    inputData,
+    outputData: liveOutputData,
+    isLoading,
+    error,
+    refetch,
+  } = useNodeExecutionDetails(nodeId, executionId, nodeState?.status)
+
+  const mockDataPinned = pinnedMockOutput != null
+  // Pinned mock data takes precedence over the live activity output: it's what was
+  // actually in effect during the run, even if the backend also recorded runtime values.
+  const outputData = pinnedMockOutput ?? liveOutputData
 
   const approvalAudit = useMemo(() => extractApprovalAudit(outputData), [outputData])
   const usedTools = useMemo(() => extractUsedTools(outputData), [outputData])
@@ -394,6 +413,7 @@ export function NodeExecutionDetailsPanel({
         nodeCompleted={nodeCompleted}
         nodeElapsedLabel={nodeElapsedLabel}
         status={nodeState?.status}
+        mockDataPinned={mockDataPinned}
       />
 
       {/* Approval audit strip (shown only for decided approval nodes) */}

@@ -13,6 +13,7 @@ import { formatElapsedTime } from '../../utils/dateUtils'
 import { detachPromise } from '../../utils/detachPromise'
 import { NodeExecutionDetailsPanel } from '../executions/NodeExecutionDetailsPanel'
 import type { ActivityState } from '../workflows/execution/types'
+import { parseCompositeKey } from '../workflows/execution/utils/activityState'
 import {
   useExecutionStore,
   useExecutionStoreActions,
@@ -67,6 +68,7 @@ type ThreePanelLayoutProps = {
   executionId: string
   selectedNodeState?: ActivityState
   selectedNodeType?: string
+  pinnedMockOutput?: Record<string, unknown> | null
   viewMode: ViewMode
   onViewModeChange: (mode: ViewMode) => void
   onRowClick?: (nodeId: string, nodeName: string) => void
@@ -90,6 +92,7 @@ function ThreePanelLayout({
   executionId,
   selectedNodeState,
   selectedNodeType,
+  pinnedMockOutput,
   viewMode,
   onViewModeChange,
   onRowClick,
@@ -166,6 +169,7 @@ function ThreePanelLayout({
               executionId={executionId}
               nodeState={selectedNodeState}
               nodeType={selectedNodeType}
+              pinnedMockOutput={pinnedMockOutput}
             />
           ) : (
             <NoSelectionState />
@@ -368,6 +372,10 @@ export function ExecutionDetailsPanel({
       onNodeSelect,
     })
 
+  const pinnedMockOutput = effectiveKey
+    ? (executionMetadata?.pre_resolved_nodes?.[parseCompositeKey(effectiveKey).baseId]?.output ?? null)
+    : null
+
   const handleViewModeChange = useCallback(
     (mode: ViewMode) => {
       setViewMode(mode)
@@ -406,6 +414,7 @@ export function ExecutionDetailsPanel({
         executionId={executionId}
         selectedNodeState={selectedNodeState}
         selectedNodeType={selectedNodeType}
+        pinnedMockOutput={pinnedMockOutput}
         viewMode={viewMode}
         onViewModeChange={handleViewModeChange}
         onRowClick={handleRowClick}
