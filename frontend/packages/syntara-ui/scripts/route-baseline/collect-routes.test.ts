@@ -1,7 +1,3 @@
-import { mkdtempSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-
 import { describe, expect, it } from 'vitest'
 
 import {
@@ -11,13 +7,29 @@ import {
   collectPathsFromObject,
   extractBalancedObjectBody,
   parseAppRouteCatalog,
-  parseCreateRouteBlocks,
-  parseMountedRouteModules,
+  parseCreateRouteBlocks as parseBlocks,
   resolveAppRouteReference,
-  resolveMountedCreateRouteModules,
 } from './collect-routes'
 
+// Each parser fixture includes a real root declaration; unresolved parents must fail.
+function parseCreateRouteBlocks(source: string, options?: Parameters<typeof parseBlocks>[1]) {
+  return parseBlocks(`const rootRoute = createRootRoute({})\n${source}`, options)
+}
+
 describe('parseCreateRouteBlocks', () => {
+  it('ignores route-like comments, strings and nested metadata paths', () => {
+    const source = `
+const example = "createRoute({ path: '/example' })"
+// createRoute({ path: '/comment' })
+createRoute({
+  getParentRoute: () => rootRoute,
+  staticData: { path: '/metadata' },
+  path: '/actual',
+})
+`
+    expect(parseCreateRouteBlocks(source)).toStrictEqual([{ path: '/actual', kind: 'page' }])
+  })
+
   it('resolves nested child paths even when the parent is declared later', () => {
     const source = `
 const fieldRoute = createRoute({ getParentRoute: () => categoryRoute, path: '/$field' })
@@ -96,6 +108,7 @@ createRoute({
   it('throws when AppRoute redirect cannot be resolved', () => {
     const source = `
 createRoute({
+  getParentRoute: () => rootRoute,
   path: '/configuration',
   beforeLoad: () => redirect({ to: AppRoute.Missing.Path, replace: true }),
 })
@@ -108,6 +121,7 @@ createRoute({
   it('throws for unsupported non-literal redirect targets', () => {
     const source = `
 createRoute({
+  getParentRoute: () => rootRoute,
   path: '/configuration',
   beforeLoad: () => redirect({ to: someVariable, replace: true }),
 })
@@ -144,44 +158,6 @@ createRoute({
 describe('extractBalancedObjectBody', () => {
   it('returns null for unbalanced input', () => {
     expect(extractBalancedObjectBody('{ left open', 0)).toBeNull()
-  })
-})
-
-describe('parseMountedRouteModules', () => {
-  it('requires both import and addChildren spread', () => {
-    const treeSource = `
-import { rootRoute } from './routes/__root'
-import { workflowsRoutes } from './routes/workflows'
-import { orphanRoutes } from './routes/orphan'
-
-export const buildTanStackRouteTree = () =>
-  rootRoute.addChildren([
-    ...workflowsRoutes,
-  ])
-`
-    expect(parseMountedRouteModules(treeSource)).toStrictEqual(['workflows'])
-  })
-})
-
-describe('resolveMountedCreateRouteModules', () => {
-  it('follows static re-export barrels to the createRoute module', () => {
-    const routesDir = mkdtempSync(join(tmpdir(), 'route-baseline-reexport-'))
-    writeFileSync(
-      join(routesDir, 'workflows.tsx'),
-      `
-import { createRoute } from '@tanstack/react-router'
-export const workflowsRoutes = [
-  createRoute({ getParentRoute: () => rootRoute, path: '/workflows' }),
-]
-`
-    )
-    writeFileSync(join(routesDir, 'workflows-reexport.ts'), `export { workflowsRoutes } from './workflows'\n`)
-
-    const treeSource = `
-import { workflowsRoutes } from './routes/workflows-reexport'
-export const buildTanStackRouteTree = () => rootRoute.addChildren([...workflowsRoutes])
-`
-    expect(resolveMountedCreateRouteModules(routesDir, treeSource)).toStrictEqual(['workflows'])
   })
 })
 
