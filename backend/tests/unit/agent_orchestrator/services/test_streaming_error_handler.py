@@ -6,17 +6,40 @@ Simplified test suite focusing on:
 - Invocation ID handling
 """
 
+from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
 import pytest
 
-from syntara.agent_orchestrator.exceptions import AgentTimeoutError, ToolDiscoveryError, ToolSelectionUnavailableError
+from syntara.agent_orchestrator.exceptions import (
+    AgentOrchestratorError,
+    AgentTimeoutError,
+    ToolDiscoveryError,
+    ToolSelectionUnavailableError,
+)
 from syntara.agent_orchestrator.services.error_handler import (
     ERROR_TYPE_BASE_URI,
     classify_streaming_error,
+    log_streaming_error,
+    streaming_error_diagnostics,
 )
 
 pytestmark = pytest.mark.unit
+
+# Live OpenRouter 402 body when the key is out of credits.
+OPENROUTER_402_BODY: dict[str, object] = {
+    "error": {
+        "message": "Insufficient credits. Add more using https://openrouter.ai/settings/credits",
+        "code": 402,
+        "metadata": {
+            "limit_source": "openrouter_credits",
+            "remedy_hint": (
+                "Add credits at https://openrouter.ai/settings/credits, or lower "
+                "max_tokens / prompt size to fit your remaining balance."
+            ),
+        },
+    }
+}
 
 
 @pytest.mark.parametrize(
@@ -79,6 +102,11 @@ pytestmark = pytest.mark.unit
             "TOOL_SELECTION_UNAVAILABLE",
             False,
         ),
+        # Insufficient credits (OpenRouter 402)
+        (Exception("Error code: 402 - This request requires more credits"), "INSUFFICIENT_CREDITS", False),
+        (Exception("HTTP 402: Payment Required"), "INSUFFICIENT_CREDITS", False),
+        (Exception("insufficient credits on this API key"), "INSUFFICIENT_CREDITS", False),
+        (Exception(str(OPENROUTER_402_BODY)), "INSUFFICIENT_CREDITS", False),
         # Unknown errors
         (ValueError("Invalid input format"), "UNKNOWN_ERROR", False),
         (Exception("Something went wrong"), "UNKNOWN_ERROR", False),
@@ -103,6 +131,10 @@ pytestmark = pytest.mark.unit
         "tool_discovery_zero_provision",
         "tool_discovery_zero_match",
         "tool_selection_unavailable",
+        "credits_402_message",
+        "credits_http_402",
+        "credits_insufficient",
+        "credits_openrouter_body",
         "unknown_value_error",
         "unknown_generic",
         "unknown_empty",
@@ -134,8 +166,10 @@ def test_error_classification(
         ("Network UNREACHABLE", "CONNECTION_ERROR"),
         ("HTTP 503", "UPSTREAM_ERROR"),
         ("RATE LIMIT EXCEEDED", "RATE_LIMIT_EXCEEDED"),
+        ("PAYMENT REQUIRED", "INSUFFICIENT_CREDITS"),
+        ("HTTP 402", "INSUFFICIENT_CREDITS"),
     ],
-    ids=["auth_caps", "network_caps", "upstream_caps", "rate_limit_caps"],
+    ids=["auth_caps", "network_caps", "upstream_caps", "rate_limit_caps", "credits_caps", "credits_http_caps"],
 )
 def test_case_insensitive_matching(message: str, expected_code: str) -> None:
     """Test all error matching is case-insensitive."""
@@ -151,6 +185,46 @@ def test_mixed_error_signals_priority() -> None:
 
     # Rate limit should match first (comes before connection check)
     assert error.code == "RATE_LIMIT_EXCEEDED"
+
+
+def test_credit_error_not_unknown_streaming_error() -> None:
+    """OpenRouter 402 must not fall through to UNKNOWN_ERROR / LLM Streaming Error."""
+    exception = Exception("Error code: 402 - {'error': {'message': 'This request requires more credits', 'code': 402}}")
+    error = classify_streaming_error(exception, uuid4())
+
+    assert error.code == "INSUFFICIENT_CREDITS"
+    assert error.retryable is False
+    assert error.title == "LLM Insufficient Credits"
+    assert "insufficient credits" in (error.detail or "").lower()
+    assert error.code != "UNKNOWN_ERROR"
+
+
+class _OpenRouterApiStatusError(Exception):
+    """Stand-in for openai.APIStatusError: generic str(), payload on body/status_code."""
+
+    def __init__(self, body: dict[str, object]) -> None:
+        super().__init__("Error")
+        self.status_code = 402
+        self.body = body
+
+
+def test_openrouter_402_body_on_exception_attributes() -> None:
+    """Classify the live OpenRouter 402 payload even when it is not in str(exception)."""
+    error = classify_streaming_error(_OpenRouterApiStatusError(OPENROUTER_402_BODY), uuid4())
+
+    assert error.code == "INSUFFICIENT_CREDITS"
+    assert error.retryable is False
+    assert error.title == "LLM Insufficient Credits"
+
+
+def test_openrouter_402_body_on_chained_cause() -> None:
+    """Walk __cause__ so a wrapped AgentOrchestratorError still sees the 402 body."""
+    inner = _OpenRouterApiStatusError(OPENROUTER_402_BODY)
+    wrapped = AgentOrchestratorError("Execution error: Error")
+    wrapped.__cause__ = inner
+    error = classify_streaming_error(wrapped, uuid4())
+
+    assert error.code == "INSUFFICIENT_CREDITS"
 
 
 def test_tool_discovery_not_misclassified_as_llm_network_error() -> None:
@@ -242,3 +316,62 @@ def test_multiple_invocations_independent() -> None:
     assert error1.instance == f"/invocations/{invocation_id1}"
     assert error2.instance == f"/invocations/{invocation_id2}"
     assert error1.instance != error2.instance
+
+
+def test_streaming_error_diagnostics_walks_provider_body() -> None:
+    """HTTP status and body on the cause must appear in log fields."""
+    inner = _OpenRouterApiStatusError(OPENROUTER_402_BODY)
+    wrapped = AgentOrchestratorError("Execution error: Error")
+    wrapped.__cause__ = inner
+
+    fields = streaming_error_diagnostics(wrapped)
+
+    assert fields["error_type"] == "AgentOrchestratorError"
+    assert fields["error_message"] == "Execution error: Error"
+    assert fields["http_status"] == 402
+    assert "openrouter_credits" in fields["provider_body"]
+    assert any("_OpenRouterApiStatusError" in cause for cause in fields["cause_chain"])
+
+
+def test_streaming_error_diagnostics_truncates_large_body() -> None:
+    class _FatBodyError(Exception):
+        def __init__(self) -> None:
+            super().__init__("short")
+            self.body = "x" * 5000
+
+    fields = streaming_error_diagnostics(_FatBodyError())
+
+    assert len(fields["provider_body"]) == 2000
+    assert fields["provider_body"].endswith("...")
+
+
+@patch("syntara.agent_orchestrator.services.error_handler.logger")
+def test_log_streaming_error_uses_unclassified_event_for_unknown(mock_logger: MagicMock) -> None:
+    """UNKNOWN_ERROR keeps a generic client detail and logs the real exception."""
+    invocation_id = uuid4()
+    exception = Exception("novel provider failure xyz")
+
+    error = log_streaming_error(exception, invocation_id=invocation_id)
+
+    assert error.code == "UNKNOWN_ERROR"
+    mock_logger.exception.assert_called_once()
+    event, kwargs = mock_logger.exception.call_args.args[0], mock_logger.exception.call_args.kwargs
+    assert event == "Unclassified LLM streaming error"
+    assert kwargs["error_code"] == "UNKNOWN_ERROR"
+    assert kwargs["error_type"] == "Exception"
+    assert kwargs["error_message"] == "novel provider failure xyz"
+    assert kwargs["client_detail"] == "An unexpected error occurred during LLM streaming. Please try again."
+    assert kwargs["invocation_id"] == str(invocation_id)
+
+
+@patch("syntara.agent_orchestrator.services.error_handler.logger")
+def test_log_streaming_error_includes_provider_status_and_body(mock_logger: MagicMock) -> None:
+    exception = _OpenRouterApiStatusError(OPENROUTER_402_BODY)
+
+    error = log_streaming_error(exception)
+
+    assert error.code == "INSUFFICIENT_CREDITS"
+    kwargs = mock_logger.exception.call_args.kwargs
+    assert mock_logger.exception.call_args.args[0] == "Streaming orchestration failed"
+    assert kwargs["http_status"] == 402
+    assert "openrouter_credits" in kwargs["provider_body"]

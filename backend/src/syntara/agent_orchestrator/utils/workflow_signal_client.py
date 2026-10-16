@@ -12,7 +12,7 @@ from uuid import UUID
 import httpx
 import structlog
 
-from syntara.agent_orchestrator.services.error_handler import classify_streaming_error
+from syntara.agent_orchestrator.services.error_handler import classify_streaming_error, streaming_error_diagnostics
 from syntara.core.tls.http_client import build_internal_http_client
 
 logger = structlog.stdlib.get_logger(__name__)
@@ -221,8 +221,8 @@ class WorkflowSignalClient:
             "FAILURE SIGNAL: Sending to callback",
             callback_url=callback_url,
             invocation_id=invocation_id,
-            error_type=type(error).__name__,
-            raw_error=str(error),
+            error_code=classified.code,
+            **streaming_error_diagnostics(error),
         )
 
         try:

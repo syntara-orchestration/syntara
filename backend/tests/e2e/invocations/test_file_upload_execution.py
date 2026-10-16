@@ -49,7 +49,7 @@ def _poll_invocation(
 class TestFileUploadExecution:
     """Verify the full file-upload → conversion → execution pipeline."""
 
-    @pytest.mark.xfail(strict=False, reason="OpenRouter insufficient credits")
+    @pytest.mark.xfail_openrouter_credits
     def test_file_upload_invocation_completes_with_converted_files(
         self,
         syntara_base_url: str,

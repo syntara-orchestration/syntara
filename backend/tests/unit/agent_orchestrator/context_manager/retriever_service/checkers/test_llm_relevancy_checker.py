@@ -23,7 +23,7 @@ from syntara.files.models import FileMetadata
 _TEST_CREDENTIAL = LLMCredentialConfig(
     api_key="test-key",
     base_url="https://openrouter.ai/api/v1",
-    model="anthropic/claude-sonnet-4",
+    model="anthropic/claude-sonnet-4.5",
 )
 
 

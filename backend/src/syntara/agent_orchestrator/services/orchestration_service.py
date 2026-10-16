@@ -42,7 +42,7 @@ from syntara.agent_orchestrator.models.streaming_events import (
     ToolCallEventData,
     ToolResultEventData,
 )
-from syntara.agent_orchestrator.services.error_handler import classify_streaming_error
+from syntara.agent_orchestrator.services.error_handler import log_streaming_error
 from syntara.agent_orchestrator.services.streaming_service import get_invocation_stream_id
 from syntara.agent_orchestrator.tool_manager import ToolRetriever
 from syntara.agent_orchestrator.tool_manager.execution_failure_handler import (
@@ -609,12 +609,6 @@ class OrchestrationService:
                     )
                 raise
             except Exception as e:
-                # Handle streaming errors
-                logger.exception(
-                    "Exception in orchestration service",
-                    invocation_id=invocation_id,
-                    error_type=type(e).__name__,
-                )
                 await self._handle_streaming_error(e, invocation_id, stream_id, client)
 
                 # Send failure signal to workflow if callback_url is present
@@ -1013,10 +1007,7 @@ class OrchestrationService:
             client: StreamClient for publishing events
 
         """
-        logger.exception("Streaming orchestration failed", invocation_id=invocation_id)
-
-        # Publish error event with RFC 9457 classification
-        error_data = classify_streaming_error(exception, invocation_id=invocation_id)
+        error_data = log_streaming_error(exception, invocation_id=invocation_id)
         await self._publish_stream_event(
             client, stream_id, "error", invocation_id, error_data.model_dump(exclude_none=True)
         )

@@ -41,7 +41,7 @@ from syntara.agent_orchestrator.models import (
     InvocationStatus,
     LLMCredentialConfig,
 )
-from syntara.agent_orchestrator.services.error_handler import classify_streaming_error
+from syntara.agent_orchestrator.services.error_handler import classify_streaming_error, log_streaming_error
 from syntara.agent_orchestrator.services.orchestration_service import OrchestrationService
 from syntara.agent_orchestrator.token_manager.repository import TokenUsageRepository
 from syntara.agent_orchestrator.utils.cancellation import get_invocation_cancel_key
@@ -582,11 +582,7 @@ class InvocationExecutor:
     ) -> None:
         self._record_invocation_metrics(recorder, invocation_start, invocation.id, status="error", error=e)
 
-        logger.exception(
-            "Exception during invocation execution",
-            invocation_id=invocation.id,
-            error_type=type(e).__name__,
-        )
+        log_streaming_error(e, invocation_id=invocation.id)
 
         if not await self._fail_invocation_if_not_cancelled(
             invocation.id,

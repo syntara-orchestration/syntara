@@ -41,6 +41,11 @@ from orchestrator_test_sdk.e2e.auth import (
 from orchestrator_test_sdk.e2e.helpers import (
     get_first_non_builtin_project_id,
 )
+from orchestrator_test_sdk.e2e.openrouter import (
+    DEFAULT_OPENROUTER_MODEL,
+    apply_openrouter_probe,
+    probe_openrouter,
+)
 from orchestrator_test_sdk.e2e.tls import e2e_ssl_context
 
 if TYPE_CHECKING:
@@ -480,12 +485,30 @@ def llm_model() -> str:
     Reads APP_OPENROUTER_MODEL from the environment; falls back to the
     app's default so local runs work without any extra configuration.
     """
-    return os.environ.get("APP_OPENROUTER_MODEL", "anthropic/claude-sonnet-4")
+    return os.environ.get("APP_OPENROUTER_MODEL", DEFAULT_OPENROUTER_MODEL)
+
+
+@pytest.fixture(scope="session")
+def openrouter_preflight(llm_model: str) -> None:
+    """Probe OpenRouter for a valid key, remaining credits, and a known model id.
+
+    Cheap GETs to ``/api/v1/key`` and ``/api/v1/models`` so agentic tests do not
+    spend a 180s workflow poll discovering an invalid key, empty balance, or
+    unknown ``APP_OPENROUTER_MODEL``. Missing/invalid key or unknown model skip;
+    empty credits xfail.
+    """
+    api_key = os.environ.get("APP_OPENROUTER_API_KEY")
+    if not api_key:
+        pytest.skip("APP_OPENROUTER_API_KEY not set — LLM credential required")
+    apply_openrouter_probe(probe_openrouter(api_key, llm_model))
 
 
 @pytest.fixture(scope="session")
 def llm_credential_id(
-    syntara_api: SyntaraApiRegistry, worker_id: str, first_project_id: UUID
+    syntara_api: SyntaraApiRegistry,
+    worker_id: str,
+    first_project_id: UUID,
+    openrouter_preflight: None,
 ) -> Generator[str, None, None]:
     """Create an LLM Provider credential for e2e tests and yield its UUID.
 

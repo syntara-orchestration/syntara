@@ -15,6 +15,8 @@ pytest_plugins = [
     "tests.fixtures.hooks",
     # Dynamic xfail from remote URL (enabled via --xfail-from-url)
     "tests.fixtures.xfail_from_url",
+    # Xfail LLM e2e tests only on an actual OpenRouter credit/402 failure
+    "tests.fixtures.xfail_openrouter_credits",
     # Shared fixtures used across unit, integration, performance, and E2E tests
     "tests.fixtures.database",
     "tests.fixtures.users",
