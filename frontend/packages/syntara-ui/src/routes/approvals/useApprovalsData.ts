@@ -1,3 +1,4 @@
+import { keepPreviousData } from '@tanstack/react-query'
 import { useMemo } from 'react'
 
 import { approvalsClient } from '../../client'
@@ -25,6 +26,11 @@ type UseApprovalsDataParams = {
   projects: ProjectRead[]
 }
 
+const approvalsListQueryOptions = {
+  // Keep the table mounted while sort/filter/cursor params change so column header focus is not lost.
+  placeholderData: keepPreviousData,
+}
+
 export function useApprovalsData({
   projectSelectorReady,
   isAllProjects,
@@ -39,6 +45,7 @@ export function useApprovalsData({
       params: { query: queryParams },
     },
     {
+      ...approvalsListQueryOptions,
       enabled: projectSelectorReady && isAllProjects,
     }
   )
@@ -53,6 +60,7 @@ export function useApprovalsData({
       },
     },
     {
+      ...approvalsListQueryOptions,
       enabled: !!stableProjectId && !isAllProjects,
     }
   )

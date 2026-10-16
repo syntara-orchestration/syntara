@@ -1,4 +1,4 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { keepPreviousData, QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { renderHook, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
@@ -147,7 +147,30 @@ describe('useApprovalsData', () => {
       'get',
       '/approvals',
       { params: { query: { sort: 'workflow_name', limit: 20, include_total: true } } },
-      { enabled: true }
+      { enabled: true, placeholderData: keepPreviousData }
+    )
+  })
+
+  it('keeps previous list data while sort or filter query params change', async () => {
+    const { approvalsClient } = await import('../../client')
+
+    renderHook(
+      () =>
+        useApprovalsData({
+          projectSelectorReady: true,
+          isAllProjects: true,
+          stableProjectId: null,
+          queryParams: { sort: '-created_at' },
+          projects: mockProjects,
+        }),
+      { wrapper: createWrapper() }
+    )
+
+    expect(approvalsClient.useQuery).toHaveBeenCalledWith(
+      'get',
+      '/approvals',
+      { params: { query: { sort: '-created_at' } } },
+      expect.objectContaining({ placeholderData: keepPreviousData })
     )
   })
 

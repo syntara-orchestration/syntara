@@ -538,6 +538,49 @@ describe('Approvals Component', () => {
         assertUrlParam(mockSetSearchParams, 'sort', 'workflow_name')
       })
     })
+
+    it('keeps sortable headers on screen while a background refetch is in flight', () => {
+      vi.mocked(approvalsClient.useQuery).mockReturnValue({
+        data: { resources: mockApprovals, next: null, prev: null, total: mockApprovals.length },
+        isPending: false,
+        isFetching: true,
+        error: null,
+        isError: false,
+        refetch: vi.fn(),
+      })
+
+      render(<Approvals />)
+
+      const workflowHeader = screen.getByRole('columnheader', { name: /^Workflow$/i })
+      expect(within(workflowHeader).getByRole('button')).toBeInTheDocument()
+      expect(screen.queryByTestId('loading-state')).not.toBeInTheDocument()
+    })
+
+    it('keeps focus on the workflow sort control after keyboard activation', async () => {
+      const user = userEvent.setup()
+      mockApprovalsQuery(mockApprovals)
+
+      render(<Approvals />)
+
+      const sortButton = within(screen.getByRole('columnheader', { name: /^Workflow$/i })).getByRole('button')
+      for (let i = 0; i < 40; i += 1) {
+        await user.tab()
+        try {
+          expect(sortButton).toHaveFocus()
+          break
+        } catch {
+          // keep tabbing until the workflow sort control is focused
+        }
+      }
+      expect(sortButton).toHaveFocus()
+
+      await user.keyboard('{Enter}')
+
+      await waitFor(() => {
+        assertUrlParam(mockSetSearchParams, 'sort', 'workflow_name')
+        expect(sortButton).toHaveFocus()
+      })
+    })
   })
 
   describe('Row Expansion', () => {
