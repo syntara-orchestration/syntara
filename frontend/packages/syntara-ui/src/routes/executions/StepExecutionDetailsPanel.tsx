@@ -374,7 +374,8 @@ export function StepExecutionDetailsPanel({
     stepId,
     executionId,
     stepState?.status,
-    stepState?.iteration
+    stepState?.iteration,
+    stepState?.outputData
   )
 
   const approvalAudit = useMemo(() => extractApprovalAudit(outputData), [outputData])
