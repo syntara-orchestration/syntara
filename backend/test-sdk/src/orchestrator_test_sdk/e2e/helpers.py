@@ -24,8 +24,11 @@ from syntara_api_client.models.workflow_definition import WorkflowDefinition
 from syntara_api_client.types import UnexpectedResponseException
 
 if TYPE_CHECKING:
+    from collections.abc import Collection
+
     from syntara_api_client.api import SyntaraApiRegistry
     from syntara_api_client.models.approval_request_read import ApprovalRequestRead
+
 
 POLL_INTERVAL = 1
 POLL_TIMEOUT = 20
@@ -85,26 +88,51 @@ def _retry_api_call(fn, *, retries: int = API_RETRIES, delay: float = API_RETRY_
     raise last_exc  # type: ignore[misc]
 
 
-def _activities_settled(execution: ExecutionRead) -> bool:
-    """True when every present activity has reached a terminal status.
+def _activity_status_value(status: object) -> object:
+    """Return the plain status string from an enum or raw value."""
+    return getattr(status, "value", status)
+
+
+def _activities_settled(
+    execution: object,
+    expected_activity_ids: Collection[str] | None = None,
+) -> bool:
+    """True when present (and optionally expected) activities are terminal.
 
     The execution-level status can flip to terminal a moment before the
     activity_execution rows finish syncing from Temporal, transiently leaving an
     activity (e.g. an agentic node) reported as "running". Absent activities
-    (skipped branches with no row yet) are not waited on.
+    (skipped branches with no row yet) are not waited on unless
+    *expected_activity_ids* is provided.
     """
-    return all(getattr(a.status, "value", a.status) in TERMINAL_ACTIVITY_STATUSES for a in (execution.activities or []))
+    activities = getattr(execution, "activities", None) or []
+    if not all(_activity_status_value(a.status) in TERMINAL_ACTIVITY_STATUSES for a in activities):
+        return False
+    if expected_activity_ids is None:
+        return True
+    present = {a.activity_id for a in activities}
+    return set(expected_activity_ids).issubset(present)
 
 
 def poll_execution(
-    api: SyntaraApiRegistry, exec_id: str, timeout: int = POLL_TIMEOUT, interval: int = POLL_INTERVAL
+    api: SyntaraApiRegistry,
+    exec_id: str,
+    timeout: int = POLL_TIMEOUT,
+    interval: int = POLL_INTERVAL,
+    expected_activity_ids: Collection[str] | None = None,
 ) -> ExecutionRead:
     """Poll until execution reaches a terminal state, returning the final ExecutionRead.
 
     Once the execution is terminal, waits up to ``ACTIVITY_SETTLE_TIMEOUT`` additional
     seconds for every present activity row to also reach a terminal status, so callers
     don't observe an activity still marked "running" after the execution has completed.
+
+    When *expected_activity_ids* is set, also waits until those activity rows exist
+    (using the remaining poll timeout, at least ``ACTIVITY_SETTLE_TIMEOUT``). Parallel
+    DAGs under cluster load can reach execution ``completed`` before every
+    activity_execution row has been synced (AAP-95126).
     """
+    expected = set(expected_activity_ids) if expected_activity_ids is not None else None
     elapsed = 0
     while elapsed < timeout:
         time.sleep(interval)
@@ -113,11 +141,20 @@ def poll_execution(
         execution: ExecutionRead = response.assert_and_get()
         if execution.status in TERMINAL_STATUSES:
             settle_elapsed = 0
-            while not _activities_settled(execution) and settle_elapsed < ACTIVITY_SETTLE_TIMEOUT:
+            remaining = timeout - elapsed
+            settle_limit = max(ACTIVITY_SETTLE_TIMEOUT, remaining) if expected is not None else ACTIVITY_SETTLE_TIMEOUT
+            while not _activities_settled(execution, expected) and settle_elapsed < settle_limit:
                 time.sleep(interval)
                 settle_elapsed += interval
                 response = _retry_api_call(lambda: api.executions.get(execution_id=UUID(exec_id), include="activities"))
                 execution = response.assert_and_get()
+            if expected is not None and not _activities_settled(execution, expected):
+                present = {a.activity_id: _activity_status_value(a.status) for a in (execution.activities or [])}
+                pytest.fail(
+                    f"Execution {exec_id} is {execution.status} but expected activities "
+                    f"{sorted(expected)} did not all reach a terminal status within {settle_limit}s. "
+                    f"Present: {present}"
+                )
             return execution
     pytest.fail(f"Execution {exec_id} did not finish within {timeout}s")
 
@@ -190,10 +227,19 @@ def create_and_run_workflow(
     definition: dict[str, Any],
     timeout: int = POLL_TIMEOUT,
     project_id: UUID | None = None,
+    expected_activity_ids: Collection[str] | None = None,
 ) -> ExecutionRead:
     """Create (or update) a workflow, execute it, and return the completed ExecutionRead.
 
     If *project_id* is not provided, the first available project is looked up from the API.
+
+    *definition* is deep-copied before parsing so generated ``from_dict()`` ``pop()``
+    calls cannot mutate the caller's dict (AAP-83908). Prefer a unique *name* per run
+    when the shared DB may already contain a workflow with that name.
+
+    *expected_activity_ids* is forwarded to ``poll_execution`` so callers that need
+    every node row (parallel DAGs) wait for activity-sync lag, not only execution
+    status (AAP-95126).
     """
     if project_id is None:
         project_id = get_first_non_builtin_project_id(api)
@@ -204,6 +250,9 @@ def create_and_run_workflow(
     workflows_list = list_response.assert_and_get()
     existing = [w for w in workflows_list.resources if w.name == name]
 
+    # Nested node/parameter dicts are shared under a shallow copy; generated
+    # from_dict() pops keys from those nested dicts.
+    definition = copy.deepcopy(definition)
     wf_def = WorkflowDefinition.from_dict(definition)
 
     if existing:
@@ -231,7 +280,12 @@ def create_and_run_workflow(
         lambda: api.executions.create(body=ExecutionCreate(workflow_id=wf_id, trigger_node_id=trigger_node_id))
     )
     execution = exec_response.assert_and_get()
-    return poll_execution(api, str(execution.id), timeout=timeout)
+    return poll_execution(
+        api,
+        str(execution.id),
+        timeout=timeout,
+        expected_activity_ids=expected_activity_ids,
+    )
 
 
 # ---------------------------------------------------------------------------
