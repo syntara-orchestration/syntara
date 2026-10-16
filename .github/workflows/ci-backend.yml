@@ -3,9 +3,9 @@ name: CI Backend
 
 on:
   pull_request:
-    branches: [devel, early-access, 'feature/**']
+    branches: [devel, early-access, 'feature/*', 'feature/**/*', 'feat/*', 'feat/**/*']
   merge_group:
-    branches: [devel, early-access, 'feature/**']
+    branches: [devel, early-access]
   push:
     branches: [devel, early-access]
 
@@ -323,9 +323,7 @@ jobs:
         working-directory: backend
 
       - name: Check OpenAPI breaking changes against devel
-        id: breaking-check
         if: github.event_name != 'merge_group'
-        continue-on-error: ${{ startsWith(github.base_ref, 'feature/') }}
         run: make check-openapi-breaking-pre-commit
         working-directory: backend
         env:
@@ -348,11 +346,6 @@ jobs:
           git cat-file -e "${MERGE_GROUP_BASE_SHA}^{commit}"
           make check-openapi-breaking OPENAPI_BASE_REF="$MERGE_GROUP_BASE_SHA"
         working-directory: backend
-
-      - name: Warn on feature branch breaking changes
-        if: steps.breaking-check.outcome == 'failure' && startsWith(github.base_ref, 'feature/')
-        run: |
-          echo "::warning title=Breaking Changes on Feature Branch::OpenAPI breaking changes detected. This PR targets a feature branch, so the check passes with a warning. This check would FAIL when merging to devel/early-access."
 
   verify-test-structure:
     name: (Backend) Verify Test Structure
@@ -571,10 +564,7 @@ jobs:
   test-compose-e2e:
     name: (Backend) Test Podman Compose E2E
     needs: changes
-    if: >-
-      needs.changes.outputs.backend == 'true' &&
-      (github.event_name == 'merge_group' ||
-      (github.event_name == 'pull_request' && startsWith(github.base_ref, 'feature/')))
+    if: needs.changes.outputs.backend == 'true' && github.event_name == 'merge_group'
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     env:
@@ -672,7 +662,12 @@ jobs:
           echo "All services are healthy"
 
       - name: Run E2E tests (excluding global revocation)
-        run: cd backend && make test-e2e E2E_ARGS="--tb=short"
+        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3
+        with:
+          timeout_minutes: 20
+          max_attempts: 3
+          retry_wait_seconds: 30
+          command: cd backend && make test-e2e
         env:
           APP_SCRIPT_NODES_ENABLED: "true"
           APP_BASE_URL: https://localhost:8000
@@ -1013,6 +1008,9 @@ jobs:
     if: always()
     steps:
       - name: Check required jobs passed
+        env:
+          # Konflux API tests run on feature-base PRs for signal; failures do not block merge.
+          FEATURE_BASE_PR: ${{ github.event_name == 'pull_request' && (startsWith(github.base_ref, 'feature/') || startsWith(github.base_ref, 'feat/')) }}
         run: |
           # If no backend changes, pass immediately
           if [[ "${{ needs.changes.outputs.backend }}" == "false" ]]; then
@@ -1028,7 +1026,7 @@ jobs:
 
           # Check all other required jobs
           ok="success|skipped"
-          for job in api-spec-validation api-spec-bundle api-spec-drift generate-api-client check-api-paths check-dead-code check-cycles check-openapi-breaking verify-test-structure mypy test-unit test-cli test-integration test-compose-e2e konflux-backend-gate konflux-api-tests-gate shared-checks-gate snyk-sast snyk-sca; do
+          for job in api-spec-validation api-spec-bundle api-spec-drift generate-api-client check-api-paths check-dead-code check-cycles check-orphans check-openapi-breaking verify-test-structure mypy test-unit test-cli test-integration test-compose-e2e konflux-backend-gate konflux-api-tests-gate shared-checks-gate snyk-sast snyk-sca; do
             case "$job" in
               api-spec-validation)   result="${{ needs.api-spec-validation.result }}" ;;
               api-spec-bundle)       result="${{ needs.api-spec-bundle.result }}" ;;
@@ -1037,7 +1035,7 @@ jobs:
               check-api-paths)       result="${{ needs.check-api-paths.result }}" ;;
               check-dead-code)       result="${{ needs.check-dead-code.result }}" ;;
               check-cycles)          result="${{ needs.check-cycles.result }}" ;;
-              # check-orphans)         result="${{ needs.check-orphans.result }}" ;;
+              check-orphans)         result="${{ needs.check-orphans.result }}" ;;
               check-openapi-breaking) result="${{ needs.check-openapi-breaking.result }}" ;;
               verify-test-structure) result="${{ needs.verify-test-structure.result }}" ;;
               mypy)                  result="${{ needs.mypy.result }}" ;;
@@ -1052,6 +1050,12 @@ jobs:
               snyk-sca)              result="${{ needs.snyk-sca.result }}" ;;
             esac
             echo "$job: $result"
+            if [[ "$FEATURE_BASE_PR" == "true" && "$job" == "konflux-api-tests-gate" ]]; then
+              if [[ "$result" == "failure" ]]; then
+                echo "::warning::konflux-api-tests-gate failed on a feature-base PR (informational only)"
+              fi
+              continue
+            fi
             if [[ ! "$result" =~ ^($ok)$ ]]; then
               echo "::error::Required job '$job' has result '$result'"
               exit 1

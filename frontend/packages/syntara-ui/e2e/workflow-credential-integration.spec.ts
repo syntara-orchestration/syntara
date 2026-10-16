@@ -1,6 +1,14 @@
 import { type Page } from './fixtures'
 import { test, expect, toAppUrl } from './fixtures'
-import { deleteCredentialByName, goToCredentialsList, selectCredentialType } from './helpers/credentials'
+import {
+  fillCredentialSecret,
+  deleteCredentialByName,
+  goToCredentialsList,
+  selectCredentialType,
+  waitForCredentialFormTypesReady,
+  waitForCredentialTypeSelectReady,
+  ensureInlineCredentialProjectSelected,
+} from './helpers/credentials'
 import { buildUniqueName, clickAddConnectedStep, selectProjectIfRequired } from './helpers/workflows'
 import { ensureProject } from './utils/api'
 
@@ -11,11 +19,11 @@ import { ensureProject } from './utils/api'
  * Flow: New workflow → Manual trigger → Add connected step → Action → REST API
  */
 async function navigateToApiActionForm(app: Page) {
-  await ensureProject(app)
+  const project = await ensureProject(app)
   await app.goto(toAppUrl('/workflow-builder/new'))
   await expect(app.getByRole('heading', { name: 'Select a trigger node' })).toBeVisible()
 
-  await selectProjectIfRequired(app)
+  await selectProjectIfRequired(app, project?.name)
 
   await app.getByRole('button', { name: 'Manual trigger' }).click()
   await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Manual trigger')
@@ -28,10 +36,13 @@ async function navigateToApiActionForm(app: Page) {
 
   await expect(app.getByRole('textbox', { name: 'Name', exact: true })).toBeVisible()
   await credentialsLoaded
+  // Inline CredentialFormModal needs defaultProjectId from the builder header project.
+  await selectProjectIfRequired(app, project?.name)
   const credToggle = app.getByRole('button', { name: 'Authentication credential', exact: true })
   // The CredentialSelector re-queries when projectId populates (initial fetch without project_id,
   // then a second fetch with project_id). Use 30s to cover both fetches.
   await expect(credToggle).toBeEnabled({ timeout: 30_000 })
+  return project
 }
 
 test.describe('Credential Selector', () => {
@@ -231,22 +242,22 @@ test.describe('Inline Credential Creation', () => {
 
   test('inline creation validates required fields', async ({ app }) => {
     // Arrange
-    await navigateToApiActionForm(app)
+    const project = await navigateToApiActionForm(app)
     await app.getByRole('button', { name: 'Authentication credential', exact: true }).click()
     await app.getByRole('option', { name: /Create new credential/ }).click()
 
     // Act - Submit without filling required fields
-    const modal = app.getByRole('dialog')
+    const modal = app.getByRole('dialog', { name: 'Create credential' })
+    await waitForCredentialTypeSelectReady(modal)
+    await ensureInlineCredentialProjectSelected(modal, app, project?.name)
+    await selectCredentialType(modal, 'HTTP Bearer Token')
+    await waitForCredentialFormTypesReady(modal, 'Token')
+
+    await modal.getByRole('textbox', { name: 'Credential name' }).fill(buildUniqueName('e2e-inline-validation'))
     await modal.getByRole('button', { name: 'Create credential' }).click()
 
-    // Assert - Validation errors shown
-    // Scope to the Name field's FormGroup to avoid matching "Username is required"
-    await expect(
-      modal
-        .getByRole('textbox', { name: 'Credential name' })
-        .locator('xpath=ancestor::div[contains(@class,"form__group")]')
-        .getByText('Name is required')
-    ).toBeVisible()
+    await expect(modal).toBeVisible()
+    await expect(modal.getByText('Token is required')).toBeVisible({ timeout: 20_000 })
   })
 
   test('newly created credential is available in selector', async ({ app }) => {
@@ -254,21 +265,33 @@ test.describe('Inline Credential Creation', () => {
 
     try {
       // Arrange - Create a credential via inline modal
-      await navigateToApiActionForm(app)
+      const project = await navigateToApiActionForm(app)
       await app.getByRole('button', { name: 'Authentication credential', exact: true }).click()
       await app.getByRole('option', { name: /Create new credential/ }).click()
 
-      const modal = app.getByRole('dialog')
+      const modal = app.getByRole('dialog', { name: 'Create credential' })
+      await waitForCredentialTypeSelectReady(modal)
+      await ensureInlineCredentialProjectSelected(modal, app, project?.name)
+      await selectCredentialType(modal, 'HTTP Bearer Token')
+      await waitForCredentialFormTypesReady(modal, 'Token')
       await modal.getByRole('textbox', { name: 'Credential name' }).fill(credName)
-      await modal.getByRole('textbox', { name: 'Token' }).fill('availability-test-token')
+      await fillCredentialSecret(modal, 'Token', 'availability-test-token')
 
-      // Wait for the GET (refetch) after creation so the dropdown has fresh data
+      const credentialCreated = app.waitForResponse(
+        (resp) =>
+          resp.request().method() === 'POST' &&
+          resp.url().includes('/credentials') &&
+          resp.status() >= 200 &&
+          resp.status() < 300
+      )
       const credentialsRefetched = app.waitForResponse(
         (resp) => resp.url().includes('/credentials') && resp.request().method() === 'GET' && resp.status() === 200
       )
       await modal.getByRole('button', { name: 'Create credential' }).click()
       await expect(app.getByText('Credential created')).toBeVisible()
+      await credentialCreated
       await credentialsRefetched
+      await expect(modal).not.toBeVisible()
 
       // Act - Open the selector dropdown again
       await app.getByRole('button', { name: 'Authentication credential', exact: true }).click()

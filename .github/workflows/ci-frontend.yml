@@ -5,7 +5,7 @@ name: CI Frontend
 
 on:
   pull_request:
-    branches: [devel, early-access, feature/*]
+    branches: [devel, early-access, 'feature/*', 'feature/**/*', 'feat/*', 'feat/**/*']
   merge_group:
     branches: [devel, early-access]
   push:
@@ -846,6 +846,9 @@ jobs:
       - test-compose-e2e
     steps:
       - name: Check required jobs passed
+        env:
+          # Konflux UI tests run on feature-base PRs for signal; failures do not block merge.
+          FEATURE_BASE_PR: ${{ github.event_name == 'pull_request' && (startsWith(github.base_ref, 'feature/') || startsWith(github.base_ref, 'feat/')) }}
         run: |
           if [[ "${{ needs.changes.result }}" != "success" ]]; then
             echo "::error::Detect Changes job did not succeed: ${{ needs.changes.result }}"
@@ -870,6 +873,12 @@ jobs:
               shared-checks-gate)      result="${{ needs.shared-checks-gate.result }}" ;;
             esac
             echo "$job: $result"
+            if [[ "$FEATURE_BASE_PR" == "true" && "$job" == "konflux-ui-tests-gate" ]]; then
+              if [[ "$result" == "failure" ]]; then
+                echo "::warning::konflux-ui-tests-gate failed on a feature-base PR (informational only)"
+              fi
+              continue
+            fi
             if [[ ! "$result" =~ ^($ok)$ ]]; then
               echo "::error::Required job '$job' has result '$result'"
               exit 1

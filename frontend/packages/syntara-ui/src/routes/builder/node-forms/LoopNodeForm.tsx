@@ -14,10 +14,12 @@ import {
 import { RhUiErrorIcon } from '@patternfly/react-icons'
 import type { ReactNode } from 'react'
 import { use, useEffect, useMemo, useState } from 'react'
-import { Controller, FormProvider, useForm, useFormContext, useWatch } from 'react-hook-form'
+import { Controller, useFormContext, useWatch } from 'react-hook-form'
 
 import { ExpressionBuilderCore as ExpressionBuilder } from '../../../components/expressions/ExpressionBuilderCore'
+import { SynForm } from '../../../components/forms/SynForm'
 import { SynSelect } from '../../../components/SynSelect'
+import { useSynForm } from '../../../hooks/useSynForm'
 import { NodeEditorAutoSubmitContext, useRegisterAutoSubmit } from '../hooks/useNodeEditorAutoSubmit'
 import { useWorkflowEngineDefaults } from '../hooks/useWorkflowEngineDefaults'
 import { useIsVersionView } from '../VersionViewContext'
@@ -25,7 +27,6 @@ import { useIsVersionView } from '../VersionViewContext'
 import { loopFormSchema, type LoopFormData } from './loopFormSchema'
 import { ActivityNameField } from './shared/ActivityNameField'
 import { conditionValidationRules } from './shared/conditionValidation'
-import { zodResolver } from './shared/formSchemaUtils'
 import { LoopTypeHelp } from './shared/LoopTypeHelp'
 import { MaxIterationsHelp } from './shared/MaxIterationsHelp'
 import { nodeHelp } from './shared/nodeFieldHelp'
@@ -113,8 +114,8 @@ function LoopFormFields({
   }, [errors.items, errors.condition, errors.maxIterations])
 
   const nameField = useMemo(
-    () => <ActivityNameField register={register} fieldId="loop-name" ariaLabel="Name" />,
-    [register]
+    () => <ActivityNameField control={control} fieldId="loop-name" ariaLabel="Name" />,
+    [control]
   )
 
   useEffect(() => {
@@ -126,7 +127,7 @@ function LoopFormFields({
 
   const parametersContent = (
     <Stack hasGutter>
-      {!onHeaderContentChange && <ActivityNameField register={register} fieldId="loop-name" />}
+      {!onHeaderContentChange && <ActivityNameField fieldId="loop-name" />}
 
       <StackItem>
         <FormGroup label="Type" labelHelp={<LoopTypeHelp />} fieldId="loop-type">
@@ -305,23 +306,23 @@ export function LoopNodeForm(props: LoopNodeFormProps) {
     props.onSubmit(cleanedData)
   }
 
-  const methods = useForm<LoopFormData>({
-    resolver: zodResolver(loopFormSchema, undefined, { mode: 'sync' }),
+  const form = useSynForm({
+    schema: loopFormSchema,
     defaultValues,
   })
 
   const autoSubmitRef = use(NodeEditorAutoSubmitContext)
-  useRegisterAutoSubmit(autoSubmitRef, methods, handleSubmit)
+  useRegisterAutoSubmit(autoSubmitRef, form, handleSubmit)
 
   const {
     formState: { errors },
-  } = methods
+  } = form
 
   return (
-    <FormProvider {...methods}>
-      <NodeFormContainer formId="loop-node-form" onSubmit={methods.handleSubmit(handleSubmit)}>
+    <NodeFormContainer formId="loop-node-form" onSubmit={form.handleSubmit(handleSubmit)}>
+      <SynForm form={form}>
         <LoopFormFields onHeaderContentChange={props.onHeaderContentChange} validationErrors={errors} />
-      </NodeFormContainer>
-    </FormProvider>
+      </SynForm>
+    </NodeFormContainer>
   )
 }

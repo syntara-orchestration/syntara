@@ -59,6 +59,8 @@ vi.mock('@xyflow/react', () => ({
     getViewport: () => ({ x: 0, y: 0, zoom: 1 }),
     getNode: vi.fn(),
   }),
+  useStore: (selector: (state: { transform: [number, number, number]; nodes: unknown[] }) => unknown) =>
+    selector({ transform: [0, 0, 1], nodes: [] }),
   useUpdateNodeInternals: () => vi.fn(),
 }))
 
