@@ -11,8 +11,10 @@ from syntara.workflows.models.activity_execution import ActivityStatus
 from syntara.workflows.utils.loop_body_nodes import collect_loop_bodies
 from syntara.workflows.utils.loop_iteration_names import strip_iteration_suffix
 from syntara.workflows.utils.namespace_resolver import NamespaceResolver
-from syntara.workflows.workflow_engine.activities.retry_node_replay_activity import RESTORABLE_SOURCE_STATUSES
-from syntara.workflows.workflow_engine.constants import DEFAULT_ACTIVITY_TIMEOUT_SECONDS
+from syntara.workflows.workflow_engine.constants import (
+    DEFAULT_ACTIVITY_TIMEOUT_SECONDS,
+    RESTORABLE_SOURCE_STATUSES,
+)
 from syntara.workflows.workflow_engine.graph import ActivityNode, WorkflowGraph
 from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName, LoopState, NodeType
 
@@ -46,21 +48,47 @@ _CONTROL_NODE_TYPES_FOR_RETRY = frozenset(
     }
 )
 
+#: A control node needs at least two output ports before a branch means anything.
+_MIN_BRANCHES_FOR_INFERENCE = 2
+
+#: Control nodes whose taken branch can be inferred from a source run's node
+#: statuses, so replaying them is possible even when the run predates persisted
+#: control state. LOOP and WAIT are absent: a loop's position is a per-iteration
+#: question, and a wait node emits no control data at all.
+_INFERABLE_CONTROL_NODE_TYPES = frozenset(
+    {
+        NodeType.CONDITION,
+        NodeType.SWITCH,
+    }
+)
+
 
 class WorkflowRetryMixin:
     """Retry policy and restoration; state is initialized by the workflow."""
 
     retry_context: dict[str, Any]
     _retry_restorable_cache: set[str] | None
-    #: Nodes this retry may replay, decided up front in ``_prepare_retry``.
-    #: The sync service asks the workflow whether a completing activity is one of
-    #: these before waiting on it, so it must be populated before any node runs.
+    #: The upstream region, decided up front in ``_prepare_retry``. The sync service
+    #: asks the workflow whether a completing activity is one of these before
+    #: waiting on it, so it must be populated before any node runs. Nothing is
+    #: pre-subtracted, not even a control node this retry cannot replay, because
+    #: the set is expected to grow into replaying every control node. A node that
+    #: is a candidate when it is scheduled but turns out to rerun is discarded
+    #: then, before it completes, so the service never waits on it.
     _retry_replay_candidates: set[str]
     _restored_node_timestamps: dict[str, dict[str, str | None]]
     #: The source status of a node this retry restored, keyed by node id. Read by the
     #: completion path so a restored skip or failure is not republished as a success
     #: and does not have its successors scheduled.
     _restored_node_statuses: dict[str, str]
+    #: The routing decision each restorable control node's source run recorded,
+    #: keyed by node id. Read once during ``_prepare_retry`` so the synchronous
+    #: classification paths can honour it without awaiting anything.
+    _restored_control_ports: dict[str, str]
+    #: The port each control node resolved to, keyed by node id. Memoised because
+    #: the resolver is reached from candidate construction and again when the node
+    #: is scheduled, and workflow code must reach the same answer both times.
+    _resolved_control_port_cache: dict[str, str | None]
     #: The output a restored node produced before it failed in the source run,
     #: keyed by node id. Republished by the failure path, so a successor reading it
     #: sees what the source run produced rather than an empty output model.
@@ -110,7 +138,7 @@ class WorkflowRetryMixin:
         # Memoised restorable set: derived from the graph and the retry context,
         # neither of which changes during a run.
         self._retry_restorable_cache: set[str] | None = None
-        # Nodes this retry may replay, and the source state for the ones it did.
+        # The upstream region, and the source state for the nodes it restored.
         # The sync service consults the candidate set to tell a replayed activity
         # from an ordinary one before waiting on it, so these are filled during
         # _prepare_retry rather than on first use.
@@ -118,6 +146,8 @@ class WorkflowRetryMixin:
         self._restored_node_timestamps: dict[str, dict[str, str | None]] = {}
         self._restored_node_statuses: dict[str, str] = {}
         self._restored_node_outputs: dict[str, dict[str, Any]] = {}
+        self._restored_control_ports: dict[str, str] = {}
+        self._resolved_control_port_cache: dict[str, str | None] = {}
         self._retry_source_statuses: dict[str, str] = {}
 
     def _create_loop_state_for_type(self, loop_type: str, node: ActivityNode) -> LoopState: ...  # type: ignore[empty-body]
@@ -132,10 +162,28 @@ class WorkflowRetryMixin:
             activity_id="__internal__fetch_retry_source_state",
             start_to_close_timeout=timedelta(seconds=DEFAULT_ACTIVITY_TIMEOUT_SECONDS),
         )
+        # Persisted routing, read before anything classifies. Restorable-node
+        # selection and _should_restore_node are both synchronous, so the branch a
+        # source run recorded has to be known already — otherwise both would fall
+        # back to inference and reject a node whose branch is sitting in the row.
+        self._restored_control_ports = await workflow.execute_activity(
+            ActivityName.RETRY_CONTROL_PORTS,
+            args=[self.retry_context["retry_from_execution_id"]],
+            activity_id="__internal__fetch_retry_control_ports",
+            start_to_close_timeout=timedelta(seconds=DEFAULT_ACTIVITY_TIMEOUT_SECONDS),
+        )
         self._classify_unselected_branches(graph)
-        # Decided here rather than on first use: the sync service consults this set
-        # the moment an activity completes, so a node discovered mid-graph would
-        # otherwise look like an ordinary execution and never get its source times.
+        # The upstream region, control nodes included: the set is expected to grow
+        # into replaying every control node, so nothing is pre-subtracted here and
+        # the replay-or-rerun choice is made when the node is scheduled. Decided
+        # here rather than on first use because the sync service consults it the
+        # moment an activity completes, so a node discovered mid-graph would look
+        # like an ordinary execution and never get its source times.
+        #
+        # Control nodes are included even though 826 cannot replay all of them.
+        # _maybe_restore_retry_output discards one the moment it decides to rerun
+        # it, so the set can stay open to the control nodes a later PR will add
+        # without the sync service ever waiting on one that will not replay.
         self._retry_replay_candidates = set(self._retry_restorable_nodes(graph))
 
     def _classify_unselected_branches(self, graph: WorkflowGraph) -> None:
@@ -145,7 +193,7 @@ class WorkflowRetryMixin:
         retain their results under R6c, even if a different predecessor failed.
 
         A failure the caller did not select is restored as a failure by
-        ``_restore_node_output``, from its own recorded error. What this suppresses
+        ``_restore_node_state``, from its own recorded error. What this suppresses
         is everything *downstream* of such a failure — those nodes have nothing to
         run against, and the source run never produced results for them either. The
         failing node itself is deliberately not added here: marking it skipped would
@@ -169,12 +217,19 @@ class WorkflowRetryMixin:
                 pending.extend(graph.get_successors(current))
 
     def _retry_restorable_nodes(self, graph: WorkflowGraph) -> set[str]:
-        """Return the base node ids whose stored output this retry can restore.
+        """Return the base node ids in this retry's upstream region.
 
         The control plane already validated the selection, so this only re-derives
         *which upstream nodes may be skipped* — a node qualifies when it is not a
-        retry starting point, not a trigger or control node, not a loop body, and not
+        retry starting point, not a trigger node, not a loop body, and not
         downstream of a retry point.
+
+        Control nodes stay in this set. Whether one is actually replayed is decided
+        when traversal reaches it, not here: a condition or switch whose branch is
+        recoverable is restored, and one whose branch cannot be recovered runs
+        normally. Excluding them here and re-admitting them at the point of use
+        encodes the same rule in two places that have to keep agreeing, and it
+        leaves out the control nodes a later PR will want to replay.
 
         R6a's continue_on_failure case is covered by the ``downstream`` subtraction
         rather than a rule of its own. A failed CoF step is a retry point, so
@@ -199,11 +254,10 @@ class WorkflowRetryMixin:
         # input, so there is no source output to restore for one.
         triggers = {node.id for node in graph.get_trigger_nodes()}
 
-        # Control nodes decide routing rather than producing a value to inject,
-        # and a loop body is not one node but one execution per iteration. Both
-        # are excluded here so the set means what it says, instead of relying on
-        # _should_restore_node to filter them again at the point of use.
-        control = {node.id for node in graph.get_all_nodes() if node.type in _CONTROL_NODE_TYPES_FOR_RETRY}
+        # A loop body is not one node but one execution per iteration, so it is
+        # excluded here rather than at the point of use. Control nodes are not:
+        # they are restored or re-run depending on what is recoverable, which is
+        # only knowable once traversal reaches them.
         loop_bodies = self._loop_body_node_ids(graph)
 
         # Everything downstream of a failure point re-executes, so it cannot be
@@ -214,11 +268,106 @@ class WorkflowRetryMixin:
         for node_id in must_run:
             downstream |= self._walk_downstream(node_id, graph)
 
-        restorable = (
-            {node.id for node in graph.get_all_nodes()} - must_run - triggers - control - loop_bodies - downstream
-        )
+        restorable = {node.id for node in graph.get_all_nodes()} - must_run - triggers - loop_bodies - downstream
         self._retry_restorable_cache = restorable
         return restorable
+
+    def _resolved_control_port(self, node: ActivityNode, graph: WorkflowGraph) -> str | None:
+        """Resolve the port this control node is routed by, or None to rerun.
+
+        Resolved once per node, in the order the branch is actually known:
+
+        1. what the source run persisted in ``control_data``,
+        2. failing that, the branch inferred from the source run's statuses,
+        3. failing that, rerun the node for real.
+
+        The persisted value has to win in the synchronous paths too — restorable
+        classification and ``_should_restore_node`` both run before any node can
+        dispatch an activity, so an unconsulted record would be rejected before the
+        branch was ever read.
+        """
+        if node.id in self._resolved_control_port_cache:
+            return self._resolved_control_port_cache[node.id]
+        recorded = self._restored_control_ports.get(node.id)
+        resolved = str(recorded) if recorded else self._infer_control_node_branch(node, graph)
+        self._resolved_control_port_cache[node.id] = resolved
+        return resolved
+
+    def _infer_control_node_branch(self, node: ActivityNode, graph: WorkflowGraph) -> str | None:
+        """Which output port a control node took in the source run, or None.
+
+        A control node re-evaluates its own condition against the namespace this
+        retry has rebuilt, and that namespace is incomplete while sibling branches
+        are still restoring. So a restored control node is given the branch the
+        source run recorded rather than being asked to decide again.
+
+        The source run already records it implicitly: ``_skip_non_taken_branches``
+        marks the untaken branch SKIPPED and cascades, so the branch that has
+        activity is the one that ran.
+
+        Only branch-exclusive nodes count. A node reachable from more than one port
+        records activity whichever branch fired, so its status says nothing about
+        the choice — a graph whose branches merge cannot be inferred, and returns
+        None so the caller reruns the node.
+
+        Returns:
+            The port name, or None when it is not inferable: fewer than two ports,
+            no branch has activity, more than one does, or no port is exclusive.
+
+        """
+        if node.type not in _INFERABLE_CONTROL_NODE_TYPES:
+            return None
+
+        ports = sorted({edge["from_port"] for edge in graph.get_outgoing_edges(node.id) if edge.get("from_port")})
+        if len(ports) < _MIN_BRANCHES_FOR_INFERENCE:
+            return None
+
+        # Everything reachable through each port, so exclusivity can be computed by
+        # set difference rather than a separate traversal per candidate pair.
+        reach = {port: self._walk_from_port(node.id, port, graph) for port in ports}
+
+        taken: list[str] = []
+        for port in ports:
+            others: set[str] = set()
+            for other in ports:
+                if other != port:
+                    others |= reach[other]
+            exclusive = reach[port] - others
+            if any(
+                self._retry_source_statuses.get(node_id) not in (None, ActivityStatus.SKIPPED.value)
+                for node_id in exclusive
+            ):
+                taken.append(port)
+
+        if len(taken) != 1:
+            # No branch ran, or both did. Either way the recorded state does not
+            # identify one branch, and guessing would send the retry down the wrong
+            # edge.
+            return None
+        return taken[0]
+
+    @staticmethod
+    def _walk_from_port(node_id: str, port: str, graph: WorkflowGraph) -> set[str]:
+        """Every node reachable from ``node_id`` through ``port``, exclusive.
+
+        Plain adjacency from the port's immediate successors. A loop body is not
+        followed through its owner: a node inside a loop is one execution per
+        iteration, so its status cannot say which branch entered it.
+        """
+        seen: set[str] = set()
+        queue = collections.deque(successor.id for successor in graph.get_next_activities_by_port(node_id, port))
+        while queue:
+            current = queue.popleft()
+            if current in seen:
+                continue
+            seen.add(current)
+            node = graph.get_node(current)
+            if node is not None and node.type == NodeType.LOOP:
+                # Stop at a loop: its iterations are per-iteration records and say
+                # nothing about which branch reached it.
+                continue
+            queue.extend(graph.get_successors(current))
+        return seen
 
     @staticmethod
     def _loop_body_node_ids(graph: WorkflowGraph) -> set[str]:
@@ -273,59 +422,80 @@ class WorkflowRetryMixin:
         misstate the source run, and a failure reported as a skip would drop the
         reason it failed.
         """
-        if not self.retry_context or not self._should_restore_node(node.id, graph):
+        if not self.retry_context:
             return None
-        return await self._restore_node_output(node)
+        if not self._should_restore_node(node.id, graph):
+            # This node is about to run for real, so it must stop looking like a
+            # replay candidate before it completes. The sync service asks the
+            # workflow whether a completing activity is one it should expect a
+            # replay for, and a candidate that never replays costs it a 5s wait
+            # for a timestamp that is never written. Discarding here — at the
+            # moment the decision is made, and before the node runs — is what
+            # lets the candidate set start out holding every upstream node
+            # without paying for the ones that turn out to rerun. A no-op for a
+            # node that was never a candidate.
+            self._retry_replay_candidates.discard(node.id)
+            return None
+        return await self._restore_node_state(node, graph)
 
     def _should_restore_node(self, node_id: str, graph: WorkflowGraph) -> bool:
-        """Whether this node's stored output may be injected instead of running it."""
+        """Whether this node's stored output may be injected instead of running it.
+
+        Membership decides it, for every node type. A control node in the set is
+        then held to the extra test of whether the branch it took is recoverable:
+        a condition or switch is restored when it is, and re-decides normally when
+        it is not. A loop and a converge are never restored — they gate their
+        successors rather than producing a value to inject, so replaying one would
+        release the graph without the gate being evaluated.
+        """
         if not self.retry_context:
+            return False
+        if strip_iteration_suffix(node_id) not in self._retry_restorable_nodes(graph):
             return False
         node = graph.get_node(node_id)
         if node is not None and node.type in _CONTROL_NODE_TYPES_FOR_RETRY:
-            return False
-        return strip_iteration_suffix(node_id) in self._retry_restorable_nodes(graph)
+            return node.type in _INFERABLE_CONTROL_NODE_TYPES and bool(self._resolved_control_port(node, graph))
+        return True
 
-    async def _restore_node_output(self, node: ActivityNode) -> dict[str, Any] | None:
+    async def _restore_node_state(self, node: ActivityNode, graph: WorkflowGraph) -> dict[str, Any] | None:
         """Replay this node's recorded outcome from its source run, or None.
 
-        Returns None when the source run has no restorable record for the node, so
-        the caller falls through to normal execution. A node that never reached a
-        terminal state cannot be restored, because there would be nothing to
-        reproduce.
+        One path for both node kinds. The replay fetch is the same, and so is the
+        state it publishes — the recorded input, status and times — so only the
+        result differs: a control node routes on the branch the source run took,
+        an ordinary node publishes the output it recorded.
 
-        The replay activity runs under the node's own id — not an
-        ``__internal__`` id — so the normal event-driven sync records it
-        node-by-node: the sync service maps it to this node, writes its row, and
-        emits a per-node WebSocket delta exactly as for an executed node. Both
-        halves are republished: the output into the execution namespace, and the
-        input into ``node_inputs`` (what ``get_activity_input`` reads), so a
-        restored node shows the same input and output on drill-down as one that
-        executed.
+        The recorded status and times are kept for the sync service, which is what
+        writes the row: without them the sync records the replay activity's own
+        successful completion and every restored node would be reported COMPLETED.
+        The input goes to ``node_inputs`` (what ``get_activity_input`` reads), so a
+        restored node shows the same input on drill-down as one that executed.
 
-        The recorded status decides what this returns. COMPLETED publishes a normal
-        completion, so the scheduler treats the node as done and its successors run.
-        SKIPPED and FAILED publish the failure namespace and record the node
-        accordingly, so the scheduler treats them as terminal without executing
-        them — a restored skip must not schedule downstream work, and a restored
-        failure must not read as a success.
+        Two differences from the ordinary path are deliberate and kept rather than
+        unified. A control node carries no status guard and tolerates a vanished
+        record, because it can still be restored from a recorded port; an ordinary
+        node cannot, so it skips the replay entirely and raises if the row is gone.
 
-        Either way the recorded status and times are kept for the sync service,
-        which is what writes the row: without them the sync records the replay
-        activity's own successful completion and every restored node would be
-        reported as COMPLETED.
+        The replay activity runs under the node's own id — not an ``__internal__``
+        id — so the normal event-driven sync records it node-by-node: the service
+        maps it to this node, writes its row, and emits a per-node WebSocket delta
+        exactly as for an executed node.
 
-        The replay is not scheduled at all when the source run has no restorable
-        record for this node. It runs under the node's own activity id, so the
-        event it emits is consumed as *this node's* execution and marks the row
-        terminal; a real execution afterwards is then refused by the sync
-        service's terminal-status guard, leaving the row showing the replay's
-        output and times instead of the real run's. Deciding up front costs
-        nothing: ``_prepare_retry`` already read every source status, so this is
-        a lookup rather than a query, and it saves an activity and a history
-        event for every node that was never replayable.
+        Returns:
+            The synthetic completion for a node that qualified, or None to fall
+            through to normal execution. A node that never reached a terminal state
+            cannot be restored, because there would be nothing to reproduce.
+
         """
-        if self._retry_source_statuses.get(node.id) not in _RESTORABLE_SOURCE_STATUS_VALUES:
+        is_control = node.type in _CONTROL_NODE_TYPES_FOR_RETRY
+
+        # Decided up front rather than after the fetch: the replay runs under the
+        # node's own activity id, so the event it emits is consumed as *this node's*
+        # execution and marks the row terminal; a real execution afterwards is then
+        # refused by the sync service's terminal-status guard, leaving the row
+        # showing the replay's output and times. This costs a lookup rather than a
+        # query, because ``_prepare_retry`` already read every source status.
+        if not is_control and self._retry_source_statuses.get(node.id) not in _RESTORABLE_SOURCE_STATUS_VALUES:
             self._retry_replay_candidates.discard(node.id)
             return None
 
@@ -335,7 +505,7 @@ class WorkflowRetryMixin:
             activity_id=node.id,
             start_to_close_timeout=timedelta(seconds=DEFAULT_ACTIVITY_TIMEOUT_SECONDS),
         )
-        if record is None:
+        if not is_control and record is None:
             # The status map said this node was restorable but the row is gone —
             # deleted between _prepare_retry and here. Rare, but the replay event
             # has already been emitted under the node's id and will be persisted
@@ -348,22 +518,41 @@ class WorkflowRetryMixin:
             msg = f"source record for retry node {node.id} disappeared between classification and replay"
             raise SafeValueError(msg)
 
-        source_status = str(record.get("status") or ActivityStatus.COMPLETED.value)
-        output = record.get("output_data") or {}
-        error_details = record.get("error_details")
-        self.node_inputs[node.id] = record.get("input_data") or {}
+        output = (record or {}).get("output_data") or {}
+        source_status = str((record or {}).get("status") or ActivityStatus.COMPLETED.value)
+        error_details = (record or {}).get("error_details")
+        self.node_inputs[node.id] = (record or {}).get("input_data") or {}
+        self._restored_node_statuses[node.id] = source_status
         self._restored_node_timestamps[node.id] = {
-            "started_at": record.get("started_at"),
-            "completed_at": record.get("completed_at"),
-            # The status and error travel to the sync service so the row reports
-            # what the source run recorded rather than the replay's own success.
+            "started_at": (record or {}).get("started_at"),
+            "completed_at": (record or {}).get("completed_at"),
+            # The source run's own status and times, so the row this node ends up
+            # with reports what actually happened rather than the replay's success.
             "status": source_status,
             "error_details": error_details,
         }
-        self._restored_node_statuses[node.id] = source_status
+
+        if is_control:
+            # A control node needs the routing decision, not a payload, and the
+            # source row already carries it. The persisted ``control_data`` wins,
+            # because the sync layer records the branch the run actually took;
+            # inference stays the fallback for runs predating that column and for
+            # control data with no ``next_port``. The output is the source run's own
+            # and must not be replaced — only the port travels as control data,
+            # which is what the scheduler reads to pick the edge.
+            stored_control = (record or {}).get("control_data") or {}
+            recorded_port = stored_control.get("next_port") if isinstance(stored_control, dict) else None
+            port = str(recorded_port) if recorded_port else self._resolved_control_port(node, graph)
+            if port is None:
+                return None
+            workflow.logger.info(
+                "Restored control node branch from source run", extra={"node_id": node.id, "port": port}
+            )
+            return {"output": output, "control": {"next_port": port}}
+
+        # Only a node that did not succeed has output worth keeping: a restored
+        # completion publishes its own output through the normal path.
         if source_status != ActivityStatus.COMPLETED.value and output:
-            # Only a node that did not succeed has output worth keeping: a restored
-            # completion publishes its own output through the normal path.
             self._restored_node_outputs[node.id] = output
 
         workflow.logger.info(
@@ -376,6 +565,10 @@ class WorkflowRetryMixin:
             },
         )
 
+        # SKIPPED and FAILED publish the failure namespace and record the node
+        # accordingly, so the scheduler treats them as terminal without executing
+        # them: a restored skip must not schedule downstream work, and a restored
+        # failure must not read as a success.
         if source_status != ActivityStatus.COMPLETED.value:
             return self._restored_terminal_result(node, source_status, output, error_details)
 
