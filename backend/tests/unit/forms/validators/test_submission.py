@@ -417,26 +417,41 @@ class TestDateFieldSubmission:
         return _form(_field("date", "start", **toggles))
 
     @pytest.mark.parametrize(
-        ("toggles", "submitted"),
+        ("toggles", "submitted", "expected"),
         [
-            ({}, {"date": "2026-01-05"}),
-            ({"include_timezone": True}, {"date": "2026-01-05", "timezone": "America/New_York"}),
+            ({}, {"date": "2026-01-05"}, "2026-01-05"),
+            (
+                {"include_timezone": True},
+                {"date": "2026-01-05", "timezone": "America/New_York"},
+                "2026-01-05",
+            ),
             (
                 {"include_time": True, "include_timezone": True},
                 {"date": "2026-01-05", "time": "14:30", "timezone": "America/New_York"},
+                "2026-01-05T14:30:00-05:00",
             ),
             (
                 {"include_date": False, "include_time": True, "include_timezone": True},
                 {"time": "14:30", "timezone": "America/New_York"},
+                "14:30:00-05:00",
             ),
-            ({"include_date": False, "include_timezone": True}, {"timezone": "America/New_York"}),
+            (
+                {"include_date": False, "include_timezone": True},
+                {"timezone": "America/New_York"},
+                "America/New_York",
+            ),
         ],
     )
-    def test_complete_submission_round_trips(self, toggles: dict[str, bool], submitted: dict[str, str]) -> None:
-        """A submission covering every included component is returned verbatim."""
+    def test_complete_submission_uses_output_format(
+        self,
+        toggles: dict[str, bool],
+        submitted: dict[str, str],
+        expected: str,
+    ) -> None:
+        """Every date field component combination produces a single string."""
         cleaned = validate_form_submission(self._date_form(**toggles), {"start": submitted})
 
-        assert cleaned["start"] == submitted
+        assert cleaned["start"] == expected
 
     def test_missing_component_rejected(self) -> None:
         """Every included component is mandatory once the field is answered."""
@@ -517,7 +532,7 @@ class TestDateFieldSubmission:
 
         cleaned = validate_form_submission(form, {})
 
-        assert cleaned["start"] == {"date": "2026-03-01", "time": "08:00", "timezone": "Europe/Paris"}
+        assert cleaned["start"] == "2026-03-01T08:00:00+01:00"
 
     @pytest.mark.parametrize("field_type", ["dropdown", "multi_select"])
     def test_resolved_options_enforce_typed_membership(self, field_type: str) -> None:
