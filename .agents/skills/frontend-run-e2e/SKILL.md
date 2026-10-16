@@ -8,7 +8,7 @@ user-invocable: true
 
 This skill walks you through running Playwright E2E tests. For how to **write** them, see `.agents/skills/frontend-playwright-e2e/SKILL.md`.
 
-When this skill is invoked, follow the wizard below. Ask the user for configuration using the interaction mechanism available in the current agent, pre-filling sensible defaults. The user should only need to confirm or override — not fill in from scratch.
+When this skill is invoked, follow the wizard below. Ask for any missing configuration together, using the interaction mechanism available in the current agent and pre-filling sensible defaults. Treat choices the user already gave as answers.
 
 ---
 
@@ -34,7 +34,7 @@ If you accidentally read the password file, do not repeat its contents. Acknowle
 
 ### Step 1: Resolve defaults
 
-Before asking the user anything, find the repo root and verify defaults silently:
+Before asking the user anything, find the repo root and check which supported URLs are reachable:
 
 ```bash
 REPO_ROOT=$(git rev-parse --show-toplevel)
@@ -42,17 +42,19 @@ REPO_ROOT=$(git rev-parse --show-toplevel)
 
 | Setting | Default | How to verify |
 |---|---|---|
-| UI project path | `$REPO_ROOT/frontend/packages/syntara-ui` | `ls $REPO_ROOT/frontend/packages/syntara-ui/playwright.config.ts` |
-| Admin password path | `$REPO_ROOT/backend/.secrets/admin-password` | `test -f $REPO_ROOT/backend/.secrets/admin-password` |
-| CA cert path | `$REPO_ROOT/backend/.secrets/certs/ca.pem` | `test -f $REPO_ROOT/backend/.secrets/certs/ca.pem` |
-| Backend URL | `https://localhost:8000` | `curl -sf --cacert $REPO_ROOT/backend/.secrets/certs/ca.pem https://localhost:8000/healthz/ready` |
-| Frontend URL | `http://localhost:5173` | `curl -sf http://localhost:5173 -o /dev/null` |
+| UI project path | `$REPO_ROOT/frontend/packages/syntara-ui` | `ls "$REPO_ROOT/frontend/packages/syntara-ui/playwright.config.ts"` |
+| Admin password path | `$REPO_ROOT/backend/.secrets/admin-password` | `test -f "$REPO_ROOT/backend/.secrets/admin-password"` |
+| Local TLS CA cert | `$REPO_ROOT/backend/.secrets/certs/ca.pem` | `test -f "$REPO_ROOT/backend/.secrets/certs/ca.pem"` |
+| Local-dev API URL | `https://localhost:8000` | `curl -sf --cacert "$REPO_ROOT/backend/.secrets/certs/ca.pem" https://localhost:8000/healthz/ready -o /dev/null` |
+| Compose API URL | `http://localhost:8000` | `curl -sf http://localhost:8000/healthz/ready -o /dev/null` |
+| Local Vite URL | `http://localhost:5173` | `curl -sf http://localhost:5173 -o /dev/null` |
+| Compose UI URL | `http://localhost:8080` | `curl -sf http://localhost:8080 -o /dev/null` |
 
-Use the results to inform the wizard — if a check fails, mention it in the question so the user knows something needs attention.
+Local development (`make dev`) serves the API over HTTPS on port 8000 and the Vite UI on port 5173. Compose (`make -C backend run-all`) serves the API over HTTP on port 8000 and the UI on port 8080. Use reachable endpoints as defaults; if the intended setup is unclear, ask which one the user wants.
 
 ### Step 2: Ask the user
 
-Ask the user these questions together in one interaction:
+Ask only for choices the user has not already specified, combining the remaining questions in one interaction:
 
 1. **Mode** — "Run against real backend or mock API?"
    - **Real backend (Recommended)** — Tests against live Syntara API, database, and auth. Requires backend + frontend to be running.
@@ -81,48 +83,61 @@ Ask the user to confirm or override the detected defaults:
    - Default: `$REPO_ROOT/backend/.secrets/admin-password`
    - If the file doesn't exist, warn: "File not found — run `make secrets` to generate it."
 
-2. **Backend URL** — "Backend API URL?"
-   - Default: `https://localhost:8000`
-   - If the health check failed in Step 1, warn: "Backend not responding — start it with `make -C backend run-all` from the repository root."
+2. **CA cert path** — ask only when the selected API URL uses HTTPS.
+   - Default: `$REPO_ROOT/backend/.secrets/certs/ca.pem`
+   - If it doesn't exist, warn: "File not found — run `make certs` to generate it."
+   - Compose uses HTTP and does not need a CA cert.
 
-3. **Frontend URL** — "Frontend dev server URL?"
-   - Default: `http://localhost:5173`
-   - If the check failed in Step 1, warn: "Frontend not responding — start it with `VITE_API_URL=https://localhost:8000 npm run start:ui` from `frontend/`."
+3. **Backend URL** — "Backend API URL?"
+   - Local development default: `https://localhost:8000`
+   - Compose default: `http://localhost:8000`
+   - If neither health check succeeded, explain that local development uses `make dev` and Compose uses `make -C backend run-all`; ask which setup they use before choosing a URL.
 
-Most of the time the user will accept all defaults by selecting the default option.
+4. **Frontend URL** — "Frontend URL?"
+   - Local Vite default: `http://localhost:5173`
+   - Compose default: `http://localhost:8080`
+   - If no UI responds but the API is ready, the skill can start a local Vite UI on port 5173 pointed at the selected API URL.
+
+Most of the time the user will accept the detected defaults.
+Carry the confirmed values as `PASSWORD_PATH`, `CA_PATH` (for HTTPS only), `BACKEND_URL`, and `FRONTEND_URL` through the preflight and test command.
 
 ### Step 4: Preflight checks
 
-Before running, verify the environment is ready. For real backend mode, the skill should **automatically start the frontend dev server** if it's not already running.
+Before running, follow the repository setup rule: run `make install` from the repository root. For real-backend mode, verify the selected endpoints and automatically start a local E2E Vite server if no UI is already running.
 
 **For real backend mode:**
 
 ```bash
 # 1. Password file exists (NEVER cat/read the file — only check existence)
-test -f $REPO_ROOT/backend/.secrets/admin-password && echo "OK: password file found" || echo "FAIL: password file not found — run: make secrets"
+test -f "$PASSWORD_PATH" && echo "OK: password file found" || echo "FAIL: password file not found — run: make secrets"
 
-# 2. Backend is responding
-curl -sf --cacert $REPO_ROOT/backend/.secrets/certs/ca.pem https://localhost:8000/healthz/ready -o /dev/null && echo "OK: backend responding" || echo "FAIL: backend not responding — run: make -C backend run-all"
+# 2. Backend is responding at the selected URL. Use the local CA only for HTTPS:
+if [[ "$BACKEND_URL" == https://* ]]; then
+  curl -sf --cacert "$CA_PATH" "${BACKEND_URL%/}/healthz/ready" -o /dev/null && echo "OK: backend responding" || echo "FAIL: backend not responding"
+else
+  curl -sf "${BACKEND_URL%/}/healthz/ready" -o /dev/null && echo "OK: backend responding" || echo "FAIL: backend not responding"
+fi
 
-# 3. Frontend is responding — start it if not
-curl -sf http://localhost:5173 -o /dev/null && echo "OK: frontend responding"
+# 3. Frontend is responding at the selected URL
+curl -sf "$FRONTEND_URL" -o /dev/null && echo "OK: frontend responding"
 ```
 
-If the frontend is **not** responding, start it automatically:
+If no frontend URL is responding but the backend is ready, set `FRONTEND_URL=http://localhost:5173` and start the E2E-only Vite server (not `start:ui`, which also starts Storybook):
 
 ```bash
-cd $REPO_ROOT/frontend && VITE_API_URL=https://localhost:8000 npm run start:ui &
+cd "$REPO_ROOT/frontend"
+VITE_API_URL="$BACKEND_URL" npm run start:e2e --prefix packages/syntara-ui -- --port 5173
 ```
 
-Then wait for it to come up (poll every 2 seconds, up to 60 seconds):
+Run it in a persistent terminal, then wait for it to come up (poll every 2 seconds, up to 60 seconds):
 
 ```bash
 echo "Starting frontend dev server..."
 for i in $(seq 1 30); do
-  curl -sf http://localhost:5173 -o /dev/null && break
+  curl -sf "$FRONTEND_URL" -o /dev/null && break
   sleep 2
 done
-curl -sf http://localhost:5173 -o /dev/null && echo "OK: frontend is ready" || echo "FAIL: frontend failed to start after 60s"
+curl -sf "$FRONTEND_URL" -o /dev/null && echo "OK: frontend is ready" || echo "FAIL: frontend failed to start after 60s"
 ```
 
 Tell the user what you're doing ("Frontend not running — starting it now..."). If the password file is missing or the backend isn't responding, tell the user what's wrong and how to fix it. Don't proceed until the environment is ready (or the user explicitly says to go ahead).
@@ -133,34 +148,30 @@ No preflight checks needed — Playwright auto-starts both the mock API and UI. 
 
 ### Step 5: Build and run the command
 
-Construct the command based on the wizard answers.
+Construct the command from the wizard answers. Use the selected backend and frontend URLs and the password file path from Step 3.
 
 **Real backend mode:**
 
 ```bash
-(cd $REPO_ROOT/frontend/packages/syntara-ui && \
-VITE_API_URL=https://localhost:8000 \
+(cd "$REPO_ROOT/frontend/packages/syntara-ui" && \
+VITE_API_URL="$BACKEND_URL" \
 SYNTARA_E2E_SKIP_WEB_SERVER=1 \
-SYNTARA_E2E_BASE_URL=http://localhost:5173 \
-SYNTARA_E2E_PASSWORD=$(cat $REPO_ROOT/backend/.secrets/admin-password) \
-npx playwright test $TEST_ARGS)
+SYNTARA_E2E_BASE_URL="$FRONTEND_URL" \
+SYNTARA_E2E_PASSWORD="$(cat "$PASSWORD_PATH")" \
+npx playwright test)
 ```
 
-If the user provided a custom admin password path, backend URL, or frontend URL, substitute those values. `$TEST_ARGS` is:
-- All tests: _(empty)_
-- Specific file: `e2e/workflows.spec.ts` (or whatever the user specified)
-- By pattern: `--grep "pattern"`
-- Add `--ui`, `--headed`, or `--debug` based on run mode
+Append the selected spec and run-mode options directly to `npx playwright test`. For example: `npx playwright test e2e/workflows.spec.ts --headed` or `npx playwright test --grep 'user creates a workflow' --debug`. Do not store quoted options in a scalar such as `$TEST_ARGS`: quotes inside a variable are not reparsed by the shell, so patterns with spaces split into multiple arguments.
 
 **Mock API mode:**
 
 ```bash
-(cd $REPO_ROOT/frontend/packages/syntara-ui && npx playwright test $TEST_ARGS)
+(cd "$REPO_ROOT/frontend/packages/syntara-ui" && npx playwright test)
 ```
 
-No env vars needed — Playwright auto-starts everything.
+No E2E env vars are needed — Playwright auto-starts the mock API and UI. In mock mode the default suite also includes the screenshot tests under `e2e/visual-regression/`. Append a spec, `--grep 'pattern'`, or the selected run-mode flag directly to the command.
 
-Show the user the full command before executing it. The command must use `$(cat $REPO_ROOT/backend/.secrets/admin-password)` for the password — never the expanded value. This is both the preview and the actual command; the shell expands it at runtime.
+Show the user the full command before executing it. For real-backend mode, keep `$(cat "$PASSWORD_PATH")` literal in the preview — never show its expanded value. This is both the preview and the actual command; the shell expands it at runtime.
 
 ### Step 6: Report results
 
@@ -189,9 +200,9 @@ Keep the report concise — the user should be able to see the result at a glanc
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `VITE_API_URL` | `http://localhost:3300` | Backend URL for direct API calls in test fixtures |
-| `SYNTARA_E2E_SKIP_WEB_SERVER` | _(unset)_ | Set to `1` to skip auto-starting servers |
-| `SYNTARA_E2E_BASE_URL` | `http://localhost:4173` | UI URL for browser navigation |
+| `VITE_API_URL` | `http://localhost:3300` | Mock API URL for direct API calls in test fixtures; set to the selected API URL in real-backend mode |
+| `SYNTARA_E2E_SKIP_WEB_SERVER` | _(unset)_ | Set to `1` for real-backend mode; disables Playwright server startup and excludes `e2e/visual-regression/` |
+| `SYNTARA_E2E_BASE_URL` | `http://localhost:4173` | UI URL for browser navigation; set to the selected UI URL in real-backend mode |
 | `SYNTARA_E2E_PORT` | `4173` | UI server port (mock mode only) |
 | `SYNTARA_E2E_API_PORT` | `3300` | Mock API port (mock mode only) |
 | `SYNTARA_E2E_PASSWORD` | _(unset)_ | Admin password for real backend login |
@@ -214,16 +225,18 @@ This syncs the password from `backend/.secrets/admin-password` into the database
 
 ### Starting services (if not already running)
 
-From the repo root:
+From the repository root, choose the setup that matches the selected URLs:
 
 ```bash
-# Start everything at once
+# Local development: API https://localhost:8000, Vite UI http://localhost:5173
 make dev
 
-# Or start individually:
-make services-up              # Infrastructure (DB, Redis, Temporal, OPA)
-make -C backend run-all                  # Backend API on https://localhost:8000
-cd frontend && VITE_API_URL=https://localhost:8000 npm run start:ui  # Frontend on http://localhost:5173
+# Compose: API http://localhost:8000, UI http://localhost:8080
+make -C backend run-all
+
+# If the local backend is already running and only the UI is missing:
+cd frontend
+VITE_API_URL=https://localhost:8000 npm run start:e2e --prefix packages/syntara-ui -- --port 5173
 ```
 
 ### Running specific tests
@@ -233,16 +246,19 @@ cd frontend && VITE_API_URL=https://localhost:8000 npm run start:ui  # Frontend 
 npx playwright test e2e/workflows.spec.ts
 
 # By name pattern
-npx playwright test --grep "user creates a workflow"
+npx playwright test --grep 'user creates a workflow'
 
 # @pr-check suite — fast, critical-path subset (intended quick gate; not yet used by CI automatically)
 npx playwright test --grep @pr-check
 
-# Exclude visual-regression (they require npm run e2e:visual-regression, not the default runner)
-npx playwright test --grep-invert @local-only
+# Exclude tests tagged @local-only
+npx playwright test --grep-invert '@local-only'
 
-# Full-app accessibility audit (report-only; mock API; see frontend-a11y-audit skill)
-npm run e2e:a11y-audit
+# Run the page screenshot suite (from frontend/; default mock E2E also discovers these tests)
+cd "$REPO_ROOT/frontend" && npm run e2e:visual-regression
+
+# Full-app accessibility audit (report-only; mock API; from frontend/; see frontend-a11y-audit skill)
+cd "$REPO_ROOT/frontend" && npm run e2e:a11y-audit
 
 # Show trace from a failed run
 npx playwright show-trace test-results/*/trace.zip
@@ -253,7 +269,7 @@ npx playwright show-trace test-results/*/trace.zip
 | Tag | Select with | Purpose |
 |---|---|---|
 | `@pr-check` | `--grep @pr-check` | Fast critical-path subset for quick local validation |
-| `@local-only` | `--grep-invert @local-only` | Visual regression tests; excluded from all CI automatically |
+| `@local-only` | `--grep-invert '@local-only'` | Mock-dependent audits and screenshot tests; not a blanket CI exclusion. Standard real-backend E2E skips these tests, while dedicated baseline workflows run page screenshots in CI. |
 
 See `.agents/skills/frontend-playwright-e2e/SKILL.md` → **Test Suite Tags** for the full rules on when to apply each tag.
 
@@ -261,13 +277,13 @@ See `.agents/skills/frontend-playwright-e2e/SKILL.md` → **Test Suite Tags** fo
 
 | Problem | Cause | Fix |
 |---|---|---|
-| Connection refused | Servers not running | Start with `make dev` or check URLs |
+| Connection refused | Selected server is not running | Start local services with `make dev`, Compose with `make -C backend run-all`, or check the selected URLs |
 | SYNTARA_E2E_PASSWORD required | Missing password env var | Set it: `SYNTARA_E2E_PASSWORD=$(cat <path>)` |
 | "Incorrect login credentials" | Password file and database are out of sync | Run `make admin-password` from repo root to sync |
 | Login errors (other) | Wrong password file or unseeded DB | Regenerate: `make secrets` then `make admin-password` |
 | API 404s in mock mode | UI started without correct VITE_API_URL | Playwright handles this automatically; if manual, use `VITE_API_URL=http://localhost:3300` |
-| Port conflicts | Stale processes | `kill-port 3300 4173` |
-| Visual regression tests skipped | Expected in real backend mode | These only run in mock mode with deterministic data |
+| Port conflicts | Another service uses an E2E port | Stop that service or set `SYNTARA_E2E_PORT` and `SYNTARA_E2E_API_PORT` to free ports |
+| Visual regression tests skipped | Expected in real-backend mode | The config excludes `e2e/visual-regression/` when `SYNTARA_E2E_SKIP_WEB_SERVER=1`; run them in mock mode with `npm run e2e:visual-regression` from `frontend/` |
 
 ### What works where
 

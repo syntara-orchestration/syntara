@@ -56,12 +56,12 @@ test('my test', { tag: ['@local-only'] }, async ({ app }) => { ... })
 | Tag | What it marks | Runs in | Excluded from | Mechanism |
 |---|---|---|---|---|
 | `@pr-check` | Fast, reliable describe blocks covering the most critical user paths — intended as a quick PR gate subset | All CI environments (full suite always runs; `--grep @pr-check` selects this subset locally) | _(no current CI filter — tag exists for manual use and future CI optimization)_ | `--grep @pr-check` |
-| `@local-only` | Visual regression screenshot tests (`e2e/visual-regression/`) | Local development via `npm run e2e:visual-regression` | All CI | `playwright.config.ts` `testIgnore: **/visual-regression/**` + in-test `test.skip(!!process.env.CI)` |
+| `@local-only` | Mock-dependent audits (`a11y-audit`) and screenshot suites (page screenshots and PF6 token snapshots) | Mock mode; page screenshots are discoverable by default, the a11y audit is opt-in, and dedicated baseline workflows run page screenshots in CI | Standard real-backend E2E skips the visual-regression directory and the a11y audit. The tag itself does not exclude tests from every CI workflow. | `--grep @local-only` or `--grep-invert '@local-only'` |
 
 ### Tag rules
 
 - **`@pr-check`** — Tag a `test.describe` when the tests inside are fast (under ~30 s total), reliable (no flaky backend dependencies), and cover the most critical user paths. Do NOT tag slow, data-dependent, or flaky describe blocks.
-- **`@local-only`** — Reserved for visual regression tests. Do not apply to functional tests.
+- **`@local-only`** — Use for tests that rely on seeded mock data or local/OS-specific screenshot baselines. It is a Playwright selection tag, not a blanket CI exclusion; configure each test/workflow's environment behavior explicitly. Do not apply it to general functional tests.
 
 ### Never commit `test.fixme` as a long-term state
 
