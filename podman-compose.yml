@@ -26,12 +26,32 @@ services:
     entrypoint: ["/bin/sh", "-ec"]
     command:
       - >-
-        psql -h database -U postgres -d postgres
+        ready=0;
+        attempts=0;
+        until [ "$$ready" -ge 3 ];
+        do
+          attempts=$$((attempts + 1));
+          if [ "$$attempts" -gt 90 ]; then
+            echo "Timed out waiting for PostgreSQL";
+            exit 1;
+          fi;
+          if psql -h database -U postgres -d postgres -c 'SELECT 1';
+          then
+            ready=$$((ready + 1));
+            echo "PostgreSQL accepted a connection ($$ready/3)";
+          else
+            ready=0;
+            echo Waiting for PostgreSQL;
+          fi;
+          sleep 2;
+        done;
+        until psql -h database -U postgres -d postgres
         -v ep_migrator_password="$${EP_DB_MIGRATOR_PASSWORD}"
         -v ep_runtime_password="$${EP_DB_RUNTIME_PASSWORD}"
         -v ao_database="$${APP_DB_NAME}"
         -v ao_runtime_role="$${APP_DB_USER}"
-        -f /scripts/create_database.sql
+        -f /scripts/create_database.sql;
+        do echo Retrying database bootstrap; sleep 2; done
     environment:
       PGPASSWORD: ${APP_DB_PASSWORD:-admin}
       APP_DB_NAME: ${APP_DB_NAME:-syntara_api}
@@ -40,9 +60,7 @@ services:
       EP_DB_RUNTIME_PASSWORD: ${EP_DB_RUNTIME_PASSWORD:-ep-runtime}
     volumes:
       - ./backend/containers/execution-plane/create_database.sql:/scripts/create_database.sql:ro,z
-    depends_on:
-      database:
-        condition: service_healthy
+    depends_on: ["database"]
 
   redis:
     image: ${APP_CACHE_IMAGE:-mirror.gcr.io/library/redis:6.2.22@sha256:da7091440b2b4d9456603be812dba895cd75bedd66564d7f01f1f010521f8467}

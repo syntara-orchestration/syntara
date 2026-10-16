@@ -342,7 +342,8 @@ background-worker-run: check-deps _ensure-secrets _ensure-certs ## Run Temporal 
 .PHONY: ep-migrate
 ep-migrate: check-deps ## Apply execution_plane schema migrations (separate from main Syntara migrations)
 	@echo "🔄 Running execution_plane migrations..."
-	@$(COMPOSE_FINAL_CMD) up execution-plane-db-init
+	@$(COMPOSE_FINAL_CMD) up -d database
+	@$(COMPOSE_FINAL_CMD) run --rm --no-deps -T execution-plane-db-init
 	@cd $(EP_REPOSITORY) && \
 		DATABASE_URL="$${EP_DATABASE_MIGRATOR_URL:-$(EP_DATABASE_MIGRATOR_URL)}" \
 		EP_CREDENTIAL_ENCRYPTION_KEY_PATH="$(abspath .secrets/ep-credential-encryption-key)" \
