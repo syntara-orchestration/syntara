@@ -209,7 +209,16 @@ export function parseFiltersFromUrl(searchParams: URLSearchParams): FilterConfig
  * ```
  */
 /** Pagination / sort / page chrome — never treat these as filter fields. */
-const RESERVED_URL_PARAMS = new Set(['sort', 'page', 'perPage', 'cursor', 'history', 'version'])
+const RESERVED_URL_PARAMS = new Set([
+  'sort',
+  'page',
+  'perPage',
+  'cursor',
+  'history',
+  'version',
+  'form_prompt',
+  'approval',
+])
 
 function isReservedUrlParam(key: string): boolean {
   // Namespaced sorts (e.g. `activity_sort` on execution detail) share the URL with list filters.

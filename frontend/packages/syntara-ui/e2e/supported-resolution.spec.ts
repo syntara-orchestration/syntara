@@ -79,9 +79,10 @@ const SMOKE_PAGES: SmokePage[] = [
     },
   },
   {
-    path: AppRoute.Approvals.Root,
+    path: `${AppRoute.Tasks.Root}/approvals`,
     waitFor: async (page) => {
-      await expect(page.getByRole('heading', { level: 1, name: 'Approvals' })).toBeVisible()
+      await expect(page.getByRole('heading', { level: 1, name: 'Tasks' })).toBeVisible()
+      await expect(page.getByRole('tabpanel', { name: 'Approvals' })).toBeVisible()
     },
   },
   {

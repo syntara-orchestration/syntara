@@ -36,7 +36,12 @@ async function openApprovalNodeForm(page: Page) {
   await openAddNodePanel(page)
 
   const panel = addNodePanel(page)
-  const approvalBtn = panel.getByRole('button', { name: 'Approval', exact: true })
+  const humanTasksBtn = panel.getByRole('button', { name: 'Human tasks', exact: true })
+  await expect(humanTasksBtn).toBeVisible()
+  await humanTasksBtn.click()
+  const humanTaskPanel = page.getByRole('region', { name: /select a human task step/i })
+  await expect(humanTaskPanel).toBeVisible({ timeout: 10_000 })
+  const approvalBtn = humanTaskPanel.getByRole('button', { name: 'Approval', exact: true })
   await expect(approvalBtn).toBeVisible()
   await approvalBtn.click()
 

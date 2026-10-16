@@ -1112,6 +1112,7 @@ export interface components {
       | 'orphaned_node'
       | 'converge_configuration'
       | 'approval_configuration'
+      | 'form_prompt_configuration'
       | 'definition_limits'
     /**
      * ValidationFinding

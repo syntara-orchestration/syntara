@@ -51,6 +51,16 @@ _COMPONENT_METRIC_MAP: dict[MetricType, tuple[str, str, tuple[str, ...]]] = {
     MetricType.WORKFLOW_CREATION_SUCCESS_RATE: ("workflow_creation_success_rate", "gauge", ()),
     MetricType.WORKFLOW_SERIALIZATION_DURATION: ("workflow_serialization_duration_seconds", "histogram", ()),
     MetricType.WORKFLOW_VALIDATION_DURATION: ("workflow_validation_duration_seconds", "histogram", ()),
+    MetricType.FORM_PROMPT_SUBMISSION_HANDOFF: (
+        "form_prompt_submission_handoff_seconds",
+        "histogram",
+        (),
+    ),
+    MetricType.FORM_PROMPT_RESUME_DISPATCH: (
+        "form_prompt_resume_dispatch_seconds",
+        "histogram",
+        (),
+    ),
     # Temporal Worker
     MetricType.TEMPORAL_QUEUE_DEPTH: ("temporal_queue_depth", "gauge", ("task_queue",)),
     MetricType.ACTIVE_WORKFLOWS: ("active_workflows", "gauge", ()),

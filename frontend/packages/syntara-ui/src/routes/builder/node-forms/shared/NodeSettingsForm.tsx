@@ -10,7 +10,7 @@ import {
   StackItem,
   Switch,
 } from '@patternfly/react-core'
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import { useFormContext, useWatch } from 'react-hook-form'
 
 import { SynFormField } from '../../../../components/forms/SynFormField'
@@ -37,8 +37,18 @@ type NodeSettingsFormProps = {
   supportsRetryPolicy?: boolean
   /** Additional help text shown under the continue_on_failure dropdown. */
   continueOnFailureHelp?: string
+  /** When set, hides the inner "On failure behavior" label (section title only). */
+  continueOnFailureHideFieldLabel?: boolean
   /** Node type used to select the matching system timeout default. */
   timeoutNodeType?: TimeoutNodeType
+  /** Overrides system default seconds for timeout placeholder/help (e.g. expected-duration UI). */
+  timeoutDefaultSeconds?: number
+  /** Custom timeout section title. Omit for default; pass empty string for no section title. */
+  timeoutSectionTitle?: string
+  /** Custom timeout field label (seconds input mode). */
+  timeoutLabel?: string
+  /** Custom helper text under the timeout field. */
+  timeoutHelp?: string
 }
 
 function formatSeconds(seconds: number): string {
@@ -90,6 +100,7 @@ type CofSectionProps = {
   continueOnFailure: boolean | undefined | null
   cofDefaultLabel: string
   continueOnFailureHelp?: string
+  hideFieldLabel?: boolean
   setValue: (name: 'settings.continue_on_failure', value: boolean | undefined) => void
   isDisabled?: boolean
 }
@@ -98,9 +109,11 @@ function ContinueOnFailureSection({
   continueOnFailure,
   cofDefaultLabel,
   continueOnFailureHelp,
+  hideFieldLabel,
   setValue,
   isDisabled,
 }: CofSectionProps) {
+  const cofFieldLabelId = useId()
   const [isOpen, setIsOpen] = useState(false)
   const selected = cofValueFromBool(continueOnFailure)
   const selectedLabel = COF_OPTIONS.find((o) => o.value === selected)?.label ?? 'System default'
@@ -114,9 +127,19 @@ function ContinueOnFailureSection({
     <FormSection title="On failure">
       <Stack hasGutter>
         <StackItem>
-          <FormGroup label="On failure behavior" labelHelp={nodeHelp.onFailureBehavior} fieldId="node-settings-cof">
+          <FormGroup
+            label={hideFieldLabel ? undefined : 'On failure behavior'}
+            labelHelp={hideFieldLabel ? undefined : nodeHelp.onFailureBehavior}
+            fieldId="node-settings-cof"
+          >
+            {hideFieldLabel && (
+              <span id={cofFieldLabelId} className="pf-v6-u-screen-reader">
+                On failure behavior
+              </span>
+            )}
             <SynSelect
               id="node-settings-cof"
+              aria-labelledby={hideFieldLabel ? cofFieldLabelId : undefined}
               isOpen={isOpen}
               selected={selected}
               onSelect={handleSelect}
@@ -129,7 +152,8 @@ function ContinueOnFailureSection({
                   isExpanded={isOpen}
                   isFullWidth
                   isDisabled={isDisabled}
-                  aria-label="On failure behavior"
+                  aria-label={hideFieldLabel ? undefined : 'On failure behavior'}
+                  aria-labelledby={hideFieldLabel ? cofFieldLabelId : undefined}
                 >
                   {selectedLabel}
                 </MenuToggle>
@@ -161,14 +185,28 @@ type TimeoutSectionProps = {
   timeoutFormat: 'seconds' | 'duration'
   timeoutDefault: number | null
   timeoutPlaceholder: string
+  sectionTitle?: string
+  fieldLabel?: string
+  helperText?: string
   isDisabled?: boolean
 }
 
-function TimeoutSection({ timeoutFormat, timeoutDefault, timeoutPlaceholder, isDisabled }: TimeoutSectionProps) {
+function TimeoutSection({
+  timeoutFormat,
+  timeoutDefault,
+  timeoutPlaceholder,
+  sectionTitle,
+  fieldLabel,
+  helperText,
+  isDisabled,
+}: TimeoutSectionProps) {
   const durationHelp =
-    timeoutDefault !== null
+    helperText ??
+    (timeoutDefault !== null
       ? `How long to wait before timing out. System default: ${formatSeconds(timeoutDefault)}.`
-      : 'How long to wait before timing out. Falls back to system default if not set.'
+      : 'How long to wait before timing out. Falls back to system default if not set.')
+  const secondsSectionTitle = sectionTitle ?? 'Timeout (seconds)'
+  const secondsFieldLabel = fieldLabel ?? 'Timeout (seconds)'
 
   if (timeoutFormat === 'duration') {
     return (
@@ -202,20 +240,33 @@ function TimeoutSection({ timeoutFormat, timeoutDefault, timeoutPlaceholder, isD
     )
   }
 
-  return (
-    <FormSection title="Timeout (seconds)">
-      <SynTextField
-        name="settings.timeout"
-        label="Timeout (seconds)"
-        labelHelp={nodeHelp.timeout}
-        fieldId="node-settings-timeout-seconds"
-        type="number"
-        min={1}
-        placeholder={timeoutPlaceholder}
-        isDisabled={isDisabled}
-      />
-    </FormSection>
+  const secondsField = (
+    <Stack hasGutter>
+      <StackItem>
+        <SynTextField
+          name="settings.timeout"
+          label={secondsFieldLabel}
+          labelHelp={helperText ? undefined : nodeHelp.timeout}
+          fieldId="node-settings-timeout-seconds"
+          type="number"
+          min={1}
+          placeholder={timeoutPlaceholder}
+          isDisabled={isDisabled}
+        />
+      </StackItem>
+      <StackItem>
+        <HelperText>
+          <HelperTextItem>{durationHelp}</HelperTextItem>
+        </HelperText>
+      </StackItem>
+    </Stack>
   )
+
+  if (sectionTitle === '') {
+    return secondsField
+  }
+
+  return <FormSection title={secondsSectionTitle}>{secondsField}</FormSection>
 }
 
 type RetryFieldsProps = {
@@ -295,29 +346,50 @@ function getCofDefaultLabel(cofDefault: boolean | null): string {
   return ' (system default: stop on failure)'
 }
 
-export function NodeSettingsForm({
+function resolveTimeoutDefaultSeconds(
+  timeoutDefaultSeconds: number | undefined,
+  timeoutNodeType: TimeoutNodeType | undefined,
+  defaults: ReturnType<typeof useWorkflowEngineDefaults>['defaults']
+): number | null {
+  if (timeoutDefaultSeconds !== undefined) {
+    return timeoutDefaultSeconds
+  }
+  if (!timeoutNodeType) {
+    return null
+  }
+  return defaults?.timeoutSeconds[timeoutNodeType] ?? null
+}
+
+type NodeSettingsFormSectionsProps = NodeSettingsFormProps & {
+  isVersionView: boolean
+  setValue: ReturnType<typeof useFormContext<FormWithSettings>>['setValue']
+  continueOnFailure: boolean | undefined | null
+  overrideRetry: boolean
+  cofDefaultLabel: string
+  timeoutDefault: number | null
+  timeoutPlaceholder: string
+  retryDefaults: RetryFieldsProps['retryDefaults']
+}
+
+function NodeSettingsFormSections({
   timeoutFormat = 'seconds',
   supportsTimeout = true,
   supportsContinueOnFailure = true,
   supportsRetryPolicy = true,
   continueOnFailureHelp,
-  timeoutNodeType,
-}: NodeSettingsFormProps) {
-  const isVersionView = useIsVersionView()
-  const { control, setValue } = useFormContext<FormWithSettings>()
-  const retryPolicy = useWatch({ control, name: 'settings.retry_policy' })
-  const continueOnFailure = useWatch({ control, name: 'settings.continue_on_failure' })
-  const overrideRetry = retryPolicy !== undefined
-
-  const { defaults } = useWorkflowEngineDefaults()
-
-  const timeoutDefault = timeoutNodeType ? (defaults?.timeoutSeconds[timeoutNodeType] ?? null) : null
-  const cofDefault = defaults?.continueOnFailure ?? null
-  const retryDefaults = defaults?.retry ?? null
-
-  const cofDefaultLabel = getCofDefaultLabel(cofDefault)
-  const timeoutPlaceholder = timeoutDefault !== null ? `${String(timeoutDefault)} — system default` : 'System default'
-
+  continueOnFailureHideFieldLabel = false,
+  timeoutSectionTitle,
+  timeoutLabel,
+  timeoutHelp,
+  isVersionView,
+  setValue,
+  continueOnFailure,
+  overrideRetry,
+  cofDefaultLabel,
+  timeoutDefault,
+  timeoutPlaceholder,
+  retryDefaults,
+}: NodeSettingsFormSectionsProps) {
   function handleRetryOverrideToggle(_event: React.FormEvent<HTMLInputElement>, checked: boolean) {
     if (checked) {
       setValue('settings.retry_policy', {})
@@ -338,6 +410,7 @@ export function NodeSettingsForm({
             continueOnFailure={continueOnFailure}
             cofDefaultLabel={cofDefaultLabel}
             continueOnFailureHelp={continueOnFailureHelp}
+            hideFieldLabel={continueOnFailureHideFieldLabel}
             setValue={setValue}
             isDisabled={isVersionView}
           />
@@ -350,6 +423,9 @@ export function NodeSettingsForm({
             timeoutFormat={timeoutFormat}
             timeoutDefault={timeoutDefault}
             timeoutPlaceholder={timeoutPlaceholder}
+            sectionTitle={timeoutSectionTitle}
+            fieldLabel={timeoutLabel}
+            helperText={timeoutHelp}
             isDisabled={isVersionView}
           />
         </StackItem>
@@ -383,5 +459,49 @@ export function NodeSettingsForm({
         </StackItem>
       )}
     </Stack>
+  )
+}
+
+export function NodeSettingsForm(props: NodeSettingsFormProps) {
+  const {
+    timeoutFormat = 'seconds',
+    supportsTimeout = true,
+    supportsContinueOnFailure = true,
+    supportsRetryPolicy = true,
+    timeoutNodeType,
+    timeoutDefaultSeconds,
+  } = props
+
+  const isVersionView = useIsVersionView()
+  const { control, setValue } = useFormContext<FormWithSettings>()
+  const retryPolicy = useWatch({ control, name: 'settings.retry_policy' })
+  const continueOnFailure = useWatch({ control, name: 'settings.continue_on_failure' })
+  const overrideRetry = retryPolicy !== undefined
+
+  const { defaults } = useWorkflowEngineDefaults()
+
+  const timeoutDefault = resolveTimeoutDefaultSeconds(timeoutDefaultSeconds, timeoutNodeType, defaults)
+  const cofDefault = defaults?.continueOnFailure ?? null
+  const retryDefaults = defaults?.retry ?? null
+
+  const cofDefaultLabel = getCofDefaultLabel(cofDefault)
+  const timeoutPlaceholder = timeoutDefault !== null ? `${String(timeoutDefault)} — system default` : 'System default'
+
+  return (
+    <NodeSettingsFormSections
+      {...props}
+      timeoutFormat={timeoutFormat}
+      supportsTimeout={supportsTimeout}
+      supportsContinueOnFailure={supportsContinueOnFailure}
+      supportsRetryPolicy={supportsRetryPolicy}
+      isVersionView={isVersionView}
+      setValue={setValue}
+      continueOnFailure={continueOnFailure}
+      overrideRetry={overrideRetry}
+      cofDefaultLabel={cofDefaultLabel}
+      timeoutDefault={timeoutDefault}
+      timeoutPlaceholder={timeoutPlaceholder}
+      retryDefaults={retryDefaults}
+    />
   )
 }

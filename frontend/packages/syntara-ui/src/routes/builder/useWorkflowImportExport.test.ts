@@ -17,6 +17,12 @@ const mockReplaceWorkflowContent = vi.fn()
 const mockGetState = vi.fn<() => Record<string, unknown>>()
 
 const mockHandleVerify = vi.fn()
+const mockUseWorkflowVerification = vi.fn()
+const mockVerificationReturn = {
+  handleVerify: mockHandleVerify,
+  isVerifying: false,
+  validationErrorCount: 0,
+}
 
 vi.mock('../../providers/alerts', () => ({
   useAlerts: () => ({ showError: mockShowError }),
@@ -39,7 +45,10 @@ vi.mock('../../utils/downloadWorkflowExport', () => ({
 }))
 
 vi.mock('./useWorkflowVerification', () => ({
-  useWorkflowVerification: () => ({ handleVerify: mockHandleVerify, isVerifying: false, validationErrorCount: 0 }),
+  useWorkflowVerification: (options: unknown) => {
+    mockUseWorkflowVerification(options)
+    return mockVerificationReturn
+  },
 }))
 
 vi.mock('./utils/parseImportedDefinition', () => ({
@@ -60,7 +69,12 @@ beforeEach(() => {
 })
 
 describe('useWorkflowImportExport', () => {
-  function renderImportExportHook(isNew = true, workflowName = 'Test', workflowDescription = 'desc') {
+  function renderImportExportHook(
+    isNew = true,
+    workflowName = 'Test',
+    workflowDescription = 'desc',
+    extra?: { beforeVerify?: () => Promise<boolean> }
+  ) {
     return renderHook(() =>
       useWorkflowImportExport({
         dispatch: mockDispatch,
@@ -69,6 +83,7 @@ describe('useWorkflowImportExport', () => {
         workflowName,
         workflowDescription,
         onPendingImport: mockOnPendingImport,
+        beforeVerify: extra?.beforeVerify,
       })
     )
   }
@@ -336,5 +351,12 @@ describe('useWorkflowImportExport', () => {
 
     expect(result.current.handleVerify).toBe(mockHandleVerify)
     expect(result.current.isVerifying).toBe(false)
+  })
+
+  it('passes beforeVerify to useWorkflowVerification', () => {
+    const beforeVerify = vi.fn().mockResolvedValue(true)
+    renderImportExportHook(true, 'Test', 'desc', { beforeVerify })
+
+    expect(mockUseWorkflowVerification).toHaveBeenCalledWith(expect.objectContaining({ beforeVerify }))
   })
 })

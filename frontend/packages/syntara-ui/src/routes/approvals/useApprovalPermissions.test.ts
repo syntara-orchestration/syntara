@@ -87,6 +87,25 @@ describe('useApprovalPermissions', () => {
 
     expect(result.current.canRead).toBe(true)
     expect(result.current.canDecide).toBe(true)
+    expect(result.current.isError).toBe(false)
+  })
+
+  it('returns isError when loading project permissions fails', async () => {
+    mockCanI({ read: true, decide: true })
+    vi.mocked(useAllPermissions).mockReturnValue({
+      permissions: [],
+      isLoading: false,
+      error: new Error('Failed to load permissions'),
+      refetch: vi.fn() as ReturnType<typeof useAllPermissions>['refetch'],
+    })
+
+    const { result } = renderHook(() => useApprovalPermissions(), { wrapper: createWrapper() })
+
+    await waitFor(() => {
+      expect(result.current.isChecking).toBe(false)
+    })
+
+    expect(result.current.isError).toBe(true)
   })
 
   it('returns canRead false when approval:read is denied', async () => {

@@ -9,12 +9,16 @@ from unittest.mock import AsyncMock, Mock, patch
 from uuid import UUID, uuid4
 
 import pytest
+from prometheus_client import CollectorRegistry
 from temporalio.api.enums.v1 import EventType
 from temporalio.client import WorkflowExecutionStatus, WorkflowQueryRejectedError
 from temporalio.exceptions import ApplicationError
 from temporalio.service import RPCError, RPCStatusCode
 
 from syntara.core.exceptions import SafeValueError
+from syntara.metrics.recorder import MetricsRecorder
+from syntara.metrics.types import ComponentLabel, MetricType
+from syntara.telemetry.events.workflow_error import RETRY_REASON_MAX_LENGTH
 from syntara.workflows.models.activity_execution import ActivityExecution, ActivityStatus
 from syntara.workflows.models.execution import Execution, ExecutionStatus
 from syntara.workflows.workflow_engine.activities.internal import register_activity_monitoring
@@ -393,6 +397,7 @@ class TestActivityEventProcessing:
         attempt: int = 1,
         failure_message: str | None = None,
         failure_type: str | None = None,
+        last_failure: Mock | None = None,
     ) -> Mock:
         """Create a mock Temporal history event."""
         event = Mock()
@@ -410,7 +415,7 @@ class TestActivityEventProcessing:
             attrs = Mock()
             attrs.scheduled_event_id = scheduled_event_id
             attrs.attempt = attempt
-            attrs.last_failure = None
+            attrs.last_failure = last_failure
             event.activity_task_started_event_attributes = attrs
 
         elif event_type == EventType.EVENT_TYPE_ACTIVITY_TASK_COMPLETED:
@@ -636,6 +641,108 @@ class TestActivityEventProcessing:
         assert self.metadata.pending_activity_updates[1]["status"] == expected_status
         assert self.metadata.pending_activity_updates[1]["started_at"] is not None
         assert self.metadata.pending_activity_updates[1]["retry_count"] == expected_retry_count
+
+    @pytest.mark.parametrize(
+        "node_type",
+        [NodeType.APPROVAL, NodeType.FORM_PROMPT],
+    )
+    def test_process_activity_started_human_task_is_waiting(self, node_type: NodeType) -> None:
+        """Approval and form prompt activities enter WAITING when the task starts."""
+        activity_id = "human-task-node"
+        self.metadata.activity_definitions_map[activity_id] = {"id": activity_id, "type": node_type}
+        self.metadata.pending_activity_updates[1] = {
+            "activity_id": activity_id,
+            "status": ActivityStatus.PENDING,
+            "started_at": None,
+            "retry_count": 0,
+        }
+
+        event = self._create_mock_event(
+            EventType.EVENT_TYPE_ACTIVITY_TASK_STARTED,
+            event_id=2,
+            scheduled_event_id=1,
+            attempt=1,
+        )
+
+        self.service._process_activity_started(event, self.metadata)
+
+        assert self.metadata.pending_activity_updates[1]["status"] == ActivityStatus.WAITING
+        assert self.metadata.pending_activity_updates[1]["started_at"] is not None
+
+    def test_process_activity_started_skips_when_scheduled_update_missing(self) -> None:
+        """No-op when STARTED references a scheduled_event_id that was not tracked."""
+        event = self._create_mock_event(
+            EventType.EVENT_TYPE_ACTIVITY_TASK_STARTED,
+            event_id=2,
+            scheduled_event_id=99,
+            attempt=1,
+        )
+
+        self.service._process_activity_started(event, self.metadata)
+
+        assert 99 not in self.metadata.pending_activity_updates
+        assert 99 not in self.metadata.pending_sync_event_ids
+
+    def test_process_activity_started_retry_attempt_records_retry_info(self) -> None:
+        """Retries attach truncated reason and failure type from the last failure."""
+        long_reason = "x" * (RETRY_REASON_MAX_LENGTH + 10)
+        last_failure = Mock()
+        last_failure.message = long_reason
+        last_failure.cause = Mock()
+        last_failure.cause.application_failure_info = Mock(type="UpstreamFailure")
+        last_failure.application_failure_info = None
+
+        self.metadata.pending_activity_updates[1] = {
+            "activity_id": "test-activity",
+            "status": ActivityStatus.PENDING,
+            "started_at": None,
+            "retry_count": 0,
+        }
+
+        event = self._create_mock_event(
+            EventType.EVENT_TYPE_ACTIVITY_TASK_STARTED,
+            event_id=2,
+            scheduled_event_id=1,
+            attempt=2,
+            last_failure=last_failure,
+        )
+
+        self.service._process_activity_started(event, self.metadata)
+
+        retry_info = self.metadata.pending_activity_updates[1]["_retry_info"]
+        assert retry_info["retry_count"] == 1
+        assert retry_info["error_type"] == "UpstreamFailure"
+        assert retry_info["retry_reason"] == ("x" * (RETRY_REASON_MAX_LENGTH - 3)) + "..."
+
+    def test_failure_type_from_last_failure_uses_application_failure_info(self) -> None:
+        last_failure = Mock()
+        last_failure.cause = None
+        last_failure.application_failure_info = Mock(type="DirectAppFailure")
+
+        assert ActivitySyncService._failure_type_from_last_failure(last_failure) == "DirectAppFailure"
+
+    def test_failure_type_from_last_failure_returns_none_without_payload(self) -> None:
+        assert ActivitySyncService._failure_type_from_last_failure(None) is None
+
+    def test_truncate_retry_reason_returns_none_for_empty_message(self) -> None:
+        assert ActivitySyncService._truncate_retry_reason(None) is None
+
+    def test_truncate_retry_reason_returns_short_messages_unchanged(self) -> None:
+        message = "transient network blip"
+        assert ActivitySyncService._truncate_retry_reason(message) == message
+
+    def test_failure_type_from_last_failure_returns_none_when_types_missing(self) -> None:
+        last_failure = Mock()
+        last_failure.cause = Mock()
+        last_failure.cause.application_failure_info = None
+        last_failure.application_failure_info = None
+
+        assert ActivitySyncService._failure_type_from_last_failure(last_failure) is None
+
+    def test_status_for_activity_task_started_wait_node_is_waiting(self) -> None:
+        activity_definitions = {"wait-node": {"type": NodeType.WAIT}}
+        status = ActivitySyncService._status_for_activity_task_started("wait-node", activity_definitions, 1)
+        assert status == ActivityStatus.WAITING
 
     @pytest.mark.parametrize(
         ("failure_message", "expected_error"),
@@ -3090,6 +3197,33 @@ class TestSyntheticActivityStarted:
         )
 
         event = SyntheticActivityStarted(activity_id="approval-node", scheduled_event_id=5)
+
+        with patch.object(self.service, "_sync_activities_to_db", new_callable=AsyncMock):
+            await self.service._process_synthetic_activity_started(event, metadata, Mock())
+
+        assert metadata.pending_activity_updates[5]["status"] == ActivityStatus.WAITING
+        assert metadata.pending_activity_updates[5]["started_at"] is not None
+
+    @pytest.mark.asyncio
+    async def test_updates_form_prompt_activity_to_waiting(self) -> None:
+        """Synthetic STARTED transitions form prompt nodes to WAITING."""
+        metadata = create_test_metadata(
+            execution_id=self.execution_id,
+            activity_definitions_map={"form-node": {"type": "form_prompt"}},
+            pending_activity_updates={
+                5: {
+                    "activity_id": "form-node",
+                    "activity_name": "form-node",
+                    "status": ActivityStatus.PENDING,
+                    "started_at": None,
+                    "completed_at": None,
+                    "error_details": None,
+                    "retry_count": 0,
+                },
+            },
+        )
+
+        event = SyntheticActivityStarted(activity_id="form-node", scheduled_event_id=5)
 
         with patch.object(self.service, "_sync_activities_to_db", new_callable=AsyncMock):
             await self.service._process_synthetic_activity_started(event, metadata, Mock())
@@ -6169,3 +6303,201 @@ class TestActivitySyncPreservesIoOnQueryFailure:
 
         assert activity.output_data == heartbeat_partial
         assert activity.status == ActivityStatus.RUNNING
+
+
+class TestFormPromptResumeDispatchMetric:
+    """Temporal event times measure dispatch latency after form activity completion."""
+
+    def setup_method(self) -> None:
+        self.service = ActivitySyncService(Mock(), Mock())
+        self.metadata = create_test_metadata(
+            activity_definitions_map={"form-node": {"id": "form-node", "type": NodeType.FORM_PROMPT}},
+        )
+        self.recorder = MetricsRecorder(prometheus_registry=CollectorRegistry())
+        self.queue: asyncio.Queue[Any] = asyncio.Queue()
+
+    def _scheduled_event(self, event_id: int, activity_id: str = "form-node_iter_2") -> Mock:
+        event = Mock()
+        event.event_type = EventType.EVENT_TYPE_ACTIVITY_TASK_SCHEDULED
+        event.event_id = event_id
+        attrs = Mock()
+        attrs.activity_id = activity_id
+        event.activity_task_scheduled_event_attributes = attrs
+        return event
+
+    @staticmethod
+    def _completed_event(event_id: int, scheduled_event_id: int, event_time: datetime) -> Mock:
+        event = Mock()
+        event.event_type = EventType.EVENT_TYPE_ACTIVITY_TASK_COMPLETED
+        event.event_id = event_id
+        event.event_time = event_time
+        attrs = Mock()
+        attrs.scheduled_event_id = scheduled_event_id
+        event.activity_task_completed_event_attributes = attrs
+        return event
+
+    @staticmethod
+    def _workflow_task_started_event(event_id: int, event_time: datetime) -> Mock:
+        event = Mock()
+        event.event_type = EventType.EVENT_TYPE_WORKFLOW_TASK_STARTED
+        event.event_id = event_id
+        event.event_time = event_time
+        return event
+
+    @staticmethod
+    def _activity_failed_event(event_id: int, scheduled_event_id: int) -> Mock:
+        event = Mock()
+        event.event_type = EventType.EVENT_TYPE_ACTIVITY_TASK_FAILED
+        event.event_id = event_id
+        attrs = Mock()
+        attrs.scheduled_event_id = scheduled_event_id
+        event.activity_task_failed_event_attributes = attrs
+        return event
+
+    @pytest.mark.asyncio
+    async def test_records_completion_to_first_resumed_workflow_task(self) -> None:
+        """The metric uses two timestamps from the same Temporal history."""
+        completed_at = datetime(2026, 1, 1, 12, 0, 0, tzinfo=UTC)
+        self.service._track_scheduled_form_prompt(self._scheduled_event(10), self.metadata)
+        completed_event = self._completed_event(
+            event_id=11,
+            scheduled_event_id=10,
+            event_time=completed_at,
+        )
+        self.service._track_completed_form_prompt(completed_event, self.metadata)
+
+        resume_event = self._workflow_task_started_event(
+            event_id=12,
+            event_time=datetime(2026, 1, 1, 12, 0, 1, 250_000, tzinfo=UTC),
+        )
+        session_factory = Mock()
+        self.service.session_factory = session_factory
+        with patch(
+            "syntara.workflows.workflow_engine.services.activity_sync_monitor.get_metrics_recorder",
+            return_value=self.recorder,
+        ):
+            result = await self.service._process_history_event(
+                resume_event,
+                self.metadata,
+                AsyncMock(),
+                self.queue,
+                [],
+            )
+
+        assert result is True
+        records = list(self.recorder.query(metric_types={MetricType.FORM_PROMPT_RESUME_DISPATCH}))
+        assert len(records) == 1
+        assert records[0].value == pytest.approx(1250.0)
+        assert records[0].unit == "ms"
+        assert records[0].labels == {"component": ComponentLabel.WORKFLOW_ENGINE.value}
+        sample = self.recorder.prometheus.form_prompt_resume_dispatch_seconds.labels(
+            component=ComponentLabel.WORKFLOW_ENGINE.value,
+        )
+        assert sample._sum.get() == pytest.approx(1.25)
+        assert self.metadata.pending_form_prompt_completed_at == []
+        assert self.metadata.last_form_prompt_resume_metric_event_id == resume_event.event_id
+        session_factory.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_replay_does_not_reobserve_resume_in_same_monitor(self) -> None:
+        """A monitor retry replays history without recording the same resume twice."""
+        self.metadata.last_processed_event_id = 10
+        completion_time = datetime(2026, 1, 1, 12, 0, 0, tzinfo=UTC)
+        schedule_event = self._scheduled_event(event_id=8)
+        completion_event = self._completed_event(
+            event_id=9,
+            scheduled_event_id=8,
+            event_time=completion_time,
+        )
+        resume_event = self._workflow_task_started_event(
+            event_id=11,
+            event_time=datetime(2026, 1, 1, 12, 0, 2, tzinfo=UTC),
+        )
+
+        with patch(
+            "syntara.workflows.workflow_engine.services.activity_sync_monitor.get_metrics_recorder",
+            return_value=self.recorder,
+        ):
+            for _ in range(2):
+                self.service._track_scheduled_form_prompt(schedule_event, self.metadata)
+                self.service._track_completed_form_prompt(completion_event, self.metadata)
+                await self.service._process_history_event(
+                    resume_event,
+                    self.metadata,
+                    AsyncMock(),
+                    self.queue,
+                    [],
+                )
+
+        records = list(self.recorder.query(metric_types={MetricType.FORM_PROMPT_RESUME_DISPATCH}))
+        assert len(records) == 1
+        assert self.metadata.pending_form_prompt_completed_at == []
+
+    @pytest.mark.asyncio
+    async def test_skips_negative_temporal_event_interval(self) -> None:
+        completed_at = datetime(2026, 1, 1, 12, 0, 2, tzinfo=UTC)
+        self.service._track_scheduled_form_prompt(self._scheduled_event(30), self.metadata)
+        self.service._track_completed_form_prompt(
+            self._completed_event(event_id=31, scheduled_event_id=30, event_time=completed_at),
+            self.metadata,
+        )
+        resume_event = self._workflow_task_started_event(
+            event_id=32,
+            event_time=datetime(2026, 1, 1, 12, 0, 1, tzinfo=UTC),
+        )
+
+        with patch(
+            "syntara.workflows.workflow_engine.services.activity_sync_monitor.get_metrics_recorder",
+            return_value=self.recorder,
+        ):
+            await self.service._process_history_event(resume_event, self.metadata, AsyncMock(), self.queue, [])
+
+        assert list(self.recorder.query(metric_types={MetricType.FORM_PROMPT_RESUME_DISPATCH})) == []
+        assert self.metadata.pending_form_prompt_completed_at == []
+        assert self.metadata.last_form_prompt_resume_metric_event_id == resume_event.event_id
+
+    @pytest.mark.asyncio
+    async def test_failed_form_activity_does_not_record_resume_dispatch(self) -> None:
+        self.service._track_scheduled_form_prompt(self._scheduled_event(40), self.metadata)
+        self.service._forget_scheduled_form_prompt(
+            self._activity_failed_event(event_id=41, scheduled_event_id=40),
+            self.metadata,
+        )
+        resume_event = self._workflow_task_started_event(
+            event_id=42,
+            event_time=datetime(2026, 1, 1, 12, 0, 1, tzinfo=UTC),
+        )
+
+        with patch(
+            "syntara.workflows.workflow_engine.services.activity_sync_monitor.get_metrics_recorder",
+            return_value=self.recorder,
+        ):
+            await self.service._process_history_event(resume_event, self.metadata, AsyncMock(), self.queue, [])
+
+        assert list(self.recorder.query(metric_types={MetricType.FORM_PROMPT_RESUME_DISPATCH})) == []
+        assert self.metadata.pending_form_prompt_completed_at == []
+
+    @pytest.mark.asyncio
+    async def test_recorder_failure_does_not_escape_history_processing(self) -> None:
+        completed_at = datetime(2026, 1, 1, 12, 0, 0, tzinfo=UTC)
+        self.service._track_scheduled_form_prompt(self._scheduled_event(50), self.metadata)
+        self.service._track_completed_form_prompt(
+            self._completed_event(event_id=51, scheduled_event_id=50, event_time=completed_at),
+            self.metadata,
+        )
+        resume_event = self._workflow_task_started_event(
+            event_id=52,
+            event_time=datetime(2026, 1, 1, 12, 0, 1, tzinfo=UTC),
+        )
+        failing_recorder = Mock()
+        failing_recorder.record.side_effect = RuntimeError("metrics disabled")
+
+        with patch(
+            "syntara.workflows.workflow_engine.services.activity_sync_monitor.get_metrics_recorder",
+            return_value=failing_recorder,
+        ):
+            result = await self.service._process_history_event(resume_event, self.metadata, AsyncMock(), self.queue, [])
+
+        assert result is True
+        failing_recorder.record.assert_called_once()
+        assert self.metadata.pending_form_prompt_completed_at == []

@@ -1,7 +1,5 @@
-import { createRoute } from '@tanstack/react-router'
+import { createRoute, redirect } from '@tanstack/react-router'
 
-import { Approvals } from '../lazyRoutes'
-import { makeRouteComponent } from '../makeRouteComponent'
 import { listSearchParams } from '../routeSearchParams'
 
 import { rootRoute } from './__root'
@@ -13,6 +11,10 @@ export const approvalsRoutes = [
     getParentRoute: () => rootRoute,
     path: '/approvals',
     validateSearch: approvalsSearch,
-    component: makeRouteComponent(<Approvals />),
+    beforeLoad: () => {
+      // TanStack Router redirect is thrown, not an Error instance
+      // eslint-disable-next-line @typescript-eslint/only-throw-error
+      throw redirect({ to: '/tasks/approvals', replace: true })
+    },
   }),
 ]

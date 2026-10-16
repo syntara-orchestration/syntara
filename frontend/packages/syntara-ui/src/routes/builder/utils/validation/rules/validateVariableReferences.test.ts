@@ -322,6 +322,40 @@ describe('validateVariableReferences', () => {
       expect(warnings[0].message).toContain('missing_node')
     })
 
+    it('extracts references from form step dynamic dropdown expressions', () => {
+      const activities: Activity[] = [
+        makeActivity({
+          id: 'form_prompt_1',
+          type: 'form_prompt',
+          name: 'Deploy gate',
+          parameters: {
+            form_definition: {
+              fields: [
+                {
+                  value_name: 'target_env',
+                  type: 'dropdown',
+                  label: 'Target environment',
+                  required: true,
+                  options: {
+                    source: 'dynamic',
+                    expression: '${nonexistent_upstream.output.items}',
+                    label_key: 'name',
+                    value_key: 'id',
+                  },
+                },
+              ],
+            },
+          },
+        }),
+      ]
+
+      const errors = validateVariableReferences(activities, [])
+      expect(errors).toHaveLength(1)
+      expect(errors[0].message).toContain('nonexistent_upstream')
+      expect(errors[0].message).toContain('output.items')
+      expect(errors[0].message).toContain('does not exist in this workflow')
+    })
+
     it('extracts references from parameter arrays', () => {
       const activities: Activity[] = [
         makeActivity({

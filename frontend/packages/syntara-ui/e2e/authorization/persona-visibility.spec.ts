@@ -77,7 +77,7 @@ test.describe('Persona visibility', () => {
     try {
       await loginAsUser(page, persona)
       const nav = page.getByRole('navigation', { name: 'Main navigation' })
-      await expect(nav.getByRole('link', { name: 'Approvals' })).toBeVisible({ timeout: 10_000 })
+      await expect(nav.getByRole('link', { name: 'Tasks' })).toBeVisible({ timeout: 10_000 })
     } finally {
       await ctx.close()
       await cleanupPersona(app, persona)

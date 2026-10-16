@@ -33,6 +33,7 @@ import { ExecutionDetailsPanelWrapper } from './components/ExecutionDetailsPanel
 import { NodeEditorOverlay } from './components/NodeEditorOverlay'
 import { UnsavedStepEditorDialog } from './components/UnsavedStepEditorDialog'
 import { VersionHistorySidePanel } from './components/VersionHistorySidePanel'
+import { resolveStepEditorBeforeVerify } from './hooks/resolveStepEditorBeforeVerify'
 import { useBuilderApproval } from './hooks/useBuilderApproval'
 import { useBuilderConflict } from './hooks/useBuilderConflict'
 import { useBuilderContentQueries } from './hooks/useBuilderContentQueries'
@@ -42,7 +43,6 @@ import { useBuilderFlowInteractionHandlers } from './hooks/useBuilderFlowInterac
 import { useBuilderLiveRunPanel } from './hooks/useBuilderLiveRunPanel'
 import { useBuilderSaveWorkflow } from './hooks/useBuilderSaveWorkflow'
 import { useBuilderToolbarHandlers } from './hooks/useBuilderToolbarHandlers'
-import { useBuilderValidation } from './hooks/useBuilderValidation'
 import { useBuilderVersionPanel } from './hooks/useBuilderVersionPanel'
 import { useBuilderWindowEffects } from './hooks/useBuilderWindowEffects'
 import { useBuilderWorkflowLifecycle } from './hooks/useBuilderWorkflowLifecycle'
@@ -58,6 +58,7 @@ import { NodeActionsContext } from './NodeActionsContext'
 import { SaveBeforeViewDialog } from './SaveBeforeViewDialog'
 import type { BuilderContentProps } from './types/builderContent'
 import { useBuilderPermissions } from './useBuilderPermissions'
+import { useWorkflowVerification } from './useWorkflowVerification'
 import { createAddStepHandler } from './utils/panelActions'
 import { buildWorkflowDefinition, transformNodeParameters } from './utils/workflowDefinitionBuilder'
 import { ValidationBanner } from './ValidationBanner'
@@ -198,8 +199,20 @@ export function BuilderContent(props: BuilderContentProps) {
       })
     }
   }, [initialViewVersion, dispatch, clearExecutionFilters])
-  const { handleVerifySilent } = useBuilderValidation({
+  const beforeVerify = useCallback(
+    () =>
+      resolveStepEditorBeforeVerify({
+        isNodeEditorOpen,
+        nodeEditorMode,
+        autoSubmitRef,
+        dispatch,
+      }),
+    [autoSubmitRef, dispatch, isNodeEditorOpen, nodeEditorMode]
+  )
+
+  const { handleVerifySilent } = useWorkflowVerification({
     dispatch,
+    beforeVerify,
   })
   const { mutate: createWorkflow, isPending: isCreating } = workflowClient.useMutation('post', '/workflows')
   const { mutate: updateWorkflow, isPending: isUpdating } = workflowClient.useMutation(
@@ -631,6 +644,7 @@ export function BuilderContent(props: BuilderContentProps) {
                   onExitVersionView={versionPanel.handleExitVersionView}
                   onRestoreVersion={versionPanel.openRestoreDialogForCurrentVersion}
                   isNodeEditorOpen={isNodeEditorOpen}
+                  beforeVerify={beforeVerify}
                 />
               </StackItem>
               <BuilderReadOnlyBanner

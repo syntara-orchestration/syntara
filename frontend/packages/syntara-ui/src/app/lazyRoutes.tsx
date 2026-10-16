@@ -18,6 +18,7 @@ export const EditIntegration = lazy(() =>
 export const Settings = lazy(() => import('../routes/configuration/settings/Settings'))
 export const Glossary = lazy(() => import('../routes/documentation/glossary/Glossary'))
 export const Approvals = lazy(() => import('../routes/approvals/Approvals'))
+export const TasksAccessGate = lazy(() => import('../routes/tasks/TasksAccessGate'))
 export const AccessManagement = lazy(() =>
   import('../routes/access-management/AccessManagement').then((m) => ({ default: m.AccessManagement }))
 )

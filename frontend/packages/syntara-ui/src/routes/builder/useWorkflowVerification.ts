@@ -5,8 +5,10 @@ import { workflowFetchClient } from '../../client'
 import { useAlerts } from '../../providers/alerts'
 import { useWorkflowStore } from '../../stores/useWorkflowStore'
 import { getErrorMessage } from '../../utils/apiErrors'
+import { detachPromise } from '../../utils/detachPromise'
 
 import type { BuilderAction, ValidationError, ValidationSeverity } from './builderReducer'
+import { useWorkflowEngineDefaults } from './hooks/useWorkflowEngineDefaults'
 import { validateWorkflow } from './utils/validation'
 import { formatValidationFindingMessage } from './utils/validation/formatValidationFindingMessage'
 import { validateMinimumWorkflow } from './utils/validation/rules/validateMinimumWorkflow'
@@ -99,6 +101,13 @@ export function extractValidationErrorsFromUnknown(error: unknown): ValidationEr
   return null
 }
 
+export function getWorkflowValidationFailureDescription(error: unknown): string | undefined {
+  const findings = extractValidationErrorsFromUnknown(error)
+  if (!findings?.length) return undefined
+
+  return `Workflow validation failed:\n• ${findings.map((finding) => finding.message).join('\n• ')}`
+}
+
 type ValidateResponse = {
   data?: { is_valid?: boolean; findings?: ValidationFinding[] }
   error?: unknown
@@ -148,69 +157,86 @@ function processValidateResponse(
   }
 }
 
+type BeforeVerifyFn = () => Promise<boolean>
+
 type UseWorkflowVerificationOptions = Readonly<{
   dispatch: (action: BuilderAction) => void
+  /** Flush open step editor state into the store before building the definition (matches save). */
+  beforeVerify?: BeforeVerifyFn
 }>
 
-export function useWorkflowVerification({ dispatch }: UseWorkflowVerificationOptions) {
+export function useWorkflowVerification({ dispatch, beforeVerify }: UseWorkflowVerificationOptions) {
   const { showError, showSuccess } = useAlerts()
+  const { defaults } = useWorkflowEngineDefaults()
   const [isVerifying, setIsVerifying] = useState(false)
   const validationErrorCount = useWorkflowStore((state) => state.validationErrorCount)
 
   const handleVerify = useCallback(
     (onValid?: () => void, options?: { silent?: boolean }) => {
       const silent = options?.silent ?? false
-      const { currentWorkflow, edges, nodePositions } = useWorkflowStore.getState()
-      if (!currentWorkflow) {
-        dispatch({ type: 'SET_KEBAB_OPEN', payload: false })
-        return
-      }
 
-      dispatch({ type: 'SET_KEBAB_OPEN', payload: false })
-
-      const { activities } = currentWorkflow.workflow
-      const triggers = currentWorkflow.triggers ?? []
-      const name = currentWorkflow.name ?? 'workflow'
-      const description = currentWorkflow.description ?? ''
-
-      let definition: ReturnType<typeof buildWorkflowDefinition>
-      try {
-        definition = buildWorkflowDefinition({
-          workflowName: name,
-          workflowDescription: description,
-          activities: activities,
-          triggers: triggers,
-          edges,
-          nodePositions,
-        })
-      } catch (err: unknown) {
-        dispatch({ type: 'CLEAR_VALIDATION_ERRORS' })
-        useWorkflowStore.getState().setValidationErrorCount(0)
-        if (!silent) {
-          showError({ title: 'Verification failed', description: getErrorMessage(err) })
+      const run = async () => {
+        if (beforeVerify) {
+          const ready = await beforeVerify()
+          if (!ready) {
+            dispatch({ type: 'SET_KEBAB_OPEN', payload: false })
+            return
+          }
         }
-        return
-      }
 
-      dispatch({ type: 'CLEAR_VALIDATION_ERRORS' })
+        const { currentWorkflow, edges, nodePositions } = useWorkflowStore.getState()
+        if (!currentWorkflow) {
+          dispatch({ type: 'SET_KEBAB_OPEN', payload: false })
+          return
+        }
 
-      const frontendResult = validateWorkflow(activities, edges, { triggers })
-      const minimumErrors = validateMinimumWorkflow(activities, edges, triggers)
-      const allFrontendErrors: ValidationError[] = [...frontendResult.errors, ...minimumErrors].map((e) => ({
-        message: e.message,
-        nodeId: e.nodeId ?? null,
-        nodeName: lookupNodeName(e.nodeId ?? null, { activityIdFallback: true }),
-        severity: (e.severity ?? 'error') as ValidationSeverity,
-      }))
+        dispatch({ type: 'SET_KEBAB_OPEN', payload: false })
 
-      setIsVerifying(true)
-      workflowFetchClient
-        .POST('/workflows/validate', {
-          body: {
-            workflow_definition: definition as unknown as WorkflowAPI.components['schemas']['WorkflowDefinition'],
-          },
+        const { activities } = currentWorkflow.workflow
+        const triggers = currentWorkflow.triggers ?? []
+        const name = currentWorkflow.name ?? 'workflow'
+        const description = currentWorkflow.description ?? ''
+
+        let definition: ReturnType<typeof buildWorkflowDefinition>
+        try {
+          definition = buildWorkflowDefinition({
+            workflowName: name,
+            workflowDescription: description,
+            activities: activities,
+            triggers: triggers,
+            edges,
+            nodePositions,
+          })
+        } catch (err: unknown) {
+          dispatch({ type: 'CLEAR_VALIDATION_ERRORS' })
+          useWorkflowStore.getState().setValidationErrorCount(0)
+          if (!silent) {
+            showError({ title: 'Verification failed', description: getErrorMessage(err) })
+          }
+          return
+        }
+
+        dispatch({ type: 'CLEAR_VALIDATION_ERRORS' })
+
+        const frontendResult = validateWorkflow(activities, edges, {
+          triggers,
+          systemContinueOnFailure: defaults?.continueOnFailure ?? false,
         })
-        .then((resp) => {
+        const minimumErrors = validateMinimumWorkflow(activities, edges, triggers)
+        const allFrontendErrors: ValidationError[] = [...frontendResult.errors, ...minimumErrors].map((e) => ({
+          message: e.message,
+          nodeId: e.nodeId ?? null,
+          nodeName: lookupNodeName(e.nodeId ?? null, { activityIdFallback: true }),
+          severity: (e.severity ?? 'error') as ValidationSeverity,
+        }))
+
+        setIsVerifying(true)
+        try {
+          const resp = await workflowFetchClient.POST('/workflows/validate', {
+            body: {
+              workflow_definition: definition as unknown as WorkflowAPI.components['schemas']['WorkflowDefinition'],
+            },
+          })
           processValidateResponse(resp, dispatch, {
             frontendErrors: allFrontendErrors,
             onValid,
@@ -218,16 +244,19 @@ export function useWorkflowVerification({ dispatch }: UseWorkflowVerificationOpt
             showSuccess,
             showError,
           })
-        })
-        .catch((err: unknown) => {
+        } catch (err: unknown) {
           applyValidationState(dispatch, allFrontendErrors)
           if (!silent) {
             showError({ title: 'Verification failed', description: getErrorMessage(err) })
           }
-        })
-        .finally(() => setIsVerifying(false))
+        } finally {
+          setIsVerifying(false)
+        }
+      }
+
+      detachPromise(run())
     },
-    [dispatch, showError, showSuccess]
+    [beforeVerify, dispatch, showError, showSuccess, defaults?.continueOnFailure]
   )
 
   const handleVerifySilent = useCallback(

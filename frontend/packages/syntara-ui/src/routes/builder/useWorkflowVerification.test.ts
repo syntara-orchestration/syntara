@@ -46,6 +46,10 @@ vi.mock('./utils/validation/rules/validateMinimumWorkflow', () => ({
   validateMinimumWorkflow: () => mockValidateMinimum(),
 }))
 
+vi.mock('./hooks/useWorkflowEngineDefaults', () => ({
+  useWorkflowEngineDefaults: () => ({ defaults: { continueOnFailure: false }, isLoading: false }),
+}))
+
 vi.mock('./utils/workflowDefinitionBuilder', () => ({
   buildWorkflowDefinition: (...args: unknown[]) => mockBuildDefinition(...args),
 }))
@@ -61,8 +65,8 @@ beforeEach(() => {
 })
 
 describe('useWorkflowVerification', () => {
-  function renderVerificationHook() {
-    return renderHook(() => useWorkflowVerification({ dispatch: mockDispatch }))
+  function renderVerificationHook(options?: { beforeVerify?: () => Promise<boolean> }) {
+    return renderHook(() => useWorkflowVerification({ dispatch: mockDispatch, beforeVerify: options?.beforeVerify }))
   }
 
   const workflowState = {
@@ -88,6 +92,39 @@ describe('useWorkflowVerification', () => {
 
     expect(mockDispatch).toHaveBeenCalledWith({ type: 'SET_KEBAB_OPEN', payload: false })
     expect(mockPost).not.toHaveBeenCalled()
+  })
+
+  it('skips verification when beforeVerify returns false', async () => {
+    const beforeVerify = vi.fn().mockResolvedValue(false)
+    mockGetState.mockReturnValue(workflowState)
+    const { result } = renderVerificationHook({ beforeVerify })
+
+    act(() => result.current.handleVerify())
+
+    await waitFor(() => {
+      expect(beforeVerify).toHaveBeenCalledOnce()
+    })
+    expect(mockPost).not.toHaveBeenCalled()
+    expect(mockDispatch).toHaveBeenCalledWith({ type: 'SET_KEBAB_OPEN', payload: false })
+  })
+
+  it('runs verification after beforeVerify returns true', async () => {
+    const beforeVerify = vi.fn().mockResolvedValue(true)
+    mockGetState.mockReturnValue(workflowState)
+    mockBuildDefinition.mockReturnValue({ nodes: [], edges: [], triggers: [] })
+    mockPost.mockResolvedValue({
+      data: { is_valid: true, findings: [] },
+      error: undefined,
+      response: { ok: true },
+    })
+    const { result } = renderVerificationHook({ beforeVerify })
+
+    act(() => result.current.handleVerify())
+
+    await waitFor(() => {
+      expect(beforeVerify).toHaveBeenCalledOnce()
+      expect(mockPost).toHaveBeenCalled()
+    })
   })
 
   it('clears stale validation errors before starting verification', async () => {

@@ -6,13 +6,17 @@
  * - UI-29: Self-contained approve flow — create workflow with approval node,
  *   run it, find the pending approval in the queue, approve it, verify execution resumes
  */
-import { type Page } from '../fixtures'
-import { test, expect, toAppUrl } from '../fixtures'
-import { applyApprovalNameFilter, dismissConnectionBanner, navigateToApprovalAndOpen } from '../helpers/approvals'
-import { APP_TITLE } from '../helpers/appTitle'
-import { addApprovalNodeWithBranch } from '../helpers/v2-nodes'
-import { runWorkflowFromBuilder, waitForExecutionPaused } from '../helpers/workflow-run'
-import { buildUniqueName, openWorkflowInBuilder } from '../helpers/workflows'
+import { createUnavailableGuard, type Page, test, expect, toAppUrl } from '../fixtures'
+import {
+  applyApprovalNameFilter,
+  dismissConnectionBanner,
+  expectApprovalsListPageTitle,
+  getApprovalsBulkToolbar,
+  gotoApprovalsList,
+  navigateToApprovalAndOpen,
+} from '../helpers/approvals'
+import { buildUniqueName } from '../helpers/workflows'
+import { isSkipWebServerForPlaywrightTests } from '../playwrightWebServerEnv'
 import {
   apiRequest,
   createWorkflowViaApi,
@@ -21,6 +25,9 @@ import {
   publishWorkflowViaApi,
   pollExecutionStatus,
 } from '../utils/api'
+
+/** Temporal can be slow to reach the approval gate under CI load. */
+const APPROVAL_GATE_POLL_TIMEOUT = 90_000
 
 /**
  * Helper: Create a workflow with an approval node and run it to create a pending approval.
@@ -136,9 +143,8 @@ test('user filters approvals by name and status', async ({ app }) => {
   const approval = await createPendingApprovalLight(app, 'e2e-filter')
 
   try {
-    await app.goto(toAppUrl('/approvals'))
-    await expect(app.getByRole('heading', { level: 1, name: 'Approvals' })).toBeVisible()
-    await expect(app).toHaveTitle(`Approvals | ${APP_TITLE}`)
+    await gotoApprovalsList(app)
+    await expectApprovalsListPageTitle(app)
 
     const table = app.getByRole('grid', { name: 'Approvals table' })
     await expect(table).toBeVisible({ timeout: 15_000 })
@@ -194,6 +200,44 @@ test('user filters approvals by name and status', async ({ app }) => {
   }
 })
 
+/** Mock seed row in syntara-mock-api/src/resources/approvals.ts (approved, decision_notes: null). */
+const SILENT_APPROVAL_MOCK_ID = '550e8400-e29b-41d4-a716-446655440046'
+const SILENT_APPROVAL_MOCK_NAME = 'Silent Approval Decision'
+
+test.describe('Approvals list expand toggle (mock seed)', { tag: '@pr-check' }, () => {
+  test.skip(
+    isSkipWebServerForPlaywrightTests(),
+    'Silent Approval seed exists only in syntara-mock-api (Playwright webServer)'
+  )
+
+  const seedGuard = createUnavailableGuard(
+    'Mock approval seed required (Silent Approval Decision in syntara-mock-api approvals)'
+  )
+
+  test.beforeEach(async ({ app }) => {
+    const seedResp = await apiRequest(app, 'get', `/approvals/${SILENT_APPROVAL_MOCK_ID}`)
+    if (!seedResp.ok()) {
+      seedGuard.markUnavailable()
+      test.skip(true, 'Mock approval seed required (Silent Approval Decision)')
+    }
+  })
+
+  test('hides row expand control when decision notes are empty', async ({ app }) => {
+    await app.goto(toAppUrl('/tasks/approvals'))
+    await expect(app.getByRole('heading', { level: 1, name: 'Tasks' })).toBeVisible()
+
+    const table = app.getByRole('grid', { name: 'Approvals table' })
+    await expect(table).toBeVisible({ timeout: 15_000 })
+
+    await applyApprovalNameFilter(app, table, SILENT_APPROVAL_MOCK_NAME, {
+      waitForRowText: SILENT_APPROVAL_MOCK_NAME,
+    })
+
+    const row = table.getByRole('row').filter({ hasText: SILENT_APPROVAL_MOCK_NAME })
+    await expect(row.getByRole('button', { name: /details/i })).toHaveCount(0)
+  })
+})
+
 test.describe('Approval Workflow Operations', () => {
   test.skip(!process.env['SYNTARA_E2E_HAS_TEMPORAL_WORKER'], 'Temporal worker unavailable (globalSetup probe)')
 
@@ -205,8 +249,7 @@ test.describe('Approval Workflow Operations', () => {
 
     try {
       // Navigate to approvals page
-      await app.goto(toAppUrl('/approvals'))
-      await expect(app.getByRole('heading', { level: 1, name: 'Approvals' })).toBeVisible()
+      await gotoApprovalsList(app)
 
       const table = app.getByRole('grid', { name: 'Approvals table' })
       await table.waitFor({ state: 'visible', timeout: 15_000 })
@@ -220,12 +263,11 @@ test.describe('Approval Workflow Operations', () => {
       await expect(rows.filter({ hasText: approval2.approvalName })).toBeVisible({ timeout: 15_000 })
       await rows.filter({ hasText: approval2.approvalName }).getByRole('checkbox').check()
 
-      // Bulk actions live in the page header (Compass toolbar has no accessible name).
-      const pageHeader = app.getByTestId('page-header')
-      await expect(pageHeader.getByText('2 selected')).toBeVisible()
+      const bulkToolbar = getApprovalsBulkToolbar(app, 2)
+      await expect(bulkToolbar).toBeVisible()
 
-      const approveButton = pageHeader.getByRole('button', { name: 'Approve' })
-      const rejectButton = pageHeader.getByRole('button', { name: 'Reject' })
+      const approveButton = bulkToolbar.getByRole('button', { name: 'Approve' })
+      const rejectButton = bulkToolbar.getByRole('button', { name: 'Reject' })
       await expect(approveButton).toBeVisible()
       await expect(rejectButton).toBeVisible()
 
@@ -248,7 +290,7 @@ test.describe('Approval Workflow Operations', () => {
       // Step 7: Verify success notification
       await expect(app.getByText('Approvals submitted')).toBeVisible({ timeout: 10_000 })
 
-      await expect(pageHeader.getByText('2 selected')).not.toBeVisible()
+      await expect(app.getByText('2 selected')).not.toBeVisible()
 
       // Step 9: Verify checkboxes are unchecked
       await expect(rows.filter({ hasText: approval1.approvalName }).getByRole('checkbox')).not.toBeChecked()
@@ -268,8 +310,7 @@ test.describe('Approval Workflow Operations', () => {
 
     try {
       // Navigate to approvals page
-      await app.goto(toAppUrl('/approvals'))
-      await expect(app.getByRole('heading', { level: 1, name: 'Approvals' })).toBeVisible()
+      await gotoApprovalsList(app)
 
       const table = app.getByRole('grid', { name: 'Approvals table' })
       await table.waitFor({ state: 'visible', timeout: 15_000 })
@@ -283,10 +324,10 @@ test.describe('Approval Workflow Operations', () => {
       await expect(rows.filter({ hasText: approval2.approvalName })).toBeVisible({ timeout: 15_000 })
       await rows.filter({ hasText: approval2.approvalName }).getByRole('checkbox').check()
 
-      const pageHeader = app.getByTestId('page-header')
-      await expect(pageHeader.getByText('2 selected')).toBeVisible({ timeout: 15_000 })
+      const bulkToolbar = getApprovalsBulkToolbar(app, 2)
+      await expect(bulkToolbar).toBeVisible({ timeout: 15_000 })
 
-      const rejectButton = pageHeader.getByRole('button', { name: 'Reject' })
+      const rejectButton = bulkToolbar.getByRole('button', { name: 'Reject' })
       await expect(rejectButton).toBeVisible()
       await rejectButton.click()
 
@@ -309,7 +350,7 @@ test.describe('Approval Workflow Operations', () => {
       await expect(app.getByText('Approvals rejected')).toBeVisible({ timeout: 10_000 })
 
       // Step 8: Verify selection cleared
-      await expect(pageHeader.getByText('2 selected')).not.toBeVisible()
+      await expect(app.getByText('2 selected')).not.toBeVisible()
 
       // Step 9: Verify checkboxes are unchecked
       await expect(rows.filter({ hasText: approval1.approvalName }).getByRole('checkbox')).not.toBeChecked()
@@ -331,8 +372,7 @@ test.describe('Approval Workflow Operations', () => {
       await pollApprovalVisible(app, approval.approvalName)
 
       // Navigate to approvals page
-      await app.goto(toAppUrl('/approvals'))
-      await expect(app.getByRole('heading', { level: 1, name: 'Approvals' })).toBeVisible()
+      await gotoApprovalsList(app)
 
       const table = app.getByRole('grid', { name: 'Approvals table' })
       await table.waitFor({ state: 'visible', timeout: 15_000 })
@@ -346,10 +386,10 @@ test.describe('Approval Workflow Operations', () => {
       await expect(row).toBeVisible({ timeout: 15_000 })
       await row.getByRole('checkbox').check()
 
-      const pageHeader = app.getByTestId('page-header')
-      await expect(pageHeader.getByText('1 selected')).toBeVisible({ timeout: 15_000 })
+      const bulkToolbar = getApprovalsBulkToolbar(app, 1)
+      await expect(bulkToolbar).toBeVisible({ timeout: 15_000 })
 
-      const approveButton = pageHeader.getByRole('button', { name: 'Approve' })
+      const approveButton = bulkToolbar.getByRole('button', { name: 'Approve' })
       await expect(approveButton).toBeVisible()
       await approveButton.click()
 
@@ -359,11 +399,11 @@ test.describe('Approval Workflow Operations', () => {
       await dialog.getByRole('button', { name: 'Cancel' }).click()
 
       await expect(app.getByRole('dialog')).not.toBeVisible({ timeout: 10_000 })
-      await expect(pageHeader.getByText('1 selected')).toBeVisible({ timeout: 10_000 })
+      await expect(bulkToolbar).toBeVisible({ timeout: 10_000 })
 
       // Step 4: Deselect to clean up
       await row.getByRole('checkbox').uncheck()
-      await expect(pageHeader.getByText('1 selected')).not.toBeVisible()
+      await expect(app.getByText('1 selected')).not.toBeVisible()
     } finally {
       // Cleanup: delete created workflow
       await apiRequest(app, 'delete', `/workflows/${approval.workflowId}`).catch(() => {})
@@ -431,8 +471,7 @@ test.describe('Approval Workflow Operations', () => {
 
     try {
       // Navigate to approvals page
-      await app.goto(toAppUrl('/approvals'))
-      await expect(app.getByRole('heading', { level: 1, name: 'Approvals' })).toBeVisible()
+      await gotoApprovalsList(app)
 
       const table = app.getByRole('grid', { name: 'Approvals table' })
       await table.waitFor({ state: 'visible', timeout: 15_000 })
@@ -453,24 +492,22 @@ test.describe('Approval Workflow Operations', () => {
         timeout: 15_000,
       })
 
-      // Click header row checkbox to select all. Bulk actions live in the page header
-      // (Compass toolbar has no accessible name) — same pattern as sibling batch tests.
+      // Click header row checkbox to select all. Bulk actions live in the list toolbar.
       // Under Konflux cluster load the checkbox click can fail to register; retry the whole sequence.
       const selectAllCheckbox = table.getByRole('checkbox', { name: /select all/i })
       await expect(selectAllCheckbox).toBeEnabled()
-      const pageHeader = app.getByTestId('page-header')
-      const selectedText = pageHeader.getByText('2 selected')
+      const bulkToolbar = getApprovalsBulkToolbar(app, 2)
 
       await expect(async () => {
         await selectAllCheckbox.check()
-        await expect(selectedText).toBeVisible()
+        await expect(bulkToolbar).toBeVisible()
       }).toPass({ timeout: 15_000, intervals: [500] })
 
       // Uncheck header checkbox to deselect all
       await selectAllCheckbox.uncheck()
 
       // Verify selection cleared
-      await expect(selectedText).not.toBeVisible()
+      await expect(app.getByText('2 selected')).not.toBeVisible()
 
       // Verify all checkboxes are unchecked
       await expect(rows.filter({ hasText: approval1.approvalName }).getByRole('checkbox')).not.toBeChecked()
@@ -483,33 +520,43 @@ test.describe('Approval Workflow Operations', () => {
   })
 
   test('UI-29: self-contained approve flow via approvals queue', async ({ app }) => {
-    // Create a workflow with an approval node so we control the approval name.
-    // Avoid 'approve' in the workflow name — getByRole({ name: 'Approve' }) is a
-    // substring match and collides with the workflow link button on execution detail.
+    test.slow()
     const workflowName = buildUniqueName('e2e-ui29')
     const approvalNodeName = buildUniqueName('gate')
-    const { id: workflowId } = await createWorkflowViaApi({
+
+    const { id: workflowId, versionNumber } = await createWorkflowViaApi({
       app,
       name: workflowName,
       triggers: [{ id: 'trigger_1', type: 'manual_trigger', name: 'Manual trigger', parameters: {} }],
+      nodes: [
+        { id: 'approval_1', type: 'approval', name: approvalNodeName, parameters: {} },
+        {
+          id: 'script_1',
+          type: 'script',
+          name: `${approvalNodeName} - approved action`,
+          parameters: { language: 'python', code: 'print("approved")' },
+        },
+      ],
+      edges: [
+        { from: 'trigger_1', to: 'approval_1' },
+        { from: 'approval_1', to: 'script_1', from_port: 'approved' },
+      ],
     })
-    await openWorkflowInBuilder(app, workflowName, workflowId)
+    await publishWorkflowViaApi(app, workflowId, versionNumber)
+
+    const runResp = await apiRequest(app, 'post', '/executions', {
+      data: { workflow_id: workflowId, trigger_node_id: 'trigger_1', use_published: true },
+    })
+    expect(runResp.ok(), `POST /executions returned ${runResp.status()}`).toBeTruthy()
+    const execution = (await runResp.json()) as { id?: string; execution_id?: string }
+    const executionId = execution.id ?? execution.execution_id
+    expect(executionId, 'POST /executions did not return an execution ID').toBeTruthy()
 
     try {
-      // Add approval node with a unique name so we can find it in the approvals list
-      await addApprovalNodeWithBranch(app, approvalNodeName)
-      await app.getByRole('button', { name: 'Save workflow' }).click()
-      await runWorkflowFromBuilder(app)
-      const executionId = app.url().match(/\/executions\/([^/?]+)/)?.[1]
-      expect(executionId, 'Could not parse execution ID after run').toBeTruthy()
+      await pollExecutionStatus(app, executionId!, ['paused'], { timeout: APPROVAL_GATE_POLL_TIMEOUT })
+      await pollApprovalVisible(app, approvalNodeName, { timeout: 45_000 })
 
-      // Wait for execution to pause at the approval node (requires Temporal)
-      const reachedApproval = await waitForExecutionPaused(app)
-      expect(reachedApproval, 'Execution stayed Pending — Temporal worker may not be running').toBeTruthy()
-
-      // Navigate to the approvals queue and find our approval
-      await app.goto(toAppUrl('/approvals'))
-      await expect(app.getByRole('heading', { level: 1, name: 'Approvals' })).toBeVisible()
+      await gotoApprovalsList(app)
 
       const approvalsTable = app.getByRole('grid', { name: 'Approvals table' })
       await approvalsTable.waitFor({ state: 'visible', timeout: 15_000 })
@@ -524,23 +571,43 @@ test.describe('Approval Workflow Operations', () => {
       // Click approval — navigates to execution detail with side panel
       await approvalLink.click()
       await expect(app).toHaveURL(/\/executions\/[^?]+\?approval=/)
-      await expect(app.getByRole('heading', { name: 'Review Approval' })).toBeVisible({ timeout: 15_000 })
+      await expect(app.getByRole('heading', { name: 'Review approval' })).toBeVisible({ timeout: 15_000 })
+
+      const approvalIdFromUrl = new URL(app.url()).searchParams.get('approval')
+      expect(approvalIdFromUrl, 'Expected ?approval= on execution detail URL').toBeTruthy()
 
       // Approve with notes (exact: true — workflow link names must not substring-match)
       await app.getByRole('button', { name: 'Approve', exact: true }).click()
       await app.getByPlaceholder(/Explain the reason for approving/i).fill('Approved in E2E test')
-      await app.getByRole('button', { name: 'Submit decision' }).click()
+      const submitDecision = app.getByRole('button', { name: 'Submit decision' })
+      await expect(submitDecision).toBeEnabled()
 
-      // Verify approval was submitted, then poll API for terminal state (UI live updates can lag)
+      const [patchResponse] = await Promise.all([
+        app.waitForResponse(
+          (response) =>
+            response.request().method() === 'PATCH' &&
+            response.url().includes(`/approvals/${approvalIdFromUrl}`) &&
+            response.ok(),
+          { timeout: 30_000 }
+        ),
+        submitDecision.click(),
+      ])
+
+      const decisionBody = (await patchResponse.json()) as { status?: string }
+      expect(decisionBody.status).toBe('approved')
       await expect(app.getByText('Approval submitted')).toBeVisible({ timeout: 15_000 })
-      await pollExecutionStatus(app, executionId!, ['completed', 'completed_with_errors', 'failed', 'cancelled'], {
-        timeout: 60_000,
-      })
-      await app.reload()
-      await expect(app.getByRole('heading', { level: 1 })).toBeVisible({ timeout: 15_000 })
-      await expect(app.getByTestId('execution-status-badge').getByText('Completed')).toBeVisible({
-        timeout: 30_000,
-      })
+
+      if (isSkipWebServerForPlaywrightTests()) {
+        // Live stack: wait for Temporal to finish the run after the decide signal.
+        await pollExecutionStatus(app, executionId!, ['completed', 'completed_with_errors', 'failed', 'cancelled'], {
+          timeout: APPROVAL_GATE_POLL_TIMEOUT,
+        })
+        await app.reload()
+        await expect(app.getByRole('heading', { level: 1 })).toBeVisible({ timeout: 15_000 })
+        await expect(app.getByTestId('execution-status-badge').getByText('Completed')).toBeVisible({
+          timeout: 30_000,
+        })
+      }
     } finally {
       if (workflowId) {
         await apiRequest(app, 'delete', `/workflows/${workflowId}`).catch(() => {})

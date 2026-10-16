@@ -18,7 +18,7 @@
  * - project-admin: project-scoped create/update/delete/run on assigned project
  */
 
-import { loginAsUser } from './authorization/fixtures'
+import { cleanupPersona, createPersona, loginAsUser, PERSONA_ACTIONS } from './authorization/fixtures'
 import { type Page, test, expect, toAppUrl, appBaseUrl } from './fixtures'
 import { openRowKebab } from './helpers/patternfly'
 import { buildUniqueName } from './helpers/workflows'
@@ -180,7 +180,7 @@ test.describe('Permission gating — Navigation visibility', () => {
 
     await expect(nav.getByRole('link', { name: 'Workflows' })).toBeVisible()
     await expect(nav.getByRole('link', { name: 'Workflow Runs' })).toBeVisible()
-    await expect(nav.getByRole('link', { name: 'Approvals' })).toBeVisible()
+    await expect(nav.getByRole('link', { name: 'Tasks' })).toBeVisible()
 
     const configItem = nav.getByLabel('Configuration')
     await expect(configItem).toBeVisible()
@@ -204,7 +204,7 @@ test.describe('Permission gating — Navigation visibility', () => {
 
     await expect(nav.getByRole('link', { name: 'Workflows' })).toBeVisible()
     await expect(nav.getByRole('link', { name: 'Workflow Runs' })).toBeVisible()
-    await expect(nav.getByRole('link', { name: 'Approvals' })).toBeVisible()
+    await expect(nav.getByRole('link', { name: 'Tasks' })).toBeVisible()
     await expect(nav.getByLabel('Configuration')).toBeVisible()
 
     await expect(nav.getByLabel('System Administration')).not.toBeVisible()
@@ -215,7 +215,7 @@ test.describe('Permission gating — Navigation visibility', () => {
 
     await expect(nav.getByRole('link', { name: 'Workflows' })).toBeVisible()
     await expect(nav.getByRole('link', { name: 'Workflow Runs' })).toBeVisible()
-    await expect(nav.getByRole('link', { name: 'Approvals' })).toBeVisible()
+    await expect(nav.getByRole('link', { name: 'Tasks' })).toBeVisible()
     await expect(nav.getByLabel('Configuration')).toBeVisible()
 
     const sysAdminItem = nav.getByLabel('System Administration')
@@ -231,7 +231,7 @@ test.describe('Permission gating — Navigation visibility', () => {
 
     await expect(nav.getByRole('link', { name: 'Workflows' })).toBeVisible()
     await expect(nav.getByRole('link', { name: 'Workflow Runs' })).toBeVisible()
-    await expect(nav.getByRole('link', { name: 'Approvals' })).toBeVisible()
+    await expect(nav.getByRole('link', { name: 'Tasks' })).toBeVisible()
     await expect(nav.getByLabel('Configuration')).toBeVisible()
 
     // When only one SA child is visible (Access Management), the nav renders
@@ -240,6 +240,68 @@ test.describe('Permission gating — Navigation visibility', () => {
     await expect(sysAdminLink).toBeVisible()
     await sysAdminLink.click()
     await expect(userApp.getByRole('heading', { name: 'Access Management' })).toBeVisible()
+  })
+})
+
+// ── Tasks tab visibility ─────────────────────────────────────────────────
+
+test.describe('Permission gating — Tasks tabs', () => {
+  test('admin sees Approvals and Form responses tabs on the Tasks page', async ({ app }) => {
+    await app.goto(toAppUrl('/tasks/approvals'))
+
+    await expect(app.getByRole('heading', { level: 1, name: 'Tasks' })).toBeVisible()
+    await expect(app.getByRole('tab', { name: 'Approvals' })).toBeVisible()
+    await expect(app.getByRole('tab', { name: 'Form responses' })).toBeVisible()
+  })
+
+  test('user with approval read only sees the Approvals tab', async ({ userApp }) => {
+    await userApp.goto(toAppUrl('/tasks/approvals'))
+
+    await expect(userApp.getByRole('heading', { level: 1, name: 'Tasks' })).toBeVisible()
+    await expect(userApp.getByRole('tab', { name: 'Approvals' })).toBeVisible()
+    await expect(userApp.getByRole('tab', { name: 'Form responses' })).not.toBeVisible()
+  })
+
+  test('persona with form_prompt read only sees the Form responses tab', async ({ app, browser }) => {
+    const persona = await createPersona(app, buildUniqueName('form-prompt-reader'), [
+      'form_prompt:read',
+      'workflow:read',
+      'project:read',
+    ])
+
+    const context = await browser.newContext()
+    const page = await context.newPage()
+
+    try {
+      await loginAsUser(page, persona)
+      await page.goto(toAppUrl('/tasks/form-responses'))
+
+      await expect(page.getByRole('heading', { level: 1, name: 'Tasks' })).toBeVisible()
+      await expect(page.getByRole('tab', { name: 'Form responses' })).toBeVisible()
+      await expect(page.getByRole('tab', { name: 'Approvals' })).not.toBeVisible()
+    } finally {
+      await context.close()
+      await cleanupPersona(app, persona)
+    }
+  })
+
+  test('approval operator sees Approvals tab only', async ({ app, browser }) => {
+    const persona = await createPersona(app, buildUniqueName('approval-op'), PERSONA_ACTIONS.approvalOperator)
+
+    const context = await browser.newContext()
+    const page = await context.newPage()
+
+    try {
+      await loginAsUser(page, persona)
+      await page.goto(toAppUrl('/tasks/approvals'))
+
+      await expect(page.getByRole('heading', { level: 1, name: 'Tasks' })).toBeVisible()
+      await expect(page.getByRole('tab', { name: 'Approvals' })).toBeVisible()
+      await expect(page.getByRole('tab', { name: 'Form responses' })).not.toBeVisible()
+    } finally {
+      await context.close()
+      await cleanupPersona(app, persona)
+    }
   })
 })
 

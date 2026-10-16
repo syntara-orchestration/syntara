@@ -57,6 +57,8 @@ export type SynTextFieldProps<
   max?: number
   /** Forwarded to `TextInput` when `type="number"`. */
   step?: number
+  /** Called after the field value changes (user input). */
+  onValueChange?: () => void
 }
 
 function optionalNumberFromInput(value: string | number | undefined): number | undefined {
@@ -115,6 +117,7 @@ export function SynTextField<
   min,
   max,
   step,
+  onValueChange,
 }: Readonly<SynTextFieldProps<TFieldValues, TName>>) {
   const resolvedFieldId = fieldId ?? name
   const isNumberInput = type === 'number'
@@ -148,15 +151,18 @@ export function SynTextField<
                 if (value === '') {
                   setNumberDraft('')
                   field.onChange(undefined)
+                  onValueChange?.()
                   return
                 }
                 setNumberDraft(value)
                 if (!isPartialNumberInput(value)) {
                   field.onChange(optionalNumberFromInput(value))
                   setNumberDraft(null)
+                  onValueChange?.()
                 }
               } else {
                 field.onChange(value)
+                onValueChange?.()
               }
             }}
             onBlur={() => {

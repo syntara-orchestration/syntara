@@ -679,6 +679,38 @@ class TestRecorderPrometheus:
         )
         assert sample._sum.get() == pytest.approx(0.25)
 
+    def test_form_prompt_submission_handoff_updates_histogram(self, recorder: MetricsRecorder) -> None:
+        """The form submission handoff is observed in seconds with the API label."""
+        recorder.record(
+            MetricType.FORM_PROMPT_SUBMISSION_HANDOFF,
+            250.0,
+            unit="ms",
+            component=ComponentLabel.API_SERVICE,
+        )
+
+        sample = recorder.prometheus.form_prompt_submission_handoff_seconds.labels(
+            component=ComponentLabel.API_SERVICE.value,
+        )
+        assert sample._sum.get() == pytest.approx(0.25)
+        records = list(recorder.query(metric_types={MetricType.FORM_PROMPT_SUBMISSION_HANDOFF}))
+        assert len(records) == 1
+
+    def test_form_prompt_resume_dispatch_updates_histogram(self, recorder: MetricsRecorder) -> None:
+        """The form resume dispatch is observed in seconds with the workflow-engine label."""
+        recorder.record(
+            MetricType.FORM_PROMPT_RESUME_DISPATCH,
+            250.0,
+            unit="ms",
+            component=ComponentLabel.WORKFLOW_ENGINE,
+        )
+
+        sample = recorder.prometheus.form_prompt_resume_dispatch_seconds.labels(
+            component=ComponentLabel.WORKFLOW_ENGINE.value,
+        )
+        assert sample._sum.get() == pytest.approx(0.25)
+        records = list(recorder.query(metric_types={MetricType.FORM_PROMPT_RESUME_DISPATCH}))
+        assert len(records) == 1
+
     def test_workflow_completion_rate_updates_gauge(self, recorder: MetricsRecorder) -> None:
         """Recording WORKFLOW_COMPLETION_RATE sets the gauge."""
         recorder.record(

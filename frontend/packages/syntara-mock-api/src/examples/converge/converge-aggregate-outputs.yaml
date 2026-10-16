@@ -1,5 +1,5 @@
 ---
-schema_version: "2.0.0"
+schema_version: '2.0.0'
 name: converge-aggregate-test
 description: Test converge with output aggregation from multiple branches
 triggers:
@@ -13,19 +13,19 @@ nodes:
     type: script
     parameters:
       language: bash
-      code: "echo '{\"value\": 10}'"
+      code: 'echo ''{"value": 10}'''
 
   - id: data_task2
     type: script
     parameters:
       language: bash
-      code: "echo '{\"value\": 20}'"
+      code: 'echo ''{"value": 20}'''
 
   - id: data_task3
     type: script
     parameters:
       language: bash
-      code: "echo '{\"value\": 30}'"
+      code: 'echo ''{"value": 30}'''
 
   - id: parallel_aggregate_join
     type: join

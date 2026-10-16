@@ -3,6 +3,7 @@ import { expect, test as base, type Page, type Request } from '@playwright/test'
 
 import { APP_TITLE } from './helpers/appTitle'
 import { isSkipWebServerForPlaywrightTests } from './playwrightWebServerEnv'
+import { mockAccessTokenForUsername } from './utils/mockJwt'
 import { type RoleSetupResult, setupRoleUsers } from './utils/roleSetup'
 import {
   type XfailEntry,
@@ -20,6 +21,8 @@ const e2ePassword: string | undefined = processEnv['SYNTARA_E2E_PASSWORD']
 const isRealBackend: boolean = isSkipWebServerForPlaywrightTests()
 
 export const toAppUrl = (path: string): string => new URL(path, appBaseUrl).toString()
+
+const MOCK_AUTH_REFRESH_ROUTE = '**/api/v1/auth/refresh'
 
 async function loginAs(page: Page, username: string, password?: string): Promise<void> {
   await page.goto(appBaseUrl)
@@ -50,12 +53,13 @@ async function loginAsRole(page: Page, username: string): Promise<void> {
   // Intercept auth refresh to return a token for this role.
   // The mock API's cookie-based bootstrap refresh would otherwise return
   // an admin token, preventing the role-specific flow.
-  await page.route('**/api/v1/auth/refresh', (route) =>
+  await page.unroute(MOCK_AUTH_REFRESH_ROUTE)
+  await page.route(MOCK_AUTH_REFRESH_ROUTE, (route) =>
     route.fulfill({
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
-        access_token: `mock-token-${username}`,
+        access_token: mockAccessTokenForUsername(username),
         token_type: 'bearer',
         expires_in: 3600,
       }),
@@ -126,7 +130,12 @@ export const test = xfailBase.extend<
   ],
 
   app: async ({ page }, use) => {
-    await loginAs(page, 'admin')
+    if (!isRealBackend) {
+      // Cookie bootstrap refresh can yield a non-admin JWT; pin admin like other mock personas.
+      await loginAsRole(page, 'admin')
+    } else {
+      await loginAs(page, 'admin')
+    }
     await use(page)
   },
 

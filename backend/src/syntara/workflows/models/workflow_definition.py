@@ -20,6 +20,7 @@ from syntara.workflows.workflow_engine.models.workflow_definition import (
     ConvergeNodeParameters,
     DoWhileLoopParameters,
     ForEachLoopParameters,
+    FormPromptNodeParameters,
     NodeSettingsBase,
     NodeSettingsCof,
     NodeSettingsCofDisabled,
@@ -102,6 +103,14 @@ class ApprovalNode(WorkflowNodeBase):
     settings: NodeSettingsNoRetry | None = None
 
 
+class FormPromptNode(WorkflowNodeBase):
+    """Form prompt node — pauses execution to collect structured user input."""
+
+    type: Literal["form_prompt"]
+    parameters: FormPromptNodeParameters
+    settings: NodeSettingsNoRetry | None = None
+
+
 class ConditionNode(WorkflowNodeBase):
     """Binary conditional branching node."""
 
@@ -149,6 +158,7 @@ _AllNodeTypes = (
     | AgenticNode
     | ScriptNode
     | ApprovalNode
+    | FormPromptNode
     | ConditionNode
     | SwitchNode
     | LoopNode
