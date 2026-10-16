@@ -10,6 +10,10 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from syntara.api.main import app
 from syntara.audit.dispatcher import AuditEventDispatcher
+from syntara.audit.outbox import session as outbox_session
+from syntara.audit.outbox import worker as outbox_worker
+from syntara.audit.outbox.session import AuditWorkerAsyncSessionLocal
+from syntara.core.database.session import AsyncSessionLocal
 
 
 @asynccontextmanager
@@ -38,6 +42,7 @@ async def _test_lifespan_context(test_db_engine: AsyncEngine) -> AsyncGenerator[
         patch("syntara.api.main.engine", test_db_engine),
         patch("syntara.api.main.AsyncSessionLocal", test_session_factory),
         patch("syntara.audit.outbox.worker.AuditWorkerAsyncSessionLocal", test_session_factory),
+        patch("syntara.audit.outbox.session.AuditWorkerAsyncSessionLocal", test_session_factory),
         patch("syntara.api.main.RegoEvaluator", return_value=mock_evaluator),
     ):
         # Seed required data before app startup
@@ -92,4 +97,30 @@ async def test_multiple_startup_shutdown_cycles_do_not_accumulate_handlers(test_
         assert second_count == first_count, (
             f"Expected {first_count} handlers in second cycle, but got {second_count}. "
             "Handlers may be accumulating across cycles."
+        )
+
+
+@pytest.mark.asyncio
+async def test_lifespan_context_redirects_outbox_worker_factories(test_db_engine: AsyncEngine) -> None:
+    """Verify _test_lifespan_context redirects every factory the outbox worker reads.
+
+    Regression guard for the deterministic Integration CI failures seen in
+    October 2026: this context historically omitted
+    syntara.audit.outbox.worker.AsyncSessionLocal, so when this file ran
+    before a worker's first session_app test, the lru_cache singleton behind
+    get_outbox_worker() was created bound to the real database factories
+    (localhost:5432, unreachable in CI) and every later audit write in that
+    pytest-xdist worker failed after retries.
+    """
+    async with _test_lifespan_context(test_db_engine):
+        assert outbox_worker.AsyncSessionLocal is not AsyncSessionLocal, (
+            "_test_lifespan_context must patch syntara.audit.outbox.worker.AsyncSessionLocal "
+            "(the outbox write factory); otherwise get_outbox_worker() caches a singleton "
+            "bound to the real database"
+        )
+        assert outbox_worker.AuditWorkerAsyncSessionLocal is not AuditWorkerAsyncSessionLocal, (
+            "_test_lifespan_context must patch syntara.audit.outbox.worker.AuditWorkerAsyncSessionLocal"
+        )
+        assert outbox_session.AuditWorkerAsyncSessionLocal is not AuditWorkerAsyncSessionLocal, (
+            "_test_lifespan_context must patch syntara.audit.outbox.session.AuditWorkerAsyncSessionLocal"
         )
