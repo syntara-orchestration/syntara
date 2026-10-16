@@ -221,8 +221,8 @@ From the repo root:
 make dev
 
 # Or start individually:
-make services-up              # Infrastructure (DB, Redis, Temporal, OPA)
-make -C backend run-all                  # Backend API on https://localhost:8000
+make services-up              # Database, Redis, Temporal, workers, MCP, and supporting services
+make -C backend run-all       # Backend API and all backend services
 cd frontend && VITE_API_URL=https://localhost:8000 npm run start:ui  # Frontend on http://localhost:5173
 ```
 
@@ -266,7 +266,7 @@ See `.agents/skills/frontend-playwright-e2e/SKILL.md` → **Test Suite Tags** fo
 | "Incorrect login credentials" | Password file and database are out of sync | Run `make admin-password` from repo root to sync |
 | Login errors (other) | Wrong password file or unseeded DB | Regenerate: `make secrets` then `make admin-password` |
 | API 404s in mock mode | UI started without correct VITE_API_URL | Playwright handles this automatically; if manual, use `VITE_API_URL=http://localhost:3300` |
-| Port conflicts | Stale processes | `kill-port 3300 4173` |
+| Port conflicts | A process is already using one of the configured ports | Stop the process using the port, or override it with `SYNTARA_E2E_PORT` / `SYNTARA_E2E_API_PORT` |
 | Visual regression tests skipped | Expected in real backend mode | These only run in mock mode with deterministic data |
 
 ### What works where

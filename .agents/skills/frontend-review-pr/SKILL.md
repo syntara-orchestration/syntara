@@ -1,6 +1,6 @@
 ---
 name: frontend-review-pr
-description: "Review a frontend PR against the project's 36-item checklist and coding standards."
+description: "Review a frontend PR against the project's current checklist and coding standards."
 user-invocable: true
 ---
 

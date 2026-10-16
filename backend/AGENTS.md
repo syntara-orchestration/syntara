@@ -50,7 +50,7 @@ Syntara is a distributed multi-agent system that enables coordinated AI agents t
    - `make test-all` - All tests
    - `make typecheck` - Type checking (mypy strict mode)
 
-3. **Formatting rule**: Pre-commit (`.pre-commit-config.yaml`) is the single source of truth for formatting tools and versions. Never add standalone formatter invocations that duplicate a pre-commit hook. See [Formatting Standards](/docs/standards/formatting.md)
+3. **Formatting rule**: Pre-commit (`.pre-commit-config.yaml`) is the single source of truth for formatting tools and versions. Never add standalone formatter invocations that duplicate a pre-commit hook. See [Formatting Standards](docs/standards/formatting.md)
 
 4. **Documentation**: Update [README.md](README.md) if changes affect:
 
@@ -59,7 +59,7 @@ Syntara is a distributed multi-agent system that enables coordinated AI agents t
    - Project structure
    - Development workflow
 
-5. **Konflux CI skip patterns**: When a backend E2E test fails only in the Konflux pipeline (not locally or GitHub CI), use one of these patterns rather than disabling the test globally. See the full reference in the root [CLAUDE.md](../CLAUDE.md) under "Konflux CI Environment". For a known flaky test that needs temporary quarantine from CI, follow the [test quarantine workflow](../docs/ci/test-quarantine.md). Quick summary:
+5. **Konflux CI skip patterns**: When a backend E2E test fails only in the Konflux pipeline (not locally or GitHub CI), use one of these patterns rather than disabling the test globally. See the full reference in the root [AGENTS.md](../AGENTS.md) under "Konflux CI Environment". For a known flaky test that needs temporary quarantine from CI, follow the [test quarantine workflow](../docs/ci/test-quarantine.md). Quick summary:
    - **`@requires_httpbin` class marker**: skips the class when httpbin is unreachable from the test runner.
    - **Graceful skip on backend connectivity failure**: when the Temporal worker can't reach an external URL, the execution fails with no `status_code`; check `if not output.get("status_code"): pytest.skip(...)`.
    - **Graceful skip on 502**: catch `UnexpectedResponseException` from `syntara_api_client.types` and `pytest.skip()` when `exc.status_code == 502` — these are transient nginx/backend restart failures under cluster load.
@@ -76,32 +76,32 @@ Syntara is a distributed multi-agent system that enables coordinated AI agents t
 Consult these standards when making changes.
 
 **Core:**
-- [Decision Records](/decision-records.md) — technology choices and rationale
-- [Error Handling Strategy](/docs/error-handling-strategy.md) — RFC 9457 compliance, exception patterns
-- [The `/_internal/` Path Prefix](/docs/internal-path-prefix.md) — what the prefix disables (cert auth, audit, metrics, rate limiting), the unenforced network-isolation assumption, and when an endpoint may live there
+- [Decision Records](decision-records.md) — technology choices and rationale
+- [Error Handling Strategy](docs/error-handling-strategy.md) — RFC 9457 compliance, exception patterns
+- [The `/_internal/` Path Prefix](docs/internal-path-prefix.md) — what the prefix disables (cert auth, audit, metrics, rate limiting), the unenforced network-isolation assumption, and when an endpoint may live there
 
 **Domain Standards:**
-- [Access Control](/docs/standards/access-control.md) — authentication, RBAC (PermissionChecker/VisibilityFilter), compliance tests, exclusion lists
-- [Testing](/docs/standards/testing.md) — test organization, naming, fixtures, markers, infrastructure
-- [Imports and Modules](/docs/standards/imports-and-modules.md) — import ordering, `__init__.py` patterns, domain module structure
-- [Logging](/docs/standards/logging.md) — structlog usage, log levels, structured context
-- [Dependency Management](/docs/standards/dependency-management.md) — version pinning, uv workflow, requirements sync
-- [Observability](/docs/standards/observability.md) — Prometheus metrics, Segment telemetry, instrumentation
-- [WebSocket](/docs/standards/websocket.md) — connection lifecycle, streaming handlers, message formats, close codes
-- [Redis](/docs/standards/redis.md) — stream operations, connection management, key naming, TTL policies
-- [Configuration](/docs/standards/configuration.md) — Pydantic Settings patterns, env vars, constants module, adding new settings, testing
-- [API Response Format](/docs/standards/api-response-format.md) — list responses, pagination, filtering, sorting, CRUD endpoint conventions, model naming, field validators
-- [Database](/docs/standards/database.md) — connection pooling, migrations, label filtering, GIN indexes, session management
-- [Services](/docs/standards/services.md) — BaseService, extension mixins, dependency injection, middleware, periodic workers
-- [Exceptions](/docs/standards/exceptions.md) — exception naming, error handlers, PROBLEM_TYPES, @fastapi_exception, retry classification
-- [OpenAPI Spec Management](/docs/standards/openapi-spec-management.md) — sub-spec layout, bundling, drift detection, CI checks, AsyncAPI conventions
-- [UI-API Parity](/docs/standards/ui-api-parity.md) — typed clients, contract generation, full-stack PR workflow, WebSocket scope
-- [Static Analysis](/docs/standards/static-analysis.md) — dead code detection (Vulture), import cycle detection (pyan3), allowlists, CI checks
-- [Formatting](/docs/standards/formatting.md) — pre-commit as single source of truth, tool inventory, generated file cleanup
+- [Access Control](docs/standards/access-control.md) — authentication, RBAC (PermissionChecker/VisibilityFilter), compliance tests, exclusion lists
+- [Testing](docs/standards/testing.md) — test organization, naming, fixtures, markers, infrastructure
+- [Imports and Modules](docs/standards/imports-and-modules.md) — import ordering, `__init__.py` patterns, domain module structure
+- [Logging](docs/standards/logging.md) — structlog usage, log levels, structured context
+- [Dependency Management](docs/standards/dependency-management.md) — version pinning, uv workflow, requirements sync
+- [Observability](docs/standards/observability.md) — Prometheus metrics, Segment telemetry, instrumentation
+- [WebSocket](docs/standards/websocket.md) — connection lifecycle, streaming handlers, message formats, close codes
+- [Redis](docs/standards/redis.md) — stream operations, connection management, key naming, TTL policies
+- [Configuration](docs/standards/configuration.md) — Pydantic Settings patterns, env vars, constants module, adding new settings, testing
+- [API Response Format](docs/standards/api-response-format.md) — list responses, pagination, filtering, sorting, CRUD endpoint conventions, model naming, field validators
+- [Database](docs/standards/database.md) — connection pooling, migrations, label filtering, GIN indexes, session management
+- [Services](docs/standards/services.md) — BaseService, extension mixins, dependency injection, middleware, periodic workers
+- [Exceptions](docs/standards/exceptions.md) — exception naming, error handlers, PROBLEM_TYPES, @fastapi_exception, retry classification
+- [OpenAPI Spec Management](docs/standards/openapi-spec-management.md) — sub-spec layout, bundling, drift detection, CI checks, AsyncAPI conventions
+- [UI-API Parity](docs/standards/ui-api-parity.md) — typed clients, contract generation, full-stack PR workflow, WebSocket scope
+- [Static Analysis](docs/standards/static-analysis.md) — dead code detection (Vulture), import cycle detection (pyan3), allowlists, CI checks
+- [Formatting](docs/standards/formatting.md) — pre-commit as single source of truth, tool inventory, generated file cleanup
 
-**Open Questions:** [Questions](/docs/standards/questions.md) — known inconsistencies and areas needing investigation
+**Open Questions:** [Questions](docs/standards/questions.md) — known inconsistencies and areas needing investigation
 
-**Full index:** [docs/standards/README.md](/docs/standards/README.md)
+**Full index:** [docs/standards/README.md](docs/standards/README.md)
 
 ## Additional context
 Read and load @AGENTS.local.md file if exists for more instructions for AI agents.
