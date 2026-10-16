@@ -88,7 +88,7 @@ export interface paths {
     patch?: never
     trace?: never
   }
-  '/executions/{execution_id}/retry-from-failure-preview': {
+  '/executions/{execution_id}/retry_from_failure_preview': {
     parameters: {
       query?: never
       header?: never
@@ -108,7 +108,7 @@ export interface paths {
     patch?: never
     trace?: never
   }
-  '/executions/{execution_id}/retry-from-failure': {
+  '/executions/{execution_id}/retry_from_failure': {
     parameters: {
       query?: never
       header?: never
@@ -535,7 +535,7 @@ export interface components {
     }
     /**
      * RetryFailureRequest
-     * @description Request body for POST /executions/{id}/retry-from-failure.
+     * @description Request body for POST /executions/{id}/retry_from_failure.
      */
     RetryFailureRequest: {
       /**
@@ -555,7 +555,7 @@ export interface components {
     }
     /**
      * RetryFromFailureValidationResponse
-     * @description Retry preview (GET /executions/{id}/retry-from-failure-preview).
+     * @description Retry preview (GET /executions/{id}/retry_from_failure_preview).
      */
     RetryFromFailureValidationResponse: {
       /**

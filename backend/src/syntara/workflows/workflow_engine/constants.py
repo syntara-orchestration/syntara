@@ -6,6 +6,7 @@ in the Settings Catalog — see ``catalog.py``.
 """
 
 from syntara.core.config.base import get_settings
+from syntara.workflows.models.activity_execution import ActivityStatus
 
 # Clear cached settings so re-imports pick up any environment changes
 get_settings.cache_clear()
@@ -50,3 +51,14 @@ DEFAULT_MAX_OUTPUT_BYTES = 1_048_576
 _TEMPORAL_BLOB_SIZE_ERROR = 2_097_152  # 2 MB
 # 10% headroom covers JSON escaping expansion and protobuf envelope overhead.
 TEMPORAL_PAYLOAD_MAX_BYTES = int(_TEMPORAL_BLOB_SIZE_ERROR * 0.9)
+
+#: Source statuses a restored node may carry when replaying a failed run's
+#: upstream state. Defined here rather than beside the replay activity because
+#: the workflow mixin needs it too, and importing an activity module from inside
+#: a workflow drags structlog into Temporal's sandbox, which rejects the
+#: ``random`` access it performs at import time.
+RESTORABLE_SOURCE_STATUSES = (
+    ActivityStatus.COMPLETED,
+    ActivityStatus.SKIPPED,
+    ActivityStatus.FAILED,
+)

@@ -1017,7 +1017,7 @@ components:
     RetryFailureRequest:
       type: object
       title: RetryFailureRequest
-      description: Request body for POST /executions/{id}/retry-from-failure.
+      description: Request body for POST /executions/{id}/retry_from_failure.
       properties:
         retry_point_ids:
           type: array
@@ -1051,7 +1051,7 @@ components:
     RetryFromFailureValidationResponse:
       type: object
       title: RetryFromFailureValidationResponse
-      description: Retry preview (GET /executions/{id}/retry-from-failure-preview).
+      description: Retry preview (GET /executions/{id}/retry_from_failure_preview).
       required:
         - eligible
       properties:
