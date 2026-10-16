@@ -2,6 +2,7 @@
 
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -114,14 +115,19 @@ async def test_lifespan_context_redirects_outbox_worker_factories(test_db_engine
     pytest-xdist worker failed after retries.
     """
     async with _test_lifespan_context(test_db_engine):
-        assert outbox_worker.AsyncSessionLocal is not AsyncSessionLocal, (
+        # The dot access below needs Any-typed module aliases: worker.py and
+        # session.py only import these factory names, so mypy
+        # --no-implicit-reexport flags reading them as module attributes.
+        worker_ns: Any = outbox_worker
+        session_ns: Any = outbox_session
+        assert worker_ns.AsyncSessionLocal is not AsyncSessionLocal, (
             "_test_lifespan_context must patch syntara.audit.outbox.worker.AsyncSessionLocal "
             "(the outbox write factory); otherwise get_outbox_worker() caches a singleton "
             "bound to the real database"
         )
-        assert outbox_worker.AuditWorkerAsyncSessionLocal is not AuditWorkerAsyncSessionLocal, (
+        assert worker_ns.AuditWorkerAsyncSessionLocal is not AuditWorkerAsyncSessionLocal, (
             "_test_lifespan_context must patch syntara.audit.outbox.worker.AuditWorkerAsyncSessionLocal"
         )
-        assert outbox_session.AuditWorkerAsyncSessionLocal is not AuditWorkerAsyncSessionLocal, (
+        assert session_ns.AuditWorkerAsyncSessionLocal is not AuditWorkerAsyncSessionLocal, (
             "_test_lifespan_context must patch syntara.audit.outbox.session.AuditWorkerAsyncSessionLocal"
         )
