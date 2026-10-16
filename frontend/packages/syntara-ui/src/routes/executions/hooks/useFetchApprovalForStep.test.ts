@@ -2,7 +2,7 @@ import { act, renderHook } from '@testing-library/react'
 
 import { approvalsClient } from '../../../client'
 
-import { useFetchApprovalForNode } from './useFetchApprovalForNode'
+import { useFetchApprovalForStep } from './useFetchApprovalForStep'
 
 vi.mock('../../../client', () => ({
   approvalsClient: {
@@ -28,7 +28,7 @@ const mockApprovalOther = {
   execution_id: 'exec-1',
 }
 
-describe('useFetchApprovalForNode', () => {
+describe('useFetchApprovalForStep', () => {
   const mockRefetch = vi.fn()
 
   beforeEach(() => {
@@ -43,7 +43,7 @@ describe('useFetchApprovalForNode', () => {
   })
 
   it('starts with isLoading false', () => {
-    const { result } = renderHook(() => useFetchApprovalForNode('exec-1'))
+    const { result } = renderHook(() => useFetchApprovalForStep('exec-1'))
 
     expect(result.current.isLoading).toBe(false)
   })
@@ -53,11 +53,11 @@ describe('useFetchApprovalForNode', () => {
       data: { resources: [mockApproval, mockApprovalOther] },
     })
 
-    const { result } = renderHook(() => useFetchApprovalForNode('exec-1'))
+    const { result } = renderHook(() => useFetchApprovalForStep('exec-1'))
 
     let fetchedApproval: unknown
     await act(async () => {
-      fetchedApproval = await result.current.fetchForNode('node-abc')
+      fetchedApproval = await result.current.fetchForStep('node-abc')
     })
 
     expect(fetchedApproval).toEqual(mockApproval)
@@ -69,11 +69,11 @@ describe('useFetchApprovalForNode', () => {
       data: { resources: [mockApprovalOther] },
     })
 
-    const { result } = renderHook(() => useFetchApprovalForNode('exec-1'))
+    const { result } = renderHook(() => useFetchApprovalForStep('exec-1'))
 
     let fetchedApproval: unknown
     await act(async () => {
-      fetchedApproval = await result.current.fetchForNode('nonexistent-node')
+      fetchedApproval = await result.current.fetchForStep('nonexistent-node')
     })
 
     expect(fetchedApproval).toBeNull()
@@ -84,11 +84,11 @@ describe('useFetchApprovalForNode', () => {
       data: { resources: [{ ...mockApproval, approval_node_id: 'node-abc_iter_1' }, mockApprovalOther] },
     })
 
-    const { result } = renderHook(() => useFetchApprovalForNode('exec-1'))
+    const { result } = renderHook(() => useFetchApprovalForStep('exec-1'))
 
     let fetchedApproval: unknown
     await act(async () => {
-      fetchedApproval = await result.current.fetchForNode('node-abc')
+      fetchedApproval = await result.current.fetchForStep('node-abc')
     })
 
     expect(fetchedApproval).toMatchObject({ approval_node_id: 'node-abc_iter_1' })
@@ -99,18 +99,18 @@ describe('useFetchApprovalForNode', () => {
       data: { resources: [] },
     })
 
-    const { result } = renderHook(() => useFetchApprovalForNode('exec-1'))
+    const { result } = renderHook(() => useFetchApprovalForStep('exec-1'))
 
     let fetchedApproval: unknown
     await act(async () => {
-      fetchedApproval = await result.current.fetchForNode('node-abc')
+      fetchedApproval = await result.current.fetchForStep('node-abc')
     })
 
     expect(fetchedApproval).toBeNull()
   })
 
   it('resets isLoading on clear', () => {
-    const { result } = renderHook(() => useFetchApprovalForNode('exec-1'))
+    const { result } = renderHook(() => useFetchApprovalForStep('exec-1'))
 
     act(() => {
       result.current.clear()
@@ -122,17 +122,17 @@ describe('useFetchApprovalForNode', () => {
   it('resets isLoading when fetch fails', async () => {
     mockRefetch.mockRejectedValue(new Error('Network error'))
 
-    const { result } = renderHook(() => useFetchApprovalForNode('exec-1'))
+    const { result } = renderHook(() => useFetchApprovalForStep('exec-1'))
 
     await act(async () => {
-      await expect(result.current.fetchForNode('node-abc')).rejects.toThrow('Network error')
+      await expect(result.current.fetchForStep('node-abc')).rejects.toThrow('Network error')
     })
 
     expect(result.current.isLoading).toBe(false)
   })
 
   it('queries with correct execution_id and pending status', () => {
-    renderHook(() => useFetchApprovalForNode('exec-42'))
+    renderHook(() => useFetchApprovalForStep('exec-42'))
 
     expect(approvalsClient.useQuery).toHaveBeenCalledWith('get', '/approvals', {
       params: {
@@ -146,11 +146,11 @@ describe('useFetchApprovalForNode', () => {
   })
 
   it('returns null without fetching when executionId is empty', async () => {
-    const { result } = renderHook(() => useFetchApprovalForNode(''))
+    const { result } = renderHook(() => useFetchApprovalForStep(''))
 
     let fetchedApproval: unknown
     await act(async () => {
-      fetchedApproval = await result.current.fetchForNode('node-abc')
+      fetchedApproval = await result.current.fetchForStep('node-abc')
     })
 
     expect(fetchedApproval).toBeNull()

@@ -4,7 +4,7 @@ import { executionsClient } from '../../../client'
 import { detachPromise } from '../../../utils/detachPromise'
 import type { ActivityStatus } from '../../workflows/execution/types'
 
-type NodeExecutionDetails = {
+type StepExecutionDetails = {
   /** Resolved config values passed to the activity at runtime */
   inputData: Record<string, unknown> | null
   /** Activity results after output mapping */
@@ -15,7 +15,7 @@ type NodeExecutionDetails = {
 }
 
 /**
- * Fetches execution details (input/output data) for a specific activity node.
+ * Fetches execution details (input/output data) for a specific workflow step.
  *
  * Uses the `activity_name` query parameter for server-side filtering,
  * so only the matching activity is returned from the API.
@@ -23,21 +23,21 @@ type NodeExecutionDetails = {
  * When `activityStatus` changes (e.g. from WebSocket updates), the query
  * refetches so the Parameters/Output panes stay current.
  */
-export function useNodeExecutionDetails(
-  nodeId: string,
+export function useStepExecutionDetails(
+  stepId: string,
   executionId: string | null | undefined,
   activityStatus?: ActivityStatus
-): NodeExecutionDetails {
+): StepExecutionDetails {
   const queryResult = executionsClient.useQuery(
     'get',
     '/executions/{execution_id}/activities',
     {
       params: {
         path: { execution_id: executionId ?? '' },
-        query: { activity_name: nodeId, limit: 1 },
+        query: { activity_name: stepId, limit: 1 },
       },
     },
-    { enabled: !!executionId && !!nodeId }
+    { enabled: !!executionId && !!stepId }
   )
 
   const { data, isLoading, error, refetch } = queryResult

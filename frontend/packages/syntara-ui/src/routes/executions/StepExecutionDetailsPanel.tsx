@@ -43,18 +43,18 @@ import { extractApprovalAudit, type ApprovalAudit } from '../workflows/execution
 
 import { extractAgentTrace } from './agentTraceTypes'
 import { AgentTraceView } from './AgentTraceView'
-import { useNodeExecutionDetails } from './hooks/useNodeExecutionDetails'
-import styles from './NodeExecutionDetailsPanel.module.css'
+import { useStepExecutionDetails } from './hooks/useStepExecutionDetails'
+import styles from './StepExecutionDetailsPanel.module.css'
 import { extractUsedTools, type UsedTool } from './utils/extractUsedTools'
 
-type NodeExecutionDetailsPanelProps = {
-  nodeId: string
-  nodeName: string
+type StepExecutionDetailsPanelProps = {
+  stepId: string
+  stepName: string
   executionId: string
   /** Activity state from the execution store, used for status and elapsed time. */
-  nodeState?: ActivityState
-  /** Node type from workflow definition (e.g. 'aap_job_template'). */
-  nodeType?: string
+  stepState?: ActivityState
+  /** Step type from workflow definition (e.g. 'aap_job_template'). */
+  stepType?: string
 }
 
 function NoDataState({ label }: Readonly<{ label: string }>) {
@@ -67,14 +67,14 @@ function NoDataState({ label }: Readonly<{ label: string }>) {
 
 type DataPaneProps = {
   title: string
-  nodeId: string
+  stepId: string
   data: Record<string, unknown> | null
   view: PanelView
   onViewChange: (view: PanelView) => void
   isErrorState?: boolean
 }
 
-function DataPane({ title, nodeId, data, view, onViewChange, isErrorState = false }: Readonly<DataPaneProps>) {
+function DataPane({ title, stepId, data, view, onViewChange, isErrorState = false }: Readonly<DataPaneProps>) {
   const [searchTerm, setSearchTerm] = useState('')
   const scrollContainerRef = useRef<HTMLDivElement>(null)
 
@@ -102,7 +102,7 @@ function DataPane({ title, nodeId, data, view, onViewChange, isErrorState = fals
     }
     switch (view) {
       case 'schema':
-        return <InputSchemaView data={data} nodeId={nodeId} searchTerm={searchTerm} />
+        return <InputSchemaView data={data} nodeId={stepId} searchTerm={searchTerm} />
       case 'table':
         return <InputTableView data={data} searchTerm={searchTerm} />
       case 'json':
@@ -208,9 +208,9 @@ function ApprovalAuditSection({ audit }: Readonly<{ audit: ApprovalAudit }>) {
 
 function AAPJobLink({
   outputData,
-  nodeType,
-}: Readonly<{ outputData: Record<string, unknown> | null; nodeType?: string }>) {
-  const jobUrl = isAAPNodeType(nodeType) ? extractAAPJobUrl(outputData) : null
+  stepType,
+}: Readonly<{ outputData: Record<string, unknown> | null; stepType?: string }>) {
+  const jobUrl = isAAPNodeType(stepType) ? extractAAPJobUrl(outputData) : null
   if (!jobUrl) return null
 
   return (
@@ -244,17 +244,17 @@ function UsedToolsSection({ tools }: Readonly<{ tools: UsedTool[] }>) {
   )
 }
 
-function NodeDetailsHeader({
-  nodeName,
-  nodeStarted,
-  nodeCompleted,
-  nodeElapsedLabel,
+function StepDetailsHeader({
+  stepName,
+  stepStarted,
+  stepCompleted,
+  stepElapsedLabel,
   status,
 }: Readonly<{
-  nodeName: string
-  nodeStarted: string | null
-  nodeCompleted: string | null
-  nodeElapsedLabel?: string
+  stepName: string
+  stepStarted: string | null
+  stepCompleted: string | null
+  stepElapsedLabel?: string
   status?: ActivityState['status']
 }>) {
   return (
@@ -262,31 +262,31 @@ function NodeDetailsHeader({
       <Flex justifyContent={{ default: 'justifyContentSpaceBetween' }} alignItems={{ default: 'alignItemsCenter' }}>
         <FlexItem>
           <Title headingLevel="h2" size={TitleSizes.md} style={{ margin: 0 }}>
-            {nodeName}
+            {stepName}
           </Title>
         </FlexItem>
         <FlexItem>
           <Flex gap={{ default: 'gapMd' }} alignItems={{ default: 'alignItemsCenter' }}>
-            {nodeStarted && (
+            {stepStarted && (
               <Content
                 component={ContentVariants.small}
                 style={{ color: 'var(--pf-t--global--text--color--subtle)', margin: 0 }}
               >
-                <ExecutionTimestamp dateString={nodeStarted} />
-                {nodeCompleted && (
+                <ExecutionTimestamp dateString={stepStarted} />
+                {stepCompleted && (
                   <>
                     {' - '}
-                    <ExecutionTimestamp dateString={nodeCompleted} />
+                    <ExecutionTimestamp dateString={stepCompleted} />
                   </>
                 )}
               </Content>
             )}
-            {nodeElapsedLabel && (
+            {stepElapsedLabel && (
               <Content
                 component={ContentVariants.small}
                 style={{ color: 'var(--pf-t--global--text--color--subtle)', margin: 0 }}
               >
-                Elapsed time: {nodeElapsedLabel}
+                Elapsed time: {stepElapsedLabel}
               </Content>
             )}
             {status && (
@@ -301,29 +301,29 @@ function NodeDetailsHeader({
   )
 }
 
-type NodeContentAreaProps = Readonly<{
-  nodeId: string
+type StepContentAreaProps = Readonly<{
+  stepId: string
   inputData: Record<string, unknown> | null
   outputData: Record<string, unknown> | null
   isLoading: boolean
   error: unknown
   refetch: () => Promise<unknown>
-  nodeIsFailed: boolean
-  isAgenticNode: boolean
+  stepIsFailed: boolean
+  isAgenticStep: boolean
   activeTab: 'io' | 'agent-steps'
 }>
 
-function NodeContentArea({
-  nodeId,
+function StepContentArea({
+  stepId,
   inputData,
   outputData,
   isLoading,
   error,
   refetch,
-  nodeIsFailed,
-  isAgenticNode,
+  stepIsFailed,
+  isAgenticStep,
   activeTab,
-}: NodeContentAreaProps) {
+}: StepContentAreaProps) {
   const [inputView, setInputView] = useState<PanelView>('json')
   const [outputView, setOutputView] = useState<PanelView>('json')
 
@@ -335,7 +335,7 @@ function NodeContentArea({
   if (isLoading) {
     return <Spinner aria-label="Loading activity data" />
   }
-  if (activeTab === 'agent-steps' && isAgenticNode) {
+  if (activeTab === 'agent-steps' && isAgenticStep) {
     return <AgentTraceView agentTrace={extractAgentTrace(outputData)} />
   }
   return (
@@ -345,58 +345,58 @@ function NodeContentArea({
       className={styles.dataPaneContainer}
     >
       <FlexItem flex={{ default: 'flex_1' }} className={styles.paneItem}>
-        <DataPane title="Parameters" nodeId={nodeId} data={inputData} view={inputView} onViewChange={setInputView} />
+        <DataPane title="Parameters" stepId={stepId} data={inputData} view={inputView} onViewChange={setInputView} />
       </FlexItem>
       <FlexItem flex={{ default: 'flex_1' }} className={styles.paneItem}>
         <DataPane
           title="Output"
-          nodeId={nodeId}
+          stepId={stepId}
           data={outputData}
           view={outputView}
           onViewChange={setOutputView}
-          isErrorState={nodeIsFailed}
+          isErrorState={stepIsFailed}
         />
       </FlexItem>
     </Flex>
   )
 }
 
-export function NodeExecutionDetailsPanel({
-  nodeId,
-  nodeName,
+export function StepExecutionDetailsPanel({
+  stepId,
+  stepName,
   executionId,
-  nodeState,
-  nodeType,
-}: Readonly<NodeExecutionDetailsPanelProps>) {
+  stepState,
+  stepType,
+}: Readonly<StepExecutionDetailsPanelProps>) {
   const [activeTab, setActiveTab] = useState<'io' | 'agent-steps'>('io')
-  const isAgenticNode = nodeType === ActivityTypeEnum.AGENTIC
-  const { inputData, outputData, isLoading, error, refetch } = useNodeExecutionDetails(
-    nodeId,
+  const isAgenticStep = stepType === ActivityTypeEnum.AGENTIC
+  const { inputData, outputData, isLoading, error, refetch } = useStepExecutionDetails(
+    stepId,
     executionId,
-    nodeState?.status
+    stepState?.status
   )
 
   const approvalAudit = useMemo(() => extractApprovalAudit(outputData), [outputData])
   const usedTools = useMemo(() => extractUsedTools(outputData), [outputData])
 
-  const nodeStarted = nodeState?.startedAt ?? null
-  const nodeCompleted = nodeState?.completedAt ?? null
-  const nodeIsRunning = nodeState?.status === 'running'
-  const nodeIsFailed = nodeState?.status === 'failed'
-  const { elapsedMs } = useElapsedTime(nodeStarted, nodeCompleted, nodeIsRunning)
-  const nodeElapsedLabel = elapsedMs === undefined ? undefined : formatElapsedTime(elapsedMs)
+  const stepStarted = stepState?.startedAt ?? null
+  const stepCompleted = stepState?.completedAt ?? null
+  const stepIsRunning = stepState?.status === 'running'
+  const stepIsFailed = stepState?.status === 'failed'
+  const { elapsedMs } = useElapsedTime(stepStarted, stepCompleted, stepIsRunning)
+  const stepElapsedLabel = elapsedMs === undefined ? undefined : formatElapsedTime(elapsedMs)
 
   return (
     <Stack className={styles.contentContainer}>
-      <NodeDetailsHeader
-        nodeName={nodeName}
-        nodeStarted={nodeStarted}
-        nodeCompleted={nodeCompleted}
-        nodeElapsedLabel={nodeElapsedLabel}
-        status={nodeState?.status}
+      <StepDetailsHeader
+        stepName={stepName}
+        stepStarted={stepStarted}
+        stepCompleted={stepCompleted}
+        stepElapsedLabel={stepElapsedLabel}
+        status={stepState?.status}
       />
 
-      {/* Approval audit strip (shown only for decided approval nodes) */}
+      {/* Approval audit strip (shown only for decided approval steps) */}
       {approvalAudit && (
         <StackItem style={{ flexShrink: 0 }}>
           <ApprovalAuditSection audit={approvalAudit} />
@@ -405,10 +405,10 @@ export function NodeExecutionDetailsPanel({
 
       {usedTools && <UsedToolsSection tools={usedTools} />}
 
-      <AAPJobLink outputData={outputData} nodeType={nodeType} />
+      <AAPJobLink outputData={outputData} stepType={stepType} />
 
-      {/* Tab bar for agentic nodes */}
-      {isAgenticNode && (
+      {/* Tab bar for agentic steps */}
+      {isAgenticStep && (
         <StackItem className={styles.tabBar}>
           <Tabs
             activeKey={activeTab}
@@ -422,15 +422,15 @@ export function NodeExecutionDetailsPanel({
       )}
 
       <StackItem isFilled style={{ minHeight: 0, overflow: 'hidden' }}>
-        <NodeContentArea
-          nodeId={nodeId}
+        <StepContentArea
+          stepId={stepId}
           inputData={inputData}
           outputData={outputData}
           isLoading={isLoading}
           error={error}
           refetch={refetch}
-          nodeIsFailed={nodeIsFailed}
-          isAgenticNode={isAgenticNode}
+          stepIsFailed={stepIsFailed}
+          isAgenticStep={isAgenticStep}
           activeTab={activeTab}
         />
       </StackItem>

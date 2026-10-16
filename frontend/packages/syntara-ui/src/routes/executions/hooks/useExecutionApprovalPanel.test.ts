@@ -84,7 +84,7 @@ vi.mock('../../../providers/alerts', () => ({
   })),
 }))
 
-function makeNodeClick(currentApproval: Approval | null = null, approvals: Approval[] = []) {
+function makeStepClick(currentApproval: Approval | null = null, approvals: Approval[] = []) {
   return {
     fetchApprovals: mockFetchApprovals,
     setApprovalsAndIndex: mockSetApprovalsAndIndex,
@@ -92,10 +92,6 @@ function makeNodeClick(currentApproval: Approval | null = null, approvals: Appro
     approvals,
     currentIndex: 0,
     currentApproval,
-    selectedNodeId: null,
-    setSelectedNodeId: vi.fn(),
-    isFetching: false,
-    nodeExecution: undefined,
   } as never
 }
 
@@ -112,19 +108,19 @@ describe('useExecutionApprovalPanel', () => {
   })
 
   it('starts with panel closed', () => {
-    const { result } = renderHook(() => useExecutionApprovalPanel('exec-1', '', makeNodeClick(), undefined))
+    const { result } = renderHook(() => useExecutionApprovalPanel('exec-1', '', makeStepClick(), undefined))
     expect(result.current.panelOpen).toBe(false)
   })
 
   it('opens panel via open()', () => {
-    const { result } = renderHook(() => useExecutionApprovalPanel('exec-1', '', makeNodeClick(), undefined))
+    const { result } = renderHook(() => useExecutionApprovalPanel('exec-1', '', makeStepClick(), undefined))
 
     act(() => result.current.open())
     expect(result.current.panelOpen).toBe(true)
   })
 
   it('closes panel via close()', () => {
-    const { result } = renderHook(() => useExecutionApprovalPanel('exec-1', '', makeNodeClick(), undefined))
+    const { result } = renderHook(() => useExecutionApprovalPanel('exec-1', '', makeStepClick(), undefined))
 
     act(() => result.current.open())
     expect(result.current.panelOpen).toBe(true)
@@ -135,7 +131,7 @@ describe('useExecutionApprovalPanel', () => {
 
   it('dismiss() closes panel when no more approvals remain', async () => {
     mockFetchApprovals.mockResolvedValue([]) // No more pending approvals
-    const { result } = renderHook(() => useExecutionApprovalPanel('exec-1', '', makeNodeClick(), undefined))
+    const { result } = renderHook(() => useExecutionApprovalPanel('exec-1', '', makeStepClick(), undefined))
 
     act(() => result.current.open())
 
@@ -154,7 +150,7 @@ describe('useExecutionApprovalPanel', () => {
       { ...mockApproval, id: 'approval-3', name: 'Third Approval' },
     ]
     mockFetchApprovals.mockResolvedValue(remainingApprovals)
-    const { result } = renderHook(() => useExecutionApprovalPanel('exec-1', '', makeNodeClick(), undefined))
+    const { result } = renderHook(() => useExecutionApprovalPanel('exec-1', '', makeStepClick(), undefined))
 
     act(() => result.current.open())
 
@@ -173,7 +169,7 @@ describe('useExecutionApprovalPanel', () => {
     mockFetchApprovals.mockResolvedValue([mockApproval])
 
     const { result } = renderHook(() =>
-      useExecutionApprovalPanel('exec-1', '?approval=approval-1', makeNodeClick(), undefined)
+      useExecutionApprovalPanel('exec-1', '?approval=approval-1', makeStepClick(), undefined)
     )
 
     await act(async () => {
@@ -195,7 +191,7 @@ describe('useExecutionApprovalPanel', () => {
 
     mockFetchApprovals.mockResolvedValue([mockApproval])
 
-    const { result } = renderHook(() => useExecutionApprovalPanel('exec-1', '', makeNodeClick(), undefined))
+    const { result } = renderHook(() => useExecutionApprovalPanel('exec-1', '', makeStepClick(), undefined))
 
     expect(capturedCallback).toBeDefined()
 
@@ -221,7 +217,7 @@ describe('useExecutionApprovalPanel', () => {
 
     mockFetchApprovals.mockResolvedValue([mockApproval])
 
-    const { result } = renderHook(() => useExecutionApprovalPanel('exec-1', 'history=open', makeNodeClick(), undefined))
+    const { result } = renderHook(() => useExecutionApprovalPanel('exec-1', 'history=open', makeStepClick(), undefined))
 
     await act(async () => {
       capturedCallback!(mockApproval)
@@ -233,24 +229,24 @@ describe('useExecutionApprovalPanel', () => {
   })
 
   it('returns approvalMessage from workflow definition', () => {
-    const nodeClick = makeNodeClick(mockApproval, [mockApproval])
+    const stepClick = makeStepClick(mockApproval, [mockApproval])
     const wfDef = {
       nodes: [{ id: 'node-1', config: { prompt: 'Deploy to production?' } }],
     }
 
-    const { result } = renderHook(() => useExecutionApprovalPanel('exec-1', '', nodeClick, wfDef))
+    const { result } = renderHook(() => useExecutionApprovalPanel('exec-1', '', stepClick, wfDef))
 
     expect(result.current.approvalMessage).toBe('Deploy to production?')
   })
 
   it('prefers persisted approval.prompt over workflow definition', () => {
     const withPrompt = { ...mockApproval, prompt: 'From approval record' }
-    const nodeClick = makeNodeClick(withPrompt, [withPrompt])
+    const stepClick = makeStepClick(withPrompt, [withPrompt])
     const wfDef = {
       nodes: [{ id: 'node-1', parameters: { prompt: 'From definition' } }],
     }
 
-    const { result } = renderHook(() => useExecutionApprovalPanel('exec-1', '', nodeClick, wfDef))
+    const { result } = renderHook(() => useExecutionApprovalPanel('exec-1', '', stepClick, wfDef))
 
     expect(result.current.approvalMessage).toBe('From approval record')
   })
@@ -258,7 +254,7 @@ describe('useExecutionApprovalPanel', () => {
   it('returns approval.prompt when workflow definition is missing', () => {
     const withPrompt = { ...mockApproval, prompt: 'From approval record' }
     const { result } = renderHook(() =>
-      useExecutionApprovalPanel('exec-1', '', makeNodeClick(withPrompt, [withPrompt]), undefined)
+      useExecutionApprovalPanel('exec-1', '', makeStepClick(withPrompt, [withPrompt]), undefined)
     )
 
     expect(result.current.approvalMessage).toBe('From approval record')
@@ -266,29 +262,29 @@ describe('useExecutionApprovalPanel', () => {
 
   it('returns approvalMessage when approval_node_id has a loop-iteration suffix', () => {
     const loopApproval = { ...mockApproval, approval_node_id: 'node-1_iter_0' }
-    const nodeClick = makeNodeClick(loopApproval, [loopApproval])
+    const stepClick = makeStepClick(loopApproval, [loopApproval])
     const wfDef = {
       nodes: [{ id: 'node-1', config: { prompt: 'Approve this server?' } }],
     }
 
-    const { result } = renderHook(() => useExecutionApprovalPanel('exec-1', '', nodeClick, wfDef))
+    const { result } = renderHook(() => useExecutionApprovalPanel('exec-1', '', stepClick, wfDef))
 
     expect(result.current.approvalMessage).toBe('Approve this server?')
   })
 
   it('returns approvalMessage from v2 parameters.prompt', () => {
-    const nodeClick = makeNodeClick(mockApproval, [mockApproval])
+    const stepClick = makeStepClick(mockApproval, [mockApproval])
     const wfDef = {
       nodes: [{ id: 'node-1', parameters: { prompt: 'Message will go here. User inputs it' } }],
     }
 
-    const { result } = renderHook(() => useExecutionApprovalPanel('exec-1', '', nodeClick, wfDef))
+    const { result } = renderHook(() => useExecutionApprovalPanel('exec-1', '', stepClick, wfDef))
 
     expect(result.current.approvalMessage).toBe('Message will go here. User inputs it')
   })
 
   it('prefers parameters.prompt over config.prompt', () => {
-    const nodeClick = makeNodeClick(mockApproval, [mockApproval])
+    const stepClick = makeStepClick(mockApproval, [mockApproval])
     const wfDef = {
       nodes: [
         {
@@ -299,25 +295,25 @@ describe('useExecutionApprovalPanel', () => {
       ],
     }
 
-    const { result } = renderHook(() => useExecutionApprovalPanel('exec-1', '', nodeClick, wfDef))
+    const { result } = renderHook(() => useExecutionApprovalPanel('exec-1', '', stepClick, wfDef))
 
     expect(result.current.approvalMessage).toBe('From parameters')
   })
 
   it('returns undefined approvalMessage when no matching node', () => {
-    const nodeClick = makeNodeClick(mockApproval, [mockApproval])
+    const stepClick = makeStepClick(mockApproval, [mockApproval])
     const wfDef = {
       nodes: [{ id: 'other-node', config: { prompt: 'Something else' } }],
     }
 
-    const { result } = renderHook(() => useExecutionApprovalPanel('exec-1', '', nodeClick, wfDef))
+    const { result } = renderHook(() => useExecutionApprovalPanel('exec-1', '', stepClick, wfDef))
 
     expect(result.current.approvalMessage).toBeUndefined()
   })
 
   it('returns undefined approvalMessage when no workflow definition', () => {
     const { result } = renderHook(() =>
-      useExecutionApprovalPanel('exec-1', '', makeNodeClick(mockApproval, [mockApproval]), undefined)
+      useExecutionApprovalPanel('exec-1', '', makeStepClick(mockApproval, [mockApproval]), undefined)
     )
 
     expect(result.current.approvalMessage).toBeUndefined()
@@ -325,37 +321,37 @@ describe('useExecutionApprovalPanel', () => {
 
   it('returns undefined approvalMessage when workflow definition has no nodes', () => {
     const { result } = renderHook(() =>
-      useExecutionApprovalPanel('exec-1', '', makeNodeClick(mockApproval, [mockApproval]), { nodes: [] })
+      useExecutionApprovalPanel('exec-1', '', makeStepClick(mockApproval, [mockApproval]), { nodes: [] })
     )
 
     expect(result.current.approvalMessage).toBeUndefined()
   })
 
   it('returns undefined approvalMessage when node has no config', () => {
-    const nodeClick = makeNodeClick(mockApproval, [mockApproval])
+    const stepClick = makeStepClick(mockApproval, [mockApproval])
     const wfDef = {
       nodes: [{ id: 'node-1' }], // No config
     }
 
-    const { result } = renderHook(() => useExecutionApprovalPanel('exec-1', '', nodeClick, wfDef))
+    const { result } = renderHook(() => useExecutionApprovalPanel('exec-1', '', stepClick, wfDef))
 
     expect(result.current.approvalMessage).toBeUndefined()
   })
 
   it('returns undefined approvalMessage when config has no prompt', () => {
-    const nodeClick = makeNodeClick(mockApproval, [mockApproval])
+    const stepClick = makeStepClick(mockApproval, [mockApproval])
     const wfDef = {
       nodes: [{ id: 'node-1', config: {} }], // Empty config
     }
 
-    const { result } = renderHook(() => useExecutionApprovalPanel('exec-1', '', nodeClick, wfDef))
+    const { result } = renderHook(() => useExecutionApprovalPanel('exec-1', '', stepClick, wfDef))
 
     expect(result.current.approvalMessage).toBeUndefined()
   })
 
   it('dismiss() closes panel when fetch fails', async () => {
     mockFetchApprovals.mockRejectedValue(new Error('Fetch failed'))
-    const { result } = renderHook(() => useExecutionApprovalPanel('exec-1', '', makeNodeClick(), undefined))
+    const { result } = renderHook(() => useExecutionApprovalPanel('exec-1', '', makeStepClick(), undefined))
 
     act(() => result.current.open())
     expect(result.current.panelOpen).toBe(true)
@@ -376,7 +372,7 @@ describe('useExecutionApprovalPanel', () => {
     mockFetchApprovals.mockResolvedValue([mockApproval]) // URL approval not in the fetched list
 
     const { result } = renderHook(() =>
-      useExecutionApprovalPanel('exec-1', '?approval=url-approval-not-in-list', makeNodeClick(), undefined)
+      useExecutionApprovalPanel('exec-1', '?approval=url-approval-not-in-list', makeStepClick(), undefined)
     )
 
     await act(async () => {
@@ -401,7 +397,7 @@ describe('useExecutionApprovalPanel', () => {
     vi.mocked(useFetchApprovalForUrlParam).mockReturnValue(mockApproval)
     mockFetchApprovals.mockRejectedValue(new Error('Failed to fetch'))
 
-    renderHook(() => useExecutionApprovalPanel('exec-1', '?approval=approval-1', makeNodeClick(), undefined))
+    renderHook(() => useExecutionApprovalPanel('exec-1', '?approval=approval-1', makeStepClick(), undefined))
 
     await act(async () => {
       await vi.runAllTimersAsync()
@@ -431,7 +427,7 @@ describe('useExecutionApprovalPanel', () => {
 
     mockFetchApprovals.mockRejectedValue(new Error('Fetch failed'))
 
-    renderHook(() => useExecutionApprovalPanel('exec-1', '', makeNodeClick(), undefined))
+    renderHook(() => useExecutionApprovalPanel('exec-1', '', makeStepClick(), undefined))
 
     await act(async () => {
       capturedCallback!(mockApproval)
@@ -455,7 +451,7 @@ describe('useExecutionApprovalPanel', () => {
     const detectedApproval = { ...mockApproval, id: 'detected-not-in-list' }
     mockFetchApprovals.mockResolvedValue([mockApproval]) // detected approval not in list
 
-    renderHook(() => useExecutionApprovalPanel('exec-1', '', makeNodeClick(), undefined))
+    renderHook(() => useExecutionApprovalPanel('exec-1', '', makeStepClick(), undefined))
 
     await act(async () => {
       capturedCallback!(detectedApproval)
@@ -466,11 +462,11 @@ describe('useExecutionApprovalPanel', () => {
   })
 
   it('auto-closes panel when approvals transition from some to none', async () => {
-    const nodeClick = makeNodeClick(mockApproval, [mockApproval])
+    const stepClick = makeStepClick(mockApproval, [mockApproval])
     const { result, rerender } = renderHook(
-      ({ nc }: { nc: ReturnType<typeof makeNodeClick> }) => useExecutionApprovalPanel('exec-1', '', nc, undefined),
+      ({ nc }: { nc: ReturnType<typeof makeStepClick> }) => useExecutionApprovalPanel('exec-1', '', nc, undefined),
       {
-        initialProps: { nc: nodeClick },
+        initialProps: { nc: stepClick },
       }
     )
 
@@ -478,8 +474,8 @@ describe('useExecutionApprovalPanel', () => {
     expect(result.current.panelOpen).toBe(true)
 
     // Simulate approvals going from 1 to 0
-    const emptyNodeClick = makeNodeClick(null, [])
-    rerender({ nc: emptyNodeClick })
+    const emptyStepClick = makeStepClick(null, [])
+    rerender({ nc: emptyStepClick })
 
     await act(async () => {
       await vi.runAllTimersAsync()
@@ -490,17 +486,17 @@ describe('useExecutionApprovalPanel', () => {
   })
 
   it('does not auto-close when panel was already closed', async () => {
-    const nodeClick = makeNodeClick(mockApproval, [mockApproval])
+    const stepClick = makeStepClick(mockApproval, [mockApproval])
     const { rerender } = renderHook(
-      ({ nc }: { nc: ReturnType<typeof makeNodeClick> }) => useExecutionApprovalPanel('exec-1', '', nc, undefined),
+      ({ nc }: { nc: ReturnType<typeof makeStepClick> }) => useExecutionApprovalPanel('exec-1', '', nc, undefined),
       {
-        initialProps: { nc: nodeClick },
+        initialProps: { nc: stepClick },
       }
     )
 
     // Panel starts closed
-    const emptyNodeClick = makeNodeClick(null, [])
-    rerender({ nc: emptyNodeClick })
+    const emptyStepClick = makeStepClick(null, [])
+    rerender({ nc: emptyStepClick })
 
     await act(async () => {
       await vi.runAllTimersAsync()
@@ -511,47 +507,47 @@ describe('useExecutionApprovalPanel', () => {
   })
 
   it('resolves approval message from workflow.activities when nodes is missing', () => {
-    const nodeClick = makeNodeClick(mockApproval, [mockApproval])
+    const stepClick = makeStepClick(mockApproval, [mockApproval])
     const wfDef = {
       workflow: {
         activities: [{ id: 'node-1', parameters: { prompt: 'Approve deployment?' } }],
       },
     }
 
-    const { result } = renderHook(() => useExecutionApprovalPanel('exec-1', '', nodeClick, wfDef))
+    const { result } = renderHook(() => useExecutionApprovalPanel('exec-1', '', stepClick, wfDef))
 
     expect(result.current.approvalMessage).toBe('Approve deployment?')
   })
 
   it('returns undefined approvalMessage when config.prompt is not a string', () => {
-    const nodeClick = makeNodeClick(mockApproval, [mockApproval])
+    const stepClick = makeStepClick(mockApproval, [mockApproval])
     const wfDef = {
       nodes: [{ id: 'node-1', config: { prompt: 123 } }], // prompt is a number
     }
 
-    const { result } = renderHook(() => useExecutionApprovalPanel('exec-1', '', nodeClick, wfDef))
+    const { result } = renderHook(() => useExecutionApprovalPanel('exec-1', '', stepClick, wfDef))
 
     expect(result.current.approvalMessage).toBeUndefined()
   })
 
   it('returns undefined approvalMessage when config is not an object', () => {
-    const nodeClick = makeNodeClick(mockApproval, [mockApproval])
+    const stepClick = makeStepClick(mockApproval, [mockApproval])
     const wfDef = {
       nodes: [{ id: 'node-1', config: 'invalid' }], // config is a string
     }
 
-    const { result } = renderHook(() => useExecutionApprovalPanel('exec-1', '', nodeClick, wfDef))
+    const { result } = renderHook(() => useExecutionApprovalPanel('exec-1', '', stepClick, wfDef))
 
     expect(result.current.approvalMessage).toBeUndefined()
   })
 
   it('returns undefined approvalMessage when config is null', () => {
-    const nodeClick = makeNodeClick(mockApproval, [mockApproval])
+    const stepClick = makeStepClick(mockApproval, [mockApproval])
     const wfDef = {
       nodes: [{ id: 'node-1', config: null }],
     }
 
-    const { result } = renderHook(() => useExecutionApprovalPanel('exec-1', '', nodeClick, wfDef))
+    const { result } = renderHook(() => useExecutionApprovalPanel('exec-1', '', stepClick, wfDef))
 
     expect(result.current.approvalMessage).toBeUndefined()
   })
@@ -562,7 +558,7 @@ describe('useExecutionApprovalPanel', () => {
     mockFetchApprovals.mockResolvedValue([mockApproval])
 
     const { result, rerender } = renderHook(
-      ({ search }: { search: string }) => useExecutionApprovalPanel('exec-1', search, makeNodeClick(), undefined),
+      ({ search }: { search: string }) => useExecutionApprovalPanel('exec-1', search, makeStepClick(), undefined),
       {
         initialProps: { search: '?approval=approval-1' },
       }
@@ -589,12 +585,12 @@ describe('useExecutionApprovalPanel', () => {
 
   it('auto-dismisses panel when activity transitions to terminal state', async () => {
     mockFetchApprovals.mockResolvedValue([])
-    const nodeClick = makeNodeClick(mockApproval, [mockApproval])
+    const stepClick = makeStepClick(mockApproval, [mockApproval])
 
     // Set activity to waiting state initially
     storeHelpers.setStatus('node-1', 'waiting')
 
-    const { result } = renderHook(() => useExecutionApprovalPanel('exec-1', '', nodeClick, undefined))
+    const { result } = renderHook(() => useExecutionApprovalPanel('exec-1', '', stepClick, undefined))
 
     act(() => result.current.open())
     expect(result.current.panelOpen).toBe(true)
@@ -611,11 +607,11 @@ describe('useExecutionApprovalPanel', () => {
   })
 
   it('does not auto-dismiss when activity is still waiting', async () => {
-    const nodeClick = makeNodeClick(mockApproval, [mockApproval])
+    const stepClick = makeStepClick(mockApproval, [mockApproval])
 
     storeHelpers.setStatus('node-1', 'waiting')
 
-    const { result } = renderHook(() => useExecutionApprovalPanel('exec-1', '', nodeClick, undefined))
+    const { result } = renderHook(() => useExecutionApprovalPanel('exec-1', '', stepClick, undefined))
 
     act(() => result.current.open())
     expect(result.current.panelOpen).toBe(true)
@@ -631,11 +627,11 @@ describe('useExecutionApprovalPanel', () => {
   it('auto-dismisses using this approval iteration activity key', async () => {
     mockFetchApprovals.mockResolvedValue([])
     const loopApproval = { ...mockApproval, loop_iteration_path: [2] }
-    const nodeClick = makeNodeClick(loopApproval, [loopApproval])
+    const stepClick = makeStepClick(loopApproval, [loopApproval])
 
     storeHelpers.setStatus('node-1#iter-2', 'waiting')
 
-    const { result } = renderHook(() => useExecutionApprovalPanel('exec-1', '', nodeClick, undefined))
+    const { result } = renderHook(() => useExecutionApprovalPanel('exec-1', '', stepClick, undefined))
 
     act(() => result.current.open())
     expect(result.current.panelOpen).toBe(true)
@@ -652,13 +648,13 @@ describe('useExecutionApprovalPanel', () => {
   it('does not dismiss a nested pass when an earlier canvas record is already completed', async () => {
     mockFetchApprovals.mockResolvedValue([])
     const nestedApproval = { ...mockApproval, loop_iteration_path: [1, 0] }
-    const nodeClick = makeNodeClick(nestedApproval, [nestedApproval])
+    const stepClick = makeStepClick(nestedApproval, [nestedApproval])
 
     storeHelpers.setStatus('node-1', 'completed')
     storeHelpers.setStatus('node-1#iter-0', 'completed')
     storeHelpers.setStatus('node-1#iter-3', 'waiting')
 
-    const { result } = renderHook(() => useExecutionApprovalPanel('exec-1', '', nodeClick, undefined))
+    const { result } = renderHook(() => useExecutionApprovalPanel('exec-1', '', stepClick, undefined))
 
     act(() => result.current.open())
     expect(result.current.panelOpen).toBe(true)

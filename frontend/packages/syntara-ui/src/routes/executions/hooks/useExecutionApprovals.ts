@@ -48,7 +48,7 @@ type UseExecutionApprovalsResult = {
  * When the user clicks an approval node in "waiting" status on the canvas,
  * this hook fetches all pending approvals and sets the index to the clicked approval.
  *
- * Part of the approval hooks architecture. See `useExecutionNodeClick.ts` for the full layering explanation.
+ * Part of the approval hooks architecture. See `useExecutionStepClick.ts` for the full layering explanation.
  */
 export function useExecutionApprovals(executionId: string | undefined): UseExecutionApprovalsResult {
   const [approvals, setApprovals] = useState<Approval[]>([])
