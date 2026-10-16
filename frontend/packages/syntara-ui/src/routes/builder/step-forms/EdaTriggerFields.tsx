@@ -47,7 +47,7 @@ export function EdaFields() {
         urlLabel={
           <FormLabelWithHelp
             label="Endpoint URL"
-            helpText="Your EDA webhook endpoint. Configure your job template to send a POST request to this URL. Click the copy icon to capture the full URL."
+            helpText="Your EDA webhook endpoint. Configure a job template to send a POST request to this URL. Click the copy icon to capture the full URL."
           />
         }
       />
