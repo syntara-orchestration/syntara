@@ -8,9 +8,12 @@ import {
   MastheadToggle,
   Toolbar,
   ToolbarContent,
+  ToolbarGroup,
+  ToolbarItem,
 } from '@patternfly/react-core'
 import { Link } from '@tanstack/react-router'
 
+import { CommandPaletteNavButton } from '../components/command-palette/CommandPaletteNavButton'
 import { useBrand } from '../providers/brand'
 
 import styles from './AppMobileMasthead.module.css'
@@ -54,7 +57,13 @@ export function AppMobileMasthead() {
       </MastheadMain>
       <MastheadContent>
         <Toolbar isStatic id="mobile-toolbar">
-          <ToolbarContent />
+          <ToolbarContent>
+            <ToolbarGroup variant="action-group-plain" align={{ default: 'alignEnd' }}>
+              <ToolbarItem>
+                <CommandPaletteNavButton isDocked={false} />
+              </ToolbarItem>
+            </ToolbarGroup>
+          </ToolbarContent>
         </Toolbar>
       </MastheadContent>
     </Masthead>

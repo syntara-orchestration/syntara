@@ -27,5 +27,5 @@ export function useAllSettings(options?: { enabled?: boolean }) {
     queryFn: fetchAllSettingsPages,
     enabled,
   })
-  return { settings, isLoading: isPending, error, refetch }
+  return { settings, isLoading: enabled && isPending, error, refetch }
 }
