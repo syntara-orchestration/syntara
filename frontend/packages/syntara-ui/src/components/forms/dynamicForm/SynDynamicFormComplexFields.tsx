@@ -29,7 +29,14 @@ function toSubmissionDateValue(next: DateValueShape | null): DateSubmissionValue
   return Object.keys(value).length === 0 ? '' : value
 }
 
-function parseNumberFieldValue(value: unknown): number | undefined {
+/**
+ * Maps the stored form value to a `NumberInput` value.
+ *
+ * Returns `''` (not `undefined`) for an empty field: `NumberInput` defaults an
+ * `undefined` value to `0`, which would make a cleared field snap back to zero
+ * and would also overwrite a partially typed entry such as a lone `-`.
+ */
+function parseNumberFieldValue(value: unknown): number | '' {
   if (typeof value === 'number' && Number.isFinite(value)) {
     return value
   }
@@ -39,7 +46,7 @@ function parseNumberFieldValue(value: unknown): number | undefined {
       return parsed
     }
   }
-  return undefined
+  return ''
 }
 
 export function SynDynamicFormNumberField({
@@ -68,22 +75,34 @@ export function SynDynamicFormNumberField({
 
         return (
           <NumberInput
-            id={fieldId}
-            aria-label={field.label}
+            // NumberInput spreads unknown props onto its wrapper div, so the id
+            // and accessible name have to be routed to the inner text input for
+            // the FormGroup label to point at it.
+            inputProps={{ id: fieldId }}
+            inputName={rhfField.name}
+            inputAriaLabel={field.label}
             value={displayValue}
             isDisabled={isDisabled}
             validated={fieldState.error ? 'error' : 'default'}
             onMinus={() => {
-              const base = displayValue ?? 0
+              const base = displayValue === '' ? 0 : displayValue
               rhfField.onChange(base - 1)
             }}
             onPlus={() => {
-              const base = displayValue ?? 0
+              const base = displayValue === '' ? 0 : displayValue
               rhfField.onChange(base + 1)
             }}
             onBlur={rhfField.onBlur}
             onChange={(event) => {
               const target = event.target as HTMLInputElement
+              // On blur NumberInput rewrites the input to `Number(value)` and
+              // reports it through onChange, turning an empty field into 0.
+              // Undo that write so an intentionally empty field stays empty;
+              // the form value is already '' so React will not re-render here.
+              if (event.type === 'blur' && displayValue === '') {
+                target.value = ''
+                return
+              }
               if (target.value === '') {
                 rhfField.onChange('')
                 return
