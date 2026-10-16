@@ -21,6 +21,7 @@
 import { cleanupPersona, createPersona, loginAsUser, PERSONA_ACTIONS } from './authorization/fixtures'
 import { type Page, test, expect, toAppUrl, appBaseUrl } from './fixtures'
 import { openRowKebab } from './helpers/patternfly'
+import { installPersonaAuthzRoutes } from './helpers/personaAuthz'
 import { buildUniqueName } from './helpers/workflows'
 import {
   apiRequest,
@@ -263,16 +264,15 @@ test.describe('Permission gating — Tasks tabs', () => {
   })
 
   test('persona with form_prompt read only sees the Form responses tab', async ({ app, browser }) => {
-    const persona = await createPersona(app, buildUniqueName('form-prompt-reader'), [
-      'form_prompt:read',
-      'workflow:read',
-      'project:read',
-    ])
+    const personaActions = ['form_prompt:read', 'workflow:read', 'project:read']
+    const persona = await createPersona(app, buildUniqueName('form-prompt-reader'), personaActions)
 
     const context = await browser.newContext()
     const page = await context.newPage()
 
     try {
+      // Register before login so nav/tasks never cache live-backend can_i (staleTime: Infinity).
+      await installPersonaAuthzRoutes(page, personaActions)
       await loginAsUser(page, persona)
       await page.goto(toAppUrl('/tasks/form-responses'))
 
@@ -286,12 +286,14 @@ test.describe('Permission gating — Tasks tabs', () => {
   })
 
   test('approval operator sees Approvals tab only', async ({ app, browser }) => {
-    const persona = await createPersona(app, buildUniqueName('approval-op'), PERSONA_ACTIONS.approvalOperator)
+    const personaActions = PERSONA_ACTIONS.approvalOperator
+    const persona = await createPersona(app, buildUniqueName('approval-op'), personaActions)
 
     const context = await browser.newContext()
     const page = await context.newPage()
 
     try {
+      await installPersonaAuthzRoutes(page, personaActions)
       await loginAsUser(page, persona)
       await page.goto(toAppUrl('/tasks/approvals'))
 

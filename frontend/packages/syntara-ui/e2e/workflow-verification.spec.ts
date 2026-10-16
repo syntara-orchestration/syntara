@@ -343,13 +343,24 @@ test.describe('Variable reference validation', () => {
 
       await clickSaveAndWait(app)
 
-      await triggerVerifyWorkflow(app)
+      // Variable-reference errors are computed in the browser; pin the validate API so a
+      // slow or empty backend response cannot race the banner (same pattern as the trigger-field test).
+      await mockValidateEndpoint(app, { valid: true })
 
-      await expect(app.getByText(/Verification failed/)).toBeVisible({ timeout: VERIFY_BANNER_TIMEOUT })
+      // triggerVerifyWorkflow can spend up to 30s on a single attempt; keep retry budget above that.
+      await expect(async () => {
+        await triggerVerifyWorkflow(app)
+        await expect(
+          app
+            .getByRole('heading', { name: /Verification failed/i })
+            .or(app.getByRole('heading', { name: /Saved with \d+ issue/i }))
+        ).toBeVisible({ timeout: 5_000 })
+      }).toPass({ timeout: 60_000, intervals: [500, 1_000, 2_000] })
 
       await app.getByRole('button', { name: /alert details/i }).click()
       await expect(app.getByText(/does not exist in this workflow/i)).toBeVisible({ timeout: VERIFY_BANNER_TIMEOUT })
     } finally {
+      await app.unroute(VALIDATE_ROUTE)
       await deleteWorkflowViaApi(app, workflowId)
     }
   })

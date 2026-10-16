@@ -44,6 +44,17 @@ async function ensureFieldExpanded(page: Page, fieldNumber: number) {
   }
 }
 
+/** Dismiss dnd-kit drag overlays/handles that can intercept clicks on field cards after reorder. */
+async function settleFormFieldBuilderInteraction(page: Page) {
+  await page.keyboard.press('Escape')
+  const scope = formFieldBuilderScope(page)
+  // CSS modules hash local class names in CI preview builds — match the stable suffix.
+  await expect(scope.locator('[class*="dragging"]')).toHaveCount(0, { timeout: 5_000 })
+  await expect(page.locator('[class*="dragOverlay"]').filter({ visible: true })).toHaveCount(0, {
+    timeout: 5_000,
+  })
+}
+
 export async function scrollFormFieldBuilderIntoView(page: Page) {
   await page.locator('#form-prompt-form-fields').scrollIntoViewIfNeeded()
 }
@@ -160,6 +171,7 @@ export async function expectFormFieldRequiredChecked(page: Page, fieldNumber: nu
 
 export async function selectFormFieldType(page: Page, fieldNumber: number, typeLabel: FormFieldTypeMenuLabel) {
   await scrollFormFieldBuilderIntoView(page)
+  await settleFormFieldBuilderInteraction(page)
   await ensureFieldExpanded(page, fieldNumber)
   const card = formFieldBuilderCard(page, fieldNumber)
   const toggle = card.getByRole('button', { name: FIELD_TYPE_TOGGLE_NAME })
@@ -167,15 +179,23 @@ export async function selectFormFieldType(page: Page, fieldNumber: number, typeL
   if (currentLabel === typeLabel) {
     return
   }
-  await toggle.scrollIntoViewIfNeeded()
-  await toggle.click()
-  if ((await toggle.getAttribute('aria-expanded')) !== 'true') {
-    await toggle.click({ force: true })
-  }
-  const visibleOptions = page.getByRole('option', { name: typeLabel, exact: true }).filter({ visible: true })
-  await expect(visibleOptions).toHaveCount(1, { timeout: 10_000 })
-  await visibleOptions.click()
-  await expect(toggle).toHaveText(typeLabel)
+
+  await expect(async () => {
+    await settleFormFieldBuilderInteraction(page)
+    await toggle.scrollIntoViewIfNeeded()
+    await toggle.focus()
+    if ((await toggle.getAttribute('aria-expanded')) !== 'true') {
+      await toggle.click({ force: true, timeout: 2_000 }).catch(() => {})
+      if ((await toggle.getAttribute('aria-expanded')) !== 'true') {
+        await page.keyboard.press('Enter')
+      }
+    }
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true', { timeout: 2_000 })
+    const visibleOptions = page.getByRole('option', { name: typeLabel, exact: true }).filter({ visible: true })
+    await expect(visibleOptions).toHaveCount(1, { timeout: 2_000 })
+    await visibleOptions.click({ force: true, timeout: 2_000 })
+    await expect(toggle).toHaveText(typeLabel, { timeout: 2_000 })
+  }).toPass({ timeout: 30_000, intervals: [300, 500, 1_000, 2_000] })
 }
 
 export async function removeFormField(page: Page, fieldNumber: number) {
@@ -236,6 +256,7 @@ export async function reorderFormField(
       await moveFormFieldUpOneStep(page, currentIndex)
     }
   }).toPass({ timeout: reorderTimeout, intervals: [300, 500, 1_000, 2_000] })
+  await settleFormFieldBuilderInteraction(page)
 }
 
 export async function fieldLabelValuesInOrder(page: Page): Promise<string[]> {
