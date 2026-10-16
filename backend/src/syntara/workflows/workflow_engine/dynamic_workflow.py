@@ -64,6 +64,7 @@ from syntara.workflows.workflow_engine.utils.loop_iteration_ids import loop_cont
 # Each entry must have a corresponding @activity.defn with a matching name.
 ALLOWED_TRIGGER_TYPES: set[str] = {
     ActivityName.EDA_TRIGGER,
+    ActivityName.FORM_TRIGGER,
     ActivityName.MANUAL_TRIGGER,
     ActivityName.SCHEDULED_TRIGGER,
     ActivityName.WEBHOOK_TRIGGER,
@@ -257,13 +258,23 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin, Workflo
             )
             raise SafeValueError(msg)
 
-        # Dispatch dynamically by trigger type (activity name matches node type for triggers)
-        trigger_result = await workflow.execute_activity(
-            trigger_node.type,
-            args=[trigger_inputs, trigger_node.outputs],
-            activity_id=trigger_node.id,
-            start_to_close_timeout=timedelta(seconds=DEFAULT_ACTIVITY_TIMEOUT_SECONDS),
-        )
+        if trigger_node.type == ActivityName.FORM_TRIGGER:
+            # Form triggers do not retry a failed pass-through.
+            trigger_result = await workflow.execute_activity(
+                trigger_node.type,
+                args=[trigger_inputs, trigger_node.outputs],
+                activity_id=trigger_node.id,
+                start_to_close_timeout=timedelta(seconds=DEFAULT_ACTIVITY_TIMEOUT_SECONDS),
+                retry_policy=RetryPolicy(maximum_attempts=1),
+            )
+        else:
+            # Keep Temporal's existing default for all other trigger types.
+            trigger_result = await workflow.execute_activity(
+                trigger_node.type,
+                args=[trigger_inputs, trigger_node.outputs],
+                activity_id=trigger_node.id,
+                start_to_close_timeout=timedelta(seconds=DEFAULT_ACTIVITY_TIMEOUT_SECONDS),
+            )
 
         trigger_output = trigger_result.get("output", trigger_result)
         self.resolver.set_namespace("trigger", trigger_output)

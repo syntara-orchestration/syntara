@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://automation.example.com/schemas/workflows/v2/triggers/form",
+  "title": "Form Trigger Node",
+  "description": "Workflow entry point that collects structured user input via a form before execution begins.",
+  "parameterSchema": {
+    "type": "object",
+    "required": ["form_definition"],
+    "properties": {
+      "message": {
+        "type": "string",
+        "maxLength": 2000,
+        "description": "Message shown above the form."
+      },
+      "form_definition": {
+        "type": "object",
+        "description": "Form fields to collect. Dropdown and multi-select options must use static sources.",
+        "properties": {
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "if": {
+                "properties": {
+                  "type": { "enum": ["dropdown", "multi_select"] }
+                },
+                "required": ["type"]
+              },
+              "then": {
+                "required": ["options"],
+                "properties": {
+                  "options": { "$ref": "#/$defs/authoredOptions" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "submit_label": {
+        "type": "string",
+        "maxLength": 64,
+        "description": "Submit button label."
+      },
+      "success_message": {
+        "type": "string",
+        "maxLength": 500,
+        "description": "Message shown after successful form submission."
+      },
+      "css_override": {
+        "type": "string",
+        "maxLength": 10000,
+        "description": "Custom CSS applied to the form view."
+      }
+    },
+    "additionalProperties": false
+  },
+  "$defs": {
+    "authoredOptions": {
+      "type": "object",
+      "required": ["source"],
+      "properties": {
+        "source": {
+          "type": "string",
+          "enum": ["static"],
+          "description": "Only static options can be authored on a form trigger."
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "source": { "const": "static" } },
+            "required": ["source"]
+          },
+          "then": {
+            "required": ["values"],
+            "properties": {
+              "source": {},
+              "values": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 500,
+                "items": {
+                  "type": "object",
+                  "required": ["display_label", "value"],
+                  "properties": {
+                    "display_label": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    },
+                    "value": { "type": "string" }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      ]
+    }
+  },
+  "resultSchema": {
+    "type": "object",
+    "description": "Flat pass-through of submitted values keyed by field value_name. For example, {\"email\": \"...\"} is available as ${<node_id>.email}. Unlike form_prompt, values are not nested under response_data. Submitter metadata is not injected; use ${workflow_context.execution.created_by} and ${workflow_context.execution.created_at}.",
+    "additionalProperties": true
+  }
+}

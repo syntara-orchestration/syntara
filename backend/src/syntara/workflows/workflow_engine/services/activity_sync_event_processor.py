@@ -138,6 +138,7 @@ class ActivitySyncEventProcessorMixin:
             ActivityName.SCHEDULED_TRIGGER,
             ActivityName.WEBHOOK_TRIGGER,
             ActivityName.EDA_TRIGGER,
+            ActivityName.FORM_TRIGGER,
         }
     )
 
@@ -145,8 +146,7 @@ class ActivitySyncEventProcessorMixin:
     def _extract_trigger_activity_type(activity_definitions_map: dict[str, dict[str, Any]]) -> ActivityName | None:
         """Extract the trigger type from activity definitions.
 
-        Searches through the activity definitions to find a trigger node
-        (e.g., manual_trigger, scheduled_trigger, webhook_trigger, eda_trigger).
+        Searches through the activity definitions to find a trigger node.
 
         Args:
             activity_definitions_map: Map of activity ID to activity definition

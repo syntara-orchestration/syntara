@@ -1831,6 +1831,7 @@ class TestExtractTriggerActivityType:
             ({"trigger-1": {"type": "scheduled_trigger"}}, "scheduled_trigger"),
             ({"trigger-1": {"type": "webhook_trigger"}}, "webhook_trigger"),
             ({"trigger-1": {"type": "eda_trigger"}}, "eda_trigger"),
+            ({"trigger-1": {"type": "form_trigger"}}, ActivityName.FORM_TRIGGER),
             (
                 {
                     "node-1": {"type": "script"},
@@ -1851,6 +1852,7 @@ class TestExtractTriggerActivityType:
             "scheduled_trigger",
             "webhook_trigger",
             "eda_trigger",
+            "form_trigger",
             "mixed_nodes_with_trigger",
             "no_trigger_nodes",
             "empty_map",

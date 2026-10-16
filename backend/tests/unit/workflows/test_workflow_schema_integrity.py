@@ -231,6 +231,7 @@ class TestCatalogCompleteness:
             "webhook_trigger",
             "scheduled_trigger",
             "eda_trigger",
+            "form_trigger",
             # Executors
             "script",
             "aap_job_template",

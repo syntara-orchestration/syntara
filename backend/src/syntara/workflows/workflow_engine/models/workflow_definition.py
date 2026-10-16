@@ -20,7 +20,7 @@ from syntara.aap.models.responses import AAPJobType as AAPJobType  # noqa: PLC04
 from syntara.core.constants import FieldLimits, WebhookLimits
 from syntara.core.exceptions import SafeValueError
 from syntara.core.utils.security import validate_css_security
-from syntara.forms.models.form_fields import FormDefinition, ResolvedOptions
+from syntara.forms.models.form_fields import DynamicOptions, FormDefinition, ResolvedOptions
 from syntara.forms.validators.form_definition import validate_form_definition
 from syntara.workflows.json_schema_validation import validate_json_schema_definition
 from syntara.workflows.utils.iso8601_interval import parse_iso8601_repeating_interval
@@ -127,6 +127,7 @@ class ActivityName(StrEnum):
     SCHEDULED_TRIGGER = "scheduled_trigger"
     WEBHOOK_TRIGGER = "webhook_trigger"
     EDA_TRIGGER = "eda_trigger"
+    FORM_TRIGGER = "form_trigger"
     # Control nodes
     CONDITION = "condition"
     CONVERGE = "converge"
@@ -168,6 +169,7 @@ class NodeType(str, Enum):
     SCHEDULED_TRIGGER = "scheduled_trigger"
     WEBHOOK_TRIGGER = "webhook_trigger"
     EDA_TRIGGER = "eda_trigger"
+    FORM_TRIGGER = "form_trigger"
     # Control nodes
     CONDITION = "condition"
     CONVERGE = "converge"
@@ -935,6 +937,116 @@ class FormPromptNodeParameters(BaseModel):
             raise SafeValueError(str(exc)) from exc
 
         return v
+
+
+_FORM_PROMPT_ONLY_PARAMETERS: frozenset[str] = frozenset(
+    {"response_window", "fallback_decision", "responder_users", "responder_groups"}
+)
+_MAX_FORM_TRIGGER_TEMPLATE_PATH_DEPTH = 50
+
+
+def _collect_template_paths(value: Any, path: str = "", depth: int = 0) -> list[str]:  # noqa: ANN401
+    """Return dotted paths for string values containing template expressions."""
+    if depth > _MAX_FORM_TRIGGER_TEMPLATE_PATH_DEPTH:
+        return []
+    if isinstance(value, str):
+        return [path or "<root>"] if TEMPLATE_PATTERN.search(value) else []
+    if isinstance(value, dict):
+        paths: list[str] = []
+        for key, child in value.items():
+            child_path = f"{path}.{key}" if path else str(key)
+            paths.extend(_collect_template_paths(child, child_path, depth + 1))
+        return paths
+    if isinstance(value, list):
+        paths = []
+        for index, child in enumerate(value):
+            child_path = f"{path}.{index}" if path else str(index)
+            paths.extend(_collect_template_paths(child, child_path, depth + 1))
+        return paths
+    return []
+
+
+class FormTriggerParameters(BaseModel):
+    """Parameters for form trigger nodes."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    form_definition: FormDefinition = Field(
+        description="Form definition describing the fields shown to submitters.",
+    )
+    message: str | None = Field(
+        default=None,
+        max_length=FieldLimits.DESCRIPTION_MAX_LENGTH,
+        description="Message shown above the form.",
+    )
+    submit_label: str | None = Field(
+        default=None,
+        max_length=FieldLimits.FORM_SUBMIT_LABEL_MAX_LENGTH,
+        description="Submit button label.",
+    )
+    success_message: str | None = Field(
+        default=None,
+        max_length=FieldLimits.FORM_SUCCESS_MESSAGE_MAX_LENGTH,
+        description="Shown after submission.",
+    )
+    css_override: str | None = Field(
+        default=None,
+        max_length=FieldLimits.FORM_CSS_OVERRIDE_MAX_LENGTH,
+        description="Custom CSS applied to the form view.",
+    )
+
+    @model_validator(mode="before")
+    @classmethod
+    def reject_prompt_only_parameters(cls, raw: Any) -> Any:  # noqa: ANN401
+        """Reject options that only apply to an in-execution form prompt."""
+        if not isinstance(raw, dict):
+            return raw
+        for parameter in _FORM_PROMPT_ONLY_PARAMETERS:
+            if parameter in raw:
+                msg = f"'{parameter}' applies only to the form prompt node, not a form trigger."
+                raise SafeValueError(msg)
+        return raw
+
+    @model_validator(mode="before")
+    @classmethod
+    def reject_template_expressions(cls, raw: Any) -> Any:  # noqa: ANN401
+        """Reject templates throughout trigger parameters, which have no upstream context."""
+        paths = _collect_template_paths(raw)
+        if paths:
+            msg = (
+                "Template expressions are not supported on a form trigger because it has no upstream node to resolve "
+                f"against. Found at: {', '.join(paths)}"
+            )
+            raise SafeValueError(msg)
+        return raw
+
+    @field_validator("form_definition", mode="after")
+    @classmethod
+    def validate_authored_form_definition(cls, value: FormDefinition) -> FormDefinition:
+        """Reject run-time option sources and validate authored defaults."""
+        for field in value.fields:
+            options = getattr(field, "options", None)
+            if isinstance(options, (ResolvedOptions, DynamicOptions)):
+                source = options.source
+                msg = (
+                    f"Field '{field.value_name}': options source '{source}' is not supported on a form trigger. "
+                    "Use 'static'."
+                )
+                raise SafeValueError(msg)
+        validate_form_definition(value, form_id=None)
+        return value
+
+    @field_validator("css_override")
+    @classmethod
+    def validate_css_override(cls, value: str | None) -> str | None:
+        """Validate CSS for security (reject patterns that enable data exfiltration or code execution)."""
+        if value is None:
+            return value
+        try:
+            validate_css_security(value)
+        except ValueError as exc:
+            raise SafeValueError(str(exc)) from exc
+        return value
 
 
 class WebhookTriggerParameters(TemplateAwareBaseModel):

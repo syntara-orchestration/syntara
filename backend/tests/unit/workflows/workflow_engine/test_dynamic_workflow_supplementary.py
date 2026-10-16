@@ -542,9 +542,33 @@ class TestAllowedTriggerTypes:
         assert {
             ActivityName.MANUAL_TRIGGER,
             ActivityName.EDA_TRIGGER,
+            ActivityName.FORM_TRIGGER,
             ActivityName.SCHEDULED_TRIGGER,
             ActivityName.WEBHOOK_TRIGGER,
         } == ALLOWED_TRIGGER_TYPES
+
+    @pytest.mark.parametrize(
+        "trigger_type",
+        ["form_trigger", "manual_trigger", "webhook_trigger", "scheduled_trigger", "eda_trigger"],
+    )
+    @pytest.mark.asyncio
+    async def test_trigger_retry_policy_is_scoped_to_form_trigger(
+        self,
+        _mock_temporal_workflow: MagicMock,  # noqa: PT019
+        trigger_type: str,
+    ) -> None:
+        """Only form_trigger opts out of Temporal's default retries."""
+        backend = InMemoryGraphBackend()
+        backend.add_node("trigger", {"id": "trigger", "type": trigger_type, "parameters": {}})
+        graph = WorkflowGraph(backend)
+
+        await _make_workflow()._execute_trigger("trigger", {}, graph, {})
+
+        call_kwargs = _mock_temporal_workflow.execute_activity.call_args.kwargs
+        if trigger_type == "form_trigger":
+            assert call_kwargs["retry_policy"].maximum_attempts == 1
+        else:
+            assert "retry_policy" not in call_kwargs
 
 
 class TestLoopBodyCompleteEdgeCases:
