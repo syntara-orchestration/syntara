@@ -27,3 +27,10 @@ SYNTARA_MUTATION_RUN_ID=<run-id> npm --prefix frontend run mutation:audit
 Finished batches stay saved. The interrupted batch starts again from the beginning. Keep the source files, tests, lockfile, and dependencies unchanged while resuming. Do not run two copies of the same run ID at once.
 
 This command creates a local report only. It does not run in CI or block pull requests.
+
+## Preserved baseline
+
+The [October 13–15, 2026 baseline](mutation-audits/2026-10-13/README.md)
+contains the completed audit summary and per-file CSV, and documents the local
+archive of the original reports. It records the audited revision and restore
+instructions, so inspecting the results does not require another full run.
