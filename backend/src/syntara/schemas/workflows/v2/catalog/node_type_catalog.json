@@ -144,6 +144,17 @@
       "since": "2.0.0"
     },
     {
+      "type": "sub_workflow",
+      "name": "Sub-workflow",
+      "description": "Execute another workflow as a sub-workflow in reference mode",
+      "labels": {
+        "category": "executor"
+      },
+      "schema_ref": "../executors/sub_workflow.schema.json",
+      "deprecated": false,
+      "since": "2.0.0"
+    },
+    {
       "type": "internal_activity",
       "name": "Internal Activity",
       "description": "Execute built-in system operations as native Temporal activities",

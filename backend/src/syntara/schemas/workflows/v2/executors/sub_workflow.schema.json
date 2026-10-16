@@ -1,0 +1,126 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://automation.example.com/schemas/workflows/v2/executors/sub_workflow",
+  "title": "Sub-workflow Node",
+  "description": "Execute another workflow as a sub-workflow in reference mode. The parent workflow invokes the child workflow and waits for its completion.",
+  "parameterSchema": {
+    "type": "object",
+    "required": ["workflow_id", "trigger_node_id"],
+    "properties": {
+      "workflow_id": {
+        "type": "string",
+        "maxLength": 550,
+        "description": "UUID of the child workflow to invoke (latest published version), or template expression (max 500 chars). Validated by Pydantic validator."
+      },
+      "trigger_node_id": {
+        "type": "string",
+        "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+        "description": "Graph node ID of the Subworkflow Trigger to invoke in the child workflow"
+      },
+      "input_mapping": {
+        "type": "object",
+        "description": "Mapping of child workflow input field names to static values or template expressions. Keys are child workflow input field names; values can be static types (string, int, bool, dict, list) or template expression strings (${step_id.field.path}).",
+        "maxProperties": 100,
+        "additionalProperties": true
+      }
+    },
+    "additionalProperties": false
+  },
+  "settingSchema": {
+    "$ref": "../common-definitions.schema.json#/$defs/nodeSettingsNoRetry"
+  },
+  "resultSchema": {
+    "$ref": "#/$defs/SubWorkflowOutput"
+  },
+  "$defs": {
+    "StandardOutputWrapper": {
+      "type": "object",
+      "description": "Standard output envelope for Step SDK. All step outputs follow this structure.",
+      "properties": {
+        "Result": {
+          "description": "Primary task return payload (type varies by step)"
+        },
+        "StatusCode": {
+          "type": ["integer", "null"],
+          "description": "Execution status code (0=success, non-zero=failure per POSIX convention)"
+        },
+        "StatusMessage": {
+          "type": ["string", "null"],
+          "maxLength": 500,
+          "description": "Human-readable status summary (max 500 chars)"
+        },
+        "ErrorMessage": {
+          "type": ["string", "null"],
+          "maxLength": 10000,
+          "description": "Detailed error diagnostics (max 10k chars)"
+        }
+      },
+      "additionalProperties": false
+    },
+    "SubWorkflowOutputResult": {
+      "type": ["object", "null"],
+      "description": "Child execution metadata for Sub-workflow steps.",
+      "properties": {
+        "child_execution_id": {
+          "type": ["string", "null"],
+          "format": "uuid",
+          "description": "UUID of the child workflow execution instance (null if invocation failed)"
+        },
+        "child_workflow_id": {
+          "type": ["string", "null"],
+          "format": "uuid",
+          "description": "UUID of the invoked child workflow definition"
+        },
+        "child_workflow_name": {
+          "type": ["string", "null"],
+          "maxLength": 255,
+          "description": "Human-readable name of the child workflow"
+        },
+        "child_workflow_version": {
+          "type": ["integer", "null"],
+          "description": "Version number of the child workflow that was invoked"
+        },
+        "child_status": {
+          "type": ["string", "null"],
+          "enum": ["completed", "completed_with_errors", "failed", "cancelled", null],
+          "description": "Terminal execution status of the child workflow (reference mode: parent blocks until child completes, so only terminal statuses are returned)"
+        },
+        "outputs": {
+          "type": ["object", "null"],
+          "description": "Child workflow terminal step outputs. Keys are child step IDs, values are StandardOutputWrapper envelopes. May be null if authorization denied.",
+          "maxProperties": 1000,
+          "additionalProperties": {
+            "$ref": "#/$defs/StandardOutputWrapper"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "SubWorkflowOutput": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/StandardOutputWrapper"
+        }
+      ],
+      "type": "object",
+      "description": "Output model for Sub-workflow steps. Follows StandardOutputWrapper structure with Result containing child execution metadata.",
+      "properties": {
+        "Result": {
+          "$ref": "#/$defs/SubWorkflowOutputResult"
+        },
+        "StatusCode": {
+          "type": ["integer", "null"]
+        },
+        "StatusMessage": {
+          "type": ["string", "null"],
+          "maxLength": 500
+        },
+        "ErrorMessage": {
+          "type": ["string", "null"],
+          "maxLength": 10000
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

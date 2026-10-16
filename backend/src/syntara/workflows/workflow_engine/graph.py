@@ -24,6 +24,7 @@ _NODE_SETTINGS_CLASS: dict[str, type[NodeSettingsBase]] = {
     NodeType.SCRIPT: NodeSettingsNoRetry,
     NodeType.AGENTIC: NodeSettingsNoRetry,
     NodeType.APPROVAL: NodeSettingsNoRetry,
+    NodeType.SUB_WORKFLOW: NodeSettingsNoRetry,
     NodeType.WAIT: NodeSettingsCofDisabled,
     NodeType.CONVERGE: NodeSettingsCof,
     NodeType.LOOP: NodeSettingsCof,

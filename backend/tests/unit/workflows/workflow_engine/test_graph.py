@@ -186,6 +186,17 @@ class TestParseNodeSettings:
         assert isinstance(settings, NodeSettingsNoRetry)
         assert settings.disabled is True
 
+    def test_sub_workflow_gets_no_retry(self) -> None:
+        """Sub-workflow steps use NodeSettingsNoRetry."""
+        settings = _parse_node_settings("sub_workflow", {"timeout": 120})
+        assert isinstance(settings, NodeSettingsNoRetry)
+        assert settings.timeout == 120
+
+    def test_sub_workflow_rejects_retry_policy(self) -> None:
+        """Sub-workflow steps do not support retry_policy (per SDP R6)."""
+        with pytest.raises(ValidationError):
+            _parse_node_settings("sub_workflow", {"retry_policy": {"max_retries": 2}})
+
 
 class TestActivityNodeToDict:
     """Tests for ActivityNode.to_dict."""

@@ -26,6 +26,7 @@ from syntara.workflows.workflow_engine.models.workflow_definition import (
     NodeSettingsFull,
     NodeSettingsNoRetry,
     ScriptExecutorParameters,
+    SubWorkflowExecutorParameters,
     SwitchNodeParameters,
     WaitNodeParameters,
 )
@@ -102,6 +103,18 @@ class ApprovalNode(WorkflowNodeBase):
     settings: NodeSettingsNoRetry | None = None
 
 
+class SubWorkflowNode(WorkflowNodeBase):
+    """Sub-workflow executor node.
+
+    Invokes another published workflow in reference mode and waits for its completion.
+    The parent workflow can access child workflow outputs via template expressions.
+    """
+
+    type: Literal["sub_workflow"]
+    parameters: SubWorkflowExecutorParameters
+    settings: NodeSettingsNoRetry | None = None
+
+
 class ConditionNode(WorkflowNodeBase):
     """Binary conditional branching node."""
 
@@ -149,6 +162,7 @@ _AllNodeTypes = (
     | AgenticNode
     | ScriptNode
     | ApprovalNode
+    | SubWorkflowNode
     | ConditionNode
     | SwitchNode
     | LoopNode

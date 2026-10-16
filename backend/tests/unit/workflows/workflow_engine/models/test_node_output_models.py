@@ -27,6 +27,7 @@ from syntara.workflows.workflow_engine.models.workflow_definition import (
     NodeOutput,
     NodeType,
     ScriptOutput,
+    SubWorkflowOutput,
     SwitchOutput,
     WaitOutput,
 )
@@ -438,6 +439,7 @@ class TestNodeOutputModelsRegistry:
             NodeType.AAP_WORKFLOW_JOB_TEMPLATE,
             NodeType.AGENTIC,
             NodeType.APPROVAL,
+            NodeType.SUB_WORKFLOW,
             NodeType.CONDITION,
             NodeType.SWITCH,
             NodeType.CONVERGE,
@@ -448,6 +450,10 @@ class TestNodeOutputModelsRegistry:
 
     def test_approval_maps_to_approval_output(self) -> None:
         assert NODE_OUTPUT_MODELS[NodeType.APPROVAL] is ApprovalOutput
+
+    def test_sub_workflow_maps_to_sub_workflow_output(self) -> None:
+        """SUB_WORKFLOW maps to SubWorkflowOutput."""
+        assert NODE_OUTPUT_MODELS[NodeType.SUB_WORKFLOW] is SubWorkflowOutput
 
     def test_all_values_are_node_output_subclasses(self) -> None:
         for node_type, model_cls in NODE_OUTPUT_MODELS.items():

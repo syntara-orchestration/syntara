@@ -791,8 +791,8 @@ class SubWorkflowExecutorParameters(TemplateAwareBaseModel):
     a parent workflow. The Sub-workflow step always invokes the latest published
     version of the target workflow.
 
-    Per ANSTRAT-2347 (updated 2026-10-08): When a workflow has multiple
-    Subworkflow Triggers, the calling step must select a specific trigger to invoke.
+    When a workflow has multiple Subworkflow Triggers, the calling step must
+    select a specific trigger to invoke via the trigger_node_id field.
 
     Attributes:
         workflow_id: UUID of the child workflow to invoke.
@@ -804,7 +804,10 @@ class SubWorkflowExecutorParameters(TemplateAwareBaseModel):
     """
 
     workflow_id: str = Field(
-        description="UUID of the child workflow to invoke (latest published version)",
+        max_length=550,
+        description=(
+            "UUID of the child workflow to invoke (latest published version), or template expression (max 500 chars)"
+        ),
     )
     trigger_node_id: str = Field(
         pattern=r"^[a-zA-Z_][a-zA-Z0-9_]*$",
@@ -1070,6 +1073,60 @@ class WaitOutput(NodeOutput):
     """Output model for wait control nodes."""
 
 
+class StandardOutputWrapper(BaseModel):
+    """Standard output wrapper for Step SDK.
+
+    All steps in the Step SDK must return this envelope structure with:
+    - Result: Primary task return payload (type varies by step)
+    - StatusCode: Integer 0-255 (0=success, non-zero=failure per POSIX convention)
+    - StatusMessage: Human-readable summary (max 500 chars)
+    - ErrorMessage: Detailed error diagnostics (max 10k chars)
+
+    This is a forward-compatible structure defined for sub-workflow outputs.
+    Existing NodeOutput models use flat structure but will eventually migrate
+    to this pattern when the Step SDK is fully implemented.
+    """
+
+    Result: Any = None  # Type varies by step - validated by step-specific models
+    StatusCode: int | None = None
+    StatusMessage: str | None = Field(default=None, max_length=500)
+    ErrorMessage: str | None = Field(default=None, max_length=10000)
+
+
+class SubWorkflowOutputResult(BaseModel):
+    """Result payload for Sub-workflow steps containing child execution metadata.
+
+    This is the Result field of the StandardOutputWrapper structure.
+    Contains aggregate child execution metadata and nested child step outputs.
+    """
+
+    child_execution_id: str | None = None
+    child_workflow_id: str | None = None
+    child_workflow_name: str | None = Field(default=None, max_length=255)
+    child_workflow_version: int | None = None
+    child_status: WorkflowTerminalStatus | None = None
+    outputs: dict[str, StandardOutputWrapper] | None = Field(default=None, max_length=1000)
+
+
+class SubWorkflowOutput(StandardOutputWrapper, NodeOutput):
+    """Output model for Sub-workflow steps (reference mode).
+
+    Inherits from StandardOutputWrapper to ensure field consistency (StatusCode,
+    StatusMessage, ErrorMessage) and from NodeOutput to provide the dump() method
+    for output mapping.
+
+    This model adopts the StandardOutputWrapper pattern proactively, even though
+    existing NodeOutput models use flat structure, to align with the Step SDK
+    specification and avoid future breaking changes.
+
+    The outputs field (nested in Result) is a dict where keys are child step IDs
+    and values are their StandardOutputWrapper outputs. This allows dotted-path
+    template expressions like: ${sub_workflow_step.Result.outputs.child_step_id.field}
+    """
+
+    Result: SubWorkflowOutputResult | None = None  # Override to specify concrete Result type
+
+
 NODE_OUTPUT_MODELS: dict[str, type[NodeOutput]] = {
     NodeType.SCRIPT: ScriptOutput,
     NodeType.HTTP_REQUEST: HttpRequestOutput,
@@ -1077,6 +1134,7 @@ NODE_OUTPUT_MODELS: dict[str, type[NodeOutput]] = {
     NodeType.AAP_WORKFLOW_JOB_TEMPLATE: AAPWorkflowJobTemplateOutput,
     NodeType.AGENTIC: AgenticOutput,
     NodeType.APPROVAL: ApprovalOutput,
+    NodeType.SUB_WORKFLOW: SubWorkflowOutput,
     NodeType.CONDITION: ConditionOutput,
     NodeType.SWITCH: SwitchOutput,
     NodeType.CONVERGE: ConvergeOutput,

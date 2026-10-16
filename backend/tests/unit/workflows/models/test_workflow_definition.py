@@ -4,12 +4,13 @@ Tests cover:
 - Empty description coercion to None
 - Valid description passthrough
 - None description default
+- Node type discrimination (SubWorkflowNode)
 """
 
 import pytest
 from pydantic import ValidationError
 
-from syntara.workflows.models.workflow_definition import WorkflowDefinition
+from syntara.workflows.models.workflow_definition import SubWorkflowNode, WorkflowDefinition
 
 MINIMAL_KWARGS = {
     "schema_version": "2.0.0",
@@ -48,3 +49,83 @@ def test_description_exceeding_max_length_rejected() -> None:
     """Description exceeding 1000 chars should be rejected."""
     with pytest.raises(ValidationError, match="string_too_long"):
         WorkflowDefinition(**MINIMAL_KWARGS, description="x" * 1001)
+
+
+def test_sub_workflow_node_validates_in_workflow_definition() -> None:
+    """SubWorkflowNode should be accepted in WorkflowDefinition.nodes list."""
+    workflow_def = WorkflowDefinition(
+        schema_version="2.0.0",
+        name="test-workflow-with-subworkflow",
+        triggers=[{"type": "manual_trigger"}],
+        nodes=[
+            {
+                "id": "sub1",
+                "type": "sub_workflow",
+                "parameters": {
+                    "workflow_id": "550e8400-e29b-41d4-a716-446655440000",
+                    "trigger_node_id": "trigger_1",
+                },
+            }
+        ],
+        edges=[{"from": "manual_trigger", "to": "sub1"}],
+    )
+
+    # Verify workflow validates successfully
+    assert workflow_def.schema_version == "2.0.0"
+    assert len(workflow_def.nodes) == 1
+
+    # Verify node discriminates correctly to SubWorkflowNode
+    node = workflow_def.nodes[0]
+    assert isinstance(node, SubWorkflowNode)
+    assert node.type == "sub_workflow"
+    assert node.parameters.workflow_id == "550e8400-e29b-41d4-a716-446655440000"
+    assert node.parameters.trigger_node_id == "trigger_1"
+
+
+def test_sub_workflow_node_with_input_mapping() -> None:
+    """SubWorkflowNode should accept input_mapping in parameters."""
+    workflow_def = WorkflowDefinition(
+        schema_version="2.0.0",
+        name="test-workflow",
+        triggers=[{"type": "manual_trigger"}],
+        nodes=[
+            {
+                "id": "sub1",
+                "type": "sub_workflow",
+                "parameters": {
+                    "workflow_id": "550e8400-e29b-41d4-a716-446655440000",
+                    "trigger_node_id": "trigger_1",
+                    "input_mapping": {"host": "web-server-01", "port": 8080},
+                },
+            }
+        ],
+        edges=[],
+    )
+
+    node = workflow_def.nodes[0]
+    assert isinstance(node, SubWorkflowNode)
+    assert node.parameters.input_mapping == {"host": "web-server-01", "port": 8080}
+
+
+def test_sub_workflow_node_with_template_expression() -> None:
+    """SubWorkflowNode should accept template expressions in workflow_id."""
+    workflow_def = WorkflowDefinition(
+        schema_version="2.0.0",
+        name="test-workflow",
+        triggers=[{"type": "manual_trigger"}],
+        nodes=[
+            {
+                "id": "sub1",
+                "type": "sub_workflow",
+                "parameters": {
+                    "workflow_id": "${parent_step.child_workflow_id}",
+                    "trigger_node_id": "trigger_1",
+                },
+            }
+        ],
+        edges=[],
+    )
+
+    node = workflow_def.nodes[0]
+    assert isinstance(node, SubWorkflowNode)
+    assert node.parameters.workflow_id == "${parent_step.child_workflow_id}"

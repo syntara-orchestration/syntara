@@ -1504,6 +1504,85 @@ export interface components {
       [key: string]: unknown
     }
     /**
+     * SubWorkflowExecutorParameters
+     * @description Parameters for Sub-workflow executor.
+     *
+     *     Defines the design-time configuration for invoking a child workflow from
+     *     a parent workflow. The Sub-workflow step always invokes the latest published
+     *     version of the target workflow.
+     *
+     *     When a workflow has multiple Subworkflow Triggers, the calling step must
+     *     select a specific trigger to invoke via the trigger_node_id field.
+     *
+     *     Attributes:
+     *         workflow_id: UUID of the child workflow to invoke.
+     *         trigger_node_id: Graph node ID of the Subworkflow Trigger to invoke.
+     *         input_mapping: Mapping of child workflow input field names to values.
+     *             Values can be static (string, int, bool, dict, list) or template
+     *             expressions (${step_id.field.path}).
+     */
+    SubWorkflowExecutorParameters: {
+      /**
+       * Workflow Id
+       * @description UUID of the child workflow to invoke (latest published version), or template expression (max 500 chars)
+       */
+      workflow_id: string
+      /**
+       * Trigger Node Id
+       * @description Graph node ID of the Subworkflow Trigger to invoke in the child workflow
+       */
+      trigger_node_id: string
+      /**
+       * Input Mapping
+       * @description Mapping of child workflow input field names to static values or template expressions. Keys are child workflow input field names; values can be static types (string, int, bool, dict, list) or template expression strings (${step_id.field.path}). Max 100 entries.
+       */
+      input_mapping?: {
+        [key: string]: unknown
+      }
+    }
+    /**
+     * SubWorkflowNode
+     * @description Sub-workflow executor node.
+     *
+     *     Invokes another published workflow in reference mode and waits for its completion.
+     *     The parent workflow can access child workflow outputs via template expressions.
+     */
+    SubWorkflowNode: {
+      /**
+       * Id
+       * @description Unique identifier for the node within the workflow
+       */
+      id: string
+      /**
+       * Name
+       * @description Human-readable name for the node
+       */
+      name?: string | null
+      /**
+       * Description
+       * @description Human-readable description of the node purpose
+       */
+      description?: string | null
+      /**
+       * Outputs
+       * @description Output extraction mapping
+       */
+      outputs?: {
+        [key: string]: string
+      } | null
+      /** @description Optional UI position hint */
+      position?: components['schemas']['NodePosition'] | null
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'sub_workflow'
+      parameters: components['schemas']['SubWorkflowExecutorParameters']
+      settings?: components['schemas']['NodeSettingsNoRetry'] | null
+    } & {
+      [key: string]: unknown
+    }
+    /**
      * SwitchCase
      * @description A single case in a switch node.
      */
@@ -1686,6 +1765,7 @@ export interface components {
         | components['schemas']['AgenticNode']
         | components['schemas']['ScriptNode']
         | components['schemas']['ApprovalNode']
+        | components['schemas']['SubWorkflowNode']
         | components['schemas']['ConditionNode']
         | components['schemas']['SwitchNode']
         | components['schemas']['LoopNode']

@@ -1037,6 +1037,8 @@ components:
       $ref: ./shared-schemas.yaml#/components/schemas/ScriptNode
     ApprovalNode:
       $ref: ./shared-schemas.yaml#/components/schemas/ApprovalNode
+    SubWorkflowNode:
+      $ref: ./shared-schemas.yaml#/components/schemas/SubWorkflowNode
     ConditionNode:
       $ref: ./shared-schemas.yaml#/components/schemas/ConditionNode
     SwitchNode:
@@ -1062,6 +1064,8 @@ components:
       $ref: ./shared-schemas.yaml#/components/schemas/ScriptExecutorParameters
     ApprovalNodeParameters:
       $ref: ./shared-schemas.yaml#/components/schemas/ApprovalNodeParameters
+    SubWorkflowExecutorParameters:
+      $ref: ./shared-schemas.yaml#/components/schemas/SubWorkflowExecutorParameters
     ConditionNodeParameters:
       $ref: ./shared-schemas.yaml#/components/schemas/ConditionNodeParameters
     SwitchNodeParameters:
