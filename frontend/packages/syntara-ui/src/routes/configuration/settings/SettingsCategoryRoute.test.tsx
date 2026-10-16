@@ -35,7 +35,15 @@ const applicationSettings = [
   },
 ]
 
-function renderCategoryRoute() {
+function setPathname(pathname: string) {
+  mockUseRouterState.mockImplementation((options: { select: (state: { location: { pathname: string } }) => unknown }) =>
+    options.select({ location: { pathname } })
+  )
+}
+
+function renderCategoryRoute(pathname = '/system-administration/settings/application') {
+  setPathname(pathname)
+
   return render(
     <SettingsCategoryTabContext
       value={{
@@ -54,16 +62,38 @@ function renderCategoryRoute() {
 
 describe('SettingsCategoryRoute', () => {
   beforeEach(() => {
-    mockUseRouterState.mockImplementation(
-      (options: { select: (state: { location: { pathname: string } }) => unknown }) =>
-        options.select({ location: { pathname: '/system-administration/settings/application' } })
-    )
+    setPathname('/system-administration/settings/application')
   })
 
   it('renders the category selected by the route parameter', () => {
     renderCategoryRoute()
 
     expect(screen.getByText('Debug mode')).toBeInTheDocument()
+  })
+
+  it('renders nothing when the path is outside the settings route', () => {
+    const { container } = renderCategoryRoute('/system-administration/users')
+
+    expect(container).toBeEmptyDOMElement()
+  })
+
+  it('renders nothing when the settings path has no category', () => {
+    const { container } = renderCategoryRoute('/system-administration/settings/')
+
+    expect(container).toBeEmptyDOMElement()
+  })
+
+  it('renders nothing when the category tab context is missing', () => {
+    const { container } = render(<SettingsCategoryRoute />)
+
+    expect(container).toBeEmptyDOMElement()
+  })
+
+  it('renders an empty category when the route category has no settings', () => {
+    renderCategoryRoute('/system-administration/settings/unknown')
+
+    expect(screen.queryByText('Debug mode')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Reset to defaults' })).toBeDisabled()
   })
 
   it('has no accessibility violations', async () => {
