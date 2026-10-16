@@ -31,7 +31,7 @@ test.describe('Builder save validation — project required', () => {
     await ensureProject(app)
 
     await app.goto(toAppUrl('/workflow-builder/new'))
-    await expect(app.getByRole('heading', { name: 'Select a trigger node' })).toBeVisible()
+    await expect(app.getByRole('heading', { name: 'Select a trigger step type' })).toBeVisible()
 
     // Add a trigger step
     await app.getByRole('button', { name: 'Manual trigger' }).click()
@@ -84,7 +84,7 @@ test.describe('Builder save validation — project required', () => {
    */
   test('Save button is clickable even without a project selected', async ({ app }) => {
     await app.goto(toAppUrl('/workflow-builder/new'))
-    await expect(app.getByRole('heading', { name: 'Select a trigger node' })).toBeVisible()
+    await expect(app.getByRole('heading', { name: 'Select a trigger step type' })).toBeVisible()
 
     const saveButton = app.getByRole('button', { name: 'Save workflow' })
     await expect(saveButton).toBeVisible()
@@ -100,7 +100,7 @@ test.describe('Builder save validation — project required', () => {
     await ensureProject(app)
 
     await app.goto(toAppUrl('/workflow-builder/new'))
-    await expect(app.getByRole('heading', { name: 'Select a trigger node' })).toBeVisible()
+    await expect(app.getByRole('heading', { name: 'Select a trigger step type' })).toBeVisible()
 
     try {
       // Add a trigger step
@@ -139,7 +139,7 @@ test.describe('Builder save validation — project required', () => {
     await ensureProject(app)
 
     await app.goto(toAppUrl('/workflow-builder/new'))
-    await expect(app.getByRole('heading', { name: 'Select a trigger node' })).toBeVisible()
+    await expect(app.getByRole('heading', { name: 'Select a trigger step type' })).toBeVisible()
 
     await app.getByRole('button', { name: 'Manual trigger' }).click()
     await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Manual trigger')

@@ -101,7 +101,7 @@ test.describe('Manual Trigger', () => {
     await ensureProject(app)
     await app.goto(toAppUrl('/workflow-builder/new'))
 
-    await expect(app.getByRole('heading', { name: /select a trigger node/i })).toBeVisible({ timeout: 10_000 })
+    await expect(app.getByRole('heading', { name: /select a trigger step type/i })).toBeVisible({ timeout: 10_000 })
     await app.getByRole('button', { name: 'Manual trigger' }).click()
 
     const nameInput = app.getByRole('textbox', { name: 'Name', exact: true })

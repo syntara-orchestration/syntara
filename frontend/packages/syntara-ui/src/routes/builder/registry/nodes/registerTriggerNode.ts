@@ -33,7 +33,7 @@ export default function registerTriggerNode() {
         description: 'Start workflow execution with manual, scheduled, or event triggers',
         keywords: ['start', 'begin', 'manual', 'schedule', 'event', 'webhook', 'api', 'http', 'eda'],
         order: 100,
-        selectionTitle: 'Select a trigger node',
+        selectionTitle: 'Select a trigger step type',
         subtypes: [
           {
             id: RegistryNodeId.TRIGGER_MANUAL,

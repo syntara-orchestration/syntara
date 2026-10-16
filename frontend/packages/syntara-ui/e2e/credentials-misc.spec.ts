@@ -141,7 +141,7 @@ test.describe('Credential Selector — Error State', () => {
 
     try {
       await app.goto(toAppUrl('/workflow-builder/new'))
-      await expect(app.getByRole('heading', { name: 'Select a trigger node' })).toBeVisible()
+      await expect(app.getByRole('heading', { name: 'Select a trigger step type' })).toBeVisible()
 
       await selectProjectIfRequired(app)
 

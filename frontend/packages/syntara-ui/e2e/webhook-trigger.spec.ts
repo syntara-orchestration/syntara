@@ -85,7 +85,7 @@ test.describe('Webhook Trigger', () => {
     await app.goto(toAppUrl('/workflow-builder/new'))
 
     // Wait for trigger selection and select Webhook trigger
-    await expect(app.getByRole('heading', { name: /select a trigger node/i })).toBeVisible({ timeout: 10_000 })
+    await expect(app.getByRole('heading', { name: /select a trigger step type/i })).toBeVisible({ timeout: 10_000 })
     await app.getByRole('button', { name: 'Webhook trigger', exact: true }).click()
 
     // Type a path
@@ -107,7 +107,7 @@ test.describe('Webhook Trigger', () => {
     try {
       await app.goto(toAppUrl('/workflow-builder/new'))
 
-      await expect(app.getByRole('heading', { name: /select a trigger node/i })).toBeVisible({ timeout: 10_000 })
+      await expect(app.getByRole('heading', { name: /select a trigger step type/i })).toBeVisible({ timeout: 10_000 })
       await app.getByRole('button', { name: 'Webhook trigger', exact: true }).click()
 
       // Clear the auto-generated path — trigger fields are optional by design
@@ -138,7 +138,7 @@ test.describe('Webhook Trigger', () => {
   test('webhook form validates invalid path characters', async ({ app }) => {
     await app.goto(toAppUrl('/workflow-builder/new'))
 
-    await expect(app.getByRole('heading', { name: /select a trigger node/i })).toBeVisible({ timeout: 10_000 })
+    await expect(app.getByRole('heading', { name: /select a trigger step type/i })).toBeVisible({ timeout: 10_000 })
     await app.getByRole('button', { name: 'Webhook trigger', exact: true }).click()
 
     // Enter invalid characters
