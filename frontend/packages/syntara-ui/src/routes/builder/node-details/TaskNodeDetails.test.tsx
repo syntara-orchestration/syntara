@@ -145,6 +145,20 @@ vi.mock('../node-forms/AAPJobTemplateForm', () => ({
       >
         Update with input variables
       </button>
+      <button
+        onClick={() =>
+          onSubmit({
+            name: 'Updated AAP Task',
+            use_input_variables: false,
+            organization_name: 'Default',
+            job_template_name: 'Deploy App',
+            job_template_id: undefined,
+          })
+        }
+        data-testid="aap-submit-disable-input-vars-button"
+      >
+        Disable input variables after re-enabling picker mode
+      </button>
       <button onClick={onCancel} data-testid="aap-cancel-button">
         Cancel
       </button>
@@ -422,6 +436,31 @@ describe('TaskNodeDetails Component', () => {
     renderTaskNodeDetails(taskData, 'task-aap')
 
     await user.click(screen.getByTestId('aap-submit-input-vars-button'))
+
+    expect(mockShowError).not.toHaveBeenCalled()
+    expect(mockUpdateActivity).toHaveBeenCalledWith('task-aap', expect.objectContaining({ name: 'Updated AAP Task' }))
+  })
+
+  // AAP-95765: enabling "Use input variables" on a JT node and saving strips job_template_id
+  // from the stored config (see buildExpressionModeActivity). Re-opening the node and disabling
+  // the toggle again never restores job_template_id, so the save below should still succeed
+  // (the JT must be referenced correctly) instead of failing with a "positive integer" error.
+  it('updates an AAP job template when disabling use_input_variables after it was previously enabled', async () => {
+    const user = userEvent.setup()
+    const taskData = {
+      type: 'aap_job_template' as const,
+      id: 'task-aap',
+      name: 'AAP Task',
+      parameters: {
+        use_input_variables: true,
+        organization_name: 'Default',
+        job_template_name: 'Deploy App',
+      },
+    }
+
+    renderTaskNodeDetails(taskData, 'task-aap')
+
+    await user.click(screen.getByTestId('aap-submit-disable-input-vars-button'))
 
     expect(mockShowError).not.toHaveBeenCalled()
     expect(mockUpdateActivity).toHaveBeenCalledWith('task-aap', expect.objectContaining({ name: 'Updated AAP Task' }))
