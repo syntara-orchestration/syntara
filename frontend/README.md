@@ -194,7 +194,7 @@ We welcome contributions! Please read our [Contributing Guidelines](CONTRIBUTING
 - React 19 with TypeScript
 - Vite build tool
 - PatternFly 6
-- Wouter (routing)
+- TanStack Router (routing)
 - TanStack Query (data fetching)
 - openapi-fetch + openapi-react-query (type-safe API client)
 - Fuse.js (fuzzy search)

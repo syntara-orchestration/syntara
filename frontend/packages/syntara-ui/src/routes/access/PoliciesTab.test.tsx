@@ -36,15 +36,6 @@ vi.mock('../../components/details/SynCodeBlock', () => ({
   SynCodeBlock: ({ jsonObject }: { jsonObject: unknown }) => <pre>{JSON.stringify(jsonObject)}</pre>,
 }))
 
-vi.mock('wouter', async () => {
-  const React = await import('react')
-  return {
-    useLocation: () => ['/system-administration/access-management/policies', vi.fn()],
-    useSearch: () => '',
-    useSearchParams: () => React.useState(new URLSearchParams()),
-  }
-})
-
 const samplePolicies: PolicyRead[] = [
   {
     id: 'p1',

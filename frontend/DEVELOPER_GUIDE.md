@@ -21,7 +21,7 @@ Syntara UI is a React-based application for building and managing complex automa
 
 ### Technology Stack
 
-- **Frontend**: React 19, TypeScript, Wouter
+- **Frontend**: React 19, TypeScript, TanStack Router
 - **Styling**: PatternFly 6
 - **State Management**: TanStack Query (server state), Zustand (client state)
 - **API Integration**: openapi-fetch, openapi-react-query
@@ -70,7 +70,7 @@ npm start
 
 ### Key Architectural Patterns
 
-- Centralized routing: path constants in `src/app/AppRoute.tsx`, route mapping in `src/app/AppRouter.tsx`
+- Routing: route definitions in `src/app/routes/` are assembled by `src/app/tanstackRouteTree.tsx` and mounted through TanStack Router's `RouterProvider`. `src/app/AppRoute.tsx` holds reusable path strings, while `src/app/navigationItems.tsx` defines navigation and its permission visibility.
 - Lazy-loaded components
 - Type-safe API calls
 - Automatic memoization via React Compiler

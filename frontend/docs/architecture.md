@@ -19,7 +19,7 @@ This document explains **how the Syntara UI is organized**, **how it fetches dat
 7. [Your First Day](#your-first-day)
 8. [Repository Layout](#repository-layout-monorepo)
 9. [App Startup](#app-startup-where-everything-begins)
-10. [Routing](#routing-wouter)
+10. [Routing](#routing-tanstack-router)
 11. [State Management](#state-management)
 12. [Backend Requests + Data Flow](#backend-requests--data-flow-tanstack-query--openapi-clients)
 13. [Workflow Builder](#workflow-builder-backend-workflow--ui-graph-react-flow)
@@ -53,7 +53,7 @@ Nice to have (but we'll explain the basics):
 | **Zustand**           | Lightweight state management library (like Redux but simpler). We use it for workflow editing state.                        | [Zustand docs](https://zustand-demo.pmnd.rs/)              |
 | **TanStack Query**    | Server-state library that handles fetching, caching, and synchronizing backend data. Replaces manual `useEffect` + `fetch`. | [TanStack Query docs](https://tanstack.com/query/latest)   |
 | **React Flow**        | Library for building node-based editors (like our workflow canvas). Nodes + edges = graph.                                  | [React Flow docs](https://reactflow.dev/)                  |
-| **Wouter**            | Tiny router (~1KB). Like React Router but minimal.                                                                          | [Wouter docs](https://github.com/molefrog/wouter)          |
+| **TanStack Router**   | Client-side router used to match route objects, validate search state, and navigate between screens.                        | [TanStack Router docs](https://tanstack.com/router/latest) |
 | **OpenAPI**           | Specification for REST APIs. We generate TypeScript types from the backend's OpenAPI spec.                                  | [OpenAPI spec](https://swagger.io/specification/)          |
 | **Dagre**             | Graph layout algorithm. Automatically positions nodes so the workflow looks organized.                                      | [Dagre wiki](https://github.com/dagrejs/dagre/wiki)        |
 | **useWebSocketStore** | Zustand store that manages WebSocket connections, reconnection, and message routing.                                        | [`websocket-architecture.md`](./websocket-architecture.md) |
@@ -70,7 +70,7 @@ Nice to have (but we'll explain the basics):
 
 **Three things to remember:**
 
-1. **Routing**: Wouter + a `navigationItems` tree → `AppRouter` maps it into routes.
+1. **Routing**: TanStack Router route objects under `app/routes/` are assembled into a route tree and mounted with `RouterProvider`. `navigationItems.tsx` describes the navigation tree and its permission visibility.
 2. **Backend data**: Typed OpenAPI clients (`openapi-react-query`) → TanStack Query cache.
 3. **Workflow builder**:
    - API v2 uses **flat** nodes + edges (same as the builder's internal model)
@@ -100,7 +100,7 @@ Nice to have (but we'll explain the basics):
 | **State (Server)**  | TanStack Query                          | Caching, fetching, synchronizing API data     |
 | **State (Client)**  | Zustand                                 | Lightweight store for workflow editing        |
 | **WebSocket**       | Pure Zustand store                      | Real-time communication with backend          |
-| **Routing**         | Wouter                                  | Minimal router (~1KB)                         |
+| **Routing**         | TanStack Router                         | Route tree, route matching, and URL state     |
 | **Build**           | Vite                                    | Fast dev server and bundler                   |
 | **Testing**         | Vitest + Testing Library                | Unit and component testing                    |
 
@@ -113,12 +113,14 @@ Nice to have (but we'll explain the basics):
 ```mermaid
 flowchart TD
   A[main.tsx] --> B[registerAllNodes]
-  A --> C[Lazy load App]
-  C --> D[App.tsx]
-  D --> E[QueryClientProvider]
-  E --> F[AppRouter.tsx wouter]
-  F --> G[navigationItems.tsx]
-  G --> H[Route elements lazy screens]
+  A --> C[Render App]
+  C --> D[App.tsx providers]
+  D --> E[RouterProvider]
+  E --> F[tanstackRouter.ts]
+  F --> G[tanstackRouteTree.tsx]
+  G --> H[Root route and route modules]
+  H --> I[Matched screen component]
+  H --> J[RootLayout: AppShell and Outlet]
 ```
 
 ### Backend request flow (typical screen)
@@ -336,25 +338,33 @@ This is why adding a new canvas step type is usually just "create a new `registe
 **App root**: `packages/syntara-ui/src/app/App.tsx`
 
 - Imports the singleton `QueryClient` from `src/queryClient.ts` and provides it via `QueryClientProvider`
-- Renders the global layout and mounts `AppRouter`
+- Mounts `RouterProvider` with the module-scoped router from `tanstackRouter.ts`
+- The router tree is assembled from route modules under `app/routes/`; the root route renders `RootLayout`, which places the matched screen in `AppShell` through an `Outlet`
 
 > The `QueryClient` is defined in `src/queryClient.ts` (not inline in `App.tsx`) so that `useAuthStore` can import it directly to call `queryClient.clear()` on logout, session expiry, and auth middleware failures — preventing stale permission cache from leaking across user sessions.
 
 ---
 
-## Routing (Wouter)
+## Routing (TanStack Router)
+
+The app creates one module-scoped router in `app/tanstackRouter.ts` and mounts it with `RouterProvider` in `App.tsx`. `buildTanStackRouteTree()` assembles the root route and route groups from `app/routes/*.tsx`. Those modules declare screens with TanStack Router's `createRoute`, including URL search validation where needed. The root route renders `RootLayout`, which wraps the matched page in `AppShell` and renders it through an `Outlet`.
+
+`navigationItems.tsx` is separate from route registration. It describes the app's navigation tree, labels, and visibility requirements. It does not generate the router's route tree.
 
 ```mermaid
 flowchart LR
   subgraph Definition["Route Definition"]
-    AR[AppRoute.tsx<br/>path constants]
-    NI[navigationItems.tsx<br/>nav tree + lazy components]
+    Root["routes/__root.ts<br/>RootLayout"]
+    Modules["routes/*.tsx<br/>createRoute declarations"]
+    Tree["tanstackRouteTree.tsx<br/>assemble route groups"]
+    Root --> Tree
+    Modules --> Tree
   end
 
-  subgraph Router["AppRouter.tsx"]
-    Map["Map navigationItems"]
-    Route["<Route> elements"]
-    Map --> Route
+  subgraph Runtime["TanStack Router"]
+    Router["tanstackRouter.ts"]
+    Provider["RouterProvider"]
+    Router --> Provider
   end
 
   subgraph URL["Browser URL"]
@@ -363,39 +373,46 @@ flowchart LR
     U3["/system-administration/settings"]
   end
 
-  AR --> NI
-  NI --> Router
-  URL --> Router
-  Router -->|"match"| Component["Lazy-loaded Component"]
+  Tree --> Router
+  URL --> Provider
+  Provider -->|"match"| Component["Matched screen component"]
+  Root -->|"layout"| Shell["RootLayout > AppShell > Outlet"]
 ```
 
-| File                      | Role                                                                       |
-| ------------------------- | -------------------------------------------------------------------------- |
-| `app/AppRoute.tsx`        | Route path constants (e.g., `/workflows`, `/workflow-builder/:workflowId`) |
-| `app/navigationItems.tsx` | Defines nav tree + lazy-loaded route components                            |
-| `app/AppRouter.tsx`       | Maps `navigationItems` into `<Route>` elements                             |
+| File                         | Role                                                                                                          |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `app/tanstackRouter.ts`      | Creates the module-scoped TanStack Router instance from the assembled route tree.                             |
+| `app/tanstackRouteTree.tsx`  | Combines the root route and route groups declared under `app/routes/`.                                        |
+| `app/routes/__root.ts`       | Defines the root route, root layout, and not-found redirect.                                                  |
+| `app/routes/*.tsx`           | Declares route objects with `createRoute`, screen components, permissions, and search validation.             |
+| `app/makeRouteComponent.tsx` | Wraps screen components in loading/error boundaries and, when requested, a `ProtectedRoute` permission check. |
+| `app/RootLayout.tsx`         | Renders `AppShell` and the matched child route through `Outlet`.                                              |
+| `app/AppRoute.tsx`           | Holds reusable path strings for common destinations.                                                          |
+| `app/navigationItems.tsx`    | Defines navigation labels, hierarchy, and permission-based visibility; it does not register routes.           |
 
 **Permission gating on routes:**
 
-Each `TNavigationItem` in `navigationItems.tsx` supports two permission fields:
+Navigation visibility and route access are handled separately:
 
-- `requiredPermissions` (array of `{ action, resourceType }`, OR logic): controls navigation visibility. The item is hidden if the user lacks ALL listed permissions. Consumed by `useFilteredNavigationItems`.
-- `routePermission` (single `{ action, resourceType }`): wraps the route component in `ProtectedRoute`, which shows `SynEmptyStateAccessDenied` when the permission check fails. Used for create/edit routes.
+- `requiredPermissions` on a navigation item (array of `{ action, resourceType }`, OR logic) controls whether that item is shown. `useFilteredNavigationItems` hides it when none of the listed permissions are granted.
+- Route definitions pass an optional permission requirement to `makeRouteComponent`, which wraps the screen in `ProtectedRoute` and shows `SynEmptyStateAccessDenied` when access is denied.
 
 See [`docs/permissions-rbac.md`](permissions-rbac.md) for the full permission gating architecture.
 
-> **Note**: The `/dashboard` route is defined in `AppRoute.tsx` and appears in navigation, but has no component mounted (placeholder for future implementation).
+> **Note**: `AppRoute.Dashboard` is a path constant only. There is no matching route declaration or navigation item for `/dashboard` in the current app.
 
 **Common patterns:**
 
 ```tsx
 // Navigate programmatically
-const [, navigate] = useLocation()
-navigate('/workflows')
+const navigate = useNavigate()
+detachPromise(navigate({ to: AppRoute.Workflows.Root }))
 
-// Read URL params
-const { workflowId } = useParams()
+// Read route params in a component that is not bound to one route object
+const { executionId }: { executionId: string } = useParams({ strict: false })
 ```
+
+Use `SynLink` for UI links and TanStack Router's `useNavigate` for programmatic navigation. Route modules may validate URL search state with `validateSearch`; components read router state with TanStack Router hooks. Some existing destinations still use reusable strings from `AppRoute.tsx` while route APIs are being migrated.
 
 **Routing strategy details:**
 
@@ -1106,9 +1123,10 @@ flowchart TB
 
 ### Add a new screen/route
 
-1. Add path constant in `app/AppRoute.tsx`
-2. Add lazy route entry in `app/navigationItems.tsx`
-3. `AppRouter.tsx` picks it up automatically
+1. Add a `createRoute` declaration to the appropriate module under `app/routes/` (or create a route module for a new area).
+2. Add the new route group to `buildTanStackRouteTree()` in `app/tanstackRouteTree.tsx`.
+3. Add a reusable path string to `app/AppRoute.tsx` when callers need it outside the route declaration.
+4. Add an item to `app/navigationItems.tsx` only when the screen should appear in the app navigation; set `requiredPermissions` for visibility rules.
 
 ### Add a new API call
 
