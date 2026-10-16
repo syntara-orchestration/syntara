@@ -276,15 +276,18 @@ describe('OutputPanel', () => {
       expect(mockUnpinOutputMock).toHaveBeenCalledWith(testNodeId)
     })
 
-    it('prioritizes real output data over mock data', () => {
+    it('shows pinned mock data instead of last-run output data when mock is pinned (AAP-89683)', () => {
+      // AAP-89683: when mock data is pinned, the Output panel must display the
+      // pinned mock value (matching the "Edit mock data" dialog), not the last
+      // execution's real output, even if real output data exists.
       const mockOutput = { mock: 'data' }
       mockGetOutputMock.mockReturnValue(mockOutput)
 
       renderWithProviders(<OutputPanel outputData={sampleOutput} nodeId={testNodeId} />)
 
-      // Should show real data, not mock
-      expect(screen.getByText(/"result": "success"/)).toBeInTheDocument()
-      expect(screen.queryByText(/"mock": "data"/)).not.toBeInTheDocument()
+      // Pinned mock data should be authoritative, not the last real execution output
+      expect(screen.getByText(/"mock": "data"/)).toBeInTheDocument()
+      expect(screen.queryByText(/"result": "success"/)).not.toBeInTheDocument()
     })
 
     it('pre-populates editor with existing mock data when setting mock again', async () => {
