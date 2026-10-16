@@ -98,7 +98,7 @@ class TestResolveLlmModelAndIntegration:
         assert ca_cert is None
 
     @pytest.mark.asyncio
-    async def test_happy_path_no_base_url(self) -> None:
+    async def test_happy_path_no_base_url_uses_provider_default(self) -> None:
         executor, session = _make_executor()
         mock_model, mock_integration = _mock_model_and_integration(base_url=None)
         session.get = _session_get_dispatch(mock_model, mock_integration)
@@ -108,7 +108,7 @@ class TestResolveLlmModelAndIntegration:
         )
 
         assert model_id == "gpt-4o"
-        assert base_url is None
+        assert base_url == "https://api.openai.com/v1"
         assert provider_hint == "openai"
         assert skip_tls is False
         assert ca_cert is None
