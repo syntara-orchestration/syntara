@@ -1,5 +1,3 @@
-import { randomUUID } from 'node:crypto'
-
 import { type Page, expect, toAppUrl } from '../fixtures'
 import {
   createBasicWorkflowViaApi,
@@ -15,8 +13,7 @@ import { clickSaveAndWait } from './workflow-save'
 export { createBasicWorkflowViaApi, publishWorkflowViaApi }
 export { clickAddConnectedStep }
 export { clickSaveAndWait, isWorkflowSaveResponse } from './workflow-save'
-
-export const buildUniqueName = (prefix: string) => `${prefix}-${Date.now()}-${randomUUID()}`
+export { buildUniqueName } from './workflowNames'
 
 export const addNodePanel = (page: Page) =>
   page.getByRole('region', {
