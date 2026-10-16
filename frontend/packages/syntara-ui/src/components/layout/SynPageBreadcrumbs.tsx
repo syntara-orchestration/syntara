@@ -1,10 +1,11 @@
-import { Breadcrumb, BreadcrumbItem } from '@patternfly/react-core'
+import { Breadcrumb, BreadcrumbItem, Truncate } from '@patternfly/react-core'
 import type { BreadcrumbItemRenderArgs } from '@patternfly/react-core'
 import { Link } from '@tanstack/react-router'
 import { useSyncExternalStore } from 'react'
 
 import type { AppBreadcrumbItem } from '../../app/breadcrumbs/appBreadcrumbItem'
 
+import styles from './SynPageBreadcrumbs.module.css'
 import { SynPageBreadcrumbsCollapsedMiddle } from './SynPageBreadcrumbsCollapsedMiddle'
 
 export type { AppBreadcrumbItem }
@@ -41,6 +42,17 @@ function useNarrowViewportForBreadcrumb() {
   return useSyncExternalStore(subscribeNarrowMedia, getNarrowMediaSnapshot, getNarrowMediaServerSnapshot)
 }
 
+function BreadcrumbCurrentLabel({ label }: Readonly<{ label: string }>) {
+  return (
+    <Truncate
+      content={label}
+      className={styles.currentSegment}
+      data-testid="breadcrumb-current-segment"
+      tooltipProps={{ enableFlip: true, maxWidth: 'min(100vw - 2rem, 24rem)' }}
+    />
+  )
+}
+
 type SynPageBreadcrumbsProps = Readonly<{
   /** Ordered breadcrumb segments. Requires at least two items to render. */
   items: readonly AppBreadcrumbItem[]
@@ -62,7 +74,7 @@ export function SynPageBreadcrumbs(props: SynPageBreadcrumbsProps) {
   const collapseMiddle = isNarrow && middle.length >= 2
 
   return (
-    <Breadcrumb aria-label="Breadcrumb">
+    <Breadcrumb aria-label="Breadcrumb" className={styles.breadcrumb}>
       {collapseMiddle ? (
         <>
           {first.href ? (
@@ -71,7 +83,9 @@ export function SynPageBreadcrumbs(props: SynPageBreadcrumbsProps) {
             <BreadcrumbItem isActive>{first.label}</BreadcrumbItem>
           )}
           <SynPageBreadcrumbsCollapsedMiddle middleItems={middle} />
-          <BreadcrumbItem isActive>{last.label}</BreadcrumbItem>
+          <BreadcrumbItem isActive>
+            <BreadcrumbCurrentLabel label={last.label} />
+          </BreadcrumbItem>
         </>
       ) : (
         items.map((item, index) => {
@@ -80,7 +94,7 @@ export function SynPageBreadcrumbs(props: SynPageBreadcrumbsProps) {
           if (isLast) {
             return (
               <BreadcrumbItem key={itemKey} isActive>
-                {item.label}
+                <BreadcrumbCurrentLabel label={item.label} />
               </BreadcrumbItem>
             )
           }

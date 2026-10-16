@@ -112,14 +112,14 @@ describe('SynPageBreadcrumbs', () => {
     expect(toggle).toHaveAttribute('aria-expanded', 'false')
   })
 
-  it('renders very long labels so entity names remain available in the DOM', () => {
-    const longLabel = `Project ${'x'.repeat(400)}`
+  it('renders a long current-page label with PatternFly Truncate', () => {
+    const longLabel = `Project ${'x'.repeat(200)}`
 
     render(
       <SynPageBreadcrumbs items={[{ label: 'Access management', href: '/access-management' }, { label: longLabel }]} />
     )
 
-    expect(screen.getByText(longLabel)).toBeInTheDocument()
+    expect(screen.getByTestId('breadcrumb-current-segment')).toHaveTextContent(longLabel)
   })
 
   it('renders a non-link middle segment in the full trail (wide viewport)', () => {

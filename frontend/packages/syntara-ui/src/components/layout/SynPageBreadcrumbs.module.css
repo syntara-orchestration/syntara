@@ -1,0 +1,34 @@
+.breadcrumb {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.breadcrumb :global(.pf-v6-c-breadcrumb__list) {
+  flex-wrap: nowrap;
+  width: 100%;
+  min-width: 0;
+}
+
+.breadcrumb :global(.pf-v6-c-breadcrumb__item:not(:last-child)) {
+  flex-shrink: 0;
+}
+
+/* Let the current-page crumb shrink so earlier links stay visible. */
+.breadcrumb :global(.pf-v6-c-breadcrumb__item:last-child) {
+  min-width: 0;
+  flex: 1 1 0%;
+  overflow: hidden;
+}
+
+/* Truncate uses inline-grid; do not override with block. Constrain width for ellipsis + tooltip. */
+.breadcrumb :global(.pf-v6-c-breadcrumb__item:last-child) :global(.pf-v6-c-truncate) {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.currentSegment {
+  min-width: 0;
+  max-width: 100%;
+}

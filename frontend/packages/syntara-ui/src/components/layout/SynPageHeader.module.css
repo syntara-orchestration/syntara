@@ -8,6 +8,12 @@
 
 .header :global(.pf-v6-c-compass__main-header-title) {
   min-width: 0;
+  width: 100%;
+}
+
+.header :global(.pf-v6-c-compass__main-header-title) :global(.pf-v6-c-stack) {
+  min-width: 0;
+  width: 100%;
 }
 
 .header :global(.pf-v6-c-compass__main-header-title) :is(h1, .pf-v6-c-title) {
