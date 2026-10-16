@@ -27,7 +27,7 @@ Not all settings apply to all node types. The available settings depend on the n
 | Tier | Fields | Node Types |
 |------|--------|------------|
 | **Full** | `disabled`, `continue_on_failure`, `timeout`, `retry_policy` | `http_request`, `aap_job_template`, `aap_workflow_job_template` |
-| **No Retry** | `disabled`, `continue_on_failure`, `timeout` | `script`, `agentic`, `approval` |
+| **No Retry** | `disabled`, `continue_on_failure`, `timeout` | `script`, `agentic`, `approval`, `form_prompt` |
 | **COF + Disabled** | `disabled`, `continue_on_failure` | `wait` |
 | **COF Only** | `continue_on_failure` | `converge`, `loop` |
 | **None** | *(no settings)* | `condition`, `switch` |
@@ -117,7 +117,9 @@ settings:
     backoff_coefficient: 2.0
 ```
 
-**Why only Full tier?** Retry is only applicable to nodes that make HTTP requests where the engine can classify transient vs permanent errors. Other node types either handle retry internally (agentic, approval) or have no retry semantics (script, control nodes).
+**Why only Full tier?** Retry is applicable to HTTP executor nodes, where the engine can
+classify transient vs. permanent failures. Other nodes either retry internally (`agentic`,
+`approval`, `form_prompt`) or have no retry semantics (`script`, control nodes).
 
 ## Resolution Order
 
@@ -143,7 +145,7 @@ Settings validation happens at two layers:
 NodeSettingsBase
   → NodeSettingsCof (+continue_on_failure)        ← converge, loop
     → NodeSettingsCofDisabled (+disabled)            ← wait
-      → NodeSettingsNoRetry (+timeout)             ← script, agentic, approval
+      → NodeSettingsNoRetry (+timeout)             ← script, agentic, approval, form_prompt
         → NodeSettingsFull (+retry_policy)          ← http_request, aap_*
 ```
 
