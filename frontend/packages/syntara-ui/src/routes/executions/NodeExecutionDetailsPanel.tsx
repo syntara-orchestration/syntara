@@ -373,7 +373,8 @@ export function NodeExecutionDetailsPanel({
   const { inputData, outputData, isLoading, error, refetch } = useNodeExecutionDetails(
     nodeId,
     executionId,
-    nodeState?.status
+    nodeState?.status,
+    nodeState?.outputData
   )
 
   const approvalAudit = useMemo(() => extractApprovalAudit(outputData), [outputData])

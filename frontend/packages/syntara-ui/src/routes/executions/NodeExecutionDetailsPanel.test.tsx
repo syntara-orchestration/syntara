@@ -139,6 +139,38 @@ describe('NodeExecutionDetailsPanel', () => {
     expect(screen.getByText('No parameters data')).toBeInTheDocument()
   })
 
+  // AAP-89482: a pre-resolved (mock data) predecessor was never actually run by the
+  // backend, so there is no ActivityExecution record and the activities REST query
+  // returns nothing for it. The mock output supplied via "Set mock data" is carried
+  // on the skipped node's ActivityState (nodeState.outputData) and must still be
+  // shown in the Output pane instead of an empty state.
+  it('shows the supplied mock output for a pre-resolved (skipped) node when no activity record exists', () => {
+    mockUseQuery.mockReturnValue({
+      data: { resources: [] },
+      isLoading: false,
+      error: null,
+      refetch: vi.fn(),
+    })
+
+    render(
+      <NodeExecutionDetailsPanel
+        {...defaultProps}
+        nodeState={{
+          activityId: 'first_action',
+          status: 'skipped',
+          startedAt: null,
+          completedAt: null,
+          outputData: { hostname: 'mock-server', load: 0.75, status: 'degraded' },
+        }}
+      />,
+      { wrapper }
+    )
+
+    expect(screen.queryByText('No output data')).not.toBeInTheDocument()
+    expect(screen.getByText(/"hostname"/)).toBeInTheDocument()
+    expect(screen.getByText(/"mock-server"/)).toBeInTheDocument()
+  })
+
   it('passes activity_name as query parameter for server-side filtering', () => {
     render(<NodeExecutionDetailsPanel {...defaultProps} />, { wrapper })
 

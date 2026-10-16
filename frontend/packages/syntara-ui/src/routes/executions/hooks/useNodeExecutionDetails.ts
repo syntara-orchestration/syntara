@@ -22,11 +22,17 @@ type NodeExecutionDetails = {
  *
  * When `activityStatus` changes (e.g. from WebSocket updates), the query
  * refetches so the Parameters/Output panes stay current.
+ *
+ * A pre-resolved (mock data) node is never actually run by the backend, so no
+ * ActivityExecution record exists for it and the query returns no resource.
+ * `fallbackOutputData` (the node's in-memory ActivityState.outputData) is used
+ * as the Output pane content in that case.
  */
 export function useNodeExecutionDetails(
   nodeId: string,
   executionId: string | null | undefined,
-  activityStatus?: ActivityStatus
+  activityStatus?: ActivityStatus,
+  fallbackOutputData?: Record<string, unknown> | null
 ): NodeExecutionDetails {
   const queryResult = executionsClient.useQuery(
     'get',
@@ -51,21 +57,21 @@ export function useNodeExecutionDetails(
   }, [activityStatus, refetch])
 
   return useMemo(() => {
-    if (!data) {
-      return { inputData: null, outputData: null, isLoading, error, refetch }
-    }
+    const activity = data?.resources?.[0]
 
-    const activity = data.resources?.[0]
+    if (!activity) {
+      return { inputData: null, outputData: fallbackOutputData ?? null, isLoading, error, refetch }
+    }
 
     // Contract types input_data as Record<string, never> — the runtime values
     // are arbitrary JSON objects, so we widen to Record<string, unknown>.
     // output_data is already typed as Record<string, unknown> | null in the contract.
     return {
-      inputData: activity?.input_data ?? null,
-      outputData: activity?.output_data ?? null,
+      inputData: activity.input_data ?? null,
+      outputData: activity.output_data ?? null,
       isLoading,
       error,
       refetch,
     }
-  }, [data, isLoading, error, refetch])
+  }, [data, isLoading, error, refetch, fallbackOutputData])
 }
