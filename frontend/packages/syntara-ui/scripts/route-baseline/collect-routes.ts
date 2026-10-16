@@ -1,10 +1,7 @@
-import { existsSync, readdirSync, readFileSync } from 'node:fs'
-import { basename, join } from 'node:path'
-
 import { extractParameters, normalizeTemplate } from './normalize-route'
+import { collectRouteGraph, parseRouteSource } from './route-graph'
 import {
   absolutePathSchema,
-  parsedCreateRouteSchema,
   plainObjectSchema,
   type NormalizedRoute,
   type ParsedCreateRoute,
@@ -101,8 +98,8 @@ export type ParseCreateRouteBlocksOptions = {
 /**
  * Parse `createRoute({ ... })` blocks from a route module source string.
  *
- * Uses brace-depth scanning so nested option objects cannot truncate the block.
- * Text parsing avoids importing page components or CSS.
+ * Uses the TypeScript parser and symbol resolution for parent references.
+ * Source analysis avoids executing page components or CSS.
  *
  * Redirect targets may be string literals or `AppRoute.Foo.Bar` references
  * (resolved via {@link resolveAppRouteReference}).
@@ -115,26 +112,7 @@ export function parseCreateRouteBlocks(
   source: string,
   options: ParseCreateRouteBlocksOptions = {}
 ): ParsedCreateRoute[] {
-  const results: ParsedCreateRoute[] = []
-  const startRegex = /createRoute\s*\(\s*\{/g
-
-  for (const match of source.matchAll(startRegex)) {
-    const openBraceIndex = (match.index ?? 0) + match[0].lastIndexOf('{')
-    const body = extractBalancedObjectBody(source, openBraceIndex)
-    if (body === null) continue
-
-    const pathMatch = body.match(/\bpath:\s*['"]([^'"]+)['"]/)
-    const path = pathMatch?.[1]
-    if (!path) continue
-
-    const redirectTo = extractRedirectTarget(body, options.appRouteCatalog)
-    const parsed = parsedCreateRouteSchema.safeParse(
-      redirectTo ? { path, kind: 'redirect', redirectTo } : { path, kind: 'page' }
-    )
-    if (parsed.success) results.push(parsed.data)
-  }
-
-  return results
+  return parseRouteSource(source, (body) => extractRedirectTarget(body, options.appRouteCatalog))
 }
 
 /**
@@ -172,106 +150,35 @@ function extractRedirectTarget(body: string, appRouteCatalog: unknown): string |
 }
 
 /**
- * Parse `tanstackRouteTree.tsx` for route modules that are imported and mounted.
- *
- * A module counts as mounted only when its export is both imported from
- * `./routes/...` and spread into `addChildren([...])`.
- *
- * Returns the **imported** basenames (before re-export following). Prefer
- * {@link resolveMountedCreateRouteModules} when scraping `createRoute` files.
- *
- * @param treeSource - File contents of `tanstackRouteTree.tsx`
- * @returns Sorted unique route module basenames (for example `workflows`)
- */
-export function parseMountedRouteModules(treeSource: string): string[] {
-  const importByBinding = new Map<string, string>()
-
-  for (const match of treeSource.matchAll(/import\s*\{\s*(\w+)\s*\}\s*from\s*['"]\.\/routes\/([^'"]+)['"]/g)) {
-    const binding = match[1]
-    const modulePath = match[2]
-    if (!binding || !modulePath) continue
-    importByBinding.set(binding, basename(modulePath))
-  }
-
-  const mounted = new Set<string>()
-  const childrenMatch = treeSource.match(/addChildren\(\[([\s\S]*?)\]\)/)
-  const childrenBody = childrenMatch?.[1] ?? ''
-
-  for (const match of childrenBody.matchAll(/\.\.\.(\w+)/g)) {
-    const binding = match[1]
-    if (!binding) continue
-    const moduleName = importByBinding.get(binding)
-    if (moduleName) mounted.add(moduleName)
-  }
-
-  return [...mounted].sort()
-}
-
-/**
- * Resolve mounted tree imports to modules that actually contain `createRoute`.
- *
- * Follows static `export { ... } from './other'` / `export * from './other'`
- * re-exports under `routesDir` without executing route modules.
- *
- * @param routesDir - Absolute path to `src/app/routes`
- * @param treeSource - Contents of `tanstackRouteTree.tsx`
- * @returns Sorted basenames of modules that define `createRoute`
- */
-export function resolveMountedCreateRouteModules(routesDir: string, treeSource: string): string[] {
-  const mounted = new Set<string>()
-  for (const imported of parseMountedRouteModules(treeSource)) {
-    const resolved = followToCreateRouteModule(routesDir, imported)
-    mounted.add(resolved ?? imported)
-  }
-  return [...mounted].sort()
-}
-
-/**
  * Collect normalized routes from route modules mounted in the TanStack tree.
  *
- * Only files referenced by `tanstackRouteTree.tsx` (including one-hop+ static
- * re-exports) are scraped, so orphan `createRoute` modules cannot pollute the
- * baseline.
+ * Follows mounted route arrays and addChildren calls through TypeScript symbols,
+ * including imports and re-exports. Unmounted declarations do not enter the baseline.
  *
  * @param routesDir - Absolute path to `src/app/routes`
  * @param treeSource - Contents of `tanstackRouteTree.tsx`
  * @param appRouteCatalog - Catalog for resolving `redirect({ to: AppRoute... })`
- * @returns Deduplicated router routes plus any unmounted route file basenames
+ * @returns Deduplicated router routes plus unmounted paths relative to routesDir
  */
 export function collectMountedRouterRoutes(
   routesDir: string,
   treeSource: string,
   appRouteCatalog?: unknown
 ): { routes: NormalizedRoute[]; unmountedRouteFiles: string[] } {
-  const mountedModules = new Set(resolveMountedCreateRouteModules(routesDir, treeSource))
-  const routeFiles = readdirSync(routesDir).filter(
-    (name) => (name.endsWith('.tsx') || name.endsWith('.ts')) && !name.includes('.test.') && name !== '__root.ts'
+  const { routes, unmountedRouteFiles } = collectRouteGraph(routesDir, treeSource, (body) =>
+    extractRedirectTarget(body, appRouteCatalog)
   )
-
-  const unmountedRouteFiles = routeFiles
-    .filter((name) => {
-      const base = basename(name, name.endsWith('.tsx') ? '.tsx' : '.ts')
-      if (base === '__root') return false
-      const source = readFileSync(join(routesDir, name), 'utf-8')
-      return parseCreateRouteBlocks(source, { appRouteCatalog }).length > 0 && !mountedModules.has(base)
-    })
-    .sort()
 
   const byTemplate = new Map<string, NormalizedRoute>()
 
-  for (const moduleName of mountedModules) {
-    const fileName = resolveRouteModuleFile(routesDir, moduleName)
-    if (!fileName) continue
-    const source = readFileSync(join(routesDir, fileName), 'utf-8')
-    for (const route of parseCreateRouteBlocks(source, { appRouteCatalog })) {
-      mergeRoute(byTemplate, {
-        template: normalizeTemplate(route.path),
-        parameters: extractParameters(normalizeTemplate(route.path)),
-        kind: route.kind,
-        sources: ['router'],
-        ...(route.redirectTo ? { redirectTo: normalizeTemplate(route.redirectTo) } : {}),
-      })
-    }
+  for (const route of routes) {
+    mergeRoute(byTemplate, {
+      template: normalizeTemplate(route.path),
+      parameters: extractParameters(normalizeTemplate(route.path)),
+      kind: route.kind,
+      sources: ['router'],
+      ...(route.redirectTo ? { redirectTo: normalizeTemplate(route.redirectTo) } : {}),
+    })
   }
 
   return { routes: [...byTemplate.values()], unmountedRouteFiles }
@@ -487,70 +394,6 @@ export function collectFallbackRouteFromSource(rootSource: string): NormalizedRo
     redirectTo: normalizeTemplate(redirectTo.data),
     sources: ['router'],
   }
-}
-
-/**
- * Resolve a mounted module basename to a file under `routesDir`.
- *
- * @param routesDir - Absolute path to `src/app/routes`
- * @param moduleName - Basename without extension (for example `workflows`)
- * @returns Matching filename, or `undefined` when missing
- */
-function resolveRouteModuleFile(routesDir: string, moduleName: string): string | undefined {
-  const candidates = [`${moduleName}.tsx`, `${moduleName}.ts`]
-  for (const candidate of candidates) {
-    if (existsSync(join(routesDir, candidate))) return candidate
-  }
-  return undefined
-}
-
-/**
- * Follow static re-exports until a module that defines `createRoute` is found.
- *
- * @param routesDir - Absolute path to `src/app/routes`
- * @param moduleName - Starting basename (imported from the route tree)
- * @param seen - Cycle guard
- * @returns Basename that contains `createRoute`, or `undefined` if none
- */
-function followToCreateRouteModule(
-  routesDir: string,
-  moduleName: string,
-  seen: Set<string> = new Set()
-): string | undefined {
-  if (seen.has(moduleName)) return undefined
-  seen.add(moduleName)
-
-  const fileName = resolveRouteModuleFile(routesDir, moduleName)
-  if (!fileName) return undefined
-
-  const source = readFileSync(join(routesDir, fileName), 'utf-8')
-  // Presence only — do not resolve redirects (AppRoute catalog may be absent here).
-  if (/createRoute\s*\(\s*\{/.test(source)) return moduleName
-
-  for (const target of parseRelativeReexportTargets(source)) {
-    const resolved = followToCreateRouteModule(routesDir, basename(target), seen)
-    if (resolved) return resolved
-  }
-
-  return undefined
-}
-
-/**
- * Collect relative module specifiers from `export ... from './x'` statements.
- *
- * @param source - TypeScript module source
- * @returns Relative paths as written (for example `./workflows`)
- */
-function parseRelativeReexportTargets(source: string): string[] {
-  const targets: string[] = []
-  const patterns = [/export\s*\*\s*from\s*['"](\.\/[^'"]+)['"]/g, /export\s*\{[^}]*\}\s*from\s*['"](\.\/[^'"]+)['"]/g]
-  for (const pattern of patterns) {
-    for (const match of source.matchAll(pattern)) {
-      const target = match[1]
-      if (target && !targets.includes(target)) targets.push(target)
-    }
-  }
-  return targets
 }
 
 /**

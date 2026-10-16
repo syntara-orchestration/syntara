@@ -192,7 +192,7 @@ const FIXTURE_ROUTE_SOURCES = {
   'src/app/App.tsx': `if (globalThis.location.pathname === AppRoute.Auth.TestSignInCallback) return null\n`,
   'src/app/AppRoute.tsx': `export const AppRoute = {\n  Workflows: { Root: '/workflows' },\n  Auth: { TestSignInCallback: '/auth/test-signin-callback' },\n}\n`,
   'src/app/navigationItems.tsx': `const items = [{ path: AppRoute.Workflows.Root }]\n`,
-  'src/app/tanstackRouteTree.tsx': `import { workflowsRoutes } from './routes/workflows'\nexport const tree = rootRoute.addChildren([...workflowsRoutes])\n`,
-  'src/app/routes/__root.ts': `navigate({ to: '/workflows', replace: true })\n`,
-  'src/app/routes/workflows.tsx': `export const workflowsRoutes = [\n  createRoute({ getParentRoute: () => rootRoute, path: '/workflows' }),\n]\n`,
+  'src/app/tanstackRouteTree.tsx': `import { rootRoute } from './routes/__root'\nimport { workflowsRoutes } from './routes/workflows'\nexport const tree = rootRoute.addChildren([...workflowsRoutes])\n`,
+  'src/app/routes/__root.ts': `export const rootRoute = createRootRoute({})\nnavigate({ to: '/workflows', replace: true })\n`,
+  'src/app/routes/workflows.tsx': `import { rootRoute } from './__root'\nexport const workflowsRoutes = [\n  createRoute({ getParentRoute: () => rootRoute, path: '/workflows' }),\n]\n`,
 } as const

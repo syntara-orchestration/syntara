@@ -59,8 +59,22 @@ Fix the route sources (`src/app/routes/*`, `AppRoute.tsx`, `navigationItems.tsx`
 ## Collector notes
 
 - Redirect targets may be string literals **or** `AppRoute.Foo.Bar` references.
-- Mounted modules may be reached through static `export { ... } from './other'`
-  re-exports under `src/app/routes/` (text follow, not runtime import).
+- The TypeScript compiler API resolves mounted route arrays and `addChildren`
+  calls without executing application modules or importing CSS at runtime.
+- Parent paths resolve recursively across relative imports, aliases, namespace
+  imports, default exports, and named or star re-exports. Parents can be in a
+  different directory. Nesting has no configured depth limit.
+- Pathless layouts preserve their parent's URL; index routes preserve the trailing
+  slash. The root is identified by its factory, not by a variable name.
+- Unresolved references, cycles, dynamic path expressions, and unsupported route
+  factories fail with a source location. Fix the source or add explicit static
+  syntax support; the collector does not guess a URL.
+- Only literal route paths and static route arrays/`addChildren` calls are supported.
+  Module resolution follows relative TypeScript imports, including `.js` specifiers
+  pointing to TypeScript sources and directory index modules. External packages and
+  tsconfig path aliases are not followed for route definitions.
+- Route declarations in unmounted modules under `src/app/routes/` are reported,
+  including modules in subdirectories.
 - Search params, page JSX, and non-redirect `beforeLoad` logic are out of scope.
 
 ## Known exception
