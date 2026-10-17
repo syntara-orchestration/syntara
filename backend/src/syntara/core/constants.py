@@ -66,6 +66,13 @@ class JsonbLimits:
     MAX_WORKFLOW_EDGES = 500
 
 
+class EventStreamLimits:
+    """Candidate event byte limits pending release transport validation."""
+
+    DEFAULT_MAX_VALUE_BYTES = 256 * 1024
+    DEFAULT_MAX_ENVELOPE_BYTES = 1024 * 1024
+
+
 class WebSocketConfig:
     """WebSocket configuration constants."""
 

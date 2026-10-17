@@ -28,7 +28,7 @@ from pydantic import Field, HttpUrl, SecretStr, computed_field, field_validator,
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.engine import URL, make_url
 
-from syntara.core.constants import RequestLimits, RetrieverServiceDefaults
+from syntara.core.constants import EventStreamLimits, RequestLimits, RetrieverServiceDefaults
 from syntara.core.exceptions import SafeValueError
 
 # =============================================================================
@@ -1465,6 +1465,25 @@ class TelemetrySettings(BaseSettings):
 # =============================================================================
 
 
+class EventStreamSettings(BaseSettings):
+    """Candidate event limits; use Settings via get_settings().
+
+    These defaults require release transport validation and do not guarantee
+    that complete workflow start arguments fit downstream transport limits.
+    """
+
+    event_max_value_bytes: int = Field(
+        default=EventStreamLimits.DEFAULT_MAX_VALUE_BYTES,
+        gt=0,
+        description="Candidate raw event value byte limit pending release validation",
+    )
+    event_max_envelope_bytes: int = Field(
+        default=EventStreamLimits.DEFAULT_MAX_ENVELOPE_BYTES,
+        gt=0,
+        description="Candidate encoded event envelope byte limit pending release validation",
+    )
+
+
 class WorkflowEngineSettings(BaseSettings):
     """Workflow execution settings and configuration.
 
@@ -1957,6 +1976,7 @@ class Settings(
     LoggingSettings,
     TemporalSettings,
     S2STLSSettings,
+    EventStreamSettings,
     WorkflowEngineSettings,
     JWTSettings,
     ToolManagerSettings,
