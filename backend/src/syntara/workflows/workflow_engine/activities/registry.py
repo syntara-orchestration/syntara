@@ -26,6 +26,7 @@ from syntara.workflows.workflow_engine.activities.condition import condition
 from syntara.workflows.workflow_engine.activities.converge import converge
 from syntara.workflows.workflow_engine.activities.credential_resolution_activity import resolve_workflow_credentials
 from syntara.workflows.workflow_engine.activities.eda_trigger import eda_trigger
+from syntara.workflows.workflow_engine.activities.event_subscribe_trigger import event_subscribe_trigger
 from syntara.workflows.workflow_engine.activities.http_request_activity import execute_http_request_activity
 from syntara.workflows.workflow_engine.activities.integration_resolution_activity import resolve_workflow_integration
 from syntara.workflows.workflow_engine.activities.integration_scope_activity import validate_node_references
@@ -59,6 +60,7 @@ _TEMPORAL_ACTIVITIES: list[Callable[..., Any]] = [
     condition,
     converge,
     eda_trigger,
+    event_subscribe_trigger,
     switch,
     execute_http_request_activity,
     execute_internal_activity,
