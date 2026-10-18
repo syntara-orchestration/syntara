@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://automation.example.com/schemas/workflows/v2/triggers/event_subscribe.schema.json",
+  "title": "Event Subscribe Trigger Node",
+  "description": "Transport-neutral Subscribe fields. Validate complete parameters against a concrete transport schema.",
+  "parameterSchema": {
+    "type": "object",
+    "required": ["integration_id", "credential_id", "transport"],
+    "properties": {
+      "integration_id": {
+        "type": "string",
+        "format": "uuid",
+        "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+      },
+      "credential_id": {
+        "type": "string",
+        "format": "uuid",
+        "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+      },
+      "transport": {
+        "type": "string"
+      },
+      "input_schema": {
+        "type": ["object", "null"],
+        "description": "Optional self-contained JSON Schema (Draft-07) for the event payload.",
+        "additionalProperties": true
+      }
+    }
+  },
+  "resultSchema": {
+    "type": "object",
+    "description": "The supplied transport-neutral event envelope after ordinary output mapping.",
+    "additionalProperties": true
+  }
+}

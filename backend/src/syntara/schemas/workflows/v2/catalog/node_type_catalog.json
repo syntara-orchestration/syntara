@@ -23,6 +23,15 @@
   ],
   "node_types": [
     {
+      "type": "event_subscribe_trigger",
+      "name": "Event Subscribe",
+      "description": "Workflow entry point receiving a standard event envelope from a managed subscription",
+      "labels": {"category": "trigger"},
+      "schema_ref": "../triggers/event_subscribe.schema.json",
+      "deprecated": false,
+      "since": "2.0.0"
+    },
+    {
       "type": "manual_trigger",
       "name": "Manual Trigger",
       "description": "Workflow entry point triggered manually with user-provided inputs",
