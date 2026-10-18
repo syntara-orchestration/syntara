@@ -124,6 +124,7 @@ class ActivitySyncEventProcessorMixin:
             ActivityName.SCHEDULED_TRIGGER,
             ActivityName.WEBHOOK_TRIGGER,
             ActivityName.EDA_TRIGGER,
+            ActivityName.EVENT_SUBSCRIBE_TRIGGER,
         }
     )
 
