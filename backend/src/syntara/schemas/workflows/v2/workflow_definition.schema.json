@@ -143,6 +143,21 @@
       "oneOf": [
         {
           "allOf": [
+            {"$ref": "#/$defs/node_base"},
+            {
+              "properties": {
+                "type": {"const": "event_subscribe_trigger"},
+                "parameters": {
+                  "oneOf": [
+                    {"$ref": "triggers/kafka_subscribe.schema.json#/parameterSchema"}
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
             {
               "$ref": "#/$defs/node_base"
             },

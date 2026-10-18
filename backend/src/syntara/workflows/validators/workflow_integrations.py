@@ -8,6 +8,7 @@ from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from syntara.core.exceptions import SafeValueError
+from syntara.eventstreams.adapters.subscribe_parameters import validate_event_subscribe_parameters
 from syntara.integrations.models.integration import (
     Integration,
     IntegrationProjectAssignment,
@@ -40,7 +41,10 @@ def _extract_ids_from_nodes(
 ) -> set[str]:
     """Extract valid UUIDs from node parameters using the given extractor function."""
     ids: set[str] = set()
-    for node in workflow_definition.get("nodes", []):
+    for node in [
+        *workflow_definition.get("nodes", []),
+        *(t for t in workflow_definition.get("triggers", []) if t.get("type") == NodeType.EVENT_SUBSCRIBE_TRIGGER),
+    ]:
         params = node.get("parameters", {})
         for val in extractor(params):
             if _is_valid_uuid(val):
@@ -404,6 +408,19 @@ async def validate_workflow_references(
     await _validate_integration_scope(
         session, workflow_definition, project_id, model_integration_ids | tool_integration_ids
     )
+    for trigger in workflow_definition.get("triggers", []):
+        if trigger.get("type") != NodeType.EVENT_SUBSCRIBE_TRIGGER:
+            continue
+        try:
+            config = validate_event_subscribe_parameters(trigger.get("parameters", {}))
+            integration = await session.get(Integration, config.integration_id)
+            if integration is None:
+                msg = "One or more selected integrations are no longer available"
+                raise SafeValueError(msg)
+            validate_event_subscribe_parameters(trigger["parameters"], integration_type=integration.integration_type)
+        except (TypeError, ValueError) as exc:
+            msg = "Invalid Event Subscribe parameters or Integration type"
+            raise SafeValueError(msg) from exc
     await _validate_integration_types(session, workflow_definition)
     tool_findings = await _clean_unavailable_tool_selections(session, workflow_definition)
     sa_findings: list[ValidationFinding] = []

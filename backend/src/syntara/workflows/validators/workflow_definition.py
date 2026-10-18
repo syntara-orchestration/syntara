@@ -18,7 +18,9 @@ from referencing.jsonschema import DRAFT202012
 
 from syntara.core.constants import JsonbLimits
 from syntara.core.exceptions import SafeValueError
+from syntara.eventstreams.adapters.subscribe_parameters import validate_event_subscribe_parameters
 from syntara.schemas import SCHEMA_DIR
+from syntara.workflows.json_schema_validation import validate_json_schema_definition
 from syntara.workflows.models.validation_finding import (
     ValidationCategory,
     ValidationFinding,
@@ -498,6 +500,32 @@ def collect_scheduled_trigger_config_findings(
     return findings
 
 
+def collect_event_subscribe_config_findings(
+    workflow_definition: dict[str, Any],
+) -> list[ValidationFinding]:
+    """Validate literal Subscribe bindings and the optional payload schema."""
+    findings: list[ValidationFinding] = []
+    for trigger in workflow_definition.get("triggers", []):
+        if not isinstance(trigger, dict) or trigger.get("type") != NodeType.EVENT_SUBSCRIBE_TRIGGER:
+            continue
+        try:
+            config = validate_event_subscribe_parameters(trigger.get("parameters", {}))
+            if config.input_schema is not None:
+                validate_json_schema_definition(config.input_schema)
+        except (TypeError, ValueError):
+            # Do not include input values or schema contents in operational findings/logs.
+            findings.append(
+                ValidationFinding(
+                    severity=ValidationSeverity.error,
+                    category=ValidationCategory.schema_violation,
+                    message="Invalid Event Subscribe parameters or payload schema",
+                    node_id=trigger.get("id"),
+                    field_path="parameters",
+                )
+            )
+    return findings
+
+
 class WorkflowValidator:
     """Validator for V2 workflows and metadata.
 
@@ -528,6 +556,9 @@ class WorkflowValidator:
         scheduled_trigger_findings = collect_scheduled_trigger_config_findings(workflow_definition)
         if scheduled_trigger_findings:
             raise SafeValueError(scheduled_trigger_findings[0].message)
+        event_subscribe_findings = collect_event_subscribe_config_findings(workflow_definition)
+        if event_subscribe_findings:
+            raise SafeValueError(event_subscribe_findings[0].message)
 
     def validate_workflow_name(self, name: str) -> None:
         """Validate workflow name is not empty.
@@ -674,6 +705,7 @@ class WorkflowValidator:
             findings.extend(check_template_expressions(workflow_definition, node_ids))
 
         findings.extend(collect_scheduled_trigger_config_findings(workflow_definition))
+        findings.extend(collect_event_subscribe_config_findings(workflow_definition))
 
         return findings
 
