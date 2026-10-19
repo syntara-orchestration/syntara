@@ -2,18 +2,27 @@
 
 import asyncio
 import secrets
+from collections.abc import Callable
 from typing import Any
 from uuid import UUID
 
 import structlog
 from sqlalchemy.exc import InterfaceError, OperationalError
 from sqlalchemy.exc import TimeoutError as SATimeoutError
+from sqlmodel.ext.asyncio.session import AsyncSession
 from temporalio.api.enums.v1 import EventType
 from temporalio.api.history.v1 import HistoryEvent
 from temporalio.client import WorkflowHandle
 from temporalio.exceptions import TemporalError
+from temporalio.service import RPCError, RPCStatusCode
 
 from syntara.audit.context_managers import actor_context
+from syntara.eventstreams.core.scheduling_metadata import (
+    EVENT_DELIVERY_METADATA_KEY,
+    SCHEDULING_STATE_KEY,
+    SCHEDULING_STATE_PREPARED,
+)
+from syntara.workflows.models.execution import Execution, ExecutionStatus
 from syntara.workflows.workflow_engine.models.workflow_definition import NodeType
 from syntara.workflows.workflow_engine.services.activity_sync_types import (
     ExecutionMonitorMetadata,
@@ -54,6 +63,7 @@ class ActivitySyncMonitorMixin:
     _process_activity_failed: Any
     _process_activity_timed_out: Any
     _process_activity_canceled: Any
+    session_factory: Callable[..., AsyncSession]
 
     async def _handle_event_post_processing(
         self,
@@ -281,6 +291,15 @@ class ActivitySyncMonitorMixin:
         if all_tasks:
             await asyncio.gather(*all_tasks, return_exceptions=True)
 
+    async def _delivery_recovery_owns_missing_run(self, execution_id: UUID) -> bool:
+        """Keep uncertain prepared events pending; only delivery recovery settles them."""
+        async with self.session_factory() as session:
+            execution = await session.get(Execution, execution_id)
+            if execution is None or execution.status != ExecutionStatus.PENDING:
+                return False
+            scheduling = (execution.execution_metadata or {}).get(EVENT_DELIVERY_METADATA_KEY, {})
+            return isinstance(scheduling, dict) and scheduling.get(SCHEDULING_STATE_KEY) == SCHEDULING_STATE_PREPARED
+
     async def _monitor_execution(
         self,
         execution_id: UUID,
@@ -343,6 +362,17 @@ class ActivitySyncMonitorMixin:
         except asyncio.CancelledError:
             logger.info("Activity monitoring cancelled for execution", execution_id=execution_id)
             raise
+        except RPCError as exc:
+            try:
+                delegated = exc.status == RPCStatusCode.NOT_FOUND and await self._delivery_recovery_owns_missing_run(
+                    execution_id
+                )
+            except (OperationalError, InterfaceError, SATimeoutError):
+                delegated = False
+            if delegated:
+                logger.info("Prepared event missing run delegated to delivery recovery", execution_id=execution_id)
+                return
+            logger.warning("Temporal error while monitoring execution, will not retry", execution_id=execution_id)
         except TemporalError:
             logger.warning(
                 "Temporal error while monitoring execution, will not retry",

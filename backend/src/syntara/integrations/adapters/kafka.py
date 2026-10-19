@@ -20,7 +20,9 @@ from aiokafka import client as aiokafka_client
 from aiokafka.client import AIOKafkaClient
 from aiokafka.errors import KafkaConnectionError, KafkaError, KafkaTimeoutError
 
+from syntara.core.exceptions import SafeValueError
 from syntara.integrations.adapters.factory import register_health_check_adapter
+from syntara.integrations.adapters.kafka_credentials import resolve_kafka_authentication
 from syntara.integrations.adapters.protocol import (
     DiscoverResult,
     HealthCheckErrorType,
@@ -31,8 +33,6 @@ from syntara.integrations.models.integration_configuration import KafkaConfigura
 
 logger = structlog.stdlib.get_logger(__name__)
 
-_KAFKA_USERNAME_KEY = "kafka_username"
-_KAFKA_PASSWORD_KEY = "kafka_password"  # noqa: S105
 _CLIENT_ID = "syntara-kafka-integration"
 _MS_PER_SECOND = 1000
 # bootstrap() calls the module-level create_conn. Serializing the recorder swap
