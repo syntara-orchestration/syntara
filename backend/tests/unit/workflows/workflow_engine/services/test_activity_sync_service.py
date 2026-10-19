@@ -5326,6 +5326,38 @@ class TestReconcileStaleExecutions:
         mock_session.commit.assert_not_awaited()
 
     @pytest.mark.asyncio
+    async def test_paused_pending_approval_execution_reconciled_after_restart(self) -> None:
+        """AAP-94824: an execution left PAUSED for a pending approval across a worker
+        restart must still be reconciled to a terminal status once its Temporal
+        workflow has actually finished, the same way a RUNNING execution is.
+        Otherwise the run stays stuck showing "Paused - Pending Approval" forever
+        even though the approved workflow completed in Temporal.
+        """
+        service, mock_session, mock_client = self._make_service()
+        execution = self._make_stale_execution()
+        execution.status = ExecutionStatus.PAUSED
+
+        mock_result_list = Mock()
+        mock_result_list.all.return_value = [execution]
+        mock_result_single = Mock()
+        mock_result_single.one_or_none.return_value = execution
+        mock_session.exec = AsyncMock(side_effect=[mock_result_list, mock_result_single])
+
+        mock_event = Mock()
+        mock_event.event_type = EventType.EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED
+        mock_event.event_time = datetime(2026, 1, 1, 0, 5, tzinfo=UTC)
+        mock_event.workflow_execution_completed_event_attributes = None
+        mock_client.get_workflow_handle = Mock(
+            return_value=self._make_temporal_handle("COMPLETED", events=[mock_event]),
+        )
+
+        with patch.object(service, "_publish_snapshot", new_callable=AsyncMock):
+            await service.reconcile_stale_executions()
+
+        assert execution.status == ExecutionStatus.COMPLETED
+        mock_session.commit.assert_awaited()
+
+    @pytest.mark.asyncio
     async def test_deleted_execution_during_reconcile_skipped(self) -> None:
         """Execution deleted between initial query and re-fetch is skipped."""
         service, mock_session, mock_client = self._make_service()
