@@ -484,6 +484,42 @@ class TestCollectFindings:
         assert orphan.category == ValidationCategory.orphaned_node
         assert "unreachable" in orphan.message
 
+    def test_aap_job_template_use_input_variables_accepted(self, validator: WorkflowValidator) -> None:
+        """AAP-92977: Verify must accept the same node shape that Save accepts.
+
+        The Workflow Builder writes a UI-only ``use_input_variables`` marker
+        into an AAP Job Template node's parameters whenever the "Use input
+        variables" toggle is enabled (frontend aapHelpers.ts /
+        workflowFactories.ts). Save silently drops the unknown key (Pydantic's
+        default "ignore" extra behavior on the typed executor parameters
+        submodel), but collect_findings validates the raw dict straight
+        against the JSON Schema, which has additionalProperties: false and
+        rejects the key. That asymmetry is what makes Verify fail immediately
+        after saving a node with the toggle on, while a page reload (which
+        re-fetches the already-stripped definition from the database) makes
+        Verify pass again.
+        """
+        definition: dict[str, Any] = {
+            "schema_version": "2.0.0",
+            "name": "aap-use-input-variables",
+            "triggers": [{"id": "t1", "type": "manual_trigger", "parameters": {}}],
+            "nodes": [
+                {
+                    "id": "aap1",
+                    "type": "aap_job_template",
+                    "parameters": {
+                        "job_template_id": 1,
+                        "extra_vars": {"ticket_id": "incident-123"},
+                        "use_input_variables": True,
+                    },
+                },
+            ],
+            "edges": [{"from": "t1", "to": "aap1"}],
+        }
+        result = validator.collect_findings(definition)
+        assert result.is_valid is True
+        assert result.findings == []
+
     def test_multiple_schema_findings_per_node(self, validator: WorkflowValidator) -> None:
         definition: dict[str, Any] = {
             "schema_version": "2.0.0",
