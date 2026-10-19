@@ -2,7 +2,6 @@ import { Button, EmptyState, EmptyStateBody, Flex, FlexItem, StackItem, Truncate
 import { RhUiConnectedIcon, RhUiDisconnectedIcon, RhUiKeyIcon, RhUiLinkIcon } from '@patternfly/react-icons'
 import { Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
 import type { IdentityProvidersAPI } from '@syntara/contracts'
-import { useNavigate } from '@tanstack/react-router'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { AppRoute } from '../../../app/AppRoute'
@@ -286,7 +285,6 @@ export function UserIdentitiesPanel({
   isLocalUser = false,
   hasPassword,
 }: Readonly<UserIdentitiesPanelProps>) {
-  const navigate = useNavigate()
   const identityPermissions = useUserIdentityPermissions()
   const { showAlert } = useAlerts()
   const handleMutationError = useMutationErrorHandler()
@@ -367,9 +365,7 @@ export function UserIdentitiesPanel({
   const hasActiveFilters = identitiesFilter.filters.length > 0
   const showTable = identities.length > 0 || (!isBuiltinUser && unlinkedProviders.length > 0) || hasActiveFilters
 
-  const handleTransferIdentity = identityPermissions.canAttach
-    ? () => detachPromise(navigate({ to: AppRoute.AccessManagement.TransferIdentity.replace(':userId', userId) }))
-    : undefined
+  const transferIdentityTo = AppRoute.AccessManagement.TransferIdentity.replace(':userId', userId)
 
   const dialogs = (
     <IdentityDialogsWrapper
@@ -427,14 +423,15 @@ export function UserIdentitiesPanel({
                 isDisabled={!identityPermissions.canAttach}
                 content={identityPermissions.tooltips.attach}
               >
-                <Button
-                  variant="primary"
-                  icon={<RhUiLinkIcon />}
-                  isAriaDisabled={!identityPermissions.canAttach}
-                  onClick={handleTransferIdentity}
-                >
-                  Transfer identity
-                </Button>
+                {identityPermissions.canAttach ? (
+                  <SynLink to={transferIdentityTo} variant="primary" icon={<RhUiLinkIcon />}>
+                    Transfer identity
+                  </SynLink>
+                ) : (
+                  <Button variant="primary" icon={<RhUiLinkIcon />} isAriaDisabled>
+                    Transfer identity
+                  </Button>
+                )}
               </DisabledWithTooltip>
             </FlexItem>
           )}

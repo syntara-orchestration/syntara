@@ -26,7 +26,7 @@ const defaultProps: WorkflowsListViewProps = {
   filters: [],
   onFilterChange: vi.fn(),
   onClearAllFilters: vi.fn(),
-  onCreateWorkflow: vi.fn(),
+  createWorkflowTo: '/workflow-builder/new',
   getSortParams: vi.fn(() => undefined),
   isAllProjects: false,
   groupedWorkflows: null,
@@ -68,12 +68,9 @@ describe('WorkflowsListView', () => {
       expect(screen.queryByRole('search', { name: 'Filters' })).not.toBeInTheDocument()
     })
 
-    it('calls onCreateWorkflow when the create button is clicked', async () => {
-      const user = userEvent.setup()
-      const onCreateWorkflow = vi.fn()
-      render(<WorkflowsListView {...defaultProps} onCreateWorkflow={onCreateWorkflow} />)
-      await user.click(screen.getByRole('button', { name: 'Create workflow' }))
-      expect(onCreateWorkflow).toHaveBeenCalledOnce()
+    it('links to the workflow builder from the create action', () => {
+      render(<WorkflowsListView {...defaultProps} />)
+      expect(screen.getByRole('link', { name: 'Create workflow' })).toHaveAttribute('href', '/workflow-builder/new')
     })
   })
 

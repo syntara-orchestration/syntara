@@ -266,7 +266,10 @@ describe('UsersTab Component', () => {
     it('renders without crashing', () => {
       render(<UsersTab />, { wrapper })
 
-      expect(screen.getByRole('button', { name: 'Create user' })).toBeInTheDocument()
+      expect(screen.getByRole('link', { name: 'Create user' })).toHaveAttribute(
+        'href',
+        '/system-administration/access-management/users/create'
+      )
     })
 
     it('renders users in table', () => {
@@ -456,7 +459,10 @@ describe('UsersTab Component', () => {
 
       expect(screen.getByText('No users yet')).toBeInTheDocument()
       expect(screen.getByText('Create a user to manage access to the platform.')).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: 'Create user' })).toBeInTheDocument()
+      expect(screen.getByRole('link', { name: 'Create user' })).toHaveAttribute(
+        'href',
+        '/system-administration/access-management/users/create'
+      )
     })
   })
 
@@ -672,15 +678,13 @@ describe('UsersTab Component', () => {
   })
 
   describe('Navigation', () => {
-    it('navigates to create user page when Create user is clicked', async () => {
-      const user = userEvent.setup()
+    it('links to the create user page', () => {
       render(<UsersTab />, { wrapper })
 
-      await user.click(screen.getByRole('button', { name: /create user/i }))
-
-      expect(routerTestState.navigate).toHaveBeenCalledWith({
-        to: '/system-administration/access-management/users/create',
-      })
+      expect(screen.getByRole('link', { name: /create user/i })).toHaveAttribute(
+        'href',
+        '/system-administration/access-management/users/create'
+      )
     })
 
     it('navigates to edit user page when edit action is clicked', async () => {

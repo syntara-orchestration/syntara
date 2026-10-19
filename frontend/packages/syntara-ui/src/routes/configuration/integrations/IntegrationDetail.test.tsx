@@ -490,16 +490,12 @@ describe('IntegrationDetail', () => {
       expect(screen.getByText('Disabled')).toBeInTheDocument()
     })
 
-    it('shows Edit integration as a primary link in toolbar', () => {
+    it('shows Edit integration as a primary link to the edit route', () => {
       render(<IntegrationDetail />, { wrapper })
 
-      expect(screen.getByRole('link', { name: 'Edit integration' })).toBeInTheDocument()
-    })
-
-    it('links to the edit route from Edit integration', () => {
-      render(<IntegrationDetail />, { wrapper })
-
-      expect(screen.getByRole('link', { name: 'Edit integration' })).toHaveAttribute(
+      const editLink = screen.getByRole('link', { name: 'Edit integration' })
+      expect(editLink).toHaveClass('pf-m-primary')
+      expect(editLink).toHaveAttribute(
         'href',
         '/configuration/integrations/int-1/edit'
       )

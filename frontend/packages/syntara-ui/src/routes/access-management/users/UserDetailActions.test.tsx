@@ -78,7 +78,10 @@ describe('UserDetailToolbar', () => {
       />
     )
 
-    expect(screen.getByRole('link', { name: 'Edit user' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Edit user' })).toHaveAttribute(
+      'href',
+      '/system-administration/access-management/users/user-1/edit'
+    )
     expect(screen.queryByRole('button', { name: 'User actions' })).not.toBeInTheDocument()
   })
 

@@ -1,4 +1,3 @@
-import { useNavigate } from '@tanstack/react-router'
 import { useMemo } from 'react'
 
 import { AppRoute } from '../../../app/AppRoute'
@@ -19,7 +18,6 @@ type ProjectWorkflowsTabProps = {
 }
 
 export function ProjectWorkflowsTab({ projectId, isBuiltin = false }: Readonly<ProjectWorkflowsTabProps>) {
-  const navigate = useNavigate()
   const permissions = useWorkflowPermissions({ resourceProject: projectId })
   const extraParams = useMemo(() => ({ project_id: projectId }), [projectId])
 
@@ -70,7 +68,7 @@ export function ProjectWorkflowsTab({ projectId, isBuiltin = false }: Readonly<P
       filterFieldDefinitions={workflowFilterDefinitions}
       onFilterChange={handleFilterChange}
       onClearAllFilters={handleClearAllFilters}
-      onCreateWorkflow={canCreate ? () => detachPromise(navigate({ to: AppRoute.WorkflowBuilder.New })) : undefined}
+      createWorkflowTo={canCreate ? AppRoute.WorkflowBuilder.New : undefined}
       footer={getFooterProps(workflowsQuery.data)}
       getSortParams={getSortParams}
       isAllProjects={false}

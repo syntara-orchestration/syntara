@@ -15,7 +15,7 @@ describe('renderUserDetailEarlyShell', () => {
         isMeQueryPending: true,
         hasUserQueryError: false,
         queryState: null,
-        navigateBack: vi.fn(),
+        backTo: '/workflows',
         refetchUser: vi.fn(),
       })
     )
@@ -31,7 +31,7 @@ describe('renderUserDetailEarlyShell', () => {
         isMeQueryPending: true,
         hasUserQueryError: false,
         queryState: null,
-        navigateBack: vi.fn(),
+        backTo: '/workflows',
         refetchUser: vi.fn(),
       })
     )
@@ -41,7 +41,6 @@ describe('renderUserDetailEarlyShell', () => {
 
   it('shows not-found state with workflows back label for My Profile errors', async () => {
     const user = userEvent.setup()
-    const navigateBack = vi.fn()
     const refetchUser = vi.fn().mockResolvedValue(undefined)
 
     render(
@@ -50,14 +49,12 @@ describe('renderUserDetailEarlyShell', () => {
         isMeQueryPending: false,
         hasUserQueryError: true,
         queryState: null,
-        navigateBack,
+        backTo: '/workflows',
         refetchUser,
       })
     )
 
-    expect(screen.getByRole('button', { name: 'Back to workflows' })).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Back to workflows' }))
-    expect(navigateBack).toHaveBeenCalled()
+    expect(screen.getByRole('link', { name: 'Back to workflows' })).toHaveAttribute('href', '/workflows')
 
     await user.click(screen.getByRole('button', { name: 'Retry' }))
     expect(refetchUser).toHaveBeenCalledOnce()
@@ -65,7 +62,6 @@ describe('renderUserDetailEarlyShell', () => {
 
   it('shows not-found state with default back label for admin user detail errors', async () => {
     const user = userEvent.setup()
-    const navigateBack = vi.fn()
     const refetchUser = vi.fn().mockResolvedValue(undefined)
 
     render(
@@ -74,14 +70,12 @@ describe('renderUserDetailEarlyShell', () => {
         isMeQueryPending: false,
         hasUserQueryError: true,
         queryState: null,
-        navigateBack,
+        backTo: '/users',
         refetchUser,
       })
     )
 
-    expect(screen.getByRole('button', { name: 'Back to users' })).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Back to users' }))
-    expect(navigateBack).toHaveBeenCalled()
+    expect(screen.getByRole('link', { name: 'Back to users' })).toHaveAttribute('href', '/users')
 
     await user.click(screen.getByRole('button', { name: 'Retry' }))
     expect(refetchUser).toHaveBeenCalledOnce()
@@ -94,7 +88,7 @@ describe('renderUserDetailEarlyShell', () => {
         isMeQueryPending: false,
         hasUserQueryError: false,
         queryState: <SynErrorState title="Error loading profile" message="Network error" onRetry={vi.fn()} />,
-        navigateBack: vi.fn(),
+        backTo: '/workflows',
         refetchUser: vi.fn(),
       })
     )
@@ -110,7 +104,7 @@ describe('renderUserDetailEarlyShell', () => {
         isMeQueryPending: false,
         hasUserQueryError: true,
         queryState: null,
-        navigateBack: vi.fn(),
+        backTo: '/users',
         refetchUser: vi.fn(),
       })
     )
@@ -125,7 +119,7 @@ describe('renderUserDetailEarlyShell', () => {
         isMeQueryPending: false,
         hasUserQueryError: false,
         queryState: <SynErrorState title="Error loading user" message="Network error" onRetry={vi.fn()} />,
-        navigateBack: vi.fn(),
+        backTo: '/users',
         refetchUser: vi.fn(),
       })
     )
@@ -140,7 +134,7 @@ describe('renderUserDetailEarlyShell', () => {
         isMeQueryPending: false,
         hasUserQueryError: false,
         queryState: null,
-        navigateBack: vi.fn(),
+        backTo: '/users',
         refetchUser: vi.fn(),
       })
     )

@@ -1,16 +1,9 @@
 import { render, screen } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it } from 'vitest'
-
-import { routerTestState } from '../../../test/setup'
+import { describe, expect, it } from 'vitest'
 
 import { IntegrationEmptyState } from './IntegrationEmptyState'
 
 describe('IntegrationEmptyState', () => {
-  beforeEach(() => {
-    routerTestState.navigate.mockClear()
-  })
-
   it('renders empty state message', () => {
     render(<IntegrationEmptyState />)
 
@@ -23,21 +16,18 @@ describe('IntegrationEmptyState', () => {
     expect(screen.getByText(/Configure integrations to connect external tools and services/i)).toBeInTheDocument()
   })
 
-  it('renders configure integration button', () => {
+  it('renders a configure integration link', () => {
     render(<IntegrationEmptyState />)
 
-    expect(screen.getByRole('button', { name: 'Configure integration' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Configure integration' })).toHaveAttribute(
+      'href',
+      '/configuration/integrations/configure'
+    )
   })
 
-  it('navigates to configure page when button is clicked', async () => {
-    const user = userEvent.setup()
-    render(<IntegrationEmptyState />)
+  it('omits the configure link when the user cannot create integrations', () => {
+    render(<IntegrationEmptyState canCreate={false} />)
 
-    const addButton = screen.getByRole('button', { name: 'Configure integration' })
-    await user.click(addButton)
-
-    expect(routerTestState.navigate).toHaveBeenCalledWith(
-      expect.objectContaining({ to: '/configuration/integrations/configure' })
-    )
+    expect(screen.queryByRole('link', { name: 'Configure integration' })).not.toBeInTheDocument()
   })
 })
