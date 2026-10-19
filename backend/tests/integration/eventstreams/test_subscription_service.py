@@ -98,7 +98,6 @@ def _trigger_node(
     input_schema: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     parameters: dict[str, Any] = {
-        "transport": "kafka",
         "topic": topic,
         "integration_id": str(integration_id),
         "credential_id": str(credential_id),

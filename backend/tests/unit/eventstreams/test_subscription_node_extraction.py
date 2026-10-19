@@ -12,7 +12,7 @@ def _trigger(node_id: str, topic: str) -> dict[str, Any]:
     return {
         "id": node_id,
         "type": "event_subscribe_trigger",
-        "parameters": {"transport": "kafka", "topic": topic},
+        "parameters": {"topic": topic},
     }
 
 

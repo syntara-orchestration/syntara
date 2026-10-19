@@ -299,9 +299,13 @@ class EventSubscriptionService(BaseService):
         if integration is None:
             msg = "Event Subscribe references an Integration that does not exist"
             raise SafeValueError(msg)
-        # Defense-in-depth: the transport must match the selected Integration type.
+        # Re-validate against the resolved Integration type so the transport-specific
+        # subclass (e.g. KafkaSubscribeParameters) is returned for source projection,
+        # and an Integration type that cannot drive a subscription is rejected.
         try:
-            validate_event_subscribe_parameters(raw_parameters, integration_type=integration.integration_type.value)
+            parameters = validate_event_subscribe_parameters(
+                raw_parameters, integration_type=integration.integration_type.value
+            )
         except (TypeError, ValueError) as exc:
             msg = "Event Subscribe transport does not match the selected Integration type"
             raise SafeValueError(msg) from exc
