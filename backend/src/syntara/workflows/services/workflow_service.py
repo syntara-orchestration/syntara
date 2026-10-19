@@ -137,10 +137,29 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
     including CRUD operations, validation, and version management.
     """
 
-    def __init__(self, session: AsyncSession, user: User, opa_client: AuthzEvaluator | None = None) -> None:
-        """Initialize WorkflowService with database session and user context."""
+    def __init__(
+        self,
+        session: AsyncSession,
+        user: User,
+        opa_client: AuthzEvaluator | None = None,
+        *,
+        is_cert_authenticated: bool = False,
+    ) -> None:
+        """Initialize WorkflowService with database session and user context.
+
+        Args:
+            session: Database session.
+            user: The authenticated user (or service principal).
+            opa_client: Authorization evaluator used for in-service authz checks.
+            is_cert_authenticated: True when the caller authenticated via a service
+                certificate. Cert-authenticated principals bypass OPA at the
+                dependency layer (ProjectScopeFilter/VisibilityFilter/AuthorizationGuard);
+                service-level authz must honor the same bypass to stay consistent.
+
+        """
         super().__init__(session, user, convert_resource_mixin=WorkflowConvertResourceMixin())
         self.opa_client = opa_client
+        self.is_cert_authenticated = is_cert_authenticated
 
     @staticmethod
     def _emit_lifecycle_event(
@@ -432,24 +451,27 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
             raise SafeValueError(findings[0].message)
         credential_ids = self._extract_credential_ids(workflow_definition)
 
-        if not credential_ids:
-            return
+        if credential_ids:
+            stmt = select(Credential.id, Credential.project_id).where(
+                Credential.id.in_(credential_ids),  # type: ignore[attr-defined]
+            )
+            result = await self.session.exec(stmt)
+            rows = result.all()
 
-        stmt = select(Credential.id, Credential.project_id).where(
-            Credential.id.in_(credential_ids),  # type: ignore[attr-defined]
-        )
-        result = await self.session.exec(stmt)
-        rows = result.all()
+            found_ids = {str(row[0]) for row in rows}
+            missing = credential_ids - found_ids
+            wrong_project = any(row[1] != project_id for row in rows)
 
-        found_ids = {str(row[0]) for row in rows}
-        missing = credential_ids - found_ids
-        wrong_project = any(row[1] != project_id for row in rows)
+            if missing or wrong_project:
+                msg = "One or more credential references are invalid or belong to a different project."
+                raise SafeValueError(msg)
 
-        if missing or wrong_project:
-            msg = "One or more credential references are invalid or belong to a different project."
-            raise SafeValueError(msg)
+            await self._check_credential_use_permission(credential_ids, previous_credential_ids, project_id)
 
-        await self._check_credential_use_permission(credential_ids, previous_credential_ids, project_id)
+        # Integration binding validation is keyed off event_subscribe triggers, not
+        # credentials, so run it unconditionally rather than behind the credential
+        # early-return — it would otherwise be silently skipped if a trigger ever
+        # carried no credential. It self-guards when no such trigger exists.
         await self._validate_event_subscribe_bindings(workflow_definition)
 
     async def _validate_event_subscribe_bindings(self, workflow_definition: dict[str, Any]) -> None:
@@ -461,6 +483,34 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
         ]
         if not configs:
             return
+        # Cert-authenticated service principals bypass OPA at the dependency layer
+        # (ProjectScopeFilter/VisibilityFilter return unrestricted). Honor the same
+        # bypass here so a principal that can list every Integration is not denied
+        # at bind time. Runtime credential/type compatibility below still applies.
+        visible_ids = None if self.is_cert_authenticated else await self._resolve_visible_integration_ids()
+        integration_service = IntegrationService(self.session, self.user)
+        for config in configs:
+            if visible_ids is not None and config.integration_id not in visible_ids:
+                msg = "One or more selected Integrations are not visible to the current user"
+                raise SafeValueError(msg)
+            integration = await self.session.get(Integration, config.integration_id)
+            credential = await self.session.get(Credential, config.credential_id)
+            if integration is None or credential is None or not credential.enabled or not integration.enabled:
+                msg = "One or more Event Subscribe resource references are unavailable"
+                raise SafeValueError(msg)
+            try:
+                validate_event_subscribe_parameters(
+                    config.model_dump(mode="json"), integration_type=integration.integration_type
+                )
+            except ValueError as exc:
+                msg = "Event Subscribe transport does not match the selected Integration type"
+                raise SafeValueError(msg) from exc
+            await integration_service._validate_credential_type(  # noqa: SLF001 -- reuse Integration compatibility rules
+                integration.integration_type, config.credential_id
+            )
+
+    async def _resolve_visible_integration_ids(self) -> list[UUID] | None:
+        """Resolve the Integration IDs visible to the current user (None = unrestricted)."""
         if self.opa_client is None:
             msg = "Authorization service unavailable; cannot verify Integration access"
             raise AuthorizationDeniedError(msg)
@@ -504,27 +554,7 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
             visible_scope = AllowedProjectsResult(all_projects=False, project_ids=list(result.scalars().all()))
         else:
             visible_scope = read_scope
-        visible_ids = await IntegrationService.resolve_visible_integration_ids(self.session, visible_scope)
-        integration_service = IntegrationService(self.session, self.user)
-        for config in configs:
-            if visible_ids is not None and config.integration_id not in visible_ids:
-                msg = "One or more selected Integrations are not visible to the current user"
-                raise SafeValueError(msg)
-            integration = await self.session.get(Integration, config.integration_id)
-            credential = await self.session.get(Credential, config.credential_id)
-            if integration is None or credential is None or not credential.enabled or not integration.enabled:
-                msg = "One or more Event Subscribe resource references are unavailable"
-                raise SafeValueError(msg)
-            try:
-                validate_event_subscribe_parameters(
-                    config.model_dump(mode="json"), integration_type=integration.integration_type
-                )
-            except ValueError as exc:
-                msg = "Event Subscribe transport does not match the selected Integration type"
-                raise SafeValueError(msg) from exc
-            await integration_service._validate_credential_type(  # noqa: SLF001 -- reuse Integration compatibility rules
-                integration.integration_type, config.credential_id
-            )
+        return await IntegrationService.resolve_visible_integration_ids(self.session, visible_scope)
 
     async def _check_credential_use_permission(
         self,
@@ -543,6 +573,10 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
             AuthorizationDeniedError: If the user lacks credential:use on any new credential.
 
         """
+        # Cert-authenticated service principals bypass OPA at the dependency layer;
+        # honor the same bypass here for consistency with the integration checks.
+        if self.is_cert_authenticated:
+            return
         if self.opa_client is None:
             msg = "Authorization service unavailable; cannot verify credential:use permission"
             raise AuthorizationDeniedError(msg)
