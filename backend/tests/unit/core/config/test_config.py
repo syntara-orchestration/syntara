@@ -9,7 +9,7 @@ import pytest
 from pydantic import HttpUrl, ValidationError
 
 from syntara.core.config.base import Settings
-from syntara.core.constants import RequestLimits
+from syntara.core.constants import EventDeliveryDefaults, RequestLimits
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -819,3 +819,27 @@ class TestFileStorageSettings:
         monkeypatch.setenv("APP_S3_CA_BUNDLE", "")
         settings = Settings()
         assert settings.s3_ca_bundle is None
+
+
+class TestEventDeliveryRetentionSettings:
+    """Terminal retention is positive and independent of short processing leases."""
+
+    def test_default(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """One hour is the default minimum, without imposing a storage deadline."""
+        monkeypatch.delenv("APP_EVENT_DELIVERY_RETENTION_SECONDS", raising=False)
+        assert Settings().event_delivery_retention_seconds == 3600
+
+    @pytest.mark.parametrize("seconds", [1, 7200, 86400])
+    def test_positive_override(self, seconds: int, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Deployment overrides affect retention independently of claims and cache TTL."""
+        monkeypatch.setenv("APP_EVENT_DELIVERY_RETENTION_SECONDS", str(seconds))
+        assert Settings().event_delivery_retention_seconds == seconds
+        assert EventDeliveryDefaults.CLAIM_LEASE_SECONDS == 60
+        assert EventDeliveryDefaults.CLAIM_RENEWAL_INTERVAL_SECONDS == 20
+
+    @pytest.mark.parametrize("value", ["0", "-1", "1.5", "true", "invalid"])
+    def test_invalid_retention(self, value: str, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Zero, negatives and nonintegers cannot disable retention."""
+        monkeypatch.setenv("APP_EVENT_DELIVERY_RETENTION_SECONDS", value)
+        with pytest.raises(ValidationError):
+            Settings()
