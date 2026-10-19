@@ -305,7 +305,6 @@ export default function ExecutionDetail() {
                   activityNameMap={page.activityNameMap}
                   onFormPromptClose={page.formPromptPanel.close}
                   onFormPromptSubmitted={page.formPromptPanel.dismiss}
-                  workflowDefinition={page.workflowDefinitionForSidePanel}
                   approvalPanelOpen={page.approval.panelOpen}
                   currentApproval={page.currentApproval}
                   approvalMessage={page.approval.approvalMessage}

@@ -8,7 +8,7 @@ import { SidePanelHeader } from '../../components/SidePanelHeader'
 import { useSidePanelFocusOnOpen } from '../../hooks/useSidePanelFocusOnOpen'
 
 import styles from './ApprovalSidePanel.module.css'
-import type { WorkflowDefinitionLike } from './formPrompt/resolveCanvasNodeType'
+import { FORM_PROMPT_RESPOND_PANEL_TITLE } from './formPrompt/formPromptRespondPanelConstants'
 import { FormPromptResponseContent } from './FormPromptResponseContent'
 
 type FormPromptSummary = FormsAPI.components['schemas']['FormPromptSummary']
@@ -25,7 +25,6 @@ type FormPromptSidePanelProps = Readonly<{
   hasNext?: boolean
   onNavigatePrev?: () => void
   onNavigateNext?: () => void
-  workflowDefinition?: WorkflowDefinitionLike
 }>
 
 export function FormPromptSidePanel({
@@ -40,9 +39,8 @@ export function FormPromptSidePanel({
   hasNext,
   onNavigatePrev,
   onNavigateNext,
-  workflowDefinition,
 }: FormPromptSidePanelProps) {
-  const panelRootRef = useRef<HTMLDivElement>(null)
+  const panelRootRef = useRef<HTMLElement>(null)
   useSidePanelFocusOnOpen(true, panelRootRef)
 
   const showNavigation = totalCount !== undefined && totalCount > 1 && onNavigatePrev && onNavigateNext
@@ -53,12 +51,12 @@ export function FormPromptSidePanel({
 
   return (
     <SynPanel hasNoPadding isFullHeight className={styles.panel}>
-      <div ref={panelRootRef} className={styles.panelInner}>
+      <section ref={panelRootRef} className={styles.panelInner} aria-label={FORM_PROMPT_RESPOND_PANEL_TITLE}>
         <Stack className={styles.panelStack}>
           <StackItem className={styles.headerPadding}>
             {showNavigation ? (
               <ApprovalNavigationHeader
-                title="Respond to prompt"
+                title={FORM_PROMPT_RESPOND_PANEL_TITLE}
                 currentIndex={currentIndex}
                 totalCount={totalCount}
                 hasPrev={hasPrev}
@@ -71,7 +69,11 @@ export function FormPromptSidePanel({
                 navigateNextAriaLabel="Next prompt"
               />
             ) : (
-              <SidePanelHeader title="Respond to prompt" onClose={onClose} closeAriaLabel="Close form prompt panel" />
+              <SidePanelHeader
+                title={FORM_PROMPT_RESPOND_PANEL_TITLE}
+                onClose={onClose}
+                closeAriaLabel="Close form prompt panel"
+              />
             )}
           </StackItem>
 
@@ -82,11 +84,10 @@ export function FormPromptSidePanel({
               formPromptId={promptId}
               activityNameMap={activityNameMap}
               onSubmitted={onSubmitted}
-              workflowDefinition={workflowDefinition}
             />
           </StackItem>
         </Stack>
-      </div>
+      </section>
     </SynPanel>
   )
 }
