@@ -413,10 +413,16 @@ async def validate_workflow_references(
             continue
         try:
             config = validate_event_subscribe_parameters(trigger.get("parameters", {}))
-            integration = await session.get(Integration, config.integration_id)
-            if integration is None:
-                msg = "One or more selected integrations are no longer available"
-                raise SafeValueError(msg)
+        except (TypeError, ValueError) as exc:
+            msg = "Invalid Event Subscribe parameters or Integration type"
+            raise SafeValueError(msg) from exc
+        # Existence/enablement is already enforced by _validate_integration_scope above;
+        # this guard is defensive and narrows the type before the type-aware re-validation.
+        integration = await session.get(Integration, config.integration_id)
+        if integration is None:
+            msg = "One or more selected integrations are no longer available"
+            raise SafeValueError(msg)
+        try:
             validate_event_subscribe_parameters(trigger["parameters"], integration_type=integration.integration_type)
         except (TypeError, ValueError) as exc:
             msg = "Invalid Event Subscribe parameters or Integration type"
