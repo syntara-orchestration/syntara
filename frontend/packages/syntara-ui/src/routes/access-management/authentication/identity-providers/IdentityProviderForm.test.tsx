@@ -250,7 +250,10 @@ describe('IdentityProviderForm', () => {
       const { container } = render(<IdentityProviderForm mode="edit" />, { wrapper })
 
       expect(screen.getByText('Identity provider not found')).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: /Back to identity providers/ })).toBeInTheDocument()
+      expect(screen.getByRole('link', { name: /Back to identity providers/ })).toHaveAttribute(
+        'href',
+        '/system-administration/authentication'
+      )
       expect(screen.getByRole('button', { name: /Retry/ })).toBeInTheDocument()
 
       const results = await axe(container)

@@ -11,6 +11,7 @@ import { SynPage, SynPageBody } from '../../../components/layout/SynPage'
 import { SynPageHeader } from '../../../components/layout/SynPageHeader'
 import { SynPanel } from '../../../components/layout/SynPanel'
 import { useQueryState } from '../../../components/states/useQueryState'
+import { SynLink } from '../../../components/SynLink'
 import { SynPageTitle } from '../../../components/SynPageTitle'
 import { useDirtyFormGuard } from '../../../hooks/useDirtyFormGuard'
 import type { UseSynFormReturn } from '../../../hooks/useSynForm'
@@ -133,13 +134,13 @@ function UserFormMainPanel({
   )
 }
 
-function UserFormEditNotFoundPage({ onBack, onRetry }: Readonly<{ onBack: () => void; onRetry: () => void }>) {
+function UserFormEditNotFoundPage({ backTo, onRetry }: Readonly<{ backTo: string; onRetry: () => void }>) {
   return (
     <SynPage>
       <SynPageHeader title="Edit user" breadcrumbs={breadcrumbsUserFormLoading('Edit user')} />
       <SynPageBody>
         <SynPanel isFullHeight>
-          <UserNotFoundState onBack={onBack} onRetry={onRetry} />
+          <UserNotFoundState backTo={backTo} onRetry={onRetry} />
         </SynPanel>
       </SynPageBody>
     </SynPage>
@@ -216,7 +217,7 @@ export function UserForm({ mode }: Readonly<UserFormProps>) {
   if (isEdit && userQuery.error) {
     return (
       <UserFormEditNotFoundPage
-        onBack={navigateBack}
+        backTo={AppRoute.AccessManagement.Users}
         onRetry={() => {
           detachPromise(refetchUser())
         }}
@@ -253,9 +254,7 @@ export function UserForm({ mode }: Readonly<UserFormProps>) {
               >
                 {submitLabel}
               </Button>
-              <Button variant="link" onClick={navigateBack}>
-                Cancel
-              </Button>
+              <SynLink to={AppRoute.AccessManagement.Users}>Cancel</SynLink>
             </ActionGroup>
           }
         />

@@ -7,7 +7,6 @@ import { axe } from 'vitest-axe'
 
 import { identityProvidersClient, usersClient } from '../../../client'
 import { AlertProvider } from '../../../providers/alerts'
-import { routerTestState } from '../../../test/setup'
 
 import { useDetachIdentity } from './useDetachIdentity'
 import { UserIdentitiesPanel } from './UserIdentitiesPanel'
@@ -425,12 +424,15 @@ describe('UserIdentitiesPanel', () => {
   // ---- Transfer identity button (table view) --------------------------------
 
   describe('Transfer identity button', () => {
-    it('renders Transfer identity button in table view', () => {
+    it('renders Transfer identity link in table view', () => {
       setupMocks(mockIdentities)
 
       render(<UserIdentitiesPanel userId="user-1" hasPassword={false} />, { wrapper })
 
-      expect(screen.getByRole('button', { name: /transfer identity/i })).toBeInTheDocument()
+      expect(screen.getByRole('link', { name: /transfer identity/i })).toHaveAttribute(
+        'href',
+        '/system-administration/access-management/users/user-1/transfer-identity'
+      )
     })
 
     it('disables Transfer identity when user lacks attach permission', () => {
@@ -844,17 +846,15 @@ describe('UserIdentitiesPanel', () => {
   // ---- Transfer identity navigation ---------------------------------
 
   describe('Transfer identity navigation', () => {
-    it('navigates to transfer identity wizard when Transfer identity button is clicked', async () => {
-      const user = userEvent.setup()
+    it('links to the transfer identity wizard', () => {
       setupMocks(mockIdentities)
 
       render(<UserIdentitiesPanel userId="user-1" hasPassword={false} />, { wrapper })
 
-      await user.click(screen.getByRole('button', { name: /transfer identity/i }))
-
-      expect(routerTestState.navigate).toHaveBeenCalledWith({
-        to: '/system-administration/access-management/users/user-1/transfer-identity',
-      })
+      expect(screen.getByRole('link', { name: /transfer identity/i })).toHaveAttribute(
+        'href',
+        '/system-administration/access-management/users/user-1/transfer-identity'
+      )
     })
   })
 

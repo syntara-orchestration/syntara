@@ -16,6 +16,7 @@ import { SynPage, SynPageBody } from '../../../../components/layout/SynPage'
 import { SynPageHeader } from '../../../../components/layout/SynPageHeader'
 import { SynPanel } from '../../../../components/layout/SynPanel'
 import { useQueryState } from '../../../../components/states/useQueryState'
+import { SynLink } from '../../../../components/SynLink'
 import { SynPageTitle } from '../../../../components/SynPageTitle'
 import { useDirtyFormGuard } from '../../../../hooks/useDirtyFormGuard'
 import { useSynForm } from '../../../../hooks/useSynForm'
@@ -221,7 +222,7 @@ function identityProviderFormBreadcrumbTrail(
   return breadcrumbsIdentityProviderFormLoading(pageTitle)
 }
 
-function ProviderNotFound({ onBack, onRetry }: Readonly<{ onBack: () => void; onRetry: () => void }>) {
+function ProviderNotFound({ onRetry }: Readonly<{ onRetry: () => void }>) {
   return (
     <SynPage>
       <SynPageTitle segments={['Edit OIDC provider', 'Identity Providers']} />
@@ -237,9 +238,13 @@ function ProviderNotFound({ onBack, onRetry }: Readonly<{ onBack: () => void; on
             </EmptyStateBody>
             <EmptyStateFooter>
               <EmptyStateActions>
-                <Button variant="primary" icon={<RhUiArrowLeftIcon />} onClick={onBack}>
+                <SynLink
+                  to={AppRoute.SystemAdministration.Authentication.Root}
+                  variant="primary"
+                  icon={<RhUiArrowLeftIcon />}
+                >
                   Back to identity providers
-                </Button>
+                </SynLink>
                 <Button variant="link" icon={<RhUiSyncIcon />} onClick={onRetry}>
                   Retry
                 </Button>
@@ -437,7 +442,7 @@ export function IdentityProviderForm({ mode }: Readonly<IdentityProviderFormProp
     onRetry: () => detachPromise(refetchProvider()),
   })
   if (isEdit && getErrorStatus(providerQuery.error) === 404) {
-    return <ProviderNotFound onBack={navigateBack} onRetry={() => detachPromise(refetchProvider())} />
+    return <ProviderNotFound onRetry={() => detachPromise(refetchProvider())} />
   }
   if (isEdit && queryState) {
     return (

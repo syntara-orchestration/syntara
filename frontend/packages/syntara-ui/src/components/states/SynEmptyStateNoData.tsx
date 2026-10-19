@@ -2,6 +2,8 @@ import { Button, EmptyState, EmptyStateBody, EmptyStateActions, EmptyStateFooter
 import { PlusCircleIcon, RhUiAddIcon } from '@patternfly/react-icons'
 import type { ReactNode } from 'react'
 
+import { SynLink } from '../SynLink'
+
 import { SynEmptyStateImageIcon } from './SynEmptyStateImageIcon'
 
 /**
@@ -12,21 +14,26 @@ import { SynEmptyStateImageIcon } from './SynEmptyStateImageIcon'
  *   title="No workflows yet"
  *   description="Create your first workflow to get started."
  *   buttonText="Create workflow"
- *   addData={() => navigate('/create')}
+ *   linkTo="/create"
  * />
  */
-export type SynEmptyStateNoDataProps = {
+type SynEmptyStateNoDataBaseProps = {
   title?: string
   description?: string
   buttonText?: string
   imageSrc?: string
   imageAlt?: string
-  addData?: () => void
   secondaryActions?: ReactNode
 }
 
+export type SynEmptyStateNoDataProps =
+  /** Use a route link when the CTA navigates to another page. */
+  | (SynEmptyStateNoDataBaseProps & { linkTo: string; addData?: never })
+  /** Use an action callback for in-page actions such as opening a modal. */
+  | (SynEmptyStateNoDataBaseProps & { linkTo?: never; addData?: () => void })
+
 export function SynEmptyStateNoData(props: SynEmptyStateNoDataProps) {
-  const { title, description, buttonText, imageSrc, imageAlt, addData, secondaryActions } = props
+  const { title, description, buttonText, imageSrc, imageAlt, linkTo, addData, secondaryActions } = props
 
   const defaultTitle = 'No data available'
   const defaultDescription = 'There is no data to display at this time.'
@@ -38,12 +45,18 @@ export function SynEmptyStateNoData(props: SynEmptyStateNoDataProps) {
   return (
     <EmptyState headingLevel="h2" titleText={title ?? defaultTitle} icon={icon} isFullHeight>
       <EmptyStateBody>{description ?? defaultDescription}</EmptyStateBody>
-      {addData && (
+      {(linkTo || addData) && (
         <EmptyStateFooter>
           <EmptyStateActions>
-            <Button variant="primary" icon={<RhUiAddIcon />} onClick={addData}>
-              {buttonText ?? defaultButtonText}
-            </Button>
+            {linkTo ? (
+              <SynLink to={linkTo} variant="primary" icon={<RhUiAddIcon />}>
+                {buttonText ?? defaultButtonText}
+              </SynLink>
+            ) : (
+              <Button variant="primary" icon={<RhUiAddIcon />} onClick={addData}>
+                {buttonText ?? defaultButtonText}
+              </Button>
+            )}
           </EmptyStateActions>
           {secondaryActions && <EmptyStateActions>{secondaryActions}</EmptyStateActions>}
         </EmptyStateFooter>
