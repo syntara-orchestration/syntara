@@ -2,10 +2,10 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://automation.example.com/schemas/workflows/v2/triggers/event_subscribe.schema.json",
   "title": "Event Subscribe Trigger Node",
-  "description": "Transport-neutral Subscribe fields. Validate complete parameters against a concrete transport schema.",
+  "description": "Workflow entry point receiving events from a managed subscription. The transport (Kafka, …) is determined by the referenced Integration; transport-specific topic rules are enforced server-side.",
   "parameterSchema": {
     "type": "object",
-    "required": ["integration_id", "credential_id", "transport"],
+    "required": ["integration_id", "credential_id", "topic"],
     "properties": {
       "integration_id": {
         "type": "string",
@@ -17,15 +17,19 @@
         "format": "uuid",
         "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
       },
-      "transport": {
-        "type": "string"
+      "topic": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 1024,
+        "description": "Topic/subject to subscribe to. Transport-specific naming rules (e.g. Kafka's charset and length limits) are enforced against the resolved Integration."
       },
       "input_schema": {
         "type": ["object", "null"],
         "description": "Optional self-contained JSON Schema (Draft-07) for the event payload.",
         "additionalProperties": true
       }
-    }
+    },
+    "additionalProperties": false
   },
   "resultSchema": {
     "type": "object",

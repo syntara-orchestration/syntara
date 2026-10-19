@@ -17,11 +17,14 @@ from syntara.eventstreams.core.subscribe_parameters import EventSubscribeParamet
 
 @pytest.fixture
 def parameters() -> dict[str, Any]:
-    """A flat definition with explicit runtime resource bindings."""
+    """A flat definition with explicit runtime resource bindings.
+
+    Transport is NOT a client field: it is resolved from the Integration type
+    passed to the validator.
+    """
     return {
         "integration_id": str(uuid4()),
         "credential_id": str(uuid4()),
-        "transport": "kafka",
         "topic": "infra.alerts",
     }
 
@@ -33,10 +36,18 @@ def test_valid_parameters(parameters: dict[str, Any]) -> None:
     assert isinstance(config, KafkaSubscribeParameters)
     assert config.integration_id == UUID(parameters["integration_id"])
     assert config.credential_id == UUID(parameters["credential_id"])
+    assert config.topic == parameters["topic"]
     assert config.input_schema is None
 
 
-@pytest.mark.parametrize("field", ["integration_id", "credential_id", "transport", "topic"])
+def test_structural_pass_is_transport_neutral(parameters: dict[str, Any]) -> None:
+    # Without an Integration type, only the transport-neutral base contract applies.
+    config = validate_event_subscribe_parameters(parameters)
+    assert isinstance(config, EventSubscribeParameters)
+    assert not isinstance(config, KafkaSubscribeParameters)
+
+
+@pytest.mark.parametrize("field", ["integration_id", "credential_id", "topic"])
 def test_required_fields(parameters: dict[str, Any], field: str) -> None:
     parameters.pop(field)
     with pytest.raises(ValueError):
@@ -47,6 +58,7 @@ def test_required_fields(parameters: dict[str, Any], field: str) -> None:
     "field",
     [
         "unknown",
+        "transport",
         "source",
         "group_id",
         "consumer_group",
@@ -60,35 +72,37 @@ def test_required_fields(parameters: dict[str, Any], field: str) -> None:
     ],
 )
 def test_unknown_and_account_fields_forbidden(parameters: dict[str, Any], field: str) -> None:
+    # `transport` is intentionally not a field anymore — it must be rejected like any extra key.
     parameters[field] = {"topic": "nested"} if field == "source" else "forbidden"
     with pytest.raises(ValidationError):
         validate_event_subscribe_parameters(parameters)
 
 
-@pytest.mark.parametrize("field", ["integration_id", "credential_id", "transport", "topic"])
-def test_expression_references_forbidden(parameters: dict[str, Any], field: str) -> None:
+@pytest.mark.parametrize("field", ["integration_id", "credential_id"])
+def test_uuid_expression_references_forbidden(parameters: dict[str, Any], field: str) -> None:
     parameters[field] = "${trigger.value}"
     with pytest.raises(ValueError):
         validate_event_subscribe_parameters(parameters)
 
 
-@pytest.mark.parametrize("topic", ["", ".", "..", "alerts.*", "alerts,other", " a", "a/b", "a" * 250])
-def test_topic_is_one_exact_name(parameters: dict[str, Any], topic: str) -> None:
+@pytest.mark.parametrize(
+    "topic", ["", ".", "..", "alerts.*", "alerts,other", " a", "a/b", "a" * 250, "${trigger.value}"]
+)
+def test_kafka_topic_is_one_exact_name(parameters: dict[str, Any], topic: str) -> None:
+    # Kafka's naming rules are enforced only once the Integration resolves to kafka.
     parameters["topic"] = topic
     with pytest.raises(ValidationError):
-        validate_event_subscribe_parameters(parameters)
-
-
-@pytest.mark.parametrize("transport", ["sns", "eventbridge", "eventgrid", "servicebus", None, {}])
-def test_unimplemented_transport_rejected(parameters: dict[str, Any], transport: Any) -> None:  # noqa: ANN401
-    parameters["transport"] = transport
-    with pytest.raises(ValueError, match="Unsupported"):
-        validate_event_subscribe_parameters(parameters)
+        validate_event_subscribe_parameters(parameters, integration_type="kafka")
 
 
 def test_incompatible_integration_rejected(parameters: dict[str, Any]) -> None:
     with pytest.raises(ValueError, match="Integration type"):
         validate_event_subscribe_parameters(parameters, integration_type="mcp_server")
+
+
+def test_non_object_parameters_rejected() -> None:
+    with pytest.raises(TypeError):
+        validate_event_subscribe_parameters(["not", "a", "dict"])
 
 
 @pytest.mark.parametrize("input_schema", [None, {}, {"type": "object"}])
@@ -97,11 +111,11 @@ def test_optional_payload_schema(parameters: dict[str, Any], input_schema: dict[
     assert validate_event_subscribe_parameters(parameters).input_schema == input_schema
 
 
-def test_common_schema_has_no_transport_fields() -> None:
+def test_base_schema_fields() -> None:
     assert set(EventSubscribeParameters.model_fields) == {
         "integration_id",
         "credential_id",
-        "transport",
+        "topic",
         "input_schema",
     }
 
