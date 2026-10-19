@@ -412,7 +412,7 @@ Syntara uses LangChain with OpenRouter for intelligent agent responses. The Gene
    cp .env.example .env
 
    # Edit .env (LLM credentials are configured on workflow agentic nodes)
-   APP_OPENROUTER_MODEL=anthropic/claude-sonnet-4  # default model
+   APP_OPENROUTER_MODEL=anthropic/claude-sonnet-4.5  # default model
    APP_OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
    ```
 
@@ -442,7 +442,7 @@ LLM API keys are provided through the credential system — attach an LLM Provid
 credential to the workflow's agentic node. No global API key env var is needed.
 
 **Environment Variables**:
-- `APP_OPENROUTER_MODEL` (default: `anthropic/claude-sonnet-4`)
+- `APP_OPENROUTER_MODEL` (default: `anthropic/claude-sonnet-4.5`)
 - `APP_OPENROUTER_BASE_URL` (default: `https://openrouter.ai/api/v1`)
 
 **Example API Usage**:
