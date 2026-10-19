@@ -520,16 +520,29 @@ async def test_committed_verified(mock_aiokafka: MagicMock) -> None:
 
 
 @pytest.mark.anyio
-async def test_committed_none_is_uncertain(mock_aiokafka: MagicMock) -> None:
+async def test_committed_none_assigned_is_absent(mock_aiokafka: MagicMock) -> None:
+    consumer_instance = mock_aiokafka.return_value
+    consumer_instance.committed = AsyncMock(return_value=None)
+    adapter = KafkaPartitionConsumer(_connection(), _source_config(topic="t"))
+    await _start_with_partitions(adapter, mock_aiokafka, {0})
+
+    results = await adapter.committed([0])
+    assert results[0].status == PositionStatus.ABSENT
+    assert results[0].offset is None
+
+    await adapter.stop()
+
+
+@pytest.mark.anyio
+async def test_committed_none_unassigned_is_uncertain(mock_aiokafka: MagicMock) -> None:
     consumer_instance = mock_aiokafka.return_value
     consumer_instance.committed = AsyncMock(return_value=None)
     adapter = KafkaPartitionConsumer(_connection(), _source_config())
     await adapter.start()
 
-    results = await adapter.committed([0])
-    assert results[0].status == PositionStatus.UNCERTAIN
-    assert results[0].offset is None
-    assert results[0].error is not None
+    results = await adapter.committed([5])
+    assert results[5].status == PositionStatus.UNCERTAIN
+    assert results[5].error is not None
 
     await adapter.stop()
 
@@ -564,24 +577,20 @@ async def test_committed_unavailable_on_kafka_error(mock_aiokafka: MagicMock) ->
 
 @pytest.mark.anyio
 async def test_committed_multiple_partitions_mixed(mock_aiokafka: MagicMock) -> None:
-    call_count = 0
-
     async def _side_effect(tp: TopicPartition) -> int | None:
-        nonlocal call_count
-        call_count += 1
         if tp.partition == 0:
             return 100
         return None
 
     consumer_instance = mock_aiokafka.return_value
     consumer_instance.committed = AsyncMock(side_effect=_side_effect)
-    adapter = KafkaPartitionConsumer(_connection(), _source_config())
-    await adapter.start()
+    adapter = KafkaPartitionConsumer(_connection(), _source_config(topic="t"))
+    await _start_with_partitions(adapter, mock_aiokafka, {0, 1})
 
     results = await adapter.committed([0, 1])
     assert results[0].status == PositionStatus.VERIFIED
     assert results[0].offset == 100
-    assert results[1].status == PositionStatus.UNCERTAIN
+    assert results[1].status == PositionStatus.ABSENT
 
     await adapter.stop()
 

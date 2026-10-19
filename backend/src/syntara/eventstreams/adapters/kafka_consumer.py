@@ -213,8 +213,9 @@ class KafkaPartitionConsumer:
         """Read committed offsets with typed verification status.
 
         aiokafka returns ``None`` both for a genuine no-commit (-1) and for
-        ``UnknownTopicOrPartitionError``, so ``None`` is reported as
-        ``UNCERTAIN`` rather than ``ABSENT``.
+        ``UnknownTopicOrPartitionError``.  For assigned partitions the
+        topic/partition is known to exist, so ``None`` means ``ABSENT``.
+        For unassigned partitions the cause is ambiguous: ``UNCERTAIN``.
         """
         consumer = self._require_running()
         results: dict[int, CommittedPositionResult] = {}
@@ -226,9 +227,12 @@ class KafkaPartitionConsumer:
                     timeout=timeout_ms / 1000,
                 )
                 if offset_and_meta is None:
-                    results[partition] = CommittedPositionResult.uncertain(
-                        partition, "no committed offset or unknown partition"
-                    )
+                    if partition in self._assignment:
+                        results[partition] = CommittedPositionResult.absent(partition)
+                    else:
+                        results[partition] = CommittedPositionResult.uncertain(
+                            partition, "no committed offset or unknown partition"
+                        )
                 else:
                     results[partition] = CommittedPositionResult.verified(partition, offset_and_meta)
             except (TimeoutError, KafkaTimeoutError):
