@@ -109,6 +109,9 @@ data/uploads/
 !.claude/commands/
 !.claude/commands/**
 CLAUDE.local.md
+# Same policy for Codex's local runtime files: local MCP config and settings
+# must not ship (see .github/AI_AGENT_POLICY.md).
+.codex/*
 AGENTS.local.md
 .gemini/
 worktrees/
