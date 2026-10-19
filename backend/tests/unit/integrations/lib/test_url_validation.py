@@ -163,13 +163,13 @@ class TestValidateConfigurationNoSsrf:
     @pytest.mark.ssrf_enforced
     def test_kafka_private_broker_rejected(self) -> None:
         """A private broker address is rejected before any connection is opened."""
-        config = KafkaConfiguration(bootstrap_servers=["192.168.1.10:9092"], allow_http=True)
+        config = KafkaConfiguration(bootstrap_servers=["192.168.1.10:9092"])
         with pytest.raises(ValueError, match="SSRF blocked"):
             validate_integration_configuration_no_ssrf(config)
 
     @pytest.mark.ssrf_enforced
     def test_kafka_metadata_broker_rejected(self) -> None:
         """Cloud metadata is blocked for a broker address."""
-        config = KafkaConfiguration(bootstrap_servers=["169.254.169.254:9092"], allow_http=True)
+        config = KafkaConfiguration(bootstrap_servers=["169.254.169.254:9092"])
         with pytest.raises(ValueError, match="SSRF blocked"):
             validate_integration_configuration_no_ssrf(config)

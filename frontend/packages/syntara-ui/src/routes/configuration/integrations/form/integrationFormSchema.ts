@@ -89,6 +89,13 @@ const kafkaSchema = z.object({
       if (error) {
         ctx.addIssue({ code: z.ZodIssueCode.custom, message: error, path: ['bootstrap_servers'] })
       }
+      if (data.allow_http) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Kafka does not support SASL_PLAINTEXT. Use SASL_SSL.',
+          path: ['allow_http'],
+        })
+      }
     }),
 })
 
@@ -212,7 +219,7 @@ export function toApiConfiguration(configuration: IntegrationFormData['configura
       integration_type: IntegrationTypeEnum.KAFKA,
       bootstrap_servers: parseBootstrapServers(configuration.bootstrap_servers),
       sasl_mechanism: configuration.sasl_mechanism,
-      allow_http: configuration.allow_http,
+      allow_http: false,
       insecure_skip_tls_verify: configuration.insecure_skip_tls_verify,
       ca_certificate: configuration.ca_certificate,
     }

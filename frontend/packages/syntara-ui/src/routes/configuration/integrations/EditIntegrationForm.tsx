@@ -65,7 +65,14 @@ const CREDENTIAL_DESCRIPTION: Record<string, string> = {
   [IntegrationTypeEnum.ANSIBLE_AUTOMATION_PLATFORM]:
     'This credential is used to verify the connection to the Ansible Automation Platform. Workflow credentials are configured separately in the workflow builder.',
   [IntegrationTypeEnum.KAFKA]:
-    'This credential is the Kafka-connection login used to verify that the brokers are reachable. Workflow credentials are configured separately in the workflow builder.',
+    'This credential is the Kafka login used to verify that the brokers are reachable. Workflow credentials are configured separately in the workflow builder.',
+}
+
+function allowHttpForEdit(integration: IntegrationRead): boolean {
+  if (integration.integration_type === IntegrationTypeEnum.KAFKA) return false
+  const config = integration.configuration
+  if (!('allow_http' in config)) return false
+  return Boolean(config.allow_http)
 }
 
 type FormFieldsProps = Readonly<{
@@ -142,7 +149,7 @@ function EditIntegrationFormFields({
 
       {isKafka && <EditKafkaFields control={control} errorMessage={errors.bootstrap_servers?.message} />}
 
-      <EditSecurityFields />
+      <EditSecurityFields showAllowHttp={!isKafka} />
 
       <ScopeFields<EditIntegrationFormValues>
         scope={scope}
@@ -278,7 +285,7 @@ export function EditIntegrationForm() {
           : '',
       sasl_mechanism:
         'sasl_mechanism' in config && config.sasl_mechanism ? config.sasl_mechanism : DEFAULT_KAFKA_SASL_MECHANISM,
-      allow_http: 'allow_http' in config ? Boolean(config.allow_http) : false,
+      allow_http: allowHttpForEdit(integration),
       insecure_skip_tls_verify: 'insecure_skip_tls_verify' in config ? Boolean(config.insecure_skip_tls_verify) : false,
       ca_certificate: 'ca_certificate' in config ? (config.ca_certificate ?? null) : null,
       scope: (integration.scope as 'global' | 'project') ?? 'global',

@@ -141,7 +141,8 @@ function IntegrationTypeSelect({
 
 function SecurityFields({
   allowHttpDescription = 'Permits unencrypted HTTP URLs for this integration',
-}: Readonly<{ allowHttpDescription?: string }>) {
+  showAllowHttp = true,
+}: Readonly<{ allowHttpDescription?: string; showAllowHttp?: boolean }>) {
   const [isExpanded, setIsExpanded] = useState(false)
   const skipTlsVerify = useWatch<IntegrationFormData, 'configuration.insecure_skip_tls_verify'>({
     name: 'configuration.insecure_skip_tls_verify',
@@ -155,23 +156,25 @@ function SecurityFields({
       isIndented
     >
       <div className={styles.securityFields}>
-        <SynFormField<IntegrationFormData, 'configuration.allow_http'>
-          name="configuration.allow_http"
-          label="Allow HTTP connections"
-          fieldId="allow-http"
-          hideFormGroupLabel
-          hideFooter
-        >
-          {({ field }) => (
-            <Checkbox
-              id="allow-http"
-              label="Allow HTTP connections"
-              description={allowHttpDescription}
-              isChecked={field.value}
-              onChange={(_event, checked) => field.onChange(checked)}
-            />
-          )}
-        </SynFormField>
+        {showAllowHttp && (
+          <SynFormField<IntegrationFormData, 'configuration.allow_http'>
+            name="configuration.allow_http"
+            label="Allow HTTP connections"
+            fieldId="allow-http"
+            hideFormGroupLabel
+            hideFooter
+          >
+            {({ field }) => (
+              <Checkbox
+                id="allow-http"
+                label="Allow HTTP connections"
+                description={allowHttpDescription}
+                isChecked={field.value}
+                onChange={(_event, checked) => field.onChange(checked)}
+              />
+            )}
+          </SynFormField>
+        )}
         <SynFormField<IntegrationFormData, 'configuration.insecure_skip_tls_verify'>
           name="configuration.insecure_skip_tls_verify"
           label="Disable TLS certificate verification"
@@ -416,13 +419,7 @@ export function IntegrationDetailsStep({ setValue, onTypeChange }: IntegrationDe
           <KafkaSaslMechanismField control={control} name="configuration.sasl_mechanism" fieldId="sasl-mechanism" />
         )}
 
-        <SecurityFields
-          allowHttpDescription={
-            isKafka
-              ? 'Permits an unencrypted SASL connection (SASL_PLAINTEXT). Leave this off to use SASL_SSL.'
-              : undefined
-          }
-        />
+        <SecurityFields showAllowHttp={!isKafka} />
 
         <ScopeFields<IntegrationFormData>
           scope={scope}

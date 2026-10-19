@@ -127,7 +127,7 @@ _MAX_TCP_PORT = 65535
 
 
 class KafkaSaslMechanism(StrEnum):
-    """SASL mechanism used with the Kafka-connection username and password.
+    """SASL mechanism used with the Kafka credential username and password.
 
     Cloud brokers such as Aiven use SCRAM-SHA-256. PLAIN remains available
     for clusters that authenticate that way.
@@ -182,7 +182,8 @@ class KafkaConfiguration(IntegrationSecurityMixin):
     """Configuration for a Kafka cluster integration.
 
     Broker addresses live here. The username and password stay on the
-    linked Kafka-connection credential.
+    linked Kafka credential. Kafka uses SASL_SSL and rejects allow_http
+    because it would select SASL_PLAINTEXT.
     """
 
     integration_type: Literal["kafka"] = "kafka"
@@ -202,7 +203,13 @@ class KafkaConfiguration(IntegrationSecurityMixin):
 
     @model_validator(mode="after")
     def validate_bootstrap_servers(self) -> Self:
-        """Normalize each broker address. DNS and SSRF checks run later, at connect time."""
+        """Normalize each broker address and reject unencrypted SASL.
+
+        DNS and SSRF checks run later, at connect time.
+        """
+        if self.allow_http:
+            msg = "Kafka does not support SASL_PLAINTEXT. Use SASL_SSL."
+            raise ValueError(msg)
         self.bootstrap_servers = [parse_bootstrap_server(server) for server in self.bootstrap_servers]
         return self
 

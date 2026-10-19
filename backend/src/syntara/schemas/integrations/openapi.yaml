@@ -1591,7 +1591,7 @@ components:
       type: string
       title: KafkaSaslMechanism
       description: |-
-        SASL mechanism used with the Kafka-connection username and password.
+        SASL mechanism used with the Kafka credential username and password.
 
         Cloud brokers such as Aiven use SCRAM-SHA-256. PLAIN remains available
         for clusters that authenticate that way.
@@ -1605,7 +1605,8 @@ components:
         Configuration for a Kafka cluster integration.
 
         Broker addresses live here. The username and password stay on the
-        linked Kafka-connection credential.
+        linked Kafka credential. Kafka uses SASL_SSL and rejects allow_http
+        because it would select SASL_PLAINTEXT.
       additionalProperties: false
       properties:
         integration_type:

@@ -30,6 +30,22 @@ function validateUrl(
   return undefined
 }
 
+function refineKafka(
+  data: { integration_type: string; bootstrap_servers?: string; allow_http: boolean },
+  ctx: z.RefinementCtx
+) {
+  if (data.integration_type !== IntegrationTypeEnum.KAFKA) return
+  const err = bootstrapServersFieldError(data.bootstrap_servers ?? '')
+  if (err) ctx.addIssue({ code: z.ZodIssueCode.custom, message: err, path: ['bootstrap_servers'] })
+  if (data.allow_http) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Kafka does not support SASL_PLAINTEXT. Use SASL_SSL.',
+      path: ['allow_http'],
+    })
+  }
+}
+
 export function buildEditSchema(requiresBaseUrl: boolean) {
   return z
     .object({
@@ -78,10 +94,7 @@ export function buildEditSchema(requiresBaseUrl: boolean) {
         })
         if (err) ctx.addIssue({ code: z.ZodIssueCode.custom, message: err, path: ['base_url'] })
       }
-      if (data.integration_type === IntegrationTypeEnum.KAFKA) {
-        const err = bootstrapServersFieldError(data.bootstrap_servers ?? '')
-        if (err) ctx.addIssue({ code: z.ZodIssueCode.custom, message: err, path: ['bootstrap_servers'] })
-      }
+      refineKafka(data, ctx)
     })
 }
 
@@ -107,6 +120,7 @@ export function buildConfiguration(integrationType: string, values: EditIntegrat
       bootstrap_servers: parseBootstrapServers(values.bootstrap_servers ?? ''),
       sasl_mechanism: values.sasl_mechanism ?? DEFAULT_KAFKA_SASL_MECHANISM,
       ...securityFields(values),
+      allow_http: false,
     }
   }
   if (integrationType === IntegrationTypeEnum.ANSIBLE_AUTOMATION_PLATFORM) {

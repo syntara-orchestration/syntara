@@ -1,7 +1,12 @@
 import { IntegrationTypeEnum, LLMProviderHintEnum } from '@syntara/contracts'
 import { describe, expect, it } from 'vitest'
 
-import { integrationFormSchema, getStep1Fields, getDefaultConfiguration } from './integrationFormSchema'
+import {
+  integrationFormSchema,
+  getStep1Fields,
+  getDefaultConfiguration,
+  toApiConfiguration,
+} from './integrationFormSchema'
 
 const securityDefaults = {
   allow_http: false,
@@ -363,6 +368,34 @@ describe('integrationFormSchema', () => {
         scope: 'global' as const,
       })
       expect(rejected.success).toBe(false)
+    })
+
+    it('rejects Kafka SASL_PLAINTEXT and sends SASL_SSL', () => {
+      const rejected = integrationFormSchema.safeParse({
+        integration_type: 'kafka' as const,
+        name: 'Production Kafka',
+        configuration: {
+          integration_type: 'kafka' as const,
+          bootstrap_servers: 'broker.example.com:9093',
+          sasl_mechanism: 'SCRAM-SHA-256' as const,
+          ...securityDefaults,
+          allow_http: true,
+        },
+        scope: 'global' as const,
+      })
+      expect(rejected.success).toBe(false)
+      if (!rejected.success) {
+        expect(rejected.error.issues.some((issue) => issue.message.includes('SASL_PLAINTEXT'))).toBe(true)
+      }
+
+      const configuration = toApiConfiguration({
+        integration_type: 'kafka',
+        bootstrap_servers: 'broker.example.com:9093',
+        sasl_mechanism: 'SCRAM-SHA-256',
+        ...securityDefaults,
+        allow_http: true,
+      })
+      expect(configuration).toMatchObject({ integration_type: 'kafka', allow_http: false })
     })
   })
 
