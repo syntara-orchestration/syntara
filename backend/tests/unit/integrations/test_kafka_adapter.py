@@ -26,7 +26,7 @@ def kafka_config() -> KafkaConfiguration:
 
 @pytest.fixture
 def resolved_credential() -> dict[str, Any]:
-    """Resolved Kafka-connection extra_vars."""
+    """Resolved Kafka credential extra_vars."""
     return {
         "auth_type": "kafka_connection",
         "kafka_username": _USERNAME,
@@ -79,17 +79,22 @@ class TestKafkaValidateSuccess:
         assert isinstance(kwargs["ssl_context"], ssl.SSLContext)
 
     @pytest.mark.asyncio
-    async def test_allow_http_uses_plaintext(self, resolved_credential: dict[str, Any]) -> None:
-        """allow_http selects SASL_PLAINTEXT and skips the SSL context."""
-        config = KafkaConfiguration(bootstrap_servers=_BROKERS, allow_http=True)
-        client = _client_mock()
-        with patch("syntara.integrations.adapters.kafka.AIOKafkaClient", return_value=client) as constructor:
+    async def test_allow_http_rejects_sasl_plaintext(self, resolved_credential: dict[str, Any]) -> None:
+        """allow_http would select SASL_PLAINTEXT, which Kafka does not support."""
+        config = KafkaConfiguration.model_construct(
+            integration_type="kafka",
+            bootstrap_servers=_BROKERS,
+            sasl_mechanism="SCRAM-SHA-256",
+            allow_http=True,
+        )
+        with patch("syntara.integrations.adapters.kafka.AIOKafkaClient") as constructor:
             result = await KafkaAdapter(config).validate(resolved_credential, timeout_seconds=5)
 
-        assert result.success is True
-        kwargs = constructor.call_args.kwargs
-        assert kwargs["security_protocol"] == "SASL_PLAINTEXT"
-        assert kwargs["ssl_context"] is None
+        assert result.success is False
+        assert result.error_type == HealthCheckErrorType.CONNECTION_ERROR
+        assert result.error is not None
+        assert "SASL_PLAINTEXT" in result.error
+        constructor.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_plain_mechanism_is_forwarded(self, resolved_credential: dict[str, Any]) -> None:

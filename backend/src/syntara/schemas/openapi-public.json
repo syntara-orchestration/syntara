@@ -45234,7 +45234,7 @@
       "KafkaSaslMechanism": {
         "type": "string",
         "title": "KafkaSaslMechanism",
-        "description": "SASL mechanism used with the Kafka-connection username and password.\n\nCloud brokers such as Aiven use SCRAM-SHA-256. PLAIN remains available\nfor clusters that authenticate that way.",
+        "description": "SASL mechanism used with the Kafka credential username and password.\n\nCloud brokers such as Aiven use SCRAM-SHA-256. PLAIN remains available\nfor clusters that authenticate that way.",
         "enum": [
           "PLAIN",
           "SCRAM-SHA-256",
@@ -45242,7 +45242,7 @@
         ]
       },
       "KafkaConfiguration": {
-        "description": "Configuration for a Kafka cluster integration.\n\nBroker addresses live here. The username and password stay on the\nlinked Kafka-connection credential.",
+        "description": "Configuration for a Kafka cluster integration.\n\nBroker addresses live here. The username and password stay on the\nlinked Kafka credential. Kafka uses SASL_SSL and rejects allow_http\nbecause it would select SASL_PLAINTEXT.",
         "additionalProperties": false,
         "properties": {
           "integration_type": {

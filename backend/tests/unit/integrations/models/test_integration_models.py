@@ -445,6 +445,10 @@ class TestKafkaConfiguration:
         assert config.integration_type == "kafka"
         assert config.sasl_mechanism == "SCRAM-SHA-256"
 
+    def test_rejects_sasl_plaintext(self) -> None:
+        with pytest.raises(ValidationError, match="SASL_PLAINTEXT"):
+            KafkaConfiguration(bootstrap_servers=["broker.example.com:9093"], allow_http=True)
+
     def test_accepts_plain_mechanism(self) -> None:
         config = KafkaConfiguration(bootstrap_servers=["broker.example.com:9093"], sasl_mechanism="PLAIN")
         assert config.sasl_mechanism == "PLAIN"
