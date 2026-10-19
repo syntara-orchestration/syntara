@@ -45,7 +45,7 @@ info:
     Available node types and their configuration schemas are defined in the
     [Node Type Catalog](./catalog/node_type_catalog.json). Individual node schemas
     (config and result) are in the `executors/`, `control-nodes/`, and `triggers/` directories.
-  version: 2.0.0
+  version: 2.1.0
   contact:
     name: Syntara Team
 servers:
@@ -869,8 +869,465 @@ paths:
             application/problem+json:
               schema:
                 $ref: '../../base/shared-resources.openapi.yaml#/components/schemas/ErrorData'
+  /workflows/{workflow_id}/event-subscriptions:
+    get:
+      tags:
+        - Workflows
+      summary: List workflow event subscriptions
+      description: Read current published subscription/source configuration with bounded pagination.
+      operationId: list_event_subscriptions
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: workflow_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Workflow Id
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            maximum: 100
+            exclusiveMinimum: 0
+            description: Maximum number of results per page
+            default: 20
+            title: Limit
+          description: Maximum number of results per page
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+              - type: 'null'
+            description: Pagination cursor from previous response
+            title: Cursor
+          description: Pagination cursor from previous response
+        - name: sort
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+                pattern: ^-?[a-z][a-z0-9_]*$
+              - type: 'null'
+            description: Sort parameter (e.g., 'name', '-created_at')
+            title: Sort
+          description: Sort parameter (e.g., 'name', '-created_at')
+        - name: include_total
+          in: query
+          required: false
+          schema:
+            type: boolean
+            description: Include total count in response (expensive)
+            default: false
+            title: Include Total
+          description: Include total count in response (expensive)
+        - name: transport
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - const: kafka
+                type: string
+              - type: 'null'
+            x-query-param: true
+            title: Transport
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResourcesResponse_EventSubscriptionRead_'
+        '400':
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/BadRequestError
+        '401':
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError
+        '403':
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError
+        '404':
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/NotFoundError
+        '409':
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/ConflictError
+        '422':
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/ValidationError
+        '429':
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/RateLimitError
+        '500':
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError
+      x-app-permission:
+        resource: workflow
+        action: read
+  /workflows/{workflow_id}/event-subscriptions/test:
+    post:
+      tags:
+        - Workflows
+      summary: Test unsaved event subscription
+      description: Check runtime credentials and non-creating metadata; READ/group ACLs remain unverified.
+      operationId: test_event_subscription
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: workflow_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Workflow Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/KafkaSubscribeParameters'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventSubscriptionTestResponse'
+        '400':
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/BadRequestError
+        '401':
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError
+        '403':
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError
+        '404':
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/NotFoundError
+        '409':
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/ConflictError
+        '422':
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/ValidationError
+        '429':
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/RateLimitError
+        '500':
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError
+      x-app-permission:
+        resource: workflow
+        action: update
+  /workflows/{workflow_id}/event-subscriptions/{subscription_id}:
+    get:
+      tags:
+        - Workflows
+      summary: Get workflow event subscription
+      description: Read the requested current subscription within its workflow/project.
+      operationId: get_event_subscription
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: workflow_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Workflow Id
+        - name: subscription_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Subscription Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventSubscriptionRead'
+        '400':
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/BadRequestError
+        '401':
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError
+        '403':
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError
+        '404':
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/NotFoundError
+        '409':
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/ConflictError
+        '422':
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/ValidationError
+        '429':
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/RateLimitError
+        '500':
+          $ref: ../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError
+      x-app-permission:
+        resource: workflow
+        action: read
 components:
   schemas:
+    ResourcesResponse_EventSubscriptionRead_:
+      properties:
+        next:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Next
+          description: Cursor for next page of results
+        prev:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Prev
+          description: Cursor for previous page of results
+        total:
+          anyOf:
+            - type: integer
+              minimum: 0.0
+            - type: 'null'
+          title: Total
+          description: Total count of resources (only when include_total=true)
+        resources:
+          items:
+            $ref: '#/components/schemas/EventSubscriptionRead'
+          type: array
+          maxItems: 100
+          title: Resources
+          description: Array of resources in current page
+      type: object
+      required:
+        - resources
+      title: ResourcesResponse[EventSubscriptionRead]
+      examples:
+        - next: eyJpZCI6InV1aWQifQ
+          total: 150
+        - next: eyJpZCI6Im5leHQifQ
+          prev: eyJpZCI6InByZXYifQ
+    EventSubscriptionRead:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        workflow_id:
+          type: string
+          format: uuid
+          title: Workflow Id
+        project_id:
+          type: string
+          format: uuid
+          title: Project Id
+        trigger_node_id:
+          type: string
+          title: Trigger Node Id
+        published_version_id:
+          type: string
+          format: uuid
+          title: Published Version Id
+        configuration_revision:
+          type: integer
+          title: Configuration Revision
+        runtime_credential_id:
+          anyOf:
+            - type: string
+              format: uuid
+            - type: 'null'
+          title: Runtime Credential Id
+        input_schema:
+          anyOf:
+            - additionalProperties: true
+              type: object
+            - type: 'null'
+          title: Input Schema
+        desired_enabled:
+          type: boolean
+          title: Desired Enabled
+        paused:
+          type: boolean
+          title: Paused
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        updated_at:
+          type: string
+          format: date-time
+          title: Updated At
+        source:
+          $ref: '#/components/schemas/EventSubscriptionSourceRead'
+      type: object
+      required:
+        - id
+        - workflow_id
+        - project_id
+        - trigger_node_id
+        - published_version_id
+        - configuration_revision
+        - runtime_credential_id
+        - input_schema
+        - desired_enabled
+        - paused
+        - created_at
+        - updated_at
+        - source
+      title: EventSubscriptionRead
+      description: Currently available published configuration; no runtime-health claims.
+    EventSubscriptionSourceRead:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        generation:
+          type: integer
+          title: Generation
+        integration_id:
+          anyOf:
+            - type: string
+              format: uuid
+            - type: 'null'
+          title: Integration Id
+        transport:
+          type: string
+          title: Transport
+        configuration:
+          oneOf:
+            - $ref: '#/components/schemas/KafkaSourceConfiguration'
+          title: Configuration
+          discriminator:
+            propertyName: transport
+            mapping:
+              kafka: '#/components/schemas/KafkaSourceConfiguration'
+      type: object
+      required:
+        - id
+        - generation
+        - integration_id
+        - transport
+        - configuration
+      title: EventSubscriptionSourceRead
+      description: The current source's non-secret configuration.
+    KafkaSourceConfiguration:
+      properties:
+        transport:
+          type: string
+          const: kafka
+          title: Transport
+          default: kafka
+        topic:
+          type: string
+          maxLength: 249
+          minLength: 1
+          pattern: ^[a-zA-Z0-9._-]+$
+          title: Topic
+        group_id:
+          type: string
+          maxLength: 512
+          minLength: 1
+          title: Group Id
+        cluster_id:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Cluster Id
+        topic_id:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Topic Id
+      additionalProperties: false
+      type: object
+      required:
+        - topic
+        - group_id
+      title: KafkaSourceConfiguration
+      description: |-
+        Fixed Kafka source address for one source generation; no secrets or payloads.
+
+        ``topic`` and the generated ``group_id`` are immutable within a generation.
+        ``cluster_id`` and ``topic_id`` are populated once during verified
+        initialization where the broker exposes them; an identity change creates a
+        new generation rather than mutating these fields.
+    KafkaSubscribeParameters:
+      properties:
+        integration_id:
+          type: string
+          format: uuid
+          title: Integration Id
+        credential_id:
+          type: string
+          format: uuid
+          title: Credential Id
+        transport:
+          type: string
+          const: kafka
+          title: Transport
+        input_schema:
+          anyOf:
+            - additionalProperties: true
+              type: object
+            - type: 'null'
+          title: Input Schema
+        topic:
+          type: string
+          maxLength: 249
+          minLength: 1
+          pattern: ^[a-zA-Z0-9._-]+$
+          title: Topic
+      additionalProperties: false
+      type: object
+      required:
+        - integration_id
+        - credential_id
+        - transport
+        - topic
+      title: KafkaSubscribeParameters
+      description: One exact topic; consumer groups and connection settings are not inputs.
+    EventSubscriptionTestResponse:
+      properties:
+        success:
+          type: boolean
+          title: Success
+        checked_at:
+          type: string
+          format: date-time
+          title: Checked At
+        connection:
+          type: string
+          enum:
+            - verified
+            - failed
+            - unverified
+          title: Connection
+          default: unverified
+        topic_metadata:
+          type: string
+          enum:
+            - verified
+            - failed
+            - unverified
+          title: Topic Metadata
+          default: unverified
+        topic_read:
+          type: string
+          const: unverified
+          title: Topic Read
+          default: unverified
+        group_access:
+          type: string
+          const: unverified
+          title: Group Access
+          default: unverified
+        error_code:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Error Code
+          description: Sanitized failure code; no broker error text
+      type: object
+      required:
+        - success
+        - checked_at
+      title: EventSubscriptionTestResponse
+      description: Success proves connectivity and topic metadata only, never runtime ACLs.
     # Import workflow-specific schemas
     WorkflowRead:
       $ref: ./shared-schemas.yaml#/components/schemas/WorkflowRead

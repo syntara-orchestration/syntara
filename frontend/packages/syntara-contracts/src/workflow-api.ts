@@ -276,10 +276,266 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/workflows/{workflow_id}/event-subscriptions': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * List workflow event subscriptions
+     * @description Read current published subscription/source configuration with bounded pagination.
+     */
+    get: operations['list_event_subscriptions']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/workflows/{workflow_id}/event-subscriptions/test': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Test unsaved event subscription
+     * @description Check runtime credentials and non-creating metadata; READ/group ACLs remain unverified.
+     */
+    post: operations['test_event_subscription']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/workflows/{workflow_id}/event-subscriptions/{subscription_id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Get workflow event subscription
+     * @description Read the requested current subscription within its workflow/project.
+     */
+    get: operations['get_event_subscription']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
 }
 export type webhooks = Record<string, never>
 export interface components {
   schemas: {
+    /**
+     * ResourcesResponse[EventSubscriptionRead]
+     * @example {
+     *       "next": "eyJpZCI6InV1aWQifQ",
+     *       "total": 150
+     *     }
+     * @example {
+     *       "next": "eyJpZCI6Im5leHQifQ",
+     *       "prev": "eyJpZCI6InByZXYifQ"
+     *     }
+     */
+    ResourcesResponse_EventSubscriptionRead_: {
+      /**
+       * Next
+       * @description Cursor for next page of results
+       */
+      next?: string | null
+      /**
+       * Prev
+       * @description Cursor for previous page of results
+       */
+      prev?: string | null
+      /**
+       * Total
+       * @description Total count of resources (only when include_total=true)
+       */
+      total?: number | null
+      /**
+       * Resources
+       * @description Array of resources in current page
+       */
+      resources: components['schemas']['EventSubscriptionRead'][]
+    }
+    /**
+     * EventSubscriptionRead
+     * @description Currently available published configuration; no runtime-health claims.
+     */
+    EventSubscriptionRead: {
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string
+      /**
+       * Workflow Id
+       * Format: uuid
+       */
+      workflow_id: string
+      /**
+       * Project Id
+       * Format: uuid
+       */
+      project_id: string
+      /** Trigger Node Id */
+      trigger_node_id: string
+      /**
+       * Published Version Id
+       * Format: uuid
+       */
+      published_version_id: string
+      /** Configuration Revision */
+      configuration_revision: number
+      /** Runtime Credential Id */
+      runtime_credential_id: string | null
+      /** Input Schema */
+      input_schema: {
+        [key: string]: unknown
+      } | null
+      /** Desired Enabled */
+      desired_enabled: boolean
+      /** Paused */
+      paused: boolean
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string
+      /**
+       * Updated At
+       * Format: date-time
+       */
+      updated_at: string
+      source: components['schemas']['EventSubscriptionSourceRead']
+    }
+    /**
+     * EventSubscriptionSourceRead
+     * @description The current source's non-secret configuration.
+     */
+    EventSubscriptionSourceRead: {
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string
+      /** Generation */
+      generation: number
+      /** Integration Id */
+      integration_id: string | null
+      /** Transport */
+      transport: string
+      /** Configuration */
+      configuration: components['schemas']['KafkaSourceConfiguration']
+    }
+    /**
+     * KafkaSourceConfiguration
+     * @description Fixed Kafka source address for one source generation; no secrets or payloads.
+     *
+     *     ``topic`` and the generated ``group_id`` are immutable within a generation.
+     *     ``cluster_id`` and ``topic_id`` are populated once during verified
+     *     initialization where the broker exposes them; an identity change creates a
+     *     new generation rather than mutating these fields.
+     */
+    KafkaSourceConfiguration: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      transport: 'kafka'
+      /** Topic */
+      topic: string
+      /** Group Id */
+      group_id: string
+      /** Cluster Id */
+      cluster_id?: string | null
+      /** Topic Id */
+      topic_id?: string | null
+    }
+    /**
+     * KafkaSubscribeParameters
+     * @description One exact topic; consumer groups and connection settings are not inputs.
+     */
+    KafkaSubscribeParameters: {
+      /**
+       * Integration Id
+       * Format: uuid
+       */
+      integration_id: string
+      /**
+       * Credential Id
+       * Format: uuid
+       */
+      credential_id: string
+      /**
+       * Transport
+       * @constant
+       */
+      transport: 'kafka'
+      /** Input Schema */
+      input_schema?: {
+        [key: string]: unknown
+      } | null
+      /** Topic */
+      topic: string
+    }
+    /**
+     * EventSubscriptionTestResponse
+     * @description Success proves connectivity and topic metadata only, never runtime ACLs.
+     */
+    EventSubscriptionTestResponse: {
+      /** Success */
+      success: boolean
+      /**
+       * Checked At
+       * Format: date-time
+       */
+      checked_at: string
+      /**
+       * Connection
+       * @default unverified
+       * @enum {string}
+       */
+      connection?: 'verified' | 'failed' | 'unverified'
+      /**
+       * Topic Metadata
+       * @default unverified
+       * @enum {string}
+       */
+      topic_metadata?: 'verified' | 'failed' | 'unverified'
+      /**
+       * Topic Read
+       * @default unverified
+       * @constant
+       */
+      topic_read?: 'unverified'
+      /**
+       * Group Access
+       * @default unverified
+       * @constant
+       */
+      group_access?: 'unverified'
+      /**
+       * Error Code
+       * @description Sanitized failure code; no broker error text
+       */
+      error_code?: string | null
+    }
     /**
      * WorkflowRead
      * @description Schema for workflow response (GET /workflows/{id}).
@@ -3086,6 +3342,111 @@ export interface operations {
           'application/problem+json': components['schemas']['ErrorData']
         }
       }
+      422: components['responses']['ValidationError']
+      429: components['responses']['RateLimitError']
+      500: components['responses']['InternalServerError']
+    }
+  }
+  list_event_subscriptions: {
+    parameters: {
+      query?: {
+        /** @description Maximum number of results per page */
+        limit?: number
+        /** @description Pagination cursor from previous response */
+        cursor?: string | null
+        /** @description Sort parameter (e.g., 'name', '-created_at') */
+        sort?: string | null
+        /** @description Include total count in response (expensive) */
+        include_total?: boolean
+        transport?: 'kafka' | null
+      }
+      header?: never
+      path: {
+        workflow_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ResourcesResponse_EventSubscriptionRead_']
+        }
+      }
+      400: components['responses']['BadRequestError']
+      401: components['responses']['UnauthorizedError']
+      403: components['responses']['ForbiddenError']
+      404: components['responses']['NotFoundError']
+      409: components['responses']['ConflictError']
+      422: components['responses']['ValidationError']
+      429: components['responses']['RateLimitError']
+      500: components['responses']['InternalServerError']
+    }
+  }
+  test_event_subscription: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        workflow_id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['KafkaSubscribeParameters']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['EventSubscriptionTestResponse']
+        }
+      }
+      400: components['responses']['BadRequestError']
+      401: components['responses']['UnauthorizedError']
+      403: components['responses']['ForbiddenError']
+      404: components['responses']['NotFoundError']
+      409: components['responses']['ConflictError']
+      422: components['responses']['ValidationError']
+      429: components['responses']['RateLimitError']
+      500: components['responses']['InternalServerError']
+    }
+  }
+  get_event_subscription: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        workflow_id: string
+        subscription_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['EventSubscriptionRead']
+        }
+      }
+      400: components['responses']['BadRequestError']
+      401: components['responses']['UnauthorizedError']
+      403: components['responses']['ForbiddenError']
+      404: components['responses']['NotFoundError']
+      409: components['responses']['ConflictError']
       422: components['responses']['ValidationError']
       429: components['responses']['RateLimitError']
       500: components['responses']['InternalServerError']
