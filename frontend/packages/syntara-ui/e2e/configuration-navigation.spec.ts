@@ -20,6 +20,23 @@ test.describe('Configuration Navigation & Tabs', () => {
     await expect(app.getByRole('heading', { level: 1, name: 'Credentials' })).toBeVisible()
   })
 
+  test('opens an Integrations flyout link in a new tab on modified click', async ({ app }) => {
+    await app.goto(toAppUrl('/workflows'))
+    await expect(app.getByRole('heading', { level: 1, name: 'Workflows' })).toBeVisible()
+
+    await app.getByRole('button', { name: 'Configuration', exact: true }).hover()
+    const integrationsLink = app.getByRole('menuitem', { name: 'Integrations', exact: true })
+    await expect(integrationsLink).toHaveAttribute('href', '/configuration/integrations')
+
+    const openedPagePromise = app.context().waitForEvent('page')
+    await integrationsLink.click({ modifiers: ['ControlOrMeta'] })
+    const integrationsPage = await openedPagePromise
+
+    await expect(integrationsPage).toHaveURL(toAppUrl('/configuration/integrations'))
+    await expect(integrationsPage.getByRole('heading', { level: 1, name: 'Integrations' })).toBeVisible()
+    await expect(app).toHaveURL(toAppUrl('/workflows'))
+  })
+
   test('persists active tab after page refresh', async ({ app }) => {
     await app.goto(toAppUrl('/configuration/credentials'))
     await expect(app.getByRole('heading', { level: 1, name: 'Credentials' })).toBeVisible()
