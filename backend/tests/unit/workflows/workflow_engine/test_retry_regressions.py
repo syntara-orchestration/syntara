@@ -95,6 +95,14 @@ def _wf(retry_context: dict[str, Any] | None = None) -> OrchestratorWorkflow:
     wf._restored_node_timestamps = {}
     wf._restored_node_statuses = {}
     wf._restored_node_outputs = {}
+    # Persisted routing, read before classification. Empty means nothing was
+    # recorded, so every control node falls back to inference — the pre-existing
+    # behaviour for these tests.
+    wf._restored_control_ports = {}
+    wf._resolved_control_port_cache = {}
+    # Branch inference reads it; empty means no control node is inferable, which is
+    # the pre-existing behaviour for these tests.
+    wf._retry_source_statuses = {}
     wf.resolver = NamespaceResolver()
     wf.skipped_nodes = set()
     wf.failed_nodes = {}
@@ -207,7 +215,8 @@ async def test_restored_predecessor_counts_toward_converge_gate(mock_wf: MagicMo
     wf._retry_source_statuses = {"b1": "completed"}
     mock_wf.execute_activity = AsyncMock(return_value={"b1": {"v": 1}})
     node = ActivityNode(node_id="b1", node_type="script", parameters={})
-    result = await wf._restore_node_output(node)
+    graph = _converge_graph()
+    result = await wf._restore_node_state(node, graph)
     from .conftest import complete_supplied_node
 
     assert result is not None
@@ -229,7 +238,8 @@ async def test_converge_is_not_skipped_when_a_predecessor_was_restored(mock_wf: 
     wf._retry_source_statuses = {"b1": "completed"}
     mock_wf.execute_activity = AsyncMock(return_value={"b1": {"v": 1}})
     node = ActivityNode(node_id="b1", node_type="script", parameters={})
-    result = await wf._restore_node_output(node)
+    graph = _converge_graph()
+    result = await wf._restore_node_state(node, graph)
     from .conftest import complete_supplied_node
 
     assert result is not None
