@@ -131,7 +131,7 @@ async def test_rebalance_listener_handles_real_topicpartition_sets() -> None:
     real_revoked = {TopicPartition("real.topic", 3)}
     await listener.on_partitions_revoked(real_revoked)
     assert adapter.assignment == frozenset({0})
-    assert events[-1] == ("revoked", frozenset({3}), 1)
+    assert events[-1] == ("revoked", frozenset({3}), 0)
 
 
 # ---------------------------------------------------------------------------
@@ -239,6 +239,40 @@ async def test_operations_interleaved_with_rebalance() -> None:
         await listener.on_partitions_assigned({TopicPartition("t", 0), TopicPartition("t", 1)})
         await adapter.resume([0], expected_epoch=0)
         await adapter.commit({0: 44, 1: 1}, expected_epoch=0)
+
+        await adapter.stop()
+
+
+@pytest.mark.anyio
+async def test_commit_during_revoke_then_epoch_rejected() -> None:
+    """Callback can commit revoked partitions; same epoch rejected after."""
+    with patch("syntara.eventstreams.adapters.kafka_consumer.AIOKafkaConsumer") as mock_cls:
+        mock_consumer = _patched_consumer()
+        mock_cls.return_value = mock_consumer
+
+        committed_offsets: dict[int, int] = {}
+
+        class _DrainCallback:
+            async def on_partitions_assigned(self, partitions: frozenset[int], epoch: int) -> None:
+                pass
+
+            async def on_partitions_revoked(self, partitions: frozenset[int], epoch: int) -> None:
+                committed_offsets.update(dict.fromkeys(partitions, 50))
+                await adapter.commit(dict.fromkeys(partitions, 50), expected_epoch=epoch)
+
+        adapter = KafkaPartitionConsumer(_connection(), _source_config(topic="t"), rebalance_callback=_DrainCallback())
+        await adapter.start()
+        listener = mock_cls.return_value.subscribe.call_args.kwargs["listener"]
+        await listener.on_partitions_assigned({TopicPartition("t", 0), TopicPartition("t", 1)})
+
+        await listener.on_partitions_revoked({TopicPartition("t", 0), TopicPartition("t", 1)})
+
+        assert committed_offsets == {0: 50, 1: 50}
+        mock_consumer.commit.assert_awaited_once()
+        assert adapter.epoch == 1
+
+        with pytest.raises(StaleEpochError):
+            await adapter.commit({0: 51}, expected_epoch=0)
 
         await adapter.stop()
 

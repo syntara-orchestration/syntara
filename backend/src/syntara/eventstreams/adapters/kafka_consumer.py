@@ -10,6 +10,7 @@ exception messages.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import re
 from typing import TYPE_CHECKING
 
@@ -20,7 +21,7 @@ from aiokafka.coordinator.assignors.roundrobin import RoundRobinPartitionAssigno
 from aiokafka.errors import KafkaError, KafkaTimeoutError
 from aiokafka.structs import OffsetAndMetadata
 
-from syntara.eventstreams.core.consumer import CommittedPositionResult, PositionStatus, RebalanceCallback
+from syntara.eventstreams.core.consumer import CommittedPositionResult, RebalanceCallback
 from syntara.eventstreams.exceptions import (
     ConsumerNotRunningError,
     KafkaTransportError,
@@ -144,6 +145,8 @@ class KafkaPartitionConsumer:
         try:
             await consumer.start()
         except KafkaError as exc:
+            with contextlib.suppress(KafkaError):
+                await consumer.stop()
             raise KafkaTransportError(_sanitize(str(exc))) from exc
 
         self._consumer = consumer
@@ -158,17 +161,22 @@ class KafkaPartitionConsumer:
     async def stop(self) -> None:
         """Stop the consumer and release resources.
 
-        Safe to call after partial startup or when already stopped.
+        Raises ``KafkaTransportError`` if the client fails to shut down.
+        The client reference is cleared regardless so a failed stop does
+        not leave a stale handle.  Safe to call when already stopped.
         """
         self._running = False
-        self._assignment = frozenset()
         consumer = self._consumer
-        self._consumer = None
-        if consumer is not None:
-            try:
-                await consumer.stop()
-            except KafkaError as exc:
-                logger.warning("Error during consumer shutdown", error=_sanitize(str(exc)))
+        if consumer is None:
+            self._assignment = frozenset()
+            return
+        try:
+            await consumer.stop()
+        except KafkaError as exc:
+            raise KafkaTransportError(_sanitize(str(exc))) from None
+        finally:
+            self._consumer = None
+            self._assignment = frozenset()
 
     async def seek(self, partition: int, offset: int, *, expected_epoch: int) -> None:
         """Seek a partition to an offset; reject stale epochs."""
@@ -202,7 +210,12 @@ class KafkaPartitionConsumer:
         *,
         timeout_ms: int = 5000,
     ) -> dict[int, CommittedPositionResult]:
-        """Read committed offsets with typed verification status."""
+        """Read committed offsets with typed verification status.
+
+        aiokafka returns ``None`` both for a genuine no-commit (-1) and for
+        ``UnknownTopicOrPartitionError``, so ``None`` is reported as
+        ``UNCERTAIN`` rather than ``ABSENT``.
+        """
         consumer = self._require_running()
         results: dict[int, CommittedPositionResult] = {}
         for partition in partitions:
@@ -213,7 +226,9 @@ class KafkaPartitionConsumer:
                     timeout=timeout_ms / 1000,
                 )
                 if offset_and_meta is None:
-                    results[partition] = CommittedPositionResult.absent(partition)
+                    results[partition] = CommittedPositionResult.uncertain(
+                        partition, "no committed offset or unknown partition"
+                    )
                 else:
                     results[partition] = CommittedPositionResult.verified(partition, offset_and_meta)
             except (TimeoutError, KafkaTimeoutError):
@@ -228,9 +243,14 @@ class KafkaPartitionConsumer:
         *,
         timeout_ms: int = 5000,
     ) -> dict[int, CommittedPositionResult]:
-        """Read the ``read_committed`` visible-end boundary for initialization."""
+        """Read the ``read_committed`` visible-end boundary for initialization.
+
+        Missing partitions in the response or ``-1`` (unknown offset) are
+        reported as ``UNCERTAIN``.
+        """
         consumer = self._require_running()
-        tps = [self._tp(p) for p in partitions]
+        partition_list = list(partitions)
+        tps = [self._tp(p) for p in partition_list]
         try:
             raw = await asyncio.wait_for(
                 consumer.end_offsets(tps),
@@ -242,14 +262,18 @@ class KafkaPartitionConsumer:
             msg = _sanitize(str(exc))
             return {tp.partition: CommittedPositionResult.unavailable(tp.partition, msg) for tp in tps}
 
-        return {
-            tp.partition: CommittedPositionResult(
-                partition=tp.partition,
-                status=PositionStatus.VERIFIED,
-                offset=offset,
-            )
-            for tp, offset in raw.items()
-        }
+        results: dict[int, CommittedPositionResult] = {}
+        returned_partitions = {tp.partition for tp in raw}
+        for p in partition_list:
+            if p not in returned_partitions:
+                results[p] = CommittedPositionResult.uncertain(p, "partition missing from end_offsets response")
+                continue
+            offset = raw[self._tp(p)]
+            if offset < 0:
+                results[p] = CommittedPositionResult.uncertain(p, "unknown offset boundary")
+            else:
+                results[p] = CommittedPositionResult.verified(p, offset)
+        return results
 
     async def pause(self, partitions: Iterable[int], *, expected_epoch: int) -> None:
         """Pause fetching from partitions without dropping group membership."""
@@ -294,19 +318,19 @@ class KafkaPartitionConsumer:
         if not revoked_partitions:
             return
 
-        self._epoch += 1
-        self._assignment -= revoked_partitions
         epoch = self._epoch
-
-        logger.debug(
-            "Partitions revoked",
-            topic=self.topic,
-            revoked=sorted(revoked_partitions),
-            epoch=epoch,
-        )
-
-        if self._rebalance_callback is not None:
-            await self._rebalance_callback.on_partitions_revoked(revoked_partitions, epoch)
+        try:
+            if self._rebalance_callback is not None:
+                await self._rebalance_callback.on_partitions_revoked(revoked_partitions, epoch)
+        finally:
+            self._assignment -= revoked_partitions
+            self._epoch += 1
+            logger.debug(
+                "Partitions revoked",
+                topic=self.topic,
+                revoked=sorted(revoked_partitions),
+                epoch=self._epoch,
+            )
 
     async def _handle_partitions_assigned(self, assigned: set[TopicPartition]) -> None:
         assigned_partitions = frozenset(tp.partition for tp in assigned)

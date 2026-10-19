@@ -55,6 +55,11 @@ class CommittedPositionResult(SQLModel):
         """Create a result for a failed position query."""
         return CommittedPositionResult(partition=partition, status=PositionStatus.UNAVAILABLE, error=error)
 
+    @staticmethod
+    def uncertain(partition: int, reason: str) -> CommittedPositionResult:
+        """Create a result where evidence is ambiguous."""
+        return CommittedPositionResult(partition=partition, status=PositionStatus.UNCERTAIN, error=reason)
+
 
 @runtime_checkable
 class RebalanceCallback(Protocol):

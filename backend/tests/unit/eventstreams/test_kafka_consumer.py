@@ -185,12 +185,16 @@ async def test_stop_clears_assignment(mock_aiokafka: MagicMock) -> None:
 
 
 @pytest.mark.anyio
-async def test_stop_handles_consumer_stop_error(mock_aiokafka: MagicMock) -> None:
+async def test_stop_raises_on_shutdown_error(mock_aiokafka: MagicMock) -> None:
     mock_aiokafka.return_value.stop.side_effect = KafkaError("shutdown error")
     adapter = KafkaPartitionConsumer(_connection(), _source_config())
     await adapter.start()
-    await adapter.stop()
+
+    with pytest.raises(KafkaTransportError):
+        await adapter.stop()
+
     assert not adapter.is_running
+    assert adapter._consumer is None
 
 
 @pytest.mark.anyio
@@ -281,7 +285,36 @@ async def test_rebalance_callback_invoked(mock_aiokafka: MagicMock) -> None:
     callback.on_partitions_assigned.assert_awaited_once_with(frozenset({0}), 0)
 
     await listener.on_partitions_revoked({TopicPartition("t", 0)})
-    callback.on_partitions_revoked.assert_awaited_once_with(frozenset({0}), 1)
+    callback.on_partitions_revoked.assert_awaited_once_with(frozenset({0}), 0)
+
+    await adapter.stop()
+
+
+@pytest.mark.anyio
+async def test_commit_succeeds_inside_revoke_callback(mock_aiokafka: MagicMock) -> None:
+    committed_epoch: int | None = None
+
+    class _DrainCallback:
+        async def on_partitions_assigned(self, partitions: frozenset[int], epoch: int) -> None:
+            pass
+
+        async def on_partitions_revoked(self, partitions: frozenset[int], epoch: int) -> None:
+            nonlocal committed_epoch
+            committed_epoch = epoch
+            await adapter.commit(dict.fromkeys(partitions, 100), expected_epoch=epoch)
+
+    adapter = KafkaPartitionConsumer(_connection(), _source_config(topic="t"), rebalance_callback=_DrainCallback())
+    listener = await _start_with_partitions(adapter, mock_aiokafka, {0, 1})
+
+    await listener.on_partitions_revoked({TopicPartition("t", 0), TopicPartition("t", 1)})
+
+    assert committed_epoch == 0
+    mock_aiokafka.return_value.commit.assert_awaited_once()
+    assert adapter.epoch == 1
+    assert adapter.assignment == frozenset()
+
+    with pytest.raises(StaleEpochError):
+        await adapter.commit({0: 101}, expected_epoch=0)
 
     await adapter.stop()
 
@@ -487,15 +520,16 @@ async def test_committed_verified(mock_aiokafka: MagicMock) -> None:
 
 
 @pytest.mark.anyio
-async def test_committed_absent(mock_aiokafka: MagicMock) -> None:
+async def test_committed_none_is_uncertain(mock_aiokafka: MagicMock) -> None:
     consumer_instance = mock_aiokafka.return_value
     consumer_instance.committed = AsyncMock(return_value=None)
     adapter = KafkaPartitionConsumer(_connection(), _source_config())
     await adapter.start()
 
     results = await adapter.committed([0])
-    assert results[0].status == PositionStatus.ABSENT
+    assert results[0].status == PositionStatus.UNCERTAIN
     assert results[0].offset is None
+    assert results[0].error is not None
 
     await adapter.stop()
 
@@ -547,7 +581,7 @@ async def test_committed_multiple_partitions_mixed(mock_aiokafka: MagicMock) -> 
     results = await adapter.committed([0, 1])
     assert results[0].status == PositionStatus.VERIFIED
     assert results[0].offset == 100
-    assert results[1].status == PositionStatus.ABSENT
+    assert results[1].status == PositionStatus.UNCERTAIN
 
     await adapter.stop()
 
@@ -583,6 +617,37 @@ async def test_end_offsets_unavailable_on_timeout(mock_aiokafka: MagicMock) -> N
 
     results = await adapter.end_offsets([0], timeout_ms=100)
     assert results[0].status == PositionStatus.UNAVAILABLE
+
+    await adapter.stop()
+
+
+@pytest.mark.anyio
+async def test_end_offsets_missing_partition_is_uncertain(mock_aiokafka: MagicMock) -> None:
+    tp0 = TopicPartition("events.test", 0)
+    consumer_instance = mock_aiokafka.return_value
+    consumer_instance.end_offsets = AsyncMock(return_value={tp0: 100})
+    adapter = KafkaPartitionConsumer(_connection(), _source_config())
+    await adapter.start()
+
+    results = await adapter.end_offsets([0, 1])
+    assert results[0].status == PositionStatus.VERIFIED
+    assert results[0].offset == 100
+    assert results[1].status == PositionStatus.UNCERTAIN
+
+    await adapter.stop()
+
+
+@pytest.mark.anyio
+async def test_end_offsets_negative_offset_is_uncertain(mock_aiokafka: MagicMock) -> None:
+    tp0 = TopicPartition("events.test", 0)
+    consumer_instance = mock_aiokafka.return_value
+    consumer_instance.end_offsets = AsyncMock(return_value={tp0: -1})
+    adapter = KafkaPartitionConsumer(_connection(), _source_config())
+    await adapter.start()
+
+    results = await adapter.end_offsets([0])
+    assert results[0].status == PositionStatus.UNCERTAIN
+    assert results[0].error is not None
 
     await adapter.stop()
 
@@ -745,6 +810,13 @@ def test_position_result_unavailable_factory() -> None:
     r = CommittedPositionResult.unavailable(2, "timeout")
     assert r.status == PositionStatus.UNAVAILABLE
     assert r.error == "timeout"
+
+
+def test_position_result_uncertain_factory() -> None:
+    r = CommittedPositionResult.uncertain(4, "ambiguous")
+    assert r.status == PositionStatus.UNCERTAIN
+    assert r.error == "ambiguous"
+    assert r.offset is None
 
 
 def test_position_result_frozen() -> None:
