@@ -39,3 +39,34 @@ class EventSubscriptionInUseError(EventStreamError):
             "Bound subscription evidence blocks deletion until it is released by a "
             "recovery-aware operation; retirement alone does not unblock it."
         )
+
+
+class StaleEpochError(EventStreamError):
+    """Operation rejected because the local assignment epoch was superseded."""
+
+    def __init__(self, *, expected: int, current: int) -> None:
+        """Record expected and current epoch values."""
+        self.expected_epoch = expected
+        self.current_epoch = current
+        super().__init__(f"Stale assignment epoch: expected {expected}, current {current}")
+
+
+class OwnershipRevokedError(EventStreamError):
+    """Partition is not in the current assignment."""
+
+    def __init__(self, partition: int) -> None:
+        """Record the unassigned partition number."""
+        self.partition = partition
+        super().__init__(f"Partition {partition} is not currently assigned")
+
+
+class ConsumerNotRunningError(EventStreamError):
+    """Operation attempted on a consumer that is not started or already stopped."""
+
+    def __init__(self) -> None:
+        """Initialize with a fixed message."""
+        super().__init__("Consumer is not running")
+
+
+class KafkaTransportError(EventStreamError):
+    """Sanitized wrapper around an aiokafka error; credentials are never included."""
