@@ -17,7 +17,6 @@ def _kafka_params(topic: str = "infra.alerts") -> KafkaSubscribeParameters:
     return KafkaSubscribeParameters(
         integration_id=uuid4(),
         credential_id=uuid4(),
-        transport="kafka",
         topic=topic,
     )
 
@@ -85,10 +84,11 @@ def test_same_topic_different_generation_shares_address_identity() -> None:
 
 
 def test_project_source_configuration_rejects_unsupported_transport() -> None:
+    # A transport-neutral base instance (no concrete transport subclass) cannot be projected.
     base = EventSubscribeParameters(
         integration_id=uuid4(),
         credential_id=uuid4(),
-        transport="rabbitmq",
+        topic="orders",
     )
 
     with pytest.raises(ValueError, match="Unsupported Event Subscribe transport"):
