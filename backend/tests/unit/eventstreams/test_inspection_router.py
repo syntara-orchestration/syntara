@@ -71,7 +71,7 @@ def test_list_rejects_invalid_bounds(client: TestClient, service: AsyncMock, que
 
 def test_unsaved_flat_request_delegates(client: TestClient, service: AsyncMock) -> None:
     workflow_id = uuid4()
-    data = {"transport": "kafka", "topic": "alerts", "integration_id": str(uuid4()), "credential_id": str(uuid4())}
+    data = {"topic": "alerts", "integration_id": str(uuid4()), "credential_id": str(uuid4())}
     response = client.post(f"/api/v1/workflows/{workflow_id}/event-subscriptions/test", json=data)
     assert response.status_code == 200
     assert response.json()["topic_read"] == response.json()["group_access"] == "unverified"
@@ -95,7 +95,7 @@ def test_unsaved_flat_request_delegates(client: TestClient, service: AsyncMock) 
 def test_unsaved_rejects_invalid_or_selected_account_fields(
     client: TestClient, service: AsyncMock, change: dict[str, Any]
 ) -> None:
-    data = {"transport": "kafka", "topic": "alerts", "integration_id": str(uuid4()), "credential_id": str(uuid4())}
+    data = {"topic": "alerts", "integration_id": str(uuid4()), "credential_id": str(uuid4())}
     response = client.post(f"/api/v1/workflows/{uuid4()}/event-subscriptions/test", json={**data, **change})
     assert response.status_code == 422
     service.test_unsaved.assert_not_called()

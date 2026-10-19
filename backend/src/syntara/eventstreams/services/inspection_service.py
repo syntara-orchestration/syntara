@@ -143,5 +143,5 @@ class EventSubscriptionInspectionService(BaseService):
         if integration is None or not isinstance(integration.configuration, KafkaConfiguration):
             msg = "Selected Kafka Integration is unavailable"
             raise SafeValueError(msg)
-        credential = await self.integrations._resolve_credential(parameters.credential_id)  # noqa: SLF001 -- shared secret/injector path
+        credential = await self.integrations.resolve_credential(parameters.credential_id)
         return await test_kafka_connection(integration.configuration, credential, parameters.topic)

@@ -51251,11 +51251,6 @@
             "format": "uuid",
             "title": "Credential Id"
           },
-          "transport": {
-            "type": "string",
-            "const": "kafka",
-            "title": "Transport"
-          },
           "input_schema": {
             "anyOf": [
               {
@@ -51281,7 +51276,6 @@
         "required": [
           "integration_id",
           "credential_id",
-          "transport",
           "topic"
         ],
         "title": "KafkaSubscribeParameters",

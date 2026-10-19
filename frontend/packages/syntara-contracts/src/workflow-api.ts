@@ -482,11 +482,6 @@ export interface components {
        * Format: uuid
        */
       credential_id: string
-      /**
-       * Transport
-       * @constant
-       */
-      transport: 'kafka'
       /** Input Schema */
       input_schema?: {
         [key: string]: unknown

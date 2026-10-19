@@ -7,20 +7,23 @@ can be negotiated, so older brokers cannot silently drop the creation flag.
 
 import asyncio
 import ssl
+from collections.abc import Iterable
 from datetime import UTC, datetime
 from typing import Any
 
+import structlog
 from aiokafka.conn import AIOKafkaConnection, collect_hosts, create_conn
 from aiokafka.errors import IncompatibleBrokerVersion, KafkaError
 from aiokafka.protocol.api import Request
 from aiokafka.protocol.metadata import MetadataRequest_v4, MetadataRequest_v5
 
 from syntara.eventstreams.models.responses import EventSubscriptionTestResponse
-from syntara.integrations.adapters.kafka import KafkaAdapter
+from syntara.integrations.adapters.kafka import KafkaAdapter, KafkaAuthenticationConfigurationError
 from syntara.integrations.models.integration_configuration import KafkaConfiguration
 
 _PREFLIGHT_TIMEOUT_SECONDS = 10
 _CLOSE_TIMEOUT_SECONDS = 1
+logger = structlog.stdlib.get_logger(__name__)
 
 
 class NonCreatingMetadataRequest(Request[MetadataRequest_v4 | MetadataRequest_v5]):  # type: ignore[misc]  # aiokafka has no typing marker
@@ -54,8 +57,21 @@ async def _close(connection: AIOKafkaConnection) -> None:
             closed = connection.close()
             if closed is not None:
                 await closed
-    except (TimeoutError, OSError, KafkaError):
-        pass
+    except (TimeoutError, OSError, KafkaError) as exc:
+        # Broker/client exception messages may contain sensitive connection data.
+        logger.debug("Kafka preflight connection close failed", error_type=type(exc).__name__)
+
+
+def _topic_metadata_available(topics: Iterable[tuple[int, str, bool, list[tuple[Any, ...]]]], topic: str) -> bool:
+    """Decode topic tuples by name; partition error codes lead both v4/v5 layouts."""
+    for error_code, topic_name, _is_internal, partitions in topics:
+        if topic_name == topic:
+            return (
+                error_code == 0
+                and bool(partitions)
+                and all(partition_error == 0 for partition_error, *_partition_metadata in partitions)
+            )
+    return False
 
 
 async def test_kafka_connection(
@@ -63,9 +79,6 @@ async def test_kafka_connection(
 ) -> EventSubscriptionTestResponse:
     """Authenticate and inspect metadata within one total network deadline."""
     result = EventSubscriptionTestResponse(success=False, checked_at=datetime.now(UTC))
-    if not credential.get("kafka_username") or not credential.get("kafka_password"):
-        result.error_code = "authentication_configuration"
-        return result
     connection = None
     try:
         options = KafkaAdapter(config).connection_options(credential, _PREFLIGHT_TIMEOUT_SECONDS)
@@ -77,13 +90,14 @@ async def test_kafka_connection(
                 return result
             result.connection = "verified"
             response = await connection.send(NonCreatingMetadataRequest(topic))
-            topics = [entry for entry in response.topics if entry[1] == topic]
-            if not topics or topics[0][0] != 0 or not topics[0][3] or any(p[0] != 0 for p in topics[0][3]):
+            if not _topic_metadata_available(response.topics, topic):
                 result.topic_metadata = "failed"
                 result.error_code = "topic_metadata_unavailable"
             else:
                 result.topic_metadata = "verified"
                 result.success = True
+    except KafkaAuthenticationConfigurationError:
+        result.error_code = "authentication_configuration"
     except TimeoutError:
         result.error_code = "timeout"
     except (IncompatibleBrokerVersion, NotImplementedError):

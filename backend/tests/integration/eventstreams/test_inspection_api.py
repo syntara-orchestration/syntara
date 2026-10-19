@@ -79,7 +79,6 @@ class InspectionScenario:
     def parameters(self) -> dict[str, str]:
         """Unsaved parameters always identify a runtime credential explicitly."""
         return {
-            "transport": "kafka",
             "integration_id": str(self.integration.id),
             "credential_id": str(self.runtime.id),
             "topic": "unsaved.alerts",
@@ -110,7 +109,6 @@ async def _publish(
                     "id": node,
                     "type": "event_subscribe_trigger",
                     "parameters": {
-                        "transport": "kafka",
                         "integration_id": str(integration.id),
                         "credential_id": str(credential.id),
                         "topic": topic,

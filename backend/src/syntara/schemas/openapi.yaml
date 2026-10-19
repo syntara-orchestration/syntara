@@ -35887,10 +35887,6 @@ components:
           type: string
           format: uuid
           title: Credential Id
-        transport:
-          type: string
-          const: kafka
-          title: Transport
         input_schema:
           anyOf:
             - additionalProperties: true
@@ -35908,7 +35904,6 @@ components:
       required:
         - integration_id
         - credential_id
-        - transport
         - topic
       title: KafkaSubscribeParameters
       description: One exact topic; consumer groups and connection settings are not inputs.

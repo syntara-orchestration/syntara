@@ -83,14 +83,14 @@ def service() -> EventSubscriptionInspectionService:
     instance.workflows.get_workflow_by_id = AsyncMock(return_value=SimpleNamespace(id=uuid4(), project_id=uuid4()))
     instance.workflows.validate_event_subscribe_access = AsyncMock()
     instance.integrations = MagicMock()
-    instance.integrations._resolve_credential = AsyncMock(
+    instance.integrations.resolve_credential = AsyncMock(
         return_value={"kafka_username": "runtime", "kafka_password": "secret"}
     )
     return instance
 
 
 async def test_preflight_uses_only_selected_runtime_credential(service: EventSubscriptionInspectionService) -> None:
-    params = KafkaSubscribeParameters(transport="kafka", topic="alerts", integration_id=uuid4(), credential_id=uuid4())
+    params = KafkaSubscribeParameters(topic="alerts", integration_id=uuid4(), credential_id=uuid4())
     integration = SimpleNamespace(
         configuration=KafkaConfiguration(bootstrap_servers=["broker.example.com:9093"]),
         management_credential_id=uuid4(),
@@ -103,20 +103,20 @@ async def test_preflight_uses_only_selected_runtime_credential(service: EventSub
     cast("MagicMock", service.workflows).validate_event_subscribe_access.assert_awaited_once_with(
         params.model_dump(mode="json"), workflow.project_id
     )
-    cast("MagicMock", service.integrations)._resolve_credential.assert_awaited_once_with(params.credential_id)
+    cast("MagicMock", service.integrations).resolve_credential.assert_awaited_once_with(params.credential_id)
     assert probe.call_args.args[1]["kafka_username"] == "runtime"
     for method in ("add", "flush", "commit", "delete"):
         getattr(cast("AsyncMock", service.session), method).assert_not_called()
 
 
 async def test_denied_reference_never_decrypts_or_connects(service: EventSubscriptionInspectionService) -> None:
-    params = KafkaSubscribeParameters(transport="kafka", topic="alerts", integration_id=uuid4(), credential_id=uuid4())
+    params = KafkaSubscribeParameters(topic="alerts", integration_id=uuid4(), credential_id=uuid4())
     cast("MagicMock", service.workflows).validate_event_subscribe_access.side_effect = AuthorizationDeniedError(
         "Denied"
     )
     with patch(f"{MODULE}.test_kafka_connection") as probe, pytest.raises(AuthorizationDeniedError):
         await service.test_unsaved(uuid4(), params)
-    cast("MagicMock", service.integrations)._resolve_credential.assert_not_called()
+    cast("MagicMock", service.integrations).resolve_credential.assert_not_called()
     probe.assert_not_called()
 
 
