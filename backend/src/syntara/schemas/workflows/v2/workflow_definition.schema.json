@@ -147,11 +147,7 @@
             {
               "properties": {
                 "type": {"const": "event_subscribe_trigger"},
-                "parameters": {
-                  "oneOf": [
-                    {"$ref": "triggers/kafka_subscribe.schema.json#/parameterSchema"}
-                  ]
-                }
+                "parameters": {"$ref": "triggers/event_subscribe.schema.json#/parameterSchema"}
               }
             }
           ]

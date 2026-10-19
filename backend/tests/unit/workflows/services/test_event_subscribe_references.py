@@ -35,7 +35,6 @@ def definition() -> dict[str, Any]:
                 "id": "incoming",
                 "type": "event_subscribe_trigger",
                 "parameters": {
-                    "transport": "kafka",
                     "integration_id": str(uuid4()),
                     "credential_id": str(uuid4()),
                     "topic": "alerts",
