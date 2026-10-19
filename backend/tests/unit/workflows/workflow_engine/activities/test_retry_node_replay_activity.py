@@ -31,8 +31,10 @@ class _Row:
         completed_at: datetime | None = None,
         error_details: str | None = None,
         control_data: dict[str, Any] | None = None,
+        temporal_activity_id: str | None = None,
     ) -> None:
         self.activity_name = activity_name
+        self.temporal_activity_id = temporal_activity_id or activity_name
         self.status = status
         self.output_data = output
         self.input_data = input_data
@@ -50,15 +52,33 @@ def _mock_session(rows: list[Any]) -> AsyncMock:
     return session
 
 
-async def _run(rows: list[Any], node_id: str | None) -> dict[str, Any] | None:
+async def _run(
+    rows: list[Any],
+    node_id: str | None,
+    *,
+    temporal_activity_id: str | None = None,
+    allow_legacy_fallback: bool = True,
+) -> dict[str, Any] | None:
     # The mock session does not execute SQL, so the activity's predicates are
     # applied here to keep these tests meaningful: the restorable-status filter
     # and the exact-name match the query performs. The integration test for this
     # activity covers the real query.
     wanted = node_id.strip() if node_id else ""
-    session = _mock_session(
-        [row for row in rows if row.status in RESTORABLE_SOURCE_STATUSES and row.activity_name == wanted]
-    )
+    legacy_rows = [row for row in rows if row.status in RESTORABLE_SOURCE_STATUSES and row.activity_name == wanted]
+    if temporal_activity_id:
+        exact_rows = [
+            row
+            for row in rows
+            if row.status in RESTORABLE_SOURCE_STATUSES and row.temporal_activity_id == temporal_activity_id
+        ]
+        session = AsyncMock()
+        exact_result = MagicMock()
+        exact_result.first.return_value = exact_rows[0] if exact_rows else None
+        legacy_result = MagicMock()
+        legacy_result.first.return_value = legacy_rows[0] if legacy_rows else None
+        session.exec.side_effect = [exact_result, legacy_result] if allow_legacy_fallback else [exact_result]
+    else:
+        session = _mock_session(legacy_rows)
 
     async def mock_get_db():  # noqa: ANN202
         yield session
@@ -67,7 +87,11 @@ async def _run(rows: list[Any], node_id: str | None) -> dict[str, Any] | None:
         "syntara.workflows.workflow_engine.activities.retry_node_replay_activity.get_db",
         mock_get_db,
     ):
-        return await replay_retry_node_activity("src-1", node_id) if node_id is not None else None
+        return (
+            await replay_retry_node_activity("src-1", node_id, temporal_activity_id, allow_legacy_fallback)
+            if node_id is not None
+            else None
+        )
 
 
 @pytest.mark.asyncio
@@ -107,6 +131,55 @@ async def test_only_requested_nodes_are_returned() -> None:
         "started_at": None,
         "completed_at": None,
     }
+
+
+@pytest.mark.asyncio
+async def test_nested_loop_restore_selects_the_exact_temporal_path() -> None:
+    rows = [
+        _Row(
+            "step#iter-1",
+            ActivityStatus.COMPLETED,
+            {"value": "outer-0"},
+            temporal_activity_id="step_iter_0_iter_1",
+        ),
+        _Row(
+            "step#iter-2",
+            ActivityStatus.COMPLETED,
+            {"value": "outer-2"},
+            temporal_activity_id="step_iter_2_iter_1",
+        ),
+    ]
+
+    answer = await _run(
+        rows,
+        "step#iter-2",
+        temporal_activity_id="step_iter_2_iter_1",
+        allow_legacy_fallback=False,
+    )
+
+    assert answer is not None
+    assert answer["output_data"] == {"value": "outer-2"}
+
+
+@pytest.mark.asyncio
+async def test_nested_loop_restore_does_not_guess_from_the_global_iteration_name() -> None:
+    rows = [
+        _Row(
+            "step#iter-2",
+            ActivityStatus.COMPLETED,
+            {"value": "wrong-outer-iteration"},
+            temporal_activity_id="step_iter_2_iter_0",
+        )
+    ]
+
+    answer = await _run(
+        rows,
+        "step#iter-2",
+        temporal_activity_id="step_iter_1_iter_2",
+        allow_legacy_fallback=False,
+    )
+
+    assert answer is None
 
 
 @pytest.mark.asyncio
@@ -474,23 +547,27 @@ async def _run_ports(pairs: list[Any]) -> dict[str, str]:
 @pytest.mark.asyncio
 async def test_control_ports_maps_node_ids_to_ports() -> None:
     """Every control node that recorded a port is returned, keyed by node id."""
-    ports = await _run_ports([("cond_1", {"next_port": "true"}), ("sw_1", {"next_port": "b"})])
+    ports = await _run_ports([("cond_1", "cond_1", {"next_port": "true"}), ("sw_1", "sw_1", {"next_port": "b"})])
 
     assert ports == {"cond_1": "true", "sw_1": "b"}
 
 
 @pytest.mark.asyncio
 async def test_control_ports_strips_iteration_suffixes() -> None:
-    """A nested control node is keyed by its base id, matching the restorable set."""
-    ports = await _run_ports([("cond_1_iter_2_iter_3", {"next_port": "true"})])
+    """A nested control node keeps its path and also maps to its base id."""
+    ports = await _run_ports([("cond_1#iter-3", "cond_1_iter_2_iter_3", {"next_port": "true"})])
 
-    assert ports == {"cond_1": "true"}
+    assert ports == {
+        "cond_1#iter-3": "true",
+        "cond_1": "true",
+        "cond_1_iter_2_iter_3": "true",
+    }
 
 
 @pytest.mark.asyncio
 async def test_control_ports_skips_rows_with_no_port() -> None:
     """Control data without a next_port is left to the caller's inference."""
-    ports = await _run_ports([("cond_1", {"other": 1}), ("sw_1", {"next_port": "a"})])
+    ports = await _run_ports([("cond_1", "cond_1", {"other": 1}), ("sw_1", "sw_1", {"next_port": "a"})])
 
     assert ports == {"sw_1": "a"}, "a row with no next_port must not become a routing entry"
 
@@ -498,6 +575,6 @@ async def test_control_ports_skips_rows_with_no_port() -> None:
 @pytest.mark.asyncio
 async def test_control_ports_ignores_non_dict_control_data() -> None:
     """A malformed value is skipped rather than crashing the whole read."""
-    ports = await _run_ports([("cond_1", "not-a-dict"), ("sw_1", {"next_port": "a"})])
+    ports = await _run_ports([("cond_1", "cond_1", "not-a-dict"), ("sw_1", "sw_1", {"next_port": "a"})])
 
     assert ports == {"sw_1": "a"}

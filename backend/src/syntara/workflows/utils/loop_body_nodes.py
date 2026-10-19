@@ -24,3 +24,20 @@ def collect_loop_bodies(
             pending.extend(adjacency.get(node_id, ()))
         bodies[loop_id] = body
     return bodies
+
+
+def collect_direct_loop_bodies(
+    loop_bodies: Mapping[str, set[str]],
+    loop_ids: set[str],
+) -> dict[str, set[str]]:
+    """Keep each loop's direct body nodes and remove nested-loop descendants.
+
+    A nested loop controller remains in its parent's direct body. Nodes inside
+    that controller's body do not, so a parent-loop probe cannot use a nested
+    descendant as evidence for the parent's current iteration.
+    """
+    direct_bodies: dict[str, set[str]] = {}
+    for loop_id, body in loop_bodies.items():
+        nested_descendants = set().union(*(loop_bodies.get(node_id, set()) for node_id in body if node_id in loop_ids))
+        direct_bodies[loop_id] = body - nested_descendants
+    return direct_bodies

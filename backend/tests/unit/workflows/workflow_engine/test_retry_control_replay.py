@@ -123,6 +123,20 @@ def _loop_after_condition_graph() -> WorkflowGraph:
     return WorkflowGraph(backend)
 
 
+def _retry_inside_loop_graph() -> WorkflowGraph:
+    """Loop body chain where a downstream node ran before the failed iteration."""
+    backend = InMemoryGraphBackend()
+    backend.add_node("loop_1", {"id": "loop_1", "type": "loop", "parameters": {}})
+    backend.add_node("before", {"id": "before", "type": "script", "parameters": {}})
+    backend.add_node("failed", {"id": "failed", "type": "script", "parameters": {}})
+    backend.add_node("after", {"id": "after", "type": "script", "parameters": {}})
+    backend.add_edge("loop_1", "before", {"from_port": "iterate"})
+    backend.add_edge("before", "failed", None)
+    backend.add_edge("failed", "after", None)
+    backend.add_edge("after", "loop_1", {"to_port": "iterate"})
+    return WorkflowGraph(backend)
+
+
 def _node(graph: WorkflowGraph, node_id: str) -> ActivityNode:
     node = graph.get_node(node_id)
     assert node is not None, f"missing node {node_id}"
@@ -301,7 +315,16 @@ async def test_restored_control_result_reads_the_replay_under_the_node_id(mock_w
     await wf._restore_node_state(node, graph)
 
     assert mock_wf.execute_activity.await_args.kwargs["activity_id"] == "cond_1"
-    assert mock_wf.execute_activity.await_args.kwargs["args"] == ["src-1", "cond_1"], "the node id names the source row"
+    assert mock_wf.execute_activity.await_args.kwargs["args"] == ["src-1", "cond_1", "cond_1", True]
+
+
+def test_replayed_timestamps_are_addressable_by_the_full_temporal_path() -> None:
+    wf = _make_workflow()
+    wf._retry_replay_candidates = {"body_a"}
+    restored: dict[str, str | None] = {"status": ActivityStatus.COMPLETED.value, "started_at": "source"}
+    wf._restored_node_timestamps = {"body_a_iter_2_iter_1": restored}
+
+    assert wf.get_replayed_node_timestamps_if_ready("body_a_iter_2_iter_1") == restored
 
 
 @pytest.mark.asyncio
@@ -581,7 +604,7 @@ async def test_no_prefetched_port_still_falls_back_to_inference(mock_wf: MagicMo
 # the set through _prepare_retry, which is what populates it.
 
 
-async def test_a_loop_is_a_candidate_and_is_replayed(
+async def test_a_loop_stays_a_candidate_until_the_loop_probe_runs(
     mock_wf: MagicMock,
 ) -> None:
     """A loop in the upstream candidate set uses the loop replay path."""
@@ -592,7 +615,7 @@ async def test_a_loop_is_a_candidate_and_is_replayed(
     await wf._prepare_retry(graph)
 
     assert "loop_1" in wf._retry_replay_candidates
-    assert wf._should_restore_node("loop_1", graph) is True
+    assert wf._should_restore_node("loop_1", graph) is False
 
 
 async def test_a_control_node_is_dropped_from_the_candidates_when_it_must_rerun(
@@ -613,6 +636,33 @@ async def test_a_control_node_is_dropped_from_the_candidates_when_it_must_rerun(
 
     assert await wf._maybe_restore_retry_output(_node(graph, "loop_1"), graph) is None
     assert "loop_1" not in wf._retry_replay_candidates, "and is gone once it reruns"
+
+
+def test_body_nodes_from_earlier_iterations_restore_even_if_downstream_of_failure() -> None:
+    wf = _make_workflow({"retry_from_execution_id": "src-1", "eligible_point_ids": ["failed"]})
+    graph = _retry_inside_loop_graph()
+    wf.loop_body_map = {"before": "loop_1", "failed": "loop_1", "after": "loop_1"}
+    wf._loop_bodies = {"loop_1": {"before", "failed", "after"}}
+    wf._retry_source_statuses = {"after": ActivityStatus.COMPLETED.value}
+    wf._retry_source_temporal_statuses = {"after_iter_1": ActivityStatus.COMPLETED.value}
+    wf._retry_selected_failure_paths = {"failed": [[2]]}
+    wf.node_control_data = {"loop_1": {"current_index": 1}}
+
+    assert "after" not in wf._retry_restorable_nodes(graph)
+    assert wf._should_restore_node("after", graph) is True
+
+
+def test_selected_failure_node_runs_at_its_failed_iteration() -> None:
+    wf = _make_workflow({"retry_from_execution_id": "src-1", "eligible_point_ids": ["failed"]})
+    graph = _retry_inside_loop_graph()
+    wf.loop_body_map = {"failed": "loop_1"}
+    wf._loop_bodies = {"loop_1": {"failed"}}
+    wf._retry_source_statuses = {"failed": ActivityStatus.FAILED.value}
+    wf._retry_source_temporal_statuses = {"failed_iter_2": ActivityStatus.FAILED.value}
+    wf._retry_selected_failure_paths = {"failed": [[2]]}
+    wf.node_control_data = {"loop_1": {"current_index": 2}}
+
+    assert wf._should_restore_node("failed", graph) is False
 
 
 async def test_a_restored_control_node_stays_a_candidate(mock_wf: MagicMock) -> None:

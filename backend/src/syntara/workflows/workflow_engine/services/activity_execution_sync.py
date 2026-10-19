@@ -213,7 +213,14 @@ class ActivityExecutionSyncMixin:
         }
 
         existing.status = activity_data["status"]
-        existing.started_at = activity_data["started_at"] or (existing.started_at if is_loop_control else None)
+        if activity_data.get("temporal_activity_id") and not activity_data.get("_is_retry_loop_record_restore"):
+            existing.temporal_activity_id = activity_data["temporal_activity_id"]
+        if is_loop_control:
+            # A logical loop has one row across all iterations; its start is the
+            # first loop start, not the start of the latest control activity.
+            existing.started_at = existing.started_at or activity_data["started_at"]
+        else:
+            existing.started_at = activity_data["started_at"]
         existing.completed_at = activity_data["completed_at"]
         existing.input_data = input_data or {}
         existing.output_data = output_data
@@ -262,11 +269,12 @@ class ActivityExecutionSyncMixin:
             if not activity_data or activity_data.get("status") != ActivityStatus.COMPLETED:
                 continue
             activity_id = activity_data["activity_id"]
-            if activity_id in resolved:
+            timestamp_key = activity_data.get("temporal_activity_id") or activity_id
+            if timestamp_key in resolved:
                 continue
-            replayed_ts = await self._replayed_node_timestamps(metadata, handle, activity_id)
+            replayed_ts = await self._replayed_node_timestamps(metadata, handle, timestamp_key)
             if replayed_ts is not None:
-                resolved[activity_id] = replayed_ts
+                resolved[timestamp_key] = replayed_ts
         return resolved
 
     async def _replayed_node_timestamps(
@@ -401,7 +409,10 @@ class ActivityExecutionSyncMixin:
             return
 
         source_status = replayed_state.get("status")
-        if source_status in RESTORABLE_SOURCE_STATUSES:
+        is_loop_record_restore = bool(activity_data.get("_is_retry_loop_record_restore"))
+        if source_status in RESTORABLE_SOURCE_STATUSES or (
+            is_loop_record_restore and source_status == ActivityStatus.RUNNING.value
+        ):
             try:
                 activity_data["status"] = ActivityStatus(source_status)
             except ValueError:
@@ -411,7 +422,7 @@ class ActivityExecutionSyncMixin:
                     activity_id=activity_data.get("activity_id"),
                 )
             error_details = replayed_state.get("error_details")
-            if error_details is not None:
+            if is_loop_record_restore or error_details is not None:
                 activity_data["error_details"] = error_details
 
         if replayed_state.get("started_at") is not None:
@@ -419,7 +430,9 @@ class ActivityExecutionSyncMixin:
         # Applied for any terminal status, not just COMPLETED: a restored skip or
         # failure carries the source time too, and stamping this run's time instead
         # would report work as having happened now when it happened before.
-        if replayed_state.get("completed_at") is not None:
+        if is_loop_record_restore:
+            activity_data["completed_at"] = replayed_state.get("completed_at")
+        elif replayed_state.get("completed_at") is not None:
             activity_data["completed_at"] = replayed_state["completed_at"]
 
     @staticmethod
@@ -583,7 +596,13 @@ class ActivityExecutionSyncMixin:
         # For body children whose original record already reached terminal status,
         # create a separate per-iteration record instead of overwriting
         if is_body_iteration and existing and existing.status in TERMINAL_ACTIVITY_STATUSES:
-            existing, is_new = self._get_or_create_iteration_record(activity_id, existing_activities, metadata, session)
+            existing, is_new = self._get_or_create_iteration_record(
+                activity_id,
+                existing_activities,
+                metadata,
+                session,
+                temporal_activity_id=activity_data.get("temporal_activity_id"),
+            )
             if existing is None:
                 return None
 
@@ -639,7 +658,11 @@ class ActivityExecutionSyncMixin:
         # A retry-replayed node is recorded through this normal path, so the event
         # describes the replay rather than the work. Its recorded status, error and
         # times were resolved before the transaction opened and are restored here.
-        self._apply_replayed_state((replayed_timestamps or {}).get(activity_id), activity_data)
+        timestamp_key = activity_data.get("temporal_activity_id") or activity_id
+        self._apply_replayed_state(
+            (replayed_timestamps or {}).get(timestamp_key) or (replayed_timestamps or {}).get(activity_id),
+            activity_data,
+        )
 
         # Update existing activity and track old values for patch generation
         old_values = self._update_activity_record(
@@ -715,6 +738,11 @@ class ActivityExecutionSyncMixin:
             logger.warning("Could not query activity control data", activity_id=activity_id)
             return None
 
+        # A loop-record restore carries the source control data already. Its
+        # absence must not trigger the ordinary 30s wait for a live control node.
+        if activity_data.get("_is_retry_loop_record_restore"):
+            return cast("dict[str, Any]", result) if isinstance(result, dict) else None
+
         # The query can race with workflow result processing for every control
         # node, not only loops. Failed/cancelled/skipped activities do not
         # produce control data, so they must not wait for the update.
@@ -732,6 +760,8 @@ class ActivityExecutionSyncMixin:
         existing_activities: dict[str, ActivityExecution],
         metadata: ExecutionMonitorMetadata,
         session: AsyncSession,
+        *,
+        temporal_activity_id: str | None = None,
     ) -> tuple[ActivityExecution | None, bool]:
         """Get or create a per-iteration ActivityExecution record for a loop body child.
 
@@ -744,6 +774,7 @@ class ActivityExecutionSyncMixin:
             existing_activities: Map of activity_name to existing records (mutated on create)
             metadata: Monitoring metadata (activity_index_map is mutated on create)
             session: Database session for adding new records
+            temporal_activity_id: Canonical Temporal ID for this iteration when known.
 
         Returns:
             Tuple of (activity_record, is_new). is_new is True when a new record was created.
@@ -781,7 +812,7 @@ class ActivityExecutionSyncMixin:
             execution_id=metadata.execution_id,
             activity_name=composite_key,
             node_type=original.node_type,
-            temporal_activity_id=composite_key,
+            temporal_activity_id=temporal_activity_id or composite_key,
             status=ActivityStatus.PENDING,
             started_at=None,
             completed_at=None,

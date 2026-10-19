@@ -1,10 +1,4 @@
-"""Probing whether the source run reached a loop iteration.
-
-The probe is what routes a loop replay: it answers "did this iteration happen"
-from what the source run recorded, instead of re-deriving the loop's decision.
-That is the whole reason it can be trusted under ``continue_on_failure``, where a
-failed body node does not mean the loop exited.
-"""
+"""Probe source execution records using complete loop iteration paths."""
 
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -18,12 +12,22 @@ from syntara.workflows.workflow_engine.activities.retry_node_replay_activity imp
 )
 
 
-async def _run(body_ids: list[str], index: int, *, found: bool) -> tuple[bool, Select[Any] | None]:
-    """Run the probe, returning its answer and the statement it used, if any."""
-    session = AsyncMock()
+def _result(*, found: bool) -> MagicMock:
     result = MagicMock()
     result.first.return_value = object() if found else None
-    session.exec.return_value = result
+    return result
+
+
+async def _run(
+    body_ids: list[str],
+    path: list[int],
+    *,
+    found: list[bool],
+    child_loops: list[str] | None = None,
+    loop_id: str = "loop_1",
+) -> tuple[bool | None, list[Select[Any]]]:
+    session = AsyncMock()
+    session.exec.side_effect = [_result(found=value) for value in found]
 
     async def mock_get_db():  # noqa: ANN202
         yield session
@@ -32,83 +36,82 @@ async def _run(body_ids: list[str], index: int, *, found: bool) -> tuple[bool, S
         "syntara.workflows.workflow_engine.activities.retry_node_replay_activity.get_db",
         mock_get_db,
     ):
-        answer = await probe_retry_loop_iteration("src-1", body_ids, index)
+        answer = await probe_retry_loop_iteration("src-1", loop_id, body_ids, child_loops or [], path)
 
-    # No query is issued for an empty body, so the statement is genuinely absent.
-    issued = session.exec.await_args
-    return answer, issued.args[0] if issued else None
-
-
-@pytest.mark.asyncio
-async def test_answers_true_when_the_iteration_was_reached() -> None:
-    answer, _ = await _run(["body_a"], 2, found=True)
-
-    assert answer is True
-
-
-@pytest.mark.asyncio
-async def test_answers_false_when_the_source_never_got_there() -> None:
-    answer, _ = await _run(["body_a"], 9, found=False)
-
-    assert answer is False
-
-
-@pytest.mark.asyncio
-async def test_an_empty_body_never_reached_an_iteration() -> None:
-    """No body nodes means nothing can have run, and no query is worth making."""
-    answer, query = await _run([], 0, found=True)
-
-    assert answer is False
-    assert query is None, "an empty body must not reach the database at all"
+    statements = [call.args[0] for call in session.exec.await_args_list]
+    return answer, statements
 
 
 def _render(query: Select[Any]) -> str:
-    """Compile to literal SQL so the asserted values appear verbatim.
-
-    ``.in_()`` and the OR branches otherwise compile to bind parameters, so a
-    substring check against the default rendering would pass whether or not the
-    node ids were actually in the statement.
-    """
-    # Select.compile carries no annotation in the pinned SQLAlchemy, so strict
-    # mypy cannot see this call as typed even though it is.
     kwargs: dict[str, Any] = {"literal_binds": True}
     compiled = query.compile(dialect=postgresql.dialect(), compile_kwargs=kwargs)  # type: ignore[no-untyped-call]
     return str(compiled)
 
 
 @pytest.mark.asyncio
-async def test_the_statement_checks_both_row_conventions() -> None:
-    """Iteration 0 is the node's own row; later iterations are ``node#iter-n``.
+async def test_exact_full_path_record_means_iteration_was_reached() -> None:
+    answer, queries = await _run(["body_a"], [2, 3], found=[True])
 
-    The sync service writes the first run under the plain activity name and only
-    mints a composite key once the previous row is terminal, so a probe that
-    assumed one convention would miss half the iterations.
-    """
-    _, query = await _run(["body_a"], 3, found=True)
-    assert query is not None
-    sql = _render(query)
-
-    assert "body_a" in sql
-    assert "body_a#iter-3" in sql
-    assert "iteration" in sql
+    assert answer is True
+    assert "body_a_iter_2_iter_3" in _render(queries[0])
+    assert "src-1" in _render(queries[0])
 
 
 @pytest.mark.asyncio
-async def test_the_statement_is_scoped_to_the_source_execution() -> None:
-    """A row from another execution must not answer this one."""
-    _, query = await _run(["body_a"], 1, found=True)
-    assert query is not None
-    sql = _render(query)
+async def test_loop_control_completion_is_not_body_iteration_evidence() -> None:
+    answer, queries = await _run(["body_a"], [2], found=[False, False])
 
-    assert "src-1" in sql
+    assert answer is False
+    assert "loop_1_iter_2" not in _render(queries[0])
 
 
 @pytest.mark.asyncio
-async def test_every_body_node_is_considered() -> None:
-    """Any node in the body counts — a loop may have several, and one is enough."""
-    _, query = await _run(["body_a", "body_b"], 1, found=True)
-    assert query is not None
-    sql = _render(query)
+async def test_nested_scope_record_means_missing_iteration_was_not_reached() -> None:
+    answer, queries = await _run(["body_a"], [2, 3], found=[False, True])
 
-    assert "body_a#iter-1" in sql
-    assert "body_b#iter-1" in sql
+    assert answer is False
+    assert len(queries) == 2
+    assert "body/_a/_iter/_2/_iter/_" in _render(queries[1])
+    assert "loop/_1/_iter/_2/_iter/_" in _render(queries[1])
+
+
+@pytest.mark.asyncio
+async def test_legacy_nested_history_is_unknown_and_must_not_skip_work() -> None:
+    answer, _ = await _run(["body_a"], [2, 3], found=[False, False])
+
+    assert answer is None
+
+
+@pytest.mark.asyncio
+async def test_top_level_legacy_rows_keep_the_compatibility_lookup() -> None:
+    answer, queries = await _run(["body_a"], [3], found=[False, True])
+
+    assert answer is True
+    legacy_sql = _render(queries[1])
+    assert "body_a" in legacy_sql
+    assert "body_a#iter-3" in legacy_sql
+    assert "iteration" in legacy_sql
+
+
+@pytest.mark.asyncio
+async def test_nested_loop_controller_counts_under_the_exact_parent_path() -> None:
+    answer, queries = await _run([], [2], child_loops=["inner"], found=[True])
+
+    assert answer is True
+    assert "inner/_iter/_2/_iter/_" in _render(queries[0])
+
+
+@pytest.mark.asyncio
+async def test_empty_body_never_queries_the_database() -> None:
+    answer, queries = await _run([], [0], found=[])
+
+    assert answer is False
+    assert queries == []
+
+
+@pytest.mark.asyncio
+async def test_nested_loop_with_no_direct_activity_body_is_unknown_for_legacy_rows() -> None:
+    answer, queries = await _run([], [1, 0], found=[])
+
+    assert answer is None
+    assert queries == []

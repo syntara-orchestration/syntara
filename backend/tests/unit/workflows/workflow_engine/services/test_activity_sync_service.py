@@ -31,6 +31,7 @@ from syntara.workflows.workflow_engine.services.activity_sync_service import (
     SyntheticActivityStarted,
     SyntheticPartialOutput,
 )
+from syntara.workflows.workflow_engine.utils.loop_iteration_ids import retry_loop_record_activity_id
 from syntara.workflows.workflow_engine.utils.timeout_messages import (
     build_timeout_error_message,
     format_timeout_friendly,
@@ -480,6 +481,26 @@ class TestActivityEventProcessing:
 
         assert 1 not in self.metadata.pending_activity_updates
 
+    def test_retry_loop_record_event_maps_to_one_logical_loop_row(self) -> None:
+        marker_id = retry_loop_record_activity_id("loop-node")
+        event = self._create_mock_event(
+            EventType.EVENT_TYPE_ACTIVITY_TASK_SCHEDULED,
+            event_id=10,
+            activity_id=marker_id,
+        )
+
+        self.service._process_activity_scheduled(event, self.metadata)
+
+        update = self.metadata.pending_activity_updates[10]
+        assert update["activity_id"] == "loop-node"
+        assert update["activity_name"] == "loop-node"
+        assert update["temporal_activity_id"] == marker_id
+        assert update["_is_retry_loop_record_restore"] is True
+        assert update["_is_loop_control"] is True
+        assert update["_is_loop_iteration"] is False
+        assert update["_has_control_data"] is True
+        assert update["iteration"] is None
+
     def test_process_activity_scheduled_sets_loop_flags_for_iter_suffix(self) -> None:
         """An activity with _iter_N suffix is recognized as a loop iteration control node."""
         event = self._create_mock_event(
@@ -578,6 +599,8 @@ class TestActivityEventProcessing:
         assert update["_is_loop_iteration"] is True
         assert update["_is_loop_control"] is False
         assert update["iteration"] == 0
+        assert update["temporal_activity_id"] == "approval-node_iter_1_iter_0"
+        assert update["loop_iteration_path"] == [1, 0]
 
     def test_process_activity_scheduled_loop_type_iter_suffix_is_loop_control(self) -> None:
         """A LOOP-typed node with _iter_N suffix is still classified as loop control."""
@@ -2442,6 +2465,25 @@ class TestGetOrCreateIterationRecord:
         assert result.iteration == 1
         assert original.iteration == 0
         session.add.assert_called_once()
+
+    def test_keeps_the_canonical_temporal_id_for_a_new_nested_iteration(self) -> None:
+        metadata = create_test_metadata(execution_id=uuid4(), activity_index_map={"body-node": 0})
+        original = self._create_mock_activity()
+        existing_activities: dict[str, ActivityExecution] = {"body-node": original}
+        session = Mock()
+
+        result, is_new = ActivitySyncService._get_or_create_iteration_record(
+            "body-node",
+            existing_activities,
+            metadata,
+            session,
+            temporal_activity_id="body-node_iter_2_iter_1",
+        )
+
+        assert is_new is True
+        assert result is not None
+        assert result.activity_name == "body-node#iter-1"
+        assert result.temporal_activity_id == "body-node_iter_2_iter_1"
 
     def test_reuses_non_terminal_iteration_record(self) -> None:
         """Returns existing non-terminal iteration record instead of creating a new one."""
@@ -6189,6 +6231,65 @@ class TestActivitySyncPreservesIoOnQueryFailure:
         assert activity.status == ActivityStatus.RUNNING
 
 
+class TestLogicalLoopRecordSync:
+    """A loop's visible ActivityExecution row represents all its iterations."""
+
+    def test_loop_keeps_first_start_and_record_restore_keeps_temporal_row_key(self) -> None:
+        first_started = datetime(2026, 1, 1, 0, 0, 0, tzinfo=UTC)
+        next_started = datetime(2026, 1, 1, 0, 0, 30, tzinfo=UTC)
+        existing = Mock(spec=ActivityExecution)
+        existing.status = ActivityStatus.PENDING
+        existing.started_at = None
+        existing.completed_at = None
+        existing.error_details = None
+        existing.retry_count = 0
+        existing.output_data = None
+        existing.iteration = None
+        existing.temporal_activity_id = "loop-node_iter_0"
+        existing.updated_at = None
+
+        ActivitySyncService._update_activity_record(
+            existing,
+            {
+                "status": ActivityStatus.RUNNING,
+                "started_at": first_started,
+                "completed_at": None,
+                "error_details": None,
+                "retry_count": 0,
+                "iteration": 0,
+                "temporal_activity_id": retry_loop_record_activity_id("loop-node"),
+                "_is_retry_loop_record_restore": True,
+            },
+            {},
+            {},
+            None,
+            is_loop_control=True,
+        )
+
+        assert existing.started_at == first_started
+        assert existing.temporal_activity_id == "loop-node_iter_0"
+
+        ActivitySyncService._update_activity_record(
+            existing,
+            {
+                "status": ActivityStatus.RUNNING,
+                "started_at": next_started,
+                "completed_at": None,
+                "error_details": None,
+                "retry_count": 0,
+                "iteration": 1,
+                "temporal_activity_id": "loop-node_iter_1",
+            },
+            {},
+            {},
+            None,
+            is_loop_control=True,
+        )
+
+        assert existing.started_at == first_started
+        assert existing.temporal_activity_id == "loop-node_iter_1"
+
+
 class TestReplayedNodeStateOverride:
     """A restored node must report what the source run recorded, not the replay.
 
@@ -6257,11 +6358,19 @@ class TestReplayedNodeStateOverride:
                 }
             )
             metadata.pending_sync_event_ids = {1}
-            metadata.pending_activity_updates = {1: {"activity_id": "script_1", "status": ActivityStatus.COMPLETED}}
+            temporal_activity_id = "script_1_iter_2_iter_0"
+            metadata.pending_activity_updates = {
+                1: {
+                    "activity_id": "script_1",
+                    "temporal_activity_id": temporal_activity_id,
+                    "status": ActivityStatus.COMPLETED,
+                }
+            }
 
             resolved = await self.service._resolve_replayed_timestamps(metadata, handle)
 
-            state = resolved["script_1"]
+            state = resolved[temporal_activity_id]
+            handle.query.assert_awaited_with("get_replayed_node_timestamps_if_ready", temporal_activity_id)
             assert state["status"] == source_status, source_status
             assert state.get("error_details") == error_details, source_status
 
@@ -6397,6 +6506,30 @@ class TestReplayedNodeStateOverride:
 
         assert activity_data["status"] == ActivityStatus.RUNNING
         assert activity_data["completed_at"] is None
+
+    def test_loop_record_restore_can_reset_an_unfinished_loop_to_running(self) -> None:
+        activity_data = {
+            "status": ActivityStatus.COMPLETED,
+            "started_at": "restore-event-start",
+            "completed_at": "restore-event-complete",
+            "error_details": "stale",
+            "_is_retry_loop_record_restore": True,
+        }
+
+        self.service._apply_replayed_state(
+            {
+                "status": "running",
+                "started_at": datetime(2026, 1, 1, 0, 0, 0, tzinfo=UTC),
+                "completed_at": None,
+                "error_details": None,
+            },
+            activity_data,
+        )
+
+        assert activity_data["status"] == ActivityStatus.RUNNING
+        assert activity_data["started_at"] == datetime(2026, 1, 1, 0, 0, 0, tzinfo=UTC)
+        assert activity_data["completed_at"] is None
+        assert activity_data["error_details"] is None
 
     def test_apply_keeps_the_event_status_for_an_unrecognised_status(self) -> None:
         """An unknown status must not fail the node's sync."""

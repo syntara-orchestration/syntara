@@ -33,6 +33,22 @@ if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
 
 LOOP_ITERATION_UNIQUE_IDS_PATCH = "loop-iteration-unique-ids"
+LOOP_BODY_ACTIVITY_PATH_IDS_PATCH = "loop-body-activity-path-ids"
+RETRY_LOOP_RECORD_ACTIVITY_PREFIX = "__retry_loop_record__:"
+
+
+def retry_loop_record_activity_id(loop_node_id: str) -> str:
+    """Return a reserved activity ID used to sync one restored logical loop row."""
+    return f"{RETRY_LOOP_RECORD_ACTIVITY_PREFIX}{loop_node_id}"
+
+
+def retry_loop_record_node_id(activity_id: str) -> str | None:
+    """Return the logical loop ID for a loop-record restore activity ID."""
+    if not activity_id.startswith(RETRY_LOOP_RECORD_ACTIVITY_PREFIX):
+        return None
+    node_id = activity_id.removeprefix(RETRY_LOOP_RECORD_ACTIVITY_PREFIX)
+    return node_id or None
+
 
 _LOOP_ITER_CHAIN_RE = re.compile(r"(?:_iter_\d+)+$")
 _LOOP_ITER_CAPTURE_RE = re.compile(r"_iter_(\d+)$")
@@ -58,6 +74,13 @@ def innermost_iteration_index(activity_id: str) -> int | None:
     """Return the last ``_iter_N`` index, or None if the ID has no iteration suffix."""
     match = _LOOP_ITER_CAPTURE_RE.search(activity_id)
     return int(match.group(1)) if match else None
+
+
+def loop_iteration_path(activity_id: str) -> list[int]:
+    """Return all trailing loop indices from an activity ID, outermost first."""
+    base = strip_loop_iteration_suffixes(activity_id)
+    suffix = activity_id[len(base) :]
+    return [int(index) for index in re.findall(r"_iter_(\d+)", suffix)]
 
 
 def join_loop_iteration_id(node_id: str, indices: Sequence[int]) -> str:
@@ -103,6 +126,24 @@ def approval_temporal_activity_id(
     if not use_unique_loop_iteration_ids():
         return node_id
     return join_loop_iteration_id(node_id, loop_index_chain(node_id, loop_body_map, node_control_data))
+
+
+def loop_body_temporal_activity_id(
+    node_id: str,
+    loop_body_map: Mapping[str, str],
+    node_control_data: Mapping[str, Mapping[str, Any]],
+) -> str:
+    """Temporal ID for an ordinary activity inside a loop body.
+
+    A separate patch marker keeps histories that already recorded the approval
+    ID patch deterministic: those executions retain their original body IDs.
+    """
+    path = loop_index_chain(node_id, loop_body_map, node_control_data)
+    if not path:
+        return node_id
+    if workflow.in_workflow() and not workflow.patched(LOOP_BODY_ACTIVITY_PATH_IDS_PATCH):
+        return node_id
+    return join_loop_iteration_id(node_id, path)
 
 
 def loop_control_activity_id(

@@ -6,8 +6,10 @@ from syntara.workflows.workflow_engine.utils.loop_iteration_ids import (
     approval_temporal_activity_id,
     innermost_iteration_index,
     join_loop_iteration_id,
+    loop_body_temporal_activity_id,
     loop_control_activity_id,
     loop_index_chain,
+    loop_iteration_path,
     matches_loop_iteration_id,
     strip_loop_iteration_suffixes,
 )
@@ -35,6 +37,12 @@ def test_innermost_iteration_index() -> None:
     assert innermost_iteration_index("approval") is None
     assert innermost_iteration_index("approval_iter_3") == 3
     assert innermost_iteration_index("approval_iter_1_iter_0") == 0
+
+
+def test_loop_iteration_path_extracts_all_suffixes() -> None:
+    assert loop_iteration_path("approval") == []
+    assert loop_iteration_path("approval_iter_3") == [3]
+    assert loop_iteration_path("approval_iter_2_iter_0") == [2, 0]
 
 
 def test_join_loop_iteration_id() -> None:
@@ -147,6 +155,23 @@ def test_approval_temporal_activity_id_new_and_unpatched() -> None:
         return_value=False,
     ):
         assert approval_temporal_activity_id("approval", body_map, control) == "approval"
+
+
+def test_loop_body_temporal_id_uses_full_path() -> None:
+    body_map = {"step": "inner", "inner": "outer"}
+    control = {"outer": {"current_index": 2}, "inner": {"current_index": 0}}
+
+    assert loop_body_temporal_activity_id("step", body_map, control) == "step_iter_2_iter_0"
+
+
+def test_loop_body_temporal_id_preserves_unpatched_history() -> None:
+    body_map = {"step": "loop"}
+    control = {"loop": {"current_index": 3}}
+    with (
+        patch("syntara.workflows.workflow_engine.utils.loop_iteration_ids.workflow.in_workflow", return_value=True),
+        patch("syntara.workflows.workflow_engine.utils.loop_iteration_ids.workflow.patched", return_value=False),
+    ):
+        assert loop_body_temporal_activity_id("step", body_map, control) == "step"
 
 
 def test_matches_loop_iteration_id() -> None:

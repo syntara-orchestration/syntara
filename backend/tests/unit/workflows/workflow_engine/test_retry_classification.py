@@ -14,6 +14,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from syntara.core.exceptions import SafeValueError
+from syntara.workflows.models.activity_execution import ActivityStatus
 from syntara.workflows.utils.namespace_resolver import NamespaceResolver
 from syntara.workflows.workflow_engine.dynamic_workflow import PRE_RESOLVED_MARKER, OrchestratorWorkflow
 from syntara.workflows.workflow_engine.graph import ActivityNode, WorkflowGraph
@@ -452,20 +453,37 @@ def test_loop_body_nodes_are_restored_per_iteration() -> None:
     assert wf._replay_source_name("step_2") == "step_2"
 
 
-def test_a_loop_node_is_restored_not_executed() -> None:
-    """A replayed loop routes from what the source recorded, not by re-deriving.
+@pytest.mark.asyncio
+async def test_restoring_a_loop_body_uses_its_canonical_temporal_path(mock_wf: MagicMock) -> None:
+    wf = _injectable_workflow(source_statuses={"body_a": ActivityStatus.COMPLETED.value})
+    wf.retry_context = _retry("step_2")
+    graph = _loop_graph()
+    wf.loop_body_map = {"body_a": "loop_1"}
+    wf.node_control_data = {"loop_1": {"current_index": 2}}
+    wf._loop_bodies = {"loop_1": {"body_a", "body_b"}}
+    wf._retry_source_temporal_statuses = {"body_a_iter_2": ActivityStatus.COMPLETED.value}
+    mock_wf.execute_activity = AsyncMock(
+        return_value={"status": "completed", "input_data": {}, "output_data": {"result": 7}}
+    )
 
-    Executing the loop control would re-evaluate the loop expression against a
-    namespace this retry is still rebuilding, so the loop is restored and asked
-    whether each next iteration happened instead.
-    """
+    result = await wf._restore_node_state(_node("body_a"), graph)
+
+    assert result is not None
+    call = mock_wf.execute_activity.await_args
+    assert call.kwargs["args"] == ["src-1", "body_a#iter-2", "body_a_iter_2", True]
+    assert call.kwargs["activity_id"] == "body_a_iter_2"
+    assert "body_a_iter_2" in wf._restored_node_timestamps
+
+
+def test_a_loop_node_uses_its_probe_instead_of_generic_node_restoration() -> None:
+    """The loop must reach its executor so it can probe each source iteration."""
     from syntara.workflows.workflow_engine.models.workflow_definition import NodeType
     from syntara.workflows.workflow_engine.retry_mixin import _CONTROL_NODE_TYPES_FOR_RETRY
 
     wf = _make_workflow(_retry("step_2"))
     graph = _loop_graph()
 
-    assert wf._should_restore_node("loop_1", graph) is True
+    assert wf._should_restore_node("loop_1", graph) is False
     assert NodeType.LOOP not in _CONTROL_NODE_TYPES_FOR_RETRY
     assert NodeType.WAIT not in _CONTROL_NODE_TYPES_FOR_RETRY
 
@@ -477,10 +495,14 @@ def test_non_loop_successors_of_a_loop_stay_restorable() -> None:
     # of the loop and is still eligible for restoration.
     downstream = _make_workflow(_retry("body_b"))
     graph = _loop_graph()
+    downstream._retry_source_statuses = {
+        "body_a": ActivityStatus.COMPLETED.value,
+        "step_2": ActivityStatus.COMPLETED.value,
+    }
     restorable = downstream._retry_restorable_nodes(graph)
 
     assert downstream._should_restore_node("step_2", graph) is True
-    assert downstream._should_restore_node("loop_1", graph) is True
+    assert downstream._should_restore_node("loop_1", graph) is False
     assert downstream._should_restore_node("body_a", graph) is True
     assert downstream._should_restore_node("body_b", graph) is False
     assert restorable == {"body_a", "loop_1", "step_2"}
@@ -611,7 +633,7 @@ async def test_restore_dispatches_the_retry_outputs_activity(mock_wf: MagicMock)
 
     call = mock_wf.execute_activity.call_args
     assert call[0][0] == ActivityName.RETRY_NODE_REPLAY
-    assert call.kwargs["args"] == ["src-1", "step_1"]
+    assert call.kwargs["args"] == ["src-1", "step_1", "step_1", True]
     assert call.kwargs["activity_id"] == "step_1"
 
 

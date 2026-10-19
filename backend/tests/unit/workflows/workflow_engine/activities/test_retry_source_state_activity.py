@@ -16,7 +16,7 @@ from syntara.workflows.workflow_engine.activities.retry_node_replay_activity imp
 )
 
 
-async def _run(rows: list[tuple[str, str]]) -> tuple[dict[str, str], Any]:
+async def _run(rows: list[tuple[str | None, str, str | None]]) -> tuple[dict[str, dict[str, str]], Any]:
     """Run the activity over ``rows``, returning the mapping and the query used."""
     session = AsyncMock()
     result = MagicMock()
@@ -37,17 +37,19 @@ async def _run(rows: list[tuple[str, str]]) -> tuple[dict[str, str], Any]:
 
 @pytest.mark.asyncio
 async def test_returns_the_status_for_a_node() -> None:
-    states, _ = await _run([("step_1", "completed")])
+    states, _ = await _run([("step_1", "completed", "step_1")])
 
-    assert states == {"step_1": "completed"}
+    assert states["activity_statuses"] == {"step_1": "completed"}
+    assert states["activity_name_statuses"] == {"step_1": "completed"}
+    assert states["temporal_activity_statuses"] == {"step_1": "completed"}
 
 
 @pytest.mark.asyncio
 async def test_a_failed_node_keeps_its_failed_status() -> None:
     """The whole point of the read: a retry needs to see *which* nodes failed."""
-    states, _ = await _run([("step_1", "completed"), ("step_2", "failed")])
+    states, _ = await _run([("step_1", "completed", "step_1"), ("step_2", "failed", "step_2")])
 
-    assert states["step_2"] == "failed"
+    assert states["activity_statuses"]["step_2"] == "failed"
 
 
 @pytest.mark.asyncio
@@ -59,29 +61,39 @@ async def test_strips_the_iteration_suffix_so_a_loop_body_appears_once() -> None
     """
     states, _ = await _run(
         [
-            ("body#iter-1", "completed"),
-            ("body#iter-2", "completed"),
-            ("body#iter-3", "failed"),
+            ("body#iter-1", "completed", "body_iter_1"),
+            ("body#iter-2", "completed", "body_iter_2"),
+            ("body#iter-3", "failed", "body_iter_3"),
         ]
     )
 
-    assert states == {"body": "failed"}
+    assert states["activity_statuses"] == {"body": "failed"}
+    assert states["activity_name_statuses"] == {
+        "body#iter-1": "completed",
+        "body#iter-2": "completed",
+        "body#iter-3": "failed",
+    }
+    assert states["temporal_activity_statuses"] == {
+        "body_iter_1": "completed",
+        "body_iter_2": "completed",
+        "body_iter_3": "failed",
+    }
 
 
 @pytest.mark.asyncio
 async def test_the_last_row_for_a_repeated_node_wins() -> None:
     """Ordering is by iteration then creation, so the newest attempt is the truth."""
-    states, _ = await _run([("body#iter-1", "failed"), ("body#iter-2", "completed")])
+    states, _ = await _run([("body#iter-1", "failed", "body_iter_1"), ("body#iter-2", "completed", "body_iter_2")])
 
-    assert states == {"body": "completed"}
+    assert states["activity_statuses"] == {"body": "completed"}
 
 
 @pytest.mark.asyncio
 async def test_a_null_activity_name_is_ignored() -> None:
     """Sync bookkeeping rows carry no activity name and map to no node."""
-    states, _ = await _run([(None, "completed"), ("step_1", "completed")])  # type: ignore[list-item]
+    states, _ = await _run([(None, "completed", None), ("step_1", "completed", "step_1")])
 
-    assert states == {"step_1": "completed"}
+    assert states["activity_statuses"] == {"step_1": "completed"}
 
 
 @pytest.mark.asyncio
@@ -107,19 +119,19 @@ async def test_selects_only_the_columns_it_reads() -> None:
 async def test_reads_rows_as_a_column_tuple() -> None:
     """A projected select yields tuples, not row objects.
 
-    Reading ``row.activity_name`` off a two-column result raises at runtime while
+    Reading ``row.activity_name`` off a projected result raises at runtime while
     type checking rejects it, so both the shape and the unpacking are pinned here
     to keep the projection from being "simplified" back into an entity select.
     """
-    states, query = await _run([("step_1", "completed")])
+    states, query = await _run([("step_1", "completed", "step_1")])
 
-    assert len(query.selected_columns) == 2
-    assert states == {"step_1": "completed"}
+    assert len(query.selected_columns) == 3
+    assert states["activity_statuses"] == {"step_1": "completed"}
 
 
 @pytest.mark.asyncio
 async def test_the_status_is_returned_as_its_value() -> None:
     """Statuses come back as the string the rest of the engine compares against."""
-    states, _ = await _run([("step_1", ActivityStatus.SKIPPED.value)])
+    states, _ = await _run([("step_1", ActivityStatus.SKIPPED.value, "step_1")])
 
-    assert states == {"step_1": "skipped"}
+    assert states["activity_statuses"] == {"step_1": "skipped"}
