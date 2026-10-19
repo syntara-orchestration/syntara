@@ -43,6 +43,7 @@ from syntara.workflow_runtime.engines.temporal.activities.manual_trigger import 
 from syntara.workflow_runtime.engines.temporal.activities.retry_node_replay_activity import (
     fetch_retry_source_state_activity,
     replay_retry_node_activity,
+    retry_control_ports,
 )
 from syntara.workflow_runtime.engines.temporal.activities.runtime_settings_activity import (
     fetch_workflow_runtime_settings,

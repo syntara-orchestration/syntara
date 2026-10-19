@@ -17,16 +17,7 @@ from syntara.workflow_runtime.engines.temporal.services.activity_sync_types impo
 from syntara.workflows.audit.execution_error import WorkflowExecutionErrorEvent
 from syntara.workflows.models.activity_execution import TERMINAL_ACTIVITY_STATUSES, ActivityExecution, ActivityStatus
 from syntara.workflow_runtime.engines.temporal.utils.datetime import ensure_timezone_aware
-
-#: Source statuses a restored node may carry. Mirrors the replay activity's
-#: RESTORABLE_SOURCE_STATUSES; an ordinary node's own event status is never
-#: overwritten from this.
-RESTORABLE_SOURCE_STATUSES = (
-    ActivityStatus.COMPLETED,
-    ActivityStatus.SKIPPED,
-    ActivityStatus.FAILED,
-)
-
+from syntara.workflow_runtime.engines.temporal.constants import RESTORABLE_SOURCE_STATUSES
 
 logger = structlog.stdlib.get_logger(__name__)
 
