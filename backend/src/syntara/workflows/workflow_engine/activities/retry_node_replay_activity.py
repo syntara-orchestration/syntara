@@ -19,14 +19,18 @@ import structlog
 from sqlmodel import col, select
 from temporalio import activity, workflow
 
+from syntara.workflows.workflow_engine.constants import RESTORABLE_SOURCE_STATUSES
+
 with workflow.unsafe.imports_passed_through():
     from syntara.core.constants import JsonbLimits
     from syntara.core.database.session import get_db
     from syntara.core.exceptions import SafeValueError
     from syntara.workflows.models.activity_execution import ActivityExecution, ActivityStatus
     from syntara.workflows.utils.loop_iteration_names import strip_iteration_suffix
+    from syntara.workflows.workflow_engine.utils.loop_iteration_ids import strip_loop_iteration_suffixes
 
 logger = structlog.stdlib.get_logger(__name__)
+
 
 #: Source statuses a retry can restore.
 #:
@@ -39,13 +43,6 @@ logger = structlog.stdlib.get_logger(__name__)
 #: "Workflow was cancelled" error and no output. So there is no recorded state to
 #: replay, and restoring one would report an interrupted node as a failure — which
 #: would set the run's unhandled-failure flag for a node that merely stopped.
-RESTORABLE_SOURCE_STATUSES = (
-    ActivityStatus.COMPLETED,
-    ActivityStatus.SKIPPED,
-    ActivityStatus.FAILED,
-)
-
-
 @activity.defn(name="replay_retry_node")
 async def replay_retry_node_activity(
     source_execution_id: str,
@@ -61,7 +58,8 @@ async def replay_retry_node_activity(
 
     Returns:
         The node's ``status``, ``input_data``, ``output_data``, ``error_details``,
-        ``started_at`` and ``completed_at`` from the source run, or None when the
+        ``control_data``, ``started_at`` and ``completed_at`` from the source run,
+        or None when the
         source run has no restorable record for it. All six travel together: the
         caller republishes the input into ``node_inputs``, the output into the
         execution namespace, and restores the recorded status so a skipped node
@@ -129,6 +127,10 @@ async def replay_retry_node_activity(
                 # Carried so a restored failure keeps the reason it failed, rather
                 # than surfacing as a skip with no explanation.
                 "error_details": activity_row.error_details,
+                # The routing decision the sync layer persisted. Without this the
+                # retry cannot tell a recorded branch from one it would have to
+                # re-derive, and falls back to inference for every node.
+                "control_data": activity_row.control_data,
                 # The source row's own timestamps, carried so the replayed
                 # node's row reports when the work ran, not the replay time.
                 "started_at": activity_row.started_at.isoformat() if activity_row.started_at else None,
@@ -189,3 +191,42 @@ async def fetch_retry_source_state_activity(source_execution_id: str) -> dict[st
             if activity_name:
                 states[strip_iteration_suffix(activity_name)] = ActivityStatus(status).value
     return states
+
+
+@activity.defn
+async def retry_control_ports(source_execution_id: str) -> dict[str, str]:
+    """Routing decision each control node's source run recorded, keyed by node id.
+
+    Read in one pass during ``_prepare_retry`` because restorable-node selection
+    and ``_should_restore_node`` are synchronous: they cannot dispatch an
+    activity per node, and without this they would reject a control node before
+    the branch its source run persisted was ever read.
+
+    Only nodes that actually persisted a ``next_port`` appear. Anything absent —
+    a run predating the column, a control node with no routing of its own — is
+    left to the caller's inference fallback.
+
+    Args:
+        source_execution_id: Execution whose control nodes hold the routing state.
+
+    Returns:
+        Node id to port, for the control nodes that recorded one.
+
+    """
+    ports: dict[str, str] = {}
+    async for session in get_db():
+        rows = (
+            await session.exec(
+                select(ActivityExecution.activity_name, ActivityExecution.control_data).where(
+                    ActivityExecution.execution_id == source_execution_id,
+                    col(ActivityExecution.control_data).isnot(None),
+                )
+            )
+        ).all()
+        for activity_name, control_data in rows:
+            if not isinstance(control_data, dict):
+                continue
+            port = control_data.get("next_port")
+            if port:
+                ports[strip_loop_iteration_suffixes(activity_name)] = str(port)
+    return ports
