@@ -1247,6 +1247,15 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
             raise
 
         integration_name = integration.name
+
+        # Conservatively block deletion while event-subscription source evidence is
+        # bound; the RESTRICT FK is the DB backstop. Recovery-aware release is a
+        # later story.
+        from syntara.eventstreams.services.subscription_service import EventSubscriptionService  # noqa: PLC0415
+
+        subscription_service = EventSubscriptionService(self.session, self.user)
+        await subscription_service.assert_integration_not_bound(integration_id, integration_name)
+
         tools_count = await self._count_linked_tools(integration_id)
 
         await self._hard_delete_linked_tool_params(integration_id)

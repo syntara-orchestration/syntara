@@ -33,6 +33,26 @@ def mock_service() -> WorkflowService:
     return service
 
 
+@pytest.fixture(autouse=True)
+def _mock_event_subscription_sync() -> Generator[None, None, None]:
+    """Neutralize Kafka subscription projection/guards, which need a real session."""
+    from syntara.eventstreams.services.subscription_service import (
+        EventSubscriptionService,
+        SubscriptionChangeSet,
+    )
+
+    with (
+        patch.object(
+            EventSubscriptionService,
+            "sync_from_published_definition",
+            new_callable=AsyncMock,
+            return_value=SubscriptionChangeSet(),
+        ),
+        patch.object(EventSubscriptionService, "assert_workflow_not_bound", new_callable=AsyncMock),
+    ):
+        yield
+
+
 def _pending_delete_tasks() -> list[asyncio.Task[None]]:
     return [task for task in _pending_schedule_delete_tasks if not task.done()]
 
