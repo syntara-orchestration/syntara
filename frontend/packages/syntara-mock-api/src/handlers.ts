@@ -14,6 +14,7 @@ import {
   WorkflowVersionStatusEnum,
 } from '@syntara/contracts'
 import { credentials, credentialTypes, credentialWorkflows } from './resources/credentials'
+import { executionTargets } from './resources/executionTargets'
 import { integrations } from './resources/integrations'
 import { models } from './resources/models'
 import { workflows } from './resources/workflows'
@@ -423,6 +424,34 @@ export const handlers = [
   }),
 
   // ── Integrations ──────────────────────────────────────────────────────────
+
+  http.get('/api/execution_plane/v1/execution_targets', ({ request }) => {
+    const username = getUsernameFromRequest(request)
+    // Match backend role conventions: only admin/auditor have execution_target:read
+    if (username === 'viewer' || username === 'user' || username === 'puser' || username === 'project-user') {
+      return HttpResponse.json(
+        {
+          type: 'https://api.example.com/errors/forbidden',
+          title: 'Forbidden',
+          detail: 'Insufficient permissions for execution_target:read',
+          code: 'FORBIDDEN',
+          retryable: false,
+        },
+        { status: 403 }
+      )
+    }
+
+    const url = new URL(request.url)
+    const parsedLimit = Number.parseInt(url.searchParams.get('limit') ?? '20', 10)
+    const limit = Number.isFinite(parsedLimit) ? Math.min(Math.max(parsedLimit, 1), 100) : 20
+    const resources = executionTargets.slice(0, limit)
+    return HttpResponse.json({
+      resources,
+      next: null,
+      prev: null,
+      total: executionTargets.length,
+    })
+  }),
 
   http.get('/api/v1/integrations', ({ request }) => {
     const url = new URL(request.url)

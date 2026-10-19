@@ -4,6 +4,7 @@ import * as ApprovalsAPI from './approvals-api.js'
 import * as AuthAPI from './auth-api.js'
 import * as AuthzAPI from './authz-api.js'
 import * as CredentialsAPI from './credentials-api.js'
+import * as ExecutionPlaneAPI from './execution-plane-api.js'
 import * as ExecutionsAPI from './executions-api.js'
 import * as FilesAPI from './files-api.js'
 import * as IdentityProvidersAPI from './identity-providers-api.js'
@@ -25,6 +26,7 @@ export {
   AuthAPI,
   AuthzAPI,
   CredentialsAPI,
+  ExecutionPlaneAPI,
   ExecutionsAPI,
   FilesAPI,
   IdentityProvidersAPI,

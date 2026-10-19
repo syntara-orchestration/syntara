@@ -79,6 +79,12 @@
       "kind": "page",
       "parameters": [],
       "sources": ["appRoute", "navigation", "router"],
+      "template": "/execution-plane"
+    },
+    {
+      "kind": "page",
+      "parameters": [],
+      "sources": ["appRoute", "navigation", "router"],
       "template": "/executions"
     },
     {

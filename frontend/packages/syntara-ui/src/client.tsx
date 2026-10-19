@@ -4,6 +4,7 @@ import type {
   ApprovalsAPI,
   AuthAPI,
   CredentialsAPI,
+  ExecutionPlaneAPI,
   ExecutionsAPI,
   FilesAPI,
   IdentityProvidersAPI,
@@ -142,6 +143,12 @@ export const integrationsFetchClient = createFetchClient<IntegrationsAPI.paths>(
 integrationsFetchClient.use(interfaceTagMiddleware)
 integrationsFetchClient.use(authMiddleware)
 export const integrationsClient = createClient(integrationsFetchClient)
+
+// Paths in the Execution Plane OpenAPI spec already include `/api/execution_plane/v1/...`.
+export const executionPlaneFetchClient = createFetchClient<ExecutionPlaneAPI.paths>({ baseUrl: '/' })
+executionPlaneFetchClient.use(interfaceTagMiddleware)
+executionPlaneFetchClient.use(authMiddleware)
+export const executionPlaneClient = createClient(executionPlaneFetchClient)
 
 const identityProvidersFetchClient = createFetchClient<IdentityProvidersAPI.paths>({
   baseUrl: '/api/v1',

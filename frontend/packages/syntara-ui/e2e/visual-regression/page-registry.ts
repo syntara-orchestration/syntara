@@ -222,6 +222,32 @@ export const pages: PageEntry[] = [
   ...approvalInteractivePages,
 
   // ══════════════════════════════════════════════════════════════════════════
+  // EXECUTION PLANE
+  // ══════════════════════════════════════════════════════════════════════════
+  {
+    section: 'execution-plane',
+    name: 'execution-plane-list',
+    path: AppRoute.ExecutionPlane.Root,
+    waitFor: async (page) => {
+      await expect(page.getByRole('heading', { level: 1, name: 'Execution Plane' })).toBeVisible()
+      await expect(page.locator('table tbody tr').first()).toBeVisible()
+    },
+  },
+  {
+    section: 'execution-plane',
+    name: 'execution-plane-list-empty-filter',
+    path: AppRoute.ExecutionPlane.Root,
+    waitFor: async (page) => {
+      await expect(page.getByRole('heading', { level: 1, name: 'Execution Plane' })).toBeVisible()
+      await expect(page.locator('table tbody tr').first()).toBeVisible()
+    },
+    setup: async (page) => {
+      await applyNameFilter(page, 'zzz-no-match-zzz')
+      await expect(page.getByText(/No results found|Adjust your filters/i)).toBeVisible()
+    },
+  },
+
+  // ══════════════════════════════════════════════════════════════════════════
   // ACCESS MANAGEMENT — Users
   // ══════════════════════════════════════════════════════════════════════════
   {

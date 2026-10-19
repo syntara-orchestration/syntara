@@ -4,6 +4,7 @@ import { approvalsRoutes } from './routes/approvals'
 import { authenticationRoutes } from './routes/authentication'
 import { builderRoutes } from './routes/builder'
 import { configurationRoutes } from './routes/configuration'
+import { executionPlaneRoutes } from './routes/execution-plane'
 import { executionsRoutes } from './routes/executions'
 import { myProfileRoutes } from './routes/my-profile'
 import { settingsRoutes } from './routes/settings'
@@ -16,6 +17,7 @@ export const buildTanStackRouteTree = () =>
     ...workflowsRoutes,
     ...executionsRoutes,
     ...approvalsRoutes,
+    ...executionPlaneRoutes,
     ...configurationRoutes,
     ...settingsRoutes,
     ...authenticationRoutes,

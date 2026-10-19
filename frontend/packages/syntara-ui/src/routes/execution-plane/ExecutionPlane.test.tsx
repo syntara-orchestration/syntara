@@ -1,0 +1,168 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import type { ReactNode } from 'react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { axe } from 'vitest-axe'
+
+import { executionPlaneClient } from '../../client'
+import { AlertProvider } from '../../providers/alerts'
+import { assertUrlParam } from '../../test/filter-test-helpers'
+import { routerTestState } from '../../test/setup'
+
+import ExecutionPlane from './ExecutionPlane'
+
+vi.mock('../../client', () => ({
+  executionPlaneClient: {
+    useQuery: vi.fn(),
+  },
+  authMiddleware: { onRequest: vi.fn(({ request }: { request: unknown }) => request) },
+  interfaceTagMiddleware: { onRequest: vi.fn() },
+}))
+
+vi.mock('../../hooks/useCanI', () => ({
+  useCanI: () => ({ allowed: true, isChecking: false, isError: false }),
+}))
+
+vi.mock('wouter', () => ({
+  useLocation: () => ['/execution-plane', routerTestState.navigate],
+}))
+
+vi.mock('../../hooks/routing/useLocation', () => ({
+  useLocation: () => '/execution-plane',
+}))
+
+const mockSearchParams = new URLSearchParams()
+const mockSetSearchParams = vi.fn()
+
+vi.mock('../../hooks/routing/useSearchParams', () => ({
+  useSearchParams: () => [mockSearchParams, mockSetSearchParams],
+}))
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: { retry: false },
+  },
+})
+
+const wrapper = ({ children }: { children: ReactNode }) => (
+  <QueryClientProvider client={queryClient}>
+    <AlertProvider>{children}</AlertProvider>
+  </QueryClientProvider>
+)
+
+const mockTargets = [
+  {
+    id: 'et-001',
+    cluster_id: 'cl-001',
+    name: 'Prod OpenShift West',
+    backend_type: 'kubernetes',
+    endpoint: 'https://api.west.example.com',
+    placement: { type: 'kubernetes' as const, namespace: 'syntara-workers', node_selectors: [], tolerations: [] },
+    status: 'ready',
+    enabled: true,
+    is_default: true,
+    status_message: null,
+    labels: { region: 'us-west', env: 'prod' },
+    created_at: '2026-01-01T00:00:00Z',
+    last_ran_at: null,
+  },
+  {
+    id: 'et-002',
+    cluster_id: 'cl-002',
+    name: 'Staging OpenShift',
+    backend_type: 'kubernetes',
+    endpoint: 'https://api.staging.example.com',
+    placement: { type: 'kubernetes' as const, namespace: 'syntara-staging', node_selectors: [], tolerations: [] },
+    status: 'provisioning',
+    enabled: false,
+    is_default: false,
+    status_message: 'Waiting for workers',
+    labels: { env: 'staging' },
+    created_at: '2026-01-02T00:00:00Z',
+    last_ran_at: null,
+  },
+]
+
+function mockFacadeQuery(overrides: Record<string, unknown> = {}) {
+  vi.mocked(executionPlaneClient.useQuery).mockReturnValue({
+    data: { resources: mockTargets, next: null, prev: null, total: mockTargets.length },
+    isPending: false,
+    isFetching: false,
+    error: null,
+    refetch: vi.fn(),
+    ...overrides,
+  } as ReturnType<typeof executionPlaneClient.useQuery>)
+}
+
+describe('ExecutionPlane', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockSearchParams.forEach((_value, key) => mockSearchParams.delete(key))
+    mockFacadeQuery()
+  })
+
+  it('lists execution targets with required columns', async () => {
+    render(<ExecutionPlane />, { wrapper })
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Execution Plane' })).toBeInTheDocument()
+    expect(screen.getByText('Prod OpenShift West')).toBeInTheDocument()
+    expect(screen.getByText('Staging OpenShift')).toBeInTheDocument()
+    expect(screen.getByText('cl-001')).toBeInTheDocument()
+    expect(screen.getByText('Ready')).toBeInTheDocument()
+    expect(screen.getByText('region=us-west')).toBeInTheDocument()
+    expect(screen.getByRole('row', { name: /Prod OpenShift West.*Enabled/ })).toBeInTheDocument()
+    expect(screen.getByRole('row', { name: /Staging OpenShift.*Disabled/ })).toBeInTheDocument()
+  })
+
+  it('requests execution targets from the facade endpoint', () => {
+    render(<ExecutionPlane />, { wrapper })
+
+    const call = vi.mocked(executionPlaneClient.useQuery).mock.calls[0]
+    expect(call?.[0]).toBe('get')
+    expect(call?.[1]).toBe('/api/execution_plane/v1/execution_targets')
+    const options = call?.[2] as { params?: { query?: { limit?: number } } } | undefined
+    expect(typeof options?.params?.query?.limit).toBe('number')
+  })
+
+  it('shows empty state with configure path when no targets exist', async () => {
+    mockFacadeQuery({ data: { resources: [], next: null, prev: null, total: 0 } })
+
+    render(<ExecutionPlane />, { wrapper })
+
+    expect(await screen.findByText('No execution targets yet')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Configure integration' })).toBeInTheDocument()
+  })
+
+  it('shows error state when the facade query fails', async () => {
+    mockFacadeQuery({
+      data: undefined,
+      error: { title: 'Internal Error', detail: 'boom', status: 500 },
+      isPending: false,
+    })
+
+    render(<ExecutionPlane />, { wrapper })
+
+    expect(await screen.findByRole('heading', { name: 'Error loading execution targets' })).toBeInTheDocument()
+    expect(screen.getByText('boom')).toBeInTheDocument()
+    expect(screen.queryByText('Prod OpenShift West')).not.toBeInTheDocument()
+  })
+
+  it('writes name filter to URL search params', async () => {
+    const user = userEvent.setup()
+    render(<ExecutionPlane />, { wrapper })
+
+    expect(await screen.findByText('Prod OpenShift West')).toBeInTheDocument()
+
+    await user.type(screen.getByPlaceholderText('Filter by name'), 'staging')
+    await user.keyboard('{Enter}')
+
+    assertUrlParam(mockSetSearchParams, 'name[contains]', 'staging')
+  })
+
+  it('has no accessibility violations', async () => {
+    const { container } = render(<ExecutionPlane />, { wrapper })
+    await screen.findByRole('heading', { level: 1, name: 'Execution Plane' })
+    expect(await axe(container)).toHaveNoViolations()
+  })
+})

@@ -69,6 +69,9 @@ export default tseslint.config(
       'playwright-report/**',
       'scripts/**',
       'eslint-plugin-syntara/**',
+      // Flat config itself — pre-commit matches *.js under packages/; linting this file
+      // alongside other packages trips typescript-eslint's multi-tsconfigRootDir check.
+      'eslint.config.js',
     ],
   },
   js.configs.recommended,
@@ -678,6 +681,7 @@ export default tseslint.config(
       '**/routes/**/ExecutionDetail.tsx',
       '**/routes/**/Integrations.tsx',
       '**/routes/**/IntegrationTools.tsx',
+      '**/routes/**/ExecutionPlane.tsx',
       '**/routes/**/Glossary.tsx',
       '**/routes/**/Settings.tsx',
       '**/routes/**/Approvals.tsx',
