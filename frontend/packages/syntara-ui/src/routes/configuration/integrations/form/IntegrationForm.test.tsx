@@ -6,7 +6,6 @@ import type { ReactNode } from 'react'
 import { type Mock, beforeEach, describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
-import { tanstackRouter } from '../../../../app/tanstackRouter'
 import { integrationsClient } from '../../../../client'
 import { AlertProvider } from '../../../../providers/alerts'
 import type { DocKey } from '../../../../utils/docs/types'
@@ -26,6 +25,8 @@ vi.mock('../useProjectAssignmentSync', () => ({
 }))
 
 vi.mock('../../../../client', () => ({
+  authMiddleware: { onRequest: vi.fn() },
+  interfaceTagMiddleware: { onRequest: vi.fn() },
   integrationsClient: {
     useMutation: vi.fn(() => ({
       mutate: vi.fn(),
@@ -37,10 +38,6 @@ vi.mock('../../../../client', () => ({
   credentialsClient: {
     useQuery: vi.fn(() => ({ data: { results: [] }, isLoading: false, error: null, refetch: vi.fn() })),
   },
-}))
-
-vi.mock('../../../../app/tanstackRouter', () => ({
-  tanstackRouter: { navigate: vi.fn().mockResolvedValue(undefined) },
 }))
 
 vi.mock('../../../access/useAllProjects', () => {
@@ -146,11 +143,11 @@ describe('IntegrationForm', () => {
     expect(screen.getByText('MCP Server')).toBeInTheDocument()
   })
 
-  it('shows Next and Cancel buttons on step 1', () => {
+  it('shows a Next button and Cancel link on step 1', () => {
     render(<IntegrationForm />, { wrapper })
 
     expect(screen.getByRole('button', { name: 'Next' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Cancel' })).toHaveAttribute('href', '/configuration/integrations')
     expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument()
   })
 
@@ -246,15 +243,10 @@ describe('IntegrationForm', () => {
     expect(screen.getByText(/credential is used to discover/i)).toBeInTheDocument()
   })
 
-  it('navigates to integrations list when Cancel is clicked', async () => {
-    const user = userEvent.setup()
+  it('links to the integrations list from Cancel', () => {
     render(<IntegrationForm />, { wrapper })
 
-    await user.click(screen.getByRole('button', { name: 'Cancel' }))
-
-    expect(vi.mocked(tanstackRouter.navigate)).toHaveBeenCalledWith(
-      expect.objectContaining({ to: '/configuration/integrations' })
-    )
+    expect(screen.getByRole('link', { name: 'Cancel' })).toHaveAttribute('href', '/configuration/integrations')
   })
 
   it('navigates back to step 1 when Back is clicked on step 2', async () => {

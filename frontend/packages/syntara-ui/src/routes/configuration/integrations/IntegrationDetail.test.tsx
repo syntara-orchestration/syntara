@@ -484,19 +484,22 @@ describe('IntegrationDetail', () => {
       expect(screen.getByText('Disabled')).toBeInTheDocument()
     })
 
-    it('shows Edit integration as a primary button in toolbar', () => {
+    it('shows Edit integration as a primary link in toolbar', () => {
       render(<IntegrationDetail />, { wrapper })
 
-      expect(screen.getByRole('button', { name: 'Edit integration' })).toBeInTheDocument()
+      expect(screen.getByRole('link', { name: 'Edit integration' })).toHaveAttribute(
+        'href',
+        '/configuration/integrations/int-1/edit'
+      )
     })
 
-    it('navigates to edit page when Edit integration is clicked', async () => {
-      const user = userEvent.setup()
+    it('preserves the edit page href on the Edit integration link', () => {
       render(<IntegrationDetail />, { wrapper })
 
-      await user.click(screen.getByRole('button', { name: 'Edit integration' }))
-
-      expect(mockNavigate).toHaveBeenCalledWith({ to: '/configuration/integrations/int-1/edit' })
+      expect(screen.getByRole('link', { name: 'Edit integration' })).toHaveAttribute(
+        'href',
+        '/configuration/integrations/int-1/edit'
+      )
     })
 
     it('shows kebab menu', () => {

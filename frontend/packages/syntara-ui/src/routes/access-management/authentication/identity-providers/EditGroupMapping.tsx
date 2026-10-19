@@ -1,6 +1,6 @@
-import { Button, EmptyState, EmptyStateActions, EmptyStateBody, EmptyStateFooter } from '@patternfly/react-core'
+import { EmptyState, EmptyStateActions, EmptyStateBody, EmptyStateFooter } from '@patternfly/react-core'
 import { RhUiArrowLeftIcon, RhUiSearchIcon } from '@patternfly/react-icons'
-import { useNavigate, useParams, useRouterState } from '@tanstack/react-router'
+import { useParams, useRouterState } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
 import { useEffect, useRef } from 'react'
 
@@ -9,6 +9,7 @@ import { SynPage, SynPageBody } from '../../../../components/layout/SynPage'
 import { SynPageHeader } from '../../../../components/layout/SynPageHeader'
 import { SynPanel } from '../../../../components/layout/SynPanel'
 import { SynEmptyStateAccessDenied } from '../../../../components/states/SynEmptyStateAccessDenied'
+import { SynLink } from '../../../../components/SynLink'
 import { SynPageTitle } from '../../../../components/SynPageTitle'
 import { useCanI } from '../../../../hooks/useCanI'
 import { detachPromise } from '../../../../utils/detachPromise'
@@ -37,7 +38,6 @@ function GroupMappingPageShell({
 }
 
 export function EditGroupMapping() {
-  const navigate = useNavigate()
   const { providerId }: { providerId: string } = useParams({ strict: false })
   const search = useRouterState({ select: (s) => s.location.searchStr.replace(/^\?/, '') })
   const metadata = useGroupMappingFormMetadata(providerId, search)
@@ -61,9 +61,6 @@ export function EditGroupMapping() {
     detachPromise(Promise.resolve(openTestSignInRef.current()))
   }, [metadata.openDiscoverOnMount, metadata.isReady, canUpdate])
 
-  const navigateToAuthentication = () =>
-    detachPromise(navigate({ to: AppRoute.SystemAdministration.Authentication.Root }))
-
   if (!metadata.isValidId) {
     return (
       <GroupMappingPageShell title={metadata.pageTitle} breadcrumbs={metadata.breadcrumbs}>
@@ -83,9 +80,13 @@ export function EditGroupMapping() {
           </EmptyStateBody>
           <EmptyStateFooter>
             <EmptyStateActions>
-              <Button variant="primary" icon={<RhUiArrowLeftIcon />} onClick={navigateToAuthentication}>
+              <SynLink
+                to={AppRoute.SystemAdministration.Authentication.Root}
+                variant="primary"
+                icon={<RhUiArrowLeftIcon />}
+              >
                 Back to identity providers
-              </Button>
+              </SynLink>
             </EmptyStateActions>
           </EmptyStateFooter>
         </EmptyState>

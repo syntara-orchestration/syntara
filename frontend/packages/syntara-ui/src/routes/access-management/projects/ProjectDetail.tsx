@@ -187,7 +187,7 @@ export function ProjectDetail() {
     return (
       <DetailPageShell title="Project Details" breadcrumbs={breadcrumbsProjectDetailEarlyShell()}>
         <ProjectNotFoundState
-          onBack={navigateBack}
+          backTo={AppRoute.AccessManagement.Projects}
           onRetry={() => {
             refetchProject().catch(() => {})
           }}

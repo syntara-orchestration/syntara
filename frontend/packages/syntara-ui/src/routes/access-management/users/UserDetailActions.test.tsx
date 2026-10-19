@@ -53,13 +53,13 @@ describe('UserDetailToolbar', () => {
       <UserDetailToolbar
         permissions={fullPermissions}
         showKebabMenu
-        onEdit={vi.fn()}
+        editTo="/users/user-1/edit"
         onRevoke={vi.fn()}
         onDelete={vi.fn()}
       />
     )
 
-    const editButton = screen.getByRole('button', { name: 'Edit user' })
+    const editButton = screen.getByRole('link', { name: 'Edit user' })
     expect(editButton).toBeInTheDocument()
     expect(editButton).toHaveClass('pf-m-primary')
     await user.click(screen.getByRole('button', { name: 'User actions' }))
@@ -72,13 +72,13 @@ describe('UserDetailToolbar', () => {
       <UserDetailToolbar
         permissions={fullPermissions}
         showKebabMenu={false}
-        onEdit={vi.fn()}
+        editTo="/users/user-1/edit"
         onRevoke={vi.fn()}
         onDelete={vi.fn()}
       />
     )
 
-    expect(screen.getByRole('button', { name: 'Edit user' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Edit user' })).toHaveAttribute('href', '/users/user-1/edit')
     expect(screen.queryByRole('button', { name: 'User actions' })).not.toBeInTheDocument()
   })
 
@@ -87,7 +87,7 @@ describe('UserDetailToolbar', () => {
       <UserDetailToolbar
         permissions={{ ...fullPermissions, canUpdate: false }}
         showKebabMenu
-        onEdit={vi.fn()}
+        editTo="/users/user-1/edit"
         onRevoke={vi.fn()}
         onDelete={vi.fn()}
       />
@@ -96,22 +96,18 @@ describe('UserDetailToolbar', () => {
     expect(screen.getByRole('button', { name: 'Edit user' })).toHaveAttribute('aria-disabled', 'true')
   })
 
-  it('calls onEdit when Edit user is clicked with update permission', async () => {
-    const user = userEvent.setup()
-    const onEdit = vi.fn()
-
+  it('links to the edit page when update is permitted', () => {
     render(
       <UserDetailToolbar
         permissions={fullPermissions}
         showKebabMenu
-        onEdit={onEdit}
+        editTo="/users/user-1/edit"
         onRevoke={vi.fn()}
         onDelete={vi.fn()}
       />
     )
 
-    await user.click(screen.getByRole('button', { name: 'Edit user' }))
-    expect(onEdit).toHaveBeenCalledOnce()
+    expect(screen.getByRole('link', { name: 'Edit user' })).toHaveAttribute('href', '/users/user-1/edit')
   })
 
   it('calls onRevoke and onDelete from kebab menu when permitted', async () => {
@@ -123,7 +119,7 @@ describe('UserDetailToolbar', () => {
       <UserDetailToolbar
         permissions={fullPermissions}
         showKebabMenu
-        onEdit={vi.fn()}
+        editTo="/users/user-1/edit"
         onRevoke={onRevoke}
         onDelete={onDelete}
       />
@@ -145,7 +141,7 @@ describe('UserDetailToolbar', () => {
       <UserDetailToolbar
         permissions={{ ...fullPermissions, canRevoke: false, canDelete: false }}
         showKebabMenu
-        onEdit={vi.fn()}
+        editTo="/users/user-1/edit"
         onRevoke={vi.fn()}
         onDelete={vi.fn()}
       />
@@ -161,7 +157,7 @@ describe('UserDetailToolbar', () => {
       <UserDetailToolbar
         permissions={fullPermissions}
         showKebabMenu
-        onEdit={vi.fn()}
+        editTo="/users/user-1/edit"
         onRevoke={vi.fn()}
         onDelete={vi.fn()}
       />

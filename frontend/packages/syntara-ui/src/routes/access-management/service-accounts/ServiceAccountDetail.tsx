@@ -223,7 +223,7 @@ export function ServiceAccountDetail() {
     return (
       <DetailPageShell title="Service Account Details" breadcrumbs={breadcrumbsServiceAccountDetailEarlyShell()}>
         <ServiceAccountNotFoundState
-          onBack={navigateBack}
+          backTo={AppRoute.AccessManagement.ServiceAccounts}
           onRetry={() => {
             detachPromise(refetchSa())
           }}

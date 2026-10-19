@@ -6,6 +6,7 @@ import { SynConfirmationDialog } from '../../../components/dialogs/SynConfirmati
 import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
 import { IconLabel } from '../../../components/IconLabel'
 import { SynKebabMenu } from '../../../components/SynKebabMenu'
+import { SynLink } from '../../../components/SynLink'
 import { useDialogState } from '../../../hooks/useDialogState'
 import { useUserPermissions } from '../useUserPermissions'
 
@@ -62,27 +63,28 @@ export function UserDetailConfirmationDialogs({
 export function UserDetailToolbar({
   permissions,
   showKebabMenu,
-  onEdit,
+  editTo,
   onRevoke,
   onDelete,
 }: Readonly<{
   permissions: ReturnType<typeof useUserPermissions>
   showKebabMenu: boolean
-  onEdit: () => void
+  editTo: string
   onRevoke: () => void
   onDelete: () => void
 }>) {
   return (
     <>
       <DisabledWithTooltip isDisabled={!permissions.canUpdate} content={permissions.tooltips.update}>
-        <Button
-          variant="primary"
-          icon={<RhUiEditIcon />}
-          isAriaDisabled={!permissions.canUpdate}
-          onClick={permissions.canUpdate ? onEdit : undefined}
-        >
-          Edit user
-        </Button>
+        {permissions.canUpdate ? (
+          <SynLink to={editTo} variant="primary" icon={<RhUiEditIcon />}>
+            Edit user
+          </SynLink>
+        ) : (
+          <Button variant="primary" icon={<RhUiEditIcon />} isAriaDisabled>
+            Edit user
+          </Button>
+        )}
       </DisabledWithTooltip>
       {showKebabMenu && (
         <SynKebabMenu

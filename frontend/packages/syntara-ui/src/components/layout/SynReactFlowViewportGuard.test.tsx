@@ -1,18 +1,12 @@
 import { render, screen, within } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
 import { axe } from 'vitest-axe'
 
 import { AppRoute } from '../../app/AppRoute'
 import { REACT_FLOW_VIEWPORT_EMPTY_STATE } from '../../constants/viewport'
-import { routerTestState } from '../../test/setup'
 
 import { SynReactFlowViewportGuard } from './SynReactFlowViewportGuard'
 
 describe('SynReactFlowViewportGuard', () => {
-  beforeEach(() => {
-    routerTestState.navigate.mockClear()
-  })
-
   it('renders canvas content at supported viewport sizes', () => {
     render(
       <SynReactFlowViewportGuard>
@@ -33,42 +27,32 @@ describe('SynReactFlowViewportGuard', () => {
     ).toBeInTheDocument()
   })
 
-  it('navigates to workflows when Return to Workflows is clicked', async () => {
-    const user = userEvent.setup()
-
+  it('links to workflows by default', () => {
     render(
       <SynReactFlowViewportGuard>
         <div>Workflow canvas</div>
       </SynReactFlowViewportGuard>
     )
 
-    const returnButton = screen.getByRole('button', {
+    const returnLink = screen.getByRole('link', {
       name: REACT_FLOW_VIEWPORT_EMPTY_STATE.returnLabel,
       hidden: true,
     })
-    await user.click(returnButton)
-
-    expect(routerTestState.navigate).toHaveBeenCalledWith({ to: AppRoute.Workflows.Root })
+    expect(returnLink).toHaveAttribute('href', AppRoute.Workflows.Root)
   })
 
-  it('navigates to custom destination when onReturn callback is provided', async () => {
-    const user = userEvent.setup()
-    const customReturn = vi.fn()
-
+  it('links to a custom destination', () => {
     render(
-      <SynReactFlowViewportGuard onReturn={customReturn}>
+      <SynReactFlowViewportGuard returnTo="/executions">
         <div>Workflow canvas</div>
       </SynReactFlowViewportGuard>
     )
 
-    const returnButton = screen.getByRole('button', {
+    const returnLink = screen.getByRole('link', {
       name: REACT_FLOW_VIEWPORT_EMPTY_STATE.returnLabel,
       hidden: true,
     })
-    await user.click(returnButton)
-
-    expect(customReturn).toHaveBeenCalledTimes(1)
-    expect(routerTestState.navigate).not.toHaveBeenCalled()
+    expect(returnLink).toHaveAttribute('href', '/executions')
   })
 
   it('has no accessibility violations', async () => {
