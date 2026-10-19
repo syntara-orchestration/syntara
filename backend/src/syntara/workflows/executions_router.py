@@ -304,7 +304,7 @@ async def retry_execution(
 
 
 @router.get(
-    "/{execution_id}/retry-from-failure-preview",
+    "/{execution_id}/retry_from_failure_preview",
     operation_id="retry_from_failure_preview",
     summary="Preview retry from failure",
     description="Report whether an execution can be retried from its failure points, and what would re-run. "
@@ -326,7 +326,7 @@ async def retry_from_failure_preview(
 
 
 @router.post(
-    "/{execution_id}/retry-from-failure",
+    "/{execution_id}/retry_from_failure",
     operation_id="retry_from_failure",
     summary="Retry from failure",
     description="Retry a failed execution from the given failure points, optionally overriding "

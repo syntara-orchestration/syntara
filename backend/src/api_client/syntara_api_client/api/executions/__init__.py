@@ -64,6 +64,22 @@ class ExecutionsApi:
         endpoint_module = self._load_endpoint_module("retry_execution")
         return await endpoint_module.asyncio_detailed(client=self._client, **kwargs)
 
+    def retry_from_failure_preview(self, **kwargs: Any) -> Response[Any]:
+        endpoint_module = self._load_endpoint_module("retry_from_failure_preview")
+        return endpoint_module.sync_detailed(client=self._client, **kwargs)
+
+    async def async_retry_from_failure_preview(self, **kwargs: Any) -> Response[Any]:
+        endpoint_module = self._load_endpoint_module("retry_from_failure_preview")
+        return await endpoint_module.asyncio_detailed(client=self._client, **kwargs)
+
+    def retry_from_failure(self, **kwargs: Any) -> Response[Any]:
+        endpoint_module = self._load_endpoint_module("retry_from_failure")
+        return endpoint_module.sync_detailed(client=self._client, **kwargs)
+
+    async def async_retry_from_failure(self, **kwargs: Any) -> Response[Any]:
+        endpoint_module = self._load_endpoint_module("retry_from_failure")
+        return await endpoint_module.asyncio_detailed(client=self._client, **kwargs)
+
     def list_activities(self, **kwargs: Any) -> Response[Any]:
         endpoint_module = self._load_endpoint_module("list_execution_activities")
         return endpoint_module.sync_detailed(client=self._client, **kwargs)

@@ -1,4 +1,4 @@
-"""Integration tests for retry-from-failure endpoints (AAP-92820)."""
+"""Integration tests for retry_from_failure endpoints (AAP-92820)."""
 
 import uuid
 from collections.abc import Generator
@@ -239,7 +239,7 @@ async def _eligible_execution(session: AsyncSession, workflow: Workflow, user: U
 
 @pytest.mark.asyncio
 class TestPreviewRetryFromFailure:
-    """Integration tests for GET /executions/{execution_id}/retry-from-failure-preview.
+    """Integration tests for GET /executions/{execution_id}/retry_from_failure_preview.
 
     The preview takes no failure-point selection, so every case here exercises the default
     (all currently failed nodes). Fixtures below each have a single failed node, which makes the
@@ -252,7 +252,7 @@ class TestPreviewRetryFromFailure:
     ) -> None:
         execution = await _eligible_execution(test_db_session, test_workflow, test_user)
 
-        response = await auth_client.get(f"/api/v1/executions/{execution.id}/retry-from-failure-preview")
+        response = await auth_client.get(f"/api/v1/executions/{execution.id}/retry_from_failure_preview")
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
@@ -268,7 +268,7 @@ class TestPreviewRetryFromFailure:
         """SDP R11/AC-15: an empty selection is the default (all currently failed nodes), not an error."""
         execution = await _eligible_execution(test_db_session, test_workflow, test_user)
 
-        response = await auth_client.get(f"/api/v1/executions/{execution.id}/retry-from-failure-preview")
+        response = await auth_client.get(f"/api/v1/executions/{execution.id}/retry_from_failure_preview")
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
@@ -285,7 +285,7 @@ class TestPreviewRetryFromFailure:
         test_db_session.add(execution)
         await test_db_session.commit()
 
-        response = await auth_client.get(f"/api/v1/executions/{execution.id}/retry-from-failure-preview")
+        response = await auth_client.get(f"/api/v1/executions/{execution.id}/retry_from_failure_preview")
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
@@ -311,7 +311,7 @@ class TestPreviewRetryFromFailure:
         ]
         await _save_new_version(test_db_session, test_workflow, test_user, [changed[0], gate, *changed[1:]], gate_edges)
 
-        response = await auth_client.get(f"/api/v1/executions/{execution.id}/retry-from-failure-preview")
+        response = await auth_client.get(f"/api/v1/executions/{execution.id}/retry_from_failure_preview")
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
@@ -341,7 +341,7 @@ class TestPreviewRetryFromFailure:
         test_db_session.add(version)
         await test_db_session.commit()
 
-        response = await auth_client.get(f"/api/v1/executions/{execution.id}/retry-from-failure-preview")
+        response = await auth_client.get(f"/api/v1/executions/{execution.id}/retry_from_failure_preview")
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
@@ -357,7 +357,7 @@ class TestPreviewRetryFromFailure:
     ) -> None:
         execution = await _converge_execution(test_db_session, test_workflow, test_user, ActivityStatus.COMPLETED)
 
-        response = await auth_client.get(f"/api/v1/executions/{execution.id}/retry-from-failure-preview")
+        response = await auth_client.get(f"/api/v1/executions/{execution.id}/retry_from_failure_preview")
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
@@ -369,7 +369,7 @@ class TestPreviewRetryFromFailure:
     ) -> None:
         execution = await _converge_execution(test_db_session, test_workflow, test_user, ActivityStatus.FAILED)
 
-        response = await auth_client.get(f"/api/v1/executions/{execution.id}/retry-from-failure-preview")
+        response = await auth_client.get(f"/api/v1/executions/{execution.id}/retry_from_failure_preview")
 
         assert response.status_code == status.HTTP_200_OK
         assert response.json()["eligible"] is True
@@ -390,7 +390,7 @@ class TestPreviewRetryFromFailure:
             test_db_session, execution, "step_1", {"status_code": 200, "password": "[REDACTED]", "stderr": ""}
         )
 
-        response = await auth_client.get(f"/api/v1/executions/{execution.id}/retry-from-failure-preview")
+        response = await auth_client.get(f"/api/v1/executions/{execution.id}/retry_from_failure_preview")
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
@@ -398,7 +398,7 @@ class TestPreviewRetryFromFailure:
         assert data["sanitized_node_ids"] == []
 
     async def test_preview_missing_execution_returns_404(self, auth_client: AsyncClient) -> None:
-        response = await auth_client.get(f"/api/v1/executions/{uuid.uuid4()}/retry-from-failure-preview")
+        response = await auth_client.get(f"/api/v1/executions/{uuid.uuid4()}/retry_from_failure_preview")
 
         assert response.status_code == status.HTTP_404_NOT_FOUND
         assert_error_data(
@@ -413,7 +413,7 @@ class TestPreviewRetryFromFailure:
 
 @pytest.mark.asyncio
 class TestRetryExecution:
-    """Integration tests for POST /executions/{execution_id}/retry-from-failure."""
+    """Integration tests for POST /executions/{execution_id}/retry_from_failure."""
 
     async def test_retry_success(
         self,
@@ -426,7 +426,7 @@ class TestRetryExecution:
         execution = await _eligible_execution(test_db_session, test_workflow, test_user)
 
         response = await auth_client.post(
-            f"/api/v1/executions/{execution.id}/retry-from-failure",
+            f"/api/v1/executions/{execution.id}/retry_from_failure",
             json={"retry_point_ids": ["step_2"]},
         )
 
@@ -465,7 +465,7 @@ class TestRetryExecution:
         await _save_new_version(test_db_session, test_workflow, test_user, changed)
 
         response = await auth_client.post(
-            f"/api/v1/executions/{execution.id}/retry-from-failure",
+            f"/api/v1/executions/{execution.id}/retry_from_failure",
             json={"retry_point_ids": ["step_2"]},
         )
 
@@ -487,7 +487,7 @@ class TestRetryExecution:
         await test_db_session.commit()
 
         response = await auth_client.post(
-            f"/api/v1/executions/{execution.id}/retry-from-failure",
+            f"/api/v1/executions/{execution.id}/retry_from_failure",
             json={"retry_point_ids": ["step_2"]},
         )
 
@@ -504,7 +504,7 @@ class TestRetryExecution:
 
     async def test_retry_missing_execution_returns_404(self, auth_client: AsyncClient) -> None:
         response = await auth_client.post(
-            f"/api/v1/executions/{uuid.uuid4()}/retry-from-failure",
+            f"/api/v1/executions/{uuid.uuid4()}/retry_from_failure",
             json={"retry_point_ids": ["step_2"]},
         )
 
@@ -522,7 +522,7 @@ class TestRetryExecution:
         execution = await _eligible_execution(test_db_session, test_workflow, test_user)
 
         response = await auth_client.post(
-            f"/api/v1/executions/{execution.id}/retry-from-failure",
+            f"/api/v1/executions/{execution.id}/retry_from_failure",
             json={"retry_point_ids": ["step_2"], "input_parameter_overrides": {"step_2": {"code": "echo fixed"}}},
         )
 
@@ -543,7 +543,7 @@ class TestRetryExecution:
         execution = await _eligible_execution(test_db_session, test_workflow, test_user)
 
         response = await auth_client.post(
-            f"/api/v1/executions/{execution.id}/retry-from-failure",
+            f"/api/v1/executions/{execution.id}/retry_from_failure",
             json={"retry_point_ids": ["step_2"], "input_parameter_overrides": {"step_2": {"nope": "x"}}},
         )
 
@@ -564,7 +564,7 @@ class TestRetryExecution:
         execution = await _eligible_execution(test_db_session, test_workflow, test_user)
 
         response = await auth_client.post(
-            f"/api/v1/executions/{execution.id}/retry-from-failure",
+            f"/api/v1/executions/{execution.id}/retry_from_failure",
             json={"retry_point_ids": ["step_2"]},
         )
 
@@ -583,7 +583,7 @@ class TestRetryExecution:
         execution = await _eligible_execution(test_db_session, test_workflow, test_user)
 
         response = await auth_client.post(
-            f"/api/v1/executions/{execution.id}/retry-from-failure",
+            f"/api/v1/executions/{execution.id}/retry_from_failure",
             json={"retry_point_ids": ["step_3"]},
         )
 
@@ -622,7 +622,7 @@ class TestRetryExecution:
         await test_db_session.commit()
 
         response = await auth_client.post(
-            f"/api/v1/executions/{execution.id}/retry-from-failure",
+            f"/api/v1/executions/{execution.id}/retry_from_failure",
             json={"retry_point_ids": ["step_2"]},
         )
 
@@ -642,7 +642,7 @@ class TestRetryExecution:
         execution = await _eligible_execution(test_db_session, test_workflow, test_user)
 
         response = await auth_client.get(
-            f"/api/v1/executions/{execution.id}/retry-from-failure-preview",
+            f"/api/v1/executions/{execution.id}/retry_from_failure_preview",
             params={"retry_point_ids": "step_3"},
         )
 
