@@ -20,7 +20,7 @@ ruleTester.run('syntara/no-route-navigation-callbacks', rule, {
     { code: '<Button onClick={() => setDialogOpen(true)}>Create</Button>' },
     { code: "<Button onClick={() => { save(); navigate({ to: '/users' }) }}>Save</Button>" },
     { code: "<SynLink to='/users/new'>Create</SynLink>" },
-    { code: "<DropdownItem onClick={() => navigate({ to: '/users' })}>Open</DropdownItem>" },
+    { code: '<DropdownItem onClick={() => setDialogOpen(true)}>Open</DropdownItem>' },
     { code: '<Toolbar onEdit={() => openEditDialog()}/>' },
     { code: "<Toolbar onNavigate={() => navigate({ to: '/users' })}/>" },
     { code: "<Wizard onCancel={() => navigate({ to: '/users' })}/>" },
@@ -40,6 +40,14 @@ ruleTester.run('syntara/no-route-navigation-callbacks', rule, {
     },
     {
       code: "<Toolbar onBack={() => navigate({ to: '/users' })}/>",
+      errors: [{ messageId: 'useLink' }],
+    },
+    {
+      code: "<DropdownItem onClick={() => navigate({ to: '/users' })}>Open</DropdownItem>",
+      errors: [{ messageId: 'useLink' }],
+    },
+    {
+      code: "<MenuItem onClick={() => navigate({ to: '/users' })}>Open</MenuItem>",
       errors: [{ messageId: 'useLink' }],
     },
   ],
