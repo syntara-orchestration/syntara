@@ -6797,7 +6797,7 @@ class TestInitializeMonitoringSetsRetryFlag:
         """A closed or pre-query workflow must not be treated as a retry."""
         service, client = self._service(self._execution(), query_result=True)
         client.get_workflow_handle().query = AsyncMock(
-            side_effect=WorkflowQueryRejectedError(RuntimeError("workflow closed"))
+            side_effect=WorkflowQueryRejectedError(WorkflowExecutionStatus.COMPLETED)
         )
 
         metadata = await service._initialize_monitoring(uuid4())
