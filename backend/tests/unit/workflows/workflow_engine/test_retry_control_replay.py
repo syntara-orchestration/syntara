@@ -58,6 +58,8 @@ def _make_workflow(retry_context: dict[str, Any] | None = None) -> OrchestratorW
     wf.loop_state = {}
     wf.loop_body_map = {}
     wf.loop_iteration_results = {}
+    wf._loop_bodies = {}
+    wf._active_loop_iteration = {}
     wf._timeout_tasks = {}
     wf._timed_out_converge_nodes = set()
     wf._detached_nodes = set()
@@ -579,17 +581,10 @@ async def test_no_prefetched_port_still_falls_back_to_inference(mock_wf: MagicMo
 # the set through _prepare_retry, which is what populates it.
 
 
-async def test_a_loop_is_a_candidate_but_is_still_never_replayed(
+async def test_a_loop_is_a_candidate_and_is_replayed(
     mock_wf: MagicMock,
 ) -> None:
-    """The candidate set holds every upstream node, including ones that rerun.
-
-    The set is expected to grow into replaying every control node, so nothing is
-    pre-subtracted. A loop 826 cannot replay stays in it, which costs the sync
-    service a bounded 5s wait per such node before it degrades to Temporal's
-    values. That is the accepted cost of not pre-subtracting, and the decision
-    that keeps the node from being restored is still made at scheduling time.
-    """
+    """A loop in the upstream candidate set uses the loop replay path."""
     wf = _make_workflow({"retry_from_execution_id": "src-1", "eligible_point_ids": ["step_2"]})
     graph = _loop_after_condition_graph()
     wf._retry_source_statuses = {"step_2": ActivityStatus.FAILED.value}
@@ -597,7 +592,7 @@ async def test_a_loop_is_a_candidate_but_is_still_never_replayed(
     await wf._prepare_retry(graph)
 
     assert "loop_1" in wf._retry_replay_candidates
-    assert wf._should_restore_node("loop_1", graph) is False, "…but it is never replayed"
+    assert wf._should_restore_node("loop_1", graph) is True
 
 
 async def test_a_control_node_is_dropped_from_the_candidates_when_it_must_rerun(

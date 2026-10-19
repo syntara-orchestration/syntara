@@ -2,7 +2,7 @@
 
 import collections
 from datetime import timedelta
-from typing import Any
+from typing import Any, cast
 
 from temporalio import workflow
 
@@ -618,14 +618,16 @@ class WorkflowRetryMixin:
         loop_id = self._enclosing_loop(node_id)
         if loop_id is None:
             return node_id
-        index = self._active_loop_iteration.get(loop_id)
+        active_iterations = cast("dict[str, int]", getattr(self, "_active_loop_iteration", {}))
+        index = active_iterations.get(loop_id)
         if index is None:
             return node_id
         return node_id if index == 0 else f"{node_id}{LOOP_ITERATION_SEP}{index}"
 
     def _enclosing_loop(self, node_id: str) -> str | None:
         """Find the loop whose body ``node_id`` sits in, or None if it is not a body."""
-        for loop_id, body in self._loop_bodies.items():
+        loop_bodies = cast("dict[str, set[str]]", getattr(self, "_loop_bodies", {}))
+        for loop_id, body in loop_bodies.items():
             if node_id in body:
                 return loop_id
         return None
