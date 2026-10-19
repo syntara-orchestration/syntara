@@ -212,6 +212,31 @@ describe('buildEditSchema', () => {
     })
   })
 
+  describe('Kafka', () => {
+    const validKafka = {
+      name: 'Production Kafka',
+      description: '',
+      integration_type: 'kafka',
+      bootstrap_servers: 'broker.example.com:9093',
+      sasl_mechanism: 'SCRAM-SHA-256' as const,
+      scope: 'global' as const,
+      management_credential_id: null,
+      ...securityDefaults,
+    }
+
+    it('accepts SASL_SSL', () => {
+      expect(schema.safeParse(validKafka).success).toBe(true)
+    })
+
+    it('rejects SASL_PLAINTEXT', () => {
+      const result = schema.safeParse({ ...validKafka, allow_http: true })
+      expect(result.success).toBe(false)
+      if (!result.success) {
+        expect(result.error.issues.some((issue) => issue.message.includes('SASL_PLAINTEXT'))).toBe(true)
+      }
+    })
+  })
+
   describe('shared fields', () => {
     it('rejects empty name', () => {
       const result = schema.safeParse({ ...validMcp, name: '' })
@@ -276,6 +301,18 @@ describe('buildConfiguration', () => {
         sasl_mechanism: 'SCRAM-SHA-256',
         ...expectedSecurityDefaults,
       })
+    })
+
+    it('forces SASL_SSL when allow_http is set', () => {
+      const kafkaValues = {
+        ...baseValues,
+        integration_type: 'kafka',
+        bootstrap_servers: 'broker.example.com:9093',
+        sasl_mechanism: 'SCRAM-SHA-256' as const,
+        allow_http: true,
+      }
+      const config = buildConfiguration('kafka', kafkaValues)
+      expect(config).toMatchObject({ allow_http: false })
     })
   })
 

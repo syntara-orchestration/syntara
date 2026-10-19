@@ -16,12 +16,13 @@ class KafkaConfiguration:
     """Configuration for a Kafka cluster integration.
 
     Broker addresses live here. The username and password stay on the
-    linked Kafka-connection credential.
+    linked Kafka credential. Kafka uses SASL_SSL and rejects allow_http
+    because it would select SASL_PLAINTEXT.
 
         Attributes:
             bootstrap_servers (list[str]): Kafka bootstrap servers as host:port (or [ipv6]:port) values.
             integration_type (Literal['kafka'] | Unset):  Default: 'kafka'.
-            sasl_mechanism (KafkaSaslMechanism | Unset): SASL mechanism used with the Kafka-connection username and
+            sasl_mechanism (KafkaSaslMechanism | Unset): SASL mechanism used with the Kafka credential username and
                 password.
 
                 Cloud brokers such as Aiven use SCRAM-SHA-256. PLAIN remains available

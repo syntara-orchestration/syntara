@@ -2,7 +2,7 @@
 
 validate(): Opens a short-lived SASL client and bootstraps against the
 configured brokers. Username and password come from the resolved
-Kafka-connection credential.
+Kafka credential.
 
 discover(): Delegates to validate() and returns an empty DiscoverResult.
 Kafka has no discoverable resources at the integration level.
@@ -38,11 +38,12 @@ _MS_PER_SECOND = 1000
 class KafkaAdapter:
     """Adapter for Kafka integrations implementing validate() and discover().
 
-    ``allow_http`` false uses SASL_SSL. ``allow_http`` true uses SASL_PLAINTEXT.
-    ``sasl_mechanism`` selects PLAIN, SCRAM-SHA-256, or SCRAM-SHA-512. The
-    default is SCRAM-SHA-256. ``insecure_skip_tls_verify`` and
-    ``ca_certificate`` keep the shared security-mixin meaning. discover()
-    delegates to validate() because a cluster has no tools or models to sync.
+    Connections use SASL_SSL. ``allow_http`` is rejected because it would
+    select SASL_PLAINTEXT. ``sasl_mechanism`` selects PLAIN, SCRAM-SHA-256,
+    or SCRAM-SHA-512. The default is SCRAM-SHA-256.
+    ``insecure_skip_tls_verify`` and ``ca_certificate`` keep the shared
+    security-mixin meaning. discover() delegates to validate() because a
+    cluster has no tools or models to sync.
     """
 
     def __init__(self, config: KafkaConfiguration) -> None:
@@ -55,12 +56,17 @@ class KafkaAdapter:
         """
         self._config = config
 
-    def _security_protocol(self) -> str:
-        return "SASL_PLAINTEXT" if self._config.allow_http else "SASL_SSL"
-
-    def _ssl_context(self) -> ssl.SSLContext | None:
-        if self._config.allow_http:
+    def _plaintext_rejection(self) -> ValidateResult | None:
+        if not self._config.allow_http:
             return None
+        return ValidateResult(
+            success=False,
+            checked_at=datetime.now(UTC),
+            error="Kafka does not support SASL_PLAINTEXT. Use SASL_SSL.",
+            error_type=HealthCheckErrorType.CONNECTION_ERROR,
+        )
+
+    def _ssl_context(self) -> ssl.SSLContext:
         if self._config.insecure_skip_tls_verify:
             context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
             context.check_hostname = False
@@ -94,6 +100,10 @@ class KafkaAdapter:
                 error="Authentication configuration is incomplete",
                 error_type=HealthCheckErrorType.AUTH_FAILURE,
             )
+        rejected = self._plaintext_rejection()
+        if rejected is not None:
+            logger.warning("Kafka validate rejected SASL_PLAINTEXT")
+            return rejected
 
         if self._config.insecure_skip_tls_verify:
             logger.warning(
@@ -104,7 +114,7 @@ class KafkaAdapter:
         client = AIOKafkaClient(
             bootstrap_servers=list(self._config.bootstrap_servers),
             client_id=_CLIENT_ID,
-            security_protocol=self._security_protocol(),
+            security_protocol="SASL_SSL",
             sasl_mechanism=self._config.sasl_mechanism,
             sasl_plain_username=username,
             sasl_plain_password=password,
@@ -120,7 +130,7 @@ class KafkaAdapter:
             logger.info(
                 "Kafka validate succeeded",
                 bootstrap_servers=self._config.bootstrap_servers,
-                security_protocol=self._security_protocol(),
+                security_protocol="SASL_SSL",
             )
         except (TimeoutError, KafkaTimeoutError):
             success = False

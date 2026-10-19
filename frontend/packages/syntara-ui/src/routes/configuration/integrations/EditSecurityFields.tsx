@@ -9,7 +9,7 @@ import type { EditIntegrationFormValues } from './editIntegrationFormSchema'
 
 const CA_CERT_HINT = "PEM-encoded CA certificate to trust for this integration's TLS connections."
 
-export function EditSecurityFields() {
+export function EditSecurityFields({ showAllowHttp = true }: Readonly<{ showAllowHttp?: boolean }>) {
   const { control } = useFormContext<EditIntegrationFormValues>()
   const { errors } = useFormState({ control })
   const [userExpanded, setUserExpanded] = useState(false)
@@ -26,23 +26,25 @@ export function EditSecurityFields() {
       isIndented
     >
       <div className={styles.securityFields}>
-        <SynFormField<EditIntegrationFormValues, 'allow_http'>
-          name="allow_http"
-          label="Allow HTTP connections"
-          fieldId="edit-allow-http"
-          hideFormGroupLabel
-          hideFooter
-        >
-          {({ field }) => (
-            <Checkbox
-              id="edit-allow-http"
-              label="Allow HTTP connections"
-              description="Permits unencrypted HTTP URLs for this integration"
-              isChecked={field.value}
-              onChange={(_event, checked) => field.onChange(checked)}
-            />
-          )}
-        </SynFormField>
+        {showAllowHttp && (
+          <SynFormField<EditIntegrationFormValues, 'allow_http'>
+            name="allow_http"
+            label="Allow HTTP connections"
+            fieldId="edit-allow-http"
+            hideFormGroupLabel
+            hideFooter
+          >
+            {({ field }) => (
+              <Checkbox
+                id="edit-allow-http"
+                label="Allow HTTP connections"
+                description="Permits unencrypted HTTP URLs for this integration"
+                isChecked={field.value}
+                onChange={(_event, checked) => field.onChange(checked)}
+              />
+            )}
+          </SynFormField>
+        )}
         <SynFormField<EditIntegrationFormValues, 'insecure_skip_tls_verify'>
           name="insecure_skip_tls_verify"
           label="Disable TLS certificate verification"

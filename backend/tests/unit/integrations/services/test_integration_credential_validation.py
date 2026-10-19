@@ -71,7 +71,7 @@ class TestCredentialTypeValidation:
 
     @pytest.mark.asyncio
     async def test_kafka_with_kafka_connection_succeeds(self, integration_service: IntegrationService) -> None:
-        mock_type = type("MockType", (), {"name": "Kafka-connection"})()
+        mock_type = type("MockType", (), {"name": "Kafka"})()
         with patch(
             "syntara.integrations.services.integration_service.fetch_credential_with_type",
             new_callable=AsyncMock,
@@ -89,7 +89,7 @@ class TestCredentialTypeValidation:
                 new_callable=AsyncMock,
                 return_value=(None, mock_type),
             ),
-            pytest.raises(IntegrationCredentialTypeMismatchError, match="Kafka-connection"),
+            pytest.raises(IntegrationCredentialTypeMismatchError, match="Kafka"),
         ):
             await integration_service._validate_credential_type(IntegrationType.KAFKA, credential_id)
 

@@ -8,7 +8,7 @@ export const CREDENTIAL_TYPES_BY_INTEGRATION: Record<string, string[]> = {
   [IntegrationTypeEnum.MCP_SERVER]: ['HTTP Bearer Token'],
   [IntegrationTypeEnum.LLM_PROVIDER]: ['LLM Provider'],
   [IntegrationTypeEnum.ANSIBLE_AUTOMATION_PLATFORM]: ['Ansible Automation Platform'],
-  [IntegrationTypeEnum.KAFKA]: ['Kafka-connection'],
+  [IntegrationTypeEnum.KAFKA]: ['Kafka'],
 }
 
 /** Integration types that require a management credential for discovery and validation. */
