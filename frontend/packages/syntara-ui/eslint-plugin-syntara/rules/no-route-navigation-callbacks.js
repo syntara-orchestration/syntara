@@ -1,4 +1,4 @@
-const EXEMPT_ELEMENTS = new Set(['DropdownItem', 'MenuItem', 'SynLink', 'Link', 'TanStackLink'])
+const EXEMPT_ELEMENTS = new Set(['SynLink', 'Link', 'TanStackLink'])
 const ROUTE_CALLBACK_PROP = /^(?:onClick|onCreate|onEdit|onBack|onReturn)/
 
 function unwrap(node) {
@@ -78,7 +78,7 @@ export default {
     },
     schema: [],
     messages: {
-      useLink: 'This callback only navigates. Render a SynLink with a route instead of a button or callback prop.',
+      useLink: 'This callback only navigates. Use a link destination instead of callback-driven navigation.',
     },
   },
   create(context) {
