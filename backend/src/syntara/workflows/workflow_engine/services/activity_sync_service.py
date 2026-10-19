@@ -12,7 +12,7 @@ from uuid import UUID
 import structlog
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlalchemy.orm import selectinload
-from sqlmodel import select
+from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 from temporalio.api.enums.v1 import PendingActivityState
 from temporalio.api.history.v1 import HistoryEvent
@@ -22,7 +22,7 @@ from temporalio.exceptions import TemporalError
 from syntara.audit.dispatcher import AuditEventDispatcher
 from syntara.workflows.audit.execution_started import WorkflowStartEvent
 from syntara.workflows.models.activity_execution import TERMINAL_ACTIVITY_STATUSES, ActivityExecution, ActivityStatus
-from syntara.workflows.models.execution import Execution, ExecutionStatus
+from syntara.workflows.models.execution import TERMINAL_EXECUTION_STATUSES, Execution, ExecutionStatus
 from syntara.workflows.models.visualization import JsonPatchOperation
 from syntara.workflows.models.workflow import Workflow
 from syntara.workflows.models.workflow_version import WorkflowVersion
@@ -308,18 +308,19 @@ class ActivitySyncService(
     )
 
     async def reconcile_stale_executions(self) -> None:
-        """Reconcile executions stuck in RUNNING status after a worker restart.
+        """Reconcile executions stuck in a non-terminal status after a worker restart.
 
-        Queries the database for executions in RUNNING status, checks each
-        one's Temporal workflow status, and updates the DB for any that have
-        already completed in Temporal. Executions still running in Temporal
-        are skipped to avoid duplicate monitoring across workers.
+        Queries the database for executions in a non-terminal status (e.g. RUNNING
+        or PAUSED pending approval), checks each one's Temporal workflow status, and
+        updates the DB for any that have already completed in Temporal. Executions
+        still running in Temporal are skipped to avoid duplicate monitoring across
+        workers.
         """
         try:
             async with self.session_factory() as session:
                 query = (
                     select(Execution)
-                    .where(Execution.status == ExecutionStatus.RUNNING)
+                    .where(col(Execution.status).not_in(TERMINAL_EXECUTION_STATUSES))
                     .options(selectinload(Execution.activities))  # type: ignore[arg-type]
                 )
                 result = await session.exec(query)
@@ -391,7 +392,7 @@ class ActivitySyncService(
             )
             result = await session.exec(query)
             fresh_execution = result.one_or_none()
-            if not fresh_execution or fresh_execution.status != ExecutionStatus.RUNNING:
+            if not fresh_execution or fresh_execution.status in TERMINAL_EXECUTION_STATUSES:
                 return "skipped"
 
             if completed_at <= fresh_execution.created_at:
