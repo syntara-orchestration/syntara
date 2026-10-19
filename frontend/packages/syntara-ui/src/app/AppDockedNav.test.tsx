@@ -191,10 +191,37 @@ describe('AppDockedNav', () => {
     renderDockedNav()
 
     await user.click(screen.getByRole('button', { name: 'User menu' }))
-    await user.click(screen.getByText('My Profile'))
+    const profileLink = screen.getByRole('menuitem', { name: 'My Profile' })
+    expect(profileLink).toHaveAttribute('href', '/my-profile')
+    await user.click(profileLink)
 
     expect(mockNavigate).toHaveBeenCalledWith({ to: '/my-profile' })
   })
+
+  it.each(['Meta', 'Control'] as const)(
+    'preserves modified-click behavior for My Profile with %s',
+    async (modifier) => {
+      const user = userEvent.setup()
+      renderDockedNav()
+
+      await user.click(screen.getByRole('button', { name: 'User menu' }))
+      const profileLink = screen.getByRole('menuitem', { name: 'My Profile' })
+      let clickEvent: MouseEvent | undefined
+      const observeClick = (event: MouseEvent) => {
+        clickEvent = event
+      }
+      document.addEventListener('click', observeClick, { capture: true, once: true })
+
+      await user.keyboard(`{${modifier}>}`)
+      await user.pointer({ keys: '[MouseLeft]', target: profileLink })
+      await user.keyboard(`{/${modifier}}`)
+      document.removeEventListener('click', observeClick, { capture: true })
+
+      expect(clickEvent?.defaultPrevented).toBe(false)
+      expect(mockNavigate).not.toHaveBeenCalled()
+      expect(screen.getByRole('menuitem', { name: 'My Profile' })).toBeInTheDocument()
+    }
+  )
 
   it('opens external documentation when documentation button is clicked', async () => {
     const user = userEvent.setup()
@@ -284,6 +311,37 @@ describe('AppDockedNav', () => {
     await user.click(screen.getByRole('link', { name: linkName }))
     expect(mockRequestNavigation).toHaveBeenCalledWith(expectedPath)
   })
+
+  it.each(['Meta', 'Control'] as const)(
+    'preserves modified-click behavior for expanded nav child links with %s',
+    async (modifier) => {
+      const user = userEvent.setup()
+      mockUseDockState.mockReturnValue(
+        createMockDockState({
+          isDockExpanded: true,
+          isNavGroupExpanded: () => true,
+        })
+      )
+      renderDockedNav()
+
+      const integrationsLink = screen.getByRole('link', { name: 'Integrations' })
+      expect(integrationsLink).toHaveAttribute('href', '/configuration/integrations')
+      let clickEvent: MouseEvent | undefined
+      const observeClick = (event: MouseEvent) => {
+        clickEvent = event
+      }
+      document.addEventListener('click', observeClick, { capture: true, once: true })
+
+      await user.keyboard(`{${modifier}>}`)
+      await user.pointer({ keys: '[MouseLeft]', target: integrationsLink })
+      await user.keyboard(`{/${modifier}}`)
+      document.removeEventListener('click', observeClick, { capture: true })
+
+      expect(clickEvent?.defaultPrevented).toBe(false)
+      expect(mockRequestNavigation).not.toHaveBeenCalled()
+      expect(screen.getByRole('link', { name: 'Integrations' })).toBeInTheDocument()
+    }
+  )
 
   it('shows System Administration child links when the group is expanded', () => {
     mockUseDockState.mockReturnValue(

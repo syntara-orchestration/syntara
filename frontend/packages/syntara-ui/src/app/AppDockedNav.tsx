@@ -205,6 +205,17 @@ function UserMenuDropdown({ showTooltip }: Readonly<{ showTooltip: boolean }>) {
     })
   }
 
+  const handleProfileClick = (event: React.MouseEvent | undefined) => {
+    if (isModifiedClick(event)) {
+      event?.stopPropagation()
+      return
+    }
+
+    event?.preventDefault()
+    setIsOpen(false)
+    detachPromise(navigate({ to: AppRoute.MyProfile.Root }))
+  }
+
   /* v8 ignore start -- phantom branches from compiled JSX props */
   const toggle = (dropdownRef: React.Ref<MenuToggleElement>) => (
     <MenuToggle
@@ -238,10 +249,8 @@ function UserMenuDropdown({ showTooltip }: Readonly<{ showTooltip: boolean }>) {
         <DropdownList>
           <DropdownItem
             key="profile"
-            onClick={() => {
-              detachPromise(navigate({ to: AppRoute.MyProfile.Root }))
-              setIsOpen(false)
-            }}
+            to={AppRoute.MyProfile.Root}
+            onClick={handleProfileClick}
           >
             My Profile
           </DropdownItem>
