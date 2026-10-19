@@ -413,7 +413,7 @@ class TestExecutionCreate(SQLModel):
         return self
 
 
-#: Description for the retry-from-failure input-override map (SDP AC-14/R10c).
+#: Description for the retry_from_failure input-override map (SDP AC-14/R10c).
 _INPUT_PARAMETER_OVERRIDES_DESCRIPTION = (
     "Input parameter overrides for the retry's starting nodes, keyed by node id then parameter name "
     "(SDP AC-14/R10c). Each override replaces the value the node would otherwise receive, after upstream "
@@ -425,7 +425,7 @@ _INPUT_PARAMETER_OVERRIDES_DESCRIPTION = (
 
 
 class RetryFailureRequest(SQLModel):
-    """Request body for POST /executions/{id}/retry-from-failure."""
+    """Request body for POST /executions/{id}/retry_from_failure."""
 
     __test__ = False  # Prevent pytest from collecting this as a test class
 
@@ -444,7 +444,7 @@ class RetryFailureRequest(SQLModel):
 
 
 class RetryFromFailureValidationResponse(SQLModel):
-    """Retry preview (GET /executions/{id}/retry-from-failure-preview)."""
+    """Retry preview (GET /executions/{id}/retry_from_failure_preview)."""
 
     eligible: bool = Field(description="Whether the retry is allowed to proceed")
     reason: str | None = Field(default=None, description="Rejection reason when eligible is false, null otherwise")
