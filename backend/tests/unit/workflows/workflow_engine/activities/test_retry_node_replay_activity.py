@@ -12,9 +12,10 @@ import pytest
 
 from syntara.workflows.models.activity_execution import ActivityStatus
 from syntara.workflows.workflow_engine.activities.retry_node_replay_activity import (
-    RESTORABLE_SOURCE_STATUSES,
     replay_retry_node_activity,
+    retry_control_ports,
 )
+from syntara.workflows.workflow_engine.constants import RESTORABLE_SOURCE_STATUSES
 
 
 class _Row:
@@ -29,6 +30,7 @@ class _Row:
         started_at: datetime | None = None,
         completed_at: datetime | None = None,
         error_details: str | None = None,
+        control_data: dict[str, Any] | None = None,
     ) -> None:
         self.activity_name = activity_name
         self.status = status
@@ -37,6 +39,7 @@ class _Row:
         self.started_at = started_at
         self.completed_at = completed_at
         self.error_details = error_details
+        self.control_data = control_data
 
 
 def _mock_session(rows: list[Any]) -> AsyncMock:
@@ -75,6 +78,7 @@ async def test_returns_completed_output_for_a_node() -> None:
     assert await _run(rows, "step_1") == {
         "status": "completed",
         "error_details": None,
+        "control_data": None,
         "input_data": {},
         "output_data": {"result": "ok"},
         "started_at": None,
@@ -97,6 +101,7 @@ async def test_only_requested_nodes_are_returned() -> None:
     assert await _run(rows, "step_1") == {
         "status": "completed",
         "error_details": None,
+        "control_data": None,
         "input_data": {},
         "output_data": {"result": "ok"},
         "started_at": None,
@@ -126,6 +131,7 @@ async def test_completed_node_with_no_output_returns_empty_dict() -> None:
     assert await _run(rows, "step_1") == {
         "status": "completed",
         "error_details": None,
+        "control_data": None,
         "input_data": {},
         "output_data": {},
         "started_at": None,
@@ -227,6 +233,7 @@ async def test_ids_are_whitespace_trimmed() -> None:
     assert await _run(rows, "  step_1  ") == {
         "status": "completed",
         "error_details": None,
+        "control_data": None,
         "input_data": {},
         "output_data": {"result": "ok"},
         "started_at": None,
@@ -276,6 +283,7 @@ async def test_returns_stored_input_alongside_output() -> None:
     assert result == {
         "status": "completed",
         "error_details": None,
+        "control_data": None,
         "input_data": {"query": "select 1"},
         "output_data": {"result": "ok"},
         "started_at": None,
@@ -403,3 +411,93 @@ async def test_a_completed_node_in_a_cancelled_run_is_still_restorable() -> None
     assert result["status"] == "completed"
     assert result["output_data"] == {"result": "ok"}
     assert await _run([rows[1]], "interrupted") is None
+
+
+# --- persisted routing data reaches the caller -------------------------------
+#
+# The retry mixin reads ``control_data`` from the activity's return. If the
+# activity stops carrying it the field is silently ``{}`` and every retry falls
+# back to inference, with no error anywhere — so the shape is pinned here.
+
+
+@pytest.mark.asyncio
+async def test_replay_carries_the_persisted_control_data() -> None:
+    """The source row's routing decision must survive the replay transport."""
+    row = _Row(
+        activity_name="cond_1",
+        status=ActivityStatus.COMPLETED,
+        output={"evaluated_result": True},
+        control_data={"next_port": "true"},
+    )
+
+    stored = await _run([row], "cond_1")
+
+    assert stored is not None
+    assert stored["control_data"] == {"next_port": "true"}, (
+        "the mixin reads control_data from this record; without it the persisted branch is never consulted"
+    )
+
+
+@pytest.mark.asyncio
+async def test_replay_reports_null_control_data_for_older_runs() -> None:
+    """A row predating the column returns None, so the caller falls back."""
+    row = _Row(activity_name="cond_1", status=ActivityStatus.COMPLETED, output={})
+
+    stored = await _run([row], "cond_1")
+
+    assert stored is not None
+    assert stored["control_data"] is None
+
+
+def _port_session(rows: list[Any]) -> AsyncMock:
+    """Session whose ``.all()`` returns the (name, control_data) pairs."""
+    session = AsyncMock()
+    result = MagicMock()
+    result.all.return_value = rows
+    session.exec.return_value = result
+    return session
+
+
+async def _run_ports(pairs: list[Any]) -> dict[str, str]:
+    session = _port_session(pairs)
+
+    async def mock_get_db():  # noqa: ANN202
+        yield session
+
+    with patch(
+        "syntara.workflows.workflow_engine.activities.retry_node_replay_activity.get_db",
+        mock_get_db,
+    ):
+        return await retry_control_ports("src-1")
+
+
+@pytest.mark.asyncio
+async def test_control_ports_maps_node_ids_to_ports() -> None:
+    """Every control node that recorded a port is returned, keyed by node id."""
+    ports = await _run_ports([("cond_1", {"next_port": "true"}), ("sw_1", {"next_port": "b"})])
+
+    assert ports == {"cond_1": "true", "sw_1": "b"}
+
+
+@pytest.mark.asyncio
+async def test_control_ports_strips_iteration_suffixes() -> None:
+    """A nested control node is keyed by its base id, matching the restorable set."""
+    ports = await _run_ports([("cond_1_iter_2_iter_3", {"next_port": "true"})])
+
+    assert ports == {"cond_1": "true"}
+
+
+@pytest.mark.asyncio
+async def test_control_ports_skips_rows_with_no_port() -> None:
+    """Control data without a next_port is left to the caller's inference."""
+    ports = await _run_ports([("cond_1", {"other": 1}), ("sw_1", {"next_port": "a"})])
+
+    assert ports == {"sw_1": "a"}, "a row with no next_port must not become a routing entry"
+
+
+@pytest.mark.asyncio
+async def test_control_ports_ignores_non_dict_control_data() -> None:
+    """A malformed value is skipped rather than crashing the whole read."""
+    ports = await _run_ports([("cond_1", "not-a-dict"), ("sw_1", {"next_port": "a"})])
+
+    assert ports == {"sw_1": "a"}
