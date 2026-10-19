@@ -22,6 +22,9 @@ from syntara.core.models.secret import EncryptedSecret, Secret
 from syntara.credentials.models.credential import Credential
 from syntara.credentials.models.credential_type import CredentialType
 from syntara.eventstreams.models.consumer_worker import EventConsumerWorker
+from syntara.eventstreams.models.delivery import EventDelivery
+from syntara.eventstreams.models.delivery_capacity import EventDeliveryCapacity
+from syntara.eventstreams.models.recovery_hold import EventDeliveryRecoveryHold
 from syntara.eventstreams.models.source import EventSubscriptionSource
 from syntara.eventstreams.models.subscription import EventSubscription
 from syntara.files.models import FileMetadata
@@ -85,4 +88,7 @@ ALL_MODELS = [
     EventSubscription,
     EventSubscriptionSource,
     EventConsumerWorker,
+    EventDelivery,
+    EventDeliveryRecoveryHold,
+    EventDeliveryCapacity,
 ]

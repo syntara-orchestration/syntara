@@ -77,6 +77,58 @@ def _utc_now() -> datetime:
     return datetime.now(UTC)
 
 
+async def lock_source_lifecycle(
+    session: AsyncSession, source_id: UUID
+) -> tuple[EventSubscription, EventSubscriptionSource] | None:
+    """Lock workflow -> subscription -> source, including retired recovery state.
+
+    The initial lookup only discovers lock keys. Every row is reloaded under its
+    lock before it is used; delivery rows must be locked after this function.
+    The caller owns the surrounding short transaction.
+    """
+    from syntara.workflows.models.workflow import Workflow  # noqa: PLC0415
+
+    keys = (
+        await session.exec(
+            select(EventSubscriptionSource.subscription_id, EventSubscription.workflow_id)
+            .join(EventSubscription, col(EventSubscription.id) == EventSubscriptionSource.subscription_id)
+            .where(col(EventSubscriptionSource.id) == source_id)
+        )
+    ).one_or_none()
+    if keys is None:
+        return None
+    subscription_id, workflow_id = keys
+    workflow = (
+        await session.exec(
+            select(Workflow)
+            .where(col(Workflow.id) == workflow_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+    ).one_or_none()
+    if workflow is None:
+        return None
+    subscription = (
+        await session.exec(
+            select(EventSubscription)
+            .where(col(EventSubscription.id) == subscription_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+    ).one_or_none()
+    source = (
+        await session.exec(
+            select(EventSubscriptionSource)
+            .where(col(EventSubscriptionSource.id) == source_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+    ).one_or_none()
+    if subscription is None or source is None or source.subscription_id != subscription.id:
+        return None
+    return subscription, source
+
+
 class EventSubscriptionService(BaseService):
     """Project and reconcile event subscriptions within the publication transaction."""
 
