@@ -5,11 +5,11 @@ import { axe } from 'vitest-axe'
 import { SettingsCategoryRoute } from './SettingsCategoryRoute'
 import { SettingsCategoryTabContext } from './SettingsCategoryTabContext'
 
-const mockUseRouterState = vi.hoisted(() => vi.fn())
+const mockUseParams = vi.hoisted(() => vi.fn())
 
 vi.mock('@tanstack/react-router', async () => {
   const actual = await vi.importActual('@tanstack/react-router')
-  return { ...actual, useRouterState: mockUseRouterState }
+  return { ...actual, useParams: mockUseParams }
 })
 
 const applicationSettings = [
@@ -35,14 +35,12 @@ const applicationSettings = [
   },
 ]
 
-function setPathname(pathname: string) {
-  mockUseRouterState.mockImplementation((options: { select: (state: { location: { pathname: string } }) => unknown }) =>
-    options.select({ location: { pathname } })
-  )
+function setCategory(category?: string) {
+  mockUseParams.mockReturnValue({ category })
 }
 
-function renderCategoryRoute(pathname = '/system-administration/settings/application') {
-  setPathname(pathname)
+function renderCategoryRoute(category: string | undefined) {
+  setCategory(category)
 
   return render(
     <SettingsCategoryTabContext
@@ -62,23 +60,17 @@ function renderCategoryRoute(pathname = '/system-administration/settings/applica
 
 describe('SettingsCategoryRoute', () => {
   beforeEach(() => {
-    setPathname('/system-administration/settings/application')
+    setCategory('application')
   })
 
   it('renders the category selected by the route parameter', () => {
-    renderCategoryRoute()
+    renderCategoryRoute('application')
 
     expect(screen.getByText('Debug mode')).toBeInTheDocument()
   })
 
-  it('renders nothing when the path is outside the settings route', () => {
-    const { container } = renderCategoryRoute('/system-administration/users')
-
-    expect(container).toBeEmptyDOMElement()
-  })
-
-  it('renders nothing when the settings path has no category', () => {
-    const { container } = renderCategoryRoute('/system-administration/settings/')
+  it('renders nothing when the route has no category parameter', () => {
+    const { container } = renderCategoryRoute(undefined)
 
     expect(container).toBeEmptyDOMElement()
   })
@@ -90,14 +82,14 @@ describe('SettingsCategoryRoute', () => {
   })
 
   it('renders an empty category when the route category has no settings', () => {
-    renderCategoryRoute('/system-administration/settings/unknown')
+    renderCategoryRoute('unknown')
 
     expect(screen.queryByText('Debug mode')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Reset to defaults' })).toBeDisabled()
   })
 
   it('has no accessibility violations', async () => {
-    const { container } = renderCategoryRoute()
+    const { container } = renderCategoryRoute('application')
 
     expect(await axe(container)).toHaveNoViolations()
   })
