@@ -49,6 +49,8 @@ class EventDelivery(SQLModel, table=True):
 
     attempt_count: int = Field(default=0, sa_type=BigInteger)
     first_start_attempt_at: datetime | None = Field(default=None, sa_type=DateTime(timezone=True))  # type: ignore[call-overload]
+    start_retry_deadline: datetime | None = Field(default=None, sa_type=DateTime(timezone=True))  # type: ignore[call-overload]
+    scheduling_failure_count: int = Field(default=0, sa_type=BigInteger, sa_column_kwargs={"server_default": text("0")})
     next_attempt_at: datetime = Field(
         default_factory=lambda: datetime.now(UTC),
         sa_type=DateTime(timezone=True),  # type: ignore[call-overload]
@@ -66,6 +68,12 @@ class EventDelivery(SQLModel, table=True):
         CheckConstraint("identity_version = 1", name="ck_event_deliveries_identity_version"),
         CheckConstraint("source_generation > 0", name="ck_event_deliveries_generation"),
         CheckConstraint("attempt_count >= 0", name="ck_event_deliveries_attempt_count"),
+        CheckConstraint("scheduling_failure_count >= 0", name="ck_event_deliveries_scheduling_failure_count"),
+        CheckConstraint(
+            "start_retry_deadline IS NULL OR (first_start_attempt_at IS NOT NULL "
+            "AND start_retry_deadline > first_start_attempt_at)",
+            name="ck_event_deliveries_start_retry_deadline",
+        ),
         CheckConstraint(
             "state IN ('in_progress', 'scheduled', 'filtered', 'rejected', 'cancelled')",
             name="ck_event_deliveries_state",

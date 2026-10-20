@@ -30,7 +30,13 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.engine import URL, make_url
 
 from syntara.core.config.event_delivery import validate_delivery_cache_trust_inputs
-from syntara.core.constants import EventDeliveryDefaults, EventStreamLimits, RequestLimits, RetrieverServiceDefaults
+from syntara.core.constants import (
+    EventDeliveryDefaults,
+    EventSchedulingDefaults,
+    EventStreamLimits,
+    RequestLimits,
+    RetrieverServiceDefaults,
+)
 from syntara.core.exceptions import SafeValueError
 
 # =============================================================================
@@ -1493,6 +1499,14 @@ class EventStreamSettings(BaseSettings):
         default=EventDeliveryDefaults.RETENTION_SECONDS,
         gt=0,
         description="Minimum terminal delivery retention from resolved_at; never expires unresolved evidence",
+    )
+    event_temporal_history_retention_seconds: int = Field(
+        default=EventSchedulingDefaults.HISTORY_RETENTION_SECONDS,
+        gt=EventSchedulingDefaults.HISTORY_SAFETY_MARGIN_SECONDS,
+        description=(
+            "Deployment-guaranteed minimum Temporal history retention; verified against the namespace before "
+            "new starts. Does not configure Temporal or extend existing ambiguous retry deadlines."
+        ),
     )
     event_delivery_cache_enabled: bool = Field(
         default=False, description="Enable terminal proofs only with trusted external epoch and bounded clocks"
