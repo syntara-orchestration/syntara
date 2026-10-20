@@ -8,7 +8,6 @@ import { axe } from 'vitest-axe'
 import { workflowClient } from '../../../client'
 import { AlertProvider } from '../../../providers/alerts'
 import { searchParamsMock } from '../../../test/searchParamsMock'
-import { routerTestState } from '../../../test/setup'
 import { accessClient } from '../../access/accessClient'
 import { useWorkflowPermissions } from '../../workflows/useWorkflowPermissions'
 
@@ -196,17 +195,14 @@ describe('ProjectWorkflowsTab', () => {
     expect(screen.queryByRole('columnheader', { name: 'Actions' })).not.toBeInTheDocument()
   })
 
-  it('shows true empty messaging and create action when the project has no workflows', async () => {
+  it('shows true empty messaging and a create link when the project has no workflows', () => {
     mockQueries({ resources: [] })
-    const user = userEvent.setup()
     render(<ProjectWorkflowsTab projectId="proj-1" />, { wrapper })
 
     expect(screen.getByText('No workflows yet')).toBeInTheDocument()
     expect(screen.getByText('Create your first workflow to get started.')).toBeInTheDocument()
     expect(screen.queryByText('No results found')).not.toBeInTheDocument()
-
-    await user.click(screen.getByRole('button', { name: 'Create workflow' }))
-    expect(routerTestState.navigate).toHaveBeenCalledWith({ to: '/workflow-builder/new' })
+    expect(screen.getByRole('link', { name: 'Create workflow' })).toHaveAttribute('href', '/workflow-builder/new')
   })
 
   it('hides the create action when the user cannot create workflows', () => {
@@ -215,14 +211,14 @@ describe('ProjectWorkflowsTab', () => {
     render(<ProjectWorkflowsTab projectId="proj-1" />, { wrapper })
 
     expect(screen.getByText('No workflows yet')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Create workflow' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Create workflow' })).not.toBeInTheDocument()
   })
 
   it('hides the create action for builtin projects', () => {
     mockQueries({ resources: [] })
     render(<ProjectWorkflowsTab projectId="proj-1" isBuiltin />, { wrapper })
 
-    expect(screen.queryByRole('button', { name: 'Create workflow' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Create workflow' })).not.toBeInTheDocument()
   })
 
   it('shows filtered-empty messaging when filters match no rows', async () => {
