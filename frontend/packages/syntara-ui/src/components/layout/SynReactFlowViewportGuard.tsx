@@ -3,14 +3,17 @@ import type { ReactNode } from 'react'
 
 import { AppRoute } from '../../app/AppRoute'
 import { panelContentStackStyle } from '../../app/panelContentStackStyle'
-import { SynEmptyStateViewportTooSmall } from '../states/SynEmptyStateViewportTooSmall'
+import {
+  SynEmptyStateViewportTooSmall,
+  type SynEmptyStateViewportTooSmallProps,
+} from '../states/SynEmptyStateViewportTooSmall'
 
 import styles from './SynReactFlowViewportGuard.module.css'
 
 type SynReactFlowViewportGuardProps = {
   children: ReactNode
   /** Route for the return link in the empty state. Defaults to Workflows. */
-  returnTo?: string
+  returnTo?: SynEmptyStateViewportTooSmallProps['returnTo']
 }
 
 /** Hides page content and shows a full-page empty state when the viewport width is below 1024px (nav bar remains visible). Height is not gated. */

@@ -73,4 +73,10 @@ export const AppRoute = {
     Root: '/my-profile',
     Tab: '/my-profile/:tab',
   },
-}
+  Support: {
+    Root: '/support/glossary',
+    Documentation: '/support/documentation',
+    FAQ: '/support/faq',
+    Glossary: '/support/glossary',
+  },
+} as const

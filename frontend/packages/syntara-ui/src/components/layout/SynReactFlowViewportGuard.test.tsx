@@ -43,7 +43,7 @@ describe('SynReactFlowViewportGuard', () => {
 
   it('links to a custom destination', () => {
     render(
-      <SynReactFlowViewportGuard returnTo="/executions">
+      <SynReactFlowViewportGuard returnTo={AppRoute.Executions.Root}>
         <div>Workflow canvas</div>
       </SynReactFlowViewportGuard>
     )
