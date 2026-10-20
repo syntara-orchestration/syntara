@@ -41,6 +41,8 @@ with workflow.unsafe.imports_passed_through():
     )
     from syntara.workflows.workflow_engine.utils.credential_scrubber import scrub_credential_values, scrub_credentials
     from syntara.workflows.workflow_engine.utils.timeout_messages import build_timeout_error_message
+
+from syntara.workflows.utils.loop_iteration_names import strip_iteration_suffix
 from syntara.workflows.utils.namespace_resolver import NamespaceResolver
 from syntara.workflows.workflow_engine.approval_mixin import WorkflowApprovalMixin
 from syntara.workflows.workflow_engine.converge_mixin import WorkflowConvergeMixin
@@ -56,7 +58,14 @@ from syntara.workflows.workflow_engine.models.workflow_definition import (
 )
 from syntara.workflows.workflow_engine.retry_mixin import WorkflowRetryMixin
 from syntara.workflows.workflow_engine.unified_eval import safe_eval_with_namespace
-from syntara.workflows.workflow_engine.utils.loop_iteration_ids import loop_control_activity_id
+from syntara.workflows.workflow_engine.utils.loop_iteration_ids import (
+    join_loop_iteration_id,
+    loop_body_temporal_activity_id,
+    loop_control_activity_id,
+    loop_index_chain,
+    retry_loop_record_node_id,
+    strip_loop_iteration_suffixes,
+)
 
 # Trigger types allowed for dynamic dispatch via Temporal activities.
 # Each entry must have a corresponding @activity.defn with a matching name.
@@ -1295,7 +1304,7 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
             await workflow.execute_activity(
                 activity_name,
                 args=args,
-                activity_id=node.id,
+                activity_id=loop_body_temporal_activity_id(node.id, self.loop_body_map, self.node_control_data),
                 start_to_close_timeout=timedelta(seconds=timeout_seconds),
                 heartbeat_timeout=heartbeat_timeout,
                 retry_policy=retry_policy,
@@ -1323,7 +1332,7 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
         wait_handle = workflow.start_activity(
             ActivityName.WAIT,
             args=[resolved_parameters, outputs],
-            activity_id=node_id,
+            activity_id=loop_body_temporal_activity_id(node_id, self.loop_body_map, self.node_control_data),
             start_to_close_timeout=timedelta(seconds=total_seconds + self._TEMPORAL_MARGIN),
         )
 
@@ -1379,10 +1388,154 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
             await workflow.execute_activity(
                 ActivityName.CONVERGE,
                 args=[parameters_with_counts, outputs, predecessor_results],
-                activity_id=node_id,
+                activity_id=loop_body_temporal_activity_id(node_id, self.loop_body_map, self.node_control_data),
                 start_to_close_timeout=timedelta(seconds=timeout_seconds),
             ),
         )
+
+    @staticmethod
+    def _loop_iteration_probe_entries(node_id: str, graph: WorkflowGraph) -> list[ActivityNode]:
+        """Find the first executable nodes on this loop's iterate paths.
+
+        Disabled nodes are bypassed by the scheduler without producing a
+        Temporal activity record, so walk through those nodes only. This keeps
+        retry probing lazy while still finding an occurrence that can prove the
+        iteration ran.
+        """
+        pending = list(graph.get_next_activities_by_port(node_id, "iterate"))
+        entries: list[ActivityNode] = []
+        visited: set[str] = set()
+        while pending:
+            successor = pending.pop()
+            if successor.id in visited:
+                continue
+            visited.add(successor.id)
+            if getattr(successor.settings, "disabled", False):
+                pending.extend(graph.get_next_activities(successor.id))
+            else:
+                entries.append(successor)
+        return entries
+
+    async def _replayed_loop_control(
+        self,
+        node_id: str,
+        state: LoopState,
+        graph: WorkflowGraph,
+    ) -> dict[str, Any] | None:
+        """Route a loop being replayed, or None to execute it as usual.
+
+        The question during a replay is not "what did the loop decide" but "did
+        the next iteration happen" — a fact the source run already recorded.
+        Asking the database that, rather than re-deriving the decision, is what
+        makes the replay correct under ``continue_on_failure``, where a failed body
+        node does not mean the loop exited and so cannot be mapped back to a port.
+
+        The loop remains synthetic through the selected failure iteration. The
+        exact failed body occurrence switches its enclosing loops to live mode;
+        loop-control scheduling before that node must not evaluate loop logic.
+
+        Returns None when this loop is not being replayed, or when it has reached
+        the retry point and must run for real from there on.
+        """
+        if not self._should_replay_loop(node_id) or node_id not in self._loop_bodies:
+            return None
+
+        iterate_entries = self._loop_iteration_probe_entries(node_id, graph)
+        child_loop_entry_ids = sorted(successor.id for successor in iterate_entries if successor.type == NodeType.LOOP)
+        iterate_entry_node_ids = sorted(
+            successor.id for successor in iterate_entries if successor.type != NodeType.LOOP
+        )
+        current = state.current_index
+        iteration_path = [*loop_index_chain(node_id, self.loop_body_map, self.node_control_data), current]
+        loop_body_region = self._loop_bodies.get(node_id, set())
+
+        # A selected body failure changes the hand-back point from after the loop
+        # to its exact occurrence. The synthetic controller still routes into
+        # that iteration; the selected body node performs the handoff.
+        retry_points = {strip_iteration_suffix(p) for p in self.retry_context.get("eligible_point_ids", [])}
+        selected_in_region = retry_points & loop_body_region
+        if selected_in_region:
+            failure_paths = [
+                path
+                for point in selected_in_region
+                for path in getattr(self, "_retry_selected_failure_paths", {}).get(point, [])
+                if len(path) >= len(iteration_path)
+            ]
+            if not failure_paths:
+                # Without the selected occurrence's complete Temporal path,
+                # running this loop could repeat completed side effects. Reject
+                # the retry rather than guessing its iteration.
+                msg = (
+                    f"Cannot safely replay nested loop {node_id}: the source execution "
+                    "does not record a complete iteration path for the selected failure"
+                )
+                raise ApplicationError(msg, type="RetryLoopPathMissing", non_retryable=True)
+            target_prefix = min(path[: len(iteration_path)] for path in failure_paths)
+
+            # Each nested controller is probed at its current next-body path. A
+            # path after the selected occurrence would indicate inconsistent
+            # source history; do not execute the loop expression to guess.
+            if iteration_path > target_prefix:
+                msg = (
+                    f"Cannot safely replay loop {node_id}: reached iteration {iteration_path} "
+                    f"after selected failure path {target_prefix}"
+                )
+                raise ApplicationError(msg, type="RetryLoopPathInconsistent", non_retryable=True)
+
+        record_state = self._retry_loop_record_states.get(node_id, {})
+        if not iterate_entry_node_ids and not child_loop_entry_ids:
+            # An empty body, or one made entirely of disabled nodes, has no
+            # per-node Temporal occurrence to query. The synced loop output
+            # records how many iterations the source reached; fail closed if
+            # that count was omitted by a custom output mapping.
+            output_data = record_state.get("output_data") or {}
+            source_iteration_count = output_data.get("iteration_count") if isinstance(output_data, dict) else None
+            if not isinstance(source_iteration_count, int) or isinstance(source_iteration_count, bool):
+                msg = f"Cannot safely replay loop {node_id}: no iteration entry or source iteration count is available"
+                raise ApplicationError(msg, type="RetryLoopProbeUnavailable", non_retryable=True)
+            reached = current < source_iteration_count
+        else:
+            reached = await workflow.execute_activity(
+                ActivityName.RETRY_LOOP_ITERATION_PROBE,
+                args=[
+                    self.retry_context.get("retry_from_execution_id"),
+                    iterate_entry_node_ids,
+                    child_loop_entry_ids,
+                    iteration_path,
+                ],
+                activity_id=join_loop_iteration_id(f"__internal__probe_retry_loop_{node_id}", iteration_path),
+                start_to_close_timeout=timedelta(seconds=DEFAULT_ACTIVITY_TIMEOUT_SECONDS),
+            )
+        next_port = "iterate" if reached else "complete"
+        next_index = current + 1 if reached else current
+
+        # Remember which iteration this loop is replaying, so each body node's own
+        # replay can ask for the row for *this* iteration rather than the first.
+        self._active_loop_iteration[node_id] = current
+
+        workflow.logger.info(
+            "Replayed loop iteration routing",
+            extra={
+                "loop_id": node_id,
+                "current_index": current,
+                "iteration_path": iteration_path,
+                "reached_in_source": reached,
+                "next_port": next_port,
+            },
+        )
+        replay_output = (
+            {"iteration_count": current, "iteration_results": None}
+            if reached
+            else record_state.get("output_data") or {"iteration_count": current, "iteration_results": {}}
+        )
+        return {
+            "output": replay_output,
+            "control": {
+                "next_port": next_port,
+                "next_index": next_index,
+                "current_index": current,
+            },
+        }
 
     async def _execute_loop_node(
         self,
@@ -1390,6 +1543,8 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
         node: ActivityNode,
         resolved_parameters: dict[str, Any],
         timeout_seconds: int = DEFAULT_ACTIVITY_TIMEOUT_SECONDS,
+        *,
+        graph: WorkflowGraph | None = None,
     ) -> dict[str, Any]:
         """Execute a loop node.
 
@@ -1398,6 +1553,7 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
             node: Activity node
             resolved_parameters: Resolved configuration
             timeout_seconds: Activity timeout in seconds (default: DEFAULT_ACTIVITY_TIMEOUT_SECONDS)
+            graph: Workflow graph, required when replaying a loop
 
         Returns:
             Activity result with output and control data
@@ -1418,25 +1574,17 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
 
         state = self.loop_state[node_id]
 
-        # For do_while, evaluate condition after first iteration
-        condition_result = None
-        if isinstance(state, DoWhileLoopState) and state.current_index > 0:
-            # Set context for condition evaluation (loop body nodes are available)
-            self.resolver.set_context(loop_node_id=node_id)
+        # A replayed loop never evaluates its expression or condition. Its cached
+        # resolved source input initializes state; source body occurrences decide
+        # whether another synthetic iteration exists.
+        replayed = await self._replay_loop_if_needed(node_id, state, graph)
+        if replayed is not None:
+            control_data = replayed.get("control", {})
+            if control_data:
+                state.current_index = control_data.get("next_index", state.current_index)
+            return replayed
 
-            # Validate that condition is defined
-            if not state.condition:
-                msg = f"Loop {node_id} (do_while) has no condition defined"
-                raise ValueError(msg)
-
-            # Use unified evaluator (Tier 2) instead of string substitution
-            # Wrap in try/finally to guarantee loop context cleanup even if evaluation raises
-            try:
-                namespace = self.resolver.get_complete_namespace()
-                condition_result = safe_eval_with_namespace(state.condition, namespace)
-                workflow.logger.info(f"Loop {node_id} condition evaluated: {state.condition} = {condition_result}")
-            finally:
-                self.resolver.set_context(loop_node_id=None)
+        condition_result = self._evaluate_do_while_condition(node_id, state)
 
         # Pass current state to activity
         loop_parameters: dict[str, Any] = {
@@ -1474,6 +1622,95 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
             state.current_index = control_data.get("next_index", 0)
 
         return loop_result
+
+    async def _replay_loop_if_needed(
+        self,
+        node_id: str,
+        state: LoopState,
+        graph: WorkflowGraph | None,
+    ) -> dict[str, Any] | None:
+        """Get one synthetic loop transition, or None when the loop is live."""
+        if not self._should_replay_loop(node_id):
+            return None
+        if graph is None:
+            msg = f"Cannot safely replay loop {node_id}: workflow graph is unavailable"
+            raise ApplicationError(msg, type="RetryLoopGraphUnavailable", non_retryable=True)
+        replayed = await self._replayed_loop_control(node_id, state, graph)
+        if replayed is None:
+            msg = f"Cannot safely replay loop {node_id}: no source iteration decision is available"
+            raise ApplicationError(msg, type="RetryLoopProbeUnavailable", non_retryable=True)
+        return replayed
+
+    def _evaluate_do_while_condition(self, node_id: str, state: LoopState) -> bool | None:
+        """Evaluate a live do-while loop condition after its first body pass."""
+        if not isinstance(state, DoWhileLoopState) or state.current_index == 0:
+            return None
+        self.resolver.set_context(loop_node_id=node_id)
+        if not state.condition:
+            msg = f"Loop {node_id} (do_while) has no condition defined"
+            raise ValueError(msg)
+        try:
+            namespace = self.resolver.get_complete_namespace()
+            condition_result = safe_eval_with_namespace(state.condition, namespace)
+            workflow.logger.info(f"Loop {node_id} condition evaluated: {state.condition} = {condition_result}")
+            return condition_result
+        finally:
+            self.resolver.set_context(loop_node_id=None)
+
+    def _refresh_nested_loop_inputs_at_retry(self, node: ActivityNode, graph: WorkflowGraph) -> None:
+        """Resolve nested loop inputs for the exact outer iteration being resumed.
+
+        The activity-sync model keeps one visible row per loop node, so a nested
+        loop's stored input is from its last outer-loop invocation. Replay must not
+        evaluate loop expressions while probing earlier occurrences. Once the
+        selected body occurrence is reached, rebuild each nested ``for_each``
+        input from its restored parent ``loop.item`` so the live retry uses the
+        items for this outer iteration instead of the last one recorded.
+        """
+        loop_chain = self._loop_ancestor_chain(node.id)
+        for depth, loop_id in enumerate(loop_chain):
+            self._setup_loop_namespace(loop_id)
+            if depth == 0:
+                # A root loop has one invocation, so its restored input is valid
+                # for every occurrence in that loop.
+                continue
+
+            loop_node = graph.get_node(loop_id)
+            state = self.loop_state.get(loop_id)
+            if loop_node is None or state is None:
+                continue
+
+            resolved_parameters = self._resolve_node_parameters(loop_node)
+            self.node_inputs[loop_id] = copy.deepcopy(resolved_parameters)
+            if isinstance(state, ForEachLoopState):
+                items = _parse_items(resolved_parameters.get("items", []))
+                self._validate_foreach_items(loop_node, items)
+                active_index = self.node_control_data.get(loop_id, {}).get("current_index", 0)
+                if active_index >= len(items):
+                    msg = (
+                        f"Cannot safely retry {node.id}: nested loop {loop_id} has no item "
+                        f"at source iteration {active_index}"
+                    )
+                    raise ApplicationError(msg, type="RetryLoopInputPathMismatch", non_retryable=True)
+                state.items = items
+            elif isinstance(state, DoWhileLoopState):
+                state.condition = loop_node.parameters.get("condition")
+                state.max_iterations = resolved_parameters.get("max_iterations")
+
+            # Make this loop's current item available when the next nested loop
+            # input is resolved, and when the selected body node resolves inputs.
+            self._setup_loop_namespace(loop_id)
+
+    async def _prepare_retry_node(
+        self,
+        node: ActivityNode,
+        graph: WorkflowGraph,
+    ) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
+        """Return cached loop inputs or a restored node result, if applicable."""
+        if node.type == NodeType.LOOP and self._should_replay_loop(node.id):
+            loop_record = await self._restore_retry_loop_record(node.id)
+            return loop_record["input_data"], None
+        return None, await self._maybe_restore_retry_output(node, graph)
 
     def _create_loop_state_for_type(
         self,
@@ -1557,15 +1794,17 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
         if node.id in self.pre_resolved_outputs:
             return self._process_supplied_result(node, self.pre_resolved_outputs[node.id])
 
+        node_id = node.id
+        node_type = node.type
+        if self.retry_context and self._enter_live_retry_mode_at_selected_node(node):
+            self._refresh_nested_loop_inputs_at_retry(node, graph)
+
         # Retry-from-failure: a node that completed upstream of the failure
         # point is skipped and its stored output injected. Checked after
         # pre_resolved_outputs so an explicit mock still wins.
-        restored = await self._maybe_restore_retry_output(node, graph)
+        retry_loop_inputs, restored = await self._prepare_retry_node(node, graph)
         if restored is not None:
             return self._process_supplied_result(node, restored)
-
-        node_id = node.id
-        node_type = node.type
 
         # Refresh workflow_context.now and workflow_context.today so each node
         # sees the current wall-clock time, not the execution start time.
@@ -1578,7 +1817,12 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
                 wf_ctx["today"] = current_time.strftime("%Y-%m-%d")
 
         # Special handling for condition nodes (Tier 2)
-        if node_type == NodeType.CONDITION:
+        if retry_loop_inputs is not None:
+            # The source loop row contains the already-resolved loop inputs. Using
+            # them avoids re-evaluating for_each expressions while traversal is
+            # still synthetic.
+            resolved_parameters = retry_loop_inputs
+        elif node_type == NodeType.CONDITION:
             # Set loop context if this node is inside a loop body
             self.resolver.set_context(loop_node_id=self.loop_body_map.get(node_id))
 
@@ -1797,7 +2041,9 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
                 node_id, resolved_parameters, node.outputs, graph, timeout_seconds=timeout_seconds
             )
         if node_type == NodeType.LOOP:
-            return await self._execute_loop_node(node_id, node, resolved_parameters, timeout_seconds=timeout_seconds)
+            return await self._execute_loop_node(
+                node_id, node, resolved_parameters, timeout_seconds=timeout_seconds, graph=graph
+            )
 
         return {"output": {"status": "skipped", "reason": f"Unsupported node type: {node_type}"}}
 
@@ -1988,8 +2234,13 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
         ready. The caller retries once, and failing that keeps Temporal's values —
         degrading the row's times and status rather than losing the record.
         """
+        node_id = strip_loop_iteration_suffixes(activity_id)
+        is_loop_record_restore = retry_loop_record_node_id(activity_id) is not None
         await workflow.wait_condition(
-            lambda: (activity_id in self._restored_node_timestamps or activity_id not in self._retry_replay_candidates),
+            lambda: (
+                activity_id in self._restored_node_timestamps
+                or (not is_loop_record_restore and node_id not in self._retry_replay_candidates)
+            ),
             timeout=timedelta(seconds=5),
         )
         return self._restored_node_timestamps.get(activity_id)
@@ -2007,7 +2258,10 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
         returns None — which is the node whose state has not landed yet, and the one
         case where waiting is what makes the answer correct.
         """
-        if activity_id not in self._retry_replay_candidates:
+        node_id = strip_loop_iteration_suffixes(activity_id)
+        if activity_id in self._restored_node_timestamps:
+            return self._restored_node_timestamps[activity_id]
+        if node_id not in self._retry_replay_candidates:
             return None
         return self._restored_node_timestamps.get(activity_id)
 
