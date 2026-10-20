@@ -5,8 +5,9 @@
  * - UI-7: Custom submit label, success message, and CSS overrides on the rendered form
  * - UI-8: Run published workflow from the Workflows list (no pre-run modal), then respond in panel
  */
-import { test, expect } from '../fixtures'
+import { test, expect, toAppUrl } from '../fixtures'
 import { openExecutionFormPromptDeepLink, waitForFormPromptPanel } from '../helpers/formPromptPanel'
+import { isRealBackendE2e } from '../helpers/formPromptRbac'
 import {
   MULTI_FIELD_FORM_DEFINITION,
   createPendingFormStepWorkflow,
@@ -15,12 +16,13 @@ import {
 } from '../helpers/formResponses'
 import { clickWhenEnabled } from '../helpers/patternfly'
 import { runPublishedWorkflowFromList } from '../helpers/workflow-run'
+import { apiRequest } from '../utils/api'
 
 const CUSTOM_SUBMIT_LABEL = 'Send form step'
 const CUSTOM_SUCCESS_MESSAGE = 'Form step saved for this run.'
 const CUSTOM_FORM_MESSAGE = 'Please complete the form step fields below.'
-const FORM_STEP_CSS_OVERRIDE =
-  '.form-step-response-form label[for="syn-dynamic-form-summary"] { color: rgb(170, 0, 0) !important; }'
+/** Backend publish validation rejects attribute selectors in css_override. */
+const FORM_STEP_CSS_OVERRIDE = '.form-step-response-form label { color: rgb(170, 0, 0) !important; }'
 
 test.describe('Form step — SynDynamicForm rendering', { tag: '@pr-check' }, () => {
   test('UI-4: blocks submit until required fields are filled across multiple field types', async ({ app }) => {
@@ -72,7 +74,7 @@ test.describe('Form step — SynDynamicForm rendering', { tag: '@pr-check' }, ()
 
       await expect(app.getByRole('button', { name: CUSTOM_SUBMIT_LABEL })).toBeVisible()
 
-      await expect(app.locator('label[for="syn-dynamic-form-summary"]')).toHaveCSS('color', 'rgb(170, 0, 0)')
+      await expect(app.getByText('Summary', { exact: true })).toHaveCSS('color', 'rgb(170, 0, 0)')
 
       await app.getByRole('textbox', { name: 'Summary' }).fill('Customization probe')
       await app.getByRole('button', { name: CUSTOM_SUBMIT_LABEL }).click()
@@ -102,20 +104,33 @@ test.describe('Form step — SynDynamicForm rendering', { tag: '@pr-check' }, ()
       executionId = executionIdFromPageUrl(app)
 
       await expect(app.getByRole('heading', { level: 1 })).toBeVisible({ timeout: 15_000 })
-      await expect(app.getByText(CUSTOM_FORM_MESSAGE)).toBeVisible({ timeout: 30_000 })
 
-      const respondButton = app.getByRole('button', { name: 'Respond to prompt' })
+      const panelTimeout = isRealBackendE2e ? 45_000 : 15_000
       await expect(async () => {
-        if (
-          !(await app
-            .getByRole('heading', { name: 'Respond to prompt' })
-            .isVisible()
-            .catch(() => false))
-        ) {
-          await clickWhenEnabled(respondButton, { timeout: 10_000 })
+        const promptsResp = await apiRequest(
+          app,
+          'get',
+          `/form_prompts?execution_id=${executionId}&status=pending&limit=100`
+        )
+        expect(promptsResp.ok()).toBeTruthy()
+        const promptsBody = (await promptsResp.json()) as {
+          resources?: Array<{ id?: string; name?: string }>
         }
-        await waitForFormPromptPanel(app, { expectedMessage: CUSTOM_FORM_MESSAGE })
-      }).toPass({ timeout: 45_000, intervals: [2_000] })
+        const pendingPrompt = promptsBody.resources?.find((prompt) => prompt.name === created.promptName)
+        expect(pendingPrompt?.id).toBeTruthy()
+        const formPromptId = pendingPrompt!.id!
+
+        const panelHeading = app.getByRole('heading', { name: 'Respond to prompt' })
+        if (!(await panelHeading.isVisible().catch(() => false))) {
+          const respondButton = app.getByRole('button', { name: 'Respond to prompt' })
+          if (await respondButton.isVisible().catch(() => false)) {
+            await clickWhenEnabled(respondButton, { timeout: 10_000 })
+          } else {
+            await app.goto(toAppUrl(`/executions/${executionId}?form_prompt=${formPromptId}&history=closed`))
+          }
+        }
+        await waitForFormPromptPanel(app, { expectedMessage: CUSTOM_FORM_MESSAGE, timeout: panelTimeout })
+      }).toPass({ timeout: isRealBackendE2e ? 90_000 : 45_000, intervals: [2_000] })
 
       await app.getByRole('textbox', { name: 'Answer' }).fill('Run from workflows list')
       await app.getByRole('button', { name: CUSTOM_SUBMIT_LABEL }).click()

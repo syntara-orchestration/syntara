@@ -6,7 +6,7 @@ from datetime import date as calendar_date
 from typing import Annotated, Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from pydantic import BaseModel, ConfigDict, Discriminator, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Discriminator, Field, ValidationInfo, field_validator, model_validator
 
 from syntara.core.constants import FieldLimits
 from syntara.core.exceptions import SafeValueError
@@ -298,6 +298,25 @@ class DropdownField(FormFieldBase):
     options: OptionsSource
     default: str | int | float | bool | None = None
 
+    @field_validator("default")
+    @classmethod
+    def _default_in_option_list(
+        cls,
+        default: str | float | bool | None,  # noqa: FBT001
+        info: ValidationInfo,
+    ) -> str | int | float | bool | None:
+        """Require a static or resolved default to occur in this field's options."""
+        options = info.data.get("options")
+        if default is None or not isinstance(options, (StaticOptions, ResolvedOptions)):
+            return default
+
+        valid_values = {option.value for option in options.values}
+        if default not in valid_values:
+            value_name = info.data.get("value_name", "<unnamed>")
+            msg = f"Field '{value_name}': default value '{default}' is not in the option list"
+            raise SafeValueError(msg)
+        return default
+
 
 class MultiSelectField(FormFieldBase):
     """Multi-select field."""
@@ -305,6 +324,23 @@ class MultiSelectField(FormFieldBase):
     type: Literal["multi_select"]
     options: OptionsSource
     default: list[str | int | float | bool] | None = None
+
+    @field_validator("default")
+    @classmethod
+    def _defaults_in_option_list(
+        cls,
+        defaults: list[str | int | float | bool] | None,
+        info: ValidationInfo,
+    ) -> list[str | int | float | bool] | None:
+        """Require multi-select defaults to occur in static or resolved options."""
+        options = info.data.get("options")
+        if defaults is None or not isinstance(options, (StaticOptions, ResolvedOptions)):
+            return defaults
+
+        valid_values = {option.value for option in options.values}
+        value_name = info.data.get("value_name", "<unnamed>")
+        _check_multi_select_defaults(value_name, defaults, valid_values)
+        return defaults
 
 
 FormField = Annotated[
@@ -319,6 +355,13 @@ FormField = Annotated[
     | MultiSelectField,
     Discriminator("type"),
 ]
+
+# Discriminator values for FormField and OptionsSource unions.
+# Used by validators to normalize Pydantic error paths by stripping union tags.
+FORM_FIELD_TYPES = frozenset(
+    {"text", "textarea", "masked_text", "email", "number", "checkbox", "date", "dropdown", "multi_select"}
+)
+OPTIONS_SOURCES = frozenset({"static", "dynamic", "dynamic_resolved"})
 
 
 def _check_multi_select_defaults(
@@ -353,31 +396,4 @@ class FormDefinition(BaseModel):
         if duplicates:
             msg = f"Duplicate field names are not allowed: {', '.join(sorted(duplicates))}"
             raise SafeValueError(msg)
-        return self
-
-    @model_validator(mode="after")
-    def _default_in_option_list(self) -> FormDefinition:
-        """Ensure defaults belong to static or runtime-resolved option lists.
-
-        Dynamic options have not been materialized yet, so their defaults are
-        checked by the workflow engine after it resolves the upstream value.
-        """
-        for field in self.fields:
-            if not isinstance(field, (DropdownField, MultiSelectField)) or not isinstance(
-                field.options, (StaticOptions, ResolvedOptions)
-            ):
-                continue
-
-            valid_values = {opt.value for opt in field.options.values}
-
-            # Bind to a local after narrowing the field type: the checkers track
-            # `defaults is not None` on a local, but disagree about the type of
-            # `field.default` across the two branches of the union.
-            if isinstance(field, MultiSelectField):
-                defaults = field.default
-                if defaults is not None:
-                    _check_multi_select_defaults(field.value_name, defaults, valid_values)
-            elif field.default is not None and field.default not in valid_values:
-                msg = f"Field '{field.value_name}': default value '{field.default}' is not in the option list"
-                raise SafeValueError(msg)
         return self

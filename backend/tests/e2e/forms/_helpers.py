@@ -110,6 +110,54 @@ def wait_for_activity_outputs(
     pytest.fail(f"Execution {exec_id} did not expose output data for activities: {sorted(missing)} within {timeout}s")
 
 
+def assert_problem_response(
+    response: Response[Any],
+    *,
+    expected_status: HTTPStatus,
+    expected_code: str,
+) -> dict[str, Any]:
+    """Return RFC 9457 problem details after checking status and code.
+
+    Error responses intentionally use the raw body because the generated API
+    client parses problem extensions differently across endpoint schemas.
+    """
+    if response.status_code == HTTPStatus.BAD_GATEWAY:
+        pytest.skip("Backend returned 502 Bad Gateway - transient infrastructure issue")
+
+    assert response.status_code == expected_status, (
+        f"Expected {expected_status.value} {expected_status.phrase}, got {response.status_code}: {response.content!r}"
+    )
+    content_type = response.headers.get("content-type", "")
+    assert content_type.startswith("application/problem+json"), (
+        f"Expected application/problem+json, got {content_type!r}"
+    )
+
+    problem = cast("dict[str, Any]", json.loads(response.content))
+    assert problem["code"] == expected_code, f"Expected code {expected_code}, got {problem}"
+    return problem
+
+
+def assert_definition_invalid(response: Response[Any]) -> dict[str, Any]:
+    """Assert an RFC 9457 workflow-definition validation problem and return it."""
+    problem = assert_problem_response(
+        response,
+        expected_status=HTTPStatus.UNPROCESSABLE_ENTITY,
+        expected_code="WORKFLOW_DEFINITION_INVALID",
+    )
+    assert problem["type"]
+    assert problem["title"] == "Workflow Definition Invalid"
+    assert problem["detail"]
+    assert problem["retryable"] is False
+    assert problem["instance"]
+
+    validation_result = problem["validation_result"]
+    assert validation_result["is_valid"] is False
+    assert validation_result["error_count"] >= 1
+    assert validation_result["findings"]
+    assert any(finding.get("node_id") == "prompt" for finding in validation_result["findings"])
+    return problem
+
+
 def get_form_prompt(syntara_api: SyntaraApiRegistry, prompt_id: UUID) -> FormPromptRead:
     """GET a form prompt, skipping only on a transient Bad Gateway."""
     return cast(

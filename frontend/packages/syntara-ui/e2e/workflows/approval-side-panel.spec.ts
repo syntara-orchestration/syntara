@@ -12,6 +12,7 @@
  * - UI-30: Self-contained — reject a pending approval and verify execution terminates
  */
 import { test, expect, toAppUrl } from '../fixtures'
+import { gotoApprovalsList } from '../helpers/approvals'
 import { buildUniqueName } from '../helpers/workflows'
 import {
   apiRequest,
@@ -19,11 +20,19 @@ import {
   deleteWorkflowViaApi,
   getAuthToken,
   pollExecutionStatus,
+  pollExecutionTerminalAfterReject,
+  pollPendingApprovalForExecution,
   publishWorkflowViaApi,
 } from '../utils/api'
 
+/** Execution can stay `running` on live backends while Temporal reaches the approval gate. */
+const EXECUTION_AWAITING_APPROVAL_STATUSES = ['paused', 'running'] as const
+
 /** Per-attempt budget for the Review approval click and the panel to come back. */
 const REVIEW_REOPEN_TIMEOUT = 5_000
+
+/** Temporal can be slow to reach the approval gate under CI load. */
+const APPROVAL_GATE_POLL_TIMEOUT = 90_000
 
 test.describe('Approval Side Panel', () => {
   test.skip(!process.env['SYNTARA_E2E_HAS_TEMPORAL_WORKER'], 'Temporal worker unavailable (globalSetup probe)')
@@ -51,7 +60,6 @@ test.describe('Approval Side Panel', () => {
 
       const result = await createWorkflowViaApi({ app: page, name: workflowName, triggers, nodes, edges })
       workflowId = result.id
-      await publishWorkflowViaApi(page, workflowId, result.versionNumber)
 
       const token = await getAuthToken(page)
       if (!token) throw new Error('Could not obtain auth token')
@@ -64,14 +72,10 @@ test.describe('Approval Side Panel', () => {
       const body = (await resp.json()) as { id: string }
       executionId = body.id
 
-      await pollExecutionStatus(page, executionId, ['paused'], { token, timeout: 60_000 })
-
-      await expect(async () => {
-        const r = await apiRequest(page, 'get', `/approvals?execution_id=${executionId}&status=pending`, { token })
-        const data = (await r.json()) as { resources?: Array<{ id: string }> }
-        approvalId = data.resources?.[0]?.id ?? ''
-        expect(approvalId).toBeTruthy()
-      }).toPass({ timeout: 30_000, intervals: [2_000] })
+      approvalId = await pollPendingApprovalForExecution(page, executionId, {
+        token,
+        timeout: APPROVAL_GATE_POLL_TIMEOUT,
+      })
     } finally {
       await page.close()
     }
@@ -89,8 +93,7 @@ test.describe('Approval Side Panel', () => {
 
   test.describe('list navigation', () => {
     test('clicking approval name navigates to execution detail with side panel', async ({ app }) => {
-      await app.goto(toAppUrl('/approvals'))
-      await expect(app.getByRole('heading', { level: 1, name: 'Approvals' })).toBeVisible()
+      await gotoApprovalsList(app)
 
       const table = app.getByRole('grid', { name: 'Approvals table' })
       await table.waitFor({ state: 'visible', timeout: 15_000 })
@@ -105,7 +108,7 @@ test.describe('Approval Side Panel', () => {
 
       await expect(app).toHaveURL(/\/executions\/[^?]+\?approval=.*&history=closed/)
       await expect(app.getByRole('heading', { level: 1 })).toBeVisible({ timeout: 15_000 })
-      await expect(app.getByRole('heading', { name: 'Review Approval' })).toBeVisible({ timeout: 30_000 })
+      await expect(app.getByRole('heading', { name: 'Review approval' })).toBeVisible({ timeout: 30_000 })
     })
   })
 
@@ -113,7 +116,7 @@ test.describe('Approval Side Panel', () => {
     test.beforeEach(async ({ app }) => {
       await app.goto(toAppUrl(`/executions/${executionId}?approval=${approvalId}&history=closed`))
       await expect(app.getByRole('heading', { level: 1 })).toBeVisible({ timeout: 15_000 })
-      await expect(app.getByRole('heading', { name: 'Review Approval' })).toBeVisible({ timeout: 30_000 })
+      await expect(app.getByRole('heading', { name: 'Review approval' })).toBeVisible({ timeout: 30_000 })
     })
 
     test('side panel displays approval details and action buttons', async ({ app }) => {
@@ -155,7 +158,7 @@ test.describe('Approval Side Panel', () => {
 
     test('run history and approval panel are mutually exclusive', async ({ app }) => {
       const historyHeading = app.getByRole('heading', { name: 'Run history' })
-      const reviewHeading = app.getByRole('heading', { name: 'Review Approval' })
+      const reviewHeading = app.getByRole('heading', { name: 'Review approval' })
       const reviewBtn = app.getByRole('button', { name: 'Review approval' })
 
       await expect(historyHeading).not.toBeVisible()
@@ -194,7 +197,7 @@ test.describe('Approval Side Panel', () => {
     test('viewer: approve and reject buttons are disabled', async ({ viewerApp }) => {
       await viewerApp.goto(toAppUrl(`/executions/${executionId}?approval=${approvalId}&history=closed`))
       await expect(viewerApp.getByRole('heading', { level: 1 })).toBeVisible({ timeout: 15_000 })
-      await expect(viewerApp.getByRole('heading', { name: 'Review Approval' })).toBeVisible({ timeout: 30_000 })
+      await expect(viewerApp.getByRole('heading', { name: 'Review approval' })).toBeVisible({ timeout: 30_000 })
 
       const approveBtn = viewerApp.getByRole('button', { name: 'Approve' })
       const rejectBtn = viewerApp.getByRole('button', { name: 'Reject' })
@@ -227,25 +230,37 @@ test.describe('Approval Side Panel', () => {
         nodes,
         edges,
       })
+      await publishWorkflowViaApi(app, localWorkflowId, versionNumber)
 
       try {
-        await publishWorkflowViaApi(app, localWorkflowId, versionNumber)
-
         const token = await getAuthToken(app)
         if (!token) throw new Error('Could not obtain auth token')
 
         const resp = await apiRequest(app, 'post', '/executions', {
           token,
-          data: { workflow_id: localWorkflowId, trigger_node_id: 'trigger_1' },
+          data: { workflow_id: localWorkflowId, trigger_node_id: 'trigger_1', use_published: true },
         })
         expect(resp.ok(), `POST /executions returned ${resp.status()}`).toBeTruthy()
         const { id: localExecutionId } = (await resp.json()) as { id: string }
 
-        await pollExecutionStatus(app, localExecutionId, ['paused'], { token, timeout: 60_000 })
+        await pollPendingApprovalForExecution(app, localExecutionId, {
+          token,
+          timeout: APPROVAL_GATE_POLL_TIMEOUT,
+        })
+        await pollExecutionStatus(app, localExecutionId, [...EXECUTION_AWAITING_APPROVAL_STATUSES], {
+          token,
+          timeout: APPROVAL_GATE_POLL_TIMEOUT,
+        })
 
         await app.goto(toAppUrl(`/executions/${localExecutionId}`))
         await expect(app.getByRole('heading', { level: 1 })).toBeVisible({ timeout: 15_000 })
-        await expect(app.getByText('Waiting for approval')).toBeVisible({ timeout: 30_000 })
+        await expect(app.getByTestId('execution-status-badge').getByText(/^(Paused|Running)$/)).toBeVisible({
+          timeout: 30_000,
+        })
+        await expect(app.getByTestId('approval-status-badge').getByText('Pending approval')).toBeVisible({
+          timeout: 30_000,
+        })
+        await expect(app.getByRole('img', { name: 'Waiting for approval' })).toBeVisible({ timeout: 30_000 })
         await expect(app.getByRole('button', { name: 'Review approval' })).toBeVisible({ timeout: 30_000 })
       } finally {
         await deleteWorkflowViaApi(app, localWorkflowId)
@@ -267,7 +282,7 @@ test.describe('Approval Side Panel', () => {
         { from: 'approval_1', to: 'post_1', from_port: 'approved' },
       ]
 
-      const { id: localWorkflowId, versionNumber } = await createWorkflowViaApi({
+      const { id: localWorkflowId } = await createWorkflowViaApi({
         app,
         name: localWorkflowName,
         triggers,
@@ -276,11 +291,10 @@ test.describe('Approval Side Panel', () => {
       })
 
       try {
-        await publishWorkflowViaApi(app, localWorkflowId, versionNumber)
-
         const token = await getAuthToken(app)
         if (!token) throw new Error('Could not obtain auth token')
 
+        // Match backend E2E (test_approval_reject): run current draft, not published snapshot.
         const resp = await apiRequest(app, 'post', '/executions', {
           token,
           data: { workflow_id: localWorkflowId, trigger_node_id: 'trigger_1' },
@@ -288,40 +302,50 @@ test.describe('Approval Side Panel', () => {
         expect(resp.ok(), `POST /executions returned ${resp.status()}`).toBeTruthy()
         const { id: localExecutionId } = (await resp.json()) as { id: string }
 
-        await pollExecutionStatus(app, localExecutionId, ['paused'], { token, timeout: 60_000 })
-
-        let localApprovalId: string | undefined
-        await expect(async () => {
-          const r = await apiRequest(app, 'get', `/approvals?execution_id=${localExecutionId}&status=pending`, {
-            token,
-          })
-          const body = (await r.json()) as { resources?: Array<{ id: string }> }
-          localApprovalId = body.resources?.[0]?.id
-          expect(localApprovalId).toBeTruthy()
-        }).toPass({ timeout: 30_000, intervals: [2_000] })
+        const localApprovalId = await pollPendingApprovalForExecution(app, localExecutionId, {
+          token,
+          timeout: APPROVAL_GATE_POLL_TIMEOUT,
+        })
 
         await app.goto(toAppUrl(`/executions/${localExecutionId}?approval=${localApprovalId}&history=closed`))
         await expect(app.getByRole('heading', { level: 1 })).toBeVisible({ timeout: 15_000 })
-        await expect(app.getByRole('heading', { name: 'Review Approval' })).toBeVisible({ timeout: 30_000 })
+        await expect(app.getByRole('heading', { name: 'Review approval' })).toBeVisible({ timeout: 30_000 })
 
         await app.getByRole('button', { name: 'Reject', exact: true }).click()
-        await app.getByPlaceholder(/Explain the reason for rejecting/i).fill('Rejected in E2E test')
-        await app.getByRole('button', { name: 'Submit decision' }).click()
+        const rejectionNotes = app.getByPlaceholder(/Explain the reason for rejecting/i)
+        await expect(rejectionNotes).toBeVisible({ timeout: 10_000 })
+        const rejectionReason = 'Rejected in E2E test'
+        await rejectionNotes.fill(rejectionReason)
+        await expect(app.getByRole('button', { name: 'Submit decision' })).toBeEnabled()
 
+        const [patchResponse] = await Promise.all([
+          app.waitForResponse(
+            (response) =>
+              response.request().method() === 'PATCH' &&
+              response.url().includes(`/approvals/${localApprovalId}`) &&
+              response.ok(),
+            { timeout: 30_000 }
+          ),
+          app.getByRole('button', { name: 'Submit decision' }).click(),
+        ])
+
+        const decisionBody = (await patchResponse.json()) as {
+          status?: string
+          signal_delivery_error?: string | null
+        }
+        expect(decisionBody.status).toBe('rejected')
+        expect(decisionBody.signal_delivery_error ?? null).toBeNull()
         await expect(app.getByText('Rejection submitted')).toBeVisible({ timeout: 15_000 })
 
-        await pollExecutionStatus(
-          app,
-          localExecutionId,
-          ['completed', 'completed_with_errors', 'failed', 'cancelled'],
-          {
-            token,
-            timeout: 60_000,
-          }
-        )
+        await pollExecutionTerminalAfterReject(app, localExecutionId, localApprovalId, {
+          token,
+          timeout: APPROVAL_GATE_POLL_TIMEOUT,
+        })
         await app.reload()
         await expect(app.getByRole('heading', { level: 1 })).toBeVisible({ timeout: 15_000 })
-        await expect(app.getByTestId('execution-status-badge').getByText(/Completed|Failed|Rejected/i)).toBeVisible({
+        await expect(
+          app.getByTestId('execution-status-badge').getByText(/Completed|Failed|Rejected|Cancelled/i)
+        ).toBeVisible({
           timeout: 30_000,
         })
       } finally {

@@ -128,6 +128,54 @@ describe('FormResponsesListPanel', () => {
     expect(screen.getByRole('columnheader', { name: 'Name' })).toBeInTheDocument()
   })
 
+  it('shows no-data empty state when there are no form responses and no active filters', () => {
+    mockUseFormResponsesData.mockReturnValue({
+      formPromptsQuery: {
+        isPending: false,
+        isFetching: false,
+        error: null,
+        refetch: vi.fn(),
+        data: { resources: [] },
+      },
+      enrichedRows: [],
+      groupedRows: new Map(),
+      sortedRows: [],
+    })
+
+    render(
+      <SynListPanel>
+        <FormResponsesListPanel />
+      </SynListPanel>
+    )
+
+    expect(screen.getByText('No form responses yet')).toBeInTheDocument()
+    expect(screen.queryByRole('search', { name: 'Filters' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('grid', { name: 'Form responses table' })).not.toBeInTheDocument()
+  })
+
+  it('has no accessibility violations in the no-data empty state', async () => {
+    mockUseFormResponsesData.mockReturnValue({
+      formPromptsQuery: {
+        isPending: false,
+        isFetching: false,
+        error: null,
+        refetch: vi.fn(),
+        data: { resources: [] },
+      },
+      enrichedRows: [],
+      groupedRows: new Map(),
+      sortedRows: [],
+    })
+
+    const { container } = render(
+      <SynListPanel>
+        <FormResponsesListPanel />
+      </SynListPanel>
+    )
+
+    expect(await axe(container)).toHaveNoViolations()
+  })
+
   it('shows filters when rows are empty but filters are active', () => {
     mockUseCursorPagination.mockReturnValue({
       cursor: { page: 1, perPage: 20 },
@@ -161,6 +209,8 @@ describe('FormResponsesListPanel', () => {
     )
 
     expect(screen.getByRole('search', { name: 'Filters' })).toBeInTheDocument()
+    expect(screen.getByText('No results found')).toBeInTheDocument()
+    expect(screen.queryByText('No form responses yet')).not.toBeInTheDocument()
   })
 
   it('shows an error state with retry when the query fails', () => {

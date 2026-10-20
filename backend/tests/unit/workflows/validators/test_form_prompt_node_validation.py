@@ -1,9 +1,41 @@
 """Unit tests for form prompt node validation rules."""
 
+from typing import Any
+
 import pytest
 
-from syntara.workflows.models.validation_finding import ValidationCategory, ValidationSeverity
-from syntara.workflows.validators.workflow_definition import WorkflowValidator
+from syntara.workflows.models.validation_finding import ValidationCategory, ValidationFinding, ValidationSeverity
+from syntara.workflows.validators.workflow_definition import (
+    WorkflowValidator,
+    _merge_form_prompt_field_findings_by_index,
+)
+
+_VALID_FORM_DEFINITION: dict[str, Any] = {"fields": [{"type": "text", "value_name": "answer", "label": "Answer"}]}
+
+
+def _workflow_with_form_prompt(
+    fields: list[dict[str, Any]],
+    *,
+    extra_parameters: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Build a valid graph around form fields and optional prompt parameters."""
+    parameters: dict[str, Any] = {"form_definition": {"fields": fields}}
+    if extra_parameters:
+        parameters.update(extra_parameters)
+
+    return {
+        "schema_version": "2.0.0",
+        "name": "form-prompt-paths",
+        "triggers": [{"id": "trigger", "type": "manual_trigger", "parameters": {}}],
+        "nodes": [
+            {"id": "form", "type": "form_prompt", "parameters": parameters},
+            {"id": "consumer", "type": "script", "parameters": {"language": "bash", "code": "echo done"}},
+        ],
+        "edges": [
+            {"from": "trigger", "to": "form"},
+            {"from": "form", "to": "consumer", "from_port": "submitted"},
+        ],
+    }
 
 
 class TestFormPromptPlacementMatrix:
@@ -19,7 +51,7 @@ class TestFormPromptPlacementMatrix:
                 {
                     "id": "form",
                     "type": "form_prompt",
-                    "parameters": {"form_definition": {"type": "object"}},
+                    "parameters": {"form_definition": _VALID_FORM_DEFINITION},
                 },
                 {"id": "done", "type": "script", "parameters": {"language": "bash", "code": "echo done"}},
             ],
@@ -42,7 +74,7 @@ class TestFormPromptPlacementMatrix:
                 {
                     "id": "form",
                     "type": "form_prompt",
-                    "parameters": {"form_definition": {"type": "object"}},
+                    "parameters": {"form_definition": _VALID_FORM_DEFINITION},
                 },
                 {"id": "script2", "type": "script", "parameters": {"language": "bash", "code": "echo 2"}},
             ],
@@ -66,7 +98,7 @@ class TestFormPromptPlacementMatrix:
                 {
                     "id": "form",
                     "type": "form_prompt",
-                    "parameters": {"form_definition": {"type": "object"}},
+                    "parameters": {"form_definition": _VALID_FORM_DEFINITION},
                 },
                 {"id": "done", "type": "script", "parameters": {"language": "bash", "code": "echo done"}},
             ],
@@ -90,7 +122,7 @@ class TestFormPromptPlacementMatrix:
                 {
                     "id": "form",
                     "type": "form_prompt",
-                    "parameters": {"form_definition": {"type": "object"}},
+                    "parameters": {"form_definition": _VALID_FORM_DEFINITION},
                 },
             ],
             "edges": [
@@ -113,7 +145,7 @@ class TestFormPromptPlacementMatrix:
                 {
                     "id": "form",
                     "type": "form_prompt",
-                    "parameters": {"form_definition": {"type": "object"}},
+                    "parameters": {"form_definition": _VALID_FORM_DEFINITION},
                 },
                 {"id": "done", "type": "script", "parameters": {"language": "bash", "code": "echo done"}},
             ],
@@ -136,12 +168,12 @@ class TestFormPromptPlacementMatrix:
                 {
                     "id": "form1",
                     "type": "form_prompt",
-                    "parameters": {"form_definition": {"type": "object"}},
+                    "parameters": {"form_definition": _VALID_FORM_DEFINITION},
                 },
                 {
                     "id": "form2",
                     "type": "form_prompt",
-                    "parameters": {"form_definition": {"type": "object"}},
+                    "parameters": {"form_definition": _VALID_FORM_DEFINITION},
                 },
                 {"id": "done", "type": "script", "parameters": {"language": "bash", "code": "echo done"}},
             ],
@@ -164,7 +196,7 @@ class TestFormPromptPlacementMatrix:
                 {
                     "id": "form",
                     "type": "form_prompt",
-                    "parameters": {"form_definition": {"type": "object"}},
+                    "parameters": {"form_definition": _VALID_FORM_DEFINITION},
                 },
                 {"id": "script", "type": "script", "parameters": {"language": "bash", "code": "echo 1"}},
                 {"id": "converge", "type": "converge", "parameters": {}},
@@ -192,7 +224,7 @@ class TestFormPromptPlacementNegative:
                 {
                     "id": "form_trigger",
                     "type": "form_prompt",
-                    "parameters": {"form_definition": {"type": "object"}},
+                    "parameters": {"form_definition": _VALID_FORM_DEFINITION},
                 }
             ],
             "nodes": [],
@@ -216,7 +248,7 @@ class TestFormPromptPortRules:
                 {
                     "id": "form",
                     "type": "form_prompt",
-                    "parameters": {"form_definition": {"type": "object"}},
+                    "parameters": {"form_definition": _VALID_FORM_DEFINITION},
                 }
             ],
             "edges": [{"from": "trigger", "to": "form"}],
@@ -240,7 +272,7 @@ class TestFormPromptPortRules:
                 {
                     "id": "form",
                     "type": "form_prompt",
-                    "parameters": {"form_definition": {"type": "object"}},
+                    "parameters": {"form_definition": _VALID_FORM_DEFINITION},
                     "settings": {"continue_on_failure": True},
                 },
             ],
@@ -265,7 +297,7 @@ class TestFormPromptPortRules:
                 {
                     "id": "form",
                     "type": "form_prompt",
-                    "parameters": {"form_definition": {"type": "object"}},
+                    "parameters": {"form_definition": _VALID_FORM_DEFINITION},
                     "settings": {"continue_on_failure": False},
                 },
             ],
@@ -333,6 +365,136 @@ class TestFormPromptValidationErrorPath:
         workflow_validator = WorkflowValidator()
         with pytest.raises(SafeValueError):
             workflow_validator.validate_workflow_definition(workflow_def)
+
+
+class TestFormPromptFindingPaths:
+    """Pydantic findings keep parameter and field locations anchored."""
+
+    def test_non_form_definition_parameter_path_keeps_parameters_prefix(self) -> None:
+        workflow_def = _workflow_with_form_prompt(
+            _VALID_FORM_DEFINITION["fields"],
+            extra_parameters={"css_override": ".form { background: url(https://example.test); }"},
+        )
+
+        result = WorkflowValidator().collect_findings(workflow_def)
+
+        finding = next(f for f in result.findings if f.node_id == "form")
+        assert finding.category == ValidationCategory.form_prompt_configuration
+        assert finding.field_path == "parameters.css_override"
+
+    def test_nested_form_field_path_preserves_form_definition_segment(self) -> None:
+        workflow_def = _workflow_with_form_prompt([{"type": "text", "value_name": "bad name", "label": "Answer"}])
+
+        result = WorkflowValidator().collect_findings(workflow_def)
+
+        finding = next(f for f in result.findings if f.node_id == "form")
+        assert finding.category == ValidationCategory.schema_violation
+        assert finding.field_path == "parameters.form_definition.fields.0.value_name"
+
+    def test_value_name_containing_default_does_not_change_field_path(self) -> None:
+        workflow_def = _workflow_with_form_prompt(
+            [
+                {
+                    "type": "date",
+                    "value_name": "default_region",
+                    "label": "When",
+                    "include_date": False,
+                    "include_time": False,
+                    "include_timezone": False,
+                }
+            ]
+        )
+
+        result = WorkflowValidator().collect_findings(workflow_def)
+
+        finding = next(f for f in result.findings if f.node_id == "form")
+        assert finding.category == ValidationCategory.form_prompt_configuration
+        assert finding.field_path == "parameters.form_definition.fields.0"
+
+    def test_form_definition_error_points_to_invalid_default(self) -> None:
+        workflow_def = _workflow_with_form_prompt(
+            [
+                {"type": "text", "value_name": "answer", "label": "Answer"},
+                {"type": "email", "value_name": "contact", "label": "Contact", "default": "not-an-email"},
+            ]
+        )
+
+        result = WorkflowValidator().collect_findings(workflow_def)
+
+        finding = next(f for f in result.findings if f.node_id == "form")
+        assert finding.category == ValidationCategory.form_prompt_configuration
+        assert finding.field_path == "parameters.form_definition.fields.1.default"
+
+    def test_field_findings_are_ordered_without_reordering_non_field_findings(self) -> None:
+        def field_finding(index: int) -> ValidationFinding:
+            return ValidationFinding(
+                severity=ValidationSeverity.error,
+                category=ValidationCategory.schema_violation,
+                message=f"field-{index}",
+                node_id="form",
+                field_path=f"parameters.form_definition.fields.{index}.label",
+            )
+
+        findings = [
+            field_finding(2),
+            ValidationFinding(
+                severity=ValidationSeverity.warning,
+                category=ValidationCategory.form_prompt_configuration,
+                message="prompt warning",
+                node_id="form",
+                field_path="parameters.response_window",
+            ),
+            field_finding(0),
+            ValidationFinding(
+                severity=ValidationSeverity.error,
+                category=ValidationCategory.schema_violation,
+                message="workflow error",
+            ),
+            field_finding(1),
+        ]
+
+        merged = _merge_form_prompt_field_findings_by_index(findings)
+
+        assert [finding.message for finding in merged] == [
+            "field-0",
+            "prompt warning",
+            "field-1",
+            "workflow error",
+            "field-2",
+        ]
+
+    def test_dynamic_resolved_source_schema_and_model_errors_are_deduplicated(self) -> None:
+        workflow_def = _workflow_with_form_prompt(
+            [
+                {
+                    "type": "dropdown",
+                    "value_name": "choice",
+                    "label": "Choice",
+                    "options": {
+                        "source": "dynamic_resolved",
+                        "values": [{"display_label": "Choice", "value": "choice"}],
+                    },
+                }
+            ]
+        )
+
+        result = WorkflowValidator().collect_findings(workflow_def)
+
+        form_findings = [finding for finding in result.findings if finding.node_id == "form"]
+        assert len(form_findings) == 1
+        assert form_findings[0].category == ValidationCategory.form_prompt_configuration
+        assert form_findings[0].field_path == "parameters.form_definition.fields.0.options"
+
+    def test_missing_form_definition_schema_and_model_errors_are_deduplicated(self) -> None:
+        workflow_def = _workflow_with_form_prompt(_VALID_FORM_DEFINITION["fields"])
+        del workflow_def["nodes"][0]["parameters"]["form_definition"]
+
+        result = WorkflowValidator().collect_findings(workflow_def)
+
+        form_findings = [finding for finding in result.findings if finding.node_id == "form"]
+        assert len(form_findings) == 1
+        assert form_findings[0].category == ValidationCategory.schema_violation
+        assert form_findings[0].field_path == "parameters.form_definition"
 
 
 @pytest.mark.parametrize(

@@ -9,6 +9,8 @@
 
 import { EXPRESSION_MODE_LABELS } from '../../src/components/expressions/expressionBuilderLabels'
 import { test, expect } from '../fixtures'
+import { selectResponderUserFromPicker } from '../helpers/formPromptNodeConfig'
+import { DEFAULT_FORM_PROMPT_WHO_CAN_USERS, stubFormPromptSubmitWhoCanUsers } from '../helpers/stubAuthzWhoCan'
 import {
   buildUniqueName,
   deleteWorkflow,
@@ -95,9 +97,11 @@ test('user can add an Approval node to the canvas', async ({ app }) => {
 
     const panel = await clickAddConnectedStep(app)
 
-    const approvalButton = panel.getByRole('button', { name: /Approval/i, exact: true })
+    await panel.getByRole('button', { name: 'Human tasks', exact: true }).click()
+    const humanTaskPanel = app.getByRole('region', { name: /select a human task step/i })
+    await expect(humanTaskPanel).toBeVisible({ timeout: 10_000 })
+    const approvalButton = humanTaskPanel.getByRole('button', { name: 'Approval', exact: true })
     await expect(approvalButton).toBeVisible()
-
     await approvalButton.click()
 
     await expect(app.getByRole('textbox', { name: 'Name', exact: true })).toBeVisible()
@@ -161,27 +165,7 @@ test('user can add a Form prompt node and select responder users from who_can', 
   const workflowName = buildUniqueName('e2e-builder')
   await createWorkflowWithTrigger(app, workflowName)
 
-  await app.route('**/api/v1/authz/who_can', async (route) => {
-    const request = route.request()
-    if (request.method() === 'POST') {
-      const body = request.postDataJSON() as { action?: string; resource_type?: string } | null
-      if (body?.action === 'submit' && body?.resource_type === 'form_prompt') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            resources: [
-              { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', username: 'demo' },
-              { id: 'b2c3d4e5-f6a7-8901-bcde-f12345678901', username: 'jdoe' },
-            ],
-            next: null,
-          }),
-        })
-        return
-      }
-    }
-    await route.continue()
-  })
+  await stubFormPromptSubmitWhoCanUsers(app, DEFAULT_FORM_PROMPT_WHO_CAN_USERS)
 
   try {
     await closeNodeEditorPanel(app)
@@ -189,34 +173,14 @@ test('user can add a Form prompt node and select responder users from who_can', 
 
     const panel = await clickAddConnectedStep(app)
     await panel.getByRole('button', { name: 'Human tasks', exact: true }).click()
-    await panel.getByRole('button', { name: 'Form', exact: true }).click()
+    const humanTaskPanel = app.getByRole('region', { name: /select a human task step/i })
+    await expect(humanTaskPanel).toBeVisible({ timeout: 10_000 })
+    await humanTaskPanel.getByRole('button', { name: 'Form', exact: true }).click()
 
     await expect(app.getByRole('textbox', { name: 'Name', exact: true })).toBeVisible()
     await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Intake Form')
 
-    const responderUsersButton = app.getByPlaceholder(/Select users/i)
-    await expect(responderUsersButton).toBeVisible({ timeout: 15_000 })
-    await expect(responderUsersButton).toBeEnabled({ timeout: 15_000 })
-
-    const expectedUsername = 'demo'
-    await responderUsersButton.click()
-
-    const listbox = app.getByRole('listbox')
-    await expect(listbox).toBeVisible({ timeout: 5000 })
-
-    await expect(async () => {
-      const menuItems = app.getByRole('menuitem')
-      const count = await menuItems.count()
-      if (count === 0) {
-        throw new Error('No menu items rendered yet')
-      }
-      const texts = await Promise.all((await menuItems.all()).map((item) => item.textContent()))
-      if (!texts.some((t) => t?.includes(expectedUsername))) {
-        throw new Error(`${expectedUsername} not found. Available: ${texts.join(', ')}`)
-      }
-    }).toPass({ timeout: 15_000 })
-
-    await app.getByRole('menuitem').filter({ hasText: expectedUsername }).click()
+    await selectResponderUserFromPicker(app, 'demo')
 
     await expect(app.getByRole('button', { name: 'Create', exact: true })).toBeEnabled({ timeout: 15_000 })
     await app.getByRole('button', { name: 'Create', exact: true }).click()
@@ -317,14 +281,17 @@ test('multiple nodes can be added sequentially', async ({ app }) => {
 
     await panel.getByRole('button', { name: 'Human tasks', exact: true }).click()
 
+    const humanTaskPanel = app.getByRole('region', { name: /select a human task step/i })
+    await expect(humanTaskPanel).toBeVisible({ timeout: 10_000 })
+
     // Wait for Approval button to be stable before clicking
     await expect(async () => {
-      const approvalBtn = panel.getByRole('button', { name: 'Approval', exact: true })
+      const approvalBtn = humanTaskPanel.getByRole('button', { name: 'Approval', exact: true })
       await expect(approvalBtn).toBeVisible()
       await expect(approvalBtn).toBeEnabled()
     }).toPass({ timeout: 15000, intervals: [500, 1000] })
 
-    const approvalBtn = panel.getByRole('button', { name: 'Approval', exact: true })
+    const approvalBtn = humanTaskPanel.getByRole('button', { name: 'Approval', exact: true })
     await approvalBtn.click()
 
     // Wait for form to be stable

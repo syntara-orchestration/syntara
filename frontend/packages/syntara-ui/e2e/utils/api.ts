@@ -46,6 +46,11 @@ export {
 export {
   pollExecutionStatus,
   pollApprovalVisible,
+  pollApprovalStatusForExecution,
+  pollApprovalStatusById,
+  pollPendingApprovalForExecution,
+  pollExecutionTerminalAfterReject,
   pollFormPromptVisible,
   cancelExecutionViaApi,
+  TERMINAL_EXECUTION_STATUSES,
 } from './api-executions'

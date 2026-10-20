@@ -1,17 +1,18 @@
-import { zodResolver } from '@hookform/resolvers/zod'
 import { Button, Form, Modal, ModalBody, ModalFooter, ModalHeader } from '@patternfly/react-core'
 import { useQueryClient } from '@tanstack/react-query'
-import { useForm } from 'react-hook-form'
 
+import { SynForm } from '../../components/forms/SynForm'
+import { SynFormField } from '../../components/forms/SynFormField'
+import { SynTextField } from '../../components/forms/SynTextField'
 import { invalidateAuthzCaches } from '../../hooks/invalidateAuthzCaches'
-import { useFormMutationErrorHandler } from '../../hooks/useFormMutationErrorHandler'
+import { useSynForm } from '../../hooks/useSynForm'
 import { useAlerts } from '../../providers/alerts'
 
 import { accessClient } from './accessClient'
-import { roleBaseSchema } from './addRoleSchema'
+import { accessControlHelp } from './accessControlFieldHelp'
+import { ROLE_NAME_HINT, roleBaseSchema } from './addRoleSchema'
 import type { EditRoleFormData } from './addRoleSchema'
 import { PolicySelect } from './PolicySelect'
-import { RoleFormFields } from './RoleFormFields'
 import type { RoleRead } from './types'
 
 type EditRoleDialogProps = {
@@ -24,22 +25,22 @@ export function EditRoleDialog({ role, onClose, onSuccess }: Readonly<EditRoleDi
   const queryClient = useQueryClient()
   const { showSuccess } = useAlerts()
 
-  const {
-    register,
-    handleSubmit,
-    control,
-    setError,
-    formState: { errors },
-  } = useForm<EditRoleFormData>({
-    resolver: zodResolver(roleBaseSchema, undefined, { mode: 'sync' }),
+  const form = useSynForm({
+    schema: roleBaseSchema,
     defaultValues: {
       name: role.name,
       description: role.description ?? '',
-      policies: role.policies,
+      policies: role.policies ?? [],
     },
+    values: {
+      name: role.name,
+      description: role.description ?? '',
+      policies: role.policies ?? [],
+    },
+    onClose,
   })
+  const { handleSubmit, handleError, handleClose } = form
 
-  const handleError = useFormMutationErrorHandler<EditRoleFormData>(setError)
   const { mutate: updateRole, isPending } = accessClient.useMutation('put', '/roles/{role_id}')
 
   const onSubmit = (data: EditRoleFormData) => {
@@ -56,8 +57,8 @@ export function EditRoleDialog({ role, onClose, onSuccess }: Readonly<EditRoleDi
         onSuccess: () => {
           showSuccess({ title: 'Role updated', description: `${data.name} has been updated.` })
           invalidateAuthzCaches(queryClient)
+          handleClose()
           onSuccess()
-          onClose()
         },
         onError: handleError({ title: 'Failed to update role' }),
       }
@@ -65,34 +66,37 @@ export function EditRoleDialog({ role, onClose, onSuccess }: Readonly<EditRoleDi
   }
 
   return (
-    <Modal isOpen onClose={onClose} variant="medium">
+    <Modal isOpen onClose={handleClose} variant="medium">
       <ModalHeader title={`Edit ${role.name}`} />
       <ModalBody>
         <Form id="edit-role-form" onSubmit={handleSubmit(onSubmit)}>
-          <RoleFormFields
-            fieldIds={{ name: 'role-name', description: 'role-description', policies: 'role-policies' }}
-            register={register}
-            control={control}
-            errors={errors}
-            nameField="name"
-            descriptionField="description"
-            policiesField="policies"
-            renderPolicySelect={({ selected, onChange, hasError }) => (
-              <PolicySelect
-                selected={selected}
-                onChange={onChange}
-                hasError={hasError}
-                scopeProjectId={role.project_id ?? null}
-              />
-            )}
-          />
+          <SynForm form={form}>
+            <SynTextField name="name" label="Name" fieldId="role-name" isRequired hint={ROLE_NAME_HINT} />
+            <SynTextField name="description" label="Description" fieldId="role-description" />
+            <SynFormField<EditRoleFormData, 'policies'>
+              name="policies"
+              label="Policies"
+              fieldId="role-policies"
+              isRequired
+              labelHelp={accessControlHelp.policies}
+            >
+              {({ field, fieldState }) => (
+                <PolicySelect
+                  selected={field.value}
+                  onChange={field.onChange}
+                  hasError={!!fieldState.error}
+                  scopeProjectId={role.project_id ?? null}
+                />
+              )}
+            </SynFormField>
+          </SynForm>
         </Form>
       </ModalBody>
       <ModalFooter>
-        <Button variant="primary" form="edit-role-form" type="submit" isLoading={isPending}>
+        <Button variant="primary" form="edit-role-form" type="submit" isDisabled={isPending} isLoading={isPending}>
           Save role
         </Button>
-        <Button variant="link" onClick={onClose}>
+        <Button variant="link" onClick={handleClose} isDisabled={isPending}>
           Cancel
         </Button>
       </ModalFooter>

@@ -16,6 +16,7 @@ import {
   applyFormResponseStatusFilter,
   createPendingFormPromptLight,
   disposeFormPromptWorkflow,
+  isMockFormPromptSidePanelSeedAvailable,
   openFormResponsesTab,
   tasksProjectSelector,
 } from '../helpers/formResponses'
@@ -23,29 +24,78 @@ import { paginationFooterForTable } from '../helpers/patternfly'
 import { buildUniqueName } from '../helpers/workflows'
 import { apiRequest, getAuthToken } from '../utils/api'
 
+/** Tests that need multi-row / multi-project mock seeds — do not create API rows in beforeEach. */
+const MOCK_SEED_ONLY_TESTS = new Set([
+  'filters form responses by name and status',
+  'expands a row to show message and submitted data',
+  'groups rows by project when All projects is selected',
+  'scopes the list to the selected project',
+])
+
 test.describe('Tasks — Form responses tab', { tag: '@pr-check' }, () => {
   const seedGuard = createUnavailableGuard(
     'Form responses seed data required (see syntara-mock-api formPrompts or run against a seeded backend)'
   )
 
-  test.beforeEach(async ({ app }) => {
-    await openFormResponsesTab(app)
-    const table = app.getByRole('grid', { name: 'Form responses table' })
-    const hasSeed = await table
-      .getByRole('link', { name: MOCK_FORM_RESPONSE_SEED.pendingName })
-      .waitFor({ state: 'visible', timeout: 15_000 })
-      .then(() => true)
-      .catch(() => false)
-    if (!hasSeed) seedGuard.markUnavailable()
-    expect(
-      hasSeed,
-      'Form responses seed data required (see syntara-mock-api formPrompts or run against a seeded backend)'
-    ).toBeTruthy()
+  let usingApiRow = false
+  let apiRow: { promptName: string; workflowId: string } | undefined
+
+  test.beforeEach(async ({ app }, testInfo) => {
+    usingApiRow = false
+    apiRow = undefined
+
+    const hasSeed = await isMockFormPromptSidePanelSeedAvailable(app)
+    if (!hasSeed && MOCK_SEED_ONLY_TESTS.has(testInfo.title)) {
+      test.skip(true, 'Requires mock API form response seed rows')
+      return
+    }
+
+    if (!hasSeed && !process.env['SYNTARA_E2E_HAS_TEMPORAL_WORKER']) {
+      seedGuard.markUnavailable()
+      expect(
+        hasSeed,
+        'Form responses seed data required (see syntara-mock-api formPrompts or run against a seeded backend)'
+      ).toBeTruthy()
+      return
+    }
+
+    if (!hasSeed) {
+      const created = await createPendingFormPromptLight(app, 'e2e-form-responses-tab')
+      apiRow = { promptName: created.promptName, workflowId: created.workflowId }
+      usingApiRow = true
+    }
+
+    const table = await openFormResponsesTab(app)
+    if (usingApiRow && apiRow) {
+      await applyFormResponseNameFilter(app, table, apiRow.promptName, { waitForRowText: apiRow.promptName })
+      return
+    }
+
+    await expect(table.getByRole('link', { name: MOCK_FORM_RESPONSE_SEED.pendingName })).toBeVisible({
+      timeout: 15_000,
+    })
+  })
+
+  test.afterEach(async ({ app }) => {
+    if (apiRow?.workflowId) {
+      await disposeFormPromptWorkflow(app, apiRow.workflowId)
+      apiRow = undefined
+      usingApiRow = false
+    }
   })
 
   test('shows the form responses table with seeded rows', async ({ app }) => {
     const table = app.getByRole('grid', { name: 'Form responses table' })
     await expect(app).toHaveTitle(`Tasks | ${APP_TITLE}`)
+
+    if (usingApiRow && apiRow) {
+      await expect(table.getByRole('link', { name: apiRow.promptName })).toBeVisible()
+      await expect(table.getByRole('columnheader', { name: 'Name' })).toBeVisible()
+      await expect(table.getByRole('columnheader', { name: 'Workflow' })).toBeVisible()
+      await expect(table.getByRole('columnheader', { name: 'Initiated' })).toBeVisible()
+      await expect(table.getByRole('columnheader', { name: 'Status' })).toBeVisible()
+      return
+    }
 
     await expect(table.getByRole('link', { name: MOCK_FORM_RESPONSE_SEED.pendingName })).toBeVisible()
     await expect(table.getByRole('link', { name: MOCK_FORM_RESPONSE_SEED.submittedName })).toBeVisible()
@@ -56,6 +106,7 @@ test.describe('Tasks — Form responses tab', { tag: '@pr-check' }, () => {
   })
 
   test('filters form responses by name and status', async ({ app }) => {
+    test.skip(usingApiRow, 'Name/status filter matrix requires mock seed rows')
     const table = app.getByRole('grid', { name: 'Form responses table' })
 
     await applyFormResponseNameFilter(app, table, 'Collect', {
@@ -87,7 +138,8 @@ test.describe('Tasks — Form responses tab', { tag: '@pr-check' }, () => {
 
     await expect(app.getByRole('heading', { name: 'No results found' })).toBeVisible()
     await app.getByRole('button', { name: 'Clear all filters' }).last().click()
-    await expect(table.getByRole('link', { name: MOCK_FORM_RESPONSE_SEED.pendingName })).toBeVisible()
+    const restoredName = usingApiRow && apiRow ? apiRow.promptName : MOCK_FORM_RESPONSE_SEED.pendingName
+    await expect(table.getByRole('link', { name: restoredName })).toBeVisible()
   })
 
   test('sorts by name when the column header is clicked', async ({ app }) => {
@@ -102,6 +154,7 @@ test.describe('Tasks — Form responses tab', { tag: '@pr-check' }, () => {
   })
 
   test('expands a row to show message and submitted data', async ({ app }) => {
+    test.skip(usingApiRow, 'Requires mock seed rows with submitted data')
     const table = app.getByRole('grid', { name: 'Form responses table' })
 
     const pendingRow = table.getByRole('row').filter({ hasText: MOCK_FORM_RESPONSE_SEED.pendingName })
@@ -115,14 +168,19 @@ test.describe('Tasks — Form responses tab', { tag: '@pr-check' }, () => {
 
   test('UI-8: opens execution detail with the form prompt panel from the Tasks name link', async ({ app }) => {
     const table = app.getByRole('grid', { name: 'Form responses table' })
+    const linkName = usingApiRow && apiRow ? apiRow.promptName : MOCK_FORM_RESPONSE_SEED.pendingName
 
-    await table.getByRole('link', { name: MOCK_FORM_RESPONSE_SEED.pendingName }).click()
+    await table.getByRole('link', { name: linkName }).click()
 
-    await expect(app).toHaveURL(
-      new RegExp(
-        `/executions/${MOCK_FORM_RESPONSE_SEED.executionId}\\?form_prompt=${MOCK_FORM_RESPONSE_SEED.pendingId}(&history=closed)?`
+    if (usingApiRow && apiRow) {
+      await expect(app).toHaveURL(/\/executions\/[^/]+\?form_prompt=[^&]+(&history=closed)?/)
+    } else {
+      await expect(app).toHaveURL(
+        new RegExp(
+          `/executions/${MOCK_FORM_RESPONSE_SEED.executionId}\\?form_prompt=${MOCK_FORM_RESPONSE_SEED.pendingId}(&history=closed)?`
+        )
       )
-    )
+    }
     await expect(app).toHaveURL(/history=closed/)
     await expect(app.getByRole('heading', { name: 'Respond to prompt' })).toBeVisible({ timeout: 15_000 })
   })
@@ -138,6 +196,7 @@ test.describe('Tasks — Form responses tab', { tag: '@pr-check' }, () => {
   })
 
   test('groups rows by project when All projects is selected', async ({ app }) => {
+    test.skip(usingApiRow, 'Requires mock seed rows in multiple projects')
     const projectInput = tasksProjectSelector(app)
     const selectorVisible = await projectInput
       .waitFor({ state: 'visible', timeout: 10_000 })
@@ -160,6 +219,7 @@ test.describe('Tasks — Form responses tab', { tag: '@pr-check' }, () => {
   })
 
   test('scopes the list to the selected project', async ({ app }) => {
+    test.skip(usingApiRow, 'Requires mock seed rows in multiple projects')
     const projectInput = tasksProjectSelector(app)
     const selectorVisible = await projectInput
       .waitFor({ state: 'visible', timeout: 10_000 })
@@ -198,14 +258,16 @@ test.describe('Tasks — Form responses pagination', { tag: '@pr-check' }, () =>
 
   test.beforeEach(async ({ app }) => {
     await openFormResponsesTab(app)
+    const hasSeed = await isMockFormPromptSidePanelSeedAvailable(app)
+    if (!hasSeed) {
+      paginationGuard.markUnavailable()
+      test.skip(true, 'Form responses pagination requires mock API seed rows')
+      return
+    }
     const table = app.getByRole('grid', { name: 'Form responses table' })
-    const hasSeed = await table
-      .getByRole('link', { name: MOCK_FORM_RESPONSE_SEED.pendingName })
-      .waitFor({ state: 'visible', timeout: 15_000 })
-      .then(() => true)
-      .catch(() => false)
-    if (!hasSeed) paginationGuard.markUnavailable()
-    expect(hasSeed, 'Form responses seed data required to test pagination').toBeTruthy()
+    await expect(table.getByRole('link', { name: MOCK_FORM_RESPONSE_SEED.pendingName })).toBeVisible({
+      timeout: 15_000,
+    })
 
     const footer = paginationFooterForTable(app, 'Form responses table')
     const perPageToggle = footer.getByRole('button', { name: /\d+ - \d+/ })
@@ -218,8 +280,10 @@ test.describe('Tasks — Form responses pagination', { tag: '@pr-check' }, () =>
       .waitFor({ state: 'visible', timeout: 10_000 })
       .then(() => nextButton.isEnabled())
       .catch(() => false)
-    if (!hasNextPage) paginationGuard.markUnavailable()
-    expect(hasNextPage, 'Need more than ten form responses to paginate (mock pagination seeds)').toBeTruthy()
+    if (!hasNextPage) {
+      paginationGuard.markUnavailable()
+      test.skip(true, 'Need more than ten form responses to paginate (mock pagination seeds)')
+    }
   })
 
   test('next page shows a different form response row', async ({ app }) => {

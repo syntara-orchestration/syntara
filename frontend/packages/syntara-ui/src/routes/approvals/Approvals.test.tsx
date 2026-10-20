@@ -542,13 +542,13 @@ describe('Approvals Component', () => {
   })
 
   describe('Row Expansion', () => {
-    it('renders an expand toggle on every approval row', async () => {
+    it('renders an expand toggle only on rows with decision notes', async () => {
       mockApprovalsQuery(mockApprovals)
 
       render(<Approvals />)
 
       const expandButtons = await screen.findAllByRole('button', { name: /details/i })
-      expect(expandButtons).toHaveLength(3)
+      expect(expandButtons).toHaveLength(2)
     })
 
     it('expands a row when clicking the expand button', async () => {
@@ -558,7 +558,7 @@ describe('Approvals Component', () => {
       render(<Approvals />)
 
       const expandButtons = await screen.findAllByRole('button', { name: /details/i })
-      await user.click(expandButtons[1])
+      await user.click(expandButtons[0])
 
       expect(screen.getByText('Approval notes')).toBeInTheDocument()
       expect(screen.getByText('Approved after review')).toBeInTheDocument()
@@ -573,10 +573,10 @@ describe('Approvals Component', () => {
       const expandButtons = await screen.findAllByRole('button', { name: /details/i })
 
       // Expand then collapse
-      await user.click(expandButtons[1])
+      await user.click(expandButtons[0])
       expect(screen.getByText('Approved after review')).toBeInTheDocument()
 
-      await user.click(expandButtons[1])
+      await user.click(expandButtons[0])
       // Row toggle was clicked again - state should be collapsed
       // The expanded row content is still in DOM but the row state changes
       expect(expandButtons[0]).toBeInTheDocument()
@@ -617,7 +617,7 @@ describe('Approvals Component', () => {
       expect(expandAllButton).toBeInTheDocument()
     })
 
-    it('shows expand controls when decision notes are empty', async () => {
+    it('hides expand controls when no approval has decision notes', () => {
       const pendingOnly = {
         ...mockApprovals[0],
         id: 'no-notes-approval',
@@ -626,8 +626,8 @@ describe('Approvals Component', () => {
 
       render(<Approvals />)
 
-      expect(await screen.findByRole('button', { name: /expand all/i })).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: /details/i })).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /expand all/i })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /details/i })).not.toBeInTheDocument()
     })
   })
 

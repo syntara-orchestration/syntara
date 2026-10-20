@@ -145,6 +145,7 @@ type BuilderEditorToolbarProps = Readonly<{
   triggers?: { id: string; name?: string }[]
   builderPermissions: BuilderPermissions
   isNodeEditorOpen?: boolean
+  beforeVerify?: () => Promise<boolean>
 }>
 
 export function BuilderEditorToolbar({
@@ -174,6 +175,7 @@ export function BuilderEditorToolbar({
   triggers,
   builderPermissions,
   isNodeEditorOpen,
+  beforeVerify,
 }: BuilderEditorToolbarProps) {
   const { importFileRef, handleImportFile, handleExport, handleVerify, isVerifying, validationErrorCount } =
     useWorkflowImportExport({
@@ -183,6 +185,7 @@ export function BuilderEditorToolbar({
       workflowName,
       workflowDescription,
       onPendingImport,
+      beforeVerify,
     })
 
   const hasNoSteps = useWorkflowStore((s) => (s.currentWorkflow?.workflow?.activities?.length ?? 0) === 0)

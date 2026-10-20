@@ -933,7 +933,7 @@ export const integrationDialogPages: PageEntry[] = [
  */
 async function waitForApprovalPanel(page: Page) {
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible({ timeout: 20_000 })
-  await expect(page.getByRole('heading', { name: 'Review Approval' })).toBeVisible({ timeout: 15_000 })
+  await expect(page.getByRole('heading', { name: 'Review approval' })).toBeVisible({ timeout: 15_000 })
 }
 
 export const approvalInteractivePages: PageEntry[] = [
@@ -1096,7 +1096,8 @@ export const statusVariantPages: PageEntry[] = [
     name: 'approvals-expanded-row',
     path: AppRoute.Approvals.Root,
     waitFor: async (page) => {
-      await expect(page.getByRole('heading', { level: 1, name: 'Approvals' })).toBeVisible()
+      await expect(page.getByRole('heading', { level: 1, name: 'Tasks' })).toBeVisible()
+      await expect(page.getByRole('tabpanel', { name: 'Approvals' })).toBeVisible()
       await expect(page.locator('table tbody tr').first()).toBeVisible()
     },
     setup: async (page) => {

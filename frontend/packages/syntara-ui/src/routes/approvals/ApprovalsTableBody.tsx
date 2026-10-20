@@ -18,7 +18,7 @@ import { LinkCell } from '../../components/table/LinkCell'
 import { UserTimestamp } from '../../components/table/UserTimestamp'
 import type { ProjectRead } from '../access/types'
 
-import { getNotesLabel } from './approvalNotes'
+import { getNotesLabel, hasExpandableNotes } from './approvalNotes'
 import type { ApprovalWithDetails } from './Approvals'
 import styles from './ApprovalsTableBody.module.css'
 import { ApprovalStatusBadges } from './approvalUtils'
@@ -122,7 +122,7 @@ function ApprovalRow({
   isLoadingPermissions?: boolean
 }>) {
   const isPending = approval.status === 'pending'
-  const notesText = approval.decision_notes?.trim() || '—'
+  const isExpandable = hasExpandableNotes(approval)
 
   // SECURITY: Client-side check for UX only - disables checkbox for unauthorized users
   // Backend ALWAYS validates and returns 403 via ApprovalService._is_user_authorized_approver()
@@ -145,11 +145,15 @@ function ApprovalRow({
           />
         )}
         <Td
-          expand={{
-            rowIndex,
-            isExpanded,
-            onToggle: () => onToggleRow(approval.id),
-          }}
+          expand={
+            isExpandable
+              ? {
+                  rowIndex,
+                  isExpanded,
+                  onToggle: () => onToggleRow(approval.id),
+                }
+              : undefined
+          }
         />
         <Td dataLabel="Approval name">
           <LinkCell href={`/executions/${approval.execution_id}?approval=${approval.id}&history=closed`}>
@@ -175,18 +179,20 @@ function ApprovalRow({
           <ApprovalStatusBadges status={approval.status} />
         </Td>
       </Tr>
-      <Tr isExpanded={isExpanded}>
-        <Td colSpan={showSelect ? 7 : 6}>
-          <ExpandableRowContent>
-            <DescriptionList>
-              <DescriptionListGroup>
-                <DescriptionListTerm>{getNotesLabel(approval.status)}</DescriptionListTerm>
-                <DescriptionListDescription>{notesText}</DescriptionListDescription>
-              </DescriptionListGroup>
-            </DescriptionList>
-          </ExpandableRowContent>
-        </Td>
-      </Tr>
+      {isExpandable && (
+        <Tr isExpanded={isExpanded}>
+          <Td colSpan={showSelect ? 7 : 6}>
+            <ExpandableRowContent>
+              <DescriptionList>
+                <DescriptionListGroup>
+                  <DescriptionListTerm>{getNotesLabel(approval.status)}</DescriptionListTerm>
+                  <DescriptionListDescription>{approval.decision_notes}</DescriptionListDescription>
+                </DescriptionListGroup>
+              </DescriptionList>
+            </ExpandableRowContent>
+          </Td>
+        </Tr>
+      )}
     </Fragment>
   )
 }

@@ -10,7 +10,7 @@ import {
   type DragStartEvent,
 } from '@dnd-kit/core'
 import { restrictToVerticalAxis } from '@dnd-kit/modifiers'
-import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
+import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { Alert, Button, Content, ContentVariants, Flex, FlexItem, Stack, StackItem } from '@patternfly/react-core'
 import { RhUiAddIcon, RhUiGripVerticalFillIcon } from '@patternfly/react-icons'
 import type { FormDefinition } from '@syntara/contracts'
@@ -42,7 +42,10 @@ export function FormFieldBuilderDesignTab({ isDisabled }: Readonly<FormFieldBuil
   const [activeId, setActiveId] = useState<string | null>(null)
   const [pendingRemoveIndex, setPendingRemoveIndex] = useState<number | null>(null)
 
-  const sensors = useSensors(useSensor(PointerSensor), useSensor(KeyboardSensor))
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  )
 
   const handleDragStart = (event: DragStartEvent) => {
     setActiveId(event.active.id as string)

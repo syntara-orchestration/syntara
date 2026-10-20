@@ -1,4 +1,3 @@
-import { zodResolver } from '@hookform/resolvers/zod'
 import {
   Alert,
   Button,
@@ -7,7 +6,6 @@ import {
   Flex,
   FlexItem,
   Form,
-  FormGroup,
   Spinner,
   Stack,
   StackItem,
@@ -16,33 +14,28 @@ import {
 import { RhUiCaretLeftIcon, RhUiCaretRightIcon } from '@patternfly/react-icons'
 import { Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
 import { useCallback, useMemo, useState } from 'react'
-import { Controller, useForm, useWatch } from 'react-hook-form'
-import { z } from 'zod'
+import { useWatch } from 'react-hook-form'
 
+import { SynForm } from '../../components/forms/SynForm'
+import { SynFormField } from '../../components/forms/SynFormField'
 import { SynEmptyStateNoData } from '../../components/states/SynEmptyStateNoData'
 import { SynErrorState } from '../../components/states/SynErrorState'
 import { LinkCell } from '../../components/table/LinkCell'
 import { SynScrollableTableContainer } from '../../components/table/SynScrollableTableContainer'
+import { useSynForm } from '../../hooks/useSynForm'
 import { getErrorMessage } from '../../utils/apiErrors'
 import { getUserDetailPath } from '../access-management/accessManagementPaths'
 
 import { accessClient } from './accessClient'
 import { accessControlHelp } from './accessControlFieldHelp'
+import type { AuthzExplorerQueryFormData } from './authzExplorerQuerySchema'
+import { authzExplorerQuerySchema } from './authzExplorerQuerySchema'
 import type { ResourceActionMap } from './canIUtils'
 import { ProjectSelect } from './ProjectSelect'
 import { ResourceIdSelect } from './ResourceIdSelect'
 import { TypeaheadSelect } from './TypeaheadSelect'
 import type { WhoCanUser } from './types'
 import { useAllProjects } from './useAllProjects'
-
-const whoCanSchema = z.object({
-  resourceType: z.string().min(1, 'Resource type is required'),
-  action: z.string().min(1, 'Action is required'),
-  resourceId: z.string().optional(),
-  project: z.string().optional(),
-})
-
-type WhoCanFormData = z.infer<typeof whoCanSchema>
 
 function WhoCanResults({
   users,
@@ -143,10 +136,11 @@ function WhoCanResults({
 export function WhoCanView({ resourceTypes, actionsByResource }: Readonly<ResourceActionMap>) {
   const { projects } = useAllProjects()
 
-  const { control, handleSubmit, setValue, getValues } = useForm<WhoCanFormData>({
-    resolver: zodResolver(whoCanSchema, undefined, { mode: 'sync' }),
+  const form = useSynForm({
+    schema: authzExplorerQuerySchema,
     defaultValues: { resourceType: '', action: '', resourceId: '', project: '' },
   })
+  const { control, handleSubmit, setValue, getValues } = form
 
   const resourceType = useWatch({ control, name: 'resourceType', defaultValue: '' })
   const action = useWatch({ control, name: 'action', defaultValue: '' })
@@ -171,12 +165,12 @@ export function WhoCanView({ resourceTypes, actionsByResource }: Readonly<Resour
   // Pagination state: track cursor history for previous page navigation
   const [cursorHistory, setCursorHistory] = useState<string[]>([])
   const [currentCursor, setCurrentCursor] = useState<string | undefined>(undefined)
-  const [lastSubmittedFormData, setLastSubmittedFormData] = useState<WhoCanFormData | null>(null)
+  const [lastSubmittedFormData, setLastSubmittedFormData] = useState<AuthzExplorerQueryFormData | null>(null)
 
   const whoCanMutation = accessClient.useMutation('post', '/authz/who_can')
 
   const submitWithCursor = useCallback(
-    (formData: WhoCanFormData, cursor?: string) => {
+    (formData: AuthzExplorerQueryFormData, cursor?: string) => {
       whoCanMutation.mutate({
         body: {
           action: formData.action.trim(),
@@ -220,16 +214,15 @@ export function WhoCanView({ resourceTypes, actionsByResource }: Readonly<Resour
     <Flex direction={{ default: 'row' }} gap={{ default: 'gapXl' }} alignItems={{ default: 'alignItemsFlexStart' }}>
       <FlexItem style={{ minWidth: 340, maxWidth: 400 }}>
         <Form onSubmit={onSubmit}>
-          <FormGroup
-            label="Resource type"
-            isRequired
-            fieldId="who-can-resource-type"
-            labelHelp={accessControlHelp.resourceType}
-          >
-            <Controller
+          <SynForm form={form}>
+            <SynFormField<AuthzExplorerQueryFormData, 'resourceType'>
               name="resourceType"
-              control={control}
-              render={({ field }) => (
+              label="Resource type"
+              fieldId="who-can-resource-type"
+              isRequired
+              labelHelp={accessControlHelp.resourceType}
+            >
+              {({ field }) => (
                 <TypeaheadSelect
                   id="who-can-resource-type"
                   ariaLabel="Resource type"
@@ -242,14 +235,16 @@ export function WhoCanView({ resourceTypes, actionsByResource }: Readonly<Resour
                   placeholder="Select a resource type"
                 />
               )}
-            />
-          </FormGroup>
+            </SynFormField>
 
-          <FormGroup label="Action" isRequired fieldId="who-can-action" labelHelp={accessControlHelp.action}>
-            <Controller
+            <SynFormField<AuthzExplorerQueryFormData, 'action'>
               name="action"
-              control={control}
-              render={({ field }) => (
+              label="Action"
+              fieldId="who-can-action"
+              isRequired
+              labelHelp={accessControlHelp.action}
+            >
+              {({ field }) => (
                 <TypeaheadSelect
                   id="who-can-action"
                   ariaLabel="Action"
@@ -260,14 +255,15 @@ export function WhoCanView({ resourceTypes, actionsByResource }: Readonly<Resour
                   isDisabled={!resourceType}
                 />
               )}
-            />
-          </FormGroup>
+            </SynFormField>
 
-          <FormGroup label="Project" fieldId="who-can-project" labelHelp={accessControlHelp.project}>
-            <Controller
+            <SynFormField<AuthzExplorerQueryFormData, 'project'>
               name="project"
-              control={control}
-              render={({ field }) => (
+              label="Project"
+              fieldId="who-can-project"
+              labelHelp={accessControlHelp.project}
+            >
+              {({ field }) => (
                 <ProjectSelect
                   id="who-can-project"
                   value={field.value ?? ''}
@@ -275,18 +271,19 @@ export function WhoCanView({ resourceTypes, actionsByResource }: Readonly<Resour
                   projects={projects}
                 />
               )}
-            />
-          </FormGroup>
+            </SynFormField>
 
-          <FormGroup label="Resource ID" fieldId="who-can-resource-id" labelHelp={accessControlHelp.resourceId}>
-            <Controller
+            <SynFormField<AuthzExplorerQueryFormData, 'resourceId'>
               name="resourceId"
-              control={control}
-              render={({ field }) => (
+              label="Resource ID"
+              fieldId="who-can-resource-id"
+              labelHelp={accessControlHelp.resourceId}
+            >
+              {({ field }) => (
                 <ResourceIdSelect resourceType={resourceType} value={field.value ?? ''} onChange={field.onChange} />
               )}
-            />
-          </FormGroup>
+            </SynFormField>
+          </SynForm>
 
           <Button
             variant="primary"

@@ -56,6 +56,39 @@ export async function deleteCredentialViaApi(app: Page, credentialId: string): P
   }
 }
 
+type CredentialSummary = { id: string; name: string; project_id?: string }
+
+function pickCredentialInProject(
+  resources: CredentialSummary[] | undefined,
+  name: string,
+  projectId: string
+): CredentialSummary | null {
+  return resources?.find((c) => c.name === name && c.project_id === projectId) ?? null
+}
+
+/**
+ * Find a credential by exact name within a project (idempotent E2E setup).
+ *
+ * Uses `name[eq]` on the real backend; falls back to mock API `name=` exact filter.
+ */
+export async function findCredentialByNameAndProject(
+  app: Page,
+  name: string,
+  projectId: string
+): Promise<{ id: string; name: string } | null> {
+  const queries = [`name[eq]=${encodeURIComponent(name)}&limit=100`, `name=${encodeURIComponent(name)}&limit=100`]
+
+  for (const query of queries) {
+    const resp = await apiRequest(app, 'get', `/credentials?${query}`)
+    if (!resp.ok()) continue
+    const body = (await resp.json()) as { resources?: CredentialSummary[] }
+    const match = pickCredentialInProject(body.resources, name, projectId)
+    if (match) return { id: match.id, name: match.name }
+  }
+
+  return null
+}
+
 /**
  * List credentials by name via the authenticated API.
  * Returns matching credentials for cleanup purposes.
@@ -65,10 +98,17 @@ export async function listCredentialsByName(app: Page, name: string): Promise<Ar
     const token = await getAuthToken(app)
     if (!token) return []
 
-    const resp = await apiRequest(app, 'get', `/credentials?name=${encodeURIComponent(name)}`, {
+    const resp = await apiRequest(app, 'get', `/credentials?name[eq]=${encodeURIComponent(name)}&limit=100`, {
       token,
     })
-    if (!resp.ok()) return []
+    if (!resp.ok()) {
+      const fallback = await apiRequest(app, 'get', `/credentials?name=${encodeURIComponent(name)}&limit=100`, {
+        token,
+      })
+      if (!fallback.ok()) return []
+      const fallbackBody = (await fallback.json()) as { resources?: Array<{ id: string }> }
+      return fallbackBody.resources ?? []
+    }
 
     const body = (await resp.json()) as { resources?: Array<{ id: string }> }
     return body.resources ?? []

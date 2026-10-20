@@ -20,7 +20,7 @@ export const buildUniqueName = (prefix: string) => `${prefix}-${Date.now()}-${ra
 
 export const addNodePanel = (page: Page) =>
   page.getByRole('region', {
-    name: /add step|select an action node|select a trigger node|select a logic node|select an aap execution node/i,
+    name: /add step|select an action node|select a trigger node|select a logic node|select an aap execution node|select a human task step/i,
   })
 
 /**

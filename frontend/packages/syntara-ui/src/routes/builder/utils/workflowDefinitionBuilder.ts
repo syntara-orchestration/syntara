@@ -252,9 +252,9 @@ export function buildWorkflowDefinition(params: {
   const sanitizedName = workflowName.replace(CONTROL_CHAR_PATTERN, '')
   const sanitizedDescription = workflowDescription?.replace(CONTROL_CHAR_PATTERN, '') || undefined
 
-  validateEntityIds(activities, triggers, edges)
-
   const activitiesForDefinition = activities.map((activity) => normalizeFormPromptActivityForDefinition(activity))
+
+  validateEntityIds(activitiesForDefinition, triggers, edges)
 
   // SECURITY: Build allowlist of known real IDs for positive validation of edge endpoints.
   // After trigger display IDs are resolved, every edge source/target must match a known

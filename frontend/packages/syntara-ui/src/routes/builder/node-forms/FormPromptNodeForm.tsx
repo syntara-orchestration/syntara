@@ -186,8 +186,8 @@ function FormPromptFormFields({
   const { groups, isLoading: isLoadingGroups } = useApprovalDecideGroups()
 
   const nameField = useMemo(
-    () => <ActivityNameField register={register} fieldId="form-prompt-name" ariaLabel="Name" />,
-    [register]
+    () => <ActivityNameField control={control} fieldId="form-prompt-name" ariaLabel="Name" />,
+    [control]
   )
 
   useEffect(() => {

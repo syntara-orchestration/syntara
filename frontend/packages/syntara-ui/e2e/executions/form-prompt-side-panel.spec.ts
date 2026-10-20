@@ -8,73 +8,95 @@
  * - Previous/next navigation between prompts on the same execution
  *
  * Mock seed: syntara-mock-api/src/resources/formPrompts.ts (exec-form-prompt).
+ * Real backend (Konflux): creates paused executions via API (requires Temporal worker).
  */
-import { createUnavailableGuard, test, expect, toAppUrl, type Page } from '../fixtures'
+import { test, expect, toAppUrl, type Page } from '../fixtures'
 import {
   FORM_PROMPT_NAV_STEP_TIMEOUT,
+  activityTableRowByActivityName,
+  expectFormStepDropdownOptions,
+  formStepDropdownField,
   openExecutionFormPromptDeepLink,
   waitForFormPromptPanel,
 } from '../helpers/formPromptPanel'
-import { createPendingFormPromptLight, MOCK_FORM_RESPONSE_SEED } from '../helpers/formResponses'
+import { isRealBackendE2e } from '../helpers/formPromptRbac'
+import {
+  createPendingFormPromptLight,
+  isMockFormPromptSidePanelSeedAvailable,
+  loadSidePanelScenario,
+  MOCK_FORM_RESPONSE_SEED,
+  type SidePanelScenario,
+} from '../helpers/formResponses'
 import { clickWhenEnabled, pfWidget } from '../helpers/patternfly'
 import { apiRequest, deleteWorkflowViaApi } from '../utils/api'
 
-const SEED = MOCK_FORM_RESPONSE_SEED
-
 test.describe('Execution detail — Form step side panel', { tag: '@pr-check' }, () => {
-  const seedGuard = createUnavailableGuard(
-    'Form step execution seed required (see syntara-mock-api formPrompts / exec-form-prompt)'
-  )
+  test.describe.configure({ mode: 'serial' })
+
+  let scenario: SidePanelScenario | undefined
 
   test.beforeEach(async ({ app }) => {
-    const seedResp = await apiRequest(app, 'get', `/form_prompts/${SEED.pendingId}`)
-    const hasSeed = seedResp.ok()
-    if (!hasSeed) seedGuard.markUnavailable()
-    expect(
-      hasSeed,
-      'Form step execution seed required (see syntara-mock-api formPrompts / exec-form-prompt)'
-    ).toBeTruthy()
+    try {
+      scenario = await loadSidePanelScenario(app, 'e2e-side-panel')
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('Temporal worker')) {
+        test.skip(true, error.message)
+      }
+      throw error
+    }
+  })
+
+  test.afterEach(async ({ app }) => {
+    if (scenario?.workflowId) {
+      await deleteWorkflowViaApi(app, scenario.workflowId)
+    }
+    scenario = undefined
   })
 
   async function openSeedPanel(app: Page): Promise<void> {
-    await openExecutionFormPromptDeepLink(app, SEED.executionId, SEED.pendingId, {
-      expectedMessage: SEED.pendingMessage,
+    const seed = scenario ?? (await loadSidePanelScenario(app))
+    await openExecutionFormPromptDeepLink(app, seed.executionId, seed.pendingId, {
+      expectedMessage: seed.pendingMessage,
     })
     await expect(app.getByRole('textbox', { name: 'Reason' })).toBeVisible({ timeout: 15_000 })
   }
 
   test('UI-13: deep-link opens the form step panel with summary and fields', async ({ app }) => {
+    const seed = scenario!
     await openSeedPanel(app)
 
     await expect(app.getByText('Prompt step', { exact: true })).toBeVisible()
-    await expect(app.getByText(SEED.pendingMessage)).toBeVisible()
+    await expect(app.getByText(seed.pendingMessage)).toBeVisible()
     await expect(app.getByRole('textbox', { name: 'Reason' })).toBeVisible()
-    await expect(app.getByRole('button', { name: SEED.customSubmitLabel })).toBeVisible()
+    await expect(app.getByRole('button', { name: seed.customSubmitLabel })).toBeVisible()
   })
 
   test('UI-4: shows validation error when submitting without required fields', async ({ app }) => {
+    const seed = scenario!
     await openSeedPanel(app)
 
-    await app.getByRole('button', { name: SEED.customSubmitLabel }).click()
+    await app.getByRole('button', { name: seed.customSubmitLabel }).click()
     await expect(app.getByText('This field is required')).toBeVisible({ timeout: 10_000 })
     await expect(pfWidget(app, 'Alert').filter({ hasText: 'Form submitted' })).not.toBeVisible()
   })
 
   test('UI-13: activity table row opens the waiting form step panel', async ({ app }) => {
-    await app.goto(toAppUrl(`/executions/${SEED.executionId}`))
+    const seed = scenario!
+    await app.goto(toAppUrl(`/executions/${seed.executionId}`))
     await expect(app.getByRole('heading', { level: 1 })).toBeVisible({ timeout: 15_000 })
 
     const activityTable = app.getByRole('grid', { name: 'Activity states' })
     await expect(activityTable).toBeVisible({ timeout: 15_000 })
 
-    await activityTable.getByRole('row').filter({ hasText: SEED.pendingName }).click()
+    await activityTableRowByActivityName(activityTable, seed.pendingName).click()
 
     await waitForFormPromptPanel(app)
-    await expect(app.getByText(SEED.pendingMessage)).toBeVisible()
+    await expect(app.getByText(seed.pendingMessage)).toBeVisible()
   })
 
   test('UI-13: Respond to prompt toolbar action opens the form step panel', async ({ app }) => {
-    await app.goto(toAppUrl(`/executions/${SEED.executionId}?history=closed`))
+    const seed = scenario!
+    await app.goto(toAppUrl(`/executions/${seed.executionId}?history=closed`))
     await expect(app.getByRole('heading', { level: 1 })).toBeVisible({ timeout: 15_000 })
 
     const panelHeading = app.getByRole('heading', { name: 'Respond to prompt' })
@@ -87,7 +109,7 @@ test.describe('Execution detail — Form step side panel', { tag: '@pr-check' },
       }
       await clickWhenEnabled(respondButton, { timeout: 10_000 })
       await waitForFormPromptPanel(app)
-      await expect(app.getByText(SEED.pendingMessage)).toBeVisible()
+      await expect(app.getByText(seed.pendingMessage)).toBeVisible()
     }).toPass({ timeout: 45_000, intervals: [2_000] })
   })
 
@@ -99,47 +121,67 @@ test.describe('Execution detail — Form step side panel', { tag: '@pr-check' },
   })
 
   test('navigates between form steps with previous and next', async ({ app }) => {
+    test.skip(
+      !(await isMockFormPromptSidePanelSeedAvailable(app)),
+      'Two pending prompts on one execution are only seeded in the mock API'
+    )
+
+    const seed = MOCK_FORM_RESPONSE_SEED
     const panelHeading = app.getByRole('heading', { name: 'Respond to prompt' })
     const prevButton = app.getByRole('button', { name: 'Previous prompt' })
     const nextButton = app.getByRole('button', { name: 'Next prompt' })
 
-    const deepLink = toAppUrl(`/executions/${SEED.executionId}?form_prompt=${SEED.pendingId}&history=closed`)
+    const deepLink = toAppUrl(`/executions/${seed.executionId}?form_prompt=${seed.pendingId}&history=closed`)
 
     await expect(async () => {
       await app.goto(deepLink)
-      await waitForFormPromptPanel(app, { expectedMessage: SEED.pendingMessage })
+      await waitForFormPromptPanel(app, { expectedMessage: seed.pendingMessage })
 
       const counter = panelHeading.getByText(/\d+ of \d+/)
-      await expect(counter).toHaveText('1 of 2', { timeout: FORM_PROMPT_NAV_STEP_TIMEOUT })
+      await expect(counter).toHaveText('(1 of 2)', { timeout: FORM_PROMPT_NAV_STEP_TIMEOUT })
 
       await expect(prevButton).toBeDisabled({ timeout: FORM_PROMPT_NAV_STEP_TIMEOUT })
 
       await clickWhenEnabled(nextButton, { timeout: FORM_PROMPT_NAV_STEP_TIMEOUT })
-      await expect(counter).toHaveText('2 of 2', { timeout: FORM_PROMPT_NAV_STEP_TIMEOUT })
-      await expect(app.getByText(SEED.pendingMessage)).not.toBeVisible({ timeout: FORM_PROMPT_NAV_STEP_TIMEOUT })
+      await expect(counter).toHaveText('(2 of 2)', { timeout: FORM_PROMPT_NAV_STEP_TIMEOUT })
+      await expect(app.getByText(seed.pendingMessage)).not.toBeVisible({ timeout: FORM_PROMPT_NAV_STEP_TIMEOUT })
 
       await clickWhenEnabled(prevButton, { timeout: FORM_PROMPT_NAV_STEP_TIMEOUT })
-      await expect(counter).toHaveText('1 of 2', { timeout: FORM_PROMPT_NAV_STEP_TIMEOUT })
-      await expect(app.getByText(SEED.pendingMessage)).toBeVisible({ timeout: FORM_PROMPT_NAV_STEP_TIMEOUT })
+      await expect(counter).toHaveText('(1 of 2)', { timeout: FORM_PROMPT_NAV_STEP_TIMEOUT })
+      await expect(app.getByText(seed.pendingMessage)).toBeVisible({ timeout: FORM_PROMPT_NAV_STEP_TIMEOUT })
     }).toPass({ timeout: 60_000, intervals: [3_000] })
   })
 
   test('UI-14: displays resolved dynamic dropdown options in the form step panel', async ({ app }) => {
-    await openExecutionFormPromptDeepLink(app, SEED.executionId, SEED.dynamicPendingId, {
-      expectedMessage: SEED.dynamicPendingMessage,
-    })
+    test.skip(
+      isRealBackendE2e,
+      'Resolved dynamic dropdown options use mock seed fp-exec-form-prompt-dynamic (see formPrompts.ts)'
+    )
 
-    const environmentField = app.getByRole('combobox', { name: 'Environment' })
-    await expect(environmentField).toBeVisible({ timeout: 15_000 })
-    await environmentField.click()
-    await expect(app.getByRole('option', { name: 'Development' })).toBeVisible()
-    await expect(app.getByRole('option', { name: 'Production' })).toBeVisible()
+    await openExecutionFormPromptDeepLink(
+      app,
+      MOCK_FORM_RESPONSE_SEED.executionId,
+      MOCK_FORM_RESPONSE_SEED.dynamicPendingId
+    )
+
+    const environmentField = formStepDropdownField(app, 'Environment')
+    if (!(await environmentField.isVisible().catch(() => false))) {
+      const nextPrompt = app.getByRole('button', { name: 'Next prompt' })
+      await clickWhenEnabled(nextPrompt, { timeout: FORM_PROMPT_NAV_STEP_TIMEOUT })
+      await expect(app.getByText(MOCK_FORM_RESPONSE_SEED.dynamicPendingMessage)).toBeVisible({
+        timeout: FORM_PROMPT_NAV_STEP_TIMEOUT,
+      })
+    }
+    await expect(environmentField).toBeVisible({ timeout: 10_000 })
+
+    await expectFormStepDropdownOptions(app, 'Environment', ['Development', 'Production'])
   })
 
   test('UI-16: shows expired state when the response window has ended', async ({ app }) => {
+    const seed = scenario!
     const expiredAt = new Date(Date.now() - 60_000).toISOString()
 
-    await app.route(`**/form_prompts/${SEED.pendingId}`, async (route) => {
+    await app.route(`**/form_prompts/${seed.pendingId}`, async (route) => {
       if (route.request().method() !== 'GET') {
         await route.continue()
         return
@@ -156,26 +198,49 @@ test.describe('Execution detail — Form step side panel', { tag: '@pr-check' },
       })
     })
 
-    await openExecutionFormPromptDeepLink(app, SEED.executionId, SEED.pendingId, {
-      expectedMessage: SEED.pendingMessage,
+    await openExecutionFormPromptDeepLink(app, seed.executionId, seed.pendingId, {
+      expectedMessage: seed.pendingMessage,
     })
 
-    await expect(app.getByText(/no longer accepting responses/i)).toBeVisible({ timeout: 15_000 })
-    await expect(app.getByRole('button', { name: SEED.customSubmitLabel })).not.toBeVisible()
+    const closedAlert = pfWidget(app, 'Alert').filter({ hasText: 'Form prompt closed' })
+    await expect(closedAlert).toContainText(/no longer accepting responses/i, { timeout: 15_000 })
+    await expect(app.getByRole('button', { name: seed.customSubmitLabel })).not.toBeVisible()
   })
 })
 
 test.describe('Execution detail — Form step side panel (viewer)', { tag: '@pr-check' }, () => {
-  test('UI-10: viewer without submit permission sees a read-only form step panel', async ({ viewerApp }) => {
-    await openExecutionFormPromptDeepLink(viewerApp, SEED.executionId, SEED.pendingId, {
-      expectedMessage: SEED.pendingMessage,
-    })
-    await expect(viewerApp.getByRole('textbox', { name: 'Reason' })).toBeDisabled({ timeout: 20_000 })
-    await expect(viewerApp.getByRole('button', { name: 'Submit response' })).not.toBeVisible()
+  test('UI-10: viewer without submit permission sees a read-only form step panel', async ({ app, viewerApp }) => {
+    let scenario: SidePanelScenario
+    try {
+      scenario = await loadSidePanelScenario(app, 'e2e-viewer-panel')
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('Temporal worker')) {
+        test.skip(true, error.message)
+      }
+      throw error
+    }
+    try {
+      await openExecutionFormPromptDeepLink(viewerApp, scenario.executionId, scenario.pendingId, {
+        expectedMessage: scenario.pendingMessage,
+      })
+      await expect(viewerApp.getByRole('textbox', { name: 'Reason' })).toBeDisabled({ timeout: 20_000 })
+      await expect(viewerApp.getByRole('button', { name: scenario.customSubmitLabel })).not.toBeVisible()
+    } finally {
+      if (scenario.workflowId) {
+        await deleteWorkflowViaApi(app, scenario.workflowId)
+      }
+    }
   })
 })
 
 test.describe('Execution detail — Form step submit (API-created)', { tag: '@pr-check' }, () => {
+  test.beforeEach(async ({ app }) => {
+    const hasMock = await isMockFormPromptSidePanelSeedAvailable(app)
+    if (!hasMock && !process.env['SYNTARA_E2E_HAS_TEMPORAL_WORKER']) {
+      test.skip(true, 'Temporal worker required to create form prompt executions on the real backend')
+    }
+  })
+
   test('UI-7 and UI-13: submits a pending form step and shows customized success feedback', async ({ app }) => {
     const created = await createPendingFormPromptLight(app, 'e2e-panel-submit')
 
@@ -183,11 +248,11 @@ test.describe('Execution detail — Form step submit (API-created)', { tag: '@pr
       await openExecutionFormPromptDeepLink(app, created.executionId, created.formPromptId)
 
       await app.getByRole('textbox', { name: 'Answer' }).fill('E2E panel submit')
-      await app.getByRole('button', { name: 'Submit response' }).click()
+      await app.getByRole('button', { name: MOCK_FORM_RESPONSE_SEED.customSubmitLabel }).click()
 
       const successAlert = pfWidget(app, 'Alert').filter({ hasText: 'Form submitted' })
       await expect(successAlert).toBeVisible({ timeout: 15_000 })
-      await expect(successAlert).toContainText(SEED.customSuccessMessage)
+      await expect(successAlert).toContainText(MOCK_FORM_RESPONSE_SEED.customSuccessMessage)
       await expect(app.getByRole('heading', { name: 'Respond to prompt' })).not.toBeVisible({ timeout: 15_000 })
     } finally {
       await deleteWorkflowViaApi(app, created.workflowId)
@@ -215,13 +280,13 @@ test.describe('Execution detail — Form step submit (API-created)', { tag: '@pr
       await openExecutionFormPromptDeepLink(app, created.executionId, created.formPromptId)
 
       await app.getByRole('textbox', { name: 'Answer' }).fill('E2E submit failure probe')
-      await app.getByRole('button', { name: 'Submit response' }).click()
+      await app.getByRole('button', { name: MOCK_FORM_RESPONSE_SEED.customSubmitLabel }).click()
 
       await expect(pfWidget(app, 'Alert').filter({ hasText: 'Failed to submit form' })).toBeVisible({
         timeout: 15_000,
       })
       await expect(pfWidget(app, 'Alert').filter({ hasText: 'Form submitted' })).not.toBeVisible()
-      await expect(app.getByRole('button', { name: 'Submit response' })).toBeVisible()
+      await expect(app.getByRole('button', { name: MOCK_FORM_RESPONSE_SEED.customSubmitLabel })).toBeVisible()
     } finally {
       await deleteWorkflowViaApi(app, created.workflowId)
     }
@@ -241,7 +306,7 @@ test.describe('Execution detail — Form step submit (API-created)', { tag: '@pr
 
       await expect(app.getByText('Submitted response', { exact: true })).toBeVisible({ timeout: 15_000 })
       await expect(app.getByText(answer)).toBeVisible()
-      await expect(app.getByRole('button', { name: 'Submit response' })).not.toBeVisible()
+      await expect(app.getByRole('button', { name: MOCK_FORM_RESPONSE_SEED.customSubmitLabel })).not.toBeVisible()
     } finally {
       await deleteWorkflowViaApi(app, created.workflowId)
     }

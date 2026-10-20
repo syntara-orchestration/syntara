@@ -7,6 +7,42 @@ from typing import Any, Literal
 from syntara_api_client.models import WorkflowDefinition
 
 DEFAULT_CONSUMER_CODE = 'print("submitted path executed")'
+
+ALL_SUPPORTED_FORM_FIELDS: list[dict[str, Any]] = [
+    {"type": "text", "value_name": "text_value", "label": "Text", "required": True},
+    {"type": "textarea", "value_name": "textarea_value", "label": "Textarea", "required": True},
+    {"type": "number", "value_name": "number_value", "label": "Number", "required": True},
+    {"type": "masked_text", "value_name": "masked_value", "label": "Masked text", "required": True},
+    {
+        "type": "dropdown",
+        "value_name": "dropdown_value",
+        "label": "Dropdown",
+        "required": True,
+        "options": {
+            "source": "static",
+            "values": [
+                {"display_label": "Blue", "value": "blue"},
+                {"display_label": "Green", "value": "green"},
+            ],
+        },
+    },
+    {
+        "type": "multi_select",
+        "value_name": "multi_select_value",
+        "label": "Multi-select",
+        "required": True,
+        "options": {
+            "source": "static",
+            "values": [
+                {"display_label": "Red", "value": "red"},
+                {"display_label": "Blue", "value": "blue"},
+            ],
+        },
+    },
+    {"type": "checkbox", "value_name": "checkbox_value", "label": "Checkbox", "required": True},
+    {"type": "date", "value_name": "date_value", "label": "Date", "required": True},
+    {"type": "email", "value_name": "email_value", "label": "Email", "required": True},
+]
 _FORM_PROMPT_RESULT_CAPTURE_CODE = 'import os\nprint(os.environ["FORM_PROMPT_RESULT"])'
 
 

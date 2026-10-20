@@ -24,47 +24,12 @@ from ._helpers import (
     submit_form_prompt,
     wait_for_activity_outputs,
 )
+from ._workflows import ALL_SUPPORTED_FORM_FIELDS
 
 pytestmark = [pytest.mark.e2e]
 
 _FORM_PROMPT_WORKFLOW_NAME_PREFIX = "e2e-form-prompt-field-validation"
 _FORM_PROMPT_WORKFLOW_DESCRIPTION = "E2E: validate form prompt field types and submissions"
-
-_ALL_FIELDS = [
-    {"type": "text", "value_name": "text_value", "label": "Text", "required": True},
-    {"type": "textarea", "value_name": "textarea_value", "label": "Textarea", "required": True},
-    {"type": "number", "value_name": "number_value", "label": "Number", "required": True},
-    {"type": "masked_text", "value_name": "masked_value", "label": "Masked text", "required": True},
-    {
-        "type": "dropdown",
-        "value_name": "dropdown_value",
-        "label": "Dropdown",
-        "required": True,
-        "options": {
-            "source": "static",
-            "values": [
-                {"display_label": "Blue", "value": "blue"},
-                {"display_label": "Green", "value": "green"},
-            ],
-        },
-    },
-    {
-        "type": "multi_select",
-        "value_name": "multi_select_value",
-        "label": "Multi-select",
-        "required": True,
-        "options": {
-            "source": "static",
-            "values": [
-                {"display_label": "Red", "value": "red"},
-                {"display_label": "Blue", "value": "blue"},
-            ],
-        },
-    },
-    {"type": "checkbox", "value_name": "checkbox_value", "label": "Checkbox", "required": True},
-    {"type": "date", "value_name": "date_value", "label": "Date", "required": True},
-    {"type": "email", "value_name": "email_value", "label": "Email", "required": True},
-]
 
 _ALL_FIELDS_SUBMISSION: dict[str, Any] = {
     "text_value": "short answer",
@@ -158,7 +123,7 @@ def test_all_supported_field_types_resume_and_flow_to_consumer(
         description=_FORM_PROMPT_WORKFLOW_DESCRIPTION,
         track_execution=form_prompt_execution_cleanup,
         producer_output={},
-        form_fields=_ALL_FIELDS,
+        form_fields=ALL_SUPPORTED_FORM_FIELDS,
         consumer_code=_ALL_FIELDS_CONSUMER_CODE,
         consumer_environment=_ALL_FIELDS_ENVIRONMENT,
     )

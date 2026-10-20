@@ -71,7 +71,7 @@ def test_curated_models_have_profiles(model_id: str) -> None:
     ("model_id", "expected_name"),
     [
         ("anthropic/claude-opus-4-8", "Claude Opus 4.8"),
-        ("anthropic/claude-sonnet-4-0", "Claude Sonnet 4 (latest)"),
+        ("anthropic/claude-sonnet-4-5", "Claude Sonnet 4.5 (latest)"),
         ("anthropic/claude-haiku-4-5", "Claude Haiku 4.5 (latest)"),
         ("google/gemini-2.5-flash", "Gemini 2.5 Flash"),
         ("google/gemini-2.0-flash", "Gemini 2.0 Flash"),

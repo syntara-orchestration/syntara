@@ -102,6 +102,7 @@ function RoleAssignmentsTableBody({
       <Thead>
         <Tr>
           <Th
+            width={10}
             expand={{
               areAllExpanded: !allRowsExpanded,
               collapseAllAriaLabel: allRowsExpanded ? 'Collapse all' : 'Expand all',
@@ -109,11 +110,27 @@ function RoleAssignmentsTableBody({
             }}
             aria-label="Row expansion"
           />
-          {isVisible('roleName') && <Th sort={getSortParams(sortIndex('roleName'))}>Role name</Th>}
-          {isVisible('description') && <Th sort={getSortParams(sortIndex('description'))}>Description</Th>}
-          {isVisible('scope') && <Th sort={getSortParams(sortIndex('scope'))}>Scope</Th>}
-          {isVisible('project') && <Th sort={getSortParams(sortIndex('project'))}>Project</Th>}
-          <Th screenReaderText="Actions" />
+          {isVisible('roleName') && (
+            <Th width={15} sort={getSortParams(sortIndex('roleName'))}>
+              Role name
+            </Th>
+          )}
+          {isVisible('description') && (
+            <Th width={30} sort={getSortParams(sortIndex('description'))}>
+              Description
+            </Th>
+          )}
+          {isVisible('scope') && (
+            <Th width={15} sort={getSortParams(sortIndex('scope'))}>
+              Scope
+            </Th>
+          )}
+          {isVisible('project') && (
+            <Th width={15} sort={getSortParams(sortIndex('project'))}>
+              Project
+            </Th>
+          )}
+          <Th width={10} screenReaderText="Actions" />
         </Tr>
       </Thead>
       {paginatedRows.map((row, rowIndex) => {

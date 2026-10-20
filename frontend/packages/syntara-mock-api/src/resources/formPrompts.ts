@@ -7,6 +7,8 @@ import { mockWorkflowVersionNumber } from '../utils/workflowVersion'
 
 type FormPromptRead = FormsAPI.components['schemas']['FormPromptRead']
 type FormPromptListRead = FormsAPI.components['schemas']['FormPromptListRead']
+/** Mock in-memory store mutates prompts at runtime (submit, cancel, etc.). */
+type MutableFormPromptRead = { -readonly [K in keyof FormPromptRead]: FormPromptRead[K] }
 
 const MOCK_WORKFLOW_CONTEXT = {
   workflow_id: 'wf-form-prompt-demo',
@@ -121,7 +123,7 @@ export function formPromptToListRead(prompt: FormPromptRead): FormPromptListRead
   }
 }
 
-export const formPrompts: FormPromptRead[] = [
+export const formPrompts: MutableFormPromptRead[] = [
   {
     id: 'fp-exec-form-prompt-timeout-fail',
     created_at: mockDate.hoursAgo2,
@@ -273,3 +275,14 @@ export const formPrompts: FormPromptRead[] = [
     }
   }),
 ]
+
+/** When an execution is cancelled, pending prompts for that run must not accept submissions. */
+export function cancelPendingFormPromptsForExecution(executionId: string): void {
+  const now = mockDate.now
+  for (const prompt of formPrompts) {
+    if (prompt.execution_id === executionId && prompt.status === 'pending') {
+      prompt.status = 'cancelled'
+      prompt.updated_at = now
+    }
+  }
+}

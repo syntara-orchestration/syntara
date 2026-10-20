@@ -1,5 +1,5 @@
 /**
- * E2E Tests: Interactive Prompt — SynFormFieldBuilder (form_prompt node)
+ * E2E Tests: Form step — SynFormFieldBuilder (form_prompt node)
  *
  * Covers form field builder scenarios UI-1 through UI-3 on the form_prompt node.
  */
@@ -46,6 +46,8 @@ const UI1_FIELD_SPECS: Ui1FieldSpec[] = [
 ]
 
 test.describe('Form prompt — form field builder', { tag: '@pr-check' }, () => {
+  test.describe.configure({ mode: 'serial' })
+
   test('UI-1: configures all supported field types and persists after save and reload', async ({ app }) => {
     test.slow()
     const workflowName = buildUniqueName('e2e-form-builder-ui1')
@@ -134,11 +136,7 @@ test.describe('Form prompt — form field builder', { tag: '@pr-check' }, () => 
       await setFormFieldLabel(app, 3, 'Gamma')
       await setFormFieldLabel(app, 4, 'Delta')
 
-      await reorderFormField(app, 4, 1)
-      await expect(async () => {
-        const labels = await fieldLabelValuesInOrder(app)
-        expect(labels[0]).toBe('Delta')
-      }).toPass({ timeout: 10_000 })
+      await reorderFormField(app, 4, 1, { assertFirstLabel: 'Delta' })
 
       await selectFormFieldType(app, 4, FORM_FIELD_TYPE_MENU_LABELS.checkbox)
       await expect(formFieldBuilderCard(app, 4).getByRole('textbox', { name: 'Checkbox label' })).toBeVisible()

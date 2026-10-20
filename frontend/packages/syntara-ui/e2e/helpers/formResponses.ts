@@ -42,6 +42,57 @@ const MINIMAL_FORM_DEFINITION = {
   ],
 } as const
 
+/** Matches mock `sampleFormDefinition` (Reason field) for side-panel parity. */
+export const SIDE_PANEL_REASON_FORM_DEFINITION = {
+  fields: [
+    {
+      value_name: 'reason',
+      type: 'text',
+      label: 'Reason',
+      required: true,
+      placeholder: 'Describe why you are approving this change',
+    },
+  ],
+} as const
+
+/** Matches mock `dynamicResolvedFormDefinition` (resolved at run time for UI-14). */
+export const ENVIRONMENT_DYNAMIC_RESOLVED_FORM_DEFINITION = {
+  fields: [
+    {
+      value_name: 'environment',
+      type: 'dropdown',
+      label: 'Environment',
+      required: true,
+      options: {
+        source: 'dynamic_resolved',
+        values: [
+          { display_label: 'Development', value: 'dev' },
+          { display_label: 'Production', value: 'prod' },
+        ],
+      },
+    },
+  ],
+} as const
+
+/** Static dropdown for environment selection (publishable on real backend). */
+export const ENVIRONMENT_DROPDOWN_FORM_DEFINITION = {
+  fields: [
+    {
+      value_name: 'environment',
+      type: 'dropdown',
+      label: 'Environment',
+      required: true,
+      options: {
+        source: 'static',
+        values: [
+          { display_label: 'Development', value: 'dev' },
+          { display_label: 'Production', value: 'prod' },
+        ],
+      },
+    },
+  ],
+} as const
+
 export const MULTI_FIELD_FORM_DEFINITION = {
   fields: [
     {
@@ -63,13 +114,159 @@ export const MULTI_FIELD_FORM_DEFINITION = {
 
 export type FormStepNodeParameters = {
   message?: string
-  form_definition?: typeof MINIMAL_FORM_DEFINITION | typeof MULTI_FIELD_FORM_DEFINITION
+  form_definition?:
+    | typeof MINIMAL_FORM_DEFINITION
+    | typeof MULTI_FIELD_FORM_DEFINITION
+    | typeof SIDE_PANEL_REASON_FORM_DEFINITION
+    | typeof ENVIRONMENT_DROPDOWN_FORM_DEFINITION
   submit_label?: string
   success_message?: string
   css_override?: string
   response_window?: number
-  responder_users?: string[]
-  responder_groups?: string[]
+  /** Workflow schema stores usernames / group names (strings). Objects are normalized before publish. */
+  responder_users?: Array<string | { id: string; username: string }>
+  responder_groups?: Array<string | { id: string; name: string }>
+  fallback_decision?: 'submit' | 'fallback'
+}
+
+function normalizeResponderUsersForWorkflowApi(
+  users?: Array<string | { id: string; username: string }>
+): string[] | undefined {
+  if (users === undefined) return undefined
+  return users.map((entry) => (typeof entry === 'string' ? entry : entry.username))
+}
+
+function normalizeResponderGroupsForWorkflowApi(
+  groups?: Array<string | { id: string; name: string }>
+): string[] | undefined {
+  if (groups === undefined) return undefined
+  return groups.map((entry) => (typeof entry === 'string' ? entry : entry.name))
+}
+
+export type SidePanelScenario = {
+  executionId: string
+  pendingId: string
+  pendingName: string
+  pendingMessage: string
+  customSubmitLabel: string
+  customSuccessMessage: string
+  dynamicPendingId?: string
+  dynamicPendingMessage?: string
+  workflowId?: string
+}
+
+export async function isMockFormPromptSidePanelSeedAvailable(app: Page): Promise<boolean> {
+  const seedResp = await apiRequest(app, 'get', `/form_prompts/${MOCK_FORM_RESPONSE_SEED.pendingId}`)
+  return seedResp.ok()
+}
+
+export async function loadSidePanelScenario(app: Page, namePrefix = 'e2e-side-panel'): Promise<SidePanelScenario> {
+  if (await isMockFormPromptSidePanelSeedAvailable(app)) {
+    return { ...MOCK_FORM_RESPONSE_SEED }
+  }
+
+  if (!process.env['SYNTARA_E2E_HAS_TEMPORAL_WORKER']) {
+    throw new Error('Temporal worker required to create form prompt executions on the real backend')
+  }
+
+  const pendingMessage = MOCK_FORM_RESPONSE_SEED.pendingMessage
+  const customSubmitLabel = MOCK_FORM_RESPONSE_SEED.customSubmitLabel
+  const customSuccessMessage = MOCK_FORM_RESPONSE_SEED.customSuccessMessage
+
+  const primary = await createPendingFormStepWorkflow(app, {
+    namePrefix,
+    parameters: {
+      message: pendingMessage,
+      form_definition: SIDE_PANEL_REASON_FORM_DEFINITION,
+      submit_label: customSubmitLabel,
+      success_message: customSuccessMessage,
+      responder_users: [],
+      responder_groups: [],
+    },
+  })
+
+  return {
+    executionId: primary.executionId,
+    pendingId: primary.formPromptId,
+    pendingName: primary.promptName,
+    pendingMessage,
+    customSubmitLabel,
+    customSuccessMessage,
+    workflowId: primary.workflowId,
+  }
+}
+
+export async function loadSidePanelEnvironmentScenario(
+  app: Page,
+  namePrefix = 'e2e-side-panel-env'
+): Promise<{
+  executionId: string
+  dynamicPendingId: string
+  dynamicPendingMessage: string
+  workflowId?: string
+}> {
+  if (await isMockFormPromptSidePanelSeedAvailable(app)) {
+    return {
+      executionId: MOCK_FORM_RESPONSE_SEED.executionId,
+      dynamicPendingId: MOCK_FORM_RESPONSE_SEED.dynamicPendingId,
+      dynamicPendingMessage: MOCK_FORM_RESPONSE_SEED.dynamicPendingMessage,
+    }
+  }
+
+  if (!process.env['SYNTARA_E2E_HAS_TEMPORAL_WORKER']) {
+    throw new Error('Temporal worker required to create form prompt executions on the real backend')
+  }
+
+  const created = await createPendingFormStepWorkflow(app, {
+    namePrefix,
+    parameters: {
+      message: MOCK_FORM_RESPONSE_SEED.dynamicPendingMessage,
+      form_definition: ENVIRONMENT_DROPDOWN_FORM_DEFINITION,
+      submit_label: MOCK_FORM_RESPONSE_SEED.customSubmitLabel,
+      success_message: MOCK_FORM_RESPONSE_SEED.customSuccessMessage,
+      responder_users: [],
+      responder_groups: [],
+    },
+  })
+
+  await routeResolvedEnvironmentFormPrompt(app, created.formPromptId)
+
+  return {
+    executionId: created.executionId,
+    dynamicPendingId: created.formPromptId,
+    dynamicPendingMessage: MOCK_FORM_RESPONSE_SEED.dynamicPendingMessage,
+    workflowId: created.workflowId,
+  }
+}
+
+async function routeResolvedEnvironmentFormPrompt(app: Page, promptId: string): Promise<void> {
+  await app.route(`**/api/v1/form_prompts/${promptId}`, async (route) => {
+    if (route.request().method() !== 'GET') {
+      await route.continue()
+      return
+    }
+    let body: Record<string, unknown> = {}
+    try {
+      const response = await route.fetch()
+      const parsed: unknown = await response.json()
+      if (typeof parsed === 'object' && parsed !== null) {
+        body = parsed as Record<string, unknown>
+      }
+    } catch {
+      // Use synthetic body when the upstream fetch or parse fails.
+    }
+    await route.fulfill({
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        ...body,
+        id: promptId,
+        status: (body['status'] as string) || 'pending',
+        message: MOCK_FORM_RESPONSE_SEED.dynamicPendingMessage,
+        form_definition: ENVIRONMENT_DYNAMIC_RESOLVED_FORM_DEFINITION,
+      }),
+    })
+  })
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -177,7 +374,15 @@ export async function disposeFormPromptWorkflow(app: Page, workflowId: string, e
  */
 export async function createPendingFormStepWorkflow(
   app: Page,
-  options?: { namePrefix?: string; parameters?: FormStepNodeParameters; runAfterPublish?: boolean }
+  options?: {
+    namePrefix?: string
+    parameters?: FormStepNodeParameters
+    runAfterPublish?: boolean
+    formPromptNodeId?: string
+    formPromptNodeSettings?: { timeout?: number }
+    trailingNodes?: Array<{ id: string; type: string; name: string; parameters: Record<string, unknown> }>
+    trailingEdges?: Array<{ from: string; to: string; from_port?: string }>
+  }
 ): Promise<{
   workflowId: string
   workflowName: string
@@ -189,6 +394,7 @@ export async function createPendingFormStepWorkflow(
   const promptName = buildUniqueName(options?.namePrefix ?? 'form-step')
   const runAfterPublish = options?.runAfterPublish ?? true
   const hasTemporal = !!process.env['SYNTARA_E2E_HAS_TEMPORAL_WORKER']
+  const mockPollTimeout = process.env.CI ? 45_000 : 15_000
   const nodeParameters: FormStepNodeParameters = {
     message: 'E2E form step rendering test',
     form_definition: MINIMAL_FORM_DEFINITION,
@@ -197,6 +403,19 @@ export async function createPendingFormStepWorkflow(
     responder_groups: [],
     ...options?.parameters,
   }
+  nodeParameters.responder_users = normalizeResponderUsersForWorkflowApi(nodeParameters.responder_users)
+  nodeParameters.responder_groups = normalizeResponderGroupsForWorkflowApi(nodeParameters.responder_groups)
+
+  const formPromptNodeId = options?.formPromptNodeId ?? 'form_prompt_1'
+  const trailingNodes = options?.trailingNodes ?? [
+    {
+      id: 'script_1',
+      type: 'script',
+      name: 'Submitted branch',
+      parameters: { language: 'python', code: 'print("submitted")' },
+    },
+  ]
+  const trailingEdges = options?.trailingEdges ?? [{ from: formPromptNodeId, to: 'script_1', from_port: 'submitted' }]
 
   const { id: workflowId, versionNumber } = await createWorkflowViaApi({
     app,
@@ -204,22 +423,15 @@ export async function createPendingFormStepWorkflow(
     triggers: [{ id: 'trigger_1', type: 'manual_trigger', name: 'Manual trigger', parameters: {} }],
     nodes: [
       {
-        id: 'form_prompt_1',
+        id: formPromptNodeId,
         type: 'form_prompt',
         name: promptName,
         parameters: nodeParameters,
+        ...(options?.formPromptNodeSettings ? { settings: options.formPromptNodeSettings } : {}),
       },
-      {
-        id: 'script_1',
-        type: 'script',
-        name: `${promptName} - submitted action`,
-        parameters: { language: 'python', code: 'print("submitted")' },
-      },
+      ...trailingNodes,
     ],
-    edges: [
-      { from: 'trigger_1', to: 'form_prompt_1' },
-      { from: 'form_prompt_1', to: 'script_1', from_port: 'submitted' },
-    ],
+    edges: [{ from: 'trigger_1', to: formPromptNodeId }, ...trailingEdges],
   })
 
   try {
@@ -236,9 +448,9 @@ export async function createPendingFormStepWorkflow(
 
     if (hasTemporal) {
       await pollExecutionStatus(app, executionId, ['paused'])
-      await pollFormPromptVisible(app, promptName, { timeout: 45_000 })
+      await pollFormPromptVisible(app, promptName, { timeout: 45_000, executionId })
     } else {
-      await pollFormPromptVisible(app, promptName, { timeout: 15_000 })
+      await pollFormPromptVisible(app, promptName, { timeout: mockPollTimeout, executionId })
     }
 
     let formPromptId = ''
@@ -247,7 +459,7 @@ export async function createPendingFormStepWorkflow(
       const match = findFormPromptIdByName(await resp.json(), promptName)
       expect(match).toBeTruthy()
       formPromptId = match ?? ''
-    }).toPass({ timeout: 15_000 })
+    }).toPass({ timeout: mockPollTimeout })
 
     return { workflowId, workflowName, executionId, promptName, formPromptId }
   } catch (error) {
@@ -268,7 +480,11 @@ export async function createPendingFormPromptLight(
 }> {
   const created = await createPendingFormStepWorkflow(app, {
     namePrefix,
-    parameters: { message: 'E2E form response list test' },
+    parameters: {
+      message: 'E2E form response list test',
+      submit_label: MOCK_FORM_RESPONSE_SEED.customSubmitLabel,
+      success_message: MOCK_FORM_RESPONSE_SEED.customSuccessMessage,
+    },
   })
   return {
     workflowId: created.workflowId,

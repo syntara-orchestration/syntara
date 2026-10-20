@@ -13,6 +13,7 @@ import { detachPromise } from '../../utils/detachPromise'
 import type { ProjectRead } from '../access/types'
 
 import { getApprovalNameFilterDefinition, getApprovalStatusFilterDefinition } from './approvalFilters'
+import { hasExpandableNotes } from './approvalNotes'
 import type { ApprovalWithDetails } from './Approvals'
 import { ApprovalsBulkActions } from './ApprovalsBulkActions'
 import { ApprovalsContent } from './ApprovalsContent'
@@ -124,7 +125,10 @@ export function ApprovalsListPanel({
     [sortedApprovals, canDecideAllProjects, canDecideProjectNames, projects]
   )
 
-  const expandableApprovalIds = useMemo(() => sortedApprovals.map((approval) => approval.id), [sortedApprovals])
+  const expandableApprovalIds = useMemo(
+    () => sortedApprovals.filter(hasExpandableNotes).map((approval) => approval.id),
+    [sortedApprovals]
+  )
 
   const selectableApprovalIds = useSelectableApprovalIds(sortedApprovals, approvalPermissions, isLoadingDecideProjects)
 
