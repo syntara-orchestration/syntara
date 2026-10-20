@@ -38,7 +38,7 @@ export function buildEditSchema(requiresBaseUrl: boolean) {
       insecure_skip_tls_verify: z.boolean(),
       ca_certificate: z.string().optional().nullable(),
       scope: z.enum(['global', 'project']),
-      project_ids: z.array(z.string()).max(200).default([]),
+      project_ids: z.array(z.string()).default([]),
       management_credential_id: z.string().nullable(),
     })
     .superRefine((data, ctx) => {

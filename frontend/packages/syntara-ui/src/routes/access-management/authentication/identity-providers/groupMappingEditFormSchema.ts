@@ -26,7 +26,7 @@ export const groupMappingEditFormSchema = z
           ctx.addIssue({ code: z.ZodIssueCode.custom, message: syntaxError })
         }
       }),
-    entries: z.array(groupMappingEditEntrySchema).max(200),
+    entries: z.array(groupMappingEditEntrySchema),
   })
   .superRefine((data, ctx) => {
     data.entries.forEach((entry, index) => {

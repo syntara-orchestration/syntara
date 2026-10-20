@@ -12,7 +12,7 @@ export const assignRoleFormSchema = z
   .object({
     scope: z.enum(roleAssignmentScopeValues),
     projectId: z.string().optional(),
-    roleIds: z.array(z.string()).min(1, 'Select at least one role').max(100),
+    roleIds: z.array(z.string()).min(1, 'Select at least one role'),
   })
   .superRefine((data, ctx) => {
     if (data.scope === RoleAssignmentScope.PROJECT && !data.projectId?.trim()) {

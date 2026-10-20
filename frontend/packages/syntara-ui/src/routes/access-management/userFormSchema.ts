@@ -23,7 +23,7 @@ const baseSchema = z.object({
       }
     }),
   is_enabled: z.boolean(),
-  group_names: z.array(z.string()).max(200).optional(),
+  group_names: z.array(z.string()).optional(),
 })
 
 /** Schema that enforces password on create mode */

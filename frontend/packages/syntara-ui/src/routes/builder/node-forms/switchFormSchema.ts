@@ -12,7 +12,7 @@ const switchCaseSchema = z.object({
 
 export const switchFormSchema = z.object({
   name: z.string(),
-  cases: z.array(switchCaseSchema).max(100),
+  cases: z.array(switchCaseSchema),
 })
 
 export type SwitchFormData = z.infer<typeof switchFormSchema>

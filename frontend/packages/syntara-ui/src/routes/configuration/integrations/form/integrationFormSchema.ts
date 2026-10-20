@@ -14,7 +14,7 @@ const sharedFields = {
   description: z.string().optional().nullable(),
   management_credential_id: z.string().optional().nullable(),
   scope: z.enum(['global', 'project']),
-  project_ids: z.array(z.string()).max(200).default([]),
+  project_ids: z.array(z.string()).default([]),
 }
 
 function isLoopback(hostname: string): boolean {

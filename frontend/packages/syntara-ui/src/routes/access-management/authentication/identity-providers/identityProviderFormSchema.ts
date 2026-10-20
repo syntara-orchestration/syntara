@@ -18,7 +18,7 @@ const groupMappingEntrySchema = z.object({
 const groupMappingSchema = z
   .object({
     jmespathExpression: z.string().min(1, 'Group extraction expression is required'),
-    entries: z.array(groupMappingEntrySchema).max(200),
+    entries: z.array(groupMappingEntrySchema),
   })
   .nullable()
 
