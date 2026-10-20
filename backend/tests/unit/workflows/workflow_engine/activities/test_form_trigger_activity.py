@@ -16,15 +16,15 @@ class TestFormTriggerPassThrough:
 
         result = await form_trigger(values, None)
 
-        assert result == {"output": values}
+        assert result == {"output": {"response_data": values}}
         assert "status" not in result["output"]
-        assert "submitted_by" not in result["output"]
+        assert "submitted_by" not in result["output"]["response_data"]
 
     @pytest.mark.asyncio
     async def test_empty_output_mapping_suppresses_values(self) -> None:
         result = await form_trigger({"email": "user@example.com"}, {})
 
-        assert result == {"output": {}}
+        assert result == {"output": {"response_data": {}}}
 
     @pytest.mark.asyncio
     async def test_output_mapping_extracts_selected_value(self) -> None:
@@ -33,4 +33,4 @@ class TestFormTriggerPassThrough:
             {"contact": "${result.email}"},
         )
 
-        assert result == {"output": {"contact": "user@example.com"}}
+        assert result == {"output": {"response_data": {"contact": "user@example.com"}}}

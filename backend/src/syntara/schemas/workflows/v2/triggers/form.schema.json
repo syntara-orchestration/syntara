@@ -102,7 +102,15 @@
   },
   "resultSchema": {
     "type": "object",
-    "description": "Flat pass-through of submitted values keyed by field value_name. For example, {\"email\": \"...\"} is available as ${<node_id>.email}. Unlike form_prompt, values are not nested under response_data. Submitter metadata is not injected; use ${workflow_context.execution.created_by} and ${workflow_context.execution.created_at}.",
-    "additionalProperties": true
+    "description": "Form-trigger results contain submitted values under response_data. For example, {\"email\": \"...\"} is available as ${<node_id>.response_data.email} and ${trigger.response_data.email}. Submitter metadata is not injected; use ${workflow_context.execution.created_by} and ${workflow_context.execution.created_at}.",
+    "required": ["response_data"],
+    "properties": {
+      "response_data": {
+        "type": "object",
+        "description": "Submitted form values keyed by field value_name.",
+        "additionalProperties": true
+      }
+    },
+    "additionalProperties": false
   }
 }
