@@ -1,0 +1,31 @@
+/* Fixed menu width so long labels ellipsize instead of growing the panel (and a PF tooltip off-screen). */
+.dropdownPopper {
+  width: min(calc(100vw - 2rem), 18rem);
+  max-width: min(calc(100vw - 2rem), 18rem);
+}
+
+.dropdownPopper :global(.pf-v6-c-menu),
+.dropdownPopper :global(.pf-v6-c-menu__content),
+.dropdownPopper :global(.pf-v6-c-menu__list) {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.dropdownPopper :global(.pf-v6-c-menu__list-item),
+.dropdownPopper :global(.pf-v6-c-menu__item),
+.dropdownPopper :global(.pf-v6-c-menu__item-main),
+.dropdownPopper :global(.pf-v6-c-menu__item-text) {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.menuItemLabel {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

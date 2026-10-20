@@ -137,9 +137,6 @@ describe('SynPageBreadcrumbs', () => {
     expect(currentSegment).toHaveTextContent(longLabel)
 
     expect(currentSegment).toHaveClass('pf-v6-c-truncate')
-    expect(
-      screen.getByText((_content, element) => element?.classList.contains('pf-v6-c-truncate__start') === true)
-    ).toHaveTextContent(longLabel)
 
     await user.hover(currentSegment)
 
@@ -147,15 +144,50 @@ describe('SynPageBreadcrumbs', () => {
       expect(screen.getByRole('tooltip')).toHaveTextContent(longLabel)
     })
 
+    const parentCrumb = screen.getByRole('link', { name: 'Access management' })
     await user.tab()
-    expect(screen.getByRole('link', { name: 'Access management' })).toHaveFocus()
+    expect(parentCrumb).toHaveFocus()
 
+    await user.tab()
     await user.tab()
     expect(currentSegment).toHaveFocus()
 
     await waitFor(() => {
       expect(screen.getByRole('tooltip')).toHaveTextContent(longLabel)
     })
+  })
+
+  it('truncates a long linked middle segment on a wide viewport with four crumbs', () => {
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe = vi.fn()
+        disconnect = vi.fn()
+        unobserve = vi.fn()
+      }
+    )
+
+    const longProject = `alice-sandbox-${'x'.repeat(80)}`
+
+    render(
+      <div style={{ width: 480 }}>
+        <SynPageBreadcrumbs
+          items={[
+            { label: 'Access management', href: '/access-management' },
+            { label: 'Projects', href: '/access-management/projects' },
+            { label: longProject, href: '/access-management/projects/1' },
+            { label: 'Workflows' },
+          ]}
+        />
+      </div>
+    )
+
+    expect(screen.getByRole('link', { name: longProject })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Projects' })).toBeInTheDocument()
+    expect(
+      screen.getAllByTestId('breadcrumb-truncated-label').some((node) => node.textContent?.includes(longProject))
+    ).toBe(true)
+    expect(screen.getByTestId('breadcrumb-current-segment')).toHaveTextContent('Workflows')
   })
 
   it('renders a non-link middle segment in the full trail (wide viewport)', () => {

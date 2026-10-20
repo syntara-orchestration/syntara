@@ -10,11 +10,34 @@ import { SynPageBreadcrumbsCollapsedMiddle } from './SynPageBreadcrumbsCollapsed
 
 export type { AppBreadcrumbItem }
 
+const breadcrumbTruncateTooltipProps = {
+  enableFlip: true,
+  maxWidth: 'min(100vw - 2rem, 24rem)',
+  position: 'bottom',
+}
+
+function BreadcrumbTruncatedLabel({
+  label,
+  testId = 'breadcrumb-truncated-label',
+}: Readonly<{
+  label: string
+  testId?: string
+}>) {
+  return (
+    <Truncate
+      content={label}
+      className={styles.truncatedLabel}
+      data-testid={testId}
+      tooltipProps={breadcrumbTruncateTooltipProps}
+    />
+  )
+}
+
 function renderBreadcrumbLink(href: string, label: string) {
   return ({ className, ariaCurrent }: BreadcrumbItemRenderArgs) => (
     // TanStack Router expects literal route strings; breadcrumb hrefs are dynamic
-    <Link to={href} className={className} aria-current={ariaCurrent}>
-      {label}
+    <Link to={href} className={`${className ?? ''} ${styles.segmentLink}`} aria-current={ariaCurrent}>
+      <BreadcrumbTruncatedLabel label={label} />
     </Link>
   )
 }
@@ -43,14 +66,7 @@ function useNarrowViewportForBreadcrumb() {
 }
 
 function BreadcrumbCurrentLabel({ label }: Readonly<{ label: string }>) {
-  return (
-    <Truncate
-      content={label}
-      className={styles.currentSegment}
-      data-testid="breadcrumb-current-segment"
-      tooltipProps={{ enableFlip: true, maxWidth: 'min(100vw - 2rem, 24rem)' }}
-    />
-  )
+  return <BreadcrumbTruncatedLabel label={label} testId="breadcrumb-current-segment" />
 }
 
 type SynPageBreadcrumbsProps = Readonly<{
@@ -103,7 +119,7 @@ export function SynPageBreadcrumbs(props: SynPageBreadcrumbsProps) {
           }
           return (
             <BreadcrumbItem key={itemKey} isActive>
-              {item.label}
+              <BreadcrumbTruncatedLabel label={item.label} />
             </BreadcrumbItem>
           )
         })
