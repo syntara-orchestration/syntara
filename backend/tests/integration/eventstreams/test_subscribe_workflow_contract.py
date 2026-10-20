@@ -34,7 +34,6 @@ def definition() -> dict[str, Any]:
                 "id": "incoming",
                 "type": "event_subscribe_trigger",
                 "parameters": {
-                    "transport": "kafka",
                     "topic": "alerts",
                     "integration_id": str(uuid4()),
                     "credential_id": str(uuid4()),
@@ -90,8 +89,8 @@ async def test_definition_to_envelope_output_mapping(definition: dict[str, Any])
         ("execution_service_account_id", "selected"),
         ("selected_account_id", "selected"),
         ("unknown", True),
+        # `transport` is no longer a trigger parameter — it must be rejected as an extra field.
         ("transport", "sns"),
-        ("topic", "${trigger.topic}"),
         ("integration_id", "${trigger.integration}"),
         ("credential_id", "${trigger.credential}"),
         ("input_schema", {"$ref": "https://example.com/schema"}),
@@ -111,7 +110,7 @@ def test_definition_boundaries_reject_invalid_parameters(
         validator.validate_workflow_definition(definition)
 
 
-@pytest.mark.parametrize("field", ["integration_id", "credential_id", "transport", "topic"])
+@pytest.mark.parametrize("field", ["integration_id", "credential_id", "topic"])
 def test_definition_requires_explicit_bindings(definition: dict[str, Any], field: str) -> None:
     definition["triggers"][0]["parameters"].pop(field)
     with pytest.raises(SafeValueError):
