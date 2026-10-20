@@ -244,28 +244,26 @@ async def retry_control_ports(source_execution_id: str) -> dict[str, str]:
 @activity.defn
 async def probe_retry_loop_iteration(
     source_execution_id: str,
-    body_node_ids: list[str],
-    child_loop_node_ids: list[str],
+    iterate_entry_node_ids: list[str],
+    child_loop_entry_ids: list[str],
     iteration_path: list[int],
 ) -> bool:
-    """Whether the source run reached this exact loop iteration.
+    """Whether the source run reached the next loop iteration.
 
-    Direct body nodes are checked for an exact canonical Temporal activity ID.
-    A direct child-loop controller appends its own iteration index, so its ID is
-    checked under the current path prefix. The current loop's own control record
-    is not body evidence: its final ``complete`` call has an iteration ID even
-    though no body ran. Child-loop controllers are checked by their full parent
-    path plus any child iteration. Missing exact-path evidence means this
-    iteration was not reached.
+    The graph's ``iterate`` port successors are the entry points for the next
+    iteration. Ordinary entries are checked for their exact canonical Temporal
+    activity ID. A nested-loop entry appends its own iteration index, so its ID
+    is checked under the current path prefix. Missing entry evidence means the
+    next iteration was not reached.
     """
     if not iteration_path:
         return False
-    if not body_node_ids and not child_loop_node_ids:
+    if not iterate_entry_node_ids and not child_loop_entry_ids:
         return False
 
-    exact_activity_ids = [join_loop_iteration_id(node_id, iteration_path) for node_id in body_node_ids]
+    exact_activity_ids = [join_loop_iteration_id(node_id, iteration_path) for node_id in iterate_entry_node_ids]
     child_loop_prefixes = [
-        join_loop_iteration_id(node_id, iteration_path) + "_iter_" for node_id in child_loop_node_ids
+        join_loop_iteration_id(node_id, iteration_path) + "_iter_" for node_id in child_loop_entry_ids
     ]
     async for session in get_db():
         direct_conditions: list[ColumnElement[bool]] = [

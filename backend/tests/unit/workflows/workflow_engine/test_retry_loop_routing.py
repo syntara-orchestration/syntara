@@ -6,18 +6,32 @@ re-deriving the loop's decision. That is what makes it correct under
 """
 
 from typing import Any, cast
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from temporalio.exceptions import ApplicationError
 
 from syntara.workflows.utils.namespace_resolver import NamespaceResolver
 from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkflow
-from syntara.workflows.workflow_engine.models.workflow_definition import DoWhileLoopState, ForEachLoopState, LoopType
+from syntara.workflows.workflow_engine.graph import ActivityNode, WorkflowGraph
+from syntara.workflows.workflow_engine.models.workflow_definition import (
+    DoWhileLoopState,
+    ForEachLoopState,
+    LoopType,
+    NodeSettingsNoRetry,
+)
 from syntara.workflows.workflow_engine.utils.loop_iteration_ids import retry_loop_record_activity_id
 
+_TEST_GRAPHS: dict[int, MagicMock] = {}
 
-def _wf(*, retry_points: list[str], bodies: dict[str, set[str]]) -> OrchestratorWorkflow:
+
+def _wf(
+    *,
+    retry_points: list[str],
+    bodies: dict[str, set[str]],
+    iterate_successors: dict[str, list[ActivityNode]] | None = None,
+    downstream_successors: dict[str, list[ActivityNode]] | None = None,
+) -> OrchestratorWorkflow:
     wf = OrchestratorWorkflow.__new__(OrchestratorWorkflow)
     wf.retry_context = {"retry_from_execution_id": "src-1", "eligible_point_ids": retry_points} if retry_points else {}
     wf.resolver = NamespaceResolver()
@@ -29,8 +43,20 @@ def _wf(*, retry_points: list[str], bodies: dict[str, set[str]]) -> Orchestrator
     wf.loop_body_map = {}
     wf.loop_iteration_results = {}
     wf._loop_bodies = bodies
-    wf._loop_direct_bodies = {}
-    wf._loop_direct_child_loops = {}
+    graph = MagicMock()
+    successors = iterate_successors
+    if successors is None:
+        successors = {
+            loop_id: [ActivityNode(node_id=sorted(body)[0], node_type="script", parameters={})]
+            for loop_id, body in bodies.items()
+            if body
+        }
+    next_nodes = downstream_successors or {}
+    graph.get_next_activities_by_port.side_effect = lambda node_id, port: (
+        successors.get(node_id, []) if port == "iterate" else []
+    )
+    graph.get_next_activities.side_effect = lambda node_id: next_nodes.get(node_id, [])
+    _TEST_GRAPHS[id(wf)] = graph
     wf._active_loop_iteration = {}
     wf._retry_replay_candidates = set(bodies)
     wf._retry_loop_record_states = {}
@@ -44,6 +70,22 @@ def _wf(*, retry_points: list[str], bodies: dict[str, set[str]]) -> Orchestrator
     wf._retry_restorable_cache = None
     wf._runtime_settings = {}
     return wf
+
+
+def _graph(wf: OrchestratorWorkflow) -> WorkflowGraph:
+    return cast("WorkflowGraph", _TEST_GRAPHS[id(wf)])
+
+
+def _graph_mock(wf: OrchestratorWorkflow) -> MagicMock:
+    return _TEST_GRAPHS[id(wf)]
+
+
+async def _replay_loop(
+    wf: OrchestratorWorkflow,
+    node_id: str,
+    state: ForEachLoopState | DoWhileLoopState,
+) -> dict[str, Any] | None:
+    return await wf._replayed_loop_control(node_id, state, _graph(wf))
 
 
 @pytest.fixture
@@ -60,7 +102,7 @@ def patched_workflow():
 async def _probe(wf: OrchestratorWorkflow, patched, *, reached: bool) -> dict[str, Any] | None:
     patched.execute_activity.return_value = reached
     state = ForEachLoopState(type=LoopType.FOR_EACH, items=[1, 2, 3], current_index=1)
-    return await wf._replayed_loop_control("loop_1", state)
+    return await _replay_loop(wf, "loop_1", state)
 
 
 @pytest.mark.asyncio
@@ -111,7 +153,7 @@ async def test_loop_probes_the_iteration_that_contains_the_retry_point(patched_w
     state = ForEachLoopState(type=LoopType.FOR_EACH, items=[1, 2, 3], current_index=1)
     patched_workflow.execute_activity.return_value = True
 
-    result = await wf._replayed_loop_control("loop_1", state)
+    result = await _replay_loop(wf, "loop_1", state)
 
     assert result is not None
     assert result["control"]["next_port"] == "iterate"
@@ -126,7 +168,7 @@ async def test_body_occurrence_switches_enclosing_loop_to_live_mode(patched_work
     patched_workflow.execute_activity.return_value = True
     state = ForEachLoopState(type=LoopType.FOR_EACH, items=[1, 2, 3], current_index=1)
 
-    result = await wf._replayed_loop_control("loop_1", state)
+    result = await _replay_loop(wf, "loop_1", state)
 
     assert result is not None
     assert result["control"]["next_port"] == "iterate"
@@ -134,7 +176,7 @@ async def test_body_occurrence_switches_enclosing_loop_to_live_mode(patched_work
 
     patched_workflow.execute_activity.reset_mock()
     state.current_index = 2
-    result = await wf._replayed_loop_control("loop_1", state)
+    result = await _replay_loop(wf, "loop_1", state)
 
     assert result is not None
     patched_workflow.execute_activity.assert_awaited_once()
@@ -164,7 +206,7 @@ async def test_continue_on_failure_restarts_at_lowest_failed_iteration(patched_w
     # Passing the earliest failed iteration would mean we selected the later one.
     state = ForEachLoopState(type=LoopType.FOR_EACH, items=list(range(6)), current_index=3)
     with pytest.raises(ApplicationError, match=r"after selected failure path \[2\]"):
-        await wf._replayed_loop_control("loop_1", state)
+        await _replay_loop(wf, "loop_1", state)
     patched_workflow.execute_activity.assert_not_awaited()
 
     # Replay reaches iteration 2, then hands the selected body node and its loop
@@ -173,7 +215,7 @@ async def test_continue_on_failure_restarts_at_lowest_failed_iteration(patched_w
     state.current_index = 2
     wf.node_control_data["loop_1"] = {"current_index": 2}
     patched_workflow.execute_activity.return_value = True
-    result = await wf._replayed_loop_control("loop_1", state)
+    result = await _replay_loop(wf, "loop_1", state)
 
     assert result is not None
     assert result["control"]["next_port"] == "iterate"
@@ -187,7 +229,7 @@ async def test_continue_on_failure_restarts_at_lowest_failed_iteration(patched_w
     assert "loop_1" not in wf._retry_replay_candidates
 
     state.current_index = 3
-    assert await wf._replayed_loop_control("loop_1", state) is None
+    assert await _replay_loop(wf, "loop_1", state) is None
     patched_workflow.execute_activity.assert_awaited_once()
 
 
@@ -197,11 +239,10 @@ async def test_nested_loop_replays_before_inner_failed_iteration(patched_workflo
     wf.loop_body_map = {"inner": "outer", "body_a": "inner"}
     wf.node_control_data = {"outer": {"current_index": 2}}
     wf._retry_selected_failure_paths = {"body_a": [[2, 1]]}
-    wf._loop_direct_bodies = {"inner": {"body_a"}}
     patched_workflow.execute_activity.return_value = True
     state = ForEachLoopState(type=LoopType.FOR_EACH, items=[1, 2], current_index=0)
 
-    result = await wf._replayed_loop_control("inner", state)
+    result = await _replay_loop(wf, "inner", state)
 
     assert result is not None
     assert result["control"]["next_port"] == "iterate"
@@ -209,7 +250,7 @@ async def test_nested_loop_replays_before_inner_failed_iteration(patched_workflo
 
     patched_workflow.execute_activity.reset_mock()
     state.current_index = 1
-    result = await wf._replayed_loop_control("inner", state)
+    result = await _replay_loop(wf, "inner", state)
 
     assert result is not None
     assert result["control"]["next_port"] == "iterate"
@@ -217,40 +258,130 @@ async def test_nested_loop_replays_before_inner_failed_iteration(patched_workflo
 
 
 @pytest.mark.asyncio
-async def test_loop_probe_uses_only_direct_body_nodes_and_separates_nested_loop_controls(patched_workflow) -> None:
-    wf = _wf(retry_points=["step_after_loops"], bodies={"outer": {"outer_step", "inner", "inner_step"}})
-    wf._loop_direct_bodies = {"outer": {"outer_step", "inner"}}
-    wf._loop_direct_child_loops = {"outer": {"inner"}}
+async def test_loop_probe_uses_iterate_successors_not_recursive_loop_membership(patched_workflow) -> None:
+    wf = _wf(
+        retry_points=["step_after_loops"],
+        bodies={"outer": {"outer_step", "inner", "inner_step"}},
+        iterate_successors={
+            "outer": [
+                ActivityNode(node_id="outer_step", node_type="script", parameters={}),
+                ActivityNode(node_id="inner", node_type="loop", parameters={}),
+            ]
+        },
+    )
     patched_workflow.execute_activity.return_value = True
     state = ForEachLoopState(type=LoopType.FOR_EACH, items=[1, 2], current_index=1)
 
-    await wf._replayed_loop_control("outer", state)
+    await _replay_loop(wf, "outer", state)
 
     args = patched_workflow.execute_activity.await_args.kwargs["args"]
     assert args == ["src-1", ["outer_step"], ["inner"], [1]]
+    _graph_mock(wf).get_next_activities_by_port.assert_called_once_with("outer", "iterate")
 
 
 @pytest.mark.asyncio
 async def test_loop_probe_never_falls_back_to_recursive_body_membership(patched_workflow) -> None:
-    wf = _wf(retry_points=["step_after_loops"], bodies={"outer": {"outer_step", "inner_step"}})
+    wf = _wf(
+        retry_points=["step_after_loops"],
+        bodies={"outer": {"outer_step", "inner_step"}},
+        iterate_successors={"outer": [ActivityNode(node_id="outer_step", node_type="script", parameters={})]},
+    )
     patched_workflow.execute_activity.return_value = False
     state = ForEachLoopState(type=LoopType.FOR_EACH, items=[1], current_index=0)
 
-    await wf._replayed_loop_control("outer", state)
+    await _replay_loop(wf, "outer", state)
 
-    assert patched_workflow.execute_activity.await_args.kwargs["args"] == ["src-1", [], [], [0]]
+    assert patched_workflow.execute_activity.await_args.kwargs["args"] == ["src-1", ["outer_step"], [], [0]]
+
+
+@pytest.mark.asyncio
+async def test_loop_probe_walks_through_disabled_iterate_entries(patched_workflow) -> None:
+    disabled_entry = ActivityNode(
+        node_id="disabled_entry",
+        node_type="script",
+        parameters={},
+        settings=NodeSettingsNoRetry(disabled=True),
+    )
+    executable_entry = ActivityNode(node_id="body_a", node_type="script", parameters={})
+    wf = _wf(
+        retry_points=["after"],
+        bodies={"loop_1": {"disabled_entry", "body_a"}},
+        iterate_successors={"loop_1": [disabled_entry]},
+        downstream_successors={"disabled_entry": [executable_entry]},
+    )
+    patched_workflow.execute_activity.return_value = True
+    state = ForEachLoopState(type=LoopType.FOR_EACH, items=[1, 2], current_index=1)
+
+    await _replay_loop(wf, "loop_1", state)
+
+    assert patched_workflow.execute_activity.await_args.kwargs["args"] == ["src-1", ["body_a"], [], [1]]
+    _graph_mock(wf).get_next_activities.assert_called_once_with("disabled_entry")
+
+
+@pytest.mark.asyncio
+async def test_loop_without_executable_entry_uses_synced_iteration_count(patched_workflow) -> None:
+    disabled_entry = ActivityNode(
+        node_id="disabled_entry",
+        node_type="script",
+        parameters={},
+        settings=NodeSettingsNoRetry(disabled=True),
+    )
+    wf = _wf(
+        retry_points=["after"],
+        bodies={"loop_1": {"disabled_entry"}},
+        iterate_successors={"loop_1": [disabled_entry]},
+    )
+    wf._retry_loop_record_states = {"loop_1": {"output_data": {"iteration_count": 2}}}
+    state = ForEachLoopState(type=LoopType.FOR_EACH, items=[1, 2], current_index=1)
+
+    result = await _replay_loop(wf, "loop_1", state)
+
+    assert result is not None
+    assert result["control"]["next_port"] == "iterate"
+    patched_workflow.execute_activity.assert_not_awaited()
+
+    state.current_index = 2
+    result = await _replay_loop(wf, "loop_1", state)
+
+    assert result is not None
+    assert result["control"]["next_port"] == "complete"
+    patched_workflow.execute_activity.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_loop_without_entry_or_synced_count_fails_closed(patched_workflow) -> None:
+    disabled_entry = ActivityNode(
+        node_id="disabled_entry",
+        node_type="script",
+        parameters={},
+        settings=NodeSettingsNoRetry(disabled=True),
+    )
+    wf = _wf(
+        retry_points=["after"],
+        bodies={"loop_1": {"disabled_entry"}},
+        iterate_successors={"loop_1": [disabled_entry]},
+    )
+    state = ForEachLoopState(type=LoopType.FOR_EACH, items=[1], current_index=0)
+
+    with pytest.raises(ApplicationError, match="no iteration entry or source iteration count"):
+        await _replay_loop(wf, "loop_1", state)
+
+    patched_workflow.execute_activity.assert_not_awaited()
 
 
 @pytest.mark.asyncio
 async def test_nested_loop_probe_passes_outer_then_inner_index(patched_workflow) -> None:
-    wf = _wf(retry_points=["step_after_loops"], bodies={"inner": {"inner_step"}})
+    wf = _wf(
+        retry_points=["step_after_loops"],
+        bodies={"inner": {"inner_step"}},
+        iterate_successors={"inner": [ActivityNode(node_id="inner_step", node_type="script", parameters={})]},
+    )
     wf.loop_body_map = {"inner": "outer"}
     wf.node_control_data = {"outer": {"current_index": 2}}
-    wf._loop_direct_bodies = {"inner": {"inner_step"}}
     patched_workflow.execute_activity.return_value = True
     state = ForEachLoopState(type=LoopType.FOR_EACH, items=[1, 2], current_index=1)
 
-    await wf._replayed_loop_control("inner", state)
+    await _replay_loop(wf, "inner", state)
 
     args = patched_workflow.execute_activity.await_args.kwargs["args"]
     assert args == ["src-1", ["inner_step"], [], [2, 1]]
@@ -268,9 +399,7 @@ async def test_a_loop_outside_the_retry_is_executed_normally(patched_workflow) -
     """
     wf = _wf(retry_points=["step_2"], bodies={"loop_1": {"body_a"}})
 
-    result = await wf._replayed_loop_control(
-        "other_loop", ForEachLoopState(type=LoopType.FOR_EACH, items=[1], current_index=0)
-    )
+    result = await _replay_loop(wf, "other_loop", ForEachLoopState(type=LoopType.FOR_EACH, items=[1], current_index=0))
 
     assert result is None
     patched_workflow.execute_activity.assert_not_awaited()
@@ -293,7 +422,7 @@ async def test_nested_loop_with_ambiguous_legacy_failure_path_fails_closed(patch
     state = ForEachLoopState(type=LoopType.FOR_EACH, items=[1], current_index=0)
 
     with pytest.raises(ApplicationError, match="does not record a complete iteration path"):
-        await wf._replayed_loop_control("inner", state)
+        await _replay_loop(wf, "inner", state)
 
     patched_workflow.execute_activity.assert_not_awaited()
 
@@ -404,6 +533,7 @@ async def test_replayed_loop_does_not_evaluate_do_while_condition(patched_workfl
                 parameters={"type": "do_while", "condition": "${body_a.done}"},
             ),
             {"type": "do_while", "condition": "${body_a.done}", "max_iterations": 5},
+            graph=_graph(wf),
         )
 
     assert result == replayed_result

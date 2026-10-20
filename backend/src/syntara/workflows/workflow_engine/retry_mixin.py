@@ -9,7 +9,7 @@ from temporalio.exceptions import ApplicationError
 
 from syntara.core.exceptions import SafeValueError
 from syntara.workflows.models.activity_execution import ActivityStatus
-from syntara.workflows.utils.loop_body_nodes import collect_direct_loop_bodies, collect_loop_bodies
+from syntara.workflows.utils.loop_body_nodes import collect_loop_bodies
 from syntara.workflows.utils.loop_iteration_names import strip_iteration_suffix
 from syntara.workflows.utils.namespace_resolver import NamespaceResolver
 from syntara.workflows.workflow_engine.constants import (
@@ -123,8 +123,6 @@ class WorkflowRetryMixin:
     #: because the loop control needs them on every iteration and the graph does
     #: not change during a run.
     _loop_bodies: dict[str, set[str]]
-    _loop_direct_bodies: dict[str, set[str]]
-    _loop_direct_child_loops: dict[str, set[str]]
     #: Which iteration each loop is currently replaying, so a body node's own replay
     #: can ask for the row for that iteration rather than the first.
     _active_loop_iteration: dict[str, int]
@@ -173,11 +171,9 @@ class WorkflowRetryMixin:
         self._retry_source_statuses: dict[str, str] = {}
         self._retry_source_temporal_statuses: dict[str, str] = {}
         self._retry_selected_failure_paths: dict[str, list[list[int]]] = {}
-        # Filled from the graph by _prepare_retry; a loop body replays per iteration,
-        # and the control node needs the body set on every iteration.
+        # Filled from the graph by _prepare_retry; selected retry points use loop
+        # ancestry to keep their enclosing controller in replay mode.
         self._loop_bodies: dict[str, set[str]] = {}
-        self._loop_direct_bodies: dict[str, set[str]] = {}
-        self._loop_direct_child_loops: dict[str, set[str]] = {}
         self._active_loop_iteration: dict[str, int] = {}
         self._retry_loop_record_states: dict[str, dict[str, Any]] = {}
         self._retry_live_loop_ids: set[str] = set()
@@ -198,10 +194,6 @@ class WorkflowRetryMixin:
                 },
             ).items()
         }
-        graph_nodes = {node.id: node for node in graph.get_all_nodes()}
-        loop_ids = {node.id for node in graph_nodes.values() if node.type == NodeType.LOOP}
-        self._loop_direct_bodies = collect_direct_loop_bodies(self._loop_bodies, loop_ids)
-        self._loop_direct_child_loops = {loop_id: body & loop_ids for loop_id, body in self._loop_direct_bodies.items()}
         source_state = await workflow.execute_activity(
             ActivityName.RETRY_SOURCE_STATE,
             args=[self.retry_context["retry_from_execution_id"]],

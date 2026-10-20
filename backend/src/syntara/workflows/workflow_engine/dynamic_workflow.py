@@ -1393,10 +1393,34 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
             ),
         )
 
+    @staticmethod
+    def _loop_iteration_probe_entries(node_id: str, graph: WorkflowGraph) -> list[ActivityNode]:
+        """Find the first executable nodes on this loop's iterate paths.
+
+        Disabled nodes are bypassed by the scheduler without producing a
+        Temporal activity record, so walk through those nodes only. This keeps
+        retry probing lazy while still finding an occurrence that can prove the
+        iteration ran.
+        """
+        pending = list(graph.get_next_activities_by_port(node_id, "iterate"))
+        entries: list[ActivityNode] = []
+        visited: set[str] = set()
+        while pending:
+            successor = pending.pop()
+            if successor.id in visited:
+                continue
+            visited.add(successor.id)
+            if getattr(successor.settings, "disabled", False):
+                pending.extend(graph.get_next_activities(successor.id))
+            else:
+                entries.append(successor)
+        return entries
+
     async def _replayed_loop_control(
         self,
         node_id: str,
         state: LoopState,
+        graph: WorkflowGraph,
     ) -> dict[str, Any] | None:
         """Route a loop being replayed, or None to execute it as usual.
 
@@ -1416,10 +1440,11 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
         if not self._should_replay_loop(node_id) or node_id not in self._loop_bodies:
             return None
 
-        direct_bodies = getattr(self, "_loop_direct_bodies", {})
-        direct_child_loops = getattr(self, "_loop_direct_child_loops", {})
-        child_loop_ids = sorted(direct_child_loops.get(node_id, set()))
-        body_ids = sorted(direct_bodies.get(node_id, set()) - set(child_loop_ids))
+        iterate_entries = self._loop_iteration_probe_entries(node_id, graph)
+        child_loop_entry_ids = sorted(successor.id for successor in iterate_entries if successor.type == NodeType.LOOP)
+        iterate_entry_node_ids = sorted(
+            successor.id for successor in iterate_entries if successor.type != NodeType.LOOP
+        )
         current = state.current_index
         iteration_path = [*loop_index_chain(node_id, self.loop_body_map, self.node_control_data), current]
         loop_body_region = self._loop_bodies.get(node_id, set())
@@ -1457,12 +1482,30 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
                 )
                 raise ApplicationError(msg, type="RetryLoopPathInconsistent", non_retryable=True)
 
-        reached = await workflow.execute_activity(
-            ActivityName.RETRY_LOOP_ITERATION_PROBE,
-            args=[self.retry_context.get("retry_from_execution_id"), body_ids, child_loop_ids, iteration_path],
-            activity_id=join_loop_iteration_id(f"__internal__probe_retry_loop_{node_id}", iteration_path),
-            start_to_close_timeout=timedelta(seconds=DEFAULT_ACTIVITY_TIMEOUT_SECONDS),
-        )
+        record_state = self._retry_loop_record_states.get(node_id, {})
+        if not iterate_entry_node_ids and not child_loop_entry_ids:
+            # An empty body, or one made entirely of disabled nodes, has no
+            # per-node Temporal occurrence to query. The synced loop output
+            # records how many iterations the source reached; fail closed if
+            # that count was omitted by a custom output mapping.
+            output_data = record_state.get("output_data") or {}
+            source_iteration_count = output_data.get("iteration_count") if isinstance(output_data, dict) else None
+            if not isinstance(source_iteration_count, int) or isinstance(source_iteration_count, bool):
+                msg = f"Cannot safely replay loop {node_id}: no iteration entry or source iteration count is available"
+                raise ApplicationError(msg, type="RetryLoopProbeUnavailable", non_retryable=True)
+            reached = current < source_iteration_count
+        else:
+            reached = await workflow.execute_activity(
+                ActivityName.RETRY_LOOP_ITERATION_PROBE,
+                args=[
+                    self.retry_context.get("retry_from_execution_id"),
+                    iterate_entry_node_ids,
+                    child_loop_entry_ids,
+                    iteration_path,
+                ],
+                activity_id=join_loop_iteration_id(f"__internal__probe_retry_loop_{node_id}", iteration_path),
+                start_to_close_timeout=timedelta(seconds=DEFAULT_ACTIVITY_TIMEOUT_SECONDS),
+            )
         next_port = "iterate" if reached else "complete"
         next_index = current + 1 if reached else current
 
@@ -1480,7 +1523,6 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
                 "next_port": next_port,
             },
         )
-        record_state = self._retry_loop_record_states.get(node_id, {})
         replay_output = (
             {"iteration_count": current, "iteration_results": None}
             if reached
@@ -1501,6 +1543,8 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
         node: ActivityNode,
         resolved_parameters: dict[str, Any],
         timeout_seconds: int = DEFAULT_ACTIVITY_TIMEOUT_SECONDS,
+        *,
+        graph: WorkflowGraph | None = None,
     ) -> dict[str, Any]:
         """Execute a loop node.
 
@@ -1509,6 +1553,7 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
             node: Activity node
             resolved_parameters: Resolved configuration
             timeout_seconds: Activity timeout in seconds (default: DEFAULT_ACTIVITY_TIMEOUT_SECONDS)
+            graph: Workflow graph, required when replaying a loop
 
         Returns:
             Activity result with output and control data
@@ -1532,7 +1577,7 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
         # A replayed loop never evaluates its expression or condition. Its cached
         # resolved source input initializes state; source body occurrences decide
         # whether another synthetic iteration exists.
-        replayed = await self._replay_loop_if_needed(node_id, state)
+        replayed = await self._replay_loop_if_needed(node_id, state, graph)
         if replayed is not None:
             control_data = replayed.get("control", {})
             if control_data:
@@ -1578,11 +1623,19 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
 
         return loop_result
 
-    async def _replay_loop_if_needed(self, node_id: str, state: LoopState) -> dict[str, Any] | None:
+    async def _replay_loop_if_needed(
+        self,
+        node_id: str,
+        state: LoopState,
+        graph: WorkflowGraph | None,
+    ) -> dict[str, Any] | None:
         """Get one synthetic loop transition, or None when the loop is live."""
         if not self._should_replay_loop(node_id):
             return None
-        replayed = await self._replayed_loop_control(node_id, state)
+        if graph is None:
+            msg = f"Cannot safely replay loop {node_id}: workflow graph is unavailable"
+            raise ApplicationError(msg, type="RetryLoopGraphUnavailable", non_retryable=True)
+        replayed = await self._replayed_loop_control(node_id, state, graph)
         if replayed is None:
             msg = f"Cannot safely replay loop {node_id}: no source iteration decision is available"
             raise ApplicationError(msg, type="RetryLoopProbeUnavailable", non_retryable=True)
@@ -1988,7 +2041,9 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
                 node_id, resolved_parameters, node.outputs, graph, timeout_seconds=timeout_seconds
             )
         if node_type == NodeType.LOOP:
-            return await self._execute_loop_node(node_id, node, resolved_parameters, timeout_seconds=timeout_seconds)
+            return await self._execute_loop_node(
+                node_id, node, resolved_parameters, timeout_seconds=timeout_seconds, graph=graph
+            )
 
         return {"output": {"status": "skipped", "reason": f"Unsupported node type: {node_type}"}}
 

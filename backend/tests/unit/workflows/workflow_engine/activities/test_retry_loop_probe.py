@@ -19,11 +19,11 @@ def _result(*, found: bool) -> MagicMock:
 
 
 async def _run(
-    body_ids: list[str],
+    iterate_entry_ids: list[str],
     path: list[int],
     *,
     found: list[bool],
-    child_loops: list[str] | None = None,
+    child_loop_entry_ids: list[str] | None = None,
 ) -> tuple[bool, list[Select[Any]]]:
     session = AsyncMock()
     session.exec.side_effect = [_result(found=value) for value in found]
@@ -35,7 +35,7 @@ async def _run(
         "syntara.workflows.workflow_engine.activities.retry_node_replay_activity.get_db",
         mock_get_db,
     ):
-        answer = await probe_retry_loop_iteration("src-1", body_ids, child_loops or [], path)
+        answer = await probe_retry_loop_iteration("src-1", iterate_entry_ids, child_loop_entry_ids or [], path)
 
     statements = [call.args[0] for call in session.exec.await_args_list]
     return answer, statements
@@ -69,21 +69,22 @@ async def test_missing_exact_path_is_not_iteration_evidence() -> None:
 
 @pytest.mark.asyncio
 async def test_nested_iteration_without_an_exact_path_record_is_not_reached() -> None:
-    answer, _ = await _run(["body_a"], [2, 3], found=[False, False])
+    answer, queries = await _run(["body_a"], [2, 3], found=[False])
 
     assert answer is False
+    assert len(queries) == 1
 
 
 @pytest.mark.asyncio
-async def test_nested_loop_controller_counts_under_the_exact_parent_path() -> None:
-    answer, queries = await _run([], [2], child_loops=["inner"], found=[True])
+async def test_nested_loop_iterate_successor_counts_under_the_exact_parent_path() -> None:
+    answer, queries = await _run([], [2], child_loop_entry_ids=["inner"], found=[True])
 
     assert answer is True
     assert "inner/_iter/_2/_iter/_" in _render(queries[0])
 
 
 @pytest.mark.asyncio
-async def test_empty_body_never_queries_the_database() -> None:
+async def test_no_iterate_successors_never_queries_the_database() -> None:
     answer, queries = await _run([], [0], found=[])
 
     assert answer is False
@@ -91,8 +92,27 @@ async def test_empty_body_never_queries_the_database() -> None:
 
 
 @pytest.mark.asyncio
-async def test_nested_loop_with_no_direct_body_has_no_iteration_evidence() -> None:
-    answer, queries = await _run([], [1, 0], found=[])
+async def test_multiple_iterate_successors_are_checked_together() -> None:
+    answer, queries = await _run(
+        ["first_entry", "second_entry"],
+        [1, 0],
+        child_loop_entry_ids=["inner"],
+        found=[True],
+    )
+
+    assert answer is True
+    sql = _render(queries[0])
+    assert "first_entry_iter_1_iter_0" in sql
+    assert "second_entry_iter_1_iter_0" in sql
+    assert "inner/_iter/_1/_iter/_0/_iter/_" in sql
+
+
+@pytest.mark.asyncio
+async def test_missing_evidence_for_any_iterate_entry_means_iteration_was_not_reached() -> None:
+    answer, queries = await _run(["entry_a", "entry_b"], [1, 0], found=[False])
 
     assert answer is False
-    assert queries == []
+    assert len(queries) == 1
+    sql = _render(queries[0])
+    assert "entry_a_iter_1_iter_0" in sql
+    assert "entry_b_iter_1_iter_0" in sql
