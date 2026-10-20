@@ -41,6 +41,7 @@ from syntara.workflows.workflow_engine.models.workflow_definition import (
 _SCHEMA_DIR = SCHEMA_DIR / "workflows" / "v2"
 _BASE_URI = "https://automation.example.com/schemas/workflows/v2/"
 _FEEDBACK_PORTS: frozenset[str] = frozenset({"iterate"})
+_PARAMETERS_PATH_PREFIX = "parameters."
 _FORM_FIELD_TYPE_LOCATION_PARTS = 3
 
 
@@ -614,7 +615,7 @@ def _form_configuration_schema_finding_is_redundant(
         schema_finding.field_path == "parameters"
         and schema_finding.message.startswith("Additional properties are not allowed")
         and form_finding.category == ValidationCategory.schema_violation
-        and form_finding.field_path.startswith("parameters.")
+        and form_finding.field_path.startswith(_PARAMETERS_PATH_PREFIX)
         and form_finding.message == "Extra inputs are not permitted"
     )
 
@@ -766,7 +767,7 @@ def _form_validation_field_path(
     if not path_parts:
         return "parameters.form_definition"
 
-    return "parameters." + ".".join(str(part) for part in path_parts)
+    return _PARAMETERS_PATH_PREFIX + ".".join(str(part) for part in path_parts)
 
 
 def _normalize_form_location(location: tuple[Any, ...] | list[Any]) -> list[Any]:
@@ -1031,7 +1032,7 @@ def collect_scheduled_trigger_config_findings(
             if errors:
                 loc = errors[0].get("loc", ())
                 if loc:
-                    field_path = "parameters." + ".".join(str(part) for part in loc)
+                    field_path = _PARAMETERS_PATH_PREFIX + ".".join(str(part) for part in loc)
             findings.append(
                 ValidationFinding(
                     severity=ValidationSeverity.error,

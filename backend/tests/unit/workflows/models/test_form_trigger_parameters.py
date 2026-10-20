@@ -81,8 +81,9 @@ class TestFormTriggerParameters:
         ["response_window", "fallback_decision", "responder_users", "responder_groups"],
     )
     def test_prompt_only_parameters_are_named_and_rejected(self, parameter: str) -> None:
+        parameters = _parameters(_text_field(), **{parameter: "not-supported"})
         with pytest.raises(ValidationError, match=parameter):
-            FormTriggerParameters.model_validate(_parameters(_text_field(), **{parameter: "not-supported"}))
+            FormTriggerParameters.model_validate(parameters)
 
     @pytest.mark.parametrize(
         ("options", "source"),
@@ -111,8 +112,9 @@ class TestFormTriggerParameters:
                 "options": options,
             }
         ]
+        parameters = _parameters(*fields)
         with pytest.raises(ValidationError, match=f"Field 'region'.*{source}"):
-            FormTriggerParameters.model_validate(_parameters(*fields))
+            FormTriggerParameters.model_validate(parameters)
 
     def test_invalid_default_is_rejected_by_shared_form_definition_validation(self) -> None:
         fields: list[dict[str, object]] = [
@@ -123,15 +125,16 @@ class TestFormTriggerParameters:
                 "default": "not-an-email",
             }
         ]
+        parameters = _parameters(*fields)
         with pytest.raises(FormDefinitionError, match="invalid field definition"):
-            FormTriggerParameters.model_validate(_parameters(*fields))
+            FormTriggerParameters.model_validate(parameters)
 
     def test_unsafe_css_is_rejected(self) -> None:
+        parameters = _parameters(_text_field(), css_override=".form { background: url(x); }")
         with pytest.raises(ValidationError, match=r"url\(\)"):
-            FormTriggerParameters.model_validate(
-                _parameters(_text_field(), css_override=".form { background: url(x); }")
-            )
+            FormTriggerParameters.model_validate(parameters)
 
     def test_unknown_parameters_are_rejected(self) -> None:
+        parameters = _parameters(_text_field(), unexpected="value")
         with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
-            FormTriggerParameters.model_validate(_parameters(_text_field(), unexpected="value"))
+            FormTriggerParameters.model_validate(parameters)
