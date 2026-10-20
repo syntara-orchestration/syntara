@@ -187,23 +187,21 @@ describe('IdentityProvidersTab', () => {
       expect(screen.getByText(/Configure an external identity provider to enable single sign-on/)).toBeInTheDocument()
     })
 
-    it('renders add button in empty state', () => {
+    it('renders add provider link in empty state', () => {
       setupEmptyProviders()
       render(<IdentityProvidersTab />, { wrapper })
 
-      expect(screen.getByRole('button', { name: /Add OIDC provider/ })).toBeInTheDocument()
+      expect(screen.getByRole('link', { name: /Add OIDC provider/ })).toBeInTheDocument()
     })
 
-    it('navigates to add provider page when add button clicked', async () => {
+    it('links to the add provider page', () => {
       setupEmptyProviders()
-      const user = userEvent.setup()
       render(<IdentityProvidersTab />, { wrapper })
 
-      await user.click(screen.getByRole('button', { name: /Add OIDC provider/ }))
-
-      expect(routerTestState.navigate).toHaveBeenCalledWith({
-        to: '/system-administration/authentication/identity-providers/add',
-      })
+      expect(screen.getByRole('link', { name: /Add OIDC provider/ })).toHaveAttribute(
+        'href',
+        '/system-administration/authentication/identity-providers/add'
+      )
     })
 
     it('opens AAP setup modal when Add Ansible Automation Platform button is clicked', async () => {
