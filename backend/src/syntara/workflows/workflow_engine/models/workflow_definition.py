@@ -939,9 +939,6 @@ class FormPromptNodeParameters(BaseModel):
         return v
 
 
-_FORM_PROMPT_ONLY_PARAMETERS: frozenset[str] = frozenset(
-    {"response_window", "fallback_decision", "responder_users", "responder_groups"}
-)
 _MAX_FORM_TRIGGER_TEMPLATE_PATH_DEPTH = 50
 
 
@@ -994,18 +991,6 @@ class FormTriggerParameters(BaseModel):
         max_length=FieldLimits.FORM_CSS_OVERRIDE_MAX_LENGTH,
         description="Custom CSS applied to the form view.",
     )
-
-    @model_validator(mode="before")
-    @classmethod
-    def reject_prompt_only_parameters(cls, raw: Any) -> Any:  # noqa: ANN401
-        """Reject options that only apply to an in-execution form prompt."""
-        if not isinstance(raw, dict):
-            return raw
-        for parameter in _FORM_PROMPT_ONLY_PARAMETERS:
-            if parameter in raw:
-                msg = f"'{parameter}' applies only to the form prompt node, not a form trigger."
-                raise SafeValueError(msg)
-        return raw
 
     @model_validator(mode="before")
     @classmethod
