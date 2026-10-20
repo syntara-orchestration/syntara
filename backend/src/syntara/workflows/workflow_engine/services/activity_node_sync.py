@@ -7,11 +7,13 @@ from uuid import UUID
 import structlog
 from sqlalchemy import or_
 from sqlmodel import select
+from sqlmodel.ext.asyncio.session import AsyncSession
 from temporalio.client import WorkflowHandle
 
 from syntara.core.constants import FieldLimits
 from syntara.workflows.models.activity_execution import TERMINAL_ACTIVITY_STATUSES, ActivityExecution, ActivityStatus
 from syntara.workflows.models.workflow_version import WorkflowVersion
+from syntara.workflows.utils.datetime import ensure_timezone_aware
 from syntara.workflows.workflow_engine.models.workflow_definition import NodeType
 from syntara.workflows.workflow_engine.services.activity_sync_types import ExecutionMonitorMetadata
 
@@ -284,6 +286,12 @@ class ActivityNodeSyncMixin:
             if not activities:
                 return
 
+            source_converge_timestamps = (
+                await self._retry_converge_source_timestamps(session, metadata, node_ids)
+                if target_status == ActivityStatus.FAILED
+                else {}
+            )
+
             updated_activities: list[tuple[ActivityExecution, dict[str, Any]]] = []
             now = datetime.now(UTC)
             for activity in activities:
@@ -299,6 +307,9 @@ class ActivityNodeSyncMixin:
                 }
                 activity.status = target_status
                 activity.completed_at = now
+                source_timestamps = source_converge_timestamps.get(activity.activity_name)
+                if source_timestamps is not None:
+                    activity.started_at, activity.completed_at = source_timestamps
                 if error_map is not None:
                     base_name = activity.activity_name.split(_COMPOSITE_ITER_SEP)[0]
                     activity.error_details = error_map.get(base_name)
@@ -318,3 +329,42 @@ class ActivityNodeSyncMixin:
             )
 
             await self._publish_activity_patches(metadata, updated_activities)
+
+    async def _retry_converge_source_timestamps(
+        self,
+        session: AsyncSession,
+        metadata: ExecutionMonitorMetadata,
+        node_ids: list[str],
+    ) -> dict[str, tuple[datetime | None, datetime | None]]:
+        """Load source times for top-level converges failed during a retry."""
+        if not metadata.is_retry_from_failure or metadata.retry_source_execution_id is None:
+            return {}
+
+        converge_node_ids = [
+            node_id
+            for node_id in node_ids
+            if _COMPOSITE_ITER_SEP not in node_id
+            and metadata.activity_definitions_map.get(node_id, {}).get("type") == NodeType.CONVERGE
+        ]
+        if not converge_node_ids:
+            return {}
+
+        source_result = await session.exec(
+            select(
+                ActivityExecution.activity_name,
+                ActivityExecution.status,
+                ActivityExecution.started_at,
+                ActivityExecution.completed_at,
+            ).where(
+                ActivityExecution.execution_id == metadata.retry_source_execution_id,
+                ActivityExecution.activity_name.in_(converge_node_ids),  # type: ignore[attr-defined]
+            )
+        )
+        source_timestamps: dict[str, tuple[datetime | None, datetime | None]] = {}
+        for activity_name, source_status, started_at, completed_at in source_result.all():
+            if source_status in (ActivityStatus.COMPLETED, ActivityStatus.FAILED):
+                source_timestamps[activity_name] = (
+                    ensure_timezone_aware(started_at) if started_at else None,
+                    ensure_timezone_aware(completed_at) if completed_at else None,
+                )
+        return source_timestamps

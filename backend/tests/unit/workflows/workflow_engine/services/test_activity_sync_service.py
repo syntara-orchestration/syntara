@@ -2700,6 +2700,34 @@ class TestSyncNodesToTerminalStatus:
         assert result == {"node-A": "Key 'output' not found in namespace path"}
 
     @pytest.mark.asyncio
+    async def test_retry_converge_failure_keeps_source_timestamps(self) -> None:
+        """A workflow-reported converge failure has no Temporal completion event."""
+        activity = self._create_mock_activity_execution("converge_1")
+        session = self._mock_session([activity])
+        source_started_at = datetime(2026, 1, 1, 0, 0, 0, tzinfo=UTC)
+        source_completed_at = datetime(2026, 1, 1, 0, 5, 0, tzinfo=UTC)
+        source_result = Mock()
+        source_result.all.return_value = [
+            ("converge_1", ActivityStatus.COMPLETED, source_started_at, source_completed_at)
+        ]
+        session.exec.side_effect = [Mock(all=Mock(return_value=[activity])), source_result]
+        metadata = self._create_metadata(activity_index_map={"converge_1": 0})
+        metadata.is_retry_from_failure = True
+        metadata.retry_source_execution_id = uuid4()
+        metadata.activity_definitions_map = {"converge_1": {"type": NodeType.CONVERGE}}
+
+        await self.service._sync_nodes_to_terminal_status(
+            metadata,
+            ["converge_1"],
+            ActivityStatus.FAILED,
+            error_map={"converge_1": "converge gate failed"},
+        )
+
+        assert activity.status == ActivityStatus.FAILED
+        assert activity.started_at == source_started_at
+        assert activity.completed_at == source_completed_at
+
+    @pytest.mark.asyncio
     async def test_multiple_failed_nodes_all_marked(self) -> None:
         """Multiple failed nodes should each get the correct error message."""
         activity_a = self._create_mock_activity_execution("node-A")
@@ -6594,6 +6622,17 @@ class TestReplayedTimestampResolution:
         handle.execute_update = AsyncMock(return_value=returned)
         return handle
 
+    def _set_source_activity_result(self, source: tuple[ActivityStatus, datetime | None, datetime | None]) -> Mock:
+        result = Mock()
+        result.one_or_none.return_value = source
+        session = Mock()
+        session.exec = AsyncMock(return_value=result)
+        session_context = Mock()
+        session_context.__aenter__ = AsyncMock(return_value=session)
+        session_context.__aexit__ = AsyncMock(return_value=False)
+        self.service.session_factory = Mock(return_value=session_context)
+        return session
+
     @pytest.mark.asyncio
     async def test_a_run_that_is_not_retrying_from_failure_asks_nothing(self) -> None:
         """The workflow said no once at monitor start, so no per-activity ask follows.
@@ -6630,6 +6669,76 @@ class TestReplayedTimestampResolution:
                 "completed_at": datetime(2026, 1, 1, 0, 5, 0, tzinfo=UTC),
             }
         }
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("event_status", "source_status"),
+        [
+            (ActivityStatus.COMPLETED, ActivityStatus.COMPLETED),
+            (ActivityStatus.FAILED, ActivityStatus.FAILED),
+        ],
+    )
+    async def test_top_level_converge_rerun_uses_source_timestamps(
+        self,
+        event_status: ActivityStatus,
+        source_status: ActivityStatus,
+    ) -> None:
+        source_started_at = datetime(2026, 1, 1, 0, 0, 0, tzinfo=UTC)
+        source_completed_at = datetime(2026, 1, 1, 0, 5, 0, tzinfo=UTC)
+        session = self._set_source_activity_result((source_status, source_started_at, source_completed_at))
+        metadata = self._metadata([(1, "converge_1", event_status)])
+        metadata.activity_definitions_map = {"converge_1": {"type": NodeType.CONVERGE}}
+        metadata.retry_source_execution_id = uuid4()
+        handle = self._handle()
+
+        resolved = await self.service._resolve_replayed_timestamps(metadata, handle)
+
+        assert resolved == {
+            "converge_1": {
+                "started_at": source_started_at,
+                "completed_at": source_completed_at,
+                "_preserve_timestamp_values": True,
+            }
+        }
+        session.exec.assert_awaited_once()
+        handle.query.assert_not_awaited()
+        handle.execute_update.assert_not_awaited()
+
+        activity_data = {
+            "status": event_status,
+            "started_at": "retry start",
+            "completed_at": "retry completion",
+        }
+        self.service._apply_replayed_state(resolved["converge_1"], activity_data)
+
+        assert activity_data == {
+            "status": event_status,
+            "started_at": source_started_at,
+            "completed_at": source_completed_at,
+        }
+
+    @pytest.mark.asyncio
+    async def test_skipped_source_converge_keeps_the_retry_timestamps(self) -> None:
+        session = self._set_source_activity_result((ActivityStatus.SKIPPED, None, None))
+        metadata = self._metadata([(1, "converge_1", ActivityStatus.COMPLETED)])
+        metadata.activity_definitions_map = {"converge_1": {"type": NodeType.CONVERGE}}
+        metadata.retry_source_execution_id = uuid4()
+        handle = self._handle()
+
+        assert await self.service._resolve_replayed_timestamps(metadata, handle) == {}
+        session.exec.assert_awaited_once()
+        handle.query.assert_not_awaited()
+        handle.execute_update.assert_not_awaited()
+
+    def test_apply_preserves_explicit_none_for_source_converge_timestamps(self) -> None:
+        activity_data = {"status": ActivityStatus.COMPLETED, "started_at": "retry", "completed_at": "retry"}
+
+        self.service._apply_replayed_state(
+            {"started_at": None, "completed_at": None, "_preserve_timestamp_values": True},
+            activity_data,
+        )
+
+        assert activity_data == {"status": ActivityStatus.COMPLETED, "started_at": None, "completed_at": None}
 
     @pytest.mark.asyncio
     async def test_the_update_is_used_when_the_query_cannot_answer_yet(self) -> None:
@@ -6918,6 +7027,16 @@ class TestInitializeMonitoringSetsRetryFlag:
         metadata = await service._initialize_monitoring(uuid4())
 
         assert metadata.is_retry_from_failure is True, "retry must not restore nothing"
+
+    async def test_source_execution_id_is_carried_for_retry_from_failure(self) -> None:
+        execution = self._execution()
+        source_execution_id = uuid4()
+        execution.retried_from_execution_id = source_execution_id
+        service, _ = self._service(execution, query_result=True)
+
+        metadata = await service._initialize_monitoring(uuid4())
+
+        assert metadata.retry_source_execution_id == source_execution_id
 
     async def test_flag_false_for_an_ordinary_run(self) -> None:
         service, _ = self._service(self._execution(), query_result=False)

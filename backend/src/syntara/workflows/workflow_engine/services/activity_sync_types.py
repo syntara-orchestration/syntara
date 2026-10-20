@@ -82,6 +82,7 @@ class ExecutionMonitorMetadata:
     used_published: bool | None = None
     is_retry: bool = False
     is_retry_from_failure: bool = False
+    retry_source_execution_id: UUID | None = None
 
 
 type QueueItem = HistoryEvent | SyntheticActivityStarted | SyntheticPartialOutput | None
