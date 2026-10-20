@@ -144,6 +144,50 @@ async def test_body_occurrence_switches_enclosing_loop_to_live_mode(patched_work
 
 
 @pytest.mark.asyncio
+async def test_continue_on_failure_restarts_at_lowest_failed_iteration(patched_workflow) -> None:
+    """Multiple failures of one selected node resume from the earliest occurrence."""
+    wf = _wf(retry_points=["body_a"], bodies={"loop_1": {"body_a"}})
+    wf.loop_body_map = {"body_a": "loop_1"}
+    wf._retry_source_temporal_statuses = {
+        "body_a_iter_5": "failed",
+        "body_a_iter_3": "completed",
+        "body_a_iter_2": "failed",
+    }
+    wf._retry_selected_failure_paths = wf._selected_failure_iteration_paths()
+
+    assert wf._retry_selected_failure_paths == {"body_a": [[2], [5]]}
+
+    # Passing the earliest failed iteration would mean we selected the later one.
+    state = ForEachLoopState(type=LoopType.FOR_EACH, items=list(range(6)), current_index=3)
+    with pytest.raises(ApplicationError, match=r"after selected failure path \[2\]"):
+        await wf._replayed_loop_control("loop_1", state)
+    patched_workflow.execute_activity.assert_not_awaited()
+
+    # Replay reaches iteration 2, then hands the selected body node and its loop
+    # back to normal execution. Later iterations (including the second failure)
+    # are handled by that live pass.
+    state.current_index = 2
+    wf.node_control_data["loop_1"] = {"current_index": 2}
+    patched_workflow.execute_activity.return_value = True
+    result = await wf._replayed_loop_control("loop_1", state)
+
+    assert result is not None
+    assert result["control"]["next_port"] == "iterate"
+    assert wf._active_loop_iteration["loop_1"] == 2
+
+    from syntara.workflows.workflow_engine.graph import ActivityNode
+
+    selected_node = ActivityNode(node_id="body_a", node_type="script", parameters={})
+    assert wf._enter_live_retry_mode_at_selected_node(selected_node)
+    assert wf._retry_live_loop_ids == {"loop_1"}
+    assert "loop_1" not in wf._retry_replay_candidates
+
+    state.current_index = 3
+    assert await wf._replayed_loop_control("loop_1", state) is None
+    patched_workflow.execute_activity.assert_awaited_once()
+
+
+@pytest.mark.asyncio
 async def test_nested_loop_replays_before_inner_failed_iteration(patched_workflow) -> None:
     wf = _wf(retry_points=["body_a"], bodies={"outer": {"inner", "body_a"}, "inner": {"body_a"}})
     wf.loop_body_map = {"inner": "outer", "body_a": "inner"}
