@@ -354,6 +354,7 @@ export interface components {
       | 'scheduled_trigger'
       | 'webhook_trigger'
       | 'eda_trigger'
+      | 'event_subscribe_trigger'
       | 'condition'
       | 'converge'
       | 'loop'
