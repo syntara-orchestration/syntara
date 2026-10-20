@@ -596,33 +596,6 @@ class WorkflowRetryMixin:
         return seen
 
     @staticmethod
-    def _loop_body_node_ids(graph: WorkflowGraph) -> set[str]:
-        """Return every node that runs inside a loop body.
-
-        Seeds from each loop node's ``iterate`` successors, then follows plain
-        adjacency. Only a multi-output node's edges carry ``from_port``, so the
-        walk may filter on it for the seed and must not for the rest of the body:
-        doing so stops after the first node and leaves the remainder of the body
-        looking like ordinary nodes. Feedback edges (``to_port="iterate"``) are
-        stripped when the graph is built, so the walk terminates at the end of the
-        body and cannot escape via the loop's ``complete`` port.
-
-        Body nodes stay in the retry region. This helper identifies their loop
-        owner so replay can choose the source row for the active iteration instead
-        of treating each body node as a single execution.
-
-        Args:
-            graph: Workflow graph.
-
-        """
-        loop_ids = [node.id for node in graph.get_all_nodes() if node.type == NodeType.LOOP]
-        bodies = collect_loop_bodies(
-            {node.id: graph.get_successors(node.id) for node in graph.get_all_nodes()},
-            {owner: [node.id for node in graph.get_next_activities_by_port(owner, "iterate")] for owner in loop_ids},
-        )
-        return set().union(*bodies.values()) if bodies else set()
-
-    @staticmethod
     def _walk_downstream(start_node_id: str, graph: WorkflowGraph) -> set[str]:
         """Every node reachable from ``start_node_id``, inclusive."""
         seen: set[str] = set()

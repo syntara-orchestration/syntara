@@ -712,28 +712,6 @@ async def test_maybe_restore_returns_none_outside_a_retry(mock_wf: MagicMock) ->
     assert await wf._maybe_restore_retry_output(node, _chain_graph()) is None
 
 
-def test_loop_body_walk_survives_a_repeated_node() -> None:
-    """A body reachable twice is visited once, so the walk cannot spin.
-
-    A nested or re-entrant body makes the same node reachable on more than one
-    path; the visited check is what keeps the traversal terminating.
-    """
-    from syntara.workflows.workflow_engine.graph import WorkflowGraph
-    from syntara.workflows.workflow_engine.graph_backend import InMemoryGraphBackend
-
-    backend = InMemoryGraphBackend()
-    backend.add_node("loop_1", {"id": "loop_1", "type": "loop", "parameters": {}})
-    backend.add_node("body_a", {"id": "body_a", "type": "script", "parameters": {}})
-    backend.add_node("body_b", {"id": "body_b", "type": "script", "parameters": {}})
-    # Two iterate paths converge on body_b.
-    backend.add_edge("loop_1", "body_a", {"from_port": "iterate"})
-    backend.add_edge("loop_1", "body_b", {"from_port": "iterate"})
-    backend.add_edge("body_a", "body_b", {"from_port": "iterate"})
-    graph = WorkflowGraph(backend)
-
-    assert OrchestratorWorkflow._loop_body_node_ids(graph) == {"body_a", "body_b"}
-
-
 # ---------------------------------------------------------------------------
 # End-to-end replay of a plain linear chain
 #

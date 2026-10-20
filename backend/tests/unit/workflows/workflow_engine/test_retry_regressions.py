@@ -75,18 +75,6 @@ def _diamond_graph() -> WorkflowGraph:
     return WorkflowGraph(backend)
 
 
-def _two_loop_graph() -> WorkflowGraph:
-    """loop_a { a_body } and loop_b { b_body }, independent."""
-    backend = InMemoryGraphBackend()
-    _add(backend, "loop_a", "loop")
-    _add(backend, "a_body", "script")
-    _add(backend, "loop_b", "loop")
-    _add(backend, "b_body", "script")
-    backend.add_edge("loop_a", "a_body", {"from_port": "iterate"})
-    backend.add_edge("loop_b", "b_body", {"from_port": "iterate"})
-    return WorkflowGraph(backend)
-
-
 def _wf(retry_context: dict[str, Any] | None = None) -> OrchestratorWorkflow:
     wf = OrchestratorWorkflow.__new__(OrchestratorWorkflow)
     wf.retry_context = retry_context or {}
@@ -139,33 +127,12 @@ def mock_wf() -> Generator[MagicMock, None, None]:
 
 
 # ---------------------------------------------------------------------------
-# 1. Loop body detection must walk the whole body
+# Loop body nodes restore from their per-iteration source rows
 # ---------------------------------------------------------------------------
 
 
-def test_loop_body_includes_every_body_node() -> None:
-    """Every body node is found, not just the first.
-
-    Only the loop's own exit edge carries ``from_port``; filtering on it at every
-    hop stops the walk after one node.
-    """
-    assert OrchestratorWorkflow._loop_body_node_ids(_loop_body_graph()) == {"body_a", "body_b", "body_c"}
-
-
-def test_loop_body_does_not_include_nodes_after_the_loop() -> None:
-    """The walk must stop at the loop's complete port."""
-    body = OrchestratorWorkflow._loop_body_node_ids(_loop_body_graph())
-
-    assert "step_2" not in body
-    assert "loop_1" not in body
-
-
-def test_multi_node_body_is_restored_per_iteration() -> None:
-    """A multi-node loop body is not restorable.
-
-    Regression guard: body_b and body_c were classified restorable and injected
-    as a single scalar.
-    """
+def test_multi_node_body_remains_eligible_for_per_iteration_replay() -> None:
+    """All nodes in a loop body remain eligible for per-iteration replay."""
     wf = _wf(_retry("step_2"))
 
     restorable = wf._retry_restorable_nodes(_loop_body_graph())
@@ -175,23 +142,7 @@ def test_multi_node_body_is_restored_per_iteration() -> None:
 
 
 # ---------------------------------------------------------------------------
-# 2. Loop body lookup must be scoped to the loop being resumed
-# ---------------------------------------------------------------------------
-
-
-def test_loop_body_is_scoped_per_loop() -> None:
-    """Every loop body is collected, and no loop adopts only one of them."""
-    graph = _two_loop_graph()
-
-    # Loop resume is a separate piece of work, so this now answers one question
-    # only: which nodes must never be replayed as if they were ordinary nodes.
-    # Both bodies are excluded, because a body node is one execution per
-    # iteration and a single stored output cannot stand in for all of them.
-    assert OrchestratorWorkflow._loop_body_node_ids(graph) == {"a_body", "b_body"}
-
-
-# ---------------------------------------------------------------------------
-# 3. A restored predecessor must satisfy a converge gate
+# A restored predecessor must satisfy a converge gate
 # ---------------------------------------------------------------------------
 
 
@@ -361,32 +312,6 @@ def test_a_completed_converge_is_retained_but_never_restored() -> None:
     assert "join" not in wf.skipped_nodes
     # Not restorable: a converge must always evaluate its own gate.
     assert not wf._should_restore_node("join", graph)
-
-
-def test_definition_validator_and_retry_share_loop_body_membership() -> None:
-    """Raw edges and built-graph adapters agree across plain and feedback edges."""
-    from syntara.workflows.validators.template_expressions import _identify_loop_body_nodes
-
-    definition = {
-        "nodes": [{"id": "loop_1", "type": "loop"}],
-        "edges": [
-            {"from": "trigger", "to": "loop_1"},
-            {"from": "loop_1", "to": "body_a", "from_port": "iterate"},
-            {"from": "body_a", "to": "body_b"},
-            {"from": "body_b", "to": "body_c"},
-            {"from": "body_c", "to": "loop_1", "to_port": "iterate"},
-            {"from": "loop_1", "to": "step_2", "from_port": "complete"},
-        ],
-    }
-    assert (
-        set(_identify_loop_body_nodes(definition))
-        == _wf()._loop_body_node_ids(_loop_body_graph())
-        == {
-            "body_a",
-            "body_b",
-            "body_c",
-        }
-    )
 
 
 class TestNoOverwrittenFailureNamespaceEntry:
