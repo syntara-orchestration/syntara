@@ -21,6 +21,7 @@ from syntara.workflows.workflow_engine.models.workflow_definition import Activit
 from syntara.workflows.workflow_engine.utils.loop_iteration_ids import (
     approval_temporal_activity_id,
     loop_body_temporal_activity_id,
+    loop_control_activity_id,
     loop_index_chain,
     loop_iteration_path,
     retry_loop_record_activity_id,
@@ -86,6 +87,12 @@ class WorkflowRetryMixin:
     _retry_replay_candidates: set[str]
     #: Source times/status keyed only by the canonical Temporal activity ID.
     _restored_node_timestamps: dict[str, dict[str, str | None]]
+    #: Loop-controller occurrences reached through source-history probes. These
+    #: synthetic transitions have no node replay activity, but can be a branch
+    #: input to a converge inside an enclosing loop.
+    _replayed_loop_control_activity_ids: set[str]
+    #: Loop converge occurrences whose direct branch inputs were all restored.
+    _retry_converges_with_replayed_branches: set[str]
     #: The source status of a node this retry restored, keyed by node id. Read by the
     #: completion path so a restored skip or failure is not republished as a success
     #: and does not have its successors scheduled.
@@ -164,6 +171,8 @@ class WorkflowRetryMixin:
         # _prepare_retry rather than on first use.
         self._retry_replay_candidates: set[str] = set()
         self._restored_node_timestamps: dict[str, dict[str, str | None]] = {}
+        self._replayed_loop_control_activity_ids: set[str] = set()
+        self._retry_converges_with_replayed_branches: set[str] = set()
         self._restored_node_statuses: dict[str, str] = {}
         self._restored_node_outputs: dict[str, dict[str, Any]] = {}
         self._restored_control_ports: dict[str, str] = {}
@@ -347,6 +356,45 @@ class WorkflowRetryMixin:
         if node.type == NodeType.APPROVAL:
             return approval_temporal_activity_id(node.id, loop_body_map, node_control_data)
         return loop_body_temporal_activity_id(node.id, loop_body_map, node_control_data)
+
+    def _all_converge_predecessors_replayed(self, node_id: str, graph: WorkflowGraph) -> bool:
+        """Whether every direct input to this converge was restored from source.
+
+        Converge evaluates its gate again during retry. Its old timestamp is safe
+        to retain inside a loop only when the values feeding that gate came from
+        replayed source occurrences, rather than freshly executed branches.
+        """
+        if not self.retry_context:
+            return False
+
+        predecessor_ids = graph.get_predecessors(node_id)
+        if not predecessor_ids:
+            return False
+
+        for predecessor_id in predecessor_ids:
+            predecessor = graph.get_node(predecessor_id)
+            if predecessor.type == NodeType.LOOP:
+                state = getattr(self, "loop_state", {}).get(predecessor_id)
+                if state is None:
+                    return False
+                temporal_id = loop_control_activity_id(
+                    predecessor_id,
+                    state.current_index,
+                    getattr(self, "loop_body_map", {}),
+                    getattr(self, "node_control_data", {}),
+                )
+                if temporal_id not in self._replayed_loop_control_activity_ids:
+                    return False
+            elif self._source_temporal_activity_id(predecessor) not in self._restored_node_timestamps:
+                return False
+
+        return True
+
+    def _mark_loop_converge_timestamp_candidate(self, node_id: str, graph: WorkflowGraph) -> None:
+        """Expose a loop converge occurrence only when all direct inputs replayed."""
+        temporal_id = loop_body_temporal_activity_id(node_id, self.loop_body_map, self.node_control_data)
+        if loop_iteration_path(temporal_id) and self._all_converge_predecessors_replayed(node_id, graph):
+            self._retry_converges_with_replayed_branches.add(temporal_id)
 
     def _selected_failure_iteration_paths(self) -> dict[str, list[list[int]]]:
         """Index selected failed rows by their recorded complete iteration path."""

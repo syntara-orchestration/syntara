@@ -61,6 +61,8 @@ def _wf(
     wf._retry_replay_candidates = set(bodies)
     wf._retry_loop_record_states = {}
     wf._retry_live_loop_ids = set()
+    wf._replayed_loop_control_activity_ids = set()
+    wf._retry_converges_with_replayed_branches = set()
     wf._restored_node_timestamps = {}
     wf._restored_node_statuses = {}
     wf._restored_node_outputs = {}

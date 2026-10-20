@@ -18,7 +18,7 @@ from syntara.workflows.models.activity_execution import ActivityStatus
 from syntara.workflows.utils.namespace_resolver import NamespaceResolver
 from syntara.workflows.workflow_engine.dynamic_workflow import PRE_RESOLVED_MARKER, OrchestratorWorkflow
 from syntara.workflows.workflow_engine.graph import ActivityNode, WorkflowGraph
-from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName
+from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName, NodeType
 from syntara.workflows.workflow_engine.retry_mixin import (
     _CONTROL_NODE_TYPES_FOR_RETRY,
     WorkflowRetryMixin,
@@ -71,6 +71,42 @@ def _node(node_id: str = "step_2", parameters: dict[str, Any] | None = None) -> 
         node_type="script",
         parameters=parameters if parameters is not None else {},
     )
+
+
+def test_loop_converge_timestamp_candidate_requires_every_nested_branch_replay() -> None:
+    """A nested converge retains source times only when both direct inputs replayed."""
+    wf = _make_workflow({"retry_from_execution_id": "src-1"})
+    wf.loop_body_map = {
+        "inner_loop": "outer_loop",
+        "branch_a": "inner_loop",
+        "branch_b": "inner_loop",
+        "converge": "inner_loop",
+    }
+    wf.node_control_data = {
+        "outer_loop": {"current_index": 1},
+        "inner_loop": {"current_index": 4},
+    }
+    wf._restored_node_timestamps = {
+        "branch_a_iter_1_iter_4": {"started_at": "a"},
+        "branch_b_iter_1_iter_4": {"started_at": "b"},
+    }
+    graph = MagicMock()
+    graph.get_predecessors.return_value = ["branch_a", "branch_b"]
+    graph.get_node.side_effect = {
+        "branch_a": ActivityNode("branch_a", NodeType.SCRIPT, {}),
+        "branch_b": ActivityNode("branch_b", NodeType.SCRIPT, {}),
+    }.__getitem__
+
+    wf._mark_loop_converge_timestamp_candidate("converge", graph)
+
+    assert wf._retry_converges_with_replayed_branches == {"converge_iter_1_iter_4"}
+
+    wf._retry_converges_with_replayed_branches.clear()
+    del wf._restored_node_timestamps["branch_b_iter_1_iter_4"]
+
+    wf._mark_loop_converge_timestamp_candidate("converge", graph)
+
+    assert wf._retry_converges_with_replayed_branches == set()
 
 
 # ---------------------------------------------------------------------------

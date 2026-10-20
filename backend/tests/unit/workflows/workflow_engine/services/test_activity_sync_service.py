@@ -2648,6 +2648,7 @@ class TestSyncNodesToTerminalStatus:
         """Create a mock ActivityExecution database record."""
         activity = Mock()
         activity.activity_name = activity_name
+        activity.temporal_activity_id = activity_name
         activity.status = status
         activity.started_at = None
         activity.completed_at = None
@@ -2703,14 +2704,16 @@ class TestSyncNodesToTerminalStatus:
     async def test_retry_converge_failure_keeps_source_timestamps(self) -> None:
         """A workflow-reported converge failure has no Temporal completion event."""
         activity = self._create_mock_activity_execution("converge_1")
-        session = self._mock_session([activity])
         source_started_at = datetime(2026, 1, 1, 0, 0, 0, tzinfo=UTC)
         source_completed_at = datetime(2026, 1, 1, 0, 5, 0, tzinfo=UTC)
-        source_result = Mock()
-        source_result.all.return_value = [
-            ("converge_1", ActivityStatus.COMPLETED, source_started_at, source_completed_at)
+        sessions = [
+            self._session_with_result([("converge_1", "converge_1", ActivityStatus.PENDING)]),
+            self._session_with_result(
+                [("converge_1", ActivityStatus.COMPLETED, source_started_at, source_completed_at)]
+            ),
+            self._session_with_result([activity]),
         ]
-        session.exec.side_effect = [Mock(all=Mock(return_value=[activity])), source_result]
+        self.mock_session_factory.side_effect = [self._session_context(session) for session in sessions]
         metadata = self._create_metadata(activity_index_map={"converge_1": 0})
         metadata.is_retry_from_failure = True
         metadata.retry_source_execution_id = uuid4()
@@ -2726,6 +2729,58 @@ class TestSyncNodesToTerminalStatus:
         assert activity.status == ActivityStatus.FAILED
         assert activity.started_at == source_started_at
         assert activity.completed_at == source_completed_at
+
+    @pytest.mark.asyncio
+    async def test_loop_converge_failure_keeps_source_timestamps_only_when_branches_replayed(self) -> None:
+        """A failed nested converge uses the exact source occurrence only when eligible."""
+        temporal_activity_id = "converge_1_iter_2_iter_4"
+        activity = self._create_mock_activity_execution("converge_1#iter-2#iter-4")
+        activity.temporal_activity_id = temporal_activity_id
+        source_started_at = datetime(2026, 1, 1, 0, 0, 0, tzinfo=UTC)
+        source_completed_at = datetime(2026, 1, 1, 0, 5, 0, tzinfo=UTC)
+        sessions = [
+            self._session_with_result([(activity.activity_name, temporal_activity_id, ActivityStatus.PENDING)]),
+            self._session_with_result(
+                [(temporal_activity_id, ActivityStatus.COMPLETED, source_started_at, source_completed_at)]
+            ),
+            self._session_with_result([activity]),
+        ]
+        self.mock_session_factory.side_effect = [self._session_context(session) for session in sessions]
+        metadata = self._create_metadata(activity_index_map={"converge_1": 0})
+        metadata.is_retry_from_failure = True
+        metadata.retry_source_execution_id = uuid4()
+        metadata.activity_definitions_map = {"converge_1": {"type": NodeType.CONVERGE}}
+        handle = AsyncMock()
+        handle.query = AsyncMock(return_value=True)
+
+        await self.service._sync_nodes_to_terminal_status(
+            metadata,
+            ["converge_1"],
+            ActivityStatus.FAILED,
+            error_map={"converge_1": "converge gate failed"},
+            handle=handle,
+        )
+
+        handle.query.assert_awaited_once_with("should_preserve_loop_converge_timestamps", temporal_activity_id)
+        assert activity.status == ActivityStatus.FAILED
+        assert activity.started_at == source_started_at
+        assert activity.completed_at == source_completed_at
+
+    def _session_context(self, session: Mock) -> Mock:
+        context = Mock()
+        context.__aenter__ = AsyncMock(return_value=session)
+        context.__aexit__ = AsyncMock(return_value=False)
+        return context
+
+    @staticmethod
+    def _session_with_result(rows: list[Any]) -> Mock:
+        result = Mock()
+        result.all.return_value = rows
+        session = Mock()
+        session.exec = AsyncMock(return_value=result)
+        session.commit = AsyncMock()
+        session.rollback = AsyncMock()
+        return session
 
     @pytest.mark.asyncio
     async def test_multiple_failed_nodes_all_marked(self) -> None:
@@ -6716,6 +6771,48 @@ class TestReplayedTimestampResolution:
             "started_at": source_started_at,
             "completed_at": source_completed_at,
         }
+
+    @pytest.mark.asyncio
+    async def test_loop_converge_rerun_uses_source_times_for_exact_iteration_when_all_branches_replayed(self) -> None:
+        temporal_activity_id = "converge_1_iter_2_iter_4"
+        source_started_at = datetime(2026, 1, 1, 0, 0, 0, tzinfo=UTC)
+        source_completed_at = datetime(2026, 1, 1, 0, 5, 0, tzinfo=UTC)
+        session = self._set_source_activity_result((ActivityStatus.COMPLETED, source_started_at, source_completed_at))
+        metadata = self._metadata([(1, "converge_1", ActivityStatus.FAILED)])
+        metadata.pending_activity_updates[1]["temporal_activity_id"] = temporal_activity_id
+        metadata.pending_activity_updates[1]["_is_loop_iteration"] = True
+        metadata.activity_definitions_map = {"converge_1": {"type": NodeType.CONVERGE}}
+        metadata.retry_source_execution_id = uuid4()
+        handle = self._handle()
+        handle.query = AsyncMock(return_value=True)
+
+        resolved = await self.service._resolve_replayed_timestamps(metadata, handle)
+
+        assert resolved == {
+            temporal_activity_id: {
+                "started_at": source_started_at,
+                "completed_at": source_completed_at,
+                "_preserve_timestamp_values": True,
+            }
+        }
+        handle.query.assert_awaited_once_with("should_preserve_loop_converge_timestamps", temporal_activity_id)
+        query = session.exec.await_args.args[0]
+        assert temporal_activity_id in query.compile().params.values()
+
+    @pytest.mark.asyncio
+    async def test_loop_converge_rerun_keeps_retry_times_when_any_branch_was_rerun(self) -> None:
+        metadata = self._metadata([(1, "converge_1", ActivityStatus.COMPLETED)])
+        metadata.pending_activity_updates[1]["temporal_activity_id"] = "converge_1_iter_2_iter_4"
+        metadata.pending_activity_updates[1]["_is_loop_iteration"] = True
+        metadata.activity_definitions_map = {"converge_1": {"type": NodeType.CONVERGE}}
+        metadata.retry_source_execution_id = uuid4()
+        handle = self._handle()
+        handle.query = AsyncMock(return_value=False)
+
+        assert await self.service._resolve_replayed_timestamps(metadata, handle) == {}
+
+        handle.query.assert_awaited_once_with("should_preserve_loop_converge_timestamps", "converge_1_iter_2_iter_4")
+        self.service.session_factory.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_skipped_source_converge_keeps_the_retry_timestamps(self) -> None:

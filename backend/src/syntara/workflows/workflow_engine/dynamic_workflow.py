@@ -1382,13 +1382,15 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
         # total_branches is injected at runtime (not part of the user-facing parameter schema)
         # so the converge activity can distinguish branch_count from completed_count.
         parameters_with_counts = {**resolved_parameters, "total_branches": len(predecessor_ids)}
+        activity_id = loop_body_temporal_activity_id(node_id, self.loop_body_map, self.node_control_data)
+        self._mark_loop_converge_timestamp_candidate(node_id, graph)
 
         return cast(
             "dict[str, Any]",
             await workflow.execute_activity(
                 ActivityName.CONVERGE,
                 args=[parameters_with_counts, outputs, predecessor_results],
-                activity_id=loop_body_temporal_activity_id(node_id, self.loop_body_map, self.node_control_data),
+                activity_id=activity_id,
                 start_to_close_timeout=timedelta(seconds=timeout_seconds),
             ),
         )
@@ -1508,6 +1510,13 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
             )
         next_port = "iterate" if reached else "complete"
         next_index = current + 1 if reached else current
+
+        # Loop replay is synthetic: no LOOP activity is emitted for a restored
+        # transition. Remember its full occurrence ID so a downstream converge in
+        # the enclosing loop can distinguish this source branch from a live rerun.
+        self._replayed_loop_control_activity_ids.add(
+            loop_control_activity_id(node_id, current, self.loop_body_map, self.node_control_data)
+        )
 
         # Remember which iteration this loop is replaying, so each body node's own
         # replay can ask for the row for *this* iteration rather than the first.
@@ -2264,6 +2273,11 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
         if node_id not in self._retry_replay_candidates:
             return None
         return self._restored_node_timestamps.get(activity_id)
+
+    @workflow.query
+    def should_preserve_loop_converge_timestamps(self, temporal_activity_id: str) -> bool:
+        """Whether this loop converge's direct branches were all replayed."""
+        return temporal_activity_id in self._retry_converges_with_replayed_branches
 
     @workflow.query
     def is_retry_from_failure(self) -> bool:

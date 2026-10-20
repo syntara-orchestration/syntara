@@ -55,6 +55,8 @@ class WorkflowConvergeMixin:
         self, start_node_id: str, graph: WorkflowGraph, boundary: set[str] | None = None
     ) -> None: ...
 
+    def _mark_loop_converge_timestamp_candidate(self, node_id: str, graph: WorkflowGraph) -> None: ...
+
     @staticmethod
     def _collect_ancestors(node_id: str, graph: WorkflowGraph) -> set[str]:
         """BFS backward from a node to collect all of its ancestors (inclusive)."""
@@ -250,6 +252,7 @@ class WorkflowConvergeMixin:
         skipped (via ``_timed_out_converge_nodes``).
         """
         node = graph.get_node(node_id)
+        self._mark_loop_converge_timestamp_candidate(node_id, graph)
         cof = resolve_continue_on_failure(node, self._runtime_settings)
 
         self.failed_nodes[node_id] = error_msg

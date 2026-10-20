@@ -29,6 +29,8 @@ def init_workflow_runtime(wf: OrchestratorWorkflow) -> None:
     # times, the source status and the output can each be read independently.
     wf._retry_replay_candidates = set()
     wf._restored_node_timestamps = {}
+    wf._replayed_loop_control_activity_ids = set()
+    wf._retry_converges_with_replayed_branches = set()
     wf._restored_node_statuses = {}
     wf._restored_node_outputs = {}
     wf._restored_control_ports = {}

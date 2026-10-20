@@ -274,21 +274,37 @@ class ActivityExecutionSyncMixin:
             if not activity_data:
                 continue
             activity_id = activity_data["activity_id"]
-            is_converge_rerun = metadata.activity_definitions_map.get(activity_id, {}).get(
-                "type"
-            ) == NodeType.CONVERGE and not activity_data.get("_is_loop_iteration")
+            is_converge = metadata.activity_definitions_map.get(activity_id, {}).get("type") == NodeType.CONVERGE
+            is_loop_converge_rerun = is_converge and bool(activity_data.get("_is_loop_iteration"))
+            is_top_level_converge_rerun = is_converge and not activity_data.get("_is_loop_iteration")
             if activity_data.get("status") != ActivityStatus.COMPLETED and not (
-                is_converge_rerun and activity_data.get("status") == ActivityStatus.FAILED
+                (is_loop_converge_rerun or is_top_level_converge_rerun)
+                and activity_data.get("status") == ActivityStatus.FAILED
             ):
                 continue
             timestamp_key = activity_data.get("temporal_activity_id") or activity_id
             if timestamp_key in resolved:
                 continue
-            replayed_ts = (
-                await self._source_converge_timestamps(metadata, activity_id)
-                if is_converge_rerun
-                else await self._replayed_node_timestamps(metadata, handle, timestamp_key)
-            )
+            if is_loop_converge_rerun:
+                try:
+                    preserve_source_timestamps = await handle.query(
+                        "should_preserve_loop_converge_timestamps", timestamp_key
+                    )
+                except (RPCError, TemporalError, ValueError):
+                    logger.warning(
+                        "Could not determine whether loop converge branches were replayed",
+                        activity_id=timestamp_key,
+                    )
+                    preserve_source_timestamps = False
+                replayed_ts = (
+                    await self._source_converge_timestamps(metadata, activity_id, timestamp_key)
+                    if preserve_source_timestamps
+                    else None
+                )
+            elif is_top_level_converge_rerun:
+                replayed_ts = await self._source_converge_timestamps(metadata, activity_id, timestamp_key)
+            else:
+                replayed_ts = await self._replayed_node_timestamps(metadata, handle, timestamp_key)
             if replayed_ts is not None:
                 resolved[timestamp_key] = replayed_ts
         return resolved
@@ -391,14 +407,17 @@ class ActivityExecutionSyncMixin:
         self,
         metadata: ExecutionMonitorMetadata,
         activity_id: str,
+        temporal_activity_id: str | None = None,
     ) -> dict[str, Any] | None:
-        """Return timestamps from an executed source converge node for its retry rerun.
+        """Return timestamps from the source converge occurrence for its retry rerun.
 
         Converge nodes deliberately execute again during retry-from-failure so their
         gate is evaluated against the restored branches. Their output/status comes
         from that new execution, but the run view should retain the source run's
-        timestamps. A source converge that was skipped never executed and therefore
-        has no replay times to preserve.
+        timestamps. Loop occurrences are matched by their full Temporal activity
+        ID; the canvas activity name alone would conflate iterations. A source
+        converge that was skipped never executed and therefore has no replay times
+        to preserve.
         """
         if metadata.retry_source_execution_id is None:
             return None
@@ -407,7 +426,7 @@ class ActivityExecutionSyncMixin:
             result = await session.exec(
                 select(ActivityExecution.status, ActivityExecution.started_at, ActivityExecution.completed_at).where(
                     ActivityExecution.execution_id == metadata.retry_source_execution_id,
-                    ActivityExecution.activity_name == activity_id,
+                    ActivityExecution.temporal_activity_id == (temporal_activity_id or activity_id),
                 )
             )
             source = result.one_or_none()
