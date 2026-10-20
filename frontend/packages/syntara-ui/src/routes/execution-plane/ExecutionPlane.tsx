@@ -1,5 +1,6 @@
 import { Truncate } from '@patternfly/react-core'
 import { Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
+import type { ExecutionPlaneAPI } from '@syntara/contracts'
 import { useMemo } from 'react'
 
 import { executionPlaneClient } from '../../client'
@@ -22,8 +23,9 @@ import { useDocLink } from '../../utils/docs/useDocLink'
 import { ExecutionPlaneEmptyState } from './ExecutionPlaneEmptyState'
 import { getExecutionTargetNameFilterDefinition } from './executionPlaneFilters'
 import { ExecutionTargetStatusLabel } from './ExecutionTargetStatusLabel'
-import { filterExecutionTargets, type ExecutionTarget } from './filterExecutionTargets'
 import { RoutingLabelsCell } from './RoutingLabelsCell'
+
+type ExecutionTarget = ExecutionPlaneAPI.components['schemas']['ExecutionTargetFacadeRead']
 
 function ExecutionPlaneTableContent({ rows }: Readonly<{ rows: ExecutionTarget[] }>) {
   return (
@@ -73,7 +75,7 @@ export default function ExecutionPlane() {
     resetPagination,
     filters,
     hasActiveFilters,
-    perPage,
+    queryParams,
     handleFilterChange,
     handleClearAllFilters,
     getFooterProps,
@@ -85,27 +87,24 @@ export default function ExecutionPlane() {
     'get',
     '/api/execution_plane/v1/execution_targets',
     {
-      params: { query: { limit: perPage } },
+      params: { query: queryParams },
     },
     {
       refetchInterval: 30_000,
     }
   )
 
-  const rows = useMemo(
-    () => filterExecutionTargets(query.data?.resources ?? [], filters),
-    [query.data?.resources, filters]
-  )
+  const results = query.data?.resources ?? []
 
   useCursorReset({
-    itemCount: rows.length,
+    itemCount: results.length,
     hasActiveFilters,
     cursor,
     isFetching: query.isFetching,
     resetPagination,
   })
 
-  const isEmpty = rows.length === 0
+  const isEmpty = results.length === 0
 
   return (
     <SynPage>
@@ -134,17 +133,8 @@ export default function ExecutionPlane() {
               ) : undefined
             }
             body={
-              <SynListPanelTable
-                caption="Execution targets"
-                footer={getFooterProps({
-                  resources: rows,
-                  total: rows.length,
-                  next: null,
-                  prev: null,
-                })}
-                useFixedLayout={false}
-              >
-                <ExecutionPlaneTableContent rows={rows} />
+              <SynListPanelTable caption="Execution targets" footer={getFooterProps(query.data)} useFixedLayout={false}>
+                <ExecutionPlaneTableContent rows={results} />
               </SynListPanelTable>
             }
           />

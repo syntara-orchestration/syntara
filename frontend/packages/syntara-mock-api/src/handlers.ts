@@ -428,7 +428,8 @@ export const handlers = [
   http.get('/api/execution_plane/v1/execution_targets', ({ request }) => {
     const username = getUsernameFromRequest(request)
     // Match backend role conventions: only admin/auditor have execution_target:read
-    if (username === 'viewer' || username === 'user' || username === 'puser' || username === 'project-user') {
+    // (project-admin / padmin are denied — same as can_i without a project grant).
+    if (username !== 'admin' && username !== 'auditor') {
       return HttpResponse.json(
         {
           type: 'https://api.example.com/errors/forbidden',
@@ -442,15 +443,19 @@ export const handlers = [
     }
 
     const url = new URL(request.url)
+    const nameContains = url.searchParams.get('name[contains]')
+    const cursor = url.searchParams.get('cursor')
     const parsedLimit = Number.parseInt(url.searchParams.get('limit') ?? '20', 10)
     const limit = Number.isFinite(parsedLimit) ? Math.min(Math.max(parsedLimit, 1), 100) : 20
-    const resources = executionTargets.slice(0, limit)
-    return HttpResponse.json({
-      resources,
-      next: null,
-      prev: null,
-      total: executionTargets.length,
-    })
+    const includeTotal = url.searchParams.get('include_total') === 'true'
+
+    let filtered = [...executionTargets]
+    if (nameContains) {
+      const lower = nameContains.toLowerCase()
+      filtered = filtered.filter((target) => target.name.toLowerCase().includes(lower))
+    }
+
+    return HttpResponse.json(paginate(filtered, cursor, limit, includeTotal))
   }),
 
   http.get('/api/v1/integrations', ({ request }) => {

@@ -8,6 +8,7 @@ import { axe } from 'vitest-axe'
 import { executionPlaneClient } from '../../client'
 import { AlertProvider } from '../../providers/alerts'
 import { assertUrlParam } from '../../test/filter-test-helpers'
+import { expectPageTitle } from '../../test/pageTitle'
 import { routerTestState } from '../../test/setup'
 
 import ExecutionPlane from './ExecutionPlane'
@@ -106,6 +107,7 @@ describe('ExecutionPlane', () => {
     render(<ExecutionPlane />, { wrapper })
 
     expect(await screen.findByRole('heading', { level: 1, name: 'Execution Plane' })).toBeInTheDocument()
+    expectPageTitle(['Execution Plane'])
     expect(screen.getByText('Prod OpenShift West')).toBeInTheDocument()
     expect(screen.getByText('Staging OpenShift')).toBeInTheDocument()
     expect(screen.getByText('cl-001')).toBeInTheDocument()
@@ -115,14 +117,42 @@ describe('ExecutionPlane', () => {
     expect(screen.getByRole('row', { name: /Staging OpenShift.*Disabled/ })).toBeInTheDocument()
   })
 
-  it('requests execution targets from the facade endpoint', () => {
+  it('requests execution targets from the facade endpoint with cursor query params', () => {
     render(<ExecutionPlane />, { wrapper })
 
     const call = vi.mocked(executionPlaneClient.useQuery).mock.calls[0]
     expect(call?.[0]).toBe('get')
     expect(call?.[1]).toBe('/api/execution_plane/v1/execution_targets')
-    const options = call?.[2] as { params?: { query?: { limit?: number } } } | undefined
-    expect(typeof options?.params?.query?.limit).toBe('number')
+    const queryParams = (call?.[2] as { params?: { query?: Record<string, unknown> } } | undefined)?.params?.query
+    expect(queryParams).toMatchObject({
+      limit: 20,
+      include_total: true,
+    })
+  })
+
+  it('configures 30-second polling interval on the execution targets query', () => {
+    render(<ExecutionPlane />, { wrapper })
+
+    const call = vi.mocked(executionPlaneClient.useQuery).mock.calls[0]
+    const queryOptions = call?.[3] as { refetchInterval?: number } | undefined
+    expect(queryOptions?.refetchInterval).toBe(30_000)
+  })
+
+  it('wires pagination footer from facade response cursors and total', async () => {
+    mockFacadeQuery({
+      data: {
+        resources: mockTargets,
+        next: 'next-cursor',
+        prev: null,
+        total: 42,
+      },
+    })
+
+    render(<ExecutionPlane />, { wrapper })
+
+    expect(await screen.findByText('Prod OpenShift West')).toBeInTheDocument()
+    expect(screen.queryAllByText((_, el) => (el?.textContent ?? '').includes('of 42'))).not.toHaveLength(0)
+    expect(screen.getByRole('button', { name: 'Go to next page' })).toBeEnabled()
   })
 
   it('shows empty state with configure path when no targets exist', async () => {
