@@ -1,5 +1,5 @@
 import { Breadcrumb, BreadcrumbItem, Truncate } from '@patternfly/react-core'
-import type { BreadcrumbItemRenderArgs } from '@patternfly/react-core'
+import type { BreadcrumbItemRenderArgs, TooltipProps } from '@patternfly/react-core'
 import { Link } from '@tanstack/react-router'
 import { useSyncExternalStore } from 'react'
 
@@ -14,7 +14,7 @@ const breadcrumbTruncateTooltipProps = {
   enableFlip: true,
   maxWidth: 'min(100vw - 2rem, 24rem)',
   position: 'bottom',
-}
+} satisfies Omit<TooltipProps, 'content'>
 
 function BreadcrumbTruncatedLabel({
   label,

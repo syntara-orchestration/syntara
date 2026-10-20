@@ -66,7 +66,7 @@ export function SynPageBreadcrumbsCollapsedMiddle(props: SynPageBreadcrumbsColla
       <Dropdown
         isOpen={isOpen}
         onOpenChange={setIsOpen}
-        popperProps={{ className: styles.dropdownPopper, maxWidth: collapsedMenuMaxWidth }}
+        popperProps={{ minWidth: collapsedMenuMaxWidth, maxWidth: collapsedMenuMaxWidth }}
         toggle={renderToggle}
       >
         <DropdownList>
