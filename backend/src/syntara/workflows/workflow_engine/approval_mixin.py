@@ -36,7 +36,6 @@ from syntara.workflows.workflow_engine.graph import ActivityNode, WorkflowGraph
 from syntara.workflows.workflow_engine.utils.loop_iteration_ids import (
     approval_temporal_activity_id,
     loop_index_chain,
-    use_unique_loop_iteration_ids,
 )
 
 _APPROVAL_COMMENTS_MAX_LENGTH = FieldLimits.DESCRIPTION_MAX_LENGTH
@@ -155,8 +154,8 @@ class WorkflowApprovalMixin:
     def _approval_activity_id(self, node_id: str) -> str:
         """Return the Temporal activity ID for this approval node.
 
-        New executions suffix the canvas ID with the loop-index chain. In-flight
-        pre-patch executions keep the canvas ID so replay matches history.
+        The full loop-index chain distinguishes this occurrence from other
+        iterations of the same canvas node.
         The Approvals API ``approval_node_id`` is always the canvas ID.
         """
         return approval_temporal_activity_id(node_id, self.loop_body_map, self.node_control_data)
@@ -400,15 +399,12 @@ class WorkflowApprovalMixin:
             approver_group_ids,
             self._project_id,
         ]
-        # Always call patched() here. Extra args must not appear on replay of
-        # histories that scheduled this activity with 10 positional arguments.
-        if use_unique_loop_iteration_ids():
-            args.extend(
-                [
-                    self._loop_iteration_path(node.id),
-                    self._approval_activity_id(node.id),
-                ]
-            )
+        args.extend(
+            [
+                self._loop_iteration_path(node.id),
+                self._approval_activity_id(node.id),
+            ]
+        )
         if workflow.patched(_APPROVAL_PROMPT_PATCH):
             # select+guard -> scrub -> coerce+truncate. Order is load-bearing:
             # the guard proves the value is safe to recurse into, and scrubbing
