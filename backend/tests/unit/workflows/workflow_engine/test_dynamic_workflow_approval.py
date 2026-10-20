@@ -259,8 +259,8 @@ class TestPrepareApprovalArgs:
         assert args[11] == "approval_iter_0"
 
     @pytest.mark.asyncio
-    async def test_unpatched_replay_keeps_ten_approval_args(self) -> None:
-        """Pre-#279 history scheduled 10 args; replay must not emit loop or prompt extras."""
+    async def test_approval_args_always_include_loop_identity(self) -> None:
+        """The full iteration path is passed even when the prompt patch is absent."""
         wf = _make_workflow()
         wf.loop_body_map["approval"] = "loop"
         wf.node_control_data["loop"] = {"current_index": 1, "next_port": "iterate"}
@@ -278,8 +278,10 @@ class TestPrepareApprovalArgs:
         ):
             args = await wf._prepare_approval_args(node, graph, node.parameters)
 
-        assert len(args) == 10
+        assert len(args) == 12
         assert args[1] == "approval"
+        assert args[10] == [1]
+        assert args[11] == "approval_iter_1"
 
     @pytest.mark.asyncio
     async def test_approval_args_with_approver_config(self) -> None:
@@ -888,8 +890,8 @@ class TestDispatchApprovalNode:
         assert approval_call.kwargs["args"][11] == "approval_iter_2"
 
     @pytest.mark.asyncio
-    async def test_unpatched_dispatch_keeps_canvas_activity_id_and_ten_args(self) -> None:
-        """Pre-#279 replay schedules the canvas Temporal id with the original 10 args."""
+    async def test_dispatch_always_uses_path_activity_id_and_loop_args(self) -> None:
+        """Approval dispatch always uses the canonical path ID and arguments."""
         wf = _make_workflow()
         wf.loop_body_map["approval"] = "loop"
         wf.node_control_data["loop"] = {"current_index": 2}
@@ -912,8 +914,8 @@ class TestDispatchApprovalNode:
             await wf._dispatch_node_to_executor(node, {}, graph, timeout_seconds=300)
 
         approval_call = mock_activity.call_args_list[0]
-        assert approval_call.kwargs["activity_id"] == "approval"
-        assert len(approval_call.kwargs["args"]) == 10
+        assert approval_call.kwargs["activity_id"] == "approval_iter_2"
+        assert len(approval_call.kwargs["args"]) == 12
         assert approval_call.kwargs["args"][1] == "approval"
 
     @pytest.mark.asyncio
@@ -1329,11 +1331,13 @@ class TestApprovalActivityId:
         assert second == "approval_iter_1_iter_0"
         assert first != second
 
-    def test_unpatched_replay_keeps_canvas_temporal_id(self) -> None:
-        """Pre-patch in-flight executions keep Temporal activity_id equal to the canvas id."""
+    def test_approval_id_always_uses_the_full_path(self) -> None:
+        """Approval occurrence identity always includes its loop iteration."""
         wf = _make_workflow()
         wf.loop_body_map["approval"] = "loop"
         wf.node_control_data["loop"] = {"current_index": 3}
+        assert wf._approval_activity_id("approval") == "approval_iter_3"
+        assert wf._loop_iteration_path("approval") == [3]
         with patch(
             "syntara.workflow_runtime.engines.temporal.utils.loop_iteration_ids.use_unique_loop_iteration_ids",
             return_value=False,
