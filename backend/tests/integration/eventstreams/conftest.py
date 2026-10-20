@@ -196,7 +196,6 @@ async def delivery_context(
                     "id": "incoming",
                     "type": "event_subscribe_trigger",
                     "parameters": {
-                        "transport": "kafka",
                         "integration_id": str(integration.id),
                         "credential_id": str(credential.id),
                         "topic": "orders",
