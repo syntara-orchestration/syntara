@@ -483,11 +483,7 @@ class ActivityExecutionSyncMixin:
         # Applied for any terminal status, not just COMPLETED: a restored skip or
         # failure carries the source time too, and stamping this run's time instead
         # would report work as having happened now when it happened before.
-        if (
-            is_loop_record_restore
-            or replayed_state.get("completed_at") is not None
-            or preserve_timestamp_values
-        ):
+        if is_loop_record_restore or replayed_state.get("completed_at") is not None or preserve_timestamp_values:
             activity_data["completed_at"] = replayed_state.get("completed_at")
 
     @staticmethod
