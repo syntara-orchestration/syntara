@@ -24,8 +24,7 @@ async def _run(
     *,
     found: list[bool],
     child_loops: list[str] | None = None,
-    loop_id: str = "loop_1",
-) -> tuple[bool | None, list[Select[Any]]]:
+) -> tuple[bool, list[Select[Any]]]:
     session = AsyncMock()
     session.exec.side_effect = [_result(found=value) for value in found]
 
@@ -36,7 +35,7 @@ async def _run(
         "syntara.workflows.workflow_engine.activities.retry_node_replay_activity.get_db",
         mock_get_db,
     ):
-        answer = await probe_retry_loop_iteration("src-1", loop_id, body_ids, child_loops or [], path)
+        answer = await probe_retry_loop_iteration("src-1", body_ids, child_loops or [], path)
 
     statements = [call.args[0] for call in session.exec.await_args_list]
     return answer, statements
@@ -58,39 +57,21 @@ async def test_exact_full_path_record_means_iteration_was_reached() -> None:
 
 
 @pytest.mark.asyncio
-async def test_loop_control_completion_is_not_body_iteration_evidence() -> None:
-    answer, queries = await _run(["body_a"], [2], found=[False, False])
+async def test_missing_exact_path_is_not_iteration_evidence() -> None:
+    answer, queries = await _run(["body_a"], [2], found=[False])
 
     assert answer is False
-    assert "loop_1_iter_2" not in _render(queries[0])
+    sql = _render(queries[0])
+    assert "loop_1_iter_2" not in sql
+    assert "activity_name" not in sql
+    assert "iteration" not in sql
 
 
 @pytest.mark.asyncio
-async def test_nested_scope_record_means_missing_iteration_was_not_reached() -> None:
-    answer, queries = await _run(["body_a"], [2, 3], found=[False, True])
-
-    assert answer is False
-    assert len(queries) == 2
-    assert "body/_a/_iter/_2/_iter/_" in _render(queries[1])
-    assert "loop/_1/_iter/_2/_iter/_" in _render(queries[1])
-
-
-@pytest.mark.asyncio
-async def test_legacy_nested_history_is_unknown_and_must_not_skip_work() -> None:
+async def test_nested_iteration_without_an_exact_path_record_is_not_reached() -> None:
     answer, _ = await _run(["body_a"], [2, 3], found=[False, False])
 
-    assert answer is None
-
-
-@pytest.mark.asyncio
-async def test_top_level_legacy_rows_keep_the_compatibility_lookup() -> None:
-    answer, queries = await _run(["body_a"], [3], found=[False, True])
-
-    assert answer is True
-    legacy_sql = _render(queries[1])
-    assert "body_a" in legacy_sql
-    assert "body_a#iter-3" in legacy_sql
-    assert "iteration" in legacy_sql
+    assert answer is False
 
 
 @pytest.mark.asyncio
@@ -110,8 +91,8 @@ async def test_empty_body_never_queries_the_database() -> None:
 
 
 @pytest.mark.asyncio
-async def test_nested_loop_with_no_direct_activity_body_is_unknown_for_legacy_rows() -> None:
+async def test_nested_loop_with_no_direct_body_has_no_iteration_evidence() -> None:
     answer, queries = await _run([], [1, 0], found=[])
 
-    assert answer is None
+    assert answer is False
     assert queries == []

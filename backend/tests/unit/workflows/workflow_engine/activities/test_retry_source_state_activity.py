@@ -20,7 +20,9 @@ async def _run(rows: list[tuple[str | None, str, str | None]]) -> tuple[dict[str
     """Run the activity over ``rows``, returning the mapping and the query used."""
     session = AsyncMock()
     result = MagicMock()
-    result.all.return_value = rows
+    # The activity projects only status and the canonical Temporal ID. Preserve
+    # the input display names here to ensure the implementation does not consult them.
+    result.all.return_value = [(status, temporal_id) for _, status, temporal_id in rows]
     session.exec.return_value = result
 
     async def mock_get_db():  # noqa: ANN202
@@ -40,7 +42,6 @@ async def test_returns_the_status_for_a_node() -> None:
     states, _ = await _run([("step_1", "completed", "step_1")])
 
     assert states["activity_statuses"] == {"step_1": "completed"}
-    assert states["activity_name_statuses"] == {"step_1": "completed"}
     assert states["temporal_activity_statuses"] == {"step_1": "completed"}
 
 
@@ -68,11 +69,6 @@ async def test_strips_the_iteration_suffix_so_a_loop_body_appears_once() -> None
     )
 
     assert states["activity_statuses"] == {"body": "failed"}
-    assert states["activity_name_statuses"] == {
-        "body#iter-1": "completed",
-        "body#iter-2": "completed",
-        "body#iter-3": "failed",
-    }
     assert states["temporal_activity_statuses"] == {
         "body_iter_1": "completed",
         "body_iter_2": "completed",
@@ -89,15 +85,15 @@ async def test_the_last_row_for_a_repeated_node_wins() -> None:
 
 
 @pytest.mark.asyncio
-async def test_a_null_activity_name_is_ignored() -> None:
-    """Sync bookkeeping rows carry no activity name and map to no node."""
+async def test_a_missing_temporal_id_is_ignored_even_if_a_display_name_exists() -> None:
+    """A display label without canonical occurrence identity maps to no node."""
     states, _ = await _run([(None, "completed", None), ("step_1", "completed", "step_1")])
 
     assert states["activity_statuses"] == {"step_1": "completed"}
 
 
 @pytest.mark.asyncio
-async def test_selects_only_the_columns_it_reads() -> None:
+async def test_temporal_ids_are_the_only_source_status_identity() -> None:
     """The query must not carry the payload columns into the workflow.
 
     ``input_data`` and ``output_data`` are unbounded JSONB. Selecting them
@@ -109,7 +105,8 @@ async def test_selects_only_the_columns_it_reads() -> None:
     _, query = await _run([])
     sql = str(cast("Any", query))
 
-    assert "activity_name" in sql
+    assert "temporal_activity_id" in sql
+    assert "activity_name" not in sql
     assert "status" in sql
     for payload_column in ("output_data", "input_data"):
         assert payload_column not in sql, f"{payload_column} must not be selected"
@@ -125,7 +122,7 @@ async def test_reads_rows_as_a_column_tuple() -> None:
     """
     states, query = await _run([("step_1", "completed", "step_1")])
 
-    assert len(query.selected_columns) == 3
+    assert len(query.selected_columns) == 2
     assert states["activity_statuses"] == {"step_1": "completed"}
 
 

@@ -39,7 +39,6 @@ def _wf(*, retry_points: list[str], bodies: dict[str, set[str]]) -> Orchestrator
     wf._restored_node_statuses = {}
     wf._restored_node_outputs = {}
     wf._retry_source_statuses = {}
-    wf._retry_source_activity_name_statuses = {}
     wf._retry_source_temporal_statuses = {}
     wf._retry_selected_failure_paths = {}
     wf._retry_restorable_cache = None
@@ -96,7 +95,12 @@ async def test_the_iteration_being_replayed_is_recorded_for_its_body(patched_wor
     await _probe(wf, patched_workflow, reached=True)
 
     assert wf._active_loop_iteration["loop_1"] == 1
-    assert wf._replay_source_name("body_a") == "body_a#iter-1"
+    from syntara.workflows.workflow_engine.graph import ActivityNode
+
+    wf.loop_body_map = {"body_a": "loop_1"}
+    wf.node_control_data = {"loop_1": {"current_index": 1}}
+    body = ActivityNode(node_id="body_a", node_type="script", parameters={})
+    assert wf._source_temporal_activity_id(body) == "body_a_iter_1"
 
 
 @pytest.mark.asyncio
@@ -223,7 +227,18 @@ async def test_loop_probe_uses_only_direct_body_nodes_and_separates_nested_loop_
     await wf._replayed_loop_control("outer", state)
 
     args = patched_workflow.execute_activity.await_args.kwargs["args"]
-    assert args == ["src-1", "outer", ["outer_step"], ["inner"], [1]]
+    assert args == ["src-1", ["outer_step"], ["inner"], [1]]
+
+
+@pytest.mark.asyncio
+async def test_loop_probe_never_falls_back_to_recursive_body_membership(patched_workflow) -> None:
+    wf = _wf(retry_points=["step_after_loops"], bodies={"outer": {"outer_step", "inner_step"}})
+    patched_workflow.execute_activity.return_value = False
+    state = ForEachLoopState(type=LoopType.FOR_EACH, items=[1], current_index=0)
+
+    await wf._replayed_loop_control("outer", state)
+
+    assert patched_workflow.execute_activity.await_args.kwargs["args"] == ["src-1", [], [], [0]]
 
 
 @pytest.mark.asyncio
@@ -238,7 +253,7 @@ async def test_nested_loop_probe_passes_outer_then_inner_index(patched_workflow)
     await wf._replayed_loop_control("inner", state)
 
     args = patched_workflow.execute_activity.await_args.kwargs["args"]
-    assert args == ["src-1", "inner", ["inner_step"], [], [2, 1]]
+    assert args == ["src-1", ["inner_step"], [], [2, 1]]
     assert patched_workflow.execute_activity.await_args.kwargs["activity_id"] == (
         "__internal__probe_retry_loop_inner_iter_2_iter_1"
     )
@@ -396,90 +411,16 @@ async def test_replayed_loop_does_not_evaluate_do_while_condition(patched_workfl
     execute.assert_not_awaited()
 
 
-# --- which source row a body node replays from ---
-
-
-def test_an_ordinary_node_replays_under_its_own_id() -> None:
-    """A node outside every loop body has no iteration to qualify."""
-    wf = _wf(retry_points=["step_2"], bodies={"loop_1": {"body_a"}})
-    wf._active_loop_iteration["loop_1"] = 3
-
-    assert wf._replay_source_name("step_2") == "step_2"
-
-
-def test_iteration_zero_keeps_the_plain_node_name() -> None:
-    """The first iteration's row is stored unsuffixed, so it must replay unsuffixed."""
-    wf = _wf(retry_points=["step_2"], bodies={"loop_1": {"body_a"}})
-    wf._active_loop_iteration["loop_1"] = 0
-
-    assert wf._replay_source_name("body_a") == "body_a"
-
-
-def test_a_later_iteration_replays_its_own_suffixed_row() -> None:
-    """Iteration n restores the row the sync service wrote as ``{node}#iter-{n}``."""
-    wf = _wf(retry_points=["step_2"], bodies={"loop_1": {"body_a"}})
-    wf._active_loop_iteration["loop_1"] = 2
-
-    assert wf._replay_source_name("body_a") == "body_a#iter-2"
-
-
-def test_a_body_whose_loop_is_not_replaying_keeps_the_plain_name() -> None:
-    """No active iteration means the loop is running normally, not being replayed."""
-    wf = _wf(retry_points=["step_2"], bodies={"loop_1": {"body_a"}})
-
-    assert wf._active_loop_iteration == {}
-    assert wf._replay_source_name("body_a") == "body_a"
-
-
-def test_each_body_uses_its_own_loops_iteration() -> None:
-    """Two loops replaying at different indices must not borrow each other's number."""
-    wf = _wf(retry_points=["step_2"], bodies={"loop_1": {"body_a"}, "loop_2": {"body_b"}})
-    wf._active_loop_iteration["loop_1"] = 1
-    wf._active_loop_iteration["loop_2"] = 4
-
-    assert wf._replay_source_name("body_a") == "body_a#iter-1"
-    assert wf._replay_source_name("body_b") == "body_b#iter-4"
-
-
-# --- which loop a body node belongs to ---
-
-
-def test_enclosing_loop_finds_the_owning_loop() -> None:
-    wf = _wf(retry_points=["step_2"], bodies={"loop_1": {"body_a", "body_b"}})
-
-    assert wf._enclosing_loop("body_a") == "loop_1"
-
-
-def test_enclosing_loop_is_none_for_an_ordinary_node() -> None:
-    wf = _wf(retry_points=["step_2"], bodies={"loop_1": {"body_a"}})
-
-    assert wf._enclosing_loop("step_2") is None
-
-
-def test_enclosing_loop_is_none_when_no_loops_exist() -> None:
-    wf = _wf(retry_points=["step_2"], bodies={})
-
-    assert wf._enclosing_loop("body_a") is None
-
-
 def test_selected_failure_path_uses_the_full_temporal_id_not_the_display_counter() -> None:
     wf = _wf(retry_points=["body_a"], bodies={"outer": {"inner", "body_a"}, "inner": {"body_a"}})
     wf._retry_source_temporal_statuses = {"body_a_iter_2_iter_1": "failed"}
-    wf._retry_source_activity_name_statuses = {"body_a#iter-7": "failed"}
 
     assert wf._selected_failure_iteration_paths() == {"body_a": [[2, 1]]}
 
 
-def test_a_legacy_single_loop_failure_uses_its_composite_iteration_name() -> None:
+def test_display_name_cannot_supply_a_missing_failure_iteration_path() -> None:
     wf = _wf(retry_points=["body_a"], bodies={"loop_1": {"body_a"}})
-    wf._retry_source_activity_name_statuses = {"body_a#iter-3": "failed"}
-
-    assert wf._selected_failure_iteration_paths() == {"body_a": [[3]]}
-
-
-def test_a_legacy_nested_failure_does_not_guess_from_the_global_counter() -> None:
-    wf = _wf(retry_points=["body_a"], bodies={"outer": {"inner", "body_a"}, "inner": {"body_a"}})
-    wf._retry_source_activity_name_statuses = {"body_a#iter-3": "failed"}
+    wf._retry_source_statuses = {"body_a": "failed"}
 
     assert wf._selected_failure_iteration_paths() == {}
 

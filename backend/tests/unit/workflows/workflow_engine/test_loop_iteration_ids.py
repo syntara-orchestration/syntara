@@ -1,7 +1,5 @@
 """Unit tests for loop-iteration Temporal / approval ID helpers."""
 
-from unittest.mock import patch
-
 from syntara.workflows.workflow_engine.utils.loop_iteration_ids import (
     approval_temporal_activity_id,
     innermost_iteration_index,
@@ -134,27 +132,18 @@ def test_loop_control_activity_id_same_inner_next_outer_differs() -> None:
     assert first != second
 
 
-def test_loop_control_activity_id_unpatched_nested_uses_own_index_only() -> None:
-    """Pre-patch nested loop control IDs used only the inner current_index."""
+def test_loop_control_activity_id_always_uses_the_full_nested_path() -> None:
+    """Every nested controller ID includes its enclosing-loop path."""
     body_map = {"inner": "outer"}
     control = {"outer": {"current_index": 2}}
-    with patch(
-        "syntara.workflows.workflow_engine.utils.loop_iteration_ids.use_unique_loop_iteration_ids",
-        return_value=False,
-    ):
-        assert loop_control_activity_id("inner", 0, body_map, control) == "inner_iter_0"
+    assert loop_control_activity_id("inner", 0, body_map, control) == "inner_iter_2_iter_0"
 
 
-def test_approval_temporal_activity_id_new_and_unpatched() -> None:
-    """New runs suffix Temporal IDs; unpatched replay keeps the canvas ID."""
+def test_approval_temporal_activity_id_always_uses_the_full_path() -> None:
+    """Approval IDs include the full path without a workflow patch split."""
     body_map = {"approval": "loop"}
     control = {"loop": {"current_index": 3}}
     assert approval_temporal_activity_id("approval", body_map, control) == "approval_iter_3"
-    with patch(
-        "syntara.workflows.workflow_engine.utils.loop_iteration_ids.use_unique_loop_iteration_ids",
-        return_value=False,
-    ):
-        assert approval_temporal_activity_id("approval", body_map, control) == "approval"
 
 
 def test_loop_body_temporal_id_uses_full_path() -> None:
@@ -164,14 +153,10 @@ def test_loop_body_temporal_id_uses_full_path() -> None:
     assert loop_body_temporal_activity_id("step", body_map, control) == "step_iter_2_iter_0"
 
 
-def test_loop_body_temporal_id_preserves_unpatched_history() -> None:
-    body_map = {"step": "loop"}
-    control = {"loop": {"current_index": 3}}
-    with (
-        patch("syntara.workflows.workflow_engine.utils.loop_iteration_ids.workflow.in_workflow", return_value=True),
-        patch("syntara.workflows.workflow_engine.utils.loop_iteration_ids.workflow.patched", return_value=False),
-    ):
-        assert loop_body_temporal_activity_id("step", body_map, control) == "step"
+def test_loop_body_temporal_id_always_uses_the_full_path() -> None:
+    body_map = {"step": "inner", "inner": "outer"}
+    control = {"outer": {"current_index": 2}, "inner": {"current_index": 4}}
+    assert loop_body_temporal_activity_id("step", body_map, control) == "step_iter_2_iter_4"
 
 
 def test_matches_loop_iteration_id() -> None:

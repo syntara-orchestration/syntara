@@ -10,7 +10,7 @@ from temporalio.exceptions import ApplicationError
 from syntara.core.exceptions import SafeValueError
 from syntara.workflows.models.activity_execution import ActivityStatus
 from syntara.workflows.utils.loop_body_nodes import collect_direct_loop_bodies, collect_loop_bodies
-from syntara.workflows.utils.loop_iteration_names import LOOP_ITERATION_SEP, strip_iteration_suffix
+from syntara.workflows.utils.loop_iteration_names import strip_iteration_suffix
 from syntara.workflows.utils.namespace_resolver import NamespaceResolver
 from syntara.workflows.workflow_engine.constants import (
     DEFAULT_ACTIVITY_TIMEOUT_SECONDS,
@@ -84,16 +84,15 @@ class WorkflowRetryMixin:
     #: is a candidate when it is scheduled but turns out to rerun is discarded
     #: then, before it completes, so the service never waits on it.
     _retry_replay_candidates: set[str]
-    #: Source times/status keyed by canonical Temporal activity ID, with a base-ID
-    #: alias retained for nodes and sync workers that do not carry iteration IDs.
+    #: Source times/status keyed only by the canonical Temporal activity ID.
     _restored_node_timestamps: dict[str, dict[str, str | None]]
     #: The source status of a node this retry restored, keyed by node id. Read by the
     #: completion path so a restored skip or failure is not republished as a success
     #: and does not have its successors scheduled.
     _restored_node_statuses: dict[str, str]
     #: The routing decision each restorable control node's source run recorded,
-    #: keyed by node id. Read once during ``_prepare_retry`` so the synchronous
-    #: classification paths can honour it without awaiting anything.
+    #: keyed by canonical Temporal activity ID. Read once during ``_prepare_retry``
+    #: so the synchronous classification paths can honour it without awaiting.
     _restored_control_ports: dict[str, str]
     #: The port each control node resolved to, keyed by node id. Memoised because
     #: the resolver is reached from candidate construction and again when the node
@@ -114,7 +113,6 @@ class WorkflowRetryMixin:
     loop_body_map: dict[str, str]
     node_control_data: dict[str, dict[str, Any]]
     _retry_source_statuses: dict[str, str]
-    _retry_source_activity_name_statuses: dict[str, str]
     _retry_source_temporal_statuses: dict[str, str]
     _retry_selected_failure_paths: dict[str, list[list[int]]]
     skipped_nodes: set[str]
@@ -173,7 +171,6 @@ class WorkflowRetryMixin:
         self._restored_control_ports: dict[str, str] = {}
         self._resolved_control_port_cache: dict[str, str | None] = {}
         self._retry_source_statuses: dict[str, str] = {}
-        self._retry_source_activity_name_statuses: dict[str, str] = {}
         self._retry_source_temporal_statuses: dict[str, str] = {}
         self._retry_selected_failure_paths: dict[str, list[list[int]]] = {}
         # Filled from the graph by _prepare_retry; a loop body replays per iteration,
@@ -211,15 +208,10 @@ class WorkflowRetryMixin:
             activity_id="__internal__fetch_retry_source_state",
             start_to_close_timeout=timedelta(seconds=DEFAULT_ACTIVITY_TIMEOUT_SECONDS),
         )
-        # Newer fetches return all three indexes so nested iterations can be
-        # classified by their exact Temporal ID. Keep accepting the original flat
-        # mapping while a retry started by an older workflow version is replayed.
-        if "activity_statuses" in source_state:
-            self._retry_source_statuses = source_state["activity_statuses"]
-            self._retry_source_activity_name_statuses = source_state.get("activity_name_statuses", {})
-            self._retry_source_temporal_statuses = source_state.get("temporal_activity_statuses", {})
-        else:
-            self._retry_source_statuses = source_state
+        # The exact Temporal ID is the occurrence identity. The node-level view
+        # is only for graph-wide classification and is projected from those IDs.
+        self._retry_source_statuses = source_state["activity_statuses"]
+        self._retry_source_temporal_statuses = source_state["temporal_activity_statuses"]
         self._retry_selected_failure_paths = self._selected_failure_iteration_paths()
         # Persisted routing, read before anything classifies. Restorable-node
         # selection and _should_restore_node are both synchronous, so the branch a
@@ -347,22 +339,11 @@ class WorkflowRetryMixin:
         branch was ever read.
         """
         temporal_id = self._source_temporal_activity_id(node)
-        iteration_path = loop_index_chain(
-            node.id, getattr(self, "loop_body_map", {}), getattr(self, "node_control_data", {})
-        )
-        cache_key = temporal_id if iteration_path else node.id
+        cache_key = temporal_id
         if cache_key in self._resolved_control_port_cache:
             return self._resolved_control_port_cache[cache_key]
 
         recorded = self._restored_control_ports.get(temporal_id)
-        if recorded is None and iteration_path:
-            # A single-level pre-path history can still be identified by its
-            # per-iteration activity name. Nested legacy rows are ambiguous and
-            # must be inferred from current-path source statuses or rerun.
-            if len(iteration_path) == 1 and loop_iteration_path(temporal_id) != iteration_path:
-                recorded = self._restored_control_ports.get(self._replay_source_name(node.id))
-        elif recorded is None:
-            recorded = self._restored_control_ports.get(node.id)
         resolved = str(recorded) if recorded else self._infer_control_node_branch(node, graph)
         self._resolved_control_port_cache[cache_key] = resolved
         return resolved
@@ -380,50 +361,15 @@ class WorkflowRetryMixin:
         selected = {strip_iteration_suffix(point) for point in self.retry_context.get("eligible_point_ids", [])}
         paths: dict[str, list[list[int]]] = {}
         temporal_statuses = getattr(self, "_retry_source_temporal_statuses", {})
-        activity_name_statuses = getattr(self, "_retry_source_activity_name_statuses", {})
         for temporal_id, status in temporal_statuses.items():
             node_id = strip_loop_iteration_suffixes(temporal_id)
             path = loop_iteration_path(temporal_id)
             if node_id in selected and status == ActivityStatus.FAILED.value and path:
                 paths.setdefault(node_id, []).append(path)
 
-        # Before path-aware Temporal IDs were introduced, single-level loop rows
-        # were still named ``node#iter-N`` by the sync service. Recover that one
-        # index for compatibility; nested legacy names do not encode a safe path.
-        for activity_name, status in activity_name_statuses.items():
-            if status != ActivityStatus.FAILED.value:
-                continue
-            node_id = strip_iteration_suffix(activity_name)
-            if node_id not in selected:
-                continue
-            if paths.get(node_id):
-                # A canonical Temporal ID already gives the complete path. The
-                # composite display name carries only a global iteration counter
-                # and must not be mistaken for another path in a nested loop.
-                continue
-            legacy_path = self._legacy_failure_iteration_path(activity_name, node_id)
-            if legacy_path is None:
-                continue
-            if legacy_path not in paths.setdefault(node_id, []):
-                paths[node_id].append(legacy_path)
-
         for node_paths in paths.values():
             node_paths.sort()
         return paths
-
-    def _legacy_failure_iteration_path(self, activity_name: str, node_id: str) -> list[int] | None:
-        """Recover an unambiguous single-loop index from the stored activity name."""
-        loop_owners = [loop_id for loop_id, body in self._loop_bodies.items() if node_id in body]
-        if len(loop_owners) != 1:
-            # The activity-name counter is global per node, so it cannot recover
-            # the outer and inner indices needed for a nested path.
-            return None
-        prefix, separator, suffix = activity_name.rpartition(LOOP_ITERATION_SEP)
-        if separator:
-            if LOOP_ITERATION_SEP in prefix or prefix != node_id or not suffix.isdigit():
-                return None
-            return [int(suffix)]
-        return [0]
 
     def _source_status_for_node(self, node_id: str, graph: WorkflowGraph) -> str | None:
         """Return the source status for this node at its active iteration path."""
@@ -432,30 +378,20 @@ class WorkflowRetryMixin:
         except KeyError:
             node = None
         if node is None:
+            if node_id in getattr(self, "loop_body_map", {}):
+                return None
             return self._retry_source_statuses.get(node_id)
 
         temporal_id = self._source_temporal_activity_id(node)
-        iteration_path = loop_index_chain(
-            node_id, getattr(self, "loop_body_map", {}), getattr(self, "node_control_data", {})
-        )
-        temporal_path = loop_iteration_path(temporal_id)
-        if iteration_path:
-            if len(iteration_path) > 1 and temporal_path != iteration_path:
-                return None
-            temporal_status = getattr(self, "_retry_source_temporal_statuses", {}).get(temporal_id)
-            if len(iteration_path) > 1 and temporal_status is None:
-                return None
-            return (
-                temporal_status
-                or getattr(self, "_retry_source_activity_name_statuses", {}).get(self._replay_source_name(node_id))
-                or self._retry_source_statuses.get(node_id)
-            )
-
-        return (
-            getattr(self, "_retry_source_temporal_statuses", {}).get(temporal_id)
-            or getattr(self, "_retry_source_activity_name_statuses", {}).get(node_id)
-            or self._retry_source_statuses.get(node_id)
-        )
+        temporal_statuses = cast("dict[str, str]", getattr(self, "_retry_source_temporal_statuses", {}))
+        temporal_status = temporal_statuses.get(temporal_id)
+        if temporal_status is not None:
+            return temporal_status
+        if loop_index_chain(node_id, getattr(self, "loop_body_map", {}), getattr(self, "node_control_data", {})):
+            return None
+        # Outside loops the canonical Temporal ID is the canvas node ID. This
+        # projection is also built from temporal_activity_id, never activity_name.
+        return self._retry_source_statuses.get(node_id)
 
     def _is_before_selected_failure_iteration(self, node_id: str) -> bool:
         """Whether this row belongs to an earlier enclosing-loop iteration.
@@ -580,8 +516,8 @@ class WorkflowRetryMixin:
         if failure_paths and not any(path[: len(node_path)] == node_path for path in failure_paths):
             return False
         if not failure_paths and node_path:
-            # A nested legacy row has no full path. _replayed_loop_control fails
-            # closed before reaching an occurrence it cannot identify.
+            # Without the canonical failed occurrence path, replay cannot safely
+            # identify which loop item to resume, so fail closed.
             return False
 
         live_loops = self._loop_ancestor_chain(node.id)
@@ -759,9 +695,7 @@ class WorkflowRetryMixin:
             return node.type in _INFERABLE_CONTROL_NODE_TYPES and bool(self._resolved_control_port(node, graph))
         return self._source_status_for_node(node_id, graph) in _RESTORABLE_SOURCE_STATUS_VALUES
 
-    async def _restore_node_state(  # noqa: PLR0911
-        self, node: ActivityNode, graph: WorkflowGraph
-    ) -> dict[str, Any] | None:
+    async def _restore_node_state(self, node: ActivityNode, graph: WorkflowGraph) -> dict[str, Any] | None:
         """Replay this node's recorded outcome from its source run, or None.
 
         One path for both node kinds. The replay fetch is the same, and so is the
@@ -802,26 +736,16 @@ class WorkflowRetryMixin:
             self._retry_replay_candidates.discard(node.id)
             return None
 
-        # A loop body is one execution per iteration, so the row asked for is the
-        # one for the iteration this loop is replaying — not the node's first. The
-        # base name is what iteration 0 is stored under.
-        source_name = self._replay_source_name(node.id)
-        iteration_path = loop_index_chain(
-            node.id, getattr(self, "loop_body_map", {}), getattr(self, "node_control_data", {})
-        )
+        # A loop body is one execution per iteration, so the full-path Temporal ID
+        # selects the row for this iteration, including when the index is zero.
         source_temporal_id = self._source_temporal_activity_id(node)
-        has_full_iteration_path = loop_iteration_path(source_temporal_id) == iteration_path
-        if len(iteration_path) > 1 and not has_full_iteration_path:
-            self._retry_replay_candidates.discard(node.id)
-            return None
 
         record = await workflow.execute_activity(
             ActivityName.RETRY_NODE_REPLAY,
             args=[
                 self.retry_context.get("retry_from_execution_id"),
-                source_name,
-                source_temporal_id if has_full_iteration_path else None,
-                not iteration_path or len(iteration_path) == 1,
+                node.id,
+                source_temporal_id,
             ],
             activity_id=source_temporal_id,
             start_to_close_timeout=timedelta(seconds=DEFAULT_ACTIVITY_TIMEOUT_SECONDS),
@@ -852,10 +776,7 @@ class WorkflowRetryMixin:
             "status": source_status,
             "error_details": error_details,
         }
-        # Iteration-aware sync asks by Temporal ID; retain the base key for older
-        # sync workers and non-iterated callers.
         self._restored_node_timestamps[source_temporal_id] = restored_timestamps
-        self._restored_node_timestamps[node.id] = restored_timestamps
 
         if is_control:
             # A control node needs the routing decision, not a payload, and the
@@ -904,35 +825,6 @@ class WorkflowRetryMixin:
             return {"output": output, "control": self._restored_approval_control(output)}
 
         return {"output": output, "control": None}
-
-    def _replay_source_name(self, node_id: str) -> str:
-        """Resolve the stored activity name to replay for ``node_id`` on this pass.
-
-        An ordinary node restores under its own id. A loop body restores per
-        iteration, so it needs the row for the iteration its loop is replaying —
-        which the sync service names ``{node}#iter-{n}`` once the previous row
-        reached a terminal status. Iteration 0 keeps the plain node name, so the
-        first iteration needs no suffix.
-        """
-        loop_id = self._enclosing_loop(node_id)
-        if loop_id is None:
-            return node_id
-        active_iterations = cast("dict[str, int]", getattr(self, "_active_loop_iteration", {}))
-        index = active_iterations.get(loop_id)
-        if index is None:
-            path = loop_index_chain(node_id, getattr(self, "loop_body_map", {}), getattr(self, "node_control_data", {}))
-            if not path:
-                return node_id
-            index = path[-1]
-        return node_id if index == 0 else f"{node_id}{LOOP_ITERATION_SEP}{index}"
-
-    def _enclosing_loop(self, node_id: str) -> str | None:
-        """Find the loop whose body ``node_id`` sits in, or None if it is not a body."""
-        loop_bodies = cast("dict[str, set[str]]", getattr(self, "_loop_bodies", {}))
-        for loop_id, body in loop_bodies.items():
-            if node_id in body:
-                return loop_id
-        return None
 
     @staticmethod
     def _restored_approval_control(output: dict[str, Any]) -> dict[str, str] | None:

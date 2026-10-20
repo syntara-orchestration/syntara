@@ -57,28 +57,14 @@ async def _run(
     node_id: str | None,
     *,
     temporal_activity_id: str | None = None,
-    allow_legacy_fallback: bool = True,
 ) -> dict[str, Any] | None:
-    # The mock session does not execute SQL, so the activity's predicates are
-    # applied here to keep these tests meaningful: the restorable-status filter
-    # and the exact-name match the query performs. The integration test for this
-    # activity covers the real query.
-    wanted = node_id.strip() if node_id else ""
-    legacy_rows = [row for row in rows if row.status in RESTORABLE_SOURCE_STATUSES and row.activity_name == wanted]
-    if temporal_activity_id:
-        exact_rows = [
-            row
-            for row in rows
-            if row.status in RESTORABLE_SOURCE_STATUSES and row.temporal_activity_id == temporal_activity_id
-        ]
-        session = AsyncMock()
-        exact_result = MagicMock()
-        exact_result.first.return_value = exact_rows[0] if exact_rows else None
-        legacy_result = MagicMock()
-        legacy_result.first.return_value = legacy_rows[0] if legacy_rows else None
-        session.exec.side_effect = [exact_result, legacy_result] if allow_legacy_fallback else [exact_result]
-    else:
-        session = _mock_session(legacy_rows)
+    # The mock session does not execute SQL, so apply its predicates here: row
+    # identity is the canonical Temporal ID, never the display activity name.
+    wanted = temporal_activity_id or (node_id.strip() if node_id else "")
+    matching_rows = [
+        row for row in rows if row.status in RESTORABLE_SOURCE_STATUSES and row.temporal_activity_id == wanted
+    ]
+    session = _mock_session(matching_rows)
 
     async def mock_get_db():  # noqa: ANN202
         yield session
@@ -87,11 +73,7 @@ async def _run(
         "syntara.workflows.workflow_engine.activities.retry_node_replay_activity.get_db",
         mock_get_db,
     ):
-        return (
-            await replay_retry_node_activity("src-1", node_id, temporal_activity_id, allow_legacy_fallback)
-            if node_id is not None
-            else None
-        )
+        return await replay_retry_node_activity("src-1", node_id, wanted) if node_id is not None else None
 
 
 @pytest.mark.asyncio
@@ -154,7 +136,6 @@ async def test_nested_loop_restore_selects_the_exact_temporal_path() -> None:
         rows,
         "step#iter-2",
         temporal_activity_id="step_iter_2_iter_1",
-        allow_legacy_fallback=False,
     )
 
     assert answer is not None
@@ -176,7 +157,6 @@ async def test_nested_loop_restore_does_not_guess_from_the_global_iteration_name
         rows,
         "step#iter-2",
         temporal_activity_id="step_iter_1_iter_2",
-        allow_legacy_fallback=False,
     )
 
     assert answer is None
@@ -214,32 +194,26 @@ async def test_completed_node_with_no_output_returns_empty_dict() -> None:
 
 @pytest.mark.asyncio
 async def test_iteration_suffixed_request_is_not_resolved_to_a_base_node() -> None:
-    """A suffixed id matches nothing, because the query matches names exactly.
-
-    Stripping the suffix used to be this activity's job, but only loop replay
-    needs it: classification excludes loop nodes and loop bodies, so no suffixed
-    id reaches here. Resolving one now would need per-iteration state this
-    single-record transport cannot carry.
-    """
+    """A display-style iteration name does not identify a canonical source row."""
     rows = [_Row("step_1", ActivityStatus.COMPLETED, {"result": "ok"})]
 
     assert await _run(rows, "step_1#iter-2") is None
 
 
 @pytest.mark.asyncio
-async def test_an_iteration_row_is_matched_only_by_its_own_exact_name() -> None:
-    """Exact matching means an iteration row is reachable only by its own name.
-
-    Nothing sends such an id today, since classification excludes loop nodes and
-    bodies. It is worth pinning that the match is literal rather than by suffix,
-    so the loop work knows what this transport does and does not already do.
-    """
+async def test_an_iteration_row_is_matched_only_by_its_temporal_activity_id() -> None:
+    """Loop occurrence replay uses its full canonical path, not its UI label."""
     rows = [
         _Row("step_1", ActivityStatus.COMPLETED, {"result": "iter-0"}),
-        _Row("step_1#iter-1", ActivityStatus.COMPLETED, {"result": "iter-1"}),
+        _Row(
+            "A#iter-1",
+            ActivityStatus.COMPLETED,
+            {"result": "iter-1"},
+            temporal_activity_id="step_1_iter_1",
+        ),
     ]
 
-    by_iteration = await _run(rows, "step_1#iter-1")
+    by_iteration = await _run(rows, "step_1#iter-1", temporal_activity_id="step_1_iter_1")
     by_base = await _run(rows, "step_1")
 
     assert by_iteration is not None
@@ -249,8 +223,8 @@ async def test_an_iteration_row_is_matched_only_by_its_own_exact_name() -> None:
 
 
 @pytest.mark.asyncio
-async def test_the_lookup_filters_by_name_in_the_query() -> None:
-    """The name predicate belongs in the query, not in a Python loop over rows.
+async def test_the_lookup_filters_by_temporal_id_in_the_query() -> None:
+    """The canonical ID predicate belongs in the query, not in Python.
 
     This activity runs once per restored node. Reading the run's completed rows
     and filtering in Python made each call cost the whole execution, and pulled
@@ -276,14 +250,15 @@ async def test_the_lookup_filters_by_name_in_the_query() -> None:
         "syntara.workflows.workflow_engine.activities.retry_node_replay_activity.get_db",
         mock_get_db,
     ):
-        assert await replay_retry_node_activity("src-1", "step_target") is None
+        assert await replay_retry_node_activity("src-1", "ui label", "step_target") is None
 
     assert len(captured) == 1
     statement = captured[0]
     sql = str(statement)
-    assert "activity_execution.activity_name = " in sql
+    assert "activity_execution.temporal_activity_id = " in sql
+    assert "activity_execution.activity_name =" not in sql
     assert "LIMIT" in sql.upper()
-    assert statement.compile().params["activity_name_1"] == "step_target"
+    assert statement.compile().params["temporal_activity_id_1"] == "step_target"
 
 
 @pytest.mark.asyncio
@@ -523,7 +498,7 @@ async def test_replay_reports_null_control_data_for_older_runs() -> None:
 
 
 def _port_session(rows: list[Any]) -> AsyncMock:
-    """Session whose ``.all()`` returns the (name, control_data) pairs."""
+    """Session whose ``.all()`` returns canonical ID/control data pairs."""
     session = AsyncMock()
     result = MagicMock()
     result.all.return_value = rows
@@ -546,28 +521,24 @@ async def _run_ports(pairs: list[Any]) -> dict[str, str]:
 
 @pytest.mark.asyncio
 async def test_control_ports_maps_node_ids_to_ports() -> None:
-    """Every control node that recorded a port is returned, keyed by node id."""
-    ports = await _run_ports([("cond_1", "cond_1", {"next_port": "true"}), ("sw_1", "sw_1", {"next_port": "b"})])
+    """Every control node that recorded a port is keyed by its Temporal ID."""
+    ports = await _run_ports([("cond_1", {"next_port": "true"}), ("sw_1", {"next_port": "b"})])
 
     assert ports == {"cond_1": "true", "sw_1": "b"}
 
 
 @pytest.mark.asyncio
-async def test_control_ports_strips_iteration_suffixes() -> None:
-    """A nested control node keeps its path and also maps to its base id."""
-    ports = await _run_ports([("cond_1#iter-3", "cond_1_iter_2_iter_3", {"next_port": "true"})])
+async def test_control_ports_keep_only_the_exact_iteration_path() -> None:
+    """A nested control decision is not aliased to its UI name or base node."""
+    ports = await _run_ports([("cond_1_iter_2_iter_3", {"next_port": "true"})])
 
-    assert ports == {
-        "cond_1#iter-3": "true",
-        "cond_1": "true",
-        "cond_1_iter_2_iter_3": "true",
-    }
+    assert ports == {"cond_1_iter_2_iter_3": "true"}
 
 
 @pytest.mark.asyncio
 async def test_control_ports_skips_rows_with_no_port() -> None:
     """Control data without a next_port is left to the caller's inference."""
-    ports = await _run_ports([("cond_1", "cond_1", {"other": 1}), ("sw_1", "sw_1", {"next_port": "a"})])
+    ports = await _run_ports([("cond_1", {"other": 1}), ("sw_1", {"next_port": "a"})])
 
     assert ports == {"sw_1": "a"}, "a row with no next_port must not become a routing entry"
 
@@ -575,6 +546,6 @@ async def test_control_ports_skips_rows_with_no_port() -> None:
 @pytest.mark.asyncio
 async def test_control_ports_ignores_non_dict_control_data() -> None:
     """A malformed value is skipped rather than crashing the whole read."""
-    ports = await _run_ports([("cond_1", "cond_1", "not-a-dict"), ("sw_1", "sw_1", {"next_port": "a"})])
+    ports = await _run_ports([("cond_1", "not-a-dict"), ("sw_1", {"next_port": "a"})])
 
     assert ports == {"sw_1": "a"}

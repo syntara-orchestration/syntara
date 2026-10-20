@@ -1419,7 +1419,7 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
         direct_bodies = getattr(self, "_loop_direct_bodies", {})
         direct_child_loops = getattr(self, "_loop_direct_child_loops", {})
         child_loop_ids = sorted(direct_child_loops.get(node_id, set()))
-        body_ids = sorted(direct_bodies.get(node_id, self._loop_bodies.get(node_id, set())) - set(child_loop_ids))
+        body_ids = sorted(direct_bodies.get(node_id, set()) - set(child_loop_ids))
         current = state.current_index
         iteration_path = [*loop_index_chain(node_id, self.loop_body_map, self.node_control_data), current]
         loop_body_region = self._loop_bodies.get(node_id, set())
@@ -1437,9 +1437,9 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
                 if len(path) >= len(iteration_path)
             ]
             if not failure_paths:
-                # Legacy nested activity names do not encode the complete path.
-                # Running this loop normally could repeat completed side effects,
-                # so reject the retry instead of guessing.
+                # Without the selected occurrence's complete Temporal path,
+                # running this loop could repeat completed side effects. Reject
+                # the retry rather than guessing its iteration.
                 msg = (
                     f"Cannot safely replay nested loop {node_id}: the source execution "
                     "does not record a complete iteration path for the selected failure"
@@ -1459,16 +1459,10 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
 
         reached = await workflow.execute_activity(
             ActivityName.RETRY_LOOP_ITERATION_PROBE,
-            args=[self.retry_context.get("retry_from_execution_id"), node_id, body_ids, child_loop_ids, iteration_path],
+            args=[self.retry_context.get("retry_from_execution_id"), body_ids, child_loop_ids, iteration_path],
             activity_id=join_loop_iteration_id(f"__internal__probe_retry_loop_{node_id}", iteration_path),
             start_to_close_timeout=timedelta(seconds=DEFAULT_ACTIVITY_TIMEOUT_SECONDS),
         )
-        if reached is None:
-            workflow.logger.info(
-                "Could not identify this source iteration",
-                extra={"loop_id": node_id, "iteration_path": iteration_path},
-            )
-            return None
         next_port = "iterate" if reached else "complete"
         next_index = current + 1 if reached else current
 
@@ -2194,7 +2188,7 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
             ),
             timeout=timedelta(seconds=5),
         )
-        return self._restored_node_timestamps.get(activity_id) or self._restored_node_timestamps.get(node_id)
+        return self._restored_node_timestamps.get(activity_id)
 
     @workflow.query
     def get_replayed_node_timestamps_if_ready(
@@ -2214,7 +2208,7 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
             return self._restored_node_timestamps[activity_id]
         if node_id not in self._retry_replay_candidates:
             return None
-        return self._restored_node_timestamps.get(activity_id) or self._restored_node_timestamps.get(node_id)
+        return self._restored_node_timestamps.get(activity_id)
 
     @workflow.query
     def is_retry_from_failure(self) -> bool:

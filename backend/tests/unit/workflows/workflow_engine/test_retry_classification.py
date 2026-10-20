@@ -439,18 +439,17 @@ def test_loop_body_nodes_are_restored_per_iteration() -> None:
 
     assert {"body_a", "body_b"} <= wf._retry_restorable_nodes(graph)
 
-    # Nothing replaying yet, so a body restores under its own id.
-    assert wf._replay_source_name("body_a") == "body_a"
-
-    # Iteration 0 is stored under the plain name; later ones get a suffix.
-    wf._active_loop_iteration["loop_1"] = 0
-    assert wf._replay_source_name("body_a") == "body_a"
-    wf._active_loop_iteration["loop_1"] = 2
-    assert wf._replay_source_name("body_a") == "body_a#iter-2"
-
-    # A node outside any loop is unaffected.
-    wf._active_loop_iteration["loop_1"] = 5
-    assert wf._replay_source_name("step_2") == "step_2"
+    # The full path is used for every occurrence, including iteration zero.
+    body = graph.get_node("body_a")
+    assert body is not None
+    wf.loop_body_map = {"body_a": "loop_1"}
+    wf.node_control_data = {"loop_1": {"current_index": 0}}
+    assert wf._source_temporal_activity_id(body) == "body_a_iter_0"
+    wf.node_control_data["loop_1"]["current_index"] = 2
+    assert wf._source_temporal_activity_id(body) == "body_a_iter_2"
+    outside = graph.get_node("step_2")
+    assert outside is not None
+    assert wf._source_temporal_activity_id(outside) == "step_2"
 
 
 @pytest.mark.asyncio
@@ -470,9 +469,10 @@ async def test_restoring_a_loop_body_uses_its_canonical_temporal_path(mock_wf: M
 
     assert result is not None
     call = mock_wf.execute_activity.await_args
-    assert call.kwargs["args"] == ["src-1", "body_a#iter-2", "body_a_iter_2", True]
+    assert call.kwargs["args"] == ["src-1", "body_a", "body_a_iter_2"]
     assert call.kwargs["activity_id"] == "body_a_iter_2"
     assert "body_a_iter_2" in wf._restored_node_timestamps
+    assert "body_a" not in wf._restored_node_timestamps
 
 
 def test_a_loop_node_uses_its_probe_instead_of_generic_node_restoration() -> None:
@@ -524,8 +524,10 @@ def _injectable_workflow(*, source_statuses: dict[str, str] | None = None) -> Or
     wf = _make_workflow()
     if source_statuses is not None:
         wf._retry_source_statuses = source_statuses
+        wf._retry_source_temporal_statuses = source_statuses
     else:
         wf._retry_source_statuses = dict.fromkeys(("step_1", "step_2", "step_3", "trigger"), "completed")
+        wf._retry_source_temporal_statuses = wf._retry_source_statuses
     return wf
 
 
@@ -633,7 +635,7 @@ async def test_restore_dispatches_the_retry_outputs_activity(mock_wf: MagicMock)
 
     call = mock_wf.execute_activity.call_args
     assert call[0][0] == ActivityName.RETRY_NODE_REPLAY
-    assert call.kwargs["args"] == ["src-1", "step_1", "step_1", True]
+    assert call.kwargs["args"] == ["src-1", "step_1", "step_1"]
     assert call.kwargs["activity_id"] == "step_1"
 
 
@@ -843,7 +845,9 @@ class TestLinearChainReplay:
         wf = _injectable_workflow()
         wf.retry_context = _retry("step_3")
         wf.retry_context = _retry("step_3")
-        mock_wf.execute_activity = AsyncMock(return_value={})
+        mock_wf.execute_activity = AsyncMock(
+            side_effect=[{"activity_statuses": {}, "temporal_activity_statuses": {}}, {}]
+        )
 
         await wf._prepare_retry(self.graph)
 
@@ -921,6 +925,17 @@ class TestReplayedTimestampUpdateHandler:
 
         assert satisfied_now is False, "answering early here loses the source times for good"
         assert result is None
+
+    @pytest.mark.asyncio
+    async def test_a_loop_occurrence_does_not_fall_back_to_the_canvas_timestamp(self) -> None:
+        result, satisfied_now, _timeout = await self._call(
+            "script_1_iter_2",
+            candidates={"script_1"},
+            timestamps={"script_1": self.SOURCE_TIMES},
+        )
+
+        assert result is None
+        assert not satisfied_now, "a different iteration's times cannot satisfy this occurrence"
 
     @pytest.mark.asyncio
     async def test_an_ordinary_node_answers_immediately_with_nothing(self) -> None:

@@ -315,7 +315,7 @@ async def test_restored_control_result_reads_the_replay_under_the_node_id(mock_w
     await wf._restore_node_state(node, graph)
 
     assert mock_wf.execute_activity.await_args.kwargs["activity_id"] == "cond_1"
-    assert mock_wf.execute_activity.await_args.kwargs["args"] == ["src-1", "cond_1", "cond_1", True]
+    assert mock_wf.execute_activity.await_args.kwargs["args"] == ["src-1", "cond_1", "cond_1"]
 
 
 def test_replayed_timestamps_are_addressable_by_the_full_temporal_path() -> None:
@@ -325,6 +325,15 @@ def test_replayed_timestamps_are_addressable_by_the_full_temporal_path() -> None
     wf._restored_node_timestamps = {"body_a_iter_2_iter_1": restored}
 
     assert wf.get_replayed_node_timestamps_if_ready("body_a_iter_2_iter_1") == restored
+
+
+def test_replayed_timestamps_do_not_fall_back_to_the_canvas_node() -> None:
+    wf = _make_workflow()
+    wf._retry_replay_candidates = {"body_a"}
+    restored: dict[str, str | None] = {"status": ActivityStatus.COMPLETED.value, "started_at": "wrong-item"}
+    wf._restored_node_timestamps = {"body_a": restored}
+
+    assert wf.get_replayed_node_timestamps_if_ready("body_a_iter_2_iter_1") is None
 
 
 @pytest.mark.asyncio
@@ -611,6 +620,10 @@ async def test_a_loop_stays_a_candidate_until_the_loop_probe_runs(
     wf = _make_workflow({"retry_from_execution_id": "src-1", "eligible_point_ids": ["step_2"]})
     graph = _loop_after_condition_graph()
     wf._retry_source_statuses = {"step_2": ActivityStatus.FAILED.value}
+    mock_wf.execute_activity.side_effect = [
+        {"activity_statuses": {"step_2": "failed"}, "temporal_activity_statuses": {"step_2": "failed"}},
+        {},
+    ]
 
     await wf._prepare_retry(graph)
 
@@ -631,6 +644,10 @@ async def test_a_control_node_is_dropped_from_the_candidates_when_it_must_rerun(
     wf = _make_workflow({"retry_from_execution_id": "src-1", "eligible_point_ids": ["step_2"]})
     graph = _loop_after_condition_graph()
     wf._retry_source_statuses = {"step_2": ActivityStatus.FAILED.value}
+    mock_wf.execute_activity.side_effect = [
+        {"activity_statuses": {"step_2": "failed"}, "temporal_activity_statuses": {"step_2": "failed"}},
+        {},
+    ]
     await wf._prepare_retry(graph)
     assert "loop_1" in wf._retry_replay_candidates, "it starts as a candidate"
 
@@ -673,7 +690,8 @@ async def test_a_restored_control_node_stays_a_candidate(mock_wf: MagicMock) -> 
     async def _activity(name: str, **kwargs: object) -> object:
         if name == ActivityName.RETRY_CONTROL_PORTS:
             return {"cond_1": "true"}
-        return {"step_true": ActivityStatus.COMPLETED.value, "step_2": ActivityStatus.FAILED.value}
+        statuses = {"step_true": ActivityStatus.COMPLETED.value, "step_2": ActivityStatus.FAILED.value}
+        return {"activity_statuses": statuses, "temporal_activity_statuses": statuses}
 
     mock_wf.execute_activity.side_effect = _activity
     await wf._prepare_retry(graph)
@@ -736,7 +754,8 @@ async def test_a_restored_condition_is_a_candidate_so_the_service_asks_about_it(
     async def _activity(name: str, **kwargs: object) -> object:
         if name == ActivityName.RETRY_CONTROL_PORTS:
             return {"cond_1": "true"}
-        return {"step_true": ActivityStatus.COMPLETED.value, "step_2": ActivityStatus.FAILED.value}
+        statuses = {"step_true": ActivityStatus.COMPLETED.value, "step_2": ActivityStatus.FAILED.value}
+        return {"activity_statuses": statuses, "temporal_activity_statuses": statuses}
 
     mock_wf.execute_activity.side_effect = _activity
 
