@@ -33,7 +33,6 @@
 .dragHandle {
   cursor: grab;
   color: var(--pf-t--global--icon--color--regular);
-  margin-block-start: var(--pf-t--global--spacer--md);
 }
 
 .headerToggle {
@@ -46,6 +45,8 @@
 
 .fieldCard {
   flex-grow: 1;
+  /* Match switch path rows: rectangular outline, PatternFly card body inset (not isPlain). */
+  --pf-v6-c-card--BorderRadius: 0;
 }
 
 .fieldCardBody {
