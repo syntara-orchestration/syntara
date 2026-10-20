@@ -158,6 +158,10 @@ class EventDeliveryStore:
             attempt_count=row.attempt_count,
             first_start_attempt_at=row.first_start_attempt_at,
             temporal_run_id=row.temporal_run_id,
+            start_retry_deadline=row.start_retry_deadline,
+            scheduling_failure_count=row.scheduling_failure_count,
+            next_attempt_at=row.next_attempt_at,
+            last_error_code=row.last_error_code,
         )
 
     @staticmethod
@@ -287,6 +291,16 @@ class EventDeliveryStore:
         }
         return input_fingerprint(execution.input_data, context)
 
+    @staticmethod
+    def _merge_delivery_metadata(execution: Execution, *, replace: bool = False, **fields: object) -> None:
+        """Merge scheduling fields; a new freeze replaces only the delivery section."""
+        metadata = execution.execution_metadata or {}
+        delivery_metadata = {} if replace else metadata.get(EVENT_DELIVERY_METADATA_KEY, {})
+        execution.execution_metadata = {
+            **metadata,
+            EVENT_DELIVERY_METADATA_KEY: {**delivery_metadata, **fields},
+        }
+
     def _validate_execution(
         self, identity: DeliveryIdentity, binding: FrozenDeliveryBinding, execution: Execution
     ) -> None:
@@ -345,15 +359,16 @@ class EventDeliveryStore:
                 if prepared.status != ExecutionStatus.PENDING:
                     msg = "New delivery preparation requires a pending Execution"
                     raise ValueError(msg)
-                prepared.execution_metadata = {
-                    **(prepared.execution_metadata or {}),
-                    EVENT_DELIVERY_METADATA_KEY: {
+                self._merge_delivery_metadata(
+                    prepared,
+                    replace=True,
+                    **{
                         "identity_digest": claim.identity.digest,
                         SCHEDULING_STATE_KEY: SCHEDULING_STATE_PREPARED,
                         "input_fingerprint": binding.input_fingerprint,
                         "temporal_workflow_id": claim.identity.temporal_workflow_id,
                     },
-                }
+                )
                 self.session.add(prepared)
                 await self.session.flush()
                 changed = await self._change(claim, frozen_binding=binding, execution_id=prepared.id)
@@ -361,7 +376,9 @@ class EventDeliveryStore:
         except _ClaimExpiredError:
             return ClaimLost()
 
-    async def record_start_attempt(self, claim: DeliveryClaim) -> DeliveryClaim | ClaimLost:
+    async def record_start_attempt(
+        self, claim: DeliveryClaim, *, retry_deadline: datetime | None = None, attempt_id: UUID | None = None
+    ) -> DeliveryClaim | ClaimLost:
         """Fence and persist first attempt/counter before a Temporal RPC is permitted."""
         row = await self._current(claim)
         if row is None:
@@ -369,12 +386,87 @@ class EventDeliveryStore:
         if row.frozen_binding is None or row.execution_id is None:
             msg = "A start attempt requires frozen Execution preparation"
             raise ValueError(msg)
+        deadline = row.start_retry_deadline
+        if retry_deadline is not None:
+            if retry_deadline.tzinfo is None:
+                msg = "Start retry deadline must be timezone-aware"
+                raise ValueError(msg)
+            # Never grant a new window to legacy ambiguous work or extend one.
+            if row.attempt_count == 0:
+                deadline = retry_deadline
+            elif deadline is not None:
+                deadline = min(deadline, retry_deadline)
+            if deadline is None or deadline <= await self._now():
+                msg = "Start retry evidence is expired or unavailable"
+                raise ValueError(msg)
+        execution = await self.session.get(Execution, row.execution_id, with_for_update=True, populate_existing=True)
+        if execution is None:
+            msg = "Prepared Execution evidence is unavailable"
+            raise ValueError(msg)
         changed = await self._change(
             claim,
             attempt_count=col(EventDelivery.attempt_count) + 1,
             first_start_attempt_at=func.coalesce(EventDelivery.first_start_attempt_at, func.clock_timestamp()),
+            start_retry_deadline=deadline,
         )
+        if changed is not None:
+            self._merge_delivery_metadata(
+                execution,
+                replace=False,
+                attempt_count=changed.attempt_count,
+                first_start_attempt_at=(
+                    changed.first_start_attempt_at.isoformat() if changed.first_start_attempt_at is not None else None
+                ),
+                start_retry_deadline=deadline.isoformat() if deadline is not None else None,
+                **({"start_attempt_id": str(attempt_id)} if attempt_id is not None else {}),
+            )
+            await self.session.flush()
         return ClaimLost() if changed is None else self._claim(changed)
+
+    async def record_scheduling_failure(
+        self, claim: DeliveryClaim, *, next_attempt_at: datetime, error_code: str
+    ) -> DeliveryClaim | ClaimLost:
+        """Commit the retry budget with Execution metadata and release ownership."""
+        if re.fullmatch(r"[a-z][a-z0-9_]{0,99}", error_code) is None or next_attempt_at.tzinfo is None:
+            msg = "A sanitized error code and timezone-aware retry time are required"
+            raise ValueError(msg)
+        row = await self._current(claim)
+        if row is None:
+            return ClaimLost()
+        if row.frozen_binding is None or row.execution_id is None:
+            msg = "Scheduling failure requires prepared work"
+            raise ValueError(msg)
+        execution = await self.session.get(Execution, row.execution_id, with_for_update=True, populate_existing=True)
+        if execution is None:
+            msg = "Prepared Execution evidence is unavailable"
+            raise ValueError(msg)
+        changed = await self._change(
+            claim,
+            scheduling_failure_count=col(EventDelivery.scheduling_failure_count) + 1,
+            next_attempt_at=next_attempt_at,
+            last_error_code=error_code,
+            claim_token=None,
+            owner_worker_id=None,
+            lease_until=None,
+        )
+        if changed is None:
+            return ClaimLost()
+        self._merge_delivery_metadata(
+            execution,
+            replace=False,
+            scheduling_failure_count=changed.scheduling_failure_count,
+            next_attempt_at=next_attempt_at.isoformat(),
+            last_error_code=error_code,
+        )
+        await self.session.flush()
+        # A snapshot for reporting, not a renewed mutation capability.
+        return claim.model_copy(
+            update={
+                "scheduling_failure_count": changed.scheduling_failure_count,
+                "next_attempt_at": next_attempt_at,
+                "last_error_code": error_code,
+            }
+        )
 
     @staticmethod
     def _validate_acceptance(row: EventDelivery, acceptance: TemporalAcceptance) -> None:
@@ -437,15 +529,15 @@ class EventDeliveryStore:
         )
         if changed is None:
             return ClaimLost()
-        execution.execution_metadata = {
-            **(execution.execution_metadata or {}),
-            EVENT_DELIVERY_METADATA_KEY: {
-                **(execution.execution_metadata or {}).get(EVENT_DELIVERY_METADATA_KEY, {}),
+        self._merge_delivery_metadata(
+            execution,
+            replace=False,
+            **{
                 SCHEDULING_STATE_KEY: SCHEDULING_STATE_CONFIRMED,
                 "temporal_run_id": acceptance.temporal_run_id,
                 "confirmed_at": changed.execution_confirmed_at.isoformat() if changed.execution_confirmed_at else None,
             },
-        }
+        )
         await self.session.flush()
         return self._terminal(changed)
 
@@ -495,7 +587,7 @@ class EventDeliveryStore:
             raise ValueError(msg)
         return self._terminal(row)
 
-    async def claim_due(self, owner_worker_id: str, *, limit: int) -> list[DeliveryClaim]:
+    async def claim_due(self, owner_worker_id: str, *, limit: int, prepared_only: bool = False) -> list[DeliveryClaim]:
         """Claim a bounded due batch using lifecycle-before-delivery lock ordering."""
         self._validate_worker(owner_worker_id)
         if not isinstance(limit, int) or isinstance(limit, bool) or not 1 <= limit <= FieldLimits.MAX_ITEMS_PER_PAGE:
@@ -511,6 +603,7 @@ class EventDeliveryStore:
                         col(EventDelivery.lease_until).is_(None),
                         col(EventDelivery.lease_until) <= func.clock_timestamp(),
                     ),
+                    col(EventDelivery.frozen_binding).is_not(None) if prepared_only else True,
                 )
                 .order_by(col(EventDelivery.next_attempt_at), col(EventDelivery.identity_digest))
                 .limit(limit)
@@ -531,3 +624,18 @@ class EventDeliveryStore:
             if isinstance(result, DeliveryClaim):
                 claims.append(result)
         return claims
+
+    async def request_scheduling_retry(self, identity: DeliveryIdentity) -> bool:
+        """Wake prepared recovery after caller-authorized correction; never reset its budget."""
+        row = await self._locked(identity)
+        if row is None or row.state != DeliveryState.IN_PROGRESS or row.frozen_binding is None:
+            return False
+        now = await self._now()
+        if row.lease_until is not None and row.lease_until > now:
+            return False
+        row.next_attempt_at = now
+        row.claim_token = None
+        row.owner_worker_id = None
+        row.lease_until = None
+        await self.session.flush()
+        return True
