@@ -63,6 +63,7 @@ function findFirstEnabledPath(item: TNavigationItem): string {
 /** Items with multiple children render as expandable groups instead of direct links. */
 type RouterNavLinkProps = React.AnchorHTMLAttributes<HTMLAnchorElement>
 
+/** Adapts PatternFly's `href` prop to TanStack Router's `to` prop. */
 function RouterNavLink({ href, children, ...rest }: RouterNavLinkProps) {
   return (
     <Link to={href ?? '/'} {...(rest as Omit<React.ComponentProps<typeof Link>, 'to' | 'children'>)}>
@@ -71,6 +72,7 @@ function RouterNavLink({ href, children, ...rest }: RouterNavLinkProps) {
   )
 }
 
+/** Returns true when a click uses a modifier key or a non-primary mouse button. */
 function isModifiedClick(event: React.SyntheticEvent | undefined): boolean {
   if (!event || typeof globalThis.MouseEvent === 'undefined') return false
 
