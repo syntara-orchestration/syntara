@@ -31,7 +31,7 @@ const triggerFormSchemaBase = z.object({
     .optional(),
   inputSchema: z.string().optional(),
   webhookPath: z.string().optional(),
-  authorizedServiceAccountIds: z.array(z.string().uuid()).optional(),
+  authorizedServiceAccountIds: z.array(z.string().uuid()).max(100).optional(),
 })
 
 function validateInputSchemaJson(schemaText: string | undefined, ctx: z.RefinementCtx) {

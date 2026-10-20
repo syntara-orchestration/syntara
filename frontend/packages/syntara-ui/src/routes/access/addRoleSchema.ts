@@ -14,7 +14,7 @@ export const roleBaseSchema = z.object({
       'Name must be lowercase alphanumeric with hyphens, starting and ending with a letter or number'
     ),
   description: z.string().max(1024, 'Description must be 1024 characters or fewer').optional().or(z.literal('')),
-  policies: z.array(z.string()).min(1, 'At least one policy is required'),
+  policies: z.array(z.string()).min(1, 'At least one policy is required').max(100),
 })
 
 export type EditRoleFormData = z.infer<typeof roleBaseSchema>

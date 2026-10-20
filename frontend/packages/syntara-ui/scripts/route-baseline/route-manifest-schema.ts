@@ -53,7 +53,7 @@ export const normalizedRouteSchema = z.object({
   /** Canonical pathname template, for example `/users/$userId`. */
   template: z.string().min(1),
   /** Ordered path-parameter names extracted from `template`. */
-  parameters: z.array(z.string()),
+  parameters: z.array(z.string()).max(20),
   /** How this route behaves at runtime. */
   kind: routeKindSchema,
   /** Target path when `kind` is `redirect` or `fallback`. */
@@ -78,7 +78,7 @@ export const routeManifestSchema = z.object({
   /** Manifest schema version. Bump only when the JSON shape changes. */
   version: z.literal(1),
   /** Deterministically sorted route entries. */
-  routes: z.array(normalizedRouteSchema),
+  routes: z.array(normalizedRouteSchema).max(1000),
 })
 
 /**

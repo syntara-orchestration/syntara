@@ -35,7 +35,7 @@ export const aapWorkflowTemplateSchema = z
     scm_branch: z.string().optional(),
     tags: z.string().optional(),
     skip_tags: z.string().optional(),
-    labels: z.array(z.string()).optional(),
+    labels: z.array(z.string()).max(100).optional(),
     settings: nodeSettingsSchema.optional(),
     // Local UI mode: persisted in node parameters so reopen restores the toggle
     use_input_variables: z.boolean().optional(),

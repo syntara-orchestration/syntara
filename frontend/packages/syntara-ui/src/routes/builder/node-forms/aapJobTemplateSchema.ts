@@ -31,7 +31,7 @@ export const aapJobTemplateSchema = z
     tags: z.string().optional(),
     skip_tags: z.string().optional(),
     verbosity: z.string().optional(),
-    job_credentials: z.array(z.number()).optional(),
+    job_credentials: z.array(z.number()).max(50).optional(),
 
     // ── Additional fields ─────────────────────────────────────────────
     job_type: z.string().optional(),
@@ -42,7 +42,7 @@ export const aapJobTemplateSchema = z
     execution_environment_id: optionalNumber.optional(),
     instance_group: z.string().optional(),
     instance_group_id: optionalNumber.optional(),
-    labels: z.array(z.string()).optional(),
+    labels: z.array(z.string()).max(100).optional(),
     settings: nodeSettingsSchema.optional(),
     // Local UI mode: persisted in node parameters so reopen restores the toggle
     use_input_variables: z.boolean().optional(),
