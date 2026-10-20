@@ -939,30 +939,6 @@ class FormPromptNodeParameters(BaseModel):
         return v
 
 
-_MAX_FORM_TRIGGER_TEMPLATE_PATH_DEPTH = 50
-
-
-def _collect_template_paths(value: Any, path: str = "", depth: int = 0) -> list[str]:  # noqa: ANN401
-    """Return dotted paths for string values containing template expressions."""
-    if depth > _MAX_FORM_TRIGGER_TEMPLATE_PATH_DEPTH:
-        return []
-    if isinstance(value, str):
-        return [path or "<root>"] if TEMPLATE_PATTERN.search(value) else []
-    if isinstance(value, dict):
-        paths: list[str] = []
-        for key, child in value.items():
-            child_path = f"{path}.{key}" if path else str(key)
-            paths.extend(_collect_template_paths(child, child_path, depth + 1))
-        return paths
-    if isinstance(value, list):
-        paths = []
-        for index, child in enumerate(value):
-            child_path = f"{path}.{index}" if path else str(index)
-            paths.extend(_collect_template_paths(child, child_path, depth + 1))
-        return paths
-    return []
-
-
 class FormTriggerParameters(BaseModel):
     """Parameters for form trigger nodes."""
 
@@ -991,19 +967,6 @@ class FormTriggerParameters(BaseModel):
         max_length=FieldLimits.FORM_CSS_OVERRIDE_MAX_LENGTH,
         description="Custom CSS applied to the form view.",
     )
-
-    @model_validator(mode="before")
-    @classmethod
-    def reject_template_expressions(cls, raw: Any) -> Any:  # noqa: ANN401
-        """Reject templates throughout trigger parameters, which have no upstream context."""
-        paths = _collect_template_paths(raw)
-        if paths:
-            msg = (
-                "Template expressions are not supported on a form trigger because it has no upstream node to resolve "
-                f"against. Found at: {', '.join(paths)}"
-            )
-            raise SafeValueError(msg)
-        return raw
 
     @field_validator("form_definition", mode="after")
     @classmethod

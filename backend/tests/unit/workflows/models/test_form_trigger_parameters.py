@@ -114,34 +114,6 @@ class TestFormTriggerParameters:
         with pytest.raises(ValidationError, match=f"Field 'region'.*{source}"):
             FormTriggerParameters.model_validate(_parameters(*fields))
 
-    @pytest.mark.parametrize(
-        ("parameters", "expected_path"),
-        [
-            (_parameters(_text_field(), message="${upstream.value}"), "message"),
-            (_parameters(_text_field(label="${upstream.label}")), "form_definition.fields.0.label"),
-            (_parameters(_text_field(default="${upstream.default}")), "form_definition.fields.0.default"),
-            (
-                _parameters(
-                    {
-                        "type": "dropdown",
-                        "value_name": "region",
-                        "label": "Region",
-                        "options": {
-                            "source": "static",
-                            "values": [{"display_label": "${upstream.label}", "value": "east"}],
-                        },
-                    }
-                ),
-                "form_definition.fields.0.options.values.0.display_label",
-            ),
-        ],
-    )
-    def test_template_expressions_are_rejected_with_paths(
-        self, parameters: dict[str, object], expected_path: str
-    ) -> None:
-        with pytest.raises(ValidationError, match=expected_path.replace(".", r"\.")):
-            FormTriggerParameters.model_validate(parameters)
-
     def test_invalid_default_is_rejected_by_shared_form_definition_validation(self) -> None:
         fields: list[dict[str, object]] = [
             {
