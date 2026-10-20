@@ -24,6 +24,56 @@ vi.mock('../../../access/useAllProjects', () => {
   return { useAllProjects: projectsMock, useSelectableProjects: projectsMock }
 })
 
+function getDefaultFormValues(defaultType: string): IntegrationFormData {
+  if (defaultType === IntegrationTypeEnum.ANSIBLE_AUTOMATION_PLATFORM) {
+    return {
+      name: '',
+      description: '',
+      integration_type: IntegrationTypeEnum.ANSIBLE_AUTOMATION_PLATFORM,
+      configuration: {
+        integration_type: IntegrationTypeEnum.ANSIBLE_AUTOMATION_PLATFORM,
+        base_url: '',
+        allow_http: false,
+        insecure_skip_tls_verify: false,
+      },
+      scope: 'global',
+      project_ids: [],
+    }
+  }
+
+  if (defaultType === IntegrationTypeEnum.OPENSHIFT) {
+    return {
+      name: '',
+      description: '',
+      integration_type: IntegrationTypeEnum.OPENSHIFT,
+      configuration: {
+        integration_type: IntegrationTypeEnum.OPENSHIFT,
+        base_url: '',
+        namespace: 'default',
+        allow_http: false,
+        insecure_skip_tls_verify: false,
+        ca_certificate: null,
+      },
+      scope: 'global',
+      project_ids: [],
+    }
+  }
+
+  return {
+    name: '',
+    description: '',
+    integration_type: IntegrationTypeEnum.MCP_SERVER,
+    configuration: {
+      integration_type: IntegrationTypeEnum.MCP_SERVER,
+      base_url: '',
+      allow_http: false,
+      insecure_skip_tls_verify: false,
+    },
+    scope: 'global',
+    project_ids: [],
+  }
+}
+
 function TestWrapper({
   defaultType = IntegrationTypeEnum.MCP_SERVER,
   onTypeChange: onTypeChangeProp = vi.fn(),
@@ -31,36 +81,7 @@ function TestWrapper({
   defaultType?: string
   onTypeChange?: (newType: string) => void
 } = {}) {
-  const defaultValues: IntegrationFormData =
-    defaultType === IntegrationTypeEnum.ANSIBLE_AUTOMATION_PLATFORM
-      ? {
-          name: '',
-          description: '',
-          integration_type: IntegrationTypeEnum.ANSIBLE_AUTOMATION_PLATFORM,
-          configuration: {
-            integration_type: IntegrationTypeEnum.ANSIBLE_AUTOMATION_PLATFORM,
-            base_url: '',
-            allow_http: false,
-            insecure_skip_tls_verify: false,
-          },
-          scope: 'global',
-          project_ids: [],
-        }
-      : {
-          name: '',
-          description: '',
-          integration_type: IntegrationTypeEnum.MCP_SERVER,
-          configuration: {
-            integration_type: IntegrationTypeEnum.MCP_SERVER,
-            base_url: '',
-            allow_http: false,
-            insecure_skip_tls_verify: false,
-          },
-          scope: 'global',
-          project_ids: [],
-        }
-
-  const form = useForm<IntegrationFormData>({ defaultValues })
+  const form = useForm<IntegrationFormData>({ defaultValues: getDefaultFormValues(defaultType) })
   const { setValue } = form
 
   const onTypeChange = useCallback(
@@ -173,6 +194,38 @@ describe('IntegrationDetailsStep', () => {
       render(<TestWrapper defaultType={IntegrationTypeEnum.ANSIBLE_AUTOMATION_PLATFORM} />)
 
       expect(screen.getByRole('textbox', { name: /server name/i })).toBeInTheDocument()
+    })
+  })
+
+  describe('OpenShift', () => {
+    it('uses Cluster name label and placeholder', () => {
+      render(<TestWrapper defaultType={IntegrationTypeEnum.OPENSHIFT} />)
+
+      const nameField = screen.getByRole('textbox', { name: /cluster name/i })
+      expect(nameField).toBeInTheDocument()
+      expect(nameField).toHaveAttribute('placeholder', 'Enter cluster name')
+    })
+
+    it('renders Cluster URL field with OpenShift placeholder', () => {
+      render(<TestWrapper defaultType={IntegrationTypeEnum.OPENSHIFT} />)
+
+      const clusterUrl = screen.getByRole('textbox', { name: /cluster url/i })
+      expect(clusterUrl).toBeInTheDocument()
+      expect(clusterUrl).toHaveAttribute('placeholder', 'https://api.example.com:6443')
+    })
+
+    it('renders required Namespace field', () => {
+      render(<TestWrapper defaultType={IntegrationTypeEnum.OPENSHIFT} />)
+
+      const namespace = screen.getByRole('textbox', { name: /namespace/i })
+      expect(namespace).toBeInTheDocument()
+      expect(namespace).toHaveAttribute('placeholder', 'default')
+    })
+
+    it('does not show API URL label for OpenShift', () => {
+      render(<TestWrapper defaultType={IntegrationTypeEnum.OPENSHIFT} />)
+
+      expect(screen.queryByRole('textbox', { name: /^api url$/i })).not.toBeInTheDocument()
     })
   })
 

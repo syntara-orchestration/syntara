@@ -37,6 +37,17 @@ const validLlmBase = {
   scope: 'global' as const,
 }
 
+const validOpenShiftBase = {
+  integration_type: 'openshift' as const,
+  configuration: {
+    integration_type: 'openshift' as const,
+    base_url: 'https://api.example.com:6443',
+    namespace: 'default',
+    ...securityDefaults,
+  },
+  scope: 'global' as const,
+}
+
 describe('integrationFormSchema', () => {
   describe('MCP Server', () => {
     it('accepts valid form data', () => {
@@ -229,6 +240,126 @@ describe('integrationFormSchema', () => {
     })
   })
 
+  describe('OpenShift', () => {
+    it('accepts valid OpenShift form data', () => {
+      const result = integrationFormSchema.safeParse({
+        ...validOpenShiftBase,
+        name: 'Prod Cluster',
+        description: 'West region',
+      })
+      expect(result.success).toBe(true)
+      if (result.success) {
+        expect(result.data.name).toBe('Prod Cluster')
+        expect(result.data.configuration).toHaveProperty('base_url', 'https://api.example.com:6443')
+        expect(result.data.configuration).toHaveProperty('namespace', 'default')
+      }
+    })
+
+    it('rejects empty cluster URL', () => {
+      const result = integrationFormSchema.safeParse({
+        ...validOpenShiftBase,
+        name: 'Cluster',
+        configuration: {
+          integration_type: 'openshift' as const,
+          base_url: '',
+          namespace: 'default',
+          ...securityDefaults,
+        },
+      })
+      expect(result.success).toBe(false)
+      if (!result.success) {
+        expect(result.error.issues.some((i) => i.message === 'Cluster URL is required')).toBe(true)
+      }
+    })
+
+    it('rejects invalid namespace format', () => {
+      const result = integrationFormSchema.safeParse({
+        ...validOpenShiftBase,
+        name: 'Cluster',
+        configuration: {
+          integration_type: 'openshift' as const,
+          base_url: 'https://api.example.com:6443',
+          namespace: 'Invalid_Namespace',
+          ...securityDefaults,
+        },
+      })
+      expect(result.success).toBe(false)
+      if (!result.success) {
+        expect(result.error.issues.some((i) => i.message === 'Invalid namespace format')).toBe(true)
+      }
+    })
+
+    it('rejects empty namespace', () => {
+      const result = integrationFormSchema.safeParse({
+        ...validOpenShiftBase,
+        name: 'Cluster',
+        configuration: {
+          integration_type: 'openshift' as const,
+          base_url: 'https://api.example.com:6443',
+          namespace: '',
+          ...securityDefaults,
+        },
+      })
+      expect(result.success).toBe(false)
+      if (!result.success) {
+        expect(result.error.issues.some((i) => i.message === 'Namespace is required')).toBe(true)
+      }
+    })
+
+    it('rejects allow_http=true', () => {
+      const result = integrationFormSchema.safeParse({
+        ...validOpenShiftBase,
+        name: 'Cluster',
+        configuration: {
+          integration_type: 'openshift' as const,
+          base_url: 'https://api.example.com:6443',
+          namespace: 'default',
+          ...securityDefaults,
+          allow_http: true,
+        },
+      })
+      expect(result.success).toBe(false)
+      if (!result.success) {
+        expect(result.error.issues.some((i) => i.message === 'OpenShift requires HTTPS')).toBe(true)
+      }
+    })
+
+    it('rejects insecure_skip_tls_verify=true', () => {
+      const result = integrationFormSchema.safeParse({
+        ...validOpenShiftBase,
+        name: 'Cluster',
+        configuration: {
+          integration_type: 'openshift' as const,
+          base_url: 'https://api.example.com:6443',
+          namespace: 'default',
+          ...securityDefaults,
+          insecure_skip_tls_verify: true,
+        },
+      })
+      expect(result.success).toBe(false)
+      if (!result.success) {
+        expect(result.error.issues.some((i) => i.message === 'OpenShift requires TLS verification')).toBe(true)
+      }
+    })
+
+    it('rejects non-HTTPS cluster URL', () => {
+      const result = integrationFormSchema.safeParse({
+        ...validOpenShiftBase,
+        name: 'Cluster',
+        configuration: {
+          integration_type: 'openshift' as const,
+          base_url: 'http://api.example.com:6443',
+          namespace: 'default',
+          ...securityDefaults,
+        },
+      })
+      expect(result.success).toBe(false)
+      if (!result.success) {
+        expect(result.error.issues.some((i) => i.message === 'Must be an HTTPS URL')).toBe(true)
+      }
+    })
+  })
+
   describe('LLM provider validation', () => {
     it('accepts valid LLM provider form data', () => {
       const result = integrationFormSchema.safeParse({
@@ -346,6 +477,13 @@ describe('integrationFormSchema', () => {
       expect(fields).toContain('configuration.base_url')
     })
 
+    it('returns name, base_url, and namespace for OpenShift', () => {
+      const fields = getStep1Fields(IntegrationTypeEnum.OPENSHIFT)
+      expect(fields).toContain('name')
+      expect(fields).toContain('configuration.base_url')
+      expect(fields).toContain('configuration.namespace')
+    })
+
     it('references valid schema paths that are required for MCP', () => {
       const result = integrationFormSchema.safeParse({
         ...validMcpBase,
@@ -425,6 +563,17 @@ describe('integrationFormSchema', () => {
         },
       ],
       [IntegrationTypeEnum.MCP_SERVER, { integration_type: 'mcp_server', base_url: '', ...expectedSecurityDefaults }],
+      [
+        IntegrationTypeEnum.OPENSHIFT,
+        {
+          integration_type: 'openshift',
+          base_url: '',
+          namespace: 'default',
+          insecure_skip_tls_verify: false,
+          allow_http: false,
+          ca_certificate: null,
+        },
+      ],
     ])('returns correct defaults for %s', (integrationType, expected) => {
       expect(getDefaultConfiguration(integrationType)).toEqual(expected)
     })
