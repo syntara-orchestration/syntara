@@ -14,6 +14,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from syntara.core.exceptions import SafeValueError
+from syntara.workflows.models.activity_execution import ActivityStatus
 from syntara.workflows.utils.namespace_resolver import NamespaceResolver
 from syntara.workflows.workflow_engine.dynamic_workflow import PRE_RESOLVED_MARKER, OrchestratorWorkflow
 from syntara.workflows.workflow_engine.graph import ActivityNode, WorkflowGraph
@@ -48,6 +49,8 @@ def _make_workflow(retry_context: dict[str, Any] | None = None) -> OrchestratorW
     wf.loop_state = {}
     wf.loop_body_map = {}
     wf.loop_iteration_results = {}
+    wf._loop_bodies = {}
+    wf._active_loop_iteration = {}
     wf._timeout_tasks = {}
     wf._timed_out_converge_nodes = set()
     wf._detached_nodes = set()
@@ -343,7 +346,7 @@ def test_default_continue_on_failure_is_false_so_upstream_is_restored() -> None:
 
 @pytest.mark.parametrize(
     "node_type",
-    ["condition", "switch", "loop", "converge"],
+    ["condition", "switch", "converge"],
 )
 def test_control_nodes_are_never_restored(node_type: str) -> None:
     """Condition/switch/loop/converge/wait decide routing, so they must always run.
@@ -422,48 +425,87 @@ def _loop_graph() -> WorkflowGraph:
     return WorkflowGraph(backend)
 
 
-def test_loop_body_nodes_are_not_restored() -> None:
-    """A loop body cannot be restored as a single stored output.
+def test_loop_body_nodes_are_restored_per_iteration() -> None:
+    """A body is restored once per iteration, not once per node.
 
-    The body is not one node: it runs once per iteration, and the loop aggregates
-    a list of results across them. Injecting the last stored body output and
-    skipping the body would hand the loop a scalar where it expects a list, and
-    would leave every body-node reference downstream unresolved.
+    The body is not one node: it runs once per iteration and the loop aggregates a
+    list across them. So the row asked for has to be the one for the iteration the
+    loop is currently replaying — otherwise every iteration would restore
+    iteration 0's output and the list would be the same value N times.
     """
     wf = _make_workflow(_retry("step_2"))
+    graph = _loop_graph()
+    wf._loop_bodies = {"loop_1": {"body_a", "body_b"}}
 
-    restorable = wf._retry_restorable_nodes(_loop_graph())
+    assert {"body_a", "body_b"} <= wf._retry_restorable_nodes(graph)
 
-    assert "body_a" not in restorable
-    assert "body_b" not in restorable
+    # The full path is used for every occurrence, including iteration zero.
+    body = graph.get_node("body_a")
+    assert body is not None
+    wf.loop_body_map = {"body_a": "loop_1"}
+    wf.node_control_data = {"loop_1": {"current_index": 0}}
+    assert wf._source_temporal_activity_id(body) == "body_a_iter_0"
+    wf.node_control_data["loop_1"]["current_index"] = 2
+    assert wf._source_temporal_activity_id(body) == "body_a_iter_2"
+    outside = graph.get_node("step_2")
+    assert outside is not None
+    assert wf._source_temporal_activity_id(outside) == "step_2"
 
 
-def test_loop_node_itself_is_not_restored() -> None:
-    """The loop control node always runs: it has to iterate to completion.
+@pytest.mark.asyncio
+async def test_restoring_a_loop_body_uses_its_canonical_temporal_path(mock_wf: MagicMock) -> None:
+    wf = _injectable_workflow(source_statuses={"body_a": ActivityStatus.COMPLETED.value})
+    wf.retry_context = _retry("step_2")
+    graph = _loop_graph()
+    wf.loop_body_map = {"body_a": "loop_1"}
+    wf.node_control_data = {"loop_1": {"current_index": 2}}
+    wf._loop_bodies = {"loop_1": {"body_a", "body_b"}}
+    wf._retry_source_temporal_statuses = {"body_a_iter_2": ActivityStatus.COMPLETED.value}
+    mock_wf.execute_activity = AsyncMock(
+        return_value={"status": "completed", "input_data": {}, "output_data": {"result": 7}}
+    )
 
-    The loop stays in the upstream region — it is upstream and a later PR will
-    want to replay it — but the scheduling-time decision refuses it, because a
-    restored loop would release its body without ever iterating.
-    """
+    result = await wf._restore_node_state(_node("body_a"), graph)
+
+    assert result is not None
+    call = mock_wf.execute_activity.await_args
+    assert call.kwargs["args"] == ["src-1", "body_a", "body_a_iter_2"]
+    assert call.kwargs["activity_id"] == "body_a_iter_2"
+    assert "body_a_iter_2" in wf._restored_node_timestamps
+    assert "body_a" not in wf._restored_node_timestamps
+
+
+def test_a_loop_node_uses_its_probe_instead_of_generic_node_restoration() -> None:
+    """The loop must reach its executor so it can probe each source iteration."""
+    from syntara.workflows.workflow_engine.models.workflow_definition import NodeType
+    from syntara.workflows.workflow_engine.retry_mixin import _CONTROL_NODE_TYPES_FOR_RETRY
+
     wf = _make_workflow(_retry("step_2"))
     graph = _loop_graph()
 
     assert wf._should_restore_node("loop_1", graph) is False
+    assert NodeType.LOOP not in _CONTROL_NODE_TYPES_FOR_RETRY
+    assert NodeType.WAIT not in _CONTROL_NODE_TYPES_FOR_RETRY
 
 
 def test_non_loop_successors_of_a_loop_stay_restorable() -> None:
     """Excluding the body must not over-reach past the loop's ``complete`` port."""
-    # Retrying from inside the body: body_b is the starting point, body_a is
-    # loop-body so it never restores, but step_2 is an ordinary node downstream
+    # Retrying from inside the body: body_b is the starting point, body_a is a
+    # loop body and restores per iteration, but step_2 is an ordinary node downstream
     # of the loop and is still eligible for restoration.
     downstream = _make_workflow(_retry("body_b"))
     graph = _loop_graph()
+    downstream._retry_source_statuses = {
+        "body_a": ActivityStatus.COMPLETED.value,
+        "step_2": ActivityStatus.COMPLETED.value,
+    }
     restorable = downstream._retry_restorable_nodes(graph)
 
     assert downstream._should_restore_node("step_2", graph) is True
     assert downstream._should_restore_node("loop_1", graph) is False
-    assert downstream._should_restore_node("body_a", graph) is False
-    assert {"step_2", "loop_1"} <= restorable, "the region holds both; the decision separates them"
+    assert downstream._should_restore_node("body_a", graph) is True
+    assert downstream._should_restore_node("body_b", graph) is False
+    assert restorable == {"body_a", "loop_1", "step_2"}
 
 
 # ---------------------------------------------------------------------------
@@ -482,8 +524,10 @@ def _injectable_workflow(*, source_statuses: dict[str, str] | None = None) -> Or
     wf = _make_workflow()
     if source_statuses is not None:
         wf._retry_source_statuses = source_statuses
+        wf._retry_source_temporal_statuses = source_statuses
     else:
         wf._retry_source_statuses = dict.fromkeys(("step_1", "step_2", "step_3", "trigger"), "completed")
+        wf._retry_source_temporal_statuses = wf._retry_source_statuses
     return wf
 
 
@@ -591,7 +635,7 @@ async def test_restore_dispatches_the_retry_outputs_activity(mock_wf: MagicMock)
 
     call = mock_wf.execute_activity.call_args
     assert call[0][0] == ActivityName.RETRY_NODE_REPLAY
-    assert call.kwargs["args"] == ["src-1", "step_1"]
+    assert call.kwargs["args"] == ["src-1", "step_1", "step_1"]
     assert call.kwargs["activity_id"] == "step_1"
 
 
@@ -666,28 +710,6 @@ async def test_maybe_restore_returns_none_outside_a_retry(mock_wf: MagicMock) ->
     mock_wf.execute_activity = AsyncMock(side_effect=AssertionError("must not be called"))
 
     assert await wf._maybe_restore_retry_output(node, _chain_graph()) is None
-
-
-def test_loop_body_walk_survives_a_repeated_node() -> None:
-    """A body reachable twice is visited once, so the walk cannot spin.
-
-    A nested or re-entrant body makes the same node reachable on more than one
-    path; the visited check is what keeps the traversal terminating.
-    """
-    from syntara.workflows.workflow_engine.graph import WorkflowGraph
-    from syntara.workflows.workflow_engine.graph_backend import InMemoryGraphBackend
-
-    backend = InMemoryGraphBackend()
-    backend.add_node("loop_1", {"id": "loop_1", "type": "loop", "parameters": {}})
-    backend.add_node("body_a", {"id": "body_a", "type": "script", "parameters": {}})
-    backend.add_node("body_b", {"id": "body_b", "type": "script", "parameters": {}})
-    # Two iterate paths converge on body_b.
-    backend.add_edge("loop_1", "body_a", {"from_port": "iterate"})
-    backend.add_edge("loop_1", "body_b", {"from_port": "iterate"})
-    backend.add_edge("body_a", "body_b", {"from_port": "iterate"})
-    graph = WorkflowGraph(backend)
-
-    assert OrchestratorWorkflow._loop_body_node_ids(graph) == {"body_a", "body_b"}
 
 
 # ---------------------------------------------------------------------------
@@ -801,7 +823,9 @@ class TestLinearChainReplay:
         wf = _injectable_workflow()
         wf.retry_context = _retry("step_3")
         wf.retry_context = _retry("step_3")
-        mock_wf.execute_activity = AsyncMock(return_value={})
+        mock_wf.execute_activity = AsyncMock(
+            side_effect=[{"activity_statuses": {}, "temporal_activity_statuses": {}}, {}]
+        )
 
         await wf._prepare_retry(self.graph)
 
@@ -879,6 +903,17 @@ class TestReplayedTimestampUpdateHandler:
 
         assert satisfied_now is False, "answering early here loses the source times for good"
         assert result is None
+
+    @pytest.mark.asyncio
+    async def test_a_loop_occurrence_does_not_fall_back_to_the_canvas_timestamp(self) -> None:
+        result, satisfied_now, _timeout = await self._call(
+            "script_1_iter_2",
+            candidates={"script_1"},
+            timestamps={"script_1": self.SOURCE_TIMES},
+        )
+
+        assert result is None
+        assert not satisfied_now, "a different iteration's times cannot satisfy this occurrence"
 
     @pytest.mark.asyncio
     async def test_an_ordinary_node_answers_immediately_with_nothing(self) -> None:
