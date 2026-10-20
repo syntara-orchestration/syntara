@@ -13,21 +13,26 @@ path, which is what makes a replayed node indistinguishable from an executed one
 """
 
 import json
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import structlog
-from sqlmodel import col, select
+from sqlmodel import col, or_, select
 from temporalio import activity, workflow
 
 from syntara.workflows.workflow_engine.constants import RESTORABLE_SOURCE_STATUSES
+
+if TYPE_CHECKING:
+    from sqlalchemy.sql.elements import ColumnElement
 
 with workflow.unsafe.imports_passed_through():
     from syntara.core.constants import JsonbLimits
     from syntara.core.database.session import get_db
     from syntara.core.exceptions import SafeValueError
     from syntara.workflows.models.activity_execution import ActivityExecution, ActivityStatus
-    from syntara.workflows.utils.loop_iteration_names import strip_iteration_suffix
-    from syntara.workflows.workflow_engine.utils.loop_iteration_ids import strip_loop_iteration_suffixes
+    from syntara.workflows.workflow_engine.utils.loop_iteration_ids import (
+        join_loop_iteration_id,
+        strip_loop_iteration_suffixes,
+    )
 
 logger = structlog.stdlib.get_logger(__name__)
 
@@ -47,14 +52,15 @@ logger = structlog.stdlib.get_logger(__name__)
 async def replay_retry_node_activity(
     source_execution_id: str,
     node_id: str,
+    temporal_activity_id: str,
 ) -> dict[str, Any] | None:
     """Fetch the recorded state of one node a retry will skip.
 
     Args:
         source_execution_id: Execution whose ``ActivityExecution`` rows hold the
             state to restore.
-        node_id: Canvas node id to fetch, matched exactly against
-            ``ActivityExecution.activity_name``.
+        node_id: Canvas node ID, used for validation and logging.
+        temporal_activity_id: Canonical Temporal activity ID and sole row identity.
 
     Returns:
         The node's ``status``, ``input_data``, ``output_data``, ``error_details``,
@@ -80,14 +86,14 @@ async def replay_retry_node_activity(
     """
     if not node_id or not node_id.strip():
         return None
-    wanted = node_id.strip()
+    wanted_activity_id = temporal_activity_id.strip()
+    if not wanted_activity_id:
+        return None
 
     stored: dict[str, Any] | None = None
     async for session in get_db():
-        # Matched by name in the query rather than by scanning the run's rows in
-        # Python: this is called once per restored node, so loading every row of
-        # the run made each call cost the whole execution. Matching the indexed
-        # name returns the one row, and its payload with it.
+        # The full Temporal activity ID uniquely selects this occurrence. The UI
+        # activity name is intentionally not a retry identity and is never queried.
         #
         # Every restorable status is returned, not just COMPLETED. A retry has to
         # reproduce what the source run did: a node that was skipped stays skipped,
@@ -100,18 +106,12 @@ async def replay_retry_node_activity(
         # caller runs it for real — which is the correct outcome for work that never
         # finished.
         #
-        # The name is matched exactly, with no iteration-suffix stripping. Loop
-        # replay is out of scope, and classification already excludes loop nodes
-        # and loop bodies, so nothing sends a suffixed id on this path. Restoring
-        # per-iteration loop state needs more than one record per node — the
-        # results are a list keyed by iteration — so that work reworks this
-        # transport rather than extending it.
         activity_row = (
             await session.exec(
                 select(ActivityExecution)
                 .where(
                     ActivityExecution.execution_id == source_execution_id,
-                    ActivityExecution.activity_name == wanted,
+                    ActivityExecution.temporal_activity_id == wanted_activity_id,
                     col(ActivityExecution.status).in_(RESTORABLE_SOURCE_STATUSES),
                 )
                 .limit(1)
@@ -167,7 +167,7 @@ async def replay_retry_node_activity(
 
 
 @activity.defn(name="fetch_retry_source_state")
-async def fetch_retry_source_state_activity(source_execution_id: str) -> dict[str, str]:
+async def fetch_retry_source_state_activity(source_execution_id: str) -> dict[str, dict[str, str]]:
     """Return source statuses, projected so no payload is read.
 
     Only the three columns this needs are selected. ``input_data`` and
@@ -177,25 +177,31 @@ async def fetch_retry_source_state_activity(source_execution_id: str) -> dict[st
     own query for the same reason.
     """
     states: dict[str, str] = {}
+    temporal_states: dict[str, str] = {}
     async for session in get_db():
         rows = (
             await session.exec(
-                select(ActivityExecution.activity_name, ActivityExecution.status)
+                select(ActivityExecution.status, ActivityExecution.temporal_activity_id)
                 .where(ActivityExecution.execution_id == source_execution_id)
                 .order_by(
                     col(ActivityExecution.iteration), col(ActivityExecution.created_at), col(ActivityExecution.id)
                 )
             )
         ).all()
-        for activity_name, status in rows:
-            if activity_name:
-                states[strip_iteration_suffix(activity_name)] = ActivityStatus(status).value
-    return states
+        for status, temporal_activity_id in rows:
+            if temporal_activity_id:
+                status_value = ActivityStatus(status).value
+                states[strip_loop_iteration_suffixes(temporal_activity_id)] = status_value
+                temporal_states[temporal_activity_id] = status_value
+    return {
+        "activity_statuses": states,
+        "temporal_activity_statuses": temporal_states,
+    }
 
 
 @activity.defn
 async def retry_control_ports(source_execution_id: str) -> dict[str, str]:
-    """Routing decision each control node's source run recorded, keyed by node id.
+    """Routing decision each control occurrence's source run recorded.
 
     Read in one pass during ``_prepare_retry`` because restorable-node selection
     and ``_should_restore_node`` are synchronous: they cannot dispatch an
@@ -210,23 +216,73 @@ async def retry_control_ports(source_execution_id: str) -> dict[str, str]:
         source_execution_id: Execution whose control nodes hold the routing state.
 
     Returns:
-        Node id to port, for the control nodes that recorded one.
+        Canonical Temporal activity ID to port, for control occurrences that recorded one.
 
     """
     ports: dict[str, str] = {}
     async for session in get_db():
         rows = (
             await session.exec(
-                select(ActivityExecution.activity_name, ActivityExecution.control_data).where(
+                select(
+                    ActivityExecution.temporal_activity_id,
+                    ActivityExecution.control_data,
+                ).where(
                     ActivityExecution.execution_id == source_execution_id,
                     col(ActivityExecution.control_data).isnot(None),
                 )
             )
         ).all()
-        for activity_name, control_data in rows:
+        for temporal_activity_id, control_data in rows:
             if not isinstance(control_data, dict):
                 continue
             port = control_data.get("next_port")
-            if port:
-                ports[strip_loop_iteration_suffixes(activity_name)] = str(port)
+            if port and temporal_activity_id:
+                ports[temporal_activity_id] = str(port)
     return ports
+
+
+@activity.defn
+async def probe_retry_loop_iteration(
+    source_execution_id: str,
+    iterate_entry_node_ids: list[str],
+    child_loop_entry_ids: list[str],
+    iteration_path: list[int],
+) -> bool:
+    """Whether the source run reached the next loop iteration.
+
+    The graph's ``iterate`` port successors are the entry points for the next
+    iteration. Ordinary entries are checked for their exact canonical Temporal
+    activity ID. A nested-loop entry appends its own iteration index, so its ID
+    is checked under the current path prefix. Missing entry evidence means the
+    next iteration was not reached.
+    """
+    if not iteration_path:
+        return False
+    if not iterate_entry_node_ids and not child_loop_entry_ids:
+        return False
+
+    exact_activity_ids = [join_loop_iteration_id(node_id, iteration_path) for node_id in iterate_entry_node_ids]
+    child_loop_prefixes = [
+        join_loop_iteration_id(node_id, iteration_path) + "_iter_" for node_id in child_loop_entry_ids
+    ]
+    async for session in get_db():
+        direct_conditions: list[ColumnElement[bool]] = [
+            col(ActivityExecution.temporal_activity_id).in_(exact_activity_ids)
+        ]
+        direct_conditions.extend(
+            col(ActivityExecution.temporal_activity_id).startswith(prefix, autoescape=True)
+            for prefix in child_loop_prefixes
+        )
+        found = await session.exec(
+            select(ActivityExecution.id)
+            .where(ActivityExecution.execution_id == source_execution_id, or_(*direct_conditions))
+            .limit(1)
+        )
+        return found.first() is not None
+
+    return False
+
+
+@activity.defn(name="sync_retry_loop_record")
+async def sync_retry_loop_record_activity() -> None:
+    """Emit the one-shot activity event that persists a staged logical loop row."""

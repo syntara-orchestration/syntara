@@ -12,6 +12,8 @@ from syntara.workflows.workflow_engine.models.workflow_definition import Activit
 from syntara.workflows.workflow_engine.services.activity_sync_types import ExecutionMonitorMetadata
 from syntara.workflows.workflow_engine.utils.loop_iteration_ids import (
     innermost_iteration_index,
+    loop_iteration_path,
+    retry_loop_record_node_id,
     strip_loop_iteration_suffixes,
 )
 from syntara.workflows.workflow_engine.utils.timeout_messages import build_timeout_error_message
@@ -27,27 +29,38 @@ class ActivitySyncEventProcessorMixin:
         attrs = event.activity_task_scheduled_event_attributes
         if attrs.activity_id.startswith("__internal__"):
             return
-        iteration_number = innermost_iteration_index(attrs.activity_id)
-        if iteration_number is not None:
-            base_activity_id = strip_loop_iteration_suffixes(attrs.activity_id)
-            has_iter_suffix = True
+        retry_loop_record_node_id_value = retry_loop_record_node_id(attrs.activity_id)
+        if retry_loop_record_node_id_value is not None:
+            # This one-shot event restores the logical loop row from the source
+            # execution. Synthetic per-iteration probes stay internal and never
+            # reach the activity sync service.
+            base_activity_id = retry_loop_record_node_id_value
+            iteration_number = None
+            is_loop_iteration = False
+            is_loop_control = True
+            has_control_data = True
         else:
-            base_activity_id = attrs.activity_id
-            has_iter_suffix = False
-        is_loop_iteration = has_iter_suffix or base_activity_id in metadata.terminal_activity_ids
-        # Loop *control* nodes use `{loop_id}_iter_{n}` (or
-        # `{loop_id}_iter_{outer}_iter_{inner}` when nested). Body nodes inside
-        # a loop (e.g. approval) reuse that suffix for uniqueness; they must
-        # not be classified as control or their status is held at RUNNING
-        # between iterations. Unknown type keeps the historical control
-        # heuristic so tests without a definitions map still pass.
-        activity_type = metadata.activity_definitions_map.get(base_activity_id, {}).get("type")
-        is_loop_control = has_iter_suffix and activity_type in (None, NodeType.LOOP)
-        has_control_data = is_loop_control or activity_type in (
-            NodeType.CONDITION,
-            NodeType.APPROVAL,
-            NodeType.SWITCH,
-        )
+            iteration_number = innermost_iteration_index(attrs.activity_id)
+            if iteration_number is not None:
+                base_activity_id = strip_loop_iteration_suffixes(attrs.activity_id)
+                has_iter_suffix = True
+            else:
+                base_activity_id = attrs.activity_id
+                has_iter_suffix = False
+            is_loop_iteration = has_iter_suffix or base_activity_id in metadata.terminal_activity_ids
+            # Loop *control* nodes use `{loop_id}_iter_{n}` (or
+            # `{loop_id}_iter_{outer}_iter_{inner}` when nested). Body nodes inside
+            # a loop (e.g. approval) reuse that suffix for uniqueness; they must
+            # not be classified as control or their status is held at RUNNING
+            # between iterations. Unknown type keeps the historical control
+            # heuristic so tests without a definitions map still pass.
+            activity_type = metadata.activity_definitions_map.get(base_activity_id, {}).get("type")
+            is_loop_control = has_iter_suffix and activity_type in (None, NodeType.LOOP)
+            has_control_data = is_loop_control or activity_type in (
+                NodeType.CONDITION,
+                NodeType.APPROVAL,
+                NodeType.SWITCH,
+            )
         configured_timeout_seconds: float | None = None
         if attrs.start_to_close_timeout and attrs.start_to_close_timeout.seconds > 0:
             configured_timeout_seconds = attrs.start_to_close_timeout.seconds + (
@@ -57,8 +70,11 @@ class ActivitySyncEventProcessorMixin:
         metadata.pending_activity_updates[event.event_id] = {
             "activity_id": base_activity_id,
             "activity_name": base_activity_id,
+            "temporal_activity_id": attrs.activity_id,
+            "loop_iteration_path": loop_iteration_path(attrs.activity_id),
             "_is_loop_iteration": is_loop_iteration,
             "_is_loop_control": is_loop_control,
+            "_is_retry_loop_record_restore": retry_loop_record_node_id_value is not None,
             "_has_control_data": has_control_data,
             "status": ActivityStatus.PENDING,
             "started_at": None,
