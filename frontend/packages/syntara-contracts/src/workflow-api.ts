@@ -2208,6 +2208,7 @@ export interface components {
       | 'converge_configuration'
       | 'approval_configuration'
       | 'form_prompt_configuration'
+      | 'form_trigger_configuration'
       | 'definition_limits'
     /**
      * ValidationFinding

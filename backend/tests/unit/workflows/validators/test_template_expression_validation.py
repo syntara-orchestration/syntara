@@ -574,9 +574,7 @@ class TestTriggerExpressions:
         [
             (
                 {
-                    "form_definition": {
-                        "fields": [{"type": "text", "value_name": "reason", "label": "Reason"}]
-                    },
+                    "form_definition": {"fields": [{"type": "text", "value_name": "reason", "label": "Reason"}]},
                     "message": "${upstream.value}",
                 },
                 "parameters.message",

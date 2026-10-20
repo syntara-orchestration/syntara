@@ -972,6 +972,9 @@ class FormTriggerParameters(BaseModel):
     @classmethod
     def validate_authored_form_definition(cls, value: FormDefinition) -> FormDefinition:
         """Reject run-time option sources and validate authored defaults."""
+        # Check defaults before rejecting unsupported option sources so both
+        # issues can be reported for the same authored form.
+        validate_form_definition(value, form_id=None)
         for field in value.fields:
             options = getattr(field, "options", None)
             if isinstance(options, (ResolvedOptions, DynamicOptions)):
@@ -981,7 +984,6 @@ class FormTriggerParameters(BaseModel):
                     "Use 'static'."
                 )
                 raise SafeValueError(msg)
-        validate_form_definition(value, form_id=None)
         return value
 
     @field_validator("css_override")
