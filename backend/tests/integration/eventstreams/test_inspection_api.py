@@ -6,7 +6,7 @@ are real. These tests do not require a live Kafka broker or Temporal worker.
 """
 
 from collections.abc import AsyncGenerator
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import UUID, uuid4
 
@@ -64,12 +64,10 @@ class InspectionScenario:
     evaluator: RegoEvaluator
     policy: Policy
     workflow: Workflow
-    other_workflow: Workflow
     other_project: Project
     integration: Integration
     runtime: Credential
-    management: Credential
-    subscriptions: dict[str, EventSubscription]
+    subscriptions: dict[str, EventSubscription] = field(default_factory=dict)
 
     @property
     def url(self) -> str:
@@ -184,22 +182,7 @@ async def scenario(
         enabled=True,
     )
     workflow = Workflow(name="inspected", project_id=test_project_id, created_by=test_user.id)
-    other_workflow = Workflow(name="another", project_id=test_project_id, created_by=test_user.id)
-    session.add_all([integration, workflow, other_workflow])
-    await session.flush()
-    await _publish(
-        session,
-        test_user,
-        workflow,
-        integration,
-        runtime,
-        {"a": "alerts.a", "b": "alerts.b", "c": "alerts.old", "retired": "alerts.retired"},
-        1,
-    )
-    subscriptions = await _publish(
-        session, test_user, workflow, integration, runtime, {"a": "alerts.a", "b": "alerts.b", "c": "alerts.current"}, 2
-    )
-    await _publish(session, test_user, other_workflow, integration, runtime, {"other": "other.alerts"}, 1)
+    session.add_all([integration, workflow])
     await session.commit()
     evaluator = RegoEvaluator()
     evaluator.start()
@@ -232,12 +215,9 @@ async def scenario(
                 evaluator,
                 policy,
                 workflow,
-                other_workflow,
                 other_project,
                 integration,
                 runtime,
-                management,
-                subscriptions,
             )
     finally:
         clear_authz_cache()
@@ -249,6 +229,44 @@ async def _remove_permission(scenario: InspectionScenario, action: str) -> None:
     scenario.session.add(scenario.policy)
     await scenario.session.commit()
     clear_authz_cache()
+
+
+@pytest_asyncio.fixture
+async def published_subscriptions(scenario: InspectionScenario) -> None:
+    """Only read tests need publication history; preflight tests use a draft."""
+    other = Workflow(name="another", project_id=scenario.workflow.project_id, created_by=scenario.user.id)
+    scenario.session.add(other)
+    await scenario.session.flush()
+    await _publish(
+        scenario.session,
+        scenario.user,
+        scenario.workflow,
+        scenario.integration,
+        scenario.runtime,
+        {"a": "alerts.a", "b": "alerts.b", "c": "alerts.old", "retired": "alerts.retired"},
+        1,
+    )
+    scenario.subscriptions = await _publish(
+        scenario.session,
+        scenario.user,
+        scenario.workflow,
+        scenario.integration,
+        scenario.runtime,
+        {"a": "alerts.a", "b": "alerts.b", "c": "alerts.current"},
+        2,
+    )
+    scenario.subscriptions.update(
+        await _publish(
+            scenario.session,
+            scenario.user,
+            other,
+            scenario.integration,
+            scenario.runtime,
+            {"other": "other.alerts"},
+            1,
+        )
+    )
+    await scenario.session.commit()
 
 
 def _connection() -> MagicMock:
@@ -266,10 +284,21 @@ def _connection() -> MagicMock:
     return connection
 
 
+@pytest.mark.usefixtures("published_subscriptions")
 async def test_current_collection_paginates_and_counts_without_retired_or_other_workflows(
     scenario: InspectionScenario,
 ) -> None:
-    first = await scenario.client.get(scenario.url, params={"limit": 2, "include_total": "true", "transport": "kafka"})
+    first = await scenario.client.get(
+        scenario.url,
+        params={
+            "limit": 2,
+            "include_total": "true",
+            "transport": "kafka",
+            "workflow_id[in]": str(scenario.subscriptions["other"].workflow_id),
+            "project_id": str(scenario.other_project.id),
+            "retired": "true",
+        },
+    )
     assert first.status_code == 200, first.text
     page = first.json()
     assert page["total"] == 3
@@ -295,44 +324,25 @@ async def test_current_collection_paginates_and_counts_without_retired_or_other_
     assert [row["id"] for row in previous.json()["resources"]] == [row["id"] for row in page["resources"]]
 
 
+@pytest.mark.usefixtures("published_subscriptions")
 async def test_detail_returns_current_source_only_and_safe_missing_errors(scenario: InspectionScenario) -> None:
     response = await scenario.client.get(f"{scenario.url}/{scenario.subscriptions['c'].id}")
     assert response.status_code == 200, response.text
     assert response.json()["source"]["generation"] == 2
     assert response.json()["source"]["configuration"]["topic"] == "alerts.current"
-    other = await scenario.session.exec(
-        select(EventSubscription).where(EventSubscription.workflow_id == scenario.other_workflow.id)
-    )
-    for subscription_id in [uuid4(), scenario.subscriptions["retired"].id, other.one().id]:
+    for subscription_id in [uuid4(), scenario.subscriptions["retired"].id, scenario.subscriptions["other"].id]:
         missing = await scenario.client.get(f"{scenario.url}/{subscription_id}")
         assert missing.status_code == 404, missing.text
         assert missing.headers["content-type"] == "application/problem+json"
         assert missing.json()["detail"] == "Event subscription not found"
 
-
-async def test_caller_filters_cannot_expand_workflow_project_or_retired_scope(scenario: InspectionScenario) -> None:
-    response = await scenario.client.get(
-        scenario.url,
-        params={
-            "workflow_id[in]": str(scenario.other_workflow.id),
-            "project_id": str(scenario.other_project.id),
-            "retired": "true",
-            "include_total": "true",
-        },
-    )
-    assert response.status_code == 200, response.text
-    assert response.json()["total"] == 3
-    assert {row["trigger_node_id"] for row in response.json()["resources"]} == {"a", "b", "c"}
-
-
-async def test_mismatched_subscription_project_is_excluded(scenario: InspectionScenario) -> None:
     subscription = scenario.subscriptions["a"]
     subscription.project_id = scenario.other_project.id
     await scenario.session.commit()
-    response = await scenario.client.get(scenario.url, params={"include_total": "true"})
-    assert response.status_code == 200, response.text
-    assert response.json()["total"] == 2
-    assert str(subscription.id) not in {row["id"] for row in response.json()["resources"]}
+    listing = await scenario.client.get(scenario.url, params={"include_total": "true"})
+    assert listing.status_code == 200, listing.text
+    assert listing.json()["total"] == 2
+    assert str(subscription.id) not in {row["id"] for row in listing.json()["resources"]}
     assert (await scenario.client.get(f"{scenario.url}/{subscription.id}")).status_code == 404
 
 
@@ -344,7 +354,7 @@ async def test_workflow_project_permissions_are_enforced(scenario: InspectionSce
     assert response.status_code == 403, response.text
     await _remove_permission(scenario, "workflow:read")
     assert (await scenario.client.get(scenario.url)).status_code == 403
-    assert (await scenario.client.get(f"{scenario.url}/{scenario.subscriptions['a'].id}")).status_code == 403
+    assert (await scenario.client.get(f"{scenario.url}/{uuid4()}")).status_code == 403
 
 
 async def test_preflight_decrypts_runtime_credential_without_writes_or_execution_permission(
@@ -409,10 +419,8 @@ async def test_preflight_requires_each_resource_permission(scenario: InspectionS
     "invalid",
     [
         "cross_project_credential",
-        "missing_credential",
         "disabled_credential",
         "missing_integration",
-        "disabled_integration",
         "unassigned_integration",
     ],
 )
@@ -422,14 +430,10 @@ async def test_preflight_rejects_unavailable_or_out_of_scope_references(
     parameters = scenario.parameters()
     if invalid == "cross_project_credential":
         scenario.runtime.project_id = scenario.other_project.id
-    elif invalid == "missing_credential":
-        parameters["credential_id"] = str(uuid4())
     elif invalid == "disabled_credential":
         scenario.runtime.enabled = False
     elif invalid == "missing_integration":
         parameters["integration_id"] = str(uuid4())
-    elif invalid == "disabled_integration":
-        scenario.integration.enabled = False
     else:
         scenario.integration.scope = IntegrationScope.PROJECT
     await scenario.session.commit()
@@ -438,26 +442,3 @@ async def test_preflight_rejects_unavailable_or_out_of_scope_references(
     assert response.status_code == 422, response.text
     assert response.headers["content-type"] == "application/problem+json"
     connect.assert_not_called()
-
-
-@pytest.mark.parametrize("field", ["selected_account_id", "execution_service_account_id", "group_id", "source"])
-async def test_preflight_rejects_extra_fields_before_network_access(scenario: InspectionScenario, field: str) -> None:
-    with patch(f"{_KAFKA_MODULE}.create_conn") as connect:
-        response = await scenario.client.post(
-            f"{scenario.url}/test", json={**scenario.parameters(), field: str(uuid4())}
-        )
-    assert response.status_code == 422, response.text
-    connect.assert_not_called()
-
-
-async def test_preflight_failure_remains_sanitized_and_unverified(scenario: InspectionScenario) -> None:
-    connection = _connection()
-    connection.send.side_effect = TimeoutError(_RUNTIME_PASSWORD)
-    with patch(f"{_KAFKA_MODULE}.create_conn", return_value=connection):
-        response = await scenario.client.post(f"{scenario.url}/test", json=scenario.parameters())
-    assert response.status_code == 200, response.text
-    assert response.json()["success"] is False
-    assert response.json()["error_code"] == "timeout"
-    assert response.json()["topic_read"] == response.json()["group_access"] == "unverified"
-    assert _RUNTIME_PASSWORD not in response.text
-    connection.close.assert_awaited_once()

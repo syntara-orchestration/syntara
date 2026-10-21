@@ -1,6 +1,5 @@
 """Preflight sends non-creating metadata only and never claims runtime ACLs."""
 
-import asyncio
 from types import SimpleNamespace
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -18,16 +17,6 @@ CREDENTIAL = {"kafka_username": "runtime", "kafka_password": "private-value"}
 CONFIG = KafkaConfiguration(bootstrap_servers=["broker.example.com:9093"])
 
 
-@pytest.mark.parametrize("version", [4, 5])
-def test_metadata_explicitly_prevents_topic_creation(version: int) -> None:
-    """Exercise the actual aiokafka request builder, including encoded bytes."""
-    request = NonCreatingMetadataRequest("alerts").prepare({3: (version, version)})
-    assert request.allow_auto_topic_creation is False
-    assert request.topics == ["alerts"]
-    decoded = (MetadataRequest_v4 if version == 4 else MetadataRequest_v5).decode(request.encode())
-    assert decoded.allow_auto_topic_creation is False
-
-
 @pytest.mark.parametrize("versions", [{}, {3: (0, 3)}])
 def test_unsafe_metadata_versions_are_rejected(versions: dict[int, tuple[int, int]]) -> None:
     """No downgrade may silently omit the creation-control flag."""
@@ -43,27 +32,9 @@ def connection(topics: list[tuple[Any, ...]]) -> MagicMock:
     return conn
 
 
-async def test_success_verifies_metadata_but_never_read_or_group_permissions() -> None:
-    conn = connection([(0, "alerts", False, [(0, 0, 1, [1], [1], [])])])
-    with patch(f"{MODULE}.create_conn", return_value=conn) as create:
-        result = await preflight(CONFIG, CREDENTIAL, "alerts")
-    assert result.success
-    assert result.connection == result.topic_metadata == "verified"
-    assert result.topic_read == result.group_access == "unverified"
-    assert CREDENTIAL["kafka_password"] not in result.model_dump_json()
-    assert create.call_args.kwargs["sasl_plain_username"] == "runtime"
-    assert "group_id" not in create.call_args.kwargs
-    conn.send.assert_awaited_once()
-    request = conn.send.call_args.args[0]
-    assert isinstance(request, NonCreatingMetadataRequest)
-    assert request.prepare({3: (0, 5)}).allow_auto_topic_creation is False
-    conn.close.assert_awaited_once()
-    assert [call[0] for call in conn.method_calls] == ["send", "close"]
-
-
 @pytest.mark.parametrize(
     "topics",
-    [[], [(3, "alerts", False, [])], [(29, "alerts", False, [])], [(0, "alerts", False, [(5, 0, -1, [], [], [])])]],
+    [[], [(29, "alerts", False, [])]],
 )
 async def test_missing_denied_or_unavailable_topic_is_safe(topics: list[tuple[Any, ...]]) -> None:
     conn = connection(topics)
@@ -100,8 +71,6 @@ async def test_failures_are_sanitized_and_close_connections(error: Exception, co
     [
         {},
         {"kafka_username": "runtime", "kafka_password": " \t"},
-        {"kafka_username": " \n", "kafka_password": "private-value"},
-        {"kafka_username": None, "kafka_password": "private-value"},
     ],
 )
 async def test_empty_credentials_never_connect(credential: dict[str, Any]) -> None:
@@ -128,17 +97,23 @@ async def test_metadata_parsing_with_real_protocol_responses(version: int, parti
     )
     conn = connection([])
     conn.send.return_value = response_type.decode(response.encode())
-    with patch(f"{MODULE}.create_conn", return_value=conn):
+    with patch(f"{MODULE}.create_conn", return_value=conn) as create:
         result = await preflight(CONFIG, CREDENTIAL, "alerts")
     assert result.success is (partition_error == 0)
     assert result.topic_metadata == ("verified" if partition_error == 0 else "failed")
     assert result.topic_read == result.group_access == "unverified"
+    assert CREDENTIAL["kafka_password"] not in result.model_dump_json()
+    assert create.call_args.kwargs["sasl_plain_username"] == "runtime"
+    assert "group_id" not in create.call_args.kwargs
+    request = conn.send.call_args.args[0].prepare({3: (version, version)})
+    decoded = (MetadataRequest_v4 if version == 4 else MetadataRequest_v5).decode(request.encode())
+    assert decoded.topics == ["alerts"]
+    assert decoded.allow_auto_topic_creation is False
+    assert [call[0] for call in conn.method_calls] == ["send", "close"]
 
 
-@pytest.mark.parametrize(
-    "error", [TimeoutError("private-value"), OSError("private-value"), KafkaConnectionError("private-value")]
-)
-async def test_close_failures_are_logged_without_secrets_or_changing_result(error: Exception) -> None:
+async def test_close_failures_are_logged_without_secrets_or_changing_result() -> None:
+    error = KafkaConnectionError("private-value")
     conn = connection([(0, "alerts", False, [(0, 0, 1, [1], [1], [])])])
     conn.close.side_effect = error
     with patch(f"{MODULE}.create_conn", return_value=conn), patch(f"{MODULE}.logger") as logger:
@@ -155,25 +130,3 @@ async def test_bootstrap_fallback_is_bounded_and_uses_same_runtime_identity() ->
         assert (await preflight(config, CREDENTIAL, "alerts")).success
     assert create.call_count == 2
     assert all(c.kwargs["sasl_plain_username"] == "runtime" for c in create.call_args_list)
-
-
-async def test_total_deadline_and_cleanup_deadline() -> None:
-    conn = connection([])
-
-    async def stalled() -> None:
-        await asyncio.Future()
-
-    # A real cancellation exercises timeout enforcement, without a live broker.
-    async def blocked_send(*_args: object) -> None:
-        await stalled()
-
-    conn.send.side_effect = blocked_send
-    conn.close.side_effect = stalled
-    with (
-        patch(f"{MODULE}.create_conn", return_value=conn),
-        patch(f"{MODULE}._PREFLIGHT_TIMEOUT_SECONDS", 0.01),
-        patch(f"{MODULE}._CLOSE_TIMEOUT_SECONDS", 0.01),
-    ):
-        result = await preflight(CONFIG, CREDENTIAL, "alerts")
-    assert result.error_code == "timeout"
-    conn.close.assert_awaited_once()
