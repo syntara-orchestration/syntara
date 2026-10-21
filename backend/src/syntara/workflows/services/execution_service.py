@@ -11,6 +11,7 @@ from uuid import UUID, uuid4
 
 import jsonschema
 import structlog
+from pydantic import ValidationError
 from referencing.exceptions import Unresolvable
 from sqlalchemy.orm import selectinload
 from sqlalchemy.sql import Select
@@ -18,13 +19,20 @@ from sqlmodel import and_, col, func, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 from temporalio.exceptions import ApplicationError
 
+from syntara.agent_orchestrator.services.invocation_service import InvocationService
 from syntara.audit.dispatcher import AuditEventDispatcher
+from syntara.audit.emitter import request_id_context_var
 from syntara.authz.engine import AllowedProjectsResult
+from syntara.authz.models import Project
 from syntara.core.config.base import get_settings
+from syntara.core.exceptions import SafeValueError
 from syntara.core.models import User
 from syntara.core.services import BaseService
 from syntara.core.services.extensions import ConvertResourceMixin, EnrichQueryMixin
 from syntara.core.services.user_reference_resolution import UserReferenceResolverMixin
+from syntara.forms.exceptions import FormDataValidationError, FormDefinitionError
+from syntara.forms.models.form_fields import DynamicOptions, ResolvedOptions
+from syntara.forms.validators.submission import validate_form_submission
 from syntara.metrics.dependencies import get_metrics_recorder
 from syntara.metrics.emission import emit_completion_metrics
 from syntara.metrics.interface_tag import interface_context_var
@@ -59,8 +67,13 @@ from syntara.workflows.models.execution import (
 from syntara.workflows.models.workflow import Workflow
 from syntara.workflows.models.workflow_definition import WorkflowDefinition
 from syntara.workflows.models.workflow_version import WorkflowVersion
+from syntara.workflows.services.invocation_cancellation import cancel_invocations_for_execution
 from syntara.workflows.utils.workflow_metadata import build_workflow_metadata, resolve_user_display_name
-from syntara.workflows.workflow_engine.models.workflow_definition import NodeType, resolve_trigger_node
+from syntara.workflows.workflow_engine.models.workflow_definition import (
+    FormTriggerParameters,
+    NodeType,
+    resolve_trigger_node,
+)
 from syntara.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
 from syntara.workflows.workflow_engine.signals.processor import resolve_signal_failure_message
 
@@ -284,6 +297,66 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
             msg = "Trigger schema contains blocked $ref reference"
             raise TriggerValidationError(msg) from e
 
+    @staticmethod
+    def _validate_form_trigger_submission(
+        trigger_node: dict[str, Any],
+        input_data: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Validate and normalize a form-trigger submission.
+
+        Returns the same cleaned value shape used by form prompt
+        submissions. The trigger-specific parameter model also verifies that
+        persisted form definitions still obey Form Trigger authoring rules.
+        """
+        trigger_node_id = trigger_node.get("id")
+        raw_parameters = trigger_node.get("parameters")
+        if not isinstance(raw_parameters, dict) or not raw_parameters.get("form_definition"):
+            logger.error("Form trigger has no form definition", trigger_node_id=trigger_node_id)
+            msg = "Form trigger is missing its form definition"
+            raise TriggerValidationError(msg)
+
+        try:
+            parameters = FormTriggerParameters.model_validate(raw_parameters)
+        except (ValidationError, FormDefinitionError) as exc:
+            logger.exception("Form trigger has an invalid form definition", trigger_node_id=trigger_node_id)
+            msg = "Form trigger has an invalid form definition"
+            raise TriggerValidationError(msg) from exc
+
+        if any(
+            isinstance(getattr(field, "options", None), (DynamicOptions, ResolvedOptions))
+            for field in parameters.form_definition.fields
+        ):
+            logger.error("Form trigger has unsupported dynamic options", trigger_node_id=trigger_node_id)
+            msg = "Form trigger form definition contains unsupported dynamic options"
+            raise TriggerValidationError(msg)
+
+        try:
+            return validate_form_submission(parameters.form_definition, input_data)
+        except FormDataValidationError as exc:
+            logger.warning(
+                "Form trigger submission validation failed",
+                trigger_node_id=trigger_node_id,
+                error_count=len(exc.errors),
+            )
+            # Re-raise with the trigger node id attached for log/diagnostic context.
+            raise FormDataValidationError(exc.errors, form_id=trigger_node_id) from exc
+
+    @staticmethod
+    def _normalize_trigger_input(
+        trigger_node: dict[str, Any],
+        input_data: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Validate trigger input and return normalized data.
+
+        Form Triggers use their typed form definition. Other trigger types keep
+        the existing JSON Schema defaults and validation behavior.
+        """
+        if trigger_node.get("type") == NodeType.FORM_TRIGGER:
+            return ExecutionService._validate_form_trigger_submission(trigger_node, input_data)
+
+        ExecutionService._apply_trigger_schema_defaults(trigger_node, input_data)
+        return input_data
+
     async def create_execution(
         self,
         workflow_id: UUID,
@@ -312,6 +385,8 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
         Raises:
             WorkflowNotFoundError: If workflow not found
             WorkflowNotPublishedError: If use_published=True and no published version
+            FormDataValidationError: If a Form Trigger submission is invalid
+            TriggerValidationError: If trigger input or configuration is invalid
             Exception: If Temporal workflow start fails
 
         """
@@ -351,10 +426,10 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
             schema_version=workflow_version.schema_version,
         )
 
-        # Step 2: Resolve trigger node and apply input_schema defaults
+        # Step 2: Resolve trigger node and validate/normalize trigger input
         workflow_def = workflow_version.workflow_definition
         trigger_node_id, trigger_node = resolve_trigger_node(workflow_def, trigger_node_id)
-        self._apply_trigger_schema_defaults(trigger_node, input_data)
+        input_data = self._normalize_trigger_input(trigger_node, input_data)
 
         return await self._start_temporal_and_create_execution(
             workflow=workflow,
@@ -416,8 +491,6 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
         )
 
         # Start Temporal workflow FIRST (if temporal_service is available)
-        from syntara.audit.emitter import request_id_context_var  # noqa: PLC0415
-
         if self.temporal_service is not None:
             logger.info("Starting Temporal workflow for execution...")
             with recorder.time(
@@ -550,10 +623,6 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
             WorkflowNotFoundError: If no workflow with this name exists
 
         """
-        from sqlmodel import col  # noqa: PLC0415
-
-        from syntara.authz.models import Project  # noqa: PLC0415
-
         query = (
             select(Workflow, WorkflowVersion)
             .join(
@@ -579,8 +648,6 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
         workflow, workflow_version = row
         triggers = workflow_version.workflow_definition.get("triggers", [])
         if not triggers or not triggers[0].get("id"):
-            from syntara.core.exceptions import SafeValueError  # noqa: PLC0415
-
             msg = f"Builtin workflow '{workflow_name}' has no triggers"
             raise SafeValueError(msg)
 
@@ -602,8 +669,6 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
         execute_target: bool = True,
     ) -> None:
         """Validate pre_resolved_nodes against the workflow definition."""
-        from syntara.core.exceptions import SafeValueError  # noqa: PLC0415
-
         trigger_ids = {t["id"] for t in workflow_def.get("triggers", []) if "id" in t}
         invalid_pre_resolved = set(pre_resolved_nodes.keys()) - node_ids
         if invalid_pre_resolved:
@@ -666,11 +731,11 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
         Raises:
             WorkflowNotFoundError: If workflow not found
             SafeValueError: If target_node_id not found in workflow definition
+            FormDataValidationError: If Form Trigger inputs are invalid
+            TriggerValidationError: If a Form Trigger configuration is invalid
             Exception: If Temporal workflow start fails
 
         """
-        from syntara.core.exceptions import SafeValueError  # noqa: PLC0415
-
         logger.info(
             "Creating test execution for workflow",
             workflow_id=workflow_id,
@@ -730,6 +795,16 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
             execute_target=execute_target,
         )
 
+        # The trigger remains the workflow entry point during a node test, so
+        # normalize Form Trigger inputs before they reach the trigger activity.
+        # Keep unknown trigger IDs on their existing Temporal-service error path.
+        test_trigger_node = next(
+            (trigger for trigger in workflow_def.get("triggers", []) if trigger.get("id") == trigger_node_id),
+            None,
+        )
+        if test_trigger_node is not None and test_trigger_node.get("type") == NodeType.FORM_TRIGGER:
+            trigger_inputs = self._validate_form_trigger_submission(test_trigger_node, trigger_inputs)
+
         # Convert PreResolvedNodeOutput objects to dicts for Temporal and metadata
         pre_resolved_dicts = {node_id: output.model_dump() for node_id, output in pre_resolved_nodes.items()}
 
@@ -761,8 +836,6 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
         )
 
         # Step 4: Start Temporal workflow with test parameters (if temporal_service is available)
-        from syntara.audit.emitter import request_id_context_var  # noqa: PLC0415
-
         if self.temporal_service is not None:
             logger.info("Starting Temporal workflow for test execution...")
             with recorder.time(
@@ -1140,13 +1213,6 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
         # this execution.  Agentic activities use async-completion so the
         # Temporal cancel above does not reach the running agent process.
         try:
-            from syntara.agent_orchestrator.services.invocation_service import (  # noqa: PLC0415
-                InvocationService,
-            )
-            from syntara.workflows.services.invocation_cancellation import (  # noqa: PLC0415
-                cancel_invocations_for_execution,
-            )
-
             # InvocationService owns the rest: it marks each invocation CANCELLED
             # and cancels the builtin workflow running it.  It is constructed
             # here rather than inside the bridge module so temporal_service --
@@ -1226,8 +1292,6 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
         # Step 5: Resolve trigger node from the original version's definition
         workflow_def = workflow_version.workflow_definition
         if original.trigger_node_id is None:
-            from syntara.core.exceptions import SafeValueError  # noqa: PLC0415
-
             msg = "Cannot retry execution: original execution has no trigger_node_id recorded"
             raise SafeValueError(msg)
         trigger_node_id, _ = resolve_trigger_node(workflow_def, original.trigger_node_id)
