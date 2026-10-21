@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ssl
+from typing import TYPE_CHECKING, cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -12,7 +13,7 @@ from aiokafka.errors import KafkaConnectionError, KafkaError, KafkaTimeoutError
 from aiokafka.structs import OffsetAndMetadata
 from pydantic import ValidationError
 
-from syntara.eventstreams.adapters.kafka_consumer import KafkaPartitionConsumer, _sanitize
+from syntara.eventstreams.adapters.kafka_consumer import KafkaPartitionConsumer, _RebalanceListener, _sanitize
 from syntara.eventstreams.adapters.kafka_source_configuration import KafkaSourceConfiguration
 from syntara.eventstreams.core.connection import ResolvedKafkaConnection
 from syntara.eventstreams.core.consumer import PositionStatus, RebalanceCallback
@@ -22,6 +23,9 @@ from syntara.eventstreams.exceptions import (
     OwnershipRevokedError,
     StaleEpochError,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 
 def _connection() -> ResolvedKafkaConnection:
@@ -57,7 +61,7 @@ def _mock_consumer() -> AsyncMock:
 
 
 @pytest.fixture
-def mock_aiokafka() -> MagicMock:
+def mock_aiokafka() -> Iterator[MagicMock]:
     """Patch AIOKafkaConsumer constructor to return a mock."""
     with patch(
         "syntara.eventstreams.adapters.kafka_consumer.AIOKafkaConsumer",
@@ -70,13 +74,13 @@ async def _start_with_partitions(
     adapter: KafkaPartitionConsumer,
     mock_cls: MagicMock,
     partitions: set[int],
-) -> MagicMock:
+) -> _RebalanceListener:
     """Start adapter and simulate partition assignment; return listener."""
     await adapter.start()
     listener = mock_cls.return_value.subscribe.call_args.kwargs["listener"]
     topic = adapter.topic
     await listener.on_partitions_assigned({TopicPartition(topic, p) for p in partitions})
-    return listener
+    return cast("_RebalanceListener", listener)
 
 
 # ---------------------------------------------------------------------------
@@ -120,15 +124,15 @@ async def test_client_constructed_with_mandated_config(mock_aiokafka: MagicMock)
 @pytest.mark.anyio
 async def test_start_stop_are_idempotent_and_clear_assignment(mock_aiokafka: MagicMock) -> None:
     adapter = KafkaPartitionConsumer(_connection(), _source_config(topic="t"))
-    assert not adapter.is_running
+    assert not bool(adapter.is_running)
     await _start_with_partitions(adapter, mock_aiokafka, {0, 1})
     await adapter.start()
-    assert adapter.is_running
+    assert bool(adapter.is_running)
     mock_aiokafka.assert_called_once()
 
     await adapter.stop()
     await adapter.stop()
-    assert not adapter.is_running
+    assert not bool(adapter.is_running)
     assert adapter.assignment == frozenset()
     mock_aiokafka.return_value.stop.assert_awaited_once()
 
@@ -139,7 +143,7 @@ async def test_restart_preserves_epoch_and_clears_assignment(mock_aiokafka: Magi
     await adapter.stop()
     mock_aiokafka.return_value = _mock_consumer()
     await adapter.start()
-    assert adapter.is_running
+    assert bool(adapter.is_running)
     assert adapter.assignment == frozenset()
     assert adapter.epoch == 1
     await adapter.stop()
@@ -154,7 +158,7 @@ async def test_stop_raises_on_shutdown_error(mock_aiokafka: MagicMock) -> None:
     with pytest.raises(KafkaTransportError):
         await adapter.stop()
 
-    assert not adapter.is_running
+    assert not bool(adapter.is_running)
     assert adapter._consumer is None
 
 
@@ -261,7 +265,7 @@ async def test_empty_revocation_is_noop(mock_aiokafka: MagicMock) -> None:
 # ---------------------------------------------------------------------------
 
 
-async def _adapter_at_epoch_1(mock_cls: MagicMock) -> tuple[KafkaPartitionConsumer, MagicMock]:
+async def _adapter_at_epoch_1(mock_cls: MagicMock) -> tuple[KafkaPartitionConsumer, _RebalanceListener]:
     """Return an adapter at epoch 1 with partition 0 assigned."""
     adapter = KafkaPartitionConsumer(_connection(), _source_config(topic="t"))
     listener = await _start_with_partitions(adapter, mock_cls, {0})
@@ -572,7 +576,7 @@ async def test_start_wraps_kafka_error(mock_aiokafka: MagicMock) -> None:
         await adapter.start()
 
     mock_aiokafka.return_value.stop.assert_awaited_once()
-    assert not adapter.is_running
+    assert not bool(adapter.is_running)
     await adapter.stop()
     mock_aiokafka.return_value.stop.assert_awaited_once()
 
@@ -599,7 +603,7 @@ def test_connection_repr_redacts_secrets() -> None:
 def test_connection_frozen() -> None:
     conn = _connection()
     with pytest.raises(ValidationError):
-        conn.security_protocol = "PLAINTEXT"  # type: ignore[misc]
+        conn.security_protocol = "PLAINTEXT"
 
 
 def test_connection_has_ssl_context() -> None:
