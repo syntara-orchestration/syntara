@@ -131,7 +131,10 @@ function NavExpandableItem({
       isExpanded={isExpanded}
       isActive={isActive}
       id={`nav-${item.path.replaceAll('/', '-')}`}
-      buttonProps={buttonRef ? { ref: buttonRef } : undefined}
+      buttonProps={{
+        'aria-label': item.label,
+        ...(buttonRef ? { ref: buttonRef } : {}),
+      }}
       aria-label={item.label}
       onExpand={onExpand}
     >
