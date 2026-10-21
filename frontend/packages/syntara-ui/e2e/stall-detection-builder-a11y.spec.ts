@@ -77,12 +77,8 @@ test.describe('Stall detection builder and accessibility', () => {
       // Assert: No new a11y violations
       expect(results.violations).toEqual([])
 
-      // Assert: Stall warning icon has appropriate role and label
-      const stallIcon = app
-        .getByRole('row')
-        .filter({ hasText: 'Activity 1' })
-        .getByRole('img', { name: /stall|delay/i })
-      await expect(stallIcon).toBeVisible()
+      // Assert: Stall warning text label is visible
+      await expect(app.getByRole('row').filter({ hasText: 'Activity 1' }).getByText('Stalled')).toBeVisible()
 
       // Assert: ExecutionDelayedBadge has accessible text
       const delayedBadge = pageHeader(app).getByText('Delayed')

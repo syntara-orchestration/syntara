@@ -57,13 +57,8 @@ test.describe('Stall detection global settings', () => {
         // Assert: ExecutionDelayedBadge in page header
         await waitForExecutionDelayedBadge(pageHeader(app), 5_000)
 
-        // Assert: Stall warning icon on activity row
-        await expect(
-          app
-            .getByRole('row')
-            .filter({ hasText: 'Activity 1' })
-            .getByRole('img', { name: /stall|delay/i })
-        ).toBeVisible()
+        // Assert: Stall warning text label on activity row
+        await expect(app.getByRole('row').filter({ hasText: 'Activity 1' }).getByText('Stalled')).toBeVisible()
       } finally {
         // Cleanup workflow
         await deleteWorkflowViaApi(app, id)
