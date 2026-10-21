@@ -325,9 +325,15 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
         try:
             parameters = FormTriggerParameters.model_validate(raw_parameters)
         except (ValidationError, FormDefinitionError) as exc:
-            logger.exception("Form trigger has an invalid form definition", **validation_context)
+            error_count = len(exc.errors()) if isinstance(exc, ValidationError) else len(exc.errors)
+            logger.warning(
+                "Form trigger has an invalid form definition",
+                error_type=type(exc).__name__,
+                error_count=error_count,
+                **validation_context,
+            )
             msg = "Form trigger has an invalid form definition"
-            raise TriggerValidationError(msg) from exc
+            raise TriggerValidationError(msg) from None
 
         if any(
             isinstance(getattr(field, "options", None), (DynamicOptions, ResolvedOptions))
