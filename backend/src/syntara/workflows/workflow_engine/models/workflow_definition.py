@@ -20,7 +20,7 @@ from syntara.aap.models.responses import AAPJobType as AAPJobType  # noqa: PLC04
 from syntara.core.constants import FieldLimits, WebhookLimits
 from syntara.core.exceptions import SafeValueError
 from syntara.core.utils.security import validate_css_security
-from syntara.forms.models.form_fields import DynamicOptions, FormDefinition, ResolvedOptions
+from syntara.forms.models.form_fields import FormDefinition, ResolvedOptions
 from syntara.forms.validators.form_definition import validate_form_definition
 from syntara.workflows.json_schema_validation import validate_json_schema_definition
 from syntara.workflows.utils.iso8601_interval import parse_iso8601_repeating_interval
@@ -869,10 +869,10 @@ class BaseFormParameters(BaseModel):
     message: str | None = Field(
         default=None,
         max_length=FieldLimits.DESCRIPTION_MAX_LENGTH,
-        description="Message shown above the form. Template expressions are supported only for form prompts.",
+        description="Message shown above the form. Supports ${...} template expressions.",
     )
     form_definition: FormDefinition = Field(
-        description="Form definition describing the fields shown to users.",
+        description="Form definition describing the fields shown to responders.",
     )
     submit_label: str | None = Field(
         default=None,
@@ -955,20 +955,8 @@ class FormTriggerParameters(BaseFormParameters):
     @field_validator("form_definition", mode="after")
     @classmethod
     def validate_authored_form_definition(cls, value: FormDefinition) -> FormDefinition:
-        """Reject run-time option sources and validate authored defaults."""
-        # Check defaults before rejecting unsupported option sources so both
-        # issues can be reported for the same authored form.
-        cls._validate_authored_form_defaults(value)
-        for field in value.fields:
-            options = getattr(field, "options", None)
-            if isinstance(options, (ResolvedOptions, DynamicOptions)):
-                source = options.source
-                msg = (
-                    f"Field '{field.value_name}': options source '{source}' is not supported on a form trigger. "
-                    "Use 'static'."
-                )
-                raise SafeValueError(msg)
-        return value
+        """Validate authored defaults; the workflow schema restricts options to static sources."""
+        return cls._validate_authored_form_defaults(value)
 
 
 class WebhookTriggerParameters(TemplateAwareBaseModel):

@@ -85,37 +85,6 @@ class TestFormTriggerParameters:
         with pytest.raises(ValidationError, match=parameter):
             FormTriggerParameters.model_validate(parameters)
 
-    @pytest.mark.parametrize(
-        ("options", "source"),
-        [
-            (
-                {
-                    "source": "dynamic",
-                    "expression": "source.options",
-                    "label_key": "label",
-                    "value_key": "value",
-                },
-                "dynamic",
-            ),
-            (
-                {"source": "dynamic_resolved", "values": [{"display_label": "East", "value": "east"}]},
-                "dynamic_resolved",
-            ),
-        ],
-    )
-    def test_dynamic_option_sources_are_rejected(self, options: dict[str, object], source: str) -> None:
-        fields: list[dict[str, object]] = [
-            {
-                "type": "dropdown",
-                "value_name": "region",
-                "label": "Region",
-                "options": options,
-            }
-        ]
-        parameters = _parameters(*fields)
-        with pytest.raises(ValidationError, match=f"Field 'region'.*{source}"):
-            FormTriggerParameters.model_validate(parameters)
-
     def test_invalid_default_is_rejected_by_shared_form_definition_validation(self) -> None:
         fields: list[dict[str, object]] = [
             {
