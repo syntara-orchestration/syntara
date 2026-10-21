@@ -94,6 +94,13 @@ class EventExecutionPreparationService:
         A recovery caller may omit the envelope: durable input is authoritative.
         Any non-prepared result rolls back provisional writes. Existing evidence
         is retained, and no result from this method grants offset commit authority.
+
+        Invalid caller input or missing/inconsistent retained Execution evidence
+        raises ValueError rather than returning a PreparationResult. These
+        exceptional failures roll back the attempt. Callers must leave the
+        delivery unresolved and surface it to delivery recovery or an operator;
+        they must not infer claim loss, terminal resolution, or permission to
+        start Temporal or commit an offset from the exception.
         """
         try:
             async with self._session_factory() as session, session.begin():
