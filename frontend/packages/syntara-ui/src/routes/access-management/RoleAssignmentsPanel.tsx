@@ -102,7 +102,6 @@ function RoleAssignmentsTableBody({
       <Thead>
         <Tr>
           <Th
-            width={10}
             expand={{
               areAllExpanded: !allRowsExpanded,
               collapseAllAriaLabel: allRowsExpanded ? 'Collapse all' : 'Expand all',

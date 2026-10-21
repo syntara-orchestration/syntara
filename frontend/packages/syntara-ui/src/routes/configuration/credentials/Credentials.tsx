@@ -352,7 +352,6 @@ export default function Credentials() {
                   <Thead>
                     <Tr>
                       <Th
-                        width={10}
                         expand={{
                           areAllExpanded,
                           collapseAllAriaLabel: areAllExpanded ? 'Collapse all' : 'Expand all',
