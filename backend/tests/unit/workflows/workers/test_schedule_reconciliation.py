@@ -79,7 +79,10 @@ class TestExtractExpectedSchedules:
 
     def test_ignores_non_scheduled_triggers(self) -> None:
         wf_id = str(uuid4())
-        triggers = [{"id": "m1", "type": "manual_trigger", "parameters": {}}]
+        triggers = [
+            {"id": "m1", "type": "manual_trigger", "parameters": {}},
+            {"id": "f1", "type": "form_trigger", "parameters": {}},
+        ]
         lookup = _extract_expected_schedules([(wf_id, triggers)])
         assert lookup == {}
 

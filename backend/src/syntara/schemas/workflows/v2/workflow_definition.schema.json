@@ -208,6 +208,23 @@
               }
             }
           ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/node_base"
+            },
+            {
+              "properties": {
+                "type": {
+                  "const": "form_trigger"
+                },
+                "parameters": {
+                  "$ref": "triggers/form.schema.json#/parameterSchema"
+                }
+              }
+            }
+          ]
         }
       ]
     },

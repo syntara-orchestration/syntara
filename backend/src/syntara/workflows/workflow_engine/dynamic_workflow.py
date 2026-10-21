@@ -63,6 +63,7 @@ from syntara.workflows.workflow_engine.utils.loop_iteration_ids import loop_cont
 # Each entry must have a corresponding @activity.defn with a matching name.
 ALLOWED_TRIGGER_TYPES: set[str] = {
     ActivityName.EDA_TRIGGER,
+    ActivityName.FORM_TRIGGER,
     ActivityName.MANUAL_TRIGGER,
     ActivityName.SCHEDULED_TRIGGER,
     ActivityName.WEBHOOK_TRIGGER,

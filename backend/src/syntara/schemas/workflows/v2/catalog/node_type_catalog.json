@@ -34,6 +34,17 @@
       "since": "2.0.0"
     },
     {
+      "type": "form_trigger",
+      "name": "Form Trigger",
+      "description": "Workflow entry point that collects structured user input via a form before execution begins",
+      "labels": {
+        "category": "trigger"
+      },
+      "schema_ref": "../triggers/form.schema.json",
+      "deprecated": false,
+      "since": "2.0.0"
+    },
+    {
       "type": "webhook_trigger",
       "name": "Webhook Trigger",
       "description": "Workflow entry point triggered by incoming HTTP POST requests from external systems",

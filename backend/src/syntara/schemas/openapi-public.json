@@ -52398,7 +52398,7 @@
                 "type": "null"
               }
             ],
-            "description": "Trigger node type (manual_trigger, scheduled_trigger, webhook_trigger, eda_trigger)",
+            "description": "Trigger node type (manual_trigger, scheduled_trigger, webhook_trigger, eda_trigger, form_trigger)",
             "title": "Trigger Type"
           },
           "interface": {
@@ -52716,6 +52716,7 @@
           "scheduled_trigger",
           "webhook_trigger",
           "eda_trigger",
+          "form_trigger",
           "condition",
           "converge",
           "loop",
@@ -56619,6 +56620,7 @@
           "converge_configuration",
           "approval_configuration",
           "form_prompt_configuration",
+          "form_trigger_configuration",
           "definition_limits"
         ]
       },

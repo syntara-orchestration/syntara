@@ -12,6 +12,9 @@ export interface OutputFieldDef {
 }
 
 export const NODE_OUTPUT_SCHEMAS: Record<string, OutputFieldDef[]> = {
+  form_trigger: [
+    { name: 'response_data', type: 'object', description: 'Submitted form values keyed by field value_name.' },
+  ],
   scheduled_trigger: [
     {
       name: 'scheduled_at',

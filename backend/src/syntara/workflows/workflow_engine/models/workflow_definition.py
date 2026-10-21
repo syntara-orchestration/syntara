@@ -127,6 +127,7 @@ class ActivityName(StrEnum):
     SCHEDULED_TRIGGER = "scheduled_trigger"
     WEBHOOK_TRIGGER = "webhook_trigger"
     EDA_TRIGGER = "eda_trigger"
+    FORM_TRIGGER = "form_trigger"
     # Control nodes
     CONDITION = "condition"
     CONVERGE = "converge"
@@ -168,6 +169,7 @@ class NodeType(str, Enum):
     SCHEDULED_TRIGGER = "scheduled_trigger"
     WEBHOOK_TRIGGER = "webhook_trigger"
     EDA_TRIGGER = "eda_trigger"
+    FORM_TRIGGER = "form_trigger"
     # Control nodes
     CONDITION = "condition"
     CONVERGE = "converge"
@@ -859,8 +861,8 @@ class ApprovalNodeParameters(BaseModel):
     decision_window: int | None = Field(default=None, ge=1, description="Response timeout in seconds")
 
 
-class FormPromptNodeParameters(BaseModel):
-    """Parameters for form prompt nodes."""
+class BaseFormParameters(BaseModel):
+    """Fields and validation shared by form prompt and form trigger nodes."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -872,6 +874,46 @@ class FormPromptNodeParameters(BaseModel):
     form_definition: FormDefinition = Field(
         description="Form definition describing the fields shown to responders.",
     )
+    submit_label: str | None = Field(
+        default=None,
+        max_length=FieldLimits.FORM_SUBMIT_LABEL_MAX_LENGTH,
+        description="Submit button label.",
+    )
+    success_message: str | None = Field(
+        default=None,
+        max_length=FieldLimits.FORM_SUCCESS_MESSAGE_MAX_LENGTH,
+        description="Shown after submission.",
+    )
+    css_override: str | None = Field(
+        default=None,
+        max_length=FieldLimits.FORM_CSS_OVERRIDE_MAX_LENGTH,
+        description="Custom CSS applied to the form view.",
+    )
+
+    @staticmethod
+    def _validate_authored_form_defaults(value: FormDefinition) -> FormDefinition:
+        """Validate defaults using the same coercion as form submission."""
+        validate_form_definition(value, form_id=None)
+        return value
+
+    @field_validator("css_override")
+    @classmethod
+    def validate_css_override(cls, value: str | None) -> str | None:
+        """Validate CSS for security (reject patterns that enable data exfiltration or code execution)."""
+        if value is None:
+            return value
+
+        try:
+            validate_css_security(value)
+        except ValueError as exc:
+            raise SafeValueError(str(exc)) from exc
+
+        return value
+
+
+class FormPromptNodeParameters(BaseFormParameters):
+    """Parameters for form prompt nodes."""
+
     responder_users: list[str] | None = Field(
         default=None,
         max_length=100,
@@ -892,49 +934,29 @@ class FormPromptNodeParameters(BaseModel):
         default=None,
         description="Decision when form prompt times out with continue_on_failure enabled",
     )
-    submit_label: str | None = Field(
-        default=None,
-        max_length=FieldLimits.FORM_SUBMIT_LABEL_MAX_LENGTH,
-        description="Submit button label.",
-    )
-    success_message: str | None = Field(
-        default=None,
-        max_length=FieldLimits.FORM_SUCCESS_MESSAGE_MAX_LENGTH,
-        description="Shown after submission.",
-    )
-    css_override: str | None = Field(
-        default=None,
-        max_length=FieldLimits.FORM_CSS_OVERRIDE_MAX_LENGTH,
-        description="Custom CSS applied to the form view.",
-    )
 
     @field_validator("form_definition", mode="after")
     @classmethod
-    def validate_authored_form_definition(cls, v: FormDefinition) -> FormDefinition:
+    def validate_authored_form_definition(cls, value: FormDefinition) -> FormDefinition:
         """Reject engine-only options and validate defaults in authored workflows."""
-        for field in v.fields:
+        for field in value.fields:
             if isinstance(getattr(field, "options", None), ResolvedOptions):
                 msg = (
                     f"Field '{field.value_name}': options source 'dynamic_resolved' is produced by the "
                     "workflow engine at run time and cannot be authored. Use 'static' or 'dynamic'."
                 )
                 raise SafeValueError(msg)
-        validate_form_definition(v, form_id=None)
-        return v
+        return cls._validate_authored_form_defaults(value)
 
-    @field_validator("css_override")
+
+class FormTriggerParameters(BaseFormParameters):
+    """Parameters for form trigger nodes."""
+
+    @field_validator("form_definition", mode="after")
     @classmethod
-    def validate_css_override(cls, v: str | None) -> str | None:
-        """Validate CSS for security (reject patterns that enable data exfiltration or code execution)."""
-        if v is None:
-            return v
-
-        try:
-            validate_css_security(v)
-        except ValueError as exc:
-            raise SafeValueError(str(exc)) from exc
-
-        return v
+    def validate_authored_form_definition(cls, value: FormDefinition) -> FormDefinition:
+        """Validate authored defaults; the workflow schema restricts options to static sources."""
+        return cls._validate_authored_form_defaults(value)
 
 
 class WebhookTriggerParameters(TemplateAwareBaseModel):

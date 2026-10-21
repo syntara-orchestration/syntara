@@ -936,7 +936,7 @@ export interface components {
       retried_from_execution_id?: string | null
       /**
        * Trigger Type
-       * @description Trigger node type (manual_trigger, scheduled_trigger, webhook_trigger, eda_trigger)
+       * @description Trigger node type (manual_trigger, scheduled_trigger, webhook_trigger, eda_trigger, form_trigger)
        */
       trigger_type?: string | null
       /**
@@ -2208,6 +2208,7 @@ export interface components {
       | 'converge_configuration'
       | 'approval_configuration'
       | 'form_prompt_configuration'
+      | 'form_trigger_configuration'
       | 'definition_limits'
     /**
      * ValidationFinding

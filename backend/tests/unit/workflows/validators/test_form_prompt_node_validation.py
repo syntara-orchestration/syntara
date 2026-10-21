@@ -7,7 +7,7 @@ import pytest
 from syntara.workflows.models.validation_finding import ValidationCategory, ValidationFinding, ValidationSeverity
 from syntara.workflows.validators.workflow_definition import (
     WorkflowValidator,
-    _merge_form_prompt_field_findings_by_index,
+    _merge_form_field_findings_by_index,
 )
 
 _VALID_FORM_DEFINITION: dict[str, Any] = {"fields": [{"type": "text", "value_name": "answer", "label": "Answer"}]}
@@ -453,7 +453,7 @@ class TestFormPromptFindingPaths:
             field_finding(1),
         ]
 
-        merged = _merge_form_prompt_field_findings_by_index(findings)
+        merged = _merge_form_field_findings_by_index(findings)
 
         assert [finding.message for finding in merged] == [
             "field-0",
