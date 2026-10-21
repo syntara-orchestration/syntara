@@ -20,6 +20,7 @@
 
 import { loginAsUser } from './authorization/fixtures'
 import { type Page, test, expect, toAppUrl, appBaseUrl } from './fixtures'
+import { expectDockedNavGroupChildLinks, mainNavigation } from './helpers/docked-nav'
 import { openRowKebab } from './helpers/patternfly'
 import { buildUniqueName } from './helpers/workflows'
 import {
@@ -176,69 +177,63 @@ async function createTestCredential(adminApp: Page): Promise<{ id: string; name:
 
 test.describe('Permission gating — Navigation visibility', () => {
   test('admin sees all navigation items', async ({ app }) => {
-    const nav = app.getByRole('navigation', { name: 'Main navigation' })
+    const nav = mainNavigation(app)
 
     await expect(nav.getByRole('link', { name: 'Workflows' })).toBeVisible()
     await expect(nav.getByRole('link', { name: 'Workflow Runs' })).toBeVisible()
     await expect(nav.getByRole('link', { name: 'Approvals' })).toBeVisible()
 
-    const configItem = nav.getByLabel('Configuration')
-    await expect(configItem).toBeVisible()
-    await configItem.click()
-    await expect(app.getByRole('menuitem', { name: 'Integrations' })).toBeVisible()
-    await expect(app.getByRole('menuitem', { name: 'Credentials' })).toBeVisible()
-    await app.keyboard.press('Escape')
-    // Wait for the Configuration flyout to fully close before opening the next one
-    await expect(app.getByRole('menuitem', { name: 'Integrations' })).toBeHidden()
+    await expect(nav.getByRole('listitem', { name: 'Configuration', exact: true })).toBeVisible()
+    await expectDockedNavGroupChildLinks(app, 'Configuration', ['Integrations', 'Credentials'], 'Integrations')
 
-    const sysAdminItem = nav.getByLabel('System Administration')
-    await expect(sysAdminItem).toBeVisible()
-    await sysAdminItem.click()
-    await expect(app.getByRole('menuitem', { name: 'Access Management' })).toBeVisible()
-    await expect(app.getByRole('menuitem', { name: 'Identity Providers' })).toBeVisible()
-    await expect(app.getByRole('menuitem', { name: 'Settings' })).toBeVisible()
+    await expect(nav.getByRole('listitem', { name: 'System Administration', exact: true })).toBeVisible()
+    await expectDockedNavGroupChildLinks(
+      app,
+      'System Administration',
+      ['Access Management', 'Identity Providers', 'Settings'],
+      'Access Management'
+    )
   })
 
   test('viewer sees only operational items — no System Administration', async ({ viewerApp }) => {
-    const nav = viewerApp.getByRole('navigation', { name: 'Main navigation' })
+    const nav = mainNavigation(viewerApp)
 
     await expect(nav.getByRole('link', { name: 'Workflows' })).toBeVisible()
     await expect(nav.getByRole('link', { name: 'Workflow Runs' })).toBeVisible()
     await expect(nav.getByRole('link', { name: 'Approvals' })).toBeVisible()
-    await expect(nav.getByLabel('Configuration')).toBeVisible()
+    await expect(nav.getByRole('listitem', { name: 'Configuration', exact: true })).toBeVisible()
 
-    await expect(nav.getByLabel('System Administration')).not.toBeVisible()
+    await expect(nav.getByRole('listitem', { name: 'System Administration', exact: true })).not.toBeVisible()
   })
 
   test('auditor sees all navigation items', async ({ auditorApp }) => {
-    const nav = auditorApp.getByRole('navigation', { name: 'Main navigation' })
+    const nav = mainNavigation(auditorApp)
 
     await expect(nav.getByRole('link', { name: 'Workflows' })).toBeVisible()
     await expect(nav.getByRole('link', { name: 'Workflow Runs' })).toBeVisible()
     await expect(nav.getByRole('link', { name: 'Approvals' })).toBeVisible()
-    await expect(nav.getByLabel('Configuration')).toBeVisible()
+    await expect(nav.getByRole('listitem', { name: 'Configuration', exact: true })).toBeVisible()
 
-    const sysAdminItem = nav.getByLabel('System Administration')
-    await expect(sysAdminItem).toBeVisible()
-    await sysAdminItem.click()
-    await expect(auditorApp.getByRole('menuitem', { name: 'Access Management' })).toBeVisible()
-    await expect(auditorApp.getByRole('menuitem', { name: 'Identity Providers' })).toBeVisible()
-    await expect(auditorApp.getByRole('menuitem', { name: 'Settings' })).toBeVisible()
+    await expect(nav.getByRole('listitem', { name: 'System Administration', exact: true })).toBeVisible()
+    await expectDockedNavGroupChildLinks(
+      auditorApp,
+      'System Administration',
+      ['Access Management', 'Identity Providers', 'Settings'],
+      'Access Management'
+    )
   })
 
   test('user sees Access Management but not Identity Providers or Settings', async ({ userApp }) => {
-    const nav = userApp.getByRole('navigation', { name: 'Main navigation' })
+    const nav = mainNavigation(userApp)
 
     await expect(nav.getByRole('link', { name: 'Workflows' })).toBeVisible()
     await expect(nav.getByRole('link', { name: 'Workflow Runs' })).toBeVisible()
     await expect(nav.getByRole('link', { name: 'Approvals' })).toBeVisible()
-    await expect(nav.getByLabel('Configuration')).toBeVisible()
 
-    // When only one SA child is visible (Access Management), the nav renders
-    // a direct link instead of a flyout dropdown.
-    const sysAdminLink = nav.getByLabel('System Administration')
-    await expect(sysAdminLink).toBeVisible()
-    await sysAdminLink.click()
+    // Single visible child per group → top-level links (not expandable groups).
+    await expect(nav.getByRole('link', { name: 'Configuration', exact: true })).toBeVisible()
+    await expect(nav.getByRole('link', { name: 'System Administration', exact: true })).toBeVisible()
+    await nav.getByRole('link', { name: 'System Administration', exact: true }).click()
     await expect(userApp.getByRole('heading', { name: 'Access Management' })).toBeVisible()
   })
 })
