@@ -47,11 +47,16 @@ class ExecutionPlaneRejectedError(ExecutionPlaneError):
     """Raised when EP rejects an invalid or unauthorized request."""
 
     def __init__(
-        self, message: str = "Execution Plane rejected the request", *, status_code: int | None = None
+        self,
+        message: str = "Execution Plane rejected the request",
+        *,
+        status_code: int | None = None,
+        detail: object = None,
     ) -> None:
         """Retain HTTP status so callers can recover existing domain resources."""
         super().__init__(message)
         self.status_code = status_code
+        self.detail = detail
 
 
 def create_ep_service_token() -> str:
@@ -217,12 +222,17 @@ class ExecutionPlaneHttpClient:
                 or exc.response.status_code >= HTTPStatus.INTERNAL_SERVER_ERROR
             ):
                 raise ExecutionPlaneUnavailableError from exc
-            detail = "Execution Plane rejected the request"
+            detail_str = "Execution Plane rejected the request"
+            raw_detail: object = None
             with suppress(ValueError, AttributeError):
                 error_body = exc.response.json()
-                if isinstance(error_body, dict):
-                    detail = str(error_body.get("detail", detail))
-            raise ExecutionPlaneRejectedError(detail, status_code=exc.response.status_code) from exc
+                if isinstance(error_body, dict) and "detail" in error_body:
+                    raw_detail = error_body["detail"]
+                    if isinstance(raw_detail, str):
+                        detail_str = raw_detail
+            raise ExecutionPlaneRejectedError(
+                detail_str, status_code=exc.response.status_code, detail=raw_detail
+            ) from exc
         except httpx.RequestError as exc:
             raise ExecutionPlaneUnavailableError from exc
         if response.status_code == HTTPStatus.NO_CONTENT:

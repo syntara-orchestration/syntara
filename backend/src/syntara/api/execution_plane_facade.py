@@ -5,6 +5,36 @@ Documented filters correspond to execution_plane.models.work_item.WorkItem and
 execution_plane.models.execution_target.ExecutionTarget field allowlists; dynamic
 bracket filters are forwarded to EP's execution_plane.query_filters parser.
 
+Followup: remove the duplicated filter fields in ExecutionTargetListParams and
+WorkItemListParams once execution-plane-client publishes list-query metadata.
+The client currently exposes command contracts, not query allowlists. Inferring
+filters from command or response model fields would be incorrect: not every
+field is queryable, and some supported filters are absent from AO responses.
+
+The intended implementation is:
+- Add execution_plane_client.list_queries with lightweight Pydantic metadata for
+  work items, execution targets, and cluster bindings: public filter fields and
+  operators, sortable fields, default sort, page limits, and label support. Keep
+  the client free of SQLModel, SQLAlchemy, FastAPI, and EP service imports.
+- Make EP derive its __filterable_fields__, __sortable_fields__, sort validation,
+  and query documentation from those definitions. Database column aliases and
+  typed filter execution stay inside EP; preserve existing query behavior.
+- Export a helper that renders compact OpenAPI filter parameters from the shared
+  metadata, documenting each base field once with its bracket operators.
+- After releasing the additive client change, update AO's pinned dependency,
+  delete both local list-parameter subclasses, and use BaseListParams plus
+  openapi_extra generated from the imported metadata on these two routes.
+  Continue forwarding raw filters and leaving their validation to EP; preserve
+  empty values, opaque cursors, and omitted sorting.
+- Verify EP metadata against runtime allowlists, column aliases, and OpenAPI;
+  retain PostgreSQL query coverage. Verify AO documentation matches the imported
+  metadata and its forwarding tests still pass, check the built client wheel,
+  and regenerate AO's OpenAPI and TypeScript contracts.
+
+This can follow the current facade change without a coordinated deployment or
+wire-contract change: the local filter fields supply documentation, while raw
+request parameters already drive forwarding. No cluster facade route is needed.
+
 Project/RBAC semantics are a separate followup. This transport alignment retains
 the existing facade authorization checks and adds no project associations.
 """
@@ -164,7 +194,7 @@ async def list_execution_targets(
                 operation="execution_targets",
                 allowed_projects=allowed_projects,
                 params=params,
-                query_params=dict(request.query_params),
+                query_params=request.query_params.multi_items(),
             )
         resources = [ExecutionTargetFacadeRead.model_validate(item) for item in page["resources"]]
     except ExecutionPlaneUnavailableError as exc:
@@ -210,7 +240,7 @@ async def list_work_items(
                 operation="work_items",
                 allowed_projects=allowed_projects,
                 params=params,
-                query_params=dict(request.query_params),
+                query_params=request.query_params.multi_items(),
             )
         resources = [WorkItemFacadeRead.model_validate(item) for item in page["resources"]]
     except ExecutionPlaneUnavailableError as exc:
@@ -235,12 +265,12 @@ async def _list_ep_resources(
     operation: Literal["execution_targets", "work_items"],
     allowed_projects: AllowedProjectsResult,
     params: BaseListParams,
-    query_params: dict[str, str],
+    query_params: list[tuple[str, str]],
 ) -> dict[str, Any]:
     """List EP resources after AO permission checks. EP has no project scope."""
     if not allowed_projects.all_projects and not allowed_projects.project_ids:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No project-scoped access to EP resources")
-    filters = {key: value for key, value in query_params.items() if key not in BaseListParams.model_fields}
+    filters = {key: value for key, value in query_params if key not in BaseListParams.model_fields}
     try:
         list_page = client.list_work_items if operation == "work_items" else client.list_execution_targets
         return await list_page(
@@ -252,5 +282,8 @@ async def _list_ep_resources(
         )
     except ExecutionPlaneRejectedError as exc:
         if exc.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT:
-            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail=exc.detail if exc.detail is not None else str(exc),
+            ) from exc
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Invalid Execution Plane response") from exc
