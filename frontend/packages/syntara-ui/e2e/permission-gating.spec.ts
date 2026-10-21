@@ -808,14 +808,16 @@ test.describe('Permission gating — Project actions', () => {
       if (!createWorkflowResp.ok()) throw new Error('Workflow creation failed')
       const workflow = (await createWorkflowResp.json()) as { id: string }
 
-      // Viewer cannot select individual projects — dropdown only shows "All projects"
+      // Viewer lacks project update/delete — header project kebab must stay hidden even when
+      // a project is selected (mock API lists all projects; real backend may hide options).
       await viewerApp.goto(toAppUrl('/workflows'))
-      const projectSelector = viewerApp.getByRole('textbox', { name: 'Project' })
+      const projectSelector = viewerApp.getByTestId('page-header').getByRole('textbox', { name: 'Project' })
       await projectSelector.click()
-      await expect(viewerApp.getByRole('option', { name: 'All projects' })).toBeVisible()
-      await expect(viewerApp.getByRole('option', { name: projectName })).not.toBeVisible()
-      await expect(viewerApp.getByRole('option', { name: project.id })).not.toBeVisible()
-      await viewerApp.keyboard.press('Escape')
+      await projectSelector.fill(projectName)
+      const projectOption = viewerApp.getByRole('option', { name: projectName })
+      await projectOption.waitFor({ state: 'visible', timeout: 10_000 })
+      await projectOption.click()
+      await expect(viewerApp.getByRole('button', { name: 'Project actions' })).not.toBeVisible()
 
       // Clean up
       await apiRequest(app, 'delete', `/workflows/${workflow.id}`)
