@@ -33,7 +33,7 @@ export function useRetryFromFailure({ executionId, onSuccess }: UseRetryFromFail
   const { showSuccess, showError } = useAlerts()
   const queryClient = useQueryClient()
   /* v8 ignore start -- v8 emits phantom branches from the compiled generic useMutation call */
-  const retryMutation = executionsClient.useMutation('post', '/executions/{execution_id}/retry-from-failure')
+  const retryMutation = executionsClient.useMutation('post', '/executions/{execution_id}/retry_from_failure')
   /* v8 ignore stop */
 
   function handleRetry(retryPointIds?: string[]) {

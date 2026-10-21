@@ -17,7 +17,7 @@ export function useRetryFromFailurePreview({ executionId, enabled }: UseRetryFro
   /* v8 ignore start -- v8 emits phantom branches from the compiled generic useQuery call */
   const previewQuery = executionsClient.useQuery(
     'get',
-    '/executions/{execution_id}/retry-from-failure-preview',
+    '/executions/{execution_id}/retry_from_failure_preview',
     {
       params: { path: { execution_id: executionId } },
     },

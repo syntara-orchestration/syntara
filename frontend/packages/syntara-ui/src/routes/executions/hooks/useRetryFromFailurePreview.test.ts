@@ -33,7 +33,7 @@ describe('useRetryFromFailurePreview', () => {
 
     expect(mockUseQuery).toHaveBeenCalledWith(
       'get',
-      '/executions/{execution_id}/retry-from-failure-preview',
+      '/executions/{execution_id}/retry_from_failure_preview',
       { params: { path: { execution_id: 'exec-abc' } } },
       expect.objectContaining({ enabled: true })
     )
@@ -44,7 +44,7 @@ describe('useRetryFromFailurePreview', () => {
 
     expect(mockUseQuery).toHaveBeenCalledWith(
       'get',
-      '/executions/{execution_id}/retry-from-failure-preview',
+      '/executions/{execution_id}/retry_from_failure_preview',
       expect.anything(),
       expect.objectContaining({ enabled: false })
     )

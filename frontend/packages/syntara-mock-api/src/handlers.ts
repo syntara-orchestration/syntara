@@ -1914,11 +1914,11 @@ export const handlers = [
     return HttpResponse.json(newExecution, { status: 201 })
   }),
 
-  http.get('/api/v1/executions/:executionId/retry-from-failure-preview', ({ params }) => {
+  http.get('/api/v1/executions/:executionId/retry_from_failure_preview', ({ params }) => {
     const executionId = params.executionId as string
     const execution = executions.find((e) => e.id === executionId)
     if (!execution) {
-      return createExecutionNotFoundResponse(executionId, 'retry-from-failure-preview')
+      return createExecutionNotFoundResponse(executionId, 'retry_from_failure_preview')
     }
 
     if (isRetryFromFailureRejected(execution)) {
@@ -1967,11 +1967,11 @@ export const handlers = [
     })
   }),
 
-  http.post('/api/v1/executions/:executionId/retry-from-failure', async ({ params, request }) => {
+  http.post('/api/v1/executions/:executionId/retry_from_failure', async ({ params, request }) => {
     const executionId = params.executionId as string
     const execution = executions.find((e) => e.id === executionId)
     if (!execution) {
-      return createExecutionNotFoundResponse(executionId, 'retry-from-failure')
+      return createExecutionNotFoundResponse(executionId, 'retry_from_failure')
     }
 
     if (isRetryFromFailureRejected(execution)) {
@@ -1982,7 +1982,7 @@ export const handlers = [
           detail: `Cannot retry from failure: execution is in '${execution.status}' state.`,
           code: 'EXECUTION_NOT_RETRYABLE_FROM_FAILURE',
           retryable: false,
-          instance: `/api/v1/executions/${executionId}/retry-from-failure`,
+          instance: `/api/v1/executions/${executionId}/retry_from_failure`,
         },
         { status: 409 }
       )
