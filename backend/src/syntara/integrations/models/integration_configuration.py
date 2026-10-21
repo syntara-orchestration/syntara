@@ -138,6 +138,28 @@ class KafkaSaslMechanism(StrEnum):
     SCRAM_SHA_512 = "SCRAM-SHA-512"
 
 
+def _split_ipv6_bootstrap_server(value: str) -> tuple[str, str]:
+    """Split a ``[ipv6]:port`` bootstrap server into a bracketed host and port text."""
+    end = value.find("]")
+    port_suffix = value[end + 1 :] if end >= 0 else ""
+    host = value[1:end] if end > 0 else ""
+    if not host or not port_suffix.startswith(":"):
+        msg = f"Bootstrap server '{value}' must use [ipv6]:port."
+        raise ValueError(msg)
+    return f"[{host}]", port_suffix[1:]
+
+
+def _split_bootstrap_server(value: str) -> tuple[str, str]:
+    """Split a bootstrap server into a normalized host and port text."""
+    if value.startswith("["):
+        return _split_ipv6_bootstrap_server(value)
+    if value.count(":") != 1:
+        msg = f"Bootstrap server '{value}' must be host:port."
+        raise ValueError(msg)
+    host, port_text = value.split(":", 1)
+    return host, port_text
+
+
 def parse_bootstrap_server(raw: str) -> str:
     """Validate one Kafka bootstrap server as ``host:port`` or ``[ipv6]:port``."""
     value = raw.strip()
@@ -148,23 +170,8 @@ def parse_bootstrap_server(raw: str) -> str:
         msg = f"Bootstrap server '{value}' must be host:port with no path, query, or userinfo."
         raise ValueError(msg)
 
-    if value.startswith("["):
-        end = value.find("]")
-        port_suffix = value[end + 1 :] if end >= 0 else ""
-        host = value[1:end] if end > 0 else ""
-        if not host or not port_suffix.startswith(":"):
-            msg = f"Bootstrap server '{value}' must use [ipv6]:port."
-            raise ValueError(msg)
-        port_text = port_suffix[1:]
-        normalized_host = f"[{host}]"
-    else:
-        if value.count(":") != 1:
-            msg = f"Bootstrap server '{value}' must be host:port."
-            raise ValueError(msg)
-        host, port_text = value.split(":", 1)
-        normalized_host = host
-
-    if not host:
+    normalized_host, port_text = _split_bootstrap_server(value)
+    if not normalized_host:
         msg = f"Bootstrap server '{value}' is missing a host."
         raise ValueError(msg)
     try:

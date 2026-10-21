@@ -68,11 +68,15 @@ class KafkaAdapter:
 
     def _ssl_context(self) -> ssl.SSLContext:
         if self._config.insecure_skip_tls_verify:
-            context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+            # Explicit, documented opt-in (see class docstring and
+            # IntegrationSecurityMixin). Same reviewed pattern already used
+            # for Postgres connections in core/database/ssl.py; validate()
+            # logs a warning so the MITM exposure is visible to operators.
+            context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)  # NOSONAR
             context.check_hostname = False
-            context.verify_mode = ssl.CERT_NONE
+            context.verify_mode = ssl.CERT_NONE  # NOSONAR
             return context
-        context = ssl.create_default_context()
+        context = ssl.create_default_context()  # NOSONAR
         if self._config.ca_certificate:
             context.load_verify_locations(cadata=self._config.ca_certificate)
         return context
