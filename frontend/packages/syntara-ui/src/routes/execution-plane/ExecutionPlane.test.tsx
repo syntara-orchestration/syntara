@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
 import { executionPlaneClient } from '../../client'
+import { useCanI } from '../../hooks/useCanI'
 import { AlertProvider } from '../../providers/alerts'
 import { assertUrlParam } from '../../test/filter-test-helpers'
 import { expectPageTitle } from '../../test/pageTitle'
@@ -22,7 +23,7 @@ vi.mock('../../client', () => ({
 }))
 
 vi.mock('../../hooks/useCanI', () => ({
-  useCanI: () => ({ allowed: true, isChecking: false, isError: false }),
+  useCanI: vi.fn(() => ({ allowed: true, isChecking: false, isError: false })),
 }))
 
 vi.mock('wouter', () => ({
@@ -100,6 +101,7 @@ describe('ExecutionPlane', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockSearchParams.forEach((_value, key) => mockSearchParams.delete(key))
+    vi.mocked(useCanI).mockReturnValue({ allowed: true, isChecking: false, isError: false })
     mockFacadeQuery()
   })
 
@@ -164,6 +166,40 @@ describe('ExecutionPlane', () => {
     expect(screen.getByRole('button', { name: 'Configure integration' })).toBeInTheDocument()
   })
 
+  it('hides configure action in empty state when user cannot create integrations', async () => {
+    vi.mocked(useCanI).mockReturnValue({ allowed: false, isChecking: false, isError: false })
+    mockFacadeQuery({ data: { resources: [], next: null, prev: null, total: 0 } })
+
+    render(<ExecutionPlane />, { wrapper })
+
+    expect(await screen.findByText('No execution targets yet')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Configure integration' })).not.toBeInTheDocument()
+  })
+
+  it('shows filter-empty state and toolbar when filters are active but no targets match', async () => {
+    mockSearchParams.set('name[contains]', 'no-match')
+    mockFacadeQuery({ data: { resources: [], next: null, prev: null, total: 0 } })
+
+    render(<ExecutionPlane />, { wrapper })
+
+    expect(await screen.findByText('No results found')).toBeInTheDocument()
+    expect(screen.queryByText('No execution targets yet')).not.toBeInTheDocument()
+    expect(screen.getByPlaceholderText('Filter by name')).toBeInTheDocument()
+  })
+
+  it('shows loading state while the facade query is pending', () => {
+    mockFacadeQuery({
+      data: undefined,
+      isPending: true,
+      isFetching: true,
+      error: null,
+    })
+
+    render(<ExecutionPlane />, { wrapper })
+
+    expect(screen.getByTestId('loading-state')).toBeInTheDocument()
+  })
+
   it('shows error state when the facade query fails', async () => {
     mockFacadeQuery({
       data: undefined,
@@ -176,6 +212,23 @@ describe('ExecutionPlane', () => {
     expect(await screen.findByRole('heading', { name: 'Error loading execution targets' })).toBeInTheDocument()
     expect(screen.getByText('boom')).toBeInTheDocument()
     expect(screen.queryByText('Prod OpenShift West')).not.toBeInTheDocument()
+  })
+
+  it('retries the facade query when Retry is clicked', async () => {
+    const user = userEvent.setup()
+    const refetch = vi.fn().mockResolvedValue(undefined)
+    mockFacadeQuery({
+      data: undefined,
+      error: { title: 'Internal Error', detail: 'boom', status: 500, retryable: true },
+      isPending: false,
+      refetch,
+    })
+
+    render(<ExecutionPlane />, { wrapper })
+
+    expect(await screen.findByRole('heading', { name: 'Error loading execution targets' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Retry' }))
+    expect(refetch).toHaveBeenCalled()
   })
 
   it('writes name filter to URL search params', async () => {
