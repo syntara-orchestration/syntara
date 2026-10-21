@@ -16,6 +16,9 @@ import { RetryFromFailureButton } from './RetryFromFailureButton'
 
 type Execution = ExecutionsAPI.components['schemas']['ExecutionRead']
 
+/** Matches the truncation length used for the same label in `historyRowModel`. */
+const TRUNCATED_ID_LENGTH = 8
+
 export function ExecutionDetailTitleRowAddons({ execution }: Readonly<{ execution: Execution | undefined }>) {
   if (!execution?.status && !execution?.created_at) {
     return null
@@ -30,6 +33,13 @@ export function ExecutionDetailTitleRowAddons({ execution }: Readonly<{ executio
       {execution.approval_pending ? (
         <FlexItem data-testid="approval-status-badge">
           <ApprovalPendingBadge approvalPending={execution.approval_pending} />
+        </FlexItem>
+      ) : null}
+      {execution.retried_from_execution_id ? (
+        <FlexItem data-testid="retried-from-badge">
+          <SynLabel isCompact={false}>
+            {`Retried from: ${execution.retried_from_execution_id.slice(0, TRUNCATED_ID_LENGTH)}`}
+          </SynLabel>
         </FlexItem>
       ) : null}
       {execution.created_at ? (

@@ -10,12 +10,15 @@ import styles from './CompactActivityList.module.css'
 import type { ActivityOrderItem } from './ExecutionActivityTable'
 import { ActivityStatusLabel } from './ExecutionStatus'
 import { ACTIVITY_STATUS } from './utils/executionState/executionHelpers'
+import { isReplayedStep } from './utils/replayedNodes'
 
 export type CompactActivityListProps = {
   activityStates: Map<string, ActivityState>
   activityOrder: ActivityOrderItem[]
   onRowClick?: (nodeId: string, nodeName: string) => void
   selectedNodeId?: string | null
+  /** Timestamp replayed steps predate; set only for retry executions. */
+  replayBaselineAt?: string | null
 }
 
 export function CompactActivityList({
@@ -23,6 +26,7 @@ export function CompactActivityList({
   activityOrder,
   onRowClick,
   selectedNodeId,
+  replayBaselineAt,
 }: Readonly<CompactActivityListProps>) {
   return (
     <SynScrollableTableContainer caption="Activity list" useFixedLayout={false} variant="compact">
@@ -54,7 +58,11 @@ export function CompactActivityList({
                 </Stack>
               </Td>
               <Td dataLabel="Status" modifier="nowrap" className={styles.statusCell}>
-                <ActivityStatusLabel status={state?.status ?? ACTIVITY_STATUS.PENDING} nodeType={type} />
+                <ActivityStatusLabel
+                  status={state?.status ?? ACTIVITY_STATUS.PENDING}
+                  nodeType={type}
+                  replayed={isReplayedStep(state?.startedAt, replayBaselineAt)}
+                />
               </Td>
             </Tr>
           )

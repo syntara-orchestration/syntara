@@ -472,4 +472,21 @@ describe('ExecutionDetailPageHeaderParts', () => {
     render(<ExecutionDetailTitleRowAddons execution={execution} />)
     expect(screen.getByText('Pending approval')).toBeInTheDocument()
   })
+
+  it('renders retried-from label when execution was created by a retry', () => {
+    const execution = {
+      status: 'running' as const,
+      retried_from_execution_id: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
+    } as never
+    render(<ExecutionDetailTitleRowAddons execution={execution} />)
+    expect(screen.getByText('Retried from: aaaaaaaa')).toBeInTheDocument()
+  })
+
+  it('does not render retried-from label for an ordinary execution', () => {
+    const execution = {
+      status: 'running' as const,
+    } as never
+    render(<ExecutionDetailTitleRowAddons execution={execution} />)
+    expect(screen.queryByTestId('retried-from-badge')).not.toBeInTheDocument()
+  })
 })

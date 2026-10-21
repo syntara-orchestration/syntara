@@ -9,7 +9,12 @@ import { CompactActivityList } from './CompactActivityList'
 import type { ActivityOrderItem } from './ExecutionActivityTable'
 
 vi.mock('./ExecutionStatus', () => ({
-  ActivityStatusLabel: ({ status }: { status: string }) => <span>{status}</span>,
+  ActivityStatusLabel: ({ status, replayed }: { status: string; replayed?: boolean }) => (
+    <span>
+      {status}
+      {replayed && <span data-testid="activity-status-label-replayed" />}
+    </span>
+  ),
 }))
 
 function state(id: string, overrides: Partial<ActivityState> = {}): [string, ActivityState] {
@@ -75,6 +80,20 @@ describe('CompactActivityList', () => {
     const rows = screen.getAllByRole('row')
     expect(rows[0]).toHaveClass('pf-m-selected')
     expect(rows[1]).not.toHaveClass('pf-m-selected')
+  })
+
+  it('marks a row replayed when its start predates the retry baseline', () => {
+    render(
+      <CompactActivityList activityStates={states} activityOrder={order} replayBaselineAt="2024-01-02T00:00:00Z" />
+    )
+
+    expect(screen.getAllByTestId('activity-status-label-replayed')).toHaveLength(1)
+  })
+
+  it('does not mark a row replayed when there is no retry baseline', () => {
+    render(<CompactActivityList activityStates={states} activityOrder={order} />)
+
+    expect(screen.queryByTestId('activity-status-label-replayed')).not.toBeInTheDocument()
   })
 
   it('shows pending status when activity state is missing', () => {
