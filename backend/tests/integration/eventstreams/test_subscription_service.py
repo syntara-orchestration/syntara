@@ -24,7 +24,12 @@ from syntara.eventstreams.exceptions import EventSubscriptionInUseError
 from syntara.eventstreams.models.source import EventSubscriptionSource
 from syntara.eventstreams.models.subscription import EventSubscription
 from syntara.eventstreams.services.subscription_service import EventSubscriptionService
-from syntara.integrations.models.integration import Integration, IntegrationType
+from syntara.integrations.models.integration import (
+    Integration,
+    IntegrationProjectAssignment,
+    IntegrationScope,
+    IntegrationType,
+)
 from syntara.integrations.models.integration_configuration import KafkaConfiguration, MCPServerConfiguration
 from syntara.workflows.models.workflow import Workflow
 from syntara.workflows.models.workflow_version import WorkflowVersion
@@ -190,6 +195,55 @@ async def test_publish_creates_subscription_and_source(
     assert source.transport == "kafka"
     assert source.configuration.group_id == f"syntara.{source.deployment_id}.{sub.id}.1"
     assert source.retired_at is None
+
+
+@pytest.mark.parametrize("republish", [False, True])
+async def test_second_trigger_failure_leaves_projection_unchanged(
+    test_db_session: AsyncSession,
+    test_user: User,
+    workflow: Workflow,
+    kafka_integration: Integration,
+    runtime_credential: Credential,
+    *,
+    republish: bool,
+) -> None:
+    service = EventSubscriptionService(test_db_session, test_user)
+    first_trigger = _trigger_node(
+        node_id="first", integration_id=kafka_integration.id, credential_id=runtime_credential.id
+    )
+    if republish:
+        previous_version = await _make_version(test_db_session, workflow, test_user, [first_trigger], version=1)
+        await service.sync_from_published_definition(workflow, previous_version, enabled=True)
+        await service.sync_from_published_definition(workflow, enabled=False)
+
+    subscriptions_before = [sub.model_dump() for sub in await _subscriptions(test_db_session, workflow.id)]
+    sources_before = [
+        source.model_dump() for source in (await test_db_session.exec(select(EventSubscriptionSource))).all()
+    ]
+    version = await _make_version(
+        test_db_session,
+        workflow,
+        test_user,
+        [
+            _trigger_node(
+                node_id="first",
+                integration_id=kafka_integration.id,
+                credential_id=runtime_credential.id,
+                topic="changed.topic",
+            ),
+            _trigger_node(node_id="second", integration_id=uuid4(), credential_id=runtime_credential.id),
+        ],
+        version=2 if republish else 1,
+    )
+
+    with pytest.raises(SafeValueError, match="does not exist"):
+        await service.sync_from_published_definition(workflow, version, enabled=True)
+
+    # Check the open transaction: an explicit rollback would hide a partial projection.
+    assert [sub.model_dump() for sub in await _subscriptions(test_db_session, workflow.id)] == subscriptions_before
+    assert [
+        source.model_dump() for source in (await test_db_session.exec(select(EventSubscriptionSource))).all()
+    ] == sources_before
 
 
 async def test_republish_same_source_preserves_identity_without_new_generation(
@@ -618,6 +672,63 @@ async def test_sync_rejects_cross_project_credential(
     with pytest.raises(SafeValueError, match="different project"):
         await service.sync_from_published_definition(workflow, version, enabled=True)
     assert await _subscriptions(test_db_session, workflow.id) == []
+
+
+async def test_sync_rejects_project_integration_not_assigned_to_workflow_project(
+    test_db_session: AsyncSession,
+    test_user: User,
+    workflow: Workflow,
+    kafka_integration: Integration,
+    runtime_credential: Credential,
+) -> None:
+    kafka_integration.scope = IntegrationScope.PROJECT
+    await test_db_session.flush()
+
+    service = EventSubscriptionService(test_db_session, test_user)
+    version = await _make_version(
+        test_db_session,
+        workflow,
+        test_user,
+        [_trigger_node(node_id="incoming", integration_id=kafka_integration.id, credential_id=runtime_credential.id)],
+        version=1,
+    )
+
+    with pytest.raises(SafeValueError, match="not accessible in this project"):
+        await service.sync_from_published_definition(workflow, version, enabled=True)
+    assert await _subscriptions(test_db_session, workflow.id) == []
+
+
+async def test_republish_rejects_project_integration_after_assignment_removed(
+    test_db_session: AsyncSession,
+    test_user: User,
+    workflow: Workflow,
+    kafka_integration: Integration,
+    runtime_credential: Credential,
+) -> None:
+    kafka_integration.scope = IntegrationScope.PROJECT
+    assignment = IntegrationProjectAssignment(integration_id=kafka_integration.id, project_id=workflow.project_id)
+    test_db_session.add(assignment)
+    await test_db_session.flush()
+
+    service = EventSubscriptionService(test_db_session, test_user)
+    version = await _make_version(
+        test_db_session,
+        workflow,
+        test_user,
+        [_trigger_node(node_id="incoming", integration_id=kafka_integration.id, credential_id=runtime_credential.id)],
+        version=1,
+    )
+    await service.sync_from_published_definition(workflow, version, enabled=True)
+    await service.sync_from_published_definition(workflow, enabled=False)
+    await test_db_session.delete(assignment)
+    await test_db_session.flush()
+
+    with pytest.raises(SafeValueError, match="not accessible in this project"):
+        await service.sync_from_published_definition(workflow, version, enabled=True)
+
+    subscriptions = await _subscriptions(test_db_session, workflow.id)
+    assert len(subscriptions) == 1
+    assert subscriptions[0].desired_enabled is False
 
 
 async def test_sync_rejects_disabled_integration(
