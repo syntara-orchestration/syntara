@@ -10,8 +10,8 @@ import structlog
 from syntara.core.constants import EventDeliveryDefaults, FieldLimits
 from syntara.core.workers.periodic import PeriodicWorker
 from syntara.eventstreams.core.handler import BlockedDelivery, RetryDelivery
-from syntara.eventstreams.services.admission_service import EventAdmissionService
-from syntara.eventstreams.services.recovery_service import EventExecutionRecoveryService
+from syntara.eventstreams.services.admission_service import EventAdmissionService, SchedulingResult
+from syntara.eventstreams.services.deduplication_store import EventDeliveryStore
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import async_sessionmaker
@@ -51,7 +51,6 @@ class EventDeliveryRecoveryWorker:
             raise ValueError(msg)
         self._session_factory = session_factory
         self._admission = EventAdmissionService(session_factory, launcher)
-        self._recovery = EventExecutionRecoveryService(session_factory, self._admission)
         self._worker_id = worker_id
         self._batch_limit = batch_limit
         self._draining = False
@@ -61,7 +60,6 @@ class EventDeliveryRecoveryWorker:
             interval_seconds=interval_seconds,
             session_factory=session_factory,
             callback=self._tick_callback,
-            cleanup_callback=self.drain,
             coordinate=True,
         )
 
@@ -72,32 +70,38 @@ class EventDeliveryRecoveryWorker:
         logger.info("event_delivery_recovery_started", worker_id=self._worker_id)
 
     async def tick(self) -> int:
-        """Claim and recover one bounded batch; return count processed.
+        """Claim one delivery at a time, recover immediately, repeat up to batch limit.
 
-        Skips if draining. Claims are token-fenced; concurrent scanners
-        with different tokens cannot acquire the same work.
+        Each claim's lease starts fresh just before its recovery attempt,
+        so no claim waits behind slow Temporal calls with an aging lease.
+        Skips if draining.
         """
         if self._draining:
             return 0
-        results = await self._recovery.recover_due(self._worker_id, limit=self._batch_limit)
         recovered = blocked = retried = 0
-        for _identity, result in results:
+        for _ in range(self._batch_limit):
+            if self._draining:
+                break  # type: ignore[unreachable]  # set concurrently by drain()
+            result = await self._claim_and_recover_one()
+            if result is None:
+                break
             if isinstance(result, BlockedDelivery):
                 blocked += 1
             elif isinstance(result, RetryDelivery):
                 retried += 1
             else:
                 recovered += 1
-        if results:
+        total = recovered + blocked + retried
+        if total:
             logger.info(
                 "event_delivery_recovery_tick",
                 worker_id=self._worker_id,
-                total=len(results),
+                total=total,
                 recovered=recovered,
                 blocked=blocked,
                 retried=retried,
             )
-        return len(results)
+        return total
 
     async def drain(self) -> None:
         """Stop new claims and await in-flight recovery within a bound."""
@@ -115,6 +119,7 @@ class EventDeliveryRecoveryWorker:
 
     async def stop(self) -> None:
         """Drain in-flight work then stop the periodic loop."""
+        await self.drain()
         await self._periodic.stop()
         logger.info("event_delivery_recovery_stopped", worker_id=self._worker_id)
 
@@ -122,6 +127,14 @@ class EventDeliveryRecoveryWorker:
     def draining(self) -> bool:
         """Whether new claims are suppressed pending shutdown."""
         return self._draining
+
+    async def _claim_and_recover_one(self) -> SchedulingResult | None:
+        """Claim a single due delivery and recover it immediately."""
+        async with self._session_factory() as session, session.begin():
+            claims = await EventDeliveryStore(session).claim_due(self._worker_id, limit=1, prepared_only=True)
+        if not claims:
+            return None
+        return await self._admission.recover_claim(claims[0])
 
     async def _tick_callback(self, _session_factory: object) -> None:
         """PeriodicWorker callback — runs tick and tracks in-flight work."""
