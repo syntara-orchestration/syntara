@@ -315,7 +315,7 @@ async def test_restored_control_result_reads_the_replay_under_the_node_id(mock_w
     await wf._restore_node_state(node, graph)
 
     assert mock_wf.execute_activity.await_args.kwargs["activity_id"] == "cond_1"
-    assert mock_wf.execute_activity.await_args.kwargs["args"] == ["src-1", "cond_1", "cond_1"]
+    assert mock_wf.execute_activity.await_args.kwargs["args"] == ["src-1", "cond_1", "cond_1", False]
 
 
 def test_replayed_timestamps_are_addressable_by_the_full_temporal_path() -> None:

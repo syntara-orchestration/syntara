@@ -4,7 +4,6 @@ from datetime import UTC, datetime
 from typing import Any, cast
 
 import structlog
-from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 from temporalio.client import WorkflowHandle
 from temporalio.exceptions import ApplicationError, TemporalError
@@ -243,7 +242,7 @@ class ActivityExecutionSyncMixin:
         metadata: ExecutionMonitorMetadata,
         handle: WorkflowHandle[Any, Any],
     ) -> dict[str, dict[str, Any]]:
-        """Collect source timestamps for replayed nodes and converge reruns in this batch.
+        """Collect source timestamps for nodes replayed from their source run.
 
         One workflow update per completed activity, asked before the sync
         transaction opens because the update blocks until the workflow can answer
@@ -260,10 +259,9 @@ class ActivityExecutionSyncMixin:
         the workflow already holds, and only a node whose state is genuinely still
         arriving needs the update to wait for it.
 
-        Ordinary replay lookups are limited to ``COMPLETED`` events. A top-level
-        converge rerun also uses its source timestamps when it fails, because its
-        failure can be reported directly by the workflow engine without a Temporal
-        activity completion event.
+        Replayed nodes, including converges, use the source state the workflow
+        published for the synthetic replay activity. A converge that runs normally
+        keeps the timestamps from its current retry execution.
         """
         if not metadata.is_retry_from_failure:
             return {}
@@ -275,34 +273,15 @@ class ActivityExecutionSyncMixin:
                 continue
             activity_id = activity_data["activity_id"]
             is_converge = metadata.activity_definitions_map.get(activity_id, {}).get("type") == NodeType.CONVERGE
-            is_loop_converge_rerun = is_converge and bool(activity_data.get("_is_loop_iteration"))
-            is_top_level_converge_rerun = is_converge and not activity_data.get("_is_loop_iteration")
-            if activity_data.get("status") != ActivityStatus.COMPLETED and not (
-                (is_loop_converge_rerun or is_top_level_converge_rerun)
-                and activity_data.get("status") == ActivityStatus.FAILED
-            ):
+            if activity_data.get("status") != ActivityStatus.COMPLETED:
                 continue
             timestamp_key = activity_data.get("temporal_activity_id") or activity_id
             if timestamp_key in resolved:
                 continue
-            if is_loop_converge_rerun:
-                try:
-                    preserve_source_timestamps = await handle.query(
-                        "should_preserve_loop_converge_timestamps", timestamp_key
-                    )
-                except (RPCError, TemporalError, ValueError):
-                    logger.warning(
-                        "Could not determine whether loop converge branches were replayed",
-                        activity_id=timestamp_key,
-                    )
-                    preserve_source_timestamps = False
-                replayed_ts = (
-                    await self._source_converge_timestamps(metadata, activity_id, timestamp_key)
-                    if preserve_source_timestamps
-                    else None
-                )
-            elif is_top_level_converge_rerun:
-                replayed_ts = await self._source_converge_timestamps(metadata, activity_id, timestamp_key)
+            if activity_data.get("_is_retry_node_replay"):
+                replayed_ts = await self._replayed_node_timestamps(metadata, handle, timestamp_key)
+            elif is_converge:
+                replayed_ts = None
             else:
                 replayed_ts = await self._replayed_node_timestamps(metadata, handle, timestamp_key)
             if replayed_ts is not None:
@@ -402,45 +381,6 @@ class ActivityExecutionSyncMixin:
         if raw.get("error_details") is not None:
             resolved["error_details"] = raw["error_details"]
         return resolved
-
-    async def _source_converge_timestamps(
-        self,
-        metadata: ExecutionMonitorMetadata,
-        activity_id: str,
-        temporal_activity_id: str | None = None,
-    ) -> dict[str, Any] | None:
-        """Return timestamps from the source converge occurrence for its retry rerun.
-
-        Converge nodes deliberately execute again during retry-from-failure so their
-        gate is evaluated against the restored branches. Their output/status comes
-        from that new execution, but the run view should retain the source run's
-        timestamps. Loop occurrences are matched by their full Temporal activity
-        ID; the canvas activity name alone would conflate iterations. A source
-        converge that was skipped never executed and therefore has no replay times
-        to preserve.
-        """
-        if metadata.retry_source_execution_id is None:
-            return None
-
-        async with self.session_factory() as session:
-            result = await session.exec(
-                select(ActivityExecution.status, ActivityExecution.started_at, ActivityExecution.completed_at).where(
-                    ActivityExecution.execution_id == metadata.retry_source_execution_id,
-                    ActivityExecution.temporal_activity_id == (temporal_activity_id or activity_id),
-                )
-            )
-            source = result.one_or_none()
-
-        if source is None:
-            return None
-        source_status, started_at, completed_at = source
-        if source_status not in (ActivityStatus.COMPLETED, ActivityStatus.FAILED):
-            return None
-        return {
-            "started_at": ensure_timezone_aware(started_at) if started_at else None,
-            "completed_at": ensure_timezone_aware(completed_at) if completed_at else None,
-            "_preserve_timestamp_values": True,
-        }
 
     @staticmethod
     def _parse_source_timestamp(value: str | None) -> datetime | None:

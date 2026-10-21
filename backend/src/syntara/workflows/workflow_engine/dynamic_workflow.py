@@ -334,6 +334,14 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
             output = await task
         except Exception as node_error:  # noqa: BLE001
             node = graph.get_node(completed_node_id)
+            app_error = self._extract_application_error(node_error)
+            if (
+                node.type == NodeType.CONVERGE
+                and app_error is not None
+                and app_error.type == "RetryConvergeGateFailure"
+            ):
+                self._fail_converge_node(completed_node_id, app_error.message, graph, pending_tasks)
+                return
             cof = resolve_continue_on_failure(node, self._runtime_settings)
             self._handle_node_failure(completed_node_id, node_error, graph, pending_tasks, continue_on_failure=cof)
             await self._maybe_expire_approval(completed_node_id, node, node_error)
@@ -883,11 +891,10 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
             return True
 
         if successor.type == NodeType.CONVERGE:
-            # No retry exception here. A converge's whole job is to decide whether
-            # it has enough predecessors to run, so it must go through its own
-            # strategy gate on every path — including a retry. Returning False
-            # early released its successors on the first arriving predecessor,
-            # before sibling branches had finished restoring.
+            # A converge must reach its gate on every path, including a retry.
+            # It compares the source occurrence only after enough predecessor
+            # state is available; returning False early would release successors
+            # before sibling branches have finished restoring.
             return self._handle_converge_successor(node_id, successor, graph, pending_tasks)
 
         return False
@@ -1352,7 +1359,7 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
         result = await wait_handle
         return result if isinstance(result, dict) else {"output": {"status": "completed"}}
 
-    async def _execute_converge_node(
+    async def _execute_converge_node(  # noqa: C901
         self,
         node_id: str,
         resolved_parameters: dict[str, Any],
@@ -1374,6 +1381,51 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
 
         """
         predecessor_ids = graph.get_predecessors(node_id)
+
+        if self.retry_context:
+            node = graph.get_node(node_id)
+            pending_failure = self._retry_converge_failure_reasons.get(node_id)
+            if pending_failure and " timed out after " not in pending_failure:
+                await workflow.wait_condition(
+                    lambda: (
+                        self._retry_converge_gate_is_decided(node_id, resolved_parameters, graph)
+                        or " timed out after " in self._retry_converge_failure_reasons.get(node_id, "")
+                    )
+                )
+                pending_failure = self._retry_converge_failure_reasons.get(node_id)
+                if pending_failure and " timed out after " not in pending_failure:
+                    timeout_task = self._timeout_tasks.pop(node_id, None)
+                    if timeout_task is not None:
+                        timeout_task.cancel()
+            restored = await self._maybe_restore_retry_converge(node, resolved_parameters, graph)
+            if restored is not None:
+                return restored
+
+        total_branches = len(predecessor_ids)
+        retry_gate_metadata = {
+            "strategy": str(resolved_parameters.get("strategy") or ConvergeStrategy.ALL.value),
+            "n_required": resolved_parameters.get("n_required"),
+            "total_branches": total_branches,
+        }
+        self.node_control_data[node_id] = {
+            **self.node_control_data.get(node_id, {}),
+            "retry_gate_metadata": retry_gate_metadata,
+        }
+
+        failure_reason = self._retry_converge_failure_reasons.pop(node_id, None)
+        upstream_failure_id = self._retry_converge_upstream_failures.pop(node_id, None)
+        if failure_reason is not None:
+            if " timed out after " in failure_reason:
+                raise ApplicationError(failure_reason, type="RetryConvergeGateFailure", non_retryable=True)
+            resolved_failure = self._retry_converge_gate_failure(
+                node_id,
+                resolved_parameters,
+                graph,
+                upstream_failure_id,
+            )
+            if resolved_failure is not None:
+                raise ApplicationError(resolved_failure, type="RetryConvergeGateFailure", non_retryable=True)
+
         predecessor_results = {}
         for pred_id in predecessor_ids:
             if pred_id not in self.skipped_nodes and self.resolver.has_namespace(pred_id):
@@ -1381,9 +1433,8 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
 
         # total_branches is injected at runtime (not part of the user-facing parameter schema)
         # so the converge activity can distinguish branch_count from completed_count.
-        parameters_with_counts = {**resolved_parameters, "total_branches": len(predecessor_ids)}
+        parameters_with_counts = {**resolved_parameters, "total_branches": total_branches}
         activity_id = loop_body_temporal_activity_id(node_id, self.loop_body_map, self.node_control_data)
-        self._mark_loop_converge_timestamp_candidate(node_id, graph)
 
         return cast(
             "dict[str, Any]",
@@ -1510,13 +1561,6 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
             )
         next_port = "iterate" if reached else "complete"
         next_index = current + 1 if reached else current
-
-        # Loop replay is synthetic: no LOOP activity is emitted for a restored
-        # transition. Remember its full occurrence ID so a downstream converge in
-        # the enclosing loop can distinguish this source branch from a live rerun.
-        self._replayed_loop_control_activity_ids.add(
-            loop_control_activity_id(node_id, current, self.loop_body_map, self.node_control_data)
-        )
 
         # Remember which iteration this loop is replaying, so each body node's own
         # replay can ask for the row for *this* iteration rather than the first.
@@ -2273,11 +2317,6 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
         if node_id not in self._retry_replay_candidates:
             return None
         return self._restored_node_timestamps.get(activity_id)
-
-    @workflow.query
-    def should_preserve_loop_converge_timestamps(self, temporal_activity_id: str) -> bool:
-        """Whether this loop converge's direct branches were all replayed."""
-        return temporal_activity_id in self._retry_converges_with_replayed_branches
 
     @workflow.query
     def is_retry_from_failure(self) -> bool:

@@ -73,8 +73,8 @@ def _node(node_id: str = "step_2", parameters: dict[str, Any] | None = None) -> 
     )
 
 
-def test_loop_converge_timestamp_candidate_requires_every_nested_branch_replay() -> None:
-    """A nested converge retains source times only when both direct inputs replayed."""
+def test_converge_replay_compares_every_predecessor_by_identity() -> None:
+    """A converge can replay only when every direct input is restored from source."""
     wf = _make_workflow({"retry_from_execution_id": "src-1"})
     wf.loop_body_map = {
         "inner_loop": "outer_loop",
@@ -90,23 +90,55 @@ def test_loop_converge_timestamp_candidate_requires_every_nested_branch_replay()
         "branch_a_iter_1_iter_4": {"started_at": "a"},
         "branch_b_iter_1_iter_4": {"started_at": "b"},
     }
+    wf._retry_replay_candidates = {"converge"}
     graph = MagicMock()
     graph.get_predecessors.return_value = ["branch_a", "branch_b"]
-    graph.get_node.side_effect = {
+    nodes = {
         "branch_a": ActivityNode("branch_a", NodeType.SCRIPT, {}),
         "branch_b": ActivityNode("branch_b", NodeType.SCRIPT, {}),
-    }.__getitem__
+    }
+    graph.get_node.side_effect = nodes.__getitem__
+    wf._retry_restorable_cache = set(nodes)
+    wf._retry_source_temporal_statuses = {
+        "branch_a_iter_1_iter_4": ActivityStatus.COMPLETED.value,
+        "branch_b_iter_1_iter_4": ActivityStatus.COMPLETED.value,
+    }
+    source_state = {
+        "converge": {
+            "status": ActivityStatus.COMPLETED.value,
+            "input_data": {"strategy": "any", "n_required": 2},
+            "output_branch_count": 2,
+            "gate_metadata": {"strategy": "any", "n_required": 2, "total_branches": 2},
+        },
+        "predecessors": {
+            "branch_a": {"status": ActivityStatus.COMPLETED.value, "result_digest": "a"},
+            "branch_b": {"status": ActivityStatus.COMPLETED.value, "result_digest": "b"},
+        },
+    }
+    temporal_ids = {
+        "branch_a": "branch_a_iter_1_iter_4",
+        "branch_b": "branch_b_iter_1_iter_4",
+    }
 
-    wf._mark_loop_converge_timestamp_candidate("converge", graph)
+    assert wf._retry_converge_metadata_matches(
+        {"strategy": "any", "n_required": 2},
+        ["branch_a", "branch_b"],
+        temporal_ids,
+        source_state,
+        graph,
+    )
 
-    assert wf._retry_converges_with_replayed_branches == {"converge_iter_1_iter_4"}
-
-    wf._retry_converges_with_replayed_branches.clear()
+    # A pre-resolved branch executes from current input instead of replaying its
+    # source occurrence, so identical arrival order cannot make this a source match.
     del wf._restored_node_timestamps["branch_b_iter_1_iter_4"]
-
-    wf._mark_loop_converge_timestamp_candidate("converge", graph)
-
-    assert wf._retry_converges_with_replayed_branches == set()
+    wf.pre_resolved_outputs["branch_b"] = {"value": "new"}
+    assert not wf._retry_converge_metadata_matches(
+        {"strategy": "any", "n_required": 2},
+        ["branch_a", "branch_b"],
+        temporal_ids,
+        source_state,
+        graph,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -505,7 +537,7 @@ async def test_restoring_a_loop_body_uses_its_canonical_temporal_path(mock_wf: M
 
     assert result is not None
     call = mock_wf.execute_activity.await_args
-    assert call.kwargs["args"] == ["src-1", "body_a", "body_a_iter_2"]
+    assert call.kwargs["args"] == ["src-1", "body_a", "body_a_iter_2", False]
     assert call.kwargs["activity_id"] == "body_a_iter_2"
     assert "body_a_iter_2" in wf._restored_node_timestamps
     assert "body_a" not in wf._restored_node_timestamps
@@ -671,7 +703,7 @@ async def test_restore_dispatches_the_retry_outputs_activity(mock_wf: MagicMock)
 
     call = mock_wf.execute_activity.call_args
     assert call[0][0] == ActivityName.RETRY_NODE_REPLAY
-    assert call.kwargs["args"] == ["src-1", "step_1", "step_1"]
+    assert call.kwargs["args"] == ["src-1", "step_1", "step_1", False]
     assert call.kwargs["activity_id"] == "step_1"
 
 

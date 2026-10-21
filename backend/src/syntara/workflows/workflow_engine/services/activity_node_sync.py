@@ -12,10 +12,8 @@ from temporalio.client import WorkflowHandle
 from syntara.core.constants import FieldLimits
 from syntara.workflows.models.activity_execution import TERMINAL_ACTIVITY_STATUSES, ActivityExecution, ActivityStatus
 from syntara.workflows.models.workflow_version import WorkflowVersion
-from syntara.workflows.utils.datetime import ensure_timezone_aware
 from syntara.workflows.workflow_engine.models.workflow_definition import NodeType
 from syntara.workflows.workflow_engine.services.activity_sync_types import ExecutionMonitorMetadata
-from syntara.workflows.workflow_engine.utils.loop_iteration_ids import loop_iteration_path
 
 logger = structlog.stdlib.get_logger(__name__)
 
@@ -228,7 +226,6 @@ class ActivityNodeSyncMixin:
                 node_ids=list(failed_node_map.keys()),
                 target_status=ActivityStatus.FAILED,
                 error_map=failed_node_map,
-                handle=handle,
             )
         except Exception:
             logger.exception(
@@ -245,7 +242,6 @@ class ActivityNodeSyncMixin:
         node_ids: list[str],
         target_status: ActivityStatus,
         error_map: dict[str, str] | None = None,
-        handle: WorkflowHandle[Any, Any] | None = None,
     ) -> None:
         """Update ActivityExecution records to a terminal status and publish patches.
 
@@ -258,18 +254,12 @@ class ActivityNodeSyncMixin:
             node_ids: Node IDs to update
             target_status: Terminal status to set (SKIPPED, FAILED, etc.)
             error_map: Optional mapping of node ID to error message
-            handle: Temporal handle used to check loop converge replay eligibility
 
         """
         if not node_ids:
             return
 
         execution_id = metadata.execution_id
-        source_converge_timestamps = (
-            await self._retry_converge_source_timestamps(metadata, node_ids, handle)
-            if target_status == ActivityStatus.FAILED
-            else {}
-        )
         logger.debug(
             "Syncing nodes to terminal status",
             execution_id=execution_id,
@@ -309,9 +299,6 @@ class ActivityNodeSyncMixin:
                 }
                 activity.status = target_status
                 activity.completed_at = now
-                source_timestamps = source_converge_timestamps.get(activity.temporal_activity_id)
-                if source_timestamps is not None:
-                    activity.started_at, activity.completed_at = source_timestamps
                 if error_map is not None:
                     base_name = activity.activity_name.split(_COMPOSITE_ITER_SEP)[0]
                     activity.error_details = error_map.get(base_name)
@@ -331,113 +318,3 @@ class ActivityNodeSyncMixin:
             )
 
             await self._publish_activity_patches(metadata, updated_activities)
-
-    async def _retry_converge_source_timestamps(
-        self,
-        metadata: ExecutionMonitorMetadata,
-        node_ids: list[str],
-        handle: WorkflowHandle[Any, Any] | None,
-    ) -> dict[str, tuple[datetime | None, datetime | None]]:
-        """Load source times for eligible converge occurrences failed during retry.
-
-        Loop occurrences are eligible only when the workflow confirms every direct
-        branch input was replayed. Temporal queries happen between short database
-        reads, never while a session is open.
-        """
-        if not metadata.is_retry_from_failure or metadata.retry_source_execution_id is None:
-            return {}
-
-        if not self._retry_has_converge_nodes(metadata, node_ids):
-            return {}
-
-        name_conditions = [
-            ActivityExecution.activity_name.in_(node_ids),  # type: ignore[attr-defined]
-            *[ActivityExecution.activity_name.startswith(f"{node_id}{_COMPOSITE_ITER_SEP}") for node_id in node_ids],
-        ]
-        async with self.session_factory() as session:
-            current_result = await session.exec(
-                select(
-                    ActivityExecution.activity_name,
-                    ActivityExecution.temporal_activity_id,
-                    ActivityExecution.status,
-                ).where(
-                    ActivityExecution.execution_id == metadata.execution_id,
-                    or_(*name_conditions),
-                )
-            )
-            current_activities = current_result.all()
-
-        source_temporal_ids = await self._eligible_retry_converge_source_ids(metadata, current_activities, handle)
-        if not source_temporal_ids:
-            return {}
-
-        async with self.session_factory() as session:
-            source_result = await session.exec(
-                select(
-                    ActivityExecution.temporal_activity_id,
-                    ActivityExecution.status,
-                    ActivityExecution.started_at,
-                    ActivityExecution.completed_at,
-                ).where(
-                    ActivityExecution.execution_id == metadata.retry_source_execution_id,
-                    ActivityExecution.temporal_activity_id.in_(source_temporal_ids),  # type: ignore[attr-defined]
-                )
-            )
-        source_timestamps: dict[str, tuple[datetime | None, datetime | None]] = {}
-        for temporal_activity_id, source_status, started_at, completed_at in source_result.all():
-            if source_status in (ActivityStatus.COMPLETED, ActivityStatus.FAILED):
-                source_timestamps[temporal_activity_id] = (
-                    ensure_timezone_aware(started_at) if started_at else None,
-                    ensure_timezone_aware(completed_at) if completed_at else None,
-                )
-        return source_timestamps
-
-    @staticmethod
-    def _retry_has_converge_nodes(metadata: ExecutionMonitorMetadata, node_ids: list[str]) -> bool:
-        """Whether a failed-node sync needs the extra converge timestamp lookup."""
-        return any(
-            metadata.activity_definitions_map.get(node_id.split(_COMPOSITE_ITER_SEP, maxsplit=1)[0], {}).get("type")
-            == NodeType.CONVERGE
-            for node_id in node_ids
-        )
-
-    async def _eligible_retry_converge_source_ids(
-        self,
-        metadata: ExecutionMonitorMetadata,
-        current_activities: list[tuple[str, str, ActivityStatus]],
-        handle: WorkflowHandle[Any, Any] | None,
-    ) -> set[str]:
-        """Collect current converge occurrences whose source times are safe to reuse."""
-        source_temporal_ids: set[str] = set()
-        for activity_name, temporal_activity_id, status in current_activities:
-            if status in TERMINAL_ACTIVITY_STATUSES or not temporal_activity_id:
-                continue
-            base_name = activity_name.split(_COMPOSITE_ITER_SEP, maxsplit=1)[0]
-            if metadata.activity_definitions_map.get(base_name, {}).get("type") != NodeType.CONVERGE:
-                continue
-
-            if loop_iteration_path(temporal_activity_id) and not await self._should_preserve_loop_converge_timestamps(
-                temporal_activity_id, metadata, handle
-            ):
-                continue
-            source_temporal_ids.add(temporal_activity_id)
-        return source_temporal_ids
-
-    async def _should_preserve_loop_converge_timestamps(
-        self,
-        temporal_activity_id: str,
-        metadata: ExecutionMonitorMetadata,
-        handle: WorkflowHandle[Any, Any] | None,
-    ) -> bool:
-        """Ask the active workflow whether this loop converge's inputs all replayed."""
-        if handle is None:
-            return False
-        try:
-            return bool(await handle.query("should_preserve_loop_converge_timestamps", temporal_activity_id))
-        except Exception:
-            logger.exception(
-                "Could not determine whether loop converge branches were replayed",
-                activity_id=temporal_activity_id,
-                execution_id=metadata.execution_id,
-            )
-            return False

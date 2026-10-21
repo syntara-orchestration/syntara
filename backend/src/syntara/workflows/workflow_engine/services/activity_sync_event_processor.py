@@ -29,6 +29,7 @@ class ActivitySyncEventProcessorMixin:
         attrs = event.activity_task_scheduled_event_attributes
         if attrs.activity_id.startswith("__internal__"):
             return
+        is_retry_node_replay = attrs.activity_type.name == ActivityName.RETRY_NODE_REPLAY.value
         retry_loop_record_node_id_value = retry_loop_record_node_id(attrs.activity_id)
         if retry_loop_record_node_id_value is not None:
             # This one-shot event restores the logical loop row from the source
@@ -58,6 +59,7 @@ class ActivitySyncEventProcessorMixin:
             is_loop_control = has_iter_suffix and activity_type in (None, NodeType.LOOP)
             has_control_data = is_loop_control or activity_type in (
                 NodeType.CONDITION,
+                NodeType.CONVERGE,
                 NodeType.APPROVAL,
                 NodeType.SWITCH,
             )
@@ -76,6 +78,7 @@ class ActivitySyncEventProcessorMixin:
             "_is_loop_control": is_loop_control,
             "_is_retry_loop_record_restore": retry_loop_record_node_id_value is not None,
             "_has_control_data": has_control_data,
+            "_is_retry_node_replay": is_retry_node_replay,
             "status": ActivityStatus.PENDING,
             "started_at": None,
             "completed_at": None,
