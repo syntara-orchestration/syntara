@@ -44,17 +44,10 @@ class EventDeliveryTerminalLookup:
         self.cache = cache
 
     async def lookup(self, identity: DeliveryIdentity) -> TerminalDelivery | None:
-        """Return database evidence regardless of absent, stale or malformed cache content."""
-        if self.cache is not None:
-            try:
-                async with asyncio.timeout(EventDeliveryDefaults.TERMINAL_CACHE_TIMEOUT_SECONDS):
-                    await self.cache.get(identity)
-            except (RedisError, OSError, TimeoutError, ValueError):
-                logger.warning("event_delivery_terminal_cache_read_unavailable")
+        """Return database evidence and optionally cache its reference after commit."""
         async with self.session_factory() as session, session.begin():
             terminal = await EventDeliveryStore(session).lookup_terminal(identity)
-        # The transaction has committed before the cache is populated. A cache
-        # hit never skips the independent database read above.
+        # The transaction has committed before the cache is populated.
         if terminal is not None and self.cache is not None:
             try:
                 async with asyncio.timeout(EventDeliveryDefaults.TERMINAL_CACHE_TIMEOUT_SECONDS):
