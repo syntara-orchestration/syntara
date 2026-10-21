@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import ssl
+from datetime import UTC, datetime
+from types import SimpleNamespace
 from typing import TYPE_CHECKING, cast
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import UUID
@@ -34,6 +36,7 @@ from syntara.eventstreams.core.consumer import (
     PositionStatus,
     RebalanceCallback,
 )
+from syntara.eventstreams.core.source_metadata import EventSourceMetadata
 from syntara.eventstreams.exceptions import (
     ConsumerNotRunningError,
     KafkaTransportError,
@@ -78,7 +81,91 @@ def _mock_consumer() -> AsyncMock:
     consumer._client.send = AsyncMock()
     consumer.pause = MagicMock()
     consumer.resume = MagicMock()
+    consumer.getmany = AsyncMock(return_value={})
     return consumer
+
+
+def _fetch_context() -> EventSourceMetadata:
+    return EventSourceMetadata(
+        integration_id=UUID(int=1),
+        subscription_id=UUID(int=2),
+        source_generation=1,
+        received_at=datetime.now(UTC),
+    )
+
+
+async def test_fetch_preserves_bytes_headers_and_trusted_coordinates(mock_aiokafka: MagicMock) -> None:
+    adapter = KafkaPartitionConsumer(_connection(), _source_config())
+    await _start_with_partitions(adapter, mock_aiokafka, {0})
+    record = SimpleNamespace(
+        value=b'{"count":2}',
+        key=b"\xff",
+        offset=44,
+        timestamp=1234,
+        timestamp_type=1,
+        headers=[("repeat", b"\xff"), ("repeat", None), ("repeat", b"")],
+    )
+    mock_aiokafka.return_value.getmany.return_value = {TopicPartition(adapter.topic, 0): [record]}
+    result = await adapter.fetch([0], _fetch_context(), expected_epoch=adapter.epoch, max_records=3, timeout_ms=100)
+    event = result[0][0]
+    assert event.value == record.value
+    assert event.key == record.key
+    assert [(header.name, header.value) for header in event.headers] == record.headers
+    assert event.source_metadata.offset == "44"
+    assert event.source_metadata.timestamp_type == "log_append_time"
+    mock_aiokafka.return_value.getmany.assert_awaited_once_with(
+        TopicPartition(adapter.topic, 0), timeout_ms=100, max_records=3
+    )
+    mock_aiokafka.return_value.commit.assert_not_awaited()
+    await adapter.stop()
+
+
+async def test_fetch_checks_epoch_before_and_after_broker_wait(mock_aiokafka: MagicMock) -> None:
+    adapter = KafkaPartitionConsumer(_connection(), _source_config())
+    listener = await _start_with_partitions(adapter, mock_aiokafka, {0})
+    epoch = adapter.epoch
+    with pytest.raises(StaleEpochError):
+        await adapter.fetch([0], _fetch_context(), expected_epoch=epoch - 1, max_records=1, timeout_ms=1)
+    mock_aiokafka.return_value.getmany.assert_not_awaited()
+
+    async def revoke(*_args: object, **_kwargs: object) -> dict[TopicPartition, list[object]]:
+        await listener.on_partitions_revoked({TopicPartition(adapter.topic, 0)})
+        return {}
+
+    mock_aiokafka.return_value.getmany.side_effect = revoke
+    with pytest.raises(StaleEpochError):
+        await adapter.fetch([0], _fetch_context(), expected_epoch=epoch, max_records=1, timeout_ms=1)
+    await adapter.stop()
+
+
+async def test_empty_paused_fetch_still_polls(mock_aiokafka: MagicMock) -> None:
+    adapter = KafkaPartitionConsumer(_connection(), _source_config())
+    await _start_with_partitions(adapter, mock_aiokafka, {0})
+    await adapter.pause([0], expected_epoch=adapter.epoch)
+    assert await adapter.fetch([], _fetch_context(), expected_epoch=adapter.epoch, max_records=1, timeout_ms=1) == {}
+    mock_aiokafka.return_value.getmany.assert_awaited_once_with(timeout_ms=1, max_records=1)
+    await adapter.stop()
+
+
+async def test_fetch_failure_is_not_a_content_result(mock_aiokafka: MagicMock) -> None:
+    adapter = KafkaPartitionConsumer(_connection(), _source_config())
+    await _start_with_partitions(adapter, mock_aiokafka, {0})
+    mock_aiokafka.return_value.getmany.side_effect = KafkaConnectionError("password=PRIVATE")
+    with pytest.raises(KafkaTransportError) as failure:
+        await adapter.fetch([0], _fetch_context(), expected_epoch=adapter.epoch, max_records=1, timeout_ms=1)
+    assert "PRIVATE" not in str(failure.value)
+    await adapter.stop()
+
+
+async def test_fetch_client_options_use_deployment_overrides(mock_aiokafka, override_settings) -> None:
+    with override_settings(event_fetch_max_records=3, event_queue_max_bytes=4096):
+        adapter = KafkaPartitionConsumer(_connection(), _source_config())
+        await adapter.start()
+        options = mock_aiokafka.call_args.kwargs
+        assert options["max_poll_records"] == 3
+        assert options["fetch_max_bytes"] == 4096
+        assert options["max_partition_fetch_bytes"] == 4096
+        await adapter.stop()
 
 
 @pytest.fixture
@@ -182,7 +269,44 @@ async def test_stop_raises_on_shutdown_error(mock_aiokafka: MagicMock) -> None:
         await adapter.stop()
 
     assert not bool(adapter.is_running)
-    assert adapter._consumer is None
+    assert adapter._consumer is mock_aiokafka.return_value
+    with pytest.raises(KafkaTransportError, match="shutdown is incomplete"):
+        await adapter.start()
+    with pytest.raises(KafkaTransportError):
+        await adapter.stop()
+    assert adapter._consumer is mock_aiokafka.return_value
+    assert mock_aiokafka.return_value.stop.await_count == 1
+
+
+@pytest.mark.anyio
+async def test_cancelled_stop_retains_consumer_for_retry(mock_aiokafka: MagicMock) -> None:
+    adapter = KafkaPartitionConsumer(_connection(), _source_config())
+    await adapter.start()
+    await adapter._handle_partitions_assigned({TopicPartition(adapter.topic, 0)})
+    epoch = adapter.epoch
+    consumer = mock_aiokafka.return_value
+    entered, release = asyncio.Event(), asyncio.Event()
+
+    async def close() -> None:
+        entered.set()
+        await release.wait()
+
+    consumer.stop.side_effect = close
+    async with asyncio.timeout(1):
+        with pytest.raises(TimeoutError):
+            async with asyncio.timeout(0.01):
+                await adapter.stop()
+    assert entered.is_set()
+    assert adapter.epoch == epoch + 1
+    assert not adapter.assignment
+    assert adapter._consumer is consumer
+    assert adapter._stop_task is not None
+    assert not adapter._stop_task.done()
+    release.set()
+    await adapter.stop()
+    assert adapter.epoch == epoch + 1
+    assert vars(adapter)["_consumer"] is None
+    assert consumer.stop.await_count == 1
 
 
 @pytest.mark.anyio
@@ -222,14 +346,18 @@ async def test_stop_allows_revoke_drain_before_final_cleanup(mock_aiokafka: Magi
     consumer.seek.assert_called_once_with(TopicPartition(adapter.topic, 0), 100)
     consumer.commit.assert_awaited_once_with({TopicPartition(adapter.topic, 0): OffsetAndMetadata(100, "")})
     assert not adapter.is_running
-    assert adapter._consumer is None
+    assert adapter._consumer is (consumer if commit_fails else None)
     assert adapter.assignment == frozenset()
     assert adapter.epoch > assigned_epoch
     with pytest.raises(ConsumerNotRunningError):
         await adapter.commit({0: 101}, expected_epoch=assigned_epoch)
     with pytest.raises(StaleEpochError):
         await adapter.observe_source_identity(expected_epoch=assigned_epoch)
-    await adapter.stop()
+    if commit_fails:
+        with pytest.raises(KafkaTransportError):
+            await adapter.stop()
+    else:
+        await adapter.stop()
     consumer.stop.assert_awaited_once()
 
 
@@ -242,7 +370,7 @@ async def test_cancelled_stop_still_invalidates_assignment(mock_aiokafka: MagicM
     with pytest.raises(asyncio.CancelledError):
         await adapter.stop()
     assert not adapter.is_running
-    assert adapter._consumer is None
+    assert adapter._consumer is mock_aiokafka.return_value
     assert adapter.assignment == frozenset()
     assert adapter.epoch > epoch
 

@@ -75,6 +75,18 @@ class EventStreamLimits:
     HEADER_JSON_OVERHEAD_BYTES = len('{"name":"","value_base64":""}')
 
 
+class EventRunnerDefaults:
+    """Deployment defaults for bounded single-subscription processing."""
+
+    FETCH_MAX_RECORDS = 100
+    QUEUE_MAX_RECORDS = 100
+    QUEUE_MAX_BYTES = 8 * 1024 * 1024
+    PARTITION_MAX_RECORDS = 10
+    PROCESSING_CONCURRENCY = 8
+    FETCH_TIMEOUT_MS = 100
+    DRAIN_TIMEOUT_SECONDS = 20
+
+
 class EventDeliveryDefaults:
     """Delivery ownership and minimum evidence retention; independent lifetimes."""
 
