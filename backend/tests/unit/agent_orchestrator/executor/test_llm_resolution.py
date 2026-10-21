@@ -99,7 +99,9 @@ class TestResolveLlmModelAndIntegration:
 
     @pytest.mark.asyncio
     async def test_happy_path_no_base_url(self) -> None:
-        """AAP-95495: OpenAI provider with no stored base_url must resolve to
+        """Test for AAP-95495.
+
+        AAP-95495: OpenAI provider with no stored base_url must resolve to
         provider.default_base_url (https://api.openai.com/v1), the same way
         LLMProviderAdapter._resolve_base_url() does for validate/discover.
         Returning None here makes the caller fall back to

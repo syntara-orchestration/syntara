@@ -26,6 +26,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from syntara.agent_orchestrator.audit.invocation_lifecycle import InvocationLifecycleEvent
 from syntara.agent_orchestrator.clients.openrouter_config import get_openrouter_llm
 from syntara.agent_orchestrator.context_manager import ContextManagerPlanner
+from syntara.agent_orchestrator.context_manager.compressor import CompressorService
 from syntara.agent_orchestrator.exceptions import (
     AgentTimeoutError,
     CredentialResolutionError,
@@ -739,8 +740,6 @@ class InvocationExecutor:
             # Pass the credential-configured LLM to the compressor so it doesn't
             # create its own (which would fail without env var).
             def compressor_factory() -> "CompressorService":
-                from syntara.agent_orchestrator.context_manager.compressor import CompressorService  # noqa: PLC0415
-
                 return CompressorService(llm=llm)
 
             context_manager_planner = ContextManagerPlanner(
