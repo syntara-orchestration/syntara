@@ -39,7 +39,7 @@ from syntara.eventstreams.exceptions import EventStreamError, EventSubscriptionI
 from syntara.eventstreams.models.source import EventSubscriptionSource
 from syntara.eventstreams.models.subscription import EventSubscription
 from syntara.eventstreams.models.subscription_snapshot import SubscriptionSnapshot
-from syntara.integrations.models.integration import Integration
+from syntara.integrations.models.integration import Integration, IntegrationProjectAssignment, IntegrationScope
 from syntara.workflows.workflow_engine.models.workflow_definition import NodeType
 
 if TYPE_CHECKING:
@@ -123,8 +123,13 @@ class EventSubscriptionService(BaseService):
         deployment_id = await self._get_deployment_id()
         published_nodes = self._extract_event_subscribe_nodes(version.workflow_definition)
 
+        # Validate every binding before changing the projection in this transaction.
+        resolved: list[tuple[str, Integration, EventSubscribeParameters]] = []
         for node_id, raw_parameters in published_nodes.items():
             integration, parameters = await self._resolve_binding(raw_parameters, workflow.project_id)
+            resolved.append((node_id, integration, parameters))
+
+        for node_id, integration, parameters in resolved:
             existing_sub = existing_by_node.pop(node_id, None)
             if existing_sub is None:
                 snapshot = await self._create_subscription(
@@ -275,12 +280,12 @@ class EventSubscriptionService(BaseService):
     ) -> tuple[Integration, "EventSubscribeParameters"]:
         """Load and validate the Integration and runtime credential for activation.
 
-        Enforces the activation-time resource checks — Integration enablement and
-        runtime credential project scope/availability — so an enabling publish,
-        including one that republishes an existing version without an inline
-        definition, never activates a subscription against an out-of-scope or
-        unavailable binding. These are the existing project/resource checks; no
-        ``execution:run`` gate is introduced.
+        Enforces the activation-time resource checks — Integration project scope
+        and enablement, plus runtime credential project scope/availability — so an
+        enabling publish, including one that republishes an existing version
+        without an inline definition, never activates a subscription against an
+        out-of-scope or unavailable binding. These are the existing project/resource
+        checks; no ``execution:run`` gate is introduced.
 
         By design, actor-facing Integration *visibility* and ``credential:use``
         are selection-time checks applied when the trigger is edited/saved or
@@ -312,6 +317,16 @@ class EventSubscriptionService(BaseService):
         if not integration.enabled:
             msg = "Event Subscribe Integration is disabled"
             raise SafeValueError(msg)
+        if integration.scope == IntegrationScope.PROJECT:
+            assigned = await self.session.exec(
+                select(IntegrationProjectAssignment.integration_id).where(
+                    col(IntegrationProjectAssignment.integration_id) == integration.id,
+                    IntegrationProjectAssignment.project_id == project_id,
+                )
+            )
+            if assigned.first() is None:
+                msg = "Event Subscribe Integration is not accessible in this project"
+                raise SafeValueError(msg)
 
         credential = await self.session.get(Credential, parameters.credential_id)
         if credential is None:
