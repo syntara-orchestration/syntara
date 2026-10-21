@@ -21,6 +21,21 @@ export function mainNavigation(page: Page): Locator {
 }
 
 /**
+ * Top-level nav group or single-destination entry (Configuration, System Administration, …).
+ *
+ * Use for visibility assertions. Prefer `listitem` (labeled `NavExpandable`) or a lone
+ * `link` when the role only has one child — do not OR in the group toggle `button`; it
+ * shares the group name with the parent `listitem` and triggers Playwright strict-mode
+ * violations. Icon-only dock still labels the `listitem`; the expand control is unnamed.
+ */
+export function mainNavGroup(page: Page, groupName: string): Locator {
+  const nav = mainNavigation(page)
+  return nav
+    .getByRole('listitem', { name: groupName, exact: true })
+    .or(nav.getByRole('link', { name: groupName, exact: true }))
+}
+
+/**
  * Group expand toggle in icon-only dock mode is often an unnamed `button` inside a
  * `listitem` labeled with the group name; in expanded text mode it may be a named
  * `button` directly.

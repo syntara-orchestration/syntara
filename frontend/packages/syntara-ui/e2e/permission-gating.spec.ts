@@ -20,7 +20,7 @@
 
 import { loginAsUser } from './authorization/fixtures'
 import { type Page, test, expect, toAppUrl, appBaseUrl } from './fixtures'
-import { expectDockedNavGroupChildLinks, mainNavigation } from './helpers/docked-nav'
+import { expectDockedNavGroupChildLinks, mainNavGroup, mainNavigation } from './helpers/docked-nav'
 import { openRowKebab } from './helpers/patternfly'
 import { buildUniqueName } from './helpers/workflows'
 import {
@@ -183,10 +183,10 @@ test.describe('Permission gating — Navigation visibility', () => {
     await expect(nav.getByRole('link', { name: 'Workflow Runs' })).toBeVisible()
     await expect(nav.getByRole('link', { name: 'Approvals' })).toBeVisible()
 
-    await expect(nav.getByRole('listitem', { name: 'Configuration', exact: true })).toBeVisible()
+    await expect(mainNavGroup(app, 'Configuration')).toBeVisible()
     await expectDockedNavGroupChildLinks(app, 'Configuration', ['Integrations', 'Credentials'], 'Integrations')
 
-    await expect(nav.getByRole('listitem', { name: 'System Administration', exact: true })).toBeVisible()
+    await expect(mainNavGroup(app, 'System Administration')).toBeVisible()
     await expectDockedNavGroupChildLinks(
       app,
       'System Administration',
@@ -201,9 +201,9 @@ test.describe('Permission gating — Navigation visibility', () => {
     await expect(nav.getByRole('link', { name: 'Workflows' })).toBeVisible()
     await expect(nav.getByRole('link', { name: 'Workflow Runs' })).toBeVisible()
     await expect(nav.getByRole('link', { name: 'Approvals' })).toBeVisible()
-    await expect(nav.getByRole('listitem', { name: 'Configuration', exact: true })).toBeVisible()
+    await expect(mainNavGroup(viewerApp, 'Configuration')).toBeVisible()
 
-    await expect(nav.getByRole('listitem', { name: 'System Administration', exact: true })).not.toBeVisible()
+    await expect(mainNavGroup(viewerApp, 'System Administration')).not.toBeVisible()
   })
 
   test('auditor sees all navigation items', async ({ auditorApp }) => {
@@ -212,9 +212,9 @@ test.describe('Permission gating — Navigation visibility', () => {
     await expect(nav.getByRole('link', { name: 'Workflows' })).toBeVisible()
     await expect(nav.getByRole('link', { name: 'Workflow Runs' })).toBeVisible()
     await expect(nav.getByRole('link', { name: 'Approvals' })).toBeVisible()
-    await expect(nav.getByRole('listitem', { name: 'Configuration', exact: true })).toBeVisible()
+    await expect(mainNavGroup(auditorApp, 'Configuration')).toBeVisible()
 
-    await expect(nav.getByRole('listitem', { name: 'System Administration', exact: true })).toBeVisible()
+    await expect(mainNavGroup(auditorApp, 'System Administration')).toBeVisible()
     await expectDockedNavGroupChildLinks(
       auditorApp,
       'System Administration',

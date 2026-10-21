@@ -12,6 +12,7 @@
 import { type Page } from './fixtures'
 import { test, expect, toAppUrl } from './fixtures'
 import { APP_TITLE } from './helpers/appTitle'
+import { mainNavGroup } from './helpers/docked-nav'
 import { buildUniqueName } from './helpers/workflows'
 
 const VIEWER_PASSWORD = 'e2e-test-password-123!'
@@ -65,7 +66,7 @@ test('switching users reflects new permissions without hard refresh', async ({ p
       await page.goto(toAppUrl('/'))
       await expect(page.getByRole('navigation', { name: 'Main navigation' })).toBeVisible({ timeout: 15_000 })
 
-      await expect(page.getByRole('button', { name: 'System Administration' })).toBeVisible({ timeout: 15_000 })
+      await expect(mainNavGroup(page, 'System Administration')).toBeVisible({ timeout: 15_000 })
       await expect(page.getByRole('link', { name: 'Workflows' })).toBeVisible()
 
       await page.getByRole('button', { name: 'User menu' }).click()
@@ -89,19 +90,23 @@ test('switching users reflects new permissions without hard refresh', async ({ p
 
       await page.goto(toAppUrl('/'))
       await expect(page.getByRole('navigation', { name: 'Main navigation' })).toBeVisible()
-      await expect(page.getByRole('button', { name: 'System Administration' })).toBeVisible({ timeout: 15_000 })
+      await expect(mainNavGroup(page, 'System Administration')).toBeVisible({ timeout: 15_000 })
       await expect(page.getByRole('link', { name: 'Workflows' })).toBeVisible()
 
-      currentUser = 'viewer'
       await page.route('**/api/v1/auth/logout*', (route) => route.fulfill({ status: 204, body: '' }))
       await page.getByRole('button', { name: 'User menu' }).click()
       await page.getByRole('menuitem', { name: 'Logout' }).click()
-      await expect(page.getByRole('navigation', { name: 'Main navigation' })).toBeVisible()
+
+      // Same SPA session as real backend: re-login without page.goto() so a stale
+      // permission cache would still show admin nav to the viewer.
+      await page.getByRole('heading', { name: `Log in to ${APP_TITLE}` }).waitFor({ timeout: 15_000 })
+      currentUser = 'viewer'
+      await fillLoginForm(page, 'viewer', VIEWER_PASSWORD)
     }
 
     // If the cache was not cleared on logout, the admin-cached permission would
     // incorrectly show System Administration to the viewer.
-    await expect(page.getByRole('button', { name: 'System Administration' })).not.toBeVisible()
+    await expect(mainNavGroup(page, 'System Administration')).not.toBeVisible()
     await expect(page.getByRole('link', { name: 'Workflows' })).toBeVisible()
   } finally {
     if (viewerId) {
