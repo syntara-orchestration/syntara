@@ -26,6 +26,7 @@ from syntara.authz.engine import AllowedProjectsResult
 from syntara.authz.models import Project
 from syntara.core.config.base import get_settings
 from syntara.core.exceptions import SafeValueError
+from syntara.core.jsonb_limits import validate_jsonb_size
 from syntara.core.models import User
 from syntara.core.services import BaseService
 from syntara.core.services.extensions import ConvertResourceMixin, EnrichQueryMixin
@@ -361,20 +362,21 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
         *,
         workflow_id: UUID | None = None,
     ) -> dict[str, Any]:
-        """Validate trigger input and return normalized data.
+        """Validate and normalize trigger input, then enforce its JSONB size limit.
 
         Form Triggers use their typed form definition. Other trigger types keep
         the existing JSON Schema defaults and validation behavior.
         """
         if trigger_node.get("type") == NodeType.FORM_TRIGGER:
-            return ExecutionService._validate_form_trigger_submission(
+            input_data = ExecutionService._validate_form_trigger_submission(
                 trigger_node,
                 input_data,
                 workflow_id=workflow_id,
             )
+        else:
+            ExecutionService._apply_trigger_schema_defaults(trigger_node, input_data)
 
-        ExecutionService._apply_trigger_schema_defaults(trigger_node, input_data)
-        return input_data
+        return validate_jsonb_size(input_data, field_name="input_data")
 
     async def create_execution(
         self,
@@ -822,7 +824,7 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
             None,
         )
         if test_trigger_node is not None and test_trigger_node.get("type") == NodeType.FORM_TRIGGER:
-            trigger_inputs = self._validate_form_trigger_submission(
+            trigger_inputs = self._normalize_trigger_input(
                 test_trigger_node,
                 trigger_inputs,
                 workflow_id=workflow_id,
