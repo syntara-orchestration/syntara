@@ -6,7 +6,7 @@ import type { EditIntegrationFormValues } from './editIntegrationFormSchema'
 import { integrationHelp } from './integrationFieldHelp'
 import { KafkaSaslMechanismField } from './kafkaSaslField'
 
-export function EditBootstrapServersField({
+function EditBootstrapServersField({
   control,
   errorMessage,
 }: Readonly<{
