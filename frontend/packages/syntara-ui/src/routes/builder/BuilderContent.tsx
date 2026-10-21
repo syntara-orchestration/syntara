@@ -104,7 +104,7 @@ export function BuilderContent(props: BuilderContentProps) {
   } = useWorkflowStore()
   const { registerSaveHandler, unregisterSaveHandler, requestNavigation } = useUnsavedChanges()
   const handleExecutionNavigate = useCallback(
-    (id: string) => requestNavigation(`/executions/${id}`),
+    (id: string) => requestNavigation(`/executions/${id}?history=open`),
     [requestNavigation]
   )
 

@@ -1,3 +1,4 @@
+// AAP-98044: Opening a run from builder history must keep Run history open.
 import type { WorkflowAPI } from '@syntara/contracts'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen, waitFor, act, within } from '@testing-library/react'
@@ -84,6 +85,10 @@ const mockBuilderPermissions = vi.hoisted(() => ({
 
 vi.mock('./useBuilderPermissions', () => ({
   useBuilderPermissions: () => mockBuilderPermissions,
+}))
+
+vi.mock('../../hooks/useCanI', () => ({
+  useCanI: vi.fn(() => ({ allowed: true, isChecking: false, isError: false })),
 }))
 
 import { BuilderContent } from './BuilderContent'
@@ -1113,7 +1118,7 @@ describe('BuilderContent', () => {
       })
     })
 
-    it('navigates to execution page on execution selection', async () => {
+    it('keeps run history open when navigating from builder history to an execution', async () => {
       vi.mocked(executionsClient.useQuery).mockImplementation((method, path) => {
         if (method === 'get' && path === '/executions') {
           return {
@@ -1155,7 +1160,7 @@ describe('BuilderContent', () => {
       expect(row).toBeInTheDocument()
       await user.click(row)
       await waitFor(() => {
-        expect(mockRequestNavigation).toHaveBeenCalledWith('/executions/exec-1')
+        expect(mockRequestNavigation).toHaveBeenCalledWith('/executions/exec-1?history=open')
       })
     })
   })
