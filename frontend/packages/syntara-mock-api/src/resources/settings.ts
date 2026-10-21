@@ -489,6 +489,18 @@ export const settings: RuntimeSetting[] = [
     validation_schema: { min: 1 } as unknown as Record<string, never>,
   }),
   makeSetting({
+    key: 'workflow_engine.script_expected_duration_seconds',
+    name: 'Script expected duration (seconds)',
+    description:
+      'Default expected execution time for script activities. Used by the stall detection system to identify activities that are taking longer than expected. Activities exceeding this duration are flagged with a stall warning.',
+    helper_text: 'Minimum 1 second. Default: null (no stall detection).',
+    category: 'workflow_execution',
+    group: 'Execution',
+    value_type: 'integer',
+    default_value: null,
+    validation_schema: { min: 1 } as unknown as Record<string, never>,
+  }),
+  makeSetting({
     key: 'workflow_engine.http_request_timeout_seconds',
     name: 'HTTP request timeout (seconds)',
     description:

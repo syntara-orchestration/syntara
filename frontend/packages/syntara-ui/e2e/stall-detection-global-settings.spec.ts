@@ -19,20 +19,37 @@ import { deleteWorkflowViaApi, getSettingViaApi, updateSettingViaApi } from './u
 const SETTING_KEY = 'workflow_engine.script_expected_duration_seconds'
 
 test.describe('Stall detection global settings', () => {
+  // Serial execution prevents concurrent mutation of the same global setting
+  test.describe.configure({ mode: 'serial' })
+
   test('workflow inherits global expected_duration', async ({ app }) => {
     let originalValue: number | string | boolean | null = null
+    let originalVersion: number | undefined
 
     try {
-      // Read current setting value for cleanup
+      // Read current setting value and version for cleanup
       const current = await getSettingViaApi(app, SETTING_KEY)
       originalValue = current.value
+      originalVersion = current.version
 
       // Set global expected duration to 3 seconds
-      await updateSettingViaApi(app, SETTING_KEY, 3)
+      const { version: newVersion } = await updateSettingViaApi(app, SETTING_KEY, 3)
 
-      // Wait 60s for settings cache to propagate
-      // Settings cache TTL is 60s by default
-      await app.waitForTimeout(60_000)
+      // Poll for setting propagation instead of fixed wait
+      // Backend settings cache uses a 60s TTL, but propagation may be faster
+      await expect
+        .poll(
+          async () => {
+            const latest = await getSettingViaApi(app, SETTING_KEY)
+            return latest.version >= newVersion && latest.value === 3
+          },
+          {
+            message: 'Setting update did not propagate',
+            timeout: 65_000,
+            intervals: [5_000, 10_000],
+          }
+        )
+        .toBe(true)
 
       // Create workflow without expected_duration override
       const workflowName = buildUniqueName('global-setting-test')
@@ -64,12 +81,10 @@ test.describe('Stall detection global settings', () => {
         await deleteWorkflowViaApi(app, id)
       }
     } finally {
-      // Restore original setting value
-      if (originalValue !== null) {
-        await updateSettingViaApi(app, SETTING_KEY, originalValue)
-      } else {
-        // Setting was null (disabled), restore by setting to null
-        await updateSettingViaApi(app, SETTING_KEY, null)
+      // Restore original setting value using latest version
+      if (originalVersion !== undefined) {
+        const latest = await getSettingViaApi(app, SETTING_KEY)
+        await updateSettingViaApi(app, SETTING_KEY, originalValue, latest.version)
       }
     }
   })

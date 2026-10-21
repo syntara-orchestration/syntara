@@ -149,8 +149,9 @@ export async function assertNoExecutionDelayedBadge(locatorScope: Locator): Prom
  * Uses page header status badge.
  */
 export async function waitForExecutionCompleted(app: Page, timeout = 60_000): Promise<void> {
-  // Wait for "Completed" status in the execution status badge
-  await expect(app.getByText('Completed').first()).toBeVisible({ timeout })
+  // Wait for "Completed" status in the execution status badge in page header
+  const { pageHeader } = await import('./workflow-run')
+  await expect(pageHeader(app).getByText('Completed')).toBeVisible({ timeout })
 }
 
 /**
