@@ -16,7 +16,7 @@ export function formatBootstrapServers(servers: readonly string[]): string {
 }
 
 /** Return the first validation error for one broker address, matching the backend parser. */
-export function bootstrapServerError(raw: string): string | undefined {
+function bootstrapServerError(raw: string): string | undefined {
   const value = raw.trim()
   if (!value) return 'A bootstrap server must not be empty.'
   if (/[/?#@\s]/.test(value)) {
