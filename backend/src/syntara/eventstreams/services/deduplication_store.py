@@ -6,7 +6,7 @@ Temporal, Kafka or Redis I/O, or commits on behalf of an admission caller.
 """
 
 import re
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import cast
 from uuid import UUID, uuid4
 
@@ -35,6 +35,8 @@ from syntara.eventstreams.core.deduplication import (
     TerminalDelivery,
     input_fingerprint,
 )
+from syntara.eventstreams.core.processing import CONTENT_INSPECTION_PENDING, CONTENT_VALIDATED, HeldRecord
+from syntara.eventstreams.core.results import EventDecodeFailure, EventFailureCode
 from syntara.eventstreams.core.scheduling_metadata import (
     EVENT_DELIVERY_METADATA_KEY,
     SCHEDULING_STATE_CONFIRMED,
@@ -301,6 +303,102 @@ class EventDeliveryStore:
         )
         return ClaimLost() if changed is None else self._claim(changed)
 
+    async def acquire_inspection(
+        self, identity: DeliveryIdentity, expected: DeliveryExpectation, owner_worker_id: str
+    ) -> DeliveryClaim | ClaimBusy | ClaimLost | TerminalDelivery | RevisionChanged | StorageBackpressure | HeldRecord:
+        """Retain unknown content before inspecting, including behind admission holds.
+
+        This grants no workflow admission: freeze still enforces lifecycle and
+        recovery holds. The marker survives lease expiry, cancellation and restart.
+        """
+        self._validate_worker(owner_worker_id)
+        lifecycle = await lock_source_lifecycle(self.session, identity.source_id)
+        if lifecycle is None or not self._matches_scope(identity, *lifecycle):
+            return RevisionChanged()
+        if (
+            lifecycle[0].configuration_revision != expected.configuration_revision
+            or lifecycle[0].published_version_id != expected.published_version_id
+        ):
+            return RevisionChanged()
+        row = await self._delivery(identity)
+        if row is None:
+            try:
+                permitted = await self.capacity_check.permits_new_delivery()
+            except (SQLAlchemyError, OSError, TimeoutError):
+                permitted = False
+            if not permitted:
+                return StorageBackpressure()
+            await self.session.execute(
+                insert(EventDelivery)
+                .values(
+                    **identity.model_dump(exclude={"record"}),
+                    identity_digest=identity.digest,
+                    transport=identity.record.transport,
+                    record_identity=identity.record,
+                    state=DeliveryState.IN_PROGRESS.value,
+                    execution_identity=identity.execution_id,
+                    temporal_workflow_id=identity.temporal_workflow_id,
+                    next_attempt_at=func.clock_timestamp(),
+                    created_at=func.clock_timestamp(),
+                )
+                .on_conflict_do_nothing(index_elements=["identity_digest"])
+            )
+            row = await self._delivery(identity)
+        if row is None:
+            return ClaimLost()
+        result = await self._inspection_claim(row, owner_worker_id)
+        if isinstance(result, DeliveryClaim):
+            lifecycle[1].delivery_evidence_revision += 1
+            await self.session.flush()
+        return result
+
+    async def _inspection_claim(
+        self, row: EventDelivery, owner_worker_id: str
+    ) -> DeliveryClaim | ClaimBusy | ClaimLost | TerminalDelivery | HeldRecord:
+        if row.state != DeliveryState.IN_PROGRESS:
+            return self._terminal(row)
+        if row.frozen_binding is not None:
+            return HeldRecord(reason="frozen_evidence_requires_recovery")
+        if row.last_error_code in {code.value for code in EventFailureCode}:
+            return HeldRecord(reason="activity_log_unavailable", permanent_content_error=True)
+        now = await self._now()
+        if row.last_error_code == CONTENT_INSPECTION_PENDING and (row.lease_until is None or row.lease_until <= now):
+            row.next_attempt_at = now
+            await self.session.flush()
+        claim = await self._takeover(row, owner_worker_id)
+        if isinstance(claim, ClaimBusy):
+            return claim
+        changed = await self._change(
+            claim, last_error_code=CONTENT_INSPECTION_PENDING, next_attempt_at=datetime.max.replace(tzinfo=UTC)
+        )
+        return ClaimLost() if changed is None else self._claim(changed)
+
+    async def finish_inspection(
+        self, claim: DeliveryClaim, failure: EventDecodeFailure | None, *, keep_pending: bool = False
+    ) -> ClaimLost | None:
+        """Replace only a live inspection token; never resolve the delivery."""
+        row = await self._current(claim)
+        if row is None or row.frozen_binding is not None or row.last_error_code != CONTENT_INSPECTION_PENDING:
+            return ClaimLost()
+        source = await self.session.get(EventSubscriptionSource, claim.identity.source_id)
+        if source is None:
+            return ClaimLost()
+        result = await self.defer(
+            claim,
+            next_attempt_at=datetime.max.replace(tzinfo=UTC) if failure is not None else await self._now(),
+            error_code=(
+                failure.code.value
+                if failure is not None
+                else CONTENT_INSPECTION_PENDING
+                if keep_pending
+                else CONTENT_VALIDATED
+            ),
+        )
+        if result is None:
+            source.delivery_evidence_revision += 1
+            await self.session.flush()
+        return result
+
     @staticmethod
     def _fingerprint(execution: Execution) -> str:
         context = {
@@ -392,7 +490,14 @@ class EventDeliveryStore:
                 )
                 self.session.add(prepared)
                 await self.session.flush()
-                changed = await self._change(claim, frozen_binding=binding, execution_id=prepared.id)
+                changed = await self._change(
+                    claim,
+                    frozen_binding=binding,
+                    execution_id=prepared.id,
+                    last_error_code=CONTENT_VALIDATED
+                    if row.last_error_code == CONTENT_INSPECTION_PENDING
+                    else row.last_error_code,
+                )
                 return self._prepared_claim(changed)
         except _ClaimExpiredError:
             return ClaimLost()

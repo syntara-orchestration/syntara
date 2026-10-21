@@ -30,6 +30,7 @@ from syntara.eventstreams.core.deduplication import (
     DeliveryState,
     RecoveryReservation,
 )
+from syntara.eventstreams.core.processing import CONTENT_INSPECTION_PENDING
 from syntara.eventstreams.core.results import EventFailureCode
 from syntara.eventstreams.models.delivery import EventDelivery
 from syntara.eventstreams.models.recovery_hold import EventDeliveryRecoveryHold
@@ -528,6 +529,9 @@ class KafkaInitialPositionStore:
         content_codes = {code.value for code in EventFailureCode}
         if any(row.state == DeliveryState.REJECTED or row.last_error_code in content_codes for row in rows):
             msg = "permanent_content_error"
+            raise KafkaPositionError(msg)
+        if any(row.last_error_code == CONTENT_INSPECTION_PENDING for row in rows):
+            msg = "content_inspection_pending"
             raise KafkaPositionError(msg)
 
     async def reconcile_claims(
