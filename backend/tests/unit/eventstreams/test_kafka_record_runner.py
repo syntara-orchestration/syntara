@@ -1110,7 +1110,7 @@ async def test_public_status_waits_for_first_assignment_before_reporting_active(
     client.topic, client.group_id = snapshot.configuration.topic, snapshot.configuration.group_id
     client.epoch, client.assignment = 0, frozenset()
     client.fetch.return_value = {}
-    runner = KafkaRecordRunner(
+    runner: KafkaRecordRunner = KafkaRecordRunner(
         snapshot,
         client,
         MagicMock(),
