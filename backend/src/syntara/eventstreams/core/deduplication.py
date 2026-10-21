@@ -299,7 +299,7 @@ class DeliveryRepository[ExecutionPreparation: SQLModel](Protocol):
 
     async def finalize_without_execution(
         self, claim: DeliveryClaim, state: DeliveryState
-    ) -> TerminalDelivery | ClaimLost:
+    ) -> TerminalDelivery | ClaimLost | RevisionChanged:
         """Persist a no-trigger outcome without replacing prepared work."""
         ...
 

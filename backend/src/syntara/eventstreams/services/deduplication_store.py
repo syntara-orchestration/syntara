@@ -42,6 +42,7 @@ from syntara.eventstreams.core.scheduling_metadata import (
     SCHEDULING_STATE_PREPARED,
 )
 from syntara.eventstreams.models.delivery import EventDelivery
+from syntara.eventstreams.models.recovery_hold import EventDeliveryRecoveryHold
 from syntara.eventstreams.models.source import EventSubscriptionSource
 from syntara.eventstreams.models.subscription import EventSubscription
 from syntara.eventstreams.services.delivery_capacity_service import PostgreSQLDeliveryCapacityCheck
@@ -74,6 +75,20 @@ class EventDeliveryStore:
 
     async def _now(self) -> datetime:
         return cast("datetime", (await self.session.exec(select(func.clock_timestamp()))).one())
+
+    async def _recovery_held(self, source_id: UUID) -> bool:
+        """Read under lifecycle locks; recovery holds close new admission as well as cleanup."""
+        token = (
+            await self.session.exec(
+                select(EventDeliveryRecoveryHold.token)
+                .where(
+                    col(EventDeliveryRecoveryHold.source_id) == source_id,
+                    col(EventDeliveryRecoveryHold.released_at).is_(None),
+                )
+                .limit(1)
+            )
+        ).first()
+        return token is not None
 
     @staticmethod
     def _validate_worker(owner_worker_id: str) -> None:
@@ -236,15 +251,19 @@ class EventDeliveryStore:
         if row is not None:
             if row.state != DeliveryState.IN_PROGRESS:
                 return self._terminal(row)
-            return await self._takeover(row, owner_worker_id)
+            return (
+                RevisionChanged()
+                if row.frozen_binding is None and await self._recovery_held(identity.source_id)
+                else await self._takeover(row, owner_worker_id)
+            )
         if not self._admission_current(*lifecycle, expected):
             return RevisionChanged()
         try:
             permitted = await self.capacity_check.permits_new_delivery()
         except (SQLAlchemyError, OSError, TimeoutError):
             permitted = False
-        if not permitted:
-            return StorageBackpressure()
+        if not permitted or await self._recovery_held(identity.source_id):
+            return StorageBackpressure() if not permitted else RevisionChanged()
         await self.session.execute(
             insert(EventDelivery)
             .values(
@@ -332,6 +351,8 @@ class EventDeliveryStore:
                 raise ValueError(msg)
             changed = await self._change(claim, frozen_binding=row.frozen_binding)
             return ClaimLost() if changed is None else self._claim(changed)
+        if await self._recovery_held(claim.identity.source_id):
+            return RevisionChanged()
         subscription = await self.session.get(EventSubscription, claim.identity.subscription_id)
         source = await self.session.get(EventSubscriptionSource, claim.identity.source_id)
         expected = DeliveryExpectation(
@@ -543,7 +564,7 @@ class EventDeliveryStore:
 
     async def finalize_without_execution(
         self, claim: DeliveryClaim, state: DeliveryState
-    ) -> TerminalDelivery | ClaimLost:
+    ) -> TerminalDelivery | ClaimLost | RevisionChanged:
         """Persist a no-trigger decision; it cannot overwrite prepared/accepted work."""
         if state not in {DeliveryState.FILTERED, DeliveryState.REJECTED, DeliveryState.CANCELLED}:
             msg = "A terminal no-trigger state is required"
@@ -554,6 +575,8 @@ class EventDeliveryStore:
         if row.frozen_binding is not None or row.attempt_count or row.temporal_run_id is not None:
             msg = "Prepared or ambiguous work cannot be resolved without its Execution"
             raise ValueError(msg)
+        if await self._recovery_held(claim.identity.source_id):
+            return RevisionChanged()
         changed = await self._change(claim, state=state.value, resolved_at=func.clock_timestamp())
         return ClaimLost() if changed is None else self._terminal(changed)
 
