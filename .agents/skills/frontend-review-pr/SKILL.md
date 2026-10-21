@@ -12,7 +12,7 @@ Start by:
 
 1. Reading `frontend/AGENTS.md` (especially the "Common PR Mistakes" section) and relevant project guidelines
 2. Checking what files have changed (git diff or user-provided context)
-3. Following all 9 steps from the PR review skill
+3. Following the full process in the PR review skill
 
 **CRITICAL: Always run the "3a. Recurring Issues Checklist" from the PR review skill.** These are the most commonly flagged issues from real PR reviews. Every review MUST check for:
 
@@ -30,4 +30,4 @@ Start by:
 - UI changes without screenshots or screen recordings
 - New API endpoints without mock API handlers in `frontend/packages/syntara-mock-api/src/handlers.ts`
 
-Provide a structured review with the deliverables outlined in step 9.
+Provide a structured review using the "Final Deliverables" section of the PR review skill.

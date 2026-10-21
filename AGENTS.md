@@ -6,6 +6,10 @@ Upstream policy for AI agent configuration (no executable hooks; what may live
 under `.claude/`; review expectations) is in
 [`.github/AI_AGENT_POLICY.md`](.github/AI_AGENT_POLICY.md).
 
+Root and component `CLAUDE.md` files are compatibility symlinks to their
+matching `AGENTS.md` files. Edit the `AGENTS.md` target; do not maintain a
+separate Claude instruction copy.
+
 ## Component-Specific Standards
 
 - [backend/AGENTS.md](backend/AGENTS.md) — SQLModel, Alembic migrations, uv, pytest, mypy, domain standards

@@ -49,6 +49,24 @@ skills (and commands, when present). In particular the following stay private:
 
 Do not force-add ignored agent settings or hooks in a pull request.
 
+## Claude Code instruction files
+
+`AGENTS.md` is the canonical instruction file at the repository root and in
+components. Keep a relative `CLAUDE.md` symlink beside each one so Claude Code
+setups that load only `CLAUDE.md` receive the same instructions. Do not maintain
+separate Claude-specific copies. Edit the `AGENTS.md` target when instructions
+change.
+
+Claude Code v2.1.277 and later can load `AGENTS.md` directly when its default
+project-instructions setting is enabled. A `CLAUDE.md` symlink also supports
+older sessions and configurations that read only `CLAUDE.md`. Claude Code's
+Edit and Write tools refuse to write through the symlink; edit the target file
+instead. On Windows, creating these links needs Developer Mode or administrator
+privileges, and Git must have `core.symlinks` enabled. Otherwise, the checkout
+may replace a link with a plain text file containing its target path. If a
+Windows checkout cannot preserve symlinks, use a `CLAUDE.md` file containing
+`@AGENTS.md` instead. See the [Claude Code memory documentation](https://code.claude.com/docs/en/memory#share-one-file-with-other-coding-tools).
+
 ## Who may change skills and related agent docs
 
 | Path | Ownership / review |
