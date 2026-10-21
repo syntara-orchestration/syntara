@@ -8,6 +8,7 @@ from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 import syntara.integrations.adapters.aap  # register AAP adapter
+import syntara.integrations.adapters.kafka  # register Kafka adapter
 import syntara.integrations.adapters.llm_provider  # register LLM provider adapter
 import syntara.integrations.adapters.mcp_server  # noqa: F401 — register MCP adapter
 from syntara.audit.decorators import audit

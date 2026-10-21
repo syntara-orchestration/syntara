@@ -78,12 +78,14 @@ ALLOWED_CREDENTIAL_TYPES: dict[IntegrationType, frozenset[str]] = {
     IntegrationType.MCP_SERVER: frozenset({"HTTP Bearer Token"}),
     IntegrationType.LLM_PROVIDER: frozenset({"LLM Provider"}),
     IntegrationType.ANSIBLE_AUTOMATION_PLATFORM: frozenset({"Ansible Automation Platform"}),
+    IntegrationType.KAFKA: frozenset({"Kafka-connection"}),
 }
 
 CREDENTIAL_REQUIRED_TYPES: frozenset[IntegrationType] = frozenset(
     {
         IntegrationType.LLM_PROVIDER,
         IntegrationType.ANSIBLE_AUTOMATION_PLATFORM,
+        IntegrationType.KAFKA,
     }
 )
 
@@ -396,7 +398,7 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
         )
 
     def _validate_configuration_ssrf(self, configuration: IntegrationConfigurationInputTypes) -> None:
-        """Reject a base_url that resolves to a private, reserved, or cloud metadata address.
+        """Reject an address that resolves to a private, reserved, or cloud metadata address.
 
         Called at write time (create/patch) and again in this service's outbound
         entrypoints (discover/validate/refresh) as defense in depth against DNS re-pointing.
@@ -412,7 +414,8 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
         try:
             validate_integration_configuration_no_ssrf(configuration)
         except ValueError as e:
-            msg = "base_url must not resolve to a private, reserved, or cloud metadata address."
+            target = "bootstrap_servers" if getattr(configuration, "bootstrap_servers", None) else "base_url"
+            msg = f"{target} must not resolve to a private, reserved, or cloud metadata address."
             raise SafeValueError(msg) from e
 
     async def create_integration(self, data: IntegrationCreate) -> IntegrationRead:

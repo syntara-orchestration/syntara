@@ -261,6 +261,24 @@ describe('buildConfiguration', () => {
     ca_certificate: null,
   }
 
+  describe('Kafka', () => {
+    it('returns bootstrap servers as a list', () => {
+      const kafkaValues = {
+        ...baseValues,
+        integration_type: 'kafka',
+        bootstrap_servers: 'broker.example.com:9093\nother.example.com:9092',
+        sasl_mechanism: 'SCRAM-SHA-256' as const,
+      }
+      const config = buildConfiguration('kafka', kafkaValues)
+      expect(config).toEqual({
+        integration_type: 'kafka',
+        bootstrap_servers: ['broker.example.com:9093', 'other.example.com:9092'],
+        sasl_mechanism: 'SCRAM-SHA-256',
+        ...expectedSecurityDefaults,
+      })
+    })
+  })
+
   describe('MCP Server', () => {
     it('returns MCP configuration with base_url and security fields', () => {
       const config = buildConfiguration('mcp_server', baseValues)

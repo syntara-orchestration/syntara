@@ -164,6 +164,40 @@ export const credentialTypes: CredentialTypeRead[] = [
     updated_at: '2025-06-01T09:00:00Z',
     labels: {},
   },
+  {
+    id: 'ctype-kafka',
+    name: 'Kafka-connection',
+    description: 'Username and password for a Kafka connection',
+    inputs: typeInputs(
+      [
+        {
+          id: 'username',
+          type: 'string',
+          label: 'Username',
+          secret: false,
+          help_text: 'Kafka SASL username.',
+        },
+        {
+          id: 'password',
+          type: 'string',
+          label: 'Password',
+          secret: true,
+          help_text: 'Kafka SASL password. Encrypted at rest.',
+        },
+      ],
+      ['username', 'password']
+    ),
+    injectors: typeInjectors({
+      auth_type: 'kafka_connection',
+      kafka_username: '{{username}}',
+      kafka_password: '{{password}}',
+    }),
+    managed: true,
+    credential_count: 0,
+    created_at: '2025-06-01T09:00:00Z',
+    updated_at: '2025-06-01T09:00:00Z',
+    labels: {},
+  },
 ]
 
 // Workflow references for credential detail pages
