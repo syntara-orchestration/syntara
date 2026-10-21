@@ -18,10 +18,24 @@ import structlog
 from aiokafka import AIOKafkaConsumer, TopicPartition
 from aiokafka.abc import ConsumerRebalanceListener
 from aiokafka.coordinator.assignors.roundrobin import RoundRobinPartitionAssignor
-from aiokafka.errors import KafkaError, KafkaTimeoutError
+from aiokafka.errors import (
+    IncompatibleBrokerVersion,
+    KafkaError,
+    KafkaTimeoutError,
+    UnknownTopicOrPartitionError,
+    UnsupportedVersionError,
+)
 from aiokafka.structs import OffsetAndMetadata
 
-from syntara.eventstreams.core.consumer import CommittedPositionResult, RebalanceCallback
+from syntara.eventstreams.adapters.kafka_identity import SourceMetadataRequest, decode_source_identity
+from syntara.eventstreams.core.consumer import (
+    MAX_POSITION_OFFSET,
+    CommittedPositionResult,
+    IdentityObservation,
+    IdentityStatus,
+    RebalanceCallback,
+    SourceIdentityObservation,
+)
 from syntara.eventstreams.exceptions import (
     ConsumerNotRunningError,
     KafkaTransportError,
@@ -104,7 +118,7 @@ class KafkaPartitionConsumer:
 
     @property
     def epoch(self) -> int:
-        """Return current assignment epoch."""
+        """Return the opaque epoch, advanced on assignment, revocation and stop."""
         return self._epoch
 
     @property
@@ -165,6 +179,8 @@ class KafkaPartitionConsumer:
         The client reference is cleared regardless so a failed stop does
         not leave a stale handle.  Safe to call when already stopped.
         """
+        if self._running:
+            self._epoch += 1
         self._running = False
         consumer = self._consumer
         if consumer is None:
@@ -209,6 +225,7 @@ class KafkaPartitionConsumer:
         partitions: Iterable[int],
         *,
         timeout_ms: int = 5000,
+        expected_epoch: int | None = None,
     ) -> dict[int, CommittedPositionResult]:
         """Read committed offsets with typed verification status.
 
@@ -216,10 +233,15 @@ class KafkaPartitionConsumer:
         ``UnknownTopicOrPartitionError``.  For assigned partitions the
         topic/partition is known to exist, so ``None`` means ``ABSENT``.
         For unassigned partitions the cause is ambiguous: ``UNCERTAIN``.
+        Each partition read has a bounded timeout. Initialization/recovery must
+        pass expected_epoch so a rebalance during I/O invalidates the results;
+        omitting it is only suitable for diagnostics, not recovery decisions.
         """
-        consumer = self._require_running()
+        consumer = self._require_observation_epoch(expected_epoch, timeout_ms)
         results: dict[int, CommittedPositionResult] = {}
         for partition in partitions:
+            if expected_epoch is not None:
+                self._check_epoch(expected_epoch)
             tp = self._tp(partition)
             try:
                 offset_and_meta = await asyncio.wait_for(
@@ -234,50 +256,155 @@ class KafkaPartitionConsumer:
                             partition, "no committed offset or unknown partition"
                         )
                 else:
-                    results[partition] = CommittedPositionResult.verified(partition, offset_and_meta)
+                    results[partition] = self._position_result(partition, offset_and_meta)
             except (TimeoutError, KafkaTimeoutError):
                 results[partition] = CommittedPositionResult.unavailable(partition, "timeout")
-            except KafkaError as exc:
-                results[partition] = CommittedPositionResult.unavailable(partition, _sanitize(str(exc)))
+            except KafkaError:
+                results[partition] = CommittedPositionResult.unavailable(partition, "committed position lookup failed")
+        self._require_observation_epoch(expected_epoch, timeout_ms)
         return results
+
+    async def beginning_offsets(
+        self,
+        partitions: Iterable[int],
+        *,
+        expected_epoch: int,
+        timeout_ms: int = 5000,
+    ) -> dict[int, CommittedPositionResult]:
+        """Observe earliest retained offsets without changing consumer positions.
+
+        One timeout bounds the complete batch. Missing/invalid offsets and
+        unknown partitions are uncertain; broker failures/timeouts are
+        unavailable. Offsets are verified only in the non-negative int64 range.
+        The expected epoch is checked before and after I/O, including failures.
+        Reads do not establish ownership or authorize processing/commits.
+        """
+        return await self._read_boundary(
+            partitions, expected_epoch=expected_epoch, timeout_ms=timeout_ms, beginning=True
+        )
 
     async def end_offsets(
         self,
         partitions: Iterable[int],
         *,
         timeout_ms: int = 5000,
+        expected_epoch: int | None = None,
     ) -> dict[int, CommittedPositionResult]:
-        """Read the ``read_committed`` visible-end boundary for initialization.
+        """Observe the read_committed visible-end boundary without resetting.
 
-        Missing partitions in the response or ``-1`` (unknown offset) are
-        reported as ``UNCERTAIN``.
+        Initialization/recovery callers must supply expected_epoch, retain that
+        same epoch across observations, and use it for ownership-checked writes.
+        Omitting it preserves diagnostic reads without assignment guarantees.
         """
-        consumer = self._require_running()
-        partition_list = list(partitions)
-        tps = [self._tp(p) for p in partition_list]
-        try:
-            raw = await asyncio.wait_for(
-                consumer.end_offsets(tps),
-                timeout=timeout_ms / 1000,
-            )
-        except (TimeoutError, KafkaTimeoutError):
-            return {tp.partition: CommittedPositionResult.unavailable(tp.partition, "timeout") for tp in tps}
-        except KafkaError as exc:
-            msg = _sanitize(str(exc))
-            return {tp.partition: CommittedPositionResult.unavailable(tp.partition, msg) for tp in tps}
+        return await self._read_boundary(
+            partitions, expected_epoch=expected_epoch, timeout_ms=timeout_ms, beginning=False
+        )
 
-        results: dict[int, CommittedPositionResult] = {}
-        returned_partitions = {tp.partition for tp in raw}
-        for p in partition_list:
-            if p not in returned_partitions:
-                results[p] = CommittedPositionResult.uncertain(p, "partition missing from end_offsets response")
-                continue
-            offset = raw[self._tp(p)]
-            if offset < 0:
-                results[p] = CommittedPositionResult.uncertain(p, "unknown offset boundary")
+    async def observe_source_identity(
+        self,
+        *,
+        expected_epoch: int,
+        timeout_ms: int = 5000,
+    ) -> SourceIdentityObservation:
+        """Observe cluster and exact-topic IDs; never infer an identity match.
+
+        Uses the consumer's authenticated client for one bounded, version-
+        negotiated Metadata request. The request cannot create topics. Status
+        is independent per identifier: unsupported protocol, unknown topic,
+        unavailable lookup and uncertain/missing evidence are distinct.
+
+        Epoch checks before/after I/O reject a superseded assignment, including
+        stop/restart. A caller must still use current ownership and the same
+        expected epoch for any subsequent seek/commit. This method neither
+        compares saved IDs nor decides initialization or gap-recovery policy.
+        """
+        consumer = self._require_observation_epoch(expected_epoch, timeout_ms)
+        try:
+            async with asyncio.timeout(timeout_ms / 1000):
+                # aiokafka has no public consumer API for cluster/topic UUIDs.
+                # Keep access to its authenticated transport inside this adapter.
+                client = consumer._client  # noqa: SLF001 -- authenticated transport boundary, no public metadata-ID API
+                node_id = client.get_random_node()
+                if node_id is None:
+                    result = self._identity_failure(
+                        expected_epoch, IdentityStatus.UNAVAILABLE, "no metadata broker available"
+                    )
+                else:
+                    response = await client.send(node_id, SourceMetadataRequest(self.topic))
+                    result = decode_source_identity(response, topic=self.topic, epoch=expected_epoch)
+        except (TimeoutError, KafkaTimeoutError):
+            result = self._identity_failure(expected_epoch, IdentityStatus.UNAVAILABLE, "metadata lookup timed out")
+        except (UnsupportedVersionError, IncompatibleBrokerVersion, NotImplementedError):
+            result = self._identity_failure(expected_epoch, IdentityStatus.UNSUPPORTED, "metadata protocol unsupported")
+        except UnknownTopicOrPartitionError:
+            result = SourceIdentityObservation(
+                topic=self.topic,
+                assignment_epoch=expected_epoch,
+                cluster_id=IdentityObservation(status=IdentityStatus.UNAVAILABLE, error="metadata lookup failed"),
+                topic_id=IdentityObservation(status=IdentityStatus.UNKNOWN_TOPIC, error="topic is unknown to broker"),
+            )
+        except KafkaError:
+            result = self._identity_failure(expected_epoch, IdentityStatus.UNAVAILABLE, "metadata lookup failed")
+        except (AttributeError, KeyError, TypeError, ValueError):
+            result = self._identity_failure(expected_epoch, IdentityStatus.UNCERTAIN, "invalid metadata response")
+        self._require_observation_epoch(expected_epoch, timeout_ms)
+        return result
+
+    async def _read_boundary(
+        self,
+        partitions: Iterable[int],
+        *,
+        expected_epoch: int | None,
+        timeout_ms: int,
+        beginning: bool,
+    ) -> dict[int, CommittedPositionResult]:
+        consumer = self._require_observation_epoch(expected_epoch, timeout_ms)
+        tps = [self._tp(p) for p in dict.fromkeys(partitions)]
+        if not tps:
+            return {}
+        try:
+            if beginning:
+                raw = await asyncio.wait_for(consumer.beginning_offsets(tps), timeout=timeout_ms / 1000)
             else:
-                results[p] = CommittedPositionResult.verified(p, offset)
+                raw = await asyncio.wait_for(consumer.end_offsets(tps), timeout=timeout_ms / 1000)
+            results = {tp.partition: self._position_result(tp.partition, raw.get(tp)) for tp in tps}
+        except UnknownTopicOrPartitionError:
+            results = {
+                tp.partition: CommittedPositionResult.uncertain(tp.partition, "unknown topic or partition")
+                for tp in tps
+            }
+        except (TimeoutError, KafkaTimeoutError):
+            results = {tp.partition: CommittedPositionResult.unavailable(tp.partition, "timeout") for tp in tps}
+        except KafkaError:
+            results = {
+                tp.partition: CommittedPositionResult.unavailable(tp.partition, "offset lookup failed") for tp in tps
+            }
+        except (AttributeError, TypeError, ValueError):
+            results = {
+                tp.partition: CommittedPositionResult.uncertain(tp.partition, "invalid offset response") for tp in tps
+            }
+        self._require_observation_epoch(expected_epoch, timeout_ms)
         return results
+
+    @staticmethod
+    def _position_result(partition: int, offset: object) -> CommittedPositionResult:
+        if type(offset) is not int or not 0 <= offset <= MAX_POSITION_OFFSET:
+            return CommittedPositionResult.uncertain(partition, "offset missing or outside non-negative int64 range")
+        return CommittedPositionResult.verified(partition, offset)
+
+    def _require_observation_epoch(self, expected_epoch: int | None, timeout_ms: int) -> AIOKafkaConsumer:
+        if type(timeout_ms) is not int or timeout_ms <= 0:
+            msg = "timeout_ms must be positive"
+            raise ValueError(msg)
+        if expected_epoch is not None:
+            self._check_epoch(expected_epoch)
+        return self._require_running()
+
+    def _identity_failure(self, epoch: int, status: IdentityStatus, error: str) -> SourceIdentityObservation:
+        evidence = IdentityObservation(status=status, error=error)
+        return SourceIdentityObservation(
+            topic=self.topic, assignment_epoch=epoch, cluster_id=evidence, topic_id=evidence
+        )
 
     async def pause(self, partitions: Iterable[int], *, expected_epoch: int) -> None:
         """Pause fetching from partitions without dropping group membership."""
@@ -338,6 +465,7 @@ class KafkaPartitionConsumer:
 
     async def _handle_partitions_assigned(self, assigned: set[TopicPartition]) -> None:
         assigned_partitions = frozenset(tp.partition for tp in assigned)
+        self._epoch += 1
         self._assignment = assigned_partitions
         epoch = self._epoch
 

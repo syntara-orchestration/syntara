@@ -2,21 +2,30 @@
 
 from __future__ import annotations
 
+import asyncio
 import ssl
 from typing import TYPE_CHECKING, cast
 from unittest.mock import AsyncMock, MagicMock, patch
+from uuid import UUID
 
 import pytest
 from aiokafka import TopicPartition
 from aiokafka.coordinator.assignors.roundrobin import RoundRobinPartitionAssignor
-from aiokafka.errors import KafkaConnectionError, KafkaError, KafkaTimeoutError
+from aiokafka.errors import (
+    KafkaConnectionError,
+    KafkaError,
+    KafkaTimeoutError,
+    UnknownTopicOrPartitionError,
+    UnsupportedVersionError,
+)
 from aiokafka.structs import OffsetAndMetadata
 from pydantic import ValidationError
 
 from syntara.eventstreams.adapters.kafka_consumer import KafkaPartitionConsumer, _RebalanceListener, _sanitize
+from syntara.eventstreams.adapters.kafka_identity import MetadataResponseV10, SourceMetadataRequest
 from syntara.eventstreams.adapters.kafka_source_configuration import KafkaSourceConfiguration
 from syntara.eventstreams.core.connection import ResolvedKafkaConnection
-from syntara.eventstreams.core.consumer import PositionStatus, RebalanceCallback
+from syntara.eventstreams.core.consumer import MAX_POSITION_OFFSET, IdentityStatus, PositionStatus, RebalanceCallback
 from syntara.eventstreams.exceptions import (
     ConsumerNotRunningError,
     KafkaTransportError,
@@ -55,6 +64,10 @@ def _mock_consumer() -> AsyncMock:
     consumer.commit = AsyncMock()
     consumer.committed = AsyncMock(return_value=None)
     consumer.end_offsets = AsyncMock(return_value={})
+    consumer.beginning_offsets = AsyncMock(return_value={})
+    consumer._client = MagicMock()
+    consumer._client.get_random_node.return_value = 1
+    consumer._client.send = AsyncMock()
     consumer.pause = MagicMock()
     consumer.resume = MagicMock()
     return consumer
@@ -138,14 +151,14 @@ async def test_start_stop_are_idempotent_and_clear_assignment(mock_aiokafka: Mag
 
 
 @pytest.mark.anyio
-async def test_restart_preserves_epoch_and_clears_assignment(mock_aiokafka: MagicMock) -> None:
-    adapter, _ = await _adapter_at_epoch_1(mock_aiokafka)
+async def test_restart_invalidates_epoch_and_clears_assignment(mock_aiokafka: MagicMock) -> None:
+    adapter, _ = await _reassigned_adapter(mock_aiokafka)
     await adapter.stop()
     mock_aiokafka.return_value = _mock_consumer()
     await adapter.start()
     assert bool(adapter.is_running)
     assert adapter.assignment == frozenset()
-    assert adapter.epoch == 1
+    assert adapter.epoch == 4
     await adapter.stop()
 
 
@@ -166,9 +179,9 @@ async def test_stop_raises_on_shutdown_error(mock_aiokafka: MagicMock) -> None:
 async def test_operations_rejected_when_stopped() -> None:
     adapter = KafkaPartitionConsumer(_connection(), _source_config())
     with pytest.raises(ConsumerNotRunningError):
-        await adapter.seek(0, 100, expected_epoch=0)
+        await adapter.seek(0, 100, expected_epoch=adapter.epoch)
     with pytest.raises(ConsumerNotRunningError):
-        await adapter.commit({0: 100}, expected_epoch=0)
+        await adapter.commit({0: 100}, expected_epoch=adapter.epoch)
     with pytest.raises(ConsumerNotRunningError):
         await adapter.committed([0])
     with pytest.raises(ConsumerNotRunningError):
@@ -197,17 +210,17 @@ async def test_rebalance_updates_assignment_and_epoch(mock_aiokafka: MagicMock) 
 
     await listener.on_partitions_assigned({TopicPartition("t", 0), TopicPartition("t", 1)})
     assert adapter.assignment == frozenset({0, 1})
-    assert adapter.epoch == 0
-    callback.on_partitions_assigned.assert_awaited_once_with(frozenset({0, 1}), 0)
+    assert adapter.epoch == 1
+    callback.on_partitions_assigned.assert_awaited_once_with(frozenset({0, 1}), 1)
 
     await listener.on_partitions_revoked({TopicPartition("t", 1)})
     assert adapter.assignment == frozenset({0})
-    assert adapter.epoch == 1
-    callback.on_partitions_revoked.assert_awaited_once_with(frozenset({1}), 0)
+    assert adapter.epoch == 2
+    callback.on_partitions_revoked.assert_awaited_once_with(frozenset({1}), 1)
 
     await listener.on_partitions_assigned({TopicPartition("t", 0), TopicPartition("t", 2)})
     assert adapter.assignment == frozenset({0, 2})
-    assert adapter.epoch == 1
+    assert adapter.epoch == 3
 
     await adapter.stop()
 
@@ -237,13 +250,13 @@ async def test_revoke_allows_drain_then_invalidates_ownership(mock_aiokafka: Mag
     else:
         await listener.on_partitions_revoked(revoked)
 
-    assert committed_epoch == 0
+    assert committed_epoch == 1
     mock_aiokafka.return_value.commit.assert_awaited_once()
-    assert adapter.epoch == 1
+    assert adapter.epoch == 2
     assert adapter.assignment == frozenset()
 
     with pytest.raises(StaleEpochError):
-        await adapter.commit({0: 101}, expected_epoch=0)
+        await adapter.commit({0: 101}, expected_epoch=1)
 
     await adapter.stop()
 
@@ -265,8 +278,8 @@ async def test_empty_revocation_is_noop(mock_aiokafka: MagicMock) -> None:
 # ---------------------------------------------------------------------------
 
 
-async def _adapter_at_epoch_1(mock_cls: MagicMock) -> tuple[KafkaPartitionConsumer, _RebalanceListener]:
-    """Return an adapter at epoch 1 with partition 0 assigned."""
+async def _reassigned_adapter(mock_cls: MagicMock) -> tuple[KafkaPartitionConsumer, _RebalanceListener]:
+    """Return an adapter after an assignment, revocation, and reassignment."""
     adapter = KafkaPartitionConsumer(_connection(), _source_config(topic="t"))
     listener = await _start_with_partitions(adapter, mock_cls, {0})
     await listener.on_partitions_revoked({TopicPartition("t", 0)})
@@ -276,21 +289,21 @@ async def _adapter_at_epoch_1(mock_cls: MagicMock) -> tuple[KafkaPartitionConsum
 
 @pytest.mark.anyio
 async def test_seek_rejects_stale_epoch(mock_aiokafka: MagicMock) -> None:
-    adapter, _ = await _adapter_at_epoch_1(mock_aiokafka)
+    adapter, _ = await _reassigned_adapter(mock_aiokafka)
 
     with pytest.raises(StaleEpochError, match="expected 0") as exc_info:
         await adapter.seek(0, 100, expected_epoch=0)
 
     assert exc_info.value.expected_epoch == 0
-    assert exc_info.value.current_epoch == 1
+    assert exc_info.value.current_epoch == 3
     mock_aiokafka.return_value.seek.assert_not_called()
-    await adapter.seek(0, 100, expected_epoch=1)
+    await adapter.seek(0, 100, expected_epoch=adapter.epoch)
     await adapter.stop()
 
 
 @pytest.mark.anyio
 async def test_commit_rejects_stale_epoch(mock_aiokafka: MagicMock) -> None:
-    adapter, _ = await _adapter_at_epoch_1(mock_aiokafka)
+    adapter, _ = await _reassigned_adapter(mock_aiokafka)
 
     with pytest.raises(StaleEpochError):
         await adapter.commit({0: 42}, expected_epoch=0)
@@ -300,7 +313,7 @@ async def test_commit_rejects_stale_epoch(mock_aiokafka: MagicMock) -> None:
 
 @pytest.mark.anyio
 async def test_pause_rejects_stale_epoch(mock_aiokafka: MagicMock) -> None:
-    adapter, _ = await _adapter_at_epoch_1(mock_aiokafka)
+    adapter, _ = await _reassigned_adapter(mock_aiokafka)
 
     with pytest.raises(StaleEpochError):
         await adapter.pause([0], expected_epoch=0)
@@ -310,7 +323,7 @@ async def test_pause_rejects_stale_epoch(mock_aiokafka: MagicMock) -> None:
 
 @pytest.mark.anyio
 async def test_resume_rejects_stale_epoch(mock_aiokafka: MagicMock) -> None:
-    adapter, _ = await _adapter_at_epoch_1(mock_aiokafka)
+    adapter, _ = await _reassigned_adapter(mock_aiokafka)
 
     with pytest.raises(StaleEpochError):
         await adapter.resume([0], expected_epoch=0)
@@ -329,7 +342,7 @@ async def test_seek_rejects_unassigned_partition(mock_aiokafka: MagicMock) -> No
     await _start_with_partitions(adapter, mock_aiokafka, {0})
 
     with pytest.raises(OwnershipRevokedError, match="Partition 5") as exc_info:
-        await adapter.seek(5, 100, expected_epoch=0)
+        await adapter.seek(5, 100, expected_epoch=adapter.epoch)
 
     assert exc_info.value.partition == 5
     mock_aiokafka.return_value.seek.assert_not_called()
@@ -343,7 +356,7 @@ async def test_commit_rejects_unassigned_partition(mock_aiokafka: MagicMock) -> 
     await _start_with_partitions(adapter, mock_aiokafka, {0})
 
     with pytest.raises(OwnershipRevokedError):
-        await adapter.commit({0: 10, 3: 20}, expected_epoch=0)
+        await adapter.commit({0: 10, 3: 20}, expected_epoch=adapter.epoch)
 
     await adapter.stop()
 
@@ -354,7 +367,7 @@ async def test_resume_rejects_unassigned_partition(mock_aiokafka: MagicMock) -> 
     await _start_with_partitions(adapter, mock_aiokafka, {0})
 
     with pytest.raises(OwnershipRevokedError):
-        await adapter.resume([0, 5], expected_epoch=0)
+        await adapter.resume([0, 5], expected_epoch=adapter.epoch)
 
     await adapter.stop()
 
@@ -370,7 +383,7 @@ async def test_commit_passes_explicit_offset_map(mock_aiokafka: MagicMock) -> No
     adapter = KafkaPartitionConsumer(_connection(), _source_config(topic="t"))
     await _start_with_partitions(adapter, mock_aiokafka, {0, 1})
 
-    await adapter.commit({0: 42, 1: 99}, expected_epoch=0)
+    await adapter.commit({0: 42, 1: 99}, expected_epoch=adapter.epoch)
 
     consumer_instance.commit.assert_awaited_once()
     offset_map = consumer_instance.commit.call_args.args[0]
@@ -387,7 +400,7 @@ async def test_commit_wraps_kafka_error(mock_aiokafka: MagicMock) -> None:
     await _start_with_partitions(adapter, mock_aiokafka, {0})
 
     with pytest.raises(KafkaTransportError, match="password=\\*\\*\\*"):
-        await adapter.commit({0: 10}, expected_epoch=0)
+        await adapter.commit({0: 10}, expected_epoch=adapter.epoch)
 
     await adapter.stop()
 
@@ -404,7 +417,7 @@ async def test_seek_wraps_kafka_error(mock_aiokafka: MagicMock) -> None:
     await _start_with_partitions(adapter, mock_aiokafka, {0})
 
     with pytest.raises(KafkaTransportError, match="secret=\\*\\*\\*"):
-        await adapter.seek(0, 100, expected_epoch=0)
+        await adapter.seek(0, 100, expected_epoch=adapter.epoch)
 
     await adapter.stop()
 
@@ -437,7 +450,7 @@ async def test_committed_unavailable_on_kafka_error(mock_aiokafka: MagicMock) ->
 
     results = await adapter.committed([0])
     assert results[0].status == PositionStatus.UNAVAILABLE
-    assert "broker gone" in (results[0].error or "")
+    assert results[0].error == "committed position lookup failed"
 
     await adapter.stop()
 
@@ -528,13 +541,13 @@ async def test_pause_and_resume(mock_aiokafka: MagicMock) -> None:
     adapter = KafkaPartitionConsumer(_connection(), _source_config(topic="t"))
     await _start_with_partitions(adapter, mock_aiokafka, {0, 1})
 
-    await adapter.pause([0, 1], expected_epoch=0)
+    await adapter.pause([0, 1], expected_epoch=adapter.epoch)
     consumer_instance.pause.assert_called_once()
     paused_tps = set(consumer_instance.pause.call_args.args)
     assert TopicPartition("t", 0) in paused_tps
     assert TopicPartition("t", 1) in paused_tps
 
-    await adapter.resume([0], expected_epoch=0)
+    await adapter.resume([0], expected_epoch=adapter.epoch)
     consumer_instance.resume.assert_called_once()
     resumed_tps = set(consumer_instance.resume.call_args.args)
     assert TopicPartition("t", 0) in resumed_tps
@@ -548,7 +561,7 @@ async def test_pause_rejects_unassigned_partition(mock_aiokafka: MagicMock) -> N
     await _start_with_partitions(adapter, mock_aiokafka, {0})
 
     with pytest.raises(OwnershipRevokedError):
-        await adapter.pause([0, 5], expected_epoch=0)
+        await adapter.pause([0, 5], expected_epoch=adapter.epoch)
 
     await adapter.stop()
 
@@ -616,3 +629,185 @@ def test_connection_has_ssl_context() -> None:
         ssl_context=ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT),
     )
     assert conn_with.has_ssl_context()
+
+
+@pytest.mark.anyio
+async def test_beginning_offsets_validates_each_exact_partition(mock_aiokafka: MagicMock) -> None:
+    adapter = KafkaPartitionConsumer(_connection(), _source_config())
+    await _start_with_partitions(adapter, mock_aiokafka, {0})
+    consumer = mock_aiokafka.return_value
+    values = [0, MAX_POSITION_OFFSET, -1, MAX_POSITION_OFFSET + 1, None, True, 1.5, "12"]
+    consumer.beginning_offsets.return_value = {
+        TopicPartition(adapter.topic, partition): value for partition, value in enumerate(values)
+    }
+    consumer.beginning_offsets.return_value[TopicPartition("other-topic", 8)] = 10
+    result = await adapter.beginning_offsets(range(9), expected_epoch=adapter.epoch)
+    assert [result[p].offset for p in (0, 1)] == [0, MAX_POSITION_OFFSET]
+    assert all(result[p].status == PositionStatus.UNCERTAIN for p in range(2, 9))
+    consumer.beginning_offsets.assert_awaited_once_with([TopicPartition(adapter.topic, p) for p in range(9)])
+    consumer.seek.assert_not_called()
+    consumer.commit.assert_not_awaited()
+    # Observing an unassigned partition cannot authorize a subsequent write.
+    with pytest.raises(OwnershipRevokedError):
+        await adapter.seek(1, 0, expected_epoch=adapter.epoch)
+    with pytest.raises(OwnershipRevokedError):
+        await adapter.commit({1: 0}, expected_epoch=adapter.epoch)
+    await adapter.stop()
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    ("error", "status"),
+    [
+        (UnknownTopicOrPartitionError(), PositionStatus.UNCERTAIN),
+        (KafkaError("sasl password=s3cret broker:9092"), PositionStatus.UNAVAILABLE),
+        (KafkaTimeoutError(), PositionStatus.UNAVAILABLE),
+    ],
+)
+async def test_beginning_offsets_failures_are_explicit_and_sanitized(
+    mock_aiokafka: MagicMock, error: Exception, status: PositionStatus
+) -> None:
+    adapter = KafkaPartitionConsumer(_connection(), _source_config())
+    await _start_with_partitions(adapter, mock_aiokafka, {0})
+    mock_aiokafka.return_value.beginning_offsets.side_effect = error
+    result = await adapter.beginning_offsets([0, 1], expected_epoch=adapter.epoch)
+    assert all(item.status == status and item.offset is None for item in result.values())
+    assert "s3cret" not in str(result)
+    assert "broker:9092" not in str(result)
+    await adapter.stop()
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("operation", ["beginning", "identity"])
+async def test_observation_timeouts_cancel_pending_io(mock_aiokafka: MagicMock, operation: str) -> None:
+    adapter = KafkaPartitionConsumer(_connection(), _source_config())
+    await _start_with_partitions(adapter, mock_aiokafka, {0})
+    cancelled = asyncio.Event()
+
+    async def pending(*args: object) -> None:
+        try:
+            await asyncio.Event().wait()
+        finally:
+            cancelled.set()
+
+    consumer = mock_aiokafka.return_value
+    if operation == "beginning":
+        consumer.beginning_offsets.side_effect = pending
+        positions = await adapter.beginning_offsets([0], expected_epoch=adapter.epoch, timeout_ms=1)
+        assert positions[0].status == PositionStatus.UNAVAILABLE
+    else:
+        consumer._client.send.side_effect = pending
+        identity = await adapter.observe_source_identity(expected_epoch=adapter.epoch, timeout_ms=1)
+        assert identity.topic_id.status == IdentityStatus.UNAVAILABLE
+    assert cancelled.is_set()
+    await adapter.stop()
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("operation", ["beginning", "end", "committed", "identity"])
+@pytest.mark.parametrize("transition", ["reassign", "revoke", "restart"])
+async def test_observations_reject_assignment_changes_during_io(
+    mock_aiokafka: MagicMock, operation: str, transition: str
+) -> None:
+    adapter = KafkaPartitionConsumer(_connection(), _source_config())
+    listener = await _start_with_partitions(adapter, mock_aiokafka, {0})
+    epoch = adapter.epoch
+
+    async def changed(*args: object) -> object:
+        if transition == "reassign":
+            await listener.on_partitions_assigned({TopicPartition(adapter.topic, 0)})
+        elif transition == "revoke":
+            await listener.on_partitions_revoked({TopicPartition(adapter.topic, 0)})
+        else:
+            await adapter.stop()
+            await adapter.start()
+        return {TopicPartition(adapter.topic, 0): 10} if operation != "committed" else 10
+
+    consumer = mock_aiokafka.return_value
+    if operation == "identity":
+        consumer._client.send.side_effect = changed
+    else:
+        getattr(
+            consumer, {"beginning": "beginning_offsets", "end": "end_offsets", "committed": "committed"}[operation]
+        ).side_effect = changed
+    with pytest.raises(StaleEpochError):
+        if operation == "identity":
+            await adapter.observe_source_identity(expected_epoch=epoch)
+        elif operation == "beginning":
+            await adapter.beginning_offsets([0], expected_epoch=epoch)
+        elif operation == "end":
+            await adapter.end_offsets([0], expected_epoch=epoch)
+        else:
+            await adapter.committed([0], expected_epoch=epoch)
+    # A stale epoch also prevents starting another broker lookup.
+    consumer.beginning_offsets.reset_mock()
+    consumer._client.send.reset_mock()
+    with pytest.raises(StaleEpochError):
+        await adapter.beginning_offsets([0], expected_epoch=epoch)
+    with pytest.raises(StaleEpochError):
+        await adapter.observe_source_identity(expected_epoch=epoch)
+    consumer.beginning_offsets.assert_not_awaited()
+    consumer._client.send.assert_not_awaited()
+    await adapter.stop()
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    ("error", "status"),
+    [
+        (UnsupportedVersionError(), IdentityStatus.UNSUPPORTED),
+        (KafkaError("password=s3cret broker:9092"), IdentityStatus.UNAVAILABLE),
+        (ValueError("password=s3cret"), IdentityStatus.UNCERTAIN),
+        (UnknownTopicOrPartitionError(), IdentityStatus.UNKNOWN_TOPIC),
+    ],
+)
+async def test_identity_failures_never_claim_verified_identifiers(
+    mock_aiokafka: MagicMock, error: Exception, status: IdentityStatus
+) -> None:
+    adapter = KafkaPartitionConsumer(_connection(), _source_config())
+    await _start_with_partitions(adapter, mock_aiokafka, {0})
+    consumer = mock_aiokafka.return_value
+    consumer._client.send.side_effect = error
+    result = await adapter.observe_source_identity(expected_epoch=adapter.epoch)
+    assert result.topic_id.status == status
+    assert result.cluster_id.status != IdentityStatus.VERIFIED
+    assert result.topic_id.value is None
+    assert "s3cret" not in result.model_dump_json()
+    assert "broker:9092" not in result.model_dump_json()
+    consumer._client.get_random_node.return_value = None
+    consumer._client.send.reset_mock()
+    result = await adapter.observe_source_identity(expected_epoch=adapter.epoch)
+    assert result.topic_id.status == IdentityStatus.UNAVAILABLE
+    consumer._client.send.assert_not_awaited()
+    await adapter.stop()
+
+
+@pytest.mark.anyio
+async def test_identity_observation_uses_authenticated_transport_without_granting_ownership(
+    mock_aiokafka: MagicMock,
+) -> None:
+    adapter = KafkaPartitionConsumer(_connection(), _source_config())
+    await _start_with_partitions(adapter, mock_aiokafka, set())
+    consumer = mock_aiokafka.return_value
+    consumer._client.send.return_value = MetadataResponseV10(
+        throttle_time_ms=0,
+        brokers=[],
+        cluster_id="cluster-A",
+        controller_id=1,
+        topics=[(0, adapter.topic, UUID(int=1), False, [], 0, {})],
+        cluster_authorized_operations=0,
+        tags={},
+    )
+    result = await adapter.observe_source_identity(expected_epoch=adapter.epoch)
+    assert result.assignment_epoch == adapter.epoch
+    assert result.topic == adapter.topic
+    assert result.cluster_id.value == "cluster-A"
+    assert result.topic_id.status == IdentityStatus.VERIFIED
+    node, request = consumer._client.send.call_args.args
+    assert node == 1
+    assert isinstance(request, SourceMetadataRequest)
+    assert request.topic == adapter.topic
+    assert adapter.assignment == frozenset()
+    consumer.seek.assert_not_called()
+    consumer.commit.assert_not_awaited()
+    await adapter.stop()
