@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
@@ -12,7 +12,6 @@ import pytest
 
 from syntara.eventstreams.adapters.kafka_record_identity import KafkaRecordIdentity
 from syntara.eventstreams.core.deduplication import (
-    DeliveryClaim,
     DeliveryIdentity,
     DeliveryState,
     TerminalDelivery,
@@ -38,17 +37,6 @@ def _identity(offset: int = 0) -> DeliveryIdentity:
     )
 
 
-def _claim(identity: DeliveryIdentity | None = None) -> DeliveryClaim:
-    identity = identity or _identity()
-    now = datetime.now(UTC)
-    return DeliveryClaim(
-        identity=identity,
-        token=uuid4(),
-        owner_worker_id="recovery-scanner",
-        lease_until=now + timedelta(seconds=60),
-    )
-
-
 def _resolved(identity: DeliveryIdentity) -> ResolvedDelivery:
     return ResolvedDelivery(
         terminal=TerminalDelivery(
@@ -63,10 +51,15 @@ def _resolved(identity: DeliveryIdentity) -> ResolvedDelivery:
 
 
 def _worker(
-    recover_due_return: list | None = None,
+    results_sequence: list[object | None] | None = None,
     *,
     batch_limit: int = 10,
 ) -> tuple[EventDeliveryRecoveryWorker, AsyncMock]:
+    """Build a worker with mocked _claim_and_recover_one.
+
+    results_sequence: successive return values. None signals no more work.
+    Defaults to [None] (empty scan).
+    """
     launcher = SimpleNamespace(
         history_retention_seconds=AsyncMock(return_value=259200),
         start=AsyncMock(),
@@ -74,54 +67,52 @@ def _worker(
     )
     session_factory = MagicMock()
     with (
-        patch("syntara.eventstreams.services.recovery_worker.EventExecutionRecoveryService"),
         patch("syntara.eventstreams.services.recovery_worker.EventAdmissionService"),
         patch("syntara.eventstreams.services.recovery_worker.PeriodicWorker"),
     ):
         worker = EventDeliveryRecoveryWorker(session_factory, launcher, batch_limit=batch_limit, worker_id="test")
-        mock_recover_due = AsyncMock(return_value=recover_due_return or [])
-        worker._recovery = SimpleNamespace(recover_due=mock_recover_due)
-    return worker, mock_recover_due
+    sequence = results_sequence if results_sequence is not None else [None]
+    mock_claim_recover = AsyncMock(side_effect=sequence)
+    worker._claim_and_recover_one = mock_claim_recover  # type: ignore[assignment]
+    return worker, mock_claim_recover
 
 
 @pytest.mark.asyncio
-async def test_tick_scans_due_deliveries():
+async def test_tick_scans_due_deliveries() -> None:
     identity = _identity()
-    results = [(identity, _resolved(identity))]
-    worker, mock = _worker(results)
+    worker, mock = _worker([_resolved(identity), None])
     count = await worker.tick()
     assert count == 1
-    mock.assert_awaited_once_with("test", limit=10)
+    assert mock.await_count == 2
 
 
 @pytest.mark.asyncio
-async def test_tick_empty_batch_returns_zero():
-    worker, mock = _worker([])
+async def test_tick_empty_batch_returns_zero() -> None:
+    worker, mock = _worker([None])
     assert await worker.tick() == 0
     mock.assert_awaited_once()
 
 
 @pytest.mark.asyncio
-async def test_tick_counts_blocked_and_retried():
-    id1, id2, id3 = _identity(0), _identity(1), _identity(2)
-    results = [
-        (id1, _resolved(id1)),
-        (id2, BlockedDelivery(error_code=SchedulingFailureCode.RUNTIME_UNAVAILABLE)),
-        (
-            id3,
+async def test_tick_counts_blocked_and_retried() -> None:
+    id1 = _identity(0)
+    worker, _ = _worker(
+        [
+            _resolved(id1),
+            BlockedDelivery(error_code=SchedulingFailureCode.RUNTIME_UNAVAILABLE),
             RetryDelivery(
                 error_code=SchedulingFailureCode.TEMPORAL_UNAVAILABLE,
                 next_attempt_at=datetime.now(UTC),
                 circuit_open=False,
             ),
-        ),
-    ]
-    worker, _ = _worker(results)
+            None,
+        ]
+    )
     assert await worker.tick() == 3
 
 
 @pytest.mark.asyncio
-async def test_tick_skipped_while_draining():
+async def test_tick_skipped_while_draining() -> None:
     worker, mock = _worker()
     worker._draining = True
     assert await worker.tick() == 0
@@ -129,14 +120,16 @@ async def test_tick_skipped_while_draining():
 
 
 @pytest.mark.asyncio
-async def test_tick_respects_batch_limit():
-    worker, mock = _worker([], batch_limit=5)
-    await worker.tick()
-    mock.assert_awaited_once_with("test", limit=5)
+async def test_tick_stops_at_batch_limit() -> None:
+    results = [_resolved(_identity(i)) for i in range(10)]
+    worker, mock = _worker(results, batch_limit=5)
+    count = await worker.tick()
+    assert count == 5
+    assert mock.await_count == 5
 
 
 @pytest.mark.asyncio
-async def test_drain_sets_flag_and_awaits_in_flight():
+async def test_drain_sets_flag_and_awaits_in_flight() -> None:
     worker, _ = _worker()
     completed = asyncio.Event()
 
@@ -154,7 +147,7 @@ async def test_drain_sets_flag_and_awaits_in_flight():
 
 
 @pytest.mark.asyncio
-async def test_drain_timeout_does_not_hang():
+async def test_drain_timeout_does_not_hang() -> None:
     worker, _ = _worker()
 
     async def never_finish() -> None:
@@ -172,23 +165,68 @@ async def test_drain_timeout_does_not_hang():
 
 
 @pytest.mark.asyncio
-async def test_stop_calls_periodic_stop():
+async def test_stop_drains_before_periodic_stop() -> None:
+    """drain() must complete before PeriodicWorker.stop() to protect in-flight work."""
     worker, _ = _worker()
+    call_order: list[str] = []
+
+    async def mock_drain() -> None:
+        call_order.append("drain")
+
+    periodic_mock = MagicMock()
+
+    async def mock_periodic_stop() -> None:
+        call_order.append("periodic_stop")
+
+    periodic_mock.stop = mock_periodic_stop
+    worker._periodic = periodic_mock
+    worker.drain = mock_drain  # type: ignore[assignment]
+    await worker.stop()
+    assert call_order == ["drain", "periodic_stop"]
+
+
+@pytest.mark.asyncio
+async def test_stop_during_active_tick_drains_in_flight() -> None:
+    """Stop during active tick awaits in-flight recovery before stopping periodic."""
+    worker, _ = _worker()
+    tick_started = asyncio.Event()
+    tick_release = asyncio.Event()
+    drained = False
+
+    async def slow_tick() -> None:
+        tick_started.set()
+        await tick_release.wait()
+
+    task = asyncio.create_task(slow_tick())
+    worker._in_flight = task
+
+    async def do_stop() -> None:
+        nonlocal drained
+        await worker.stop()
+        drained = True
+
     worker._periodic = MagicMock()
     worker._periodic.stop = AsyncMock()
-    await worker.stop()
+
+    stop_task = asyncio.create_task(do_stop())
+    await tick_started.wait()
+    assert not drained
+    assert worker.draining
+    tick_release.set()
+    await stop_task
+    assert drained
     worker._periodic.stop.assert_awaited_once()
 
 
 @pytest.mark.asyncio
-async def test_start_resets_draining():
+async def test_start_resets_draining() -> None:
     worker, _ = _worker()
     worker._draining = True
     worker.start()
     assert not worker.draining
 
 
-def test_invalid_batch_limit_raises():
+def test_invalid_batch_limit_raises() -> None:
     launcher = SimpleNamespace(
         history_retention_seconds=AsyncMock(return_value=259200),
         start=AsyncMock(),
@@ -201,26 +239,15 @@ def test_invalid_batch_limit_raises():
 
 
 @pytest.mark.asyncio
-async def test_tick_callback_tracks_in_flight():
-    worker, _mock = _worker([])
+async def test_tick_callback_tracks_in_flight() -> None:
+    worker, _ = _worker([None])
     assert worker._in_flight is None
     await worker._tick_callback(None)
     assert worker._in_flight is None
 
 
 @pytest.mark.asyncio
-async def test_concurrent_scans_use_different_tokens():
-    """Token fencing is in claim_due, but verify tick passes worker_id."""
-    worker, mock = _worker([])
-    await worker.tick()
-    await worker.tick()
-    assert mock.await_count == 2
-    for call in mock.await_args_list:
-        assert call.args[0] == "test"
-
-
-@pytest.mark.asyncio
-async def test_drain_without_in_flight_is_immediate():
+async def test_drain_without_in_flight_is_immediate() -> None:
     worker, _ = _worker()
     worker._in_flight = None
     await worker.drain()
@@ -228,9 +255,43 @@ async def test_drain_without_in_flight_is_immediate():
 
 
 @pytest.mark.asyncio
-async def test_tick_after_drain_returns_zero():
+async def test_tick_after_drain_returns_zero() -> None:
     """Post-drain tick must not claim new work."""
     worker, mock = _worker()
     await worker.drain()
     assert await worker.tick() == 0
     mock.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_each_claim_is_fresh() -> None:
+    """Each delivery is claimed individually so no claim waits with an aging lease."""
+    id1, id2 = _identity(0), _identity(1)
+    worker, mock = _worker([_resolved(id1), _resolved(id2), None])
+    count = await worker.tick()
+    assert count == 2
+    assert mock.await_count == 3
+
+
+@pytest.mark.asyncio
+async def test_drain_mid_tick_stops_further_claims() -> None:
+    """Setting draining during tick iteration stops claiming more work."""
+    id1 = _identity()
+
+    call_count = 0
+
+    async def drain_after_first() -> object | None:
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            return _resolved(id1)
+        if call_count == 2:
+            worker._draining = True
+            return _resolved(_identity(1))
+        return None
+
+    worker, _ = _worker()
+    worker._claim_and_recover_one = AsyncMock(side_effect=drain_after_first)  # type: ignore[assignment]
+    count = await worker.tick()
+    assert count == 2
+    assert call_count == 2
