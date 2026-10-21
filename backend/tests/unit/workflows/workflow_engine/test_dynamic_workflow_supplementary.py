@@ -331,10 +331,14 @@ class TestMarkRemainingUnreachableNodes:
         assert "trigger" not in wf.skipped_nodes
         assert "node_a" in wf.skipped_nodes
 
-    def test_non_manual_trigger_types_not_marked_skipped(self) -> None:
-        """All trigger types (webhook_trigger, schedule_trigger, etc.) are excluded."""
+    @pytest.mark.parametrize(
+        "trigger_type",
+        ["webhook_trigger", "scheduled_trigger", "eda_trigger", "form_trigger"],
+    )
+    def test_non_manual_trigger_types_not_marked_skipped(self, trigger_type: str) -> None:
+        """Non-manual trigger types are excluded from the final skip pass."""
         backend = InMemoryGraphBackend()
-        backend.add_node("trigger", {"id": "trigger", "type": "webhook_trigger", "parameters": {}})
+        backend.add_node("trigger", {"id": "trigger", "type": trigger_type, "parameters": {}})
         backend.add_node("node_a", {"id": "node_a", "type": "script", "parameters": {}})
         backend.add_node("node_b", {"id": "node_b", "type": "script", "parameters": {}})
         backend.add_edge("trigger", "node_a", None)

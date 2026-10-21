@@ -254,6 +254,7 @@ class TestSyncScheduledTriggers:
             triggers=[
                 {"id": "trigger_1", "type": "manual_trigger", "parameters": {}},
                 {"id": "trigger_2", "type": "webhook_trigger", "parameters": {"webhook_path": "test"}},
+                {"id": "trigger_3", "type": "form_trigger", "parameters": {}},
             ]
         )
 
