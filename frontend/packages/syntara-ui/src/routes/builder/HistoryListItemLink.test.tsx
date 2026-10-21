@@ -24,10 +24,12 @@ describe('HistoryListItemLink', () => {
     expect(screen.getByRole('link')).toHaveClass('pf-v6-c-simple-list__item-link')
   })
 
-  it('omits the PF simple-list item-link class in overlay mode', () => {
-    render(<HistoryListItemLink to="/x" onSelect={onSelect} overlay aria-label="link" />)
+  it('applies the PF simple-list item-link class with a row overlay className', () => {
+    render(<HistoryListItemLink to="/x" onSelect={onSelect} className="row-overlay" aria-label="link" />)
 
-    expect(screen.getByRole('link')).not.toHaveClass('pf-v6-c-simple-list__item-link')
+    const link = screen.getByRole('link')
+    expect(link).toHaveClass('pf-v6-c-simple-list__item-link')
+    expect(link).toHaveClass('row-overlay')
   })
 
   it('appends custom className', () => {

@@ -37,10 +37,6 @@ const E2E_FILES = ['e2e/**']
 const SHARED_RESTRICTED_IMPORT_OPTIONS = {
   patterns: [
     {
-      group: ['wouter', 'wouter/*'],
-      message: 'wouter has been removed. Use @tanstack/react-router directly.',
-    },
-    {
       regex: '(?:\\.{1,2}/)*(?:hooks/)?routing/(?:useNavigate|useParams|useSearch|useLocation|navigate|Link)$',
       message: 'Deprecated bridge hook. Use @tanstack/react-router primitives directly.',
     },
@@ -146,7 +142,7 @@ export default tseslint.config(
           decoration: ['/', '*'],
         },
       ],
-      // axios restriction merged into the icon/wouter no-restricted-imports block below
+      // axios restriction merged into the icon no-restricted-imports block below
       // to avoid flat-config rule shadowing (the last matching block wins for a given rule).
       // Raw HTTP calls are handled by syntara/no-raw-http-calls (fetch, XMLHttpRequest) below
       'no-restricted-properties': [
@@ -161,7 +157,7 @@ export default tseslint.config(
     },
   },
   // Icon migration: flag non-RhUi icons at warn level (existing legacy imports being phased out incrementally).
-  // Wouter ban and bridge hook deprecation use @typescript-eslint/no-restricted-imports (a separate
+  // Bridge hook deprecation uses @typescript-eslint/no-restricted-imports (a separate
   // rule name) to avoid flat-config shadowing — two blocks setting the same rule on the same files
   // would cause the last one to win and silently drop the other.
   {
@@ -183,7 +179,7 @@ export default tseslint.config(
       ],
     },
   },
-  // Ban wouter (migration complete) and deprecate bridge hooks in favor of direct @tanstack/react-router imports.
+  // Deprecate bridge hooks in favor of direct @tanstack/react-router imports.
   // useSearchParams is exempt — it is a supported utility, not a deprecated bridge.
   {
     files: ['**/*.{ts,tsx}'],
