@@ -301,6 +301,8 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
     def _validate_form_trigger_submission(
         trigger_node: dict[str, Any],
         input_data: dict[str, Any],
+        *,
+        workflow_id: UUID | None = None,
     ) -> dict[str, Any]:
         """Validate and normalize a form-trigger submission.
 
@@ -309,16 +311,21 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
         persisted form definitions still obey Form Trigger authoring rules.
         """
         trigger_node_id = trigger_node.get("id")
+        validation_context = {
+            "workflow_id": workflow_id,
+            "request_id": request_id_context_var.get(),
+            "trigger_node_id": trigger_node_id,
+        }
         raw_parameters = trigger_node.get("parameters")
         if not isinstance(raw_parameters, dict) or not raw_parameters.get("form_definition"):
-            logger.error("Form trigger has no form definition", trigger_node_id=trigger_node_id)
+            logger.error("Form trigger has no form definition", **validation_context)
             msg = "Form trigger is missing its form definition"
             raise TriggerValidationError(msg)
 
         try:
             parameters = FormTriggerParameters.model_validate(raw_parameters)
         except (ValidationError, FormDefinitionError) as exc:
-            logger.exception("Form trigger has an invalid form definition", trigger_node_id=trigger_node_id)
+            logger.exception("Form trigger has an invalid form definition", **validation_context)
             msg = "Form trigger has an invalid form definition"
             raise TriggerValidationError(msg) from exc
 
@@ -326,7 +333,7 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
             isinstance(getattr(field, "options", None), (DynamicOptions, ResolvedOptions))
             for field in parameters.form_definition.fields
         ):
-            logger.error("Form trigger has unsupported dynamic options", trigger_node_id=trigger_node_id)
+            logger.error("Form trigger has unsupported dynamic options", **validation_context)
             msg = "Form trigger form definition contains unsupported dynamic options"
             raise TriggerValidationError(msg)
 
@@ -335,8 +342,8 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
         except FormDataValidationError as exc:
             logger.warning(
                 "Form trigger submission validation failed",
-                trigger_node_id=trigger_node_id,
                 error_count=len(exc.errors),
+                **validation_context,
             )
             # Re-raise with the trigger node id attached for log/diagnostic context.
             raise FormDataValidationError(exc.errors, form_id=trigger_node_id) from exc
@@ -345,6 +352,8 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
     def _normalize_trigger_input(
         trigger_node: dict[str, Any],
         input_data: dict[str, Any],
+        *,
+        workflow_id: UUID | None = None,
     ) -> dict[str, Any]:
         """Validate trigger input and return normalized data.
 
@@ -352,7 +361,11 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
         the existing JSON Schema defaults and validation behavior.
         """
         if trigger_node.get("type") == NodeType.FORM_TRIGGER:
-            return ExecutionService._validate_form_trigger_submission(trigger_node, input_data)
+            return ExecutionService._validate_form_trigger_submission(
+                trigger_node,
+                input_data,
+                workflow_id=workflow_id,
+            )
 
         ExecutionService._apply_trigger_schema_defaults(trigger_node, input_data)
         return input_data
@@ -429,7 +442,7 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
         # Step 2: Resolve trigger node and validate/normalize trigger input
         workflow_def = workflow_version.workflow_definition
         trigger_node_id, trigger_node = resolve_trigger_node(workflow_def, trigger_node_id)
-        input_data = self._normalize_trigger_input(trigger_node, input_data)
+        input_data = self._normalize_trigger_input(trigger_node, input_data, workflow_id=workflow_id)
 
         return await self._start_temporal_and_create_execution(
             workflow=workflow,
@@ -803,7 +816,11 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
             None,
         )
         if test_trigger_node is not None and test_trigger_node.get("type") == NodeType.FORM_TRIGGER:
-            trigger_inputs = self._validate_form_trigger_submission(test_trigger_node, trigger_inputs)
+            trigger_inputs = self._validate_form_trigger_submission(
+                test_trigger_node,
+                trigger_inputs,
+                workflow_id=workflow_id,
+            )
 
         # Convert PreResolvedNodeOutput objects to dicts for Temporal and metadata
         pre_resolved_dicts = {node_id: output.model_dump() for node_id, output in pre_resolved_nodes.items()}
