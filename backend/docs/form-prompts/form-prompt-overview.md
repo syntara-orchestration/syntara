@@ -65,7 +65,7 @@ Nine field types exist: `text`, `textarea`, `masked_text`, `email`, `number`, `c
 
 - **`date`** is one field type with toggles for date, time, and timezone. The enabled
   components are submitted together as one object under a single `value_name`, so downstream
-  steps reference them through one field. If time is enabled, timezone is required.
+  steps reference them through one field.
 
 ### Options
 
