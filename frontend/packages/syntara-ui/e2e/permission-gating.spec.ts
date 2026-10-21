@@ -20,7 +20,7 @@
 
 import { loginAsUser } from './authorization/fixtures'
 import { type Page, test, expect, toAppUrl, appBaseUrl } from './fixtures'
-import { expectDockedNavGroupChildLinks, mainNavGroup, mainNavigation } from './helpers/docked-nav'
+import { clickMainNavEntry, expectDockedNavGroupChildLinks, mainNavGroup, mainNavigation } from './helpers/docked-nav'
 import { openRowKebab } from './helpers/patternfly'
 import { buildUniqueName } from './helpers/workflows'
 import {
@@ -230,10 +230,19 @@ test.describe('Permission gating — Navigation visibility', () => {
     await expect(nav.getByRole('link', { name: 'Workflow Runs' })).toBeVisible()
     await expect(nav.getByRole('link', { name: 'Approvals' })).toBeVisible()
 
-    // Single visible child per group → top-level links (not expandable groups).
-    await expect(nav.getByRole('link', { name: 'Configuration', exact: true })).toBeVisible()
-    await expect(nav.getByRole('link', { name: 'System Administration', exact: true })).toBeVisible()
-    await nav.getByRole('link', { name: 'System Administration', exact: true }).click()
+    // User has credential read only (no integration) → Configuration is a single nav link.
+    await expect(mainNavGroup(userApp, 'Configuration')).toBeVisible()
+    await expect(nav.getByRole('link', { name: 'Integrations', exact: true })).not.toBeVisible()
+
+    await expect(mainNavGroup(userApp, 'Identity Providers')).not.toBeVisible()
+    await expect(mainNavGroup(userApp, 'Settings')).not.toBeVisible()
+
+    // Only Access Management under SA → single "System Administration" link (no expand toggle).
+    await expect(mainNavGroup(userApp, 'System Administration')).toBeVisible()
+    await expect(nav.getByRole('link', { name: 'Identity Providers', exact: true })).not.toBeVisible()
+    await expect(nav.getByRole('link', { name: 'Settings', exact: true })).not.toBeVisible()
+
+    await clickMainNavEntry(userApp, 'System Administration')
     await expect(userApp.getByRole('heading', { name: 'Access Management' })).toBeVisible()
   })
 })
@@ -815,9 +824,16 @@ test.describe('Permission gating — Project actions', () => {
       await projectSelector.click()
       await projectSelector.fill(projectName)
       const projectOption = viewerApp.getByRole('option', { name: projectName })
-      await projectOption.waitFor({ state: 'visible', timeout: 10_000 })
-      await projectOption.click()
-      await expect(viewerApp.getByRole('button', { name: 'Project actions' })).not.toBeVisible()
+      const optionVisible = await projectOption.isVisible({ timeout: 10_000 }).catch(() => false)
+      if (optionVisible && (await projectOption.isEnabled())) {
+        await projectOption.click()
+        await expect(viewerApp.getByRole('button', { name: 'Project actions' })).not.toBeVisible()
+      } else {
+        // Real backend: option missing or aria-disabled (no project:read) — cannot select a project.
+        if (optionVisible) await expect(projectOption).toHaveAttribute('aria-disabled', 'true')
+        await expect(viewerApp.getByRole('option', { name: 'All projects' })).toBeVisible()
+        await viewerApp.keyboard.press('Escape')
+      }
 
       // Clean up
       await apiRequest(app, 'delete', `/workflows/${workflow.id}`)

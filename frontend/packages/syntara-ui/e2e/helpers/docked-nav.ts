@@ -35,15 +35,16 @@ export function mainNavGroup(page: Page, groupName: string): Locator {
     .or(nav.getByRole('link', { name: groupName, exact: true }))
 }
 
-/**
- * Group expand toggle in icon-only dock mode is often an unnamed `button` inside a
- * `listitem` labeled with the group name; in expanded text mode it may be a named
- * `button` directly.
- */
-function dockedNavGroupToggle(nav: Locator, groupName: string): Locator {
+/** Click expand toggle — avoid scrolling `.or()` locators (Playwright can hang). */
+async function clickDockedNavGroupToggle(page: Page, groupName: string): Promise<void> {
+  const nav = mainNavigation(page)
+  await mainNavGroup(page, groupName).scrollIntoViewIfNeeded()
   const namedButton = nav.getByRole('button', { name: groupName, exact: true })
-  const iconOnlyButton = nav.getByRole('listitem', { name: groupName, exact: true }).getByRole('button')
-  return namedButton.or(iconOnlyButton)
+  if (await namedButton.isVisible().catch(() => false)) {
+    await namedButton.click()
+    return
+  }
+  await nav.getByRole('listitem', { name: groupName, exact: true }).getByRole('button').click()
 }
 
 /**
@@ -60,9 +61,7 @@ export async function expandDockedNavGroup(page: Page, groupName: string, probeC
     return
   }
 
-  const toggle = dockedNavGroupToggle(nav, groupName)
-  await toggle.scrollIntoViewIfNeeded()
-  await toggle.click()
+  await clickDockedNavGroupToggle(page, groupName)
   await expect(childLink).toBeVisible()
 }
 
@@ -112,9 +111,7 @@ export async function clickMainNavEntry(page: Page, label: string): Promise<void
     return
   }
 
-  const button = dockedNavGroupToggle(nav, label)
-  await button.scrollIntoViewIfNeeded()
-  await button.click()
+  await clickDockedNavGroupToggle(page, label)
 }
 
 /** Convenience wrapper for Configuration → child (Integrations, Credentials, …). */

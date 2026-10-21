@@ -222,9 +222,9 @@ test.describe('Built-in admin login flow', () => {
     await expect(mainNav).toBeVisible({ timeout: 30_000 })
     await settingsPermissionChecks
 
-    // Compass dock nav can overflow vertically; last items may need scroll into view.
+    // Nav can re-render when can_i checks finish — wait for attach before scrolling.
     const systemAdminNav = mainNavGroup(page, 'System Administration')
+    await expect(systemAdminNav).toBeVisible({ timeout: 15_000 })
     await systemAdminNav.scrollIntoViewIfNeeded()
-    await expect(systemAdminNav).toBeVisible()
   })
 })

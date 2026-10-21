@@ -50,6 +50,16 @@ export async function configureLoopNode(
   if (config.type) {
     const typeToggle = page.getByRole('button', { name: 'Type', exact: true })
     await expect(typeToggle).toBeVisible()
+    const openPopover = page.locator('[data-ouia-component-type="PF6/Popover"]')
+    if (
+      await openPopover
+        .first()
+        .isVisible()
+        .catch(() => false)
+    ) {
+      await page.keyboard.press('Escape')
+      await expect(openPopover.first()).toBeHidden({ timeout: 5_000 })
+    }
     await typeToggle.click()
     await page.getByRole('option', { name: config.type === 'while' ? 'While' : 'For each' }).click()
     // Wait for the type-specific field to appear, confirming the form re-rendered
