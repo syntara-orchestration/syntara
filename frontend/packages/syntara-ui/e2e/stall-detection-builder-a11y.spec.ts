@@ -47,11 +47,11 @@ test.describe('Stall detection builder and accessibility', () => {
       await waitForUIReady(app)
 
       // Open execution detail panel (click on execution in history list)
-      // The execution card should be visible in the history panel on the right
-      // Use getByRole to find the specific card in the history list
-      const historyCard = app.getByRole('article').filter({ hasText: workflowName })
-      await expect(historyCard).toBeVisible({ timeout: 15_000 })
-      await historyCard.click()
+      // The execution history list is on the right side of the builder
+      // Click the link within the list item to open the execution details
+      const historyLink = app.getByRole('link', { name: new RegExp(workflowName) })
+      await expect(historyLink).toBeVisible({ timeout: 15_000 })
+      await historyLink.click()
 
       // Wait for panel to appear
       await expect(app.getByRole('heading', { name: /execution/i })).toBeVisible({ timeout: 10_000 })
@@ -61,13 +61,8 @@ test.describe('Stall detection builder and accessibility', () => {
       const panel = app.getByRole('region').filter({ has: app.getByRole('heading', { name: /execution/i }) })
       await waitForExecutionDelayedBadge(panel, 5_000)
 
-      // Assert: Stall warning icon on stalled activity in panel's activity table
-      await expect(
-        panel
-          .getByRole('row')
-          .filter({ hasText: 'Activity 1' })
-          .getByRole('img', { name: /stall|delay/i })
-      ).toBeVisible()
+      // Assert: Stall warning label on stalled activity in panel's activity table
+      await expect(panel.getByRole('row').filter({ hasText: 'Activity 1' }).getByText('Stalled')).toBeVisible()
 
       // Navigate to execution detail page for a11y scan
       await app.goto(executionUrl)

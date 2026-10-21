@@ -71,12 +71,7 @@ test.describe('Stall detection core behavior', () => {
 
       // Assert: Stall warning persists after completion (permanent marker)
       await expect(pageHeader(app).getByText('Delayed')).toBeVisible()
-      await expect(
-        app
-          .getByRole('row')
-          .filter({ hasText: 'Activity 1' })
-          .getByRole('img', { name: /stall|delay/i })
-      ).toBeVisible()
+      await expect(app.getByRole('row').filter({ hasText: 'Activity 1' }).getByText('Stalled')).toBeVisible()
 
       // Assert: Persistence in executions list
       await app.goto(toAppUrl('/executions'))
