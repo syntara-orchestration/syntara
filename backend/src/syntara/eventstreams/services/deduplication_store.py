@@ -399,6 +399,12 @@ class EventDeliveryStore:
         row = await self._locked(claim.identity)
         if row is None or row.claim_token != claim.token or row.owner_worker_id != claim.owner_worker_id:
             return ClaimLost()
+        # Scheduled retries only read retained evidence; unresolved work needs a
+        # live lease before validation and the Execution lock. _change fences it again.
+        if row.state != DeliveryState.SCHEDULED and (
+            row.state != DeliveryState.IN_PROGRESS or row.lease_until is None or row.lease_until <= await self._now()
+        ):
+            return ClaimLost()
         self._validate_acceptance(row, acceptance)
         if row.state == DeliveryState.SCHEDULED:
             return self._terminal(row)

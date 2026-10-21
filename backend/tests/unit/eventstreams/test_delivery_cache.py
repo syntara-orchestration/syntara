@@ -13,11 +13,11 @@ from tests.unit.eventstreams.test_delivery_retention import session_factory
 
 
 @pytest.mark.parametrize("cached", [None, "stale-digest", "{malformed", TimeoutError(), OSError()])
-async def test_cache_content_or_failure_always_checks_postgresql(
+async def test_database_lookup_does_not_read_optional_cache(
     cached: object,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """A fake hit, corrupt entry, miss or outage cannot produce terminal evidence."""
+    """Database lookup avoids Redis reads regardless of cache content or availability."""
     factory, _ = session_factory()
     cache = AsyncMock(spec=TerminalReferenceCache)
     if isinstance(cached, Exception):
@@ -30,6 +30,7 @@ async def test_cache_content_or_failure_always_checks_postgresql(
     service = EventDeliveryTerminalLookup(factory, cache=cache)
     assert await service.lookup(identity()) is None
     repository.lookup_terminal.assert_awaited_once_with(identity())
+    cache.get.assert_not_awaited()
     cache.put.assert_not_awaited()
 
 
@@ -49,6 +50,8 @@ async def test_terminal_lookup_works_without_redis_or_with_rejected_writes(
     cache.put.side_effect = OSError()
     service = EventDeliveryTerminalLookup(factory, cache=cache if with_cache else None)
     assert await service.lookup(identity()) == terminal
+    repository.lookup_terminal.assert_awaited_once_with(identity())
+    cache.get.assert_not_awaited()
 
 
 async def test_terminal_reference_is_written_after_database_commit(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -66,6 +69,7 @@ async def test_terminal_reference_is_written_after_database_commit(monkeypatch: 
 
     cache.put.side_effect = write
     assert await EventDeliveryTerminalLookup(factory, cache=cache).lookup(identity()) == terminal
+    cache.get.assert_not_awaited()
     cache.put.assert_awaited_once_with(identity())
 
 

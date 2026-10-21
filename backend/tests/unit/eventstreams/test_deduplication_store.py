@@ -16,6 +16,7 @@ from syntara.eventstreams.core.deduplication import (
     FrozenDeliveryBinding,
     StorageBackpressure,
     TemporalAcceptance,
+    TerminalDelivery,
     input_fingerprint,
 )
 from syntara.eventstreams.models.delivery import EventDelivery
@@ -107,6 +108,73 @@ async def test_stale_claim_returns_lost_before_attempt_validation(monkeypatch: p
         input_fingerprint="a" * 64,
     )
     assert isinstance(await repository.record_acceptance(claim, acceptance), ClaimLost)
+
+
+@pytest.mark.parametrize("lease_until", [None, NOW - timedelta(microseconds=1), NOW])
+@pytest.mark.parametrize("prepared", [False, True])
+async def test_expired_finalization_stops_before_validation_or_execution_lock(
+    lease_until: datetime | None,
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    prepared: bool,
+) -> None:
+    """Expired unresolved claims are lost even when acceptance evidence is invalid."""
+    row = delivery()
+    if prepared:
+        row.frozen_binding = binding()
+        row.execution_id = row.execution_identity
+        row.attempt_count = 1
+        row.first_start_attempt_at = NOW
+    claim = EventDeliveryStore._claim(row)
+    row.lease_until = lease_until
+    session = MagicMock(spec=AsyncSession)
+    repository = store(session)
+    monkeypatch.setattr(repository, "_locked", AsyncMock(return_value=row))
+    monkeypatch.setattr(repository, "_now", AsyncMock(return_value=NOW))
+    acceptance = TemporalAcceptance(
+        execution_id=claim.identity.execution_id,
+        temporal_workflow_id=claim.identity.temporal_workflow_id,
+        temporal_run_id="run",
+        input_fingerprint=binding().input_fingerprint if prepared else "a" * 64,
+    )
+    assert isinstance(await repository.finalize_scheduled(claim, acceptance), ClaimLost)
+    session.exec.assert_not_awaited()
+    session.execute.assert_not_awaited()
+
+
+async def test_scheduled_finalization_retry_returns_evidence_after_lease_expiry(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An idempotent terminal read needs the same token but no live processing lease."""
+    row = delivery()
+    row.frozen_binding = binding()
+    row.attempt_count = 1
+    row.first_start_attempt_at = NOW
+    row.state = DeliveryState.SCHEDULED
+    row.temporal_run_id = "run"
+    row.execution_confirmed_at = NOW
+    row.resolved_at = NOW
+    claim = EventDeliveryStore._claim(row)
+    row.lease_until = NOW - timedelta(seconds=1)
+    session = MagicMock(spec=AsyncSession)
+    repository = store(session)
+    monkeypatch.setattr(repository, "_locked", AsyncMock(return_value=row))
+    now = AsyncMock(return_value=NOW)
+    monkeypatch.setattr(repository, "_now", now)
+    acceptance = TemporalAcceptance(
+        execution_id=claim.identity.execution_id,
+        temporal_workflow_id=claim.identity.temporal_workflow_id,
+        temporal_run_id="run",
+        input_fingerprint=binding().input_fingerprint,
+    )
+    result = await repository.finalize_scheduled(claim, acceptance)
+    assert isinstance(result, TerminalDelivery)
+    assert result.execution_id == claim.identity.execution_id
+    assert result.temporal_run_id == "run"
+    assert result.execution_confirmed_at == NOW
+    now.assert_not_awaited()
+    session.exec.assert_not_awaited()
+    session.execute.assert_not_awaited()
 
 
 async def test_no_trigger_resolution_cannot_overwrite_preparation(monkeypatch: pytest.MonkeyPatch) -> None:
