@@ -112,7 +112,9 @@ class RoleAssignmentService:
             await assert_project_alive(self.session, project_id)
 
         if principal_id is not None:
-            principal_name, principal_type_label = await self._validate_principal_id(principal_id)
+            principal_name, principal_type_label = await self._validate_principal_id(
+                principal_id, project_id=project_id
+            )
             group_name = None
         else:
             group_name = await self._validate_group_id(group_id)  # type: ignore[arg-type]
@@ -525,8 +527,8 @@ class RoleAssignmentService:
         assignment, pn, prn, pt = row
         return self._to_dict(assignment, pn, prn, pt)
 
-    async def _validate_principal_id(self, principal_id: UUID) -> tuple[str, str]:
-        """Validate that a principal exists and return (name, label)."""
+    async def _validate_principal_id(self, principal_id: UUID, *, project_id: UUID | None) -> tuple[str, str]:
+        """Validate principal existence and service account scope, returning (name, label)."""
         from syntara.core.models.principal import Principal  # noqa: PLC0415
 
         principal = await self.session.get(Principal, principal_id)
@@ -545,6 +547,9 @@ class RoleAssignmentService:
             sa = await self.session.get(ServiceAccount, principal_id)
             if not sa:
                 msg = f"Service account {principal_id} not found"
+                raise SafeValueError(msg)
+            if project_id != sa.project_id:
+                msg = "Service accounts can only be assigned roles within their owning project."
                 raise SafeValueError(msg)
             return sa.name, "service_account"
         msg = f"Unsupported principal type: {principal.principal_type}"

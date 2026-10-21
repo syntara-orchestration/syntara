@@ -387,7 +387,7 @@ Service accounts are registered as an authz resource type in `src/syntara/authz/
 
 Service accounts can receive role assignments via the standard role assignment API. The `RoleAssignment` model uses `principal_id` (FK → `principals`), which supports both users and service accounts. The authz resolver (`src/syntara/authz/resolver.py`) resolves effective policies generically via `principal_id`.
 
-The role assignment service (`src/syntara/authz/services/role_assignment_service.py`) handles the `"service_account"` principal type: it validates the SA exists, resolves its name for display, and outer-joins the `ServiceAccount` table in queries.
+The role assignment service (`src/syntara/authz/services/role_assignment_service.py`) handles the `"service_account"` principal type: it validates the SA exists, resolves its name for display, and outer-joins the `ServiceAccount` table in queries. Assignments must use a valid project-scoped role in the service account's owning project; global and cross-project assignments are rejected.
 
 ## Webhook and EDA Integration
 

@@ -172,7 +172,7 @@ class TestValidatePrincipalId:
         session.get = AsyncMock(side_effect=[principal, user_entity])
 
         svc = _make_service(session, test_user)
-        name, label = await svc._validate_principal_id(uuid4())
+        name, label = await svc._validate_principal_id(uuid4(), project_id=None)
 
         assert name == "bob"
         assert label == "user"
@@ -183,12 +183,13 @@ class TestValidatePrincipalId:
         principal.principal_type = "service_account"
         sa_entity = MagicMock()
         sa_entity.name = "deploy-bot"
+        sa_entity.project_id = uuid4()
 
         session = AsyncMock(spec=AsyncSession)
         session.get = AsyncMock(side_effect=[principal, sa_entity])
 
         svc = _make_service(session, test_user)
-        name, label = await svc._validate_principal_id(uuid4())
+        name, label = await svc._validate_principal_id(uuid4(), project_id=sa_entity.project_id)
 
         assert name == "deploy-bot"
         assert label == "service_account"
@@ -200,7 +201,7 @@ class TestValidatePrincipalId:
 
         svc = _make_service(session, test_user)
         with pytest.raises(SafeValueError, match=r"Principal .* not found"):
-            await svc._validate_principal_id(uuid4())
+            await svc._validate_principal_id(uuid4(), project_id=None)
 
     @pytest.mark.asyncio
     async def test_user_entity_missing_after_principal_found(self, test_user: User) -> None:
@@ -212,7 +213,7 @@ class TestValidatePrincipalId:
 
         svc = _make_service(session, test_user)
         with pytest.raises(SafeValueError, match=r"User .* not found"):
-            await svc._validate_principal_id(uuid4())
+            await svc._validate_principal_id(uuid4(), project_id=None)
 
     @pytest.mark.asyncio
     async def test_service_account_entity_missing_after_principal_found(self, test_user: User) -> None:
@@ -224,7 +225,7 @@ class TestValidatePrincipalId:
 
         svc = _make_service(session, test_user)
         with pytest.raises(SafeValueError, match=r"Service account .* not found"):
-            await svc._validate_principal_id(uuid4())
+            await svc._validate_principal_id(uuid4(), project_id=None)
 
     @pytest.mark.asyncio
     async def test_unsupported_principal_type(self, test_user: User) -> None:
@@ -236,7 +237,7 @@ class TestValidatePrincipalId:
 
         svc = _make_service(session, test_user)
         with pytest.raises(SafeValueError, match="Unsupported principal type"):
-            await svc._validate_principal_id(uuid4())
+            await svc._validate_principal_id(uuid4(), project_id=None)
 
 
 # ============================================================================
