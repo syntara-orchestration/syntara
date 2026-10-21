@@ -1397,6 +1397,21 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
                     timeout_task = self._timeout_tasks.pop(node_id, None)
                     if timeout_task is not None:
                         timeout_task.cancel()
+            # Defer the restore decision until every predecessor is terminal, even on
+            # the ANY / n-of-m success path where the gate fires at n_required without
+            # waiting for the remaining branches. Classifying a still-pending branch
+            # would compare its *predicted* restored status against the source instead
+            # of its actual current state, letting a stale converge output replay when
+            # a branch that the source restored is really rerunning or being skipped.
+            # The wait is bounded by the converge timeout handler, which records a
+            # "timed out after" reason so a branch that never reaches a terminal state
+            # cannot hang the gate.
+            await workflow.wait_condition(
+                lambda: (
+                    self._all_predecessors_terminal(predecessor_ids)
+                    or " timed out after " in self._retry_converge_failure_reasons.get(node_id, "")
+                )
+            )
             restored = await self._maybe_restore_retry_converge(node, resolved_parameters, graph)
             if restored is not None:
                 return restored
