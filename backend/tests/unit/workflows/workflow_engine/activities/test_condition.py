@@ -8,7 +8,7 @@ from unittest.mock import patch
 import pytest
 from temporalio.exceptions import ApplicationError
 
-from syntara.workflows.workflow_engine.activities.condition import condition
+from syntara.workflow_runtime.engines.temporal.activities.condition import condition
 
 
 class TestConditionTrueEvaluation:
@@ -74,7 +74,7 @@ class TestConditionEvaluationFailure:
     async def test_invalid_expression_raises(self) -> None:
         with (
             patch(
-                "syntara.workflows.workflow_engine.activities.condition.safe_eval_with_namespace",
+                "syntara.workflow_runtime.engines.temporal.activities.condition.safe_eval_with_namespace",
                 side_effect=ValueError("bad expression"),
             ),
             pytest.raises(ApplicationError) as exc_info,
@@ -86,7 +86,7 @@ class TestConditionEvaluationFailure:
     async def test_evaluation_error_is_non_retryable(self) -> None:
         with (
             patch(
-                "syntara.workflows.workflow_engine.activities.condition.safe_eval_with_namespace",
+                "syntara.workflow_runtime.engines.temporal.activities.condition.safe_eval_with_namespace",
                 side_effect=ValueError("invalid expression"),
             ),
             pytest.raises(ApplicationError) as exc_info,
@@ -99,7 +99,7 @@ class TestConditionEvaluationFailure:
         """Exceptions outside the explicit catch list should propagate to Temporal."""
         with (
             patch(
-                "syntara.workflows.workflow_engine.activities.condition.safe_eval_with_namespace",
+                "syntara.workflow_runtime.engines.temporal.activities.condition.safe_eval_with_namespace",
                 side_effect=OSError("disk full"),
             ),
             pytest.raises(OSError, match="disk full"),
@@ -166,7 +166,7 @@ class TestConditionErrorMessageContent:
     async def test_evaluation_error_message_includes_expression(self) -> None:
         with (
             patch(
-                "syntara.workflows.workflow_engine.activities.condition.safe_eval_with_namespace",
+                "syntara.workflow_runtime.engines.temporal.activities.condition.safe_eval_with_namespace",
                 side_effect=ValueError("syntax error"),
             ),
             pytest.raises(ApplicationError) as exc_info,
@@ -188,7 +188,7 @@ class TestConditionOutputMappingOnFailure:
     async def test_eval_error_raises_not_returns(self) -> None:
         with (
             patch(
-                "syntara.workflows.workflow_engine.activities.condition.safe_eval_with_namespace",
+                "syntara.workflow_runtime.engines.temporal.activities.condition.safe_eval_with_namespace",
                 side_effect=ValueError("bad"),
             ),
             pytest.raises(ApplicationError),
@@ -322,7 +322,7 @@ class TestConditionDoesNotBlockEventLoop:
             return True
 
         with patch(
-            "syntara.workflows.workflow_engine.activities.condition.safe_eval_with_namespace",
+            "syntara.workflow_runtime.engines.temporal.activities.condition.safe_eval_with_namespace",
             side_effect=_blocking_eval,
         ):
             ticker_task = asyncio.create_task(_ticker())
@@ -352,7 +352,7 @@ class TestConditionDoesNotBlockEventLoop:
             return True
 
         with patch(
-            "syntara.workflows.workflow_engine.activities.condition.safe_eval_with_namespace",
+            "syntara.workflow_runtime.engines.temporal.activities.condition.safe_eval_with_namespace",
             side_effect=_record_thread,
         ):
             await condition({"condition": "True", "namespace": {}}, None)

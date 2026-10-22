@@ -1,2 +1,2 @@
 #!/bin/bash
-exec python -m syntara.workflows.worker "$@"
+exec python -m syntara.workflow_runtime.workers.worker "$@"

@@ -84,7 +84,7 @@ Both resolve to the same data. Use `${trigger.*}` for single-trigger workflows. 
 
 **Output mapping** in the trigger node's `outputs` block reshapes the raw trigger data before namespace registration. Expressions like `${result.field_name}` reference fields from the raw activity output.
 
-For details on the resolver, see `NamespaceResolver` in `src/syntara/workflows/utils/namespace_resolver.py`. For output mapping, see `apply_output_mapping()` in `src/syntara/workflows/utils/output_mapping.py`.
+For details on the resolver, see `NamespaceResolver` in `src/syntara/workflow_core/utils/workflow_core/utils/namespace_resolver.py`. For output mapping, see `apply_output_mapping()` in `src/syntara/workflow_core/output_mapping.py`.
 
 ## Multi-Trigger Workflows
 
@@ -100,7 +100,7 @@ Trigger selection is handled by `resolve_trigger_node()` in `workflow_definition
 
 To add a new trigger type, you need to touch these areas:
 
-1. **Activity** — Create a new file in `src/syntara/workflows/workflow_engine/activities/` following the pass-through pattern (receive input, call `apply_output_mapping`, return `{"output": ...}`). Register it with `@activity.defn(name=ActivityName.YOUR_TRIGGER)`.
+1. **Activity** — Create a new file in `src/syntara/workflow_runtime/engines/temporal/activities/` following the pass-through pattern (receive input, call `apply_output_mapping`, return `{"output": ...}`). Register it with `@activity.defn(name=ActivityName.YOUR_TRIGGER)`.
 
 2. **Registration** — Add the new type to:
    - `ActivityName` enum in `workflow_definition.py`

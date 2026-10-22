@@ -8,9 +8,9 @@ Approval nodes suspend workflow execution using Temporal's async completion patt
 
 ### Execution Flow
 
-1. **Request creation**: `_execute_approval_node()` calls `_prepare_approval_args()` to build context (`backend/src/syntara/workflows/workflow_engine/approval_mixin.py`)
+1. **Request creation**: `_execute_approval_node()` calls `_prepare_approval_args()` to build context (`backend/src/syntara/workflow_runtime/engines/temporal/approval_mixin.py`)
 2. **Async completion**: `workflow.execute_activity(ActivityName.APPROVAL, ...)` starts the activity (`approval_mixin.py`)
-3. **Activity suspension**: `create_approval_request_activity()` creates the DB record and calls `activity.raise_complete_async()` (`backend/src/syntara/workflows/workflow_engine/activities/approval_activity.py`)
+3. **Activity suspension**: `create_approval_request_activity()` creates the DB record and calls `activity.raise_complete_async()` (`backend/src/syntara/workflow_runtime/engines/temporal/activities/approval_activity.py`)
 4. **External decision**: User submits decision via `PATCH /api/v1/approvals/{id}` (`backend/src/syntara/approvals/router.py`)
 5. **Signal delivery**: Approval service sends decision to workflow via `POST /api/v1/executions/{execution_id}/activities/{activity_id}/signal` (`backend/src/syntara/workflows/executions_router.py`)
 6. **Activity completion**: Temporal completes the async activity with signal payload
@@ -32,7 +32,7 @@ Timeout values are resolved in the following order (earliest match wins):
 2. **Global catalog default**: `workflow_engine.approval_decision_window_seconds` runtime setting
 3. **Hardcoded fallback**: `86400` seconds (24 hours)
 
-Resolution is performed by `resolve_decision_window()` in `backend/src/syntara/workflows/workflow_engine/node_settings_resolver.py`. It checks the node's `decision_window` parameter first and, if not set, falls back to the `workflow_engine.approval_decision_window_seconds` runtime catalog value (default 86400).
+Resolution is performed by `resolve_decision_window()` in `backend/src/syntara/workflow_runtime/engines/temporal/node_settings_resolver.py`. It checks the node's `decision_window` parameter first and, if not set, falls back to the `workflow_engine.approval_decision_window_seconds` runtime catalog value (default 86400).
 
 ### Temporal Timeout Margin
 
@@ -113,7 +113,7 @@ The backoff delay is calculated as `base * (growth_factor ^ attempt)`, capped at
 
 Approval activities use the node's retry policy for Temporal activity retries (separate from signal delivery retries). By default, approval nodes use `RetryPolicy(maximum_attempts=1)` (no retries) unless overridden via `node.settings.retry_policy`.
 
-Resolution is performed by `resolve_retry_policy()` in `backend/src/syntara/workflows/workflow_engine/node_settings_resolver.py`.
+Resolution is performed by `resolve_retry_policy()` in `backend/src/syntara/workflow_runtime/engines/temporal/node_settings_resolver.py`.
 
 ## Error Handling
 
@@ -156,12 +156,12 @@ This is triggered by the `asyncio.CancelledError` exception handler in the workf
 ## Implementation Reference
 
 **Core Files**:
-- Workflow approval logic: `backend/src/syntara/workflows/workflow_engine/approval_mixin.py`
-- Approval activity: `backend/src/syntara/workflows/workflow_engine/activities/approval_activity.py`
+- Workflow approval logic: `backend/src/syntara/workflow_runtime/engines/temporal/approval_mixin.py`
+- Approval activity: `backend/src/syntara/workflow_runtime/engines/temporal/activities/approval_activity.py`
 - Signal endpoint: `backend/src/syntara/workflows/executions_router.py`
 - Signal client (approvals → workflow engine): `backend/src/syntara/approvals/clients/workflow_client.py`
 - Approvals client (workflow engine → approvals): `backend/src/syntara/workflows/clients/approvals_client.py`
-- Timeout resolution: `backend/src/syntara/workflows/workflow_engine/node_settings_resolver.py`
+- Timeout resolution: `backend/src/syntara/workflow_runtime/engines/temporal/node_settings_resolver.py`
 - Retry configuration: `backend/src/syntara/core/config/base.py`
 
 **HTTP Bridge**: Communication between the workflow engine and the approvals service is bidirectional:

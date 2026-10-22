@@ -144,7 +144,7 @@ Mode affects behavior across the system:
 | File | What it does |
 |------|-------------|
 | `workflows/services/execution_service.py` | `cancel_execution()`, `retry_execution()`, `create_execution()` |
-| `workflows/workflow_engine/services/temporal_execution_service.py` | `cancel_workflow()` — Temporal handle interaction |
-| `workflows/workflow_engine/services/activity_sync_service.py` | Polls Temporal, propagates state to DB/Redis/WebSocket |
+| `workflow_runtime/engines/temporal/services/temporal_execution_service.py` | `cancel_workflow()` — Temporal handle interaction |
+| `workflow_runtime/engines/temporal/services/activity_sync_service.py` | Polls Temporal, propagates state to DB/Redis/WebSocket |
 | `workflows/models/execution.py` | `Execution` model, `ExecutionStatus`, `ExecutionMode`, `TERMINAL_EXECUTION_STATUSES` |
 | `workflows/exceptions.py` | `ExecutionInTerminalStateError`, `ExecutionNotRetryableError` |
