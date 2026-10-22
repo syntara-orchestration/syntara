@@ -41,6 +41,7 @@ export function FormPromptPendingResponseForm({
         isReadOnly={isReadOnly}
         disabledFieldTooltip={disabledFieldTooltip}
         hideSubmitButton
+        textAreaControlClassName={styles.formStepResponseTextAreaControl}
         onSubmit={onSubmit}
       />
     </div>

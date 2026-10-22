@@ -38,6 +38,7 @@ export function SynDynamicForm({
   hideSubmitButton = false,
   id,
   'data-testid': dataTestId,
+  textAreaControlClassName,
 }: Readonly<SynDynamicFormProps>) {
   const definitionError = useMemo(() => {
     try {
@@ -109,6 +110,7 @@ export function SynDynamicForm({
                     field={field}
                     isDisabled={fieldsDisabled}
                     resolveDynamicOptions={resolveDynamicOptions}
+                    textAreaControlClassName={textAreaControlClassName}
                   />
                 )
                 return (

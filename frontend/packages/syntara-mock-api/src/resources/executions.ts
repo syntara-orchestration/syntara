@@ -203,6 +203,25 @@ export const executions: ExecutionMockSeed[] = [
     ],
   },
   {
+    id: 'exec-form-prompt-textarea-layout',
+    created_at: mockDate.minutesAgo10,
+    updated_at: mockDate.minutesAgo10,
+    workflow_id: HELLO_WORLD,
+    workflow_name: workflowNames[HELLO_WORLD],
+    status: 'paused',
+    started_at: mockDate.minutesAgo10,
+    completed_at: null,
+    started_by: 'user-1',
+    input_data: {},
+    current_activities: [
+      {
+        activity_name: 'layout_check',
+        temporal_activity_id: 'layout_check-activity',
+        iteration: null,
+      },
+    ],
+  },
+  {
     id: 'exec-form-prompt-submitted',
     created_at: mockDate.daysAgo2,
     updated_at: mockDate.daysAgo1,

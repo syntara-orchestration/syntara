@@ -2,7 +2,7 @@
 
 The agentic node dispatches a prompt to the Agent Orchestrator service. It is **map-dispatched** (the engine looks up `NodeType.AGENTIC` in `_EXECUTOR_ACTIVITY_MAP` like any other executor), but uses the engine's **async completion** pattern — the activity dispatches the prompt and returns immediately, and the Agent Orchestrator signals the result back later via callback. This combination is unusual: most map-dispatched nodes complete synchronously within their Temporal activity.
 
-For the shared async-completion mechanics, see [Workflow Engine Architecture](workflow-engine-overview.md#why-async-completion-via-signals-approval-agentic-wait).
+For the shared async-completion mechanics, see [Workflow Engine Architecture](workflow-engine-overview.md#why-async-completion-via-signals-approval-form-prompt-agentic-wait).
 
 ## How It Works
 

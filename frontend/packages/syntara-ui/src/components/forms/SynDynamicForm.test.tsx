@@ -17,6 +17,7 @@ const staticPriorityOptions = {
     { display_label: 'High', value: 'high' },
   ],
 }
+const NUMBER_FIELD_LABEL = 'Count'
 
 function renderWithQueryClient(ui: ReactNode) {
   const queryClient = new QueryClient({
@@ -134,6 +135,84 @@ describe('SynDynamicForm', () => {
         notes: 'hello',
         priority: 'high',
       })
+    })
+  })
+
+  it('keeps a number field empty after clearing and blurring it', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+
+    const definition = parseFormDefinition({
+      fields: [
+        { type: FormFieldTypeEnum.NUMBER, value_name: 'count', label: 'Count' },
+        { type: FormFieldTypeEnum.TEXT, value_name: 'name', label: 'Name', required: true },
+      ],
+    })
+
+    renderWithQueryClient(<SynDynamicForm definition={definition} onSubmit={onSubmit} submitLabel="Send" />)
+
+    const count = screen.getByRole('spinbutton', { name: 'Count' })
+    expect(count).toHaveValue(null)
+
+    await user.type(count, '5')
+    expect(count).toHaveValue(5)
+
+    await user.clear(count)
+    await user.tab()
+    expect(count).toHaveValue(null)
+
+    await user.type(screen.getByRole('textbox', { name: 'Name' }), 'Ada')
+    await user.click(screen.getByRole('button', { name: 'Send' }))
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith({ name: 'Ada' })
+    })
+  })
+
+  it.each([
+    { buttonLabel: 'Plus', expectedValue: 1 },
+    { buttonLabel: 'Minus', expectedValue: -1 },
+  ])('applies $buttonLabel to an empty number field from zero', async ({ buttonLabel, expectedValue }) => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+    const definition = parseFormDefinition({
+      fields: [{ type: FormFieldTypeEnum.NUMBER, value_name: 'count', label: NUMBER_FIELD_LABEL }],
+    })
+
+    renderWithQueryClient(<SynDynamicForm definition={definition} onSubmit={onSubmit} submitLabel="Send" />)
+
+    const count = screen.getByRole('spinbutton', { name: NUMBER_FIELD_LABEL })
+    expect(count).toHaveValue(null)
+
+    await user.click(screen.getByRole('button', { name: buttonLabel }))
+    expect(count).toHaveValue(expectedValue)
+
+    await user.click(screen.getByRole('button', { name: 'Send' }))
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith({ count: expectedValue })
+    })
+  })
+
+  it('accepts a negative number typed into a number field', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+
+    const definition = parseFormDefinition({
+      fields: [{ type: FormFieldTypeEnum.NUMBER, value_name: 'offset', label: 'Offset', default: 0 }],
+    })
+
+    renderWithQueryClient(<SynDynamicForm definition={definition} onSubmit={onSubmit} submitLabel="Send" />)
+
+    const offset = screen.getByRole('spinbutton', { name: 'Offset' })
+    await user.clear(offset)
+    await user.type(offset, '-12')
+    expect(offset).toHaveValue(-12)
+
+    await user.click(screen.getByRole('button', { name: 'Send' }))
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith({ offset: -12 })
     })
   })
 

@@ -17,9 +17,15 @@ export type SynDynamicFormFieldProps = {
   field: FormField
   isDisabled?: boolean
   resolveDynamicOptions?: DynamicOptionsResolver
+  textAreaControlClassName?: string
 }
 
-export function SynDynamicFormField({ field, isDisabled, resolveDynamicOptions }: Readonly<SynDynamicFormFieldProps>) {
+export function SynDynamicFormField({
+  field,
+  isDisabled,
+  resolveDynamicOptions,
+  textAreaControlClassName,
+}: Readonly<SynDynamicFormFieldProps>) {
   const fieldId = `syn-dynamic-form-${field.value_name}`
   const hint = field.help_text ?? undefined
   const isRequired = Boolean(field.required)
@@ -74,6 +80,7 @@ export function SynDynamicFormField({ field, isDisabled, resolveDynamicOptions }
           hint={hint}
           placeholder={placeholder}
           isDisabled={isDisabled}
+          className={textAreaControlClassName}
         />
       )
     case FormFieldTypeEnum.NUMBER:
