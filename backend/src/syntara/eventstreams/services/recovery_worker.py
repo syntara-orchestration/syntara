@@ -60,7 +60,7 @@ class EventDeliveryRecoveryWorker:
             interval_seconds=interval_seconds,
             session_factory=session_factory,
             callback=self._tick_callback,
-            coordinate=True,
+            coordinate=False,
         )
 
     def start(self) -> None:
