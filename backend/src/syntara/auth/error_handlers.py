@@ -160,6 +160,7 @@ def authentication_required_handler(
         retryable=False,
         instance=str(request.url),
     )
+    response.headers["WWW-Authenticate"] = 'Bearer realm="automation-orchestrator"'
     response.headers["X-Auth-Failure-Type"] = "missing_credentials"
     return response
 
