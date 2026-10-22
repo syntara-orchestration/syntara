@@ -1482,6 +1482,11 @@ class EventStreamSettings(BaseSettings):
     that complete workflow start arguments fit downstream transport limits.
     """
 
+    eventstream_enabled: bool = Field(
+        default=False,
+        description="Enable the standalone control-plane event subscription worker",
+    )
+
     event_worker_heartbeat_interval_seconds: int = Field(
         default=EventPlacementDefaults.HEARTBEAT_INTERVAL_SECONDS,
         gt=0,
