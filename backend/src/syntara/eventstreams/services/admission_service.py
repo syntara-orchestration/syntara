@@ -3,6 +3,7 @@
 import asyncio
 import random
 from collections.abc import Callable
+from contextlib import nullcontext
 from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
@@ -38,6 +39,7 @@ from syntara.eventstreams.services.connection_provider import EventConnectionPro
 from syntara.eventstreams.services.deduplication_store import EventDeliveryStore
 from syntara.eventstreams.services.execution_preparation_service import EventExecutionPreparationService
 from syntara.eventstreams.services.subscription_service import lock_source_lifecycle
+from syntara.eventstreams.services.worker_resources import EventWorkerResources
 from syntara.integrations.exceptions import IntegrationCredentialNotFoundError
 from syntara.workflows.models.execution import Execution
 
@@ -55,12 +57,14 @@ class EventAdmissionService:
         launcher: WorkflowLauncher,
         *,
         cache: TerminalDeliveryCache | None = None,
+        resources: EventWorkerResources | None = None,
     ) -> None:
         """Inject the database factory and signed Temporal adapter."""
         self._session_factory = session_factory
         self._launcher = launcher
-        self._preparation = EventExecutionPreparationService(session_factory)
         self._cache = cache
+        self._resources = resources
+        self._preparation = EventExecutionPreparationService(session_factory, resources=resources)
 
     async def schedule(self, prepared: PreparedExecution) -> SchedulingResult:
         """Reload frozen arguments; a caller's mutable dictionaries are never authoritative."""
@@ -250,6 +254,10 @@ class EventAdmissionService:
         return ResolvedDelivery(terminal=terminal)
 
     async def _confirm(self, prepared: PreparedExecution, acceptance: TemporalAcceptance) -> SchedulingResult:
+        async with self._resources.finalization if self._resources is not None else nullcontext():
+            return await self._finalize(prepared, acceptance)
+
+    async def _finalize(self, prepared: PreparedExecution, acceptance: TemporalAcceptance) -> SchedulingResult:
         try:
             async with self._session_factory() as session, session.begin():
                 result = await EventDeliveryStore(session).finalize_scheduled(prepared.claim, acceptance)

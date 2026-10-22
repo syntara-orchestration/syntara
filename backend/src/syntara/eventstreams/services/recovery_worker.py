@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from contextlib import nullcontext
 from typing import TYPE_CHECKING
 
 import structlog
@@ -18,6 +19,7 @@ if TYPE_CHECKING:
     from sqlmodel.ext.asyncio.session import AsyncSession
 
     from syntara.eventstreams.core.handler import WorkflowLauncher
+    from syntara.eventstreams.services.worker_resources import EventWorkerResources
 
 logger = structlog.stdlib.get_logger(__name__)
 
@@ -44,13 +46,16 @@ class EventDeliveryRecoveryWorker:
         interval_seconds: float = RECOVERY_SCAN_INTERVAL_SECONDS,
         batch_limit: int = RECOVERY_BATCH_LIMIT,
         worker_id: str = "recovery-scanner",
+        admission: EventAdmissionService | None = None,
+        resources: EventWorkerResources | None = None,
     ) -> None:
         """Inject session factory, Temporal adapter, and tuning parameters."""
         if not 1 <= batch_limit <= FieldLimits.MAX_ITEMS_PER_PAGE:
             msg = f"Batch limit must be between 1 and {FieldLimits.MAX_ITEMS_PER_PAGE}"
             raise ValueError(msg)
         self._session_factory = session_factory
-        self._admission = EventAdmissionService(session_factory, launcher)
+        self._admission = admission if admission is not None else EventAdmissionService(session_factory, launcher)
+        self._resources = resources
         self._worker_id = worker_id
         self._batch_limit = batch_limit
         self._draining = False
@@ -105,7 +110,7 @@ class EventDeliveryRecoveryWorker:
 
     async def drain(self) -> None:
         """Stop new claims and await in-flight recovery within a bound."""
-        self._draining = True
+        self.close_claims()
         if self._in_flight is not None and not self._in_flight.done():
             try:
                 async with asyncio.timeout(DRAIN_TIMEOUT_SECONDS):
@@ -128,13 +133,22 @@ class EventDeliveryRecoveryWorker:
         """Whether new claims are suppressed pending shutdown."""
         return self._draining
 
+    def close_claims(self) -> None:
+        """Fence new claims synchronously before process admission is closed."""
+        self._draining = True
+
     async def _claim_and_recover_one(self) -> SchedulingResult | None:
         """Claim a single due delivery and recover it immediately."""
-        async with self._session_factory() as session, session.begin():
-            claims = await EventDeliveryStore(session).claim_due(self._worker_id, limit=1, prepared_only=True)
-        if not claims:
-            return None
-        return await self._admission.recover_claim(claims[0])
+        async with self._resources.processing if self._resources is not None else nullcontext():
+            if self._draining:
+                return None
+            async with self._session_factory() as session, session.begin():
+                if self._draining:
+                    return None  # type: ignore[unreachable]  # changed during session/transaction entry
+                claims = await EventDeliveryStore(session).claim_due(self._worker_id, limit=1, prepared_only=True)
+            if not claims:
+                return None
+            return await self._admission.recover_claim(claims[0])
 
     async def _tick_callback(self, _session_factory: object) -> None:
         """PeriodicWorker callback — runs tick and tracks in-flight work."""

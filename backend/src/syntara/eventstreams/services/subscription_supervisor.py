@@ -39,7 +39,12 @@ class SubscriptionSupervisor:
     """
 
     def __init__(
-        self, subscription_id: UUID, runner_factory: SubscriptionRunnerFactory, *, placement: PlacementAuthority
+        self,
+        subscription_id: UUID,
+        runner_factory: SubscriptionRunnerFactory,
+        *,
+        placement: PlacementAuthority,
+        startup_timeout_seconds: float | None = None,
     ) -> None:
         """Keep retry/circuit state local and reuse the existing drain deadline."""
         if placement.subscription_id != subscription_id:
@@ -49,6 +54,7 @@ class SubscriptionSupervisor:
         self._factory = runner_factory
         self._placement = placement
         self._placement_task: asyncio.Task[None] | None = None
+        self._startup_timeout = startup_timeout_seconds
         self._drain_timeout = get_settings().event_drain_timeout_seconds
         self._lock = asyncio.Lock()
         self._desired: SubscriptionSnapshot | None = None
@@ -278,19 +284,20 @@ class SubscriptionSupervisor:
             self._starting = False
 
     async def _open_runner(self, snapshot: SubscriptionSnapshot, revision: RuntimeRevision) -> None:
-        runner = await self._factory(snapshot)
-        self._runner, self._runner_revision = runner, revision
-        if runner.snapshot != snapshot:
-            raise SubscriptionRuntimeError(RuntimeFailureCode.CONFIGURATION_UNAVAILABLE)
-        runner.bind_placement(self._placement.is_current)
-        if self._closed or self._desired != snapshot or not self._placement.is_current():
-            return
-        await runner.start()
-        if self._closed or self._desired != snapshot or not self._placement.is_current():
-            return
-        if not runner.open_admission():
-            raise SubscriptionRuntimeError(RuntimeFailureCode.PLACEMENT_LOST)
-        self._applied = revision
+        async with asyncio.timeout(self._startup_timeout):
+            runner = await self._factory(snapshot)
+            self._runner, self._runner_revision = runner, revision
+            if runner.snapshot != snapshot:
+                raise SubscriptionRuntimeError(RuntimeFailureCode.CONFIGURATION_UNAVAILABLE)
+            runner.bind_placement(self._placement.is_current)
+            if self._closed or self._desired != snapshot or not self._placement.is_current():
+                return
+            await runner.start()
+            if self._closed or self._desired != snapshot or not self._placement.is_current():
+                return
+            if not runner.open_admission():
+                raise SubscriptionRuntimeError(RuntimeFailureCode.PLACEMENT_LOST)
+            self._applied = revision
 
     async def _serve(self, runner: SubscriptionRunner) -> None:
         try:
