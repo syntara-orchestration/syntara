@@ -105,7 +105,7 @@ async def run_event_worker(
     """Run independent reconciliation/recovery and delegate transport-owned drain.
 
     The optional event supports embedding and isolated tests. Readiness is exposed
-    by manager.ready; no operational HTTP routes or packaging are installed here.
+    by manager.ready; the entrypoint owns the loopback probe listener.
     """
     shutdown = shutdown_event if shutdown_event is not None else asyncio.Event()
     loop = asyncio.get_running_loop()

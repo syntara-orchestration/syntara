@@ -70,6 +70,11 @@ podman-compose up --build
 podman-compose up database redis temporal syntara
 ```
 
+The opt-in `kafka` profile provides a disposable SASL/TLS broker; `kafka-worker`
+runs the independent control-plane worker. Both are excluded from the default
+stack. See [local Kafka setup](backend/samples/kafka/README.md) and
+[worker operations](backend/docs/kafka-worker-operations.md).
+
 ## Code Quality
 
 Code quality and coverage are tracked via SonarCloud:
