@@ -112,6 +112,13 @@ describe('NodeSettingsForm', () => {
       setup({ continueOnFailureHelp: 'Custom help text here' })
       expect(screen.getByText('Custom help text here')).toBeInTheDocument()
     })
+
+    it('uses step terminology in on failure option descriptions', async () => {
+      const { user } = setup()
+      await user.click(cofToggle())
+      expect(screen.getByText('Downstream steps continue even if this step fails.')).toBeVisible()
+      expect(screen.getByText('The workflow (or current branch) stops at this step if it fails.')).toBeVisible()
+    })
   })
 
   describe('timeout', () => {

@@ -63,12 +63,12 @@ const COF_OPTIONS = [
   {
     value: 'on' as const,
     label: 'Continue on failure',
-    description: () => 'Downstream nodes continue executing even if this node fails.',
+    description: () => 'Downstream steps continue even if this step fails.',
   },
   {
     value: 'off' as const,
     label: 'Stop workflow or branch on failure',
-    description: () => 'The workflow (or current branch) stops at this node if it fails.',
+    description: () => 'The workflow (or current branch) stops at this step if it fails.',
   },
 ] as const
 
