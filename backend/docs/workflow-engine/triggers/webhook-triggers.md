@@ -110,10 +110,10 @@ flowchart LR
 |------|---------|
 | `src/syntara/workflows/webhook_router.py` | FastAPI router for both `/webhooks/{webhook_path}` and `/webhooks/eda/{webhook_path}` |
 | `src/syntara/workflows/services/webhook_trigger_service.py` | Trigger lookup and sync for both types |
-| `src/syntara/workflows/workflow_engine/activities/webhook_trigger.py` | Webhook activity (pass-through + output mapping) |
-| `src/syntara/workflows/workflow_engine/activities/eda_trigger.py` | EDA activity (delegates to webhook) |
+| `src/syntara/workflow_runtime/engines/temporal/activities/webhook_trigger.py` | Webhook activity (pass-through + output mapping) |
+| `src/syntara/workflow_runtime/engines/temporal/activities/eda_trigger.py` | EDA activity (delegates to webhook) |
 | `src/syntara/workflows/models/webhook_trigger.py` | `WebhookTrigger` SQLModel (shared DB table) |
-| `src/syntara/workflows/workflow_engine/models/workflow_definition.py` | `WebhookTriggerConfig` model |
+| `src/syntara/workflow_core/models.py` | `WebhookTriggerConfig` model |
 
 ## Related Documentation
 

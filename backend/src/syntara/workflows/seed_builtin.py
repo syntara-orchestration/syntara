@@ -32,13 +32,13 @@ from sqlmodel import col, select
 from syntara.authz.models import Project
 from syntara.core.models import User
 from syntara.core.seed_context import strict_mode_context_var
+from syntara.workflow_runtime.constants import AGENT_EXECUTION_TIMEOUT_SECONDS
 from syntara.workflows.constants import BUILTIN_PROJECT_NAME
 from syntara.workflows.exceptions import ScheduledTriggerSyncError
 from syntara.workflows.models import Workflow, WorkflowVersion
 from syntara.workflows.models.workflow_publish_event import PublishAction, WorkflowPublishEvent
 from syntara.workflows.services.scheduled_trigger_service import ScheduledTriggerService
 from syntara.workflows.validators import workflow_validator
-from syntara.workflows.workflow_engine.constants import AGENT_EXECUTION_TIMEOUT_SECONDS
 
 if TYPE_CHECKING:
     from uuid import UUID

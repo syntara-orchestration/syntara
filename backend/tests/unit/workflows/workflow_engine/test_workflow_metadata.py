@@ -13,7 +13,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
-from syntara.workflows.utils.namespace_resolver import NamespaceResolver
+from syntara.workflow_core.utils.namespace_resolver import NamespaceResolver
 
 SAMPLE_WORKFLOW_CONTEXT: dict[str, Any] = {
     "workflow": {

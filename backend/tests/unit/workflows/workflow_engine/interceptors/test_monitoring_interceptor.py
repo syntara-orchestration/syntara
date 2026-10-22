@@ -7,7 +7,7 @@ from uuid import uuid4
 import pytest
 from temporalio.worker import WorkflowInboundInterceptor, WorkflowInterceptorClassInput
 
-from syntara.workflows.workflow_engine.interceptors.monitoring_interceptor import (
+from syntara.workflow_runtime.engines.temporal.interceptors.monitoring_interceptor import (
     MonitoringWorkflowInterceptor,
     _MonitoringWorkflowInboundInterceptor,
 )

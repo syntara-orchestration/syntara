@@ -310,7 +310,7 @@ worker-run: check-deps _ensure-secrets _ensure-certs ## Run Temporal workflow wo
 	APP_AGENT_ORCHESTRATOR_BASE_URL=$(WORKER_BASE_URL) \
 	APP_APPROVALS_API_BASE_URL=$(WORKER_BASE_URL) \
 	APP_TOOL_MANAGER_BASE_URL=$(WORKER_BASE_URL) \
-	uv run python -m syntara.workflows.worker
+	uv run python -m syntara.workflow_runtime.workers.worker
 
 .PHONY: background-worker-run
 background-worker-run: check-deps _ensure-secrets _ensure-certs ## Run Temporal workflow background worker
@@ -325,7 +325,7 @@ background-worker-run: check-deps _ensure-secrets _ensure-certs ## Run Temporal 
 	APP_AGENT_ORCHESTRATOR_BASE_URL=$(WORKER_BASE_URL) \
 	APP_APPROVALS_API_BASE_URL=$(WORKER_BASE_URL) \
 	APP_TOOL_MANAGER_BASE_URL=$(WORKER_BASE_URL) \
-	uv run python -m syntara.workflows.background_worker
+	uv run python -m syntara.workflow_runtime.workers.background_worker
 
 
 # Database

@@ -12,7 +12,7 @@ from temporalio.exceptions import ApplicationError
 
 from syntara.core.config.base import Settings
 from syntara.core.models.principal import service_principal_id
-from syntara.workflows.workflow_engine.activities.internal_activity import (
+from syntara.workflow_runtime.engines.temporal.activities.internal_activity import (
     execute_internal_activity,
 )
 
@@ -64,7 +64,7 @@ class TestExecuteInternalActivity:
         mock_handler = AsyncMock(return_value={"output": {"status": "SUCCESS"}})
 
         with patch.dict(
-            "syntara.workflows.workflow_engine.activities.internal_activity._DISPATCH",
+            "syntara.workflow_runtime.engines.temporal.activities.internal_activity._DISPATCH",
             {"document_conversion": mock_handler},
         ):
             result = await execute_internal_activity(
@@ -81,7 +81,7 @@ class TestExecuteInternalActivity:
         mock_handler = AsyncMock(return_value={"output": {"status": "completed"}})
 
         with patch.dict(
-            "syntara.workflows.workflow_engine.activities.internal_activity._DISPATCH",
+            "syntara.workflow_runtime.engines.temporal.activities.internal_activity._DISPATCH",
             {"invocation_execution": mock_handler},
         ):
             result = await execute_internal_activity(
@@ -414,11 +414,11 @@ class TestInvocationExecutionHeartbeat:
                 return_value=mock_executor,
             ),
             patch(
-                "syntara.workflows.workflow_engine.activities.internal_activity.INTERNAL_ACTIVITY_HEARTBEAT_INTERVAL_SECONDS",
+                "syntara.workflow_runtime.engines.temporal.activities.internal_activity.INTERNAL_ACTIVITY_HEARTBEAT_INTERVAL_SECONDS",
                 0.02,
             ),
             patch(
-                "syntara.workflows.workflow_engine.activities.internal_activity.activity.heartbeat"
+                "syntara.workflow_runtime.engines.temporal.activities.internal_activity.activity.heartbeat"
             ) as mock_heartbeat,
         ):
             await execute_internal_activity(
@@ -446,10 +446,10 @@ class TestInvocationExecutionHeartbeat:
                 return_value=mock_executor,
             ),
             patch(
-                "syntara.workflows.workflow_engine.activities.internal_activity.INTERNAL_ACTIVITY_HEARTBEAT_INTERVAL_SECONDS",
+                "syntara.workflow_runtime.engines.temporal.activities.internal_activity.INTERNAL_ACTIVITY_HEARTBEAT_INTERVAL_SECONDS",
                 0.02,
             ),
-            patch("syntara.workflows.workflow_engine.activities.internal_activity.activity.heartbeat"),
+            patch("syntara.workflow_runtime.engines.temporal.activities.internal_activity.activity.heartbeat"),
             pytest.raises(asyncio.CancelledError),
         ):
             await execute_internal_activity(
@@ -476,11 +476,11 @@ class TestInvocationExecutionHeartbeat:
                 return_value=mock_executor,
             ),
             patch(
-                "syntara.workflows.workflow_engine.activities.internal_activity.INTERNAL_ACTIVITY_HEARTBEAT_INTERVAL_SECONDS",
+                "syntara.workflow_runtime.engines.temporal.activities.internal_activity.INTERNAL_ACTIVITY_HEARTBEAT_INTERVAL_SECONDS",
                 0.02,
             ),
             patch(
-                "syntara.workflows.workflow_engine.activities.internal_activity.activity.heartbeat",
+                "syntara.workflow_runtime.engines.temporal.activities.internal_activity.activity.heartbeat",
                 side_effect=asyncio.QueueFull(),
             ),
         ):
@@ -501,16 +501,16 @@ class TestInvocationExecutionHeartbeat:
         """
         import asyncio
 
-        from syntara.workflows.workflow_engine.activities.internal_activity import _heartbeat_until_cancelled
+        from syntara.workflow_runtime.engines.temporal.activities.internal_activity import _heartbeat_until_cancelled
 
         with (
             # A long interval: any beat observed can only be the pre-sleep one.
             patch(
-                "syntara.workflows.workflow_engine.activities.internal_activity.INTERNAL_ACTIVITY_HEARTBEAT_INTERVAL_SECONDS",
+                "syntara.workflow_runtime.engines.temporal.activities.internal_activity.INTERNAL_ACTIVITY_HEARTBEAT_INTERVAL_SECONDS",
                 600.0,
             ),
             patch(
-                "syntara.workflows.workflow_engine.activities.internal_activity.activity.heartbeat"
+                "syntara.workflow_runtime.engines.temporal.activities.internal_activity.activity.heartbeat"
             ) as mock_heartbeat,
         ):
             task = asyncio.create_task(_heartbeat_until_cancelled())
@@ -544,11 +544,11 @@ class TestInvocationExecutionHeartbeat:
                 return_value=mock_task,
             ),
             patch(
-                "syntara.workflows.workflow_engine.activities.internal_activity.INTERNAL_ACTIVITY_HEARTBEAT_INTERVAL_SECONDS",
+                "syntara.workflow_runtime.engines.temporal.activities.internal_activity.INTERNAL_ACTIVITY_HEARTBEAT_INTERVAL_SECONDS",
                 0.02,
             ),
             patch(
-                "syntara.workflows.workflow_engine.activities.internal_activity.activity.heartbeat"
+                "syntara.workflow_runtime.engines.temporal.activities.internal_activity.activity.heartbeat"
             ) as mock_heartbeat,
         ):
             await execute_internal_activity(

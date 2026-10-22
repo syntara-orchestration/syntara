@@ -16,7 +16,7 @@ from uuid import uuid4
 import pytest
 from temporalio.exceptions import ApplicationError
 
-from syntara.workflows.workflow_engine.activities.agentic_activity import (
+from syntara.workflow_runtime.engines.temporal.activities.agentic_activity import (
     execute_agentic_activity,
 )
 from tests.fixtures.temporal import CompleteAsyncError
@@ -60,7 +60,9 @@ class TestAgenticActivityResponseSchema:
         }
 
         with (
-            patch("syntara.workflows.workflow_engine.activities.agentic_activity.AgentOrchestratorClient") as mock_cls,
+            patch(
+                "syntara.workflow_runtime.engines.temporal.activities.agentic_activity.AgentOrchestratorClient"
+            ) as mock_cls,
             pytest.raises(CompleteAsyncError),
         ):
             mock_cls.return_value = mock_agent_client
@@ -83,7 +85,9 @@ class TestAgenticActivityResponseSchema:
         }
 
         with (
-            patch("syntara.workflows.workflow_engine.activities.agentic_activity.AgentOrchestratorClient") as mock_cls,
+            patch(
+                "syntara.workflow_runtime.engines.temporal.activities.agentic_activity.AgentOrchestratorClient"
+            ) as mock_cls,
             pytest.raises(CompleteAsyncError),
         ):
             mock_cls.return_value = mock_agent_client
@@ -104,7 +108,9 @@ class TestAgenticActivityResponseSchema:
         }
 
         with (
-            patch("syntara.workflows.workflow_engine.activities.agentic_activity.AgentOrchestratorClient") as mock_cls,
+            patch(
+                "syntara.workflow_runtime.engines.temporal.activities.agentic_activity.AgentOrchestratorClient"
+            ) as mock_cls,
             pytest.raises(CompleteAsyncError),
         ):
             mock_cls.return_value = mock_agent_client
@@ -126,7 +132,9 @@ class TestAgenticActivityResponseSchema:
         }
 
         with (
-            patch("syntara.workflows.workflow_engine.activities.agentic_activity.AgentOrchestratorClient") as mock_cls,
+            patch(
+                "syntara.workflow_runtime.engines.temporal.activities.agentic_activity.AgentOrchestratorClient"
+            ) as mock_cls,
             pytest.raises(CompleteAsyncError),
         ):
             mock_cls.return_value = mock_agent_client
@@ -162,7 +170,9 @@ class TestAgenticActivityResponseSchema:
         }
 
         with (
-            patch("syntara.workflows.workflow_engine.activities.agentic_activity.AgentOrchestratorClient") as mock_cls,
+            patch(
+                "syntara.workflow_runtime.engines.temporal.activities.agentic_activity.AgentOrchestratorClient"
+            ) as mock_cls,
             pytest.raises(CompleteAsyncError),
         ):
             mock_cls.return_value = mock_agent_client
@@ -185,7 +195,9 @@ class TestAgenticActivityResponseSchema:
         }
 
         with (
-            patch("syntara.workflows.workflow_engine.activities.agentic_activity.AgentOrchestratorClient") as mock_cls,
+            patch(
+                "syntara.workflow_runtime.engines.temporal.activities.agentic_activity.AgentOrchestratorClient"
+            ) as mock_cls,
             pytest.raises(CompleteAsyncError),
         ):
             mock_cls.return_value = mock_agent_client
@@ -219,7 +231,9 @@ class TestAgenticActivityResponseSchema:
         }
 
         with (
-            patch("syntara.workflows.workflow_engine.activities.agentic_activity.AgentOrchestratorClient") as mock_cls,
+            patch(
+                "syntara.workflow_runtime.engines.temporal.activities.agentic_activity.AgentOrchestratorClient"
+            ) as mock_cls,
             pytest.raises(CompleteAsyncError),
         ):
             mock_cls.return_value = mock_agent_client
@@ -246,7 +260,9 @@ class TestAgenticActivityResponseSchema:
         }
 
         with (
-            patch("syntara.workflows.workflow_engine.activities.agentic_activity.AgentOrchestratorClient") as mock_cls,
+            patch(
+                "syntara.workflow_runtime.engines.temporal.activities.agentic_activity.AgentOrchestratorClient"
+            ) as mock_cls,
             pytest.raises(CompleteAsyncError),
         ):
             mock_cls.return_value = mock_agent_client

@@ -10,7 +10,7 @@ if TYPE_CHECKING:
     from sqlmodel.ext.asyncio.session import AsyncSession
 
 from syntara.core.models import Group, User
-from syntara.workflows.workflow_engine.services.approver_resolution import ApproverResolutionService
+from syntara.workflow_runtime.engines.temporal.services.approver_resolution import ApproverResolutionService
 
 
 @pytest.fixture

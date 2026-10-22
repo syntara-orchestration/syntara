@@ -10,7 +10,7 @@ These tests verify:
 - Template expressions bypass validation (TemplateAwareBaseModel behavior)
 """
 
-from syntara.workflows.workflow_engine.models.workflow_definition import AgenticExecutorParameters
+from syntara.workflow_core.models import AgenticExecutorParameters
 
 
 class TestAgenticExecutorParametersResponseSchema:

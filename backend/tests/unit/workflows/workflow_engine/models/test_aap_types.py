@@ -2,7 +2,7 @@
 
 import pytest
 
-from syntara.workflows.workflow_engine.models.aap_types import AAPResourceType
+from syntara.workflow_core.aap_types import AAPResourceType
 
 
 class TestAAPResourceType:
