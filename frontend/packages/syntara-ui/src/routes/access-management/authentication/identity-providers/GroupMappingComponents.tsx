@@ -222,7 +222,7 @@ export function MappingTable({
   const showAddButton = !isReadOnly && showAddMappingAction
 
   const table = (
-    <SynScrollableTableContainer caption="Group mappings" variant="compact">
+    <SynScrollableTableContainer caption="Group mappings">
       <GroupMappingTableHead showActionsColumn={showActionsColumn} />
       <Tbody>
         {rows.map((row) => {
@@ -426,11 +426,7 @@ export function ReadOnlyView({ entries, mappedGroups, onEditMapping }: Readonly<
           <SynEmptyStateFilter clearAllFilters={clearFiltersAndPage} />
         </StackItem>
       ) : (
-        <SynScrollableTableContainer
-          caption="Group mappings"
-          variant="compact"
-          footer={getFooterProps(filteredEntries.length)}
-        >
+        <SynScrollableTableContainer caption="Group mappings" footer={getFooterProps(filteredEntries.length)}>
           <GroupMappingTableHead showActionsColumn={false} />
           <Tbody>
             {paginatedEntries.map((entry, index) => (
