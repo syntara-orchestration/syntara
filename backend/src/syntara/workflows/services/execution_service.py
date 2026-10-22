@@ -317,9 +317,7 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
             "trigger_node_id": trigger_node_id,
         }
         raw_parameters = trigger_node.get("parameters")
-        raw_form_definition = (
-            raw_parameters.get("form_definition") if isinstance(raw_parameters, dict) else None
-        )
+        raw_form_definition = raw_parameters.get("form_definition") if isinstance(raw_parameters, dict) else None
         try:
             form_definition = FormDefinition.model_validate(raw_form_definition)
         except ValidationError as exc:
