@@ -42,7 +42,7 @@ generations. A missing worker, elapsed timeout or expired delivery lease cannot
 acknowledge shutdown. These rows coordinate lifecycle safety and do not assign
 Kafka partitions or provide Visibility/activity storage.
 
-Detail responses include historical source generations, initialization and gap
+List and detail responses include historical source generations, initialization and gap
 metadata, queued recovery requests, and desired/applied convergence. Internal
 recovery hold tokens and credentials are excluded.
 
@@ -51,7 +51,8 @@ service. Persisted recovery holds close cross-process admission and protect
 retention while local fences drain tasks and previously issued commits. Interrupted
 requests retain their decision and holds. Re-authorized continuation may add the
 required acknowledgement or disposition authority at the current recovery revision
-without silently selecting a different policy or boundary.
+even before a recovery hold exists, without changing the configuration revision
+or silently selecting a different policy or boundary.
 
 ## Retirement and deletion
 
@@ -68,7 +69,8 @@ remain protective after shutdown. Controls cannot clear them before the required
 author-accessible activity logging exists.
 
 Integration and runtime credential references remain bound while needed. Older
-credentials in frozen admissions are guarded after republishing. Empty, safely
+credentials in frozen admissions remain guarded in every delivery state after
+republishing, for as long as that delivery evidence is retained. Empty, safely
 retired sources can detach their Integration reference while retaining the canonical
 Integration identity. A retired subscription can release its runtime credential
 only after every source is independently releasable.

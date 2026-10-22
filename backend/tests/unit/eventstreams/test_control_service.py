@@ -271,6 +271,97 @@ async def test_recovery_can_continue_after_pause_resume_supersedes_an_undispatch
     context.session.commit.assert_awaited_once()
 
 
+@pytest.mark.parametrize(("old_ack", "old_resolve"), [(False, False), (True, False), (False, True), (True, True)])
+@pytest.mark.parametrize(("ack", "resolve"), [(False, False), (True, False), (False, True), (True, True)])
+async def test_pending_recovery_accepts_added_authority_without_a_hold_or_revision_change(
+    context, old_ack, old_resolve, ack, resolve
+):
+    context.service._grant = AsyncMock()
+    old = EventSubscriptionRecovery(
+        source_id=context.source.id,
+        partition=0,
+        configuration_revision=1,
+        expected_recovery_revision=0,
+        policy="current_end",
+        reason="offset_expired",
+        acknowledge_duplicate_risk=old_ack,
+        resolve_unscheduled=old_resolve,
+        requested_by=uuid4(),
+    )
+    context.session.get.side_effect = [
+        SimpleNamespace(gap_detected_at=datetime.now(UTC), recovery_revision=0, recovery_token=None),
+        old,
+    ]
+    body = SubscriptionRecoveryRequest(
+        configuration_revision=1,
+        source_generation=1,
+        partition=0,
+        expected_recovery_revision=0,
+        policy="current_end",
+        reason="offset_expired",
+        acknowledge_duplicate_risk=ack,
+        resolve_unscheduled=resolve,
+    )
+    with patch("syntara.eventstreams.services.control_service.EventRetirementService") as retirement:
+        retirement.return_value.deliveries = AsyncMock(return_value=[])
+        retirement.return_value.assert_no_content_gate = AsyncMock()
+        if (old_ack and not ack) or (old_resolve and not resolve):
+            with pytest.raises(EventSubscriptionControlConflictError, match="recovery_request_pending"):
+                await context.service.recover(context.workflow.id, context.subscription.id, body)
+            context.session.delete.assert_not_awaited()
+            context.session.commit.assert_not_awaited()
+            return
+        response = await context.service.recover(context.workflow.id, context.subscription.id, body)
+    context.session.delete.assert_awaited_once_with(old)
+    request = context.session.add.call_args.args[0]
+    assert request.configuration_revision == 1
+    assert request.expected_recovery_revision == 0
+    assert request.acknowledge_duplicate_risk is ack
+    assert request.resolve_unscheduled is resolve
+    assert request.requested_by == context.user.id
+    assert [call.args[0] for call in context.service._grant.await_args_list] == (
+        ["recover", "retire"] if resolve else ["recover"]
+    )
+    assert response.convergence == "pending"
+    context.session.commit.assert_awaited_once()
+
+
+@pytest.mark.parametrize("changed", ["policy", "reason"])
+@pytest.mark.parametrize("hold", [None, "held"])
+async def test_stronger_recovery_authority_cannot_replace_a_pending_decision(context, changed, hold):
+    context.service._grant = AsyncMock()
+    old = EventSubscriptionRecovery(
+        source_id=context.source.id,
+        partition=0,
+        configuration_revision=1,
+        expected_recovery_revision=0,
+        policy="retained_beginning" if changed == "policy" else "current_end",
+        reason="operator_recovery" if changed == "reason" else "offset_expired",
+        requested_by=context.user.id,
+    )
+    context.session.get.side_effect = [
+        SimpleNamespace(gap_detected_at=datetime.now(UTC), recovery_revision=0, recovery_token=hold),
+        old,
+    ]
+    body = SubscriptionRecoveryRequest(
+        configuration_revision=1,
+        source_generation=1,
+        partition=0,
+        expected_recovery_revision=0,
+        policy="current_end",
+        reason="offset_expired",
+        acknowledge_duplicate_risk=True,
+        resolve_unscheduled=True,
+    )
+    with patch("syntara.eventstreams.services.control_service.EventRetirementService") as retirement:
+        retirement.return_value.deliveries = AsyncMock(return_value=[])
+        retirement.return_value.assert_no_content_gate = AsyncMock()
+        with pytest.raises(EventSubscriptionControlConflictError, match="recovery_request_pending"):
+            await context.service.recover(context.workflow.id, context.subscription.id, body)
+    context.session.delete.assert_not_awaited()
+    context.session.commit.assert_not_awaited()
+
+
 async def test_retry_does_not_acknowledge_a_wakeup_that_an_active_claim_could_lose(context):
     row = delivery()
     row.frozen_binding = binding()

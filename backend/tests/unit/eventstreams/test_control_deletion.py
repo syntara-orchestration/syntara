@@ -30,7 +30,8 @@ async def test_old_frozen_runtime_credentials_remain_protected_after_republicati
     lock.assert_awaited_once_with(session, source_id)
     statement = str(session.exec.call_args.args[0])
     assert "frozen_binding" in statement
-    assert "state" in statement
+    # Terminal deliveries retain the same credential reference after republish.
+    assert "event_deliveries.state" not in statement
 
 
 @pytest.mark.parametrize("protected", ["hold", "gap", "request"])

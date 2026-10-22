@@ -477,7 +477,7 @@ class EventSubscriptionService(BaseService):
             raise EventSubscriptionInUseError(_RESOURCE_INTEGRATION, integration_name, count)
 
     async def assert_credential_not_bound(self, credential_id: UUID, credential_name: str) -> None:
-        """Protect current references and older frozen admissions after source replacement."""
+        """Protect current references and all retained frozen bindings after replacement."""
         count = await self._count_subscriptions(col(EventSubscription.runtime_credential_id) == credential_id)
         if count:
             raise EventSubscriptionInUseError(_RESOURCE_CREDENTIAL, credential_name, count)
@@ -487,7 +487,6 @@ class EventSubscriptionService(BaseService):
             await self.session.exec(
                 select(EventDelivery.source_id)
                 .where(
-                    EventDelivery.state == "in_progress",
                     col(EventDelivery.frozen_binding)["runtime_credential_id"].as_string() == str(credential_id),
                 )
                 .distinct()

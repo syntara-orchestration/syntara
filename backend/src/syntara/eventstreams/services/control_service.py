@@ -206,8 +206,18 @@ class EventSubscriptionControlService:
                 and existing.acknowledge_duplicate_risk == body.acknowledge_duplicate_risk
                 and existing.resolve_unscheduled == body.resolve_unscheduled
             )
+            stronger_authority = (
+                (not existing.acknowledge_duplicate_risk or body.acknowledge_duplicate_risk)
+                and (not existing.resolve_unscheduled or body.resolve_unscheduled)
+                and (
+                    existing.acknowledge_duplicate_risk != body.acknowledge_duplicate_risk
+                    or existing.resolve_unscheduled != body.resolve_unscheduled
+                )
+            )
             stale_configuration = existing.configuration_revision != subscription.configuration_revision
-            if not same_decision or (not identical and position.recovery_token is None and not stale_configuration):
+            if not same_decision or (
+                not identical and not stronger_authority and position.recovery_token is None and not stale_configuration
+            ):
                 msg = "recovery_request_pending"
                 raise EventSubscriptionControlConflictError(msg)
         request = EventSubscriptionRecovery(
@@ -272,17 +282,22 @@ class EventSubscriptionControlService:
         return response
 
     async def response(
-        self, subscription: EventSubscription, source: EventSubscriptionSource
+        self,
+        subscription: EventSubscription,
+        source: EventSubscriptionSource,
+        *,
+        runtimes: list[EventSubscriptionRuntime] | None = None,
     ) -> SubscriptionControlResponse:
         """Only acknowledgements from all registered participants establish convergence."""
-        runtime_query = select(EventSubscriptionRuntime).where(EventSubscriptionRuntime.source_id == source.id)
-        if source.generation == subscription.active_source_generation:
-            runtime_query = (
-                select(EventSubscriptionRuntime)
-                .join(EventSubscriptionSource)
-                .where(EventSubscriptionSource.subscription_id == subscription.id)
-            )
-        runtimes = list((await self.session.exec(runtime_query)).all())
+        if runtimes is None:
+            runtime_query = select(EventSubscriptionRuntime).where(EventSubscriptionRuntime.source_id == source.id)
+            if source.generation == subscription.active_source_generation:
+                runtime_query = (
+                    select(EventSubscriptionRuntime)
+                    .join(EventSubscriptionSource)
+                    .where(EventSubscriptionSource.subscription_id == subscription.id)
+                )
+            runtimes = list((await self.session.exec(runtime_query)).all())
         active = (
             subscription.desired_enabled
             and not subscription.paused
