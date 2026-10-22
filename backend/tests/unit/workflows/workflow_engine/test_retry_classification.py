@@ -18,6 +18,7 @@ from syntara.workflows.models.activity_execution import ActivityStatus
 from syntara.workflows.utils.namespace_resolver import NamespaceResolver
 from syntara.workflows.workflow_engine.dynamic_workflow import PRE_RESOLVED_MARKER, OrchestratorWorkflow
 from syntara.workflows.workflow_engine.graph import ActivityNode, WorkflowGraph
+from syntara.workflows.workflow_engine.graph_backend import InMemoryGraphBackend
 from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName, NodeType
 from syntara.workflows.workflow_engine.retry_mixin import (
     _CONTROL_NODE_TYPES_FOR_RETRY,
@@ -139,6 +140,141 @@ def test_converge_replay_compares_every_predecessor_by_identity() -> None:
         source_state,
         graph,
     )
+
+
+# ---------------------------------------------------------------------------
+# Full _execute_converge_node path: quorum-aware restore-vs-execute decision
+#
+# These drive the complete retry converge path -- the wait gate,
+# _maybe_restore_retry_converge, _converge_predecessor_will_replay, and
+# _retry_converge_metadata_matches -- so the restore-vs-execute decision is
+# covered against a branch's *actual current* state, not just the gate predicate.
+# ---------------------------------------------------------------------------
+
+
+def _two_branch_converge_graph(strategy: str, n_required: int) -> WorkflowGraph:
+    """Build b1, b2 -> join, where join is a converge with the given gate."""
+    backend = InMemoryGraphBackend()
+    backend.add_node("b1", {"id": "b1", "type": "script", "parameters": {}})
+    backend.add_node("b2", {"id": "b2", "type": "script", "parameters": {}})
+    backend.add_node(
+        "join",
+        {"id": "join", "type": "converge", "parameters": {"strategy": strategy, "n_required": n_required}},
+    )
+    backend.add_edge("b1", "join", None)
+    backend.add_edge("b2", "join", None)
+    return WorkflowGraph(backend)
+
+
+@pytest.mark.asyncio
+async def test_retry_converge_executes_live_when_a_quorum_branch_is_a_rerun(mock_wf: MagicMock) -> None:
+    """1-of-2 both-failed: the quorum winner is a live rerun, so the converge executes.
+
+    Both branches failed in the source run, so retry reruns both; b1 finishes first
+    and satisfies the 1-of-2 gate while b2 is still pending. A source-failed branch
+    is not restorable, so ``_converge_predecessor_will_replay`` classifies b1 as
+    ``live`` and compares its *actual current* completed output -- which cannot match
+    the source's failed status -- so the metadata comparison falls through and the
+    converge executes live rather than restoring a stale result. Exercises the whole
+    ``_execute_converge_node`` -> ``_maybe_restore_retry_converge`` path.
+    """
+    wf = _make_workflow({"retry_from_execution_id": "src-1", "eligible_point_ids": ["b1", "b2"]})
+    graph = _two_branch_converge_graph("any", 1)
+    wf._retry_replay_candidates = {"join"}
+    wf._retry_source_statuses = {"b1": "failed", "b2": "failed", "join": "failed"}
+    wf._retry_source_temporal_statuses = {"b1": "failed", "b2": "failed", "join": "failed"}
+    # b1 reran and succeeded; b2 is still in flight (no namespace, not terminal).
+    wf.resolver.set_namespace("b1", {"v": 1, "status": "completed"})
+
+    source_state = {
+        "converge": {
+            "status": ActivityStatus.FAILED.value,
+            "input_data": {"strategy": "any", "n_required": 1},
+            "output_branch_count": 2,
+            "gate_metadata": {"strategy": "any", "n_required": 1, "total_branches": 2},
+        },
+        "predecessors": {
+            "b1": {"status": ActivityStatus.FAILED.value, "result_digest": None},
+            "b2": {"status": ActivityStatus.FAILED.value, "result_digest": None},
+        },
+    }
+    live_result = {"output": {"status": "completed", "converged": True}, "control": None}
+
+    async def _activity(name: Any, *_args: Any, **_kwargs: Any) -> Any:  # noqa: ANN401
+        if name == ActivityName.RETRY_CONVERGE_METADATA:
+            return source_state
+        if name == ActivityName.CONVERGE:
+            return live_result
+        pytest.fail(f"unexpected activity {name}")
+
+    mock_wf.wait_condition = AsyncMock()
+    mock_wf.execute_activity = AsyncMock(side_effect=_activity)
+
+    result = await wf._execute_converge_node("join", {"strategy": "any", "n_required": 1}, None, graph)
+
+    assert result == live_result
+    activities = [call.args[0] for call in mock_wf.execute_activity.call_args_list]
+    assert ActivityName.CONVERGE in activities, "a live rerun quorum must execute the converge"
+    assert "join" not in wf._retry_replay_candidates, "the stale restore must be ruled out"
+
+
+@pytest.mark.asyncio
+async def test_retry_converge_restores_when_every_branch_matches_source(mock_wf: MagicMock) -> None:
+    """Every predecessor is restored and matches the source, so the converge restores.
+
+    The complement of the live case: both branches completed in the source run and
+    have been restored identically, so ``_converge_predecessor_will_replay`` predicts
+    a restore for each, the metadata comparison matches, and the converge replays its
+    recorded result instead of executing the activity.
+    """
+    wf = _make_workflow({"retry_from_execution_id": "src-1", "eligible_point_ids": ["unrelated"]})
+    graph = _two_branch_converge_graph("any", 2)
+    wf._retry_replay_candidates = {"join"}
+    wf._retry_source_statuses = {"b1": "completed", "b2": "completed", "join": "completed"}
+    wf._retry_source_temporal_statuses = {"b1": "completed", "b2": "completed", "join": "completed"}
+    # Both branches already restored: a recorded timestamp is what marks them replayed.
+    wf._restored_node_timestamps = {"b1": {"started_at": "x"}, "b2": {"started_at": "y"}}
+    out1 = {"v": 1, "status": "completed"}
+    out2 = {"v": 2, "status": "completed"}
+    wf.resolver.set_namespace("b1", out1)
+    wf.resolver.set_namespace("b2", out2)
+
+    source_state = {
+        "converge": {
+            "status": ActivityStatus.COMPLETED.value,
+            "input_data": {"strategy": "any", "n_required": 2},
+            "output_branch_count": 2,
+            "gate_metadata": {"strategy": "any", "n_required": 2, "total_branches": 2},
+        },
+        "predecessors": {
+            "b1": {"status": ActivityStatus.COMPLETED.value, "result_digest": wf._retry_converge_result_digest(out1)},
+            "b2": {"status": ActivityStatus.COMPLETED.value, "result_digest": wf._retry_converge_result_digest(out2)},
+        },
+    }
+    converge_record = {
+        "output_data": {"status": "completed", "converged": True},
+        "status": ActivityStatus.COMPLETED.value,
+        "input_data": {},
+        "started_at": "s",
+        "completed_at": "c",
+        "control_data": {},
+    }
+
+    async def _activity(name: Any, *_args: Any, **_kwargs: Any) -> Any:  # noqa: ANN401
+        if name == ActivityName.RETRY_CONVERGE_METADATA:
+            return source_state
+        if name == ActivityName.RETRY_NODE_REPLAY:
+            return converge_record
+        pytest.fail(f"unexpected activity {name}")
+
+    mock_wf.wait_condition = AsyncMock()
+    mock_wf.execute_activity = AsyncMock(side_effect=_activity)
+
+    result = await wf._execute_converge_node("join", {"strategy": "any", "n_required": 2}, None, graph)
+
+    assert result == {"output": converge_record["output_data"], "control": None}
+    activities = [call.args[0] for call in mock_wf.execute_activity.call_args_list]
+    assert ActivityName.CONVERGE not in activities, "a fully matched source converge must restore, not execute"
 
 
 # ---------------------------------------------------------------------------
