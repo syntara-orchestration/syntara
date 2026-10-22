@@ -189,7 +189,7 @@ The workflow builder uses a unique gating pattern: instead of hiding or disablin
 
 When `canEdit` is false, the builder:
 
-- Disables the canvas (no adding/moving/deleting nodes)
+- Disables the canvas (no adding/moving/deleting steps)
 - Disables Save, Publish/Unpublish buttons with tooltips
 - Disables the workflow name input
 - Run and Delete buttons are gated independently via `canRun` and `canDelete`

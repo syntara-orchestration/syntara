@@ -33,7 +33,7 @@ test.describe('Visual regression — PF6 token migration', { tag: '@local-only' 
     await expect(app).toHaveScreenshot('glossary-page.png', screenshotOptions)
   })
 
-  test('trigger node on canvas', async ({ app }) => {
+  test('trigger step on canvas', async ({ app }) => {
     await app.goto(toAppUrl('/workflow-builder/new'))
     await expect(app.getByRole('heading', { name: 'Select a trigger step' })).toBeVisible()
 
@@ -42,13 +42,13 @@ test.describe('Visual regression — PF6 token migration', { tag: '@local-only' 
     await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Visual test trigger')
     await app.getByRole('button', { name: 'Create' }).click()
 
-    // Screenshot the canvas area with the trigger node
+    // Screenshot the canvas area with the trigger step
     const canvas = app.locator('.react-flow')
     await expect(canvas).toBeVisible()
-    await expect(canvas).toHaveScreenshot('trigger-node-canvas.png', screenshotOptions)
+    await expect(canvas).toHaveScreenshot('trigger-step-canvas.png', screenshotOptions)
   })
 
-  test('condition node with expression group', async ({ app }) => {
+  test('condition step with expression group', async ({ app }) => {
     await app.goto(toAppUrl('/workflow-builder/new'))
     await expect(app.getByRole('heading', { name: 'Select a trigger step' })).toBeVisible()
 
@@ -57,7 +57,7 @@ test.describe('Visual regression — PF6 token migration', { tag: '@local-only' 
     await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Trigger')
     await app.getByRole('button', { name: 'Create' }).click()
 
-    // Add a condition node to show ExpressionGroup
+    // Add a condition step to show ExpressionGroup
     const addStepBtn = app.getByRole('button', { name: 'Add connected step' })
     await addStepBtn.waitFor({ state: 'visible' })
     await addStepBtn.click()

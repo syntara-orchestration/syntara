@@ -1,7 +1,7 @@
 /**
  * Helper functions for adding each v2 workflow step type via the builder UI.
  *
- * V2 node types:
+ * V2 step types:
  *   Trigger:      manual, webhook, eda, scheduled
  *   Executors:    script, http_request, agentic, aap_job_template, approval
  *   Control flow: condition, loop (basic)
@@ -145,7 +145,7 @@ export async function addEdaTrigger(page: Page, name: string, webhookPath: strin
 }
 
 // ---------------------------------------------------------------------------
-// Executor nodes
+// Executor steps
 // ---------------------------------------------------------------------------
 
 /** Add a script step (v2 type: "script"). */
@@ -289,7 +289,7 @@ export async function addApprovalStep(page: Page, name: string) {
  * The "rejected" branch is optional per validation rules.
  *
  * Uses `addScriptStepOnHandle` (layout + fit-view retries) instead of `getByText`
- * on the canvas label — React Flow semantic zoom hides node text once the
+ * on the canvas label — React Flow semantic zoom hides step label text once the
  * graph is large enough that fit-view drops below SEMANTIC_ZOOM_MAX_SCALE.
  */
 export async function addApprovalStepWithBranch(page: Page, name: string) {
@@ -298,7 +298,7 @@ export async function addApprovalStepWithBranch(page: Page, name: string) {
 }
 
 // ---------------------------------------------------------------------------
-// Control flow nodes
+// Control flow steps
 // ---------------------------------------------------------------------------
 
 /**
@@ -587,11 +587,11 @@ export async function addSwitchStepWithCases(page: Page, name: string, cases: Sw
  */
 async function openSavedStepForEditing(page: Page, stepName: string, editorReady: (p: Page) => Promise<void>) {
   await triggerLayout(page)
-  const node = page.locator('[role="group"][aria-roledescription="node"]').filter({ hasText: stepName })
+  const stepElement = page.locator('[role="group"][aria-roledescription="node"]').filter({ hasText: stepName })
   const nameInput = page.getByRole('textbox', { name: 'Name', exact: true })
   await expect(async () => {
-    await expect(node).toBeVisible({ timeout: 5_000 })
-    await node.click({ timeout: 5_000 })
+    await expect(stepElement).toBeVisible({ timeout: 5_000 })
+    await stepElement.click({ timeout: 5_000 })
     await expect(nameInput).toHaveValue(stepName, { timeout: 5_000 })
     await editorReady(page)
   }).toPass({ timeout: 30_000, intervals: [500, 1_000, 2_000] })

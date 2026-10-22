@@ -1,10 +1,10 @@
-# Approval Node — Builder Integration
+# Approval Step — Builder Integration
 
 ## Overview
 
-The Approval node creates a human approval gate that pauses workflow execution until an authorized user or group member approves or rejects the request. This document describes the complete integration between the node registration, form component, validation schema, and workflow store.
+The Approval step creates a human approval gate that pauses workflow execution until an authorized user or group member approves or rejects the request. This document describes the complete integration between the step registration, form component, validation schema, and workflow store.
 
-## Node Registration
+## Step Registration
 
 **File**: `packages/syntara-ui/src/routes/builder/registry/steps/registerApprovalStep.ts`
 
@@ -29,9 +29,9 @@ StepRegistry.register<ApprovalFormSubmitData>({
 
 **Key Points**:
 
-- **No `DetailsComponent`** — the approval node uses the standard activity details view, not a custom renderer
-- **Category**: `'logic'` — appears in the logic section of the node picker
-- **Order**: `50` — positioned after control flow nodes, before utility nodes
+- **No `DetailsComponent`** — the approval step uses the standard activity details view, not a custom renderer
+- **Category**: `'logic'` — appears in the logic section of the step picker
+- **Order**: `50` — positioned after control flow steps, before utility steps
 - **Form Component**: `ApprovalStepForm` — handles all user input
 
 ### onSubmit Handler
@@ -265,7 +265,7 @@ The groups field includes a help popover with the message: "If a selected group 
 
 ### Fallback Decision
 
-Implemented in `FallbackDecisionField`. The dropdown is coupled to **effective continue on failure**, resolved the same way the engine does: node `settings.continue_on_failure` → admin `workflow_engine.continue_on_failure` → `false`.
+Implemented in `FallbackDecisionField`. The dropdown is coupled to **effective continue on failure**, resolved the same way the engine does: step `settings.continue_on_failure` → admin `workflow_engine.continue_on_failure` → `false`.
 
 **Default**: `'reject'`
 
@@ -274,7 +274,7 @@ Implemented in `FallbackDecisionField`. The dropdown is coupled to **effective c
 - If the decision window expires or the approval request cannot be delivered, the workflow uses the fallback decision
 - Requires effective continue on failure to be on; otherwise the activity fails and fallback is ignored
 - When effective continue on failure is off, the dropdown is disabled, warning helper text explains why, and an **Enable continue on failure** link sets `settings.continue_on_failure: true`
-- Warning copy differs for system default (stop) vs an explicit node-level stop
+- Warning copy differs for system default (stop) vs an explicit step-level stop
 - The enable link and disabled-state tooltip are hidden in version (read-only) view
 
 ### Decision Window
@@ -326,7 +326,7 @@ const settingsContent = (
 
 ### Why `supportsTimeout: false`
 
-The approval node does NOT support the standard activity timeout because it has its own domain-specific timeout: the **decision window**.
+The approval step does NOT support the standard activity timeout because it has its own domain-specific timeout: the **decision window**.
 
 - **Standard activity timeout**: How long the activity can run before being killed
 - **Decision window**: How long the approver has to respond before the request expires
@@ -385,7 +385,7 @@ onSuccess(activityId)
 After creating the activity object:
 
 1. Call `addActivity(activity)` on the workflow store
-2. Invoke `onSuccess(activityId)` callback to close the form and select the new node
+2. Invoke `onSuccess(activityId)` callback to close the form and select the new step
 3. The builder canvas auto-updates via Zustand subscriptions
 
 ## Approval Status Badges
@@ -457,7 +457,7 @@ The builder also handles approval interactions when viewing a live or recent exe
 
 - **Badge click detection**: Uses `EXECUTION_BADGE_SELECTOR` (a CSS data-attribute selector from `ExecutionStatusBadge.tsx`) to distinguish clicks on the execution status badge from normal node clicks
 - **Approval view**: When a user clicks a waiting-approval badge, the hook fetches the pending approval and opens `ApprovalReviewModal` inline in the builder
-- **Auto-detection**: During live runs, `useAutoApprovalDetection` monitors for newly waiting approval nodes and opens the review view automatically
+- **Auto-detection**: During live runs, `useAutoApprovalDetection` monitors for newly waiting approval steps and opens the review view automatically
 - **Activity name map**: Builds a `Map<activityId, activityName>` from the current workflow definition for human-readable display in the review view
 
 ## Known Limitations
@@ -481,7 +481,7 @@ The builder also handles approval interactions when viewing a live or recent exe
 5. **Validation passes** → `onSubmit` handler transforms data to `ApprovalFormSubmitData`
 6. **Create activity** → `buildNamedActivity` + `createApprovalActivity` produce store object
 7. **Add to store** → `useWorkflowStore.getState().addActivity(activity)`
-8. **Success callback** → Form closes, new node selected on canvas
+8. **Success callback** → Form closes, new step selected on canvas
 
 ### Key Patterns
 

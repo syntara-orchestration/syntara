@@ -19,11 +19,11 @@ const convergeStrategySelect = (page: Page) => page.getByRole('button', { name: 
  */
 export async function openConvergeStepForEditing(page: Page, stepName: string) {
   await triggerLayout(page)
-  const node = page.locator('[role="group"][aria-roledescription="node"]').filter({ hasText: stepName })
+  const stepElement = page.locator('[role="group"][aria-roledescription="node"]').filter({ hasText: stepName })
   const nameInput = page.getByRole('textbox', { name: 'Name', exact: true })
   await expect(async () => {
-    await expect(node).toBeVisible({ timeout: 5_000 })
-    await node.click({ timeout: 5_000 })
+    await expect(stepElement).toBeVisible({ timeout: 5_000 })
+    await stepElement.click({ timeout: 5_000 })
     await expect(nameInput).toHaveValue(stepName, { timeout: 5_000 })
     await expect(convergeStrategySelect(page)).toBeVisible({ timeout: 5_000 })
   }).toPass({ timeout: 30_000, intervals: [500, 1_000, 2_000] })
@@ -169,7 +169,7 @@ export async function createWorkflowWithBranchesForConverge(page: Page): Promise
  * Uses snake_case field names as they appear in the API payload.
  */
 export function expectConvergeStepConfig(
-  nodes: Array<{ id: string; type: string; parameters: Record<string, unknown> }>,
+  steps: Array<{ id: string; type: string; parameters: Record<string, unknown> }>,
   expected: {
     strategy: 'all' | 'any'
     n_required?: number
@@ -180,20 +180,20 @@ export function expectConvergeStepConfig(
     timeout?: number
   }
 ) {
-  const convergeNode = nodes.find((n) => n.type === 'converge')
-  expect(convergeNode).toBeDefined()
-  expect(convergeNode?.parameters.strategy).toBe(expected.strategy)
+  const convergeStep = steps.find((step) => step.type === 'converge')
+  expect(convergeStep).toBeDefined()
+  expect(convergeStep?.parameters.strategy).toBe(expected.strategy)
 
   if (expected.n_required !== undefined) {
-    expect(convergeNode?.parameters.n_required).toBe(expected.n_required)
+    expect(convergeStep?.parameters.n_required).toBe(expected.n_required)
   } else {
-    expect(convergeNode?.parameters.n_required).toBeUndefined()
+    expect(convergeStep?.parameters.n_required).toBeUndefined()
   }
 
   const expectedDuration = expected.wait_duration ?? expected.timeout
   if (expectedDuration !== undefined) {
-    expect(convergeNode?.parameters.wait_duration).toBe(expectedDuration)
+    expect(convergeStep?.parameters.wait_duration).toBe(expectedDuration)
   } else {
-    expect(convergeNode?.parameters.wait_duration).toBeUndefined()
+    expect(convergeStep?.parameters.wait_duration).toBeUndefined()
   }
 }
