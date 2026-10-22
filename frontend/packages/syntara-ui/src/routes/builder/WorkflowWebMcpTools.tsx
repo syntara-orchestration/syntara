@@ -10,6 +10,7 @@ import type { BuilderAction } from './builderReducer'
 import type { EdgeConnection } from './types/edge'
 import { buildWorkflowDefinition } from './utils/workflowDefinitionBuilder'
 import { buildWorkflowDraft, validateWorkflowDraft, WEBMCP_WORKFLOW_STEP_TYPES } from './workflowWebMcp'
+import { getWorkflowGuide, WORKFLOW_GUIDE_SCHEMA, WORKFLOW_GUIDE_TOPICS } from './workflowWebMcpGuide'
 
 type WorkflowWebMcpToolsProps = {
   isNew: boolean
@@ -105,6 +106,23 @@ function getWorkflowSnapshot() {
 
 function getValidationSummary(activities: Activity[], edges: EdgeConnection[], triggers: Activity[]) {
   return validateWorkflowDraft(activities, edges, triggers)
+}
+
+function createGetWorkflowGuideTool(): ToolDefinition {
+  return {
+    name: 'get_syntara_guide',
+    description:
+      'Read concise Syntara and workflow-builder documentation. Call when the user asks what Syntara does, how workflows work, or what configuration a step needs. Request one topic at a time to keep context focused.',
+    inputSchema: WORKFLOW_GUIDE_SCHEMA,
+    annotations: { readOnlyHint: true, untrustedContentHint: true, consequentialHint: false },
+    execute: (input) => {
+      const topic = isRecord(input) ? input.topic : undefined
+      const guide = getWorkflowGuide(topic)
+      return guide
+        ? { ok: true, topic, ...guide }
+        : { ok: false, message: 'Choose one supported guide topic.', available_topics: WORKFLOW_GUIDE_TOPICS }
+    },
+  }
 }
 
 async function validateCurrentWorkflow(actions: CurrentActions) {
@@ -355,7 +373,11 @@ function createRequestWorkflowRunTool(actionsRef: { current: CurrentActions }): 
 
 function buildToolDefinitions(actionsRef: { current: CurrentActions }): ToolDefinition[] {
   const actions = actionsRef.current
-  const tools = [createGetBuilderStateTool(actionsRef), createValidateWorkflowTool(actionsRef)]
+  const tools = [
+    createGetWorkflowGuideTool(),
+    createGetBuilderStateTool(actionsRef),
+    createValidateWorkflowTool(actionsRef),
+  ]
   if (actions.canEdit && actions.isNew) tools.push(createWorkflowDraftTool(actionsRef))
   if (actions.canEdit) tools.push(createSaveWorkflowTool(actionsRef))
   if (actions.canRun && actions.workflowId && !actions.isNew) {
