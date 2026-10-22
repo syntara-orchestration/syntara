@@ -65,6 +65,7 @@ import { buildWorkflowDefinition, transformStepParameters } from './utils/workfl
 import { ValidationBanner } from './ValidationBanner'
 import { VersionInfoCard } from './VersionInfoCard'
 import { VersionViewProvider } from './VersionViewProvider'
+import { WorkflowWebMcpTools } from './WorkflowWebMcpTools'
 
 type WorkflowVersion = WorkflowAPI.components['schemas']['WorkflowVersionRead']
 /* eslint-disable max-lines */
@@ -128,6 +129,7 @@ export function BuilderContent(props: BuilderContentProps) {
   const autoSubmitRef = useStepEditorAutoSubmitRef()
   const {
     confirmDialogOpen,
+    forceRunConfirmation,
     deleteDialogOpen,
     unsavedStepEditorDialogOpen,
     detailsOpen,
@@ -787,7 +789,22 @@ export function BuilderContent(props: BuilderContentProps) {
               </StackItem>
             </SynReactFlowViewportGuard>
 
-            <BuilderDialogs {...dialogProps} conflictDialogProps={conflictDialogProps} />
+            <BuilderDialogs
+              {...dialogProps}
+              forceRunConfirmation={forceRunConfirmation}
+              conflictDialogProps={conflictDialogProps}
+            />
+            <WorkflowWebMcpTools
+              isNew={isNew}
+              workflowId={workflowId}
+              workflowName={workflowName}
+              workflowDescription={workflowDescription}
+              selectedProjectId={stableProjectId ?? null}
+              canEdit={builderPermissions.canEdit}
+              canRun={builderPermissions.canRun}
+              handleSaveWorkflow={guardedSaveWorkflow}
+              dispatch={dispatch}
+            />
             <UnsavedStepEditorDialog
               isOpen={unsavedStepEditorDialogOpen}
               onClose={() => dispatch({ type: 'SET_UNSAVED_STEP_EDITOR_DIALOG', payload: false })}

@@ -20,6 +20,7 @@ export type ValidationError = {
 // Builder state interface
 export type BuilderState = {
   confirmDialogOpen: boolean
+  forceRunConfirmation: boolean
   deleteDialogOpen: boolean
   unsavedStepEditorDialogOpen: boolean
   detailsOpen: boolean
@@ -54,6 +55,7 @@ export type BuilderState = {
 // Builder action types
 export type BuilderAction =
   | { type: 'SET_CONFIRM_DIALOG'; payload: boolean }
+  | { type: 'SET_FORCE_RUN_CONFIRMATION'; payload: boolean }
   | { type: 'SET_DELETE_DIALOG'; payload: boolean }
   | { type: 'SET_UNSAVED_STEP_EDITOR_DIALOG'; payload: boolean }
   | { type: 'SET_DETAILS_OPEN'; payload: boolean }
@@ -121,6 +123,7 @@ const SIMPLE_STATE_KEY_MAP: Record<
   keyof Pick<
     BuilderState,
     | 'confirmDialogOpen'
+    | 'forceRunConfirmation'
     | 'deleteDialogOpen'
     | 'unsavedStepEditorDialogOpen'
     | 'detailsOpen'
@@ -143,6 +146,7 @@ const SIMPLE_STATE_KEY_MAP: Record<
   >
 > = {
   SET_CONFIRM_DIALOG: 'confirmDialogOpen',
+  SET_FORCE_RUN_CONFIRMATION: 'forceRunConfirmation',
   SET_DELETE_DIALOG: 'deleteDialogOpen',
   SET_UNSAVED_STEP_EDITOR_DIALOG: 'unsavedStepEditorDialogOpen',
   SET_DETAILS_OPEN: 'detailsOpen',
@@ -331,6 +335,7 @@ function handleNodeClick(state: BuilderState, action: Extract<BuilderAction, { t
 // Simple action types that just update a single property
 const SIMPLE_ACTIONS = [
   'SET_CONFIRM_DIALOG',
+  'SET_FORCE_RUN_CONFIRMATION',
   'SET_DELETE_DIALOG',
   'SET_UNSAVED_STEP_EDITOR_DIALOG',
   'SET_DETAILS_OPEN',
@@ -480,6 +485,8 @@ export function builderReducer(state: BuilderState, action: BuilderAction): Buil
       // Prevents stale UI state (selected nodes, open panels) from persisting across workflow changes
       return {
         ...state,
+        confirmDialogOpen: false,
+        forceRunConfirmation: false,
         // Reset workflow metadata
         workflowName: action.payload.name,
         workflowDescription: action.payload.description,
@@ -518,6 +525,7 @@ export function builderReducer(state: BuilderState, action: BuilderAction): Buil
 export function getInitialBuilderState(): BuilderState {
   return {
     confirmDialogOpen: false,
+    forceRunConfirmation: false,
     deleteDialogOpen: false,
     unsavedStepEditorDialogOpen: false,
     detailsOpen: false,
