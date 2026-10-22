@@ -1,0 +1,268 @@
+"""Setup activity for Sub-workflow (Reference Mode) execution.
+
+Resolves the child workflow from the database, validates the selected
+trigger, creates a child Execution record, and returns the data needed
+for the parent OrchestratorWorkflow to call ``execute_child_workflow``.
+
+Follows the ScheduledExecutionLauncher pattern: class-based activity
+that receives ``session_factory`` and ``task_queue`` at construction.
+
+Idempotency: uses a deterministic child execution ID derived from
+(parent_execution_id, node_id) so retries of the setup activity
+return the existing Execution record instead of creating duplicates.
+"""
+
+from __future__ import annotations
+
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Any
+from uuid import UUID, uuid5
+
+import structlog
+from temporalio import activity
+from temporalio.exceptions import ApplicationError
+
+from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName, NodeType
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from sqlmodel.ext.asyncio.session import AsyncSession
+
+logger = structlog.stdlib.get_logger(__name__)
+
+_SUB_WORKFLOW_NAMESPACE = UUID("a3e4c7f0-1b2d-4e5f-8a9c-0d1e2f3a4b5c")
+
+_MAX_SUB_WORKFLOW_DEPTH = 10
+
+
+class SubWorkflowSetupActivity:
+    """Temporal activity that prepares a child workflow execution.
+
+    Instantiated once at worker startup with shared dependencies.
+    """
+
+    def __init__(
+        self,
+        session_factory: Callable[..., AsyncSession],
+        task_queue: str,
+    ) -> None:
+        """Initialize with shared session factory and task queue."""
+        self._session_factory = session_factory
+        self._task_queue = task_queue
+
+    @activity.defn(name=ActivityName.SUB_WORKFLOW)
+    async def run(
+        self,
+        parameters: dict[str, Any],
+        parent_execution_id: str,
+        parent_node_id: str,
+        created_by_user_id: str,
+        current_depth: int,
+    ) -> dict[str, Any]:
+        """Resolve child workflow and prepare execution record.
+
+        Args:
+            parameters: Resolved node parameters (workflow_id, trigger_node_id, input_mapping).
+            parent_execution_id: Parent execution ID for lineage tracking.
+            parent_node_id: Node ID of the SUB_WORKFLOW step in the parent.
+            created_by_user_id: User who started the parent execution.
+            current_depth: Current sub-workflow nesting depth.
+
+        Returns:
+            Dict with all data needed to call execute_child_workflow.
+
+        Raises:
+            ApplicationError: Non-retryable, if child workflow is missing,
+                unpublished, disabled, trigger not found, wrong trigger type,
+                depth exceeded, or project mismatch.
+
+        """
+        if current_depth >= _MAX_SUB_WORKFLOW_DEPTH:
+            msg = (
+                f"Sub-workflow nesting depth {current_depth} exceeds maximum "
+                f"({_MAX_SUB_WORKFLOW_DEPTH}). This may indicate a cyclic invocation."
+            )
+            raise ApplicationError(msg, type="SubWorkflowDepthExceeded", non_retryable=True)
+
+        child_workflow_id_str = parameters.get("workflow_id")
+        if not child_workflow_id_str:
+            msg = "Sub-workflow node is missing required 'workflow_id' parameter"
+            raise ApplicationError(msg, type="ConfigError", non_retryable=True)
+
+        trigger_node_id = parameters.get("trigger_node_id")
+        if not trigger_node_id:
+            msg = "Sub-workflow node is missing required 'trigger_node_id' parameter"
+            raise ApplicationError(msg, type="ConfigError", non_retryable=True)
+
+        try:
+            child_workflow_id = UUID(child_workflow_id_str)
+        except ValueError:
+            msg = f"Invalid workflow_id format: {child_workflow_id_str}"
+            raise ApplicationError(msg, type="ConfigError", non_retryable=True) from None
+
+        child_execution_id = uuid5(_SUB_WORKFLOW_NAMESPACE, f"{parent_execution_id}:{parent_node_id}")
+        child_execution_id_str = str(child_execution_id)
+
+        return await self._prepare_child_execution(
+            child_workflow_id=child_workflow_id,
+            child_execution_id=child_execution_id,
+            child_execution_id_str=child_execution_id_str,
+            trigger_node_id=trigger_node_id,
+            input_mapping=parameters.get("input_mapping", {}),
+            parent_execution_id=parent_execution_id,
+            parent_node_id=parent_node_id,
+            created_by_user_id=created_by_user_id,
+            current_depth=current_depth,
+        )
+
+    async def _prepare_child_execution(
+        self,
+        *,
+        child_workflow_id: UUID,
+        child_execution_id: UUID,
+        child_execution_id_str: str,
+        trigger_node_id: str,
+        input_mapping: dict[str, Any],
+        parent_execution_id: str,
+        parent_node_id: str,
+        created_by_user_id: str,
+        current_depth: int,
+    ) -> dict[str, Any]:
+        from sqlmodel import select  # noqa: PLC0415
+
+        from syntara.workflows.exceptions import WorkflowNotPublishedError  # noqa: PLC0415
+        from syntara.workflows.models.execution import Execution, ExecutionStatus  # noqa: PLC0415
+        from syntara.workflows.models.workflow import Workflow  # noqa: PLC0415
+        from syntara.workflows.models.workflow_version import WorkflowVersion  # noqa: PLC0415
+        from syntara.workflows.utils.workflow_metadata import (  # noqa: PLC0415
+            build_workflow_metadata,
+            resolve_user_display_name,
+        )
+
+        async with self._session_factory() as session:
+            result = await session.exec(
+                select(Workflow, WorkflowVersion)
+                .join(WorkflowVersion, WorkflowVersion.id == Workflow.published_version_id)  # type: ignore[arg-type]
+                .where(Workflow.id == child_workflow_id)
+                .where(Workflow.is_enabled == True)  # noqa: E712
+            )
+            row = result.first()
+            if row is None:
+                raise ApplicationError(
+                    str(WorkflowNotPublishedError(child_workflow_id)),
+                    type="WorkflowNotPublishedError",
+                    non_retryable=True,
+                )
+
+            child_workflow, child_version = row
+
+            self._validate_trigger(child_version.workflow_definition, trigger_node_id)
+
+            author_name = await resolve_user_display_name(session, child_workflow.created_by)
+
+        child_wf_name = child_workflow.name
+        child_wf_id = child_workflow.id
+        child_wf_project_id = child_workflow.project_id
+        child_version_id = child_version.id
+        workflow_def = child_version.workflow_definition
+        now = datetime.now(UTC)
+
+        temporal_workflow_id = f"{child_wf_name}-{child_execution_id_str}"
+
+        child_metadata = build_workflow_metadata(
+            workflow_name=child_wf_name,
+            workflow_id=child_wf_id,
+            workflow_version=child_version.version,
+            workflow_published=True,
+            workflow_author=author_name,
+            project_id=child_wf_project_id,
+            execution_id=child_execution_id_str,
+            execution_mode="sub_workflow",
+            created_by=created_by_user_id,
+            created_by_user_id=created_by_user_id,
+            created_at=now.isoformat(),
+            workflow_version_id=child_version_id,
+        )
+        child_metadata["sub_workflow_depth"] = current_depth + 1
+
+        async with self._session_factory() as session:
+            existing = await session.get(Execution, child_execution_id)
+            if existing is not None:
+                logger.info(
+                    "Child execution already exists (idempotent retry)",
+                    child_execution_id=child_execution_id_str,
+                )
+                return {
+                    "execution_id": child_execution_id_str,
+                    "temporal_workflow_id": temporal_workflow_id,
+                    "workflow_definition": workflow_def,
+                    "trigger_node_id": trigger_node_id,
+                    "input_data": input_mapping,
+                    "task_queue": self._task_queue,
+                    "workflow_metadata": child_metadata,
+                    "child_workflow_id": str(child_wf_id),
+                    "child_workflow_name": child_wf_name,
+                    "child_workflow_version": child_version.version,
+                }
+
+            execution = Execution(
+                id=child_execution_id,
+                workflow_id=child_wf_id,
+                workflow_version_id=child_version_id,
+                project_id=child_wf_project_id,
+                temporal_workflow_id=temporal_workflow_id,
+                status=ExecutionStatus.PENDING,
+                input_data=input_mapping,
+                trigger_node_id=trigger_node_id,
+                trigger_type=ActivityName.SUBWORKFLOW_TRIGGER.value,
+                interface=None,
+                created_by=UUID(created_by_user_id),
+                updated_by=UUID(created_by_user_id),
+                execution_metadata={
+                    "trigger_type": ActivityName.SUBWORKFLOW_TRIGGER,
+                    "parent_execution_id": parent_execution_id,
+                    "parent_node_id": parent_node_id,
+                    "sub_workflow_depth": current_depth + 1,
+                },
+            )
+            session.add(execution)
+            await session.commit()
+
+        logger.info(
+            "Child execution created for sub-workflow",
+            child_execution_id=child_execution_id_str,
+            child_workflow_id=str(child_wf_id),
+            parent_execution_id=parent_execution_id,
+            parent_node_id=parent_node_id,
+        )
+
+        return {
+            "execution_id": child_execution_id_str,
+            "temporal_workflow_id": temporal_workflow_id,
+            "workflow_definition": workflow_def,
+            "trigger_node_id": trigger_node_id,
+            "input_data": input_mapping,
+            "task_queue": self._task_queue,
+            "workflow_metadata": child_metadata,
+            "child_workflow_id": str(child_wf_id),
+            "child_workflow_name": child_wf_name,
+            "child_workflow_version": child_version.version,
+        }
+
+    @staticmethod
+    def _validate_trigger(workflow_def: dict[str, Any], trigger_node_id: str) -> None:
+        """Validate that the specified trigger exists and is a subworkflow trigger."""
+        for trigger in workflow_def.get("triggers", []):
+            if trigger.get("id") == trigger_node_id:
+                trigger_type = trigger.get("type", "")
+                if trigger_type != NodeType.SUBWORKFLOW_TRIGGER:
+                    msg = (
+                        f"Trigger '{trigger_node_id}' has type '{trigger_type}', "
+                        f"expected '{NodeType.SUBWORKFLOW_TRIGGER}'. "
+                        f"Sub-workflow invocation requires a subworkflow_trigger node."
+                    )
+                    raise ApplicationError(msg, type="InvalidTriggerType", non_retryable=True)
+                return
+        msg = f"Trigger node '{trigger_node_id}' not found in child workflow definition"
+        raise ApplicationError(msg, type="TriggerNotFoundError", non_retryable=True)

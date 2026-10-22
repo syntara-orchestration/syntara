@@ -15,6 +15,7 @@ from temporalio import workflow
 from temporalio.common import RetryPolicy
 from temporalio.exceptions import ActivityError, ApplicationError
 from temporalio.exceptions import TimeoutError as TemporalTimeoutError
+from temporalio.workflow import ParentClosePolicy
 
 with workflow.unsafe.imports_passed_through():
     from syntara.core.exceptions import SafeValueError
@@ -176,12 +177,15 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
 
         self._project_id: str = ""
         self._created_by_user_id: str = ""
+        self._sub_workflow_depth: int = 0
         if workflow_metadata:
             for ns_key, ns_data in workflow_metadata.items():
                 self.resolver.set_namespace(ns_key, ns_data)
             wf_ctx = workflow_metadata.get("workflow_context", {})
             self._project_id = wf_ctx.get("workflow", {}).get("project_id", "")
             self._created_by_user_id = wf_ctx.get("execution", {}).get("created_by_user_id", "")
+            depth = workflow_metadata.get("sub_workflow_depth", 0)
+            self._sub_workflow_depth = depth if isinstance(depth, int) else 0
 
         self.node_inputs: dict[str, dict[str, Any]] = {}
         self.node_control_data: dict[str, dict[str, Any]] = {}
@@ -1682,7 +1686,79 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         if node_type == NodeType.LOOP:
             return await self._execute_loop_node(node_id, node, resolved_parameters, timeout_seconds=timeout_seconds)
 
-        return {"output": {"status": "skipped", "reason": f"Unsupported node type: {node_type}"}}
+        if node_type == NodeType.SUB_WORKFLOW:
+            result = await self._execute_sub_workflow_node(node, resolved_parameters)
+        else:
+            result = {"output": {"status": "skipped", "reason": f"Unsupported node type: {node_type}"}}
+        return result
+
+    async def _execute_sub_workflow_node(
+        self,
+        node: ActivityNode,
+        resolved_parameters: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Execute a sub-workflow node via Reference Mode.
+
+        Calls the setup activity to resolve and prepare the child execution,
+        then starts the child OrchestratorWorkflow via execute_child_workflow.
+        """
+        setup_result: dict[str, Any] = cast(
+            "dict[str, Any]",
+            await workflow.execute_activity(
+                ActivityName.SUB_WORKFLOW,
+                args=[
+                    resolved_parameters,
+                    self.execution_id,
+                    node.id,
+                    self._created_by_user_id,
+                    self._sub_workflow_depth,
+                ],
+                activity_id=f"__internal__setup_sub_workflow_{node.id}",
+                start_to_close_timeout=timedelta(seconds=DEFAULT_ACTIVITY_TIMEOUT_SECONDS),
+                retry_policy=RetryPolicy(maximum_attempts=3),
+            ),
+        )
+
+        child_result = await workflow.execute_child_workflow(
+            "orchestrator_workflow",
+            args=[
+                setup_result["workflow_definition"],
+                setup_result["execution_id"],
+                setup_result["trigger_node_id"],
+                setup_result["input_data"],
+                False,
+                None,
+                None,
+                None,
+                setup_result["workflow_metadata"],
+            ],
+            id=setup_result["temporal_workflow_id"],
+            task_queue=setup_result["task_queue"],
+            parent_close_policy=ParentClosePolicy.REQUEST_CANCEL,
+        )
+
+        valid_child_statuses = {"completed", "completed_with_errors", "failed", "cancelled"}
+        raw_status = child_result.get("status") if isinstance(child_result, dict) else None
+        child_status = raw_status if raw_status in valid_child_statuses else None
+        is_success = child_status == "completed"
+        status_detail = child_status or "returned unexpected status"
+        return {
+            "output": {
+                "Result": {
+                    "child_execution_id": setup_result["execution_id"],
+                    "child_workflow_id": setup_result.get("child_workflow_id"),
+                    "child_workflow_name": setup_result.get("child_workflow_name"),
+                    "child_workflow_version": setup_result.get("child_workflow_version"),
+                    "child_status": child_status,
+                    "outputs": None,
+                },
+                "StatusCode": 0 if is_success else 1,
+                "StatusMessage": (
+                    "Sub-workflow completed successfully" if is_success else f"Sub-workflow {status_detail}"
+                ),
+                "ErrorMessage": None,
+            }
+        }
 
     def _process_node_result(self, node: ActivityNode, result: dict[str, Any]) -> dict[str, Any]:
         """Extract control data and output from an activity result."""
