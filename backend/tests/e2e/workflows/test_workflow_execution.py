@@ -680,9 +680,10 @@ class TestParallelBranches:
 
     def test_three_parallel_branches_all_complete(self, syntara_api: SyntaraApiRegistry) -> None:
         """Three parallel script branches all complete before the converge node runs."""
+        expected_ids = ("trigger", "branch_a", "branch_b", "branch_c", "join", "final")
         result = create_and_run_workflow(
             syntara_api,
-            "e2e-three-parallel-branches",
+            unique_name("e2e-three-parallel-branches"),
             {
                 "name": "three-parallel",
                 "schema_version": "2.0.0",
@@ -724,14 +725,16 @@ class TestParallelBranches:
                     {"from": "join", "to": "final"},
                 ],
             },
+            timeout=PARALLEL_POLL_TIMEOUT,
+            expected_activity_ids=expected_ids,
         )
 
         assert result.status == ExecutionStatus.COMPLETED, f"Execution failed: {result.error_details}"
 
         activities = {a.activity_id: a.status for a in (result.activities or [])}
-        for node_id in ("trigger", "branch_a", "branch_b", "branch_c", "join", "final"):
+        for node_id in expected_ids:
             assert activities.get(node_id) == "completed", (
-                f"Expected '{node_id}' completed, got {activities.get(node_id)}"
+                f"Expected '{node_id}' completed, got {activities.get(node_id)}. All: {activities}"
             )
 
         # Final step must start after converge, which starts after all three branches.
