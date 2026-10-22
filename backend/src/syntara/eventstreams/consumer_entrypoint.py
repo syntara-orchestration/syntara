@@ -20,6 +20,7 @@ from syntara.eventstreams.services.delivery_cache_policy import DeliveryEvidence
 from syntara.eventstreams.services.execution_preparation_service import EventExecutionPreparationService
 from syntara.eventstreams.services.placement_service import SubscriptionPlacementService
 from syntara.eventstreams.services.recovery_worker import EventDeliveryRecoveryWorker
+from syntara.eventstreams.services.runtime_control_service import EventRuntimeControlService
 from syntara.eventstreams.services.subscription_hints import SubscriptionHintListener
 from syntara.eventstreams.services.subscription_reader import EventSubscriptionReader
 from syntara.eventstreams.services.worker_gate import EventWorkerGate
@@ -60,6 +61,7 @@ async def _run_connected(
         factory,
         placement,
         resources,
+        controls=EventRuntimeControlService(AsyncSessionLocal, owner),
     )
     recovery = EventDeliveryRecoveryWorker(
         AsyncSessionLocal, launcher, worker_id=owner, admission=admission, resources=resources

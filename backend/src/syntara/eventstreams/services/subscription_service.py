@@ -10,8 +10,8 @@ reading progress.
 
 It also owns the lifecycle locking interface, the immutable
 ``SubscriptionSnapshot`` builder, and the conservative deletion guards that
-protect bound workflow/Integration/credential resources. Recovery-aware release
-of those guards is a later story.
+protect bound workflow/Integration/credential resources. Recovery-aware controls
+release references only after retained evidence and recovery dependencies permit it.
 """
 
 from datetime import UTC, datetime
@@ -421,10 +421,49 @@ class EventSubscriptionService(BaseService):
     # Conservative deletion guards
     # ------------------------------------------------------------------
     async def assert_workflow_not_bound(self, workflow_id: UUID, workflow_name: str) -> None:
-        """Block workflow deletion while any subscription references it."""
+        """Release only closed sources whose retained evidence has safely expired."""
         count = await self._count_subscriptions(col(EventSubscription.workflow_id) == workflow_id)
         if count:
-            raise EventSubscriptionInUseError(_RESOURCE_WORKFLOW, workflow_name, count)
+            from syntara.eventstreams.services.retirement_service import EventRetirementService  # noqa: PLC0415
+            from syntara.workflows.models.workflow import Workflow  # noqa: PLC0415
+
+            workflow = (
+                await self.session.exec(
+                    select(Workflow)
+                    .where(Workflow.id == workflow_id)
+                    .with_for_update()
+                    .execution_options(populate_existing=True)
+                )
+            ).one_or_none()
+            if workflow is None or workflow.is_enabled:
+                raise EventSubscriptionInUseError(_RESOURCE_WORKFLOW, workflow_name, count)
+            subscriptions = (
+                await self.session.exec(
+                    select(EventSubscription)
+                    .where(EventSubscription.workflow_id == workflow_id)
+                    .order_by(col(EventSubscription.id))
+                    .with_for_update()
+                    .execution_options(populate_existing=True)
+                )
+            ).all()
+            for subscription in subscriptions:
+                if subscription.desired_enabled:
+                    raise EventSubscriptionInUseError(_RESOURCE_WORKFLOW, workflow_name, count)
+                sources = (
+                    await self.session.exec(
+                        select(EventSubscriptionSource)
+                        .where(EventSubscriptionSource.subscription_id == subscription.id)
+                        .order_by(col(EventSubscriptionSource.generation))
+                        .with_for_update()
+                        .execution_options(populate_existing=True)
+                    )
+                ).all()
+                for source in sources:
+                    source.retired_at = source.retired_at or _utc_now()
+                    await EventRetirementService(self.session).release_empty_source(source)
+                await self.session.flush()
+                await self.session.delete(subscription)
+            await self.session.flush()
 
     async def assert_integration_not_bound(self, integration_id: UUID, integration_name: str) -> None:
         """Block Integration deletion while any source references it."""
@@ -438,10 +477,27 @@ class EventSubscriptionService(BaseService):
             raise EventSubscriptionInUseError(_RESOURCE_INTEGRATION, integration_name, count)
 
     async def assert_credential_not_bound(self, credential_id: UUID, credential_name: str) -> None:
-        """Block credential deletion while any subscription references it as runtime credential."""
+        """Protect current references and older frozen admissions after source replacement."""
         count = await self._count_subscriptions(col(EventSubscription.runtime_credential_id) == credential_id)
         if count:
             raise EventSubscriptionInUseError(_RESOURCE_CREDENTIAL, credential_name, count)
+        from syntara.eventstreams.models.delivery import EventDelivery  # noqa: PLC0415
+
+        frozen = (
+            await self.session.exec(
+                select(EventDelivery.source_id)
+                .where(
+                    EventDelivery.state == "in_progress",
+                    col(EventDelivery.frozen_binding)["runtime_credential_id"].as_string() == str(credential_id),
+                )
+                .distinct()
+                .order_by(col(EventDelivery.source_id))
+            )
+        ).all()
+        for source_id in frozen:
+            await lock_source_lifecycle(self.session, source_id)
+        if frozen:
+            raise EventSubscriptionInUseError(_RESOURCE_CREDENTIAL, credential_name, len(frozen))
 
     # ------------------------------------------------------------------
     # Internals

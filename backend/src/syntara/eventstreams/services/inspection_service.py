@@ -10,18 +10,27 @@ from sqlmodel import col, select
 from syntara.core.exceptions import SafeValueError
 from syntara.core.services import BaseService
 from syntara.credentials.lib.kafka_connection import KafkaSecurityProtocol, resolve_listener_kafka_login
+
+
+from syntara.eventstreams.adapters.kafka_initial_position import (
+    KafkaPartitionInitialPosition,
+    KafkaPartitionInitialPositionRead,
+)
 from syntara.eventstreams.adapters.kafka_parameters import KafkaSubscribeParameters
 from syntara.eventstreams.adapters.kafka_preflight import test_kafka_connection
 from syntara.eventstreams.exceptions import EventSubscriptionNotFoundError
+from syntara.eventstreams.models.control import EventSubscriptionRecovery
 from syntara.eventstreams.models.responses import (
     EventSubscriptionListParams,
     EventSubscriptionListResponse,
     EventSubscriptionRead,
+    EventSubscriptionRecoveryRead,
     EventSubscriptionSourceRead,
     EventSubscriptionTestResponse,
 )
 from syntara.eventstreams.models.source import EventSubscriptionSource
 from syntara.eventstreams.models.subscription import EventSubscription
+from syntara.eventstreams.services.control_service import EventSubscriptionControlService
 from syntara.integrations.lib.url_validation import validate_integration_configuration_no_ssrf
 from syntara.integrations.models.integration import Integration
 from syntara.integrations.models.integration_configuration import KafkaConfiguration
@@ -40,11 +49,20 @@ class EventSubscriptionInspectionService(BaseService):
     """No persistence, publication or consumer activation operations."""
 
     def __init__(
-        self, session: "AsyncSession", user: "User", evaluator: "AuthzEvaluator", secret_service: "SecretService"
+        self,
+        session: "AsyncSession",
+        user: "User",
+        evaluator: "AuthzEvaluator",
+        secret_service: "SecretService",
+        *,
+        is_cert_authenticated: bool = False,
     ) -> None:
         """Reuse workflow resource checks and the listener credential resolver."""
         super().__init__(session, user)
-        self.workflows = WorkflowService(session, user, evaluator)
+        self.controls = EventSubscriptionControlService(
+            session, user, evaluator, is_cert_authenticated=is_cert_authenticated
+        )
+        self.workflows = WorkflowService(session, user, evaluator, is_cert_authenticated=is_cert_authenticated)
         self.secret_service = secret_service
 
     @staticmethod
@@ -115,7 +133,7 @@ class EventSubscriptionInspectionService(BaseService):
         )
 
     async def get_current(self, workflow_id: UUID, subscription_id: UUID) -> EventSubscriptionRead:
-        """Return only a current source belonging to this workflow and project."""
+        """Read current or retired evidence belonging to this workflow and project."""
         workflow = await self.workflows.get_workflow_by_id(workflow_id)
         result = await self.session.exec(
             select(EventSubscription, EventSubscriptionSource)
@@ -124,15 +142,41 @@ class EventSubscriptionInspectionService(BaseService):
                 EventSubscription.id == subscription_id,
                 EventSubscription.workflow_id == workflow.id,
                 EventSubscription.project_id == workflow.project_id,
-                col(EventSubscription.retired).is_(False),
                 EventSubscriptionSource.generation == EventSubscription.active_source_generation,
-                col(EventSubscriptionSource.retired_at).is_(None),
             )
         )
         row = result.one_or_none()
         if row is None:
             raise EventSubscriptionNotFoundError
-        return self._shape(*row)
+        subscription, source = row
+        response = self._shape(subscription, source)
+        sources = (
+            await self.session.exec(
+                select(EventSubscriptionSource)
+                .where(EventSubscriptionSource.subscription_id == subscription.id)
+                .order_by(col(EventSubscriptionSource.generation))
+            )
+        ).all()
+        response.sources = [EventSubscriptionSourceRead.model_validate(item) for item in sources]
+        positions = (
+            await self.session.exec(
+                select(KafkaPartitionInitialPosition)
+                .where(col(KafkaPartitionInitialPosition.source_id).in_([item.id for item in sources]))
+                .order_by(col(KafkaPartitionInitialPosition.source_id), col(KafkaPartitionInitialPosition.partition))
+            )
+        ).all()
+        response.initialization = [KafkaPartitionInitialPositionRead.from_position(item) for item in positions]
+        requests = (
+            await self.session.exec(
+                select(EventSubscriptionRecovery)
+                .where(col(EventSubscriptionRecovery.source_id).in_([item.id for item in sources]))
+                .order_by(col(EventSubscriptionRecovery.source_id), col(EventSubscriptionRecovery.partition))
+            )
+        ).all()
+        response.recovery = [EventSubscriptionRecoveryRead.model_validate(item) for item in requests]
+        convergence = await self.controls.response(subscription, source)
+        response.convergence, response.applied_revision = convergence.convergence, convergence.applied_revision
+        return response
 
     async def test_unsaved(
         self, workflow_id: UUID, parameters: KafkaSubscribeParameters

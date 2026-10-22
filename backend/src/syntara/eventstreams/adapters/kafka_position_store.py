@@ -568,7 +568,9 @@ class KafkaInitialPositionStore:
                     ):
                         msg = "unreconciled_start_evidence"
                         raise KafkaPositionError(msg)
-                    if delivery.record_identity.offset < row.pending_boundary:
+                    below_boundary = delivery.record_identity.offset < row.pending_boundary
+                    self._check_disposition(request, below_boundary=below_boundary)
+                    if below_boundary:
                         delivery.state = DeliveryState.CANCELLED
                         delivery.resolved_at = now
                         delivery.last_error_code = "cancelled_by_gap_recovery"
@@ -598,6 +600,12 @@ class KafkaInitialPositionStore:
                     raise KafkaPositionError(msg)
                 claims.append(claimed)
         return claims
+
+    @staticmethod
+    def _check_disposition(request: RecoveryRequest, *, below_boundary: bool) -> None:
+        if below_boundary and not request.allow_unscheduled_disposition:
+            msg = "retirement_authority_required"
+            raise KafkaPositionError(msg)
 
     async def stage_recovery(
         self, request: RecoveryRequest, token: UUID, boundary: int

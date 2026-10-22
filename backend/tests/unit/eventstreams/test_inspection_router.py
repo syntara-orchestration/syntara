@@ -2,11 +2,11 @@
 
 from datetime import UTC, datetime
 from typing import Any
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
 import pytest
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
 
 from syntara.eventstreams.adapters.kafka_source_configuration import KafkaSourceConfiguration
@@ -125,3 +125,11 @@ def test_unsaved_rejects_invalid_or_selected_account_fields(
     response = client.post(f"/api/v1/workflows/{uuid4()}/event-subscriptions/test", json={**data, **change})
     assert response.status_code == 422
     service.test_unsaved.assert_not_called()
+
+
+@pytest.mark.parametrize("cert_authenticated", [False, True])
+def test_inspection_service_preserves_request_authentication_context(*, cert_authenticated: bool) -> None:
+    request = Request({"type": "http", "state": {"is_cert_authenticated": cert_authenticated}})
+    instance = get_inspection_service(MagicMock(), MagicMock(), MagicMock(), request)
+    assert instance.workflows.is_cert_authenticated is cert_authenticated
+    assert instance.controls.workflows.is_cert_authenticated is cert_authenticated
