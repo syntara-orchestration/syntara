@@ -1397,18 +1397,26 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
                     timeout_task = self._timeout_tasks.pop(node_id, None)
                     if timeout_task is not None:
                         timeout_task.cancel()
-            # Defer the restore decision until every predecessor is terminal, even on
-            # the ANY / n-of-m success path where the gate fires at n_required without
-            # waiting for the remaining branches. Classifying a still-pending branch
-            # would compare its *predicted* restored status against the source instead
-            # of its actual current state, letting a stale converge output replay when
-            # a branch that the source restored is really rerunning or being skipped.
-            # The wait is bounded by the converge timeout handler, which records a
-            # "timed out after" reason so a branch that never reaches a terminal state
-            # cannot hang the gate.
+            # Defer the restore decision only until the gate is decided, not until
+            # every predecessor is terminal. On the ANY / n-of-m path the gate fires
+            # at n_required, and the remaining branches are not needed to decide it;
+            # waiting for them hangs the gate when a slow branch never reaches a
+            # terminal state. The converge timeout handler cannot rescue that wait
+            # either — on the quorum path it resolves at n_required and returns
+            # without recording a "timed out after" reason, so there is nothing to
+            # break the wait. Gating on _retry_converge_gate_is_decided proceeds the
+            # moment the gate is satisfiable (quorum met, or failure certain), which
+            # matches the state the scheduler already used to dispatch this node.
+            #
+            # Proceeding before an unneeded branch is terminal does not revive the
+            # stale-replay bug this guard originally addressed: that branch is then
+            # compared as its actual current (pending / live) state by
+            # _retry_converge_metadata_matches, which no longer equals the source's
+            # restored status, so the metadata comparison falls through to executing
+            # the converge rather than restoring a stale result.
             await workflow.wait_condition(
                 lambda: (
-                    self._all_predecessors_terminal(predecessor_ids)
+                    self._retry_converge_gate_is_decided(node_id, resolved_parameters, graph)
                     or " timed out after " in self._retry_converge_failure_reasons.get(node_id, "")
                 )
             )

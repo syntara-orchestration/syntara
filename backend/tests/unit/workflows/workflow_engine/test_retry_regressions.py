@@ -230,6 +230,62 @@ def test_plain_run_converge_behaviour_is_unchanged() -> None:
 
 
 # ---------------------------------------------------------------------------
+# A quorum-satisfied retry converge must not wait for the branches it does not need
+# ---------------------------------------------------------------------------
+
+
+def _one_of_two_converge_graph() -> WorkflowGraph:
+    """Build b1, b2 -> join, where join is a 1-of-2 (ANY, n_required=1) gate."""
+    backend = InMemoryGraphBackend()
+    _add(backend, "b1", "script")
+    _add(backend, "b2", "script")
+    _add(backend, "join", "converge", {"strategy": "any", "n_required": 1})
+    _plain(backend, "b1", "join")
+    _plain(backend, "b2", "join")
+    return WorkflowGraph(backend)
+
+
+def test_retry_converge_gate_proceeds_at_quorum_without_waiting_for_slow_branch() -> None:
+    """A 1-of-2 retry converge proceeds as soon as one branch wins the quorum.
+
+    Both branches failed in the source run, so retry reruns both in parallel.
+    Whichever finishes first satisfies the 1-of-2 gate and must move the converge
+    forward; the other branch is not needed to decide it. The restore guard used
+    to gate on ``_all_predecessors_terminal``, which forces the wait to block on
+    the slow branch — and the converge timeout handler cannot rescue it, because on
+    the quorum path it resolves at ``n_required`` and returns without recording a
+    "timed out after" reason. Gating on ``_retry_converge_gate_is_decided`` instead
+    proceeds the moment the quorum is met.
+    """
+    wf = _wf(_retry("b1", "b2"))
+    graph = _one_of_two_converge_graph()
+    resolved_parameters = {"strategy": "any", "n_required": 1}
+    predecessor_ids = graph.get_predecessors("join")
+
+    # b1 won the rerun; b2 is still in flight (no namespace, not terminal).
+    wf.resolver.set_namespace("b1", {"v": 1, "status": "completed"})
+
+    # Quorum is met, so the gate is decided and the converge may proceed...
+    assert wf._retry_converge_gate_is_decided("join", resolved_parameters, graph) is True
+    # ...even though a branch the old guard waited for has not reached a terminal
+    # state. The old ``_all_predecessors_terminal`` wait would still be blocked here.
+    assert wf._all_predecessors_terminal(predecessor_ids) is False
+
+
+def test_retry_converge_gate_waits_until_the_quorum_is_actually_met() -> None:
+    """The fix must not proceed before any branch satisfies the gate.
+
+    With both branches still in flight the 1-of-2 gate is undecided, so the
+    converge must keep waiting rather than racing ahead to a stale restore.
+    """
+    wf = _wf(_retry("b1", "b2"))
+    graph = _one_of_two_converge_graph()
+    resolved_parameters = {"strategy": "any", "n_required": 1}
+
+    assert wf._retry_converge_gate_is_decided("join", resolved_parameters, graph) is False
+
+
+# ---------------------------------------------------------------------------
 # 4. Nodes downstream of the retry point must re-execute
 # ---------------------------------------------------------------------------
 
