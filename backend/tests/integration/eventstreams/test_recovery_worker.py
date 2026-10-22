@@ -2,15 +2,18 @@
 
 from __future__ import annotations
 
+import asyncio
+from unittest.mock import patch
+
 import pytest
 import pytest_asyncio
-from sqlalchemy import func
+from sqlalchemy import func, text
 from sqlmodel import select
 
 from syntara.core.services.secret_service import create_secret_service
 from syntara.credentials.models.credential import Credential
 from syntara.credentials.models.credential_type import CredentialType
-from syntara.eventstreams.core.deduplication import DeliveryState
+from syntara.eventstreams.core.deduplication import DeliveryState, TemporalAcceptance
 from syntara.eventstreams.core.preparation import PreparedExecution
 from syntara.eventstreams.models.delivery import EventDelivery
 from syntara.eventstreams.models.source import EventSubscriptionSource
@@ -157,3 +160,84 @@ async def test_failure_isolation_across_deliveries(recovery_worker) -> None:
             row = await session.get(EventDelivery, digest)
             assert row.state == DeliveryState.IN_PROGRESS
             assert row.scheduling_failure_count > 0
+
+
+async def test_periodic_execution_holds_no_transaction_during_temporal_calls(
+    recovery_worker,
+) -> None:
+    """No scanner-owned transaction may remain open during Temporal RPCs."""
+    worker, context, temporal, prepared = recovery_worker
+    await context.expire(prepared.claim)
+
+    lock_key = worker._periodic._lock_key
+    lock_free_during_rpc: bool | None = None
+    original_start = temporal.start
+
+    async def checking_start(p: PreparedExecution) -> TemporalAcceptance:
+        nonlocal lock_free_during_rpc
+        async with context.session_factory() as check_session, check_session.begin():
+            result = await check_session.execute(
+                text("SELECT pg_try_advisory_xact_lock(:key)"),
+                {"key": lock_key},
+            )
+            lock_free_during_rpc = bool(result.scalar())
+        return await original_start(p)
+
+    temporal.start = checking_start
+
+    await worker._periodic._execute_cycle()
+
+    assert lock_free_during_rpc is True, "Advisory lock held during Temporal RPC"
+    assert len(temporal.starts) == 1
+
+
+async def test_concurrent_scanners_claim_independently(recovery_worker) -> None:
+    """Overlapping recovery scans with separate sessions must not duplicate work."""
+    worker, context, temporal, prepared = recovery_worker
+    await context.expire(prepared.claim)
+
+    worker2 = EventDeliveryRecoveryWorker(context.session_factory, temporal, batch_limit=10, worker_id="concurrent-2")
+
+    counts = await asyncio.gather(worker.tick(), worker2.tick())
+    assert sum(counts) == 1
+    assert len(temporal.starts) == 1
+
+
+async def test_drain_during_blocked_temporal_prevents_further_claims(
+    recovery_worker,
+) -> None:
+    """Drain while Temporal call is blocked stops new claims; evidence survives timeout."""
+    worker, context, temporal, prepared = recovery_worker
+    await context.expire(prepared.claim)
+
+    second_claim = await context.claim(42, prepare=True)
+    await context.expire(second_claim)
+
+    temporal_blocked = asyncio.Event()
+    temporal_release = asyncio.Event()
+    original_start = temporal.start
+
+    async def blocking_start(p: PreparedExecution) -> TemporalAcceptance:
+        temporal_blocked.set()
+        await temporal_release.wait()
+        return await original_start(p)
+
+    temporal.start = blocking_start
+
+    execute_task = asyncio.create_task(worker._periodic._execute_cycle())
+    await temporal_blocked.wait()
+
+    with patch("syntara.eventstreams.services.recovery_worker.DRAIN_TIMEOUT_SECONDS", 0.05):
+        await worker.drain()
+
+    assert worker.draining
+
+    temporal_release.set()
+    await execute_task
+
+    assert len(temporal.starts) == 1
+
+    async with context.session_factory() as session:
+        second = await session.get(EventDelivery, second_claim.identity.digest)
+        assert second.state == DeliveryState.IN_PROGRESS
+        assert second.frozen_binding is not None

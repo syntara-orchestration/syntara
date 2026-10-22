@@ -77,6 +77,19 @@ def _worker(
     return worker, mock_claim_recover
 
 
+def test_periodic_composition_disables_advisory_lock_coordination() -> None:
+    """Recovery scanner must not hold an advisory-lock transaction across Temporal RPCs."""
+    launcher = SimpleNamespace(
+        history_retention_seconds=AsyncMock(return_value=259200),
+        start=AsyncMock(),
+        describe=AsyncMock(),
+    )
+    session_factory = MagicMock()
+    with patch("syntara.eventstreams.services.recovery_worker.EventAdmissionService"):
+        worker = EventDeliveryRecoveryWorker(session_factory, launcher, worker_id="test")
+    assert worker._periodic._coordinate is False
+
+
 @pytest.mark.asyncio
 async def test_tick_scans_due_deliveries() -> None:
     identity = _identity()
