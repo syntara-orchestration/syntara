@@ -936,6 +936,55 @@ async function waitForApprovalPanel(page: Page) {
   await expect(page.getByRole('heading', { name: 'Review approval' })).toBeVisible({ timeout: 15_000 })
 }
 
+const MOCK_FORM_PROMPT_EXECUTION_ID = 'exec-form-prompt-textarea-layout'
+const MOCK_FORM_PROMPT_TEXTAREA_LAYOUT_ID = 'fp-exec-form-prompt-textarea-layout'
+
+async function waitForFormPromptRespondPanel(page: Page) {
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible({ timeout: 20_000 })
+  await expect(page.getByRole('heading', { name: 'Respond to prompt' })).toBeVisible({ timeout: 15_000 })
+  await expect(page.getByText('Summary and details fields for respond-panel layout.')).toBeVisible()
+  await expect(page.getByRole('textbox', { name: 'Summary' })).toBeVisible()
+  await expect(page.getByRole('textbox', { name: 'Details' })).toBeVisible()
+}
+
+export const formPromptInteractivePages: PageEntry[] = [
+  {
+    section: 'executions',
+    name: 'form-prompt-side-panel-textarea',
+    path: `${AppRoute.Executions.Execution.replace(':executionId', MOCK_FORM_PROMPT_EXECUTION_ID)}?form_prompt=${MOCK_FORM_PROMPT_TEXTAREA_LAYOUT_ID}&history=closed`,
+    perceptual: true,
+    waitFor: waitForFormPromptRespondPanel,
+  },
+  {
+    section: 'executions',
+    name: 'form-prompt-side-panel-textarea-widened',
+    path: `${AppRoute.Executions.Execution.replace(':executionId', MOCK_FORM_PROMPT_EXECUTION_ID)}?form_prompt=${MOCK_FORM_PROMPT_TEXTAREA_LAYOUT_ID}&history=closed`,
+    perceptual: true,
+    waitFor: waitForFormPromptRespondPanel,
+    setup: async (page) => {
+      await page.getByRole('textbox', { name: 'Details' }).evaluate((textarea) => {
+        const control = textarea.parentElement
+        if (!control) {
+          throw new Error('Expected textarea form-control wrapper')
+        }
+        control.style.width = '500px'
+      })
+    },
+  },
+  {
+    section: 'executions',
+    name: 'form-prompt-side-panel-textarea-validation',
+    path: `${AppRoute.Executions.Execution.replace(':executionId', MOCK_FORM_PROMPT_EXECUTION_ID)}?form_prompt=${MOCK_FORM_PROMPT_TEXTAREA_LAYOUT_ID}&history=closed`,
+    perceptual: true,
+    waitFor: waitForFormPromptRespondPanel,
+    setup: async (page) => {
+      await expect(page.getByRole('button', { name: 'Submit response' })).toBeEnabled({ timeout: 10_000 })
+      await page.getByRole('button', { name: 'Submit response' }).click()
+      await expect(page.getByText('This field is required')).toBeVisible()
+    },
+  },
+]
+
 export const approvalInteractivePages: PageEntry[] = [
   {
     section: 'approvals',

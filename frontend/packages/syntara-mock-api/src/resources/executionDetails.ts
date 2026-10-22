@@ -24,6 +24,27 @@ const collectInputFormParameters = {
   },
 } satisfies Extract<WorkflowNode, { type: 'form_prompt' }>['parameters']
 
+const layoutCheckFormParameters = {
+  form_definition: {
+    fields: [
+      {
+        value_name: 'summary',
+        type: 'text' as const,
+        label: 'Summary',
+        required: true,
+        placeholder: 'Describe the change',
+      },
+      {
+        value_name: 'details',
+        type: 'textarea' as const,
+        label: 'Details',
+        required: false,
+        placeholder: 'Additional context',
+      },
+    ],
+  },
+} satisfies Extract<WorkflowNode, { type: 'form_prompt' }>['parameters']
+
 const continueDefaultsScriptParameters = {
   language: 'python' as const,
   code: '# continue with defaults',
@@ -47,6 +68,15 @@ function collectInputNode(settings?: { timeout: number }): WorkflowNode {
     name: 'Collect operator input',
     parameters: collectInputFormParameters,
     ...(settings ? { settings } : {}),
+  }
+}
+
+function layoutCheckNode(): WorkflowNode {
+  return {
+    id: 'layout_check',
+    type: 'form_prompt',
+    name: 'Textarea layout check',
+    parameters: layoutCheckFormParameters,
   }
 }
 
@@ -75,6 +105,13 @@ export function getExecutionDetail(executionId: string): ExecutionDetailResponse
     return {
       ...base,
       workflow_definition: { nodes: [collectInputNode({ timeout: 1 })] },
+    }
+  }
+
+  if (execution.id === 'exec-form-prompt-textarea-layout') {
+    return {
+      ...base,
+      workflow_definition: { nodes: [layoutCheckNode()] },
     }
   }
 

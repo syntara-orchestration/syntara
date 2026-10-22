@@ -20,6 +20,7 @@ import { APP_TITLE } from '../helpers/appTitle'
 import { MOCK_IDENTITY_PROVIDER_ID } from './mock-ids'
 import {
   approvalInteractivePages,
+  formPromptInteractivePages,
   authenticationInteractivePages,
   builderInteractivePages,
   credentialDialogPages,
@@ -229,6 +230,7 @@ export const pages: PageEntry[] = [
       await expect(page.locator('table tbody tr').first()).toBeVisible()
     },
   },
+  ...formPromptInteractivePages,
   ...approvalInteractivePages,
 
   // ══════════════════════════════════════════════════════════════════════════
