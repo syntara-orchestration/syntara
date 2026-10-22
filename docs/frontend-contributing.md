@@ -10,7 +10,7 @@ All pull requests must pass the `(Frontend) Required Checks` CI gate before merg
 
 This project ships with AI agent skills (canonical files in `.agents/skills/`; Claude Code symlinks in `.claude/skills/`) that guide agents through the development workflow — implementing features, reviewing code, and writing tests — using the project's standards. These skills work with Codex, Claude Code, Cursor, or any tool that reads the skill files.
 
-**New contributors should read [`docs/ai-assisted-development.md`](docs/ai-assisted-development.md) before writing any code.** It explains:
+**New contributors should read [AI-Assisted Development](frontend/ai-assisted-development.md) before writing any code.** It explains:
 
 - How to use the **Frontend Specialist** agent to implement a feature using PatternFly, typed API clients, and Zod + react-hook-form
 - How to use the **PR Review** skill to check your code against the quality checklist before opening a PR

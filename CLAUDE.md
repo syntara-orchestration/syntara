@@ -46,8 +46,10 @@ directories for Claude Code:
 
 - **`frontend-*`** — Frontend-specific skills (coding standards, PR review, PatternFly UX, testing, Playwright E2E, library references, a11y audit)
 - **`backend-*`** — Backend-specific skills (API spec drift detection)
+- **`podman-compose-spinup-pr`** — Spin up the full podman-compose environment to locally test a specific PR (OS-agnostic, with automatic Windows workarounds)
+- **`podman-compose-teardown`** — Tear down any running podman-compose environment and clean up containers (pass `--purge` to also remove volumes/data)
 
-User-invocable skills: `/frontend-review-pr`, `/frontend-build-ui-feature`, `/frontend-a11y-audit`, `/backend-fix-api-spec-drift`. Reference skills (coding standards, testing guidelines, a11y audit methodology, etc.) are loaded automatically by Claude when working on relevant files. Load triggers are listed in `frontend/AGENTS.md` and component `AGENTS.md` files.
+User-invocable skills: `/frontend-review-pr`, `/frontend-build-ui-feature`, `/frontend-a11y-audit`, `/backend-fix-api-spec-drift`, `/podman-compose-spinup-pr`, `/podman-compose-teardown`. Reference skills (coding standards, testing guidelines, a11y audit methodology, etc.) are loaded automatically by Claude when working on relevant files. Load triggers are listed in `frontend/AGENTS.md` and component `AGENTS.md` files.
 
 ## Development Workflow
 

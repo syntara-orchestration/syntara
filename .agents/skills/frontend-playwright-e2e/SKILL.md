@@ -153,7 +153,7 @@ From the existing tests, note:
 - **File naming:** `feature-name.spec.ts` (kebab-case)
 - **Test titles:** Descriptive, user-action-based ("user creates and saves a multi-step workflow")
 - **Scoping:** Some files use `test.describe()` blocks (accessibility, filtering), others use top-level tests
-- **Conditional skipping:** `test.skip(!condition, 'reason')` for environment-dependent tests (see [Data-Dependent Tests](#data-dependent-tests--fail-when-expected-data-is-missing) for when to use `test.skip` vs `expect`)
+- **Conditional skipping:** `test.skip(!condition, 'reason')` for environment-dependent tests (see [Data-Dependent Tests](#data-dependent-tests-fail-when-expected-data-is-missing) for when to use `test.skip` vs `expect`)
 - **Multi-tab testing:** Some tests use `{ app, context }` to test URL sharing across tabs
 
 **CRITICAL:** New tests MUST match existing style. A reviewer should not be able to distinguish new tests from existing ones.
