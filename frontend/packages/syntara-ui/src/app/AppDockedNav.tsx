@@ -37,6 +37,7 @@ import { Link, useNavigate, useRouterState } from '@tanstack/react-router'
 import { use, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { authClient } from '../client'
+import { CommandPaletteNavButton } from '../components/command-palette/CommandPaletteNavButton'
 import { useAlerts } from '../providers/alerts'
 import { useBrand } from '../providers/brand'
 import { useColorScheme } from '../providers/theme/useColorScheme'
@@ -441,6 +442,9 @@ export function AppDockedNav() {
                 align={{ default: 'alignEnd' }}
                 gap={{ default: 'gapNone', md: 'gapMd' }}
               >
+                <ToolbarItem>
+                  <CommandPaletteNavButton className={styles.dockedAction} showTooltip={showTooltips} />
+                </ToolbarItem>
                 <ToolbarItem>
                   <Button
                     variant="plain"
