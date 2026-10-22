@@ -112,6 +112,16 @@ type ExecutionStoreState = {
   activityErrors: Map<string, string>
   /** Execution metadata (includes mode, pre_resolved_nodes for test runs, etc.) */
   executionMetadata: ExecutionMetadata | null
+  /**
+   * Timestamp replayed steps predate, resolved from REST execution data.
+   *
+   * Terminal executions never stream, so the WebSocket `initial_snapshot` that
+   * normally fills `visualization` (and with it the retry replay baseline)
+   * never arrives. The ExecutionDetail page sets this from the REST execution so
+   * retry replay indicators resolve for completed/failed retried runs too.
+   * `null` when the execution is not a retry.
+   */
+  retryReplayBaseline: string | null
 
   // === WebSocket State ===
   /** WebSocket connection state */
@@ -197,6 +207,13 @@ type ExecutionStoreActions = {
    * Set execution metadata (mode, pre_resolved_nodes for test runs, etc.)
    */
   setExecutionMetadata: (metadata: ExecutionMetadata | null) => void
+
+  /**
+   * Set the retry replay baseline from REST execution data.
+   * Used by the ExecutionDetail page so terminal retried runs — which never
+   * stream a `visualization` — still surface replay indicators.
+   */
+  setRetryReplayBaseline: (baseline: string | null) => void
 
   // === Reset ===
   /**
@@ -318,6 +335,7 @@ const initialState: ExecutionStoreState = {
   activityStates: new Map(),
   activityErrors: new Map(),
   executionMetadata: null,
+  retryReplayBaseline: null,
 
   // WebSocket State
   isConnected: false,
@@ -531,6 +549,11 @@ export const useExecutionStore = create<ExecutionStore>((set, get) => ({
     set({ executionMetadata: metadata })
   },
 
+  setRetryReplayBaseline: (baseline: string | null) => {
+    if (get().retryReplayBaseline === baseline) return
+    set({ retryReplayBaseline: baseline })
+  },
+
   // === Reset ===
 
   reset: () => {
@@ -605,7 +628,10 @@ export const selectIsLoaded = (state: ExecutionStore) => state.visualization !==
  * @see resolveRetryReplayBaseline
  */
 export const selectRetryReplayBaseline = (state: ExecutionStore): string | null =>
-  resolveRetryReplayBaseline(state.visualization?.createdAt, state.visualization?.retriedFromExecutionId)
+  // Streaming visualization is authoritative when present; terminal runs fall
+  // back to the baseline the ExecutionDetail page resolved from REST data.
+  resolveRetryReplayBaseline(state.visualization?.createdAt, state.visualization?.retriedFromExecutionId) ??
+  state.retryReplayBaseline
 
 // ============================================================================
 // Action Accessors - Use these to access actions without subscribing to state

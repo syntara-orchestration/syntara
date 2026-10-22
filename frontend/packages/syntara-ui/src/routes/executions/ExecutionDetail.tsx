@@ -43,6 +43,7 @@ import { useExecutionStepClick } from './hooks/useExecutionStepClick'
 import { useExecutionStreaming, useSyncActivityStore } from './hooks/useExecutionStreaming'
 import { useExecutionWorkflow } from './hooks/useExecutionWorkflow'
 import { useForkWorkflow } from './hooks/useForkWorkflow'
+import { RetryFromFailureSidePanel } from './RetryFromFailureSidePanel'
 
 /** Returns true when the page should render a fallback (missing ID, loading, or error) instead of the main content. */
 function shouldShowFallbackState(
@@ -63,6 +64,32 @@ function useResetOnExecutionChange(executionId: string | undefined) {
     }
     prevExecutionIdRef.current = executionId ?? null
   }, [executionId, reset])
+}
+
+function openRetryReview({
+  navigate,
+  executionId,
+  historyCardOpen,
+  closeApprovalPanel,
+  setRetryPanelOpen,
+}: Readonly<{
+  navigate: ReturnType<typeof useNavigate>
+  executionId: string
+  historyCardOpen: boolean
+  closeApprovalPanel: () => void
+  setRetryPanelOpen: (open: boolean) => void
+}>) {
+  closeApprovalPanel()
+  if (historyCardOpen) {
+    detachPromise(
+      navigate({
+        to: '/executions/$executionId',
+        params: { executionId },
+        search: (prev: Record<string, unknown>) => ({ ...prev, history: 'closed' }),
+      })
+    )
+  }
+  setRetryPanelOpen(true)
 }
 
 /** Build activity name map from workflow definition for resolving approval node names. */
@@ -100,6 +127,9 @@ type ExecutionWorkflow = {
 function ExecutionDetailContent({
   historyCardOpen,
   approvalPanel,
+  retryPanelOpen,
+  activityNameMap,
+  onRetryPanelClose,
   workflow,
   execution,
   activities,
@@ -117,6 +147,9 @@ function ExecutionDetailContent({
 }: Readonly<{
   historyCardOpen: boolean
   approvalPanel?: React.ReactNode
+  retryPanelOpen: boolean
+  activityNameMap: ReadonlyMap<string, string>
+  onRetryPanelClose: () => void
   workflow?: ExecutionWorkflow
   execution: Execution | undefined
   activities: (ActivityData | ActivityExecution)[]
@@ -142,6 +175,14 @@ function ExecutionDetailContent({
   const { showError } = useAlerts()
   const prevStatusRef = useRef(execution?.status)
   const [panelHeight, setPanelHeight] = useState(300)
+  const retryPanel = retryPanelOpen ? (
+    <RetryFromFailureSidePanel
+      executionId={executionId}
+      activityNameMap={activityNameMap}
+      selectedNodeId={selectedNodeId}
+      onClose={onRetryPanelClose}
+    />
+  ) : undefined
 
   const showFailureToast = useCallback(() => {
     showError({
@@ -238,6 +279,7 @@ function ExecutionDetailContent({
       </FlexItem>
 
       {approvalPanel && <FlexItem className={styles.approvalPanelSlot}>{approvalPanel}</FlexItem>}
+      {retryPanel && <FlexItem className={styles.approvalPanelSlot}>{retryPanel}</FlexItem>}
 
       {historyCardOpen && (
         <FlexItem className={styles.approvalPanelSlot}>
@@ -324,6 +366,7 @@ export default function ExecutionDetail() {
   )
   const approvalNavigation = useApprovalNavigation(currentIndex, navigateToIndex, approvals)
   const copyToEditorDialog = useDialogState<void>()
+  const [retryPanelOpen, setRetryPanelOpen] = useState(false)
   const isCancellable = isExecutionCancellable(execution?.status)
 
   const { forkAsNewWorkflow, isForkLoading } = useForkWorkflow({
@@ -334,7 +377,10 @@ export default function ExecutionDetail() {
 
   const toggleHistoryCard = () => {
     const willOpen = !historyCardOpen
-    if (willOpen) approval.close()
+    if (willOpen) {
+      approval.close()
+      setRetryPanelOpen(false)
+    }
     detachPromise(
       navigate({
         to: '/executions/$executionId',
@@ -342,6 +388,16 @@ export default function ExecutionDetail() {
         search: (prev: Record<string, unknown>) => ({ ...prev, history: willOpen ? 'open' : 'closed' }),
       })
     )
+  }
+
+  const openRetryPanel = () => {
+    openRetryReview({
+      navigate,
+      executionId,
+      historyCardOpen,
+      closeApprovalPanel: approval.close,
+      setRetryPanelOpen,
+    })
   }
 
   if (shouldShowFallbackState(executionId, executionQuery)) {
@@ -387,15 +443,16 @@ export default function ExecutionDetail() {
               isCancellable={isCancellable}
               executionId={executionId}
               execution={execution}
+              onRetryFromFailureClick={openRetryPanel}
             />
           }
         />
         <SynPageBody>
           <ExecutionDetailContent
             key={executionId}
-            historyCardOpen={historyCardOpen && !approval.panelOpen}
+            historyCardOpen={historyCardOpen && !approval.panelOpen && !retryPanelOpen}
             approvalPanel={
-              approval.panelOpen && currentApproval ? (
+              !retryPanelOpen && approval.panelOpen && currentApproval ? (
                 <ApprovalSidePanel
                   approval={currentApproval}
                   message={approval.approvalMessage}
@@ -412,6 +469,9 @@ export default function ExecutionDetail() {
                 />
               ) : undefined
             }
+            retryPanelOpen={retryPanelOpen}
+            activityNameMap={activityNameMap}
+            onRetryPanelClose={() => setRetryPanelOpen(false)}
             workflow={workflow}
             execution={execution}
             activities={activities}

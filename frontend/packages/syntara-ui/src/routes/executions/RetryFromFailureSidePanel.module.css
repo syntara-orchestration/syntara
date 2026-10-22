@@ -1,0 +1,44 @@
+.panel {
+  height: 100%;
+  max-height: 100%;
+  width: min(24rem, 92vw);
+  flex-shrink: 0;
+}
+
+.panelInner {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.panelStack {
+  height: 100%;
+  min-height: 0;
+}
+
+.headerPadding {
+  flex-shrink: 0;
+  padding: var(--pf-t--global--spacer--lg) var(--pf-t--global--spacer--md) var(--pf-t--global--spacer--md);
+}
+
+.bodyPadding {
+  min-height: 0;
+  padding: 0 var(--pf-t--global--spacer--md) var(--pf-t--global--spacer--md);
+}
+
+.summary {
+  align-items: flex-start;
+}
+
+.summaryNumber {
+  display: block;
+  font-size: var(--pf-t--global--font--size--heading--h3);
+}
+
+.retryPoint {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pf-t--global--spacer--xs);
+}

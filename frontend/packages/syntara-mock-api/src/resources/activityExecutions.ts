@@ -125,6 +125,73 @@ export const activityExecutions: Record<string, ActivityExecution[]> = {
       iteration: null,
     },
   ],
+  // Retry of exec-3 (conditional-demo). The retry was started from the
+  // temperature_routing failure point, so check_temperature is *reused* from the
+  // source run: its started_at (hoursAgo6Plus1s) predates this run's created_at
+  // (hoursAgo1), which is what drives the "Reused output" badge. The downstream
+  // steps ran fresh in this retry (started_at at/after created_at).
+  'exec-3-retry': [
+    {
+      id: 'act-3-retry-1',
+      created_at: mockDate.hoursAgo6Plus1s,
+      updated_at: mockDate.hoursAgo6Plus2s,
+      execution_id: 'exec-3-retry',
+      activity_name: 'check_temperature',
+      status: 'completed',
+      started_at: mockDate.hoursAgo6Plus1s,
+      completed_at: mockDate.hoursAgo6Plus2s,
+      input_data: {
+        temp: 42,
+      } as Record<string, unknown>,
+      output_data: {
+        temp_value: '42',
+        stdout: 'Current temperature: 42°C',
+      } as Record<string, unknown>,
+      error_details: null,
+      retry_count: 0,
+      iteration: null,
+    },
+    {
+      id: 'act-3-retry-2',
+      created_at: mockDate.hoursAgo1,
+      updated_at: mockDate.hoursAgo1Plus1s,
+      execution_id: 'exec-3-retry',
+      activity_name: 'temperature_routing',
+      status: 'completed',
+      started_at: mockDate.hoursAgo1,
+      completed_at: mockDate.hoursAgo1Plus1s,
+      input_data: {
+        temperature: 42,
+      } as Record<string, unknown>,
+      output_data: {
+        branch: 'true',
+        condition_result: true,
+      } as Record<string, unknown>,
+      error_details: null,
+      retry_count: 0,
+      iteration: null,
+    },
+    {
+      id: 'act-3-retry-3',
+      created_at: mockDate.hoursAgo1Plus1s,
+      updated_at: mockDate.minutesAgo30,
+      execution_id: 'exec-3-retry',
+      activity_name: 'hot_weather',
+      status: 'completed',
+      started_at: mockDate.hoursAgo1Plus1s,
+      completed_at: mockDate.minutesAgo30,
+      input_data: {
+        temperature: 42,
+      } as Record<string, unknown>,
+      output_data: {
+        stdout: 'It is hot! Stay hydrated.',
+        recommendation: 'Stay indoors and drink water',
+      } as Record<string, unknown>,
+      error_details: null,
+      retry_count: 0,
+      iteration: null,
+    },
+  ],
   'exec-4': [
     {
       id: 'act-4-1',

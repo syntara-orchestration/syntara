@@ -2,9 +2,10 @@ import { ExecutionStatusEnum } from '@syntara/contracts'
 
 import {
   canConfirmRetryFromFailure,
-  describeRetryScope,
   eligibleRetryPointIds,
+  getRetryPlanPoints,
   isRetryFromFailureEligible,
+  selectedRetryPointId,
   type RetryFromFailurePreview,
 } from './retryFromFailure'
 
@@ -55,33 +56,48 @@ describe('eligibleRetryPointIds', () => {
   })
 })
 
-describe('describeRetryScope', () => {
-  it('describes a single failure point re-running one step', () => {
-    expect(describeRetryScope(preview({ eligible_point_ids: ['a'], total_step_count: 1 }))).toBe(
-      'Retrying will resume at 1 failure point and re-run 1 step. Steps that already completed keep their output.'
-    )
+describe('getRetryPlanPoints', () => {
+  it('resolves display names, iteration labels, and backend step counts', () => {
+    expect(
+      getRetryPlanPoints(
+        preview({
+          eligible_point_ids: ['node-a', 'node-b#iter-2'],
+          step_count_by_eligible_point: { 'node-a': 4, 'node-b#iter-2': 2 },
+        }),
+        new Map([
+          ['node-a', 'First Step'],
+          ['node-b', 'Loop Step'],
+        ])
+      )
+    ).toEqual([
+      { id: 'node-a', name: 'First Step', stepCount: 4 },
+      { id: 'node-b#iter-2', name: 'Loop Step (Iteration 3)', stepCount: 2 },
+    ])
   })
 
-  it('pluralizes multiple failure points and steps', () => {
-    expect(describeRetryScope(preview({ eligible_point_ids: ['a', 'b'], total_step_count: 5 }))).toBe(
-      'Retrying will resume at 2 failure points and re-run 5 steps. Steps that already completed keep their output.'
-    )
+  it('falls back to the source node ID if its display name is unavailable', () => {
+    expect(getRetryPlanPoints(preview({ eligible_point_ids: ['unknown-node'] }), new Map())).toEqual([
+      { id: 'unknown-node', name: 'unknown-node', stepCount: undefined },
+    ])
+  })
+})
+
+describe('selectedRetryPointId', () => {
+  it('uses a selected failure activity as a base-node retry point', () => {
+    expect(selectedRetryPointId('node-a#iter-3', preview({ eligible_point_ids: ['node-a', 'node-b'] }))).toBe('node-a')
   })
 
-  it('states that nothing needs re-running when the total is zero', () => {
-    expect(describeRetryScope(preview({ eligible_point_ids: ['a'], total_step_count: 0 }))).toBe(
-      'Retrying will resume at 1 failure point. No additional steps need to re-run.'
-    )
+  it('does not turn a non-failure selection into an explicit retry point', () => {
+    expect(selectedRetryPointId('completed-node', preview({ eligible_point_ids: ['node-a'] }))).toBeUndefined()
   })
 
-  it('reports when no failure points were found', () => {
-    expect(describeRetryScope(preview({ eligible_point_ids: [], total_step_count: 0 }))).toBe(
-      'No failed steps were found to retry from.'
-    )
-  })
-
-  it('falls back to the no-failure-points copy when the preview is absent', () => {
-    expect(describeRetryScope(undefined)).toBe('No failed steps were found to retry from.')
+  it('does not allow a sanitized auto-included node to become an explicit retry point', () => {
+    expect(
+      selectedRetryPointId(
+        'sanitized-node',
+        preview({ eligible_point_ids: ['failed-node', 'sanitized-node'], auto_included_node_ids: ['sanitized-node'] })
+      )
+    ).toBeUndefined()
   })
 })
 

@@ -1,6 +1,8 @@
 import { ExecutionStatusEnum } from '@syntara/contracts'
 import type { ExecutionsAPI } from '@syntara/contracts'
 
+import { parseCompositeKey } from '../workflows/execution/utils/activityState'
+
 type ExecutionStatus = ExecutionsAPI.components['schemas']['ExecutionStatus']
 
 export type RetryFromFailurePreview = ExecutionsAPI.components['schemas']['RetryFromFailureValidationResponse']
@@ -34,29 +36,42 @@ export function eligibleRetryPointIds(preview: RetryFromFailurePreview | undefin
   return preview?.eligible_point_ids ?? []
 }
 
-/**
- * Copy for the confirmation body. The preview deliberately returns no
- * node-by-node breakdown, so this never claims more detail than the API gives.
- */
-export function describeRetryScope(preview: RetryFromFailurePreview | undefined): string {
-  const total = preview?.total_step_count ?? 0
-  const points = eligibleRetryPointIds(preview).length
-
-  if (points === 0) {
-    return 'No failed steps were found to retry from.'
-  }
-
-  const stepNoun = total === 1 ? 'step' : 'steps'
-  const pointNoun = points === 1 ? 'failure point' : 'failure points'
-
-  if (total === 0) {
-    return `Retrying will resume at ${points} ${pointNoun}. No additional steps need to re-run.`
-  }
-
-  return `Retrying will resume at ${points} ${pointNoun} and re-run ${total} ${stepNoun}. Steps that already completed keep their output.`
+/** Use a selected failed node as the retry point; iteration rows map to their base node ID. */
+export function selectedRetryPointId(
+  selectedNodeId: string | null | undefined,
+  preview: RetryFromFailurePreview | undefined
+): string | undefined {
+  if (!selectedNodeId) return undefined
+  const baseId = parseCompositeKey(selectedNodeId).baseId
+  const autoIncluded = preview?.auto_included_node_ids ?? []
+  return eligibleRetryPointIds(preview).includes(baseId) && !autoIncluded.includes(baseId) ? baseId : undefined
 }
 
-/** Whether the dialog's confirm button should be enabled. */
+export type RetryPlanPoint = Readonly<{
+  id: string
+  name: string
+  stepCount: number | undefined
+}>
+
+/** Resolve the preview's retry points to UI names without inferring downstream nodes. */
+export function getRetryPlanPoints(
+  preview: RetryFromFailurePreview | undefined,
+  activityNameMap: ReadonlyMap<string, string>
+): RetryPlanPoint[] {
+  return eligibleRetryPointIds(preview).map((id) => {
+    const { baseId, iteration } = parseCompositeKey(id)
+    const baseName = activityNameMap.get(baseId) ?? activityNameMap.get(id) ?? baseId
+    const name = iteration === undefined ? baseName : `${baseName} (Iteration ${iteration + 1})`
+
+    return {
+      id,
+      name,
+      stepCount: preview?.step_count_by_eligible_point?.[id],
+    }
+  })
+}
+
+/** Whether the retry action should be enabled. */
 export function canConfirmRetryFromFailure(
   preview: RetryFromFailurePreview | undefined,
   isLoading: boolean,

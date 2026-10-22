@@ -1,5 +1,6 @@
 import { Button, FlexItem } from '@patternfly/react-core'
 import type { ExecutionsAPI } from '@syntara/contracts'
+import type { ReactNode } from 'react'
 
 import { ApprovalPendingBadge } from '../../components/labels/ApprovalPendingBadge'
 import { SynLabel } from '../../components/labels/SynLabel'
@@ -65,6 +66,7 @@ export type ExecutionDetailHeaderToolbarProps = Readonly<{
   isCancellable: boolean
   executionId: string
   execution: Execution | undefined
+  onRetryFromFailureClick?: () => void
 }>
 
 export function ExecutionDetailHeaderToolbar({
@@ -79,9 +81,34 @@ export function ExecutionDetailHeaderToolbar({
   isCancellable,
   executionId,
   execution,
+  onRetryFromFailureClick,
 }: ExecutionDetailHeaderToolbarProps) {
   const isRetryable = isExecutionRetryable(execution?.status, execution?.mode)
   const showRetryFromFailure = isRetryFromFailureEligible(execution?.status, execution?.mode)
+  let retryAction: ReactNode = null
+
+  if (execution && isRetryable && showRetryFromFailure) {
+    retryAction = (
+      <RetryExecutionButton
+        executionId={executionId}
+        workflowId={execution.workflow_id}
+        workflowVersionId={execution.workflow_version_id}
+        projectId={execution.project_id}
+        retryFromFailure={{ projectId: execution.project_id, onClick: onRetryFromFailureClick }}
+      />
+    )
+  } else if (execution && isRetryable) {
+    retryAction = (
+      <RetryExecutionButton
+        executionId={executionId}
+        workflowId={execution.workflow_id}
+        workflowVersionId={execution.workflow_version_id}
+        projectId={execution.project_id}
+      />
+    )
+  } else if (execution && showRetryFromFailure) {
+    retryAction = <RetryFromFailureButton projectId={execution.project_id} onClick={onRetryFromFailureClick} />
+  }
 
   return (
     <>
@@ -95,17 +122,7 @@ export function ExecutionDetailHeaderToolbar({
       {isCancellable && execution && (
         <CancelExecutionButton executionId={executionId} projectId={execution.project_id} />
       )}
-      {isRetryable && execution && (
-        <RetryExecutionButton
-          executionId={executionId}
-          workflowId={execution.workflow_id}
-          workflowVersionId={execution.workflow_version_id}
-          projectId={execution.project_id}
-        />
-      )}
-      {showRetryFromFailure && execution && (
-        <RetryFromFailureButton executionId={executionId} projectId={execution.project_id} />
-      )}
+      {retryAction}
       <Button variant="secondary" onClick={onCopyToEditor}>
         Copy to editor
       </Button>
