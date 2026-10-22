@@ -415,6 +415,26 @@ async def test_preflight_requires_each_resource_permission(scenario: InspectionS
     connect.assert_not_called()
 
 
+@pytest.mark.ssrf_enforced
+async def test_preflight_rejects_blocked_broker_before_credential_resolution(scenario: InspectionScenario) -> None:
+    """Apply the real outbound policy and return a safe RFC 9457 error."""
+    scenario.integration.configuration = KafkaConfiguration(bootstrap_servers=["169.254.169.254:9093"])
+    await scenario.session.commit()
+    with (
+        patch("syntara.integrations.services.integration_service.IntegrationService.resolve_credential") as resolve,
+        patch(f"{_KAFKA_MODULE}.create_conn") as connect,
+    ):
+        response = await scenario.client.post(f"{scenario.url}/test", json=scenario.parameters())
+    assert response.status_code == 422, response.text
+    assert response.headers["content-type"] == "application/problem+json"
+    assert response.json()["detail"] == (
+        "bootstrap_servers must not resolve to a private, reserved, or cloud metadata address."
+    )
+    assert "169.254.169.254" not in response.text
+    resolve.assert_not_called()
+    connect.assert_not_called()
+
+
 @pytest.mark.parametrize(
     "invalid",
     [

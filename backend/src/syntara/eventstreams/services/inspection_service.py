@@ -21,6 +21,7 @@ from syntara.eventstreams.models.responses import (
 )
 from syntara.eventstreams.models.source import EventSubscriptionSource
 from syntara.eventstreams.models.subscription import EventSubscription
+from syntara.integrations.lib.url_validation import validate_integration_configuration_no_ssrf
 from syntara.integrations.models.integration import Integration
 from syntara.integrations.models.integration_configuration import KafkaConfiguration
 from syntara.integrations.services.integration_service import IntegrationService
@@ -143,5 +144,12 @@ class EventSubscriptionInspectionService(BaseService):
         if integration is None or not isinstance(integration.configuration, KafkaConfiguration):
             msg = "Selected Kafka Integration is unavailable"
             raise SafeValueError(msg)
+        # Recheck stored broker addresses before resolving secrets: DNS may have
+        # changed since the Integration was created or last validated.
+        try:
+            validate_integration_configuration_no_ssrf(integration.configuration)
+        except ValueError as exc:
+            msg = "bootstrap_servers must not resolve to a private, reserved, or cloud metadata address."
+            raise SafeValueError(msg) from exc
         credential = await self.integrations.resolve_credential(parameters.credential_id)
         return await test_kafka_connection(integration.configuration, credential, parameters.topic)
