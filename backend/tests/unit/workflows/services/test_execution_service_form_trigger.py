@@ -215,7 +215,7 @@ class TestFormTriggerSubmissionFailures:
         with pytest.raises(TriggerValidationError, match="form definition"):
             ExecutionService._validate_form_trigger_submission(trigger, {"environment": "staging"})
 
-    def test_invalid_authored_default_is_a_trigger_validation_error(self) -> None:
+    def test_wrong_typed_default_is_a_trigger_validation_error(self) -> None:
         trigger = _form_trigger(_field("number", "count", default="not-a-number"))
 
         with pytest.raises(TriggerValidationError, match="form definition"):

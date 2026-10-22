@@ -31,8 +31,8 @@ from syntara.core.models import User
 from syntara.core.services import BaseService
 from syntara.core.services.extensions import ConvertResourceMixin, EnrichQueryMixin
 from syntara.core.services.user_reference_resolution import UserReferenceResolverMixin
-from syntara.forms.exceptions import FormDataValidationError, FormDefinitionError
-from syntara.forms.models.form_fields import DynamicOptions, ResolvedOptions
+from syntara.forms.exceptions import FormDataValidationError
+from syntara.forms.models.form_fields import DynamicOptions, FormDefinition, ResolvedOptions
 from syntara.forms.validators.submission import validate_form_submission
 from syntara.metrics.dependencies import get_metrics_recorder
 from syntara.metrics.emission import emit_completion_metrics
@@ -71,7 +71,6 @@ from syntara.workflows.models.workflow_version import WorkflowVersion
 from syntara.workflows.services.invocation_cancellation import cancel_invocations_for_execution
 from syntara.workflows.utils.workflow_metadata import build_workflow_metadata, resolve_user_display_name
 from syntara.workflows.workflow_engine.models.workflow_definition import (
-    FormTriggerParameters,
     NodeType,
     resolve_trigger_node,
 )
@@ -308,8 +307,8 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
         """Validate and normalize a form-trigger submission.
 
         Returns the same cleaned value shape used by form prompt
-        submissions. The trigger-specific parameter model also verifies that
-        persisted form definitions still obey Form Trigger authoring rules.
+        submissions. Form Triggers additionally reject dynamic options because
+        they have no upstream values from which to resolve them.
         """
         trigger_node_id = trigger_node.get("id")
         validation_context = {
@@ -318,15 +317,13 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
             "trigger_node_id": trigger_node_id,
         }
         raw_parameters = trigger_node.get("parameters")
-        if not isinstance(raw_parameters, dict) or not raw_parameters.get("form_definition"):
-            logger.error("Form trigger has no form definition", **validation_context)
-            msg = "Form trigger is missing its form definition"
-            raise TriggerValidationError(msg)
-
+        raw_form_definition = (
+            raw_parameters.get("form_definition") if isinstance(raw_parameters, dict) else None
+        )
         try:
-            parameters = FormTriggerParameters.model_validate(raw_parameters)
-        except (ValidationError, FormDefinitionError) as exc:
-            error_count = len(exc.errors()) if isinstance(exc, ValidationError) else len(exc.errors)
+            form_definition = FormDefinition.model_validate(raw_form_definition)
+        except ValidationError as exc:
+            error_count = len(exc.errors())
             logger.warning(
                 "Form trigger has an invalid form definition",
                 error_type=type(exc).__name__,
@@ -338,14 +335,14 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
 
         if any(
             isinstance(getattr(field, "options", None), (DynamicOptions, ResolvedOptions))
-            for field in parameters.form_definition.fields
+            for field in form_definition.fields
         ):
             logger.error("Form trigger has unsupported dynamic options", **validation_context)
             msg = "Form trigger form definition contains unsupported dynamic options"
             raise TriggerValidationError(msg)
 
         try:
-            return validate_form_submission(parameters.form_definition, input_data)
+            return validate_form_submission(form_definition, input_data)
         except FormDataValidationError as exc:
             logger.warning(
                 "Form trigger submission validation failed",
