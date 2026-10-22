@@ -12,7 +12,7 @@ from typing import Any
 import pytest
 from temporalio.exceptions import ApplicationError
 
-from syntara.workflows.workflow_engine.activities.output_mapping import apply_output_mapping
+from syntara.workflow_runtime.engines.temporal.activities.output_mapping import apply_output_mapping
 
 # ---------------------------------------------------------------------------
 # None config — no mapping

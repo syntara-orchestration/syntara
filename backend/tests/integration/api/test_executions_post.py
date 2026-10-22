@@ -11,11 +11,11 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from temporalio.service import RPCError, RPCStatusCode
 
 from syntara.core.models import User
-from syntara.workflows.models import Workflow
-from syntara.workflows.models.execution import Execution
-from syntara.workflows.workflow_engine.services.temporal_execution_service import (
+from syntara.workflow_runtime.engines.temporal.services.temporal_execution_service import (
     TemporalExecutionService,
 )
+from syntara.workflows.models import Workflow
+from syntara.workflows.models.execution import Execution
 from tests.helpers.user_reference import assert_user_reference
 
 
