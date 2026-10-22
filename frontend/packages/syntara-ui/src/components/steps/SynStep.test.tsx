@@ -368,6 +368,41 @@ describe('SynStep validation and interaction', () => {
     expect(screen.getByTestId('node-panel')).toHaveStyle({ opacity: '0.5' })
   })
 
+  it('shows the reused-output badge for a replayed step', () => {
+    renderWithFlow(
+      <SynStep nodeProps={baseNodeProps} executionState={{ status: 'completed', replayed: true } as never}>
+        <span>Content</span>
+      </SynStep>
+    )
+
+    expect(screen.getByTestId('replayed-output-badge')).toBeInTheDocument()
+  })
+
+  it('does not show the reused-output badge for an ordinary step', () => {
+    renderWithFlow(
+      <SynStep nodeProps={baseNodeProps} executionState={{ status: 'completed', replayed: false } as never}>
+        <span>Content</span>
+      </SynStep>
+    )
+
+    expect(screen.queryByTestId('replayed-output-badge')).not.toBeInTheDocument()
+  })
+
+  it('keeps the mock-pinned badge instead of the reused-output badge', () => {
+    const nodeProps = {
+      ...baseNodeProps,
+      data: { ...baseNodeProps.data, metadata: { __mockDataPinned: true } },
+    } as unknown as NodeProps
+    renderWithFlow(
+      <SynStep nodeProps={nodeProps} executionState={{ status: 'completed', replayed: true } as never}>
+        <span>Content</span>
+      </SynStep>
+    )
+
+    expect(screen.getByText('Mock data pinned')).toBeInTheDocument()
+    expect(screen.queryByTestId('replayed-output-badge')).not.toBeInTheDocument()
+  })
+
   it('handles re-render with unchanged props', () => {
     const { rerender } = renderWithFlow(
       <SynStep nodeProps={baseNodeProps} rootTestId="node-panel">

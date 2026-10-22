@@ -73,6 +73,19 @@ describe('RetryFromFailureButton', () => {
     expect(onClick).not.toHaveBeenCalled()
   })
 
+  it('disables the dropdown item when the user lacks retry permission', async () => {
+    vi.mocked(useCanI).mockReturnValue({ allowed: false, isChecking: false, isError: false })
+    const user = userEvent.setup()
+    const onClick = vi.fn()
+    renderButton({ asDropdownItem: true, onClick })
+    const menuItem = screen.getByRole('menuitem', { name: 'Retry from failure' })
+
+    expect(menuItem).toHaveAttribute('aria-disabled', 'true')
+    await user.click(menuItem)
+
+    expect(onClick).not.toHaveBeenCalled()
+  })
+
   it('has no accessibility violations', async () => {
     const { container } = renderButton()
     const results = await axe(container)

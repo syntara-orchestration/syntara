@@ -25,28 +25,26 @@ export function RetryFromFailureButton({ projectId, onClick, asDropdownItem = fa
   const isDisabled = !canRun || isChecking
   /* v8 ignore stop */
 
-  return (
-    asDropdownItem ? (
-      <DropdownItem
-        value="retry-from-failure"
+  return asDropdownItem ? (
+    <DropdownItem
+      value="retry-from-failure"
+      onClick={isDisabled ? undefined : onClick}
+      isAriaDisabled={isDisabled}
+      tooltipProps={permissionDenied ? { content: retryTooltip } : undefined}
+      data-testid="retry-from-failure-button"
+    >
+      Retry from failure
+    </DropdownItem>
+  ) : (
+    <DisabledWithTooltip isDisabled={permissionDenied} content={retryTooltip}>
+      <Button
+        variant="secondary"
         onClick={isDisabled ? undefined : onClick}
         isAriaDisabled={isDisabled}
-        tooltipProps={permissionDenied ? { content: retryTooltip } : undefined}
         data-testid="retry-from-failure-button"
       >
         Retry from failure
-      </DropdownItem>
-    ) : (
-      <DisabledWithTooltip isDisabled={permissionDenied} content={retryTooltip}>
-        <Button
-          variant="secondary"
-          onClick={isDisabled ? undefined : onClick}
-          isAriaDisabled={isDisabled}
-          data-testid="retry-from-failure-button"
-        >
-          Retry from failure
-        </Button>
-      </DisabledWithTooltip>
-    )
+      </Button>
+    </DisabledWithTooltip>
   )
 }

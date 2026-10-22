@@ -120,6 +120,87 @@ describe('RetryFromFailureSidePanel', () => {
     expect(screen.getByTestId('retry-from-failure-confirm')).toBeDisabled()
   })
 
+  it('shows a fallback message when the backend does not include a rejection reason', () => {
+    vi.mocked(useRetryFromFailurePreview).mockReturnValue({
+      preview: { eligible: false, eligible_point_ids: [] },
+      isLoading: false,
+      isError: false,
+    })
+    renderPanel()
+
+    expect(screen.getByTestId('retry-rejected')).toHaveTextContent('No failed steps were found to retry from.')
+  })
+
+  it('shows an empty state when an eligible preview contains no retry points', () => {
+    vi.mocked(useRetryFromFailurePreview).mockReturnValue({
+      preview: { eligible: true, eligible_point_ids: [], total_step_count: 0 },
+      isLoading: false,
+      isError: false,
+    })
+    renderPanel()
+
+    expect(screen.getByTestId('retry-no-points')).toBeInTheDocument()
+    expect(screen.getByTestId('retry-from-failure-confirm')).toBeDisabled()
+  })
+
+  it('uses fallback labels when the preview omits retry path step counts', () => {
+    vi.mocked(useRetryFromFailurePreview).mockReturnValue({
+      preview: { eligible: true, eligible_point_ids: ['step-2'] },
+      isLoading: false,
+      isError: false,
+    })
+    renderPanel({ selectedNodeId: 'step-2' })
+
+    expect(screen.getByText('—')).toBeInTheDocument()
+    expect(screen.getByText('Included in the retry plan')).toBeInTheDocument()
+  })
+
+  it('uses the singular step label for a one-step retry path', () => {
+    vi.mocked(useRetryFromFailurePreview).mockReturnValue({
+      preview: {
+        eligible: true,
+        eligible_point_ids: ['step-2'],
+        step_count_by_eligible_point: { 'step-2': 1 },
+        total_step_count: 1,
+      },
+      isLoading: false,
+      isError: false,
+    })
+    renderPanel()
+
+    expect(screen.getByText('1 step in this retry path')).toBeInTheDocument()
+  })
+
+  it('keeps the default plan when the selected node is auto-included', async () => {
+    const user = userEvent.setup()
+    vi.mocked(useRetryFromFailurePreview).mockReturnValue({
+      preview: {
+        eligible: true,
+        eligible_point_ids: ['step-1', 'step-2'],
+        auto_included_node_ids: ['step-2'],
+        step_count_by_eligible_point: { 'step-1': 4, 'step-2': 3 },
+        total_step_count: 5,
+      },
+      isLoading: false,
+      isError: false,
+    })
+    renderPanel({ selectedNodeId: 'step-2' })
+
+    expect(screen.getByText('First Step')).toBeInTheDocument()
+    expect(screen.getByText('Second Step')).toBeInTheDocument()
+    await user.click(screen.getByTestId('retry-from-failure-confirm'))
+
+    expect(mockHandleRetry).toHaveBeenCalledWith(undefined)
+  })
+
+  it('disables retry and cancel while the retry request is pending', () => {
+    vi.mocked(useRetryFromFailure).mockReturnValue({ handleRetry: mockHandleRetry, isPending: true })
+    renderPanel()
+
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled()
+    expect(screen.getByTestId('retry-from-failure-confirm')).toBeDisabled()
+  })
+
   it('calls retry, closes the panel, and navigates to the new execution on success', async () => {
     const user = userEvent.setup()
     const onClose = vi.fn()

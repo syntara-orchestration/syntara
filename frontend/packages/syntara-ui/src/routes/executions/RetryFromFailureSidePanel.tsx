@@ -52,9 +52,7 @@ export function RetryFromFailureSidePanel({
     executionId,
     onSuccess: (newExecutionId) => {
       onClose()
-      detachPromise(
-        navigate({ to: AppRoute.Executions.Execution.replace(':executionId', newExecutionId) })
-      )
+      detachPromise(navigate({ to: AppRoute.Executions.Execution.replace(':executionId', newExecutionId) }))
     },
   })
 
