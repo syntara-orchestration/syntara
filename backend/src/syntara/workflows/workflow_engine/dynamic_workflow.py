@@ -1409,11 +1409,18 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
             # matches the state the scheduler already used to dispatch this node.
             #
             # Proceeding before an unneeded branch is terminal does not revive the
-            # stale-replay bug this guard originally addressed: that branch is then
-            # compared as its actual current (pending / live) state by
-            # _retry_converge_metadata_matches, which no longer equals the source's
-            # restored status, so the metadata comparison falls through to executing
-            # the converge rather than restoring a stale result.
+            # stale-replay bug this guard originally addressed, because
+            # _retry_converge_metadata_matches classifies each predecessor by what
+            # the retry will actually do with it, not by waiting:
+            #   - a branch that will rerun (live) is compared by its actual current
+            #     state, which cannot equal the source's restored status, so the
+            #     comparison falls through and the converge executes; and
+            #   - a branch that will replay is compared by its predicted source
+            #     state, and because the retry restores it to exactly that state,
+            #     restoring the converge from it is correct rather than stale.
+            # Either way the converge only restores when every branch's realised or
+            # predicted state matches the source, so an unneeded pending branch
+            # cannot produce a stale restore.
             await workflow.wait_condition(
                 lambda: (
                     self._retry_converge_gate_is_decided(node_id, resolved_parameters, graph)

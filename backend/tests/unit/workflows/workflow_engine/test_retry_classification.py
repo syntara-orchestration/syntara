@@ -277,6 +277,73 @@ async def test_retry_converge_restores_when_every_branch_matches_source(mock_wf:
     assert ActivityName.CONVERGE not in activities, "a fully matched source converge must restore, not execute"
 
 
+@pytest.mark.asyncio
+async def test_retry_converge_restores_when_a_quorum_branch_is_still_pending_replay(mock_wf: MagicMock) -> None:
+    """Quorum is met while another branch is still pending but *predicted* to replay.
+
+    b1 has been restored and satisfies the 1-of-2 gate; b2 has not run yet -- it is
+    not in ``_restored_node_timestamps`` and has no namespace -- but it is a plain
+    restore candidate, so ``_converge_predecessor_will_replay`` predicts a replay for
+    it from ``_should_restore_node`` rather than from an already-recorded timestamp.
+    Because b2 will be restored to exactly its source state, comparing it by that
+    predicted state is safe and the converge restores. This is the branch of
+    ``_converge_predecessor_will_replay`` that uses predicted (not yet realised)
+    retry state, which the restore review asked to cover explicitly.
+    """
+    wf = _make_workflow({"retry_from_execution_id": "src-1", "eligible_point_ids": ["unrelated"]})
+    graph = _two_branch_converge_graph("any", 1)
+    wf._retry_replay_candidates = {"join"}
+    wf._retry_source_statuses = {"b1": "completed", "b2": "completed", "join": "completed"}
+    wf._retry_source_temporal_statuses = {"b1": "completed", "b2": "completed", "join": "completed"}
+    out1 = {"v": 1, "status": "completed"}
+    # b1 won the quorum via a restore; b2 is predicted-to-replay but has not run yet
+    # (no recorded timestamp, no namespace), so its classification is a prediction.
+    wf._restored_node_timestamps = {"b1": {"started_at": "x"}}
+    wf.resolver.set_namespace("b1", out1)
+
+    b2_source_digest = "b2-source-digest"
+    source_state = {
+        "converge": {
+            "status": ActivityStatus.COMPLETED.value,
+            "input_data": {"strategy": "any", "n_required": 1},
+            "output_branch_count": 2,
+            "gate_metadata": {"strategy": "any", "n_required": 1, "total_branches": 2},
+        },
+        "predecessors": {
+            "b1": {"status": ActivityStatus.COMPLETED.value, "result_digest": wf._retry_converge_result_digest(out1)},
+            "b2": {"status": ActivityStatus.COMPLETED.value, "result_digest": b2_source_digest},
+        },
+    }
+    converge_record = {
+        "output_data": {"status": "completed", "converged": True},
+        "status": ActivityStatus.COMPLETED.value,
+        "input_data": {},
+        "started_at": "s",
+        "completed_at": "c",
+        "control_data": {},
+    }
+
+    async def _activity(name: Any, *_args: Any, **_kwargs: Any) -> Any:  # noqa: ANN401
+        if name == ActivityName.RETRY_CONVERGE_METADATA:
+            return source_state
+        if name == ActivityName.RETRY_NODE_REPLAY:
+            return converge_record
+        pytest.fail(f"unexpected activity {name}")
+
+    mock_wf.wait_condition = AsyncMock()
+    mock_wf.execute_activity = AsyncMock(side_effect=_activity)
+
+    # The pending branch is genuinely a replay candidate...
+    assert wf._should_restore_node("b2", graph)
+    result = await wf._execute_converge_node("join", {"strategy": "any", "n_required": 1}, None, graph)
+
+    # ...so the converge restores from its predicted (source) state rather than
+    # blocking or executing live.
+    assert result == {"output": converge_record["output_data"], "control": None}
+    activities = [call.args[0] for call in mock_wf.execute_activity.call_args_list]
+    assert ActivityName.CONVERGE not in activities, "a predicted-replay quorum branch must restore, not execute"
+
+
 # ---------------------------------------------------------------------------
 # Input parameter overrides
 # ---------------------------------------------------------------------------
