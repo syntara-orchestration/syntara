@@ -250,16 +250,30 @@ export type SynListPanelTableProps = {
   isExpandable?: boolean
   /** Opt out of fixed table layout (rarely needed). */
   useFixedLayout?: boolean
+  /** PatternFly compact density; defaults to compact resource list styling. */
+  isCompact?: boolean
+  /** Prototype compact cell/header tokens; defaults to on for resource lists. */
+  useCompactTableStyles?: boolean
 }
 
 /** Paginated scrollable table for use inside `SynListPanel`. */
-export function SynListPanelTable({ children, caption, footer, isExpandable, useFixedLayout }: SynListPanelTableProps) {
+export function SynListPanelTable({
+  children,
+  caption,
+  footer,
+  isExpandable,
+  useFixedLayout,
+  isCompact,
+  useCompactTableStyles,
+}: SynListPanelTableProps) {
   return (
     <SynScrollableTableContainer
       caption={caption}
       footer={footer}
       isExpandable={isExpandable}
       useFixedLayout={useFixedLayout}
+      isCompact={isCompact}
+      useCompactTableStyles={useCompactTableStyles}
     >
       {children}
     </SynScrollableTableContainer>

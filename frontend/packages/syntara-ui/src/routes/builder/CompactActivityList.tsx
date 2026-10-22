@@ -25,7 +25,7 @@ export function CompactActivityList({
   selectedNodeId,
 }: Readonly<CompactActivityListProps>) {
   return (
-    <SynScrollableTableContainer caption="Activity list" useFixedLayout={false} variant="compact">
+    <SynScrollableTableContainer caption="Activity list" useFixedLayout={false} useCompactTableStyles={false}>
       <Tbody>
         {activityOrder.map(({ id, name, type }) => {
           const state = activityStates.get(id)
