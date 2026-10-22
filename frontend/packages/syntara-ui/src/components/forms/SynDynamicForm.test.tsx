@@ -17,6 +17,7 @@ const staticPriorityOptions = {
     { display_label: 'High', value: 'high' },
   ],
 }
+const NUMBER_FIELD_LABEL = 'Count'
 
 function renderWithQueryClient(ui: ReactNode) {
   const queryClient = new QueryClient({
@@ -165,6 +166,31 @@ describe('SynDynamicForm', () => {
 
     await waitFor(() => {
       expect(onSubmit).toHaveBeenCalledWith({ name: 'Ada' })
+    })
+  })
+
+  it.each([
+    { buttonLabel: 'Plus', expectedValue: 1 },
+    { buttonLabel: 'Minus', expectedValue: -1 },
+  ])('applies $buttonLabel to an empty number field from zero', async ({ buttonLabel, expectedValue }) => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+    const definition = parseFormDefinition({
+      fields: [{ type: FormFieldTypeEnum.NUMBER, value_name: 'count', label: NUMBER_FIELD_LABEL }],
+    })
+
+    renderWithQueryClient(<SynDynamicForm definition={definition} onSubmit={onSubmit} submitLabel="Send" />)
+
+    const count = screen.getByRole('spinbutton', { name: NUMBER_FIELD_LABEL })
+    expect(count).toHaveValue(null)
+
+    await user.click(screen.getByRole('button', { name: buttonLabel }))
+    expect(count).toHaveValue(expectedValue)
+
+    await user.click(screen.getByRole('button', { name: 'Send' }))
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith({ count: expectedValue })
     })
   })
 
