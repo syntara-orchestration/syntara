@@ -1,4 +1,10 @@
+import type { WorkflowAPI } from '@syntara/contracts'
+import { act, renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+import { workflowFetchClient } from '../../client'
+
+import { useDuplicateWorkflow } from './useDuplicateWorkflow'
 
 /**
  * Unit tests for useDuplicateWorkflow hook
@@ -15,6 +21,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
  *
  * Full integration testing via Workflows.test.tsx covers the complete duplication UX flow.
  */
+
+type Workflow = WorkflowAPI.components['schemas']['WorkflowRead']
+
+vi.mock('../../client', () => ({
+  workflowFetchClient: {
+    GET: vi.fn(),
+    POST: vi.fn(),
+  },
+}))
 
 describe('useDuplicateWorkflow', () => {
   beforeEach(() => {
@@ -145,6 +160,87 @@ describe('useDuplicateWorkflow', () => {
 
       // Hook generates name like "My Workflow - duplicate-<timestamp>"
       expect(expectedPattern).toMatch(/My Workflow - duplicate-\w+/)
+    })
+  })
+
+  // AAP-94465: Duplicating a workflow that has a webhook trigger fails because the
+  // original webhook_path is copied verbatim into the new workflow, colliding with the
+  // (trigger_type, webhook_path) uniqueness constraint enforced by the backend.
+  describe('duplicating a workflow with a webhook trigger (AAP-94465)', () => {
+    const ORIGINAL_WEBHOOK_PATH = '/test-trigger-dupe'
+
+    function buildWorkflow(): Workflow {
+      return {
+        id: 'wf-1',
+        name: 'Workflow with webhook',
+        description: null,
+        labels: {},
+        current_version: 1,
+        is_builtin: false,
+        is_enabled: true,
+        created_at: '2024-01-01T00:00:00Z',
+        updated_at: '2024-01-01T00:00:00Z',
+        created_by: { id: 'u-1', name: 'test-user', type: 'user' },
+        project_id: 'proj-1',
+      }
+    }
+
+    beforeEach(() => {
+      vi.mocked(workflowFetchClient.GET).mockReset()
+      vi.mocked(workflowFetchClient.POST).mockReset()
+    })
+
+    it('does not reuse the original webhook path when creating the duplicate', async () => {
+      vi.mocked(workflowFetchClient.GET).mockResolvedValueOnce({
+        data: {
+          id: 'wf-1',
+          version: {
+            workflow_definition: {
+              schema_version: '2.0.0',
+              name: 'Workflow with webhook',
+              triggers: [
+                {
+                  id: 'trigger-1',
+                  type: 'webhook_trigger',
+                  parameters: { webhook_path: ORIGINAL_WEBHOOK_PATH },
+                },
+              ],
+              nodes: [],
+              edges: [],
+            },
+          },
+        },
+        error: undefined,
+        response: new Response(),
+      })
+
+      let postedBody: Record<string, unknown> | undefined
+      vi.mocked(workflowFetchClient.POST).mockImplementationOnce((_path, init) => {
+        postedBody = (init as { body: Record<string, unknown> }).body
+        return Promise.resolve({ data: { id: 'wf-2' }, error: undefined, response: new Response() })
+      })
+
+      const { result } = renderHook(() =>
+        useDuplicateWorkflow({
+          showAlert: vi.fn(),
+          showError: vi.fn(),
+          setLocation: vi.fn(),
+          onSuccess: vi.fn(),
+        })
+      )
+
+      await act(async () => {
+        await result.current.duplicateWorkflow(buildWorkflow())
+      })
+
+      await waitFor(() => expect(workflowFetchClient.POST).toHaveBeenCalled())
+
+      const definition = postedBody?.workflow_definition as { triggers: Array<{ parameters: { webhook_path: string } }> }
+      const duplicatedWebhookPath = definition.triggers[0].parameters.webhook_path
+
+      // A webhook path is unique per workflow, so duplicating must not submit the same
+      // path the original workflow already registered.
+      expect(duplicatedWebhookPath).not.toBe(ORIGINAL_WEBHOOK_PATH)
     })
   })
 })
