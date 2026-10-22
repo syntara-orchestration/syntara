@@ -1,5 +1,6 @@
-"""Shared, persistence-independent workflow definition domain."""
+"""Shared, persistence-independent workflow definition domain.
 
-from .models import ActivityName, NodeType
-
-__all__ = ["ActivityName", "NodeType"]
+Submodules are intentionally not re-exported here.  Keeping this package
+initializer free of imports prevents package-level import cycles and makes
+the dependency direction between the shared modules explicit.
+"""
