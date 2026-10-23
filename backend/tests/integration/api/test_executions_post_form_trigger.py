@@ -5,14 +5,18 @@ from __future__ import annotations
 import uuid
 from copy import deepcopy
 from typing import TYPE_CHECKING, Any
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
+from prometheus_client import CollectorRegistry
 from sqlalchemy import func
 from sqlmodel import select
 
+from syntara.audit.outbox.worker import get_outbox_worker
 from syntara.authz.engine import clear_authz_cache
 from syntara.core.error_handlers import PROBLEM_TYPES
+from syntara.metrics.recorder import MetricsRecorder
+from syntara.metrics.types import ComponentLabel, MetricType
 from syntara.workflows.executions_router import get_temporal_execution_service
 from syntara.workflows.models.execution import Execution, ExecutionStatus
 from syntara.workflows.models.workflow_version import WorkflowVersion
@@ -27,6 +31,7 @@ if TYPE_CHECKING:
     from httpx import AsyncClient
     from sqlmodel.ext.asyncio.session import AsyncSession
 
+    from syntara.core.models import User
     from syntara.workflows.models.workflow import Workflow
 
 
@@ -112,6 +117,122 @@ async def test_create_form_trigger_execution_persists_and_starts_with_cleaned_in
     assert execution.trigger_node_id == "form"
     assert execution.trigger_type == "form_trigger"
     assert execution.workflow_version_id == form_trigger_workflow.published_version_id
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+@patch("syntara.audit.outbox.worker._build_otel_log_record")
+async def test_form_trigger_submission_emits_metadata_only_audit_event(
+    mock_build_otel_log_record: MagicMock,
+    auth_client: AsyncClient,
+    form_trigger_workflow: Workflow,
+    mock_temporal_service: Mock,
+    test_user: User,
+) -> None:
+    """A committed submission reaches the audit export with bounded metadata only."""
+    submitted = _valid_form_input()
+    submitted["required_text"] = "FORM_TRIGGER_PRIVATE_TEXT_97126"
+    submitted["count"] = "713"
+    submitted["start"] = {"date": "2051-03-19"}
+    submitted["contact"] = "private.user.97126@example.com"
+
+    response = await auth_client.post(
+        "/api/v1/executions",
+        json={
+            "workflow_id": str(form_trigger_workflow.id),
+            "trigger_node_id": "form",
+            "input_data": submitted,
+            "use_published": True,
+        },
+    )
+
+    assert response.status_code == 201, response.text
+    execution_id = uuid.UUID(response.json()["id"])
+    await get_outbox_worker().drain()
+
+    events = [
+        call.args[0]
+        for call in mock_build_otel_log_record.call_args_list
+        if call.args[0].event_action == "form_trigger_submitted"
+    ]
+    assert len(events) == 1
+    event = events[0]
+    assert event.workflow_id == form_trigger_workflow.id
+    assert event.execution_id == execution_id
+    assert event.activity_id == "form"
+    assert event.actor_id == test_user.id
+    assert event.structured_data.model_dump()["field_count"] == 5
+    assert event.structured_data.model_dump()["field_types"] == ["date", "dropdown", "email", "number", "text"]
+    exported_payload = event.model_dump_json()
+    for submitted_value in (
+        "FORM_TRIGGER_PRIVATE_TEXT_97126",
+        "713",
+        "2051-03-19",
+        "private.user.97126@example.com",
+    ):
+        assert submitted_value not in exported_payload
+    for field_label in ("Required text", "Environment", "Count", "Start", "Contact"):
+        assert field_label not in exported_payload
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_form_trigger_submission_records_latency_metric(
+    auth_client: AsyncClient,
+    form_trigger_workflow: Workflow,
+    mock_temporal_service: Mock,
+) -> None:
+    """A committed form-trigger execution records its service-entry latency."""
+    recorder = MetricsRecorder(prometheus_registry=CollectorRegistry())
+    with patch(
+        "syntara.workflows.services.execution_service.get_metrics_recorder",
+        return_value=recorder,
+    ):
+        response = await auth_client.post(
+            "/api/v1/executions",
+            json={
+                "workflow_id": str(form_trigger_workflow.id),
+                "trigger_node_id": "form",
+                "input_data": _valid_form_input(),
+                "use_published": True,
+            },
+        )
+
+    assert response.status_code == 201, response.text
+    records = list(recorder.query(metric_types={MetricType.FORM_TRIGGER_SUBMISSION_START}))
+    assert len(records) == 1
+    assert records[0].unit == "ms"
+    assert records[0].value >= 0
+    assert records[0].labels == {"component": ComponentLabel.EXECUTION_SERVICE.value}
+    mock_temporal_service.start_workflow.assert_awaited_once()
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_invalid_form_trigger_submission_does_not_record_latency_metric(
+    auth_client: AsyncClient,
+    form_trigger_workflow: Workflow,
+    mock_temporal_service: Mock,
+) -> None:
+    """A rejected form submission has no form-trigger latency observation."""
+    recorder = MetricsRecorder(prometheus_registry=CollectorRegistry())
+    with patch(
+        "syntara.workflows.services.execution_service.get_metrics_recorder",
+        return_value=recorder,
+    ):
+        response = await auth_client.post(
+            "/api/v1/executions",
+            json={
+                "workflow_id": str(form_trigger_workflow.id),
+                "trigger_node_id": "form",
+                "input_data": {"count": "42"},
+                "use_published": True,
+            },
+        )
+
+    assert response.status_code == 422
+    assert list(recorder.query(metric_types={MetricType.FORM_TRIGGER_SUBMISSION_START})) == []
+    mock_temporal_service.start_workflow.assert_not_awaited()
 
 
 @pytest.mark.asyncio

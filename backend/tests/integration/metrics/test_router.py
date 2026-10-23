@@ -117,6 +117,32 @@ class TestOpenMetricsEndpoint:
         assert 'orchestrator_form_prompt_submission_handoff_seconds_sum{component="api_service"} 0.25' in response.text
         assert 'orchestrator_form_prompt_submission_handoff_seconds_count{component="api_service"} 1.0' in response.text
 
+    def test_form_trigger_submission_start_appears_in_openmetrics(
+        self,
+        client: TestClient,
+        recorder: MetricsRecorder,
+    ) -> None:
+        """Form-trigger submission latency is exported as a bounded seconds histogram."""
+        recorder.record(
+            MetricType.FORM_TRIGGER_SUBMISSION_START,
+            value=250.0,
+            unit="ms",
+            component=ComponentLabel.EXECUTION_SERVICE,
+        )
+
+        response = client.get("/metrics")
+
+        assert response.status_code == 200
+        assert "# TYPE orchestrator_form_trigger_submission_start_seconds histogram" in response.text
+        assert (
+            'orchestrator_form_trigger_submission_start_seconds_sum{component="execution_service"} 0.25'
+            in response.text
+        )
+        assert (
+            'orchestrator_form_trigger_submission_start_seconds_count{component="execution_service"} 1.0'
+            in response.text
+        )
+
     def test_tool_error_status_in_openmetrics(self, client: TestClient, recorder: MetricsRecorder) -> None:
         """OpenMetrics output reflects error and timeout status labels."""
         recorder.record(

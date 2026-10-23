@@ -211,6 +211,7 @@ export interface components {
       | 'activity_duration_ms'
       | 'form_prompt_submission_handoff_ms'
       | 'form_prompt_resume_dispatch_ms'
+      | 'form_trigger_submission_start_ms'
       | 'agent_routing_ms'
       | 'agent_invocation_ms'
       | 'agent_status'

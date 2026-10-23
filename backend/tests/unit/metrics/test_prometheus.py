@@ -50,6 +50,7 @@ class TestMetricDefinitions:
         assert prom.workflow_start_latency_seconds is not None
         assert prom.form_prompt_submission_handoff_seconds is not None
         assert prom.form_prompt_resume_dispatch_seconds is not None
+        assert prom.form_trigger_submission_start_seconds is not None
         assert prom.tool_execution_duration_seconds is not None
         assert prom.database_query_response_time_seconds is not None
         assert prom.system_e2e_latency_seconds is not None
@@ -130,6 +131,7 @@ class TestPrometheusOutput:
         prom.active_workflows.labels(component="temporal_worker").set(3)
         prom.form_prompt_submission_handoff_seconds.labels(component="api_service").observe(0.025)
         prom.form_prompt_resume_dispatch_seconds.labels(component="workflow_engine").observe(0.045)
+        prom.form_trigger_submission_start_seconds.labels(component="execution_service").observe(0.25)
 
         output = generate_latest(prom.registry).decode("utf-8")
 
@@ -138,6 +140,7 @@ class TestPrometheusOutput:
         assert "orchestrator_active_workflows" in output
         assert "orchestrator_form_prompt_submission_handoff_seconds" in output
         assert "orchestrator_form_prompt_resume_dispatch_seconds" in output
+        assert "orchestrator_form_trigger_submission_start_seconds" in output
         assert "# HELP" in output
         assert "# TYPE" in output
 
@@ -168,6 +171,11 @@ class TestBucketConstants:
         dispatch_buckets = prom.form_prompt_resume_dispatch_seconds._upper_bounds[:-1]
         assert handoff_buckets == list(LATENCY_BUCKETS_FAST)
         assert dispatch_buckets == list(LATENCY_BUCKETS_FAST)
+
+    def test_form_trigger_submission_uses_medium_buckets(self, prom: OrchestratorPrometheusMetrics) -> None:
+        """The submission-to-commit span uses medium buckets like workflow-start latency."""
+        buckets = prom.form_trigger_submission_start_seconds._upper_bounds[:-1]
+        assert buckets == list(LATENCY_BUCKETS_MEDIUM)
 
     def test_medium_buckets_sorted(self) -> None:
         """Medium buckets are in ascending order."""
