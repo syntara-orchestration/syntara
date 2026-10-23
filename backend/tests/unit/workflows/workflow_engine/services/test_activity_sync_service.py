@@ -2708,7 +2708,6 @@ class TestSyncNodesToTerminalStatus:
         self.mock_session_factory.side_effect = [self._session_context(session)]
         metadata = self._create_metadata(activity_index_map={"converge_1": 0})
         metadata.is_retry_from_failure = True
-        metadata.retry_source_execution_id = uuid4()
 
         await self.service._sync_nodes_to_terminal_status(
             metadata,
@@ -2729,7 +2728,6 @@ class TestSyncNodesToTerminalStatus:
         self.mock_session_factory.side_effect = [self._session_context(session)]
         metadata = self._create_metadata(activity_index_map={"converge_1": 0})
         metadata.is_retry_from_failure = True
-        metadata.retry_source_execution_id = uuid4()
 
         await self.service._sync_nodes_to_terminal_status(
             metadata,
@@ -6695,7 +6693,6 @@ class TestReplayedTimestampResolution:
     async def test_converge_rerun_keeps_current_run_timestamps(self, event_status: ActivityStatus) -> None:
         metadata = self._metadata([(1, "converge_1", event_status)])
         metadata.activity_definitions_map = {"converge_1": {"type": NodeType.CONVERGE}}
-        metadata.retry_source_execution_id = uuid4()
         handle = self._handle()
 
         resolved = await self.service._resolve_replayed_timestamps(metadata, handle)
@@ -6713,7 +6710,6 @@ class TestReplayedTimestampResolution:
         metadata.pending_activity_updates[1]["_is_loop_iteration"] = True
         metadata.pending_activity_updates[1]["_is_retry_node_replay"] = True
         metadata.activity_definitions_map = {"converge_1": {"type": NodeType.CONVERGE}}
-        metadata.retry_source_execution_id = uuid4()
         handle = self._handle(self.source_times, queried=self.source_times)
 
         resolved = await self.service._resolve_replayed_timestamps(metadata, handle)
@@ -6732,7 +6728,6 @@ class TestReplayedTimestampResolution:
         metadata.pending_activity_updates[1]["temporal_activity_id"] = "converge_1_iter_2_iter_4"
         metadata.pending_activity_updates[1]["_is_loop_iteration"] = True
         metadata.activity_definitions_map = {"converge_1": {"type": NodeType.CONVERGE}}
-        metadata.retry_source_execution_id = uuid4()
         handle = self._handle()
         handle.query = AsyncMock(return_value=False)
 
@@ -6745,7 +6740,6 @@ class TestReplayedTimestampResolution:
     async def test_converge_rerun_does_not_read_source_timestamps(self) -> None:
         metadata = self._metadata([(1, "converge_1", ActivityStatus.COMPLETED)])
         metadata.activity_definitions_map = {"converge_1": {"type": NodeType.CONVERGE}}
-        metadata.retry_source_execution_id = uuid4()
         handle = self._handle()
 
         assert await self.service._resolve_replayed_timestamps(metadata, handle) == {}
@@ -7050,16 +7044,6 @@ class TestInitializeMonitoringSetsRetryFlag:
         metadata = await service._initialize_monitoring(uuid4())
 
         assert metadata.is_retry_from_failure is True, "retry must not restore nothing"
-
-    async def test_source_execution_id_is_carried_for_retry_from_failure(self) -> None:
-        execution = self._execution()
-        source_execution_id = uuid4()
-        execution.retried_from_execution_id = source_execution_id
-        service, _ = self._service(execution, query_result=True)
-
-        metadata = await service._initialize_monitoring(uuid4())
-
-        assert metadata.retry_source_execution_id == source_execution_id
 
     async def test_flag_false_for_an_ordinary_run(self) -> None:
         service, _ = self._service(self._execution(), query_result=False)
