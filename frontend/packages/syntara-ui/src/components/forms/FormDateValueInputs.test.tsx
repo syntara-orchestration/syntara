@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
@@ -32,5 +33,25 @@ describe('FormDateValueInputs', () => {
     )
 
     expect(await axe(container)).toHaveNoViolations()
+  })
+
+  it('removes a cleared time while preserving the other components', async () => {
+    const user = userEvent.setup()
+    const onChange = vi.fn()
+
+    render(
+      <FormDateValueInputs
+        included={['date', 'time', 'timezone']}
+        value={{ date: '2026-03-15', time: '14:30', timezone: 'America/New_York' }}
+        onChange={onChange}
+        idPrefix="test"
+        dateAriaLabel="Due date"
+        timeAriaLabel="Due time"
+      />
+    )
+
+    await user.clear(screen.getByRole('textbox', { name: 'Due time' }))
+
+    expect(onChange).toHaveBeenCalledWith({ date: '2026-03-15', timezone: 'America/New_York' })
   })
 })

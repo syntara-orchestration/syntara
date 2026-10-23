@@ -7,13 +7,13 @@ import {
   coerceDateValueShape,
   DATE_COMPONENT_NAMES,
   dateIncludesFromField,
-  isDateFieldTimeWithoutTimezone,
+  isDateFieldDateAndTimezoneWithoutTime,
   isSoleIncludedDateComponent,
   nextDateIncludes,
   normalizeDateDefaultForIncludes,
   type DateComponentName,
 } from '../../../forms/dateFieldUtils'
-import { DATE_FIELD_TIME_REQUIRES_TIMEZONE_MESSAGE } from '../../../forms/dateFieldValidationMessages'
+import { DATE_FIELD_DATE_AND_TIMEZONE_REQUIRES_TIME_MESSAGE } from '../../../forms/dateFieldValidationMessages'
 
 import styles from './formFieldBuilder.module.css'
 import { useFormFieldBuilderCommit } from './formFieldBuilderCommitContext'
@@ -45,12 +45,12 @@ export function FormFieldBuilderDateShowInFormSection({
   }
 
   const includes = dateIncludesFromField(field)
-  const timeWithoutTimezone = isDateFieldTimeWithoutTimezone(field)
+  const dateAndTimezoneWithoutTime = isDateFieldDateAndTimezoneWithoutTime(field)
   const showInFormHelp = formFieldBuilderLabelHelp('dateShowInForm', 'Show in form')
 
   const applyIncludes = (next: Record<DateComponentName, boolean>) => {
-    // Do not run the zod resolver on each toggle — time without timezone is an intermediate
-    // builder state and would block updates before the user can finish selecting parts.
+    // Do not run the zod resolver on each toggle — date plus timezone without time is an
+    // intermediate builder state and would block updates before the user finishes choosing parts.
     setValue(`fields.${index}.include_date`, next.date, { shouldValidate: false, shouldDirty: true })
     setValue(`fields.${index}.include_time`, next.time, { shouldValidate: false, shouldDirty: true })
     setValue(`fields.${index}.include_timezone`, next.timezone, { shouldValidate: false, shouldDirty: true })
@@ -80,7 +80,7 @@ export function FormFieldBuilderDateShowInFormSection({
       fieldId={`${idPrefix}-show-in-form`}
       labelHelp={showInFormHelp}
       isRequired
-      className={timeWithoutTimezone ? styles.formGroupLabelError : undefined}
+      className={dateAndTimezoneWithoutTime ? styles.formGroupLabelError : undefined}
     >
       <Stack hasGutter>
         {DATE_COMPONENT_NAMES.map((name) => (
@@ -94,10 +94,10 @@ export function FormFieldBuilderDateShowInFormSection({
             />
           </StackItem>
         ))}
-        {timeWithoutTimezone && (
+        {dateAndTimezoneWithoutTime && (
           <StackItem>
             <HelperText>
-              <HelperTextItem variant="error">{DATE_FIELD_TIME_REQUIRES_TIMEZONE_MESSAGE}</HelperTextItem>
+              <HelperTextItem variant="error">{DATE_FIELD_DATE_AND_TIMEZONE_REQUIRES_TIME_MESSAGE}</HelperTextItem>
             </HelperText>
           </StackItem>
         )}

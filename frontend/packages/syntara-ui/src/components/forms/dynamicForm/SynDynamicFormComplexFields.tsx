@@ -188,7 +188,6 @@ export function SynDynamicFormDateField({
           dateAriaLabel={`${field.label} date`}
           timeAriaLabel={`${field.label} time`}
           timezoneAriaLabel={`${field.label} time zone`}
-          allowEmptyTimezone
         />
       )}
     </SynFormField>

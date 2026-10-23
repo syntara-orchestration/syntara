@@ -284,19 +284,18 @@ def test_publish_rejects_invalid_form_definition_and_it_cannot_run_as_published(
             "at least one of include_date, include_time, or include_timezone must be true",
         ),
         (
-            "date_time_requires_timezone",
+            "date_timezone_invalid_combination",
             [
                 {
                     "type": "date",
                     "value_name": "when",
                     "label": "When",
-                    "include_time": True,
-                    "include_timezone": False,
+                    "include_timezone": True,
                 }
             ],
             "form_prompt_configuration",
             "parameters.form_definition.fields.0",
-            "include_timezone is required when include_time is true",
+            "Select a time when both a date and timezone are included.",
         ),
         (
             "invalid_calendar_date_default",
@@ -335,8 +334,9 @@ def test_publish_rejects_invalid_form_definition_and_it_cannot_run_as_published(
                     "type": "date",
                     "value_name": "when",
                     "label": "When",
+                    "include_date": False,
                     "include_timezone": True,
-                    "default": {"date": "2026-02-14"},
+                    "default": {},
                 }
             ],
             "form_prompt_configuration",

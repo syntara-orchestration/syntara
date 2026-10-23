@@ -44834,7 +44834,7 @@
       "DateField": {
         "type": "object",
         "title": "DateField",
-        "description": "Date field collecting any combination of date, time, and timezone.",
+        "description": "Date field collecting a valid combination of date, time, and timezone.",
         "additionalProperties": false,
         "required": [
           "value_name",
@@ -44896,7 +44896,7 @@
             "type": "boolean",
             "title": "Include Time",
             "default": false,
-            "description": "Collect a 24-hour time. Requires include_timezone."
+            "description": "Collect a 24-hour time in HH:MM format."
           },
           "include_timezone": {
             "type": "boolean",

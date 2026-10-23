@@ -27,6 +27,7 @@ import { SynFormField } from '../../../components/forms/SynFormField'
 import { SynTextField } from '../../../components/forms/SynTextField'
 import { SynSelect } from '../../../components/SynSelect'
 import { useSynForm } from '../../../hooks/useSynForm'
+import { getBrowserTimezone } from '../../../utils/timezoneList'
 import { getDefaultRepeatingInterval } from '../../../utils/triggerFormatting'
 import { generateWebhookPath } from '../../../utils/webhookPath'
 import { NodeEditorAutoSubmitContext, useRegisterAutoSubmit } from '../hooks/useNodeEditorAutoSubmit'
@@ -51,14 +52,6 @@ const cronExpressionLabelHelp = <FieldHelpPopover headerContent="Cron expression
 
 export type { TriggerFormData }
 
-function resolveBrowserTimezone(): string {
-  try {
-    return Intl.DateTimeFormat().resolvedOptions().timeZone
-  } catch {
-    return 'UTC'
-  }
-}
-
 function buildTriggerFormDefaults(initialData?: Partial<TriggerFormData>): TriggerFormData {
   const values: TriggerFormData = {
     name: '',
@@ -66,7 +59,7 @@ function buildTriggerFormDefaults(initialData?: Partial<TriggerFormData>): Trigg
     scheduleType: ScheduleTypeEnum.INTERVAL,
     interval: '',
     cron: '',
-    timezone: resolveBrowserTimezone(),
+    timezone: getBrowserTimezone(),
     missedSchedulePolicy: MissedSchedulePolicyEnum.SKIP,
     inputSchema: '',
     webhookPath: '',

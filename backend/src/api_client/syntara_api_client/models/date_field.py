@@ -16,7 +16,7 @@ T = TypeVar("T", bound="DateField")
 
 @_attrs_define
 class DateField:
-    """Date field collecting any combination of date, time, and timezone.
+    """Date field collecting a valid combination of date, time, and timezone.
 
     Attributes:
         value_name (str):
@@ -26,7 +26,7 @@ class DateField:
         help_text (None | str | Unset):
         required (bool | Unset):  Default: False.
         include_date (bool | Unset): Collect a calendar date. Default: True.
-        include_time (bool | Unset): Collect a 24-hour time. Requires include_timezone. Default: False.
+        include_time (bool | Unset): Collect a 24-hour time in HH:MM format. Default: False.
         include_timezone (bool | Unset): Collect an IANA timezone name. Default: False.
         default (DateValue | None | Unset): Default value used when the responder submits nothing. Must supply exactly
             the included components.

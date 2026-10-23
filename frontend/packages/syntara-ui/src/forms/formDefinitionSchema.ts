@@ -3,7 +3,7 @@ import { z } from 'zod'
 
 import { isValidIsoCalendarDate } from '../utils/isoCalendarDate'
 
-import { DATE_FIELD_TIME_REQUIRES_TIMEZONE_MESSAGE } from './dateFieldValidationMessages'
+import { DATE_FIELD_DATE_AND_TIMEZONE_REQUIRES_TIME_MESSAGE } from './dateFieldValidationMessages'
 import {
   FORM_DEFINITION_MAX_FIELDS,
   FORM_DEFINITION_MIN_FIELDS,
@@ -147,12 +147,12 @@ const dateFieldSchema = formFieldBaseSchema
       })
     }
 
-    // A wall-clock time is ambiguous without the zone it is read in.
-    if (included.time && !included.timezone) {
+    // A timezone only adds meaning to a date when there is also a time.
+    if (included.date && included.timezone && !included.time) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: DATE_FIELD_TIME_REQUIRES_TIMEZONE_MESSAGE,
-        path: ['include_timezone'],
+        message: DATE_FIELD_DATE_AND_TIMEZONE_REQUIRES_TIME_MESSAGE,
+        path: ['include_time'],
       })
     }
 
