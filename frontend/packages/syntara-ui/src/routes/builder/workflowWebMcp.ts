@@ -115,7 +115,7 @@ function isControlCodePoint(codePoint: number): boolean {
   )
 }
 
-function stripControlCharacters(value: string): string {
+export function stripControlCharacters(value: string): string {
   return Array.from(value)
     .filter((character) => {
       const codePoint = character.codePointAt(0)
