@@ -92,7 +92,7 @@ test.describe('Credential Persistence', () => {
       await openNodeForEditing(app, 'Test Task Agent')
 
       // Wait for the form to render, then for the credential name to resolve
-      const form = app.getByTestId('ai-agent-node-form')
+      const form = app.getByTestId('ai-agent-step-form')
       await expect(form).toBeVisible({ timeout: 10_000 })
       await expect(form.getByText(credName)).toBeVisible({ timeout: 30_000 })
     } finally {

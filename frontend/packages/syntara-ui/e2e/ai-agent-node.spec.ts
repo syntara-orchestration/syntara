@@ -72,7 +72,7 @@ test.describe('AI Agent Node @pr-check', () => {
       await openWorkflowInBuilder(app, workflowName)
       await openAiAgentNodeForEditing(app, 'PromptAgent')
 
-      const form = app.getByTestId('ai-agent-node-form')
+      const form = app.getByTestId('ai-agent-step-form')
       await expect(form.getByRole('textbox', { name: 'Prompt', exact: true })).toHaveValue('Analyze this data', {
         timeout: 30_000,
       })
@@ -207,7 +207,7 @@ test.describe('AI Agent Node @pr-check', () => {
       await openWorkflowInBuilder(app, workflowName)
       await openAiAgentNodeForEditing(app, 'ToolsSchemaAgent')
 
-      const form = app.getByTestId('ai-agent-node-form')
+      const form = app.getByTestId('ai-agent-step-form')
       await expect(form.getByRole('textbox', { name: 'Select tools' })).toHaveValue('All tools selected', {
         timeout: 30_000,
       })
@@ -261,7 +261,7 @@ test.describe('AI Agent Node @pr-check', () => {
       await openWorkflowInBuilder(app, workflowName)
       await openAiAgentNodeForEditing(app, 'EditableAgent')
 
-      const form = app.getByTestId('ai-agent-node-form')
+      const form = app.getByTestId('ai-agent-step-form')
       // Wait for stale detection to settle before asserting
       await expect(modelName.or(staleWarning)).toBeVisible({ timeout: 15_000 })
       await expect(form.getByRole('textbox', { name: 'Prompt', exact: true })).toHaveValue('Updated prompt', {
@@ -379,7 +379,7 @@ test.describe('AI Agent Node @pr-check', () => {
       // Open the dropdown and filter by the LLM integration name so the test
       // doesn't depend on scroll position when many integrations exist
       await openAiAgentModelPicker(app)
-      await app.getByTestId('ai-agent-node-form').getByPlaceholder('Select a model').fill(llmName)
+      await app.getByTestId('ai-agent-step-form').getByPlaceholder('Select a model').fill(llmName)
 
       await expectAiAgentIntegrationGroupsVisible(app, [llmName])
 

@@ -688,7 +688,7 @@ export async function openScheduleTriggerForEditing(page: Page, nodeName: string
  * Create flow only — editing with a pre-selected model does not show the empty placeholder.
  */
 export async function expectAiAgentModelSelectorReady(page: Page) {
-  const form = page.getByTestId('ai-agent-node-form')
+  const form = page.getByTestId('ai-agent-step-form')
   await expect(form).toBeVisible({ timeout: 15_000 })
   const modelToggle = form.getByRole('button', { name: 'Model', exact: true })
   await expect(modelToggle).toBeEnabled({ timeout: 15_000 })
@@ -712,7 +712,7 @@ export async function openTaskAgentNodeCreateForm(page: Page) {
 /** Open a saved Task Agent node on the canvas for editing. */
 export async function openAiAgentNodeForEditing(page: Page, nodeName: string) {
   await openSavedNodeForEditing(page, nodeName, async (p) => {
-    await expect(p.getByTestId('ai-agent-node-form')).toBeVisible({ timeout: 5_000 })
+    await expect(p.getByTestId('ai-agent-step-form')).toBeVisible({ timeout: 5_000 })
     await expect(p.getByRole('button', { name: 'Model', exact: true })).toBeEnabled({ timeout: 5_000 })
   })
 }
