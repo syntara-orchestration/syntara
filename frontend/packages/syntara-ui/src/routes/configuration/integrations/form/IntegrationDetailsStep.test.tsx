@@ -393,6 +393,16 @@ describe('IntegrationDetailsStep', () => {
       expect(textarea).toHaveValue('')
     })
 
+    it('has no accessibility violations with Kafka selected', async () => {
+      const { container } = render(<KafkaTestWrapper />)
+
+      let results: Awaited<ReturnType<typeof axe>>
+      await act(async () => {
+        results = await axe(container)
+      })
+      expect(results!).toHaveNoViolations()
+    })
+
     it('hides Allow HTTP for Kafka so the connection stays SASL_SSL', async () => {
       const user = userEvent.setup()
       render(<KafkaTestWrapper />)
