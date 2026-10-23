@@ -78,6 +78,7 @@ class RecoveryRequest(PositionRequest):
     policy: RecoveryPolicy
     reason: str = ValueField(min_length=1, max_length=100, pattern=r"^[a-z][a-z0-9_]*$")
     acknowledge_duplicate_risk: bool = ValueField(default=False, strict=True)
+    allow_unscheduled_disposition: bool = ValueField(default=False, strict=True)
 
 
 class RecoveryReplacementRequest(RecoveryRequest):

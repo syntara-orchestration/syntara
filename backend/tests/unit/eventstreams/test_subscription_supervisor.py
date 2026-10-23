@@ -717,3 +717,19 @@ async def test_frozen_work_remains_discoverable_by_consumer_independent_recovery
     assert execution.model_dump() == frozen
     assert context.events.count("freeze") == 1
     assert harness.factory.await_count == (2 if change == "revision" else 1)
+
+
+async def test_revision_change_cannot_restart_past_a_known_permanent_error(harness):
+    await harness.supervisor.apply(harness.snapshot)
+    runner = harness.runners[0]
+    runner.observation = RunnerStatus(
+        state=RuntimeState.BLOCKED, reason="activity_log_unavailable", permanent_content_error=True
+    )
+    changed = harness.snapshot.model_copy(
+        update={"configuration_revision": harness.snapshot.configuration_revision + 1}
+    )
+    result = await harness.supervisor.apply(changed)
+    assert runner.stopped
+    assert result.state == RuntimeState.BLOCKED
+    assert result.permanent_content_error
+    harness.factory.assert_awaited_once()

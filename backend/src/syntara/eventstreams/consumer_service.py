@@ -13,6 +13,7 @@ from syntara.core.config.base import get_settings
 from syntara.core.constants import EventSchedulingDefaults, EventWorkerDefaults
 from syntara.eventstreams.core.runtime import RuntimeState, SubscriptionRunnerFactory
 from syntara.eventstreams.models.subscription_snapshot import SubscriptionSnapshot
+from syntara.eventstreams.services.runtime_control_service import EventRuntimeControlService
 from syntara.eventstreams.services.subscription_reader import EventSubscriptionReader
 from syntara.eventstreams.services.subscription_supervisor import SubscriptionSupervisor
 
@@ -22,10 +23,18 @@ logger = structlog.stdlib.get_logger(__name__)
 class EventWorkerManager:
     """Reconcile every active subscription locally; brokers own partition placement."""
 
-    def __init__(self, reader: EventSubscriptionReader, runner_factory: SubscriptionRunnerFactory) -> None:
+    def __init__(
+        self,
+        reader: EventSubscriptionReader,
+        runner_factory: SubscriptionRunnerFactory,
+        *,
+        controls: EventRuntimeControlService | None = None,
+    ) -> None:
         """Inject authoritative reads and transport construction, never a session."""
         self._reader = reader
         self._factory = runner_factory
+        self._controls = controls
+        self._registered: dict[UUID, SubscriptionSnapshot] = {}
         self._supervisors: dict[UUID, SubscriptionSupervisor] = {}
         self._desired: dict[UUID, SubscriptionSnapshot] = {}
         self._pending: dict[UUID, SubscriptionSnapshot | None] = {}
@@ -147,9 +156,13 @@ class EventWorkerManager:
         if self._closing:
             return
         supervisor = self._supervisors.get(key)
-        if supervisor is not None and (snapshot is None or key in self._retiring):
+        previous = self._registered.get(key)
+        replaced = previous is not None and snapshot is not None and previous.source_id != snapshot.source_id
+        if supervisor is not None and (snapshot is None or key in self._retiring or replaced):
             self._retiring.add(key)
             status = await supervisor.stop()
+            if self._controls is not None and previous is not None:
+                await self._controls.acknowledge(previous, status)
             if status.state != RuntimeState.STOPPED:
                 if not self._closing:
                     self._pending[key] = None
@@ -166,16 +179,34 @@ class EventWorkerManager:
             del self._supervisors[key]
             self._retiring.discard(key)
             supervisor = None
+            self._registered.pop(key, None)
         # Recheck after awaiting teardown so a newer inactive request cannot start a client.
         snapshot = self._desired.get(key)
         if self._closing or snapshot is None:
+            return
+        if not await self._register(key, snapshot):
             return
         if supervisor is None:
             supervisor = SubscriptionSupervisor(
                 key, self._factory, startup_timeout_seconds=EventWorkerDefaults.STARTUP_TIMEOUT_SECONDS
             )
             self._supervisors[key] = supervisor
-        await supervisor.apply(snapshot)
+        status = await supervisor.apply(snapshot)
+        if self._controls is not None:
+            await self._controls.acknowledge(snapshot, status)
+
+    async def _register(self, key: UUID, snapshot: SubscriptionSnapshot) -> bool:
+        if self._controls is not None and self._registered.get(key) != snapshot:
+            if not await self._controls.register(snapshot):
+                return False
+            self._registered[key] = snapshot
+        return True
+
+    async def _stop_supervisor(self, key: UUID, supervisor: SubscriptionSupervisor) -> None:
+        status = await supervisor.stop()
+        snapshot = self._registered.get(key)
+        if self._controls is not None and snapshot is not None:
+            await self._controls.acknowledge(snapshot, status)
 
     def _retry_retirement(self, key: UUID) -> None:
         self._retirement_retries.pop(key, None)
@@ -200,7 +231,10 @@ class EventWorkerManager:
         tasks = {
             *self._workers,
             *([self._loop] if self._loop is not None else []),
-            *(asyncio.create_task(supervisor.stop()) for supervisor in self._supervisors.values()),
+            *(
+                asyncio.create_task(self._stop_supervisor(key, supervisor))
+                for key, supervisor in self._supervisors.items()
+            ),
         }
         if not tasks:
             return

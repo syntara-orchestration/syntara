@@ -17,6 +17,7 @@ from syntara.eventstreams.models.subscription_snapshot import SubscriptionSnapsh
 from syntara.eventstreams.services.admission_service import EventAdmissionService
 from syntara.eventstreams.services.connection_provider import EventConnectionProvider
 from syntara.eventstreams.services.execution_preparation_service import EventExecutionPreparationService
+from syntara.eventstreams.services.recovery_request_service import EventRecoveryRequestService
 from syntara.eventstreams.services.worker_resources import EventWorkerResources
 from syntara.integrations.adapters.kafka import KafkaAdapter
 from syntara.integrations.adapters.kafka_credentials import resolve_kafka_authentication
@@ -80,4 +81,5 @@ class ManagedRunnerFactory:
             self._admission,
             owner_worker_id=self._owner,
             work_semaphore=self._resources.processing,
+            recovery_requests=EventRecoveryRequestService(self._session_factory),
         )

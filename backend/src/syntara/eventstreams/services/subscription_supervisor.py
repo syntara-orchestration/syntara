@@ -64,6 +64,7 @@ class SubscriptionSupervisor:
         self._failure_count = 0
         self._retry_at: datetime | None = None
         self._stop_retry_at: datetime | None = None
+        self._retained_content_gate = False
 
     @staticmethod
     def _active(snapshot: SubscriptionSnapshot) -> bool:
@@ -72,7 +73,7 @@ class SubscriptionSupervisor:
     @property
     def status(self) -> SubscriptionRuntimeStatus:
         """Distinguish requested state, applied binding, and unfinished convergence."""
-        state, reason, permanent = RuntimeState.STOPPED, None, False
+        state, reason, permanent = RuntimeState.STOPPED, None, self._retained_content_gate
         circuit = (
             self._failure is not None
             and self._failure.transient
@@ -82,14 +83,20 @@ class SubscriptionSupervisor:
             state = RuntimeState.DRAINING
             reason = RuntimeFailureCode.STOP_INCOMPLETE.value if self._stop_retry_at is not None else None
         elif not self._closed:
-            if self._failure is not None:
+            if self._retained_content_gate:
+                state, reason = RuntimeState.BLOCKED, "activity_log_unavailable"
+            elif self._failure is not None:
                 state = RuntimeState.BACKOFF if self._failure.transient and not circuit else RuntimeState.BLOCKED
                 reason = self._failure.code.value
             elif self._starting:
                 state = RuntimeState.STARTING
             elif self._runner is not None:
                 observed = self._runner.status
-                state, reason, permanent = observed.state, observed.reason, observed.permanent_content_error
+                state, reason, permanent = (
+                    observed.state,
+                    observed.reason,
+                    observed.permanent_content_error or self._retained_content_gate,
+                )
         return SubscriptionRuntimeStatus(
             subscription_id=self._subscription_id,
             desired_revision=RuntimeRevision.from_snapshot(self._desired) if self._desired is not None else None,
@@ -191,9 +198,13 @@ class SubscriptionSupervisor:
                 if not await self._stop_current(deadline=deadline):
                     return
                 continue
-            if not active or (
-                self._failure is not None
-                and (not self._failure.transient or (self._retry_at is not None and _utc_now() < self._retry_at))
+            if (
+                not active
+                or self._retained_content_gate
+                or (
+                    self._failure is not None
+                    and (not self._failure.transient or (self._retry_at is not None and _utc_now() < self._retry_at))
+                )
             ):
                 return
             await self._start_runner(snapshot, revision)
@@ -255,6 +266,7 @@ class SubscriptionSupervisor:
             self._draining = False
             self._stop_retry_at = None
             return True
+        self._retained_content_gate |= runner.status.permanent_content_error
         if not force and self._stop_retry_at is not None and _utc_now() < self._stop_retry_at:
             return False
         self._draining = True
@@ -268,6 +280,7 @@ class SubscriptionSupervisor:
                 logger.warning("event_subscription_drain_incomplete", subscription_id=str(self._subscription_id))
             async with asyncio.timeout_at(deadline):
                 await runner.stop()
+            self._retained_content_gate |= runner.status.permanent_content_error
             task = self._task
             if task is not None and not task.done():
                 task.cancel()

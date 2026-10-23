@@ -325,11 +325,111 @@ export interface paths {
     }
     /**
      * Get workflow event subscription
-     * @description Read the requested current subscription within its workflow/project.
+     * @description Read subscription lifecycle and recovery state within its workflow/project.
      */
     get: operations['get_event_subscription']
     put?: never
     post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/workflows/{workflow_id}/event-subscriptions/{subscription_id}/pause': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Pause event subscription
+     * @description Close new admission; report pending until all consumer stops are acknowledged.
+     */
+    post: operations['pause_event_subscription']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/workflows/{workflow_id}/event-subscriptions/{subscription_id}/resume': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Resume event subscription
+     * @description Resume only a current published source without changing its frozen deliveries.
+     */
+    post: operations['resume_event_subscription']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/workflows/{workflow_id}/event-subscriptions/{subscription_id}/retry': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Retry event subscription
+     * @description Retry runtime setup and prepared scheduling; never replay or reset positions.
+     */
+    post: operations['retry_event_subscription']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/workflows/{workflow_id}/event-subscriptions/{subscription_id}/recover': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Recover event subscription
+     * @description Queue an authorized boundary policy for the current partition owner.
+     */
+    post: operations['recover_event_subscription']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/workflows/{workflow_id}/event-subscriptions/{subscription_id}/retire': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Retire event subscription source
+     * @description Retire a removed/replaced source; disposition additionally requires retire authority.
+     */
+    post: operations['retire_event_subscription']
     delete?: never
     options?: never
     head?: never
@@ -375,7 +475,7 @@ export interface components {
     }
     /**
      * EventSubscriptionRead
-     * @description Currently available published configuration; no runtime-health claims.
+     * @description Published configuration, recovery evidence and acknowledged runtime convergence.
      */
     EventSubscriptionRead: {
       /**
@@ -423,6 +523,34 @@ export interface components {
        */
       updated_at: string
       source: components['schemas']['EventSubscriptionSourceRead']
+      /**
+       * Retired
+       * @default false
+       */
+      retired?: boolean
+      /**
+       * Sources
+       * @default []
+       */
+      sources?: components['schemas']['EventSubscriptionSourceRead'][]
+      /**
+       * Initialization
+       * @default []
+       */
+      initialization?: components['schemas']['KafkaPartitionInitialPositionRead'][]
+      /**
+       * Recovery
+       * @default []
+       */
+      recovery?: components['schemas']['EventSubscriptionRecoveryRead'][]
+      /**
+       * Convergence
+       * @default pending
+       * @enum {string}
+       */
+      convergence?: 'pending' | 'applied'
+      /** Applied Revision */
+      applied_revision?: number | null
     }
     /**
      * EventSubscriptionSourceRead
@@ -442,6 +570,12 @@ export interface components {
       transport: string
       /** Configuration */
       configuration: components['schemas']['KafkaSourceConfiguration']
+      /** Initialized At */
+      initialized_at?: string | null
+      /** Retired At */
+      retired_at?: string | null
+      /** Retirement Completed At */
+      retirement_completed_at?: string | null
     }
     /**
      * KafkaSourceConfiguration
@@ -470,6 +604,8 @@ export interface components {
     /**
      * KafkaSubscribeParameters
      * @description One exact topic; consumer groups and connection settings are not inputs.
+     *
+     *     Tightens the transport-neutral ``topic`` with Kafka's naming constraints.
      */
     KafkaSubscribeParameters: {
       /**
@@ -482,12 +618,12 @@ export interface components {
        * Format: uuid
        */
       credential_id: string
+      /** Topic */
+      topic: string
       /** Input Schema */
       input_schema?: {
         [key: string]: unknown
       } | null
-      /** Topic */
-      topic: string
     }
     /**
      * EventSubscriptionTestResponse
@@ -2438,6 +2574,182 @@ export interface components {
       validation_result: components['schemas']['ValidationResult']
     }
     /**
+     * EventSubscriptionRecoveryRead
+     * @description Safe queued recovery status; authority originates in the persisted request.
+     */
+    EventSubscriptionRecoveryRead: {
+      /**
+       * Source Id
+       * Format: uuid
+       */
+      source_id: string
+      /** Partition */
+      partition: number
+      /** Configuration Revision */
+      configuration_revision: number
+      /** Expected Recovery Revision */
+      expected_recovery_revision: number
+      /** Policy */
+      policy: string
+      /** Reason */
+      reason: string
+      /** Acknowledge Duplicate Risk */
+      acknowledge_duplicate_risk: boolean
+      /** Resolve Unscheduled */
+      resolve_unscheduled: boolean
+      /**
+       * Requested By
+       * Format: uuid
+       */
+      requested_by: string
+      /** Completed */
+      completed: boolean
+      /** Error Code */
+      error_code: string | null
+    }
+    /**
+     * GapReason
+     * @description Safe persisted explanations; no broker messages or customer payloads.
+     * @enum {string}
+     */
+    GapReason:
+      'missing_commit' | 'out_of_range' | 'below_authorized_boundary' | 'source_recreated' | 'initial_metadata_missing'
+    /**
+     * KafkaPartitionInitialPositionRead
+     * @description Lossless metadata schema for later read/control callers; no route is added.
+     */
+    KafkaPartitionInitialPositionRead: {
+      /**
+       * Source Id
+       * Format: uuid
+       */
+      source_id: string
+      /** Partition */
+      partition: number
+      /** Initial Next Offset */
+      initial_next_offset: string | null
+      /** Initialized At */
+      initialized_at: string | null
+      /** Initial Metadata Missing */
+      initial_metadata_missing: boolean
+      /** Observed Group Next Offset */
+      observed_group_next_offset: string | null
+      /** Initial Commit Confirmed At */
+      initial_commit_confirmed_at: string | null
+      /** Recovery Revision */
+      recovery_revision: number
+      /** Recovery Boundary */
+      recovery_boundary: string | null
+      /** Recovery Confirmed At */
+      recovery_confirmed_at: string | null
+      recovery_policy: components['schemas']['RecoveryPolicy'] | null
+      /** Recovery Reason */
+      recovery_reason: string | null
+      /** Duplicate Risk Acknowledged */
+      duplicate_risk_acknowledged: boolean
+      /** Gap Detected At */
+      gap_detected_at: string | null
+      gap_reason: components['schemas']['GapReason'] | null
+      /** Pending Boundary */
+      pending_boundary: string | null
+      pending_policy: components['schemas']['RecoveryPolicy'] | null
+      /** Pending Reason */
+      pending_reason: string | null
+      /** Pending Duplicate Risk Acknowledged */
+      pending_duplicate_risk_acknowledged: boolean
+      /** Superseded Recovery Revision */
+      superseded_recovery_revision: number | null
+      /** Superseded Recovery Boundary */
+      superseded_recovery_boundary: string | null
+    }
+    /**
+     * RecoveryPolicy
+     * @description The two permitted administrative gap policies, not replay controls.
+     * @enum {string}
+     */
+    RecoveryPolicy: 'retained_beginning' | 'current_end'
+    /**
+     * SubscriptionControlRequest
+     * @description Compare-and-set against the published projection and source generation.
+     */
+    SubscriptionControlRequest: {
+      /** Configuration Revision */
+      configuration_revision: number
+      /** Source Generation */
+      source_generation: number
+    }
+    /**
+     * SubscriptionControlResponse
+     * @description A committed action; pending is not proof that every consumer has stopped.
+     */
+    SubscriptionControlResponse: {
+      /**
+       * Subscription Id
+       * Format: uuid
+       */
+      subscription_id: string
+      /**
+       * Source Id
+       * Format: uuid
+       */
+      source_id: string
+      /** Configuration Revision */
+      configuration_revision: number
+      /** Source Generation */
+      source_generation: number
+      /**
+       * Convergence
+       * @enum {string}
+       */
+      convergence: 'pending' | 'applied'
+      /** Applied Revision */
+      applied_revision?: number | null
+    }
+    /**
+     * SubscriptionRecoveryRequest
+     * @description Boundary policy only; the assigned worker resolves the effective offset.
+     */
+    SubscriptionRecoveryRequest: {
+      /** Configuration Revision */
+      configuration_revision: number
+      /** Source Generation */
+      source_generation: number
+      /** Partition */
+      partition: number
+      /** Expected Recovery Revision */
+      expected_recovery_revision: number
+      policy: components['schemas']['RecoveryPolicy']
+      /** Reason */
+      reason: string
+      /**
+       * Acknowledge Duplicate Risk
+       * @default false
+       */
+      acknowledge_duplicate_risk?: boolean
+      /**
+       * Resolve Unscheduled
+       * @default false
+       */
+      resolve_unscheduled?: boolean
+    }
+    /**
+     * SubscriptionRetireRequest
+     * @description Safe retirement by default; disposition requires its separate grant.
+     */
+    SubscriptionRetireRequest: {
+      /** Configuration Revision */
+      configuration_revision: number
+      /** Source Generation */
+      source_generation: number
+      /**
+       * Resolve Unscheduled
+       * @default false
+       */
+      resolve_unscheduled?: boolean
+      /** Reason */
+      reason: string
+    }
+    /**
      * UserReferenceType
      * @description Kind of principal a UserReference points at.
      *
@@ -3372,14 +3684,152 @@ export interface operations {
           'application/json': components['schemas']['ResourcesResponse_EventSubscriptionRead_']
         }
       }
-      400: components['responses']['BadRequestError']
-      401: components['responses']['UnauthorizedError']
-      403: components['responses']['ForbiddenError']
-      404: components['responses']['NotFoundError']
-      409: components['responses']['ConflictError']
-      422: components['responses']['ValidationError']
-      429: components['responses']['RateLimitError']
-      500: components['responses']['InternalServerError']
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          /**
+           * @example {
+           *       "type": "https://api.example.com/errors/bad-request",
+           *       "title": "Bad Request",
+           *       "detail": "The request was malformed or contained invalid parameters",
+           *       "code": "BAD_REQUEST",
+           *       "retryable": false
+           *     }
+           */
+          'application/problem+json': components['schemas']['ErrorData']
+        }
+      }
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          /**
+           * @example {
+           *       "type": "https://api.example.com/errors/unauthorized",
+           *       "title": "Unauthorized",
+           *       "detail": "Authentication is required to access this resource",
+           *       "code": "UNAUTHORIZED",
+           *       "retryable": false
+           *     }
+           */
+          'application/problem+json': components['schemas']['ErrorData']
+        }
+      }
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          /**
+           * @example {
+           *       "type": "https://api.example.com/errors/forbidden",
+           *       "title": "Forbidden",
+           *       "detail": "You do not have permission to access this resource",
+           *       "code": "FORBIDDEN",
+           *       "retryable": false
+           *     }
+           */
+          'application/problem+json': components['schemas']['ErrorData']
+        }
+      }
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          /**
+           * @example {
+           *       "type": "https://api.example.com/errors/not-found",
+           *       "title": "Resource Not Found",
+           *       "detail": "No resource exists with the provided identifier",
+           *       "code": "NOT_FOUND",
+           *       "retryable": false,
+           *       "instance": "/api/v1/workflows"
+           *     }
+           */
+          'application/problem+json': components['schemas']['ErrorData']
+        }
+      }
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          /**
+           * @example {
+           *       "type": "https://api.example.com/errors/conflict",
+           *       "title": "Conflict",
+           *       "detail": "The request conflicts with the current state of the resource",
+           *       "code": "CONFLICT",
+           *       "retryable": false
+           *     }
+           */
+          'application/problem+json': components['schemas']['ErrorData']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          /**
+           * @example {
+           *       "type": "https://api.example.com/errors/validation-error",
+           *       "title": "Validation Error",
+           *       "detail": "Field 'name' must be between 1 and 255 characters",
+           *       "code": "VALIDATION_ERROR",
+           *       "retryable": false,
+           *       "instance": "/api/v1/workflows"
+           *     }
+           */
+          'application/problem+json': components['schemas']['ErrorData']
+        }
+      }
+      /** @description Too Many Requests */
+      429: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          /**
+           * @example {
+           *       "type": "https://api.example.com/errors/rate-limited",
+           *       "title": "Too Many Requests",
+           *       "detail": "Rate limit exceeded. Try again in 60 seconds.",
+           *       "code": "RATE_LIMITED",
+           *       "retryable": true
+           *     }
+           */
+          'application/problem+json': components['schemas']['ErrorData']
+        }
+      }
+      /** @description Internal Server Error */
+      500: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          /**
+           * @example {
+           *       "type": "https://api.example.com/errors/internal-error",
+           *       "title": "Internal Server Error",
+           *       "detail": "An unexpected error occurred",
+           *       "code": "INTERNAL_ERROR",
+           *       "retryable": true
+           *     }
+           */
+          'application/problem+json': components['schemas']['ErrorData']
+        }
+      }
     }
   }
   test_event_subscription: {
@@ -3406,14 +3856,152 @@ export interface operations {
           'application/json': components['schemas']['EventSubscriptionTestResponse']
         }
       }
-      400: components['responses']['BadRequestError']
-      401: components['responses']['UnauthorizedError']
-      403: components['responses']['ForbiddenError']
-      404: components['responses']['NotFoundError']
-      409: components['responses']['ConflictError']
-      422: components['responses']['ValidationError']
-      429: components['responses']['RateLimitError']
-      500: components['responses']['InternalServerError']
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          /**
+           * @example {
+           *       "type": "https://api.example.com/errors/bad-request",
+           *       "title": "Bad Request",
+           *       "detail": "The request was malformed or contained invalid parameters",
+           *       "code": "BAD_REQUEST",
+           *       "retryable": false
+           *     }
+           */
+          'application/problem+json': components['schemas']['ErrorData']
+        }
+      }
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          /**
+           * @example {
+           *       "type": "https://api.example.com/errors/unauthorized",
+           *       "title": "Unauthorized",
+           *       "detail": "Authentication is required to access this resource",
+           *       "code": "UNAUTHORIZED",
+           *       "retryable": false
+           *     }
+           */
+          'application/problem+json': components['schemas']['ErrorData']
+        }
+      }
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          /**
+           * @example {
+           *       "type": "https://api.example.com/errors/forbidden",
+           *       "title": "Forbidden",
+           *       "detail": "You do not have permission to access this resource",
+           *       "code": "FORBIDDEN",
+           *       "retryable": false
+           *     }
+           */
+          'application/problem+json': components['schemas']['ErrorData']
+        }
+      }
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          /**
+           * @example {
+           *       "type": "https://api.example.com/errors/not-found",
+           *       "title": "Resource Not Found",
+           *       "detail": "No resource exists with the provided identifier",
+           *       "code": "NOT_FOUND",
+           *       "retryable": false,
+           *       "instance": "/api/v1/workflows"
+           *     }
+           */
+          'application/problem+json': components['schemas']['ErrorData']
+        }
+      }
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          /**
+           * @example {
+           *       "type": "https://api.example.com/errors/conflict",
+           *       "title": "Conflict",
+           *       "detail": "The request conflicts with the current state of the resource",
+           *       "code": "CONFLICT",
+           *       "retryable": false
+           *     }
+           */
+          'application/problem+json': components['schemas']['ErrorData']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          /**
+           * @example {
+           *       "type": "https://api.example.com/errors/validation-error",
+           *       "title": "Validation Error",
+           *       "detail": "Field 'name' must be between 1 and 255 characters",
+           *       "code": "VALIDATION_ERROR",
+           *       "retryable": false,
+           *       "instance": "/api/v1/workflows"
+           *     }
+           */
+          'application/problem+json': components['schemas']['ErrorData']
+        }
+      }
+      /** @description Too Many Requests */
+      429: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          /**
+           * @example {
+           *       "type": "https://api.example.com/errors/rate-limited",
+           *       "title": "Too Many Requests",
+           *       "detail": "Rate limit exceeded. Try again in 60 seconds.",
+           *       "code": "RATE_LIMITED",
+           *       "retryable": true
+           *     }
+           */
+          'application/problem+json': components['schemas']['ErrorData']
+        }
+      }
+      /** @description Internal Server Error */
+      500: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          /**
+           * @example {
+           *       "type": "https://api.example.com/errors/internal-error",
+           *       "title": "Internal Server Error",
+           *       "detail": "An unexpected error occurred",
+           *       "code": "INTERNAL_ERROR",
+           *       "retryable": true
+           *     }
+           */
+          'application/problem+json': components['schemas']['ErrorData']
+        }
+      }
     }
   }
   get_event_subscription: {
@@ -3437,14 +4025,1017 @@ export interface operations {
           'application/json': components['schemas']['EventSubscriptionRead']
         }
       }
-      400: components['responses']['BadRequestError']
-      401: components['responses']['UnauthorizedError']
-      403: components['responses']['ForbiddenError']
-      404: components['responses']['NotFoundError']
-      409: components['responses']['ConflictError']
-      422: components['responses']['ValidationError']
-      429: components['responses']['RateLimitError']
-      500: components['responses']['InternalServerError']
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          /**
+           * @example {
+           *       "type": "https://api.example.com/errors/bad-request",
+           *       "title": "Bad Request",
+           *       "detail": "The request was malformed or contained invalid parameters",
+           *       "code": "BAD_REQUEST",
+           *       "retryable": false
+           *     }
+           */
+          'application/problem+json': components['schemas']['ErrorData']
+        }
+      }
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          /**
+           * @example {
+           *       "type": "https://api.example.com/errors/unauthorized",
+           *       "title": "Unauthorized",
+           *       "detail": "Authentication is required to access this resource",
+           *       "code": "UNAUTHORIZED",
+           *       "retryable": false
+           *     }
+           */
+          'application/problem+json': components['schemas']['ErrorData']
+        }
+      }
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          /**
+           * @example {
+           *       "type": "https://api.example.com/errors/forbidden",
+           *       "title": "Forbidden",
+           *       "detail": "You do not have permission to access this resource",
+           *       "code": "FORBIDDEN",
+           *       "retryable": false
+           *     }
+           */
+          'application/problem+json': components['schemas']['ErrorData']
+        }
+      }
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          /**
+           * @example {
+           *       "type": "https://api.example.com/errors/not-found",
+           *       "title": "Resource Not Found",
+           *       "detail": "No resource exists with the provided identifier",
+           *       "code": "NOT_FOUND",
+           *       "retryable": false,
+           *       "instance": "/api/v1/workflows"
+           *     }
+           */
+          'application/problem+json': components['schemas']['ErrorData']
+        }
+      }
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          /**
+           * @example {
+           *       "type": "https://api.example.com/errors/conflict",
+           *       "title": "Conflict",
+           *       "detail": "The request conflicts with the current state of the resource",
+           *       "code": "CONFLICT",
+           *       "retryable": false
+           *     }
+           */
+          'application/problem+json': components['schemas']['ErrorData']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          /**
+           * @example {
+           *       "type": "https://api.example.com/errors/validation-error",
+           *       "title": "Validation Error",
+           *       "detail": "Field 'name' must be between 1 and 255 characters",
+           *       "code": "VALIDATION_ERROR",
+           *       "retryable": false,
+           *       "instance": "/api/v1/workflows"
+           *     }
+           */
+          'application/problem+json': components['schemas']['ErrorData']
+        }
+      }
+      /** @description Too Many Requests */
+      429: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          /**
+           * @example {
+           *       "type": "https://api.example.com/errors/rate-limited",
+           *       "title": "Too Many Requests",
+           *       "detail": "Rate limit exceeded. Try again in 60 seconds.",
+           *       "code": "RATE_LIMITED",
+           *       "retryable": true
+           *     }
+           */
+          'application/problem+json': components['schemas']['ErrorData']
+        }
+      }
+      /** @description Internal Server Error */
+      500: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          /**
+           * @example {
+           *       "type": "https://api.example.com/errors/internal-error",
+           *       "title": "Internal Server Error",
+           *       "detail": "An unexpected error occurred",
+           *       "code": "INTERNAL_ERROR",
+           *       "retryable": true
+           *     }
+           */
+          'application/problem+json': components['schemas']['ErrorData']
+        }
+      }
+    }
+  }
+  pause_event_subscription: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        workflow_id: string
+        subscription_id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SubscriptionControlRequest']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['SubscriptionControlResponse']
+        }
+      }
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          /**
+           * @example {
+           *       "type": "https://api.example.com/errors/bad-request",
+           *       "title": "Bad Request",
+           *       "detail": "The request was malformed or contained invalid parameters",
+           *       "code": "BAD_REQUEST",
+           *       "retryable": false
+           *     }
+           */
+          'application/problem+json': components['schemas']['ErrorData']
+        }
+      }
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          /**
+           * @example {
+           *       "type": "https://api.example.com/errors/unauthorized",
+           *       "title": "Unauthorized",
+           *       "detail": "Authentication is required to access this resource",
+           *       "code": "UNAUTHORIZED",
+           *       "retryable": false
+           *     }
+           */
+          'application/problem+json': components['schemas']['ErrorData']
+        }
+      }
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          /**
+           * @example {
+           *       "type": "https://api.example.com/errors/forbidden",
+           *       "title": "Forbidden",
+           *       "detail": "You do not have permission to access this resource",
+           *       "code": "FORBIDDEN",
+           *       "retryable": false
+           *     }
+           */
+          'application/problem+json': components['schemas']['ErrorData']
+        }
+      }
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          /**
+           * @example {
+           *       "type": "https://api.example.com/errors/not-found",
+           *       "title": "Resource Not Found",
+           *       "detail": "No resource exists with the provided identifier",
+           *       "code": "NOT_FOUND",
+           *       "retryable": false,
+           *       "instance": "/api/v1/workflows"
+           *     }
+           */
+          'application/problem+json': components['schemas']['ErrorData']
+        }
+      }
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          /**
+           * @example {
+           *       "type": "https://api.example.com/errors/conflict",
+           *       "title": "Conflict",
+           *       "detail": "The request conflicts with the current state of the resource",
+           *       "code": "CONFLICT",
+           *       "retryable": false
+           *     }
+           */
+          'application/problem+json': components['schemas']['ErrorData']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          /**
+           * @example {
+           *       "type": "https://api.example.com/errors/validation-error",
+           *       "title": "Validation Error",
+           *       "detail": "Field 'name' must be between 1 and 255 characters",
+           *       "code": "VALIDATION_ERROR",
+           *       "retryable": false,
+           *       "instance": "/api/v1/workflows"
+           *     }
+           */
+          'application/problem+json': components['schemas']['ErrorData']
+        }
+      }
+      /** @description Too Many Requests */
+      429: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          /**
+           * @example {
+           *       "type": "https://api.example.com/errors/rate-limited",
+           *       "title": "Too Many Requests",
+           *       "detail": "Rate limit exceeded. Try again in 60 seconds.",
+           *       "code": "RATE_LIMITED",
+           *       "retryable": true
+           *     }
+           */
+          'application/problem+json': components['schemas']['ErrorData']
+        }
+      }
+      /** @description Internal Server Error */
+      500: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          /**
+           * @example {
+           *       "type": "https://api.example.com/errors/internal-error",
+           *       "title": "Internal Server Error",
+           *       "detail": "An unexpected error occurred",
+           *       "code": "INTERNAL_ERROR",
+           *       "retryable": true
+           *     }
+           */
+          'application/problem+json': components['schemas']['ErrorData']
+        }
+      }
+    }
+  }
+  resume_event_subscription: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        workflow_id: string
+        subscription_id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SubscriptionControlRequest']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['SubscriptionControlResponse']
+        }
+      }
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          /**
+           * @example {
+           *       "type": "https://api.example.com/errors/bad-request",
+           *       "title": "Bad Request",
+           *       "detail": "The request was malformed or contained invalid parameters",
+           *       "code": "BAD_REQUEST",
+           *       "retryable": false
+           *     }
+           */
+          'application/problem+json': components['schemas']['ErrorData']
+        }
+      }
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          /**
+           * @example {
+           *       "type": "https://api.example.com/errors/unauthorized",
+           *       "title": "Unauthorized",
+           *       "detail": "Authentication is required to access this resource",
+           *       "code": "UNAUTHORIZED",
+           *       "retryable": false
+           *     }
+           */
+          'application/problem+json': components['schemas']['ErrorData']
+        }
+      }
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          /**
+           * @example {
+           *       "type": "https://api.example.com/errors/forbidden",
+           *       "title": "Forbidden",
+           *       "detail": "You do not have permission to access this resource",
+           *       "code": "FORBIDDEN",
+           *       "retryable": false
+           *     }
+           */
+          'application/problem+json': components['schemas']['ErrorData']
+        }
+      }
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          /**
+           * @example {
+           *       "type": "https://api.example.com/errors/not-found",
+           *       "title": "Resource Not Found",
+           *       "detail": "No resource exists with the provided identifier",
+           *       "code": "NOT_FOUND",
+           *       "retryable": false,
+           *       "instance": "/api/v1/workflows"
+           *     }
+           */
+          'application/problem+json': components['schemas']['ErrorData']
+        }
+      }
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          /**
+           * @example {
+           *       "type": "https://api.example.com/errors/conflict",
+           *       "title": "Conflict",
+           *       "detail": "The request conflicts with the current state of the resource",
+           *       "code": "CONFLICT",
+           *       "retryable": false
+           *     }
+           */
+          'application/problem+json': components['schemas']['ErrorData']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          /**
+           * @example {
+           *       "type": "https://api.example.com/errors/validation-error",
+           *       "title": "Validation Error",
+           *       "detail": "Field 'name' must be between 1 and 255 characters",
+           *       "code": "VALIDATION_ERROR",
+           *       "retryable": false,
+           *       "instance": "/api/v1/workflows"
+           *     }
+           */
+          'application/problem+json': components['schemas']['ErrorData']
+        }
+      }
+      /** @description Too Many Requests */
+      429: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          /**
+           * @example {
+           *       "type": "https://api.example.com/errors/rate-limited",
+           *       "title": "Too Many Requests",
+           *       "detail": "Rate limit exceeded. Try again in 60 seconds.",
+           *       "code": "RATE_LIMITED",
+           *       "retryable": true
+           *     }
+           */
+          'application/problem+json': components['schemas']['ErrorData']
+        }
+      }
+      /** @description Internal Server Error */
+      500: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          /**
+           * @example {
+           *       "type": "https://api.example.com/errors/internal-error",
+           *       "title": "Internal Server Error",
+           *       "detail": "An unexpected error occurred",
+           *       "code": "INTERNAL_ERROR",
+           *       "retryable": true
+           *     }
+           */
+          'application/problem+json': components['schemas']['ErrorData']
+        }
+      }
+    }
+  }
+  retry_event_subscription: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        workflow_id: string
+        subscription_id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SubscriptionControlRequest']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['SubscriptionControlResponse']
+        }
+      }
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          /**
+           * @example {
+           *       "type": "https://api.example.com/errors/bad-request",
+           *       "title": "Bad Request",
+           *       "detail": "The request was malformed or contained invalid parameters",
+           *       "code": "BAD_REQUEST",
+           *       "retryable": false
+           *     }
+           */
+          'application/problem+json': components['schemas']['ErrorData']
+        }
+      }
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          /**
+           * @example {
+           *       "type": "https://api.example.com/errors/unauthorized",
+           *       "title": "Unauthorized",
+           *       "detail": "Authentication is required to access this resource",
+           *       "code": "UNAUTHORIZED",
+           *       "retryable": false
+           *     }
+           */
+          'application/problem+json': components['schemas']['ErrorData']
+        }
+      }
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          /**
+           * @example {
+           *       "type": "https://api.example.com/errors/forbidden",
+           *       "title": "Forbidden",
+           *       "detail": "You do not have permission to access this resource",
+           *       "code": "FORBIDDEN",
+           *       "retryable": false
+           *     }
+           */
+          'application/problem+json': components['schemas']['ErrorData']
+        }
+      }
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          /**
+           * @example {
+           *       "type": "https://api.example.com/errors/not-found",
+           *       "title": "Resource Not Found",
+           *       "detail": "No resource exists with the provided identifier",
+           *       "code": "NOT_FOUND",
+           *       "retryable": false,
+           *       "instance": "/api/v1/workflows"
+           *     }
+           */
+          'application/problem+json': components['schemas']['ErrorData']
+        }
+      }
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          /**
+           * @example {
+           *       "type": "https://api.example.com/errors/conflict",
+           *       "title": "Conflict",
+           *       "detail": "The request conflicts with the current state of the resource",
+           *       "code": "CONFLICT",
+           *       "retryable": false
+           *     }
+           */
+          'application/problem+json': components['schemas']['ErrorData']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          /**
+           * @example {
+           *       "type": "https://api.example.com/errors/validation-error",
+           *       "title": "Validation Error",
+           *       "detail": "Field 'name' must be between 1 and 255 characters",
+           *       "code": "VALIDATION_ERROR",
+           *       "retryable": false,
+           *       "instance": "/api/v1/workflows"
+           *     }
+           */
+          'application/problem+json': components['schemas']['ErrorData']
+        }
+      }
+      /** @description Too Many Requests */
+      429: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          /**
+           * @example {
+           *       "type": "https://api.example.com/errors/rate-limited",
+           *       "title": "Too Many Requests",
+           *       "detail": "Rate limit exceeded. Try again in 60 seconds.",
+           *       "code": "RATE_LIMITED",
+           *       "retryable": true
+           *     }
+           */
+          'application/problem+json': components['schemas']['ErrorData']
+        }
+      }
+      /** @description Internal Server Error */
+      500: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          /**
+           * @example {
+           *       "type": "https://api.example.com/errors/internal-error",
+           *       "title": "Internal Server Error",
+           *       "detail": "An unexpected error occurred",
+           *       "code": "INTERNAL_ERROR",
+           *       "retryable": true
+           *     }
+           */
+          'application/problem+json': components['schemas']['ErrorData']
+        }
+      }
+    }
+  }
+  recover_event_subscription: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        workflow_id: string
+        subscription_id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SubscriptionRecoveryRequest']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      202: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['SubscriptionControlResponse']
+        }
+      }
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          /**
+           * @example {
+           *       "type": "https://api.example.com/errors/bad-request",
+           *       "title": "Bad Request",
+           *       "detail": "The request was malformed or contained invalid parameters",
+           *       "code": "BAD_REQUEST",
+           *       "retryable": false
+           *     }
+           */
+          'application/problem+json': components['schemas']['ErrorData']
+        }
+      }
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          /**
+           * @example {
+           *       "type": "https://api.example.com/errors/unauthorized",
+           *       "title": "Unauthorized",
+           *       "detail": "Authentication is required to access this resource",
+           *       "code": "UNAUTHORIZED",
+           *       "retryable": false
+           *     }
+           */
+          'application/problem+json': components['schemas']['ErrorData']
+        }
+      }
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          /**
+           * @example {
+           *       "type": "https://api.example.com/errors/forbidden",
+           *       "title": "Forbidden",
+           *       "detail": "You do not have permission to access this resource",
+           *       "code": "FORBIDDEN",
+           *       "retryable": false
+           *     }
+           */
+          'application/problem+json': components['schemas']['ErrorData']
+        }
+      }
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          /**
+           * @example {
+           *       "type": "https://api.example.com/errors/not-found",
+           *       "title": "Resource Not Found",
+           *       "detail": "No resource exists with the provided identifier",
+           *       "code": "NOT_FOUND",
+           *       "retryable": false,
+           *       "instance": "/api/v1/workflows"
+           *     }
+           */
+          'application/problem+json': components['schemas']['ErrorData']
+        }
+      }
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          /**
+           * @example {
+           *       "type": "https://api.example.com/errors/conflict",
+           *       "title": "Conflict",
+           *       "detail": "The request conflicts with the current state of the resource",
+           *       "code": "CONFLICT",
+           *       "retryable": false
+           *     }
+           */
+          'application/problem+json': components['schemas']['ErrorData']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          /**
+           * @example {
+           *       "type": "https://api.example.com/errors/validation-error",
+           *       "title": "Validation Error",
+           *       "detail": "Field 'name' must be between 1 and 255 characters",
+           *       "code": "VALIDATION_ERROR",
+           *       "retryable": false,
+           *       "instance": "/api/v1/workflows"
+           *     }
+           */
+          'application/problem+json': components['schemas']['ErrorData']
+        }
+      }
+      /** @description Too Many Requests */
+      429: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          /**
+           * @example {
+           *       "type": "https://api.example.com/errors/rate-limited",
+           *       "title": "Too Many Requests",
+           *       "detail": "Rate limit exceeded. Try again in 60 seconds.",
+           *       "code": "RATE_LIMITED",
+           *       "retryable": true
+           *     }
+           */
+          'application/problem+json': components['schemas']['ErrorData']
+        }
+      }
+      /** @description Internal Server Error */
+      500: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          /**
+           * @example {
+           *       "type": "https://api.example.com/errors/internal-error",
+           *       "title": "Internal Server Error",
+           *       "detail": "An unexpected error occurred",
+           *       "code": "INTERNAL_ERROR",
+           *       "retryable": true
+           *     }
+           */
+          'application/problem+json': components['schemas']['ErrorData']
+        }
+      }
+    }
+  }
+  retire_event_subscription: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        workflow_id: string
+        subscription_id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SubscriptionRetireRequest']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['SubscriptionControlResponse']
+        }
+      }
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          /**
+           * @example {
+           *       "type": "https://api.example.com/errors/bad-request",
+           *       "title": "Bad Request",
+           *       "detail": "The request was malformed or contained invalid parameters",
+           *       "code": "BAD_REQUEST",
+           *       "retryable": false
+           *     }
+           */
+          'application/problem+json': components['schemas']['ErrorData']
+        }
+      }
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          /**
+           * @example {
+           *       "type": "https://api.example.com/errors/unauthorized",
+           *       "title": "Unauthorized",
+           *       "detail": "Authentication is required to access this resource",
+           *       "code": "UNAUTHORIZED",
+           *       "retryable": false
+           *     }
+           */
+          'application/problem+json': components['schemas']['ErrorData']
+        }
+      }
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          /**
+           * @example {
+           *       "type": "https://api.example.com/errors/forbidden",
+           *       "title": "Forbidden",
+           *       "detail": "You do not have permission to access this resource",
+           *       "code": "FORBIDDEN",
+           *       "retryable": false
+           *     }
+           */
+          'application/problem+json': components['schemas']['ErrorData']
+        }
+      }
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          /**
+           * @example {
+           *       "type": "https://api.example.com/errors/not-found",
+           *       "title": "Resource Not Found",
+           *       "detail": "No resource exists with the provided identifier",
+           *       "code": "NOT_FOUND",
+           *       "retryable": false,
+           *       "instance": "/api/v1/workflows"
+           *     }
+           */
+          'application/problem+json': components['schemas']['ErrorData']
+        }
+      }
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          /**
+           * @example {
+           *       "type": "https://api.example.com/errors/conflict",
+           *       "title": "Conflict",
+           *       "detail": "The request conflicts with the current state of the resource",
+           *       "code": "CONFLICT",
+           *       "retryable": false
+           *     }
+           */
+          'application/problem+json': components['schemas']['ErrorData']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          /**
+           * @example {
+           *       "type": "https://api.example.com/errors/validation-error",
+           *       "title": "Validation Error",
+           *       "detail": "Field 'name' must be between 1 and 255 characters",
+           *       "code": "VALIDATION_ERROR",
+           *       "retryable": false,
+           *       "instance": "/api/v1/workflows"
+           *     }
+           */
+          'application/problem+json': components['schemas']['ErrorData']
+        }
+      }
+      /** @description Too Many Requests */
+      429: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          /**
+           * @example {
+           *       "type": "https://api.example.com/errors/rate-limited",
+           *       "title": "Too Many Requests",
+           *       "detail": "Rate limit exceeded. Try again in 60 seconds.",
+           *       "code": "RATE_LIMITED",
+           *       "retryable": true
+           *     }
+           */
+          'application/problem+json': components['schemas']['ErrorData']
+        }
+      }
+      /** @description Internal Server Error */
+      500: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          /**
+           * @example {
+           *       "type": "https://api.example.com/errors/internal-error",
+           *       "title": "Internal Server Error",
+           *       "detail": "An unexpected error occurred",
+           *       "code": "INTERNAL_ERROR",
+           *       "retryable": true
+           *     }
+           */
+          'application/problem+json': components['schemas']['ErrorData']
+        }
+      }
     }
   }
 }

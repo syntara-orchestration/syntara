@@ -18,6 +18,7 @@ from syntara.eventstreams.handlers.workflow_launcher import TemporalWorkflowLaun
 from syntara.eventstreams.services.admission_service import EventAdmissionService
 from syntara.eventstreams.services.execution_preparation_service import EventExecutionPreparationService
 from syntara.eventstreams.services.recovery_worker import EventDeliveryRecoveryWorker
+from syntara.eventstreams.services.runtime_control_service import EventRuntimeControlService
 from syntara.eventstreams.services.subscription_hints import SubscriptionHintListener
 from syntara.eventstreams.services.subscription_reader import EventSubscriptionReader
 from syntara.eventstreams.services.worker_resources import EventWorkerResources
@@ -43,7 +44,11 @@ async def _run_connected(
     factory = ManagedRunnerFactory(
         AsyncSessionLocal, preparation, admission, resources, encryptor, owner_worker_id=owner
     )
-    manager = EventWorkerManager(EventSubscriptionReader(AsyncSessionLocal), factory)
+    manager = EventWorkerManager(
+        EventSubscriptionReader(AsyncSessionLocal),
+        factory,
+        controls=EventRuntimeControlService(AsyncSessionLocal, owner),
+    )
     recovery = EventDeliveryRecoveryWorker(
         AsyncSessionLocal, launcher, worker_id=owner, admission=admission, resources=resources
     )

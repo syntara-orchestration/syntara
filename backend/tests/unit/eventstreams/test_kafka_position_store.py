@@ -305,6 +305,7 @@ async def test_unprepared_reconciliation_preserves_records_at_or_above_recovery_
         expected_recovery_revision=0,
         policy=RecoveryPolicy.RETAINED_BEGINNING,
         reason="offset_expired",
+        allow_unscheduled_disposition=True,
     )
     assert await repository.reconcile_claims(value, UUID(int=42), "repair") == []
     assert pending.claim_token is None

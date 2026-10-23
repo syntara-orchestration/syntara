@@ -104,6 +104,10 @@ class EventSubscriptionSource(BaseResource, table=True):
         description="When this source was retired; retirement never deletes the row",
     )
 
+    retirement_completed_at: datetime | None = Field(default=None, sa_type=DateTime(timezone=True))  # type: ignore[call-overload]
+    retirement_reason: str | None = Field(default=None, max_length=100)
+    retirement_authorized_by: UUID | None = Field(default=None, foreign_key="principals.id", ondelete="RESTRICT")
+
     delivery_evidence_revision: int = Field(
         default=0,
         sa_type=BigInteger,

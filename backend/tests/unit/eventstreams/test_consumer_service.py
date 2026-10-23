@@ -472,3 +472,34 @@ async def test_shutdown_discards_queued_starts_and_hints(manager_context):
     assert context.reader.read.await_count == calls
     assert context.factory.await_count == 2
     assert all(runner.stopped for runner in context.runners)
+
+
+async def test_consumer_registration_fences_startup_before_factory_runs(manager_context):
+    from syntara.eventstreams.services.runtime_control_service import EventRuntimeControlService
+
+    context = manager_context
+    controls = AsyncMock(spec=EventRuntimeControlService)
+    controls.register.return_value = False
+    context.manager._controls = controls
+    await context.manager.start()
+    await eventually(lambda: controls.register.await_count > 0)
+    context.factory.assert_not_awaited()
+    controls.acknowledge.assert_not_awaited()
+
+
+async def test_consumer_acknowledges_pause_only_after_verified_stop(manager_context):
+    from syntara.eventstreams.services.runtime_control_service import EventRuntimeControlService
+
+    context = manager_context
+    controls = AsyncMock(spec=EventRuntimeControlService)
+    controls.register.return_value = True
+    context.manager._controls = controls
+    await context.manager.start()
+    await eventually(lambda: bool(context.runners) and context.runners[0].started)
+    context.reader.read.return_value = []
+    await context.manager.reconcile()
+    await eventually(lambda: context.runners[0].stopped)
+    await eventually(
+        lambda: any(call.args[1].state == RuntimeState.STOPPED for call in controls.acknowledge.await_args_list)
+    )
+    controls.register.assert_awaited_once_with(context.snapshot)

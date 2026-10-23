@@ -101,6 +101,13 @@ class KafkaInitialPositionService:
         if not task.cancelled():
             task.exception()  # Retrieve errors even when the caller was cancelled.
 
+    async def settle_operations(self, timeout_seconds: float) -> bool:
+        """Wait for issued operations without treating caller cancellation as settlement."""
+        if not self._operations:
+            return True
+        _, pending = await asyncio.wait(self._operations, timeout=timeout_seconds)
+        return not pending
+
     async def _exclusive(
         self, request: PositionRequest, *, recover: bool, replacement: bool, owner_worker_id: str
     ) -> PositionResult:

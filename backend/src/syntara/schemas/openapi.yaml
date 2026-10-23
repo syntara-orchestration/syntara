@@ -11,7 +11,7 @@
 openapi: 3.1.0
 info:
   title: Syntara API
-  version: 1.5.0
+  version: 1.6.0
   description: A distributed multi-agent workflow orchestration system
 servers:
   - url: /api/v1
@@ -27610,7 +27610,7 @@ paths:
       tags:
         - Workflows
       summary: Get workflow event subscription
-      description: Read the requested current subscription within its workflow/project.
+      description: Read subscription lifecycle and recovery state within its workflow/project.
       operationId: get_event_subscription
       security:
         - bearerAuth: []
@@ -27737,6 +27737,696 @@ paths:
       x-app-permission:
         resource: workflow
         action: read
+  /workflows/{workflow_id}/event-subscriptions/{subscription_id}/pause:
+    post:
+      tags:
+        - Workflows
+      summary: Pause event subscription
+      description: Close new admission; report pending until all consumer stops are acknowledged.
+      operationId: pause_event_subscription
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: workflow_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Workflow Id
+        - name: subscription_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Subscription Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubscriptionControlRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubscriptionControlResponse'
+        '400':
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/bad-request
+                title: Bad Request
+                detail: The request was malformed or contained invalid parameters
+                code: BAD_REQUEST
+                retryable: false
+        '401':
+          description: Unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/unauthorized
+                title: Unauthorized
+                detail: Authentication is required to access this resource
+                code: UNAUTHORIZED
+                retryable: false
+        '403':
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/forbidden
+                title: Forbidden
+                detail: You do not have permission to access this resource
+                code: FORBIDDEN
+                retryable: false
+        '404':
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/not-found
+                title: Resource Not Found
+                detail: No resource exists with the provided identifier
+                code: NOT_FOUND
+                retryable: false
+                instance: /api/v1/workflows
+        '409':
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/conflict
+                title: Conflict
+                detail: The request conflicts with the current state of the resource
+                code: CONFLICT
+                retryable: false
+        '422':
+          description: Validation Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/validation-error
+                title: Validation Error
+                detail: Field 'name' must be between 1 and 255 characters
+                code: VALIDATION_ERROR
+                retryable: false
+                instance: /api/v1/workflows
+        '429':
+          description: Too Many Requests
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/rate-limited
+                title: Too Many Requests
+                detail: Rate limit exceeded. Try again in 60 seconds.
+                code: RATE_LIMITED
+                retryable: true
+        '500':
+          description: Internal Server Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/internal-error
+                title: Internal Server Error
+                detail: An unexpected error occurred
+                code: INTERNAL_ERROR
+                retryable: true
+      x-app-permission:
+        resource: workflow
+        action: update
+  /workflows/{workflow_id}/event-subscriptions/{subscription_id}/resume:
+    post:
+      tags:
+        - Workflows
+      summary: Resume event subscription
+      description: Resume only a current published source without changing its frozen deliveries.
+      operationId: resume_event_subscription
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: workflow_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Workflow Id
+        - name: subscription_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Subscription Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubscriptionControlRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubscriptionControlResponse'
+        '400':
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/bad-request
+                title: Bad Request
+                detail: The request was malformed or contained invalid parameters
+                code: BAD_REQUEST
+                retryable: false
+        '401':
+          description: Unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/unauthorized
+                title: Unauthorized
+                detail: Authentication is required to access this resource
+                code: UNAUTHORIZED
+                retryable: false
+        '403':
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/forbidden
+                title: Forbidden
+                detail: You do not have permission to access this resource
+                code: FORBIDDEN
+                retryable: false
+        '404':
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/not-found
+                title: Resource Not Found
+                detail: No resource exists with the provided identifier
+                code: NOT_FOUND
+                retryable: false
+                instance: /api/v1/workflows
+        '409':
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/conflict
+                title: Conflict
+                detail: The request conflicts with the current state of the resource
+                code: CONFLICT
+                retryable: false
+        '422':
+          description: Validation Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/validation-error
+                title: Validation Error
+                detail: Field 'name' must be between 1 and 255 characters
+                code: VALIDATION_ERROR
+                retryable: false
+                instance: /api/v1/workflows
+        '429':
+          description: Too Many Requests
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/rate-limited
+                title: Too Many Requests
+                detail: Rate limit exceeded. Try again in 60 seconds.
+                code: RATE_LIMITED
+                retryable: true
+        '500':
+          description: Internal Server Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/internal-error
+                title: Internal Server Error
+                detail: An unexpected error occurred
+                code: INTERNAL_ERROR
+                retryable: true
+      x-app-permission:
+        resource: workflow
+        action: update
+  /workflows/{workflow_id}/event-subscriptions/{subscription_id}/retry:
+    post:
+      tags:
+        - Workflows
+      summary: Retry event subscription
+      description: Retry runtime setup and prepared scheduling; never replay or reset positions.
+      operationId: retry_event_subscription
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: workflow_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Workflow Id
+        - name: subscription_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Subscription Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubscriptionControlRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubscriptionControlResponse'
+        '400':
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/bad-request
+                title: Bad Request
+                detail: The request was malformed or contained invalid parameters
+                code: BAD_REQUEST
+                retryable: false
+        '401':
+          description: Unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/unauthorized
+                title: Unauthorized
+                detail: Authentication is required to access this resource
+                code: UNAUTHORIZED
+                retryable: false
+        '403':
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/forbidden
+                title: Forbidden
+                detail: You do not have permission to access this resource
+                code: FORBIDDEN
+                retryable: false
+        '404':
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/not-found
+                title: Resource Not Found
+                detail: No resource exists with the provided identifier
+                code: NOT_FOUND
+                retryable: false
+                instance: /api/v1/workflows
+        '409':
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/conflict
+                title: Conflict
+                detail: The request conflicts with the current state of the resource
+                code: CONFLICT
+                retryable: false
+        '422':
+          description: Validation Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/validation-error
+                title: Validation Error
+                detail: Field 'name' must be between 1 and 255 characters
+                code: VALIDATION_ERROR
+                retryable: false
+                instance: /api/v1/workflows
+        '429':
+          description: Too Many Requests
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/rate-limited
+                title: Too Many Requests
+                detail: Rate limit exceeded. Try again in 60 seconds.
+                code: RATE_LIMITED
+                retryable: true
+        '500':
+          description: Internal Server Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/internal-error
+                title: Internal Server Error
+                detail: An unexpected error occurred
+                code: INTERNAL_ERROR
+                retryable: true
+      x-app-permission:
+        resource: workflow
+        action: update
+  /workflows/{workflow_id}/event-subscriptions/{subscription_id}/recover:
+    post:
+      tags:
+        - Workflows
+      summary: Recover event subscription
+      description: Queue an authorized boundary policy for the current partition owner.
+      operationId: recover_event_subscription
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: workflow_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Workflow Id
+        - name: subscription_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Subscription Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubscriptionRecoveryRequest'
+      responses:
+        '202':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubscriptionControlResponse'
+        '400':
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/bad-request
+                title: Bad Request
+                detail: The request was malformed or contained invalid parameters
+                code: BAD_REQUEST
+                retryable: false
+        '401':
+          description: Unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/unauthorized
+                title: Unauthorized
+                detail: Authentication is required to access this resource
+                code: UNAUTHORIZED
+                retryable: false
+        '403':
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/forbidden
+                title: Forbidden
+                detail: You do not have permission to access this resource
+                code: FORBIDDEN
+                retryable: false
+        '404':
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/not-found
+                title: Resource Not Found
+                detail: No resource exists with the provided identifier
+                code: NOT_FOUND
+                retryable: false
+                instance: /api/v1/workflows
+        '409':
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/conflict
+                title: Conflict
+                detail: The request conflicts with the current state of the resource
+                code: CONFLICT
+                retryable: false
+        '422':
+          description: Validation Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/validation-error
+                title: Validation Error
+                detail: Field 'name' must be between 1 and 255 characters
+                code: VALIDATION_ERROR
+                retryable: false
+                instance: /api/v1/workflows
+        '429':
+          description: Too Many Requests
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/rate-limited
+                title: Too Many Requests
+                detail: Rate limit exceeded. Try again in 60 seconds.
+                code: RATE_LIMITED
+                retryable: true
+        '500':
+          description: Internal Server Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/internal-error
+                title: Internal Server Error
+                detail: An unexpected error occurred
+                code: INTERNAL_ERROR
+                retryable: true
+      x-app-permission:
+        resource: workflow
+        action: update
+  /workflows/{workflow_id}/event-subscriptions/{subscription_id}/retire:
+    post:
+      tags:
+        - Workflows
+      summary: Retire event subscription source
+      description: Retire a removed/replaced source; disposition additionally requires retire authority.
+      operationId: retire_event_subscription
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: workflow_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Workflow Id
+        - name: subscription_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Subscription Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubscriptionRetireRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubscriptionControlResponse'
+        '400':
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/bad-request
+                title: Bad Request
+                detail: The request was malformed or contained invalid parameters
+                code: BAD_REQUEST
+                retryable: false
+        '401':
+          description: Unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/unauthorized
+                title: Unauthorized
+                detail: Authentication is required to access this resource
+                code: UNAUTHORIZED
+                retryable: false
+        '403':
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/forbidden
+                title: Forbidden
+                detail: You do not have permission to access this resource
+                code: FORBIDDEN
+                retryable: false
+        '404':
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/not-found
+                title: Resource Not Found
+                detail: No resource exists with the provided identifier
+                code: NOT_FOUND
+                retryable: false
+                instance: /api/v1/workflows
+        '409':
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/conflict
+                title: Conflict
+                detail: The request conflicts with the current state of the resource
+                code: CONFLICT
+                retryable: false
+        '422':
+          description: Validation Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/validation-error
+                title: Validation Error
+                detail: Field 'name' must be between 1 and 255 characters
+                code: VALIDATION_ERROR
+                retryable: false
+                instance: /api/v1/workflows
+        '429':
+          description: Too Many Requests
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/rate-limited
+                title: Too Many Requests
+                detail: Rate limit exceeded. Try again in 60 seconds.
+                code: RATE_LIMITED
+                retryable: true
+        '500':
+          description: Internal Server Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/internal-error
+                title: Internal Server Error
+                detail: An unexpected error occurred
+                code: INTERNAL_ERROR
+                retryable: true
+      x-app-permission:
+        resource: workflow
+        action: update
 components:
   schemas:
     UserReference:
@@ -35784,6 +36474,40 @@ components:
           title: Updated At
         source:
           $ref: '#/components/schemas/EventSubscriptionSourceRead'
+        retired:
+          type: boolean
+          title: Retired
+          default: false
+        sources:
+          items:
+            $ref: '#/components/schemas/EventSubscriptionSourceRead'
+          type: array
+          title: Sources
+          default: []
+        initialization:
+          items:
+            $ref: '#/components/schemas/KafkaPartitionInitialPositionRead'
+          type: array
+          title: Initialization
+          default: []
+        recovery:
+          items:
+            $ref: '#/components/schemas/EventSubscriptionRecoveryRead'
+          type: array
+          title: Recovery
+          default: []
+        convergence:
+          type: string
+          enum:
+            - pending
+            - applied
+          title: Convergence
+          default: pending
+        applied_revision:
+          anyOf:
+            - type: integer
+            - type: 'null'
+          title: Applied Revision
       type: object
       required:
         - id
@@ -35800,7 +36524,7 @@ components:
         - updated_at
         - source
       title: EventSubscriptionRead
-      description: Currently available published configuration; no runtime-health claims.
+      description: Published configuration, recovery evidence and acknowledged runtime convergence.
     EventSubscriptionSourceRead:
       properties:
         id:
@@ -35827,6 +36551,24 @@ components:
             propertyName: transport
             mapping:
               kafka: '#/components/schemas/KafkaSourceConfiguration'
+        initialized_at:
+          anyOf:
+            - type: string
+              format: date-time
+            - type: 'null'
+          title: Initialized At
+        retired_at:
+          anyOf:
+            - type: string
+              format: date-time
+            - type: 'null'
+          title: Retired At
+        retirement_completed_at:
+          anyOf:
+            - type: string
+              format: date-time
+            - type: 'null'
+          title: Retirement Completed At
       type: object
       required:
         - id
@@ -35887,18 +36629,18 @@ components:
           type: string
           format: uuid
           title: Credential Id
-        input_schema:
-          anyOf:
-            - additionalProperties: true
-              type: object
-            - type: 'null'
-          title: Input Schema
         topic:
           type: string
           maxLength: 249
           minLength: 1
           pattern: ^[a-zA-Z0-9._-]+$
           title: Topic
+        input_schema:
+          anyOf:
+            - additionalProperties: true
+              type: object
+            - type: 'null'
+          title: Input Schema
       additionalProperties: false
       type: object
       required:
@@ -35906,7 +36648,10 @@ components:
         - credential_id
         - topic
       title: KafkaSubscribeParameters
-      description: One exact topic; consumer groups and connection settings are not inputs.
+      description: |-
+        One exact topic; consumer groups and connection settings are not inputs.
+
+        Tightens the transport-neutral ``topic`` with Kafka's naming constraints.
     EventSubscriptionTestResponse:
       properties:
         success:
@@ -38140,6 +38885,339 @@ components:
           title: Instance
         validation_result:
           $ref: '#/components/schemas/ValidationResult'
+    EventSubscriptionRecoveryRead:
+      properties:
+        source_id:
+          type: string
+          format: uuid
+          title: Source Id
+        partition:
+          type: integer
+          title: Partition
+        configuration_revision:
+          type: integer
+          title: Configuration Revision
+        expected_recovery_revision:
+          type: integer
+          title: Expected Recovery Revision
+        policy:
+          type: string
+          title: Policy
+        reason:
+          type: string
+          title: Reason
+        acknowledge_duplicate_risk:
+          type: boolean
+          title: Acknowledge Duplicate Risk
+        resolve_unscheduled:
+          type: boolean
+          title: Resolve Unscheduled
+        requested_by:
+          type: string
+          format: uuid
+          title: Requested By
+        completed:
+          type: boolean
+          title: Completed
+        error_code:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Error Code
+      type: object
+      required:
+        - source_id
+        - partition
+        - configuration_revision
+        - expected_recovery_revision
+        - policy
+        - reason
+        - acknowledge_duplicate_risk
+        - resolve_unscheduled
+        - requested_by
+        - completed
+        - error_code
+      title: EventSubscriptionRecoveryRead
+      description: Safe queued recovery status; authority originates in the persisted request.
+    GapReason:
+      type: string
+      enum:
+        - missing_commit
+        - out_of_range
+        - below_authorized_boundary
+        - source_recreated
+        - initial_metadata_missing
+      title: GapReason
+      description: Safe persisted explanations; no broker messages or customer payloads.
+    KafkaPartitionInitialPositionRead:
+      properties:
+        source_id:
+          type: string
+          format: uuid
+          title: Source Id
+        partition:
+          type: integer
+          title: Partition
+        initial_next_offset:
+          anyOf:
+            - type: string
+              pattern: ^(0|[1-9][0-9]*)$
+            - type: 'null'
+          title: Initial Next Offset
+        initialized_at:
+          anyOf:
+            - type: string
+              format: date-time
+            - type: 'null'
+          title: Initialized At
+        initial_metadata_missing:
+          type: boolean
+          title: Initial Metadata Missing
+        observed_group_next_offset:
+          anyOf:
+            - type: string
+              pattern: ^(0|[1-9][0-9]*)$
+            - type: 'null'
+          title: Observed Group Next Offset
+        initial_commit_confirmed_at:
+          anyOf:
+            - type: string
+              format: date-time
+            - type: 'null'
+          title: Initial Commit Confirmed At
+        recovery_revision:
+          type: integer
+          title: Recovery Revision
+        recovery_boundary:
+          anyOf:
+            - type: string
+              pattern: ^(0|[1-9][0-9]*)$
+            - type: 'null'
+          title: Recovery Boundary
+        recovery_confirmed_at:
+          anyOf:
+            - type: string
+              format: date-time
+            - type: 'null'
+          title: Recovery Confirmed At
+        recovery_policy:
+          anyOf:
+            - $ref: '#/components/schemas/RecoveryPolicy'
+            - type: 'null'
+        recovery_reason:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Recovery Reason
+        duplicate_risk_acknowledged:
+          type: boolean
+          title: Duplicate Risk Acknowledged
+        gap_detected_at:
+          anyOf:
+            - type: string
+              format: date-time
+            - type: 'null'
+          title: Gap Detected At
+        gap_reason:
+          anyOf:
+            - $ref: '#/components/schemas/GapReason'
+            - type: 'null'
+        pending_boundary:
+          anyOf:
+            - type: string
+              pattern: ^(0|[1-9][0-9]*)$
+            - type: 'null'
+          title: Pending Boundary
+        pending_policy:
+          anyOf:
+            - $ref: '#/components/schemas/RecoveryPolicy'
+            - type: 'null'
+        pending_reason:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Pending Reason
+        pending_duplicate_risk_acknowledged:
+          type: boolean
+          title: Pending Duplicate Risk Acknowledged
+        superseded_recovery_revision:
+          anyOf:
+            - type: integer
+            - type: 'null'
+          title: Superseded Recovery Revision
+        superseded_recovery_boundary:
+          anyOf:
+            - type: string
+              pattern: ^(0|[1-9][0-9]*)$
+            - type: 'null'
+          title: Superseded Recovery Boundary
+      additionalProperties: false
+      type: object
+      required:
+        - source_id
+        - partition
+        - initial_next_offset
+        - initialized_at
+        - initial_metadata_missing
+        - observed_group_next_offset
+        - initial_commit_confirmed_at
+        - recovery_revision
+        - recovery_boundary
+        - recovery_confirmed_at
+        - recovery_policy
+        - recovery_reason
+        - duplicate_risk_acknowledged
+        - gap_detected_at
+        - gap_reason
+        - pending_boundary
+        - pending_policy
+        - pending_reason
+        - pending_duplicate_risk_acknowledged
+        - superseded_recovery_revision
+        - superseded_recovery_boundary
+      title: KafkaPartitionInitialPositionRead
+      description: Lossless metadata schema for later read/control callers; no route is added.
+    RecoveryPolicy:
+      type: string
+      enum:
+        - retained_beginning
+        - current_end
+      title: RecoveryPolicy
+      description: The two permitted administrative gap policies, not replay controls.
+    SubscriptionControlRequest:
+      properties:
+        configuration_revision:
+          type: integer
+          maximum: 9.223372036854776e+18
+          exclusiveMinimum: 0.0
+          title: Configuration Revision
+        source_generation:
+          type: integer
+          maximum: 2147483647.0
+          exclusiveMinimum: 0.0
+          title: Source Generation
+      additionalProperties: false
+      type: object
+      required:
+        - configuration_revision
+        - source_generation
+      title: SubscriptionControlRequest
+      description: Compare-and-set against the published projection and source generation.
+    SubscriptionControlResponse:
+      properties:
+        subscription_id:
+          type: string
+          format: uuid
+          title: Subscription Id
+        source_id:
+          type: string
+          format: uuid
+          title: Source Id
+        configuration_revision:
+          type: integer
+          title: Configuration Revision
+        source_generation:
+          type: integer
+          title: Source Generation
+        convergence:
+          type: string
+          enum:
+            - pending
+            - applied
+          title: Convergence
+        applied_revision:
+          anyOf:
+            - type: integer
+            - type: 'null'
+          title: Applied Revision
+      type: object
+      required:
+        - subscription_id
+        - source_id
+        - configuration_revision
+        - source_generation
+        - convergence
+      title: SubscriptionControlResponse
+      description: A committed action; pending is not proof that every consumer has stopped.
+    SubscriptionRecoveryRequest:
+      properties:
+        configuration_revision:
+          type: integer
+          maximum: 9.223372036854776e+18
+          exclusiveMinimum: 0.0
+          title: Configuration Revision
+        source_generation:
+          type: integer
+          maximum: 2147483647.0
+          exclusiveMinimum: 0.0
+          title: Source Generation
+        partition:
+          type: integer
+          maximum: 2147483647.0
+          minimum: 0.0
+          title: Partition
+        expected_recovery_revision:
+          type: integer
+          maximum: 9.223372036854776e+18
+          minimum: 0.0
+          title: Expected Recovery Revision
+        policy:
+          $ref: '#/components/schemas/RecoveryPolicy'
+        reason:
+          type: string
+          maxLength: 100
+          minLength: 1
+          pattern: ^[a-z][a-z0-9_]*$
+          title: Reason
+        acknowledge_duplicate_risk:
+          type: boolean
+          title: Acknowledge Duplicate Risk
+          default: false
+        resolve_unscheduled:
+          type: boolean
+          title: Resolve Unscheduled
+          default: false
+      additionalProperties: false
+      type: object
+      required:
+        - configuration_revision
+        - source_generation
+        - partition
+        - expected_recovery_revision
+        - policy
+        - reason
+      title: SubscriptionRecoveryRequest
+      description: Boundary policy only; the assigned worker resolves the effective offset.
+    SubscriptionRetireRequest:
+      properties:
+        configuration_revision:
+          type: integer
+          maximum: 9.223372036854776e+18
+          exclusiveMinimum: 0.0
+          title: Configuration Revision
+        source_generation:
+          type: integer
+          maximum: 2147483647.0
+          exclusiveMinimum: 0.0
+          title: Source Generation
+        resolve_unscheduled:
+          type: boolean
+          title: Resolve Unscheduled
+          default: false
+        reason:
+          type: string
+          maxLength: 100
+          minLength: 1
+          pattern: ^[a-z][a-z0-9_]*$
+          title: Reason
+      additionalProperties: false
+      type: object
+      required:
+        - configuration_revision
+        - source_generation
+        - reason
+      title: SubscriptionRetireRequest
+      description: Safe retirement by default; disposition requires its separate grant.
   securitySchemes:
     bearerAuth:
       type: http

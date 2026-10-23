@@ -408,6 +408,12 @@ OWN_SCOPED_CASES: list[PolicyTestCase] = [
 # ---------------------------------------------------------------------------
 
 E2E_COVERAGE_EXEMPT: set[str] = {
+    # Operational subscription grants have registry, scope and denial coverage in
+    # tests/unit/eventstreams/test_control_service.py; runtime E2E is outside M1.
+    "event_subscription:recover:any",
+    "event_subscription:recover:project",
+    "event_subscription:retire:any",
+    "event_subscription:retire:project",
     # System-scoped CRUD policies that follow the same pattern as the
     # representative cases already tested e2e (create/read tested, so
     # update/delete for the same resource are unit-test-only).
