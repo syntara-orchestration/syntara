@@ -39,8 +39,8 @@ import { executionDetailHasTitleRowExtras, executionDetailPageHeading } from './
 import { executionRefetchInterval } from './executionPolling'
 import { useApprovalNavigation } from './hooks/useApprovalNavigation'
 import { useExecutionApprovalPanel } from './hooks/useExecutionApprovalPanel'
-import { useExecutionRunHistory } from './hooks/useExecutionRunHistory'
 import { useExecutionStepClick } from './hooks/useExecutionStepClick'
+import { useExecutionRunHistory } from './hooks/useExecutionRunHistory'
 import { useExecutionStreaming, useSyncActivityStore } from './hooks/useExecutionStreaming'
 import { useExecutionWorkflow } from './hooks/useExecutionWorkflow'
 import { useForkWorkflow } from './hooks/useForkWorkflow'
@@ -294,6 +294,8 @@ export default function ExecutionDetail() {
 
   useResetOnExecutionChange(executionId)
 
+  const isStreamStale = useExecutionStore((state) => state.isStale)
+
   const executionQuery = executionsClient.useQuery(
     'get',
     '/executions/{execution_id}',
@@ -306,10 +308,11 @@ export default function ExecutionDetail() {
       },
       enabled: !!executionId,
     },
-    { refetchInterval: executionRefetchInterval }
+    { refetchInterval: (query) => executionRefetchInterval(query, isStreamStale) }
   )
 
-  const execution = useExecutionWithLiveStatus(executionQuery.data)
+  const executionWithLiveStatus = useExecutionWithLiveStatus(executionQuery.data)
+  const execution = isStreamStale ? executionQuery.data : executionWithLiveStatus
 
   useExecutionStreaming(executionId, execution)
 
