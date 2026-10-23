@@ -12,6 +12,7 @@ from typing import Any, ClassVar, cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from temporalio.exceptions import ApplicationError
 
 from syntara.core.exceptions import SafeValueError
 from syntara.workflows.models.activity_execution import ActivityStatus
@@ -342,6 +343,58 @@ async def test_retry_converge_restores_when_a_quorum_branch_is_still_pending_rep
     assert result == {"output": converge_record["output_data"], "control": None}
     activities = [call.args[0] for call in mock_wf.execute_activity.call_args_list]
     assert ActivityName.CONVERGE not in activities, "a predicted-replay quorum branch must restore, not execute"
+
+
+@pytest.mark.asyncio
+async def test_retry_converge_raises_resolved_gate_failure(mock_wf: MagicMock) -> None:
+    """A deferred gate failure is re-evaluated against resolved config and raised.
+
+    Both branches failed, so the 1-of-2 gate cannot be satisfied. The deferred
+    failure reason routes through the first wait (and its timeout-task cancellation)
+    and the converge raises a non-retryable gate failure rather than executing.
+    """
+    wf = _make_workflow({"retry_from_execution_id": "src-1", "eligible_point_ids": ["b1", "b2"]})
+    graph = _two_branch_converge_graph("any", 1)
+    # Not a replay candidate, so _maybe_restore_retry_converge is a no-op and the
+    # resolved failure path owns the outcome.
+    wf._retry_replay_candidates = set()
+    wf.failed_nodes = {"b1": "boom", "b2": "boom"}
+    wf.resolver.set_namespace("b1", {"status": "failed"})
+    wf.resolver.set_namespace("b2", {"status": "failed"})
+    wf._retry_converge_failure_reasons = {"join": "Converge node join: required 1 successful branches, got 0"}
+    cancelled = MagicMock()
+    wf._timeout_tasks = {"join": cancelled}
+
+    mock_wf.wait_condition = AsyncMock()
+    mock_wf.execute_activity = AsyncMock()
+
+    with pytest.raises(ApplicationError) as excinfo:
+        await wf._execute_converge_node("join", {"strategy": "any", "n_required": 1}, None, graph)
+
+    assert excinfo.value.type == "RetryConvergeGateFailure"
+    assert "required 1 successful branches" in str(excinfo.value)
+    cancelled.cancel.assert_called_once()
+    mock_wf.execute_activity.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_retry_converge_raises_timeout_failure_verbatim(mock_wf: MagicMock) -> None:
+    """A timed-out gate reason is raised as-is without re-evaluation."""
+    wf = _make_workflow({"retry_from_execution_id": "src-1", "eligible_point_ids": ["b1", "b2"]})
+    graph = _two_branch_converge_graph("any", 1)
+    wf._retry_replay_candidates = set()
+    timeout_reason = "Converge node join timed out after 30.0s waiting for predecessors"
+    wf._retry_converge_failure_reasons = {"join": timeout_reason}
+
+    mock_wf.wait_condition = AsyncMock()
+    mock_wf.execute_activity = AsyncMock()
+
+    with pytest.raises(ApplicationError) as excinfo:
+        await wf._execute_converge_node("join", {"strategy": "any", "n_required": 1}, None, graph)
+
+    assert excinfo.value.type == "RetryConvergeGateFailure"
+    assert excinfo.value.message == timeout_reason
+    mock_wf.execute_activity.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
