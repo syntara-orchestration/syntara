@@ -23,9 +23,46 @@ from syntara.eventstreams.core.deduplication import (
 )
 from syntara.eventstreams.models.delivery import EventDelivery
 from syntara.eventstreams.models.recovery_hold import EventDeliveryRecoveryHold
+from syntara.eventstreams.models.source import EventSubscriptionSource
 from syntara.eventstreams.services.subscription_service import lock_source_lifecycle
 
 logger = structlog.stdlib.get_logger(__name__)
+
+
+async def reserve_recovery_locked(
+    session: AsyncSession, source: EventSubscriptionSource, token: UUID
+) -> RecoveryReservation | None:
+    """Reserve evidence inside a caller transaction already holding source lifecycle locks.
+
+    The result becomes durable only after that transaction commits. This lets
+    boundary recovery close admission and cleanup atomically with its metadata.
+    """
+    existing = await session.get(EventDeliveryRecoveryHold, token, populate_existing=True)
+    if existing is not None:
+        if existing.source_id != source.id or existing.released_at is not None:
+            return None
+        return RecoveryReservation(source_id=source.id, token=token)
+    now = cast("datetime", (await session.exec(select(func.clock_timestamp()))).one())
+    session.add(EventDeliveryRecoveryHold(token=token, source_id=source.id, created_at=now))
+    source.delivery_evidence_revision += 1
+    await session.flush()
+    return RecoveryReservation(source_id=source.id, token=token)
+
+
+async def release_recovery_locked(
+    session: AsyncSession, source: EventSubscriptionSource, reservation: RecoveryReservation
+) -> bool:
+    """Release a named hold while the caller still owns the source lifecycle lock."""
+    if reservation.source_id != source.id:
+        return False
+    hold = await session.get(EventDeliveryRecoveryHold, reservation.token, with_for_update=True, populate_existing=True)
+    if hold is None or hold.source_id != source.id:
+        return False
+    if hold.released_at is None:
+        hold.released_at = cast("datetime", (await session.exec(select(func.clock_timestamp()))).one())
+        source.delivery_evidence_revision += 1
+        await session.flush()
+    return True
 
 
 class EventDeliveryRetentionService:
@@ -59,16 +96,7 @@ class EventDeliveryRetentionService:
             if lifecycle is None:
                 return None
             _, source = lifecycle
-            existing = await session.get(EventDeliveryRecoveryHold, reservation_token, populate_existing=True)
-            if existing is not None:
-                if existing.source_id != source_id or existing.released_at is not None:
-                    return None
-                return RecoveryReservation(source_id=source_id, token=reservation_token)
-            now = cast("datetime", (await session.exec(select(func.clock_timestamp()))).one())
-            session.add(EventDeliveryRecoveryHold(token=reservation_token, source_id=source_id, created_at=now))
-            source.delivery_evidence_revision += 1
-            await session.flush()
-            return RecoveryReservation(source_id=source_id, token=reservation_token)
+            return await reserve_recovery_locked(session, source, reservation_token)
 
     async def release_recovery(self, reservation: RecoveryReservation) -> bool:
         """Release only the named reservation after its recovery dependency is resolved."""
@@ -77,24 +105,7 @@ class EventDeliveryRetentionService:
             if lifecycle is None:
                 return False
             _, source = lifecycle
-            hold = (
-                await session.exec(
-                    select(EventDeliveryRecoveryHold)
-                    .where(
-                        col(EventDeliveryRecoveryHold.token) == reservation.token,
-                        col(EventDeliveryRecoveryHold.source_id) == reservation.source_id,
-                    )
-                    .with_for_update()
-                    .execution_options(populate_existing=True)
-                )
-            ).one_or_none()
-            if hold is None:
-                return False
-            if hold.released_at is None:
-                hold.released_at = cast("datetime", (await session.exec(select(func.clock_timestamp()))).one())
-                source.delivery_evidence_revision += 1
-                await session.flush()
-            return True
+            return await release_recovery_locked(session, source, reservation)
 
     async def _candidate(self, session: AsyncSession, identity: DeliveryIdentity) -> CleanupCandidate | None:
         lifecycle = await lock_source_lifecycle(session, identity.source_id)

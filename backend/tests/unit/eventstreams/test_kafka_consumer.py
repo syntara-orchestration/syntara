@@ -178,6 +178,8 @@ async def test_stop_raises_on_shutdown_error(mock_aiokafka: MagicMock) -> None:
 @pytest.mark.anyio
 async def test_operations_rejected_when_stopped() -> None:
     adapter = KafkaPartitionConsumer(_connection(), _source_config())
+    with pytest.raises(ConsumerNotRunningError), adapter.position_operation(0, expected_epoch=0):
+        pytest.fail("Stopped consumer granted a position operation")
     with pytest.raises(ConsumerNotRunningError):
         await adapter.seek(0, 100, expected_epoch=adapter.epoch)
     with pytest.raises(ConsumerNotRunningError):
@@ -190,6 +192,50 @@ async def test_operations_rejected_when_stopped() -> None:
         await adapter.pause([0], expected_epoch=0)
     with pytest.raises(ConsumerNotRunningError):
         await adapter.resume([0], expected_epoch=0)
+
+
+async def test_position_operations_exclude_competing_calls_but_not_other_partitions(mock_aiokafka: MagicMock) -> None:
+    adapter = KafkaPartitionConsumer(_connection(), _source_config())
+    await _start_with_partitions(adapter, mock_aiokafka, {0, 1})
+    with adapter.position_operation(0, expected_epoch=adapter.epoch) as first:
+        assert first
+        with adapter.position_operation(0, expected_epoch=adapter.epoch) as competing:
+            assert not competing
+        with adapter.position_operation(1, expected_epoch=adapter.epoch) as independent:
+            assert independent
+    with adapter.position_operation(0, expected_epoch=adapter.epoch) as retried:
+        assert retried
+    await adapter.stop()
+
+
+async def test_position_operation_releases_after_failure(mock_aiokafka: MagicMock) -> None:
+    adapter = KafkaPartitionConsumer(_connection(), _source_config())
+    await _start_with_partitions(adapter, mock_aiokafka, {0})
+    with pytest.raises(RuntimeError, match="failed"), adapter.position_operation(0, expected_epoch=adapter.epoch):
+        msg = "failed"
+        raise RuntimeError(msg)
+    with adapter.position_operation(0, expected_epoch=adapter.epoch) as retried:
+        assert retried
+    await adapter.stop()
+
+
+async def test_reassignment_does_not_release_an_outstanding_position_operation(mock_aiokafka: MagicMock) -> None:
+    adapter = KafkaPartitionConsumer(_connection(), _source_config())
+    listener = await _start_with_partitions(adapter, mock_aiokafka, {0})
+    epoch = adapter.epoch
+    with adapter.position_operation(0, expected_epoch=epoch) as first:
+        assert first
+        await listener.on_partitions_revoked({TopicPartition(adapter.topic, 0)})
+        await listener.on_partitions_assigned({TopicPartition(adapter.topic, 0)})
+        with pytest.raises(StaleEpochError), adapter.position_operation(0, expected_epoch=epoch):
+            pytest.fail("Stale epoch granted a position operation")
+        with adapter.position_operation(0, expected_epoch=adapter.epoch) as competing:
+            assert not competing
+    with adapter.position_operation(0, expected_epoch=adapter.epoch) as retried:
+        assert retried
+    with pytest.raises(OwnershipRevokedError), adapter.position_operation(1, expected_epoch=adapter.epoch):
+        pytest.fail("Unassigned partition granted a position operation")
+    await adapter.stop()
 
 
 # ---------------------------------------------------------------------------

@@ -44,7 +44,7 @@ from syntara.eventstreams.exceptions import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Coroutine, Iterable
+    from collections.abc import Callable, Coroutine, Iterable, Iterator
 
     from syntara.eventstreams.adapters.kafka_source_configuration import KafkaSourceConfiguration
     from syntara.eventstreams.core.connection import ResolvedKafkaConnection
@@ -110,6 +110,7 @@ class KafkaPartitionConsumer:
         self._assignment: frozenset[int] = frozenset()
         self._epoch: int = 0
         self._running: bool = False
+        self._position_operations: set[int] = set()
 
     @property
     def assignment(self) -> frozenset[int]:
@@ -135,6 +136,21 @@ class KafkaPartitionConsumer:
     def group_id(self) -> str:
         """Return the consumer group identifier."""
         return self._source_config.group_id
+
+    @contextlib.contextmanager
+    def position_operation(self, partition: int, *, expected_epoch: int) -> Iterator[bool]:
+        """Keep finite position changes exclusive across services sharing this client."""
+        self._require_running()
+        self._check_epoch(expected_epoch)
+        self._check_ownership(partition)
+        if partition in self._position_operations:
+            yield False
+            return
+        self._position_operations.add(partition)
+        try:
+            yield True
+        finally:
+            self._position_operations.remove(partition)
 
     async def start(self) -> None:
         """Construct the ``AIOKafkaConsumer``, start it, and subscribe."""
