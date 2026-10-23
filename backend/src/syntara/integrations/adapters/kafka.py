@@ -94,9 +94,8 @@ class KafkaAdapter:
             timeout_seconds: Maximum seconds to wait for the bootstrap.
 
         """
-        username = str(resolved_credential.get(_KAFKA_USERNAME_KEY) or "").strip()
-        password = str(resolved_credential.get(_KAFKA_PASSWORD_KEY) or "").strip()
-        if not username or not password:
+        login = _sasl_login(resolved_credential)
+        if login is None:
             logger.warning("Kafka validate: no usable credentials configured")
             return ValidateResult(
                 success=False,
@@ -104,6 +103,7 @@ class KafkaAdapter:
                 error="Authentication configuration is incomplete",
                 error_type=HealthCheckErrorType.AUTH_FAILURE,
             )
+        username, password = login
         rejected = self._plaintext_rejection()
         if rejected is not None:
             logger.warning("Kafka validate rejected SASL_PLAINTEXT")
@@ -193,6 +193,21 @@ class KafkaAdapter:
             discovered_tools=None,
             discovered_models=None,
         )
+
+
+def _sasl_login(resolved_credential: dict[str, Any]) -> tuple[str, str] | None:
+    """Return the SASL username and the stored password.
+
+    ``strip()`` is only the blank check for the password. The value sent to
+    the broker keeps any leading or trailing whitespace.
+    """
+    username_value = resolved_credential.get(_KAFKA_USERNAME_KEY)
+    password_value = resolved_credential.get(_KAFKA_PASSWORD_KEY)
+    username = username_value.strip() if isinstance(username_value, str) else ""
+    password = password_value if isinstance(password_value, str) else ""
+    if not username or not password.strip():
+        return None
+    return username, password
 
 
 def _classify_kafka_error(exc: KafkaError) -> tuple[HealthCheckErrorType, str]:
