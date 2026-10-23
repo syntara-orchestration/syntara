@@ -115,6 +115,10 @@ class DeliveryClaim(DeliveryValue):
     attempt_count: int = Field(default=0, ge=0)
     first_start_attempt_at: AwareDatetime | None = None
     temporal_run_id: str | None = Field(default=None, min_length=1, max_length=255)
+    start_retry_deadline: AwareDatetime | None = None
+    scheduling_failure_count: int = Field(default=0, ge=0)
+    next_attempt_at: AwareDatetime | None = None
+    last_error_code: str | None = Field(default=None, max_length=100)
 
 
 class ClaimBusy(DeliveryValue):
@@ -254,8 +258,16 @@ class DeliveryRepository[ExecutionPreparation: SQLModel](Protocol):
         """Persist pending Execution preparation and freeze its immutable references."""
         ...
 
-    async def record_start_attempt(self, claim: DeliveryClaim) -> DeliveryClaim | ClaimLost:
+    async def record_start_attempt(
+        self, claim: DeliveryClaim, *, retry_deadline: datetime | None = None, attempt_id: UUID | None = None
+    ) -> DeliveryClaim | ClaimLost:
         """Persist the attempt before a caller may issue a Temporal start."""
+        ...
+
+    async def record_scheduling_failure(
+        self, claim: DeliveryClaim, *, next_attempt_at: datetime, error_code: str
+    ) -> DeliveryClaim | ClaimLost:
+        """Persist retry budget and Execution metadata, releasing current ownership."""
         ...
 
     async def finalize_scheduled(
@@ -284,6 +296,10 @@ class DeliveryRepository[ExecutionPreparation: SQLModel](Protocol):
         """Read authoritative retained evidence, including after Execution deletion."""
         ...
 
-    async def claim_due(self, owner_worker_id: str, *, limit: int) -> list[DeliveryClaim]:
+    async def claim_due(self, owner_worker_id: str, *, limit: int, prepared_only: bool = False) -> list[DeliveryClaim]:
         """Select bounded due unowned/expired work, including retired sources."""
+        ...
+
+    async def request_scheduling_retry(self, identity: DeliveryIdentity) -> bool:
+        """Make unowned prepared work due without resetting any evidence or budget."""
         ...

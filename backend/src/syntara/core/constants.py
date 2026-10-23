@@ -89,6 +89,17 @@ class EventDeliveryDefaults:
     TERMINAL_CACHE_TTL_SECONDS = 60
 
 
+class EventSchedulingDefaults:
+    """Fixed scheduling budgets, independent of delivery-row retention."""
+
+    HISTORY_RETENTION_SECONDS = 86400
+    HISTORY_SAFETY_MARGIN_SECONDS = 300
+    IMMEDIATE_ATTEMPTS = 5
+    MAX_BACKOFF_SECONDS = 30
+    TRANSIENT_PROBE_SECONDS = 60
+    RPC_TIMEOUT_SECONDS = 10
+
+
 class WebSocketConfig:
     """WebSocket configuration constants."""
 
