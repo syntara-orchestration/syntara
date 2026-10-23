@@ -470,6 +470,64 @@ describe('IntegrationForm', () => {
     })
   })
 
+  describe('Kafka wizard flow', () => {
+    async function selectKafka(user: ReturnType<typeof userEvent.setup>) {
+      await user.click(screen.getByText('MCP Server'))
+      await user.click(screen.getByRole('option', { name: 'Kafka' }))
+    }
+
+    async function advanceKafkaToStep2(user: ReturnType<typeof userEvent.setup>) {
+      await selectKafka(user)
+      await user.type(screen.getByRole('textbox', { name: 'Name' }), 'Production Kafka')
+      await user.type(screen.getByRole('textbox', { name: 'Bootstrap servers' }), 'broker.example.com:9093')
+      await user.click(screen.getByRole('button', { name: 'Next' }))
+    }
+
+    it('saves the broker list from the credential step', async () => {
+      const { createAsyncMutate } = mockMutations()
+      const user = userEvent.setup()
+      render(<IntegrationForm />, { wrapper })
+
+      await advanceKafkaToStep2(user)
+      await user.click(screen.getByTestId('select-credential'))
+      await user.click(screen.getByRole('button', { name: 'Save integration' }))
+
+      await waitFor(() => {
+        expect(createAsyncMutate).toHaveBeenCalledWith(
+          expect.objectContaining({
+            body: expect.objectContaining({
+              integration_type: IntegrationTypeEnum.KAFKA,
+              configuration: expect.objectContaining({
+                integration_type: 'kafka',
+                bootstrap_servers: ['broker.example.com:9093'],
+                sasl_mechanism: 'SCRAM-SHA-256',
+                allow_http: false,
+              }) as Record<string, unknown>,
+            }) as Record<string, unknown>,
+          })
+        )
+      })
+    })
+
+    it('shows a validation alert when bootstrap servers are cleared before save', async () => {
+      mockMutations()
+      const user = userEvent.setup()
+      render(<IntegrationForm />, { wrapper })
+
+      await advanceKafkaToStep2(user)
+      await user.click(screen.getByTestId('select-credential'))
+      await user.click(screen.getByRole('button', { name: 'Back' }))
+      await user.clear(screen.getByRole('textbox', { name: 'Bootstrap servers' }))
+      await user.click(screen.getByRole('button', { name: /Connection credential/i }))
+      await user.click(screen.getByRole('button', { name: 'Save integration' }))
+
+      await waitFor(() => {
+        expect(screen.getByText('Unable to save integration')).toBeInTheDocument()
+        expect(screen.getByText('At least one bootstrap server is required')).toBeInTheDocument()
+      })
+    })
+  })
+
   describe('Test connection (discover)', () => {
     it('calls discover endpoint when Test connection is clicked with a credential', async () => {
       const { discoverMutate } = mockMutations()
