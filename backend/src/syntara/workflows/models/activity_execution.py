@@ -18,7 +18,7 @@ from sqlmodel import Field, Relationship
 from syntara.core.constants import FieldLimits
 from syntara.core.models.base import BaseResource
 from syntara.core.models.pagination import ResourcesResponse
-from syntara.workflows.workflow_engine.models.workflow_definition import NodeType
+from syntara.workflow_runtime.engines.temporal.models.workflow_definition import NodeType
 
 if TYPE_CHECKING:
     from syntara.workflows.models.execution import Execution

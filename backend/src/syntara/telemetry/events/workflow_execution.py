@@ -10,11 +10,11 @@ from uuid import UUID  # noqa: TC003
 from sqlmodel import Field
 
 from syntara.telemetry.events.base import BaseTelemetryEvent
-from syntara.workflows.models.execution import ExecutionMode  # noqa: TC001
-from syntara.workflows.workflow_engine.models.workflow_definition import (  # noqa: TC001
+from syntara.workflow_runtime.engines.temporal.models.workflow_definition import (  # noqa: TC001
     ActivityName,
     WorkflowTerminalStatus,
 )
+from syntara.workflows.models.execution import ExecutionMode  # noqa: TC001
 
 
 class WorkflowExecutionStartEvent(BaseTelemetryEvent):

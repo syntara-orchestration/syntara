@@ -12,6 +12,7 @@ import structlog
 from jsonpatch import JsonPatch  # type: ignore[import-untyped]
 
 from syntara.core.cache.stream import StreamClient
+from syntara.workflow_runtime.engines.temporal.utils.credential_scrubber import scrub_credentials
 from syntara.workflows.models.activity_execution import ActivityExecution
 from syntara.workflows.models.execution import ActivityData, Execution
 from syntara.workflows.models.visualization import (
@@ -20,7 +21,6 @@ from syntara.workflows.models.visualization import (
     ExecutionSnapshotMessage,
     JsonPatchOperation,
 )
-from syntara.workflows.workflow_engine.utils.credential_scrubber import scrub_credentials
 
 logger = structlog.stdlib.get_logger(__name__)
 

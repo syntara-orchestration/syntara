@@ -13,7 +13,7 @@ Covers:
 import pytest
 from pydantic import ValidationError
 
-from syntara.workflows.workflow_engine.models.workflow_definition import (
+from syntara.workflow_runtime.engines.temporal.models.workflow_definition import (
     MissedSchedulePolicy,
     ScheduledTriggerConfig,
     ScheduleType,
@@ -94,7 +94,7 @@ class TestMissedSchedulePolicy:
         """Every policy string must round-trip through the StrEnum."""
         import importlib
 
-        import syntara.workflows.workflow_engine.models.workflow_definition as mod
+        import syntara.workflow_runtime.engines.temporal.models.workflow_definition as mod
 
         importlib.reload(mod)
         reloaded = mod.MissedSchedulePolicy(value)
@@ -290,7 +290,7 @@ class TestTimezoneValidation:
 
     async def test_valid_timezones_is_nonempty(self) -> None:
         """Regression: available timezone set must never be empty (AAP-86297)."""
-        from syntara.workflows.workflow_engine.models.workflow_definition import (
+        from syntara.workflow_runtime.engines.temporal.models.workflow_definition import (
             _get_valid_timezones,
         )
 
@@ -304,7 +304,7 @@ class TestTimezoneValidation:
         """Runtime guard should raise if timezone data is missing (AAP-86297)."""
         from unittest.mock import patch
 
-        import syntara.workflows.workflow_engine.models.workflow_definition as wd
+        import syntara.workflow_runtime.engines.temporal.models.workflow_definition as wd
 
         original = wd._VALID_TIMEZONES
         try:

@@ -10,13 +10,13 @@ from syntara.telemetry.events.workflow_emitters import (
     _map_execution_status_to_telemetry,
     emit_activities,
 )
-from syntara.workflows.audit.node_execution import NodeExecutedEvent
-from syntara.workflows.models.activity_execution import ActivityExecution, ActivityStatus
-from syntara.workflows.models.execution import ExecutionMode, ExecutionStatus
-from syntara.workflows.workflow_engine.models.workflow_definition import (
+from syntara.workflow_runtime.engines.temporal.models.workflow_definition import (
     ActivityTerminalStatus,
     WorkflowTerminalStatus,
 )
+from syntara.workflows.audit.node_execution import NodeExecutedEvent
+from syntara.workflows.models.activity_execution import ActivityExecution, ActivityStatus
+from syntara.workflows.models.execution import ExecutionMode, ExecutionStatus
 
 
 class TestEmitActivities:

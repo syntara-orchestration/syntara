@@ -13,16 +13,16 @@ from uuid import uuid4
 import pytest
 from temporalio.api.enums.v1 import EventType
 
+from syntara.workflow_runtime.engines.temporal.models.workflow_definition import ActivityName, WorkflowTerminalStatus
+from syntara.workflow_runtime.engines.temporal.services.activity_sync_service import (
+    ActivitySyncService,
+    ExecutionMonitorMetadata,
+)
 from syntara.workflows.audit.execution_completed import WorkflowCompletedEvent
 from syntara.workflows.audit.execution_error import WorkflowExecutionErrorEvent
 from syntara.workflows.audit.execution_started import WorkflowStartEvent
 from syntara.workflows.models import Execution
 from syntara.workflows.models.execution import ExecutionStatus
-from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName, WorkflowTerminalStatus
-from syntara.workflows.workflow_engine.services.activity_sync_service import (
-    ActivitySyncService,
-    ExecutionMonitorMetadata,
-)
 
 
 @pytest.fixture
@@ -95,7 +95,7 @@ class TestWorkflowStartEventEmission:
         service = ActivitySyncService(AsyncMock(), mock_session_factory)
 
         with patch(
-            "syntara.workflows.workflow_engine.services.activity_sync_service.AuditEventDispatcher"
+            "syntara.workflow_runtime.engines.temporal.services.activity_sync_service.AuditEventDispatcher"
         ) as mock_dispatcher:
             await service._update_execution_to_running(metadata, mock_start_event)
 
@@ -137,7 +137,7 @@ class TestWorkflowStartEventEmission:
         service = ActivitySyncService(AsyncMock(), mock_session_factory)
 
         with patch(
-            "syntara.workflows.workflow_engine.services.activity_sync_service.AuditEventDispatcher"
+            "syntara.workflow_runtime.engines.temporal.services.activity_sync_service.AuditEventDispatcher"
         ) as mock_dispatcher:
             await service._update_execution_to_running(metadata, mock_start_event)
 
@@ -192,7 +192,7 @@ class TestWorkflowCompletedEventEmission:
         service = ActivitySyncService(AsyncMock(), mock_session_factory)
 
         with patch(
-            "syntara.workflows.workflow_engine.services.activity_sync_service.AuditEventDispatcher"
+            "syntara.workflow_runtime.engines.temporal.services.activity_sync_service.AuditEventDispatcher"
         ) as mock_dispatcher:
             await service._update_execution_status_from_event(metadata, event)
 
@@ -248,7 +248,7 @@ class TestWorkflowCompletedEventEmission:
         service = ActivitySyncService(AsyncMock(), mock_session_factory)
 
         with patch(
-            "syntara.workflows.workflow_engine.services.activity_sync_service.AuditEventDispatcher"
+            "syntara.workflow_runtime.engines.temporal.services.activity_sync_service.AuditEventDispatcher"
         ) as mock_dispatcher:
             await service._update_execution_status_from_event(metadata, event)
 
@@ -295,7 +295,7 @@ class TestWorkflowCompletedEventEmission:
         service = ActivitySyncService(AsyncMock(), mock_session_factory)
 
         with patch(
-            "syntara.workflows.workflow_engine.services.activity_sync_service.AuditEventDispatcher"
+            "syntara.workflow_runtime.engines.temporal.services.activity_sync_service.AuditEventDispatcher"
         ) as mock_dispatcher:
             await service._update_execution_status_from_event(metadata, event)
 
@@ -343,7 +343,7 @@ class TestWorkflowCompletedEventEmission:
         service = ActivitySyncService(AsyncMock(), mock_session_factory)
 
         with patch(
-            "syntara.workflows.workflow_engine.services.activity_sync_service.AuditEventDispatcher"
+            "syntara.workflow_runtime.engines.temporal.services.activity_sync_service.AuditEventDispatcher"
         ) as mock_dispatcher:
             await service._update_execution_status_from_event(metadata, event)
 
@@ -392,7 +392,7 @@ class TestWorkflowCompletedEventEmission:
         service = ActivitySyncService(AsyncMock(), mock_session_factory)
 
         with patch(
-            "syntara.workflows.workflow_engine.services.activity_sync_service.AuditEventDispatcher"
+            "syntara.workflow_runtime.engines.temporal.services.activity_sync_service.AuditEventDispatcher"
         ) as mock_dispatcher:
             await service._update_execution_status_from_event(metadata, event)
 
@@ -442,7 +442,7 @@ class TestWorkflowCompletedEventEmission:
         service = ActivitySyncService(AsyncMock(), mock_session_factory)
 
         with patch(
-            "syntara.workflows.workflow_engine.services.activity_sync_service.AuditEventDispatcher"
+            "syntara.workflow_runtime.engines.temporal.services.activity_sync_service.AuditEventDispatcher"
         ) as mock_dispatcher:
             await service._update_execution_status_from_event(metadata, event)
 
@@ -496,7 +496,7 @@ class TestWorkflowExecutionErrorEventEmission:
         service = ActivitySyncService(AsyncMock(), mock_session_factory)
 
         with patch(
-            "syntara.workflows.workflow_engine.services.activity_sync_service.AuditEventDispatcher"
+            "syntara.workflow_runtime.engines.temporal.services.activity_sync_service.AuditEventDispatcher"
         ) as mock_dispatcher:
             await service._update_execution_status_from_event(metadata, event)
 
@@ -554,7 +554,7 @@ class TestWorkflowExecutionErrorEventEmission:
         service = ActivitySyncService(AsyncMock(), mock_session_factory)
 
         with patch(
-            "syntara.workflows.workflow_engine.services.activity_sync_service.AuditEventDispatcher"
+            "syntara.workflow_runtime.engines.temporal.services.activity_sync_service.AuditEventDispatcher"
         ) as mock_dispatcher:
             await service._update_execution_status_from_event(metadata, event)
 

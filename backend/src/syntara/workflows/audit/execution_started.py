@@ -17,7 +17,7 @@ from syntara.audit.models.audit_event import (
     EventStatus,
 )
 from syntara.audit.models.structured_data import AuditContextData
-from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName  # noqa: TC001
+from syntara.workflow_runtime.engines.temporal.models.workflow_definition import ActivityName  # noqa: TC001
 
 if TYPE_CHECKING:
     from uuid import UUID

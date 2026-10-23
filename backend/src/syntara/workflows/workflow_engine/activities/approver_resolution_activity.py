@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 
 with workflow.unsafe.imports_passed_through():
     from syntara.core.database.session import get_db
-    from syntara.workflows.workflow_engine.services.approver_resolution import ApproverResolutionService
+    from syntara.workflow_runtime.engines.temporal.services.approver_resolution import ApproverResolutionService
 
 logger = structlog.stdlib.get_logger(__name__)
 

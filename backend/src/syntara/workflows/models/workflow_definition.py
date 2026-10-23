@@ -10,7 +10,7 @@ from pydantic import Discriminator, Field, field_validator
 from sqlmodel import SQLModel
 
 from syntara.core.constants import JsonbLimits
-from syntara.workflows.workflow_engine.models.workflow_definition import (
+from syntara.workflow_runtime.engines.temporal.models.workflow_definition import (
     AAPJobTemplateExecutorParameters,
     AAPWorkflowJobTemplateExecutorParameters,
     AgenticExecutorParameters,

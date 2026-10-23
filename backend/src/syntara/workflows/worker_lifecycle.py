@@ -21,7 +21,7 @@ from syntara.core.config.base import get_settings
 from syntara.core.database.session import AsyncSessionLocal
 from syntara.core.logging.logging import apply_runtime_log_level
 from syntara.settings.cache.settings_cache import SettingsCache, get_runtime_settings, set_runtime_settings
-from syntara.workflows.workflow_engine.services.temporal_worker import (
+from syntara.workflow_runtime.engines.temporal.services.temporal_worker import (
     TemporalWorkerService,
     stop_worker,
 )

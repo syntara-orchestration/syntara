@@ -23,7 +23,7 @@ from sqlmodel import CheckConstraint, Field, Index, SQLModel
 
 from syntara.core.constants import WebhookLimits
 from syntara.core.models.base import BaseResource
-from syntara.workflows.workflow_engine.models.workflow_definition import NodeType
+from syntara.workflow_runtime.engines.temporal.models.workflow_definition import NodeType
 
 
 class WebhookTrigger(BaseResource, table=True):

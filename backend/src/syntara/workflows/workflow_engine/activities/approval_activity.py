@@ -15,14 +15,14 @@ from temporalio.service import RPCError
 with workflow.unsafe.imports_passed_through():
     from syntara.approvals.audit.approval import ApprovalExpiredEvent
     from syntara.audit.dispatcher import AuditEventDispatcher
+    from syntara.workflow_runtime.engines.temporal import constants
+    from syntara.workflow_runtime.engines.temporal.services.activity_sync_registry import get_activity_sync_service
     from syntara.workflows.clients.approvals_client import (
         ApprovalsApiClient,
         ApprovalsApiClientError,
     )
-    from syntara.workflows.workflow_engine import constants
-    from syntara.workflows.workflow_engine.services.activity_sync_registry import get_activity_sync_service
-from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName
-from syntara.workflows.workflow_engine.utils.loop_iteration_ids import matches_loop_iteration_id
+from syntara.workflow_runtime.engines.temporal.models.workflow_definition import ActivityName
+from syntara.workflow_runtime.engines.temporal.utils.loop_iteration_ids import matches_loop_iteration_id
 
 from .common import HEARTBEAT_STOP_MONITOR, ActivityExecutionError
 

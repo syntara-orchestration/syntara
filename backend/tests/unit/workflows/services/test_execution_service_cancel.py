@@ -8,6 +8,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from syntara.agent_orchestrator.services.invocation_service import InvocationService
 from syntara.core.models import User
+from syntara.workflow_runtime.engines.temporal.services.temporal_execution_service import TemporalExecutionService
 from syntara.workflows.exceptions import (
     ExecutionInTerminalStateError,
     ExecutionNotFoundError,
@@ -15,7 +16,6 @@ from syntara.workflows.exceptions import (
 )
 from syntara.workflows.models.execution import Execution, ExecutionStatus
 from syntara.workflows.services.execution_service import ExecutionService
-from syntara.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
 
 
 def _make_execution(status: ExecutionStatus) -> Execution:

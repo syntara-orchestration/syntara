@@ -9,7 +9,7 @@ from typing import Any
 
 from temporalio import activity
 
-from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName
+from syntara.workflow_runtime.engines.temporal.models.workflow_definition import ActivityName
 
 from .webhook_trigger import webhook_trigger
 

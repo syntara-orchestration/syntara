@@ -20,8 +20,8 @@ from syntara.core.services.secret_service import SecretService, create_secret_se
 from syntara.credentials.lib.injector_resolver import InjectorResolver
 from syntara.credentials.models.credential import Credential
 from syntara.credentials.models.credential_type import CredentialType
-from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName
-from syntara.workflows.workflow_engine.utils.credential_scrubber import MIN_SECRET_LENGTH
+from syntara.workflow_runtime.engines.temporal.models.workflow_definition import ActivityName
+from syntara.workflow_runtime.engines.temporal.utils.credential_scrubber import MIN_SECRET_LENGTH
 
 logger = structlog.stdlib.get_logger(__name__)
 

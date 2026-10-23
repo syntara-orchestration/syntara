@@ -144,6 +144,11 @@ orchestrator-admin = "syntara.orchestrator_admin:app"
 automation-orchestrator-admin = "syntara.orchestrator_admin:app"
 ao-admin = "syntara.orchestrator_admin:app"
 
+[project.entry-points."syntara.workflow_activities"]
+approvals = "syntara.approvals.activity_provider:create_activity_provider"
+invocations = "syntara.invocations.activity_provider:create_activity_provider"
+http_requests = "syntara.http_requests.activity_provider:create_activity_provider"
+
 [project.urls]
 Homepage = "https://github.com/syntara-orchestration/syntara"
 Repository = "https://github.com/syntara-orchestration/syntara"
@@ -214,7 +219,7 @@ ignore = [
     "T201",   # print() is intentional CLI output
     "BLE001", # broad Exception needed for external lib error handling
 ]
-"src/syntara/workflows/workflow_engine/unified_eval.py" = ["PLR0911"]  # _eval_node dispatcher needs 7 returns for clarity
+"src/syntara/workflow_runtime/engines/temporal/unified_eval.py" = ["PLR0911"]  # _eval_node dispatcher needs 7 returns for clarity
 
 # Pyrefly configuration — used in pre-commit for fast local type checking (~3s).
 # Mypy (strict) continues to run in CI via a dedicated GitHub Actions job.

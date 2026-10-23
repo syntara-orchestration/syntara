@@ -13,7 +13,7 @@ from syntara.telemetry.events.workflow_execution import (
     WorkflowExecutionStartEvent,
 )
 from syntara.telemetry.events.workflow_version import WorkflowVersionCreatedEvent
-from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName
+from syntara.workflow_runtime.engines.temporal.models.workflow_definition import ActivityName
 
 # Import shared test data from unit telemetry conftest
 from tests.unit.telemetry.conftest import (

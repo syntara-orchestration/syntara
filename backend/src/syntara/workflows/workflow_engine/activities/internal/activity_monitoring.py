@@ -13,14 +13,14 @@ from sqlmodel import select
 from temporalio import activity
 
 from syntara.core.database.session import AsyncSessionLocal
-from syntara.workflows.models.execution import Execution
 
 # Import directly from registry module file to avoid triggering services/__init__.py
 # which would cause circular import with temporal_worker
-from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName
-from syntara.workflows.workflow_engine.services.activity_sync_registry import (
+from syntara.workflow_runtime.engines.temporal.models.workflow_definition import ActivityName
+from syntara.workflow_runtime.engines.temporal.services.activity_sync_registry import (
     get_activity_sync_service,
 )
+from syntara.workflows.models.execution import Execution
 
 logger = structlog.stdlib.get_logger(__name__)
 

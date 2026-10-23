@@ -16,9 +16,9 @@ from temporalio.exceptions import ApplicationError
 
 from syntara.core.models.principal import service_principal_id
 from syntara.metrics.types import MetricType
+from syntara.workflow_runtime.engines.temporal.models.workflow_definition import ActivityName
+from syntara.workflow_runtime.engines.temporal.scheduled_launcher import ScheduledExecutionLauncher
 from syntara.workflows.exceptions import WorkflowNotPublishedError
-from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName
-from syntara.workflows.workflow_engine.scheduled_launcher import ScheduledExecutionLauncher
 
 
 def _make_launcher() -> ScheduledExecutionLauncher:
@@ -69,9 +69,9 @@ class TestExecutionMetadata:
 
         with (
             patch.object(launcher, "_load_published_workflow", return_value=(mock_workflow, mock_version)),
-            patch("syntara.workflows.workflow_engine.scheduled_launcher.get_settings") as mock_get_settings,
+            patch("syntara.workflow_runtime.engines.temporal.scheduled_launcher.get_settings") as mock_get_settings,
             patch(
-                "syntara.workflows.workflow_engine.scheduled_launcher.resolve_user_display_name",
+                "syntara.workflow_runtime.engines.temporal.scheduled_launcher.resolve_user_display_name",
                 return_value="Author Name",
             ),
         ):
@@ -130,9 +130,10 @@ class TestMetricsRecording:
         mock_recorder = MagicMock()
 
         with (
-            patch("syntara.workflows.workflow_engine.scheduled_launcher.activity") as mock_activity,
+            patch("syntara.workflow_runtime.engines.temporal.scheduled_launcher.activity") as mock_activity,
             patch(
-                "syntara.workflows.workflow_engine.scheduled_launcher.get_metrics_recorder", return_value=mock_recorder
+                "syntara.workflow_runtime.engines.temporal.scheduled_launcher.get_metrics_recorder",
+                return_value=mock_recorder,
             ),
             patch.object(launcher, "_create_execution", new_callable=AsyncMock) as mock_create,
         ):
@@ -167,9 +168,10 @@ class TestMetricsRecording:
         mock_recorder = MagicMock()
 
         with (
-            patch("syntara.workflows.workflow_engine.scheduled_launcher.activity") as mock_activity,
+            patch("syntara.workflow_runtime.engines.temporal.scheduled_launcher.activity") as mock_activity,
             patch(
-                "syntara.workflows.workflow_engine.scheduled_launcher.get_metrics_recorder", return_value=mock_recorder
+                "syntara.workflow_runtime.engines.temporal.scheduled_launcher.get_metrics_recorder",
+                return_value=mock_recorder,
             ),
             patch.object(launcher, "_create_execution", new_callable=AsyncMock) as mock_create,
         ):
@@ -201,9 +203,10 @@ class TestMetricsRecording:
         mock_recorder.record.side_effect = RuntimeError("metrics broken")
 
         with (
-            patch("syntara.workflows.workflow_engine.scheduled_launcher.activity") as mock_activity,
+            patch("syntara.workflow_runtime.engines.temporal.scheduled_launcher.activity") as mock_activity,
             patch(
-                "syntara.workflows.workflow_engine.scheduled_launcher.get_metrics_recorder", return_value=mock_recorder
+                "syntara.workflow_runtime.engines.temporal.scheduled_launcher.get_metrics_recorder",
+                return_value=mock_recorder,
             ),
             patch.object(launcher, "_create_execution", new_callable=AsyncMock) as mock_create,
         ):
@@ -228,7 +231,7 @@ class TestSetupActivityNoTemporalStart:
 
     def test_setup_does_not_import_temporal_execution_service(self) -> None:
         """The scheduled launcher module must NOT import TemporalExecutionService."""
-        import syntara.workflows.workflow_engine.scheduled_launcher as launcher_module
+        import syntara.workflow_runtime.engines.temporal.scheduled_launcher as launcher_module
 
         assert not hasattr(launcher_module, "create_temporal_execution_service")
 
@@ -257,9 +260,9 @@ class TestSetupActivityNoTemporalStart:
 
         with (
             patch.object(launcher, "_load_published_workflow", return_value=(mock_workflow, mock_version)),
-            patch("syntara.workflows.workflow_engine.scheduled_launcher.get_settings") as mock_get_settings,
+            patch("syntara.workflow_runtime.engines.temporal.scheduled_launcher.get_settings") as mock_get_settings,
             patch(
-                "syntara.workflows.workflow_engine.scheduled_launcher.resolve_user_display_name",
+                "syntara.workflow_runtime.engines.temporal.scheduled_launcher.resolve_user_display_name",
                 return_value="Author Name",
             ),
         ):
@@ -308,9 +311,9 @@ class TestSetupActivityNoTemporalStart:
 
         with (
             patch.object(launcher, "_load_published_workflow", return_value=(mock_workflow, mock_version)),
-            patch("syntara.workflows.workflow_engine.scheduled_launcher.get_settings") as mock_get_settings,
+            patch("syntara.workflow_runtime.engines.temporal.scheduled_launcher.get_settings") as mock_get_settings,
             patch(
-                "syntara.workflows.workflow_engine.scheduled_launcher.resolve_user_display_name",
+                "syntara.workflow_runtime.engines.temporal.scheduled_launcher.resolve_user_display_name",
                 return_value="Author Name",
             ),
         ):
@@ -358,9 +361,9 @@ class TestScheduledLauncherConcurrencyLimit:
 
         with (
             patch.object(launcher, "_load_published_workflow", return_value=(mock_workflow, mock_version)),
-            patch("syntara.workflows.workflow_engine.scheduled_launcher.get_settings") as mock_get_settings,
+            patch("syntara.workflow_runtime.engines.temporal.scheduled_launcher.get_settings") as mock_get_settings,
             patch(
-                "syntara.workflows.workflow_engine.scheduled_launcher.resolve_user_display_name",
+                "syntara.workflow_runtime.engines.temporal.scheduled_launcher.resolve_user_display_name",
                 return_value="Author Name",
             ),
             patch(
@@ -408,9 +411,9 @@ class TestScheduledLauncherConcurrencyLimit:
 
         with (
             patch.object(launcher, "_load_published_workflow", return_value=(mock_workflow, mock_version)),
-            patch("syntara.workflows.workflow_engine.scheduled_launcher.get_settings") as mock_get_settings,
+            patch("syntara.workflow_runtime.engines.temporal.scheduled_launcher.get_settings") as mock_get_settings,
             patch(
-                "syntara.workflows.workflow_engine.scheduled_launcher.resolve_user_display_name",
+                "syntara.workflow_runtime.engines.temporal.scheduled_launcher.resolve_user_display_name",
                 return_value="Author Name",
             ),
             patch(
@@ -439,7 +442,7 @@ class TestLauncherWorkflow:
 
     async def test_run_starts_child_workflow_with_correct_args(self) -> None:
         """The launcher must call execute_child_workflow with the setup activity result."""
-        from syntara.workflows.workflow_engine.scheduled_launcher import ScheduledWorkflowLauncher
+        from syntara.workflow_runtime.engines.temporal.scheduled_launcher import ScheduledWorkflowLauncher
 
         setup_data = {
             "execution_id": "exec-123",
@@ -470,7 +473,7 @@ class TestLauncherWorkflow:
         """Child workflow must use REQUEST_CANCEL so cancel_other works correctly."""
         from temporalio.workflow import ParentClosePolicy
 
-        from syntara.workflows.workflow_engine.scheduled_launcher import ScheduledWorkflowLauncher
+        from syntara.workflow_runtime.engines.temporal.scheduled_launcher import ScheduledWorkflowLauncher
 
         setup_data = {
             "execution_id": "exec-123",
@@ -503,7 +506,7 @@ class TestActivityRegistration:
         pattern where the activity started OrchestratorWorkflow. After the child-workflow
         refactor (AAP-82536), the activity only sets up DB records.
         """
-        from syntara.workflows.workflow_engine.scheduled_launcher import _LAUNCHER_ACTIVITY_NAME
+        from syntara.workflow_runtime.engines.temporal.scheduled_launcher import _LAUNCHER_ACTIVITY_NAME
 
         assert _LAUNCHER_ACTIVITY_NAME == "setup_scheduled_execution"
 
@@ -513,7 +516,7 @@ class TestActivityRegistration:
         Temporal Schedules reference this name in their action config. Changing
         it would break all existing schedules.
         """
-        from syntara.workflows.workflow_engine.scheduled_launcher import ScheduledWorkflowLauncher
+        from syntara.workflow_runtime.engines.temporal.scheduled_launcher import ScheduledWorkflowLauncher
 
         defn = getattr(ScheduledWorkflowLauncher, "__temporal_workflow_definition")
         assert defn.name == "scheduled_workflow_launcher"
@@ -569,9 +572,10 @@ class TestNonRetryablePermanentFailures:
         mock_recorder = MagicMock()
 
         with (
-            patch("syntara.workflows.workflow_engine.scheduled_launcher.activity") as mock_activity,
+            patch("syntara.workflow_runtime.engines.temporal.scheduled_launcher.activity") as mock_activity,
             patch(
-                "syntara.workflows.workflow_engine.scheduled_launcher.get_metrics_recorder", return_value=mock_recorder
+                "syntara.workflow_runtime.engines.temporal.scheduled_launcher.get_metrics_recorder",
+                return_value=mock_recorder,
             ),
             patch.object(
                 launcher,
@@ -604,9 +608,10 @@ class TestNonRetryablePermanentFailures:
         mock_recorder = MagicMock()
 
         with (
-            patch("syntara.workflows.workflow_engine.scheduled_launcher.activity") as mock_activity,
+            patch("syntara.workflow_runtime.engines.temporal.scheduled_launcher.activity") as mock_activity,
             patch(
-                "syntara.workflows.workflow_engine.scheduled_launcher.get_metrics_recorder", return_value=mock_recorder
+                "syntara.workflow_runtime.engines.temporal.scheduled_launcher.get_metrics_recorder",
+                return_value=mock_recorder,
             ),
             patch.object(
                 launcher,

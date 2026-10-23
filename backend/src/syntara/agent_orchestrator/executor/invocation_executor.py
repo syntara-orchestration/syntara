@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     import httpx
 
     from syntara.agent_orchestrator.context_manager.compressor import CompressorService
-    from syntara.workflows.workflow_engine.models.workflow_definition import IntegrationConnectionConfig
+    from syntara.workflow_runtime.engines.temporal.models.workflow_definition import IntegrationConnectionConfig
 
 from sqlalchemy.orm import selectinload
 from sqlmodel import col, select, update

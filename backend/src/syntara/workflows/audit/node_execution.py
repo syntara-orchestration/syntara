@@ -11,11 +11,11 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from uuid import UUID
 
-    from syntara.workflows.models.execution import ExecutionMode
-    from syntara.workflows.workflow_engine.models.workflow_definition import (
+    from syntara.workflow_runtime.engines.temporal.models.workflow_definition import (
         ActivityTerminalStatus,
         NodeType,
     )
+    from syntara.workflows.models.execution import ExecutionMode
 
 
 @dataclass

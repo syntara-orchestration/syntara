@@ -27,6 +27,11 @@ from syntara.core.constants import WebhookLimits
 from syntara.core.database.session import get_db
 from syntara.core.models import User
 from syntara.core.syntara_router import SyntaraRouter
+from syntara.workflow_runtime.engines.temporal.models.workflow_definition import NodeType
+from syntara.workflow_runtime.engines.temporal.services.temporal_execution_service import (
+    TemporalExecutionService,
+    create_temporal_execution_service,
+)
 from syntara.workflows.audit.webhook_auth import WebhookAuthSuccessEvent
 from syntara.workflows.exceptions import (
     PayloadTooLargeError,
@@ -36,11 +41,6 @@ from syntara.workflows.exceptions import (
 )
 from syntara.workflows.services.execution_service import ExecutionService
 from syntara.workflows.services.webhook_trigger_service import WebhookTriggerService
-from syntara.workflows.workflow_engine.models.workflow_definition import NodeType
-from syntara.workflows.workflow_engine.services.temporal_execution_service import (
-    TemporalExecutionService,
-    create_temporal_execution_service,
-)
 
 logger = structlog.stdlib.get_logger(__name__)
 

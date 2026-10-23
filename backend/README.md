@@ -38,7 +38,9 @@ src/
     ├── schemas/               # OpenAPI schema definitions for all domains
     ├── telemetry/             # Telemetry event collection and transmission
     ├── tool_manager/          # Tool provider interfaces and configuration
-    ├── workflows/             # Temporal workflow definitions and engine
+    ├── workflow_runtime/      # V2 graph execution, neutral activity registry and completion
+    ├── workers/               # Composition of runtime and business activity providers
+    ├── workflows/             # Workflow resources and legacy/common activity implementations
     └── ws/                    # WebSocket connection handling
 ```
 
@@ -52,7 +54,9 @@ Each domain represents a set of related functionality and follows a consistent s
 - **files** - File management and storage operations
 - **invocations** - Agent invocation tracking and execution history
 - **tool_manager** - Tool provider interfaces and configuration
-- **workflows** - Temporal workflow definitions and execution
+- **workflows** - Workflow definitions, publication, authorization, and execution records
+- **workflow_runtime** - V2 graph execution and engine adapters; see the [approval prototype](docs/workflow-engine/runtime-prototype.md)
+- **approvals** - Approval requests, decisions, and registered approval activities
 
 ```
 src/syntara/{domain}/

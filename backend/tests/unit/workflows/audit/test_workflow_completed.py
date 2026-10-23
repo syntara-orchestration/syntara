@@ -3,13 +3,13 @@
 from uuid import uuid4
 
 from syntara.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
+from syntara.workflow_runtime.engines.temporal.models.workflow_definition import (
+    ActivityName,
+    WorkflowTerminalStatus,
+)
 from syntara.workflows.audit.execution_completed import (
     WorkflowCompletedEvent,
     WorkflowCompletedHandler,
-)
-from syntara.workflows.workflow_engine.models.workflow_definition import (
-    ActivityName,
-    WorkflowTerminalStatus,
 )
 
 EXECUTION_ID = uuid4()

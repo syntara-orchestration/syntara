@@ -38,7 +38,6 @@ from syntara.workflows.models import Workflow, WorkflowVersion
 from syntara.workflows.models.workflow_publish_event import PublishAction, WorkflowPublishEvent
 from syntara.workflows.services.scheduled_trigger_service import ScheduledTriggerService
 from syntara.workflows.validators import workflow_validator
-from syntara.workflows.workflow_engine.constants import AGENT_EXECUTION_TIMEOUT_SECONDS
 
 if TYPE_CHECKING:
     from uuid import UUID
@@ -76,27 +75,6 @@ _BUILTIN_DEFINITIONS: list[dict[str, Any]] = [
             }
         ],
         "edges": [{"from": "trigger_api", "to": "convert"}],
-    },
-    {
-        "schema_version": "2.0.0",
-        "name": "Agent Execution",
-        "description": (
-            "System workflow that executes agent invocations. Triggered automatically when an invocation is created."
-        ),
-        "triggers": [{"id": "trigger_api", "type": "manual_trigger", "parameters": {}}],
-        "nodes": [
-            {
-                "id": "execute",
-                "type": "internal_activity",
-                "name": "Execute Invocation",
-                "parameters": {
-                    "activity": "invocation_execution",
-                    "input": {"invocation_id": "${trigger.invocation_id}"},
-                },
-                "settings": {"timeout": AGENT_EXECUTION_TIMEOUT_SECONDS},
-            }
-        ],
-        "edges": [{"from": "trigger_api", "to": "execute"}],
     },
     {
         "schema_version": "2.0.0",

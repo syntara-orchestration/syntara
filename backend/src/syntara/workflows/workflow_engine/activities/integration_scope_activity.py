@@ -24,7 +24,7 @@ from syntara.integrations.models.integration import (
 )
 from syntara.integrations.models.llm_model import LLMModel
 from syntara.tool_manager.models.tool import Tool
-from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName, NodeType
+from syntara.workflow_runtime.engines.temporal.models.workflow_definition import ActivityName, NodeType
 
 logger = structlog.stdlib.get_logger(__name__)
 

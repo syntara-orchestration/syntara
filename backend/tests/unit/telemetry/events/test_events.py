@@ -15,8 +15,8 @@ from syntara.telemetry.events.workflow_execution import (
     WorkflowExecutionCompletedEvent,
     WorkflowExecutionStartEvent,
 )
+from syntara.workflow_runtime.engines.temporal.models.workflow_definition import ActivityName
 from syntara.workflows.models.execution import ExecutionMode
-from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName
 
 # Import shared test data from conftest
 from tests.unit.telemetry.conftest import (

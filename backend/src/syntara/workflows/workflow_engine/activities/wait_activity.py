@@ -14,8 +14,8 @@ from temporalio.exceptions import ApplicationError
 from temporalio.service import RPCError
 
 from syntara.settings.cache.settings_cache import get_runtime_settings
-from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName
-from syntara.workflows.workflow_engine.services.activity_sync_registry import get_activity_sync_service
+from syntara.workflow_runtime.engines.temporal.models.workflow_definition import ActivityName
+from syntara.workflow_runtime.engines.temporal.services.activity_sync_registry import get_activity_sync_service
 
 logger = structlog.stdlib.get_logger(__name__)
 

@@ -7,7 +7,7 @@ accept, serialize, and validate the integration_id field using validate_uuid_or_
 import pytest
 from pydantic import ValidationError
 
-from syntara.workflows.workflow_engine.models.workflow_definition import (
+from syntara.workflow_runtime.engines.temporal.models.workflow_definition import (
     AAPJobTemplateExecutorParameters,
     AAPWorkflowJobTemplateExecutorParameters,
 )

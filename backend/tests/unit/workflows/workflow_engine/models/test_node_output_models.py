@@ -13,7 +13,7 @@ from typing import Any
 
 import pytest
 
-from syntara.workflows.workflow_engine.models.workflow_definition import (
+from syntara.workflow_runtime.engines.temporal.models.workflow_definition import (
     NODE_OUTPUT_MODELS,
     AAPJobTemplateOutput,
     AAPWorkflowJobTemplateOutput,

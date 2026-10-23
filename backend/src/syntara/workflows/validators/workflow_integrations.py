@@ -17,8 +17,8 @@ from syntara.integrations.models.integration import (
 from syntara.integrations.models.llm_model import LLMModel
 from syntara.service_accounts.models.service_account import ServiceAccount
 from syntara.tool_manager.models.tool import Tool
+from syntara.workflow_runtime.engines.temporal.models.workflow_definition import NodeType
 from syntara.workflows.models.validation_finding import ValidationCategory, ValidationFinding, ValidationSeverity
-from syntara.workflows.workflow_engine.models.workflow_definition import NodeType
 
 _AAP_NODE_TYPES: frozenset[str] = frozenset({NodeType.AAP_JOB_TEMPLATE, NodeType.AAP_WORKFLOW_JOB_TEMPLATE})
 _WEBHOOK_STYLE_TRIGGER_TYPES: frozenset[str] = frozenset({NodeType.WEBHOOK_TRIGGER, NodeType.EDA_TRIGGER})

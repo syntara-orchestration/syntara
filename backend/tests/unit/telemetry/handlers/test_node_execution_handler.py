@@ -5,12 +5,12 @@ from uuid import uuid4
 
 from syntara.telemetry.events.node_execution import NodeExecutionEvent
 from syntara.telemetry.handlers.node_execution import NodeExecutedTelemetryHandler
-from syntara.workflows.audit.node_execution import NodeExecutedEvent as NodeExecutedDomainEvent
-from syntara.workflows.models.execution import ExecutionMode
-from syntara.workflows.workflow_engine.models.workflow_definition import (
+from syntara.workflow_runtime.engines.temporal.models.workflow_definition import (
     ActivityTerminalStatus,
     NodeType,
 )
+from syntara.workflows.audit.node_execution import NodeExecutedEvent as NodeExecutedDomainEvent
+from syntara.workflows.models.execution import ExecutionMode
 from tests.unit.telemetry.conftest import SAMPLE_NODE_DEF
 
 

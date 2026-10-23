@@ -6,8 +6,8 @@ from typing import Any
 from temporalio import activity
 from temporalio.exceptions import ApplicationError
 
-from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName, ConditionOutput
-from syntara.workflows.workflow_engine.unified_eval import safe_eval_with_namespace
+from syntara.workflow_runtime.engines.temporal.models.workflow_definition import ActivityName, ConditionOutput
+from syntara.workflow_runtime.engines.temporal.unified_eval import safe_eval_with_namespace
 
 
 @activity.defn(name=ActivityName.CONDITION)

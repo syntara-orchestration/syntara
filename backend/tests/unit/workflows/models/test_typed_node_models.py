@@ -9,10 +9,7 @@ from typing import Any, ClassVar
 import pytest
 from pydantic import ValidationError
 
-from syntara.workflows.models.workflow_definition import (
-    WorkflowDefinition,
-)
-from syntara.workflows.workflow_engine.models.workflow_definition import (
+from syntara.workflow_runtime.engines.temporal.models.workflow_definition import (
     ApprovalNodeParameters,
     ConditionNodeParameters,
     ConvergeNodeParameters,
@@ -21,6 +18,9 @@ from syntara.workflows.workflow_engine.models.workflow_definition import (
     SwitchCase,
     SwitchNodeParameters,
     WaitNodeParameters,
+)
+from syntara.workflows.models.workflow_definition import (
+    WorkflowDefinition,
 )
 
 

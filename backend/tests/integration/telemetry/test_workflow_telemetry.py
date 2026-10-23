@@ -15,13 +15,13 @@ from syntara.telemetry.events.workflow_execution import (
     WorkflowExecutionStartEvent,
 )
 from syntara.telemetry.handlers.node_execution import NodeExecutedTelemetryHandler
-from syntara.workflows.audit.node_execution import NodeExecutedEvent
-from syntara.workflows.models.execution import ExecutionMode
-from syntara.workflows.workflow_engine.models.workflow_definition import (
+from syntara.workflow_runtime.engines.temporal.models.workflow_definition import (
     ActivityTerminalStatus,
     NodeType,
     WorkflowTerminalStatus,
 )
+from syntara.workflows.audit.node_execution import NodeExecutedEvent
+from syntara.workflows.models.execution import ExecutionMode
 
 
 class TestEndToEndWorkflowTelemetry:

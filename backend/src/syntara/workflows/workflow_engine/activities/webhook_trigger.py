@@ -11,7 +11,7 @@ from typing import Any
 import structlog
 from temporalio import activity
 
-from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName
+from syntara.workflow_runtime.engines.temporal.models.workflow_definition import ActivityName
 
 from .output_mapping import apply_output_mapping
 

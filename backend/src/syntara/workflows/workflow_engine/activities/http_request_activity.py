@@ -15,13 +15,13 @@ from temporalio.exceptions import ApplicationError
 
 from syntara.core.lib.url_validation import validate_url_no_ssrf
 from syntara.credentials.lib.auth_types import AUTH_TYPE_API_KEY, AUTH_TYPE_BASIC, AUTH_TYPE_BEARER, AUTH_TYPE_URL
-from syntara.workflows.workflow_engine import constants
-from syntara.workflows.workflow_engine.models.workflow_definition import (
+from syntara.workflow_runtime.engines.temporal import constants
+from syntara.workflow_runtime.engines.temporal.models.workflow_definition import (
     ActivityName,
     APIExecutorParameters,
     HttpRequestOutput,
 )
-from syntara.workflows.workflow_engine.utils.credential_scrubber import ensure_resolved_credentials_dict
+from syntara.workflow_runtime.engines.temporal.utils.credential_scrubber import ensure_resolved_credentials_dict
 
 from .common import HEARTBEAT_STOP_MONITOR, ActivityExecutionError, is_retryable_http_status
 

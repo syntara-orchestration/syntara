@@ -7,12 +7,12 @@ from uuid import uuid4
 import pytest
 from temporalio.exceptions import ApplicationError
 
+from syntara.workflow_runtime.engines.temporal.models import AgenticExecutorParameters
 from syntara.workflows.workflow_engine.activities.agentic_activity import (
     _build_agent_metadata,
     _inject_runtime_settings,
     execute_agentic_activity,
 )
-from syntara.workflows.workflow_engine.models import AgenticExecutorParameters
 
 
 @pytest.fixture(autouse=True)

@@ -7,26 +7,16 @@ BACKGROUND_ACTIVITY_REGISTRY (minimal subset for the background queue worker).
 from collections.abc import Callable
 from typing import Any
 
+from syntara.workflow_runtime.engines.temporal.models.workflow_definition import ActivityName
 from syntara.workflows.workflow_engine.activities.aap_job_template_activity import execute_aap_job_template_activity
 from syntara.workflows.workflow_engine.activities.aap_workflow_job_template_activity import (
     execute_aap_workflow_job_template_activity,
-)
-from syntara.workflows.workflow_engine.activities.agentic_activity import (
-    cancel_agentic_invocation_activity,
-    execute_agentic_activity,
-)
-from syntara.workflows.workflow_engine.activities.approval_activity import (
-    cancel_approval_requests_activity,
-    create_approval_request_activity,
-    expire_approval_requests_activity,
-    fail_detached_approval_activity,
 )
 from syntara.workflows.workflow_engine.activities.approver_resolution_activity import resolve_approvers_activity
 from syntara.workflows.workflow_engine.activities.condition import condition
 from syntara.workflows.workflow_engine.activities.converge import converge
 from syntara.workflows.workflow_engine.activities.credential_resolution_activity import resolve_workflow_credentials
 from syntara.workflows.workflow_engine.activities.eda_trigger import eda_trigger
-from syntara.workflows.workflow_engine.activities.http_request_activity import execute_http_request_activity
 from syntara.workflows.workflow_engine.activities.integration_resolution_activity import resolve_workflow_integration
 from syntara.workflows.workflow_engine.activities.integration_scope_activity import validate_node_references
 from syntara.workflows.workflow_engine.activities.internal import register_activity_monitoring
@@ -39,7 +29,6 @@ from syntara.workflows.workflow_engine.activities.script_activity import execute
 from syntara.workflows.workflow_engine.activities.switch import switch
 from syntara.workflows.workflow_engine.activities.wait_activity import complete_wait, wait
 from syntara.workflows.workflow_engine.activities.webhook_trigger import webhook_trigger
-from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName
 
 _TEMPORAL_ACTIVITIES: list[Callable[..., Any]] = [
     register_activity_monitoring,
@@ -49,18 +38,11 @@ _TEMPORAL_ACTIVITIES: list[Callable[..., Any]] = [
     validate_node_references,
     execute_aap_job_template_activity,
     execute_aap_workflow_job_template_activity,
-    execute_agentic_activity,
-    cancel_agentic_invocation_activity,
-    cancel_approval_requests_activity,
-    create_approval_request_activity,
-    expire_approval_requests_activity,
-    fail_detached_approval_activity,
     resolve_approvers_activity,
     condition,
     converge,
     eda_trigger,
     switch,
-    execute_http_request_activity,
     execute_internal_activity,
     loop,
     manual_trigger,

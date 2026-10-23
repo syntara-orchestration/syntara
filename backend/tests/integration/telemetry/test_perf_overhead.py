@@ -33,13 +33,13 @@ from syntara.telemetry.events.workflow_execution import (
     WorkflowExecutionStartEvent,
 )
 from syntara.telemetry.handlers.node_execution import NodeExecutedTelemetryHandler
-from syntara.workflows.audit.node_execution import NodeExecutedEvent
-from syntara.workflows.workflow_engine.activities.script_activity import execute_script_activity
-from syntara.workflows.workflow_engine.models.workflow_definition import (
+from syntara.workflow_runtime.engines.temporal.models.workflow_definition import (
     ActivityTerminalStatus,
     NodeType,
     WorkflowTerminalStatus,
 )
+from syntara.workflows.audit.node_execution import NodeExecutedEvent
+from syntara.workflows.workflow_engine.activities.script_activity import execute_script_activity
 
 logger = structlog.stdlib.get_logger(__name__)
 

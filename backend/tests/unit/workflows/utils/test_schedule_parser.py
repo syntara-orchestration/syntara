@@ -16,6 +16,7 @@ import pytest
 from temporalio.client import ScheduleOverlapPolicy, ScheduleRange
 
 from syntara.core.exceptions import SafeValueError
+from syntara.workflow_runtime.engines.temporal.models.workflow_definition import MissedSchedulePolicy
 from syntara.workflows.utils.schedule_parser import (
     _interval_to_calendar_spec,
     build_schedule_execution_workflow_id,
@@ -26,7 +27,6 @@ from syntara.workflows.utils.schedule_parser import (
     parse_iso8601_duration,
     parse_iso8601_interval,
 )
-from syntara.workflows.workflow_engine.models.workflow_definition import MissedSchedulePolicy
 
 
 class TestParseISO8601Duration:

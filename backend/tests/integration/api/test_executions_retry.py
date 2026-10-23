@@ -11,11 +11,11 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from syntara.core.models import User
+from syntara.workflow_runtime.engines.temporal.models.responses import WorkflowStartResponse
+from syntara.workflow_runtime.engines.temporal.services.temporal_execution_service import TemporalExecutionService
 from syntara.workflows.models.execution import Execution, ExecutionMode, ExecutionStatus
 from syntara.workflows.models.workflow import Workflow
 from syntara.workflows.models.workflow_version import WorkflowVersion
-from syntara.workflows.workflow_engine.models.responses import WorkflowStartResponse
-from syntara.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
 from tests.integration.helpers.error_data import assert_error_data
 
 

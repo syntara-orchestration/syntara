@@ -7,8 +7,8 @@ from uuid import uuid4
 from syntara.audit.handler import AuditEventHandler
 from syntara.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
 from syntara.audit.models.structured_data import AuditContextData
+from syntara.workflow_runtime.engines.temporal.models.workflow_definition import ActivityName
 from syntara.workflows.audit.execution_started import WorkflowStartEvent, WorkflowStartHandler
-from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName
 
 EXECUTION_ID = uuid4()
 WORKFLOW_ID = uuid4()

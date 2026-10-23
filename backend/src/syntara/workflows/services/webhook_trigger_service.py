@@ -19,6 +19,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from syntara.core.models import User
 from syntara.core.services import BaseService
 from syntara.service_accounts.models.service_account import ServiceAccount
+from syntara.workflow_runtime.engines.temporal.models.workflow_definition import NodeType, WebhookTriggerParameters
 from syntara.workflows.exceptions import (
     TriggerValidationError,
     WebhookServiceAccountNotAuthorizedError,
@@ -28,7 +29,6 @@ from syntara.workflows.exceptions import (
 from syntara.workflows.models.webhook_trigger import WebhookTrigger, WebhookTriggerRead
 from syntara.workflows.models.webhook_trigger_service_account import WebhookTriggerServiceAccount
 from syntara.workflows.models.workflow import Workflow
-from syntara.workflows.workflow_engine.models.workflow_definition import NodeType, WebhookTriggerParameters
 
 logger = structlog.stdlib.get_logger(__name__)
 

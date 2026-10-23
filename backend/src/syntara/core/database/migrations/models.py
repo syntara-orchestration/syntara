@@ -33,6 +33,7 @@ from syntara.tool_manager.models.rate_limit_config import RateLimit
 from syntara.tool_manager.models.tool import Tool, ToolParameter
 from syntara.tool_manager.models.tool_execution import ToolExecution
 from syntara.tool_manager.models.usage_counter import UsageCounter
+from syntara.workflow_runtime.models import ActivityCompletion
 from syntara.workflows.models import WebhookTrigger, Workflow, WorkflowVersion
 from syntara.workflows.models.activity_execution import ActivityExecution
 from syntara.workflows.models.execution import Execution
@@ -40,6 +41,7 @@ from syntara.workflows.models.execution import Execution
 # Ensure models are registered with SQLModel metadata
 
 ALL_MODELS = [
+    ActivityCompletion,
     Principal,
     GlobalRevocationTimestamp,
     Installation,
