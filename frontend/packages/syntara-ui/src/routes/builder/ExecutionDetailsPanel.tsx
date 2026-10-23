@@ -14,6 +14,7 @@ import { detachPromise } from '../../utils/detachPromise'
 import { NodeExecutionDetailsPanel } from '../executions/NodeExecutionDetailsPanel'
 import type { ActivityState } from '../workflows/execution/types'
 import {
+  selectRetryReplayBaseline,
   useExecutionStore,
   useExecutionStoreActions,
   useExecutionWithLiveStatus,
@@ -72,6 +73,7 @@ type ThreePanelLayoutProps = {
   onRowClick?: (nodeId: string, nodeName: string) => void
   headerLabel?: string
   onClosePanel?: () => void
+  replayBaselineAt?: string | null
 }
 
 function ThreePanelLayout({
@@ -95,6 +97,7 @@ function ThreePanelLayout({
   onRowClick,
   headerLabel,
   onClosePanel,
+  replayBaselineAt,
 }: Readonly<ThreePanelLayoutProps>) {
   return (
     <SynPanel
@@ -151,6 +154,7 @@ function ThreePanelLayout({
                 activityOrder={activityOrder}
                 onRowClick={onRowClick}
                 selectedNodeId={selectedNodeId}
+                replayBaselineAt={replayBaselineAt}
               />
             )}
           </Stack>
@@ -209,6 +213,7 @@ type SinglePanelLayoutProps = {
   selectedNodeId?: string | null
   headerLabel?: string
   onClosePanel?: () => void
+  replayBaselineAt?: string | null
 }
 
 function SinglePanelLayout({
@@ -229,6 +234,7 @@ function SinglePanelLayout({
   selectedNodeId,
   headerLabel,
   onClosePanel,
+  replayBaselineAt,
 }: Readonly<SinglePanelLayoutProps>) {
   const resolvedError = useMemo(
     () => resolveErrorDetails(execution.error_details, nameMap),
@@ -292,6 +298,7 @@ function SinglePanelLayout({
             executionError={resolvedError}
             onRowClick={onRowClick}
             selectedNodeId={selectedNodeId}
+            replayBaselineAt={replayBaselineAt}
           />
         )}
       </Stack>
@@ -310,6 +317,7 @@ export function ExecutionDetailsPanel({
 }: Readonly<ExecutionDetailsPanelProps>) {
   const { setActivityExecutions } = useExecutionStoreActions()
   const activityStates = useExecutionStore((s) => s.activityStates)
+  const replayBaselineAt = useExecutionStore(selectRetryReplayBaseline)
   const [viewMode, setViewMode] = useState<ViewMode>('overview')
 
   const executionQuery = executionsClient.useQuery('get', '/executions/{execution_id}', {
@@ -411,6 +419,7 @@ export function ExecutionDetailsPanel({
         onRowClick={handleRowClick}
         headerLabel={headerLabel}
         onClosePanel={onClosePanel}
+        replayBaselineAt={replayBaselineAt}
       />
     )
   }
@@ -434,6 +443,7 @@ export function ExecutionDetailsPanel({
       selectedNodeId={resolvedNodeId}
       headerLabel={headerLabel}
       onClosePanel={onClosePanel}
+      replayBaselineAt={replayBaselineAt}
     />
   )
 }

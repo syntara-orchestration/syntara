@@ -11,6 +11,7 @@ import { useSemanticZoom } from '../../routes/workflows/canvas/nodes/hooks/useSe
 import { NODE_TYPE_COLORS } from '../../routes/workflows/canvas/nodeTypeColors'
 import type { SemanticZoomBranchSource } from '../../routes/workflows/canvas/semanticZoomTypes'
 import type { ActivityStatus } from '../../routes/workflows/execution/types'
+import { ReplayedOutputBadge } from '../labels/ReplayedOutputBadge'
 import { SynPanel } from '../layout/SynPanel'
 
 import { SynStepExpandedAllContext } from './SynStepExpandedAllContext'
@@ -23,6 +24,8 @@ type ExecutionState = {
   completed_at?: string
   error_details?: string
   retry_count?: number
+  /** True when this step reused a previous run's output instead of executing. */
+  replayed?: boolean
 }
 
 const DEFAULT_NODE_WIDTH = 240
@@ -75,6 +78,31 @@ function ValidationErrorBadge() {
       </Icon>
     </div>
   )
+}
+
+/**
+ * Centred pill under a step. Mock-pinned data and reused output are mutually
+ * exclusive: a step replayed from a previous run carries real recorded output,
+ * so the mock-pinned marker would be misleading.
+ */
+function StepBottomBadge({ mockDataPinned, replayed }: Readonly<{ mockDataPinned: boolean; replayed: boolean }>) {
+  if (mockDataPinned) {
+    return (
+      <div style={NODE_BOTTOM_BADGE_STYLE}>
+        <Label isCompact color="purple">
+          Mock data pinned
+        </Label>
+      </div>
+    )
+  }
+  if (replayed) {
+    return (
+      <div style={NODE_BOTTOM_BADGE_STYLE}>
+        <ReplayedOutputBadge />
+      </div>
+    )
+  }
+  return null
 }
 
 const isWideTaskNode = (nodeProps: NodeProps) => {
@@ -266,14 +294,11 @@ export function SynStep(props: {
             status={props.executionState?.status ?? 'pending'}
             retryCount={props.executionState?.retry_count}
             nodeType={props.nodeProps.type}
+            replayed={props.executionState?.replayed ?? false}
           />
         )}
-        {!isSemanticZoom && mockDataPinned && (
-          <div style={NODE_BOTTOM_BADGE_STYLE}>
-            <Label isCompact color="purple">
-              Mock data pinned
-            </Label>
-          </div>
+        {!isSemanticZoom && (
+          <StepBottomBadge mockDataPinned={mockDataPinned} replayed={props.executionState?.replayed ?? false} />
         )}
         {!isSemanticZoom && hasValidationError && <ValidationErrorBadge />}
         {!props.disableTarget && (
