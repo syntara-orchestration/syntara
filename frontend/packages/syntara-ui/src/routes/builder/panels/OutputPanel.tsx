@@ -48,8 +48,8 @@ export function OutputPanel({ outputData, nodeId }: Readonly<OutputPanelProps>) 
     return activity?.type ?? null
   }, [activities, nodeId])
 
-  // Priority: real execution data > mock data > empty
-  const displayData = outputData ?? outputMock
+  // Priority: mock data (pinned, authoritative) > real execution data > empty
+  const displayData = outputMock ?? outputData
 
   function buildOutputSkeleton(): string {
     // Best case: use existing execution output as the template
