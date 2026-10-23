@@ -79,6 +79,20 @@ class TestKafkaValidateSuccess:
         assert isinstance(kwargs["ssl_context"], ssl.SSLContext)
 
     @pytest.mark.asyncio
+    async def test_password_whitespace_is_preserved(
+        self, kafka_config: KafkaConfiguration, resolved_credential: dict[str, Any]
+    ) -> None:
+        """Leading and trailing spaces are part of the SASL password."""
+        client = _client_mock()
+        password_with_spaces = f"  {_PASSWORD}  "
+        credential = {**resolved_credential, "kafka_password": password_with_spaces}
+        with patch("syntara.integrations.adapters.kafka.AIOKafkaClient", return_value=client) as constructor:
+            result = await KafkaAdapter(kafka_config).validate(credential, timeout_seconds=10)
+
+        assert result.success is True
+        assert constructor.call_args.kwargs["sasl_plain_password"] == password_with_spaces
+
+    @pytest.mark.asyncio
     async def test_allow_http_rejects_sasl_plaintext(self, resolved_credential: dict[str, Any]) -> None:
         """allow_http would select SASL_PLAINTEXT, which Kafka does not support."""
         config = KafkaConfiguration.model_construct(
@@ -117,6 +131,7 @@ class TestKafkaValidateAuth:
         [
             {},
             {"kafka_username": "user", "kafka_password": ""},
+            {"kafka_username": "user", "kafka_password": "   "},
             {"kafka_username": "  ", "kafka_password": "secret"},
         ],
     )
