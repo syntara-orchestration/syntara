@@ -88,7 +88,7 @@ export async function addManualTrigger(page: Page, name = 'Manual trigger') {
   await expect(page.getByRole('progressbar', { name: 'Loading' })).not.toBeVisible({ timeout: 15000 })
 
   // Wait for trigger selection panel with correct heading text
-  await expect(page.getByRole('heading', { name: /select a trigger node/i })).toBeVisible({ timeout: 10000 })
+  await expect(page.getByRole('heading', { name: /select a trigger step/i })).toBeVisible({ timeout: 10000 })
   await page.getByRole('button', { name: 'Manual trigger' }).click()
   await page.getByRole('textbox', { name: 'Name', exact: true }).fill(name)
   await page.getByRole('button', { name: 'Create', exact: true }).click()
@@ -118,7 +118,7 @@ export async function addWebhookTrigger(page: Page, name: string, webhookPath: s
   await expect(page.getByRole('progressbar', { name: 'Loading' })).not.toBeVisible({ timeout: 15000 })
 
   // Wait for trigger selection panel with correct heading text
-  await expect(page.getByRole('heading', { name: /select a trigger node/i })).toBeVisible({ timeout: 10000 })
+  await expect(page.getByRole('heading', { name: /select a trigger step/i })).toBeVisible({ timeout: 10000 })
   await page.getByRole('button', { name: 'Webhook trigger', exact: true }).click()
   await page.getByRole('textbox', { name: 'Name', exact: true }).fill(name)
   await page.getByRole('textbox', { name: 'Webhook path' }).fill(webhookPath)
@@ -134,7 +134,7 @@ export async function addEdaTrigger(page: Page, name: string, webhookPath: strin
   await expect(page.getByRole('progressbar', { name: 'Loading' })).not.toBeVisible({ timeout: 15000 })
 
   // Wait for trigger selection panel with correct heading text
-  await expect(page.getByRole('heading', { name: /select a trigger node/i })).toBeVisible({ timeout: 10000 })
+  await expect(page.getByRole('heading', { name: /select a trigger step/i })).toBeVisible({ timeout: 10000 })
   await page.getByRole('button', { name: 'Event-Driven Ansible trigger', exact: true }).click()
   await page.getByRole('textbox', { name: 'Name', exact: true }).fill(name)
   await page.getByRole('textbox', { name: 'Webhook path' }).fill(webhookPath)
@@ -633,7 +633,7 @@ type ScheduleTriggerConfig = {
  */
 export async function addScheduleTrigger(page: Page, name: string, config?: ScheduleTriggerConfig) {
   await expect(page.getByRole('progressbar', { name: 'Loading' })).not.toBeVisible({ timeout: 15_000 })
-  await expect(page.getByRole('heading', { name: /select a trigger node/i })).toBeVisible({ timeout: 10_000 })
+  await expect(page.getByRole('heading', { name: /select a trigger step/i })).toBeVisible({ timeout: 10_000 })
 
   await page.getByRole('button', { name: 'Schedule trigger' }).click()
 
@@ -688,7 +688,7 @@ export async function openScheduleTriggerForEditing(page: Page, nodeName: string
  * Create flow only — editing with a pre-selected model does not show the empty placeholder.
  */
 export async function expectAiAgentModelSelectorReady(page: Page) {
-  const form = page.getByTestId('ai-agent-node-form')
+  const form = page.getByTestId('ai-agent-step-form')
   await expect(form).toBeVisible({ timeout: 15_000 })
   const modelToggle = form.getByRole('button', { name: 'Model', exact: true })
   await expect(modelToggle).toBeEnabled({ timeout: 15_000 })
@@ -712,7 +712,7 @@ export async function openTaskAgentNodeCreateForm(page: Page) {
 /** Open a saved Task Agent node on the canvas for editing. */
 export async function openAiAgentNodeForEditing(page: Page, nodeName: string) {
   await openSavedNodeForEditing(page, nodeName, async (p) => {
-    await expect(p.getByTestId('ai-agent-node-form')).toBeVisible({ timeout: 5_000 })
+    await expect(p.getByTestId('ai-agent-step-form')).toBeVisible({ timeout: 5_000 })
     await expect(p.getByRole('button', { name: 'Model', exact: true })).toBeEnabled({ timeout: 5_000 })
   })
 }

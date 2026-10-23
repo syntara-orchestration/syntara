@@ -5,7 +5,7 @@ import { getActivityMetadata, useWorkflowStore } from '../../../stores/useWorkfl
 import type { NodeType } from '../../workflows/canvas/nodes/NodeType'
 import type { BuilderAction } from '../builderReducer'
 import { findDuplicatePosition } from '../duplicateNodePosition'
-import type { NodeActionsContextValue } from '../NodeActionsContext'
+import type { StepActionsContextValue } from '../StepActionsContext'
 import type { AddNodeFromEdgeOptions } from '../types'
 import { applyEdgeConnection, calculateEdgeConnection } from '../utils/edgeConnectionHelpers'
 
@@ -103,7 +103,7 @@ export function useBuilderFlowInteractionHandlers({
     [dispatch]
   )
 
-  const handleViewNodeDetails = useCallback(
+  const handleViewStepDetails = useCallback(
     (nodeId: string) => {
       const node = reactFlowInstance.getNode(nodeId)
       if (!node) return
@@ -117,14 +117,14 @@ export function useBuilderFlowInteractionHandlers({
     [dispatch, reactFlowInstance]
   )
 
-  const handleReplaceNode = useCallback(
+  const handleReplaceStep = useCallback(
     (nodeId: string) => {
       dispatch({ type: 'OPEN_ADD_NODE_PANEL', payload: { sourceNodeId: null, replacementNodeId: nodeId } })
     },
     [dispatch]
   )
 
-  const handleDuplicateNode = useCallback(
+  const handleDuplicateStep = useCallback(
     (nodeId: string) => {
       const node = reactFlowInstance.getNode(nodeId)
       dispatch({ type: 'CLOSE_NODE_EDITOR' })
@@ -142,7 +142,7 @@ export function useBuilderFlowInteractionHandlers({
     [dispatch, reactFlowInstance, duplicateActivity]
   )
 
-  const handleToggleDisabled = useCallback((nodeId: string) => {
+  const handleToggleStepDisabled = useCallback((nodeId: string) => {
     const store = useWorkflowStore.getState()
     const activities = store.currentWorkflow?.workflow.activities ?? []
     const activity = activities.find((a) => a.id === nodeId)
@@ -153,15 +153,15 @@ export function useBuilderFlowInteractionHandlers({
     })
   }, [])
 
-  const nodeActionsValue = useMemo<NodeActionsContextValue>(
+  const stepActionsValue = useMemo<StepActionsContextValue>(
     () => ({
-      onViewDetails: handleViewNodeDetails,
-      onReplace: handleReplaceNode,
-      onDuplicate: handleDuplicateNode,
+      onViewDetails: handleViewStepDetails,
+      onReplace: handleReplaceStep,
+      onDuplicate: handleDuplicateStep,
       onRunStep,
-      onToggleDisabled: handleToggleDisabled,
+      onToggleDisabled: handleToggleStepDisabled,
     }),
-    [handleViewNodeDetails, handleReplaceNode, handleDuplicateNode, onRunStep, handleToggleDisabled]
+    [handleViewStepDetails, handleReplaceStep, handleDuplicateStep, onRunStep, handleToggleStepDisabled]
   )
 
   return {
@@ -170,6 +170,6 @@ export function useBuilderFlowInteractionHandlers({
     handleAddNodeFromEdge,
     handleConnectFromPanel,
     handleNodesDeleted,
-    nodeActionsValue,
+    stepActionsValue,
   }
 }
