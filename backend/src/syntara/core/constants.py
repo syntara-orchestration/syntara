@@ -4,6 +4,8 @@ This module centralizes all magic numbers and limits used throughout the codebas
 to improve maintainability and consistency.
 """
 
+from datetime import UTC, datetime
+
 NAME_PATTERN = r"^[a-zA-Z0-9]([a-zA-Z0-9:_-]*[a-zA-Z0-9])?$"
 """Name pattern for projects, policies, and roles.
 
@@ -105,6 +107,8 @@ class EventDeliveryDefaults:
 
     CLAIM_LEASE_SECONDS = 60
     CLAIM_RENEWAL_INTERVAL_SECONDS = 20
+    # asyncpg maps datetime.max to PostgreSQL infinity, which loses tzinfo on read.
+    NO_AUTOMATIC_RETRY_AT = datetime(9999, 12, 30, tzinfo=UTC)
     RETENTION_SECONDS = 3600
     CAPACITY_PAUSE_ROWS = 3_000_000
     CAPACITY_RESUME_ROWS = 2_500_000

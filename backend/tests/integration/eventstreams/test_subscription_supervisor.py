@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock
 import pytest
 import pytest_asyncio
 
+from syntara.core.constants import EventDeliveryDefaults
 from syntara.core.models.user import User
 from syntara.core.services.secret_service import create_secret_service
 from syntara.credentials.models.credential import Credential
@@ -214,7 +215,9 @@ async def test_pause_resume_preserves_durable_permanent_content_evidence(runtime
     async with context.delivery.session_factory() as session, session.begin():
         assert (
             await context.delivery.store(session).defer(
-                claim, error_code=EventFailureCode.invalid_json.value, next_attempt_at=datetime.max.replace(tzinfo=UTC)
+                claim,
+                error_code=EventFailureCode.invalid_json.value,
+                next_attempt_at=EventDeliveryDefaults.NO_AUTOMATIC_RETRY_AT,
             )
             is None
         )

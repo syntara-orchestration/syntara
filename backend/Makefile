@@ -312,6 +312,13 @@ worker-run: check-deps _ensure-secrets _ensure-certs ## Run Temporal workflow wo
 	APP_TOOL_MANAGER_BASE_URL=$(WORKER_BASE_URL) \
 	uv run python -m syntara.workflows.worker
 
+.PHONY: eventstream-consumer-run
+eventstream-consumer-run: check-deps _ensure-secrets _ensure-certs ## Start the Kafka consumer container
+	@echo "🔄 Starting event-stream consumer..."
+	APP_EVENTSTREAM_ENABLED=true \
+	uv run --env-file .env podman-compose $(COMPOSE_ARGS) \
+		--profile kafka-worker up -d --no-deps --force-recreate kafka-worker
+
 .PHONY: background-worker-run
 background-worker-run: check-deps _ensure-secrets _ensure-certs ## Run Temporal workflow background worker
 	@echo "🔄 Starting Temporal workflow background worker..."
@@ -472,8 +479,8 @@ run-all: _ensure-secrets _ensure-certs ## Start all services (foreground, Ctrl+C
 	$(COMPOSE_FINAL_CMD) up --build --force-recreate
 
 .PHONY: services-run
-services-run: _ensure-secrets _ensure-certs ## Start all services (database + cache + temporal + UI + worker + background-worker + MCP) in background
-	@echo "🚀 Starting all services (database + cache + temporal + UI + worker + background-worker + MCP)..."
+services-run: _ensure-secrets _ensure-certs ## Start infrastructure, Temporal workers, Kafka consumer and MCP in background
+	@echo "🚀 Starting all services (database + cache + temporal + UI + worker + background-worker + Kafka consumer + MCP)..."
 	@echo "📍 Database: postgresql://admin:admin@localhost:$${APP_DB_PORT:-5432}/syntara_api"
 	@echo "📍 Cache: cache://localhost:$${APP_CACHE_PORT:-6379}"
 	@echo "📍 Temporal Server: localhost:$${APP_TEMPORAL_PORT:-7233}"

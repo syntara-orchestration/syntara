@@ -57,6 +57,7 @@ RUN --mount=from=override,source=/,target=/tmp/override \
 # requirements-build.txt still matters for prefetch completeness even though uv
 # performs the actual isolated build/install steps.
 # Local (non-hermetic) builds fall through to normal uv sync.
+# Clear uv's package cache before copying the builder home into the runtime.
 # hadolint ignore=SC2086
 RUN if [ -n "${PIP_FIND_LINKS:-}" ]; then \
         # --- Hermetic build (Konflux / cachi2) ---
@@ -95,7 +96,8 @@ RUN if [ -n "${PIP_FIND_LINKS:-}" ]; then \
     else \
         # --- Local (non-hermetic) build ---
         uv sync --frozen --no-dev; \
-    fi
+    fi && \
+    uv cache clean
 
 # Stage 2: Runtime - minimal image with Python and app copied from builder
 FROM registry.access.redhat.com/ubi9/ubi-minimal:latest@sha256:8eb2830d0936237fc13a1f2f7e45aecf90d69043380ad167fad0343632937f41

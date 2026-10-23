@@ -2,17 +2,50 @@
 
 The existing Kafka worker runs with
 `python -m syntara.eventstreams.consumer_entrypoint`, independently of API,
-workflow execution and background workers. The opt-in local compose profile runs
-that entrypoint directly using the backend image. Operator-managed Kubernetes
+workflow execution and background workers. The local compose profile runs that
+entrypoint directly using the backend image. `make services-run` enables it
+automatically for local development. Operator-managed Kubernetes
 deployment, CRD controls, container launchers and deployment health probes are
 deferred to M2. This guide covers backend configuration, local compose and runtime
 recovery safeguards. Kafka infrastructure, broker ACLs and broker credentials
 remain customer managed; the local broker example is disposable development data.
 
+## Local development
+
+After normal setup has built the backend image and applied migrations and seeders,
+run this from `backend/` to start infrastructure, Temporal workers and the Kafka
+consumer together:
+
+```bash
+make services-run
+```
+
+After updating this test branch, run `uv run alembic upgrade head` before starting
+the API or workers. The migration history preserves the earlier test revision
+`cdd536bc1946` and joins it with the parent's `52662dc0e022` revision, so existing
+test databases and fresh databases can reach the same head.
+
+The target loads the backend `.env`, explicitly enables event streams, and starts
+infrastructure, Temporal workers and `kafka-worker` in one compose invocation.
+Run `make eventstream-consumer-run` separately when only the consumer needs
+restarting.
+`make services-stop` stops the Kafka consumer along with the other services.
+`make services-clean` also includes the consumer when removing service containers
+and deleting the local database and Temporal data volumes. Images and build caches
+are retained.
+Wrap JSON arrays in `.env` in single quotes so `uv --env-file` preserves JSON
+string quotes, for example `APP_INTEGRATION_URL_ALLOWED_HOSTS='["mcp-server","localhost"]'`.
+
+The local service mounts `backend/src`. Rerun the target to load Python edits;
+dependency changes still require `make build-images`. Broker addresses, runtime
+credentials and broker CA certificates come from Integration/Credential records.
+Makefile and documentation edits do not require an image rebuild.
+
 ## Configuration contract
 
-`APP_EVENTSTREAM_ENABLED` defaults to `false`. Both local Kafka compose profiles
-are opt-in; the normal compose stack does not start a broker or Kafka worker.
+`APP_EVENTSTREAM_ENABLED` defaults to `false`. Direct compose invocations require
+the `kafka-worker` profile and an enabled flag; `make services-run` handles both
+automatically. The local broker fixture remains opt-in through the `kafka` profile.
 An enabled worker with zero active subscriptions stays running and scans prepared
 deliveries. Stopping every Kafka worker stops both consumption and prepared
 recovery; recovery waits for a compatible worker to return.

@@ -434,6 +434,8 @@ services:
       - APP_EVENT_DELIVERY_RETENTION_SECONDS=${APP_EVENT_DELIVERY_RETENTION_SECONDS:-3600}
       - APP_EVENT_TEMPORAL_HISTORY_RETENTION_SECONDS=${APP_EVENT_TEMPORAL_HISTORY_RETENTION_SECONDS:-86400}
     volumes:
+      # Match the other local workers; restart the process after Python source edits.
+      - ./backend/src:/opt/app-root/src/src:z
       - ./backend/.secrets/jwt-primary.pem:/run/secrets/jwt-primary.pem:ro,z
       - ./backend/.secrets/jwt-backup.pem:/run/secrets/jwt-backup.pem:ro,z
       - ./backend/.secrets/encryption-key:/run/secrets/encryption-key:ro,z
