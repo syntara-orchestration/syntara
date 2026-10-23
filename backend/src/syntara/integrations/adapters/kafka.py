@@ -16,6 +16,7 @@ from datetime import UTC, datetime
 from typing import Any, cast
 
 import structlog
+from aiokafka import client as aiokafka_client
 from aiokafka.client import AIOKafkaClient
 from aiokafka.errors import KafkaConnectionError, KafkaError, KafkaTimeoutError
 
@@ -34,6 +35,9 @@ _KAFKA_USERNAME_KEY = "kafka_username"
 _KAFKA_PASSWORD_KEY = "kafka_password"  # noqa: S105
 _CLIENT_ID = "syntara-kafka-integration"
 _MS_PER_SECOND = 1000
+# bootstrap() calls the module-level create_conn. Serializing the recorder swap
+# keeps concurrent validates from restoring the wrong function.
+_BOOTSTRAP_LOCK = asyncio.Lock()
 
 
 class KafkaAdapter:
@@ -149,6 +153,11 @@ class KafkaAdapter:
             error_msg = "SSL/TLS verification failed"
             error_type = HealthCheckErrorType.SSL_ERROR
             logger.warning("Kafka validate SSL error", error=str(exc))
+        except OSError as exc:
+            success = False
+            error_msg = "Unable to connect to Kafka"
+            error_type = HealthCheckErrorType.CONNECTION_ERROR
+            logger.warning("Kafka validate connection error", error_type=error_type.value, error=str(exc))
         except KafkaConnectionError as exc:
             success = False
             error_type, error_msg = _classify_kafka_error(exc)
@@ -199,14 +208,36 @@ class KafkaAdapter:
 
 
 async def _bootstrap(client: AIOKafkaClient, timeout_seconds: int) -> None:
-    """Bootstrap every broker under one deadline.
+    """Bootstrap every broker under one deadline and keep the original failure.
 
-    ``request_timeout_ms`` is a fresh budget for each broker, so a list of
-    brokers can outlast the caller's timeout. ``asyncio.timeout`` cancels the
-    whole loop when that deadline expires.
+    ``request_timeout_ms`` is a fresh budget for each broker. ``bootstrap`` then
+    catches that attempt's error and, once every broker has failed, raises a
+    generic ``KafkaConnectionError`` with no cause. Record the connection-layer
+    exception and raise it instead, so a bad password, a certificate failure,
+    and a timeout stay distinguishable. ``asyncio.timeout`` cancels the whole
+    loop when the caller's deadline expires.
     """
-    async with asyncio.timeout(timeout_seconds):
-        await client.bootstrap()
+    captured: list[BaseException] = []
+    original_create_conn = aiokafka_client.create_conn
+
+    async def _recording_create_conn(*args: object, **kwargs: object) -> object:
+        try:
+            return await original_create_conn(*args, **kwargs)
+        except Exception as exc:
+            captured.append(exc)
+            raise
+
+    async with _BOOTSTRAP_LOCK:
+        aiokafka_client.create_conn = cast("Any", _recording_create_conn)
+        try:
+            async with asyncio.timeout(timeout_seconds):
+                await client.bootstrap()
+        except KafkaConnectionError:
+            if captured:
+                raise captured[-1] from None
+            raise
+        finally:
+            aiokafka_client.create_conn = original_create_conn
 
 
 def _sasl_login(resolved_credential: dict[str, Any]) -> tuple[str, str] | None:
