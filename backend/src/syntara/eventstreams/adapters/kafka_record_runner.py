@@ -1,6 +1,7 @@
 """Single-subscription Kafka runner; durable services own scheduling decisions."""
 
 import asyncio
+import re
 from collections import deque
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -8,6 +9,7 @@ from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 import structlog
+from aiokafka.errors import KafkaError, KafkaTimeoutError
 from sqlalchemy.exc import SQLAlchemyError
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -16,7 +18,7 @@ from syntara.core.constants import EventDeliveryDefaults, EventSchedulingDefault
 from syntara.eventstreams.adapters.kafka_committed_position import KafkaCommittedPositionVerifier
 from syntara.eventstreams.adapters.kafka_consumer import KafkaPartitionConsumer
 from syntara.eventstreams.adapters.kafka_delivery_reader import KafkaDeliveryReader
-from syntara.eventstreams.adapters.kafka_initial_position import PositionRequest, PositionStatus
+from syntara.eventstreams.adapters.kafka_initial_position import PositionRequest, PositionResult, PositionStatus
 from syntara.eventstreams.adapters.kafka_initial_position_service import KafkaInitialPositionService
 from syntara.eventstreams.adapters.kafka_metadata import KafkaSourceMetadata
 from syntara.eventstreams.adapters.kafka_position_control import DrainEvidence
@@ -33,6 +35,7 @@ from syntara.eventstreams.core.processing import (
     InspectedRecord,
     PendingContentFailure,
 )
+from syntara.eventstreams.core.runtime import RunnerStatus, RuntimeFailureCode, RuntimeState, SubscriptionRuntimeError
 from syntara.eventstreams.core.source_metadata import EventSourceMetadata
 from syntara.eventstreams.exceptions import (
     ConsumerNotRunningError,
@@ -70,6 +73,7 @@ class _Partition:
     inspection_next_offset: int | None = None
     inspection_end_offset: int | None = None
     fence: UUID | None = None
+    initialization: PositionResult | None = None
 
 
 def raw_event_size(event: RawEvent) -> int:
@@ -131,6 +135,7 @@ class KafkaRecordRunner:
             else asyncio.Semaphore(self._settings.event_processing_concurrency)
         )
         self._partitions: dict[int, _Partition] = {}
+        self._assignment_epoch: int | None = None
         self._commit_lock = asyncio.Lock()
         self._fetch_lock = asyncio.Lock()
         self._stop_lock = asyncio.Lock()
@@ -152,6 +157,38 @@ class KafkaRecordRunner:
     def queued_bytes(self) -> int:
         """Include in-flight source bytes in the subscription byte bound."""
         return sum(state.byte_count for state in self._partitions.values())
+
+    @property
+    def status(self) -> RunnerStatus:
+        """Observe local convergence without granting admission or position authority."""
+        if self._stopped:
+            return RunnerStatus(state=RuntimeState.STOPPED)
+        if self._closing:
+            return RunnerStatus(state=RuntimeState.DRAINING)
+        if not self._started or self._assignment_epoch != self._client.epoch:
+            return RunnerStatus(state=RuntimeState.STARTING)
+        states = [state for state in self._partitions.values() if self._owned(state)]
+        # A permanent content hold must remain visible even if another partition
+        # is only waiting for initialization or a transient dependency.
+        states.sort(key=lambda state: (not bool(state.held and state.held.permanent_content_error), state.partition))
+        for state in states:
+            if state.held is None:
+                continue
+            reason = state.held.reason
+            if reason == "initialization_unresolved" and state.initialization is not None:
+                initialization_reason = state.initialization.reason
+                if state.initialization.status == PositionStatus.RECOVERY_GAP:
+                    reason = "recovery_gap"
+                elif initialization_reason is not None and re.fullmatch(r"[a-z][a-z0-9_]{0,99}", initialization_reason):
+                    reason = initialization_reason
+            return RunnerStatus(
+                state=RuntimeState.BLOCKED,
+                reason=reason,
+                permanent_content_error=state.held.permanent_content_error,
+            )
+        return RunnerStatus(
+            state=RuntimeState.STARTING if any(not state.ready for state in states) else RuntimeState.ACTIVE
+        )
 
     def _owned(self, state: _Partition) -> bool:
         return (
@@ -202,8 +239,15 @@ class KafkaRecordRunner:
         try:
             await self._client.start()
             self._started = True
-        except BaseException:
+        except BaseException as exc:
             await self._client.stop()
+            if isinstance(exc, KafkaTransportError):
+                cause = exc.__cause__
+                raise SubscriptionRuntimeError(
+                    RuntimeFailureCode.CONNECTION_UNAVAILABLE,
+                    transient=isinstance(cause, KafkaError)
+                    and (cause.retriable or isinstance(cause, KafkaTimeoutError)),
+                ) from None
             raise
 
     async def run(self) -> None:
@@ -222,9 +266,13 @@ class KafkaRecordRunner:
             await self._client.pause(partitions, expected_epoch=epoch)
         for partition in partitions:
             self._partitions[partition] = _Partition(partition=partition, epoch=epoch, closing=self._closing)
+        if epoch == self._client.epoch:
+            self._assignment_epoch = epoch
 
     async def on_partitions_revoked(self, partitions: frozenset[int], epoch: int) -> None:
         """Close admission and bound drain without waiting for the fetch loop."""
+        if self._assignment_epoch == epoch:
+            self._assignment_epoch = None
         states = [state for p, state in self._partitions.items() if p in partitions and state.epoch == epoch]
         for state in states:
             state.closing = True
@@ -248,6 +296,7 @@ class KafkaRecordRunner:
                     return
                 if not state.ready:
                     position = await self._positions.initialize(self._request(state))
+                    state.initialization = position
                     if position.status != PositionStatus.READY or position.assignment_epoch != state.epoch:
                         state.held = self._retry("initialization_unresolved")
                         return
