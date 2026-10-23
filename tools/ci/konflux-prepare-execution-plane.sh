@@ -4,10 +4,9 @@
 # deploy-ao (AO_EXECUTION_PLANE=true) already created myao-execution-plane-api
 # and myao-execution-plane-worker in the AO namespace. This script does not
 # deploy a sidecar EP. After AO is Ready it:
-#   1. Applies deploy/kubernetes/execution-target/rbac.yaml (dispatcher SA
-#      and Job namespace for Kind cluster-binding). In this pipeline the
-#      script runs from the syntara checkout, so the manifest falls back to
-#      the staged Execution Plane tree at ${HOME}/syntara-execution-plane.
+#   1. Verifies the execution-target pre-requisite (dispatcher SA and Job
+#      namespace); aap-dev applies it during deploy when
+#      AO_EXECUTION_PLANE=true (AAP-99675).
 #   2. Waits for the operator EP API and worker.
 #   3. Opens backend ingress from execution-plane-worker and allows the
 #      operator callback CN on the AO backend before EP starts posting.
@@ -30,11 +29,6 @@ export KUBECONFIG
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REPO_ROOT=$(cd "${SCRIPT_DIR}/../.." && pwd)
-EP_CHECKOUT="${EP_CHECKOUT:-${HOME}/syntara-execution-plane}"
-INIT_YAML="${INIT_YAML:-${REPO_ROOT}/deploy/kubernetes/execution-target/rbac.yaml}"
-if [[ ! -f "${INIT_YAML}" && -f "${EP_CHECKOUT}/deploy/kubernetes/execution-target/rbac.yaml" ]]; then
-  INIT_YAML="${EP_CHECKOUT}/deploy/kubernetes/execution-target/rbac.yaml"
-fi
 NAMESPACE="${NAMESPACE:-execution-plane}"
 AO_NAMESPACE="${AO_NAMESPACE:-aap27-next}"
 AO_NAME="${AO_NAME:-myao}"
@@ -50,10 +44,6 @@ WORK_DIR=""
 
 if [[ ! -f "${KUBECONFIG}" ]]; then
   echo "ERROR: kubeconfig not found: ${KUBECONFIG}" >&2
-  exit 1
-fi
-if [[ ! -f "${INIT_YAML}" ]]; then
-  echo "ERROR: init manifest not found: ${INIT_YAML}" >&2
   exit 1
 fi
 if [[ -n "${CREDENTIAL_REF}" && ! "${CREDENTIAL_REF}" =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]]; then
@@ -445,10 +435,7 @@ trap _cleanup EXIT
 
 _require_operator_ep_opt_in
 
-echo "=== Apply ${INIT_YAML} ==="
-kubectl apply -f "${INIT_YAML}"
-
-echo "=== Verify ${NAMESPACE} ==="
+echo "=== Verify ${NAMESPACE} (applied by aap-dev, AAP-99675) ==="
 kubectl get namespace "${NAMESPACE}"
 kubectl get serviceaccount "${SA_NAME}" -n "${NAMESPACE}"
 kubectl get role syntara-node-dispatcher -n "${NAMESPACE}"

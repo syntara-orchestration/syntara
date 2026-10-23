@@ -851,11 +851,11 @@ spec:
           description: |
             Run tools/ci/konflux-prepare-execution-plane.sh from the staged
             syntara-pipeline checkout. The operator already deployed EP via
-            aap-dev (AO_EXECUTION_PLANE=true). This task applies dispatcher
-            RBAC (rbac.yaml resolves from the staged execution-plane tree at
-            $HOME/syntara-execution-plane), registers the Kind cluster
-            through myao-execution-plane-api, pre-pulls the script-node
-            image, and points myao-worker at the operator EP.
+            aap-dev (AO_EXECUTION_PLANE=true), and aap-dev also applied the
+            execution-target pre-requisite (namespace + dispatcher RBAC from
+            the EP image, AAP-99675). This task verifies that RBAC, registers
+            the Kind cluster through myao-execution-plane-api, pre-pulls the
+            script-node image, and points myao-worker at the operator EP.
           params:
             - name: ssh-credentials-secret
               type: string
