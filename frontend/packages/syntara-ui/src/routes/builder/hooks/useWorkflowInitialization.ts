@@ -32,11 +32,16 @@ export function useWorkflowInitialization({
   const hasRunInitialLayoutRef = useRef(false)
   const workflowVersionRef = useRef(workflowVersion)
 
-  // Store latest callbacks in refs to avoid them being dependencies
+  // Store latest callbacks/nodes in refs to avoid them being dependencies
   const onLayoutRef = useRef(onLayout)
   useEffect(() => {
     onLayoutRef.current = onLayout
   }, [onLayout])
+
+  const nodesRef = useRef(nodes)
+  useEffect(() => {
+    nodesRef.current = nodes
+  }, [nodes])
 
   const onAfterInitialLayoutRef = useRef(onAfterInitialLayout)
   useEffect(() => {
@@ -73,7 +78,9 @@ export function useWorkflowInitialization({
   useEffect(() => {
     if (isInitialized && !hasRunInitialLayoutRef.current) {
       hasRunInitialLayoutRef.current = true
-      const hasStoredPositions = Object.keys(useWorkflowStore.getState().nodePositions).length > 0
+      const { nodePositions } = useWorkflowStore.getState()
+      const hasStoredPositions =
+        Object.keys(nodePositions).length > 0 && nodesRef.current.every((node) => nodePositions[node.id] != null)
       if (hasStoredPositions) {
         onAfterInitialLayoutRef.current?.()
         return
