@@ -51,7 +51,7 @@ import {
   INTEGRATION_TYPE_LABELS,
   PROVIDER_HINT_LABELS,
 } from './integrationFilters'
-import { getProviderHint, isLLMProvider } from './integrationUtils'
+import { getProviderHint, getStoredConfiguration, isLLMProvider } from './integrationUtils'
 import { formatBootstrapServers } from './kafkaBootstrapServers'
 import { DEFAULT_KAFKA_SASL_MECHANISM } from './kafkaSasl'
 import { useEditTestConnection } from './useEditTestConnection'
@@ -68,10 +68,27 @@ const CREDENTIAL_DESCRIPTION: Record<string, string> = {
     'This credential is the Kafka login used to verify that the brokers are reachable. Workflow credentials are configured separately in the workflow builder.',
 }
 
+function configurationFormFields(config: ReturnType<typeof getStoredConfiguration>) {
+  return {
+    base_url: config && 'base_url' in config ? String(config.base_url ?? '') : '',
+    bootstrap_servers:
+      config && 'bootstrap_servers' in config && Array.isArray(config.bootstrap_servers)
+        ? formatBootstrapServers(config.bootstrap_servers)
+        : '',
+    sasl_mechanism:
+      config && 'sasl_mechanism' in config && config.sasl_mechanism
+        ? config.sasl_mechanism
+        : DEFAULT_KAFKA_SASL_MECHANISM,
+    insecure_skip_tls_verify:
+      config && 'insecure_skip_tls_verify' in config ? Boolean(config.insecure_skip_tls_verify) : false,
+    ca_certificate: config && 'ca_certificate' in config ? (config.ca_certificate ?? null) : null,
+  }
+}
+
 function allowHttpForEdit(integration: IntegrationRead): boolean {
   if (integration.integration_type === IntegrationTypeEnum.KAFKA) return false
   const config = integration.configuration
-  if (!('allow_http' in config)) return false
+  if (!config || !('allow_http' in config)) return false
   return Boolean(config.allow_http)
 }
 
@@ -272,22 +289,14 @@ export function EditIntegrationForm() {
 
   const formValues = useMemo<EditIntegrationFormValues | undefined>(() => {
     if (!integration) return undefined
-    const config = integration.configuration
+    const config = getStoredConfiguration(integration)
     const projectIds = integration.scope === 'project' ? initialProjectIds : []
     return {
       name: integration.name ?? '',
       description: integration.description ?? '',
       integration_type: integration.integration_type ?? IntegrationTypeEnum.MCP_SERVER,
-      base_url: 'base_url' in config ? String(config.base_url ?? '') : '',
-      bootstrap_servers:
-        'bootstrap_servers' in config && Array.isArray(config.bootstrap_servers)
-          ? formatBootstrapServers(config.bootstrap_servers)
-          : '',
-      sasl_mechanism:
-        'sasl_mechanism' in config && config.sasl_mechanism ? config.sasl_mechanism : DEFAULT_KAFKA_SASL_MECHANISM,
+      ...configurationFormFields(config),
       allow_http: allowHttpForEdit(integration),
-      insecure_skip_tls_verify: 'insecure_skip_tls_verify' in config ? Boolean(config.insecure_skip_tls_verify) : false,
-      ca_certificate: 'ca_certificate' in config ? (config.ca_certificate ?? null) : null,
       scope: (integration.scope as 'global' | 'project') ?? 'global',
       project_ids: projectIds,
       management_credential_id: integration.management_credential_id ?? null,

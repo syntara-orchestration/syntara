@@ -10,6 +10,7 @@ from pydantic import ValidationError
 from syntara.integrations.models.integration import (
     Integration,
     IntegrationCreate,
+    IntegrationRead,
     IntegrationScope,
     IntegrationStatus,
     IntegrationSystemUpdate,
@@ -460,6 +461,51 @@ class TestKafkaConfiguration:
     def test_rejects_empty_list(self) -> None:
         with pytest.raises(ValidationError):
             KafkaConfiguration(bootstrap_servers=[])
+
+
+class TestIntegrationReadKafkaConfiguration:
+    """Kafka stays off the response configuration union."""
+
+    def test_moves_kafka_configuration_off_the_response_union(self) -> None:
+        read = IntegrationRead.model_validate(
+            {
+                "name": "Production Kafka",
+                "integration_type": "kafka",
+                "configuration": {
+                    "integration_type": "kafka",
+                    "bootstrap_servers": ["broker.example.com:9093"],
+                },
+            }
+        )
+        assert read.configuration is None
+        assert read.kafka_configuration is not None
+        assert read.kafka_configuration.bootstrap_servers == ["broker.example.com:9093"]
+
+    def test_reads_kafka_from_an_attribute_object(self) -> None:
+        class StoredIntegration:
+            name = "Production Kafka"
+            integration_type = IntegrationType.KAFKA
+            configuration = KafkaConfiguration(bootstrap_servers=["broker.example.com:9093"])
+
+        read = IntegrationRead.model_validate(StoredIntegration())
+        assert read.configuration is None
+        assert read.kafka_configuration is not None
+        assert read.kafka_configuration.bootstrap_servers == ["broker.example.com:9093"]
+
+    def test_leaves_other_configurations_in_place(self) -> None:
+        read = IntegrationRead.model_validate(
+            {
+                "name": "Docs MCP",
+                "integration_type": "mcp_server",
+                "configuration": {
+                    "integration_type": "mcp_server",
+                    "base_url": "https://example.com",
+                },
+            }
+        )
+        assert read.kafka_configuration is None
+        assert read.configuration is not None
+        assert read.configuration.base_url == "https://example.com"
 
 
 class TestIntegrationEnums:

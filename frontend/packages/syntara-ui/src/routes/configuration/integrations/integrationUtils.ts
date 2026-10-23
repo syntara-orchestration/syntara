@@ -17,8 +17,15 @@ const PROVIDER_DEFAULT_URLS: Record<string, string> = {
   [LLMProviderHintEnum.GEMINI]: 'https://generativelanguage.googleapis.com/v1',
 }
 
+export function getStoredConfiguration(integration: IntegrationRead) {
+  if (integration.integration_type === IntegrationTypeEnum.KAFKA) {
+    return integration.kafka_configuration ?? null
+  }
+  return integration.configuration
+}
+
 export function getBaseUrl(integration: IntegrationRead): string {
-  const config = integration.configuration
+  const config = getStoredConfiguration(integration)
   if (!config) return ''
   if ('base_url' in config) {
     if (config.base_url) return String(config.base_url)

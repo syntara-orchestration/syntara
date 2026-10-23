@@ -9,7 +9,11 @@ import styles from './IntegrationDetail.module.css'
 
 type IntegrationRead = IntegrationsAPI.components['schemas']['IntegrationRead']
 
-export function SecuritySection({ configuration }: Readonly<{ configuration: IntegrationRead['configuration'] }>) {
+export function SecuritySection({
+  configuration,
+}: Readonly<{
+  configuration: IntegrationRead['configuration'] | IntegrationRead['kafka_configuration']
+}>) {
   if (!configuration || !('allow_http' in configuration) || !('insecure_skip_tls_verify' in configuration)) {
     return null
   }

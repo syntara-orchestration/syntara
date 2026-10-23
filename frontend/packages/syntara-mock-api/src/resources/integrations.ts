@@ -259,7 +259,8 @@ export const integrations: IntegrationRead[] = [
     enabled: true,
     validation_status: IntegrationStatusEnum.AVAILABLE,
     scope: 'global',
-    configuration: {
+    configuration: null,
+    kafka_configuration: {
       integration_type: 'kafka',
       bootstrap_servers: ['broker.example.com:9093'],
       allow_http: false,

@@ -24,7 +24,9 @@ from syntara.core.utils.sqlmodel import DiscriminatedJSONB, postgres_enum_column
 from syntara.integrations.models.integration_configuration import (
     IntegrationConfiguration,
     IntegrationConfigurationInputTypes,
+    IntegrationConfigurationReadTypes,
     IntegrationConfigurationTypes,
+    KafkaConfiguration,
 )
 
 _ENABLED_DESCRIPTION = "Whether the integration is active"
@@ -386,6 +388,14 @@ class IntegrationCreate(SQLModel):
         return self
 
 
+def _is_kafka_configuration(config: object) -> bool:
+    if isinstance(config, KafkaConfiguration):
+        return True
+    if isinstance(config, dict):
+        return config.get("integration_type") == IntegrationType.KAFKA.value
+    return getattr(config, "integration_type", None) == IntegrationType.KAFKA.value
+
+
 class IntegrationRead(UserReferenceFieldsMixin, NamedResource, UserOwnedResource):
     """Schema for integration API responses."""
 
@@ -403,9 +413,44 @@ class IntegrationRead(UserReferenceFieldsMixin, NamedResource, UserOwnedResource
     enabled: bool = True
     validation_status: IntegrationStatus = IntegrationStatus.UNKNOWN
     scope: IntegrationScope = IntegrationScope.GLOBAL
-    configuration: IntegrationConfigurationTypes = Field(
-        description=_CONFIGURATION_DESCRIPTION, discriminator="integration_type"
+    configuration: IntegrationConfigurationReadTypes | None = Field(
+        description=_CONFIGURATION_DESCRIPTION,
+        discriminator="integration_type",
     )
+    kafka_configuration: KafkaConfiguration | None = Field(
+        default=None,
+        description=(
+            "Kafka broker configuration. Present only when integration_type is kafka, "
+            "so the configuration union above stays compatible with existing clients."
+        ),
+    )
+
+    @model_validator(mode="before")
+    @classmethod
+    def relocate_kafka_configuration(cls, data: Any) -> Any:  # noqa: ANN401 - Pydantic validator accepts arbitrary input
+        """Keep Kafka off the response configuration union.
+
+        Stored rows and create payloads put the Kafka object on configuration.
+        Responses expose it as kafka_configuration and leave configuration empty.
+        """
+        config = data.get("configuration") if isinstance(data, dict) else getattr(data, "configuration", None)
+        if not _is_kafka_configuration(config):
+            return data
+        if isinstance(data, dict):
+            relocated = dict(data)
+            relocated["configuration"] = None
+            relocated["kafka_configuration"] = config
+            return relocated
+        values: dict[str, Any] = {}
+        for name in cls.model_fields:
+            if name == "configuration":
+                values[name] = None
+            elif name == "kafka_configuration":
+                values[name] = config
+            elif hasattr(data, name):
+                values[name] = getattr(data, name)
+        return values
+
     management_credential_id: UUID | None = None
     last_validated_at: datetime | None = None
     validation_error: str | None = None
