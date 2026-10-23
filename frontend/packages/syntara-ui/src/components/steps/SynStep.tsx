@@ -176,7 +176,7 @@ export function SynStep(props: {
     ...(isSemanticZoom
       ? {
           borderWidth: 0,
-          ...props.style,
+          ...barRadiusStyle,
         }
       : {
           // Type indicator: top border in type color (structural, always present — not conditional on

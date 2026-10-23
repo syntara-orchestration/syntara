@@ -79,6 +79,31 @@ describe('SynStep semantic zoom', () => {
     expect(screen.getByRole('button', { name: 'Analyze, Task Agent' })).toBeInTheDocument()
   })
 
+  // AAP-92322: the trigger node's pill-shape style carries `paddingLeft` (so its detailed-view
+  // icon/text clear the rounded curve). In semantic zoom, only the border radius should reach the
+  // outer panel — `paddingLeft` must not leak there, or it insets the color-filled bar and leaves
+  // a gap of the panel's default background to the left of the pill shape.
+  it('does not leak non-radius style (e.g. paddingLeft) from a trigger-style pill onto the outer panel', () => {
+    viewportState.zoom = 0.5
+    renderWithFlow(
+      <SynStep
+        nodeProps={baseNodeProps}
+        topBarColor="var(--pf-t--global--color--nonstatus--blue--200)"
+        semanticZoomSummary={{ title: 'Start', typeLabel: 'Manual trigger' }}
+        rootTestId="node-panel"
+        style={{
+          borderTopLeftRadius: '75px',
+          borderBottomLeftRadius: '75px',
+          paddingLeft: '24px',
+        }}
+      >
+        <span>Detailed body</span>
+      </SynStep>
+    )
+
+    expect(screen.getByTestId('node-panel')).not.toHaveStyle({ paddingLeft: '24px' })
+  })
+
   it('semantic zoom layout has no accessibility violations', async () => {
     viewportState.zoom = 0.5
     const { container } = renderWithFlow(
