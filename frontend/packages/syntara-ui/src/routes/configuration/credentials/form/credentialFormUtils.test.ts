@@ -652,6 +652,29 @@ describe('buildEditInputs', () => {
     expect(result.oauth_token).toBe('new-token')
   })
 
+  it('keeps the Kafka password masked when only the username changes', () => {
+    const kafkaInputs = getTypeInputs(
+      makeCredentialType({
+        name: 'Kafka',
+        inputs: {
+          fields: [
+            { id: 'username', label: 'Username', type: 'string', secret: false },
+            { id: 'password', label: 'Password', type: 'string', secret: true },
+          ],
+          required: ['username', 'password'],
+        },
+      })
+    )
+
+    const result = buildEditInputs(
+      { username: 'updated-listener', password: ENCRYPTED_SENTINEL },
+      kafkaInputs,
+      new Set()
+    )
+
+    expect(result).toEqual({ username: 'updated-listener', password: ENCRYPTED_SENTINEL })
+  })
+
   it('returns inputs unchanged when typeInputs is null', () => {
     const inputs = { host: 'example.com' }
 

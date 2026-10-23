@@ -202,6 +202,93 @@ describe('useCredentialFormModal', () => {
     expect(result.current.form.getValues('name')).toBe('edited locally')
   })
 
+  it('patches in unmasked non-secret inputs once the credential detail fetch resolves', async () => {
+    // Simulates editing from the credentials list: the list row's `inputs` has every
+    // field masked as `$encrypted$` (list endpoint never decrypts), including the
+    // non-secret `username`. The single-credential detail endpoint returns the real
+    // username (only secret fields stay masked there).
+    const aapCredentialFromList: Credential = {
+      ...mockCredential,
+      id: 'cred-aap',
+      name: 'My AAP',
+      credential_type_id: 'type-aap',
+      inputs: { username: '$encrypted$', password: '$encrypted$' },
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(credentialsClient.useQuery).mockImplementation((_method: string, path: string): any => {
+      if (path === '/credentials/{credential_id}') {
+        return {
+          data: { ...aapCredentialFromList, inputs: { username: 'real-admin-user', password: '$encrypted$' } },
+          error: null,
+          isLoading: false,
+          isPending: false,
+          isError: false,
+          isFetching: false,
+          refetch: vi.fn(),
+        }
+      }
+      return typesQueryState
+    })
+
+    const { result } = renderCredentialModalHook({
+      isOpen: true,
+      credentialToEdit: aapCredentialFromList,
+      isEditMode: true,
+    })
+
+    // The list row's masked username is replaced with the real value from the
+    // detail fetch; the secret password field stays masked either way.
+    await waitFor(() => {
+      expect(result.current.form.getValues('inputs')).toEqual({
+        username: 'real-admin-user',
+        password: '$encrypted$',
+      })
+    })
+  })
+
+  it('does not patch inputs while the credential detail fetch is still loading', async () => {
+    const aapCredentialFromList: Credential = {
+      ...mockCredential,
+      id: 'cred-aap',
+      name: 'My AAP',
+      credential_type_id: 'type-aap',
+      inputs: { username: '$encrypted$', password: '$encrypted$' },
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(credentialsClient.useQuery).mockImplementation((_method: string, path: string): any => {
+      if (path === '/credentials/{credential_id}') {
+        return {
+          data: undefined,
+          error: null,
+          isLoading: true,
+          isPending: true,
+          isError: false,
+          isFetching: true,
+          refetch: vi.fn(),
+        }
+      }
+      return typesQueryState
+    })
+
+    const { result } = renderCredentialModalHook({
+      isOpen: true,
+      credentialToEdit: aapCredentialFromList,
+      isEditMode: true,
+    })
+
+    // No detail data yet, so the list-seeded (masked) values are left untouched
+    // rather than being cleared or overwritten with something incorrect.
+    await waitFor(() => {
+      expect(result.current.form.getValues('name')).toBe('My AAP')
+    })
+    expect(result.current.form.getValues('inputs')).toEqual({
+      username: '$encrypted$',
+      password: '$encrypted$',
+    })
+  })
+
   it('selects the auth method group when types finish loading in edit mode', async () => {
     const aapCredential: Credential = {
       ...mockCredential,

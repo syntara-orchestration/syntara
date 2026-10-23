@@ -88,6 +88,19 @@ def _validate_ssh_private_key(value: str) -> None:
         raise CredentialValidationError(msg) from None
 
 
+def _validate_min_length(field_id: str, value: Any, field_def: dict[str, Any]) -> None:  # noqa: ANN401
+    """Enforce an optional per-field ``min_length`` schema constraint.
+
+    Used by secret fields (e.g. Kafka's password) that must stay long enough
+    to be caught by credential_scrubber.MIN_SECRET_LENGTH-based value scrubbing
+    in workflow output — a value below that threshold is silently skipped there.
+    """
+    min_length = field_def.get("min_length")
+    if min_length is not None and isinstance(value, str) and len(value) < min_length:
+        msg = f"Field '{field_id}' must be at least {min_length} characters."
+        raise CredentialValidationError(msg)
+
+
 def _validate_field_value(field_id: str, value: Any, field_def: dict[str, Any]) -> None:  # noqa: ANN401
     """Validate a single field value against its schema definition."""
     choices = field_def.get("choices")
@@ -102,6 +115,8 @@ def _validate_field_value(field_id: str, value: Any, field_def: dict[str, Any]) 
     if field_def.get("type") == "string" and not isinstance(value, str):
         msg = f"Field '{field_id}' must be a string, got {type(value).__name__}"
         raise CredentialValidationError(msg)
+
+    _validate_min_length(field_id, value, field_def)
 
     if field_id == "ssh_private_key":
         _validate_ssh_private_key(value)
@@ -172,6 +187,39 @@ def _validate_field_constraints(inputs: dict[str, Any], type_inputs: dict[str, A
         raise CredentialValidationError(msg)
 
 
+def _reject_explicit_blank_required(
+    inputs: dict[str, Any],
+    required: set[str],
+    field_defs: dict[str, Any],
+    *,
+    allow_sentinel: bool,
+) -> None:
+    """Reject a required string that a PATCH sets to whitespace.
+
+    Omitted fields and the ``$encrypted$`` sentinel stay stored. This runs
+    only for PATCH, where the create-time required check is skipped.
+    """
+    if not allow_sentinel:
+        return
+    blank_required = sorted(
+        field_id
+        for field_id, value in inputs.items()
+        if field_id in required and _is_blank_required_string(field_id, value, field_defs)
+    )
+    if blank_required:
+        msg = f"Required field(s) cannot be blank: {', '.join(blank_required)}"
+        raise CredentialValidationError(msg)
+
+
+def _is_blank_required_string(field_id: str, value: Any, field_defs: dict[str, Any]) -> bool:  # noqa: ANN401
+    """Return True when a required string field holds only whitespace.
+
+    Scoped to type == "string" so boolean False and numeric 0 remain valid
+    "provided" values, consistent with _validate_field_constraints' _is_provided.
+    """
+    return field_defs.get(field_id, {}).get("type") == "string" and isinstance(value, str) and not value.strip()
+
+
 def _validate_inputs(
     inputs: dict[str, Any],
     type_inputs: dict[str, Any],
@@ -215,9 +263,11 @@ def _validate_inputs(
             )
             raise CredentialValidationError(msg)
 
+    _reject_explicit_blank_required(inputs, required, field_defs, allow_sentinel=allow_sentinel)
+
     # Check required fields — only on create (PATCH is partial, missing fields are preserved)
     if not allow_sentinel:
-        provided = {k for k, v in inputs.items() if v is not None}
+        provided = {k for k, v in inputs.items() if v is not None and not _is_blank_required_string(k, v, field_defs)}
         missing = required - provided
         if missing:
             msg = f"Missing required field(s): {', '.join(sorted(missing))}"

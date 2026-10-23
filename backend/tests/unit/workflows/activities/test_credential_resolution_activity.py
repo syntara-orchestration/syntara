@@ -1,7 +1,7 @@
 """Tests for credential resolution Temporal activity (T059)."""
 
 from unittest.mock import AsyncMock, MagicMock, patch
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from temporalio.exceptions import ApplicationError
@@ -404,3 +404,67 @@ class TestCrossProjectCredentialResolution:
 
         result = await resolve_workflow_credentials({ACTIVITY_ID: CREDENTIAL_ID})
         assert ACTIVITY_ID in result
+
+    @pytest.mark.asyncio
+    @patch("syntara.workflows.workflow_engine.activities.credential_resolution_activity._session_factory")
+    @patch("syntara.workflows.workflow_engine.activities.credential_resolution_activity.create_secret_service")
+    async def test_kafka_listener_resolves_only_the_step_credential(
+        self,
+        mock_create_ss: MagicMock,
+        mock_session_local: MagicMock,
+        mock_credential: MagicMock,
+    ) -> None:
+        """Listener runtime passes the step credential through SecretService and keeps the password."""
+        from syntara.credentials.models.credential import Credential
+        from syntara.credentials.models.credential_type import CredentialType
+        from syntara.workflows.workflow_engine.activities.credential_resolution_activity import (
+            resolve_workflow_credentials,
+        )
+
+        mock_credential.id = UUID(CREDENTIAL_ID)
+        kafka_type = MagicMock()
+        kafka_type.name = "Kafka"
+        kafka_type.inputs = {
+            "fields": [
+                {"id": "username", "secret": False},
+                {"id": "password", "secret": True},
+            ],
+        }
+        kafka_type.injectors = {
+            "extra_vars": {
+                "auth_type": "kafka_connection",
+                "kafka_username": "{{username}}",
+                "kafka_password": "{{password}}",
+            },
+            "env": {},
+            "file": {},
+        }
+
+        mock_session = AsyncMock()
+        mock_session_local.return_value.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session_local.return_value.__aexit__ = AsyncMock(return_value=False)
+        mock_result = MagicMock()
+        mock_result.one_or_none.return_value = mock_credential
+        mock_session.exec = AsyncMock(return_value=mock_result)
+
+        async def get(model: object, obj_id: object) -> MagicMock | None:
+            if model is CredentialType:
+                return kafka_type
+            if model is Credential and obj_id == mock_credential.id:
+                return mock_credential
+            return None
+
+        mock_session.get = AsyncMock(side_effect=get)
+        mock_ss = MagicMock()
+        mock_ss.retrieve_secret = AsyncMock(return_value={"username": "listener", "password": "  listener-secret  "})
+        mock_create_ss.return_value = mock_ss
+
+        result = await resolve_workflow_credentials({ACTIVITY_ID: CREDENTIAL_ID})
+
+        extra_vars = result[ACTIVITY_ID]["extra_vars"]
+        assert extra_vars["kafka_username"] == "listener"
+        assert extra_vars["kafka_password"] == "  listener-secret  "  # noqa: S105
+        assert result[ACTIVITY_ID]["_secret_values"] == ["  listener-secret  "]
+        assert mock_ss.retrieve_secret.await_count == 1
+        loaded_models = [call.args[0] for call in mock_session.get.await_args_list]
+        assert Credential not in loaded_models

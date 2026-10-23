@@ -57,6 +57,18 @@ export function useCredentialFormModal({
 
   const typesQuery = credentialsClient.useQuery('get', '/credential_types')
   const allTypes = useMemo(() => typesQuery.data?.resources ?? [], [typesQuery.data])
+
+  // The list endpoint masks every field (including non-secret ones like a Kafka
+  // username) as `$encrypted$` — it never decrypts for bulk listing. Only the
+  // single-credential detail endpoint unmasks non-secret fields. When editing was
+  // triggered from a list row, credentialToEdit.inputs is the masked list payload,
+  // so fetch the authoritative detail record here and patch inputs once it loads.
+  const credentialDetailQuery = credentialsClient.useQuery(
+    'get',
+    '/credentials/{credential_id}',
+    { params: { path: { credential_id: credentialToEdit?.id ?? '' } } },
+    { enabled: isOpen && isEditMode && !!credentialToEdit?.id }
+  )
   const types = useMemo(() => {
     if (!compatibleTypeNames?.length) return allTypes
     return allTypes.filter((t) => compatibleTypeNames.includes(t.name))
@@ -109,6 +121,16 @@ export function useCredentialFormModal({
       inputs: {},
     })
   }, [isOpen, resetKey, reset])
+
+  // Patch in the authoritative, non-list-masked inputs once the detail fetch
+  // resolves. Runs after the seed effect above (which may have briefly shown the
+  // list's masked $encrypted$ values for non-secret fields).
+  useEffect(() => {
+    if (!isOpen || !isEditMode) return
+    const detailInputs = credentialDetailQuery.data?.inputs
+    if (!detailInputs) return
+    setValue('inputs', detailInputs, { shouldValidate: false })
+  }, [isOpen, isEditMode, credentialDetailQuery.data, setValue])
 
   // Builder project can populate after the modal opens (new workflow header selection).
   useEffect(() => {

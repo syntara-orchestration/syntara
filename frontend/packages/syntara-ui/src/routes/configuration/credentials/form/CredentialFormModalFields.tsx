@@ -1,5 +1,6 @@
 import { Fragment } from 'react'
 
+import { FieldHelpPopover } from '../../../../components/FieldHelpPopover'
 import { FormFieldError } from '../../../../components/FormFieldError'
 import { SynForm } from '../../../../components/forms/SynForm'
 import { SynFormField } from '../../../../components/forms/SynFormField'
@@ -89,7 +90,7 @@ export function CredentialFormModalFields({ form, state }: Readonly<CredentialFo
         label="Credential type"
         fieldId="credential-type"
         isRequired
-        labelHelp={CREDENTIAL_TYPE_HELP}
+        labelHelp={<FieldHelpPopover headerContent="Credential type" helpText={CREDENTIAL_TYPE_HELP} />}
         hint={credentialTypeHint}
       >
         {({ field, fieldState }) => (

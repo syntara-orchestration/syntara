@@ -6,6 +6,7 @@ InjectorResolver for consumption by activity executors.
 """
 
 from typing import Any
+from uuid import UUID
 
 import structlog
 from sqlalchemy.exc import OperationalError
@@ -17,7 +18,14 @@ from temporalio.exceptions import ApplicationError
 from syntara.core.database.session import AsyncSessionLocal
 from syntara.core.lib.encryption import EncryptionError
 from syntara.core.services.secret_service import SecretService, create_secret_service
-from syntara.credentials.lib.injector_resolver import InjectorResolver
+from syntara.credentials.exceptions import CredentialValidationError
+from syntara.credentials.lib.auth_types import AUTH_TYPE_KAFKA_CONNECTION
+from syntara.credentials.lib.injector_resolver import InjectorResolver, ResolvedInjectors
+from syntara.credentials.lib.kafka_connection import (
+    KAFKA_CONNECTION_TYPE_NAME,
+    KafkaSecurityProtocol,
+    resolve_supplied_kafka_login,
+)
 from syntara.credentials.models.credential import Credential
 from syntara.credentials.models.credential_type import CredentialType
 from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName
@@ -135,6 +143,24 @@ async def _resolve_single_credential(
     except Exception as e:
         msg = f"Failed to resolve injector templates for credential '{credential.name}'"
         raise ApplicationError(msg, non_retryable=True) from e
+
+    if cred_type.name == KAFKA_CONNECTION_TYPE_NAME:
+        runtime_credential_id = credential.id if isinstance(credential.id, UUID) else UUID(str(credential.id))
+        try:
+            # decrypted_inputs is already this credential's secret. Applying the
+            # Kafka rules here avoids a second credential load and secret read.
+            login = resolve_supplied_kafka_login(
+                credential_id=runtime_credential_id,
+                decrypted_inputs=decrypted_inputs,
+                security_protocol=KafkaSecurityProtocol.SASL_SSL,
+            )
+        except CredentialValidationError as exc:
+            raise ApplicationError(str(exc), non_retryable=True) from exc
+        resolved_injectors = ResolvedInjectors(
+            extra_vars={"auth_type": AUTH_TYPE_KAFKA_CONNECTION, **(login or {})},
+            env=resolved_injectors.env,
+            file=resolved_injectors.file,
+        )
 
     logger.info(
         "Credential resolved",
