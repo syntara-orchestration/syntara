@@ -786,6 +786,42 @@ describe('IntegrationDetail', () => {
     })
   })
 
+  describe('Kafka', () => {
+    const mockKafkaIntegration: IntegrationRead = {
+      ...mockIntegration,
+      id: 'int-kafka',
+      name: 'Production Kafka',
+      description: 'Kafka cluster used for event listeners',
+      integration_type: 'kafka',
+      configuration: null,
+      kafka_configuration: {
+        integration_type: 'kafka',
+        bootstrap_servers: ['broker.example.com:9093', 'other.example.com:9092'],
+        allow_http: false,
+        insecure_skip_tls_verify: false,
+        ca_certificate: null,
+      },
+      enabled_tool_count: 0,
+      total_tool_count: 0,
+    }
+
+    it('shows bootstrap servers from kafka_configuration', () => {
+      setupDefaultMocks({ integration: mockKafkaIntegration })
+      render(<IntegrationDetail />, { wrapper })
+
+      expect(screen.getByText('Bootstrap servers')).toBeInTheDocument()
+      expect(screen.getByText('broker.example.com:9093, other.example.com:9092')).toBeInTheDocument()
+    })
+
+    it('shows Security section from kafka_configuration', () => {
+      setupDefaultMocks({ integration: mockKafkaIntegration })
+      render(<IntegrationDetail />, { wrapper })
+
+      expect(screen.getByText('Security')).toBeInTheDocument()
+      expect(screen.getByText('HTTPS only')).toBeInTheDocument()
+    })
+  })
+
   describe('Ansible Automation Platform', () => {
     const mockAapIntegration: IntegrationRead = {
       ...mockIntegration,

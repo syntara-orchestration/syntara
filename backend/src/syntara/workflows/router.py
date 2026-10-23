@@ -210,7 +210,12 @@ def get_workflow_service(
     FastAPI will call this function automatically, injecting all dependencies.
     This centralizes WorkflowService creation across all endpoints.
     """
-    return WorkflowService(db, current_user, request.app.state.authz_evaluator)
+    return WorkflowService(
+        db,
+        current_user,
+        request.app.state.authz_evaluator,
+        is_cert_authenticated=getattr(request.state, "is_cert_authenticated", False),
+    )
 
 
 def get_execution_service(

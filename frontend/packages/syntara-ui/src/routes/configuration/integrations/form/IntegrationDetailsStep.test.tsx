@@ -104,6 +104,30 @@ function TestWrapper({
   )
 }
 
+function KafkaTestWrapper() {
+  const form = useForm<IntegrationFormData>({
+    defaultValues: {
+      name: '',
+      description: '',
+      integration_type: IntegrationTypeEnum.KAFKA,
+      configuration: {
+        integration_type: IntegrationTypeEnum.KAFKA,
+        bootstrap_servers: '',
+        sasl_mechanism: 'SCRAM-SHA-256',
+        allow_http: false,
+        insecure_skip_tls_verify: false,
+      },
+      scope: 'global',
+      project_ids: [],
+    },
+  })
+  return (
+    <SynForm form={form}>
+      <IntegrationDetailsStep setValue={form.setValue} onTypeChange={vi.fn()} />
+    </SynForm>
+  )
+}
+
 describe('IntegrationDetailsStep', () => {
   it('renders heading and description', () => {
     render(<TestWrapper />)
@@ -369,6 +393,26 @@ describe('IntegrationDetailsStep', () => {
       expect(textarea).toHaveValue('')
     })
 
+    it('has no accessibility violations with Kafka selected', async () => {
+      const { container } = render(<KafkaTestWrapper />)
+
+      let results: Awaited<ReturnType<typeof axe>>
+      await act(async () => {
+        results = await axe(container)
+      })
+      expect(results!).toHaveNoViolations()
+    })
+
+    it('hides Allow HTTP for Kafka so the connection stays SASL_SSL', async () => {
+      const user = userEvent.setup()
+      render(<KafkaTestWrapper />)
+
+      await user.click(screen.getByText('Security'))
+
+      expect(screen.queryByRole('checkbox', { name: /allow http connections/i })).not.toBeInTheDocument()
+      expect(screen.getByRole('checkbox', { name: /disable tls certificate verification/i })).toBeInTheDocument()
+    })
+
     it('renders security section for AAP type', async () => {
       const user = userEvent.setup()
       render(<TestWrapper defaultType={IntegrationTypeEnum.ANSIBLE_AUTOMATION_PLATFORM} />)
@@ -413,6 +457,31 @@ describe('IntegrationDetailsStep', () => {
       await user.click(screen.getByRole('checkbox', { name: /disable tls certificate verification/i }))
       expect(screen.getByRole('textbox', { name: /ca certificate/i })).toBeInTheDocument()
       expect(screen.queryByText(/will not be verified/)).not.toBeInTheDocument()
+    })
+  })
+
+  describe('Kafka', () => {
+    it('shows bootstrap servers and the SASL mechanism instead of an API URL', () => {
+      render(<KafkaTestWrapper />)
+
+      expect(screen.getByRole('textbox', { name: 'Name' })).toBeInTheDocument()
+      expect(screen.getByRole('textbox', { name: 'Bootstrap servers' })).toHaveValue('')
+      expect(screen.getByText('SCRAM-SHA-256')).toBeInTheDocument()
+      expect(screen.queryByRole('textbox', { name: /api url/i })).not.toBeInTheDocument()
+    })
+
+    it('edits the broker list and SASL mechanism', async () => {
+      const user = userEvent.setup()
+      render(<KafkaTestWrapper />)
+
+      const brokers = screen.getByRole('textbox', { name: 'Bootstrap servers' })
+      await user.type(brokers, 'broker.example.com:9093')
+      expect(brokers).toHaveValue('broker.example.com:9093')
+
+      await user.click(screen.getByText('SCRAM-SHA-256'))
+      await user.click(screen.getByRole('option', { name: 'SCRAM-SHA-512' }))
+
+      expect(screen.getByText('SCRAM-SHA-512')).toBeInTheDocument()
     })
   })
 

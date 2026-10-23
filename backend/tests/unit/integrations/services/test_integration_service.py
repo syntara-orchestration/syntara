@@ -95,7 +95,7 @@ class TestCreateIntegration:
         result = await integration_service.create_integration(data)
 
         assert result.integration_type == IntegrationType.LLM_PROVIDER
-        assert result.configuration.base_url == "http://localhost:11434"
+        assert result.configuration.base_url == "http://localhost:11434"  # type: ignore[union-attr]
         assert result.configuration.provider_hint == "custom"  # type: ignore[union-attr]
 
     @pytest.mark.asyncio
@@ -112,6 +112,7 @@ class TestCreateIntegration:
         result = await integration_service.create_integration(data)
 
         assert result.integration_type == IntegrationType.ANSIBLE_AUTOMATION_PLATFORM
+        assert result.configuration is not None
         assert result.configuration.base_url == "https://gateway.example.com"
         assert result.configuration.insecure_skip_tls_verify is True
 
@@ -587,7 +588,7 @@ class TestPatchIntegration:
         )
 
         result = await integration_service.update_integration(created.id, patch)
-        assert result.configuration.base_url == "https://updated.example.com"
+        assert result.configuration.base_url == "https://updated.example.com"  # type: ignore[union-attr]
 
     @pytest.mark.asyncio
     async def test_patch_not_found_raises(
@@ -768,7 +769,7 @@ class TestIntegrationSsrfValidation:
         settings = type("S", (), {"integration_url_allowed_hosts": ["localhost"]})()
         with patch("syntara.integrations.lib.url_validation.get_settings", return_value=settings):
             result = await integration_service.create_integration(data)
-        assert result.configuration.base_url == "http://localhost:8080"
+        assert result.configuration.base_url == "http://localhost:8080"  # type: ignore[union-attr]
 
     @pytest.mark.asyncio
     async def test_create_allows_loopback_when_allowlisted_with_default_allow_http(
@@ -788,7 +789,7 @@ class TestIntegrationSsrfValidation:
         settings = type("S", (), {"integration_url_allowed_hosts": ["localhost"]})()
         with patch("syntara.integrations.lib.url_validation.get_settings", return_value=settings):
             result = await integration_service.create_integration(data)
-        assert result.configuration.base_url == "http://localhost:8080"
+        assert result.configuration.base_url == "http://localhost:8080"  # type: ignore[union-attr]
 
     @pytest.mark.asyncio
     async def test_patch_rejects_cloud_metadata(

@@ -21,8 +21,17 @@ from syntara.core.services import BaseService
 from syntara.core.services.extensions import ConvertResourceMixin
 from syntara.core.services.secret_service import SecretService
 from syntara.core.services.user_reference_resolution import UserReferenceResolverMixin
-from syntara.credentials.exceptions import CredentialDisabledError
+from syntara.credentials.exceptions import (
+    CredentialDecryptionError,
+    CredentialDisabledError,
+    CredentialValidationError,
+)
 from syntara.credentials.lib.injector_resolver import InjectorResolver
+from syntara.credentials.lib.kafka_connection import (
+    KAFKA_CONNECTION_TYPE_NAME,
+    KafkaSecurityProtocol,
+    resolve_connector_kafka_login,
+)
 from syntara.integrations.adapters.factory import create_health_check_adapter
 from syntara.integrations.adapters.protocol import (
     DiscoveredLLMModel,
@@ -78,12 +87,14 @@ ALLOWED_CREDENTIAL_TYPES: dict[IntegrationType, frozenset[str]] = {
     IntegrationType.MCP_SERVER: frozenset({"HTTP Bearer Token"}),
     IntegrationType.LLM_PROVIDER: frozenset({"LLM Provider"}),
     IntegrationType.ANSIBLE_AUTOMATION_PLATFORM: frozenset({"Ansible Automation Platform"}),
+    IntegrationType.KAFKA: frozenset({"Kafka"}),
 }
 
 CREDENTIAL_REQUIRED_TYPES: frozenset[IntegrationType] = frozenset(
     {
         IntegrationType.LLM_PROVIDER,
         IntegrationType.ANSIBLE_AUTOMATION_PLATFORM,
+        IntegrationType.KAFKA,
     }
 )
 
@@ -396,7 +407,7 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
         )
 
     def _validate_configuration_ssrf(self, configuration: IntegrationConfigurationInputTypes) -> None:
-        """Reject a base_url that resolves to a private, reserved, or cloud metadata address.
+        """Reject an address that resolves to a private, reserved, or cloud metadata address.
 
         Called at write time (create/patch) and again in this service's outbound
         entrypoints (discover/validate/refresh) as defense in depth against DNS re-pointing.
@@ -412,7 +423,8 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
         try:
             validate_integration_configuration_no_ssrf(configuration)
         except ValueError as e:
-            msg = "base_url must not resolve to a private, reserved, or cloud metadata address."
+            target = "bootstrap_servers" if getattr(configuration, "bootstrap_servers", None) else "base_url"
+            msg = f"{target} must not resolve to a private, reserved, or cloud metadata address."
             raise SafeValueError(msg) from e
 
     async def create_integration(self, data: IntegrationCreate) -> IntegrationRead:
@@ -709,19 +721,31 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
         Raises:
             IntegrationCredentialNotFoundError: If the credential or its type is not found.
             CredentialDisabledError: If the credential is disabled.
+            CredentialValidationError: If a Kafka-backed credential fails its login rules.
+            CredentialDecryptionError: If the credential's secret cannot be decrypted.
             RuntimeError: If SecretService is not available.
 
         """
-        if self._secret_service is None:
+        secret_service = self._secret_service
+        if secret_service is None:
             msg = "SecretService is required for credential resolution"
             raise RuntimeError(msg)
 
         credential, cred_type = await fetch_credential_with_type(self.session, credential_id)
         if not credential.enabled:
             raise CredentialDisabledError(credential.name)
+        if cred_type.name == KAFKA_CONNECTION_TYPE_NAME:
+            logger.debug("Resolving Kafka management credential", credential_id=str(credential_id))
+            login = await resolve_connector_kafka_login(
+                self.session,
+                secret_service,
+                management_credential_id=credential_id,
+                security_protocol=KafkaSecurityProtocol.SASL_SSL,
+            )
+            return dict(login or {})
         logger.debug("Resolving credential", credential_id=str(credential_id), credential_type=cred_type.name)
         # fetch_credential_with_type raises if secret_id is None
-        decrypted_inputs = await self._secret_service.retrieve_secret(credential.secret_id)  # type: ignore[arg-type]
+        decrypted_inputs = await secret_service.retrieve_secret(credential.secret_id)  # type: ignore[arg-type]
         resolved = InjectorResolver.resolve(cred_type.injectors or {}, decrypted_inputs)
         return resolved.extra_vars
 
@@ -849,7 +873,7 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
         if integration.management_credential_id:
             try:
                 resolved_credential = await self._resolve_credential(integration.management_credential_id)
-            except CredentialDisabledError as exc:
+            except (CredentialDisabledError, CredentialValidationError, CredentialDecryptionError) as exc:
                 await self._fail_validation(integration, exc)
 
         integration.validation_status = IntegrationStatus.VALIDATING
@@ -857,12 +881,13 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
         await self.session.commit()
 
         timeout_seconds: int = await get_runtime_settings().get("integrations.connection_test_timeout_seconds")
-        # Re-check at call time (defense in depth): the stored base_url passed the write-time
-        # check, but DNS could have been re-pointed to a private/metadata target since.
-        self._validate_configuration_ssrf(integration.configuration)
-        adapter = create_health_check_adapter(integration.integration_type, integration.configuration)
 
         try:
+            # Inside the handler that persists ERROR. A broker DNS/SSRF failure
+            # raises, and leaving it here would skip that update and leave the
+            # row in VALIDATING. Build the adapter only after that check.
+            self._validate_configuration_ssrf(integration.configuration)
+            adapter = create_health_check_adapter(integration.integration_type, integration.configuration)
             result = await adapter.validate(resolved_credential, timeout_seconds)
 
             integration = await self._get_or_raise(integration_id, for_update=True)
@@ -991,7 +1016,7 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
         if integration.management_credential_id:
             try:
                 resolved_credential = await self._resolve_credential(integration.management_credential_id)
-            except CredentialDisabledError as exc:
+            except (CredentialDisabledError, CredentialValidationError, CredentialDecryptionError) as exc:
                 await self._fail_refresh(integration, exc)
 
         integration.refresh_status = IntegrationRefreshStatus.REFRESHING
@@ -999,13 +1024,13 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
         await self.session.commit()
 
         timeout_seconds: int = await get_runtime_settings().get("integrations.connection_test_timeout_seconds")
-        # Re-check at call time (defense in depth): the stored base_url passed the write-time
-        # check, but DNS could have been re-pointed to a private/metadata target since.
-        self._validate_configuration_ssrf(integration.configuration)
-        adapter = create_health_check_adapter(integration.integration_type, integration.configuration)
 
         synced = updated = missing = 0
         try:
+            # Same placement as validate: a DNS/SSRF failure must reach the
+            # handler that records refresh ERROR instead of leaving REFRESHING.
+            self._validate_configuration_ssrf(integration.configuration)
+            adapter = create_health_check_adapter(integration.integration_type, integration.configuration)
             discover_result = await adapter.discover(resolved_credential, timeout_seconds)
 
             if not discover_result.success:

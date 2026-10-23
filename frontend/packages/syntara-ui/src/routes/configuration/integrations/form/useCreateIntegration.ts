@@ -11,6 +11,7 @@ import { detachPromise } from '../../../../utils/detachPromise'
 import { useProjectAssignmentSync } from '../useProjectAssignmentSync'
 
 import type { IntegrationFormData } from './integrationFormSchema'
+import { toApiConfiguration } from './integrationFormSchema'
 
 type UseCreateIntegrationOptions = {
   handleError: ReturnType<typeof useFormMutationErrorHandler>
@@ -51,7 +52,7 @@ export function useCreateIntegration({ handleError, onBeforeNavigate }: UseCreat
                 name: formData.name,
                 description: formData.description ?? undefined,
                 integration_type: formData.integration_type,
-                configuration: formData.configuration,
+                configuration: toApiConfiguration(formData.configuration),
                 management_credential_id: formData.management_credential_id ?? undefined,
                 scope: formData.scope,
                 discovered_tools:

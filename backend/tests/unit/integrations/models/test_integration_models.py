@@ -10,6 +10,7 @@ from pydantic import ValidationError
 from syntara.integrations.models.integration import (
     Integration,
     IntegrationCreate,
+    IntegrationRead,
     IntegrationScope,
     IntegrationStatus,
     IntegrationSystemUpdate,
@@ -18,6 +19,7 @@ from syntara.integrations.models.integration import (
 )
 from syntara.integrations.models.integration_configuration import (
     AAPConfiguration,
+    KafkaConfiguration,
     LLMProviderConfiguration,
     MCPServerConfiguration,
 )
@@ -435,6 +437,77 @@ class TestIntegrationCreateDiscoveredModels:
         assert data.discovered_models == []
 
 
+class TestKafkaConfiguration:
+    """Kafka broker address validation."""
+
+    def test_normalizes_host_port(self) -> None:
+        config = KafkaConfiguration(bootstrap_servers=[" broker.example.com:9093 ", "other.example.com:9092"])
+        assert config.bootstrap_servers == ["broker.example.com:9093", "other.example.com:9092"]
+        assert config.integration_type == "kafka"
+        assert config.sasl_mechanism == "SCRAM-SHA-256"
+
+    def test_rejects_sasl_plaintext(self) -> None:
+        with pytest.raises(ValidationError, match="SASL_PLAINTEXT"):
+            KafkaConfiguration(bootstrap_servers=["broker.example.com:9093"], allow_http=True)
+
+    def test_accepts_plain_mechanism(self) -> None:
+        config = KafkaConfiguration(bootstrap_servers=["broker.example.com:9093"], sasl_mechanism="PLAIN")
+        assert config.sasl_mechanism == "PLAIN"
+
+    def test_rejects_missing_port(self) -> None:
+        with pytest.raises(ValidationError, match="host:port"):
+            KafkaConfiguration(bootstrap_servers=["broker.example.com"])
+
+    def test_rejects_empty_list(self) -> None:
+        with pytest.raises(ValidationError):
+            KafkaConfiguration(bootstrap_servers=[])
+
+
+class TestIntegrationReadKafkaConfiguration:
+    """Kafka stays off the response configuration union."""
+
+    def test_moves_kafka_configuration_off_the_response_union(self) -> None:
+        read = IntegrationRead.model_validate(
+            {
+                "name": "Production Kafka",
+                "integration_type": "kafka",
+                "configuration": {
+                    "integration_type": "kafka",
+                    "bootstrap_servers": ["broker.example.com:9093"],
+                },
+            }
+        )
+        assert read.configuration is None
+        assert read.kafka_configuration is not None
+        assert read.kafka_configuration.bootstrap_servers == ["broker.example.com:9093"]
+
+    def test_reads_kafka_from_an_attribute_object(self) -> None:
+        class StoredIntegration:
+            name = "Production Kafka"
+            integration_type = IntegrationType.KAFKA
+            configuration = KafkaConfiguration(bootstrap_servers=["broker.example.com:9093"])
+
+        read = IntegrationRead.model_validate(StoredIntegration())
+        assert read.configuration is None
+        assert read.kafka_configuration is not None
+        assert read.kafka_configuration.bootstrap_servers == ["broker.example.com:9093"]
+
+    def test_leaves_other_configurations_in_place(self) -> None:
+        read = IntegrationRead.model_validate(
+            {
+                "name": "Docs MCP",
+                "integration_type": "mcp_server",
+                "configuration": {
+                    "integration_type": "mcp_server",
+                    "base_url": "https://example.com",
+                },
+            }
+        )
+        assert read.kafka_configuration is None
+        assert read.configuration is not None
+        assert read.configuration.base_url == "https://example.com"
+
+
 class TestIntegrationEnums:
     """Tests for integration enum values."""
 
@@ -442,6 +515,7 @@ class TestIntegrationEnums:
         assert IntegrationType.MCP_SERVER.value == "mcp_server"
         assert IntegrationType.LLM_PROVIDER.value == "llm_provider"
         assert IntegrationType.ANSIBLE_AUTOMATION_PLATFORM.value == "ansible_automation_platform"
+        assert IntegrationType.KAFKA.value == "kafka"
 
     def test_integration_status_values(self) -> None:
         assert IntegrationStatus.UNKNOWN.value == "unknown"

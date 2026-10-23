@@ -542,9 +542,28 @@ class TestAllowedTriggerTypes:
         assert {
             ActivityName.MANUAL_TRIGGER,
             ActivityName.EDA_TRIGGER,
+            ActivityName.EVENT_SUBSCRIBE_TRIGGER,
             ActivityName.SCHEDULED_TRIGGER,
             ActivityName.WEBHOOK_TRIGGER,
         } == ALLOWED_TRIGGER_TYPES
+
+    async def test_event_subscribe_selected_trigger_namespace(self, request: pytest.FixtureRequest) -> None:
+        """The ordinary trigger path exposes mapped output under both namespaces."""
+        temporal_workflow = request.getfixturevalue("_mock_temporal_workflow")
+        backend = InMemoryGraphBackend()
+        backend.add_node("incoming", {"id": "incoming", "type": "event_subscribe_trigger", "parameters": {}})
+        backend.add_node("manual", {"id": "manual", "type": "manual_trigger", "parameters": {}})
+        graph = WorkflowGraph(backend)
+        wf = _make_workflow()
+        output = {"payload": {"count": 2}, "metadata": {"offset": "9007199254740993"}}
+        temporal_workflow.execute_activity.return_value = {"output": output}
+        await wf._execute_trigger("incoming", output, graph, {})
+        assert wf.resolver.resolve_value("${trigger.payload.count}") == 2
+        assert wf.resolver.resolve_value("${incoming.metadata.offset}") == "9007199254740993"
+        assert "manual" in wf.skipped_nodes
+        assert "incoming" not in wf.skipped_nodes
+        assert {node.id for node in graph.get_trigger_nodes()} == {"incoming", "manual"}
+        assert temporal_workflow.execute_activity.call_args.args[0] == "event_subscribe_trigger"
 
 
 class TestLoopBodyCompleteEdgeCases:

@@ -34,10 +34,10 @@ def validate_integration_url_no_ssrf(url: str, *, allow_http: bool = False) -> N
 
 
 def validate_integration_configuration_no_ssrf(configuration: object) -> None:
-    """Apply the integration SSRF policy to a configuration's ``base_url``.
+    """Apply the integration SSRF policy to a configuration's address.
 
     Single choke point routed through by every boundary that turns a stored
-    integration base_url into an outbound request — write time (create/patch) and
+    integration address into an outbound request — write time (create/patch) and
     each runtime resolve/connect path (AAP proxy, workflow AAP resolution, LLM
     invocation, MCP tool connect). It reads ``base_url`` and the per-type
     ``allow_http`` flag off the configuration and delegates to
@@ -49,19 +49,28 @@ def validate_integration_configuration_no_ssrf(configuration: object) -> None:
     created before write-time validation existed.
 
     Configurations without a ``base_url`` (e.g. an LLM provider using its default
-    endpoint) are a no-op.
+    endpoint) are a no-op, unless they expose ``bootstrap_servers``. Each Kafka
+    broker is checked as ``https://host:port``, or ``http://host:port`` when
+    ``allow_http`` is set.
 
     Args:
-        configuration: An integration configuration exposing ``base_url`` and,
-            optionally, ``allow_http``.
+        configuration: An integration configuration exposing ``base_url`` or
+            ``bootstrap_servers``, and optionally ``allow_http``.
 
     Raises:
-        ValueError: If the base_url resolves to a private, reserved, or cloud
+        ValueError: If an address resolves to a private, reserved, or cloud
             metadata address (and is not allowlisted).
 
     """
-    base_url = getattr(configuration, "base_url", None)
-    if not base_url:
-        return
     allow_http = bool(getattr(configuration, "allow_http", False))
-    validate_integration_url_no_ssrf(base_url, allow_http=allow_http)
+    base_url = getattr(configuration, "base_url", None)
+    if base_url:
+        validate_integration_url_no_ssrf(base_url, allow_http=allow_http)
+        return
+
+    bootstrap_servers = getattr(configuration, "bootstrap_servers", None)
+    if not bootstrap_servers:
+        return
+    scheme = "http" if allow_http else "https"
+    for server in bootstrap_servers:
+        validate_integration_url_no_ssrf(f"{scheme}://{server}", allow_http=allow_http)
