@@ -202,8 +202,6 @@ export default tseslint.config(
       '**/components/SynLink.tsx',
       '**/components/layout/SynPageBreadcrumbs.tsx',
       '**/routes/builder/HistoryListItemLink.tsx',
-      '**/app/AppDockedNav.tsx',
-      '**/app/AppMobileMasthead.tsx',
     ],
     rules: {
       '@typescript-eslint/no-restricted-imports': 'off',

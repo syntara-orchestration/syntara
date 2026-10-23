@@ -72,7 +72,6 @@ export function WorkflowsListView({
       tabKey={tabKey}
       tabLabel={tabLabel}
       isPending={isPending}
-      // Omit isFetching: workflows table does not skeleton on refetch; dimming the filter bar flickers on nav.
       error={error}
       errorTitle="Error loading workflows"
       onRetry={onRetry}

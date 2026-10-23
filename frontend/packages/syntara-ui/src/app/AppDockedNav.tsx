@@ -30,6 +30,7 @@ import {
   RhUiProfileFillIcon,
   RhUiQuestionMarkCircleIcon,
 } from '@patternfly/react-icons'
+// eslint-disable-next-line @typescript-eslint/no-restricted-imports -- MastheadLogo needs a plain anchor; SynLink adds PF Button styling
 import { Link, useNavigate, useRouterState } from '@tanstack/react-router'
 import { useMemo, useRef, useState } from 'react'
 
@@ -275,18 +276,12 @@ export function AppDockedNav() {
           </MastheadToggle>
           <MastheadBrand>
             <MastheadLogo component={MastheadHomeLink} aria-label="Home" isCompact>
-              <Brand
-                src={brand.logoCollapsed}
-                alt={brand.appTitle}
-                heights={{ default: '37px' }}
-                data-testid="brand-logo"
-              />
+              <Brand src={brand.logoCollapsed} alt={brand.appTitle} data-testid="brand-logo" />
             </MastheadLogo>
             <MastheadLogo component={MastheadHomeLink} aria-label="Home">
               <Brand
                 src={colorScheme === 'dark' ? brand.logoExpandedDark : brand.logoExpandedLight}
                 alt={brand.appTitle}
-                heights={{ default: '37px' }}
                 data-testid="brand-logo"
               />
             </MastheadLogo>
