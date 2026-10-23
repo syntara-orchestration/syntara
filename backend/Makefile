@@ -61,6 +61,24 @@ install: _deps-install-dev _deps-install-pre-commit ## Complete setup from scrat
 .PHONY: check-deps
 check-deps: _check-dependency-binaries _ensure-secrets ## Check if all dependencies are available
 
+.PHONY: check-system-deps
+check-system-deps: ## Check system-level dependencies
+	@echo "🔍 Checking system dependencies..."
+	@python3 -c "import magic" 2>/dev/null || { \
+		echo ""; \
+		echo "❌ Error: libmagic C library is not installed"; \
+		echo ""; \
+		echo "   libmagic is required by the python-magic package for file type detection."; \
+		echo ""; \
+		echo "   Install it with:"; \
+		echo "     • macOS:  brew install libmagic"; \
+		echo "     • Ubuntu: apt-get install libmagic1"; \
+		echo "     • Fedora: dnf install file-libs"; \
+		echo ""; \
+		exit 1; \
+	}
+	@echo "✅ System dependencies are installed"
+
 _deps-install-dev: _check-uv
 	@echo "📦 Installing development dependencies with uv..."
 	uv sync --extra dev
@@ -240,8 +258,23 @@ endif
 
 # Development workflow
 # ========================================================
+
+.PHONY: wait-for-temporal
+wait-for-temporal: ## Wait for Temporal server to be ready
+	@echo "⏳ Waiting for Temporal to be ready..."
+	@timeout=60; elapsed=0; \
+	while ! nc -z localhost 7233 2>/dev/null; do \
+		if [ $$elapsed -ge $$timeout ]; then \
+			echo "❌ Temporal failed to become ready after $${timeout}s"; \
+			exit 1; \
+		fi; \
+		sleep 1; \
+		elapsed=$$((elapsed + 1)); \
+	done
+	@echo "✅ Temporal is ready"
+
 .PHONY: db-seed
-db-seed: check-deps ## Run all required database seeders
+db-seed: check-deps wait-for-temporal ## Run all required database seeders
 	@echo "🌱 Seeding database..."
 	@uv run python -m syntara.seed
 	@echo "✅ Seeding complete"
@@ -259,7 +292,7 @@ db-seed-all: check-deps ## Run all database seeders including dev samples
 	@echo "✅ Seeding complete"
 
 .PHONY: dev
-dev: check-deps _ensure-secrets _ensure-certs ## Run development server with auto-reload
+dev: check-deps check-system-deps _ensure-secrets _ensure-certs ## Run development server with auto-reload
 	@echo "🔄 Running database migrations..."
 	@APP_ADMIN_PASSWORD_PATH=.secrets/admin-password uv run alembic upgrade head
 	@$(MAKE) db-seed
