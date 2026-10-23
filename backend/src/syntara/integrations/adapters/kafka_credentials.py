@@ -14,9 +14,11 @@ def resolve_kafka_authentication(resolved_credential: Mapping[str, object]) -> t
     Returned values stay in the caller's local scope. Errors contain no field
     values, and neither credential contents nor ciphertext become revision data.
     """
-    username = str(resolved_credential.get(_KAFKA_USERNAME_KEY) or "").strip()
-    password = str(resolved_credential.get(_KAFKA_PASSWORD_KEY) or "").strip()
-    if not username or not password:
+    username_value = resolved_credential.get(_KAFKA_USERNAME_KEY)
+    password_value = resolved_credential.get(_KAFKA_PASSWORD_KEY)
+    username = username_value.strip() if isinstance(username_value, str) else ""
+    password = password_value if isinstance(password_value, str) else ""
+    if not username or not password.strip():
         msg = "Authentication configuration is incomplete"
         raise SafeValueError(msg)
     return username, password

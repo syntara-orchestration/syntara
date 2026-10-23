@@ -246,13 +246,10 @@ def _sasl_login(resolved_credential: dict[str, Any]) -> tuple[str, str] | None:
     ``strip()`` is only the blank check for the password. The value sent to
     the broker keeps any leading or trailing whitespace.
     """
-    username_value = resolved_credential.get(_KAFKA_USERNAME_KEY)
-    password_value = resolved_credential.get(_KAFKA_PASSWORD_KEY)
-    username = username_value.strip() if isinstance(username_value, str) else ""
-    password = password_value if isinstance(password_value, str) else ""
-    if not username or not password.strip():
+    try:
+        return resolve_kafka_authentication(resolved_credential)
+    except SafeValueError:
         return None
-    return username, password
 
 
 def _classify_kafka_error(exc: KafkaError) -> tuple[HealthCheckErrorType, str]:
