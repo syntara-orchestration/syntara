@@ -310,7 +310,7 @@ function FormPromptFormFields({
       timeoutSectionTitle=""
       timeoutLabel="Expected duration (seconds)"
       timeoutDefaultSeconds={600}
-      timeoutHelp="Show a 'Running long' warning after this duration. Does not stop the run. System default: 10m."
+      timeoutHelp="Saved on the node with the workflow. This is not the form submission window and does not stop the run. System default: 10m."
     />
   )
 

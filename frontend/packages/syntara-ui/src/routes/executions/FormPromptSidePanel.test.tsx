@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
+import { FORM_PROMPT_RESPOND_PANEL_TITLE } from './formPrompt/formPromptRespondPanelConstants'
 import { FormPromptSidePanel } from './FormPromptSidePanel'
 
 vi.mock('./FormPromptResponseContent', () => ({
@@ -28,7 +29,8 @@ describe('FormPromptSidePanel', () => {
       <FormPromptSidePanel executionId="exec-1" formPrompt={mockFormPrompt} onClose={vi.fn()} onSubmitted={vi.fn()} />
     )
 
-    expect(screen.getByRole('heading', { name: 'Respond to prompt' })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: FORM_PROMPT_RESPOND_PANEL_TITLE })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: FORM_PROMPT_RESPOND_PANEL_TITLE })).toBeInTheDocument()
     expect(screen.getByLabelText('Form prompt response')).toHaveTextContent('Prompt fp-1')
   })
 

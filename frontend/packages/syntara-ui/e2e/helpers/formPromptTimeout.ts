@@ -4,6 +4,7 @@ import { expect, type Page, toAppUrl } from '../fixtures'
 import { deleteWorkflowViaApi } from '../utils/api'
 import { apiUrl } from '../utils/api-core'
 
+import { formPromptRespondPanelRegion } from './formPromptPanel'
 import {
   MOCK_FORM_RESPONSE_SEED,
   SIDE_PANEL_REASON_FORM_DEFINITION,
@@ -213,7 +214,7 @@ export type TimeoutFallbackScenario = TimeoutWaitingScenario & {
   fallbackStepName: string
 }
 
-/** Waiting form step with a short running-long threshold (mock seed or API-created execution). */
+/** Waiting form step (mock seed or API-created execution). */
 export async function ensureTimeoutWaitingScenario(app: Page): Promise<TimeoutWaitingScenario> {
   const { waitingExecutionId, waitingPromptId, waitingActivityLabel } = MOCK_FORM_PROMPT_TIMEOUT_SEED
   if (await hasMockExecutionSeed(app, waitingExecutionId)) {
@@ -354,6 +355,6 @@ export async function openFormPromptRespondPanel(app: Page, executionId: string,
   const timeout = executionDetailReadyTimeoutMs()
   await app.goto(toAppUrl(`/executions/${executionId}?form_prompt=${formPromptId}&history=closed`))
   await expect(app.getByRole('heading', { name: 'Loading execution' })).toHaveCount(0, { timeout })
-  await expect(app.getByRole('heading', { name: /Respond to prompt/ })).toBeVisible({ timeout })
+  await expect(formPromptRespondPanelRegion(app)).toBeVisible({ timeout })
   await expect(app.getByRole('grid', { name: 'Activity states' })).toBeVisible({ timeout })
 }
