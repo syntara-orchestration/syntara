@@ -100,7 +100,8 @@ describe('integrationUtils', () => {
     it('joins Kafka bootstrap servers', () => {
       const integration = buildIntegration({
         integration_type: 'kafka',
-        configuration: {
+        configuration: null,
+        kafka_configuration: {
           integration_type: 'kafka',
           bootstrap_servers: ['broker.example.com:9093', 'other.example.com:9092'],
         },

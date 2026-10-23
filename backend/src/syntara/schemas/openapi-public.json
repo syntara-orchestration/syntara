@@ -44919,31 +44919,45 @@
             "default": "global"
           },
           "configuration": {
-            "oneOf": [
+            "anyOf": [
               {
-                "$ref": "#/components/schemas/MCPServerConfigurationInput"
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/MCPServerConfigurationInput"
+                  },
+                  {
+                    "$ref": "#/components/schemas/LLMProviderConfiguration"
+                  },
+                  {
+                    "$ref": "#/components/schemas/AAPConfiguration"
+                  }
+                ],
+                "discriminator": {
+                  "propertyName": "integration_type",
+                  "mapping": {
+                    "ansible_automation_platform": "#/components/schemas/AAPConfiguration",
+                    "llm_provider": "#/components/schemas/LLMProviderConfiguration",
+                    "mcp_server": "#/components/schemas/MCPServerConfigurationInput"
+                  }
+                }
               },
               {
-                "$ref": "#/components/schemas/LLMProviderConfiguration"
-              },
-              {
-                "$ref": "#/components/schemas/AAPConfiguration"
-              },
-              {
-                "$ref": "#/components/schemas/KafkaConfiguration"
+                "type": "null"
               }
             ],
             "title": "Configuration",
-            "description": "Integration-specific configuration",
-            "discriminator": {
-              "propertyName": "integration_type",
-              "mapping": {
-                "ansible_automation_platform": "#/components/schemas/AAPConfiguration",
-                "kafka": "#/components/schemas/KafkaConfiguration",
-                "llm_provider": "#/components/schemas/LLMProviderConfiguration",
-                "mcp_server": "#/components/schemas/MCPServerConfigurationInput"
+            "description": "Integration-specific configuration"
+          },
+          "kafka_configuration": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/KafkaConfiguration"
+              },
+              {
+                "type": "null"
               }
-            }
+            ],
+            "description": "Kafka broker configuration. Present only when integration_type is kafka, so the configuration union above stays compatible with existing clients."
           },
           "last_validated_at": {
             "anyOf": [
