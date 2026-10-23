@@ -444,6 +444,11 @@ export const handlers = [
 
     const url = new URL(request.url)
     const nameContains = url.searchParams.get('name[contains]')
+    const statusEq = url.searchParams.get('status')
+    const statusIn = url.searchParams.get('status[in]')
+    const enabledParam = url.searchParams.get('enabled')
+    const lastRanAtGte = url.searchParams.get('last_ran_at[gte]')
+    const lastRanAtLte = url.searchParams.get('last_ran_at[lte]')
     const sort = url.searchParams.get('sort')
     const cursor = url.searchParams.get('cursor')
     const parsedLimit = Number.parseInt(url.searchParams.get('limit') ?? '20', 10)
@@ -454,6 +459,39 @@ export const handlers = [
     if (nameContains) {
       const lower = nameContains.toLowerCase()
       filtered = filtered.filter((target) => target.name.toLowerCase().includes(lower))
+    }
+    if (statusIn) {
+      const allowed = new Set(
+        statusIn
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean)
+      )
+      filtered = filtered.filter((target) => allowed.has(target.status))
+    } else if (statusEq) {
+      filtered = filtered.filter((target) => target.status === statusEq)
+    }
+    if (enabledParam !== null) {
+      const enabled = enabledParam === 'true'
+      filtered = filtered.filter((target) => target.enabled === enabled)
+    }
+    if (lastRanAtGte) {
+      const gteMs = Date.parse(lastRanAtGte)
+      if (!Number.isNaN(gteMs)) {
+        filtered = filtered.filter((target) => {
+          if (!target.last_ran_at) return false
+          return Date.parse(target.last_ran_at) >= gteMs
+        })
+      }
+    }
+    if (lastRanAtLte) {
+      const lteMs = Date.parse(lastRanAtLte)
+      if (!Number.isNaN(lteMs)) {
+        filtered = filtered.filter((target) => {
+          if (!target.last_ran_at) return false
+          return Date.parse(target.last_ran_at) <= lteMs
+        })
+      }
     }
 
     if (sort) {

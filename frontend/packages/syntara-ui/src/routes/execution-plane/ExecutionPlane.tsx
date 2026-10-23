@@ -22,7 +22,7 @@ import { detachPromise } from '../../utils/detachPromise'
 import { useDocLink } from '../../utils/docs/useDocLink'
 
 import { ExecutionPlaneEmptyState } from './ExecutionPlaneEmptyState'
-import { getExecutionTargetNameFilterDefinition } from './executionPlaneFilters'
+import { getExecutionPlaneFilterDefinitions } from './executionPlaneFilters'
 import { executionPlaneDefaultSort, executionPlaneTableColumns } from './executionPlaneTableColumns'
 import { ExecutionTargetStatusLabel } from './ExecutionTargetStatusLabel'
 import { RoutingLabelsCell } from './RoutingLabelsCell'
@@ -101,7 +101,7 @@ export default function ExecutionPlane() {
     columns: executionPlaneTableColumns,
   })
 
-  const filterFieldDefinitions = useMemo<FilterFieldDefinition[]>(() => [getExecutionTargetNameFilterDefinition()], [])
+  const filterFieldDefinitions = useMemo<FilterFieldDefinition[]>(() => getExecutionPlaneFilterDefinitions(), [])
 
   const query = executionPlaneClient.useQuery(
     'get',

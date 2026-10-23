@@ -5,23 +5,19 @@ import { SynLabel } from '../../components/labels/SynLabel'
 import { capitalize } from '../../utils/capitalize'
 
 type StatusVisual = {
-  status: 'success' | 'danger' | 'warning' | 'custom'
+  status: 'success' | 'danger' | 'warning' | 'info' | 'custom'
   Icon: React.ComponentType<{ className?: string }>
 }
 
+/** Visuals keyed by EP `TargetStatus` values. Unknown statuses use DEFAULT_VISUAL. */
 const STATUS_VISUAL: Record<string, StatusVisual> = {
-  ready: { status: 'success', Icon: RhUiCheckCircleIcon },
-  available: { status: 'success', Icon: RhUiCheckCircleIcon },
+  registering: { status: 'info', Icon: RhUiSyncIcon },
+  validating: { status: 'info', Icon: RhUiSyncIcon },
+  bootstrapping: { status: 'info', Icon: RhUiSyncIcon },
   active: { status: 'success', Icon: RhUiCheckCircleIcon },
-  healthy: { status: 'success', Icon: RhUiCheckCircleIcon },
-  error: { status: 'danger', Icon: RhUiCloseCircleIcon },
+  degraded: { status: 'warning', Icon: RhUiSyncIcon },
+  draining: { status: 'custom', Icon: RhUiMinusCircleIcon },
   failed: { status: 'danger', Icon: RhUiCloseCircleIcon },
-  unavailable: { status: 'danger', Icon: RhUiCloseCircleIcon },
-  pending: { status: 'warning', Icon: RhUiSyncIcon },
-  provisioning: { status: 'warning', Icon: RhUiSyncIcon },
-  syncing: { status: 'warning', Icon: RhUiSyncIcon },
-  deleting: { status: 'custom', Icon: RhUiMinusCircleIcon },
-  disabled: { status: 'custom', Icon: RhUiMinusCircleIcon },
 }
 
 const DEFAULT_VISUAL: StatusVisual = { status: 'custom', Icon: RhUiMinusCircleIcon }

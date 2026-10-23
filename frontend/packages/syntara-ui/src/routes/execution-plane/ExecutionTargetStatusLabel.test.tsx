@@ -6,14 +6,14 @@ import { axe } from 'vitest-axe'
 import { ExecutionTargetStatusLabel } from './ExecutionTargetStatusLabel'
 
 describe('ExecutionTargetStatusLabel', () => {
-  it('renders capitalized status', () => {
-    render(<ExecutionTargetStatusLabel status="provisioning" />)
-    expect(screen.getByText('Provisioning')).toBeInTheDocument()
+  it('renders capitalized EP status', () => {
+    render(<ExecutionTargetStatusLabel status="bootstrapping" />)
+    expect(screen.getByText('Bootstrapping')).toBeInTheDocument()
   })
 
   it('normalizes uppercase status for visual lookup', () => {
-    render(<ExecutionTargetStatusLabel status="READY" />)
-    expect(screen.getByText('READY')).toBeInTheDocument()
+    render(<ExecutionTargetStatusLabel status="ACTIVE" />)
+    expect(screen.getByText('ACTIVE')).toBeInTheDocument()
   })
 
   it('replaces underscores in status labels', () => {
@@ -28,19 +28,19 @@ describe('ExecutionTargetStatusLabel', () => {
 
   it('shows tooltip for status message', async () => {
     const user = userEvent.setup()
-    render(<ExecutionTargetStatusLabel status="error" message="Node not ready" />)
-    await user.hover(screen.getByText('Error'))
+    render(<ExecutionTargetStatusLabel status="failed" message="Node not ready" />)
+    await user.hover(screen.getByText('Failed'))
     expect(await screen.findByRole('tooltip')).toHaveTextContent('Node not ready')
   })
 
   it('does not show a tooltip when message is null', () => {
-    render(<ExecutionTargetStatusLabel status="ready" message={null} />)
-    expect(screen.getByText('Ready')).toBeInTheDocument()
+    render(<ExecutionTargetStatusLabel status="active" message={null} />)
+    expect(screen.getByText('Active')).toBeInTheDocument()
     expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
   })
 
   it('has no accessibility violations', async () => {
-    const { container } = render(<ExecutionTargetStatusLabel status="ready" />)
+    const { container } = render(<ExecutionTargetStatusLabel status="active" />)
     expect(await axe(container)).toHaveNoViolations()
   })
 })

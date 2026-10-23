@@ -4,7 +4,8 @@ import { mockDate } from './mockDates'
 
 type ExecutionTargetFacadeRead = ExecutionPlaneAPI.components['schemas']['ExecutionTargetFacadeRead']
 
-const STATUSES = ['ready', 'provisioning', 'error', 'pending', 'syncing'] as const
+/** EP `TargetStatus` values used by the seeded mock dataset. */
+const STATUSES = ['active', 'bootstrapping', 'degraded', 'registering', 'failed', 'validating', 'draining'] as const
 const REGIONS = ['us-west', 'us-east', 'eu-central', 'ap-south'] as const
 
 /** Extra targets so default page size (20) has a next page for pagination tests. */
@@ -30,7 +31,7 @@ function buildExtraTargets(count: number): ExecutionTargetFacadeRead[] {
       status,
       enabled: index % 3 !== 0,
       is_default: false,
-      status_message: status === 'ready' ? null : `Status: ${status}`,
+      status_message: status === 'active' ? null : `Status: ${status}`,
       labels: {
         region,
         env: index % 2 === 0 ? 'prod' : 'dev',
@@ -56,7 +57,7 @@ export const executionTargets: ExecutionTargetFacadeRead[] = [
       node_selectors: ['workload=automation'],
       tolerations: [],
     },
-    status: 'ready',
+    status: 'active',
     enabled: true,
     is_default: true,
     status_message: null,
@@ -79,7 +80,7 @@ export const executionTargets: ExecutionTargetFacadeRead[] = [
       node_selectors: [],
       tolerations: [],
     },
-    status: 'provisioning',
+    status: 'bootstrapping',
     enabled: true,
     is_default: false,
     status_message: 'Waiting for worker namespace readiness',
