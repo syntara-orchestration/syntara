@@ -18,6 +18,7 @@ from syntara.eventstreams.adapters.kafka_position_store import KafkaInitialPosit
 from syntara.eventstreams.adapters.kafka_source_configuration import KafkaSourceConfiguration
 from syntara.eventstreams.core.consumer import IdentityObservation, IdentityStatus, SourceIdentityObservation
 from syntara.eventstreams.core.deduplication import ClaimLost, DeliveryExpectation, DeliveryState, RevisionChanged
+from syntara.eventstreams.core.processing import CONTENT_INSPECTION_PENDING
 from syntara.eventstreams.models.source import EventSubscriptionSource
 from syntara.eventstreams.models.subscription import EventSubscription
 from syntara.eventstreams.services import deduplication_store
@@ -188,6 +189,43 @@ def test_known_permanent_content_errors_block_even_unprepared_expired_work(error
     pending.last_error_code = error
     with pytest.raises(KafkaPositionError, match="permanent_content_error"):
         KafkaInitialPositionStore._content_gate([pending])
+
+
+@pytest.mark.parametrize("operation", ["reconcile", "stage", "confirm"])
+async def test_pending_inspection_cannot_be_cancelled_by_gap_recovery_after_lease_expiry(
+    monkeypatch, operation
+) -> None:
+    factory, _ = session_factory()
+    repository = KafkaInitialPositionStore(factory)
+    subscription, source = lifecycle()
+    position = row(gap=True)
+    token = UUID(int=42)
+    position.recovery_revision = 1
+    position.recovery_token = token
+    position.pending_boundary = 20
+    position.pending_policy = RecoveryPolicy.CURRENT_END.value
+    position.pending_reason = "offset_expired"
+    pending = delivery()
+    pending.lease_until = NOW
+    pending.last_error_code = CONTENT_INSPECTION_PENDING
+    monkeypatch.setattr(repository, "_locked", AsyncMock(return_value=(subscription, source, position)))
+    monkeypatch.setattr(repository, "_deliveries", AsyncMock(return_value=[pending]))
+    request = RecoveryRequest(
+        **position_request().model_dump(),
+        expected_recovery_revision=0,
+        policy=RecoveryPolicy.CURRENT_END,
+        reason="offset_expired",
+    )
+    with pytest.raises(KafkaPositionError, match="content_inspection_pending"):
+        if operation == "reconcile":
+            await repository.reconcile_claims(request, token, "repair")
+        elif operation == "stage":
+            await repository.stage_recovery(request, token, 20)
+        else:
+            await repository.confirm_recovery(request, token, 20)
+    assert pending.state == DeliveryState.IN_PROGRESS
+    assert pending.last_error_code == CONTENT_INSPECTION_PENDING
+    assert pending.resolved_at is None
 
 
 async def test_expired_prepared_work_never_becomes_cancelled_when_repair_cannot_claim(

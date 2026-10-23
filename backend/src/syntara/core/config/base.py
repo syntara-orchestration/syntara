@@ -30,6 +30,7 @@ from sqlalchemy.engine import URL, make_url
 
 from syntara.core.constants import (
     EventDeliveryDefaults,
+    EventRunnerDefaults,
     EventSchedulingDefaults,
     EventStreamLimits,
     RequestLimits,
@@ -1478,6 +1479,42 @@ class EventStreamSettings(BaseSettings):
     that complete workflow start arguments fit downstream transport limits.
     """
 
+    event_fetch_max_records: int = Field(
+        default=EventRunnerDefaults.FETCH_MAX_RECORDS,
+        gt=0,
+        description="Maximum records returned by one Kafka fetch",
+    )
+    event_queue_max_records: int = Field(
+        default=EventRunnerDefaults.QUEUE_MAX_RECORDS,
+        gt=0,
+        description="Maximum queued and in-flight records per subscription",
+    )
+    event_queue_max_bytes: int = Field(
+        default=EventRunnerDefaults.QUEUE_MAX_BYTES,
+        gt=0,
+        description="Maximum raw bytes retained in application queues per subscription",
+    )
+    event_partition_max_records: int = Field(
+        default=EventRunnerDefaults.PARTITION_MAX_RECORDS,
+        gt=0,
+        description="Maximum queued and in-flight records per Kafka partition",
+    )
+    event_processing_concurrency: int = Field(
+        default=EventRunnerDefaults.PROCESSING_CONCURRENCY,
+        gt=0,
+        description="Maximum concurrent downstream processing operations per subscription",
+    )
+    event_fetch_timeout_ms: int = Field(
+        default=EventRunnerDefaults.FETCH_TIMEOUT_MS,
+        gt=0,
+        description="Maximum Kafka fetch wait in milliseconds",
+    )
+    event_drain_timeout_seconds: float = Field(
+        default=EventRunnerDefaults.DRAIN_TIMEOUT_SECONDS,
+        gt=0,
+        allow_inf_nan=False,
+        description="Maximum subscription drain time in seconds",
+    )
     event_max_value_bytes: int = Field(
         default=EventStreamLimits.DEFAULT_MAX_VALUE_BYTES,
         gt=0,
