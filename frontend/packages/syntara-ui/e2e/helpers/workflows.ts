@@ -20,7 +20,7 @@ export const buildUniqueName = (prefix: string) => `${prefix}-${Date.now()}-${ra
 
 export const addNodePanel = (page: Page) =>
   page.getByRole('region', {
-    name: /add step|select an action node|select a trigger node|select a logic node|select an aap execution node/i,
+    name: /add step|select an action node|select a trigger step type|select a logic node|select an aap execution step type/i,
   })
 
 /**
@@ -520,7 +520,7 @@ export async function createBasicWorkflow(page: Page, workflowName: string, acti
   await ensureProject(page)
 
   await page.goto(toAppUrl('/workflow-builder/new'))
-  await expect(page.getByRole('heading', { name: 'Select a trigger node' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Select a trigger step type' })).toBeVisible()
 
   // Add manual trigger
   await page.getByRole('button', { name: 'Manual trigger' }).click()
@@ -553,7 +553,7 @@ export async function createBasicWorkflow(page: Page, workflowName: string, acti
 export async function startWorkflowWithTrigger(page: Page) {
   await ensureProject(page)
   await page.goto(toAppUrl('/workflow-builder/new'))
-  await expect(page.getByRole('heading', { name: 'Select a trigger node' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Select a trigger step type' })).toBeVisible()
 
   await selectProjectIfRequired(page)
 
@@ -589,7 +589,7 @@ export async function createWorkflowWithTrigger(page: Page, workflowName: string
   await ensureProject(page)
 
   await page.goto(toAppUrl('/workflow-builder/new'))
-  await expect(page.getByRole('heading', { name: 'Select a trigger node' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Select a trigger step type' })).toBeVisible()
 
   await page.getByRole('button', { name: 'Manual trigger' }).click()
   await page.getByRole('textbox', { name: 'Name', exact: true }).fill('Manual trigger')
@@ -736,7 +736,7 @@ export async function verifyNodeVisible(page: Page, nodeName: string) {
 export async function navigateToApiActionForm(page: Page) {
   await ensureProject(page)
   await page.goto(toAppUrl('/workflow-builder/new'))
-  await expect(page.getByRole('heading', { name: 'Select a trigger node' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Select a trigger step type' })).toBeVisible()
 
   await selectProjectIfRequired(page)
 

@@ -29,7 +29,7 @@ test.describe('Workflows - Create New Workflow', () => {
       await createButton.click()
 
       await expect(app).toHaveURL(/workflow-builder\/new/)
-      await expect(app.getByRole('heading', { name: 'Select a trigger node' })).toBeVisible()
+      await expect(app.getByRole('heading', { name: 'Select a trigger step type' })).toBeVisible()
 
       await app.getByRole('button', { name: 'Manual trigger' }).click()
       await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Manual trigger')
@@ -74,7 +74,7 @@ test.describe('Workflows - Create New Workflow', () => {
     const workflowNameInput = app.getByPlaceholder('Workflow name')
     await expect(workflowNameInput).toBeVisible()
 
-    await expect(app.getByRole('heading', { name: 'Select a trigger node' })).toBeVisible()
+    await expect(app.getByRole('heading', { name: 'Select a trigger step type' })).toBeVisible()
   })
 
   test('workflow name can be customized before saving', async ({ app }) => {
@@ -82,7 +82,7 @@ test.describe('Workflows - Create New Workflow', () => {
 
     try {
       await app.goto(toAppUrl('/workflow-builder/new'))
-      await expect(app.getByRole('heading', { name: 'Select a trigger node' })).toBeVisible()
+      await expect(app.getByRole('heading', { name: 'Select a trigger step type' })).toBeVisible()
 
       await app.getByRole('button', { name: 'Manual trigger' }).click()
       await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Manual trigger')

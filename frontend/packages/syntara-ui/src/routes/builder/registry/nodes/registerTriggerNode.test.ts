@@ -62,6 +62,17 @@ describe('registerTriggerNode', () => {
     expect(registration?.description).toBe('Start workflow execution with manual, scheduled, or event triggers')
   })
 
+  // AAP-96183: the Add Step panel heading for this step type's subtype list
+  // must call it a "step type" (an item on the list), not a "node" (an item
+  // already placed on the workflow canvas), to avoid confusion with AAP
+  // managed/execution nodes and OpenShift nodes.
+  it('uses "step type" terminology in the selection panel heading (AAP-96183)', () => {
+    registerTriggerNode()
+
+    const registration = NodeRegistry.get(RegistryNodeId.TRIGGER)
+    expect(registration?.selectionTitle).toBe('Select a trigger step type')
+  })
+
   it('registers with correct order', () => {
     registerTriggerNode()
 
