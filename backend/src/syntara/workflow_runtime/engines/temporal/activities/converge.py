@@ -6,6 +6,7 @@ import structlog
 from temporalio import activity
 
 from syntara.workflow_core.models import ActivityName, ConvergeOutput
+from syntara.workflow_runtime.engines.temporal.activities.output_mapping import dump_output
 
 logger = structlog.stdlib.get_logger(__name__)
 
@@ -45,4 +46,4 @@ async def converge(
         completed_branch_node_ids=completed_branch_ids,
     )
 
-    return {"output": output.dump(output_config)}
+    return {"output": dump_output(output, output_config)}

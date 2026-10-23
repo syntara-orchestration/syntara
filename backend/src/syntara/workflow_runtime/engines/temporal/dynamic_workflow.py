@@ -546,7 +546,10 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         """Build an empty output dict for a node type using its output model."""
         output_model_class = NODE_OUTPUT_MODELS.get(node.type)
         if output_model_class:
-            return output_model_class().dump(node.outputs)
+            # This is a failure fallback inside workflow code. Do not reapply the
+            # user mapping: an invalid mapping is already represented by the
+            # activity's non-retryable ApplicationError.
+            return output_model_class().model_dump()
         return {}
 
     async def _handle_continued_failure(

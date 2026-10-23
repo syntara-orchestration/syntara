@@ -26,6 +26,7 @@ from syntara.workflow_core.models import (
 from syntara.workflow_runtime.engines.temporal import constants
 
 from .common import HEARTBEAT_STOP_MONITOR, ActivityExecutionError
+from .output_mapping import dump_output
 
 SAFE_ENV_ALLOWLIST: frozenset[str] = frozenset(
     {
@@ -534,23 +535,23 @@ async def execute_script_activity(  # noqa: C901
             stderr=result["stderr"],
             stdout_json=result.get("output"),
         )
-        return _enforce_payload_limit({"output": output.dump(output_config)})
+        return _enforce_payload_limit({"output": dump_output(output, output_config)})
 
     except ApplicationError:
         raise
     except ScriptExecutionError as e:
         output = ScriptOutput(return_code=e.exit_code, stdout=e.stdout, stderr=e.stderr)
-        detail = _enforce_payload_limit({"output": output.dump(output_config)})
+        detail = _enforce_payload_limit({"output": dump_output(output, output_config)})
         raise ApplicationError(str(e), detail, type="ScriptExecutionError", non_retryable=True) from None
     except TimeoutError:
         output = ScriptOutput()
         msg = f"Script execution timed out after {timeout} seconds"
         raise ApplicationError(
-            msg, {"output": output.dump(output_config)}, type="TimeoutError", non_retryable=True
+            msg, {"output": dump_output(output, output_config)}, type="TimeoutError", non_retryable=True
         ) from None
     except Exception as e:  # noqa: BLE001
         output = ScriptOutput()
         msg = "Script activity failed unexpectedly"
         raise ApplicationError(
-            msg, {"output": output.dump(output_config)}, type=type(e).__name__, non_retryable=True
+            msg, {"output": dump_output(output, output_config)}, type=type(e).__name__, non_retryable=True
         ) from None
