@@ -632,7 +632,7 @@ async def test_converge_metadata_returns_gate_and_branch_state() -> None:
 @pytest.mark.asyncio
 async def test_converge_metadata_absent_converge_row_returns_none() -> None:
     """With no source row for the converge itself there is nothing to compare."""
-    rows = [("b1", ActivityStatus.COMPLETED, {}, {"v": 1}, {})]
+    rows: list[tuple[Any, ...]] = [("b1", ActivityStatus.COMPLETED, {}, {"v": 1}, {})]
 
     assert await _run_metadata(rows, "join", {"b1": "b1"}) is None
 
@@ -640,7 +640,7 @@ async def test_converge_metadata_absent_converge_row_returns_none() -> None:
 @pytest.mark.asyncio
 async def test_converge_metadata_missing_predecessor_is_reported_as_unknown() -> None:
     """A predecessor absent from the source run is explicit, not dropped."""
-    rows = [("join", ActivityStatus.COMPLETED, {}, {}, {})]
+    rows: list[tuple[Any, ...]] = [("join", ActivityStatus.COMPLETED, {}, {}, {})]
 
     result = await _run_metadata(rows, "join", {"b1": "b1"})
 
@@ -667,7 +667,7 @@ async def test_converge_metadata_tolerates_non_dict_payloads() -> None:
 @pytest.mark.asyncio
 async def test_converge_metadata_accepts_plain_string_statuses() -> None:
     """A status stored as a plain string (not an enum) is returned verbatim."""
-    rows = [
+    rows: list[tuple[Any, ...]] = [
         ("join", "completed", {}, {}, {}),
         ("b1", "skipped", {}, {}, {}),
     ]
