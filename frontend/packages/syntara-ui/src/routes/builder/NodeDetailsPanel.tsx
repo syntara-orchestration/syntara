@@ -116,8 +116,12 @@ function getAddModeFormId(
 }
 
 /** Get formId for TASK nodes by checking executor type */
-function getTaskFormId(taskData: TaskActivity): string {
+function getTaskFormId(taskData: Activity): string {
   const executor = taskData.type
+
+  if (executor === ExecutorTypeEnum.SUB_WORKFLOW) {
+    return 'sub-workflow-node-form'
+  }
 
   // Check if it's an AAP job template task
   if (executor === ExecutorTypeEnum.AAP_JOB_TEMPLATE) {
@@ -153,7 +157,7 @@ function getEditModeFormId(node: Node<NodeType['data']> | undefined): string | u
   if (node.type === FlowNodeType.APPROVAL) return 'approval-node-form'
   if (node.type === FlowNodeType.SWITCH) return 'switch-node-form'
   if (node.type === FlowNodeType.TASK) {
-    return getTaskFormId(node.data as TaskActivity)
+    return getTaskFormId(node.data as Activity)
   }
   return undefined
 }

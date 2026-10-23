@@ -1,4 +1,4 @@
-import type { TaskActivity } from '@syntara/contracts'
+import { ExecutorTypeEnum, type TaskActivity } from '@syntara/contracts'
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -16,6 +16,12 @@ vi.mock('./renderNodeIcon', () => ({
 
 vi.mock('./hooks/useCredentialName', () => ({
   useCredentialName: () => ({ name: undefined, isPending: false }),
+}))
+
+vi.mock('../../../../components/WorkflowName', () => ({
+  WorkflowName: ({ workflowId }: { workflowId: string }) => (
+    <span>{workflowId === 'child-workflow-id' ? 'Child workflow' : workflowId}</span>
+  ),
 }))
 
 import { TaskActivityDetails } from './TaskNode'
@@ -38,6 +44,41 @@ describe('TaskActivityDetails', () => {
     expect(screen.getByText('Script')).toBeInTheDocument()
     expect(screen.getByText('Language')).toBeInTheDocument()
     expect(screen.getByText('python')).toBeInTheDocument()
+  })
+
+  it('renders the selected child workflow name in sub-workflow task details', () => {
+    const mockSubWorkflowTask: TaskActivity = {
+      type: ExecutorTypeEnum.SUB_WORKFLOW,
+      id: 'task-sub-workflow',
+      name: 'Run child workflow',
+      parameters: {
+        workflow_id: 'child-workflow-id',
+        trigger_node_id: 'trigger-1',
+      },
+    }
+
+    render(<TaskActivityDetails data={mockSubWorkflowTask} />)
+
+    expect(screen.getByText('Workflow')).toBeInTheDocument()
+    expect(screen.getByText('Child workflow')).toBeInTheDocument()
+    expect(screen.queryByText('Workflow trigger')).not.toBeInTheDocument()
+  })
+
+  it('shows a workflow expression without fetching it as a workflow ID', () => {
+    const mockSubWorkflowTask: TaskActivity = {
+      type: ExecutorTypeEnum.SUB_WORKFLOW,
+      id: 'task-sub-workflow-expression',
+      name: 'Run dynamic child workflow',
+      parameters: {
+        workflow_id: '${workflow_context.child_workflow_id}',
+        trigger_node_id: 'trigger-1',
+      },
+    }
+
+    render(<TaskActivityDetails data={mockSubWorkflowTask} />)
+
+    expect(screen.getByText('Workflow')).toBeInTheDocument()
+    expect(screen.getByText('${workflow_context.child_workflow_id}')).toBeInTheDocument()
   })
 
   it('renders http_request task details correctly', () => {

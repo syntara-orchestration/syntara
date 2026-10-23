@@ -40,6 +40,15 @@ export const HTTP_HEADERS_HELP =
 export const HTTP_BODY_HELP =
   'Enter the request body as JSON or text. Used with POST, PUT, and PATCH methods. You can include expressions to insert dynamic values from previous steps.'
 
+export const SUBWORKFLOW_WORKFLOW_HELP =
+  'Select the published workflow to call. Only workflows you have permission to access are shown. The latest published version is always used at runtime.'
+
+export const SUBWORKFLOW_TRIGGER_HELP =
+  'The selected Sub-workflow Trigger determines which entry point is invoked when this sub-workflow runs. A workflow with one trigger selects it automatically; choose a trigger here when the workflow has multiple entry points.'
+
+export const SUBWORKFLOW_INPUT_MAPPING_HELP =
+  'Provide values for the selected trigger inputs. Values may be static or template expressions that reference data from the parent workflow.'
+
 export const AI_MODEL_HELP =
   'Select the large language model (LLM) to use for this task agent step. Models are provided by integrations configured by your administrator.'
 

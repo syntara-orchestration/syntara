@@ -23,6 +23,11 @@ export const nodeHelp = {
   httpHeaders: createFieldHelp('Headers', T.HTTP_HEADERS_HELP),
   httpBody: createFieldHelp('Body', T.HTTP_BODY_HELP),
 
+  // Sub-workflow
+  subworkflowWorkflow: createFieldHelp('Workflow', T.SUBWORKFLOW_WORKFLOW_HELP),
+  subworkflowTrigger: createFieldHelp('Workflow trigger', T.SUBWORKFLOW_TRIGGER_HELP),
+  subworkflowInputMapping: createFieldHelp('Input mapping', T.SUBWORKFLOW_INPUT_MAPPING_HELP),
+
   // AI agent
   aiModel: createFieldHelp('Model', T.AI_MODEL_HELP),
   aiCredential: createFieldHelp('Credential', T.AI_CREDENTIAL_HELP),

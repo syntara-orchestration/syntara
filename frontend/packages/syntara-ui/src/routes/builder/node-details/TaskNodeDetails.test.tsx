@@ -1,4 +1,4 @@
-import type { TaskActivity } from '@syntara/contracts'
+import { ActivityTypeEnum, type Activity, type TaskActivity } from '@syntara/contracts'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
@@ -99,6 +99,12 @@ vi.mock('../node-forms/ActionNodeForm', () => ({
         Cancel
       </button>
     </div>
+  ),
+}))
+
+vi.mock('./SubWorkflowNodeDetails', () => ({
+  SubWorkflowNodeDetails: ({ nodeId }: { nodeId: string }) => (
+    <div data-testid="subworkflow-node-details">{nodeId}</div>
   ),
 }))
 
@@ -274,6 +280,26 @@ describe('TaskNodeDetails Component', () => {
         ...(options.settings ? { settings: options.settings } : {}),
       })
     )
+  })
+
+  it('routes Sub-workflow activities to their dedicated edit form', () => {
+    render(
+      <TaskNodeDetails
+        taskData={
+          {
+            id: 'subworkflow-1',
+            type: ActivityTypeEnum.SUB_WORKFLOW,
+            name: 'Child call',
+            parameters: {},
+          } satisfies Activity
+        }
+        nodeId="subworkflow-1"
+        onClose={mockOnClose}
+        onHeaderContentChange={vi.fn()}
+      />
+    )
+
+    expect(screen.getByTestId('subworkflow-node-details')).toHaveTextContent('subworkflow-1')
   })
 
   it('renders ActionNodeForm for script task', () => {

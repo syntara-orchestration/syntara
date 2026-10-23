@@ -237,6 +237,7 @@ export type HttpRequestConfig = WorkflowAPI.components['schemas']['APIExecutorPa
 export type AgenticConfig = WorkflowAPI.components['schemas']['AgenticExecutorParameters']
 export type AAPJobTemplateConfig = WorkflowAPI.components['schemas']['AAPJobTemplateExecutorParameters']
 export type AAPWorkflowJobTemplateConfig = WorkflowAPI.components['schemas']['AAPWorkflowJobTemplateExecutorParameters']
+export type SubWorkflowConfig = WorkflowAPI.components['schemas']['SubWorkflowExecutorParameters']
 export type ApprovalConfig = WorkflowAPI.components['schemas']['ApprovalNodeParameters']
 export type ConditionConfig = WorkflowAPI.components['schemas']['ConditionNodeParameters']
 export type LoopConfig =
@@ -298,6 +299,12 @@ export interface AAPJobTemplateActivity extends ActivityBase {
 export interface AAPWorkflowJobTemplateActivity extends ActivityBase {
   type: 'aap_workflow_job_template'
   parameters: AAPWorkflowJobTemplateConfig & { [key: string]: unknown }
+}
+
+/** Sub-workflow executor node */
+export interface SubWorkflowActivity extends ActivityBase {
+  type: 'sub_workflow'
+  parameters: SubWorkflowConfig & { [key: string]: unknown }
 }
 
 /** Approval gate node */
@@ -370,6 +377,7 @@ export type TypedActivity =
   | AgenticActivity
   | AAPJobTemplateActivity
   | AAPWorkflowJobTemplateActivity
+  | SubWorkflowActivity
   | ApprovalActivity
   | ConditionActivity
   | LoopActivity
@@ -405,4 +413,9 @@ export interface Activity {
 
 /** Executor nodes (nodes that perform work) */
 export type TaskActivity =
-  ScriptActivity | HttpRequestActivity | AgenticActivity | AAPJobTemplateActivity | AAPWorkflowJobTemplateActivity
+  | ScriptActivity
+  | HttpRequestActivity
+  | AgenticActivity
+  | AAPJobTemplateActivity
+  | AAPWorkflowJobTemplateActivity
+  | SubWorkflowActivity

@@ -41,6 +41,7 @@ import {
 } from '../utils/aapHelpers'
 
 import { AIAgentNodeDetails } from './AIAgentNodeDetails'
+import { SubWorkflowNodeDetails } from './SubWorkflowNodeDetails'
 
 /**
  * Stored AAP config supports both snake_case (API) and camelCase (legacy) field names.
@@ -503,6 +504,18 @@ export function TaskNodeDetails({
   const { showError } = useAlerts()
   // Use action accessor - component won't re-render when store state changes
   const { updateActivity } = useWorkflowStoreActions()
+
+  if (taskData.type === ActivityTypeEnum.SUB_WORKFLOW) {
+    return (
+      <SubWorkflowNodeDetails
+        taskData={taskData}
+        nodeId={nodeId}
+        onClose={onClose}
+        onHeaderContentChange={onHeaderContentChange}
+        projectId={projectId}
+      />
+    )
+  }
 
   // Don't show action form for approval nodes - they have their own form
   if (taskData.type === ActivityTypeEnum.APPROVAL) {

@@ -1,4 +1,4 @@
-import { ExecutorTypeEnum } from '@syntara/contracts'
+import { ActivityTypeEnum, ExecutorTypeEnum } from '@syntara/contracts'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { RegistryNodeId } from '../../../../constants'
@@ -22,11 +22,6 @@ vi.mock('../../../../stores/useWorkflowStore', () => ({
     id: opts.id,
     name: opts.name,
     type: 'http_request' as const,
-  })),
-  createSubWorkflowActivity: vi.fn((opts: Record<string, unknown>) => ({
-    id: opts.id,
-    name: opts.name,
-    type: 'sub_workflow' as const,
   })),
 }))
 
@@ -254,13 +249,25 @@ describe('registerActionNode', () => {
     registration?.onSubmit(
       {
         name: 'My Sub-workflow',
+        workflow_id: 'child-workflow-1',
+        trigger_node_id: 'sub-trigger-1',
+        input_mapping: { host: '${lookup.host}', port: 22 },
       },
       onSuccess,
       onError,
       RegistryNodeId.SUB_WORKFLOW
     )
 
-    expect(mockAddActivity).toHaveBeenCalled()
+    expect(mockAddActivity).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: ActivityTypeEnum.SUB_WORKFLOW,
+        parameters: {
+          workflow_id: 'child-workflow-1',
+          trigger_node_id: 'sub-trigger-1',
+          input_mapping: { host: '${lookup.host}', port: 22 },
+        },
+      })
+    )
     expect(onSuccess).toHaveBeenCalledWith(expect.any(String))
     expect(onError).not.toHaveBeenCalled()
   })

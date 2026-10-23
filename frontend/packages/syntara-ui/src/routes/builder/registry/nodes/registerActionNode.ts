@@ -13,6 +13,18 @@ import { getDefaultNodeBaseName } from '../../utils/nodeNaming'
 import { createCustomNode } from '../helpers/nodeTemplates'
 import { NodeRegistry, type BaseNodeFormProps } from '../NodeRegistry'
 
+function isSubWorkflowFormData(data: ActionFormData | SubWorkflowFormData): data is SubWorkflowFormData {
+  return (
+    'workflow_id' in data &&
+    typeof data.workflow_id === 'string' &&
+    'trigger_node_id' in data &&
+    typeof data.trigger_node_id === 'string' &&
+    'input_mapping' in data &&
+    typeof data.input_mapping === 'object' &&
+    data.input_mapping !== null
+  )
+}
+
 /**
  * Register the Action step type
  */
@@ -52,7 +64,7 @@ export default function registerActionNode() {
             description: 'Call another published workflow and receive its output.',
             formTitle: 'Configure Sub-workflow',
             formComponent: SubWorkflowNodeForm as React.ComponentType<
-              BaseNodeFormProps<SubWorkflowFormData> & Record<string, unknown>
+              BaseNodeFormProps<ActionFormData | SubWorkflowFormData> & Record<string, unknown>
             >,
           },
         ],
@@ -66,7 +78,7 @@ export default function registerActionNode() {
       ) => {
         try {
           // Handle Sub-workflow subtype separately
-          if (subtypeId === RegistryNodeId.SUB_WORKFLOW) {
+          if (subtypeId === RegistryNodeId.SUB_WORKFLOW && isSubWorkflowFormData(data)) {
             const baseName = getDefaultNodeBaseName({
               nodeTypeId: RegistryNodeId.SUB_WORKFLOW,
               label: 'Sub-workflow',
@@ -75,11 +87,19 @@ export default function registerActionNode() {
               createSubWorkflowActivity({
                 id,
                 name,
+                workflowId: data.workflow_id,
+                triggerNodeId: data.trigger_node_id,
+                inputMapping: data.input_mapping,
+                settings: data.settings,
               })
             )
             useWorkflowStore.getState().addActivity(activity)
             onSuccess(activityId)
             return
+          }
+
+          if (subtypeId === RegistryNodeId.SUB_WORKFLOW) {
+            throw new Error('Sub-workflow configuration is incomplete.')
           }
 
           // Handle Script and REST API subtypes

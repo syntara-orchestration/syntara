@@ -1,9 +1,12 @@
 import { ExecutorTypeEnum, type TaskActivity } from '@syntara/contracts'
 import { type Node, type NodeProps } from '@xyflow/react'
 
+import { SynCodeBlock } from '../../../../components/details/SynCodeBlock'
+import { SynDetail } from '../../../../components/details/SynDetail'
 import { SynDetailList } from '../../../../components/details/SynDetailList'
 import { SynStep } from '../../../../components/steps/SynStep'
 import { SynStepBody } from '../../../../components/steps/SynStepBody'
+import { WorkflowName } from '../../../../components/WorkflowName'
 import { FlowNodeType } from '../../../../constants'
 import type { ActivityStatus } from '../../execution/types'
 import { getNodeTypeColor } from '../nodeTypeColors'
@@ -42,6 +45,24 @@ type AgenticConfig = {
   model?: string
   /** Attached context file UUIDs. */
   file_ids?: string[]
+}
+
+function isExpression(value?: string): boolean {
+  if (!value) return false
+  const trimmed = value.trim()
+  return trimmed.includes('${') || trimmed.includes('{{')
+}
+
+function SubWorkflowCanvasDetails({ workflowId }: { workflowId: string }) {
+  const isDynamicWorkflowId = isExpression(workflowId)
+
+  return (
+    <SynDetail label="Workflow">
+      <SynCodeBlock noMaxHeight>
+        {isDynamicWorkflowId ? workflowId : <WorkflowName workflowId={workflowId} />}
+      </SynCodeBlock>
+    </SynDetail>
+  )
 }
 
 function AgenticNodeDetails({ config, toolsText }: { config: AgenticConfig; toolsText?: string }) {
@@ -124,19 +145,13 @@ export function TaskActivityDetails(
   const aapJobConfig = isAapJobTemplate ? (config as AAPJobTemplateConfig) : null
   const aapWorkflowConfig = isAapWorkflowTemplate ? (config as AAPWorkflowTemplateConfig) : null
   const agentConfig = taskExecutor === ExecutorTypeEnum.AGENTIC ? (config as AgenticConfig) : undefined
+  const subWorkflowId = typeof config.workflow_id === 'string' ? config.workflow_id : undefined
 
   const formatCount = (count: number, singular: string, plural = `${singular}s`) =>
     `${count} ${count === 1 ? singular : plural}`
 
   const toolsCount = agentConfig?.tool_selections?.length
   const toolsText = toolsCount !== undefined ? formatCount(toolsCount, 'tool') : undefined
-
-  // Helper to detect if a value is an expression (${...} or {{...}})
-  const isExpression = (value?: string): boolean => {
-    if (!value) return false
-    const trimmed = value.trim()
-    return trimmed.includes('${') || trimmed.includes('{{')
-  }
 
   return (
     <>
@@ -153,6 +168,9 @@ export function TaskActivityDetails(
           {renderCondition(dataWithMetadata.condition)}
           {taskExecutor === ExecutorTypeEnum.SCRIPT && (
             <>{renderText('Language', (config as { language: string }).language)}</>
+          )}
+          {taskExecutor === ExecutorTypeEnum.SUB_WORKFLOW && subWorkflowId && (
+            <SubWorkflowCanvasDetails workflowId={subWorkflowId} />
           )}
           {taskExecutor === ExecutorTypeEnum.HTTP_REQUEST && (
             <>
