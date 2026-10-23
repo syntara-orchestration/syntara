@@ -20,7 +20,9 @@ from aiokafka import client as aiokafka_client
 from aiokafka.client import AIOKafkaClient
 from aiokafka.errors import KafkaConnectionError, KafkaError, KafkaTimeoutError
 
+from syntara.core.exceptions import SafeValueError
 from syntara.integrations.adapters.factory import register_health_check_adapter
+from syntara.integrations.adapters.kafka_credentials import resolve_kafka_authentication
 from syntara.integrations.adapters.protocol import (
     DiscoverResult,
     HealthCheckErrorType,
@@ -31,8 +33,6 @@ from syntara.integrations.models.integration_configuration import KafkaConfigura
 
 logger = structlog.stdlib.get_logger(__name__)
 
-_KAFKA_USERNAME_KEY = "kafka_username"
-_KAFKA_PASSWORD_KEY = "kafka_password"  # noqa: S105
 _CLIENT_ID = "syntara-kafka-integration"
 _MS_PER_SECOND = 1000
 # bootstrap() calls the module-level create_conn. Serializing the recorder swap
@@ -246,13 +246,10 @@ def _sasl_login(resolved_credential: dict[str, Any]) -> tuple[str, str] | None:
     ``strip()`` is only the blank check for the password. The value sent to
     the broker keeps any leading or trailing whitespace.
     """
-    username_value = resolved_credential.get(_KAFKA_USERNAME_KEY)
-    password_value = resolved_credential.get(_KAFKA_PASSWORD_KEY)
-    username = username_value.strip() if isinstance(username_value, str) else ""
-    password = password_value if isinstance(password_value, str) else ""
-    if not username or not password.strip():
+    try:
+        return resolve_kafka_authentication(resolved_credential)
+    except SafeValueError:
         return None
-    return username, password
 
 
 def _classify_kafka_error(exc: KafkaError) -> tuple[HealthCheckErrorType, str]:
