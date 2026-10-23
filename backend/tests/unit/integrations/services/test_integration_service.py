@@ -112,7 +112,8 @@ class TestCreateIntegration:
         result = await integration_service.create_integration(data)
 
         assert result.integration_type == IntegrationType.ANSIBLE_AUTOMATION_PLATFORM
-        assert result.configuration.base_url == "https://gateway.example.com"  # type: ignore[union-attr]
+        assert result.configuration is not None
+        assert result.configuration.base_url == "https://gateway.example.com"
         assert result.configuration.insecure_skip_tls_verify is True
 
     @pytest.mark.asyncio
