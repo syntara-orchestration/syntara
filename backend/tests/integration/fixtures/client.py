@@ -17,6 +17,7 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from syntara.audit.outbox.worker import get_outbox_worker
 from syntara.auth.dependencies import get_current_user
 from syntara.core.database.session import get_db
 from syntara.workflows.services.execution_streaming_service import ExecutionStreamingService
@@ -59,6 +60,13 @@ async def session_app(
     mock_evaluator.start = MagicMock()
     mock_evaluator.stop = AsyncMock()
     mock_evaluator.evaluate = AsyncMock(return_value={"allow": True})
+
+    # A test that entered the app lifespan earlier with an incomplete patch
+    # set (e.g. test_app_lifecycle.py, which does not patch
+    # syntara.audit.outbox.worker.AsyncSessionLocal) may have cached an
+    # AuditOutboxWorker bound to the real database factories. Drop it so the
+    # lifespan below constructs the worker inside this fixture's patch set.
+    get_outbox_worker.cache_clear()
 
     with (
         patch("syntara.core.database.session.engine", test_db_engine),

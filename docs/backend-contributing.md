@@ -102,7 +102,7 @@ chore: update dependencies
 
 This project provides a comprehensive Makefile for development tasks.
 
-For a complete list of available commands and their descriptions, see the [Development Commands section in README.md](README.md#development-commands).
+For a complete list of available commands and their descriptions, see the [Development Commands section in the backend README](https://github.com/syntara-orchestration/syntara/blob/devel/backend/README.md#development-commands).
 
 ### Testing
 
@@ -181,7 +181,7 @@ The pre-commit hook (enforced in CI) compares your spec against `devel` to detec
 
 **If breaking changes are detected**, they are blocked in place — full stop. A new major version is a new spec served from a separate URL path (e.g., `/api/v2/`), so it does not register as a breaking change to the current spec. A PR-body annotation is not enough.
 
-See [OpenAPI Spec Management](docs/standards/openapi-spec-management.md) for gate codes and repo configuration.
+See [OpenAPI Spec Management](backend/standards/openapi-spec-management.md) for gate codes and repo configuration.
 
 #### Breaking-change override process
 
@@ -236,9 +236,9 @@ Maintainers (organization owners and members) can trigger CI actions via PR comm
 
 This is a Python project with strict code quality standards. For detailed information about:
 
-- **Project structure** - See [Project Structure in README.md](README.md#project-structure)
-- **Code quality standards** - See [Code Quality in README.md](README.md#code-quality)  
-- **Development workflow** - See [Developer Workflow in README.md](README.md#developer-workflow)
+- **Project structure** - See [Project Structure in the backend README](https://github.com/syntara-orchestration/syntara/blob/devel/backend/README.md#project-structure)
+- **Code quality standards** - See [Code Quality in the backend README](https://github.com/syntara-orchestration/syntara/blob/devel/backend/README.md#code-quality)
+- **Development workflow** - See [Developer Workflow in the backend README](https://github.com/syntara-orchestration/syntara/blob/devel/backend/README.md#developer-workflow)
 
 #### Key Requirements
 - **Type checking is mandatory** - All code must pass mypy type checking

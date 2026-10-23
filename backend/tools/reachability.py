@@ -21,7 +21,7 @@ DIRECT_LINK_ENTRY = "CLAUDE.md"
 # Use inclusion when only a subset of repo files are documentation.
 STANDARDS_PREFIX = "docs/standards/"
 ADDITIONAL_STANDARDS = {
-    "decision-records.md",
+    "docs/decision-records.md",
     "docs/error-handling-strategy.md",
 }
 

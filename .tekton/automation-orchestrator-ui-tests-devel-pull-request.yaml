@@ -10,7 +10,8 @@ metadata:
     pipelinesascode.tekton.dev/cancel-in-progress: "true"
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression: >-
-      event == "pull_request" && target_branch == "devel" &&
+      event == "pull_request" &&
+      (target_branch == "devel" || target_branch.startsWith("feature/") || target_branch.startsWith("feat/")) &&
       (files.all.exists(x, x.startsWith("frontend/")) || files.all.exists(x, x.startsWith("backend/")) ||
       ".tekton/automation-orchestrator-ui-tests-devel-pull-request.yaml".pathChanged())
   creationTimestamp: null
@@ -36,12 +37,15 @@ spec:
       value: '{{revision}}'
     - name: pipeline-github-pr-number
       value: '{{pull_request_number}}'
+    # Pin aap-dev on ANSTRAT-1803's feature branch
+    - name: aap-dev-revision
+      value: AAP-90779-ep-from-source
   pipelineRef:
     params:
       - name: name
         value: ao-ui-tests
       - name: bundle
-        value: quay.io/aap-ci/tekton-catalog/pipeline/test/ao-ui-tests:0.1@sha256:52c1be9bf02af86b69424a7e44fc43f6b71257c6a6c6bcbe091fcfae62121489
+        value: quay.io/aap-ci/tekton-catalog/pipeline/test/ao-ui-tests:0.1@sha256:40a4df7bd569259e108f1c75d9976d43a7aee598ad100d05a80aa6049fad957f
       - name: kind
         value: pipeline
       - name: secret

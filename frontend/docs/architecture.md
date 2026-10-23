@@ -19,10 +19,10 @@ This document explains **how the Syntara UI is organized**, **how it fetches dat
 7. [Your First Day](#your-first-day)
 8. [Repository Layout](#repository-layout-monorepo)
 9. [App Startup](#app-startup-where-everything-begins)
-10. [Routing](#routing-wouter)
+10. [Routing](#routing-tanstack-router)
 11. [State Management](#state-management)
-12. [Backend Requests + Data Flow](#backend-requests--data-flow-tanstack-query--openapi-clients)
-13. [Workflow Builder](#workflow-builder-backend-workflow--ui-graph-react-flow)
+12. [Backend Requests + Data Flow](#backend-requests-data-flow-tanstack-query-openapi-clients)
+13. [Workflow Builder](#workflow-builder-backend-workflow-ui-graph-react-flow)
 14. [React Flow Integration](#react-flow-integration-nodes-edges-and-layout)
 15. [Where to Look for Common Changes](#where-to-look-for-common-changes)
 16. [API Filtering Architecture](#api-filtering-architecture)
@@ -53,7 +53,7 @@ Nice to have (but we'll explain the basics):
 | **Zustand**           | Lightweight state management library (like Redux but simpler). We use it for workflow editing state.                        | [Zustand docs](https://zustand-demo.pmnd.rs/)              |
 | **TanStack Query**    | Server-state library that handles fetching, caching, and synchronizing backend data. Replaces manual `useEffect` + `fetch`. | [TanStack Query docs](https://tanstack.com/query/latest)   |
 | **React Flow**        | Library for building node-based editors (like our workflow canvas). Nodes + edges = graph.                                  | [React Flow docs](https://reactflow.dev/)                  |
-| **Wouter**            | Tiny router (~1KB). Like React Router but minimal.                                                                          | [Wouter docs](https://github.com/molefrog/wouter)          |
+| **TanStack Router**   | Client-side router used to match route objects, validate search state, and navigate between screens.                        | [TanStack Router docs](https://tanstack.com/router/latest) |
 | **OpenAPI**           | Specification for REST APIs. We generate TypeScript types from the backend's OpenAPI spec.                                  | [OpenAPI spec](https://swagger.io/specification/)          |
 | **Dagre**             | Graph layout algorithm. Automatically positions nodes so the workflow looks organized.                                      | [Dagre wiki](https://github.com/dagrejs/dagre/wiki)        |
 | **useWebSocketStore** | Zustand store that manages WebSocket connections, reconnection, and message routing.                                        | [`websocket-architecture.md`](./websocket-architecture.md) |
@@ -70,7 +70,7 @@ Nice to have (but we'll explain the basics):
 
 **Three things to remember:**
 
-1. **Routing**: Wouter + a `navigationItems` tree → `AppRouter` maps it into routes.
+1. **Routing**: TanStack Router route objects under `app/routes/` are assembled into a route tree and mounted with `RouterProvider`. `navigationItems.tsx` describes the navigation tree and its permission visibility.
 2. **Backend data**: Typed OpenAPI clients (`openapi-react-query`) → TanStack Query cache.
 3. **Workflow builder**:
    - API v2 uses **flat** nodes + edges (same as the builder's internal model)
@@ -100,7 +100,7 @@ Nice to have (but we'll explain the basics):
 | **State (Server)**  | TanStack Query                          | Caching, fetching, synchronizing API data     |
 | **State (Client)**  | Zustand                                 | Lightweight store for workflow editing        |
 | **WebSocket**       | Pure Zustand store                      | Real-time communication with backend          |
-| **Routing**         | Wouter                                  | Minimal router (~1KB)                         |
+| **Routing**         | TanStack Router                         | Route tree, route matching, and URL state     |
 | **Build**           | Vite                                    | Fast dev server and bundler                   |
 | **Testing**         | Vitest + Testing Library                | Unit and component testing                    |
 
@@ -113,12 +113,14 @@ Nice to have (but we'll explain the basics):
 ```mermaid
 flowchart TD
   A[main.tsx] --> B[registerAllNodes]
-  A --> C[Lazy load App]
-  C --> D[App.tsx]
-  D --> E[QueryClientProvider]
-  E --> F[AppRouter.tsx wouter]
-  F --> G[navigationItems.tsx]
-  G --> H[Route elements lazy screens]
+  A --> C[Render App]
+  C --> D[App.tsx providers]
+  D --> E[RouterProvider]
+  E --> F[tanstackRouter.ts]
+  F --> G[tanstackRouteTree.tsx]
+  G --> H[Root route and route modules]
+  H --> I[Matched screen component]
+  H --> J[RootLayout: AppShell and Outlet]
 ```
 
 ### Backend request flow (typical screen)
@@ -336,25 +338,33 @@ This is why adding a new canvas step type is usually just "create a new `registe
 **App root**: `packages/syntara-ui/src/app/App.tsx`
 
 - Imports the singleton `QueryClient` from `src/queryClient.ts` and provides it via `QueryClientProvider`
-- Renders the global layout and mounts `AppRouter`
+- Mounts `RouterProvider` with the module-scoped router from `tanstackRouter.ts`
+- The router tree is assembled from route modules under `app/routes/`; the root route renders `RootLayout`, which places the matched screen in `AppShell` through an `Outlet`
 
 > The `QueryClient` is defined in `src/queryClient.ts` (not inline in `App.tsx`) so that `useAuthStore` can import it directly to call `queryClient.clear()` on logout, session expiry, and auth middleware failures — preventing stale permission cache from leaking across user sessions.
 
 ---
 
-## Routing (Wouter)
+## Routing (TanStack Router)
+
+The app creates one module-scoped router in `app/tanstackRouter.ts` and mounts it with `RouterProvider` in `App.tsx`. `buildTanStackRouteTree()` assembles the root route and route groups from `app/routes/*.tsx`. Those modules declare screens with TanStack Router's `createRoute`, including URL search validation where needed. The root route renders `RootLayout`, which wraps the matched page in `AppShell` and renders it through an `Outlet`.
+
+`navigationItems.tsx` is separate from route registration. It describes the app's navigation tree, labels, and visibility requirements. It does not generate the router's route tree.
 
 ```mermaid
 flowchart LR
   subgraph Definition["Route Definition"]
-    AR[AppRoute.tsx<br/>path constants]
-    NI[navigationItems.tsx<br/>nav tree + lazy components]
+    Root["routes/__root.ts<br/>RootLayout"]
+    Modules["routes/*.tsx<br/>createRoute declarations"]
+    Tree["tanstackRouteTree.tsx<br/>assemble route groups"]
+    Root --> Tree
+    Modules --> Tree
   end
 
-  subgraph Router["AppRouter.tsx"]
-    Map["Map navigationItems"]
-    Route["<Route> elements"]
-    Map --> Route
+  subgraph Runtime["TanStack Router"]
+    Router["tanstackRouter.ts"]
+    Provider["RouterProvider"]
+    Router --> Provider
   end
 
   subgraph URL["Browser URL"]
@@ -363,39 +373,46 @@ flowchart LR
     U3["/system-administration/settings"]
   end
 
-  AR --> NI
-  NI --> Router
-  URL --> Router
-  Router -->|"match"| Component["Lazy-loaded Component"]
+  Tree --> Router
+  URL --> Provider
+  Provider -->|"match"| Component["Matched screen component"]
+  Root -->|"layout"| Shell["RootLayout > AppShell > Outlet"]
 ```
 
-| File                      | Role                                                                       |
-| ------------------------- | -------------------------------------------------------------------------- |
-| `app/AppRoute.tsx`        | Route path constants (e.g., `/workflows`, `/workflow-builder/:workflowId`) |
-| `app/navigationItems.tsx` | Defines nav tree + lazy-loaded route components                            |
-| `app/AppRouter.tsx`       | Maps `navigationItems` into `<Route>` elements                             |
+| File                         | Role                                                                                                          |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `app/tanstackRouter.ts`      | Creates the module-scoped TanStack Router instance from the assembled route tree.                             |
+| `app/tanstackRouteTree.tsx`  | Combines the root route and route groups declared under `app/routes/`.                                        |
+| `app/routes/__root.ts`       | Defines the root route, root layout, and not-found redirect.                                                  |
+| `app/routes/*.tsx`           | Declares route objects with `createRoute`, screen components, permissions, and search validation.             |
+| `app/makeRouteComponent.tsx` | Wraps screen components in loading/error boundaries and, when requested, a `ProtectedRoute` permission check. |
+| `app/RootLayout.tsx`         | Renders `AppShell` and the matched child route through `Outlet`.                                              |
+| `app/AppRoute.tsx`           | Holds reusable path strings for common destinations.                                                          |
+| `app/navigationItems.tsx`    | Defines navigation labels, hierarchy, and permission-based visibility; it does not register routes.           |
 
 **Permission gating on routes:**
 
-Each `TNavigationItem` in `navigationItems.tsx` supports two permission fields:
+Navigation visibility and route access are handled separately:
 
-- `requiredPermissions` (array of `{ action, resourceType }`, OR logic): controls navigation visibility. The item is hidden if the user lacks ALL listed permissions. Consumed by `useFilteredNavigationItems`.
-- `routePermission` (single `{ action, resourceType }`): wraps the route component in `ProtectedRoute`, which shows `SynEmptyStateAccessDenied` when the permission check fails. Used for create/edit routes.
+- `requiredPermissions` on a navigation item (array of `{ action, resourceType }`, OR logic) controls whether that item is shown. `useFilteredNavigationItems` hides it when none of the listed permissions are granted.
+- Route definitions pass an optional permission requirement to `makeRouteComponent`, which wraps the screen in `ProtectedRoute` and shows `SynEmptyStateAccessDenied` when access is denied.
 
 See [`docs/permissions-rbac.md`](permissions-rbac.md) for the full permission gating architecture.
 
-> **Note**: The `/dashboard` route is defined in `AppRoute.tsx` and appears in navigation, but has no component mounted (placeholder for future implementation).
+> **Note**: `AppRoute.Dashboard` is a path constant only. There is no matching route declaration or navigation item for `/dashboard` in the current app.
 
 **Common patterns:**
 
 ```tsx
 // Navigate programmatically
-const [, navigate] = useLocation()
-navigate('/workflows')
+const navigate = useNavigate()
+detachPromise(navigate({ to: AppRoute.Workflows.Root }))
 
-// Read URL params
-const { workflowId } = useParams()
+// Read route params in a component that is not bound to one route object
+const { executionId }: { executionId: string } = useParams({ strict: false })
 ```
+
+Use `SynLink` for UI links and TanStack Router's `useNavigate` for programmatic navigation. Route modules may validate URL search state with `validateSearch`; components read router state with TanStack Router hooks. Some existing destinations still use reusable strings from `AppRoute.tsx` while route APIs are being migrated.
 
 **Routing strategy details:**
 
@@ -404,13 +421,13 @@ const { workflowId } = useParams()
 
 **Page breadcrumbs (location hierarchy):**
 
-- [`SynPageHeader`](../packages/syntara-ui/src/components/layout/SynPageHeader.tsx) accepts a required string `title` (default `h1`), optional `breadcrumbs` (PatternFly `Breadcrumb` above the title when there are at least two items), optional `toolbar` for actions (laid out right-aligned via an internal spacer—callers should not add their own `FlexItem grow`), optional `projectSelector` and other title-row slots (`titleLeading`, `titleAddons`), and `titleSlot` for rare full-width custom title rows (e.g. the workflow builder).
-- Trails are built with helpers in [`breadcrumbBuilders.ts`](../packages/syntara-ui/src/app/breadcrumbBuilders.ts); links use `href` values from [`AppRoute.tsx`](../packages/syntara-ui/src/app/AppRoute.tsx).
+- [`SynPageHeader`](https://github.com/syntara-orchestration/syntara/blob/devel/frontend/packages/syntara-ui/src/components/layout/SynPageHeader.tsx) accepts a required string `title` (default `h1`), optional `breadcrumbs` (PatternFly `Breadcrumb` above the title when there are at least two items), optional `toolbar` for actions (laid out right-aligned via an internal spacer—callers should not add their own `FlexItem grow`), optional `projectSelector` and other title-row slots (`titleLeading`, `titleAddons`), and `titleSlot` for rare full-width custom title rows (e.g. the workflow builder).
+- Trails are built with helpers in [`breadcrumbBuilders.ts`](https://github.com/syntara-orchestration/syntara/blob/devel/frontend/packages/syntara-ui/src/app/breadcrumbBuilders.ts); links use `href` values from [`AppRoute.tsx`](https://github.com/syntara-orchestration/syntara/blob/devel/frontend/packages/syntara-ui/src/app/AppRoute.tsx).
 - **Visibility**: nothing is rendered unless there are **at least two** items. The **last** item omits `href` and represents the current page (including tab-specific labels on detail views).
 - **Default tab**: On entity detail routes where the URL without a trailing segment is the same as the default tab (e.g. `…/projects/:id` and `…/projects/:id/details` both mean “Details”), the trail ends at the **entity name** so the parent link is not redundant with the current page.
 - **Access management hub**: Visiting `/system-administration/access-management` triggers a client-side `replace` navigation to `/system-administration/access-management/users` (the default tab). Breadcrumbs are omitted on that Users hub view because the page title and tab bar already convey the location; other hub tabs still show `Access management > …`.
 - **Settings (`/system-administration/settings`)**: The first category tab is the default view. Breadcrumbs are omitted (single-item trail). Selecting another tab shows `Settings > [category]` with **Settings** as a link so you can return to the default tab from the trail.
-- **Link style**: [`index.css`](../packages/syntara-ui/src/index.css) sets breadcrumb link **color**, **`TextDecorationColor`** (underline), and **hover** variants from `--pf-t--global--text--color--link--*` — PF’s default maps underline color to neutral decoration tokens; **`TextDecorationStyle`** is **solid** where globals use dotted — so links match [PatternFly breadcrumb](https://www.patternfly.org/components/breadcrumb/) styling.
+- **Link style**: [`index.css`](https://github.com/syntara-orchestration/syntara/blob/devel/frontend/packages/syntara-ui/src/index.css) sets breadcrumb link **color**, **`TextDecorationColor`** (underline), and **hover** variants from `--pf-t--global--text--color--link--*` — PF’s default maps underline color to neutral decoration tokens; **`TextDecorationStyle`** is **solid** where globals use dotted — so links match [PatternFly breadcrumb](https://www.patternfly.org/components/breadcrumb/) styling.
 - On **narrow viewports** (`max-width: 768px`), when there are two or more _middle_ segments, those segments collapse behind a dropdown toggle (badge count) per PatternFly’s breadcrumb dropdown pattern.
 
 ---
@@ -614,18 +631,19 @@ The builder edits nodes + edges directly in the Zustand store. On save, `buildWo
 | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
 | `BuilderContent.tsx`                              | Orchestrates load/save, wraps canvas                                                                                     |
 | `BuilderFlow.tsx`                                 | Converts store → React Flow nodes/edges, handles layout                                                                  |
+| `BuilderFlowCanvas.tsx`                           | Renders React Flow and batches node-internals measurement when semantic zoom changes                                     |
 | `workflows/canvas/CanvasControls.tsx`             | Bottom canvas toolbar (zoom, fit, layout, expand/collapse) and toggle for the legend                                     |
 | `workflows/canvas/CanvasLegend.tsx`               | Floating legend: step categories and approval branch colors                                                              |
 | `workflows/canvas/semanticZoom.ts`                | Semantic zoom threshold (`SEMANTIC_ZOOM_MAX_SCALE`) and `semanticZoomActivityTitle()` for consistent empty-name tooltips |
 | `workflows/canvas/semanticZoomTypes.ts`           | Shared `SemanticZoomBranchSource` type for branch handles at semantic zoom                                               |
-| `workflows/canvas/nodes/hooks/useSemanticZoom.ts` | LOD flag via typed `useStore` selector + `updateNodeInternals` when crossing the zoom threshold                          |
+| `workflows/canvas/nodes/hooks/useSemanticZoom.ts` | LOD flag via typed `useStore` selector                                                                                   |
 | `components/steps/SynStep.tsx`                    | Shared canvas step shell; semantic zoom swaps to color blocks + tooltips (title + type)                                  |
 | `utils/processExistingWorkflow.ts`                | Load API workflow → flat store format (maps v2 edges to React Flow edges)                                                |
 | `utils/workflowDefinitionBuilder.ts`              | Build v2 save payload (nodes, edges, triggers) with security validation                                                  |
 | `utils/buildNestedStructure.ts`                   | Legacy wrapper (identity function in v2 — returns activities as-is)                                                      |
 | `utils/validation/`                               | Validation rules                                                                                                         |
 
-Floating canvas surfaces (controls, step legend, steps on the canvas, undo/redo) use [`SynPanel`](../packages/syntara-ui/src/components/layout/SynPanel.tsx) so they stay readable under the glass theme: compact overlays use `variant="raised"`; large flat panels (for example the step editor shell) use `opaqueFloatingFill` instead of raised chrome.
+Floating canvas surfaces (controls, step legend, steps on the canvas, undo/redo) use [`SynPanel`](https://github.com/syntara-orchestration/syntara/blob/devel/frontend/packages/syntara-ui/src/components/layout/SynPanel.tsx) so they stay readable under the glass theme: compact overlays use `variant="raised"`; large flat panels (for example the step editor shell) use `opaqueFloatingFill` instead of raised chrome.
 
 ### Builder internals (advanced): registry, edges, and graph semantics
 
@@ -995,7 +1013,7 @@ Builder adds extra types like `placeholder` for drop targets.
 **Visual coding (builder canvas):**
 
 - **Type-colored top bar + icon**: `routes/workflows/canvas/nodeTypeColors.ts` (`getNodeTypeColor`, `NODE_TYPE_COLORS`) maps node / executor types to PatternFly non-status tokens. `SynStep` accepts optional `topBarColor` for a 4px top border; when a node is **selected**, the full brand border replaces the top bar (same as nodes without a type bar). Icons use the same token via `renderNodeIcon(..., color)`.
-- **Semantic zoom (Topology-style LOD)**: When the React Flow viewport `zoom` is at or below `SEMANTIC_ZOOM_MAX_SCALE` (defined in `semanticZoom.ts`), `SynStep` renders a compact horizontal block filled with the same accent as `topBarColor`, with a PatternFly `Tooltip` showing **title** (heading weight) and **type** (`semanticZoomSummary` from each node). For performance, LOD logic lives in **`useSemanticZoom`** (`nodes/hooks/useSemanticZoom.ts`): a **`useStore`** selector typed with **`ReactFlowState`** reads `transform[2]` (zoom) and returns a boolean so nodes re-render only when crossing the threshold—not on every pan/zoom frame like **`useViewport`** would (see [React Flow `useStore`](https://reactflow.dev/api-reference/hooks/use-store)). The primary title uses **`semanticZoomActivityTitle`** (trimmed name, else a stable fallback): structural nodes use **`Untitled ${metadata.label}`**; task-shaped nodes use **`Untitled task`** with the executor label on the second line. Tooltip copy uses **`--pf-t--global--text--color--inverse`** for both lines so it stays readable on PatternFly’s inverse tooltip surface (see `SynStepSemanticZoomBody.tsx`). Branching nodes pass **`semanticZoomBranchSources`** so multiple source handles stay on the **same bar height** with **no branch labels** (handles on the right edge; `SemanticZoomBranchSourceHandles.tsx`). `useUpdateNodeInternals` runs when toggling so edge anchors stay correct. New semantic-zoom UI should include **`vitest-axe`** coverage per the **Accessibility Testing** section in `AGENTS.md`.
+- **Semantic zoom (Topology-style LOD)**: When the React Flow viewport `zoom` is at or below `SEMANTIC_ZOOM_MAX_SCALE` (defined in `semanticZoom.ts`), `SynStep` renders a compact horizontal block filled with the same accent as `topBarColor`, with a PatternFly `Tooltip` showing **title** (heading weight) and **type** (`semanticZoomSummary` from each node). For performance, LOD logic lives in **`useSemanticZoom`** (`nodes/hooks/useSemanticZoom.ts`): a **`useStore`** selector typed with **`ReactFlowState`** reads `transform[2]` (zoom) and returns a boolean so nodes re-render only when crossing the threshold—not on every pan/zoom frame like **`useViewport`** would (see [React Flow `useStore`](https://reactflow.dev/api-reference/hooks/use-store)). The primary title uses **`semanticZoomActivityTitle`** (trimmed name, else a stable fallback): structural nodes use **`Untitled ${metadata.label}`**; task-shaped nodes use **`Untitled task`** with the executor label on the second line. Tooltip copy uses **`--pf-t--global--text--color--inverse`** for both lines so it stays readable on PatternFly’s inverse tooltip surface (see `SynStepSemanticZoomBody.tsx`). Branching nodes pass **`semanticZoomBranchSources`** so multiple source handles stay on the **same bar height** with **no branch labels** (handles on the right edge; `SemanticZoomBranchSourceHandles.tsx`). `BuilderFlowCanvas` batches `useUpdateNodeInternals` for all workflow step IDs when the threshold changes or a step is added during semantic zoom, so edge anchors stay correct without one React Flow update per step. Its store selector compares only the semantic-zoom state and ordered IDs, preventing controlled dimension updates from retriggering measurement. New semantic-zoom UI should include **`vitest-axe`** coverage per the **Accessibility Testing** section in `AGENTS.md`.
 - **Add step panel**: `getAddNodePanelColor` uses registry ids; builder registry ids are centralized in `src/constants/registryNodeIds.ts` (`RegistryNodeId`, `RegistryNodeIdUnion`).
 - **Approval branches**: `BranchHandle` and `EdgePath` / `DefaultEdge` / `ButtonEdge` color approved vs rejected handles and edges using success/danger tokens.
 
@@ -1105,9 +1123,10 @@ flowchart TB
 
 ### Add a new screen/route
 
-1. Add path constant in `app/AppRoute.tsx`
-2. Add lazy route entry in `app/navigationItems.tsx`
-3. `AppRouter.tsx` picks it up automatically
+1. Add a `createRoute` declaration to the appropriate module under `app/routes/` (or create a route module for a new area).
+2. Add the new route group to `buildTanStackRouteTree()` in `app/tanstackRouteTree.tsx`.
+3. Add a reusable path string to `app/AppRoute.tsx` when callers need it outside the route declaration.
+4. Add an item to `app/navigationItems.tsx` only when the screen should appear in the app navigation; set `requiredPermissions` for visibility rules.
 
 ### Add a new API call
 
@@ -1440,10 +1459,10 @@ Detail pages use the entity name from API data as the first segment, falling bac
 
 ## Related Docs
 
-| Doc                                                                       | Content                                                      |
-| ------------------------------------------------------------------------- | ------------------------------------------------------------ |
-| [`docs/zustand-architecture.md`](./zustand-architecture.md)               | Deep dive into workflow store, actions, and state management |
-| [`docs/websocket-architecture.md`](./websocket-architecture.md)           | WebSocket infrastructure, hooks, and real-time patterns      |
-| [`docs/user-guides/filtering.md`](./user-guides/filtering.md)             | How to use search and filters in the UI; shareable URLs      |
-| [`docs/TEST_HELPERS_FILTER_TESTING.md`](./TEST_HELPERS_FILTER_TESTING.md) | Unit-test helpers for filter URL assertions                  |
-| [`AGENTS.md`](../AGENTS.md)                                               | Quick reference for AI assistants and developers             |
+| Doc                                                                                           | Content                                                      |
+| --------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| [`docs/zustand-architecture.md`](./zustand-architecture.md)                                   | Deep dive into workflow store, actions, and state management |
+| [`docs/websocket-architecture.md`](./websocket-architecture.md)                               | WebSocket infrastructure, hooks, and real-time patterns      |
+| [`docs/user-guides/filtering.md`](./user-guides/filtering.md)                                 | How to use search and filters in the UI; shareable URLs      |
+| [`docs/TEST_HELPERS_FILTER_TESTING.md`](./TEST_HELPERS_FILTER_TESTING.md)                     | Unit-test helpers for filter URL assertions                  |
+| [`AGENTS.md`](https://github.com/syntara-orchestration/syntara/blob/devel/frontend/AGENTS.md) | Quick reference for AI assistants and developers             |

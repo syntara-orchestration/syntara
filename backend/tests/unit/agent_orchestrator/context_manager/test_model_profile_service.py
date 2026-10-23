@@ -105,8 +105,8 @@ class TestOpenRouterNormalization:
         assert _normalize_model_name("gpt-4o") == ["gpt-4o"]
 
     def test_openrouter_prefix_stripped(self) -> None:
-        candidates = _normalize_model_name("anthropic/claude-sonnet-4")
-        assert candidates == ["anthropic/claude-sonnet-4", "claude-sonnet-4"]
+        candidates = _normalize_model_name("anthropic/claude-sonnet-4.5")
+        assert candidates == ["anthropic/claude-sonnet-4.5", "claude-sonnet-4.5"]
 
     def test_multiple_slashes(self) -> None:
         candidates = _normalize_model_name("provider/org/model")
@@ -117,11 +117,11 @@ class TestOpenRouterNormalization:
         service = ModelProfileService()
         with patch.dict(
             _registries,
-            {"langchain_anthropic": {"claude-sonnet-4": {"max_input_tokens": 200000, "max_output_tokens": 8192}}},
+            {"langchain_anthropic": {"claude-sonnet-4.5": {"max_input_tokens": 200000, "max_output_tokens": 8192}}},
         ):
             _registries_loaded.add("langchain_anthropic")
             budget = await service.get_token_budget(
-                "anthropic/claude-sonnet-4",
+                "anthropic/claude-sonnet-4.5",
                 provider_hint="anthropic",
             )
 

@@ -7,6 +7,10 @@ import { useMemo, useState } from 'react'
 import type { AppBreadcrumbItem } from '../../app/breadcrumbs/appBreadcrumbItem'
 import { detachPromise } from '../../utils/detachPromise'
 
+import styles from './SynPageBreadcrumbsCollapsedMiddle.module.css'
+
+const collapsedMenuMaxWidth = 'min(calc(100vw - 2rem), 18rem)'
+
 type BreadcrumbDropdownToggleProps = Readonly<{
   toggleRef: Ref<MenuToggleElement | null>
   isOpen: boolean
@@ -59,7 +63,12 @@ export function SynPageBreadcrumbsCollapsedMiddle(props: SynPageBreadcrumbsColla
 
   return (
     <BreadcrumbItem isDropdown>
-      <Dropdown isOpen={isOpen} onOpenChange={setIsOpen} toggle={renderToggle}>
+      <Dropdown
+        isOpen={isOpen}
+        onOpenChange={setIsOpen}
+        popperProps={{ minWidth: collapsedMenuMaxWidth, maxWidth: collapsedMenuMaxWidth }}
+        toggle={renderToggle}
+      >
         <DropdownList>
           {middleItems.map((item) => (
             <DropdownItem
@@ -73,7 +82,9 @@ export function SynPageBreadcrumbsCollapsedMiddle(props: SynPageBreadcrumbsColla
                 setIsOpen(false)
               }}
             >
-              {item.label}
+              <span className={styles.menuItemLabel} title={item.label} data-testid="breadcrumb-collapsed-menu-label">
+                {item.label}
+              </span>
             </DropdownItem>
           ))}
         </DropdownList>
