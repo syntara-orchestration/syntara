@@ -1,6 +1,8 @@
 """Retry-from-failure orchestration, sharing the normal node completion path."""
 
 import collections
+import hashlib
+import json
 from datetime import timedelta
 from typing import Any, cast
 
@@ -17,10 +19,16 @@ from syntara.workflows.workflow_engine.constants import (
     RESTORABLE_SOURCE_STATUSES,
 )
 from syntara.workflows.workflow_engine.graph import ActivityNode, WorkflowGraph
-from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName, LoopState, NodeType
+from syntara.workflows.workflow_engine.models.workflow_definition import (
+    ActivityName,
+    ConvergeStrategy,
+    LoopState,
+    NodeType,
+)
 from syntara.workflows.workflow_engine.utils.loop_iteration_ids import (
     approval_temporal_activity_id,
     loop_body_temporal_activity_id,
+    loop_control_activity_id,
     loop_index_chain,
     loop_iteration_path,
     retry_loop_record_activity_id,
@@ -50,8 +58,8 @@ _CONTROL_NODE_TYPES_FOR_RETRY = frozenset(
     {
         NodeType.CONDITION,
         NodeType.SWITCH,
-        # A converge decides whether it has enough predecessors to run, so restoring
-        # one would release its successors without the gate ever being evaluated.
+        # A converge is excluded from generic restoration; its dedicated retry path
+        # evaluates the gate first and only then compares/restores the source result.
         NodeType.CONVERGE,
     }
 )
@@ -86,6 +94,8 @@ class WorkflowRetryMixin:
     _retry_replay_candidates: set[str]
     #: Source times/status keyed only by the canonical Temporal activity ID.
     _restored_node_timestamps: dict[str, dict[str, str | None]]
+    _retry_converge_failure_reasons: dict[str, str]
+    _retry_converge_upstream_failures: dict[str, str]
     #: The source status of a node this retry restored, keyed by node id. Read by the
     #: completion path so a restored skip or failure is not republished as a success
     #: and does not have its successors scheduled.
@@ -164,6 +174,8 @@ class WorkflowRetryMixin:
         # _prepare_retry rather than on first use.
         self._retry_replay_candidates: set[str] = set()
         self._restored_node_timestamps: dict[str, dict[str, str | None]] = {}
+        self._retry_converge_failure_reasons: dict[str, str] = {}
+        self._retry_converge_upstream_failures: dict[str, str] = {}
         self._restored_node_statuses: dict[str, str] = {}
         self._restored_node_outputs: dict[str, dict[str, Any]] = {}
         self._restored_control_ports: dict[str, str] = {}
@@ -223,10 +235,10 @@ class WorkflowRetryMixin:
         # moment an activity completes, so a node discovered mid-graph would look
         # like an ordinary execution and never get its source times.
         #
-        # Control nodes are included even though 826 cannot replay all of them.
-        # _maybe_restore_retry_output discards one the moment it decides to rerun
-        # it, so the set can stay open to the control nodes a later PR will add
-        # without the sync service ever waiting on one that will not replay.
+        # Control nodes are included even when they cannot be restored by the
+        # generic path. Each control node removes itself when it decides to run;
+        # converges defer that decision until their gate has enough state to
+        # compare the source occurrence and direct predecessors.
         self._retry_replay_candidates = set(self._retry_restorable_nodes(graph))
 
     def _classify_unselected_branches(self, graph: WorkflowGraph) -> None:
@@ -347,6 +359,222 @@ class WorkflowRetryMixin:
         if node.type == NodeType.APPROVAL:
             return approval_temporal_activity_id(node.id, loop_body_map, node_control_data)
         return loop_body_temporal_activity_id(node.id, loop_body_map, node_control_data)
+
+    def _converge_predecessor_temporal_activity_id(self, node: ActivityNode) -> str:
+        """Return the exact source occurrence for one direct converge predecessor."""
+        if node.type == NodeType.LOOP:
+            state = self.loop_state.get(node.id)
+            if state is not None:
+                return loop_control_activity_id(
+                    node.id,
+                    state.current_index,
+                    self.loop_body_map,
+                    self.node_control_data,
+                )
+        return self._source_temporal_activity_id(node)
+
+    def _converge_predecessor_will_replay(
+        self,
+        node: ActivityNode,
+        temporal_activity_id: str,
+        source_predecessor: dict[str, Any],
+        graph: WorkflowGraph,
+    ) -> bool:
+        """Whether this occurrence will receive source state in the retry traversal."""
+        if getattr(node.settings, "disabled", False):
+            return False
+        if source_predecessor.get("status") not in _RESTORABLE_SOURCE_STATUS_VALUES:
+            return False
+        if temporal_activity_id in self._restored_node_timestamps:
+            return True
+        if node.type == NodeType.LOOP:
+            return self._should_replay_loop(node.id)
+        if node.id in getattr(self, "pre_resolved_outputs", {}):
+            return False
+        return self._should_restore_node(node.id, graph)
+
+    async def _maybe_restore_retry_converge(
+        self,
+        node: ActivityNode,
+        resolved_parameters: dict[str, Any],
+        graph: WorkflowGraph,
+    ) -> dict[str, Any] | None:
+        """Restore this converge only when all direct predecessor metadata matches."""
+        if not self.retry_context or node.id not in self._retry_replay_candidates:
+            return None
+
+        failure_reason = self._retry_converge_failure_reasons.get(node.id)
+        if failure_reason and " timed out after " in failure_reason:
+            # A timeout means some gate state did not arrive. Planned source rows
+            # are not enough to turn that into a successful replay.
+            self._retry_replay_candidates.discard(node.id)
+            return None
+
+        predecessor_ids = graph.get_predecessors(node.id)
+        predecessor_temporal_ids = {
+            predecessor_id: self._converge_predecessor_temporal_activity_id(graph.get_node(predecessor_id))
+            for predecessor_id in predecessor_ids
+        }
+        temporal_id = self._source_temporal_activity_id(node)
+        source_state = await workflow.execute_activity(
+            ActivityName.RETRY_CONVERGE_METADATA,
+            args=[
+                self.retry_context["retry_from_execution_id"],
+                temporal_id,
+                predecessor_temporal_ids,
+            ],
+            activity_id=f"__internal__retry_converge_metadata_{hashlib.sha256(temporal_id.encode()).hexdigest()[:16]}",
+            start_to_close_timeout=timedelta(seconds=DEFAULT_ACTIVITY_TIMEOUT_SECONDS),
+        )
+
+        if source_state and self._retry_converge_metadata_matches(
+            resolved_parameters,
+            predecessor_ids,
+            predecessor_temporal_ids,
+            source_state,
+            graph,
+        ):
+            restored = await self._restore_node_state(node, graph, require_record=True)
+            if restored is not None:
+                self._retry_converge_failure_reasons.pop(node.id, None)
+                self._retry_converge_upstream_failures.pop(node.id, None)
+                return restored
+
+        # The normal activity or failure path now owns this occurrence. Removing
+        # it before dispatch keeps activity sync from waiting for replay timestamps
+        # that this converge will not publish.
+        self._retry_replay_candidates.discard(node.id)
+        return None
+
+    def _retry_converge_metadata_matches(  # noqa: C901, PLR0912, PLR0915
+        self,
+        resolved_parameters: dict[str, Any],
+        predecessor_ids: list[str],
+        predecessor_temporal_ids: dict[str, str],
+        source_state: dict[str, Any],
+        graph: WorkflowGraph,
+    ) -> bool:
+        """Compare gate configuration and each branch by identity, state, and result."""
+        source_converge = source_state.get("converge")
+        if not isinstance(source_converge, dict):
+            return False
+        if source_converge.get("status") not in {
+            ActivityStatus.COMPLETED.value,
+            ActivityStatus.FAILED.value,
+        }:
+            return False
+
+        source_gate = source_converge.get("gate_metadata")
+        source_gate = source_gate if isinstance(source_gate, dict) else {}
+        source_input = source_converge.get("input_data")
+        source_input = source_input if isinstance(source_input, dict) else {}
+
+        def normalized_strategy(value: Any) -> str:  # noqa: ANN401
+            if hasattr(value, "value"):
+                value = value.value
+            return str(value or ConvergeStrategy.ALL.value)
+
+        source_total = source_gate.get("total_branches", source_converge.get("output_branch_count"))
+        if source_total != len(predecessor_ids):
+            return False
+
+        source_predecessors = source_state.get("predecessors")
+        if not isinstance(source_predecessors, dict) or set(source_predecessors) != set(predecessor_ids):
+            return False
+
+        current_predecessors: dict[str, dict[str, Any]] = {}
+        for predecessor_id in predecessor_ids:
+            predecessor = graph.get_node(predecessor_id)
+            source_branch = source_predecessors[predecessor_id]
+            source_status = source_branch.get("status")
+            source_digest = source_branch.get("result_digest")
+            temporal_id = predecessor_temporal_ids[predecessor_id]
+
+            if getattr(predecessor.settings, "disabled", False):
+                state = "disabled"
+                status = ActivityStatus.SKIPPED.value if predecessor_id in self.skipped_nodes else "disabled"
+                result_digest = None
+            elif self._converge_predecessor_will_replay(predecessor, temporal_id, source_branch, graph):
+                state = "restored"
+                status = source_status
+                result_digest = source_digest
+            else:
+                state = "live"
+                if predecessor_id in self.skipped_nodes:
+                    status = ActivityStatus.SKIPPED.value
+                    output = (
+                        self.resolver.get_namespace(predecessor_id)
+                        if self.resolver.has_namespace(predecessor_id)
+                        else None
+                    )
+                elif predecessor_id in self.failed_nodes:
+                    status = ActivityStatus.FAILED.value
+                    output = (
+                        self.resolver.get_namespace(predecessor_id)
+                        if self.resolver.has_namespace(predecessor_id)
+                        else None
+                    )
+                elif self.resolver.has_namespace(predecessor_id):
+                    output = self.resolver.get_namespace(predecessor_id)
+                    status = (
+                        str(output.get("status", ActivityStatus.COMPLETED.value))
+                        if isinstance(output, dict)
+                        else ActivityStatus.COMPLETED.value
+                    )
+                else:
+                    status = "pending"
+                    output = None
+                result_digest = self._retry_converge_result_digest(output)
+
+            current_predecessors[predecessor_id] = {
+                "state": state,
+                "status": status,
+                "result_digest": result_digest,
+            }
+
+        source_predecessor_metadata: dict[str, dict[str, Any]] = {}
+        for predecessor_id, source_branch in source_predecessors.items():
+            predecessor = graph.get_node(predecessor_id)
+            source_status = source_branch.get("status")
+            source_digest = source_branch.get("result_digest")
+            if getattr(predecessor.settings, "disabled", False) and source_status == ActivityStatus.SKIPPED.value:
+                state = "disabled"
+                source_digest = None
+            elif source_status in _RESTORABLE_SOURCE_STATUS_VALUES:
+                state = "restored"
+            elif source_status is None:
+                state = "missing"
+            else:
+                state = "unavailable"
+            source_predecessor_metadata[predecessor_id] = {
+                "state": state,
+                "status": source_status,
+                "result_digest": source_digest,
+            }
+
+        source_strategy = source_gate.get("strategy", source_input.get("strategy"))
+        source_n_required = source_gate.get("n_required", source_input.get("n_required"))
+        source_metadata = {
+            "strategy": normalized_strategy(source_strategy),
+            "n_required": source_n_required,
+            "total_branches": source_total,
+            "predecessors": source_predecessor_metadata,
+        }
+        current_metadata = {
+            "strategy": normalized_strategy(resolved_parameters.get("strategy")),
+            "n_required": resolved_parameters.get("n_required"),
+            "total_branches": len(predecessor_ids),
+            "predecessors": current_predecessors,
+        }
+        return current_metadata == source_metadata
+
+    @staticmethod
+    def _retry_converge_result_digest(value: Any) -> str | None:  # noqa: ANN401
+        """Hash a current predecessor result with the source metadata's encoding."""
+        if value is None:
+            return None
+        serialized = json.dumps(value, sort_keys=True, separators=(",", ":"), default=str)
+        return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
 
     def _selected_failure_iteration_paths(self) -> dict[str, list[list[int]]]:
         """Index selected failed rows by their recorded complete iteration path."""
@@ -623,6 +851,11 @@ class WorkflowRetryMixin:
         """
         if not self.retry_context:
             return None
+        # Converges make their replay decision only once the gate has enough
+        # predecessor state. That decision needs resolved parameters and therefore
+        # belongs in _execute_converge_node rather than this generic fast path.
+        if node.type == NodeType.CONVERGE:
+            return None
         if not self._should_restore_node(node.id, graph):
             # This node is about to run for real, so it must stop looking like a
             # replay candidate before it completes. The sync service asks the
@@ -644,8 +877,8 @@ class WorkflowRetryMixin:
         set is held to the extra test of whether its recorded branch is recoverable;
         if it is not, it re-decides normally. A loop must reach its executor so
         its per-iteration probe can route it; generic restoration would lose that
-        routing state. A converge still reruns because restoring it would release
-        successors without evaluating its gate.
+        routing state. A converge is evaluated at its gate and restored only when
+        the source occurrence and every direct predecessor's stable state match.
         """
         if not self.retry_context:
             return False
@@ -660,7 +893,13 @@ class WorkflowRetryMixin:
             return node.type in _INFERABLE_CONTROL_NODE_TYPES and bool(self._resolved_control_port(node, graph))
         return self._source_status_for_node(node_id, graph) in _RESTORABLE_SOURCE_STATUS_VALUES
 
-    async def _restore_node_state(self, node: ActivityNode, graph: WorkflowGraph) -> dict[str, Any] | None:
+    async def _restore_node_state(  # noqa: C901, PLR0911
+        self,
+        node: ActivityNode,
+        graph: WorkflowGraph,
+        *,
+        require_record: bool = False,
+    ) -> dict[str, Any] | None:
         """Replay this node's recorded outcome from its source run, or None.
 
         One path for both node kinds. The replay fetch is the same, and so is the
@@ -674,10 +913,11 @@ class WorkflowRetryMixin:
         The input goes to ``node_inputs`` (what ``get_activity_input`` reads), so a
         restored node shows the same input on drill-down as one that executed.
 
-        Two differences from the ordinary path are deliberate and kept rather than
-        unified. A control node carries no status guard and tolerates a vanished
-        record, because it can still be restored from a recorded port; an ordinary
-        node cannot, so it skips the replay entirely and raises if the row is gone.
+        Control nodes can be restored from their persisted routing state even when
+        their activity row is unavailable. A converge is stricter: it first compares
+        the source gate and predecessor metadata, then requires the exact row it
+        validated so a vanished record cannot become a synthetic success. Ordinary
+        nodes also require their source status to remain restorable.
 
         The replay activity runs under the node's canonical Temporal ID — not an
         ``__internal__`` id — so the normal event-driven sync records it node by
@@ -711,6 +951,7 @@ class WorkflowRetryMixin:
                 self.retry_context.get("retry_from_execution_id"),
                 node.id,
                 source_temporal_id,
+                require_record,
             ],
             activity_id=source_temporal_id,
             start_to_close_timeout=timedelta(seconds=DEFAULT_ACTIVITY_TIMEOUT_SECONDS),
@@ -744,6 +985,16 @@ class WorkflowRetryMixin:
         self._restored_node_timestamps[source_temporal_id] = restored_timestamps
 
         if is_control:
+            if node.type == NodeType.CONVERGE:
+                stored_control = (record or {}).get("control_data")
+                if isinstance(stored_control, dict):
+                    self.node_control_data[node.id] = stored_control
+                if source_status != ActivityStatus.COMPLETED.value:
+                    if output:
+                        self._restored_node_outputs[node.id] = output
+                    return self._restored_terminal_result(node, source_status, output, error_details)
+                return {"output": output, "control": None}
+
             # A control node needs the routing decision, not a payload, and the
             # source row already carries it. The persisted ``control_data`` wins,
             # because the sync layer records the branch the run actually took;
