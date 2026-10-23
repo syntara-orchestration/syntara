@@ -7,6 +7,7 @@ from temporalio import activity
 from temporalio.exceptions import ApplicationError
 
 from syntara.workflow_core.models import ActivityName, LoopOutput, LoopType
+from syntara.workflow_runtime.engines.temporal.activities.output_mapping import dump_output
 
 logger = structlog.stdlib.get_logger(__name__)
 
@@ -63,7 +64,7 @@ async def loop(
         )
 
         return {
-            "output": output.dump(output_config),
+            "output": dump_output(output, output_config),
             "control": {
                 "next_port": next_port,
                 "next_index": next_index,
@@ -89,7 +90,7 @@ async def loop(
         )
 
         return {
-            "output": output.dump(output_config),
+            "output": dump_output(output, output_config),
             "control": {
                 "next_port": next_port,
                 "next_index": next_index,

@@ -1289,6 +1289,16 @@ class TestExtractFailureOutput:
         assert isinstance(result, dict)
         assert "response_code" not in result
 
+    def test_invalid_mapping_does_not_break_workflow_failure_handling(self) -> None:
+        """Failure fallback must not evaluate an already-invalid output mapping."""
+        wf = _make_workflow()
+        graph = _build_chain_graph()
+        graph.get_node("node_a").outputs = {"value": "${result.stdout_json.value}"}
+
+        result = wf._extract_failure_output("node_a", None, graph)
+
+        assert result["stdout_json"] is None
+
 
 class TestEvaluatePredecessor:
     """Tests for _evaluate_predecessor — all return paths."""

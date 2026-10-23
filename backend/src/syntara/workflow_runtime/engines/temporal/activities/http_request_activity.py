@@ -24,6 +24,7 @@ from syntara.workflow_core.utils.credential_scrubber import ensure_resolved_cred
 from syntara.workflow_runtime.engines.temporal import constants
 
 from .common import HEARTBEAT_STOP_MONITOR, ActivityExecutionError, is_retryable_http_status
+from .output_mapping import dump_output
 
 logger = structlog.stdlib.get_logger(__name__)
 
@@ -206,7 +207,7 @@ async def execute_http_request_activity(
             )
             raise ApplicationError(  # noqa: TRY301
                 msg,
-                {"output": output.dump(output_config)},
+                {"output": dump_output(output, output_config)},
                 type="HTTPError",
                 non_retryable=not is_retryable_http_status(response.status_code),
             )
@@ -223,7 +224,7 @@ async def execute_http_request_activity(
             headers=dict(response.headers),
             elapsed=elapsed,
         )
-        return {"output": output.dump(output_config)}
+        return {"output": dump_output(output, output_config)}
 
     except ApplicationError:
         raise

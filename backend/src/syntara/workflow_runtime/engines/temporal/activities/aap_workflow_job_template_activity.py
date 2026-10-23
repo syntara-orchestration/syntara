@@ -39,6 +39,7 @@ from .aap_common import (
     resolve_label_ids,
 )
 from .common import HEARTBEAT_PARTIAL_OUTPUT_KEY, HEARTBEAT_STOP_MONITOR, is_retryable_http_status
+from .output_mapping import dump_output
 
 logger = structlog.stdlib.get_logger(__name__)
 
@@ -403,7 +404,10 @@ async def execute_aap_workflow_job_template_activity(  # noqa: PLR0915
                 )
                 msg = f"AAP workflow job {job_id} failed with status: {final_status}"
                 raise ApplicationError(  # noqa: TRY301
-                    msg, {"output": output.dump(output_config)}, type="AAPWorkflowJobExecutionError", non_retryable=True
+                    msg,
+                    {"output": dump_output(output, output_config)},
+                    type="AAPWorkflowJobExecutionError",
+                    non_retryable=True,
                 )
 
             emit_completed(
@@ -417,7 +421,7 @@ async def execute_aap_workflow_job_template_activity(  # noqa: PLR0915
                 node_type=_NODE_TYPE,
                 actor_id=actor_id,
             )
-            return {"output": output.dump(output_config)}
+            return {"output": dump_output(output, output_config)}
 
     except ApplicationError:
         raise
@@ -450,7 +454,7 @@ async def execute_aap_workflow_job_template_activity(  # noqa: PLR0915
         )
         raise ApplicationError(
             str(e),
-            {"output": output.dump(output_config)},
+            {"output": dump_output(output, output_config)},
             type="AAPWorkflowJobExecutionError",
             non_retryable=not e.retryable,
         ) from e
@@ -470,5 +474,5 @@ async def execute_aap_workflow_job_template_activity(  # noqa: PLR0915
         output = AAPWorkflowJobTemplateOutput(workflow_job_id=job_id, workflow_job_url=workflow_job_url)
         msg = f"Unexpected error executing AAP workflow job template (job_id={job_id})"
         raise ApplicationError(
-            msg, {"output": output.dump(output_config)}, type=type(e).__name__, non_retryable=True
+            msg, {"output": dump_output(output, output_config)}, type=type(e).__name__, non_retryable=True
         ) from None
