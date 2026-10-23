@@ -299,6 +299,57 @@ async def test_cancelled_stop_retains_consumer_for_retry(mock_aiokafka: MagicMoc
     assert consumer.stop.await_count == 1
 
 
+async def test_cancelled_start_retains_partial_client_until_stop(mock_aiokafka: MagicMock) -> None:
+    adapter = KafkaPartitionConsumer(_connection(), _source_config())
+    consumer = mock_aiokafka.return_value
+    entered, release = asyncio.Event(), asyncio.Event()
+
+    async def start() -> None:
+        entered.set()
+        await release.wait()
+
+    consumer.start.side_effect = start
+    task = asyncio.create_task(adapter.start())
+    await entered.wait()
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    assert not adapter.is_running
+    assert adapter._consumer is consumer
+    with pytest.raises(KafkaTransportError, match="shutdown is incomplete"):
+        await adapter.start()
+    mock_aiokafka.assert_called_once()
+    await adapter.stop()
+    await adapter.stop()
+    consumer.stop.assert_awaited_once()
+    consumer.subscribe.assert_not_called()
+    assert vars(adapter)["_consumer"] is None
+
+
+async def test_failed_start_retains_client_when_cleanup_times_out(mock_aiokafka: MagicMock) -> None:
+    adapter = KafkaPartitionConsumer(_connection(), _source_config())
+    consumer = mock_aiokafka.return_value
+    consumer.start.side_effect = KafkaConnectionError("unavailable")
+    entered, release = asyncio.Event(), asyncio.Event()
+
+    async def close() -> None:
+        entered.set()
+        await release.wait()
+
+    consumer.stop.side_effect = close
+    with pytest.raises(TimeoutError):
+        async with asyncio.timeout(0.01):
+            await adapter.start()
+    assert entered.is_set()
+    assert adapter._consumer is consumer
+    with pytest.raises(KafkaTransportError, match="shutdown is incomplete"):
+        await adapter.start()
+    release.set()
+    await adapter.stop()
+    consumer.stop.assert_awaited_once()
+    assert vars(adapter)["_consumer"] is None
+
+
 @pytest.mark.anyio
 async def test_operations_rejected_when_stopped() -> None:
     adapter = KafkaPartitionConsumer(_connection(), _source_config())

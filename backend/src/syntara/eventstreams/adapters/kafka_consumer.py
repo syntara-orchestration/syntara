@@ -191,14 +191,16 @@ class KafkaPartitionConsumer:
             max_partition_fetch_bytes=settings.event_queue_max_bytes,
         )
 
+        # Startup can be cancelled by a deadline or shutdown; retain ownership
+        # so the runner's cleanup can close a partially started client.
+        self._consumer = consumer
         try:
             await consumer.start()
         except KafkaError as exc:
-            with contextlib.suppress(KafkaError):
-                await consumer.stop()
+            with contextlib.suppress(KafkaTransportError):
+                await self.stop()
             raise KafkaTransportError(_sanitize(str(exc))) from exc
 
-        self._consumer = consumer
         self._running = True
 
         listener = _RebalanceListener(

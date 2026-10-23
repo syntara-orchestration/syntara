@@ -1479,6 +1479,10 @@ class EventStreamSettings(BaseSettings):
     that complete workflow start arguments fit downstream transport limits.
     """
 
+    eventstream_enabled: bool = Field(
+        default=False,
+        description="Enable the standalone control-plane event subscription worker",
+    )
     event_fetch_max_records: int = Field(
         default=EventRunnerDefaults.FETCH_MAX_RECORDS,
         gt=0,

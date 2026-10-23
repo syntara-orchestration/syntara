@@ -37,10 +37,17 @@ class SubscriptionSupervisor:
     source identity, group position, or permanent-content evidence is changed.
     """
 
-    def __init__(self, subscription_id: UUID, runner_factory: SubscriptionRunnerFactory) -> None:
+    def __init__(
+        self,
+        subscription_id: UUID,
+        runner_factory: SubscriptionRunnerFactory,
+        *,
+        startup_timeout_seconds: float | None = None,
+    ) -> None:
         """Keep retry/circuit state local and reuse the existing drain deadline."""
         self._subscription_id = subscription_id
         self._factory = runner_factory
+        self._startup_timeout = startup_timeout_seconds
         self._drain_timeout = get_settings().event_drain_timeout_seconds
         self._lock = asyncio.Lock()
         self._desired: SubscriptionSnapshot | None = None
@@ -218,14 +225,15 @@ class SubscriptionSupervisor:
             self._starting = False
 
     async def _open_runner(self, snapshot: SubscriptionSnapshot, revision: RuntimeRevision) -> None:
-        runner = await self._factory(snapshot)
-        self._runner, self._runner_revision = runner, revision
-        if runner.snapshot != snapshot:
-            raise SubscriptionRuntimeError(RuntimeFailureCode.CONFIGURATION_UNAVAILABLE)
-        if self._closed or self._desired != snapshot:
-            return
-        await runner.start()
-        self._applied = revision
+        async with asyncio.timeout(self._startup_timeout):
+            runner = await self._factory(snapshot)
+            self._runner, self._runner_revision = runner, revision
+            if runner.snapshot != snapshot:
+                raise SubscriptionRuntimeError(RuntimeFailureCode.CONFIGURATION_UNAVAILABLE)
+            if self._closed or self._desired != snapshot:
+                return
+            await runner.start()
+            self._applied = revision
 
     async def _serve(self, runner: SubscriptionRunner) -> None:
         try:
