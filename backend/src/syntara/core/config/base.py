@@ -28,7 +28,7 @@ from pydantic import Field, HttpUrl, SecretStr, computed_field, field_validator,
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.engine import URL, make_url
 
-from syntara.core.constants import EventStreamLimits, RequestLimits, RetrieverServiceDefaults
+from syntara.core.constants import EventDeliveryDefaults, EventStreamLimits, RequestLimits, RetrieverServiceDefaults
 from syntara.core.exceptions import SafeValueError
 
 # =============================================================================
@@ -1486,6 +1486,11 @@ class EventStreamSettings(BaseSettings):
         default=EventStreamLimits.DEFAULT_MAX_HEADERS,
         gt=0,
         description="Candidate event header count limit pending release validation",
+    )
+    event_delivery_retention_seconds: int = Field(
+        default=EventDeliveryDefaults.RETENTION_SECONDS,
+        gt=0,
+        description="Minimum terminal delivery retention from resolved_at; never expires unresolved evidence",
     )
 
 
