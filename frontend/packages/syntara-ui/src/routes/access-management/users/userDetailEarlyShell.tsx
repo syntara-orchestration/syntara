@@ -12,14 +12,14 @@ export function renderUserDetailEarlyShell({
   isMeQueryPending,
   hasUserQueryError,
   queryState,
-  navigateBack,
+  backTo,
   refetchUser,
 }: Readonly<{
   isMyProfile: boolean
   isMeQueryPending: boolean
   hasUserQueryError: boolean
   queryState: ReactNode
-  navigateBack: () => void
+  backTo: string
   refetchUser: () => Promise<unknown>
 }>): ReactElement | null {
   if (isMyProfile && isMeQueryPending) {
@@ -37,7 +37,7 @@ export function renderUserDetailEarlyShell({
     return (
       <DetailPageShell title={shellTitle} breadcrumbs={shellBreadcrumbs}>
         <UserNotFoundState
-          onBack={navigateBack}
+          backTo={backTo}
           backLabel={isMyProfile ? 'Back to workflows' : undefined}
           onRetry={() => {
             detachPromise(refetchUser())

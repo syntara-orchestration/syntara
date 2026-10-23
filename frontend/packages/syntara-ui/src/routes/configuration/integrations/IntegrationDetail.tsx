@@ -16,7 +16,7 @@ import {
 import { RhUiCheckCircleIcon, RhUiEditIcon, RhUiTrashIcon, RhUiWarningIcon } from '@patternfly/react-icons'
 import type { IntegrationsAPI } from '@syntara/contracts'
 import { IntegrationTypeEnum } from '@syntara/contracts'
-import { useNavigate, useParams } from '@tanstack/react-router'
+import { useParams } from '@tanstack/react-router'
 
 import { AppRoute } from '../../../app/AppRoute'
 import { breadcrumbsIntegrationDetail, breadcrumbsIntegrationDetailEarlyShell } from '../../../app/breadcrumbBuilders'
@@ -160,13 +160,13 @@ function IntegrationToolbar({
   integration,
   kebabActions,
   onToggleEnabled,
-  onEdit,
+  editTo,
   permissions,
 }: Readonly<{
   integration: IntegrationRead
   kebabActions: KebabAction[]
   onToggleEnabled: () => void
-  onEdit: () => void
+  editTo: string
   permissions: IntegrationPermissions
 }>) {
   return (
@@ -191,14 +191,15 @@ function IntegrationToolbar({
         />
       )}
       <DisabledWithTooltip isDisabled={!permissions.canUpdate} content={permissions.tooltips.update}>
-        <Button
-          variant="primary"
-          icon={<RhUiEditIcon />}
-          isAriaDisabled={!permissions.canUpdate}
-          onClick={permissions.canUpdate ? onEdit : undefined}
-        >
-          Edit integration
-        </Button>
+        {permissions.canUpdate ? (
+          <SynLink to={editTo} variant="primary" icon={<RhUiEditIcon />}>
+            Edit integration
+          </SynLink>
+        ) : (
+          <Button variant="primary" icon={<RhUiEditIcon />} isAriaDisabled>
+            Edit integration
+          </Button>
+        )}
       </DisabledWithTooltip>
       <SynKebabMenu actions={kebabActions} aria-label="Integration actions" />
     </>
@@ -286,7 +287,6 @@ type IntegrationDetailTab = 'details' | 'resources' | 'edit'
 
 export function IntegrationDetail() {
   const { integrationId }: { integrationId: string } = useParams({ strict: false })
-  const navigate = useNavigate()
   const integrationBasePath = AppRoute.Configuration.Integrations.Detail.replace(':integrationId', integrationId)
   const editPath = AppRoute.Configuration.Integrations.Edit.replace(':integrationId', integrationId)
   const [activeTab] = useUrlTab<IntegrationDetailTab>(integrationBasePath)
@@ -398,7 +398,7 @@ export function IntegrationDetail() {
             integration={integration}
             kebabActions={kebabActions}
             onToggleEnabled={() => handleToggleEnabled(integration)}
-            onEdit={() => detachPromise(navigate({ to: editPath }))}
+            editTo={editPath}
             permissions={permissions}
           />
         }

@@ -272,10 +272,12 @@ describe('Workflows Component', () => {
       render(<Workflows />, { wrapper })
 
       const importButton = screen.getByRole('button', { name: 'Import workflow' })
-      const createButton = screen.getByRole('button', { name: 'Create workflow' })
+      const createButton = screen.getByRole('link', { name: 'Create workflow' })
 
       // Import workflow (secondary) must precede Create workflow (primary) in the DOM
       expect(importButton.compareDocumentPosition(createButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+      expect(createButton).toHaveClass('pf-m-primary')
+      expect(createButton).toHaveAttribute('href', '/workflow-builder/new')
     })
 
     it('renders workflows in the table', async () => {
@@ -398,7 +400,7 @@ describe('Workflows Component', () => {
 
       render(<Workflows />, { wrapper })
 
-      expect(screen.getByRole('button', { name: 'Create workflow' })).toBeInTheDocument()
+      expect(screen.getByRole('link', { name: 'Create workflow' })).toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'Import workflow' })).toBeInTheDocument()
     })
 
@@ -1241,14 +1243,11 @@ describe('Workflows Component', () => {
       expect(screen.getByRole('button', { name: 'Import workflow' })).toBeInTheDocument()
       // Create workflow only appears in the empty state body, not the toolbar (toolbar
       // hides Create when there are no workflows and no active filters).
-      const createButtons = screen.getAllByRole('button', { name: 'Create workflow' })
-      expect(createButtons).toHaveLength(1)
+      const createLinks = screen.getAllByRole('link', { name: 'Create workflow' })
+      expect(createLinks).toHaveLength(1)
     })
 
-    it('navigates to builder when empty state "Create workflow" button is clicked', async () => {
-      const user = userEvent.setup()
-      routerTestState.navigate.mockClear()
-
+    it('links to the builder from the empty state', () => {
       mockWorkflowQuery({
         data: {
           resources: [],
@@ -1265,10 +1264,7 @@ describe('Workflows Component', () => {
 
       render(<Workflows />, { wrapper })
 
-      const createButton = screen.getByRole('button', { name: 'Create workflow' })
-      await user.click(createButton)
-
-      expect(routerTestState.navigate).toHaveBeenCalledWith({ to: '/workflow-builder/new' })
+      expect(screen.getByRole('link', { name: 'Create workflow' })).toHaveAttribute('href', '/workflow-builder/new')
     })
 
     it('shows EmptyStateFilter when active filters return no results', () => {

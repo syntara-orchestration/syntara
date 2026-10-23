@@ -267,7 +267,7 @@ export function GroupDetail() {
     return (
       <DetailPageShell title="Group Details" breadcrumbs={breadcrumbsGroupDetailEarlyShell()}>
         <GroupNotFoundState
-          onBack={navigateBack}
+          backTo={AppRoute.AccessManagement.Groups}
           onRetry={() => {
             detachPromise(refetchGroup())
           }}

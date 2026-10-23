@@ -501,8 +501,7 @@ describe('UserDetail', () => {
       expect(screen.getByText('Azure AD')).toBeInTheDocument()
     })
 
-    it('clicking an identity provider label navigates to the identity provider detail', async () => {
-      const user = userEvent.setup()
+    it('links an identity provider label to its detail page', () => {
       vi.mocked(accessClient.useQuery).mockImplementation((_method, path) => {
         if (path === '/users/{user_id}') {
           return {
@@ -527,10 +526,9 @@ describe('UserDetail', () => {
 
       render(<UserDetail />, { wrapper })
 
-      await user.click(screen.getByText('Okta'))
-
-      expect(routerTestState.navigate).toHaveBeenCalledWith(
-        expect.objectContaining({ to: expect.stringContaining('idp-1') as string })
+      expect(screen.getByRole('link', { name: 'Okta' })).toHaveAttribute(
+        'href',
+        '/system-administration/authentication/identity-providers/idp-1'
       )
     })
 
@@ -742,7 +740,7 @@ describe('UserDetail', () => {
       ).toBeInTheDocument()
     })
 
-    it('renders Back to users button in error state', () => {
+    it('renders a Back to users link in error state', () => {
       vi.mocked(accessClient.useQuery).mockImplementation((_method, path) => {
         if (path === '/users/{user_id}') {
           return {
@@ -765,7 +763,10 @@ describe('UserDetail', () => {
 
       render(<UserDetail />, { wrapper })
 
-      expect(screen.getByRole('button', { name: 'Back to users' })).toBeInTheDocument()
+      expect(screen.getByRole('link', { name: 'Back to users' })).toHaveAttribute(
+        'href',
+        '/system-administration/access-management/users'
+      )
     })
 
     it('renders Retry button in error state', () => {
@@ -863,15 +864,13 @@ describe('UserDetail', () => {
   // ---- Navigation ---------------------------------------------------------
 
   describe('Navigation', () => {
-    it('navigates to edit page when Edit user button is clicked', async () => {
-      const user = userEvent.setup()
+    it('links to the edit page from the Edit user action', () => {
       render(<UserDetail />, { wrapper })
 
-      await user.click(screen.getByRole('button', { name: 'Edit user' }))
-
-      expect(routerTestState.navigate).toHaveBeenCalledWith({
-        to: `/system-administration/access-management/users/${VALID_USER_ID}/edit`,
-      })
+      expect(screen.getByRole('link', { name: 'Edit user' })).toHaveAttribute(
+        'href',
+        `/system-administration/access-management/users/${VALID_USER_ID}/edit`
+      )
     })
 
     it('disables Edit user button when canUpdate is false', () => {
@@ -934,7 +933,7 @@ describe('UserDetail', () => {
 
       render(<UserDetail />, { wrapper })
 
-      expect(screen.getByRole('button', { name: 'Edit user' })).toBeInTheDocument()
+      expect(screen.getByRole('link', { name: 'Edit user' })).toBeInTheDocument()
       expect(screen.queryByRole('button', { name: 'User actions' })).not.toBeInTheDocument()
     })
 
@@ -1000,9 +999,7 @@ describe('UserDetail', () => {
       expect(screen.getByRole('menuitem', { name: /revoke tokens/i })).toHaveAttribute('aria-disabled', 'true')
     })
 
-    it('navigates back to users list when Back to users button in error state is clicked', async () => {
-      const user = userEvent.setup()
-
+    it('links back to users list from the error state', () => {
       vi.mocked(accessClient.useQuery).mockImplementation((_method, path) => {
         if (path === '/users/{user_id}') {
           return {
@@ -1025,11 +1022,10 @@ describe('UserDetail', () => {
 
       render(<UserDetail />, { wrapper })
 
-      await user.click(screen.getByRole('button', { name: 'Back to users' }))
-
-      expect(routerTestState.navigate).toHaveBeenCalledWith({
-        to: '/system-administration/access-management/users',
-      })
+      expect(screen.getByRole('link', { name: 'Back to users' })).toHaveAttribute(
+        'href',
+        '/system-administration/access-management/users'
+      )
     })
   })
 
@@ -1277,8 +1273,7 @@ describe('UserDetail', () => {
       expect(screen.getByText('Azure AD')).toBeInTheDocument()
     })
 
-    it('navigates to IdP detail when clicking provider label', async () => {
-      const user = userEvent.setup()
+    it('links provider label to IdP detail', () => {
       mockQueryByPath({
         '/users/{user_id}': mockFederatedUser,
         '/users/{user_id}/groups': mockGroupsData,
@@ -1289,12 +1284,9 @@ describe('UserDetail', () => {
       })
       render(<UserDetail />, { wrapper })
 
-      await user.click(screen.getByText('Okta'))
-
-      expect(routerTestState.navigate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          to: expect.stringContaining('/system-administration/authentication/identity-providers/idp-1') as string,
-        })
+      expect(screen.getByRole('link', { name: 'Okta' })).toHaveAttribute(
+        'href',
+        '/system-administration/authentication/identity-providers/idp-1'
       )
     })
 
@@ -1506,8 +1498,7 @@ describe('UserDetail', () => {
       expect(screen.getByRole('progressbar', { name: 'Loading' })).toBeInTheDocument()
     })
 
-    it('navigates to workflows when Back button is clicked in error state', async () => {
-      const user = userEvent.setup()
+    it('links to workflows from the My Profile error state', () => {
       mockAuthQuery.mockReturnValue({
         data: { id: VALID_USER_ID },
         isPending: false,
@@ -1531,9 +1522,7 @@ describe('UserDetail', () => {
 
       render(<UserDetail isMyProfile />, { wrapper })
 
-      await user.click(screen.getByRole('button', { name: 'Back to workflows' }))
-
-      expect(routerTestState.navigate).toHaveBeenCalledWith({ to: '/workflows' })
+      expect(screen.getByRole('link', { name: 'Back to workflows' })).toHaveAttribute('href', '/workflows')
     })
 
     it('renders tab content correctly', () => {

@@ -93,12 +93,10 @@ vi.mock('../GroupFormModal', () => ({
 }))
 
 vi.mock('./GroupNotFoundState', () => ({
-  GroupNotFoundState: ({ onBack, onRetry }: { onBack: () => void; onRetry: () => void }) => (
+  GroupNotFoundState: ({ backTo, onRetry }: { backTo: string; onRetry: () => void }) => (
     <div>
       <span>Group not found</span>
-      <button type="button" onClick={onBack}>
-        Back to groups
-      </button>
+      <a href={backTo}>Back to groups</a>
       <button type="button" onClick={onRetry}>
         Retry
       </button>
@@ -423,21 +421,24 @@ describe('GroupDetail', () => {
       render(<GroupDetail />, { wrapper })
 
       expect(screen.getByText('Group not found')).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: 'Back to groups' })).toBeInTheDocument()
+      expect(screen.getByRole('link', { name: 'Back to groups' })).toHaveAttribute(
+        'href',
+        '/system-administration/access-management/groups'
+      )
       expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument()
     })
 
-    it('navigates back to groups list when Back to groups is clicked', async () => {
-      const user = userEvent.setup()
+    it('links back to groups list from the not-found state', () => {
       mockQueryByPath({
         '/groups/{group_id}': { isError: true, error: new Error('Not found') },
       })
 
       render(<GroupDetail />, { wrapper })
 
-      await user.click(screen.getByRole('button', { name: 'Back to groups' }))
-
-      expect(routerTestState.navigate).toHaveBeenCalledWith({ to: '/system-administration/access-management/groups' })
+      expect(screen.getByRole('link', { name: 'Back to groups' })).toHaveAttribute(
+        'href',
+        '/system-administration/access-management/groups'
+      )
     })
 
     it('calls refetch when Retry is clicked in error state', async () => {
