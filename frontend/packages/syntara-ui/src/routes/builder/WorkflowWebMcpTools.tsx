@@ -2,9 +2,11 @@ import type { Activity } from '@syntara/contracts'
 import { useEffect, useRef, type Dispatch } from 'react'
 
 import { workflowFetchClient } from '../../client'
+import { useProjectStore } from '../../stores/useProjectStore'
 import { useWorkflowStore } from '../../stores/useWorkflowStore'
 import { getErrorMessage } from '../../utils/apiErrors'
 import { detachPromise } from '../../utils/detachPromise'
+import type { ProjectRead } from '../access/types'
 
 import type { BuilderAction } from './builderReducer'
 import type { EdgeConnection } from './types/edge'
@@ -18,7 +20,10 @@ type WorkflowWebMcpToolsProps = {
   workflowId: string | null
   workflowName: string
   workflowDescription: string
-  selectedProjectId: string | null
+  selectableProjects: ProjectRead[]
+  selectableProjectsLoading: boolean
+  selectableProjectsFailed: boolean
+  selectProject: (project: ProjectRead) => boolean
   canEdit: boolean
   canRun: boolean
   handleSaveWorkflow: () => Promise<boolean>
@@ -71,6 +76,44 @@ function getWorkflowSnapshot() {
   const activities = currentWorkflow?.workflow.activities ?? []
   const triggers = currentWorkflow?.triggers ?? []
   return { store, currentWorkflow, activities, triggers, edges: store.edges, nodePositions: store.nodePositions }
+}
+
+type ProjectSelectionResolution =
+  | { ok: true; project: ProjectRead }
+  | { ok: false; message: string; matching_projects?: { id: string | undefined; name: string }[] }
+
+function resolveProjectSelection(input: unknown, projects: ProjectRead[]): ProjectSelectionResolution {
+  if (!isRecord(input)) return { ok: false, message: 'Provide project_name or project_id.' }
+
+  const projectName = typeof input.project_name === 'string' ? input.project_name.trim() : ''
+  const projectId = typeof input.project_id === 'string' ? input.project_id.trim() : ''
+  if (Boolean(projectName) === Boolean(projectId)) {
+    return { ok: false, message: 'Provide exactly one of project_name or project_id.' }
+  }
+
+  const normalizedName = projectName.toLowerCase()
+  const matches = projects.filter((project) =>
+    projectId ? project.id === projectId : project.name.trim().toLowerCase() === normalizedName
+  )
+  if (matches.length === 1) {
+    const [project] = matches
+    if (project) return { ok: true, project }
+  }
+
+  const suggestions = projectName
+    ? projects
+        .filter((project) => project.name.toLowerCase().includes(normalizedName))
+        .slice(0, 5)
+        .map((project) => ({ id: project.id, name: project.name }))
+    : []
+  return {
+    ok: false,
+    message:
+      matches.length > 1
+        ? 'More than one selectable project matched. Select by project_id.'
+        : 'No selectable project matched the requested name or ID.',
+    ...(suggestions.length > 0 ? { matching_projects: suggestions } : {}),
+  }
 }
 
 function getValidationSummary(activities: Activity[], edges: EdgeConnection[], triggers: Activity[]) {
@@ -172,11 +215,13 @@ function createGetBuilderStateTool(actionsRef: { current: CurrentActions }): Too
     execute: () => {
       const actions = actionsRef.current
       const { currentWorkflow, activities, triggers, store } = getWorkflowSnapshot()
+      const selectedProject = useProjectStore.getState()
       return {
         workflow_id: actions.workflowId,
         name: actions.workflowName,
         description: actions.workflowDescription,
-        selected_project_id: actions.selectedProjectId,
+        selected_project_id: selectedProject.selectedProjectId,
+        selected_project_name: selectedProject.selectedProjectName,
         is_new: actions.isNew,
         is_dirty: store.isDirty,
         permissions: { can_edit: actions.canEdit, can_run: actions.canRun },
@@ -194,6 +239,54 @@ function createGetBuilderStateTool(actionsRef: { current: CurrentActions }): Too
           target_handle: edge.targetHandle ?? null,
         })),
         ready: currentWorkflow !== null,
+      }
+    },
+  }
+}
+
+function createSelectWorkflowProjectTool(actionsRef: { current: CurrentActions }): ToolDefinition {
+  return {
+    name: 'select_workflow_project',
+    description:
+      'Select a non-built-in project for this new workflow. Provide exactly one of project_name (exact name, case-insensitive) or project_id. Use before saving; this changes the builder selection only and does not save the workflow.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        project_name: {
+          type: 'string',
+          minLength: 1,
+          description: 'Exact project name to select, matched without case sensitivity.',
+        },
+        project_id: { type: 'string', minLength: 1, description: 'ID of a selectable non-built-in project.' },
+      },
+    },
+    annotations: { readOnlyHint: false, untrustedContentHint: false, consequentialHint: false },
+    execute: (input) => {
+      const actions = actionsRef.current
+      if (!actions.canEdit) return { ok: false, message: 'You do not have permission to edit this workflow.' }
+      if (!actions.isNew) {
+        return { ok: false, message: 'Project selection is available only for a new workflow.' }
+      }
+      if (actions.selectableProjectsLoading) {
+        return { ok: false, message: 'The selectable project list is still loading. Try again shortly.' }
+      }
+      if (actions.selectableProjectsFailed) {
+        return {
+          ok: false,
+          message: 'The selectable project list could not be loaded. Check the builder and try again.',
+        }
+      }
+
+      const resolution = resolveProjectSelection(input, actions.selectableProjects)
+      if (!resolution.ok) return resolution
+      if (!actions.selectProject(resolution.project)) {
+        return { ok: false, message: 'The selected project could not be applied in the builder.' }
+      }
+      return {
+        ok: true,
+        selected_project: { id: resolution.project.id, name: resolution.project.name },
+        message: `Selected project ${resolution.project.name}.`,
       }
     },
   }
@@ -288,7 +381,7 @@ function createSaveWorkflowTool(actionsRef: { current: CurrentActions }): ToolDe
       if (!getWorkflowSnapshot().currentWorkflow) {
         return { ok: false, message: 'The workflow builder is still loading.' }
       }
-      if (actions.isNew && !actions.selectedProjectId) {
+      if (actions.isNew && !useProjectStore.getState().selectedProjectId) {
         return { ok: false, message: 'Select a project in the builder before saving this new workflow.' }
       }
 
@@ -364,6 +457,7 @@ function buildToolDefinitions(actionsRef: { current: CurrentActions }): ToolDefi
     createGetBuilderStateTool(actionsRef),
     createValidateWorkflowTool(actionsRef),
   ]
+  if (actions.canEdit && actions.isNew) tools.push(createSelectWorkflowProjectTool(actionsRef))
   if (actions.canEdit && actions.isNew) tools.push(createWorkflowDraftTool(actionsRef))
   if (actions.canEdit) tools.push(createSaveWorkflowTool(actionsRef))
   if (actions.canRun && actions.workflowId && !actions.isNew) {
@@ -378,7 +472,10 @@ export function WorkflowWebMcpTools(props: WorkflowWebMcpToolsProps) {
     workflowId,
     workflowName,
     workflowDescription,
-    selectedProjectId,
+    selectableProjects,
+    selectableProjectsLoading,
+    selectableProjectsFailed,
+    selectProject,
     canEdit,
     canRun,
     handleSaveWorkflow,
@@ -392,7 +489,10 @@ export function WorkflowWebMcpTools(props: WorkflowWebMcpToolsProps) {
       workflowId,
       workflowName,
       workflowDescription,
-      selectedProjectId,
+      selectableProjects,
+      selectableProjectsLoading,
+      selectableProjectsFailed,
+      selectProject,
       canEdit,
       canRun,
       handleSaveWorkflow,
@@ -403,7 +503,10 @@ export function WorkflowWebMcpTools(props: WorkflowWebMcpToolsProps) {
     workflowId,
     workflowName,
     workflowDescription,
-    selectedProjectId,
+    selectableProjects,
+    selectableProjectsLoading,
+    selectableProjectsFailed,
+    selectProject,
     canEdit,
     canRun,
     handleSaveWorkflow,

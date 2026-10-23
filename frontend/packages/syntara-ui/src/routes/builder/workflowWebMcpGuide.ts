@@ -78,8 +78,9 @@ const WORKFLOW_GUIDES: Record<string, WorkflowGuideSection> = {
   },
   saving_and_running: {
     title: 'Saving and running workflows',
-    summary: 'A new workflow needs a selected project before it can be saved.',
+    summary: 'Start from the Workflows page, choose a project, then validate and save the new workflow.',
     key_points: [
+      'From the Workflows page, open a blank builder with open_new_workflow_builder. In the builder, select a non-built-in project by exact name or ID with select_workflow_project.',
       'Validate the graph and node configuration, then save. Saving does not start an execution.',
       'A run request checks readiness and opens Syntara’s confirmation dialog. A person confirms and provides trigger inputs when needed.',
     ],
