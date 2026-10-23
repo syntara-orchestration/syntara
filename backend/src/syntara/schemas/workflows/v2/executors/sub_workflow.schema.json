@@ -9,8 +9,9 @@
     "properties": {
       "workflow_id": {
         "type": "string",
-        "maxLength": 550,
-        "description": "UUID of the child workflow to invoke (latest published version), or template expression (max 500 chars). Validated by Pydantic validator."
+        "maxLength": 36,
+        "format": "uuid",
+        "description": "UUID of the selected child workflow in the same Project (latest published version)."
       },
       "trigger_node_id": {
         "type": "string",

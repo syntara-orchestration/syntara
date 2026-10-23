@@ -107,25 +107,22 @@ def test_sub_workflow_node_with_input_mapping() -> None:
     assert node.parameters.input_mapping == {"host": "web-server-01", "port": 8080}
 
 
-def test_sub_workflow_node_with_template_expression() -> None:
-    """SubWorkflowNode should accept template expressions in workflow_id."""
-    workflow_def = WorkflowDefinition(
-        schema_version="2.0.0",
-        name="test-workflow",
-        triggers=[{"type": "manual_trigger"}],
-        nodes=[
-            {
-                "id": "sub1",
-                "type": "sub_workflow",
-                "parameters": {
-                    "workflow_id": "${parent_step.child_workflow_id}",
-                    "trigger_node_id": "trigger_1",
-                },
-            }
-        ],
-        edges=[],
-    )
-
-    node = workflow_def.nodes[0]
-    assert isinstance(node, SubWorkflowNode)
-    assert node.parameters.workflow_id == "${parent_step.child_workflow_id}"
+def test_sub_workflow_node_rejects_template_expression_for_workflow_id() -> None:
+    """V1 requires a statically selected workflow so its project can be validated."""
+    with pytest.raises(ValidationError, match="template expressions are not supported"):
+        WorkflowDefinition(
+            schema_version="2.0.0",
+            name="test-workflow",
+            triggers=[{"type": "manual_trigger"}],
+            nodes=[
+                {
+                    "id": "sub1",
+                    "type": "sub_workflow",
+                    "parameters": {
+                        "workflow_id": "${parent_step.child_workflow_id}",
+                        "trigger_node_id": "trigger_1",
+                    },
+                }
+            ],
+            edges=[],
+        )

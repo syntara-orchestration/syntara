@@ -66,6 +66,14 @@ type ApprovalsResponse = ApprovalsAPI.paths['/approvals']['get']['responses']['2
 type CreateWorkflowBody = WorkflowAPI.paths['/workflows']['post']['requestBody']['content']['application/json']
 type UpdateWorkflowBody =
   WorkflowAPI.paths['/workflows/{workflow_id}']['patch']['requestBody']['content']['application/json']
+type WorkflowInvocationSchemaPath = WorkflowAPI.paths['/workflows/{workflow_id}/invocation_schema']
+type WorkflowInvocationSchemaResponse =
+  WorkflowInvocationSchemaPath['get']['responses']['200']['content']['application/json']
+type WorkflowInvocationSchemaTrigger = NonNullable<WorkflowInvocationSchemaResponse['triggers']>[number]
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
 
 type MutableWorkflowWithVersion = { -readonly [K in keyof WorkflowWithVersion]: WorkflowWithVersion[K] }
 
@@ -1091,6 +1099,70 @@ export const handlers = [
       )
     }
     return HttpResponse.json(body)
+  }),
+  http.get('/api/v1/workflows/:workflowId/invocation_schema', ({ params }) => {
+    const workflowId = String(params.workflowId)
+    const workflow = workflows.find((item) => item.id === workflowId)
+    const instance = `/api/v1/workflows/${workflowId}/invocation_schema`
+    if (!workflow) {
+      return HttpResponse.json(
+        {
+          type: 'https://api.example.com/errors/workflow-not-found',
+          title: 'Workflow Not Found',
+          detail: `Workflow with id '${workflowId}' not found`,
+          code: 'WORKFLOW_NOT_FOUND',
+          retryable: false,
+          instance,
+        },
+        { status: 404 }
+      )
+    }
+
+    const publishedVersionId = workflow.published_version_id
+    const publishedVersion =
+      typeof publishedVersionId === 'string'
+        ? getOrCreateVersionStore(workflowId, workflow).find(
+            (version) => version.id === publishedVersionId && version.status === 'published'
+          )
+        : undefined
+    if (!publishedVersion) {
+      return HttpResponse.json(
+        {
+          type: 'https://api.example.com/errors/workflow-not-published',
+          title: 'Workflow Not Published',
+          detail: 'Workflow has no published version',
+          code: 'WORKFLOW_NOT_PUBLISHED',
+          retryable: false,
+          instance,
+        },
+        { status: 404 }
+      )
+    }
+
+    const definition = publishedVersion.workflow_definition
+    const triggerDefinitions: unknown[] =
+      isRecord(definition) && Array.isArray(definition.triggers) ? definition.triggers : []
+    const triggers: WorkflowInvocationSchemaTrigger[] = []
+    for (const trigger of triggerDefinitions) {
+      if (!isRecord(trigger) || trigger.type !== 'subworkflow_trigger' || typeof trigger.id !== 'string') continue
+
+      const parameters = isRecord(trigger.parameters) ? trigger.parameters : {}
+      const inputSchema = isRecord(parameters.input_schema) ? parameters.input_schema : {}
+      triggers.push({
+        trigger_node_id: trigger.id,
+        name: typeof trigger.name === 'string' ? trigger.name : null,
+        input_schema: inputSchema,
+      })
+    }
+
+    const response: WorkflowInvocationSchemaResponse = {
+      workflow_id: workflowId,
+      published_version_id: publishedVersion.id,
+      published_version: publishedVersion.version,
+      is_eligible: triggers.length > 0,
+      triggers,
+    }
+    return HttpResponse.json(response)
   }),
   http.patch('/api/v1/workflows/:workflowId', async (request) => {
     const workflowId = request.params.workflowId

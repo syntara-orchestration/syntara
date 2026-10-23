@@ -32,13 +32,13 @@ class SubWorkflowNode:
 
                 Defines the design-time configuration for invoking a child workflow from
                 a parent workflow. The Sub-workflow step always invokes the latest published
-                version of the target workflow.
+                version of the selected target workflow in the same Project (V1).
 
                 When a workflow has multiple Subworkflow Triggers, the calling step must
                 select a specific trigger to invoke via the trigger_node_id field.
 
                 Attributes:
-                    workflow_id: UUID of the child workflow to invoke.
+                    workflow_id: UUID of the selected child workflow to invoke.
                     trigger_node_id: Graph node ID of the Subworkflow Trigger to invoke.
                     input_mapping: Mapping of child workflow input field names to values.
                         Values can be static (string, int, bool, dict, list) or template

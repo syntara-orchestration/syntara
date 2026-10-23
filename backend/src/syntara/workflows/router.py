@@ -34,6 +34,7 @@ from syntara.workflows.models import (
     ValidationSeverity,
     Workflow,
     WorkflowCreate,
+    WorkflowInvocationSchemaRead,
     WorkflowListParams,
     WorkflowListResponse,
     WorkflowRead,
@@ -335,6 +336,7 @@ async def list_workflows(
     dependencies=[Depends(_wf_perm_read)],
     operation_id="get_workflow",
     response_description="Workflow details",
+    response_model=WorkflowReadWithVersion,
 )
 async def get_workflow(
     workflow_id: UUID,
@@ -343,6 +345,25 @@ async def get_workflow(
     """Get a workflow by ID including its current active version."""
     workflow, current_version = await service.get_workflow_with_version(workflow_id)
     return await _build_workflow_with_version_response(workflow, current_version, service)
+
+
+@router.get(
+    "/{workflow_id}/invocation_schema",
+    summary="Get workflow invocation schema",
+    dependencies=[Depends(_wf_perm_read)],
+    operation_id="get_workflow_invocation_schema",
+    response_description="Published Subworkflow Trigger schemas",
+    response_model=WorkflowInvocationSchemaRead,
+)
+async def get_workflow_invocation_schema(
+    workflow_id: UUID,
+    service: Annotated[WorkflowService, Depends(get_workflow_service)],
+) -> WorkflowInvocationSchemaRead:
+    """Get the latest published Subworkflow Trigger schemas for a workflow."""
+    workflow = await service.get_workflow_by_id(workflow_id)
+    if workflow.published_version_id is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workflow has no published version")
+    return await service.get_workflow_invocation_schema(workflow)
 
 
 @router.patch(

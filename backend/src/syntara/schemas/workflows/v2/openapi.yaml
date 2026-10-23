@@ -316,6 +316,49 @@ paths:
           $ref: "../../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
         '500':
           $ref: '../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError'
+  /workflows/{workflow_id}/invocation_schema:
+    get:
+      summary: Get workflow invocation schema
+      description: Get the latest published Subworkflow Trigger schemas for a workflow.
+      operationId: get_workflow_invocation_schema
+      tags:
+        - Workflows
+      security:
+        - bearerAuth: []
+      x-app-permission:
+        resource: workflow
+        action: read
+      parameters:
+        - name: workflow_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Workflow Id
+      responses:
+        '200':
+          description: Published Subworkflow Trigger schemas
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowInvocationSchemaRead'
+        '400':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/BadRequestError'
+        '401':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError'
+        '404':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/NotFoundError'
+        '409':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ConflictError'
+        '422':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ValidationError'
+        "429":
+          $ref: "../../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+        '500':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError'
   /workflows/{workflow_id}/test:
     post:
       summary: Test a single node in a workflow
@@ -876,6 +919,10 @@ components:
       $ref: ./shared-schemas.yaml#/components/schemas/WorkflowRead
     WorkflowReadWithVersion:
       $ref: ./shared-schemas.yaml#/components/schemas/WorkflowReadWithVersion
+    WorkflowInvocationTriggerSchema:
+      $ref: ./shared-schemas.yaml#/components/schemas/WorkflowInvocationTriggerSchema
+    WorkflowInvocationSchemaRead:
+      $ref: ./shared-schemas.yaml#/components/schemas/WorkflowInvocationSchemaRead
     PublishWorkflowVersionResponse:
       $ref: ./shared-schemas.yaml#/components/schemas/PublishWorkflowVersionResponse
     WorkflowVersionRead:

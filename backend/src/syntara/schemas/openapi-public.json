@@ -36817,6 +36817,187 @@
         }
       }
     },
+    "/workflows/{workflow_id}/invocation_schema": {
+      "get": {
+        "summary": "Get workflow invocation schema",
+        "description": "Get the latest published Subworkflow Trigger schemas for a workflow.",
+        "operationId": "get_workflow_invocation_schema",
+        "tags": [
+          "Workflows"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-app-permission": {
+          "resource": "workflow",
+          "action": "read"
+        },
+        "parameters": [
+          {
+            "name": "workflow_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Workflow Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Published Subworkflow Trigger schemas",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkflowInvocationSchemaRead"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorData"
+                },
+                "example": {
+                  "type": "https://api.example.com/errors/bad-request",
+                  "title": "Bad Request",
+                  "detail": "The request was malformed or contained invalid parameters",
+                  "code": "BAD_REQUEST",
+                  "retryable": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorData"
+                },
+                "example": {
+                  "type": "https://api.example.com/errors/unauthorized",
+                  "title": "Unauthorized",
+                  "detail": "Authentication is required to access this resource",
+                  "code": "UNAUTHORIZED",
+                  "retryable": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorData"
+                },
+                "example": {
+                  "type": "https://api.example.com/errors/forbidden",
+                  "title": "Forbidden",
+                  "detail": "You do not have permission to access this resource",
+                  "code": "FORBIDDEN",
+                  "retryable": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorData"
+                },
+                "example": {
+                  "type": "https://api.example.com/errors/not-found",
+                  "title": "Resource Not Found",
+                  "detail": "No resource exists with the provided identifier",
+                  "code": "NOT_FOUND",
+                  "retryable": false,
+                  "instance": "/api/v1/workflows"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorData"
+                },
+                "example": {
+                  "type": "https://api.example.com/errors/conflict",
+                  "title": "Conflict",
+                  "detail": "The request conflicts with the current state of the resource",
+                  "code": "CONFLICT",
+                  "retryable": false
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorData"
+                },
+                "example": {
+                  "type": "https://api.example.com/errors/validation-error",
+                  "title": "Validation Error",
+                  "detail": "Field 'name' must be between 1 and 255 characters",
+                  "code": "VALIDATION_ERROR",
+                  "retryable": false,
+                  "instance": "/api/v1/workflows"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorData"
+                },
+                "example": {
+                  "type": "https://api.example.com/errors/rate-limited",
+                  "title": "Too Many Requests",
+                  "detail": "Rate limit exceeded. Try again in 60 seconds.",
+                  "code": "RATE_LIMITED",
+                  "retryable": true
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorData"
+                },
+                "example": {
+                  "type": "https://api.example.com/errors/internal-error",
+                  "title": "Internal Server Error",
+                  "detail": "An unexpected error occurred",
+                  "code": "INTERNAL_ERROR",
+                  "retryable": true
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/workflows/{workflow_id}/test": {
       "post": {
         "summary": "Test a single node in a workflow",
@@ -50522,6 +50703,75 @@
           }
         }
       },
+      "WorkflowInvocationTriggerSchema": {
+        "type": "object",
+        "title": "WorkflowInvocationTriggerSchema",
+        "description": "One dedicated Subworkflow Trigger available for Reference mode.",
+        "required": [
+          "trigger_node_id"
+        ],
+        "properties": {
+          "trigger_node_id": {
+            "type": "string",
+            "title": "Trigger Node Id"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "input_schema": {
+            "type": "object",
+            "additionalProperties": true,
+            "title": "Input Schema"
+          }
+        }
+      },
+      "WorkflowInvocationSchemaRead": {
+        "type": "object",
+        "title": "WorkflowInvocationSchemaRead",
+        "description": "Published invocation schemas for a child workflow.",
+        "required": [
+          "workflow_id",
+          "published_version_id",
+          "published_version",
+          "is_eligible",
+          "triggers"
+        ],
+        "properties": {
+          "workflow_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Workflow Id"
+          },
+          "published_version_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Published Version Id"
+          },
+          "published_version": {
+            "type": "integer",
+            "title": "Published Version"
+          },
+          "is_eligible": {
+            "type": "boolean",
+            "title": "Is Eligible"
+          },
+          "triggers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkflowInvocationTriggerSchema"
+            },
+            "title": "Triggers"
+          }
+        }
+      },
       "PublishWorkflowVersionResponse": {
         "type": "object",
         "title": "PublishWorkflowVersionResponse",
@@ -53136,9 +53386,10 @@
         "properties": {
           "workflow_id": {
             "type": "string",
-            "maxLength": 550,
+            "maxLength": 36,
+            "format": "uuid",
             "title": "Workflow Id",
-            "description": "UUID of the child workflow to invoke (latest published version), or template expression (max 500 chars)"
+            "description": "UUID of the selected child workflow in the same Project (latest published version)."
           },
           "trigger_node_id": {
             "type": "string",
@@ -53160,7 +53411,7 @@
           "trigger_node_id"
         ],
         "title": "SubWorkflowExecutorParameters",
-        "description": "Parameters for Sub-workflow executor.\n\nDefines the design-time configuration for invoking a child workflow from\na parent workflow. The Sub-workflow step always invokes the latest published\nversion of the target workflow.\n\nWhen a workflow has multiple Subworkflow Triggers, the calling step must\nselect a specific trigger to invoke via the trigger_node_id field.\n\nAttributes:\n    workflow_id: UUID of the child workflow to invoke.\n    trigger_node_id: Graph node ID of the Subworkflow Trigger to invoke.\n    input_mapping: Mapping of child workflow input field names to values.\n        Values can be static (string, int, bool, dict, list) or template\n        expressions (${step_id.field.path})."
+        "description": "Parameters for Sub-workflow executor.\n\nDefines the design-time configuration for invoking a child workflow from\na parent workflow. The Sub-workflow step always invokes the latest published\nversion of the selected target workflow in the same Project (V1).\n\nWhen a workflow has multiple Subworkflow Triggers, the calling step must\nselect a specific trigger to invoke via the trigger_node_id field.\n\nAttributes:\n    workflow_id: UUID of the selected child workflow to invoke.\n    trigger_node_id: Graph node ID of the Subworkflow Trigger to invoke.\n    input_mapping: Mapping of child workflow input field names to values.\n        Values can be static (string, int, bool, dict, list) or template\n        expressions (${step_id.field.path})."
       },
       "ConditionNodeParameters": {
         "properties": {

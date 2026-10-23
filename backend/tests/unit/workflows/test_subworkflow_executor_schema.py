@@ -26,6 +26,14 @@ def subworkflow_schema() -> dict[str, Any]:
         return result
 
 
+def validate_parameter_schema(config: dict[str, Any], schema: dict[str, Any]) -> None:
+    jsonschema.validate(
+        instance=config,
+        schema=schema["parameterSchema"],
+        format_checker=jsonschema.FormatChecker(),
+    )
+
+
 def test_subworkflow_schema_has_parameter_schema(subworkflow_schema: dict[str, Any]) -> None:
     """Schema should have a parameterSchema section."""
     assert "parameterSchema" in subworkflow_schema
@@ -47,7 +55,7 @@ def test_subworkflow_config_minimal_valid(subworkflow_schema: dict[str, Any]) ->
         "workflow_id": VALID_UUID,
         "trigger_node_id": "subworkflow_trigger",
     }
-    jsonschema.validate(instance=config, schema=subworkflow_schema["parameterSchema"])
+    validate_parameter_schema(config, subworkflow_schema)
 
 
 def test_subworkflow_config_with_input_mapping(subworkflow_schema: dict[str, Any]) -> None:
@@ -62,16 +70,17 @@ def test_subworkflow_config_with_input_mapping(subworkflow_schema: dict[str, Any
             "nested": {"key": "value"},
         },
     }
-    jsonschema.validate(instance=config, schema=subworkflow_schema["parameterSchema"])
+    validate_parameter_schema(config, subworkflow_schema)
 
 
-def test_subworkflow_config_with_template_expression(subworkflow_schema: dict[str, Any]) -> None:
-    """Config with template expression for workflow_id should be valid."""
+def test_subworkflow_config_rejects_template_expression_for_workflow_id(subworkflow_schema: dict[str, Any]) -> None:
+    """V1 workflow IDs are selected UUIDs; template expressions are only for input_mapping values."""
     config = {
         "workflow_id": "${parent_step.workflow_id}",
         "trigger_node_id": "trigger_node",
     }
-    jsonschema.validate(instance=config, schema=subworkflow_schema["parameterSchema"])
+    with pytest.raises(jsonschema.ValidationError):
+        validate_parameter_schema(config, subworkflow_schema)
 
 
 def test_subworkflow_config_rejects_missing_workflow_id(subworkflow_schema: dict[str, Any]) -> None:
@@ -80,7 +89,7 @@ def test_subworkflow_config_rejects_missing_workflow_id(subworkflow_schema: dict
         "trigger_node_id": "trigger_1",
     }
     with pytest.raises(jsonschema.ValidationError) as exc_info:
-        jsonschema.validate(instance=config, schema=subworkflow_schema["parameterSchema"])
+        validate_parameter_schema(config, subworkflow_schema)
     assert "workflow_id" in str(exc_info.value)
 
 
@@ -90,23 +99,19 @@ def test_subworkflow_config_rejects_missing_trigger_node_id(subworkflow_schema: 
         "workflow_id": VALID_UUID,
     }
     with pytest.raises(jsonschema.ValidationError) as exc_info:
-        jsonschema.validate(instance=config, schema=subworkflow_schema["parameterSchema"])
+        validate_parameter_schema(config, subworkflow_schema)
     assert "trigger_node_id" in str(exc_info.value)
 
 
 def test_subworkflow_config_rejects_workflow_id_exceeding_max_length(subworkflow_schema: dict[str, Any]) -> None:
-    """Config with workflow_id exceeding maxLength should be rejected by JSON Schema.
-
-    Note: JSON Schema only enforces maxLength (550 chars). UUID format and template
-    expression validation is delegated to Pydantic's validate_uuid_or_template().
-    """
+    """Config with workflow_id exceeding the UUID length should be rejected by JSON Schema."""
     config = {
-        "workflow_id": "x" * 551,  # Exceeds maxLength: 550
+        "workflow_id": "x" * 37,  # Exceeds maxLength: 36
         "trigger_node_id": "trigger_1",
     }
     with pytest.raises(jsonschema.ValidationError) as exc_info:
-        jsonschema.validate(instance=config, schema=subworkflow_schema["parameterSchema"])
-    assert "maxLength" in str(exc_info.value).lower() or "550" in str(exc_info.value)
+        validate_parameter_schema(config, subworkflow_schema)
+    assert exc_info.value.validator in {"format", "maxLength"}
 
 
 def test_subworkflow_config_rejects_invalid_trigger_node_id_pattern(
@@ -118,7 +123,7 @@ def test_subworkflow_config_rejects_invalid_trigger_node_id_pattern(
         "trigger_node_id": "123-starts-with-digit",
     }
     with pytest.raises(jsonschema.ValidationError):
-        jsonschema.validate(instance=config, schema=subworkflow_schema["parameterSchema"])
+        validate_parameter_schema(config, subworkflow_schema)
 
 
 def test_subworkflow_config_rejects_additional_properties(subworkflow_schema: dict[str, Any]) -> None:
@@ -129,7 +134,7 @@ def test_subworkflow_config_rejects_additional_properties(subworkflow_schema: di
         "unknown_field": "should-fail",
     }
     with pytest.raises(jsonschema.ValidationError):
-        jsonschema.validate(instance=config, schema=subworkflow_schema["parameterSchema"])
+        validate_parameter_schema(config, subworkflow_schema)
 
 
 def test_subworkflow_result_schema_has_standard_wrapper_fields(subworkflow_schema: dict[str, Any]) -> None:

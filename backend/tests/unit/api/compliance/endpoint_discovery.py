@@ -183,8 +183,9 @@ def is_list_operation(operation_id: str, properties: dict[str, Any]) -> bool:
     Uses two detection methods:
     1. Fast path: Check if operation_id starts with "list_" (convention)
     2. Fallback: Inspect response schema - must have array field but NO
-       single-resource identifier (like 'id'). This distinguishes list
-       responses from single resources that happen to have array fields.
+       single-resource identifier ('id' or a resource-specific '*_id' field).
+       This distinguishes list responses from detail responses that happen to
+       include arrays, such as a workflow's Subworkflow Trigger schemas.
 
     This catches both standard list operations (list_workflows) and
     query operations that return lists (who_can, what_can_i).
@@ -203,7 +204,7 @@ def is_list_operation(operation_id: str, properties: dict[str, Any]) -> bool:
 
     # Fallback: has array field but NOT a single-resource response
     # Single resources have identifier fields
-    has_identifier = "id" in properties
+    has_identifier = any(property_name == "id" or property_name.endswith("_id") for property_name in properties)
     has_array_field = bool(_get_array_field_from_properties(properties))
 
     return has_array_field and not has_identifier

@@ -201,6 +201,57 @@ components:
           $ref: '#/components/schemas/WorkflowVersionRead'
           description: Current active version details
 
+    WorkflowInvocationTriggerSchema:
+      type: object
+      title: WorkflowInvocationTriggerSchema
+      description: One dedicated Subworkflow Trigger available for Reference mode.
+      required:
+        - trigger_node_id
+      properties:
+        trigger_node_id:
+          type: string
+          title: Trigger Node Id
+        name:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Name
+        input_schema:
+          type: object
+          additionalProperties: true
+          title: Input Schema
+
+    WorkflowInvocationSchemaRead:
+      type: object
+      title: WorkflowInvocationSchemaRead
+      description: Published invocation schemas for a child workflow.
+      required:
+        - workflow_id
+        - published_version_id
+        - published_version
+        - is_eligible
+        - triggers
+      properties:
+        workflow_id:
+          type: string
+          format: uuid
+          title: Workflow Id
+        published_version_id:
+          type: string
+          format: uuid
+          title: Published Version Id
+        published_version:
+          type: integer
+          title: Published Version
+        is_eligible:
+          type: boolean
+          title: Is Eligible
+        triggers:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkflowInvocationTriggerSchema'
+          title: Triggers
+
     PublishWorkflowVersionResponse:
       type: object
       title: PublishWorkflowVersionResponse
@@ -2300,9 +2351,10 @@ components:
       properties:
         workflow_id:
           type: string
-          maxLength: 550
+          maxLength: 36
+          format: uuid
           title: Workflow Id
-          description: UUID of the child workflow to invoke (latest published version), or template expression (max 500 chars)
+          description: UUID of the selected child workflow in the same Project (latest published version).
         trigger_node_id:
           type: string
           pattern: ^[a-zA-Z_][a-zA-Z0-9_]*$
@@ -2324,13 +2376,13 @@ components:
 
         Defines the design-time configuration for invoking a child workflow from
         a parent workflow. The Sub-workflow step always invokes the latest published
-        version of the target workflow.
+        version of the selected target workflow in the same Project (V1).
 
         When a workflow has multiple Subworkflow Triggers, the calling step must
         select a specific trigger to invoke via the trigger_node_id field.
 
         Attributes:
-            workflow_id: UUID of the child workflow to invoke.
+            workflow_id: UUID of the selected child workflow to invoke.
             trigger_node_id: Graph node ID of the Subworkflow Trigger to invoke.
             input_mapping: Mapping of child workflow input field names to values.
                 Values can be static (string, int, bool, dict, list) or template

@@ -784,18 +784,18 @@ class AAPWorkflowJobTemplateExecutorParameters(AAPResourceReferenceMixin, Templa
         return self
 
 
-class SubWorkflowExecutorParameters(TemplateAwareBaseModel):
+class SubWorkflowExecutorParameters(BaseModel):
     """Parameters for Sub-workflow executor.
 
     Defines the design-time configuration for invoking a child workflow from
     a parent workflow. The Sub-workflow step always invokes the latest published
-    version of the target workflow.
+    version of the selected target workflow in the same Project (V1).
 
     When a workflow has multiple Subworkflow Triggers, the calling step must
     select a specific trigger to invoke via the trigger_node_id field.
 
     Attributes:
-        workflow_id: UUID of the child workflow to invoke.
+        workflow_id: UUID of the selected child workflow to invoke.
         trigger_node_id: Graph node ID of the Subworkflow Trigger to invoke.
         input_mapping: Mapping of child workflow input field names to values.
             Values can be static (string, int, bool, dict, list) or template
@@ -803,11 +803,12 @@ class SubWorkflowExecutorParameters(TemplateAwareBaseModel):
 
     """
 
+    model_config = ConfigDict(validate_assignment=True)
+
     workflow_id: str = Field(
-        max_length=550,
-        description=(
-            "UUID of the child workflow to invoke (latest published version), or template expression (max 500 chars)"
-        ),
+        max_length=36,
+        json_schema_extra={"format": "uuid"},
+        description="UUID of the selected child workflow in the same Project (latest published version).",
     )
     trigger_node_id: str = Field(
         pattern=r"^[a-zA-Z_][a-zA-Z0-9_]*$",
@@ -827,8 +828,18 @@ class SubWorkflowExecutorParameters(TemplateAwareBaseModel):
     @field_validator("workflow_id")
     @classmethod
     def validate_workflow_id_format(cls, v: str) -> str:
-        """Validate that workflow_id is a valid UUID or template expression."""
-        return validate_uuid_or_template(v, "workflow_id")
+        """Validate that workflow_id is a selected workflow UUID, never an expression."""
+        try:
+            parsed_uuid = uuid.UUID(v)
+        except ValueError:
+            parsed_uuid = None
+        if parsed_uuid is None or str(parsed_uuid) != v.lower():
+            msg = (
+                f"Invalid UUID format for workflow_id: '{v}'. Must be a canonical UUID; "
+                "template expressions are not supported for V1 sub-workflow references."
+            )
+            raise SafeValueError(msg)
+        return v
 
 
 # ---------------------------------------------------------------------------

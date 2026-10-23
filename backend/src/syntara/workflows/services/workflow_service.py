@@ -52,7 +52,14 @@ from syntara.workflows.exceptions import (
     WorkflowVersionConflictError,
     WorkflowVersionNotFoundError,
 )
-from syntara.workflows.models import Workflow, WorkflowListResponse, WorkflowRead, WorkflowVersion
+from syntara.workflows.models import (
+    Workflow,
+    WorkflowInvocationSchemaRead,
+    WorkflowInvocationTriggerSchema,
+    WorkflowListResponse,
+    WorkflowRead,
+    WorkflowVersion,
+)
 from syntara.workflows.models.execution import TERMINAL_EXECUTION_STATUSES, Execution
 from syntara.workflows.models.validation_finding import (
     ValidationCategory,
@@ -67,9 +74,11 @@ from syntara.workflows.services.webhook_trigger_service import WEBHOOK_TRIGGER_T
 from syntara.workflows.services.workflow_diff import generate_change_summary
 from syntara.workflows.validators import (
     get_system_continue_on_failure,
+    validate_subworkflow_project_references,
     validate_workflow_references,
     workflow_validator,
 )
+from syntara.workflows.workflow_engine.models.workflow_definition import NodeType
 
 if TYPE_CHECKING:
     from syntara.workflows.models import WorkflowVersionListResponse, WorkflowVersionRead
@@ -627,8 +636,12 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
         ref_findings = await validate_workflow_references(
             self.session, workflow_definition, project_id, is_import=is_import
         )
-        if ref_findings:
-            result = ValidationResult.from_findings([*result.findings, *ref_findings])
+        subworkflow_findings = await validate_subworkflow_project_references(
+            self.session, workflow_definition, project_id
+        )
+        reference_findings = [*ref_findings, *subworkflow_findings]
+        if reference_findings:
+            result = ValidationResult.from_findings([*result.findings, *reference_findings])
             has_validation_issues = True
 
         schema_version = workflow_definition.get("schema_version")
@@ -1026,6 +1039,42 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
 
         return workflow, current_version
 
+    async def get_workflow_invocation_schema(self, workflow: Workflow) -> WorkflowInvocationSchemaRead:
+        """Return eligible trigger schemas from a workflow's published version."""
+        if workflow.published_version_id is None:
+            raise WorkflowNotPublishedError(workflow.id)
+
+        published_version = await self.session.get(WorkflowVersion, workflow.published_version_id)
+        if published_version is None:
+            raise WorkflowVersionNotFoundError(workflow.id, workflow.current_version)
+
+        invocation_triggers: list[WorkflowInvocationTriggerSchema] = []
+        trigger_definitions = published_version.workflow_definition.get("triggers", [])
+        if isinstance(trigger_definitions, list):
+            for trigger in trigger_definitions:
+                if not isinstance(trigger, dict) or trigger.get("type") != NodeType.SUBWORKFLOW_TRIGGER:
+                    continue
+                trigger_node_id = trigger.get("id")
+                if not isinstance(trigger_node_id, str):
+                    continue
+                parameters = trigger.get("parameters")
+                input_schema = parameters.get("input_schema") if isinstance(parameters, dict) else None
+                invocation_triggers.append(
+                    WorkflowInvocationTriggerSchema(
+                        trigger_node_id=trigger_node_id,
+                        name=trigger.get("name") if isinstance(trigger.get("name"), str) else None,
+                        input_schema=input_schema if isinstance(input_schema, dict) else {},
+                    )
+                )
+
+        return WorkflowInvocationSchemaRead(
+            workflow_id=workflow.id,
+            published_version_id=published_version.id,
+            published_version=published_version.version,
+            is_eligible=bool(invocation_triggers),
+            triggers=invocation_triggers,
+        )
+
     async def get_version_for_export(
         self,
         workflow_id: UUID,
@@ -1200,8 +1249,12 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
             await self._validate_credential_project_scope(workflow_definition, workflow.project_id, previous_cred_ids)
             await self._validate_no_secret_url_conflicts(workflow_definition)
             ref_findings = await validate_workflow_references(self.session, workflow_definition, workflow.project_id)
-            if ref_findings:
-                result = ValidationResult.from_findings([*result.findings, *ref_findings])
+            subworkflow_findings = await validate_subworkflow_project_references(
+                self.session, workflow_definition, workflow.project_id
+            )
+            reference_findings = [*ref_findings, *subworkflow_findings]
+            if reference_findings:
+                result = ValidationResult.from_findings([*result.findings, *reference_findings])
                 workflow.has_validation_issues = True
 
         version = await self._create_version_record(workflow, workflow_definition, change_description)
@@ -1381,6 +1434,11 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
                     ),
                 ]
             )
+
+        subworkflow_findings = await validate_subworkflow_project_references(
+            self.session, definition, workflow.project_id
+        )
+        result = ValidationResult.from_findings([*result.findings, *subworkflow_findings])
         if (result.error_count + result.warning_count) > 0:
             raise WorkflowPublishValidationError(result)
 

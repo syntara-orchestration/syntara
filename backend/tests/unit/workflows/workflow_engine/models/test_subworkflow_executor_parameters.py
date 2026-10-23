@@ -40,14 +40,13 @@ class TestSubWorkflowExecutorParametersValidation:
             "${trigger.data.workflow_id}",
         ],
     )
-    def test_workflow_id_accepts_template_expressions(self, template_value: str) -> None:
-        """Test that workflow_id accepts template expressions."""
-        params = SubWorkflowExecutorParameters(
-            workflow_id=template_value,
-            trigger_node_id="trigger_node",
-        )
-
-        assert params.workflow_id == template_value
+    def test_workflow_id_rejects_template_expressions(self, template_value: str) -> None:
+        """V1 must statically resolve the selected workflow's project."""
+        with pytest.raises(ValidationError, match="template expressions are not supported"):
+            SubWorkflowExecutorParameters(
+                workflow_id=template_value,
+                trigger_node_id="trigger_node",
+            )
 
     @pytest.mark.parametrize(
         "trigger_node_id",
@@ -74,6 +73,7 @@ class TestSubWorkflowExecutorParametersValidation:
             "not-a-uuid",
             "12345",
             "invalid-format",
+            "550e8400e29b41d4a716446655440000",
         ],
     )
     def test_workflow_id_invalid_uuid_format(self, invalid_value: str) -> None:

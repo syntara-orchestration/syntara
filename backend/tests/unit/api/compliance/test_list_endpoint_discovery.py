@@ -117,6 +117,14 @@ class TestHelperFunctions:
         }
         assert not is_list_operation("get_current_user", properties_with_array)
 
+        # Detail responses can use a resource-specific identifier and contain
+        # a related array, as with workflow invocation trigger schemas.
+        properties_with_resource_id = {
+            "workflow_id": {"type": "string", "format": "uuid"},
+            "triggers": {"type": "array"},
+        }
+        assert not is_list_operation("get_workflow_invocation_schema", properties_with_resource_id)
+
     def test_get_array_field_from_properties(self) -> None:
         """Test extracting array field name from response properties."""
         # Standard pattern: resources

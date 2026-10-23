@@ -65,6 +65,7 @@ from .workflow import (
     WorkflowUpdate,
 )
 from .workflow_definition import WorkflowDefinition
+from .workflow_invocation_schema import WorkflowInvocationSchemaRead, WorkflowInvocationTriggerSchema
 from .workflow_publish_event import PublishAction, WorkflowPublishEvent
 from .workflow_validation_result import (
     WorkflowValidateRequest,
@@ -110,6 +111,8 @@ __all__ = [
     "Workflow",
     "WorkflowCreate",
     "WorkflowDefinition",
+    "WorkflowInvocationSchemaRead",
+    "WorkflowInvocationTriggerSchema",
     "WorkflowListParams",
     "WorkflowListResponse",
     "WorkflowPublishEvent",

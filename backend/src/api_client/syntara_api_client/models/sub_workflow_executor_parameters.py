@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, TypeVar
+from uuid import UUID
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -21,34 +22,33 @@ class SubWorkflowExecutorParameters:
 
     Defines the design-time configuration for invoking a child workflow from
     a parent workflow. The Sub-workflow step always invokes the latest published
-    version of the target workflow.
+    version of the selected target workflow in the same Project (V1).
 
     When a workflow has multiple Subworkflow Triggers, the calling step must
     select a specific trigger to invoke via the trigger_node_id field.
 
     Attributes:
-        workflow_id: UUID of the child workflow to invoke.
+        workflow_id: UUID of the selected child workflow to invoke.
         trigger_node_id: Graph node ID of the Subworkflow Trigger to invoke.
         input_mapping: Mapping of child workflow input field names to values.
             Values can be static (string, int, bool, dict, list) or template
             expressions (${step_id.field.path}).
 
         Attributes:
-            workflow_id (str): UUID of the child workflow to invoke (latest published version), or template expression (max
-                500 chars)
+            workflow_id (UUID): UUID of the selected child workflow in the same Project (latest published version).
             trigger_node_id (str): Graph node ID of the Subworkflow Trigger to invoke in the child workflow
             input_mapping (SubWorkflowExecutorParametersInputMapping | Unset): Mapping of child workflow input field names
                 to static values or template expressions. Keys are child workflow input field names; values can be static types
                 (string, int, bool, dict, list) or template expression strings (${step_id.field.path}). Max 100 entries.
     """
 
-    workflow_id: str
+    workflow_id: UUID
     trigger_node_id: str
     input_mapping: SubWorkflowExecutorParametersInputMapping | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        workflow_id = self.workflow_id
+        workflow_id = str(self.workflow_id)
 
         trigger_node_id = self.trigger_node_id
 
@@ -74,7 +74,7 @@ class SubWorkflowExecutorParameters:
         from ..models.sub_workflow_executor_parameters_input_mapping import SubWorkflowExecutorParametersInputMapping
 
         d = dict(src_dict)
-        workflow_id = d.pop("workflow_id")
+        workflow_id = UUID(d.pop("workflow_id"))
 
         trigger_node_id = d.pop("trigger_node_id")
 

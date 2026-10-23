@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
@@ -12,6 +13,7 @@ from fastapi import HTTPException
 from syntara.workflows.models.workflow_version import PublishVersionRequest
 from syntara.workflows.router import (
     get_workflow,
+    get_workflow_invocation_schema,
     get_workflow_version,
     list_workflow_versions,
     list_workflows,
@@ -90,6 +92,35 @@ class TestWorkflowEndpoints:
         mock_service.get_workflow_with_version.assert_awaited_once_with(workflow_id)
         mock_build.assert_awaited_once_with(mock_workflow, mock_version, mock_service)
         assert result is mock_response
+
+    @pytest.mark.asyncio
+    async def test_get_workflow_invocation_schema_delegates_to_service(self) -> None:
+        mock_service = AsyncMock()
+        workflow = SimpleNamespace(published_version_id=uuid4())
+        mock_service.get_workflow_by_id.return_value = workflow
+        invocation_schema = MagicMock()
+        mock_service.get_workflow_invocation_schema.return_value = invocation_schema
+        workflow_id = uuid4()
+
+        result = await get_workflow_invocation_schema(workflow_id=workflow_id, service=mock_service)
+
+        mock_service.get_workflow_by_id.assert_awaited_once_with(workflow_id)
+        mock_service.get_workflow_invocation_schema.assert_awaited_once_with(workflow)
+        assert result is invocation_schema
+
+    @pytest.mark.asyncio
+    async def test_get_workflow_invocation_schema_returns_404_when_unpublished(self) -> None:
+        mock_service = AsyncMock()
+        workflow = SimpleNamespace(published_version_id=None)
+        mock_service.get_workflow_by_id.return_value = workflow
+
+        with (
+            pytest.raises(HTTPException, match="Workflow has no published version") as exc_info,
+        ):
+            await get_workflow_invocation_schema(workflow_id=uuid4(), service=mock_service)
+
+        assert exc_info.value.status_code == 404
+        mock_service.get_workflow_invocation_schema.assert_not_awaited()
 
     @pytest.mark.asyncio
     async def test_update_workflow_calls_build_response(self) -> None:
