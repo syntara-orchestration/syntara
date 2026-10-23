@@ -425,7 +425,7 @@ function renderAAPTaskDetails({
       if (isJobTemplateInputVariablesMode(data)) {
         updateActivity(nodeId, buildExpressionModeActivity(nodeId, data.name, data))
       } else {
-        const job_template_id = validateJobTemplateId(data.job_template_id)
+        const job_template_id = validateJobTemplateId(data.job_template_id, data.job_template_name)
         const aapNodeConfig = buildAAPConfig(data)
         updateActivity(
           nodeId,

@@ -80,12 +80,23 @@ export function buildExpressionModeActivity(
 
 /**
  * Validates that a job template ID is a valid positive integer.
+ *
+ * When no ID is provided but a job template name is, the ID is left undefined
+ * instead of throwing — the backend resolves the template by name in that case.
+ * This covers reopening a node that was previously saved in input-variables mode
+ * (which does not persist an ID) and then saved again with the toggle off,
+ * without the user re-picking the template from the dropdown.
  * @param jobTemplateId - The ID to validate
- * @returns The validated ID
+ * @param jobTemplateName - The template name, used as a fallback when no ID is given
+ * @returns The validated ID, or undefined if falling back to name-based resolution
  * @throws Error if validation fails
  */
-export function validateJobTemplateId(jobTemplateId: number | undefined): number {
-  if (!jobTemplateId || !Number.isInteger(jobTemplateId) || jobTemplateId < 1) {
+export function validateJobTemplateId(jobTemplateId: number | undefined, jobTemplateName?: string): number | undefined {
+  if (jobTemplateId === undefined) {
+    if (jobTemplateName) return undefined
+    throw new Error('Job Template ID must be a valid positive integer')
+  }
+  if (!Number.isInteger(jobTemplateId) || jobTemplateId < 1) {
     throw new Error('Job Template ID must be a valid positive integer')
   }
   return jobTemplateId

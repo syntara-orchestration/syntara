@@ -145,6 +145,20 @@ vi.mock('../node-forms/AAPJobTemplateForm', () => ({
       >
         Update with input variables
       </button>
+      <button
+        onClick={() =>
+          onSubmit({
+            name: 'Updated AAP Task',
+            use_input_variables: false,
+            organization_name: 'Default',
+            job_template_name: 'Azure web application deployment demo',
+            job_template_id: undefined,
+          })
+        }
+        data-testid="aap-submit-toggle-off-button"
+      >
+        Update after disabling input variables
+      </button>
       <button onClick={onCancel} data-testid="aap-cancel-button">
         Cancel
       </button>
@@ -422,6 +436,33 @@ describe('TaskNodeDetails Component', () => {
     renderTaskNodeDetails(taskData, 'task-aap')
 
     await user.click(screen.getByTestId('aap-submit-input-vars-button'))
+
+    expect(mockShowError).not.toHaveBeenCalled()
+    expect(mockUpdateActivity).toHaveBeenCalledWith('task-aap', expect.objectContaining({ name: 'Updated AAP Task' }))
+  })
+
+  // AAP-92997: toggling "Use input variables" off after the node was previously
+  // saved with it on must not invalidate the already-selected job template.
+  it('keeps the job template valid when "Use input variables" is turned back off', async () => {
+    const user = userEvent.setup()
+    const taskData = {
+      type: 'aap_job_template' as const,
+      id: 'task-aap',
+      name: 'AAP Task',
+      parameters: {
+        // Reflects a node previously saved while "Use input variables" was on:
+        // job_template_id was dropped, leaving only the name/org strings.
+        organization_name: 'Default',
+        job_template_name: 'Azure web application deployment demo',
+        use_input_variables: true,
+      },
+    }
+
+    renderTaskNodeDetails(taskData, 'task-aap')
+
+    // User toggles "Use input variables" back off and submits without
+    // re-picking from the job template dropdown.
+    await user.click(screen.getByTestId('aap-submit-toggle-off-button'))
 
     expect(mockShowError).not.toHaveBeenCalled()
     expect(mockUpdateActivity).toHaveBeenCalledWith('task-aap', expect.objectContaining({ name: 'Updated AAP Task' }))
