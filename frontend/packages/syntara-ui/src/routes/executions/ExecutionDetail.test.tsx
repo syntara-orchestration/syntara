@@ -1,16 +1,27 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useParams, useRouterState } from '@tanstack/react-router'
-import { act, render, screen, waitFor } from '@testing-library/react'
+import { act, render as testingLibraryRender, screen, waitFor } from '@testing-library/react'
+import type { RenderOptions } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import type { ReactNode } from 'react'
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 import { axe } from 'vitest-axe'
 
 import { executionsClient } from '../../client'
+import { FeatureFlagsProvider } from '../../providers/feature-flags-provider'
 import { capitalize } from '../../utils/capitalize'
 import { useExecutionStore } from '../workflows/stores/useExecutionStore'
 
 import ExecutionDetail from './ExecutionDetail'
 import { useExecutionStepClick } from './hooks/useExecutionStepClick'
+
+const FeatureFlagsTestWrapper = ({ children }: { children: ReactNode }) => (
+  <FeatureFlagsProvider>{children}</FeatureFlagsProvider>
+)
+
+function render(ui: ReactNode, options?: RenderOptions) {
+  return testingLibraryRender(ui, { ...options, wrapper: FeatureFlagsTestWrapper })
+}
 
 // Create mock functions
 const mockNavigate = vi.fn()

@@ -8,6 +8,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest'
 
 import { approvalsClient, executionsClient, workflowClient } from '../../client'
 import { AlertProvider } from '../../providers/alerts'
+import { FeatureFlagsProvider } from '../../providers/feature-flags-provider'
 
 vi.mock('./components/NodeEditorOverlay', () => ({
   NodeEditorOverlay: ({ isOpen }: { isOpen: boolean }) => (isOpen ? <div data-testid="node-editor-overlay" /> : null),
@@ -77,9 +78,11 @@ const queryClient = new QueryClient({
 
 const wrapper = ({ children }: { children: ReactNode }) => (
   <QueryClientProvider client={queryClient}>
-    <AlertProvider>
-      <ReactFlowProvider>{children}</ReactFlowProvider>
-    </AlertProvider>
+    <FeatureFlagsProvider>
+      <AlertProvider>
+        <ReactFlowProvider>{children}</ReactFlowProvider>
+      </AlertProvider>
+    </FeatureFlagsProvider>
   </QueryClientProvider>
 )
 

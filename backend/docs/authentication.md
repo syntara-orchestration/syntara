@@ -592,7 +592,7 @@ The setting is managed via **System Administration > Settings > Authentication**
 
 ### Providing a custom admin password
 
-If the `APP_ADMIN_PASSWORD` environment variable is set when `make secrets-generate` (or `make secrets-generate-force`) runs, the script will write that value into `.secrets/admin-password` instead of generating a random one. This lets you control the admin password at deploy time without editing any files.
+If the `APP_ADMIN_PASSWORD` environment variable is set when `make secrets-generate` (or `make secrets-generate-force`) runs, the script validates that value against the admin password complexity policy before writing it to `.secrets/admin-password`. An invalid value causes generation to fail and leaves any existing password file unchanged. This lets you control the admin password at deploy time without editing any files.
 
 Set the variable **before** secrets are generated:
 

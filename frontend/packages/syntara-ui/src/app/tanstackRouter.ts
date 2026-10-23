@@ -11,4 +11,6 @@ import { buildTanStackRouteTree } from './tanstackRouteTree'
  */
 export const tanstackRouter = createRouter({
   routeTree: buildTanStackRouteTree(),
+  // RouterProvider supplies the current snapshot from FeatureFlagsProvider.
+  context: { featureFlags: {} },
 })

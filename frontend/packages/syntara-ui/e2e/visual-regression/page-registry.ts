@@ -1115,6 +1115,7 @@ export const excludedUnimplemented: string[] = [
 
 /** Routes excluded because they need dynamic setup or have no seeded mock data */
 export const excludedDynamic: string[] = [
+  AppRoute.FeatureFlagDemo, // Temporary direct-link demo route; no baseline required.
   AppRoute.WorkflowBuilder.New,
   AppRoute.SystemAdministration.Root,
   AppRoute.SystemAdministration.Authentication.EditIdentityProvider, // covered by oidcProviderWizardPages

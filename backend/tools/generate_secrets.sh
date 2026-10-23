@@ -75,7 +75,70 @@ generate_admin_password() {
     done
 
     error "Failed to generate admin password meeting complexity requirements after ${max_attempts} attempts"
-    exit 1
+    return 1
+}
+
+# Generate the encryption key atomically so a failed openssl call cannot leave
+# an empty file that later runs mistake for an existing key.
+generate_encryption_key() {
+    local temporary_path
+
+    if ! temporary_path=$(mktemp "$SECRETS_DIR/.encryption-key.XXXXXX"); then
+        error "Failed to create temporary encryption key file"
+        return 1
+    fi
+
+    if ! openssl rand -hex 32 > "$temporary_path"; then
+        rm -f "$temporary_path"
+        error "Failed to generate encryption key"
+        return 1
+    fi
+
+    if ! chmod 600 "$temporary_path" || ! mv -f "$temporary_path" "$SECRETS_DIR/encryption-key"; then
+        rm -f "$temporary_path"
+        error "Failed to install encryption key"
+        return 1
+    fi
+}
+
+# Match CredentialEncryptionSettings' required 32-byte hex format and reject
+# its explicitly forbidden all-zero default without importing app settings.
+encryption_key_is_valid() {
+    local key
+
+    [[ -s "$SECRETS_DIR/encryption-key" ]] || return 1
+    key=$(cat "$SECRETS_DIR/encryption-key") || return 1
+    [[ "$key" =~ ^[[:xdigit:]]{64}$ ]] || return 1
+    [[ "$key" =~ ^0{64}$ ]] && return 1
+    return 0
+}
+
+# Validate the candidate before atomically replacing the admin password file.
+write_admin_password() {
+    local temporary_path
+
+    if ! temporary_path=$(mktemp "$SECRETS_DIR/.admin-password.XXXXXX"); then
+        error "Failed to create temporary admin password file"
+        return 1
+    fi
+
+    if [[ -n "${APP_ADMIN_PASSWORD:-}" ]]; then
+        if ! admin_password_meets_complexity "$APP_ADMIN_PASSWORD"; then
+            rm -f "$temporary_path"
+            error "APP_ADMIN_PASSWORD does not meet complexity requirements"
+            return 1
+        fi
+        printf '%s' "$APP_ADMIN_PASSWORD" > "$temporary_path"
+    elif ! generate_admin_password > "$temporary_path"; then
+        rm -f "$temporary_path"
+        return 1
+    fi
+
+    if ! chmod 600 "$temporary_path" || ! mv -f "$temporary_path" "$SECRETS_DIR/admin-password"; then
+        rm -f "$temporary_path"
+        error "Failed to install admin password file"
+        return 1
+    fi
 }
 
 # Generate an ES256 (ECDSA P-256) key pair
@@ -151,30 +214,31 @@ main() {
         generate_key_pair "jwt-backup"
     fi
 
+    # Password validation imports application settings, which require this file.
+    # Create it before validating either a generated or configured password.
+    if [[ "$force" != true ]] && encryption_key_is_valid; then
+        info "Encryption key already exists, skipping (use --force to regenerate)"
+    else
+        if [[ -e "$SECRETS_DIR/encryption-key" ]] && [[ "$force" != true ]]; then
+            info "Existing encryption key is invalid, replacing it"
+        fi
+        info "Generating encryption key..."
+        generate_encryption_key
+        info "  Encryption key: $SECRETS_DIR/encryption-key"
+    fi
+
     # Generate admin password file
     if [[ -f "$SECRETS_DIR/admin-password" ]] && [[ "$force" != true ]]; then
         info "Admin password file already exists, skipping (use --force to regenerate)"
     else
         info "Generating admin password file..."
+        write_admin_password
         if [[ -n "${APP_ADMIN_PASSWORD:-}" ]]; then
-            echo -n "$APP_ADMIN_PASSWORD" > "$SECRETS_DIR/admin-password"
             info "  Using password from APP_ADMIN_PASSWORD env var"
         else
-            generate_admin_password > "$SECRETS_DIR/admin-password"
             info "  Generated random password"
         fi
-        chmod 600 "$SECRETS_DIR/admin-password"
         info "  Password file: $SECRETS_DIR/admin-password"
-    fi
-
-    # Generate encryption key file
-    if [[ -f "$SECRETS_DIR/encryption-key" ]] && [[ "$force" != true ]]; then
-        info "Encryption key already exists, skipping (use --force to regenerate)"
-    else
-        info "Generating encryption key..."
-        openssl rand -hex 32 > "$SECRETS_DIR/encryption-key"
-        chmod 600 "$SECRETS_DIR/encryption-key"
-        info "  Encryption key: $SECRETS_DIR/encryption-key"
     fi
 
     # Prevent permissions issues once secrets are mounted to syntara containers
