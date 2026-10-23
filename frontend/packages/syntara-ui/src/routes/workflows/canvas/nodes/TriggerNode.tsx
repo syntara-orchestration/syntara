@@ -34,6 +34,7 @@ export function TriggerNodeComponent(props: NodeProps<TriggerNode>) {
   const isScheduled = triggerType === TriggerTypeEnum.SCHEDULED
   const isWebhook = triggerType === TriggerTypeEnum.WEBHOOK_TRIGGER
   const isEda = triggerType === TriggerTypeEnum.EDA_TRIGGER
+  const isForm = triggerType === TriggerTypeEnum.FORM_TRIGGER
 
   let metadata = nodeMetadata.trigger
   let iconId = 'trigger-manual'
@@ -46,6 +47,9 @@ export function TriggerNodeComponent(props: NodeProps<TriggerNode>) {
   } else if (isEda) {
     metadata = nodeMetadata.edaTrigger
     iconId = 'trigger-eda'
+  } else if (isForm) {
+    metadata = nodeMetadata.formTrigger
+    iconId = 'trigger-form'
   }
   const iconNode = renderNodeIcon(metadata.icon, iconId)
   // 75px border-radius is a layout constraint (pill shape), not a spacing value — no semantic token applies
@@ -85,6 +89,8 @@ export function TriggerNodeComponent(props: NodeProps<TriggerNode>) {
     triggerTypeLabel = 'Webhook trigger'
   } else if (isEda) {
     triggerTypeLabel = 'Event-Driven Ansible trigger'
+  } else if (isForm) {
+    triggerTypeLabel = 'Form trigger'
   }
 
   return (
@@ -136,6 +142,7 @@ function TriggerNodeDetails(
   const isScheduledTrigger = props.triggerKind === TriggerTypeEnum.SCHEDULED
   const isWebhookTrigger = props.triggerKind === TriggerTypeEnum.WEBHOOK_TRIGGER
   const isEdaTrigger = props.triggerKind === TriggerTypeEnum.EDA_TRIGGER
+  const isFormTrigger = props.triggerKind === TriggerTypeEnum.FORM_TRIGGER
   const normalizedDetails = props.triggerDetails ?? null
   return (
     <>
@@ -167,6 +174,7 @@ function TriggerNodeDetails(
           {isEdaTrigger && !normalizedDetails && (
             <Content component={ContentVariants.small}>Event-Driven Ansible trigger</Content>
           )}
+          {isFormTrigger && !normalizedDetails && <Content component={ContentVariants.small}>Form trigger</Content>}
           {normalizedDetails && (
             <Content component={ContentVariants.small} style={{ whiteSpace: 'pre-line', overflowWrap: 'anywhere' }}>
               {normalizedDetails}

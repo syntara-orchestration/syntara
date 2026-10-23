@@ -15,6 +15,7 @@ import type { ActivityWithMetadata } from './workflowStoreTypes'
 export {
   createEdaTrigger,
   createEventTrigger,
+  createFormTrigger,
   createManualTrigger,
   createScheduledTrigger,
   createWebhookTrigger,

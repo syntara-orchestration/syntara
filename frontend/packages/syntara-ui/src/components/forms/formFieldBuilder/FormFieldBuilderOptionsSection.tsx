@@ -1,4 +1,4 @@
-import { FormGroup, ToggleGroup, ToggleGroupItem } from '@patternfly/react-core'
+import { Alert, FormGroup, ToggleGroup, ToggleGroupItem } from '@patternfly/react-core'
 import type { FormDefinition, FormField } from '@syntara/contracts'
 import { useFormContext } from 'react-hook-form'
 
@@ -10,6 +10,7 @@ import styles from './formFieldBuilder.module.css'
 import { useFormFieldBuilderCommit } from './formFieldBuilderCommitContext'
 import { formFieldBuilderLabelHelp } from './formFieldBuilderFieldHelp'
 import { StaticOptionsEditor } from './StaticOptionsEditor'
+import { useFormFieldBuilderOptionsMode } from './useFormFieldBuilderOptionsMode'
 
 type OptionsFormField = Extract<
   FormField,
@@ -71,31 +72,44 @@ export function FormFieldBuilderOptionsSection({
 }: Readonly<FormFieldBuilderOptionsSectionProps>) {
   const commit = useFormFieldBuilderCommit()
   const { control, setValue, clearErrors } = useFormContext<FormDefinition>()
+  const optionsMode = useFormFieldBuilderOptionsMode()
   const optionsSource = field.options.source
+  const staticOnly = optionsMode === 'static-only'
+
+  if (staticOnly && optionsSource === 'dynamic') {
+    return (
+      <Alert variant="warning" isInline title="Dynamic options not supported">
+        This field uses dynamic options, which are not allowed on a form trigger. Change the field type or remove the
+        field.
+      </Alert>
+    )
+  }
 
   return (
     <FormGroup
       label="Options source"
       fieldId={`${idPrefix}-options`}
-      labelHelp={formFieldBuilderLabelHelp('optionsSource', 'Options source')}
+      labelHelp={formFieldBuilderLabelHelp(staticOnly ? 'optionsSourceStaticOnly' : 'optionsSource', 'Options source')}
     >
-      <OptionsSourceToggle
-        source={optionsSource}
-        isDisabled={isDisabled}
-        idPrefix={idPrefix}
-        onSelectStatic={() => {
-          setValue(`fields.${index}.options`, defaultStaticOptionsSource(), { shouldValidate: false })
-          commit()
-        }}
-        onSelectDynamic={() => {
-          setValue(`fields.${index}.options`, defaultDynamicOptionsSource(), { shouldValidate: false })
-          setValue(`fields.${index}.default`, null, { shouldValidate: false })
-          clearErrors(`fields.${index}.options.expression`)
-          clearErrors(`fields.${index}.options.label_key`)
-          clearErrors(`fields.${index}.options.value_key`)
-          commit()
-        }}
-      />
+      {staticOnly ? null : (
+        <OptionsSourceToggle
+          source={optionsSource}
+          isDisabled={isDisabled}
+          idPrefix={idPrefix}
+          onSelectStatic={() => {
+            setValue(`fields.${index}.options`, defaultStaticOptionsSource(), { shouldValidate: false })
+            commit()
+          }}
+          onSelectDynamic={() => {
+            setValue(`fields.${index}.options`, defaultDynamicOptionsSource(), { shouldValidate: false })
+            setValue(`fields.${index}.default`, null, { shouldValidate: false })
+            clearErrors(`fields.${index}.options.expression`)
+            clearErrors(`fields.${index}.options.label_key`)
+            clearErrors(`fields.${index}.options.value_key`)
+            commit()
+          }}
+        />
+      )}
       {optionsSource === 'static' ? (
         <StaticOptionsEditor fieldIndex={index} isDisabled={isDisabled} />
       ) : (

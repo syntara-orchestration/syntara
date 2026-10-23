@@ -17,6 +17,7 @@ const REGISTRY_SUBTYPE_DOC_KEYS: Readonly<Record<string, string>> = {
   [RegistryNodeId.TRIGGER_SCHEDULED]: 'scheduleTrigger',
   [RegistryNodeId.TRIGGER_WEBHOOK]: 'webhookTrigger',
   [RegistryNodeId.TRIGGER_EDA]: 'eventDrivenAnsibleTrigger',
+  [RegistryNodeId.TRIGGER_FORM]: 'builder',
   [RegistryNodeId.ACTION_API]: 'restApi',
   [RegistryNodeId.AGENT]: 'taskAgent',
   [RegistryNodeId.HUMAN_TASKS]: 'builder',
@@ -36,6 +37,7 @@ const TRIGGER_TYPE_DOC_KEYS: Readonly<Record<string, string>> = {
   [TriggerTypeEnum.SCHEDULED]: 'scheduleTrigger',
   [TriggerTypeEnum.WEBHOOK_TRIGGER]: 'webhookTrigger',
   [TriggerTypeEnum.EDA_TRIGGER]: 'eventDrivenAnsibleTrigger',
+  [TriggerTypeEnum.FORM_TRIGGER]: 'builder',
 }
 
 const EXECUTOR_TYPE_DOC_KEYS: Readonly<Record<string, string>> = {
