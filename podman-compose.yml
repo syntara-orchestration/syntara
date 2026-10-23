@@ -396,7 +396,7 @@ services:
   kafka-worker:
     profiles: [kafka-worker]
     image: ${APP_IMAGE:-localhost/syntara:latest}
-    command: [start-kafka-worker]
+    command: [python, -m, syntara.eventstreams.consumer_entrypoint]
     # Longer than the default 20s drain; raise together if the drain is increased.
     stop_grace_period: 60s
     restart: "no"
@@ -444,13 +444,6 @@ services:
         condition: service_healthy
       temporal:
         condition: service_healthy
-    healthcheck:
-      test: [CMD, python, -m, syntara.eventstreams.consumer_health, ready]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-      start_period: 120s
-
   mcp-server:
     build:
       context: ./backend

@@ -1,46 +1,47 @@
-# Control-plane Kafka worker operations
+# Control-plane Kafka runtime configuration and local operation
 
-The Kafka pool uses the backend image and
-`python -m syntara.eventstreams.consumer_entrypoint` (`start-kafka-worker` in the
-container). It runs independently of API, workflow execution and background
-workers. The operator's `spec.eventStreamWorker` controls enablement, replicas,
-resources, pod placement and deployment safety bounds. Kafka infrastructure,
-broker ACLs and broker credentials remain customer managed. The operator never
-creates a deployment per subscription or per message and adds no Kafka autoscaler.
+The existing Kafka worker runs with
+`python -m syntara.eventstreams.consumer_entrypoint`, independently of API,
+workflow execution and background workers. The opt-in local compose profile runs
+that entrypoint directly using the backend image. Operator-managed Kubernetes
+deployment, CRD controls, container launchers and deployment health probes are
+deferred to M2. This guide covers backend configuration, local compose and runtime
+recovery safeguards. Kafka infrastructure, broker ACLs and broker credentials
+remain customer managed; the local broker example is disposable development data.
 
 ## Configuration contract
 
-`APP_EVENTSTREAM_ENABLED` defaults to `false`. An omitted/disabled operator
-configuration keeps the Kafka deployment at zero replicas. An enabled pool with
-zero active subscriptions stays alive and runs prepared-delivery recovery. Setting
-the entire pool to zero replicas stops both consumption and prepared recovery;
-recovery waits for a compatible worker to return.
+`APP_EVENTSTREAM_ENABLED` defaults to `false`. Both local Kafka compose profiles
+are opt-in; the normal compose stack does not start a broker or Kafka worker.
+An enabled worker with zero active subscriptions stays running and scans prepared
+deliveries. Stopping every Kafka worker stops both consumption and prepared
+recovery; recovery waits for a compatible worker to return.
 
-All replicas receive one explicit configuration from the Deployment template.
-The Kafka deployment uses `Recreate` for configuration updates, so old and new
-retention values do not coexist. Expect a temporary interruption in intake and
-recovery while pods drain and are replaced. Do not patch individual pod values or
-run a second Kafka deployment with different retention against the same database.
+Keep terminal retention identical across every process sharing the database.
+For a retention change, pause subscriptions, drain and stop the whole pool, then
+restart it with one consistent value before resuming intake. Do not start a
+second pool with a different retention value against the same database. Automatic
+deployment rollout controls are part of the deferred M2 operator integration.
 
 These settings are read at process/runner startup. The backend Settings defaults,
-root and backend `.env.example`, compose worker and operator builder agree:
+root and backend `.env.example`, and local compose worker agree:
 
-| Environment variable | Default | Operator field under `spec.eventStreamWorker` |
-| --- | ---: | --- |
-| `APP_EVENTSTREAM_ENABLED` | `false` | `enabled` |
-| `APP_EVENT_FETCH_MAX_RECORDS` | `100` | `fetchMaxRecords` |
-| `APP_EVENT_QUEUE_MAX_RECORDS` | `100` | `queueMaxRecords` |
-| `APP_EVENT_QUEUE_MAX_BYTES` | `8388608` | `queueMaxBytes` |
-| `APP_EVENT_PARTITION_MAX_RECORDS` | `10` | `partitionMaxRecords` |
-| `APP_EVENT_PROCESSING_CONCURRENCY` | `8` | `processingConcurrency` |
-| `APP_EVENT_FETCH_TIMEOUT_MS` | `100` | `fetchTimeoutMs` |
-| `APP_EVENT_DRAIN_TIMEOUT_SECONDS` | `20` | `drainTimeoutSeconds` |
-| `APP_EVENT_DELIVERY_RETENTION_SECONDS` | `3600` | `deliveryRetentionSeconds` |
-| `APP_EVENT_TEMPORAL_HISTORY_RETENTION_SECONDS` | `86400` | `temporalHistoryRetentionSeconds` |
+| Environment variable | Default |
+| --- | ---: |
+| `APP_EVENTSTREAM_ENABLED` | `false` |
+| `APP_EVENT_FETCH_MAX_RECORDS` | `100` |
+| `APP_EVENT_QUEUE_MAX_RECORDS` | `100` |
+| `APP_EVENT_QUEUE_MAX_BYTES` | `8388608` |
+| `APP_EVENT_PARTITION_MAX_RECORDS` | `10` |
+| `APP_EVENT_PROCESSING_CONCURRENCY` | `8` |
+| `APP_EVENT_FETCH_TIMEOUT_MS` | `100` |
+| `APP_EVENT_DRAIN_TIMEOUT_SECONDS` | `20` |
+| `APP_EVENT_DELIVERY_RETENTION_SECONDS` | `3600` |
+| `APP_EVENT_TEMPORAL_HISTORY_RETENTION_SECONDS` | `86400` |
 
-The operator's termination grace defaults to 60 seconds and must exceed the
-configured drain deadline. Reserve extra time for hint/client/database cleanup.
-When increasing compose's drain deadline, also increase `stop_grace_period`.
+Local compose's `stop_grace_period` is 60 seconds, longer than the default drain
+deadline of 20 seconds. Reserve extra time for hint/client/database cleanup.
+When increasing the drain deadline, also increase `stop_grace_period`.
 
 Queues and raw-byte bounds apply per subscription; processing concurrency is
 shared across consumers and recovery in one worker. Candidate decoding limits
@@ -49,7 +50,7 @@ are `APP_EVENT_MAX_VALUE_BYTES=262144`, `APP_EVENT_MAX_ENVELOPE_BYTES=1048576` a
 these values are application bounds, not measured memory or throughput promises.
 
 The following are fixed implementation bounds in `syntara.core.constants`, not
-additional environment variables or CRD tuning fields:
+additional environment variables:
 
 | Control | Current bound |
 | --- | --- |
@@ -76,13 +77,13 @@ Execution evidence never expire merely because the minimum duration passed.
 Budget storage and monitor capacity separately. Redis is a disposable hint/cache;
 PostgreSQL and Kafka positions remain authoritative.
 
-## Dependencies, networking and probes
+## Dependencies, networking and lifecycle
 
 Use the existing backend PostgreSQL settings (including database TLS), encryption
 key and JWT signing keys. The encryption key must match the API's key so the
 worker can decrypt existing Integration/runtime Credential secrets. Temporal uses
 the existing namespace, signed client interceptor and internal mTLS configuration;
-the Kafka pool reuses the established worker service certificate identity. The
+the local compose worker uses the existing development worker certificate. The
 namespace must actually provide at least the guaranteed history retention; the
 setting does not configure Temporal. Preserve that history for ambiguous starts.
 
@@ -92,28 +93,17 @@ entries cannot acknowledge or authorize a delivery.
 
 Permit DNS, PostgreSQL, Temporal and optional Redis connectivity, plus **every
 bootstrap and advertised broker address/port**, including addresses returned in
-metadata after bootstrap. The operator allows Kafka worker egress because these
-customer endpoints are not known from the CR. Administrators applying additional
-network controls must account for all advertised endpoints. Standard Kubernetes
-NetworkPolicy cannot express hostname rules; use the platform's supported egress
-controls where required. Private broker hostnames must also be allowed by the
+metadata after bootstrap. Network controls must account for all advertised
+endpoints. Private broker hostnames must also be allowed by the
 application's Integration SSRF policy on the API and Kafka worker.
 
-The worker serves only loopback HTTP on `127.0.0.1:8091`; no Service or ingress is
-created. Packaging uses Python exec probes:
-
-```bash
-python -m syntara.eventstreams.consumer_health live
-python -m syntara.eventstreams.consumer_health ready
-```
-
-Readiness becomes true after the first successful authoritative reconciliation,
-including an empty subscription list. It does not wait for customer broker
-connections. Liveness observes the process event loop, not database, Redis,
-Kafka availability, record traffic or subscription lag. Broker failure is isolated
-to that subscription's retries; it must not restart unrelated workers. Readiness
-closes when shutdown starts. SIGTERM closes new intake/recovery claims and drains
-within the configured deadline, preserving unresolved evidence on timeout.
+The internal `EventWorkerManager.ready` state becomes true after the first
+successful authoritative reconciliation, including an empty subscription list.
+It does not wait for customer broker connections. Broker failures are isolated
+to subscription retries. Readiness closes when shutdown starts. SIGTERM closes
+new intake/recovery claims and drains within the configured deadline, preserving
+unresolved evidence on timeout. Deployment probe endpoints and exec commands are
+deferred to M2; the local compose worker does not install a health probe.
 
 ## Sizing and rollout
 
@@ -126,18 +116,18 @@ and database pools across all R processes before manually scaling. Shared
 processing limits are per process, so their pool-wide upper bound also grows with R.
 
 1. Keep activation closed while introducing the database migrations and a backend
-   image containing the completed worker and probes. Deploy compatible API and
-   Temporal execution workers, then the operator schema/controller support.
+   image containing the completed worker. Run compatible API and Temporal
+   execution workers before starting the local Kafka worker.
 2. Configure matching encryption/signing material, trusted TLS, database access,
-   Temporal retention and broker egress. Keep `eventStreamWorker.enabled=false` until
+   Temporal retention and broker egress. Keep `APP_EVENTSTREAM_ENABLED=false` until
    dependencies and persisted state are safe.
-3. Enable the pool with administrator-selected replicas/resources. Check the
-   reconciliation readiness and per-subscription controls before resuming intake.
+3. Explicitly enable the local worker following the [local Kafka example](../samples/kafka/README.md).
+   Confirm reconciliation and review per-subscription controls before resuming intake.
 4. For supported application rollback, pause subscriptions, wait for persisted
    worker shutdown acknowledgements, then drain/stop the pool before changing
    binaries. Keep compatible recovery/cleanup code whenever unresolved or pending
    inspection evidence exists. Do not downgrade schemas beneath their safety
-   guards. Operator release downgrades remain unsupported.
+   guards.
 
 See [event subscription controls](event-subscription-controls.md) for revision-
 checked actions and durable acknowledgements, and [record runner recovery](kafka-record-runner.md)
@@ -160,7 +150,7 @@ for pending-inspection rollback safeguards.
 5. Only after database, Kafka and Temporal recovery is safe, start compatible Kafka
    workers with subscriptions still paused. Prepared recovery runs independently of
    active consumers. Review unresolved evidence and use the guarded recovery
-   controls before resuming normal intake. With zero Kafka replicas this work waits.
+   controls before resuming normal intake. With every Kafka worker stopped this work waits.
 
 Never reset/delete consumer groups, replace initial boundaries, advance offsets
 manually, delete unresolved deliveries, clear claims as a shortcut, or delete
@@ -169,9 +159,11 @@ recovery controls when retention/compaction removed a required source window.
 
 ## Verification boundary
 
-Unit tests cover worker composition and independent recovery, probes, settings,
-packaging defaults, CRD schema, builder output and operator reconciliation. They
-do not establish live deployment, TLS/broker interoperability or restore safety.
+Unit tests cover the existing worker composition and independent recovery,
+settings, local compose defaults and disposable fixture configuration. They do
+not establish live deployment, TLS/broker interoperability or restore safety.
+Operator CRDs, deployment builders, reconciliation and deployment probe packaging
+are deferred to M2 and are not covered by this Syntara change.
 Live broker/TLS fixture matrices, CI integration/E2E provisioning, deployment smoke
 runs, scale/soak measurements, backup/restore drills, full Visibility and M4 release
 certification are deferred verification work and do not block this packaging story.

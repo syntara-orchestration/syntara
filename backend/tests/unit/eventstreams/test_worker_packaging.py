@@ -1,4 +1,4 @@
-"""Static packaging contracts; no container, deployment or live broker claims."""
+"""Local compose and configuration contracts; no live deployment or broker claims."""
 
 import json
 import re
@@ -38,7 +38,7 @@ def test_environment_examples_and_compose_match_settings_defaults():
     assert int(worker["stop_grace_period"].removesuffix("s")) > float(root["APP_EVENT_DRAIN_TIMEOUT_SECONDS"])
     assert "redis" not in worker["depends_on"]
     assert "kafka" not in worker["depends_on"]
-    assert worker["healthcheck"]["test"][-2:] == ["syntara.eventstreams.consumer_health", "ready"]
+    assert worker["command"] == ["python", "-m", "syntara.eventstreams.consumer_entrypoint"]
 
 
 def test_disposable_broker_has_no_persistent_storage_or_customer_credentials():
@@ -59,12 +59,7 @@ def test_disposable_broker_has_no_persistent_storage_or_customer_credentials():
     assert "auto.create.topics.enable=false" in server
 
 
-def test_backend_image_packages_existing_worker_launcher():
-    containerfile = (ROOT / "backend/containers/syntara/Containerfile").read_text()
-    assert "COPY containers/syntara/scripts/start-kafka-worker /usr/local/bin/start-kafka-worker" in containerfile
-    launcher = ROOT / "backend/containers/syntara/scripts/start-kafka-worker"
-    assert "exec python -m syntara.eventstreams.consumer_entrypoint" in launcher.read_text()
-    assert launcher.stat().st_mode & 0o111
+def test_terminal_retention_and_claim_cache_lifetimes_remain_independent():
     assert Settings.model_fields["event_delivery_retention_seconds"].default == 3600
     assert EventDeliveryDefaults.CLAIM_LEASE_SECONDS == 60
     assert EventDeliveryDefaults.CLAIM_RENEWAL_INTERVAL_SECONDS == 20

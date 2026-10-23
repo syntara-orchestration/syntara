@@ -152,7 +152,6 @@ RUN chown -R 1001:0 /opt/app-root && \
 COPY containers/syntara/scripts/start-api /usr/local/bin/start-api
 COPY containers/syntara/scripts/start-worker /usr/local/bin/start-worker
 COPY containers/syntara/scripts/start-background-worker /usr/local/bin/start-background-worker
-COPY containers/syntara/scripts/start-kafka-worker /usr/local/bin/start-kafka-worker
 COPY containers/syntara/scripts/run-seed /usr/local/bin/run-seed
 
 # Verify timezone data is available in the image (AAP-86297)

@@ -109,10 +109,6 @@ class EventWorkerDefaults:
     FINALIZATION_CONCURRENCY = 8
     HINT_TIMEOUT_SECONDS = 1
     HINT_CHANNEL = "syntara:eventstreams:subscription_changes"
-    HEALTH_HOST = "127.0.0.1"
-    HEALTH_PORT = 8091
-    HEALTH_TIMEOUT_SECONDS = 2
-    HEALTH_REQUEST_LIMIT_BYTES = 1024
 
 
 class EventDeliveryDefaults:

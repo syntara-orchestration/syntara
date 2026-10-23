@@ -121,5 +121,5 @@ See [event subscription controls](event-subscription-controls.md) for revision-c
 operator actions, durable shutdown acknowledgements, retirement guards and the
 additional control-coordination migration.
 
-See [Kafka worker operations](kafka-worker-operations.md) for deployment defaults,
-probes, sizing and recovery/rollout ordering.
+See [Kafka worker operations](kafka-worker-operations.md) for runtime defaults,
+local compose configuration, sizing and recovery/rollout ordering.
