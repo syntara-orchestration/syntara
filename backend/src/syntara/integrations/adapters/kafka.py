@@ -10,6 +10,7 @@ Kafka has no discoverable resources at the integration level.
 
 from __future__ import annotations
 
+import asyncio
 import ssl
 from datetime import UTC, datetime
 from typing import Any, cast
@@ -91,7 +92,9 @@ class KafkaAdapter:
         Args:
             resolved_credential: extra_vars dict from InjectorResolver.resolve().
                 Recognized keys: ``kafka_username``, ``kafka_password``.
-            timeout_seconds: Maximum seconds to wait for the bootstrap.
+            timeout_seconds: Maximum seconds for the whole bootstrap. Each broker
+                also gets this value as ``request_timeout_ms``, which is only a
+                per-attempt budget.
 
         """
         login = _sasl_login(resolved_credential)
@@ -130,7 +133,7 @@ class KafkaAdapter:
         error_msg: str | None = None
         error_type: HealthCheckErrorType | None = None
         try:
-            await client.bootstrap()
+            await _bootstrap(client, timeout_seconds)
             logger.info(
                 "Kafka validate succeeded",
                 bootstrap_servers=self._config.bootstrap_servers,
@@ -193,6 +196,17 @@ class KafkaAdapter:
             discovered_tools=None,
             discovered_models=None,
         )
+
+
+async def _bootstrap(client: AIOKafkaClient, timeout_seconds: int) -> None:
+    """Bootstrap every broker under one deadline.
+
+    ``request_timeout_ms`` is a fresh budget for each broker, so a list of
+    brokers can outlast the caller's timeout. ``asyncio.timeout`` cancels the
+    whole loop when that deadline expires.
+    """
+    async with asyncio.timeout(timeout_seconds):
+        await client.bootstrap()
 
 
 def _sasl_login(resolved_credential: dict[str, Any]) -> tuple[str, str] | None:

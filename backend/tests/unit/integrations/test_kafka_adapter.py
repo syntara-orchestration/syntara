@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import asyncio
 import ssl
+import time
 from typing import Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
+from aiokafka.client import AIOKafkaClient
 from aiokafka.errors import KafkaConnectionError, KafkaError, KafkaTimeoutError
 
 from syntara.integrations.adapters.kafka import KafkaAdapter
@@ -199,6 +202,45 @@ class TestKafkaValidateErrors:
         assert result.success is False
         assert result.error_type == HealthCheckErrorType.AUTH_FAILURE
         assert result.error == "Authentication failed"
+
+
+class TestKafkaRealBootstrap:
+    """bootstrap() itself, so the caller's deadline covers every broker."""
+
+    @pytest.mark.asyncio
+    async def test_deadline_cancels_before_the_second_broker(self, resolved_credential: dict[str, Any]) -> None:
+        """One deadline covers every broker, and cancelling the attempt closes the client."""
+        attempts = 0
+        attempt_finished = False
+        closed: list[AIOKafkaClient] = []
+        real_close = AIOKafkaClient.close
+
+        async def hang_create_conn(*_args: object, **_kwargs: object) -> None:
+            nonlocal attempts, attempt_finished
+            attempts += 1
+            await asyncio.sleep(8)
+            attempt_finished = True
+
+        async def spy_close(self: AIOKafkaClient) -> None:
+            closed.append(self)
+            await real_close(self)
+
+        config = KafkaConfiguration(bootstrap_servers=["broker-a.example:9093", "broker-b.example:9093"])
+        started = time.monotonic()
+        with (
+            patch("aiokafka.client.create_conn", hang_create_conn),
+            patch.object(AIOKafkaClient, "close", spy_close),
+        ):
+            result = await KafkaAdapter(config).validate(resolved_credential, timeout_seconds=1)
+        elapsed = time.monotonic() - started
+
+        assert result.success is False
+        assert result.error_type == HealthCheckErrorType.TIMEOUT
+        assert result.error == "Connection timed out after 1s"
+        assert attempts == 1
+        assert attempt_finished is False
+        assert elapsed < 4
+        assert len(closed) == 1
 
 
 class TestKafkaDiscover:
