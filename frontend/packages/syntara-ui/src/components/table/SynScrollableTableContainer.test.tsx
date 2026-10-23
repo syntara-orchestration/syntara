@@ -65,28 +65,6 @@ describe('SynScrollableTableContainer', () => {
     expect(screen.getByRole('grid')).not.toHaveClass('pf-m-compact')
   })
 
-  it('applies compact presentation class when useCompactTableStyles is true', () => {
-    render(
-      <Stack style={{ height: '240px' }}>
-        <SynScrollableTableContainer caption="Demo table">{minimalTable}</SynScrollableTableContainer>
-      </Stack>
-    )
-
-    expect(screen.getByRole('grid').className).toMatch(/tableCompactPresentation/)
-  })
-
-  it('omits compact presentation class when useCompactTableStyles is false', () => {
-    render(
-      <Stack style={{ height: '240px' }}>
-        <SynScrollableTableContainer caption="Demo table" useCompactTableStyles={false}>
-          {minimalTable}
-        </SynScrollableTableContainer>
-      </Stack>
-    )
-
-    expect(screen.getByRole('grid').className).not.toMatch(/tableCompactPresentation/)
-  })
-
   it('does not stripe rows when isStriped is omitted', () => {
     render(
       <Stack style={{ height: '240px' }}>

@@ -145,7 +145,7 @@ export function ExecutionActivityTable({
   const hasAAPColumn = useMemo(() => activityOrder.some((a) => isAAPNodeType(a.type)), [activityOrder])
 
   return (
-    <SynScrollableTableContainer caption="Activity states" useFixedLayout={false} useCompactTableStyles={false}>
+    <SynScrollableTableContainer caption="Activity states" useFixedLayout={false}>
       <Thead>
         <Tr>
           <Th modifier="nowrap">Name</Th>
