@@ -118,6 +118,9 @@ export function getTriggerDisplayData(trigger: Trigger): { name: string; details
     case TriggerTypeEnum.EDA_TRIGGER:
       details = getWebhookStyleDetails(trigger.parameters, 'EDA')
       break
+    case TriggerTypeEnum.FORM_TRIGGER:
+      details = 'Form'
+      break
   }
 
   return { name, details }

@@ -1,7 +1,6 @@
-import type { Activity, FormDefinition } from '@syntara/contracts'
+import type { Activity } from '@syntara/contracts'
 import type { ReactNode } from 'react'
 
-import { prepareFormDefinitionForCommit, safeParseFormDefinition } from '../../../forms'
 import { useAlerts } from '../../../providers/alerts'
 import { useWorkflowStore } from '../../../stores/useWorkflowStore'
 import type { FormPromptFormSubmitData } from '../node-forms/FormPromptNodeForm'
@@ -10,19 +9,7 @@ import { formPromptStoredParametersSchema } from '../node-forms/formPromptNodeFo
 import { persistNodeSettings } from '../node-forms/shared/nodeSettingsSchema'
 import { buildFormPromptActivityParameters } from '../utils/formPromptActivityParameters'
 import { formPromptFallbackDecisionFromBehavior } from '../utils/formPromptFallbackBehavior'
-
-function readStoredFormDefinition(rawParameters: unknown): FormDefinition | undefined {
-  if (typeof rawParameters !== 'object' || rawParameters === null) {
-    return undefined
-  }
-  const raw = (rawParameters as { form_definition?: unknown }).form_definition
-  if (typeof raw !== 'object' || raw === null || !('fields' in raw)) {
-    return undefined
-  }
-  const prepared = prepareFormDefinitionForCommit(raw as FormDefinition)
-  const parsed = safeParseFormDefinition(prepared)
-  return parsed.success ? parsed.data : undefined
-}
+import { readStoredFormDefinition } from '../utils/readStoredFormDefinition'
 
 type FormPromptNodeDetailsProps = {
   taskData: Activity

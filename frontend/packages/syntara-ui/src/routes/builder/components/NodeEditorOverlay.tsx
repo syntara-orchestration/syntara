@@ -4,6 +4,7 @@ import { memo } from 'react'
 
 import { useDocLink } from '../../../utils/docs/useDocLink'
 import type { NodeType } from '../../workflows/canvas/nodes/NodeType'
+import type { ValidationError } from '../builderReducer'
 import { NodeDetailsPanel } from '../NodeDetailsPanel'
 import type { WorkflowMetadata } from '../types/workflowMetadata'
 import { resolveStepDocKey } from '../utils/resolveStepDocKey'
@@ -27,6 +28,7 @@ type NodeEditorOverlayProps = {
   workflowMetadata?: WorkflowMetadata
   onRunStep?: () => void
   onNodeAdded?: () => void
+  validationErrors?: ValidationError[]
 }
 
 export const NodeEditorOverlay = memo(function NodeEditorOverlay(props: NodeEditorOverlayProps) {
@@ -49,6 +51,7 @@ export const NodeEditorOverlay = memo(function NodeEditorOverlay(props: NodeEdit
     workflowMetadata,
     onRunStep,
     onNodeAdded,
+    validationErrors,
   } = props
 
   const stepDocKey = resolveStepDocKey({ mode, nodeTypeId, nodeSubtypeId, selectedNode })
@@ -86,6 +89,7 @@ export const NodeEditorOverlay = memo(function NodeEditorOverlay(props: NodeEdit
           onRunStep={isVersionView ? undefined : onRunStep}
           readOnly={isVersionView}
           onNodeAdded={onNodeAdded}
+          validationErrors={validationErrors}
         />
       </FlexItem>
     </Flex>

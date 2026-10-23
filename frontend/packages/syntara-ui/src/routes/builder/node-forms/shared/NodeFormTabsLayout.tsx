@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 
 import { SynPageBody } from '../../../../components/layout/SynPage'
 
+import nodeFormStyles from './nodeFormStyles.module.css'
 import { useNodeFormTabBar } from './useNodeFormTabBar'
 
 type NodeFormTabsLayoutProps = {
@@ -18,7 +19,7 @@ export function NodeFormTabsLayout({ parametersContent, settingsContent, hideSet
   const tabBarAction = useNodeFormTabBar()
 
   return (
-    <Stack hasGutter style={{ height: '100%', minHeight: 0, flex: 1 }}>
+    <Stack hasGutter className={nodeFormStyles.nodeFormTabsLayout} style={{ height: '100%', minHeight: 0, flex: 1 }}>
       <StackItem>
         <Flex justifyContent={{ default: 'justifyContentSpaceBetween' }} alignItems={{ default: 'alignItemsCenter' }}>
           <FlexItem>
@@ -30,9 +31,11 @@ export function NodeFormTabsLayout({ parametersContent, settingsContent, hideSet
           {tabBarAction && <FlexItem>{tabBarAction}</FlexItem>}
         </Flex>
       </StackItem>
-      <SynPageBody>
-        <Stack hasGutter>
-          <StackItem>{activeTabKey === 0 ? parametersContent : (settingsContent ?? null)}</StackItem>
+      <SynPageBody className={nodeFormStyles.nodeFormTabsBody}>
+        <Stack hasGutter className={nodeFormStyles.nodeFormParametersStack}>
+          <StackItem className={nodeFormStyles.nodeFormParametersItem}>
+            {activeTabKey === 0 ? parametersContent : (settingsContent ?? null)}
+          </StackItem>
         </Stack>
       </SynPageBody>
     </Stack>

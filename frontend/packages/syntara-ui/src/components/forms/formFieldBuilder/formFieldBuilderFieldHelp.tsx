@@ -17,6 +17,7 @@ const FORM_FIELD_BUILDER_LABEL_HELP = {
     'Choose which date, time, and timezone inputs appear in the form. At least one input must be selected.',
   optionsSource:
     'Choose static to define a fixed list of options, or dynamic to populate options from a template expression at form render time.',
+  optionsSourceStaticOnly: 'Define a fixed list of options.',
   dynamicOptionsExpression:
     'Template expression that resolves to an array of { label, value } objects when the form is rendered. Drag input parameters from the Input panel to build the expression.',
   dynamicOptionsLabelKey: 'Property name used for the option label when the expression returns a list of objects.',

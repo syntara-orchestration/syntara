@@ -107,6 +107,55 @@ describe('buildWorkflowDefinition', () => {
       expect(result.triggers[0]).not.toHaveProperty('name')
     })
 
+    it('persists form_trigger parameters in workflow definition', () => {
+      const triggers: Activity[] = [
+        {
+          id: 'form',
+          name: 'Start form',
+          type: TriggerTypeEnum.FORM_TRIGGER,
+          parameters: {
+            form_definition: {
+              fields: [
+                {
+                  type: 'text',
+                  value_name: 'notes',
+                  label: 'Notes',
+                  required: false,
+                },
+              ],
+            },
+            message: 'Please fill out the form',
+            submit_label: 'Submit',
+            success_message: 'Thanks',
+            css_override: '.form { margin: 0; }',
+          },
+        },
+      ]
+
+      const result = buildWorkflowDefinition({
+        workflowName: 'Test',
+        workflowDescription: '',
+        activities: [activity('task-1')],
+        triggers,
+        edges: [{ id: 'e1', source: 'trigger-0', target: 'task-1' }],
+      })
+
+      expect(result.triggers[0]).toMatchObject({
+        id: 'form',
+        name: 'Start form',
+        type: TriggerTypeEnum.FORM_TRIGGER,
+      })
+      expect(result.triggers[0].parameters).toMatchObject({
+        message: 'Please fill out the form',
+        submit_label: 'Submit',
+        success_message: 'Thanks',
+        css_override: '.form { margin: 0; }',
+        form_definition: {
+          fields: [{ type: 'text', value_name: 'notes', label: 'Notes', required: false }],
+        },
+      })
+    })
+
     it('uses empty config when config is undefined', () => {
       const triggers: Activity[] = [
         {
