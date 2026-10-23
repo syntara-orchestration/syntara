@@ -1,4 +1,4 @@
-import { RhUiCalendarIcon, RhUiLanguageIcon, RhUiPlayIcon } from '@patternfly/react-icons'
+import { RhUiCalendarIcon, RhUiLanguageIcon, RhUiPlayIcon, RhUiPlugFillIcon } from '@patternfly/react-icons'
 import { type ScheduleType, TriggerTypeEnum, WEBHOOK_TRIGGER_TYPES } from '@syntara/contracts'
 
 import EdaIcon from '../../../../assets/eda.svg?react'
@@ -13,6 +13,7 @@ import {
 import { parseJsonSchema } from '../../../../utils/jsonSafeParse'
 import { normalizeWebhookPath } from '../../../../utils/webhookPath'
 import type { TriggerFormData } from '../../hooks/useNodeCreation'
+import { buildKafkaSubscribeTrigger } from '../../node-forms/kafkaSubscribeMapping'
 import { TriggerNodeForm } from '../../node-forms/TriggerNodeForm'
 import { buildNamedTrigger } from '../../utils/nodeCreationHelpers'
 import { getDefaultNodeBaseName } from '../../utils/nodeNaming'
@@ -31,10 +32,30 @@ export default function registerTriggerNode() {
         icon: RhUiPlayIcon,
         category: 'trigger',
         description: 'Start workflow execution with manual, scheduled, or event triggers',
-        keywords: ['start', 'begin', 'manual', 'schedule', 'event', 'webhook', 'api', 'http', 'eda'],
+        keywords: [
+          'start',
+          'begin',
+          'manual',
+          'schedule',
+          'event',
+          'webhook',
+          'api',
+          'http',
+          'eda',
+          'kafka',
+          'subscribe',
+        ],
         order: 100,
         selectionTitle: 'Select a trigger node',
         subtypes: [
+          {
+            id: RegistryNodeId.TRIGGER_KAFKA,
+            label: 'Kafka Subscribe',
+            icon: RhUiPlugFillIcon,
+            description: 'Start a workflow when a Kafka message arrives.',
+            formTitle: 'Configure Kafka Subscribe',
+            initialData: { triggerType: TriggerTypeEnum.EVENT_SUBSCRIBE },
+          },
           {
             id: RegistryNodeId.TRIGGER_MANUAL,
             label: 'Manual trigger',
@@ -74,6 +95,9 @@ export default function registerTriggerNode() {
         try {
           const baseName = getDefaultNodeBaseName({ nodeTypeId: RegistryNodeId.TRIGGER, label: 'Trigger' })
           const { trigger } = buildNamedTrigger(baseName, data.name, (triggerId, name) => {
+            if (data.triggerType === TriggerTypeEnum.EVENT_SUBSCRIBE) {
+              return buildKafkaSubscribeTrigger(triggerId, name, data)
+            }
             if (data.triggerType === TriggerTypeEnum.MANUAL_TRIGGER) {
               const inputSchema = parseJsonSchema(data.inputSchema)
               return createManualTrigger(triggerId, undefined, name, inputSchema)

@@ -43,6 +43,9 @@ export function TriggerNodeComponent(props: NodeProps<TriggerNode>) {
   } else if (isWebhook) {
     metadata = nodeMetadata.webhookTrigger
     iconId = 'trigger-webhook'
+  } else if (triggerType === TriggerTypeEnum.EVENT_SUBSCRIBE) {
+    metadata = nodeMetadata.kafkaTrigger
+    iconId = 'trigger-kafka'
   } else if (isEda) {
     metadata = nodeMetadata.edaTrigger
     iconId = 'trigger-eda'
@@ -83,6 +86,8 @@ export function TriggerNodeComponent(props: NodeProps<TriggerNode>) {
     triggerTypeLabel = 'Scheduled trigger'
   } else if (isWebhook) {
     triggerTypeLabel = 'Webhook trigger'
+  } else if (triggerType === TriggerTypeEnum.EVENT_SUBSCRIBE) {
+    triggerTypeLabel = 'Kafka Subscribe'
   } else if (isEda) {
     triggerTypeLabel = 'Event-Driven Ansible trigger'
   }

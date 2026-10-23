@@ -193,6 +193,15 @@ function renderSelector(props: Partial<CredentialSelectorProps> = {}) {
 }
 
 describe('CredentialSelector', () => {
+  it('does not offer unrelated credentials before compatible credential types are known', async () => {
+    mockUseQuery({ credentialTypes: { data: undefined, isPending: true } })
+    const user = userEvent.setup()
+    render(<CredentialSelector onChange={vi.fn()} compatibleTypeNames={['Kafka']} allowCreate={false} />, { wrapper })
+    await user.click(screen.getByRole('button', { name: 'Credential' }))
+    expect(screen.queryByRole('option', { name: 'Production API Key' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('option', { name: 'Staging Token' })).not.toBeInTheDocument()
+  })
+
   beforeEach(() => {
     vi.clearAllMocks()
   })

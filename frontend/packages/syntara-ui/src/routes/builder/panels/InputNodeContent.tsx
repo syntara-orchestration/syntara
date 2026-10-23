@@ -17,6 +17,7 @@ const TRIGGER_TYPES: ReadonlySet<string> = new Set([
   TriggerTypeEnum.EVENT,
   TriggerTypeEnum.WEBHOOK_TRIGGER,
   TriggerTypeEnum.EDA_TRIGGER,
+  TriggerTypeEnum.EVENT_SUBSCRIBE,
 ])
 
 export type InputNodeContentProps = {
@@ -50,7 +51,8 @@ export function InputNodeContent({
       const supportsInputSchema =
         upstreamNode.type === TriggerTypeEnum.MANUAL_TRIGGER ||
         upstreamNode.type === TriggerTypeEnum.WEBHOOK_TRIGGER ||
-        upstreamNode.type === TriggerTypeEnum.EDA_TRIGGER
+        upstreamNode.type === TriggerTypeEnum.EDA_TRIGGER ||
+        upstreamNode.type === TriggerTypeEnum.EVENT_SUBSCRIBE
       return <InputEmptyState variant={supportsInputSchema ? 'no-trigger-schema' : 'connected-not-run'} />
     }
     return (

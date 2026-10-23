@@ -12,6 +12,7 @@ import { useWorkflowStoreActions } from '../../../stores/useWorkflowStore'
 import type { Trigger } from '../../../stores/workflowStoreTypes'
 import { parseJsonSchema } from '../../../utils/jsonSafeParse'
 import { isValidWebhookPath, normalizeWebhookPath } from '../../../utils/webhookPath'
+import { buildKafkaSubscribeTrigger, kafkaSubscribeFormDefaults } from '../node-forms/kafkaSubscribeMapping'
 import type { TriggerFormData } from '../node-forms/TriggerNodeForm'
 import { TriggerNodeForm } from '../node-forms/TriggerNodeForm'
 
@@ -160,6 +161,9 @@ function buildWebhookStyleTrigger(
 }
 
 function buildUpdatedTrigger(data: TriggerFormData, trigger: Trigger, name: string | undefined): Trigger {
+  if (data.triggerType === TriggerTypeEnum.EVENT_SUBSCRIBE) {
+    return buildKafkaSubscribeTrigger(trigger.id, name ?? 'Kafka Subscribe', data)
+  }
   if (data.triggerType === TriggerTypeEnum.MANUAL_TRIGGER) {
     const inputSchema = parseJsonSchema(data.inputSchema)
     return {
@@ -194,19 +198,31 @@ function buildUpdatedTrigger(data: TriggerFormData, trigger: Trigger, name: stri
 }
 
 type TriggerNodeDetailsProps = Readonly<{
+  workflowId?: string | null
+  projectId?: string
   trigger: Trigger
   triggerIndex: number
   onClose: () => void
   onHeaderContentChange?: (content: ReactNode | null) => void
 }>
 
-export function TriggerNodeDetails({ trigger, triggerIndex, onClose, onHeaderContentChange }: TriggerNodeDetailsProps) {
+export function TriggerNodeDetails({
+  workflowId,
+  projectId,
+  trigger,
+  triggerIndex,
+  onClose,
+  onHeaderContentChange,
+}: TriggerNodeDetailsProps) {
   const { showError } = useAlerts()
   // Use action accessor - component won't re-render when store state changes
   const { updateTrigger } = useWorkflowStoreActions()
 
   // Extract initial data from trigger — memoized to avoid new object refs on re-render
   const initialData = useMemo((): TriggerFormData => {
+    if (trigger.type === TriggerTypeEnum.EVENT_SUBSCRIBE) {
+      return kafkaSubscribeFormDefaults(trigger)
+    }
     if (trigger.type === TriggerTypeEnum.MANUAL_TRIGGER) {
       return {
         name: trigger.name,
@@ -279,6 +295,12 @@ export function TriggerNodeDetails({ trigger, triggerIndex, onClose, onHeaderCon
   }
 
   return (
-    <TriggerNodeForm initialData={initialData} onSubmit={handleSubmit} onHeaderContentChange={onHeaderContentChange} />
+    <TriggerNodeForm
+      workflowId={workflowId}
+      projectId={projectId}
+      initialData={initialData}
+      onSubmit={handleSubmit}
+      onHeaderContentChange={onHeaderContentChange}
+    />
   )
 }

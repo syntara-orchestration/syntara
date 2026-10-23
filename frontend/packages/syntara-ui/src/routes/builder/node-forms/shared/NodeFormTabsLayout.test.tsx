@@ -1,10 +1,21 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
+import { axe } from 'vitest-axe'
 
 import { NodeFormTabsLayout } from './NodeFormTabsLayout'
 
 describe('NodeFormTabsLayout', () => {
+  it('links each tab to its panel with valid ARIA in both active states', async () => {
+    const user = userEvent.setup()
+    const { container } = render(
+      <NodeFormTabsLayout parametersContent="Parameters content" settingsContent="Settings content" />
+    )
+    expect(await axe(container)).toHaveNoViolations()
+    await user.click(screen.getByRole('tab', { name: 'Settings' }))
+    expect(await axe(container)).toHaveNoViolations()
+  })
+
   describe('tab navigation', () => {
     it('shows parameters content by default', () => {
       render(

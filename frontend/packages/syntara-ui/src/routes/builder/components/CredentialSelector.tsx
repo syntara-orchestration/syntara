@@ -230,7 +230,7 @@ export function CredentialSelector({
 
   // Derive compatible type IDs from type names
   const compatibleTypeIds = useMemo(() => {
-    if (!compatibleTypeNames || credentialTypes.length === 0) return null
+    if (!compatibleTypeNames) return null
     return credentialTypes.filter((t) => compatibleTypeNames.includes(t.name)).map((t) => t.id)
   }, [compatibleTypeNames, credentialTypes])
 

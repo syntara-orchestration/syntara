@@ -1,4 +1,4 @@
-import type { OutputFieldDef } from '@syntara/contracts'
+import { TriggerTypeEnum, type OutputFieldDef } from '@syntara/contracts'
 
 import { parseTriggerIndex } from '../../../../utils/triggerNodeIds'
 
@@ -19,7 +19,7 @@ function mapJsonSchemaType(type?: string): OutputFieldDef['type'] {
 
 export function getTriggerInputSchemaFields(
   nodeId: string,
-  triggersList: { id: string; parameters?: Record<string, unknown> }[] | undefined
+  triggersList: { id: string; type?: string; parameters?: Record<string, unknown> }[] | undefined
 ): OutputFieldDef[] | null {
   let trigger = triggersList?.find((t) => t.id === nodeId)
   if (!trigger) {
@@ -29,6 +29,18 @@ export function getTriggerInputSchemaFields(
     }
   }
   if (!trigger) return null
+  if (trigger.type === TriggerTypeEnum.EVENT_SUBSCRIBE) {
+    return [
+      { name: 'envelope_version', type: 'number', description: 'Event envelope version' },
+      {
+        name: 'payload',
+        type: 'unknown',
+        description: 'Kafka message payload; the optional input schema validates this value',
+      },
+      { name: 'original', type: 'object', description: 'Original message bytes and headers in JSON-safe form' },
+      { name: 'metadata', type: 'object', description: 'Kafka source metadata' },
+    ]
+  }
   const inputSchema = trigger.parameters?.input_schema as Record<string, unknown> | undefined
   if (!inputSchema || typeof inputSchema !== 'object') return null
   const properties = inputSchema.properties as InputSchemaProperties | undefined
