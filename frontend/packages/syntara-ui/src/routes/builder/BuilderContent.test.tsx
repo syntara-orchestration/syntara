@@ -1267,7 +1267,7 @@ describe('BuilderContent', () => {
       await screen.findByText('Delete workflow?')
       await user.click(
         screen.getByRole('checkbox', {
-          name: /I understand this workflow will be deleted and any in-progress runs will stop immediately/,
+          name: /I understand this workflow will be permanently deleted/,
         })
       )
       await user.click(screen.getByRole('button', { name: 'Delete workflow' }))
@@ -1301,7 +1301,7 @@ describe('BuilderContent', () => {
       await screen.findByText('Delete workflow?')
       await user.click(
         screen.getByRole('checkbox', {
-          name: /I understand this workflow will be deleted and any in-progress runs will stop immediately/,
+          name: /I understand this workflow will be permanently deleted/,
         })
       )
       await user.click(screen.getByRole('button', { name: 'Delete workflow' }))
@@ -2449,7 +2449,7 @@ describe('BuilderContent', () => {
       // Acknowledge and confirm delete
       await user.click(
         screen.getByRole('checkbox', {
-          name: /I understand this workflow will be deleted and any in-progress runs will stop immediately/,
+          name: /I understand this workflow will be permanently deleted/,
         })
       )
       await user.click(screen.getByRole('button', { name: 'Delete workflow' }))
