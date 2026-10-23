@@ -12,7 +12,9 @@ remain customer managed; the local broker example is disposable development data
 ## Configuration contract
 
 `APP_EVENTSTREAM_ENABLED` defaults to `false`. Both local Kafka compose profiles
-are opt-in; the normal compose stack does not start a broker or Kafka worker.
+are opt-in; plain `podman-compose up` does not start a broker or Kafka worker.
+The backend `services-run` helper explicitly selects the `eventstream` profile;
+its consumer still exits without connecting when the feature flag is false.
 An enabled worker with zero active subscriptions stays running and scans prepared
 deliveries. Stopping every Kafka worker stops both consumption and prepared
 recovery; recovery waits for a compatible worker to return.
@@ -29,6 +31,9 @@ root and backend `.env.example`, and local compose worker agree:
 | Environment variable | Default |
 | --- | ---: |
 | `APP_EVENTSTREAM_ENABLED` | `false` |
+| `APP_EVENT_WORKER_HEARTBEAT_INTERVAL_SECONDS` | `20` |
+| `APP_EVENT_WORKER_LIVENESS_SECONDS` | `60` |
+| `APP_EVENT_SUBSCRIPTION_LEASE_SECONDS` | `60` |
 | `APP_EVENT_FETCH_MAX_RECORDS` | `100` |
 | `APP_EVENT_QUEUE_MAX_RECORDS` | `100` |
 | `APP_EVENT_QUEUE_MAX_BYTES` | `8388608` |
@@ -38,6 +43,25 @@ root and backend `.env.example`, and local compose worker agree:
 | `APP_EVENT_DRAIN_TIMEOUT_SECONDS` | `20` |
 | `APP_EVENT_DELIVERY_RETENTION_SECONDS` | `3600` |
 | `APP_EVENT_TEMPORAL_HISTORY_RETENTION_SECONDS` | `86400` |
+| `APP_EVENT_DELIVERY_CACHE_ENABLED` | `false` |
+| `APP_EVENT_DELIVERY_CACHE_EPOCH` | unset; externally managed UUID |
+| `APP_EVENT_DELIVERY_CACHE_TTL_SECONDS` | `60` |
+| `APP_EVENT_DELIVERY_CACHE_TIMEOUT_SECONDS` | `1` |
+| `APP_EVENT_DELIVERY_CACHE_SKEW_SECONDS` | `1` |
+| `APP_EVENT_DELIVERY_CACHE_CLOCK_ERROR_BOUND_SECONDS` | unset; established cross-clock error bound |
+
+Placement membership and subscription leases are separate from delivery claim
+leases. Their expiry durations must exceed the heartbeat interval and leave
+margin for database latency and process pauses. These are candidate defaults,
+not validated fleet capacity or failover guarantees. See
+[subscription placement](subscription-placement.md) for ownership and drain rules.
+
+Terminal-proof caching remains disabled even when Redis is configured. Enabling
+it requires an externally managed, nonzero epoch and an established clock-error
+bound below the configured skew margin. Compose inherits those optional trust
+inputs from the caller without supplying a default epoch or clock bound.
+The proof window is capped by terminal retention; see
+[record runner cache safeguards](kafka-record-runner.md#duplicate-lookup-and-shared-gates).
 
 Local compose's `stop_grace_period` is 60 seconds, longer than the default drain
 deadline of 20 seconds. Reserve extra time for hint/client/database cleanup.
@@ -59,7 +83,6 @@ additional environment variables:
 | Shared preparation / finalization operations | 8 / 8 |
 | Immediate transient attempts / maximum backoff / later probes | 5 / 30 seconds / 60 seconds |
 | Delivery claim lease | 60 seconds; token-fenced renewal at preparation/admission checkpoints |
-| Redis terminal hint TTL / operation deadline | 60 seconds / 1 second |
 | Prepared recovery scan interval / batch maximum | 60 seconds / 100 deliveries |
 | Temporal RPC timeout / history safety margin | 10 seconds / 300 seconds |
 | Capacity pause / resume thresholds | 3,000,000 / 2,500,000 retained delivery rows |
@@ -68,6 +91,8 @@ additional environment variables:
 renews at checkpoints; it does not install a periodic 20-second renewal timer.
 Changing that constant does not change runtime renewal behavior. Claim leases,
 Redis cache lifetimes and terminal evidence retention are independent.
+Unlike these fixed bounds, terminal-proof TTL and operation deadlines use the
+cache settings above and require the external trust inputs when caching is enabled.
 
 Terminal delivery retention is a **strictly positive minimum duration from
 `resolved_at`**, not a storage cap or an automatic deletion deadline. Cleanup also
@@ -89,7 +114,9 @@ setting does not configure Temporal. Preserve that history for ambiguous starts.
 
 Redis is optional for Kafka correctness: no startup/readiness dependency is placed
 on it. Missed wakeups fall back to periodic database reconciliation; losing cache
-entries cannot acknowledge or authorize a delivery.
+entries falls back to authoritative PostgreSQL reads. An enabled terminal-proof
+cache can avoid duplicate lookups only under the shared admission gate and the
+validated proof, epoch, expiry and clock contracts.
 
 Permit DNS, PostgreSQL, Temporal and optional Redis connectivity, plus **every
 bootstrap and advertised broker address/port**, including addresses returned in
@@ -97,23 +124,26 @@ metadata after bootstrap. Network controls must account for all advertised
 endpoints. Private broker hostnames must also be allowed by the
 application's Integration SSRF policy on the API and Kafka worker.
 
-The internal `EventWorkerManager.ready` state becomes true after the first
-successful authoritative reconciliation, including an empty subscription list.
+The internal `EventWorkerManager.ready` state becomes true after registration and
+the first successful authoritative reconciliation, including when it owns no subscriptions.
 It does not wait for customer broker connections. Broker failures are isolated
 to subscription retries. Readiness closes when shutdown starts. SIGTERM closes
-new intake/recovery claims and drains within the configured deadline, preserving
-unresolved evidence on timeout. Deployment probe endpoints and exec commands are
+new intake/recovery claims and drains within the configured deadline. Membership
+heartbeats and owned placement leases continue through bounded consumer drain;
+consumers stop before leases are released. Unresolved evidence is preserved on
+timeout. Deployment probe endpoints and exec commands are
 deferred to M2; the local compose worker does not install a health probe.
 
 ## Sizing and rollout
 
-With R workers and S active subscriptions, budget approximately **R × S Kafka
-consumer clients**, even when some clients have no assigned partitions. Each
-client can hold several broker connections and background tasks. More replicas
-than topic partitions do not increase that subscription's partition parallelism.
-Budget broker connections, file descriptors, TLS/SASL load, per-subscription queues
-and database pools across all R processes before manually scaling. Shared
-processing limits are per process, so their pool-wide upper bound also grows with R.
+With R workers and S active subscriptions, PostgreSQL placement normally
+distributes the S subscription consumers across the R processes. **R × S** is an
+all-workers/all-subscriptions planning envelope, not the expected steady-state
+client count under placement. Allow for temporary takeover/drain overlap; a lease
+is not strict execution fencing. Each client can hold several broker connections
+and background tasks. Budget broker connections, file descriptors, TLS/SASL load,
+per-subscription queues and database pools across all R processes before scaling.
+Shared processing limits are per process, so their pool-wide upper bound grows with R.
 
 1. Keep activation closed while introducing the database migrations and a backend
    image containing the completed worker. Run compatible API and Temporal
@@ -147,6 +177,9 @@ for pending-inspection rollback safeguards.
    existing workflow IDs consistently with database Execution evidence. If the
    consistency or source history is uncertain, leave activation closed.
 4. Redis can be rebuilt empty. It must not be used to infer restored delivery state.
+   If terminal-proof caching was enabled, coordinate a fresh externally managed
+   cache epoch while all workers remain stopped before restarting against restored
+   evidence. Do not reuse a pre-restore epoch or allow old writers to repopulate it.
 5. Only after database, Kafka and Temporal recovery is safe, start compatible Kafka
    workers with subscriptions still paused. Prepared recovery runs independently of
    active consumers. Review unresolved evidence and use the guarded recovery

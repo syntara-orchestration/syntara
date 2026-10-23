@@ -63,7 +63,7 @@ Enable the independent worker explicitly; the flag remains false by default:
 ```bash
 APP_EVENTSTREAM_ENABLED=true \
 APP_INTEGRATION_URL_ALLOWED_HOSTS='["mcp-server","kafka"]' \
-  uv run --project backend podman-compose --profile kafka-worker up -d kafka-worker
+  uv run --project backend podman-compose --profile eventstream up -d eventstream-consumer
 
 cat backend/samples/kafka/event.example.json | \
   uv run --project backend podman-compose --profile kafka exec -T kafka \
@@ -83,7 +83,7 @@ To stop the example, first pause/retire its subscription through normal controls
 then stop the worker with its grace period and remove only the disposable broker:
 
 ```bash
-uv run --project backend podman-compose --profile kafka-worker stop kafka-worker
+uv run --project backend podman-compose --profile eventstream stop eventstream-consumer
 uv run --project backend podman-compose --profile kafka stop kafka
 uv run --project backend podman-compose --profile kafka rm -f kafka
 ```

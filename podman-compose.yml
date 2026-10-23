@@ -393,8 +393,9 @@ services:
       retries: 12
       start_period: 20s
 
-  kafka-worker:
-    profiles: [kafka-worker]
+  eventstream-consumer:
+    profiles:
+      - eventstream
     image: ${APP_IMAGE:-localhost/syntara:latest}
     command: [python, -m, syntara.eventstreams.consumer_entrypoint]
     # Longer than the default 20s drain; raise together if the drain is increased.
@@ -420,6 +421,9 @@ services:
       - APP_S2S_TLS_KEY_PATH=/run/secrets/s2s-cert.key
       - APP_INTEGRATION_URL_ALLOWED_HOSTS=${APP_INTEGRATION_URL_ALLOWED_HOSTS:-["mcp-server"]}
       - APP_EVENTSTREAM_ENABLED=${APP_EVENTSTREAM_ENABLED:-false}
+      - APP_EVENT_WORKER_HEARTBEAT_INTERVAL_SECONDS=${APP_EVENT_WORKER_HEARTBEAT_INTERVAL_SECONDS:-20}
+      - APP_EVENT_WORKER_LIVENESS_SECONDS=${APP_EVENT_WORKER_LIVENESS_SECONDS:-60}
+      - APP_EVENT_SUBSCRIPTION_LEASE_SECONDS=${APP_EVENT_SUBSCRIPTION_LEASE_SECONDS:-60}
       - APP_EVENT_MAX_VALUE_BYTES=${APP_EVENT_MAX_VALUE_BYTES:-262144}
       - APP_EVENT_MAX_ENVELOPE_BYTES=${APP_EVENT_MAX_ENVELOPE_BYTES:-1048576}
       - APP_EVENT_MAX_HEADERS=${APP_EVENT_MAX_HEADERS:-128}
@@ -432,6 +436,13 @@ services:
       - APP_EVENT_DRAIN_TIMEOUT_SECONDS=${APP_EVENT_DRAIN_TIMEOUT_SECONDS:-20}
       - APP_EVENT_DELIVERY_RETENTION_SECONDS=${APP_EVENT_DELIVERY_RETENTION_SECONDS:-3600}
       - APP_EVENT_TEMPORAL_HISTORY_RETENTION_SECONDS=${APP_EVENT_TEMPORAL_HISTORY_RETENTION_SECONDS:-86400}
+      - APP_EVENT_DELIVERY_CACHE_ENABLED=${APP_EVENT_DELIVERY_CACHE_ENABLED:-false}
+      # Optional trust inputs inherit the caller's environment; never seed an epoch or clock bound.
+      - APP_EVENT_DELIVERY_CACHE_EPOCH
+      - APP_EVENT_DELIVERY_CACHE_CLOCK_ERROR_BOUND_SECONDS
+      - APP_EVENT_DELIVERY_CACHE_TTL_SECONDS=${APP_EVENT_DELIVERY_CACHE_TTL_SECONDS:-60}
+      - APP_EVENT_DELIVERY_CACHE_TIMEOUT_SECONDS=${APP_EVENT_DELIVERY_CACHE_TIMEOUT_SECONDS:-1}
+      - APP_EVENT_DELIVERY_CACHE_SKEW_SECONDS=${APP_EVENT_DELIVERY_CACHE_SKEW_SECONDS:-1}
     volumes:
       - ./backend/.secrets/jwt-primary.pem:/run/secrets/jwt-primary.pem:ro,z
       - ./backend/.secrets/jwt-backup.pem:/run/secrets/jwt-backup.pem:ro,z

@@ -14,15 +14,18 @@ ROOT = Path(__file__).resolve().parents[4]
 
 
 def example_defaults(path):
-    return dict(re.findall(r"^# (APP_EVENT\w+)=(.+)$", path.read_text(), re.MULTILINE))
+    values = re.findall(r"^# (APP_EVENT\w+)=(.+)$", path.read_text(), re.MULTILINE)
+    assert len(values) == len(dict(values)), f"Duplicate event configuration in {path}"
+    return dict(values)
 
 
 def test_environment_examples_and_compose_match_settings_defaults():
     root = example_defaults(ROOT / ".env.example")
     assert root == example_defaults(ROOT / "backend/.env.example")
     compose = yaml.safe_load((ROOT / "podman-compose.yml").read_text())
-    worker = compose["services"]["kafka-worker"]
-    env = dict(value.split("=", 1) for value in worker["environment"])
+    worker = compose["services"]["eventstream-consumer"]
+    env = dict(value.split("=", 1) for value in worker["environment"] if "=" in value)
+    inherited = {value for value in worker["environment"] if "=" not in value}
     task_queue = Settings.model_fields["task_queue"].default
     assert env["APP_TASK_QUEUE"] == task_queue
     for path in [ROOT / ".env.example", ROOT / "backend/.env.example"]:
@@ -31,9 +34,14 @@ def test_environment_examples_and_compose_match_settings_defaults():
         assert match.group(1) == task_queue
     for key, value in root.items():
         default = Settings.model_fields[key.removeprefix("APP_").lower()].default
+        if default is None:
+            assert value.startswith("<")
+            assert value.endswith(">")
+            assert key in inherited
+            continue
         assert value == str(default).lower()
         assert env[key] == "${" + key + ":-" + value + "}"
-    assert worker["profiles"] == ["kafka-worker"]
+    assert worker["profiles"] == ["eventstream"]
     assert worker["stop_grace_period"] == "60s"
     assert int(worker["stop_grace_period"].removesuffix("s")) > float(root["APP_EVENT_DRAIN_TIMEOUT_SECONDS"])
     assert "redis" not in worker["depends_on"]
