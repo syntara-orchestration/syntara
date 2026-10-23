@@ -46,3 +46,6 @@ Queue, concurrency and drain defaults are configured through the documented
 See [event subscription controls](event-subscription-controls.md) for revision-checked
 operator actions, durable shutdown acknowledgements, retirement guards and the
 additional control-coordination migration.
+
+See [Kafka worker operations](kafka-worker-operations.md) for runtime defaults,
+local compose configuration, sizing and recovery/rollout ordering.

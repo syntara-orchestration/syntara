@@ -85,8 +85,9 @@ hints, and every 30 seconds with 10% jitter. It keeps one local consumer per
 active subscription; Kafka assigns partitions. Readiness is exposed through
 `EventWorkerManager.ready` after the first successful authoritative database
 reconciliation, without waiting for broker connections. An enabled process with
-no subscriptions remains healthy and idle. HTTP probes and operational routes
-are outside this process API.
+no subscriptions remains running and idle. See the
+[Kafka worker operations guide](docs/kafka-worker-operations.md) for configuration
+and recovery safeguards. Deployment health probes are deferred to M2 operator integration.
 
 Startup/replacement work is limited to eight concurrent tasks with a 30-second
 attempt deadline. Preparation and finalization each have a shared limit of eight.
@@ -114,8 +115,11 @@ Only currently assigned consumers may commit Kafka positions. Redis closes after
 drain, Temporal client references follow the existing SDK-managed cleanup
 pattern, and the database engine is disposed afterward.
 
-This command adds no operator/compose packaging, execution-plane deployment,
-autoscaling, per-subscription deployments, Visibility system, filtering, or Publish.
+Optional compose profiles run the existing Python worker entrypoint and provide
+a disposable local Kafka fixture; see [local Kafka examples](samples/kafka/README.md).
+Operator-managed deployment, container launchers and deployment health probes are
+deferred to M2. Execution-plane placement, autoscaling, per-subscription deployments
+and full Visibility are also deferred.
 No database or public API schema changes are required. To stop this process,
 drain it and disable the switch; retain the existing delivery/Execution evidence
 and apply the upstream migration downgrade safeguards separately.
