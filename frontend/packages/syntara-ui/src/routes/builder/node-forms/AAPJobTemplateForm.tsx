@@ -70,6 +70,22 @@ function AAPFormFields({
     [control]
   )
 
+  const jobTemplateName = useWatch({ control, name: 'job_template_name' })
+  const jobTemplateId = useWatch({ control, name: 'job_template_id' })
+
+  // Imported workflows only carry the portable organization_name/job_template_name pair
+  // (job_template_id is stripped for cross-environment portability, see aapHelpers.ts).
+  // Once the job template list loads, resolve the id from the name so the detail query
+  // (and its prompt-on-launch fields) loads without the user re-selecting the template.
+  const { jobTemplates, selectJobTemplate } = browser
+  useEffect(() => {
+    if (jobTemplateId != null || !jobTemplateName) return
+    const match = jobTemplates.find((t) => t.name === jobTemplateName)
+    if (!match) return
+    setValue('job_template_id', match.id)
+    selectJobTemplate(match.id)
+  }, [jobTemplates, jobTemplateName, jobTemplateId, setValue, selectJobTemplate])
+
   useEffect(() => {
     onHeaderContentChange?.(nameField)
     return () => {
