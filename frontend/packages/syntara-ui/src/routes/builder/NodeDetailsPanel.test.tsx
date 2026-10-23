@@ -99,7 +99,7 @@ vi.mock('./panels/OutputPanel', () => ({
 
 vi.mock('../workflows/canvas/nodes/hooks/useNodeMenuActions', () => ({
   useNodeMenuActions: vi.fn(() => []),
-  MenuNodeType: { ACTIVITY: 'activity', TRIGGER: 'trigger' },
+  StepMenuCategory: { ACTIVITY: 'activity', TRIGGER: 'trigger' },
 }))
 
 vi.mock('../../components/steps/SynStepMenu', () => ({

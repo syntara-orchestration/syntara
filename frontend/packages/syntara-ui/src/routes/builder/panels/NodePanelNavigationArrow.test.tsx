@@ -87,7 +87,7 @@ describe('NodePanelNavigationArrow', () => {
 
     expect(screen.getByRole('menuitem', { name: 'Task A' })).toBeInTheDocument()
     expect(screen.getByRole('menuitem', { name: 'Task B' })).toBeInTheDocument()
-    expect(screen.getAllByTestId('node-icon-wrapper')).toHaveLength(2)
+    expect(screen.getAllByTestId('step-icon-wrapper')).toHaveLength(2)
     expect(screen.getAllByTestId('mock-nav-icon')).toHaveLength(2)
   })
 
@@ -104,7 +104,7 @@ describe('NodePanelNavigationArrow', () => {
 
     expect(screen.getByRole('menuitem', { name: 'Task A' })).toBeInTheDocument()
     expect(screen.getByRole('menuitem', { name: 'Task B' })).toBeInTheDocument()
-    expect(screen.queryByTestId('node-icon-wrapper')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('step-icon-wrapper')).not.toBeInTheDocument()
   })
 
   it('has no accessibility violations for single-target arrow', async () => {

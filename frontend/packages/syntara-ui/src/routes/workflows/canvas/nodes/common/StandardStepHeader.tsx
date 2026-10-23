@@ -8,24 +8,24 @@ import { SynStepTitle } from '../../../../../components/steps/SynStepTitle'
 import { useIsActiveExecution } from '../../../../builder/ActiveExecutionContext'
 import { useIsExecutionView } from '../../../../builder/ExecutionViewContext'
 import { useIsVersionView } from '../../../../builder/VersionViewContext'
-import type { NodeMenuAction } from '../hooks/useNodeMenuActions'
+import type { StepMenuAction } from '../hooks/useStepMenuActions'
 
-type StandardNodeHeaderProps = {
+type StandardStepHeaderProps = {
   icon?: React.ReactNode
   /** Optional badge rendered just under the icon, above title/subtitle */
   badge?: React.ReactNode
   title?: string
   subtitle?: string
   expandable?: boolean
-  menuActions?: NodeMenuAction[]
+  menuActions?: StepMenuAction[]
 }
 
 /**
- * Standard node header component that combines icon, title, subtitle, optional expand toggle, and kebab menu.
- * Reduces boilerplate in node component implementations.
+ * Standard step header component that combines icon, title, subtitle, optional expand toggle, and kebab menu.
+ * Reduces boilerplate in step component implementations.
  *
  * The kebab menu supports:
- * - Custom actions via additionalActions prop in useNodeMenuActions
+ * - Custom actions via additionalActions prop in useStepMenuActions
  * - Automatic separator before delete action when custom actions exist
  * - Danger styling for destructive actions (variant: 'danger')
  * - Icons for menu items
@@ -51,7 +51,7 @@ const titleSectionStyle = {
   paddingBottom: 'var(--pf-t--global--spacer--sm)',
 }
 
-export function StandardNodeHeader(props: Readonly<StandardNodeHeaderProps>) {
+export function StandardStepHeader(props: Readonly<StandardStepHeaderProps>) {
   const isExecutionView = useIsExecutionView()
   const isActiveExecution = useIsActiveExecution()
   const nodesConnectable = useStore((s) => s.nodesConnectable)

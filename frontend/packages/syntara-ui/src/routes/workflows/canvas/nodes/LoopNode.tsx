@@ -4,25 +4,25 @@ import { type Node, type NodeProps } from '@xyflow/react'
 
 import { SynStep } from '../../../../components/steps/SynStep'
 import type { ActivityStatus } from '../../execution/types'
-import { getNodeTypeColor } from '../nodeTypeColors'
 import { semanticZoomActivityTitle } from '../semanticZoom'
+import { getStepTypeColor } from '../stepTypeColors'
 
 import { BranchHandle, BranchHandles } from './common/BranchHandle'
-import { StandardNodeHeader } from './common/StandardNodeHeader'
+import { StandardStepHeader } from './common/StandardStepHeader'
 import { useLoopIterationCount } from './hooks/useLoopIterationCount'
-import { MenuNodeType, useNodeMenuActions } from './hooks/useNodeMenuActions'
+import { StepMenuCategory, useStepMenuActions } from './hooks/useStepMenuActions'
 import styles from './LoopNode.module.css'
-import { nodeMetadata } from './nodeMetadata'
-import { renderNodeIcon } from './renderNodeIcon'
+import { renderStepIcon } from './renderStepIcon'
+import { stepMetadata } from './stepMetadata'
 
 export type LoopNode = { type: 'loop' } & Node<LoopActivity>
 
-export function LoopNodeComponent(props: NodeProps<LoopNode>) {
-  const metadata = nodeMetadata.loop
-  const iconNode = renderNodeIcon(metadata.icon, 'logic-loop', 'canvas', getNodeTypeColor('loop'))
-  const menuActions = useNodeMenuActions({
+export function LoopStepComponent(props: NodeProps<LoopNode>) {
+  const metadata = stepMetadata.loop
+  const iconNode = renderStepIcon(metadata.icon, 'logic-loop', 'canvas', getStepTypeColor('loop'))
+  const menuActions = useStepMenuActions({
     nodeId: props.data.id,
-    nodeType: MenuNodeType.CONTROL_FLOW,
+    stepCategory: StepMenuCategory.CONTROL_FLOW,
   })
   const iterationCount = useLoopIterationCount(props.data.id)
 
@@ -45,7 +45,7 @@ export function LoopNodeComponent(props: NodeProps<LoopNode>) {
       enableStart={metadata.enableStart}
       nodeProps={props}
       executionState={executionState}
-      topBarColor={getNodeTypeColor('loop')}
+      topBarColor={getStepTypeColor('loop')}
       semanticZoomSummary={{
         title: semanticZoomActivityTitle(props.data.name, `Untitled ${metadata.label}`),
         typeLabel: metadata.label,
@@ -55,7 +55,7 @@ export function LoopNodeComponent(props: NodeProps<LoopNode>) {
         { id: 'loop', ariaLabel: 'Loop branch output' },
       ]}
     >
-      <StandardNodeHeader
+      <StandardStepHeader
         icon={iconNode}
         title={props.data.name ?? ''}
         subtitle={metadata.label}
