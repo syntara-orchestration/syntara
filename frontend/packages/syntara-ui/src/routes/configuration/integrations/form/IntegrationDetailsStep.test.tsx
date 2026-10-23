@@ -460,6 +460,31 @@ describe('IntegrationDetailsStep', () => {
     })
   })
 
+  describe('Kafka', () => {
+    it('shows bootstrap servers and the SASL mechanism instead of an API URL', () => {
+      render(<KafkaTestWrapper />)
+
+      expect(screen.getByRole('textbox', { name: 'Name' })).toBeInTheDocument()
+      expect(screen.getByRole('textbox', { name: 'Bootstrap servers' })).toHaveValue('')
+      expect(screen.getByText('SCRAM-SHA-256')).toBeInTheDocument()
+      expect(screen.queryByRole('textbox', { name: /api url/i })).not.toBeInTheDocument()
+    })
+
+    it('edits the broker list and SASL mechanism', async () => {
+      const user = userEvent.setup()
+      render(<KafkaTestWrapper />)
+
+      const brokers = screen.getByRole('textbox', { name: 'Bootstrap servers' })
+      await user.type(brokers, 'broker.example.com:9093')
+      expect(brokers).toHaveValue('broker.example.com:9093')
+
+      await user.click(screen.getByText('SCRAM-SHA-256'))
+      await user.click(screen.getByRole('option', { name: 'SCRAM-SHA-512' }))
+
+      expect(screen.getByText('SCRAM-SHA-512')).toBeInTheDocument()
+    })
+  })
+
   describe('scope toggle', () => {
     it('defaults to global scope', () => {
       render(<TestWrapper />)
