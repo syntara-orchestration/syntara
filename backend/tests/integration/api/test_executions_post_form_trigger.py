@@ -77,7 +77,7 @@ def _cleaned_form_input() -> dict[str, Any]:
     return {
         "required_text": "submitted",
         "count": 42.0,
-        "start": {"date": "2026-02-14"},
+        "start": "2026-02-14",
         "contact": "Bob@example.com",
     }
 

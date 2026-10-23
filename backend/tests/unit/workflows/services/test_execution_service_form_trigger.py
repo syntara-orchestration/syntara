@@ -101,7 +101,7 @@ class TestFormTriggerSubmissionCleaning:
 
         cleaned = ExecutionService._validate_form_trigger_submission(trigger, {"start": {"date": "2026-02-14"}})
 
-        assert cleaned == {"start": {"date": "2026-02-14"}}
+        assert cleaned == {"start": "2026-02-14"}
 
     def test_checkbox_on_is_coerced_to_true(self) -> None:
         trigger = _form_trigger(_field("checkbox", "confirmed"))
