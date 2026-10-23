@@ -137,6 +137,36 @@ async def test_seed_preserves_existing_admin_email() -> None:
 
 
 @pytest.mark.asyncio
+async def test_seed_resyncs_password_for_existing_admin_from_current_secret() -> None:
+    """Redeploy must sync the admin password to the current secret file (AAP-89793).
+
+    Reproduces the reported bug: when the admin user already exists in the
+    database (e.g. left over from a prior failed deployment whose seeding
+    ran before the deployment failed), seeding leaves its password_hash
+    untouched even though a subsequent successful deployment's K8s secret
+    contains a different password. The stored hash and the current secret
+    then disagree and the operator cannot log in with the password from the
+    K8s secret.
+    """
+    admin = User(
+        id=uuid4(),
+        username=BOOTSTRAP_ADMIN_USERNAME,
+        first_name=BOOTSTRAP_ADMIN_FIRST_NAME,
+        email="admin@example.com",
+        is_enabled=True,
+        is_builtin=True,
+        password_hash="stale-hash-from-failed-deployment",
+    )
+    session = _mock_seed_session(admin=admin)
+
+    current_secret_hash = "hash-of-current-deployments-secret"
+    with patch("syntara.authz.seed._read_admin_password_hash", return_value=current_secret_hash):
+        await _run_seed(session)
+
+    assert admin.password_hash == current_secret_hash
+
+
+@pytest.mark.asyncio
 async def test_try_set_bootstrap_admin_email_skips_on_unique_conflict() -> None:
     """Taken placeholder email leaves admin.email unchanged and returns False."""
     admin = User(
