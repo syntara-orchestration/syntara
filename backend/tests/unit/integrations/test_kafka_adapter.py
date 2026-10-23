@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 from aiokafka.client import AIOKafkaClient
-from aiokafka.errors import KafkaConnectionError, KafkaError, KafkaTimeoutError
+from aiokafka.errors import AuthenticationFailedError, KafkaConnectionError, KafkaError, KafkaTimeoutError
 
 from syntara.integrations.adapters.kafka import KafkaAdapter
 from syntara.integrations.adapters.protocol import HealthCheckErrorType, IntegrationAdapter
@@ -205,7 +205,49 @@ class TestKafkaValidateErrors:
 
 
 class TestKafkaRealBootstrap:
-    """bootstrap() itself, so the caller's deadline covers every broker."""
+    """bootstrap() itself, with the failure injected at the connection layer.
+
+    Mocking ``AIOKafkaClient.bootstrap`` skips the loop that catches each
+    broker's error and replaces it with a generic KafkaConnectionError.
+    """
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("failure", "error_type", "error"),
+        [
+            (
+                AuthenticationFailedError("password rejected"),
+                HealthCheckErrorType.AUTH_FAILURE,
+                "Authentication failed",
+            ),
+            (ssl.SSLError("certificate verify failed"), HealthCheckErrorType.SSL_ERROR, "SSL/TLS verification failed"),
+            (TimeoutError(), HealthCheckErrorType.TIMEOUT, "Connection timed out after 1s"),
+            (OSError("connection refused"), HealthCheckErrorType.CONNECTION_ERROR, "Unable to connect to Kafka"),
+        ],
+    )
+    async def test_connection_layer_failure_keeps_its_classification(
+        self,
+        resolved_credential: dict[str, Any],
+        failure: BaseException,
+        error_type: HealthCheckErrorType,
+        error: str,
+    ) -> None:
+        """A real bootstrap reports the connection error, not a generic connect failure."""
+        attempts = 0
+
+        async def fail_create_conn(*_args: object, **_kwargs: object) -> None:
+            nonlocal attempts
+            attempts += 1
+            raise failure
+
+        config = KafkaConfiguration(bootstrap_servers=["broker-a.example:9093", "broker-b.example:9093"])
+        with patch("aiokafka.client.create_conn", fail_create_conn):
+            result = await KafkaAdapter(config).validate(resolved_credential, timeout_seconds=1)
+
+        assert attempts == 2
+        assert result.success is False
+        assert result.error_type == error_type
+        assert result.error == error
 
     @pytest.mark.asyncio
     async def test_deadline_cancels_before_the_second_broker(self, resolved_credential: dict[str, Any]) -> None:
