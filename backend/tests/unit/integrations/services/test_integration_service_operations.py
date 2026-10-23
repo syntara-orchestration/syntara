@@ -381,6 +381,39 @@ class TestValidateIntegration:
 
     @pytest.mark.asyncio
     @patch(f"{SERVICE_MODULE}.AuditEventDispatcher")
+    @patch(f"{SERVICE_MODULE}.get_runtime_settings")
+    @patch(f"{SERVICE_MODULE}.create_health_check_adapter")
+    async def test_ssrf_failure_after_validating_sets_error_status(
+        self,
+        mock_adapter_factory: MagicMock,
+        mock_settings: MagicMock,
+        mock_audit: MagicMock,
+        test_db_session: AsyncSession,
+        integration_service: IntegrationService,
+    ) -> None:
+        """A DNS/SSRF rejection after the VALIDATING commit is persisted as ERROR."""
+        created = await integration_service.create_integration(_mcp_create())
+        mock_settings.return_value = _mock_runtime_settings()
+
+        with (
+            patch.object(
+                integration_service,
+                "_validate_configuration_ssrf",
+                side_effect=SafeValueError("blocked"),
+            ),
+            pytest.raises(SafeValueError, match="blocked"),
+        ):
+            await integration_service.validate_integration(created.id)
+
+        integration = await test_db_session.get(Integration, created.id)
+        assert integration is not None
+        assert integration.validation_status == IntegrationStatus.ERROR
+        assert integration.validation_error == "Unexpected error during validation: SafeValueError"
+        assert integration.last_validated_at is not None
+        mock_adapter_factory.assert_not_called()
+
+    @pytest.mark.asyncio
+    @patch(f"{SERVICE_MODULE}.AuditEventDispatcher")
     @patch(f"{SERVICE_MODULE}.create_health_check_adapter")
     async def test_credential_required_llm_sets_error_status_and_last_validated_at(
         self,

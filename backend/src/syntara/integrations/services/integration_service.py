@@ -881,12 +881,13 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
         await self.session.commit()
 
         timeout_seconds: int = await get_runtime_settings().get("integrations.connection_test_timeout_seconds")
-        # Re-check at call time (defense in depth): the stored base_url passed the write-time
-        # check, but DNS could have been re-pointed to a private/metadata target since.
-        self._validate_configuration_ssrf(integration.configuration)
-        adapter = create_health_check_adapter(integration.integration_type, integration.configuration)
 
         try:
+            # Inside the handler that persists ERROR. A broker DNS/SSRF failure
+            # raises, and leaving it here would skip that update and leave the
+            # row in VALIDATING. Build the adapter only after that check.
+            self._validate_configuration_ssrf(integration.configuration)
+            adapter = create_health_check_adapter(integration.integration_type, integration.configuration)
             result = await adapter.validate(resolved_credential, timeout_seconds)
 
             integration = await self._get_or_raise(integration_id, for_update=True)
@@ -1023,13 +1024,13 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
         await self.session.commit()
 
         timeout_seconds: int = await get_runtime_settings().get("integrations.connection_test_timeout_seconds")
-        # Re-check at call time (defense in depth): the stored base_url passed the write-time
-        # check, but DNS could have been re-pointed to a private/metadata target since.
-        self._validate_configuration_ssrf(integration.configuration)
-        adapter = create_health_check_adapter(integration.integration_type, integration.configuration)
 
         synced = updated = missing = 0
         try:
+            # Same placement as validate: a DNS/SSRF failure must reach the
+            # handler that records refresh ERROR instead of leaving REFRESHING.
+            self._validate_configuration_ssrf(integration.configuration)
+            adapter = create_health_check_adapter(integration.integration_type, integration.configuration)
             discover_result = await adapter.discover(resolved_credential, timeout_seconds)
 
             if not discover_result.success:
