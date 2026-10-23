@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -61,7 +61,7 @@ const mockTargets = [
     backend_type: 'kubernetes',
     endpoint: 'https://api.west.example.com',
     placement: { type: 'kubernetes' as const, namespace: 'syntara-workers', node_selectors: [], tolerations: [] },
-    status: 'ready',
+    status: 'active',
     enabled: true,
     is_default: true,
     status_message: null,
@@ -76,7 +76,7 @@ const mockTargets = [
     backend_type: 'kubernetes',
     endpoint: 'https://api.staging.example.com',
     placement: { type: 'kubernetes' as const, namespace: 'syntara-staging', node_selectors: [], tolerations: [] },
-    status: 'provisioning',
+    status: 'bootstrapping',
     enabled: false,
     is_default: false,
     status_message: 'Waiting for workers',
@@ -113,7 +113,7 @@ describe('ExecutionPlane', () => {
     expect(screen.getByText('Prod OpenShift West')).toBeInTheDocument()
     expect(screen.getByText('Staging OpenShift')).toBeInTheDocument()
     expect(screen.getByText('cl-001')).toBeInTheDocument()
-    expect(screen.getByText('Ready')).toBeInTheDocument()
+    expect(screen.getByText('Active')).toBeInTheDocument()
     expect(screen.getByText('region=us-west')).toBeInTheDocument()
     expect(screen.getByRole('row', { name: /Prod OpenShift West.*Enabled/ })).toBeInTheDocument()
     expect(screen.getByRole('row', { name: /Staging OpenShift.*Disabled/ })).toBeInTheDocument()
@@ -129,6 +129,7 @@ describe('ExecutionPlane', () => {
     expect(queryParams).toMatchObject({
       limit: 20,
       include_total: true,
+      sort: 'name',
     })
   })
 
@@ -241,6 +242,107 @@ describe('ExecutionPlane', () => {
     await user.keyboard('{Enter}')
 
     assertUrlParam(mockSetSearchParams, 'name[contains]', 'staging')
+  })
+
+  it('applies status filter as status[in] when selecting an option', async () => {
+    const user = userEvent.setup()
+    render(<ExecutionPlane />, { wrapper })
+
+    expect(await screen.findByText('Prod OpenShift West')).toBeInTheDocument()
+
+    const filters = screen.getByRole('search', { name: 'Filters' })
+    // Scope to toolbar — table also has a sortable "Name" header button
+    const fieldSelector = within(filters).getByRole('button', { name: 'Name' })
+    await user.click(fieldSelector)
+    await user.click(screen.getByRole('option', { name: 'Status' }))
+
+    const valueToggle = within(filters).getByRole('button', { name: /select values|filter by status/i })
+    await user.click(valueToggle)
+    await user.click(screen.getByRole('checkbox', { name: 'Active' }))
+
+    await waitFor(() => {
+      assertUrlParam(mockSetSearchParams, 'status[in]', 'active')
+    })
+  }, 10_000)
+
+  it('applies state filter as enabled when selecting Enabled', async () => {
+    const user = userEvent.setup()
+    render(<ExecutionPlane />, { wrapper })
+
+    expect(await screen.findByText('Prod OpenShift West')).toBeInTheDocument()
+
+    const filters = screen.getByRole('search', { name: 'Filters' })
+    const fieldSelector = within(filters).getByRole('button', { name: 'Name' })
+    await user.click(fieldSelector)
+    await user.click(screen.getByRole('option', { name: 'State' }))
+
+    const valueToggle = within(filters).getByRole('button', { name: /filter by state/i })
+    await user.click(valueToggle)
+    await user.click(screen.getByRole('option', { name: 'Enabled' }))
+
+    await waitFor(() => {
+      assertUrlParam(mockSetSearchParams, 'enabled', 'true')
+    })
+  }, 10_000)
+
+  it('renders sortable headers for name, cluster, status, and state', () => {
+    render(<ExecutionPlane />, { wrapper })
+
+    for (const name of [/^Name$/i, /^Cluster$/i, /^Status$/i, /^State$/i]) {
+      const header = screen.getByRole('columnheader', { name })
+      expect(within(header).getByRole('button')).toBeInTheDocument()
+    }
+
+    const labelsHeader = screen.getByRole('columnheader', { name: /Routing labels/i })
+    expect(within(labelsHeader).queryByRole('button')).not.toBeInTheDocument()
+  })
+
+  it('writes sort URL param when a column header is clicked', async () => {
+    const user = userEvent.setup()
+    render(<ExecutionPlane />, { wrapper })
+
+    const statusHeader = screen.getByRole('columnheader', { name: /^Status$/i })
+    await user.click(within(statusHeader).getByRole('button'))
+
+    await waitFor(() => {
+      assertUrlParam(mockSetSearchParams, 'sort', 'status')
+    })
+  })
+
+  it('can sort by cluster_id via the Cluster column', async () => {
+    const user = userEvent.setup()
+    render(<ExecutionPlane />, { wrapper })
+
+    const clusterHeader = screen.getByRole('columnheader', { name: /^Cluster$/i })
+    await user.click(within(clusterHeader).getByRole('button'))
+
+    await waitFor(() => {
+      assertUrlParam(mockSetSearchParams, 'sort', 'cluster_id')
+    })
+  })
+
+  it('can sort by enabled via the State column', async () => {
+    const user = userEvent.setup()
+    render(<ExecutionPlane />, { wrapper })
+
+    const stateHeader = screen.getByRole('columnheader', { name: /^State$/i })
+    await user.click(within(stateHeader).getByRole('button'))
+
+    await waitFor(() => {
+      assertUrlParam(mockSetSearchParams, 'sort', 'enabled')
+    })
+  })
+
+  it('toggles sort direction when clicking the default name column', async () => {
+    const user = userEvent.setup()
+    render(<ExecutionPlane />, { wrapper })
+
+    const nameHeader = screen.getByRole('columnheader', { name: /^Name$/i })
+    await user.click(within(nameHeader).getByRole('button'))
+
+    await waitFor(() => {
+      assertUrlParam(mockSetSearchParams, 'sort', '-name')
+    })
   })
 
   it('has no accessibility violations', async () => {
