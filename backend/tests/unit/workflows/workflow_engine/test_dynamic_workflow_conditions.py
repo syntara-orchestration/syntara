@@ -84,6 +84,24 @@ def _build_condition_with_downstream_graph() -> WorkflowGraph:
     return WorkflowGraph(backend)
 
 
+def _build_condition_approval_rejoin_graph() -> WorkflowGraph:
+    """Build: trigger -> cond -> (true: approval -[approved]-> shared, false: shared).
+
+    One condition branch runs an approval before reaching "shared"; the other
+    branch connects directly to the same "shared" node.
+    """
+    backend = InMemoryGraphBackend()
+    backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
+    backend.add_node("cond", {"id": "cond", "type": "condition", "parameters": {"expr": "true"}})
+    backend.add_node("approval", {"id": "approval", "type": "approval", "parameters": {}})
+    backend.add_node("shared", {"id": "shared", "type": "script", "parameters": {}})
+    backend.add_edge("trigger", "cond", None)
+    backend.add_edge("cond", "approval", {"from_port": "true"})
+    backend.add_edge("cond", "shared", {"from_port": "false"})
+    backend.add_edge("approval", "shared", {"from_port": "approved"})
+    return WorkflowGraph(backend)
+
+
 def _build_linear_graph() -> WorkflowGraph:
     """Build: trigger -> node_a -> node_b (linear chain)."""
     backend = InMemoryGraphBackend()
@@ -206,6 +224,37 @@ class TestSkipPropagation:
         wf._mark_downstream_as_skipped("node_a", graph)
 
         assert "node_b" in wf.skipped_nodes
+
+    def test_approval_rejoin_node_runs_after_approved_decision(self) -> None:
+        """AAP-96074: a join node with an unused incoming link must still run.
+
+        The condition takes the "true" port into the approval branch, which
+        marks "shared"'s direct, non-taken-branch edge (from "false") as
+        skipped. Once the approval is later approved, "shared" must still be
+        scheduled through the "approved" port -- it has a live, pending path
+        to it and is not actually unreachable.
+        """
+        wf = _make_workflow()
+        graph = _build_condition_approval_rejoin_graph()
+        wf.resolver.set_namespace("trigger", {})
+        wf.resolver.set_namespace("cond", {"result": True})
+        wf.node_control_data["cond"] = {"next_port": "true"}
+        pending: dict[str, asyncio.Task[Any]] = {}
+
+        # Condition routes into the approval branch; "shared" is also the
+        # direct target of the non-taken "false" port.
+        _run_schedule_successors(wf, "cond", graph, pending)
+        assert "approval" in pending
+        assert "shared" not in pending
+
+        # The approval is later approved.
+        wf.resolver.set_namespace("approval", {"decision": "approved"})
+        wf.node_control_data["approval"] = {"next_port": "approved"}
+        pending.pop("approval", None)
+
+        _run_schedule_successors(wf, "approval", graph, pending)
+
+        assert "shared" in pending, "approved branch must still reach the shared downstream node"
 
 
 # ---------------------------------------------------------------------------
