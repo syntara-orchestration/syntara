@@ -80,11 +80,15 @@ function buildTriggerMockJson(
 ): string {
   const triggerTemplate = schemaToTemplateData(triggerInputSchema)
   const nonTriggerPreds = predecessors.filter((p) => !p.isTrigger)
-  if (nonTriggerPreds.length === 0) return JSON.stringify(triggerTemplate, null, 2)
+  if (nonTriggerPreds.length === 0) {
+    const triggerPred = predecessors.find((p) => p.isTrigger)
+    const triggerData = (triggerPred && pinnedMockData?.[triggerPred.id]) ?? triggerTemplate
+    return JSON.stringify(triggerData, null, 2)
+  }
 
   const keyed: Record<string, Record<string, unknown>> = {}
   for (const pred of predecessors) {
-    keyed[pred.id] = pred.isTrigger ? triggerTemplate : (pinnedMockData?.[pred.id] ?? {})
+    keyed[pred.id] = pred.isTrigger ? (pinnedMockData?.[pred.id] ?? triggerTemplate) : (pinnedMockData?.[pred.id] ?? {})
   }
   return JSON.stringify(keyed, null, 2)
 }
