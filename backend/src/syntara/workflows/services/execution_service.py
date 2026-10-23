@@ -359,6 +359,9 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
     ) -> dict[str, Any]:
         """Validate and normalize trigger input, then enforce its JSONB size limit.
 
+        Defaults and normalization can push input over the 1 MiB limit, so
+        recheck it here before sending it to Temporal or storing it.
+
         Form Triggers use their typed form definition. Other trigger types keep
         the existing JSON Schema defaults and validation behavior.
         """
