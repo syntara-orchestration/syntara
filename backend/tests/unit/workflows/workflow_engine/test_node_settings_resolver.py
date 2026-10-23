@@ -3,7 +3,11 @@
 from syntara.settings.catalog import SETTINGS_CATALOG
 from syntara.workflows.workflow_engine.constants import DEFAULT_MAX_OUTPUT_BYTES
 from syntara.workflows.workflow_engine.graph import ActivityNode
-from syntara.workflows.workflow_engine.node_settings_resolver import resolve_max_output_bytes, resolve_retry_policy
+from syntara.workflows.workflow_engine.node_settings_resolver import (
+    resolve_max_iterations,
+    resolve_max_output_bytes,
+    resolve_retry_policy,
+)
 
 
 def _catalog_defaults() -> dict[str, object]:
@@ -29,6 +33,16 @@ def test_resolve_retry_policy_inline_fallbacks_match_catalog_defaults() -> None:
         "Update the hardcoded fallback values in node_settings_resolver.py to match "
         "the default_value entries in settings/catalog.py."
     )
+
+
+def test_resolve_max_iterations_fallback_matches_catalog_default() -> None:
+    """The no-settings fallback must stay in sync with the catalog default."""
+    node = ActivityNode(node_id="loop", node_type="loop", parameters={})
+
+    result_inline = resolve_max_iterations(node, {})
+    result_catalog = resolve_max_iterations(node, _catalog_defaults())
+
+    assert result_inline == result_catalog == 1000
 
 
 def test_resolve_max_output_bytes_from_catalog() -> None:

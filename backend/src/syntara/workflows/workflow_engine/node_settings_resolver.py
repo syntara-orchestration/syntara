@@ -55,7 +55,7 @@ def resolve_max_iterations(node: ActivityNode, runtime_settings: dict[str, Any])
     node_value = node.parameters.get("max_iterations")
     if node_value is not None:
         return _require_int(node.id, "max_iterations", node_value)
-    return int(runtime_settings.get("workflow_engine.max_loop_iterations", 10000))
+    return int(runtime_settings.get("workflow_engine.max_loop_iterations", 1000))
 
 
 def resolve_decision_window(node: ActivityNode, runtime_settings: dict[str, Any]) -> int:
