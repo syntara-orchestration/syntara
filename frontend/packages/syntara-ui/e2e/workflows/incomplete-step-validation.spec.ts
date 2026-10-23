@@ -1,25 +1,25 @@
 /**
  * E2E Tests: Workflow Verification — Missing Required Configuration (UI-32)
  *
- * Objective: Verify that validation catches nodes with missing required configuration.
+ * Objective: Verify that validation catches steps with missing required configuration.
  *
  * Test Procedure:
- * 1. Add an AAP Job Template node with no job template selected
+ * 1. Add an AAP Job Template step with no job template selected
  * 2. Trigger verification and check for validation errors
  *
  * Expected Results:
- * - Validation identifies the unconfigured node
- * - The error message specifies which node and which field is missing
+ * - Validation identifies the unconfigured step
+ * - The error message specifies which step and which field is missing
  */
 
 import { test, expect, toAppUrl, type Page } from '../fixtures'
-import { addManualTrigger, openAddNodePanel } from '../helpers/v2-nodes'
+import { addManualTrigger, openAddStepPanel } from '../helpers/v2-steps'
 import { triggerVerifyWorkflow } from '../helpers/workflow-verify'
 import {
-  addNodePanel,
+  addStepPanel,
   buildUniqueName,
   clickSaveAndWait,
-  closeNodeEditorPanel,
+  closeStepEditorPanel,
   selectProjectIfRequired,
 } from '../helpers/workflows'
 import { ensureProject, apiRequest } from '../utils/api'
@@ -28,19 +28,19 @@ const VERIFY_BANNER_TIMEOUT = 20_000
 const ERROR_BADGE_TIMEOUT = 10_000
 
 /**
- * Add an AAP job template node WITHOUT providing the required job template ID.
+ * Add an AAP job template step WITHOUT providing the required job template ID.
  * AAP is a category button that leads to a subcategory panel; "Launch AAP job template"
- * must be selected before the node form appears.
+ * must be selected before the step form appears.
  */
-async function addIncompleteAapNode(page: Page, name: string) {
-  await openAddNodePanel(page)
+async function addIncompleteAapStep(page: Page, name: string) {
+  await openAddStepPanel(page)
   // AAP is a category — click it to reveal the subcategory panel, then pick the subtype
-  const panel = addNodePanel(page)
+  const panel = addStepPanel(page)
   const aapBtn = panel.getByRole('button', { name: /AAP/i })
   await expect(aapBtn).toBeVisible({ timeout: 5_000 })
   await aapBtn.click()
 
-  const subPanel = addNodePanel(page)
+  const subPanel = addStepPanel(page)
   const jobTemplateBtn = subPanel.getByRole('button', { name: 'Launch AAP job template', exact: true })
   await expect(jobTemplateBtn).toBeVisible({ timeout: 10_000 })
   await jobTemplateBtn.click()
@@ -54,11 +54,11 @@ async function addIncompleteAapNode(page: Page, name: string) {
   await page.getByRole('button', { name: 'Create', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Create', exact: true })).not.toBeAttached({ timeout: 15_000 })
 
-  await closeNodeEditorPanel(page)
+  await closeStepEditorPanel(page)
 }
 
 test.describe('UI-32: Workflow Verification — Missing Required Configuration', { tag: '@pr-check' }, () => {
-  test('unconfigured AAP node triggers verification error', async ({ app }) => {
+  test('unconfigured AAP step triggers verification error', async ({ app }) => {
     // Builds the workflow through the UI before verifying — the default budget is
     // too tight for that plus a verify retry on a loaded cluster.
     test.setTimeout(90_000)
@@ -71,7 +71,7 @@ test.describe('UI-32: Workflow Verification — Missing Required Configuration',
 
     try {
       await addManualTrigger(app, 'Start workflow')
-      await addIncompleteAapNode(app, 'Incomplete AAP Node')
+      await addIncompleteAapStep(app, 'Incomplete AAP Step')
 
       // Save and capture the workflow ID for reliable API-based cleanup
       await selectProjectIfRequired(app)

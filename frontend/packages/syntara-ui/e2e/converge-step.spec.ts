@@ -1,31 +1,31 @@
 import { test, expect, toAppUrl } from './fixtures'
-import { addManualTrigger, addConditionNodeWithBranch } from './helpers/v2-nodes'
+import { addManualTrigger, addConditionStepWithBranch } from './helpers/v2-steps'
 import {
-  addConvergeNodeWithAllStrategy,
-  addConvergeNodeWithAnyStrategy,
-  addConvergeNodeWithTimeout,
+  addConvergeStepWithAllStrategy,
+  addConvergeStepWithAnyStrategy,
+  addConvergeStepWithTimeout,
   createWorkflowWithBranchesForConverge,
-  expectConvergeNodeConfig,
-  openConvergeFormOnNewWorkflow,
-  openConvergeNodeForEditing,
-  openConvergeNodeParameters,
-} from './helpers/v2-nodes-converge'
+  expectConvergeStepConfig,
+  openConvergeStepFormOnNewWorkflow,
+  openConvergeStepForEditing,
+  openConvergeStepParameters,
+} from './helpers/v2-steps-converge'
 import { cancelAndCloseEditor, getWorkflowPayload } from './helpers/workflow-payload'
 import {
-  addNodePanel,
+  addStepPanel,
   selectProjectIfRequired,
   deleteWorkflow,
   openWorkflowInBuilder,
   triggerLayout,
 } from './helpers/workflows'
 
-test.describe('Converge Node - E2E Tests', () => {
+test.describe('Converge Step - E2E Tests', () => {
   test.describe('Catalog', () => {
-    test('Select converge node from Logic category', async ({ app }) => {
+    test('Select converge step from Logic category', async ({ app }) => {
       try {
         await app.goto(toAppUrl('/workflow-builder/new'))
         await addManualTrigger(app, 'Manual trigger')
-        await addConditionNodeWithBranch(app, 'Condition', 'true')
+        await addConditionStepWithBranch(app, 'Condition', 'true')
 
         const layoutButton = app.getByRole('button', { name: 'Layout' })
         if ((await layoutButton.count()) > 0) {
@@ -38,7 +38,7 @@ test.describe('Converge Node - E2E Tests', () => {
         await expect(addBtn).toBeVisible()
         await addBtn.click({ force: true })
 
-        const panel = addNodePanel(app)
+        const panel = addStepPanel(app)
         await expect(panel).toHaveCount(1)
         await panel.getByRole('button', { name: 'Logic', exact: true }).click()
         const convergeBtn = panel.getByRole('button', { name: 'Converge', exact: true })
@@ -56,8 +56,8 @@ test.describe('Converge Node - E2E Tests', () => {
       }
     })
 
-    test('Cancel adding converge node', async ({ app }) => {
-      await openConvergeFormOnNewWorkflow(app)
+    test('Cancel adding converge step', async ({ app }) => {
+      await openConvergeStepFormOnNewWorkflow(app)
 
       await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Test Converge')
       await app.getByRole('button', { name: 'Continue when criteria', exact: true }).click()
@@ -73,11 +73,11 @@ test.describe('Converge Node - E2E Tests', () => {
   })
 
   test.describe('Wait for all branches', () => {
-    test('Create converge node with "all" strategy (default)', async ({ app }) => {
+    test('Create converge step with "all" strategy (default)', async ({ app }) => {
       const wfName = await createWorkflowWithBranchesForConverge(app)
 
       try {
-        await addConvergeNodeWithAllStrategy(app, 'Converge All')
+        await addConvergeStepWithAllStrategy(app, 'Converge All')
 
         const saveRequestPromise = app.waitForRequest(
           (req) => req.url().includes('/workflows') && req.method() === 'POST'
@@ -89,17 +89,17 @@ test.describe('Converge Node - E2E Tests', () => {
 
         await expect(app.getByText('Converge All')).toBeVisible()
         const payload = getWorkflowPayload(saveRequest)
-        expectConvergeNodeConfig(payload.workflow_definition.nodes, { strategy: 'all' })
+        expectConvergeStepConfig(payload.workflow_definition.nodes, { strategy: 'all' })
       } finally {
         await deleteWorkflow(app, wfName)
       }
     })
 
-    test('Edit existing converge node with "all" strategy', async ({ app }) => {
+    test('Edit existing converge step with "all" strategy', async ({ app }) => {
       const wfName = await createWorkflowWithBranchesForConverge(app)
 
       try {
-        await addConvergeNodeWithAllStrategy(app, 'Converge All')
+        await addConvergeStepWithAllStrategy(app, 'Converge All')
         await triggerLayout(app)
 
         await selectProjectIfRequired(app)
@@ -108,7 +108,7 @@ test.describe('Converge Node - E2E Tests', () => {
         await expect(app).toHaveURL(/workflow-builder\/(?!new\b).+/)
 
         await openWorkflowInBuilder(app, wfName)
-        await openConvergeNodeForEditing(app, 'Converge All')
+        await openConvergeStepForEditing(app, 'Converge All')
 
         await expect(app.getByRole('button', { name: 'Continue when criteria', exact: true })).toContainText(
           'All branches reach this step'
@@ -136,7 +136,7 @@ test.describe('Converge Node - E2E Tests', () => {
       const wfName = await createWorkflowWithBranchesForConverge(app)
 
       try {
-        await addConvergeNodeWithAnyStrategy(app, 'Converge Any', 2)
+        await addConvergeStepWithAnyStrategy(app, 'Converge Any', 2)
         await triggerLayout(app)
 
         await selectProjectIfRequired(app)
@@ -145,7 +145,7 @@ test.describe('Converge Node - E2E Tests', () => {
         await expect(app).toHaveURL(/workflow-builder\/(?!new\b).+/)
 
         await openWorkflowInBuilder(app, wfName)
-        await openConvergeNodeForEditing(app, 'Converge Any')
+        await openConvergeStepForEditing(app, 'Converge Any')
 
         await app.getByRole('button', { name: 'Continue when criteria', exact: true }).click()
         await app.getByRole('option', { name: 'All branches reach this step' }).click()
@@ -163,7 +163,7 @@ test.describe('Converge Node - E2E Tests', () => {
         const saveRequest = await saveRequestPromise
 
         const payload = getWorkflowPayload(saveRequest)
-        expectConvergeNodeConfig(payload.workflow_definition.nodes, { strategy: 'all' })
+        expectConvergeStepConfig(payload.workflow_definition.nodes, { strategy: 'all' })
       } finally {
         await deleteWorkflow(app, wfName)
       }
@@ -171,11 +171,11 @@ test.describe('Converge Node - E2E Tests', () => {
   })
 
   test.describe('Wait for N of M branches', () => {
-    test('Create converge node with "any" strategy and valid N', async ({ app }) => {
+    test('Create converge step with "any" strategy and valid N', async ({ app }) => {
       const wfName = await createWorkflowWithBranchesForConverge(app)
 
       try {
-        await addConvergeNodeWithAnyStrategy(app, 'Converge Any', 1)
+        await addConvergeStepWithAnyStrategy(app, 'Converge Any', 1)
 
         const saveRequestPromise = app.waitForRequest(
           (req) => req.url().includes('/workflows') && req.method() === 'POST'
@@ -186,17 +186,17 @@ test.describe('Converge Node - E2E Tests', () => {
         const saveRequest = await saveRequestPromise
 
         const payload = getWorkflowPayload(saveRequest)
-        expectConvergeNodeConfig(payload.workflow_definition.nodes, { strategy: 'any', n_required: 1 })
+        expectConvergeStepConfig(payload.workflow_definition.nodes, { strategy: 'any', n_required: 1 })
       } finally {
         await deleteWorkflow(app, wfName)
       }
     })
 
-    test('Edit converge node with "any" strategy', async ({ app }) => {
+    test('Edit converge step with "any" strategy', async ({ app }) => {
       const wfName = await createWorkflowWithBranchesForConverge(app)
 
       try {
-        await addConvergeNodeWithAnyStrategy(app, 'Converge Any', 2)
+        await addConvergeStepWithAnyStrategy(app, 'Converge Any', 2)
         await triggerLayout(app)
 
         await selectProjectIfRequired(app)
@@ -205,7 +205,7 @@ test.describe('Converge Node - E2E Tests', () => {
         await expect(app).toHaveURL(/workflow-builder\/(?!new\b).+/)
 
         await openWorkflowInBuilder(app, wfName)
-        await openConvergeNodeForEditing(app, 'Converge Any')
+        await openConvergeStepForEditing(app, 'Converge Any')
 
         const requiredPathCountInput = app.getByRole('spinbutton', {
           name: /Required number of branches before continuing/i,
@@ -222,7 +222,7 @@ test.describe('Converge Node - E2E Tests', () => {
         const saveRequest = await saveRequestPromise
 
         const payload = getWorkflowPayload(saveRequest)
-        expectConvergeNodeConfig(payload.workflow_definition.nodes, { strategy: 'any', n_required: 1 })
+        expectConvergeStepConfig(payload.workflow_definition.nodes, { strategy: 'any', n_required: 1 })
       } finally {
         await deleteWorkflow(app, wfName)
       }
@@ -232,7 +232,7 @@ test.describe('Converge Node - E2E Tests', () => {
       const wfName = await createWorkflowWithBranchesForConverge(app)
 
       try {
-        await addConvergeNodeWithAllStrategy(app, 'Converge All')
+        await addConvergeStepWithAllStrategy(app, 'Converge All')
         await triggerLayout(app)
 
         await selectProjectIfRequired(app)
@@ -241,7 +241,7 @@ test.describe('Converge Node - E2E Tests', () => {
         await expect(app).toHaveURL(/workflow-builder\/(?!new\b).+/)
 
         await openWorkflowInBuilder(app, wfName)
-        await openConvergeNodeForEditing(app, 'Converge All')
+        await openConvergeStepForEditing(app, 'Converge All')
 
         await app.getByRole('button', { name: 'Continue when criteria', exact: true }).click()
         await app.getByRole('option', { name: 'Any branches reach this step' }).click()
@@ -262,7 +262,7 @@ test.describe('Converge Node - E2E Tests', () => {
         const saveRequest = await saveRequestPromise
 
         const payload = getWorkflowPayload(saveRequest)
-        expectConvergeNodeConfig(payload.workflow_definition.nodes, { strategy: 'any', n_required: 2 })
+        expectConvergeStepConfig(payload.workflow_definition.nodes, { strategy: 'any', n_required: 2 })
       } finally {
         await deleteWorkflow(app, wfName)
       }
@@ -272,7 +272,7 @@ test.describe('Converge Node - E2E Tests', () => {
       const wfName = await createWorkflowWithBranchesForConverge(app)
 
       try {
-        await addConvergeNodeWithAnyStrategy(app, 'Converge Any Persist', 5)
+        await addConvergeStepWithAnyStrategy(app, 'Converge Any Persist', 5)
         await triggerLayout(app)
 
         const saveRequestPromise = app.waitForRequest(
@@ -284,11 +284,11 @@ test.describe('Converge Node - E2E Tests', () => {
         const saveRequest = await saveRequestPromise
 
         const payload = getWorkflowPayload(saveRequest)
-        expectConvergeNodeConfig(payload.workflow_definition.nodes, { strategy: 'any', n_required: 5 })
+        expectConvergeStepConfig(payload.workflow_definition.nodes, { strategy: 'any', n_required: 5 })
 
         await expect(app).toHaveURL(/workflow-builder\/(?!new\b).+/)
         await openWorkflowInBuilder(app, wfName)
-        await openConvergeNodeForEditing(app, 'Converge Any Persist')
+        await openConvergeStepForEditing(app, 'Converge Any Persist')
 
         await expect(app.getByRole('button', { name: 'Continue when criteria', exact: true })).toContainText(
           'Any branches reach this step'
@@ -307,7 +307,7 @@ test.describe('Converge Node - E2E Tests', () => {
       const wfName = await createWorkflowWithBranchesForConverge(app)
 
       try {
-        await addConvergeNodeWithTimeout(app, 'Converge Timeout', {
+        await addConvergeStepWithTimeout(app, 'Converge Timeout', {
           seconds: 30,
           minutes: 5,
           hours: 2,
@@ -325,7 +325,7 @@ test.describe('Converge Node - E2E Tests', () => {
 
         // 30 + (5*60) + (2*3600) + (1*86400) = 93930
         const payload = getWorkflowPayload(saveRequest)
-        expectConvergeNodeConfig(payload.workflow_definition.nodes, {
+        expectConvergeStepConfig(payload.workflow_definition.nodes, {
           strategy: 'all',
           wait_duration: 93930,
         })
@@ -334,11 +334,11 @@ test.describe('Converge Node - E2E Tests', () => {
       }
     })
 
-    test('Edit existing converge node with timeout', async ({ app }) => {
+    test('Edit existing converge step with timeout', async ({ app }) => {
       const wfName = await createWorkflowWithBranchesForConverge(app)
 
       try {
-        await addConvergeNodeWithTimeout(app, 'Converge Timeout', {
+        await addConvergeStepWithTimeout(app, 'Converge Timeout', {
           minutes: 5,
           action: 'continue',
         })
@@ -350,7 +350,7 @@ test.describe('Converge Node - E2E Tests', () => {
         await expect(app).toHaveURL(/workflow-builder\/(?!new\b).+/)
 
         await openWorkflowInBuilder(app, wfName)
-        await openConvergeNodeParameters(app, 'Converge Timeout')
+        await openConvergeStepParameters(app, 'Converge Timeout')
 
         await expect(app.getByText('Wait duration')).toBeVisible()
 
@@ -367,7 +367,7 @@ test.describe('Converge Node - E2E Tests', () => {
       const wfName = await createWorkflowWithBranchesForConverge(app)
 
       try {
-        await addConvergeNodeWithTimeout(app, 'Converge Wait Edit', {
+        await addConvergeStepWithTimeout(app, 'Converge Wait Edit', {
           minutes: 10,
         })
         await triggerLayout(app)
@@ -381,14 +381,14 @@ test.describe('Converge Node - E2E Tests', () => {
         const saveRequest = await saveRequestPromise
 
         const payload = getWorkflowPayload(saveRequest)
-        expectConvergeNodeConfig(payload.workflow_definition.nodes, {
+        expectConvergeStepConfig(payload.workflow_definition.nodes, {
           strategy: 'all',
           wait_duration: 600,
         })
 
         await expect(app).toHaveURL(/workflow-builder\/(?!new\b).+/)
         await openWorkflowInBuilder(app, wfName)
-        await openConvergeNodeParameters(app, 'Converge Wait Edit')
+        await openConvergeStepParameters(app, 'Converge Wait Edit')
 
         await expect(app.getByLabel(/Minutes/i)).toHaveValue('10')
       } finally {
@@ -400,7 +400,7 @@ test.describe('Converge Node - E2E Tests', () => {
       const wfName = await createWorkflowWithBranchesForConverge(app)
 
       try {
-        await addConvergeNodeWithTimeout(app, 'Converge Complex Timeout', {
+        await addConvergeStepWithTimeout(app, 'Converge Complex Timeout', {
           seconds: 45,
           minutes: 30,
           hours: 12,
@@ -419,14 +419,14 @@ test.describe('Converge Node - E2E Tests', () => {
 
         // 45 + (30*60) + (12*3600) + (2*86400) = 217845
         const payload = getWorkflowPayload(saveRequest)
-        expectConvergeNodeConfig(payload.workflow_definition.nodes, {
+        expectConvergeStepConfig(payload.workflow_definition.nodes, {
           strategy: 'all',
           wait_duration: 217845,
         })
 
         await expect(app).toHaveURL(/workflow-builder\/(?!new\b).+/)
         await openWorkflowInBuilder(app, wfName)
-        await openConvergeNodeParameters(app, 'Converge Complex Timeout')
+        await openConvergeStepParameters(app, 'Converge Complex Timeout')
 
         await expect(app.getByLabel(/Seconds/i)).toHaveValue('45')
         await expect(app.getByLabel(/Minutes/i)).toHaveValue('30')
@@ -441,7 +441,7 @@ test.describe('Converge Node - E2E Tests', () => {
       const wfName = await createWorkflowWithBranchesForConverge(app)
 
       try {
-        await addConvergeNodeWithTimeout(app, 'Converge Any Timeout', {
+        await addConvergeStepWithTimeout(app, 'Converge Any Timeout', {
           minutes: 20,
           action: 'continue',
           strategy: 'any',
@@ -457,7 +457,7 @@ test.describe('Converge Node - E2E Tests', () => {
         const saveRequest = await saveRequestPromise
 
         const payload = getWorkflowPayload(saveRequest)
-        expectConvergeNodeConfig(payload.workflow_definition.nodes, {
+        expectConvergeStepConfig(payload.workflow_definition.nodes, {
           strategy: 'any',
           n_required: 2,
           wait_duration: 1200,

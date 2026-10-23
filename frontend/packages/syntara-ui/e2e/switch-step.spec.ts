@@ -2,7 +2,7 @@
  * E2E Tests: Switch Node — UI-15 (AAP-70970)
  *
  * Critical paths covered:
- * - Switch node is discoverable under the Logic catalog category
+ * - Switch step is discoverable under the Logic catalog category
  * - N-way case configuration: multiple conditions, custom path labels
  * - "Add path" button appends a new case; "Remove path" deletes it
  * - "Fallback path" section is always visible (unmatched route)
@@ -11,7 +11,7 @@
  * - Round-trip persistence: saved values reload correctly into the form
  *
  * Edge cases:
- * - Cancelling without saving does not persist the node to the canvas
+ * - Cancelling without saving does not persist the step to the canvas
  * - Attempting to save without filling a condition shows a validation error
  * - The form enforces a minimum of 1 path (Remove button hidden at minimum)
  */
@@ -19,13 +19,13 @@
 import { test, expect, toAppUrl } from './fixtures'
 import {
   addManualTrigger,
-  addSwitchNodeWithCases,
-  openAddNodePanel,
-  openSwitchNodeForEditing,
-} from './helpers/v2-nodes'
+  addSwitchStepWithCases,
+  openAddStepPanel,
+  openSwitchStepForEditing,
+} from './helpers/v2-steps'
 import { cancelAndCloseEditor, getWorkflowPayload, type WorkflowNode } from './helpers/workflow-payload'
 import {
-  addNodePanel,
+  addStepPanel,
   buildUniqueName,
   deleteWorkflow,
   openWorkflowInBuilder,
@@ -44,10 +44,10 @@ type SwitchCasePayload = {
 }
 
 // ---------------------------------------------------------------------------
-// Assertion helper — mirrors the pattern in converge-node.spec.ts
+// Assertion helper — mirrors the pattern in converge-step.spec.ts
 // ---------------------------------------------------------------------------
 
-function expectSwitchNodeConfig(
+function expectSwitchStepConfig(
   nodes: WorkflowNode[],
   expected: {
     caseCount: number
@@ -77,16 +77,16 @@ function expectSwitchNodeConfig(
 // Test suite
 // ---------------------------------------------------------------------------
 
-test.describe('Switch Node — UI-15', () => {
+test.describe('Switch Step — UI-15', () => {
   test.describe('Catalog', () => {
-    test('Switch node is available under the Logic category', async ({ app }) => {
+    test('Switch step is available under the Logic category', async ({ app }) => {
       await app.goto(toAppUrl('/workflow-builder/new'))
       await addManualTrigger(app, 'Manual trigger')
 
       try {
-        await openAddNodePanel(app)
+        await openAddStepPanel(app)
 
-        const panel = addNodePanel(app)
+        const panel = addStepPanel(app)
         await panel.getByRole('button', { name: 'Logic', exact: true }).click()
         await expect(panel.getByRole('button', { name: 'Switch', exact: true })).toBeVisible()
       } finally {
@@ -99,8 +99,8 @@ test.describe('Switch Node — UI-15', () => {
       await addManualTrigger(app, 'Manual trigger')
 
       try {
-        await openAddNodePanel(app)
-        const panel = addNodePanel(app)
+        await openAddStepPanel(app)
+        const panel = addStepPanel(app)
         await panel.getByRole('button', { name: 'Logic', exact: true }).click()
         await panel.getByRole('button', { name: 'Switch', exact: true }).click()
 
@@ -115,12 +115,12 @@ test.describe('Switch Node — UI-15', () => {
       }
     })
 
-    test('Cancelling the Switch form does not add the node to the canvas', async ({ app }) => {
+    test('Cancelling the Switch form does not add the step to the canvas', async ({ app }) => {
       await app.goto(toAppUrl('/workflow-builder/new'))
       await addManualTrigger(app, 'Manual trigger')
 
-      await openAddNodePanel(app)
-      const panel = addNodePanel(app)
+      await openAddStepPanel(app)
+      const panel = addStepPanel(app)
       await panel.getByRole('button', { name: 'Logic', exact: true }).click()
       await panel.getByRole('button', { name: 'Switch', exact: true }).click()
 
@@ -132,11 +132,11 @@ test.describe('Switch Node — UI-15', () => {
   })
 
   // -------------------------------------------------------------------------
-  // Saving with payload verification — matches converge-node.spec.ts pattern
+  // Saving with payload verification — matches converge-step.spec.ts pattern
   // -------------------------------------------------------------------------
 
   test.describe('Case configuration and payload', () => {
-    test('Create switch node with two cases and verify saved payload', async ({ app }) => {
+    test('Create switch step with two cases and verify saved payload', async ({ app }) => {
       const wfName = buildUniqueName('switch-two-cases')
 
       await ensureProject(app)
@@ -144,7 +144,7 @@ test.describe('Switch Node — UI-15', () => {
       await addManualTrigger(app, 'Manual trigger')
 
       try {
-        await addSwitchNodeWithCases(app, 'Route by status', [
+        await addSwitchStepWithCases(app, 'Route by status', [
           { condition: '${trigger.status} == "success"', label: 'Success' },
           { condition: '${trigger.status} == "failure"', label: 'Failure' },
         ])
@@ -160,7 +160,7 @@ test.describe('Switch Node — UI-15', () => {
         await expect(app.getByText('Route by status')).toBeVisible()
 
         const payload = getWorkflowPayload(saveRequest)
-        expectSwitchNodeConfig(payload.workflow_definition.nodes, {
+        expectSwitchStepConfig(payload.workflow_definition.nodes, {
           caseCount: 2,
           cases: [
             { condition: '${trigger.status} == "success"', label: 'Success' },
@@ -180,7 +180,7 @@ test.describe('Switch Node — UI-15', () => {
       await addManualTrigger(app, 'Manual trigger')
 
       try {
-        await addSwitchNodeWithCases(app, 'Label check', [{ condition: 'true' }, { condition: 'false' }])
+        await addSwitchStepWithCases(app, 'Label check', [{ condition: 'true' }, { condition: 'false' }])
 
         const saveRequestPromise = app.waitForRequest(
           (req) => req.url().includes('/workflows') && req.method() === 'POST'
@@ -203,7 +203,7 @@ test.describe('Switch Node — UI-15', () => {
       }
     })
 
-    test('Switch node with a single case saves correctly', async ({ app }) => {
+    test('Switch step with a single case saves correctly', async ({ app }) => {
       const wfName = buildUniqueName('switch-one-case')
 
       await ensureProject(app)
@@ -211,7 +211,7 @@ test.describe('Switch Node — UI-15', () => {
       await addManualTrigger(app, 'Manual trigger')
 
       try {
-        await addSwitchNodeWithCases(app, 'Single path', [{ condition: '${trigger.value} > 0', label: 'Positive' }])
+        await addSwitchStepWithCases(app, 'Single path', [{ condition: '${trigger.value} > 0', label: 'Positive' }])
 
         const saveRequestPromise = app.waitForRequest(
           (req) => req.url().includes('/workflows') && req.method() === 'POST'
@@ -222,7 +222,7 @@ test.describe('Switch Node — UI-15', () => {
         const saveRequest = await saveRequestPromise
 
         const payload = getWorkflowPayload(saveRequest)
-        expectSwitchNodeConfig(payload.workflow_definition.nodes, {
+        expectSwitchStepConfig(payload.workflow_definition.nodes, {
           caseCount: 1,
           cases: [{ condition: '${trigger.value} > 0', label: 'Positive' }],
         })
@@ -231,7 +231,7 @@ test.describe('Switch Node — UI-15', () => {
       }
     })
 
-    test('Switch node with three cases saves all cases', async ({ app }) => {
+    test('Switch step with three cases saves all cases', async ({ app }) => {
       const wfName = buildUniqueName('switch-three-cases')
 
       await ensureProject(app)
@@ -239,7 +239,7 @@ test.describe('Switch Node — UI-15', () => {
       await addManualTrigger(app, 'Manual trigger')
 
       try {
-        await addSwitchNodeWithCases(app, 'Three routes', [
+        await addSwitchStepWithCases(app, 'Three routes', [
           { condition: '${trigger.score} >= 90', label: 'High' },
           { condition: '${trigger.score} >= 60', label: 'Medium' },
           { condition: '${trigger.score} < 60', label: 'Low' },
@@ -254,7 +254,7 @@ test.describe('Switch Node — UI-15', () => {
         const saveRequest = await saveRequestPromise
 
         const payload = getWorkflowPayload(saveRequest)
-        expectSwitchNodeConfig(payload.workflow_definition.nodes, {
+        expectSwitchStepConfig(payload.workflow_definition.nodes, {
           caseCount: 3,
           cases: [
             { condition: '${trigger.score} >= 90', label: 'High' },
@@ -278,8 +278,8 @@ test.describe('Switch Node — UI-15', () => {
       await addManualTrigger(app, 'Manual trigger')
 
       try {
-        await openAddNodePanel(app)
-        const panel = addNodePanel(app)
+        await openAddStepPanel(app)
+        const panel = addStepPanel(app)
         await panel.getByRole('button', { name: 'Logic', exact: true }).click()
         await panel.getByRole('button', { name: 'Switch', exact: true }).click()
 
@@ -302,8 +302,8 @@ test.describe('Switch Node — UI-15', () => {
       await addManualTrigger(app, 'Manual trigger')
 
       try {
-        await openAddNodePanel(app)
-        const panel = addNodePanel(app)
+        await openAddStepPanel(app)
+        const panel = addStepPanel(app)
         await panel.getByRole('button', { name: 'Logic', exact: true }).click()
         await panel.getByRole('button', { name: 'Switch', exact: true }).click()
 
@@ -325,8 +325,8 @@ test.describe('Switch Node — UI-15', () => {
       await addManualTrigger(app, 'Manual trigger')
 
       try {
-        await openAddNodePanel(app)
-        const panel = addNodePanel(app)
+        await openAddStepPanel(app)
+        const panel = addStepPanel(app)
         await panel.getByRole('button', { name: 'Logic', exact: true }).click()
         await panel.getByRole('button', { name: 'Switch', exact: true }).click()
 
@@ -354,7 +354,7 @@ test.describe('Switch Node — UI-15', () => {
   // -------------------------------------------------------------------------
 
   test.describe('Round-trip persistence', () => {
-    test('Reopening a saved switch node shows the saved case configuration', async ({ app }) => {
+    test('Reopening a saved switch step shows the saved case configuration', async ({ app }) => {
       const wfName = buildUniqueName('switch-roundtrip')
 
       await ensureProject(app)
@@ -362,7 +362,7 @@ test.describe('Switch Node — UI-15', () => {
       await addManualTrigger(app, 'Manual trigger')
 
       try {
-        await addSwitchNodeWithCases(app, 'Persisted Switch', [
+        await addSwitchStepWithCases(app, 'Persisted Switch', [
           { condition: '${trigger.env} == "prod"', label: 'Production' },
           { condition: '${trigger.env} == "staging"', label: 'Staging' },
         ])
@@ -375,7 +375,7 @@ test.describe('Switch Node — UI-15', () => {
         // Reload the workflow in the builder
         await openWorkflowInBuilder(app, wfName)
 
-        await openSwitchNodeForEditing(app, 'Persisted Switch')
+        await openSwitchStepForEditing(app, 'Persisted Switch')
 
         await expect(app.getByRole('tab', { name: 'Parameters' })).toBeVisible()
         await expect(app.getByLabel('Path 1 name')).toHaveValue('Production')
@@ -388,7 +388,7 @@ test.describe('Switch Node — UI-15', () => {
       }
     })
 
-    test('Editing a switch node updates the saved case configuration', async ({ app }) => {
+    test('Editing a switch step updates the saved case configuration', async ({ app }) => {
       const wfName = buildUniqueName('switch-edit')
 
       await ensureProject(app)
@@ -396,7 +396,7 @@ test.describe('Switch Node — UI-15', () => {
       await addManualTrigger(app, 'Manual trigger')
 
       try {
-        await addSwitchNodeWithCases(app, 'Edit Me', [
+        await addSwitchStepWithCases(app, 'Edit Me', [
           { condition: 'true', label: 'Path A' },
           { condition: 'false', label: 'Path B' },
         ])
@@ -407,7 +407,7 @@ test.describe('Switch Node — UI-15', () => {
         await expect(app).toHaveURL(/workflow-builder\/(?!new\b).+/)
 
         await openWorkflowInBuilder(app, wfName)
-        await openSwitchNodeForEditing(app, 'Edit Me')
+        await openSwitchStepForEditing(app, 'Edit Me')
         await app.getByLabel('Path 1 name').fill('Updated Path A')
         await app.getByRole('button', { name: 'Update', exact: true }).click()
 
@@ -432,7 +432,7 @@ test.describe('Switch Node — UI-15', () => {
   // -------------------------------------------------------------------------
 
   test.describe('Canvas display', () => {
-    test('Switch node is visible on the canvas after saving', async ({ app }) => {
+    test('Switch step is visible on the canvas after saving', async ({ app }) => {
       const wfName = buildUniqueName('switch-canvas')
 
       await ensureProject(app)
@@ -440,7 +440,7 @@ test.describe('Switch Node — UI-15', () => {
       await addManualTrigger(app, 'Manual trigger')
 
       try {
-        await addSwitchNodeWithCases(app, 'My Switch', [
+        await addSwitchStepWithCases(app, 'My Switch', [
           { condition: 'true', label: 'Yes' },
           { condition: 'false', label: 'No' },
         ])
@@ -459,7 +459,7 @@ test.describe('Switch Node — UI-15', () => {
       }
     })
 
-    test('Clicking the switch node on canvas opens the three-panel editor', async ({ app }) => {
+    test('Clicking the switch step on canvas opens the three-panel editor', async ({ app }) => {
       const wfName = buildUniqueName('switch-panel-open')
 
       await ensureProject(app)
@@ -467,14 +467,14 @@ test.describe('Switch Node — UI-15', () => {
       await addManualTrigger(app, 'Manual trigger')
 
       try {
-        await addSwitchNodeWithCases(app, 'Panel Switch', [{ condition: 'true' }, { condition: 'false' }])
+        await addSwitchStepWithCases(app, 'Panel Switch', [{ condition: 'true' }, { condition: 'false' }])
 
         await selectProjectIfRequired(app)
         await app.getByPlaceholder('Workflow name').fill(wfName)
         await app.getByRole('button', { name: 'Save workflow' }).click()
         await expect(app).toHaveURL(/workflow-builder\/(?!new\b).+/)
 
-        // Click the node to open the editor
+        // Click the step to open the editor
         await app.locator('[role="group"][aria-roledescription="node"]').filter({ hasText: 'Panel Switch' }).click()
 
         // Three-panel layout must be visible

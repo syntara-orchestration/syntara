@@ -13,10 +13,10 @@ import {
   buildUniqueName,
   deleteWorkflow,
   clickAddConnectedStep,
-  closeNodeEditorPanel,
+  closeStepEditorPanel,
   createWorkflowWithTrigger,
-  addScriptNode,
-  verifyNodeVisible,
+  addScriptStep,
+  verifyStepVisible,
   waitForUIReady,
   triggerLayout,
 } from '../helpers/workflows'
@@ -25,12 +25,12 @@ import {
 // Add Nodes from Catalog
 // ========================================
 
-test('catalog panel shows available node types organized by category', async ({ app }) => {
+test('catalog panel shows available step types organized by category', async ({ app }) => {
   const workflowName = buildUniqueName('e2e-builder')
   await createWorkflowWithTrigger(app, workflowName)
 
   try {
-    await closeNodeEditorPanel(app)
+    await closeStepEditorPanel(app)
     await expect(app.getByText('Manual trigger')).toBeVisible()
 
     const panel = await clickAddConnectedStep(app)
@@ -46,22 +46,22 @@ test('catalog panel shows available node types organized by category', async ({ 
   }
 })
 
-test('user can add a Script action node to the canvas', async ({ app }) => {
+test('user can add a Script action step to the canvas', async ({ app }) => {
   const workflowName = buildUniqueName('e2e-builder')
   await createWorkflowWithTrigger(app, workflowName)
 
   try {
-    await closeNodeEditorPanel(app)
+    await closeStepEditorPanel(app)
     await expect(app.getByText('Manual trigger')).toBeVisible()
 
-    await addScriptNode(app, 'Python Hello World', 'print("Hello, World!")')
-    await verifyNodeVisible(app, 'Python Hello World')
+    await addScriptStep(app, 'Python Hello World', 'print("Hello, World!")')
+    await verifyStepVisible(app, 'Python Hello World')
   } finally {
     await deleteWorkflow(app, workflowName)
   }
 })
 
-test('user can add an Approval node to the canvas', async ({ app }) => {
+test('user can add an Approval step to the canvas', async ({ app }) => {
   const workflowName = buildUniqueName('e2e-builder')
   await createWorkflowWithTrigger(app, workflowName)
 
@@ -90,7 +90,7 @@ test('user can add an Approval node to the canvas', async ({ app }) => {
   })
 
   try {
-    await closeNodeEditorPanel(app)
+    await closeStepEditorPanel(app)
     await expect(app.getByText('Manual trigger')).toBeVisible()
 
     const panel = await clickAddConnectedStep(app)
@@ -144,7 +144,7 @@ test('user can add an Approval node to the canvas', async ({ app }) => {
 
     await app.getByRole('button', { name: 'Create', exact: true }).click()
 
-    await closeNodeEditorPanel(app)
+    await closeStepEditorPanel(app)
 
     // Wait for canvas to render the new node
     await expect(
@@ -157,12 +157,12 @@ test('user can add an Approval node to the canvas', async ({ app }) => {
   }
 })
 
-test('user can add a Logic (Conditional) node to the canvas', async ({ app }) => {
+test('user can add a Logic (Conditional) step to the canvas', async ({ app }) => {
   const workflowName = buildUniqueName('e2e-builder')
   await createWorkflowWithTrigger(app, workflowName)
 
   try {
-    await closeNodeEditorPanel(app)
+    await closeStepEditorPanel(app)
     await expect(app.getByText('Manual trigger')).toBeVisible()
 
     const panel = await clickAddConnectedStep(app)
@@ -184,7 +184,7 @@ test('user can add a Logic (Conditional) node to the canvas', async ({ app }) =>
 
     await app.getByRole('button', { name: 'Create', exact: true }).click()
 
-    await closeNodeEditorPanel(app)
+    await closeStepEditorPanel(app)
 
     // Wait for canvas to render the new node
     await expect(
@@ -200,7 +200,7 @@ test('user can add a Logic (Conditional) node to the canvas', async ({ app }) =>
   }
 })
 
-test('multiple nodes can be added sequentially', async ({ app }) => {
+test('multiple steps can be added sequentially', async ({ app }) => {
   const workflowName = buildUniqueName('e2e-builder')
   await createWorkflowWithTrigger(app, workflowName)
 
@@ -228,11 +228,11 @@ test('multiple nodes can be added sequentially', async ({ app }) => {
   })
 
   try {
-    await closeNodeEditorPanel(app)
+    await closeStepEditorPanel(app)
     await expect(app.getByText('Manual trigger')).toBeVisible()
 
-    // Add first node - Script action
-    await addScriptNode(app, 'Script Node 1', 'print("node1")')
+    // Add first step - Script action
+    await addScriptStep(app, 'Script Step 1', 'print("node1")')
 
     // Wait for UI to stabilize after first node
     await waitForUIReady(app)
@@ -258,7 +258,7 @@ test('multiple nodes can be added sequentially', async ({ app }) => {
     }).toPass({ timeout: 20000, intervals: [500, 1000] })
 
     const nameInput = app.getByRole('textbox', { name: 'Name', exact: true })
-    await nameInput.fill('Approval Node 1')
+    await nameInput.fill('Approval Step 1')
 
     // Open the approver users dropdown and select a user
     // Wait for the dropdown to be ready (loads from /authz/who_can)
@@ -303,9 +303,9 @@ test('multiple nodes can be added sequentially', async ({ app }) => {
     // Wait for panel to close
     await expect(panel).toHaveCount(0, { timeout: 15000 })
 
-    // Wait for canvas to render the new node
+    // Wait for canvas to render the new step
     await expect(
-      app.locator('[role="group"][aria-roledescription="node"]').filter({ hasText: 'Approval Node 1' })
+      app.locator('[role="group"][aria-roledescription="node"]').filter({ hasText: 'Approval Step 1' })
     ).toBeVisible({
       timeout: 10000,
     })
@@ -343,7 +343,7 @@ test('multiple nodes can be added sequentially', async ({ app }) => {
     }).toPass({ timeout: 20000, intervals: [500, 1000] })
 
     const logicNameInput = app.getByRole('textbox', { name: 'Name', exact: true })
-    await logicNameInput.fill('Logic Node 1')
+    await logicNameInput.fill('Logic Step 1')
 
     await app.getByRole('button', { name: EXPRESSION_MODE_LABELS.visual, exact: true }).click()
     await app.getByRole('option', { name: EXPRESSION_MODE_LABELS.raw }).click()
@@ -356,29 +356,29 @@ test('multiple nodes can be added sequentially', async ({ app }) => {
     // Wait for panel to close
     await expect(panel).toHaveCount(0, { timeout: 15000 })
 
-    // Wait for canvas to render the new node
+    // Wait for canvas to render the new step
     await expect(
-      app.locator('[role="group"][aria-roledescription="node"]').filter({ hasText: 'Logic Node 1' })
+      app.locator('[role="group"][aria-roledescription="node"]').filter({ hasText: 'Logic Step 1' })
     ).toBeVisible({ timeout: 10000 })
-    await verifyNodeVisible(app, 'Script Node 1')
-    await verifyNodeVisible(app, 'Approval Node 1')
-    await verifyNodeVisible(app, 'Logic Node 1')
+    await verifyStepVisible(app, 'Script Step 1')
+    await verifyStepVisible(app, 'Approval Step 1')
+    await verifyStepVisible(app, 'Logic Step 1')
   } finally {
     await deleteWorkflow(app, workflowName)
   }
 })
 
-test('added nodes are visible and interactive on the canvas', async ({ app }) => {
+test('added steps are visible and interactive on the canvas', async ({ app }) => {
   const workflowName = buildUniqueName('e2e-builder')
   await createWorkflowWithTrigger(app, workflowName)
 
   try {
-    await closeNodeEditorPanel(app)
+    await closeStepEditorPanel(app)
     await expect(app.getByText('Manual trigger')).toBeVisible()
 
-    await addScriptNode(app, 'Interactive Node', 'print("interactive")')
+    await addScriptStep(app, 'Interactive Node', 'print("interactive")')
 
-    await verifyNodeVisible(app, 'Interactive Node')
+    await verifyStepVisible(app, 'Interactive Node')
 
     await app.getByText('Interactive Node').click()
   } finally {
@@ -391,27 +391,27 @@ test('nodes are positioned on the canvas after layout', async ({ app }) => {
   await createWorkflowWithTrigger(app, workflowName)
 
   try {
-    await closeNodeEditorPanel(app)
+    await closeStepEditorPanel(app)
     await expect(app.getByText('Manual trigger')).toBeVisible()
 
     // Add a node
-    await addScriptNode(app, 'Positioned Node', 'print("positioned")')
-    await verifyNodeVisible(app, 'Positioned Node')
+    await addScriptStep(app, 'Positioned Node', 'print("positioned")')
+    await verifyStepVisible(app, 'Positioned Node')
 
     await triggerLayout(app)
 
-    await verifyNodeVisible(app, 'Positioned Node')
+    await verifyStepVisible(app, 'Positioned Node')
   } finally {
     await deleteWorkflow(app, workflowName)
   }
 })
 
-test('catalog panel can be closed without adding a node', async ({ app }) => {
+test('catalog panel can be closed without adding a step', async ({ app }) => {
   const workflowName = buildUniqueName('e2e-builder')
   await createWorkflowWithTrigger(app, workflowName)
 
   try {
-    await closeNodeEditorPanel(app)
+    await closeStepEditorPanel(app)
     await expect(app.getByText('Manual trigger')).toBeVisible()
 
     // Open the Add step panel
@@ -448,18 +448,18 @@ test('two nodes can be connected with an edge', async ({ app }) => {
   await createWorkflowWithTrigger(app, workflowName)
 
   try {
-    await closeNodeEditorPanel(app)
+    await closeStepEditorPanel(app)
     await expect(app.getByText('Manual trigger')).toBeVisible()
 
     // Add two nodes using "Add connected step" - this creates edges via the UI
-    await addScriptNode(app, 'First Node', 'print("first")')
-    await addScriptNode(app, 'Second Node', 'print("second")')
+    await addScriptStep(app, 'First Node', 'print("first")')
+    await addScriptStep(app, 'Second Node', 'print("second")')
 
-    // Edge existence is proven implicitly: addScriptNode uses clickAddConnectedStep,
+    // Edge existence is proven implicitly: addScriptStep uses clickAddConnectedStep,
     // which can only succeed by clicking an edge overlay button — so reaching this
     // point means both edges were created.
-    await verifyNodeVisible(app, 'First Node')
-    await verifyNodeVisible(app, 'Second Node')
+    await verifyStepVisible(app, 'First Node')
+    await verifyStepVisible(app, 'Second Node')
   } finally {
     await deleteWorkflow(app, workflowName)
   }
@@ -470,15 +470,15 @@ test('edge is visually distinguishable on canvas', async ({ app }) => {
   await createWorkflowWithTrigger(app, workflowName)
 
   try {
-    await closeNodeEditorPanel(app)
+    await closeStepEditorPanel(app)
     await expect(app.getByText('Manual trigger')).toBeVisible()
 
     // Add two nodes - these will auto-connect:
     // Manual trigger -> Source Node -> Target Node
-    await addScriptNode(app, 'Source Node', 'print("source")')
-    await addScriptNode(app, 'Target Node', 'print("target")')
+    await addScriptStep(app, 'Source Node', 'print("source")')
+    await addScriptStep(app, 'Target Node', 'print("target")')
 
-    // Edge existence is proven implicitly by addScriptNode succeeding (it clicks an
+    // Edge existence is proven implicitly by addScriptStep succeeding (it clicks an
     // edge overlay button). The "edge follows connection path" test verifies SVG path data.
   } finally {
     await deleteWorkflow(app, workflowName)
@@ -493,22 +493,22 @@ test('multiple edges can be created sequentially', async ({ app }) => {
   await createWorkflowWithTrigger(app, workflowName)
 
   try {
-    await closeNodeEditorPanel(app)
+    await closeStepEditorPanel(app)
     await expect(app.getByText('Manual trigger')).toBeVisible()
 
-    // Add three nodes
-    await addScriptNode(app, 'Node 1', 'print("1")')
-    await addScriptNode(app, 'Node 2', 'print("2")')
-    await addScriptNode(app, 'Node 3', 'print("3")')
+    // Add three steps
+    await addScriptStep(app, 'Step 1', 'print("1")')
+    await addScriptStep(app, 'Step 2', 'print("2")')
+    await addScriptStep(app, 'Step 3', 'print("3")')
 
     // Layout to position nodes
     await triggerLayout(app)
 
-    // Verify all nodes are visible — three successful addScriptNode calls prove
+    // Verify all steps are visible — three successful addScriptStep calls prove
     // three edges were sequentially created (each call clicks an edge overlay button).
-    await verifyNodeVisible(app, 'Node 1')
-    await verifyNodeVisible(app, 'Node 2')
-    await verifyNodeVisible(app, 'Node 3')
+    await verifyStepVisible(app, 'Step 1')
+    await verifyStepVisible(app, 'Step 2')
+    await verifyStepVisible(app, 'Step 3')
   } finally {
     await deleteWorkflow(app, workflowName)
   }
@@ -519,12 +519,12 @@ test('edge follows connection path between nodes', async ({ app }) => {
   await createWorkflowWithTrigger(app, workflowName)
 
   try {
-    await closeNodeEditorPanel(app)
+    await closeStepEditorPanel(app)
     await expect(app.getByText('Manual trigger')).toBeVisible()
 
     // Add two nodes - auto-connected: Manual trigger -> Start Node -> End Node
-    await addScriptNode(app, 'Start Node', 'print("start")')
-    await addScriptNode(app, 'End Node', 'print("end")')
+    await addScriptStep(app, 'Start Node', 'print("start")')
+    await addScriptStep(app, 'End Node', 'print("end")')
 
     // Verify edge path exists and has SVG path data.
     // ReactFlow edge paths are SVG <path> elements with no accessible role — use the DOM API directly.
@@ -546,22 +546,22 @@ test('connected nodes form a workflow DAG', async ({ app }) => {
   await createWorkflowWithTrigger(app, workflowName)
 
   try {
-    await closeNodeEditorPanel(app)
+    await closeStepEditorPanel(app)
     await expect(app.getByText('Manual trigger')).toBeVisible()
 
     // Add nodes that will form a linear DAG: Manual Trigger -> Script 1 -> Script 2
-    await addScriptNode(app, 'Processing Step', 'print("processing")')
-    await addScriptNode(app, 'Final Step', 'print("final")')
+    await addScriptStep(app, 'Processing Step', 'print("processing")')
+    await addScriptStep(app, 'Final Step', 'print("final")')
 
     // Layout to visualize the DAG
     await triggerLayout(app)
 
     // Verify all DAG nodes are present and visible after layout.
-    // DAG structure (trigger→processing→final) is proven by addScriptNode succeeding
+    // DAG structure (trigger→processing→final) is proven by addScriptStep succeeding
     // for each node — each call clicks an edge overlay button that only exists on a connected edge.
-    await verifyNodeVisible(app, 'Manual trigger')
-    await verifyNodeVisible(app, 'Processing Step')
-    await verifyNodeVisible(app, 'Final Step')
+    await verifyStepVisible(app, 'Manual trigger')
+    await verifyStepVisible(app, 'Processing Step')
+    await verifyStepVisible(app, 'Final Step')
   } finally {
     await deleteWorkflow(app, workflowName)
   }
