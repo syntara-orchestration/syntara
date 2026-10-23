@@ -9,8 +9,9 @@
 #      script runs from the syntara checkout, so the manifest falls back to
 #      the staged Execution Plane tree at ${HOME}/syntara-execution-plane.
 #   2. Waits for the operator EP API and worker.
-#   3. Opens backend ingress from execution-plane-worker and allows the
-#      operator callback CN on the AO backend before EP starts posting.
+#   3. Allows the operator callback CN on the AO backend before EP starts
+#      posting (the backend NetworkPolicy itself now admits the EP worker
+#      callback ingress; operator AAP-90779-ep-from-source).
 #   4. Sets EP_COMPLETION_CALLBACK_URL and
 #      EP_CREDENTIAL_RESOLUTION_CALLBACK_URL to AO's
 #      /api/execution_plane/v1/commands ingress.
@@ -185,38 +186,6 @@ _wait_for_operator_ep() {
     exit 1
   fi
   kubectl get pods -n "${AO_NAMESPACE}" -l "app.kubernetes.io/component in (execution-plane-api,execution-plane-worker)" -o wide
-}
-
-_allow_ep_callback_ingress() {
-  echo "=== Allow ${EP_WORKER_DEPLOY} callback into ${AO_NAME}-backend ==="
-  # Additive to the operator policies: myao-backend only admits UI/worker/
-  # background-worker/backend, so the EP worker completion POST is dropped
-  # (httpx ConnectTimeout) until this rule exists.
-  kubectl apply -f - <<EOF
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: allow-execution-plane-callback
-  namespace: ${AO_NAMESPACE}
-spec:
-  podSelector:
-    matchLabels:
-      app.kubernetes.io/component: backend
-      app.kubernetes.io/instance: ${AO_NAME}
-      app.kubernetes.io/managed-by: automation-orchestrator-operator
-  policyTypes:
-    - Ingress
-  ingress:
-    - from:
-        - podSelector:
-            matchLabels:
-              app.kubernetes.io/component: execution-plane-worker
-              app.kubernetes.io/instance: ${AO_NAME}
-              app.kubernetes.io/managed-by: automation-orchestrator-operator
-      ports:
-        - protocol: TCP
-          port: 8000
-EOF
 }
 
 _configure_ep_callback_url() {
@@ -513,7 +482,6 @@ chmod 600 "${WORK_DIR}/jwt-primary.pem"
 AO_JWT_ISSUER=$(_ao_jwt_issuer)
 echo "AO JWT issuer: ${AO_JWT_ISSUER}"
 
-_allow_ep_callback_ingress
 _allow_ep_callback_identity
 _configure_ep_callback_url
 _register_cluster_binding "${AO_JWT_ISSUER}" "${CREDENTIAL_REF}"
