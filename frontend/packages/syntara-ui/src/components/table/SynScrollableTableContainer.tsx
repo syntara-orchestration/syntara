@@ -28,16 +28,8 @@ type SynScrollableTableContainerProps = {
   isExpandable?: boolean
   /** Opt out of fixed table layout when not expandable */
   useFixedLayout?: boolean
-  /**
-   * PatternFly compact table density. Defaults to `true` for resource list tables.
-   * Workflow execution view tables set {@link useCompactTableStyles} to `false` only.
-   */
+  /** PatternFly compact table density. Defaults to `true` for resource list tables (AAP-96518). */
   isCompact?: boolean
-  /**
-   * Applies agreed compact cell/header token overrides (AAP-96518). Defaults to `true`.
-   * Set `false` on workflow execution view tables to keep PF compact without prototype padding rules.
-   */
-  useCompactTableStyles?: boolean
   /** Direct PatternFly {@link Table} variant override. Prefer {@link isCompact}. */
   variant?: TableProps['variant']
   /** Alternating row colors. Forwarded to PatternFly {@link Table}. */
@@ -59,20 +51,13 @@ export function SynScrollableTableContainer({
   isExpandable,
   useFixedLayout = true,
   isCompact = true,
-  useCompactTableStyles = true,
   variant,
   isStriped,
 }: SynScrollableTableContainerProps) {
   const useFixed = !isExpandable && useFixedLayout
   const { scrollRef, wrapperRef } = useScrollOverflow()
   const tableVariant = variant ?? (isCompact ? 'compact' : undefined)
-  const tableClassNames = [
-    styles.table,
-    useFixed ? styles.tableFixedLayout : undefined,
-    useCompactTableStyles ? styles.tableCompactPresentation : undefined,
-  ]
-    .filter(Boolean)
-    .join(' ')
+  const tableClassName = useFixed ? `${styles.table} ${styles.tableFixedLayout}` : styles.table
   const pinnedFooter = footer ? <PaginationFooter {...footer} /> : footerContent
   const scrollWrapperClassName = pinnedFooter
     ? `${styles.scrollWrapper} ${styles.scrollWrapperHasFooter}`
@@ -96,7 +81,7 @@ export function SynScrollableTableContainer({
                 isExpandable={isExpandable}
                 isStriped={isStriped}
                 variant={tableVariant}
-                className={tableClassNames}
+                className={tableClassName}
               >
                 <Caption className="pf-v6-u-screen-reader">{caption}</Caption>
                 {children}

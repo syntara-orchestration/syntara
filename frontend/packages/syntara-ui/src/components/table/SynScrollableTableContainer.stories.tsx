@@ -121,7 +121,6 @@ const meta: Meta<typeof SynScrollableTableContainer> = {
           '(disables `table-layout: fixed`).\n' +
           '- `useFixedLayout` — opt out of fixed layout for non-expandable tables (rarely needed).\n' +
           '- `isCompact` — PatternFly compact table density (default `true` for resource lists).\n' +
-          '- `useCompactTableStyles` — prototype cell/header tokens (default `true`; execution view tables use `false`).\n' +
           '- `variant` — direct PatternFly density override; prefer `isCompact`.\n' +
           '- `isStriped` — alternating row colors (PatternFly `Table` striping).\n' +
           '- `footer` — pass `PaginationFooterProps` to render a `PaginationFooter` below the table.\n' +

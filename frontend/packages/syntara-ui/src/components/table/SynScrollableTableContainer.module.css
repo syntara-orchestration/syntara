@@ -133,19 +133,3 @@
 .tableFixedLayout {
   table-layout: fixed;
 }
-
-/*
- * Resource list compact presentation (AAP-96518). Not applied to workflow execution view tables.
- */
-.tableCompactPresentation {
-  --pf-v6-c-table--cell--PaddingBlockStart: var(--pf-t--global--spacer--sm);
-  --pf-v6-c-table--cell--PaddingBlockEnd: var(--pf-t--global--spacer--sm);
-}
-
-.tableCompactPresentation :global(thead th) {
-  vertical-align: middle;
-}
-
-.tableCompactPresentation :global(.pf-v6-c-table__button) {
-  margin: 0;
-}
