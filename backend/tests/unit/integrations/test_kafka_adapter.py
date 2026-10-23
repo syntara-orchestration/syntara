@@ -12,7 +12,7 @@ import pytest
 from aiokafka.client import AIOKafkaClient
 from aiokafka.errors import AuthenticationFailedError, KafkaConnectionError, KafkaError, KafkaTimeoutError
 
-from syntara.integrations.adapters.kafka import KafkaAdapter
+from syntara.integrations.adapters.kafka import KafkaAdapter, KafkaAuthenticationConfigurationError
 from syntara.integrations.adapters.protocol import HealthCheckErrorType, IntegrationAdapter
 from syntara.integrations.models.integration_configuration import KafkaConfiguration
 
@@ -136,6 +136,8 @@ class TestKafkaValidateAuth:
             {"kafka_username": "user", "kafka_password": ""},
             {"kafka_username": "user", "kafka_password": "   "},
             {"kafka_username": "  ", "kafka_password": "secret"},
+            {"kafka_username": "user", "kafka_password": " \t"},
+            {"kafka_username": None, "kafka_password": "secret"},
         ],
     )
     async def test_missing_credentials_are_auth_failure(
@@ -148,6 +150,18 @@ class TestKafkaValidateAuth:
         constructor.assert_not_called()
         assert result.success is False
         assert result.error_type == HealthCheckErrorType.AUTH_FAILURE
+
+    def test_connection_options_reject_blank_credentials_before_tls_setup(
+        self, kafka_config: KafkaConfiguration
+    ) -> None:
+        """Direct helper callers receive the same validation before resource setup."""
+        adapter = KafkaAdapter(kafka_config)
+        with patch.object(adapter, "_ssl_context") as tls:
+            with pytest.raises(
+                KafkaAuthenticationConfigurationError, match="Authentication configuration is incomplete"
+            ):
+                adapter.connection_options({"kafka_username": "user", "kafka_password": " \t"}, 10)
+        tls.assert_not_called()
 
 
 class TestKafkaValidateErrors:

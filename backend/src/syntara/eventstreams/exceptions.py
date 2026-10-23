@@ -9,6 +9,15 @@ class EventStreamError(SyntaraError):
     """Base exception for all event stream subscription errors."""
 
 
+@fastapi_exception(handler="syntara.eventstreams.error_handlers.event_subscription_not_found_handler")
+class EventSubscriptionNotFoundError(EventStreamError):
+    """No current subscription exists within the requested workflow/project."""
+
+    def __init__(self) -> None:
+        """Use the same safe response for absent, retired and unrelated IDs."""
+        super().__init__("Event subscription not found")
+
+
 @fastapi_exception(handler="syntara.eventstreams.error_handlers.event_subscription_in_use_error_handler")
 class EventSubscriptionInUseError(EventStreamError):
     """Raised when deleting a resource still bound by event-subscription evidence.
