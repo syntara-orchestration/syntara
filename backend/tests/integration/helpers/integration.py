@@ -10,6 +10,7 @@ from syntara.integrations.models.integration import Integration, IntegrationType
 from syntara.integrations.models.integration_configuration import (
     AAPConfiguration,
     IntegrationConfigurationTypes,
+    KafkaConfiguration,
     LLMProviderConfiguration,
     MCPServerConfiguration,
 )
@@ -30,6 +31,7 @@ class IntegrationFactory:
         enabled: bool = True,
         integration_type: IntegrationType = IntegrationType.MCP_SERVER,
         base_url: str = "https://example.com",
+        bootstrap_servers: list[str] | None = None,
     ) -> Integration:
         """Create a single Integration directly in the DB.
 
@@ -37,7 +39,9 @@ class IntegrationFactory:
             name: Integration name (auto-generated if not provided)
             enabled: Whether the integration is enabled
             integration_type: Integration type enum value
-            base_url: Base URL for the integration endpoint
+            base_url: Base URL for the integration endpoint (ignored for Kafka)
+            bootstrap_servers: Kafka bootstrap servers (only used for Kafka; defaults
+                to a single placeholder broker)
 
         Returns:
             Flushed (but not committed) Integration instance.
@@ -62,6 +66,10 @@ class IntegrationFactory:
             configuration = AAPConfiguration(
                 integration_type="ansible_automation_platform",
                 base_url=base_url,
+            )
+        elif integration_type == IntegrationType.KAFKA:
+            configuration = KafkaConfiguration(
+                bootstrap_servers=bootstrap_servers or ["broker.example.com:9093"],
             )
         else:
             assert_never(integration_type)

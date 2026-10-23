@@ -87,12 +87,14 @@ ALLOWED_CREDENTIAL_TYPES: dict[IntegrationType, frozenset[str]] = {
     IntegrationType.MCP_SERVER: frozenset({"HTTP Bearer Token"}),
     IntegrationType.LLM_PROVIDER: frozenset({"LLM Provider"}),
     IntegrationType.ANSIBLE_AUTOMATION_PLATFORM: frozenset({"Ansible Automation Platform"}),
+    IntegrationType.KAFKA: frozenset({"Kafka"}),
 }
 
 CREDENTIAL_REQUIRED_TYPES: frozenset[IntegrationType] = frozenset(
     {
         IntegrationType.LLM_PROVIDER,
         IntegrationType.ANSIBLE_AUTOMATION_PLATFORM,
+        IntegrationType.KAFKA,
     }
 )
 
@@ -405,7 +407,7 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
         )
 
     def _validate_configuration_ssrf(self, configuration: IntegrationConfigurationInputTypes) -> None:
-        """Reject a base_url that resolves to a private, reserved, or cloud metadata address.
+        """Reject an address that resolves to a private, reserved, or cloud metadata address.
 
         Called at write time (create/patch) and again in this service's outbound
         entrypoints (discover/validate/refresh) as defense in depth against DNS re-pointing.
@@ -421,7 +423,8 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
         try:
             validate_integration_configuration_no_ssrf(configuration)
         except ValueError as e:
-            msg = "base_url must not resolve to a private, reserved, or cloud metadata address."
+            target = "bootstrap_servers" if getattr(configuration, "bootstrap_servers", None) else "base_url"
+            msg = f"{target} must not resolve to a private, reserved, or cloud metadata address."
             raise SafeValueError(msg) from e
 
     async def create_integration(self, data: IntegrationCreate) -> IntegrationRead:
@@ -878,12 +881,13 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
         await self.session.commit()
 
         timeout_seconds: int = await get_runtime_settings().get("integrations.connection_test_timeout_seconds")
-        # Re-check at call time (defense in depth): the stored base_url passed the write-time
-        # check, but DNS could have been re-pointed to a private/metadata target since.
-        self._validate_configuration_ssrf(integration.configuration)
-        adapter = create_health_check_adapter(integration.integration_type, integration.configuration)
 
         try:
+            # Inside the handler that persists ERROR. A broker DNS/SSRF failure
+            # raises, and leaving it here would skip that update and leave the
+            # row in VALIDATING. Build the adapter only after that check.
+            self._validate_configuration_ssrf(integration.configuration)
+            adapter = create_health_check_adapter(integration.integration_type, integration.configuration)
             result = await adapter.validate(resolved_credential, timeout_seconds)
 
             integration = await self._get_or_raise(integration_id, for_update=True)
@@ -1020,13 +1024,13 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
         await self.session.commit()
 
         timeout_seconds: int = await get_runtime_settings().get("integrations.connection_test_timeout_seconds")
-        # Re-check at call time (defense in depth): the stored base_url passed the write-time
-        # check, but DNS could have been re-pointed to a private/metadata target since.
-        self._validate_configuration_ssrf(integration.configuration)
-        adapter = create_health_check_adapter(integration.integration_type, integration.configuration)
 
         synced = updated = missing = 0
         try:
+            # Same placement as validate: a DNS/SSRF failure must reach the
+            # handler that records refresh ERROR instead of leaving REFRESHING.
+            self._validate_configuration_ssrf(integration.configuration)
+            adapter = create_health_check_adapter(integration.integration_type, integration.configuration)
             discover_result = await adapter.discover(resolved_credential, timeout_seconds)
 
             if not discover_result.success:

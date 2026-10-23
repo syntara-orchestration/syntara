@@ -97,6 +97,27 @@ describe('integrationUtils', () => {
       expect(getBaseUrl(integration)).toBe('https://gateway.example.com')
     })
 
+    it('joins Kafka bootstrap servers', () => {
+      const integration = buildIntegration({
+        integration_type: 'kafka',
+        configuration: null,
+        kafka_configuration: {
+          integration_type: 'kafka',
+          bootstrap_servers: ['broker.example.com:9093', 'other.example.com:9092'],
+        },
+      })
+      expect(getBaseUrl(integration)).toBe('broker.example.com:9093, other.example.com:9092')
+    })
+
+    it('returns an empty string when a Kafka integration has no stored configuration', () => {
+      const integration = buildIntegration({
+        integration_type: 'kafka',
+        configuration: null,
+        kafka_configuration: null,
+      })
+      expect(getBaseUrl(integration)).toBe('')
+    })
+
     it('returns empty string when configuration is undefined', () => {
       expect(getBaseUrl(buildIntegration({ configuration: undefined }))).toBe('')
     })
