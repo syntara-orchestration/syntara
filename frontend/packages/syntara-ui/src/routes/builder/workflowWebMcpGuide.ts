@@ -52,8 +52,8 @@ const WORKFLOW_GUIDES: Record<string, WorkflowGuideSection> = {
     summary:
       'Triggers start an execution. Syntara supports manual, webhook, Event-Driven Ansible (EDA), and scheduled triggers.',
     key_points: [
-      'A workflow can define multiple triggers, but each execution selects one.',
-      'The WebMCP draft creator currently adds one manual trigger.',
+      'A workflow can define multiple triggers, but each execution selects one. The draft tool supports manual, scheduled, webhook, and EDA triggers.',
+      'Trigger parameters use backend keys: input_schema for manual/webhook/EDA; schedule_type with cron or interval for scheduled; webhook_path and authorized_service_account_ids for webhook/EDA.',
     ],
   },
   step_types: {
@@ -61,16 +61,18 @@ const WORKFLOW_GUIDES: Record<string, WorkflowGuideSection> = {
     summary:
       'The builder includes AI agent, approval, script, HTTP request, Ansible Automation Platform (AAP) job and workflow job, condition, switch, loop, wait, and converge steps.',
     key_points: [
-      'WebMCP draft creation currently supports AI agent, approval, AAP job, AAP workflow job, and HTTP request steps, up to ten in sequence.',
-      'Draft creation follows the approved path after an approval. Use the canvas to add a rejected route or other branching.',
+      'WebMCP draft creation supports every user-selectable builder node type: agentic, script, http_request, aap_job_template, aap_workflow_job_template, approval, condition, switch, loop, wait, and converge.',
+      'Use nodes plus edges to build branches, parallel paths, and loop bodies. The steps shortcut remains for simple ordered chains of agentic, approval, AAP, and HTTP request nodes.',
+      'Generic placeholders and internal_activity are not user-selectable workflow steps; the builder uses them for incomplete loop bodies or system workflows.',
     ],
   },
   configuring_steps: {
     title: 'Configuring workflow steps',
     summary: 'Step settings depend on the selected node type and the integrations configured for its project.',
     key_points: [
-      'AI agent steps require a prompt; choose a model and tool access when needed. Approval steps can specify a prompt and approvers.',
-      'AAP steps need a configured integration, credential reference, and job template ID or name. HTTP steps need a method and URL.',
+      'Pass node parameters in backend format: scripts use language/code; HTTP uses method/url/headers/body; agents use prompt/model/tool selections; approval uses prompt/approvers; AAP uses template and integration references.',
+      'Condition uses a condition expression; switch uses cases with case_0 ports and a default port; loop uses type for_each with items or do_while with condition; wait uses duration; converge uses strategy all/any. Put timeout and retry_policy in node settings.',
+      'Edges use node IDs or trigger-0, trigger-1 references. Branch handles are true/false, case_0/default, approved/rejected, and loop/done. Use target_handle end for a loop-back edge.',
       'Use credential references, never secret values, in tool inputs. Later steps can reference trigger or earlier-step outputs with expressions.',
     ],
   },

@@ -9,8 +9,9 @@ import { detachPromise } from '../../utils/detachPromise'
 import type { BuilderAction } from './builderReducer'
 import type { EdgeConnection } from './types/edge'
 import { buildWorkflowDefinition } from './utils/workflowDefinitionBuilder'
-import { buildWorkflowDraft, validateWorkflowDraft, WEBMCP_WORKFLOW_STEP_TYPES } from './workflowWebMcp'
+import { buildWorkflowDraft, validateWorkflowDraft } from './workflowWebMcp'
 import { getWorkflowGuide, WORKFLOW_GUIDE_SCHEMA, WORKFLOW_GUIDE_TOPICS } from './workflowWebMcpGuide'
+import { DRAFT_SCHEMA } from './workflowWebMcpSchema'
 
 type WorkflowWebMcpToolsProps = {
   isNew: boolean
@@ -43,38 +44,6 @@ type ModelContext = {
 type CurrentActions = WorkflowWebMcpToolsProps
 
 const EMPTY_SCHEMA = { type: 'object', properties: {}, additionalProperties: false }
-
-const DRAFT_SCHEMA = {
-  type: 'object',
-  required: ['name', 'description', 'steps'],
-  additionalProperties: false,
-  properties: {
-    name: { type: 'string', maxLength: 255, description: 'Workflow name.' },
-    description: { type: 'string', maxLength: 1024, description: 'What the workflow does.' },
-    steps: {
-      type: 'array',
-      minItems: 1,
-      maxItems: 10,
-      description:
-        'Ordered workflow steps. Supported types: agentic, approval, aap_job_template, aap_workflow_job_template, http_request. Use backend parameter keys and credential references; do not provide secret values.',
-      items: {
-        type: 'object',
-        required: ['type', 'name'],
-        additionalProperties: false,
-        properties: {
-          type: { type: 'string', enum: WEBMCP_WORKFLOW_STEP_TYPES },
-          name: { type: 'string', maxLength: 255 },
-          parameters: {
-            type: 'object',
-            additionalProperties: true,
-            description:
-              'Node parameters in Syntara backend format. Example agentic keys: prompt, llm_model_id, tool_selection_strategy, tool_selections, integration_connections. Example approval keys: prompt, approver_users, approver_groups. AAP nodes use job_template_name or workflow_job_template_name and integration_id. HTTP nodes use method and url.',
-          },
-        },
-      },
-    },
-  },
-}
 
 const RUN_SCHEMA = {
   type: 'object',
@@ -197,7 +166,7 @@ function createGetBuilderStateTool(actionsRef: { current: CurrentActions }): Too
   return {
     name: 'get_workflow_builder_state',
     description:
-      'Read the open Syntara workflow builder: workflow title, selected project, trigger and step names, dirty state, and available actions. Does not reveal node parameters or credentials.',
+      'Read the open Syntara workflow builder: workflow title, selected project, trigger and step names/types, graph connections and branch handles, dirty state, and available actions. Does not reveal node parameters or credentials.',
     inputSchema: EMPTY_SCHEMA,
     annotations: { readOnlyHint: true, untrustedContentHint: true, consequentialHint: false },
     execute: () => {
@@ -218,6 +187,12 @@ function createGetBuilderStateTool(actionsRef: { current: CurrentActions }): Too
           name: trigger.name,
         })),
         steps: activities.map((activity) => ({ id: activity.id, type: activity.type, name: activity.name })),
+        connections: store.edges.map((edge) => ({
+          source: edge.source,
+          source_handle: edge.sourceHandle ?? null,
+          target: edge.target,
+          target_handle: edge.targetHandle ?? null,
+        })),
         ready: currentWorkflow !== null,
       }
     },
@@ -248,7 +223,7 @@ function createWorkflowDraftTool(actionsRef: { current: CurrentActions }): ToolD
   return {
     name: 'create_workflow_draft',
     description:
-      'On an empty new workflow builder, create a manual-trigger workflow with the supplied steps connected in order. Supports AI agent, approval, AAP job, AAP workflow job, and HTTP request nodes. This edits the canvas only; it does not save or run the workflow.',
+      'On an empty new workflow builder, create a workflow draft with any user-selectable builder trigger and node type. Use nodes plus edges for scripts, HTTP requests, agents, AAP, approvals, conditions, switches, loops, waits, and converges. The legacy steps shortcut creates a simple chain. This edits the canvas only; it does not save or run the workflow.',
     inputSchema: DRAFT_SCHEMA,
     annotations: { readOnlyHint: false, untrustedContentHint: true, consequentialHint: false },
     execute: (input) => {
@@ -278,12 +253,23 @@ function createWorkflowDraftTool(actionsRef: { current: CurrentActions }): ToolD
         name: result.name,
         description: result.description,
         trigger_count: result.workflow.triggers?.length ?? 0,
+        triggers: result.workflow.triggers?.map((trigger, index) => ({
+          index,
+          type: trigger.type,
+          name: trigger.name,
+        })),
         steps: result.workflow.workflow.activities.map((activity) => ({
           id: activity.id,
           type: activity.type,
           name: activity.name,
         })),
-        message: 'Draft added to the canvas. Review node configuration, validate, then save it.',
+        connections: result.edges.map((edge) => ({
+          source: edge.source,
+          source_handle: edge.sourceHandle,
+          target: edge.target,
+          target_handle: edge.targetHandle,
+        })),
+        message: 'Draft graph added to the canvas. Review node configuration and connections, validate, then save it.',
       }
     },
   }
