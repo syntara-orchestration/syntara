@@ -124,7 +124,7 @@ function stripControlCharacters(value: string): string {
     .join('')
 }
 
-function cleanText(value: unknown, label: string, maxLength: number): string {
+export function cleanText(value: unknown, label: string, maxLength: number): string {
   if (typeof value !== 'string') throw new Error(`${label} must be text.`)
   const cleaned = stripControlCharacters(value).trim()
   if (cleaned.length === 0) throw new Error(`${label} is required.`)
@@ -170,7 +170,7 @@ function validateJsonValue(value: unknown, path: string, depth = 0, ancestors = 
   validateJsonObject(value, path, depth, ancestors)
 }
 
-function copyParameterObject(value: unknown, path: string): Record<string, unknown> {
+export function copyParameterObject(value: unknown, path: string): Record<string, unknown> {
   if (!isRecord(value)) throw new Error(`${path} must be an object.`)
   validateJsonValue(value, path)
   return structuredClone(value)
@@ -195,7 +195,7 @@ function cleanEntityId(value: unknown, label: string): string {
   return id
 }
 
-function findSupportedType<T extends readonly string[]>(types: T, value: unknown): T[number] | null {
+export function findSupportedType<T extends readonly string[]>(types: T, value: unknown): T[number] | null {
   if (typeof value !== 'string') return null
   return types.find((type) => type === value) ?? null
 }
