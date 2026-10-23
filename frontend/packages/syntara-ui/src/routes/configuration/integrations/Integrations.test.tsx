@@ -37,10 +37,6 @@ vi.mock('../../../hooks/useFilterState', async (importOriginal) => {
 const mockSearchParams = new URLSearchParams()
 const mockSetSearchParams = vi.fn()
 
-vi.mock('wouter', () => ({
-  useLocation: () => ['/configuration/integrations', routerTestState.navigate],
-}))
-
 vi.mock('../../../hooks/routing/useLocation', () => ({
   useLocation: () => '/configuration/integrations',
 }))

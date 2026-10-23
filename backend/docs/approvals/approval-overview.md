@@ -564,7 +564,7 @@ Both approver lists (`approver_user_ids` and `approver_group_ids`) support up to
 
 **Related Documentation:**
 
-- [Approval API Specification](../../src/syntara/schemas/approvals/openapi.yaml)
+- [Approval API Specification](https://github.com/syntara-orchestration/syntara/blob/devel/backend/src/syntara/schemas/approvals/openapi.yaml)
 - [Workflow Definition Guide](../workflow-engine/workflow-definition-guide.md)
 - [Authorization Overview](../authorization.md)
 - [Approval Authorization Model](./approval-authorization-model.md)

@@ -44,7 +44,15 @@ _EXTERNAL_SCHEMAS = {"execution_plane"}
 def include_object(
     obj: SchemaItem,
     name: str | None,  # noqa: ARG001
-    type_: Literal["schema", "table", "column", "index", "unique_constraint", "foreign_key_constraint"],
+    type_: Literal[
+        "schema",
+        "table",
+        "column",
+        "index",
+        "unique_constraint",
+        "foreign_key_constraint",
+        "check_constraint",
+    ],
     reflected: bool,  # noqa: ARG001, FBT001
     compare_to: SchemaItem | None,  # noqa: ARG001
 ) -> bool:

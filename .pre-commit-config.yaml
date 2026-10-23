@@ -32,6 +32,7 @@ repos:
       - id: check-yaml
         # Kubernetes manifests are multi-document (`---` separated).
         exclude: ^backend/docs/execution-plane/execution-plane-init\.yaml$
+        args: [--unsafe]
       - id: mixed-line-ending
         args: [--fix=lf]
 

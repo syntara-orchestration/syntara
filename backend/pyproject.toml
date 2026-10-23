@@ -46,7 +46,7 @@ dependencies = [
     "langchain-mcp-adapters>=0.1.0,<0.2.0",
     "langgraph>=1.2.4",
     "boto3>=1.35.0",
-    "filelock>=3.20.0",
+    "filelock>=4.2.1",
     "pypandoc>=1.14",
     "tiktoken>=0.5.0",
     "tzdata>=2024.1",
@@ -318,7 +318,6 @@ markers = [
     "k8s_required: marks tests that need KUBECONFIG + PERF_K8S_NAMESPACE to reach a Kubernetes cluster",
     "ssrf_enforced: keep write-time SSRF base_url validation active (opt out of the autouse bypass)",
     "xfail_from_url: dynamically applied by --xfail-from-url from a remote URL",
-    "requires_httpbin: marks tests that need httpbin reachable at runtime (skipped if unreachable)",
 ]
 
 # Coverage configuration

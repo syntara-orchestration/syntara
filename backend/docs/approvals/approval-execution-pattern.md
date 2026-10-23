@@ -173,7 +173,7 @@ This is triggered by the `asyncio.CancelledError` exception handler in the workf
 
 **Related Documentation**:
 
-- [Approval API Specification](../../src/syntara/schemas/approvals/openapi.yaml)
-- [Workflow Executions API](../../src/syntara/schemas/workflows/v2/executions_openapi.yaml)
+- [Approval API Specification](https://github.com/syntara-orchestration/syntara/blob/devel/backend/src/syntara/schemas/approvals/openapi.yaml)
+- [Workflow Executions API](https://github.com/syntara-orchestration/syntara/blob/devel/backend/src/syntara/schemas/workflows/v2/executions_openapi.yaml)
 - [Approval Overview](./approval-overview.md)
 - [Approval Authorization Model](./approval-authorization-model.md)

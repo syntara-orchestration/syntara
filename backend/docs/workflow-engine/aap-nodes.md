@@ -35,7 +35,7 @@ sequenceDiagram
 
 ### Why Fire-and-Poll (Not Webhooks)?
 
-AAP lacks an outbound webhook/callback mechanism to notify Temporal of job completion. For the general rationale behind fire-and-poll (vs. async completion), see [Workflow Engine Overview — Execution Patterns](workflow-engine-overview.md#execution-patterns). The detailed mechanics — heartbeat-based early output, two-phase probe, and poll loop — are specific to AAP and documented below.
+AAP lacks an outbound webhook/callback mechanism to notify Temporal of job completion. For the general rationale behind fire-and-poll (vs. async completion), see [Workflow Engine Overview — Execution Patterns](workflow-engine-overview.md#why-fire-and-poll-for-aap-job-template). The detailed mechanics — heartbeat-based early output, two-phase probe, and poll loop — are specific to AAP and documented below.
 
 Poll interval is configurable via `aap_poll_interval_seconds`.
 

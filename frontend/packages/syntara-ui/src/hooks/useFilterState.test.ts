@@ -5,7 +5,7 @@ import type { FilterConfig } from '../types/filters'
 
 import { useFilterState } from './useFilterState'
 
-// Mock wouter's useSearchParams
+// Mock the URL search params hook
 const mockSetSearchParams = vi.fn()
 let mockSearchParams = new URLSearchParams()
 

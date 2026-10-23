@@ -147,8 +147,97 @@ describe('useApprovalsData', () => {
       'get',
       '/approvals',
       { params: { query: { sort: 'workflow_name', limit: 20, include_total: true } } },
-      { enabled: true }
+      expect.objectContaining({ enabled: true })
     )
+    const queryOptions = vi.mocked(approvalsClient.useQuery).mock.calls[0]?.[3] as { placeholderData?: unknown }
+    expect(typeof queryOptions?.placeholderData).toBe('function')
+  })
+
+  it('keeps previous list data while sort or filter query params change', async () => {
+    const { approvalsClient } = await import('../../client')
+
+    renderHook(
+      () =>
+        useApprovalsData({
+          projectSelectorReady: true,
+          isAllProjects: true,
+          stableProjectId: null,
+          queryParams: { sort: '-created_at' },
+          projects: mockProjects,
+        }),
+      { wrapper: createWrapper() }
+    )
+
+    expect(approvalsClient.useQuery).toHaveBeenCalledWith(
+      'get',
+      '/approvals',
+      { params: { query: { sort: '-created_at' } } },
+      expect.objectContaining({ enabled: true })
+    )
+    const queryOptions = vi.mocked(approvalsClient.useQuery).mock.calls[0]?.[3] as { placeholderData?: unknown }
+    expect(typeof queryOptions?.placeholderData).toBe('function')
+  })
+
+  it('does not keep placeholder data from a different project scope', async () => {
+    const { accessClient } = await import('../access/accessClient')
+
+    renderHook(
+      () =>
+        useApprovalsData({
+          projectSelectorReady: true,
+          isAllProjects: false,
+          stableProjectId: 'project-2',
+          queryParams: {},
+          projects: mockProjects,
+        }),
+      { wrapper: createWrapper() }
+    )
+
+    const options = vi.mocked(accessClient.useQuery).mock.calls[0]?.[3] as {
+      placeholderData?: (data: unknown, query: { queryKey: unknown[] }) => unknown
+    }
+    const placeholder = options?.placeholderData
+    const previous = { resources: [mockApproval1] }
+    const previousQuery = {
+      queryKey: [
+        'get',
+        '/projects/{project_id}/approvals',
+        { params: { path: { project_id: 'project-1' }, query: {} } },
+      ],
+    }
+    expect(placeholder?.(previous, previousQuery)).toBeUndefined()
+  })
+
+  it('strips stale pagination cursors from listDataForPagination while placeholder data is active', async () => {
+    const { approvalsClient } = await import('../../client')
+
+    vi.mocked(approvalsClient.useQuery).mockReturnValue({
+      data: { resources: [mockApproval1], next: 'stale-next', prev: 'stale-prev', total: 50 },
+      isLoading: false,
+      isError: false,
+      error: null,
+      isFetching: true,
+      isPlaceholderData: true,
+      refetch: vi.fn(),
+    })
+
+    const { result } = renderHook(
+      () =>
+        useApprovalsData({
+          projectSelectorReady: true,
+          isAllProjects: true,
+          stableProjectId: null,
+          queryParams: { sort: 'workflow_name' },
+          projects: mockProjects,
+        }),
+      { wrapper: createWrapper() }
+    )
+
+    await waitFor(() => {
+      expect(result.current.listDataForPagination?.next).toBeNull()
+      expect(result.current.listDataForPagination?.prev).toBeNull()
+      expect(result.current.listDataForPagination?.total).toBeNull()
+    })
   })
 
   it('uses approval ID as fallback for approvalName when name is missing', async () => {
