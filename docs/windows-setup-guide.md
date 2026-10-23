@@ -87,7 +87,7 @@ uv pip install python-magic-bin
 
 ### 6. Temporal worker crashes with `NotImplementedError` on Windows
 
-**Symptom:** `uv run python -m syntara.workflows.worker` raises `NotImplementedError` at `loop.add_signal_handler(signal.SIGINT, ...)`.
+**Symptom:** `uv run python -m syntara.workflow_runtime.workers.worker` raises `NotImplementedError` at `loop.add_signal_handler(signal.SIGINT, ...)`.
 
 **Root cause:** `asyncio.add_signal_handler()` is not implemented on Windows.
 

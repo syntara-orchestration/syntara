@@ -7,6 +7,7 @@ from temporalio import activity
 from temporalio.exceptions import ApplicationError
 
 from syntara.workflow_core.models import ActivityName, ConditionOutput
+from syntara.workflow_runtime.engines.temporal.activities.output_mapping import dump_output
 from syntara.workflow_runtime.engines.unified_eval import safe_eval_with_namespace
 
 
@@ -69,7 +70,7 @@ async def condition(
         output = ConditionOutput(evaluated_result=evaluated_result)
 
         return {
-            "output": output.dump(output_config),
+            "output": dump_output(output, output_config),
             "control": {
                 "next_port": "true" if evaluated_result else "false",
             },

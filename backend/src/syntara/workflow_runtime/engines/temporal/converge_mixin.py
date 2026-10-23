@@ -255,7 +255,9 @@ class WorkflowConvergeMixin:
         self.failed_nodes[node_id] = error_msg
         self.skipped_nodes.discard(node_id)
         output_model_class = NODE_OUTPUT_MODELS.get(node.type)
-        fail_output = output_model_class().dump(node.outputs) if output_model_class else {}
+        # Failure handling runs in workflow code, so avoid evaluating the user
+        # mapping again after an activity has already reported its error.
+        fail_output = output_model_class().model_dump() if output_model_class else {}
         fail_output["status"] = "failed"
         fail_output["error"] = error_msg
         self.resolver.set_namespace(node_id, fail_output)
