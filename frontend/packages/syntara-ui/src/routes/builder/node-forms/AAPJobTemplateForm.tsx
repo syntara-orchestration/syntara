@@ -271,14 +271,16 @@ export function AAPJobTemplateForm(props: Readonly<AAPNodeFormProps>) {
     ...initialData,
     use_input_variables:
       initialData?.use_input_variables === true ||
+      // extra_vars is excluded: dragging an input variable into it is supported
+      // while the template is still selected normally, so it must not alone
+      // flip the node into full expression mode.
       hasExpressionValue(
         initialData?.organization_name,
         initialData?.job_template_name,
         initialData?.inventory_name,
         initialData?.limit,
         initialData?.tags,
-        initialData?.skip_tags,
-        initialData?.extra_vars
+        initialData?.skip_tags
       ),
   }
 

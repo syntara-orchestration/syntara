@@ -569,7 +569,10 @@ describe('AAPNodeForm', () => {
       expect(screen.getByPlaceholderText('{"key": "value"} or drag expression')).toBeInTheDocument()
     })
 
-    it('enables the toggle and shows extra_vars when loading saved extra_vars expressions', () => {
+    // AAP-95762: extra_vars supports dragging an input variable into it while the
+    // template is still selected normally (by job_template_id), so an expression
+    // there alone must not flip the node into full expression mode.
+    it('does not enable the toggle for extra_vars expressions and still shows the saved value', () => {
       const savedExtraVars = '{"app_version": "${inputs.version}"}'
       renderWithHeader(
         <AAPNodeForm
@@ -584,11 +587,11 @@ describe('AAPNodeForm', () => {
         />
       )
 
-      expect(screen.getByRole('switch', { name: 'Use input variables' })).toBeChecked()
-      expect(screen.getByPlaceholderText('{"key": "value"} or drag expression')).toHaveValue(savedExtraVars)
+      expect(screen.getByRole('switch', { name: 'Use input variables' })).not.toBeChecked()
+      expect(screen.getByTestId('extra-vars-editor')).toHaveValue(savedExtraVars)
     })
 
-    it('enables the toggle when loading saved extra_vars with pretty-printed expressions', () => {
+    it('does not enable the toggle for pretty-printed extra_vars expressions', () => {
       const savedExtraVars = JSON.stringify({ app_version: '${inputs.version}' }, null, 2)
       renderWithHeader(
         <AAPNodeForm
@@ -600,8 +603,8 @@ describe('AAPNodeForm', () => {
         />
       )
 
-      expect(screen.getByRole('switch', { name: 'Use input variables' })).toBeChecked()
-      expect(screen.getByPlaceholderText('{"key": "value"} or drag expression')).toBeVisible()
+      expect(screen.getByRole('switch', { name: 'Use input variables' })).not.toBeChecked()
+      expect(screen.getByTestId('extra-vars-editor')).toBeVisible()
     })
 
     it('enables the toggle from tags expressions', () => {

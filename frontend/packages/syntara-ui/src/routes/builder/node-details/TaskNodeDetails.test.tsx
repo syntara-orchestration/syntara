@@ -108,13 +108,15 @@ vi.mock('../node-forms/AAPJobTemplateForm', () => ({
     onSubmit,
     onCancel,
     submitButtonText,
+    initialData,
   }: {
     onSubmit: (data: Record<string, unknown>) => void
     onCancel: () => void
     submitButtonText?: string
     onHeaderContentChange: (content: ReactNode | null) => void
+    initialData?: Record<string, unknown>
   }) => (
-    <div data-testid="aap-node-form">
+    <div data-testid="aap-node-form" data-use-input-variables={String(initialData?.use_input_variables)}>
       <button
         onClick={() =>
           onSubmit({
@@ -355,6 +357,27 @@ describe('TaskNodeDetails Component', () => {
     renderTaskNodeDetails(taskData, 'task-aap-expr')
 
     expect(screen.getByTestId('aap-node-form')).toBeInTheDocument()
+  })
+
+  // AAP-95762: dragging an input variable into extra_vars must not flip on
+  // "use input variables" when the template itself was selected normally
+  // (by job_template_id, with plain organization/template names).
+  it('does not enable use_input_variables for a normally-selected template whose extra_vars contains a dragged expression', () => {
+    const taskData = {
+      type: 'aap_job_template' as const,
+      id: 'task-aap-dragged-var',
+      name: 'AAP Task',
+      parameters: {
+        job_template_id: 123,
+        organization_name: 'Default',
+        job_template_name: 'Deploy App',
+        extra_vars: { message: '${trigger.input_value}' },
+      },
+    }
+
+    renderTaskNodeDetails(taskData, 'task-aap-dragged-var')
+
+    expect(screen.getByTestId('aap-node-form')).toHaveAttribute('data-use-input-variables', 'false')
   })
 
   it('renders AIAgentNodeDetails for agentic task', () => {

@@ -233,20 +233,21 @@ function resolveUseInputVariables(params: {
   organizationName: string
   jobTemplateName: string
   inventoryName: string
-  extraVars: string
 }): boolean {
-  const { c, organizationName, jobTemplateName, inventoryName, extraVars } = params
+  const { c, organizationName, jobTemplateName, inventoryName } = params
   return (
     c.use_input_variables === true ||
     c.useInputVariables === true ||
+    // extra_vars is excluded: its code editor supports dragging an input variable
+    // into it while the template is still selected normally (by job_template_id),
+    // so its contents alone must not flip the node into full expression mode.
     hasExpressionValue(
       organizationName,
       jobTemplateName,
       inventoryName,
       c.limit ?? '',
       c.tags ?? '',
-      c.skip_tags ?? c.skipTags ?? '',
-      extraVars
+      c.skip_tags ?? c.skipTags ?? ''
     )
   )
 }
@@ -290,7 +291,6 @@ function buildAAPInitialData(taskName: string, config: Record<string, unknown>):
       organizationName,
       jobTemplateName,
       inventoryName,
-      extraVars,
     }),
   }
 }
