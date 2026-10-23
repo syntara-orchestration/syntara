@@ -1143,6 +1143,23 @@ describe('InputPanel', () => {
       // Should display the pinned output mock as input
       expect(screen.getByText('mocked_value')).toBeInTheDocument()
     })
+
+    // AAP-89684: for a previously-run (existing) node, pinning new mock data on an
+    // upstream node must immediately be reflected in this node's Input panel, taking
+    // precedence over the upstream's last actual execution output.
+    it('shows upstream currently pinned outputMock instead of stale execution data for existing nodes', () => {
+      mockUseUpstreamNodes.mockReturnValue(upstreamNodes)
+      mockPinnedData = {
+        'upstream-1': {
+          outputMock: { mocked_field: 'freshly-pinned-value' },
+        },
+      }
+
+      render(<InputPanel nodeId="node-1" executionData={{ 'upstream-1': { mocked_field: 'stale-execution-value' } }} />)
+
+      expect(screen.getByText('freshly-pinned-value')).toBeInTheDocument()
+      expect(screen.queryByText('stale-execution-value')).not.toBeInTheDocument()
+    })
   })
 
   describe('Unpin single predecessor inline button', () => {
