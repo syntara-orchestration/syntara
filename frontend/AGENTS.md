@@ -152,7 +152,8 @@ The items below cover patterns ESLint **cannot** catch:
 ```bash
 # Development
 npm start                  # Start all services (UI, mock API)
-npm run start:ui           # Start UI only
+npm run start:ui           # Start the UI package dev script (Vite + Storybook)
+npm run start:e2e --prefix packages/syntara-ui # Start Vite only for E2E
 npm run start:mock-api     # Start mock API only
 
 # Testing
@@ -165,7 +166,7 @@ npm run e2e:visual-regression:update # Same, with --update-snapshots (see packag
 
 # E2E test suite tags — Playwright tags that control where each test runs:
 #   @pr-check      Fast critical-path tests; select with --grep @pr-check
-#   @local-only    Visual regression tests; excluded from all CI automatically
+#   @local-only    Mock-dependent audits/local screenshots; not a blanket CI exclusion
 # Full rules: .agents/skills/frontend-playwright-e2e/SKILL.md → "Test Suite Tags"
 
 For a known flaky test that needs temporary quarantine from CI, follow the
