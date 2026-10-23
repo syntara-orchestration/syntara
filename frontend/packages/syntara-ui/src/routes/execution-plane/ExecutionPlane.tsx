@@ -1,5 +1,6 @@
 import { Truncate } from '@patternfly/react-core'
 import { Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
+import type { ThProps } from '@patternfly/react-table'
 import type { ExecutionPlaneAPI } from '@syntara/contracts'
 import { useMemo } from 'react'
 
@@ -22,21 +23,36 @@ import { useDocLink } from '../../utils/docs/useDocLink'
 
 import { ExecutionPlaneEmptyState } from './ExecutionPlaneEmptyState'
 import { getExecutionTargetNameFilterDefinition } from './executionPlaneFilters'
+import { executionPlaneDefaultSort, executionPlaneTableColumns } from './executionPlaneTableColumns'
 import { ExecutionTargetStatusLabel } from './ExecutionTargetStatusLabel'
 import { RoutingLabelsCell } from './RoutingLabelsCell'
 
 type ExecutionTarget = ExecutionPlaneAPI.components['schemas']['ExecutionTargetFacadeRead']
 
-function ExecutionPlaneTableContent({ rows }: Readonly<{ rows: ExecutionTarget[] }>) {
+function ExecutionPlaneTableContent({
+  rows,
+  getSortParams,
+}: Readonly<{
+  rows: ExecutionTarget[]
+  getSortParams: (columnField: string) => ThProps['sort']
+}>) {
   return (
     <>
       <Thead>
         <Tr>
-          <Th width={20}>Name</Th>
-          <Th width={20}>Cluster</Th>
-          <Th width={15}>Status</Th>
+          <Th width={20} sort={getSortParams('name')}>
+            Name
+          </Th>
+          <Th width={20} sort={getSortParams('cluster_id')}>
+            Cluster
+          </Th>
+          <Th width={15} sort={getSortParams('status')}>
+            Status
+          </Th>
           <Th width={30}>Routing labels</Th>
-          <Th width={15}>State</Th>
+          <Th width={15} sort={getSortParams('enabled')}>
+            State
+          </Th>
         </Tr>
       </Thead>
       <Tbody>
@@ -79,7 +95,11 @@ export default function ExecutionPlane() {
     handleFilterChange,
     handleClearAllFilters,
     getFooterProps,
-  } = useCursorPagination()
+    getSortParams,
+  } = useCursorPagination({
+    defaultSort: executionPlaneDefaultSort,
+    columns: executionPlaneTableColumns,
+  })
 
   const filterFieldDefinitions = useMemo<FilterFieldDefinition[]>(() => [getExecutionTargetNameFilterDefinition()], [])
 
@@ -134,7 +154,7 @@ export default function ExecutionPlane() {
             }
             body={
               <SynListPanelTable caption="Execution targets" footer={getFooterProps(query.data)} useFixedLayout={false}>
-                <ExecutionPlaneTableContent rows={results} />
+                <ExecutionPlaneTableContent rows={results} getSortParams={getSortParams} />
               </SynListPanelTable>
             }
           />

@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -129,6 +129,7 @@ describe('ExecutionPlane', () => {
     expect(queryParams).toMatchObject({
       limit: 20,
       include_total: true,
+      sort: 'name',
     })
   })
 
@@ -241,6 +242,66 @@ describe('ExecutionPlane', () => {
     await user.keyboard('{Enter}')
 
     assertUrlParam(mockSetSearchParams, 'name[contains]', 'staging')
+  })
+
+  it('renders sortable headers for name, cluster, status, and state', () => {
+    render(<ExecutionPlane />, { wrapper })
+
+    for (const name of [/^Name$/i, /^Cluster$/i, /^Status$/i, /^State$/i]) {
+      const header = screen.getByRole('columnheader', { name })
+      expect(within(header).getByRole('button')).toBeInTheDocument()
+    }
+
+    const labelsHeader = screen.getByRole('columnheader', { name: /Routing labels/i })
+    expect(within(labelsHeader).queryByRole('button')).not.toBeInTheDocument()
+  })
+
+  it('writes sort URL param when a column header is clicked', async () => {
+    const user = userEvent.setup()
+    render(<ExecutionPlane />, { wrapper })
+
+    const statusHeader = screen.getByRole('columnheader', { name: /^Status$/i })
+    await user.click(within(statusHeader).getByRole('button'))
+
+    await waitFor(() => {
+      assertUrlParam(mockSetSearchParams, 'sort', 'status')
+    })
+  })
+
+  it('can sort by cluster_id via the Cluster column', async () => {
+    const user = userEvent.setup()
+    render(<ExecutionPlane />, { wrapper })
+
+    const clusterHeader = screen.getByRole('columnheader', { name: /^Cluster$/i })
+    await user.click(within(clusterHeader).getByRole('button'))
+
+    await waitFor(() => {
+      assertUrlParam(mockSetSearchParams, 'sort', 'cluster_id')
+    })
+  })
+
+  it('can sort by enabled via the State column', async () => {
+    const user = userEvent.setup()
+    render(<ExecutionPlane />, { wrapper })
+
+    const stateHeader = screen.getByRole('columnheader', { name: /^State$/i })
+    await user.click(within(stateHeader).getByRole('button'))
+
+    await waitFor(() => {
+      assertUrlParam(mockSetSearchParams, 'sort', 'enabled')
+    })
+  })
+
+  it('toggles sort direction when clicking the default name column', async () => {
+    const user = userEvent.setup()
+    render(<ExecutionPlane />, { wrapper })
+
+    const nameHeader = screen.getByRole('columnheader', { name: /^Name$/i })
+    await user.click(within(nameHeader).getByRole('button'))
+
+    await waitFor(() => {
+      assertUrlParam(mockSetSearchParams, 'sort', '-name')
+    })
   })
 
   it('has no accessibility violations', async () => {

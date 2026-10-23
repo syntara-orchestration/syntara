@@ -444,6 +444,7 @@ export const handlers = [
 
     const url = new URL(request.url)
     const nameContains = url.searchParams.get('name[contains]')
+    const sort = url.searchParams.get('sort')
     const cursor = url.searchParams.get('cursor')
     const parsedLimit = Number.parseInt(url.searchParams.get('limit') ?? '20', 10)
     const limit = Number.isFinite(parsedLimit) ? Math.min(Math.max(parsedLimit, 1), 100) : 20
@@ -453,6 +454,38 @@ export const handlers = [
     if (nameContains) {
       const lower = nameContains.toLowerCase()
       filtered = filtered.filter((target) => target.name.toLowerCase().includes(lower))
+    }
+
+    if (sort) {
+      const isDesc = sort.startsWith('-')
+      const field = isDesc ? sort.slice(1) : sort
+      // Fields the UI exposes as sortable; unknown values are ignored
+      filtered.sort((a, b) => {
+        let aVal: string
+        let bVal: string
+        switch (field) {
+          case 'name':
+            aVal = a.name
+            bVal = b.name
+            break
+          case 'cluster_id':
+            aVal = a.cluster_id
+            bVal = b.cluster_id
+            break
+          case 'status':
+            aVal = a.status
+            bVal = b.status
+            break
+          case 'enabled':
+            aVal = a.enabled ? '1' : '0'
+            bVal = b.enabled ? '1' : '0'
+            break
+          default:
+            return 0
+        }
+        const cmp = aVal.localeCompare(bVal)
+        return isDesc ? -cmp : cmp
+      })
     }
 
     return HttpResponse.json(paginate(filtered, cursor, limit, includeTotal))
