@@ -29,6 +29,8 @@ vi.mock('./nodeMetadata', () => ({
     trigger: { icon: () => null },
     scheduledTrigger: { icon: () => null },
     webhookTrigger: { icon: () => null },
+    edaTrigger: { icon: () => null },
+    kafkaTrigger: { icon: () => null },
     condition: { icon: () => null },
     loop: { icon: () => null },
     converge: { icon: () => null },
@@ -155,6 +157,14 @@ describe('nodeIconResolver', () => {
         { triggers: [{ type: TriggerTypeEnum.MANUAL_TRIGGER }] }
       )
       expect(result.id).toBe(RegistryNodeId.TRIGGER_MANUAL)
+    })
+
+    it('returns Kafka Subscribe icon', () => {
+      const result = getCanvasNodeIconDescriptor(
+        { id: 'trigger-0', type: 'trigger', data: { triggerType: TriggerTypeEnum.EVENT_SUBSCRIBE } },
+        { triggers: [{ type: TriggerTypeEnum.EVENT_SUBSCRIBE }] }
+      )
+      expect(result.id).toBe(RegistryNodeId.TRIGGER_KAFKA)
     })
 
     it('returns scheduled trigger icon', () => {

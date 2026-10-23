@@ -47,6 +47,12 @@ export const nodeMetadata: Record<string, NodeMetadata> = {
     disableTarget: true,
     expandable: false,
   },
+  kafkaTrigger: {
+    icon: RhUiPlugFillIcon,
+    label: 'Kafka Subscribe',
+    disableTarget: true,
+    expandable: false,
+  },
   edaTrigger: {
     icon: EdaIcon,
     label: 'Trigger',

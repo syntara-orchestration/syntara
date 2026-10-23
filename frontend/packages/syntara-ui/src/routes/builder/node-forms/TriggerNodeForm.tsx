@@ -33,6 +33,7 @@ import { NodeEditorAutoSubmitContext, useRegisterAutoSubmit } from '../hooks/use
 import { useIsVersionView } from '../VersionViewContext'
 
 import { EdaFields } from './EdaTriggerFields'
+import { KafkaSubscribeFields } from './KafkaSubscribeFields'
 import { ManualTriggerFields } from './ManualTriggerFields'
 import { ActivityNameField } from './shared/ActivityNameField'
 import { NodeFormContainer } from './shared/NodeFormContainer'
@@ -91,6 +92,8 @@ function buildTriggerFormDefaults(initialData?: Partial<TriggerFormData>): Trigg
 type TriggerNodeFormProps = Readonly<{
   onSubmit: (data: TriggerFormData) => void
   initialData?: Partial<TriggerFormData>
+  workflowId?: string | null
+  projectId?: string
   onHeaderContentChange?: (content: ReactNode | null) => void
 }>
 
@@ -267,9 +270,13 @@ function ScheduleIntervalFields({
 // ── Main form fields ─────────────────────────────────────────────────────
 
 function TriggerFormFields({
+  workflowId,
+  projectId,
   onHeaderContentChange,
   validationErrors,
 }: Readonly<{
+  workflowId?: string | null
+  projectId?: string
   onHeaderContentChange?: (content: ReactNode | null) => void
   validationErrors?: {
     interval?: { message?: string }
@@ -318,6 +325,9 @@ function TriggerFormFields({
     <Stack hasGutter>
       <input type="hidden" {...register('triggerType')} />
 
+      {triggerType === TriggerTypeEnum.EVENT_SUBSCRIBE && (
+        <KafkaSubscribeFields workflowId={workflowId} projectId={projectId} />
+      )}
       {triggerType === TriggerTypeEnum.MANUAL_TRIGGER && (
         <fieldset disabled={isVersionView} className={nodeFormStyles.disabledFieldset}>
           <ManualTriggerFields errors={errors} />
@@ -440,19 +450,23 @@ export function TriggerNodeForm(props: TriggerNodeFormProps) {
 
   const handleSubmit = (data: TriggerFormData) => {
     const isManual = data.triggerType === TriggerTypeEnum.MANUAL_TRIGGER
+    const isKafka = data.triggerType === TriggerTypeEnum.EVENT_SUBSCRIBE
     const isScheduled = data.triggerType === TriggerTypeEnum.SCHEDULED
     const isWebhookStyle = WEBHOOK_TRIGGER_TYPES.has(data.triggerType)
 
     const cleanedData: TriggerFormData = {
       name: data.name,
       triggerType: data.triggerType,
-      inputSchema: isManual || isWebhookStyle ? data.inputSchema : undefined,
+      inputSchema: isManual || isWebhookStyle || isKafka ? data.inputSchema : undefined,
       scheduleType: isScheduled ? data.scheduleType : undefined,
       interval: isScheduled && data.scheduleType === ScheduleTypeEnum.INTERVAL ? data.interval : undefined,
       cron: isScheduled && data.scheduleType === ScheduleTypeEnum.CRON ? data.cron : undefined,
       timezone: isScheduled ? data.timezone : undefined,
       missedSchedulePolicy: isScheduled ? data.missedSchedulePolicy : undefined,
       webhookPath: isWebhookStyle ? normalizeWebhookPath(data.webhookPath ?? '') : undefined,
+      integrationId: isKafka ? data.integrationId : undefined,
+      runtimeCredentialId: isKafka ? data.runtimeCredentialId : undefined,
+      topic: isKafka ? data.topic : undefined,
       authorizedServiceAccountIds: isWebhookStyle ? data.authorizedServiceAccountIds : undefined,
     }
     props.onSubmit(cleanedData)
@@ -464,7 +478,12 @@ export function TriggerNodeForm(props: TriggerNodeFormProps) {
   return (
     <NodeFormContainer formId="trigger-node-form" onSubmit={form.handleSubmit(handleSubmit)}>
       <SynForm form={form}>
-        <TriggerFormFields onHeaderContentChange={props.onHeaderContentChange} validationErrors={errors} />
+        <TriggerFormFields
+          workflowId={props.workflowId}
+          projectId={props.projectId}
+          onHeaderContentChange={props.onHeaderContentChange}
+          validationErrors={errors}
+        />
       </SynForm>
     </NodeFormContainer>
   )

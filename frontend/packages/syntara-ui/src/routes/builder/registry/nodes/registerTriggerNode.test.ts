@@ -76,11 +76,14 @@ describe('registerTriggerNode', () => {
     expect(registration?.keywords).toEqual(expect.arrayContaining(['start', 'manual', 'schedule', 'event', 'webhook']))
   })
 
-  it('includes four subtypes: manual, scheduled, webhook, and EDA', () => {
+  it('includes Kafka Subscribe alongside the existing trigger subtypes', () => {
     registerTriggerNode()
 
     const registration = NodeRegistry.get(RegistryNodeId.TRIGGER)
-    expect(registration?.subtypes).toHaveLength(4)
+    expect(registration?.subtypes).toHaveLength(5)
+
+    const kafka = registration?.subtypes?.find((s) => s.id === RegistryNodeId.TRIGGER_KAFKA)
+    expect(kafka?.initialData).toEqual({ triggerType: TriggerTypeEnum.EVENT_SUBSCRIBE })
 
     const manual = registration?.subtypes?.find((s) => s.id === RegistryNodeId.TRIGGER_MANUAL)
     expect(manual).toBeDefined()
@@ -100,6 +103,28 @@ describe('registerTriggerNode', () => {
     expect(eda).toBeDefined()
     expect(eda?.label).toBe('Event-Driven Ansible trigger')
     expect(eda?.initialData).toEqual({ triggerType: TriggerTypeEnum.EDA_TRIGGER })
+  })
+
+  it('creates Kafka Subscribe with flat backend parameters and no account binding', () => {
+    const addTrigger = vi.fn()
+    vi.mocked(useWorkflowStore.getState).mockReturnValue({ addTrigger } as never)
+    registerTriggerNode()
+    const onSuccess = vi.fn()
+    const onError = vi.fn()
+    NodeRegistry.get(RegistryNodeId.TRIGGER)?.onSubmit(
+      {
+        name: 'Orders',
+        triggerType: TriggerTypeEnum.EVENT_SUBSCRIBE,
+        integrationId: '11111111-1111-4111-8111-111111111111',
+        runtimeCredentialId: '22222222-2222-4222-8222-222222222222',
+        topic: 'orders',
+      },
+      onSuccess,
+      onError
+    )
+    expect(addTrigger).toHaveBeenCalledWith(expect.objectContaining({ type: TriggerTypeEnum.EVENT_SUBSCRIBE }))
+    expect(onSuccess).toHaveBeenCalled()
+    expect(onError).not.toHaveBeenCalled()
   })
 
   it('onSubmit creates a manual trigger and calls onSuccess', () => {
