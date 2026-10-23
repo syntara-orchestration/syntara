@@ -104,7 +104,7 @@ describe('RetryFromFailureSidePanel', () => {
     vi.mocked(useRetryFromFailurePreview).mockReturnValue({ preview: undefined, isLoading: false, isError: true })
     renderPanel()
 
-    expect(screen.getByTestId('retry-preview-error')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Danger alert: Could not load retry plan' })).toBeInTheDocument()
     expect(screen.getByTestId('retry-from-failure-confirm')).toBeDisabled()
   })
 
@@ -116,7 +116,10 @@ describe('RetryFromFailureSidePanel', () => {
     })
     renderPanel()
 
-    expect(screen.getByTestId('retry-rejected')).toHaveTextContent('This execution is still running.')
+    expect(
+      screen.getByRole('heading', { name: 'Warning alert: This run cannot be retried from failure' })
+    ).toBeInTheDocument()
+    expect(screen.getByText('This execution is still running.')).toBeInTheDocument()
     expect(screen.getByTestId('retry-from-failure-confirm')).toBeDisabled()
   })
 
@@ -128,7 +131,10 @@ describe('RetryFromFailureSidePanel', () => {
     })
     renderPanel()
 
-    expect(screen.getByTestId('retry-rejected')).toHaveTextContent('No failed steps were found to retry from.')
+    expect(
+      screen.getByRole('heading', { name: 'Warning alert: This run cannot be retried from failure' })
+    ).toBeInTheDocument()
+    expect(screen.getByText('No failed steps were found to retry from.')).toBeInTheDocument()
   })
 
   it('shows an empty state when an eligible preview contains no retry points', () => {
@@ -139,7 +145,7 @@ describe('RetryFromFailureSidePanel', () => {
     })
     renderPanel()
 
-    expect(screen.getByTestId('retry-no-points')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Warning alert: No retry points found' })).toBeInTheDocument()
     expect(screen.getByTestId('retry-from-failure-confirm')).toBeDisabled()
   })
 
