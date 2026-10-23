@@ -1,5 +1,5 @@
 import { TriggerTypeEnum } from '@syntara/contracts'
-import { screen, waitFor } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { axe } from 'vitest-axe'
@@ -563,6 +563,22 @@ describe('TriggerNodeForm Component', () => {
       // a panel ID that may not exist in the DOM when only the active tab is rendered
       const results = await axe(container, { rules: { 'aria-valid-attr-value': { enabled: false } } })
       expect(results).toHaveNoViolations()
+    })
+
+    it('tells users to configure a job template rather than an EDA rulebook for the endpoint URL', async () => {
+      // AAP-91724: until an EDA action plugin exists, rulebooks cannot POST directly
+      // to this endpoint — only a job template invoking it can, so the help text
+      // must not instruct users to configure their EDA rulebook.
+      const user = userEvent.setup()
+      renderWithHeader(
+        <TriggerNodeForm onSubmit={mockOnSubmit} initialData={{ triggerType: TriggerTypeEnum.EDA_TRIGGER }} />
+      )
+
+      await user.click(screen.getByRole('button', { name: 'Endpoint URL help' }))
+
+      const helpDialog = screen.getByRole('dialog', { name: 'Endpoint URL help' })
+      expect(within(helpDialog).queryByText(/rulebook/i)).not.toBeInTheDocument()
+      expect(within(helpDialog).getByText(/job template/i)).toBeInTheDocument()
     })
   })
 })
