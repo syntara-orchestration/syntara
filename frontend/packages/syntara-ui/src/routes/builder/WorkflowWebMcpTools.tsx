@@ -1,19 +1,26 @@
 import type { Activity } from '@syntara/contracts'
-import { useEffect, useRef, type Dispatch } from 'react'
+import { useReactFlow } from '@xyflow/react'
+import { useCallback, useEffect, useRef, type Dispatch } from 'react'
 
 import { workflowFetchClient } from '../../client'
 import { useProjectStore } from '../../stores/useProjectStore'
-import { useWorkflowStore } from '../../stores/useWorkflowStore'
 import { getErrorMessage } from '../../utils/apiErrors'
 import { detachPromise } from '../../utils/detachPromise'
+import { buildTriggerNodeId } from '../../utils/triggerNodeIds'
 import type { ProjectRead } from '../access/types'
+import type { NodeType } from '../workflows/canvas/nodes/NodeType'
 
 import type { BuilderAction } from './builderReducer'
 import type { EdgeConnection } from './types/edge'
 import { buildWorkflowDefinition } from './utils/workflowDefinitionBuilder'
-import { buildWorkflowDraft, validateWorkflowDraft } from './workflowWebMcp'
+import type { EdgeType } from './utils/workflowToGraph'
+import { validateWorkflowDraft } from './workflowWebMcp'
+import { createWorkflowConnectionTools, saveCanvasConnection } from './workflowWebMcpConnectionTools'
+import { createWorkflowDraftTool } from './workflowWebMcpDraftTool'
 import { getWorkflowGuide, WORKFLOW_GUIDE_SCHEMA, WORKFLOW_GUIDE_TOPICS } from './workflowWebMcpGuide'
-import { DRAFT_SCHEMA } from './workflowWebMcpSchema'
+import { createWorkflowNodeTools, getAvailableSourceHandles } from './workflowWebMcpNodeTools'
+import { getWorkflowSnapshot } from './workflowWebMcpState'
+import type { CanvasConnectionInput, ToolDefinition, WorkflowCanvasActions } from './workflowWebMcpToolTypes'
 
 type WorkflowWebMcpToolsProps = {
   isNew: boolean
@@ -30,23 +37,11 @@ type WorkflowWebMcpToolsProps = {
   dispatch: Dispatch<BuilderAction>
 }
 
-type ToolDefinition = {
-  name: string
-  description: string
-  inputSchema: Record<string, unknown>
-  annotations: {
-    readOnlyHint: boolean
-    untrustedContentHint: boolean
-    consequentialHint: boolean
-  }
-  execute: (input: unknown) => unknown
-}
-
 type ModelContext = {
   registerTool: (tool: ToolDefinition, options?: { signal?: AbortSignal }) => void | Promise<void>
 }
 
-type CurrentActions = WorkflowWebMcpToolsProps
+type CurrentActions = WorkflowWebMcpToolsProps & WorkflowCanvasActions
 
 const EMPTY_SCHEMA = { type: 'object', properties: {}, additionalProperties: false }
 
@@ -68,14 +63,6 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isModelContext(value: unknown): value is ModelContext {
   return !!value && typeof value === 'object' && 'registerTool' in value && typeof value.registerTool === 'function'
-}
-
-function getWorkflowSnapshot() {
-  const store = useWorkflowStore.getState()
-  const currentWorkflow = store.currentWorkflow
-  const activities = currentWorkflow?.workflow.activities ?? []
-  const triggers = currentWorkflow?.triggers ?? []
-  return { store, currentWorkflow, activities, triggers, edges: store.edges, nodePositions: store.nodePositions }
 }
 
 type ProjectSelectionResolution =
@@ -228,11 +215,19 @@ function createGetBuilderStateTool(actionsRef: { current: CurrentActions }): Too
         triggers: triggers.map((trigger, index) => ({
           index,
           id: trigger.id,
+          canvas_node_id: buildTriggerNodeId(index),
           type: trigger.type,
           name: trigger.name,
+          source_handles: getAvailableSourceHandles(trigger, true),
         })),
-        steps: activities.map((activity) => ({ id: activity.id, type: activity.type, name: activity.name })),
+        steps: activities.map((activity) => ({
+          id: activity.id,
+          type: activity.type,
+          name: activity.name,
+          source_handles: getAvailableSourceHandles(activity),
+        })),
         connections: store.edges.map((edge) => ({
+          id: edge.id,
           source: edge.source,
           source_handle: edge.sourceHandle ?? null,
           target: edge.target,
@@ -307,62 +302,6 @@ function createValidateWorkflowTool(actionsRef: { current: CurrentActions }): To
         ready_to_run: validation.readyToRun,
         errors: validation.errors,
         warnings: validation.warnings,
-      }
-    },
-  }
-}
-
-function createWorkflowDraftTool(actionsRef: { current: CurrentActions }): ToolDefinition {
-  return {
-    name: 'create_workflow_draft',
-    description:
-      'On an empty new workflow builder, create a workflow draft with any user-selectable builder trigger and node type. Use nodes plus edges for scripts, HTTP requests, agents, AAP, approvals, conditions, switches, loops, waits, and converges. The legacy steps shortcut creates a simple chain. This edits the canvas only; it does not save or run the workflow.',
-    inputSchema: DRAFT_SCHEMA,
-    annotations: { readOnlyHint: false, untrustedContentHint: true, consequentialHint: false },
-    execute: (input) => {
-      const actions = actionsRef.current
-      if (!actions.canEdit) return { ok: false, message: 'You do not have permission to edit this workflow.' }
-      if (!actions.isNew) {
-        return { ok: false, message: 'Open a new, empty workflow builder to create a draft with this tool.' }
-      }
-
-      const { store, currentWorkflow, edges } = getWorkflowSnapshot()
-      const result = buildWorkflowDraft(input, currentWorkflow, edges)
-      if (!result.ok) return result
-
-      store.replaceWorkflowContent(result.workflow, result.edges)
-      actionsRef.current = {
-        ...actions,
-        workflowName: result.name,
-        workflowDescription: result.description,
-      }
-      actions.dispatch({ type: 'SET_WORKFLOW_NAME', payload: result.name })
-      actions.dispatch({ type: 'SET_WORKFLOW_DESCRIPTION', payload: result.description })
-
-      return {
-        ok: true,
-        saved: false,
-        run_started: false,
-        name: result.name,
-        description: result.description,
-        trigger_count: result.workflow.triggers?.length ?? 0,
-        triggers: result.workflow.triggers?.map((trigger, index) => ({
-          index,
-          type: trigger.type,
-          name: trigger.name,
-        })),
-        steps: result.workflow.workflow.activities.map((activity) => ({
-          id: activity.id,
-          type: activity.type,
-          name: activity.name,
-        })),
-        connections: result.edges.map((edge) => ({
-          source: edge.source,
-          source_handle: edge.sourceHandle,
-          target: edge.target,
-          target_handle: edge.targetHandle,
-        })),
-        message: 'Draft graph added to the canvas. Review node configuration and connections, validate, then save it.',
       }
     },
   }
@@ -455,6 +394,8 @@ function buildToolDefinitions(actionsRef: { current: CurrentActions }): ToolDefi
   const tools = [
     createGetWorkflowGuideTool(),
     createGetBuilderStateTool(actionsRef),
+    ...createWorkflowNodeTools(actionsRef),
+    ...createWorkflowConnectionTools(actionsRef),
     createValidateWorkflowTool(actionsRef),
   ]
   if (actions.canEdit && actions.isNew) tools.push(createSelectWorkflowProjectTool(actionsRef))
@@ -481,7 +422,35 @@ export function WorkflowWebMcpTools(props: WorkflowWebMcpToolsProps) {
     handleSaveWorkflow,
     dispatch,
   } = props
-  const actionsRef = useRef<CurrentActions>(props)
+  const reactFlowInstance = useReactFlow<NodeType, EdgeType>()
+  const deleteCanvasNode = useCallback(
+    async (nodeId: string) => {
+      const previousIds = getWorkflowSnapshot().activities.map((activity) => activity.id)
+      await reactFlowInstance.deleteElements({ nodes: [{ id: nodeId }] })
+      const currentIds = new Set(getWorkflowSnapshot().activities.map((activity) => activity.id))
+      return previousIds.filter((id) => !currentIds.has(id))
+    },
+    [reactFlowInstance]
+  )
+  const deleteCanvasConnection = useCallback(
+    async (edgeId: string) => {
+      const result = await reactFlowInstance.deleteElements({ edges: [{ id: edgeId }] })
+      return result.deletedEdges.some((edge) => edge.id === edgeId)
+    },
+    [reactFlowInstance]
+  )
+  const saveCanvasConnectionAction = useCallback(
+    (input: CanvasConnectionInput) => {
+      return saveCanvasConnection(input, reactFlowInstance)
+    },
+    [reactFlowInstance]
+  )
+  const actionsRef = useRef<CurrentActions>({
+    ...props,
+    deleteCanvasNode,
+    deleteCanvasConnection,
+    saveCanvasConnection: saveCanvasConnectionAction,
+  })
 
   useEffect(() => {
     actionsRef.current = {
@@ -497,6 +466,9 @@ export function WorkflowWebMcpTools(props: WorkflowWebMcpToolsProps) {
       canRun,
       handleSaveWorkflow,
       dispatch,
+      deleteCanvasNode,
+      deleteCanvasConnection,
+      saveCanvasConnection: saveCanvasConnectionAction,
     }
   }, [
     isNew,
@@ -511,6 +483,9 @@ export function WorkflowWebMcpTools(props: WorkflowWebMcpToolsProps) {
     canRun,
     handleSaveWorkflow,
     dispatch,
+    deleteCanvasNode,
+    deleteCanvasConnection,
+    saveCanvasConnectionAction,
   ])
 
   useEffect(() => {
