@@ -576,10 +576,14 @@ export interface components {
        * @description Integration-specific configuration
        */
       configuration:
-        | components['schemas']['MCPServerConfigurationInput']
-        | components['schemas']['LLMProviderConfiguration']
-        | components['schemas']['AAPConfiguration']
-        | components['schemas']['KafkaConfiguration']
+        | (
+            | components['schemas']['MCPServerConfigurationInput']
+            | components['schemas']['LLMProviderConfiguration']
+            | components['schemas']['AAPConfiguration']
+          )
+        | null
+      /** @description Kafka broker configuration. Present only when integration_type is kafka, so the configuration union above stays compatible with existing clients. */
+      kafka_configuration?: components['schemas']['KafkaConfiguration'] | null
       /** Last Validated At */
       last_validated_at?: string | null
       /** Management Credential Id */

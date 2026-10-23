@@ -241,10 +241,13 @@ class AAPConfiguration(IntegrationSecurityMixin):
         return self
 
 
-# Configuration types (used by DB model, read schema, and create/patch)
-IntegrationConfigurationTypes = (
-    MCPServerConfigurationInput | LLMProviderConfiguration | AAPConfiguration | KafkaConfiguration
-)
+# Response union stays the pre-Kafka set. Adding a member there is an
+# error-level OpenAPI breaking change (response-property-one-of-added).
+# Kafka is carried on IntegrationRead.kafka_configuration instead.
+IntegrationConfigurationReadTypes = MCPServerConfigurationInput | LLMProviderConfiguration | AAPConfiguration
+# DB column and create/patch/discover requests. A new request oneOf member is
+# not an error-level breaking change.
+IntegrationConfigurationTypes = IntegrationConfigurationReadTypes | KafkaConfiguration
 IntegrationConfiguration = Annotated[
     IntegrationConfigurationTypes,
     Field(discriminator="integration_type"),

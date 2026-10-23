@@ -153,7 +153,13 @@ function IntegrationDetailsTab({
           )}
         </DescriptionList>
       </StackItem>
-      <SecuritySection configuration={integration.configuration} />
+      <SecuritySection
+        configuration={
+          integration.integration_type === IntegrationTypeEnum.KAFKA
+            ? integration.kafka_configuration
+            : integration.configuration
+        }
+      />
     </Stack>
   )
 }
