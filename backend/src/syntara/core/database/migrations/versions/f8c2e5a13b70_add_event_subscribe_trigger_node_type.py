@@ -1,10 +1,10 @@
 """Add the event Subscribe trigger node type.
 
 Revision ID: f8c2e5a13b70
-Revises: e7a1c4b92f08
+Revises: 52662dc0e022
 
 PostgreSQL enum additions are not detected by Alembic autogenerate.
-This revision is stacked after the Kafka Integration migration in PR #898.
+This revision follows the Kafka integration and activity control merge in PR #898.
 
 Before rolling application code back, stop event ingestion and ensure no
 definitions or retained activity executions using this node type will be read
@@ -18,7 +18,7 @@ from collections.abc import Sequence
 from alembic import op
 
 revision: str = "f8c2e5a13b70"
-down_revision: str | Sequence[str] | None = "e7a1c4b92f08"
+down_revision: str | Sequence[str] | None = "52662dc0e022"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
