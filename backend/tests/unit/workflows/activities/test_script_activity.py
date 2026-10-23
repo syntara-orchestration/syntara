@@ -3,7 +3,7 @@
 from collections.abc import Generator
 from typing import ClassVar, Self
 from unittest.mock import AsyncMock, MagicMock, patch
-from uuid import UUID
+from uuid import UUID, uuid5
 
 import pytest
 from execution_plane_client.protocol import MessageEnvelope, ResourceReference, TransportReceipt
@@ -15,7 +15,7 @@ from syntara.workflows.workflow_engine.activities.ep import ep_dispatch_activity
 
 ACTIVITY_INFO_PATH = "syntara.workflows.workflow_engine.activities.ep.ep_dispatch_activity.activity.info"
 EXECUTION_ID = "00000000-0000-0000-0000-000000000010"
-WORK_ITEM_ID = UUID("00000000-0000-0000-0000-000000000020")
+WORK_ITEM_ID = uuid5(UUID(EXECUTION_ID), "unit-activity")
 EXECUTION_TARGET_ID = UUID("00000000-0000-0000-0000-000000000030")
 
 
@@ -52,7 +52,7 @@ class _FakeEPClient:
 
 
 @pytest.fixture(autouse=True)
-def _mock_activity_context() -> Generator[MagicMock, None, None]:
+def mock_activity_context() -> Generator[MagicMock, None, None]:
     """Provide stable Temporal metadata without an activity worker."""
     info = MagicMock()
     info.attempt = 1
@@ -64,11 +64,6 @@ def _mock_activity_context() -> Generator[MagicMock, None, None]:
         patch(ACTIVITY_INFO_PATH, return_value=info) as activity_info,
         patch("temporalio.activity.heartbeat"),
         patch.object(activity_module, "ExecutionPlaneHttpClient", _FakeEPClient),
-        patch.object(
-            activity_module,
-            "_lookup_activity_execution_id",
-            new_callable=lambda: AsyncMock(return_value=WORK_ITEM_ID),
-        ),
     ):
         _FakeEPClient.responses = []
         _FakeEPClient.submissions = []
@@ -122,6 +117,16 @@ class TestScriptActivityDispatch:
         assert result == expected
         assert len(_FakeEPClient.submissions) == 1
         assert _FakeEPClient.submissions[0].command_id == WORK_ITEM_ID
+
+    @pytest.mark.asyncio
+    async def test_temporal_retry_reuses_work_item_id(self, mock_activity_context: MagicMock) -> None:
+        """Task attempts share an identity without an AO row lookup."""
+        _FakeEPClient.responses = [{"status": "completed", "result": {}} for _ in range(2)]
+        for attempt in (1, 2):
+            mock_activity_context.return_value.attempt = attempt
+            await activity_module.execute_script_activity({"language": "bash", "code": ":"}, None, EXECUTION_ID)
+
+        assert [message.command_id for message in _FakeEPClient.submissions] == [WORK_ITEM_ID, WORK_ITEM_ID]
 
     @pytest.mark.asyncio
     async def test_execution_target_profile_is_sent_as_ep_selector(self) -> None:

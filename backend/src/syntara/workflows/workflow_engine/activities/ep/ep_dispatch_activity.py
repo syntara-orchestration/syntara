@@ -9,12 +9,10 @@ from typing import TYPE_CHECKING, Any, cast
 
 import structlog
 from execution_plane_client.commands.work import NodeInvocation, WorkExecute
-from sqlmodel import select
 from temporalio import activity
 from temporalio.exceptions import ApplicationError
 
 from syntara.core.config.base import get_settings
-from syntara.core.database.session import AsyncSessionLocal
 from syntara.execution_plane.client import (
     EP_AUDIENCE,
     EP_CLIENT_ID,
@@ -22,7 +20,6 @@ from syntara.execution_plane.client import (
     ExecutionPlaneRejectedError,
     ExecutionPlaneUnavailableError,
 )
-from syntara.workflows.models.activity_execution import ActivityExecution
 from syntara.workflows.workflow_engine.activities.common import HEARTBEAT_STOP_MONITOR
 from syntara.workflows.workflow_engine.constants import (
     DEFAULT_MAX_OUTPUT_BYTES,
@@ -83,22 +80,6 @@ def _build_invocation(input_config: dict[str, Any], settings: Any, info: Any) ->
     }
 
 
-async def _lookup_activity_execution_id(execution_id: uuid.UUID, temporal_activity_id: str) -> uuid.UUID:
-    """Look up ActivityExecution.id by execution_id and temporal_activity_id."""
-    async with AsyncSessionLocal() as session:
-        row = (
-            await session.exec(
-                select(ActivityExecution)
-                .where(ActivityExecution.execution_id == execution_id)
-                .where(ActivityExecution.temporal_activity_id == temporal_activity_id)
-            )
-        ).first()
-    if row is None:
-        msg = f"ActivityExecution not found for execution_id={execution_id} activity_id={temporal_activity_id}"
-        raise ApplicationError(msg, type="ContextError", non_retryable=True)
-    return row.id
-
-
 async def _submit_and_read_work(client: ExecutionPlaneHttpClient, message: MessageEnvelope) -> dict[str, Any]:
     """Recover work after duplicate submission; receipts contain no work state."""
     try:
@@ -148,7 +129,7 @@ async def _dispatch_to_ep(  # noqa: C901, PLR0915 - service handoff and Temporal
         msg = "Temporal activity context is missing workflow or run identity"
         raise ApplicationError(msg, type="ContextError", non_retryable=True)
 
-    work_item_id = await _lookup_activity_execution_id(execution_id, info.activity_id)
+    work_item_id = uuid.uuid5(execution_id, info.activity_id)
     selectors = _build_work_execute_selectors(execution_target_id)
 
     image = settings.node_container_images.get(_NODE_TYPE)
