@@ -117,6 +117,15 @@ def _mock_integration_counts() -> Generator[None, None, None]:
         yield
 
 
+@pytest.fixture(autouse=True)
+def _mock_event_subscription_guard() -> Generator[None, None, None]:
+    """Mock the event-subscription deletion guard to avoid session.exec conflicts in unit tests."""
+    from syntara.eventstreams.services.subscription_service import EventSubscriptionService
+
+    with patch.object(EventSubscriptionService, "assert_credential_not_bound", new_callable=AsyncMock):
+        yield
+
+
 @pytest.fixture
 def mock_session() -> MagicMock:
     """Create a mock AsyncSession."""

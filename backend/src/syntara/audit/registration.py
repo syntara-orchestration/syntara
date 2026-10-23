@@ -19,6 +19,7 @@ import syntara.auth.audit
 import syntara.authz.audit
 import syntara.core.websocket.audit
 import syntara.credentials.audit
+import syntara.eventstreams.audit
 import syntara.files.audit
 import syntara.identity_providers.audit
 import syntara.integrations.audit
@@ -47,6 +48,7 @@ def _handler_packages() -> list[ModuleType]:
         syntara.authz.audit,
         syntara.core.websocket.audit,
         syntara.credentials.audit,
+        syntara.eventstreams.audit,
         syntara.files.audit,
         syntara.identity_providers.audit,
         syntara.integrations.audit,

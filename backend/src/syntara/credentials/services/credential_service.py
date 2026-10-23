@@ -706,6 +706,13 @@ class CredentialService(UserReferenceResolverMixin, BaseService):
             integration_names = await self._get_referencing_integration_names(credential_id, limit=5)
             raise CredentialInUseError(credential.name, integration_names, int_ref_count)
 
+        # Conservatively block deletion while any event subscription uses this
+        # credential as its runtime credential; the RESTRICT FK is the DB backstop.
+        from syntara.eventstreams.services.subscription_service import EventSubscriptionService  # noqa: PLC0415
+
+        subscription_service = EventSubscriptionService(self.session, self.user)
+        await subscription_service.assert_credential_not_bound(credential_id, credential.name)
+
         wf_counts = await self.get_workflow_counts([credential_id])
         wf_ref_count = wf_counts.get(credential_id, 0)
         if wf_ref_count:

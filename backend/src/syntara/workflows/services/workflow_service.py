@@ -33,6 +33,8 @@ from syntara.credentials.lib.auth_types import AUTH_TYPE_URL
 from syntara.credentials.models.credential import Credential
 from syntara.credentials.models.credential_type import CredentialType
 from syntara.eventstreams.adapters.subscribe_parameters import validate_event_subscribe_parameters
+from syntara.eventstreams.audit.subscription_lifecycle import EventSubscriptionLifecycleEvent
+from syntara.eventstreams.services.subscription_service import EventSubscriptionService
 from syntara.integrations.models.integration import Integration
 from syntara.integrations.services.integration_service import IntegrationService
 from syntara.metrics.dependencies import get_metrics_recorder
@@ -1560,6 +1562,15 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
             is_enabled=True,
         )
 
+        # Project Kafka event-subscription desired state atomically with the published
+        # version. No broker/Temporal I/O happens here; workers reconcile from the DB.
+        subscription_service = EventSubscriptionService(self.session, self.user)
+        subscription_changeset = await subscription_service.sync_from_published_definition(
+            workflow,
+            target_version,
+            enabled=True,
+        )
+
         try:
             await self.session.commit()
         except Exception as exc:
@@ -1571,6 +1582,13 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
                     project_id=workflow.project_id,
                     published_version_id=target_version.id,
                     user_id=self.user.id,
+                    error_type=type(exc).__name__,
+                )
+            )
+            AuditEventDispatcher.dispatch(
+                EventSubscriptionLifecycleEvent(
+                    workflow_id=workflow.id,
+                    action="published",
                     error_type=type(exc).__name__,
                 )
             )
@@ -1605,6 +1623,18 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
                 project_id=workflow.project_id,
                 published_version_id=target_version.id,
                 user_id=self.user.id,
+            )
+        )
+
+        # Optional post-commit lifecycle hint; DB reconciliation is authoritative if lost.
+        AuditEventDispatcher.dispatch(
+            EventSubscriptionLifecycleEvent(
+                workflow_id=workflow.id,
+                action="published",
+                created_count=len(subscription_changeset.created),
+                updated_count=len(subscription_changeset.updated),
+                retired_count=len(subscription_changeset.retired),
+                disabled_count=len(subscription_changeset.disabled),
             )
         )
 
@@ -1651,6 +1681,16 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
                 is_enabled=False,
             )
 
+        # Disable desired consumption while retaining subscription/source identity and
+        # progress for a later republish. Keyed by workflow, so it runs even if the
+        # published version record is missing.
+        subscription_service = EventSubscriptionService(self.session, self.user)
+        subscription_changeset = await subscription_service.sync_from_published_definition(
+            workflow,
+            published_version,
+            enabled=False,
+        )
+
         try:
             await self.session.commit()
         except Exception as exc:
@@ -1663,6 +1703,13 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
                     error_type=type(exc).__name__,
                 )
             )
+            AuditEventDispatcher.dispatch(
+                EventSubscriptionLifecycleEvent(
+                    workflow_id=workflow.id,
+                    action="unpublished",
+                    error_type=type(exc).__name__,
+                )
+            )
             raise
 
         AuditEventDispatcher.dispatch(
@@ -1671,6 +1718,15 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
                 version=version_number,
                 workflow_name=workflow.name,
                 project_id=workflow.project_id,
+            )
+        )
+
+        # Optional post-commit lifecycle hint; DB reconciliation is authoritative if lost.
+        AuditEventDispatcher.dispatch(
+            EventSubscriptionLifecycleEvent(
+                workflow_id=workflow.id,
+                action="unpublished",
+                disabled_count=len(subscription_changeset.disabled),
             )
         )
 
@@ -1814,6 +1870,12 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
         )
         if non_terminal_count:
             raise WorkflowHasActiveExecutionsError(non_terminal_count, workflow_id=workflow_id)
+
+        # Conservatively block deletion while event-subscription evidence is still
+        # bound; the RESTRICT FK is the DB backstop. Recovery-aware release is a
+        # later story.
+        subscription_service = EventSubscriptionService(self.session, self.user)
+        await subscription_service.assert_workflow_not_bound(workflow_id, workflow.name)
 
         # Explicit cleanup retained so trigger deletion is logged individually
         # (delete_triggers_for_workflow logs each removal); DB CASCADE would also

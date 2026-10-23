@@ -21,6 +21,8 @@ from syntara.core.models.principal import Principal
 from syntara.core.models.secret import EncryptedSecret, Secret
 from syntara.credentials.models.credential import Credential
 from syntara.credentials.models.credential_type import CredentialType
+from syntara.eventstreams.models.source import EventSubscriptionSource
+from syntara.eventstreams.models.subscription import EventSubscription
 from syntara.files.models import FileMetadata
 from syntara.identity_providers.models.identity_provider import IdentityProvider
 from syntara.identity_providers.models.idp_group_mapping import IdpGroupMappingEntry
@@ -79,4 +81,6 @@ ALL_MODELS = [
     WebhookTrigger,
     AuditOutboxRecord,
     AuditTableMetadata,
+    EventSubscription,
+    EventSubscriptionSource,
 ]
