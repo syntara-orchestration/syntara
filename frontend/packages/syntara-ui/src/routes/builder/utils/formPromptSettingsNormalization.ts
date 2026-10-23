@@ -1,4 +1,4 @@
-import { ActivityTypeEnum, EdgeHandleEnum, type Activity } from '@syntara/contracts'
+import { ActivityTypeEnum, EdgeHandleEnum, type Activity, type WorkflowAPI } from '@syntara/contracts'
 
 import { prepareFormDefinitionForCommit, safeParseFormDefinition } from '../../../forms'
 import type { EdgeConnection } from '../types/edge'
@@ -33,19 +33,20 @@ export function formPromptHasFallbackEdge(activityId: string, edges: EdgeConnect
   })
 }
 
-/** Keys allowed by the backend form_prompt parameterSchema (additionalProperties: false). */
-const FORM_PROMPT_PARAMETER_KEYS = new Set([
-  'message',
-  'form_definition',
-  'responder_users',
-  'responder_groups',
-  'response_window',
-  'fallback_decision',
-  'submit_label',
-  'success_message',
-  'timezone',
-  'css_override',
-])
+/** Compile-time exhaustive against the generated backend parameter contract. */
+const FORM_PROMPT_PARAMETER_KEY_SET = {
+  message: true,
+  form_definition: true,
+  responder_users: true,
+  responder_groups: true,
+  response_window: true,
+  fallback_decision: true,
+  submit_label: true,
+  success_message: true,
+  css_override: true,
+} satisfies Record<keyof WorkflowAPI.components['schemas']['FormPromptNodeParameters'], true>
+
+const FORM_PROMPT_PARAMETER_KEYS = new Set(Object.keys(FORM_PROMPT_PARAMETER_KEY_SET))
 
 function sanitizeFormPromptParameters(parameters: Record<string, unknown>): Record<string, unknown> {
   const sanitized: Record<string, unknown> = {}
@@ -74,8 +75,11 @@ function sanitizeFormPromptParameters(parameters: Record<string, unknown>): Reco
 
 /**
  * Normalize form_prompt activities before workflow definition validation/save.
- * Strips UI-only fields (e.g. fallback_behavior) and cross-step keys (e.g. approval
- * ``prompt``) that cause JSON Schema oneOf validation to surface misleading agentic errors.
+ *
+ * The backend form_prompt parameterSchema is `additionalProperties: false`, so any key
+ * outside the contract makes validate and save fail outright. Strips UI-only fields
+ * (e.g. `fallback_behavior`, mapped forward to `fallback_decision`) and cross-step
+ * leftovers from a step that changed type.
  */
 export function normalizeFormPromptActivityForDefinition(activity: Activity): Activity {
   if (activity.type !== ActivityTypeEnum.FORM_PROMPT) return activity

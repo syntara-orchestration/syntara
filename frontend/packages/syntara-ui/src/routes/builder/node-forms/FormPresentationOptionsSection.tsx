@@ -8,7 +8,6 @@ import { nodeHelp } from './shared/nodeFieldHelp'
 export type FormPresentationFormFields = {
   submit_label?: string | null
   success_message?: string | null
-  timezone?: string | null
   css_override?: string | null
 }
 

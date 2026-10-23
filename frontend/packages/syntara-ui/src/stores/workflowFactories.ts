@@ -370,7 +370,6 @@ export type CreateFormPromptActivityOptions = {
   fallback_decision?: 'submit' | 'fallback' | null
   submit_label?: string | null
   success_message?: string | null
-  timezone?: string | null
   css_override?: string | null
   settings?: Activity['settings']
 }
