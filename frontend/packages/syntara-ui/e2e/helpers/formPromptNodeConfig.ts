@@ -42,14 +42,6 @@ export async function fillFormSubmissionWindow(page: Page, totalSeconds: number)
   await page.getByLabel('Seconds').fill(String(seconds))
 }
 
-export async function setFormPromptEngineDurationSeconds(page: Page, seconds: number) {
-  await page.getByRole('tab', { name: 'Settings' }).click()
-  const durationInput = page.getByRole('spinbutton', { name: 'Expected duration (seconds)' })
-  await expect(durationInput).toBeVisible({ timeout: 10_000 })
-  await durationInput.fill(String(seconds))
-  await page.getByRole('tab', { name: 'Parameters' }).click()
-}
-
 export async function enableFormPromptContinueOnFailure(page: Page) {
   const enableLink = page.getByRole('button', { name: 'Enable continue on failure' })
   if (await enableLink.isVisible().catch(() => false)) {
@@ -128,7 +120,6 @@ export async function configureOpenFormPromptNode(
     name: string
     message?: string
     responseWindowSeconds?: number
-    engineDurationSeconds?: number
     fallbackDecision?: 'fallback' | 'submit'
     responderUserPicker?: string
     responderUserManual?: string
@@ -161,10 +152,6 @@ export async function configureOpenFormPromptNode(
 
   if (config.responseWindowSeconds !== undefined) {
     await fillFormSubmissionWindow(page, config.responseWindowSeconds)
-  }
-
-  if (config.engineDurationSeconds !== undefined) {
-    await setFormPromptEngineDurationSeconds(page, config.engineDurationSeconds)
   }
 
   if (config.fallbackDecision) {

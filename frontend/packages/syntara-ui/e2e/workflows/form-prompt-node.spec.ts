@@ -95,7 +95,6 @@ test.describe('Form prompt — node configuration', { tag: '@pr-check' }, () => 
         name: FORM_PROMPT_NODE_NAME,
         message: promptMessage,
         responseWindowSeconds: 45 * 60,
-        engineDurationSeconds: 900,
         fallbackDecision: 'submit',
         responderUserPicker: 'demo',
         responderGroup: 'admins',
@@ -114,7 +113,7 @@ test.describe('Form prompt — node configuration', { tag: '@pr-check' }, () => 
       expect(stored.fallback_decision).toBe('submit')
       expect(stored.responder_users).toEqual(['demo'])
       expect(stored.responder_groups).toEqual(['admins'])
-      expect(stored.activity_timeout).toBe(900)
+      expect(stored.activity_timeout).toBeUndefined()
 
       const definition = await readFormPromptDefinitionFromApi(app, workflowId)
       expect(definition.fields[0]?.label).toBe(fieldLabel)
@@ -129,7 +128,7 @@ test.describe('Form prompt — node configuration', { tag: '@pr-check' }, () => 
       await expect(form.getByText('demo', { exact: true })).toBeVisible()
       await expect(form.getByText('admins', { exact: true })).toBeVisible()
       await app.getByRole('tab', { name: 'Settings' }).click()
-      await expect(app.getByRole('spinbutton', { name: 'Expected duration (seconds)' })).toHaveValue('900')
+      await expect(app.getByRole('spinbutton', { name: 'Expected duration (seconds)' })).toHaveCount(0)
       await app.getByRole('tab', { name: 'Parameters' }).click()
       await expect(app.getByRole('textbox', { name: 'Field label' })).toHaveValue(fieldLabel)
       await expect(app.getByText('Default field values')).toBeVisible()
