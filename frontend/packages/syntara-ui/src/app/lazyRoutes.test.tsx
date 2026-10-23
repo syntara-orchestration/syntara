@@ -13,6 +13,7 @@ import {
   EditIdentityProvider,
   ExecutionDetail,
   ExecutionPlane,
+  ExecutionTargetDetail,
   Executions,
   Glossary,
   IntegrationForm,
@@ -35,6 +36,9 @@ vi.mock('../routes/configuration/integrations/Integrations', () => ({
 vi.mock('../routes/documentation/glossary/Glossary', () => ({ default: () => <div>Glossary</div> }))
 vi.mock('../routes/approvals/Approvals', () => ({ default: () => <div>Approvals</div> }))
 vi.mock('../routes/execution-plane/ExecutionPlane', () => ({ default: () => <div>ExecutionPlane</div> }))
+vi.mock('../routes/execution-plane/ExecutionTargetDetail', () => ({
+  default: () => <div>ExecutionTargetDetail</div>,
+}))
 vi.mock('../routes/access-management/AccessManagement', () => ({
   AccessManagement: () => <div>AccessManagement</div>,
 }))
@@ -61,6 +65,7 @@ describe('lazyRoutes', () => {
       Glossary,
       Approvals,
       ExecutionPlane,
+      ExecutionTargetDetail,
       AccessManagement,
       Authentication,
       AddIdentityProvider,
@@ -83,6 +88,7 @@ describe('lazyRoutes', () => {
       ['Glossary', Glossary, 'Glossary'],
       ['Approvals', Approvals, 'Approvals'],
       ['ExecutionPlane', ExecutionPlane, 'ExecutionPlane'],
+      ['ExecutionTargetDetail', ExecutionTargetDetail, 'ExecutionTargetDetail'],
       ['AccessManagement', AccessManagement, 'AccessManagement'],
       ['Authentication', Authentication, 'Authentication'],
       ['AddIdentityProvider', AddIdentityProvider, 'AddIdentityProvider'],

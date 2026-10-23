@@ -443,6 +443,8 @@ export const handlers = [
     }
 
     const url = new URL(request.url)
+    const id = url.searchParams.get('id')
+    const clusterId = url.searchParams.get('cluster_id')
     const nameContains = url.searchParams.get('name[contains]')
     const cursor = url.searchParams.get('cursor')
     const parsedLimit = Number.parseInt(url.searchParams.get('limit') ?? '20', 10)
@@ -450,6 +452,12 @@ export const handlers = [
     const includeTotal = url.searchParams.get('include_total') === 'true'
 
     let filtered = [...executionTargets]
+    if (id) {
+      filtered = filtered.filter((target) => target.id === id)
+    }
+    if (clusterId) {
+      filtered = filtered.filter((target) => target.cluster_id === clusterId)
+    }
     if (nameContains) {
       const lower = nameContains.toLowerCase()
       filtered = filtered.filter((target) => target.name.toLowerCase().includes(lower))

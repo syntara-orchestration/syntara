@@ -246,6 +246,15 @@ export const pages: PageEntry[] = [
       await expect(page.getByText(/No results found|Adjust your filters/i)).toBeVisible()
     },
   },
+  {
+    section: 'execution-plane',
+    name: 'execution-target-detail',
+    path: AppRoute.ExecutionPlane.Detail.replace(':executionTargetId', 'a1000000-0000-4000-8000-000000000001'),
+    waitFor: async (page) => {
+      await expect(page.getByRole('heading', { level: 1, name: 'Prod OpenShift West' })).toBeVisible()
+      await expect(page.getByText('Execution namespace')).toBeVisible()
+    },
+  },
 
   // ══════════════════════════════════════════════════════════════════════════
   // ACCESS MANAGEMENT — Users

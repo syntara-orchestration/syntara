@@ -110,8 +110,8 @@ describe('ExecutionPlane', () => {
 
     expect(await screen.findByRole('heading', { level: 1, name: 'Execution Plane' })).toBeInTheDocument()
     expectPageTitle(['Execution Plane'])
-    expect(screen.getByText('Prod OpenShift West')).toBeInTheDocument()
-    expect(screen.getByText('Staging OpenShift')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Prod OpenShift West' })).toHaveAttribute('href', '/execution-plane/et-001')
+    expect(screen.getByRole('link', { name: 'Staging OpenShift' })).toHaveAttribute('href', '/execution-plane/et-002')
     expect(screen.getByText('cl-001')).toBeInTheDocument()
     expect(screen.getByText('Ready')).toBeInTheDocument()
     expect(screen.getByText('region=us-west')).toBeInTheDocument()

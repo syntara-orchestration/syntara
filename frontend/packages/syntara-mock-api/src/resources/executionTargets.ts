@@ -25,6 +25,7 @@ export const executionTargets: ExecutionTargetFacadeRead[] = [
     labels: {
       region: 'us-west',
       env: 'prod',
+      integration_id: 'b1000000-0000-4000-8000-000000000001',
     },
     created_at: mockDate.daysAgo7,
     last_ran_at: mockDate.minutesAgo30,

@@ -73,6 +73,12 @@ export const NAV_ITEMS: TNavigationItem[] = [
     requiredPermissions: [{ action: 'read', resourceType: 'execution_target' }],
   },
   {
+    label: 'Execution Target Detail',
+    path: AppRoute.ExecutionPlane.Detail,
+    hidden: true,
+    requiredPermissions: [{ action: 'read', resourceType: 'execution_target' }],
+  },
+  {
     label: 'Configuration',
     path: AppRoute.Configuration.Integrations.Root,
     icon: <RhUiFolderIcon />,
