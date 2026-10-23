@@ -16,6 +16,7 @@ import { buildWorkflowDefinition } from './utils/workflowDefinitionBuilder'
 import type { EdgeType } from './utils/workflowToGraph'
 import { validateWorkflowDraft } from './workflowWebMcp'
 import { createWorkflowConnectionTools, saveCanvasConnection } from './workflowWebMcpConnectionTools'
+import { createWorkflowDetailsTool } from './workflowWebMcpDetailsTool'
 import { createWorkflowDraftTool } from './workflowWebMcpDraftTool'
 import { getWorkflowGuide, WORKFLOW_GUIDE_SCHEMA, WORKFLOW_GUIDE_TOPICS } from './workflowWebMcpGuide'
 import { createWorkflowNodeTools, getAvailableSourceHandles } from './workflowWebMcpNodeTools'
@@ -400,6 +401,7 @@ function buildToolDefinitions(actionsRef: { current: CurrentActions }): ToolDefi
   ]
   if (actions.canEdit && actions.isNew) tools.push(createSelectWorkflowProjectTool(actionsRef))
   if (actions.canEdit && actions.isNew) tools.push(createWorkflowDraftTool(actionsRef))
+  if (actions.canEdit) tools.push(createWorkflowDetailsTool(actionsRef))
   if (actions.canEdit) tools.push(createSaveWorkflowTool(actionsRef))
   if (actions.canRun && actions.workflowId && !actions.isNew) {
     tools.push(createRequestWorkflowRunTool(actionsRef))
