@@ -13,7 +13,7 @@ from jsonpatch import JsonPatch  # type: ignore[import-untyped]
 
 from syntara.core.cache.stream import StreamClient
 from syntara.workflows.models.activity_execution import ActivityExecution
-from syntara.workflows.models.execution import ActivityData, Execution
+from syntara.workflows.models.execution import ActivityData, Execution, execution_error_summary
 from syntara.workflows.models.visualization import (
     ActivityPatchMessage,
     ExecutionPatchMessage,
@@ -99,6 +99,10 @@ class ActivityUpdatePublisher:
         """
         # Convert execution to dict (mode="json" serializes UUIDs and datetimes to strings)
         execution_dict = execution.model_dump(mode="json")
+
+        # Mirror the `error` summary field ExecutionRead exposes via the REST API
+        # so WS clients get the same actionable failure signal as GET /executions/{id}.
+        execution_dict["error"] = execution_error_summary(execution)
 
         # Convert activities to ActivityData format
         if execution.activities:
