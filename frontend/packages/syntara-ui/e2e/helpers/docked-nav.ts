@@ -35,16 +35,49 @@ export function mainNavGroup(page: Page, groupName: string): Locator {
     .or(nav.getByRole('link', { name: groupName, exact: true }))
 }
 
-/** Click expand toggle — avoid scrolling `.or()` locators (Playwright can hang). */
-async function clickDockedNavGroupToggle(page: Page, groupName: string): Promise<void> {
+function mainNavGroupListItem(page: Page, groupName: string): Locator {
+  return mainNavigation(page).getByRole('listitem', { name: groupName, exact: true })
+}
+
+function mainNavGroupLink(page: Page, groupName: string): Locator {
+  return mainNavigation(page).getByRole('link', { name: groupName, exact: true })
+}
+
+/** Scroll a single stable node into view — never call `scrollIntoViewIfNeeded` on `.or()` locators. */
+async function scrollDockedNavGroupIntoView(page: Page, groupName: string): Promise<void> {
   const nav = mainNavigation(page)
-  await mainNavGroup(page, groupName).scrollIntoViewIfNeeded()
+  await expect(nav).toBeVisible()
+
+  const listItem = mainNavGroupListItem(page, groupName)
+  if ((await listItem.count()) > 0) {
+    await expect(listItem).toBeVisible()
+    await listItem.scrollIntoViewIfNeeded()
+    return
+  }
+
+  const link = mainNavGroupLink(page, groupName)
+  await expect(link).toBeVisible()
+  await link.scrollIntoViewIfNeeded()
+}
+
+async function clickDockedNavGroupToggle(page: Page, groupName: string): Promise<void> {
+  await scrollDockedNavGroupIntoView(page, groupName)
+
+  const nav = mainNavigation(page)
+  const listItem = mainNavGroupListItem(page, groupName)
+  const expandButton = listItem.getByRole('button')
+  if (await expandButton.isVisible().catch(() => false)) {
+    await expandButton.click()
+    return
+  }
+
   const namedButton = nav.getByRole('button', { name: groupName, exact: true })
   if (await namedButton.isVisible().catch(() => false)) {
     await namedButton.click()
     return
   }
-  await nav.getByRole('listitem', { name: groupName, exact: true }).getByRole('button').click()
+
+  throw new Error(`No expand toggle found for docked nav group "${groupName}"`)
 }
 
 /**
@@ -86,6 +119,7 @@ export async function expectDockedNavGroupChildLinks(
 export async function navigateViaDockedNavGroup(page: Page, groupName: string, childLinkName: string): Promise<void> {
   await expandDockedNavGroup(page, groupName, childLinkName)
   const link = mainNavigation(page).getByRole('link', { name: childLinkName, exact: true })
+  await expect(link).toBeVisible()
   await link.scrollIntoViewIfNeeded()
   await link.click()
 }
