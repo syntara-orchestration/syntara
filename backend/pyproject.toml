@@ -214,7 +214,7 @@ ignore = [
     "T201",   # print() is intentional CLI output
     "BLE001", # broad Exception needed for external lib error handling
 ]
-"src/syntara/workflows/workflow_engine/unified_eval.py" = ["PLR0911"]  # _eval_node dispatcher needs 7 returns for clarity
+"src/syntara/workflow_runtime/engines/unified_eval.py" = ["PLR0911"]  # _eval_node dispatcher needs 7 returns for clarity
 
 # Pyrefly configuration — used in pre-commit for fast local type checking (~3s).
 # Mypy (strict) continues to run in CI via a dedicated GitHub Actions job.
@@ -328,8 +328,8 @@ omit = [
     "src/api_client/*",  # Auto-generated API client, not production code
     "src/cli/*",  # CLI package, tested separately
     "src/syntara/core/database/migrations/**",  # Alembic migrations, not unit-testable
-    "src/syntara/workflows/worker.py",  # Entrypoint scripts, not unit-testable
-    "src/syntara/workflows/background_worker.py",
+    "src/syntara/workflow_runtime/workers/worker.py",  # Entrypoint scripts, not unit-testable
+    "src/syntara/workflow_runtime/workers/background_worker.py",
 ]
 
 [tool.coverage.report]

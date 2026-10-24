@@ -10,10 +10,10 @@ Tests instance group ID/name resolution including:
 import httpx
 import pytest
 
-from syntara.workflows.workflow_engine.activities.aap_job_template_activity import (
+from syntara.workflow_core.models import AAPJobTemplateExecutorParameters
+from syntara.workflow_runtime.engines.temporal.activities.aap_job_template_activity import (
     _build_launch_body,
 )
-from syntara.workflows.workflow_engine.models.workflow_definition import AAPJobTemplateExecutorParameters
 
 TEST_AAP_URL = "http://test.aap"
 TEST_ORG_NAME = "Engineering"

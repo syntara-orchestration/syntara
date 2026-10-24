@@ -31,8 +31,8 @@ from sqlmodel import col, select
 from syntara.core.config.base import get_settings
 from syntara.metrics.recorder import MetricsRecorder
 from syntara.metrics.types import MetricType
+from syntara.workflow_runtime.engines.temporal.services.temporal_execution_service import TemporalExecutionService
 from syntara.workflows.models.workflow import Workflow
-from syntara.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
 
 if TYPE_CHECKING:
     from sqlmodel.ext.asyncio.session import AsyncSession

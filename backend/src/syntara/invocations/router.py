@@ -36,8 +36,8 @@ from syntara.core.jsonb_limits import validate_jsonb_size
 from syntara.core.models import User
 from syntara.core.syntara_router import SyntaraRouter
 from syntara.core.utils.session_factory import create_session_factory_from_request
+from syntara.workflow_runtime.engines.temporal.services.temporal_execution_service import TemporalExecutionService
 from syntara.workflows.executions_router import get_temporal_execution_service
-from syntara.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
 
 router = SyntaraRouter(prefix="/invocations", tags=["Invocation"])
 

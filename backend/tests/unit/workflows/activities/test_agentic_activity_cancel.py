@@ -10,7 +10,7 @@ from uuid import uuid4
 
 import pytest
 
-from syntara.workflows.workflow_engine.activities.agentic_activity import (
+from syntara.workflow_runtime.engines.temporal.activities.agentic_activity import (
     cancel_agentic_invocation_activity,
 )
 
@@ -58,7 +58,7 @@ def _patch_get_db(mock_session: AsyncMock):  # noqa: ANN202
 def _patch_agent_client(mock_client: AsyncMock):  # noqa: ANN202
     """Patch AgentOrchestratorClient constructor to return mock_client."""
     return patch(
-        "syntara.workflows.workflow_engine.activities.agentic_activity.AgentOrchestratorClient",
+        "syntara.workflow_runtime.engines.temporal.activities.agentic_activity.AgentOrchestratorClient",
         return_value=mock_client,
     )
 

@@ -11,7 +11,7 @@ from typing import Any
 
 import pytest
 
-from syntara.workflows.utils.namespace_resolver import NamespaceResolver
+from syntara.workflow_core.utils.namespace_resolver import NamespaceResolver
 
 # ---------------------------------------------------------------------------
 # Fixtures

@@ -76,7 +76,7 @@ built-in workflow definition without manual intervention.
 
 ### Routing at Dispatch Time
 
-`TemporalExecutionService.start_workflow()` (`src/syntara/workflows/workflow_engine/services/temporal_execution_service.py`)
+`TemporalExecutionService.start_workflow()` (`src/syntara/workflow_runtime/engines/temporal/services/temporal_execution_service.py`)
 accepts an `is_builtin: bool = False` keyword argument. The queue selection is a single
 conditional at the Temporal client call:
 
@@ -107,14 +107,14 @@ nothing downstream of the service needs to know about queue names.
 
 ### Entrypoint and Lifecycle
 
-`src/syntara/workflows/background_worker.py` is the background worker process entrypoint:
+`src/syntara/workflow_runtime/workers/background_worker.py` is the background worker process entrypoint:
 
 ```
-python -m syntara.workflows.background_worker
+python -m syntara.workflow_runtime.workers.background_worker
 ```
 
 It calls the same `run_worker()` lifecycle function as the main workflow worker
-(`src/syntara/workflows/worker_lifecycle.py`). `run_worker()` is not a background task or
+(`src/syntara/workflow_runtime/workers/worker_lifecycle.py`). `run_worker()` is not a background task or
 a thread — it is the main event loop of the worker process, blocking on
 `asyncio.Event.wait()` until a `SIGTERM` or `SIGINT` arrives, then draining in-flight
 activities before exit.
@@ -133,7 +133,7 @@ The shared `run_worker()` function handles:
 ### Reduced Activity Surface
 
 The background worker runs a smaller activity registry than the main workflow worker
-(`src/syntara/workflows/workflow_engine/activities/registry.py`):
+(`src/syntara/workflow_runtime/engines/temporal/activities/registry.py`):
 
 | Registry | Used by | Activities |
 |---|---|---|
@@ -334,7 +334,7 @@ files only.
 
 ### Step 1 — Register an internal operation handler
 
-`execute_internal_activity` (`src/syntara/workflows/workflow_engine/activities/internal_activity.py`)
+`execute_internal_activity` (`src/syntara/workflow_runtime/engines/temporal/activities/internal_activity.py`)
 is the single Temporal activity that all built-in workflows dispatch through. It looks up the
 `activity` parameter from the node config in `_DISPATCH`, a plain dict of
 `str → async callable`:

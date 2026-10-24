@@ -23,7 +23,7 @@ _DEFAULT_ARGS: list[Any] = [{"schema_version": "2.0.0"}, "exec-1", "trigger_manu
 
 
 def _fingerprint(args: Sequence[Any]) -> str:
-    from syntara.workflows.workflow_engine.workflow_auth import _fingerprint_args
+    from syntara.workflow_runtime.engines.temporal.workflow_auth import _fingerprint_args
 
     return _fingerprint_args(args)
 
@@ -47,10 +47,10 @@ class TestWorkflowAuth:
 
     def test_sign_verify_roundtrip(self) -> None:
         with patch(
-            "syntara.workflows.workflow_engine.workflow_auth._get_signing_key",
+            "syntara.workflow_runtime.engines.temporal.workflow_auth._get_signing_key",
             return_value=_TEST_KEY,
         ):
-            from syntara.workflows.workflow_engine.workflow_auth import sign_workflow, verify_workflow
+            from syntara.workflow_runtime.engines.temporal.workflow_auth import sign_workflow, verify_workflow
 
             args = [{"key": "value"}, "exec-1"]
             token = sign_workflow("wf-1", "orchestrator_workflow", args)
@@ -58,10 +58,10 @@ class TestWorkflowAuth:
 
     def test_wrong_workflow_id_rejected(self) -> None:
         with patch(
-            "syntara.workflows.workflow_engine.workflow_auth._get_signing_key",
+            "syntara.workflow_runtime.engines.temporal.workflow_auth._get_signing_key",
             return_value=_TEST_KEY,
         ):
-            from syntara.workflows.workflow_engine.workflow_auth import sign_workflow, verify_workflow
+            from syntara.workflow_runtime.engines.temporal.workflow_auth import sign_workflow, verify_workflow
 
             args = ["a", "b"]
             token = sign_workflow("workflow-a", "orchestrator_workflow", args)
@@ -69,10 +69,10 @@ class TestWorkflowAuth:
 
     def test_wrong_workflow_type_rejected(self) -> None:
         with patch(
-            "syntara.workflows.workflow_engine.workflow_auth._get_signing_key",
+            "syntara.workflow_runtime.engines.temporal.workflow_auth._get_signing_key",
             return_value=_TEST_KEY,
         ):
-            from syntara.workflows.workflow_engine.workflow_auth import sign_workflow, verify_workflow
+            from syntara.workflow_runtime.engines.temporal.workflow_auth import sign_workflow, verify_workflow
 
             args = ["a", "b"]
             token = sign_workflow("workflow-a", "orchestrator_workflow", args)
@@ -80,20 +80,20 @@ class TestWorkflowAuth:
 
     def test_wrong_args_rejected(self) -> None:
         with patch(
-            "syntara.workflows.workflow_engine.workflow_auth._get_signing_key",
+            "syntara.workflow_runtime.engines.temporal.workflow_auth._get_signing_key",
             return_value=_TEST_KEY,
         ):
-            from syntara.workflows.workflow_engine.workflow_auth import sign_workflow, verify_workflow
+            from syntara.workflow_runtime.engines.temporal.workflow_auth import sign_workflow, verify_workflow
 
             token = sign_workflow("wf-1", "orchestrator_workflow", ["legit-wf", "trigger"])
             assert not verify_workflow("wf-1", "orchestrator_workflow", ["evil-wf", "trigger"], token)
 
     def test_sign_verify_after_temporal_round_trip(self) -> None:
         with patch(
-            "syntara.workflows.workflow_engine.workflow_auth._get_signing_key",
+            "syntara.workflow_runtime.engines.temporal.workflow_auth._get_signing_key",
             return_value=_TEST_KEY,
         ):
-            from syntara.workflows.workflow_engine.workflow_auth import sign_workflow, verify_workflow
+            from syntara.workflow_runtime.engines.temporal.workflow_auth import sign_workflow, verify_workflow
 
             raw_args: list[Any] = [
                 datetime(2024, 1, 1, tzinfo=UTC),
@@ -107,10 +107,10 @@ class TestWorkflowAuth:
 
     def test_fingerprint_args_distinct_for_concatenation_collisions(self) -> None:
         with patch(
-            "syntara.workflows.workflow_engine.workflow_auth._get_signing_key",
+            "syntara.workflow_runtime.engines.temporal.workflow_auth._get_signing_key",
             return_value=_TEST_KEY,
         ):
-            from syntara.workflows.workflow_engine.workflow_auth import _fingerprint_args
+            from syntara.workflow_runtime.engines.temporal.workflow_auth import _fingerprint_args
 
             assert _fingerprint_args([12, 3]) != _fingerprint_args([1, 23])
             assert _fingerprint_args([]) != _fingerprint_args([None])
@@ -118,10 +118,10 @@ class TestWorkflowAuth:
 
     def test_schedule_launcher_timestamp_suffix_accepted(self) -> None:
         with patch(
-            "syntara.workflows.workflow_engine.workflow_auth._get_signing_key",
+            "syntara.workflow_runtime.engines.temporal.workflow_auth._get_signing_key",
             return_value=_TEST_KEY,
         ):
-            from syntara.workflows.workflow_engine.workflow_auth import sign_workflow, verify_workflow
+            from syntara.workflow_runtime.engines.temporal.workflow_auth import sign_workflow, verify_workflow
 
             wf_id = "4297d494-0336-474e-9165-49411e2facc6"
             trigger_id = "sched_trigger"
@@ -133,10 +133,10 @@ class TestWorkflowAuth:
 
     def test_schedule_launcher_invalid_suffix_rejected(self) -> None:
         with patch(
-            "syntara.workflows.workflow_engine.workflow_auth._get_signing_key",
+            "syntara.workflow_runtime.engines.temporal.workflow_auth._get_signing_key",
             return_value=_TEST_KEY,
         ):
-            from syntara.workflows.workflow_engine.workflow_auth import sign_workflow, verify_workflow
+            from syntara.workflow_runtime.engines.temporal.workflow_auth import sign_workflow, verify_workflow
 
             wf_id = "4297d494-0336-474e-9165-49411e2facc6"
             trigger_id = "sched_trigger"
@@ -147,19 +147,19 @@ class TestWorkflowAuth:
 
     def test_invalid_token_rejected(self) -> None:
         with patch(
-            "syntara.workflows.workflow_engine.workflow_auth._get_signing_key",
+            "syntara.workflow_runtime.engines.temporal.workflow_auth._get_signing_key",
             return_value=_TEST_KEY,
         ):
-            from syntara.workflows.workflow_engine.workflow_auth import verify_workflow
+            from syntara.workflow_runtime.engines.temporal.workflow_auth import verify_workflow
 
             assert not verify_workflow("wf-1", "orchestrator_workflow", [], b"not-a-valid-hmac")
 
     def test_build_auth_header_returns_payload(self) -> None:
         with patch(
-            "syntara.workflows.workflow_engine.workflow_auth._get_signing_key",
+            "syntara.workflow_runtime.engines.temporal.workflow_auth._get_signing_key",
             return_value=_TEST_KEY,
         ):
-            from syntara.workflows.workflow_engine.workflow_auth import HEADER_NAME, build_auth_header
+            from syntara.workflow_runtime.engines.temporal.workflow_auth import HEADER_NAME, build_auth_header
 
             headers = build_auth_header("my-workflow-id", "orchestrator_workflow", ["a", "b"])
             assert HEADER_NAME in headers
@@ -190,7 +190,9 @@ class TestWorkflowAuthInboundInterceptor:
 
     @staticmethod
     def _make_interceptor() -> WorkflowInboundInterceptor:
-        from syntara.workflows.workflow_engine.interceptors.auth_interceptor import _WorkflowAuthInboundInterceptor
+        from syntara.workflow_runtime.engines.temporal.interceptors.auth_interceptor import (
+            _WorkflowAuthInboundInterceptor,
+        )
 
         next_interceptor = MagicMock()
         next_interceptor.execute_workflow = MagicMock()
@@ -208,9 +210,9 @@ class TestWorkflowAuthInboundInterceptor:
         )
 
         with (
-            patch("syntara.workflows.workflow_engine.interceptors.auth_interceptor.workflow") as mock_wf,
+            patch("syntara.workflow_runtime.engines.temporal.interceptors.auth_interceptor.workflow") as mock_wf,
             patch(
-                "syntara.workflows.workflow_engine.interceptors.auth_interceptor.verify_workflow",
+                "syntara.workflow_runtime.engines.temporal.interceptors.auth_interceptor.verify_workflow",
                 side_effect=lambda wid, wtype, args, tok: hmac_mod.compare_digest(_sign(wid, wtype, args), tok),
             ),
         ):
@@ -227,7 +229,7 @@ class TestWorkflowAuthInboundInterceptor:
         info = _FakeWorkflowInfo()
         input_data = _FakeExecuteWorkflowInput(headers={})
 
-        with patch("syntara.workflows.workflow_engine.interceptors.auth_interceptor.workflow") as mock_wf:
+        with patch("syntara.workflow_runtime.engines.temporal.interceptors.auth_interceptor.workflow") as mock_wf:
             mock_wf.info.return_value = info
 
             with pytest.raises(ApplicationError, match="Unauthorized"):
@@ -242,9 +244,9 @@ class TestWorkflowAuthInboundInterceptor:
         )
 
         with (
-            patch("syntara.workflows.workflow_engine.interceptors.auth_interceptor.workflow") as mock_wf,
+            patch("syntara.workflow_runtime.engines.temporal.interceptors.auth_interceptor.workflow") as mock_wf,
             patch(
-                "syntara.workflows.workflow_engine.interceptors.auth_interceptor.verify_workflow",
+                "syntara.workflow_runtime.engines.temporal.interceptors.auth_interceptor.verify_workflow",
                 return_value=False,
             ),
         ):
@@ -259,7 +261,7 @@ class TestWorkflowAuthInboundInterceptor:
         info = _FakeWorkflowInfo(parent=MagicMock())
         input_data = _FakeExecuteWorkflowInput(headers={})
 
-        with patch("syntara.workflows.workflow_engine.interceptors.auth_interceptor.workflow") as mock_wf:
+        with patch("syntara.workflow_runtime.engines.temporal.interceptors.auth_interceptor.workflow") as mock_wf:
             mock_wf.info.return_value = info
             interceptor.next = MagicMock()
             interceptor.next.execute_workflow = AsyncMock(return_value="child-result")
@@ -286,7 +288,7 @@ class TestWorkflowAuthClientInterceptor:
 
     @pytest.mark.asyncio
     async def test_injects_auth_header(self) -> None:
-        from syntara.workflows.workflow_engine.client_interceptor import WorkflowAuthClientInterceptor
+        from syntara.workflow_runtime.engines.temporal.client_interceptor import WorkflowAuthClientInterceptor
 
         next_outbound = MagicMock()
         next_outbound.start_workflow = AsyncMock(return_value="handle")
@@ -296,7 +298,7 @@ class TestWorkflowAuthClientInterceptor:
 
         input_data = _FakeStartWorkflowInput()
         with patch(
-            "syntara.workflows.workflow_engine.client_interceptor.sign_workflow",
+            "syntara.workflow_runtime.engines.temporal.client_interceptor.sign_workflow",
             return_value=_sign(input_data.id, input_data.workflow),
         ):
             await outbound.start_workflow(input_data)  # type: ignore[arg-type]

@@ -5,7 +5,7 @@ from uuid import UUID
 import pytest
 
 from syntara.core.config.base import get_settings
-from syntara.workflows.utils.url import generate_activity_signal_url, get_api_base_url
+from syntara.workflow_runtime.utils.url import generate_activity_signal_url, get_api_base_url
 
 
 def test_get_api_base_url_with_configured_base_url(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -7,7 +7,7 @@ from temporalio.exceptions import ApplicationError
 
 from syntara.integrations.models.integration import IntegrationType
 from syntara.integrations.models.integration_configuration import AAPConfiguration
-from syntara.workflows.workflow_engine.activities.integration_resolution_activity import (
+from syntara.workflow_runtime.engines.temporal.activities.integration_resolution_activity import (
     _resolve_integration,
 )
 
@@ -145,7 +145,7 @@ class TestResolveWorkflowIntegrationActivity:
 
     @pytest.mark.anyio
     async def test_delegates_to_resolve_integration(self) -> None:
-        from syntara.workflows.workflow_engine.activities.integration_resolution_activity import (
+        from syntara.workflow_runtime.engines.temporal.activities.integration_resolution_activity import (
             resolve_workflow_integration,
         )
 
@@ -158,11 +158,11 @@ class TestResolveWorkflowIntegrationActivity:
 
         with (
             patch(
-                "syntara.workflows.workflow_engine.activities.integration_resolution_activity._session_factory",
+                "syntara.workflow_runtime.engines.temporal.activities.integration_resolution_activity._session_factory",
                 return_value=mock_ctx,
             ),
             patch(
-                "syntara.workflows.workflow_engine.activities.integration_resolution_activity._resolve_integration",
+                "syntara.workflow_runtime.engines.temporal.activities.integration_resolution_activity._resolve_integration",
                 new_callable=AsyncMock,
                 return_value=expected,
             ) as mock_resolve,
@@ -175,7 +175,7 @@ class TestResolveWorkflowIntegrationActivity:
 
     @pytest.mark.anyio
     async def test_reraises_application_error(self) -> None:
-        from syntara.workflows.workflow_engine.activities.integration_resolution_activity import (
+        from syntara.workflow_runtime.engines.temporal.activities.integration_resolution_activity import (
             resolve_workflow_integration,
         )
 
@@ -186,11 +186,11 @@ class TestResolveWorkflowIntegrationActivity:
 
         with (
             patch(
-                "syntara.workflows.workflow_engine.activities.integration_resolution_activity._session_factory",
+                "syntara.workflow_runtime.engines.temporal.activities.integration_resolution_activity._session_factory",
                 return_value=mock_ctx,
             ),
             patch(
-                "syntara.workflows.workflow_engine.activities.integration_resolution_activity._resolve_integration",
+                "syntara.workflow_runtime.engines.temporal.activities.integration_resolution_activity._resolve_integration",
                 new_callable=AsyncMock,
                 side_effect=ApplicationError("not found", non_retryable=True),
             ),
@@ -201,7 +201,7 @@ class TestResolveWorkflowIntegrationActivity:
 
     @pytest.mark.anyio
     async def test_wraps_generic_exception_as_application_error(self) -> None:
-        from syntara.workflows.workflow_engine.activities.integration_resolution_activity import (
+        from syntara.workflow_runtime.engines.temporal.activities.integration_resolution_activity import (
             resolve_workflow_integration,
         )
 
@@ -212,11 +212,11 @@ class TestResolveWorkflowIntegrationActivity:
 
         with (
             patch(
-                "syntara.workflows.workflow_engine.activities.integration_resolution_activity._session_factory",
+                "syntara.workflow_runtime.engines.temporal.activities.integration_resolution_activity._session_factory",
                 return_value=mock_ctx,
             ),
             patch(
-                "syntara.workflows.workflow_engine.activities.integration_resolution_activity._resolve_integration",
+                "syntara.workflow_runtime.engines.temporal.activities.integration_resolution_activity._resolve_integration",
                 new_callable=AsyncMock,
                 side_effect=RuntimeError("DB gone"),
             ),

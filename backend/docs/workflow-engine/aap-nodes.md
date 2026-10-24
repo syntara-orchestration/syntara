@@ -4,7 +4,7 @@
 
 The AAP nodes launch and monitor jobs on an Ansible Automation Platform controller. Both node types (`aap_job_template` and `aap_workflow_job_template`) follow the same fire-and-poll execution pattern with early output delivery via Temporal heartbeats.
 
-For configuration fields, see `AAPJobTemplateExecutorParameters` and `AAPWorkflowJobTemplateExecutorParameters` in `workflow_engine/models/workflow_definition.py`. For output fields, see `AAPJobTemplateOutput` and `AAPWorkflowJobTemplateOutput` in the same file.
+For configuration fields, see `AAPJobTemplateExecutorParameters` and `AAPWorkflowJobTemplateExecutorParameters` in `workflow_core/models.py`. For output fields, see `AAPJobTemplateOutput` and `AAPWorkflowJobTemplateOutput` in the same file.
 
 ## Execution Pattern: Fire and Poll
 
@@ -125,6 +125,6 @@ Both node types use the same terminal status set (`AAP_JOB_TERMINAL_STATUSES` in
 | `workflow_engine/activities/aap_job_template_activity.py` | Job template activity: config validation, launch, poll, output |
 | `workflow_engine/activities/aap_workflow_job_template_activity.py` | Workflow job template activity (same pattern) |
 | `workflow_engine/activities/aap_common.py` | Shared: `resolve_aap_auth()`, `poll_until_complete()`, `handle_cancellation()`, `build_aap_job_url()` |
-| `workflow_engine/models/workflow_definition.py` | `AAPJobTemplateExecutorParameters`, `AAPWorkflowJobTemplateExecutorParameters`, output models |
+| `workflow_core/models.py` | `AAPJobTemplateExecutorParameters`, `AAPWorkflowJobTemplateExecutorParameters`, output models |
 | `schemas/workflows/v2/executors/aap_job_template.schema.json` | JSON Schema for config validation |
 | `schemas/workflows/v2/executors/aap_workflow_job_template.schema.json` | JSON Schema for config validation |

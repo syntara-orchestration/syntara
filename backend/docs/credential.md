@@ -187,7 +187,7 @@ Credentials are consumed by workflow nodes through the injector resolution syste
 
 ### Credential Scrubbing
 
-The `scrub_credentials()` function (`src/syntara/workflows/workflow_engine/utils/credential_scrubber.py`) replaces values at known credential field names in workflow execution output with `[REDACTED]`. This key-based scrubbing prevents secrets from appearing in activity logs, WebSocket streams, or API responses.
+The `scrub_credentials()` function (`src/syntara/workflow_core/utils/credential_scrubber.py`) replaces values at known credential field names in workflow execution output with `[REDACTED]`. This key-based scrubbing prevents secrets from appearing in activity logs, WebSocket streams, or API responses.
 
 ## Key Rotation
 
