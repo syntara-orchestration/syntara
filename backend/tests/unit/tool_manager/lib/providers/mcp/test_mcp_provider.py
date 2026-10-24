@@ -406,6 +406,37 @@ class TestMCPProvider:
 
     @pytest.mark.asyncio
     @patch("syntara.tool_manager.lib.providers.mcp.mcp_provider.MultiServerMCPClient")
+    async def test_refresh_tools_retries_transient_timeout(self, mock_client_class: Mock) -> None:
+        """AAP-91408: refresh_tools() (used by integration "Test Connection") must
+        tolerate a one-off timeout the same way validate_connection() does.
+
+        The streamable-http transport has a known intermittent race (see the
+        docstring on validate_connection) that times out the first attempt
+        and succeeds on retry. Today only validate_connection retries;
+        refresh_tools()/get_base_tools() — the path behind integration
+        discover()/"Test Connection" — gives up after a single attempt,
+        which is why "Test Connection" can fail once and then succeed
+        immediately after on a retry (e.g. after saving and testing again).
+        """
+        mock_tool = self._create_mock_langchain_tool("calculate_sum", "Calculate sum of two numbers")
+
+        mock_client = AsyncMock()
+        mock_client.get_tools.side_effect = [TimeoutError("Timed out"), [mock_tool]]
+        mock_client_class.return_value = mock_client
+
+        provider = MCPProvider(base_url="http://localhost:8765/mcp", api_key="test-key")
+
+        # Execute - a transient timeout on the first attempt should not fail
+        # the overall operation when the retry succeeds.
+        tools = await provider.refresh_tools()
+
+        # Verify
+        assert len(tools) == 1
+        assert tools[0].name == "calculate_sum"
+        assert mock_client.get_tools.call_count == 2
+
+    @pytest.mark.asyncio
+    @patch("syntara.tool_manager.lib.providers.mcp.mcp_provider.MultiServerMCPClient")
     async def test_refresh_tools_timeout(self, mock_client_class: Mock) -> None:
         """Test tool refresh timeout handling."""
         # Setup

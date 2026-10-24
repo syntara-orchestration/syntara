@@ -249,6 +249,10 @@ class MCPProvider(ToolProviderAdapter):
         Returns raw BaseTools for use in Agent Orchestrator without
         converting to Tool domain models.
 
+        Uses the same retry-on-timeout behavior as validate_connection(), since
+        this path backs the integration "Test Connection" action and is subject
+        to the same intermittent streamable-http transport race.
+
         Returns:
             list[BaseTool]: Raw LangChain tools from provider
 
@@ -258,36 +262,48 @@ class MCPProvider(ToolProviderAdapter):
             ConnectionError: If unable to communicate with provider
 
         """
+        max_attempts = 3
         timeout = 30  # Default timeout for tool retrieval
 
-        try:
-            logger.info("Retrieving base tools from MCP provider", integration_name=self.integration_name)
+        for attempt in range(1, max_attempts + 1):
+            try:
+                logger.info("Retrieving base tools from MCP provider", integration_name=self.integration_name)
 
-            client = await self._get_client()
+                client = await self._get_client()
 
-            # Get tools from MCP server
-            langchain_tools: list[BaseTool] = await asyncio.wait_for(client.get_tools(), timeout=timeout)
+                # Get tools from MCP server
+                langchain_tools: list[BaseTool] = await asyncio.wait_for(client.get_tools(), timeout=timeout)
 
-            logger.info(
-                "Successfully retrieved base tools from MCP provider",
-                tool_count=len(langchain_tools),
-                integration_name=self.integration_name,
-            )
-            return langchain_tools
+                logger.info(
+                    "Successfully retrieved base tools from MCP provider",
+                    tool_count=len(langchain_tools),
+                    integration_name=self.integration_name,
+                )
+                return langchain_tools
 
-        except TimeoutError as e:
-            msg = f"Tool retrieval timed out after {timeout}s"
-            logger.warning(
-                "MCP provider tool retrieval timed out",
-                integration_name=self.integration_name,
-                message=msg,
-                timeout_seconds=timeout,
-            )
-            raise TimeoutError(msg) from e
-        except Exception as e:
-            msg = f"Tool retrieval failed: {e}"
-            logger.exception("MCP provider tool retrieval failed", integration_name=self.integration_name, message=msg)
-            raise ConnectionError(msg) from e
+            except TimeoutError as e:
+                msg = f"Tool retrieval timed out after {timeout}s"
+                logger.warning(
+                    "MCP provider tool retrieval timed out",
+                    integration_name=self.integration_name,
+                    message=msg,
+                    timeout_seconds=timeout,
+                    attempt=attempt,
+                    max_attempts=max_attempts,
+                )
+                if attempt == max_attempts:
+                    raise TimeoutError(msg) from e
+                # Reset the client so the retry starts with a fresh MCP session
+                self._client = None
+            except Exception as e:
+                msg = f"Tool retrieval failed: {e}"
+                logger.exception(
+                    "MCP provider tool retrieval failed", integration_name=self.integration_name, message=msg
+                )
+                raise ConnectionError(msg) from e
+
+        msg = f"Tool retrieval timed out after {timeout}s"
+        raise TimeoutError(msg)
 
     async def refresh_tools(self) -> list[Tool]:
         """Refresh and discover tools from the MCP server.
