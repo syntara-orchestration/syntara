@@ -1,5 +1,6 @@
 /**
  * E2E Tests: Credentials List Page (additive)
+ * AAP-98030: Row chevrons should retain PatternFly spacing before credential names.
  *
  * Tests 2-7 from the ANSTRAT-1901 test plan. Test 1 (Configuration Navigation)
  * is already covered by configuration-navigation.spec.ts.
@@ -23,7 +24,7 @@ import {
 import { paginationFooter } from './helpers/patternfly'
 import { buildUniqueName } from './helpers/workflows'
 import { createCredentialSeed, deleteCredentialViaApi, type SeededCredential } from './seeds/resources'
-import { getAuthToken } from './utils/api'
+import { apiRequest, getAuthToken } from './utils/api'
 
 const seededCredentials: SeededCredential[] = []
 
@@ -95,6 +96,46 @@ test.describe('Credentials Empty State', () => {
 // Test 3: Table Display and Sorting
 // ---------------------------------------------------------------------------
 test.describe('Table Display and Sorting', () => {
+  test('row chevron uses PatternFly spacing before the credential name', async ({ app }) => {
+    const { name, id } = await createTestCredential(app, { prefix: 'e2e-chevron-spacing' })
+
+    try {
+      expect(id).not.toBeNull()
+      const response = await apiRequest(app, 'patch', `/credentials/${id}`, {
+        data: { description: 'Credential with expandable description' },
+      })
+      expect(response.ok()).toBe(true)
+
+      await goToCredentialsList(app)
+      await filterCredentialByName(app, name)
+
+      const table = app.getByRole('grid', { name: 'Credentials table' })
+      const row = table.getByRole('row').filter({ has: app.getByRole('link', { name, exact: true }) })
+      const toggle = row.getByRole('button', { name: 'Details', exact: true })
+      await expect(toggle).toBeVisible()
+
+      const spacing = await toggle.evaluate((button) => {
+        const toggleCell = button.closest('td')
+        const nameCell = toggleCell?.nextElementSibling
+        if (!toggleCell || !nameCell) throw new Error('Expected adjacent expansion and name cells')
+
+        const namePadding = Number.parseFloat(getComputedStyle(nameCell).paddingInlineStart)
+        const togglePadding = Number.parseFloat(getComputedStyle(toggleCell).paddingInlineEnd)
+
+        return {
+          actualGap: nameCell.getBoundingClientRect().left + namePadding - button.getBoundingClientRect().right,
+          patternFlyGap: togglePadding + namePadding,
+        }
+      })
+
+      expect(spacing.actualGap, 'Chevron-to-name gap should contain only PatternFly cell padding').toBeLessThanOrEqual(
+        spacing.patternFlyGap + 1
+      )
+    } finally {
+      await deleteCredentialByName(app, name)
+    }
+  })
+
   test('table displays column headers and supports name sort toggle', async ({ app }) => {
     const credNames: string[] = []
     for (let i = 0; i < 3; i++) {
