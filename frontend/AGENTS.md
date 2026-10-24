@@ -149,43 +149,17 @@ The items below cover patterns ESLint **cannot** catch:
 
 ## Essential Commands
 
-```bash
-# Development
-npm start                  # Start all services (UI, mock API)
-npm run start:ui           # Start UI only
-npm run start:mock-api     # Start mock API only
+Commands are the `scripts` in `package.json`. `npm run check` runs all static analysis concurrently and mirrors the CI "Checks" job.
 
-# Testing
-npm test                    # Run all tests
-npm run test:ui             # Run UI package tests
-npm run e2e                 # Run e2e playwright tests
-npm run e2e:ui              # Run e2e playwright tests in the playwright UI
-npm run e2e:visual-regression        # Page screenshot visual regression (mock API + UI via Playwright webServer)
-npm run e2e:visual-regression:update # Same, with --update-snapshots (see packages/syntara-ui/VISUAL_REGRESSION.md)
+E2E test suite tags — Playwright tags that control where each test runs:
 
-# E2E test suite tags — Playwright tags that control where each test runs:
-#   @pr-check      Fast critical-path tests; select with --grep @pr-check
-#   @local-only    Visual regression tests; excluded from all CI automatically
-# Full rules: .agents/skills/frontend-playwright-e2e/SKILL.md → "Test Suite Tags"
+- `@pr-check` — fast critical-path tests; select with `--grep @pr-check`
+- `@local-only` — visual regression tests; excluded from all CI automatically
+
+Full rules: `.agents/skills/frontend-playwright-e2e/SKILL.md` → "Test Suite Tags".
 
 For a known flaky test that needs temporary quarantine from CI, follow the
 [test quarantine workflow](../docs/ci/test-quarantine.md).
-
-# Run a specific test or coverage
-npx vitest run packages/syntara-ui/path/to/specific/test.test.ts
-npm run test:coverage
-
-# Build
-npm run build              # Build UI package
-npm run gen                # Regenerate API contracts
-
-# Code Quality
-npm run check              # Run all static analysis checks concurrently (mirrors CI "Checks" job)
-npm run format             # Format code
-npm run format:check       # Check formatting
-npm run lint               # Run ESLint
-npm run tsc                # Type check only
-```
 
 GitHub `CI Frontend` treats a PR as frontend code when it touches `frontend/`, `backend/`, `.github/workflows/ci-frontend.yml`, or `.github/actions/`. Paths like `.github/CODEOWNERS` do not turn on that suite.
 
@@ -402,28 +376,9 @@ function MyPage() {
 
 The key passed to `useDocLink` must exist in `src/utils/docs/docsUrls.json` (flat path string per key). TypeScript enforces this at compile time. Community builds resolve every key to the shared README; extended builds resolve per-key URLs when configured. See [`.agents/skills/frontend-coding-standards/SKILL.md`](../.agents/skills/frontend-coding-standards/SKILL.md) section 33 for full details.
 
-## Critical Development Workflows
-
-- **Dependency Management**: PatternFly components consumed from npm; automatic rebuilds in watch mode; hot reloading for component changes
-- **API Contract Generation**: Types generated from external OpenAPI specs, shared between UI and Mock API — update via `npm run gen`
-- **Mocking Approach**: MSW (Mock Service Worker) for consistent API mocking in development and testing
-
-## Performance Notes
-
-- React Compiler for automatic optimization
-- Vite for rapid builds
-- Lazy loading of routes/components
-- Vitest for lightweight testing
-
 ## Development Constraints
 
-### Technical Boundaries
-
 - Node.js 22+ required
-- TypeScript 6.0
-- React 19
-- Vite build system
-- npm workspaces
 
 ### Port Configuration (Development)
 
@@ -433,25 +388,3 @@ The key passed to `useDocLink` must exist in `src/utils/docs/docsUrls.json` (fla
 - WebSocket: derived from page origin (real backend only; override with `VITE_WS_URL` if needed)
 
 E2E tests use different ports (UI: 4173, mock API: 3300) to avoid conflicts with a running dev server.
-
-## Deployment Considerations
-
-- **Containerization**: Podman (local), Docker Buildx (CI/CD)
-- **Multi-architecture**: Supports linux/amd64 and linux/arm64
-- **Production build**: Nginx-based (UI), Node.js (Mock API)
-- **Authentication**: None — no baked-in credentials
-- **Separate containers**: UI and Mock API
-
-### Container Commands
-
-```bash
-# Build containers
-npm run podman:build              # Build all containers
-npm run podman:build:ui           # Build UI container only
-npm run podman:build:mock-api     # Build mock API container only
-
-# Run containers
-npm run podman:run                # Run all containers
-npm run podman:run:ui             # Run UI on port 4000
-npm run podman:run:mock-api       # Run API on port 3000
-```

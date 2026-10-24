@@ -2,28 +2,6 @@
 
 Syntara is a distributed multi-agent automation system. This monorepo contains the Python/FastAPI backend and the React/TypeScript frontend.
 
-## Repository Structure
-
-```
-syntara/
-├── backend/           # Python 3.12+ / FastAPI API, Temporal workflows, PostgreSQL
-│   ├── src/syntara/   # Main Python package (domain-driven, auto-discovered routers)
-│   ├── src/api_client/# Auto-generated Python API client (syntara-api-client)
-│   ├── test-sdk/      # Shared pytest plugin (orchestrator-test-sdk) — installable via pip from git
-│   ├── tests/         # pytest: unit, integration, contract, E2E, performance
-│   ├── containers/    # Containerfiles for API and MCP server
-│   └── Makefile       # Backend-specific targets (run make -C backend help)
-├── frontend/          # React 19 / TypeScript / PatternFly 6 (npm workspaces)
-│   ├── packages/
-│   │   ├── syntara-ui/          # Main UI application
-│   │   ├── syntara-contracts/   # Generated TypeScript types from backend OpenAPI specs
-│   │   └── syntara-mock-api/    # MSW-based mock API server
-│   └── package.json           # Workspace root (E2E tests at packages/syntara-ui/e2e/)
-├── podman-compose.yml # Full-stack local dev (all services)
-├── Makefile           # Root orchestration (run make help)
-└── .env.example       # Combined environment config
-```
-
 ## Component-Specific Instructions
 
 Read the component docs when working in that area — they contain detailed standards, patterns, and gotchas:
@@ -139,33 +117,4 @@ For a known flaky test that needs temporary quarantine from the pipeline, see
 - `http://httpbin:8080` resolves to a ClusterIP. Workflow HTTP Request nodes SSRF-block private IPs unless `httpbin` is on `spec.workflowHttpRequestAllowedHosts` (`APP_WORKFLOW_HTTP_REQUEST_ALLOWED_HOSTS` on the worker). aap-dev's AO CR already lists it. A Konflux `configure-ao` step that replaces that list with only `myao-backend` produces `error: "SSRF blocked: private IP range"` (no `status_code`) and must not be treated as a connectivity skip.
 - Cluster load causes 30-second timeouts and transient 502 Bad Gateway responses.
 
-#### Backend pytest skip patterns (`backend/tests/e2e/`)
-
-**Graceful skip for backend connectivity failures**: When the Temporal worker can't reach an external URL, the execution completes with `status == FAILED` but the activity output contains no `status_code` (only an `error: "HTTP request failed: ReadTimeout"` key). Add a skip guard. If `error` is `"SSRF blocked: private IP range"`, that is an allowlist misconfiguration (`httpbin` missing from `workflowHttpRequestAllowedHosts`), not a connectivity skip — fix CI rather than skipping.
-
-```python
-if execution.status == ExecutionStatus.FAILED:
-    output = _get_activity_output(execution, "api_call")
-    if not output.get("status_code"):
-        pytest.skip("Backend could not reach httpbin — network connectivity issue in this environment")
-assert execution.status == ExecutionStatus.COMPLETED
-```
-
-**Graceful skip for transient 502**: Nginx briefly returns 502 when the backend restarts under load. Catch `UnexpectedResponseException` from `syntara_api_client.types` and skip on status 502:
-
-```python
-from syntara_api_client.types import UnexpectedResponseException
-
-try:
-    result = syntara_api.workflows.get(workflow_id=wf.id).assert_and_get()
-except UnexpectedResponseException as exc:
-    if exc.status_code == 502:
-        pytest.skip("Backend returned 502 Bad Gateway — transient infrastructure issue")
-    raise
-```
-
-### Technology Stack
-
-**Backend**: Python 3.12+, FastAPI, SQLModel, PostgreSQL 15, Temporal, Redis, regopy, uv, Alembic, pytest, mypy, ruff
-
-**Frontend**: React 19, Vite, PatternFly 6, TanStack Query, Zustand, ReactFlow, Vitest, Playwright, npm workspaces
+Backend pytest skip patterns for these failures live in [`backend/tests/e2e/CLAUDE.md`](backend/tests/e2e/CLAUDE.md).
