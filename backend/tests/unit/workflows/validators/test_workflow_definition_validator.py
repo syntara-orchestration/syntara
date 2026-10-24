@@ -1,4 +1,7 @@
-"""Tests for WorkflowValidator."""
+"""Tests for WorkflowValidator.
+
+AAP-96925: Saving a Task Agent without an LLM credential must report a validation error.
+"""
 
 from typing import Any
 
@@ -420,6 +423,23 @@ class TestCollectFindings:
         assert result.error_count == 0
         assert result.warning_count == 0
         assert result.findings == []
+
+    def test_agentic_node_without_llm_credential_reports_error(self, validator: WorkflowValidator) -> None:
+        """A prompt-only Task Agent must produce a credential error during save validation."""
+        definition = _valid_definition()
+        definition["nodes"] = [
+            {"id": "n1", "type": "agentic", "parameters": {"prompt": "Summarize the workflow input."}},
+        ]
+
+        result = validator.collect_findings(definition)
+
+        assert result.is_valid is False, "Saving a Task Agent without an LLM credential must fail validation"
+        assert any(
+            finding.severity == ValidationSeverity.error
+            and finding.node_id == "n1"
+            and "credential" in finding.message.lower()
+            for finding in result.findings
+        ), result.findings
 
     def test_orphaned_node_finding(self, validator: WorkflowValidator) -> None:
         definition: dict[str, Any] = {
