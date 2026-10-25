@@ -3,6 +3,8 @@ import {
   Background,
   BackgroundVariant,
   ConnectionLineType,
+  NodeToolbar,
+  Position,
   ReactFlow,
   type Connection,
   type EdgeChange,
@@ -18,6 +20,7 @@ import {
 } from '@xyflow/react'
 import { useLayoutEffect, useRef } from 'react'
 
+import { SynLabel } from '../../components/labels/SynLabel'
 import { FlowNodeType } from '../../constants'
 import { CanvasControls } from '../workflows/canvas/CanvasControls'
 import { type NodeType } from '../workflows/canvas/nodes/NodeType'
@@ -37,6 +40,7 @@ type BuilderFlowCanvasProps = {
   effectiveExecutionStatus: string | null
   isReadOnly: boolean
   nodes: NodeType[]
+  retryPreviewNodeIds?: readonly string[]
   edges: EdgeType[]
   onNodesChange: (changes: NodeChange<NodeType>[]) => void
   onNodeDragStart?: OnNodeDrag<NodeType>
@@ -111,6 +115,7 @@ export function BuilderFlowCanvas({
   effectiveExecutionStatus,
   isReadOnly,
   nodes,
+  retryPreviewNodeIds = [],
   edges,
   onNodesChange,
   onNodeDragStart,
@@ -171,6 +176,18 @@ export function BuilderFlowCanvas({
       >
         <SemanticZoomNodeInternalsUpdater />
         <EdgeMarkers />
+        {retryPreviewNodeIds.map((nodeId) => (
+          <NodeToolbar
+            key={nodeId}
+            nodeId={nodeId}
+            isVisible
+            position={Position.Bottom}
+            align="start"
+            offset={20}
+          >
+            <SynLabel color="blue">Retry origin</SynLabel>
+          </NodeToolbar>
+        ))}
         {!isReadOnly && <Background variant={BackgroundVariant.Dots} gap={20} size={1} />}
         <CanvasControls onLayout={onLayout} hideLayout={isReadOnly} />
         {!isReadOnly && <UndoRedoControls />}

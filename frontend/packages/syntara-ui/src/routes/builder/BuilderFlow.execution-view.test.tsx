@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react'
+import { Children, isValidElement, type ReactNode } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 
 import { FlowNodeType } from '../../constants'
@@ -35,7 +36,18 @@ vi.mock('@xyflow/react', async (importOriginal) => {
     ...(actual as Record<string, unknown>),
     ReactFlow: (props: Record<string, unknown>) => {
       latestReactFlowProps = props
-      return <div data-testid="reactflow" />
+      const previewNodeIds = Children.toArray(props.children as ReactNode).flatMap((child) =>
+        isValidElement<{ nodeId?: string }>(child) && typeof child.props.nodeId === 'string'
+          ? [child.props.nodeId]
+          : []
+      )
+      return (
+        <div data-testid="reactflow">
+          {previewNodeIds.map((nodeId) => (
+            <div key={nodeId} data-testid={`retry-preview-${nodeId}`} />
+          ))}
+        </div>
+      )
     },
     Background: () => null,
     BackgroundVariant: { Dots: 'dots' },
@@ -250,6 +262,39 @@ describe('BuilderFlow execution view', () => {
     ).toBe(true)
 
     expect(screen.getByRole('progressbar')).toBeInTheDocument()
+  })
+
+  it('marks the selected retry start point on the execution canvas', () => {
+    setWorkflowState({
+      currentWorkflow: {
+        id: 'workflow-retry-preview',
+        inputs: {},
+        triggers: [],
+        workflow: {
+          activities: [
+            { id: 'step-a', type: 'script', name: 'Step A', parameters: {} },
+            { id: 'step-b', type: 'script', name: 'Step B', parameters: {} },
+          ],
+        },
+      },
+      triggers: [],
+      edges: [{ id: 'edge-step-a-b', source: 'step-a', target: 'step-b' }],
+    })
+    setExecutionState(new Map())
+
+    render(
+      <ExecutionViewContext.Provider value={true}>
+        <BuilderFlow
+          workflowId="workflow-retry-preview"
+          panelOpen={false}
+          executionStatus="failed"
+          retryPreviewPointIds={['step-a#iter-2']}
+        />
+      </ExecutionViewContext.Provider>
+    )
+
+    expect(screen.getByTestId('retry-preview-step-a')).toBeInTheDocument()
+    expect(screen.queryByTestId('retry-preview-step-b')).not.toBeInTheDocument()
   })
 
   it('keeps edit interactions enabled outside execution view', () => {

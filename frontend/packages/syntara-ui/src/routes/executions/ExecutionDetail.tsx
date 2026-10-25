@@ -152,13 +152,19 @@ function ExecutionDetailContent({
   const { showError } = useAlerts()
   const prevStatusRef = useRef(execution?.status)
   const [panelHeight, setPanelHeight] = useState(300)
+  const [retryPreviewPointIds, setRetryPreviewPointIds] = useState<string[]>([])
+  const closeRetryReview = useCallback(() => {
+    setRetryPreviewPointIds([])
+    onRetryPanelClose()
+  }, [onRetryPanelClose])
   const retryPanel = retryPanelOpen ? (
     <RetryFromFailureSidePanel
       executionId={executionId}
       activityNameMap={activityNameMap}
       activityTypeMap={activityTypeMap}
       selectedNodeId={selectedStepId}
-      onClose={onRetryPanelClose}
+      onRetryPreviewPointIdsChange={setRetryPreviewPointIds}
+      onClose={closeRetryReview}
     />
   ) : undefined
 
@@ -239,6 +245,7 @@ function ExecutionDetailContent({
               executionId={executionId}
               onNodeClick={onNodeClick}
               selectedActivityId={currentApprovalNodeId ?? selectedStepId}
+              retryPreviewPointIds={retryPreviewPointIds}
             />
           </SynPanelStackItem>
 

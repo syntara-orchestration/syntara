@@ -60,6 +60,8 @@ export type BuilderFlowProps = {
   readOnly?: boolean
   /** Activity ID of the externally selected node (e.g. from table row click). */
   selectedActivityId?: string | null
+  /** Retry start points to preview on the read-only execution canvas. */
+  retryPreviewPointIds?: readonly string[]
   /** Validation errors from the verify workflow action */
   validationErrors?: ValidationError[]
 }

@@ -1,6 +1,6 @@
 import { Stack, StackItem, Title, TitleSizes } from '@patternfly/react-core'
 import { useNavigate } from '@tanstack/react-router'
-import { useId, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useId, useLayoutEffect, useRef, useState } from 'react'
 
 import { AppRoute } from '../../app/AppRoute'
 import { SynPanel } from '../../components/layout/SynPanel'
@@ -9,7 +9,13 @@ import { detachPromise } from '../../utils/detachPromise'
 
 import { useRetryFromFailure } from './hooks/useRetryFromFailure'
 import { useRetryFromFailurePreview } from './hooks/useRetryFromFailurePreview'
-import { canConfirmRetryFromFailure, getRetryPlanPoints, selectedRetryPointId } from './retryFromFailure'
+import {
+  canConfirmRetryFromFailure,
+  eligibleRetryPointIds,
+  getRetryPlanPoints,
+  selectedRetryPointId,
+  type RetryFromFailurePreview,
+} from './retryFromFailure'
 import styles from './RetryFromFailureSidePanel.module.css'
 import { HowRetryWorks, RetryFooter, RetryPlan, type RetryScopeMode } from './RetryFromFailureSidePanelParts'
 
@@ -18,6 +24,7 @@ type RetryFromFailureSidePanelProps = Readonly<{
   activityNameMap: ReadonlyMap<string, string>
   activityTypeMap: ReadonlyMap<string, string>
   selectedNodeId?: string | null
+  onRetryPreviewPointIdsChange?: (pointIds: string[]) => void
   onClose: () => void
 }>
 
@@ -29,6 +36,7 @@ export function RetryFromFailureSidePanel({
   activityNameMap,
   activityTypeMap,
   selectedNodeId,
+  onRetryPreviewPointIdsChange,
   onClose,
 }: RetryFromFailureSidePanelProps) {
   const navigate = useNavigate()
@@ -77,6 +85,24 @@ export function RetryFromFailureSidePanel({
   useLayoutEffect(() => {
     panelRef.current?.focus()
   }, [])
+
+  const requestedRetryPointIdsKey = requestedRetryPointIds.join('\u0000')
+  const retryPreviewPointIdsKey = getRetryPreviewPointIdsKey(
+    {
+      scopeMode,
+      defaultPreview: defaultPreviewQuery.preview,
+      requestedPointIdsKey: requestedRetryPointIdsKey,
+      isLoading: activeIsLoading,
+      activePreview,
+    }
+  )
+  const notifyRetryPreviewPointIdsChange = useEffectEvent((pointIds: string[]) => {
+    onRetryPreviewPointIdsChange?.(pointIds)
+  })
+
+  useEffect(() => {
+    notifyRetryPreviewPointIdsChange(retryPreviewPointIdsKey ? retryPreviewPointIdsKey.split('\u0000') : [])
+  }, [retryPreviewPointIdsKey])
 
   const retry = useRetryFromFailure({
     executionId,
@@ -251,6 +277,28 @@ function getSelectedPointIds(
 ): string[] {
   if (scopeModeOverride === undefined && selectedCanvasPointId) return [selectedCanvasPointId]
   return checkedRetryPointIds
+}
+
+function getRetryPreviewPointIdsKey({
+  scopeMode,
+  defaultPreview,
+  requestedPointIdsKey,
+  isLoading,
+  activePreview,
+}: Readonly<{
+  scopeMode: RetryScopeMode
+  defaultPreview: RetryFromFailurePreview | undefined
+  requestedPointIdsKey: string
+  isLoading: boolean
+  activePreview: RetryFromFailurePreview | undefined
+}>): string {
+  if (scopeMode === 'all') {
+    if (!defaultPreview?.eligible) return ''
+    return eligibleRetryPointIds(defaultPreview).join('\u0000')
+  }
+  if (isLoading) return requestedPointIdsKey
+  if (!activePreview?.eligible) return ''
+  return eligibleRetryPointIds(activePreview).join('\u0000')
 }
 
 function getActivePreviewLoading(

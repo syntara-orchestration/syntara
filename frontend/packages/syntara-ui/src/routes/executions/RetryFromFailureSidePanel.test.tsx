@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { axe } from 'vitest-axe'
 
@@ -119,6 +119,7 @@ describe('RetryFromFailureSidePanel', () => {
 
   it('previews an exact selected subset and retries only the checked failure points', async () => {
     const user = userEvent.setup()
+    const onRetryPreviewPointIdsChange = vi.fn()
     const allPoints = ['step-1', 'step-2']
     vi.mocked(useRetryFromFailurePreview).mockImplementation(({ retryPointIds }) => {
       const selectedIds = retryPointIds ?? allPoints
@@ -138,10 +139,14 @@ describe('RetryFromFailureSidePanel', () => {
         isError: false,
       }
     })
-    renderPanel()
+    renderPanel({ onRetryPreviewPointIdsChange })
+
+    await waitFor(() => expect(onRetryPreviewPointIdsChange).toHaveBeenLastCalledWith(allPoints))
 
     await user.click(screen.getByRole('radio', { name: 'Choose failure points' }))
+    await waitFor(() => expect(onRetryPreviewPointIdsChange).toHaveBeenLastCalledWith([]))
     await user.click(screen.getByRole('checkbox', { name: 'First Step' }))
+    await waitFor(() => expect(onRetryPreviewPointIdsChange).toHaveBeenLastCalledWith(['step-1']))
 
     expect(screen.getByText('1 selected failure point')).toBeInTheDocument()
     expect(screen.getByText('4')).toBeInTheDocument()
@@ -154,6 +159,7 @@ describe('RetryFromFailureSidePanel', () => {
     expect(retryStartsAt).not.toHaveTextContent('Second Step')
 
     await user.click(screen.getByRole('checkbox', { name: 'Second Step' }))
+    await waitFor(() => expect(onRetryPreviewPointIdsChange).toHaveBeenLastCalledWith(allPoints))
     expect(screen.getByText('2 selected failure points')).toBeInTheDocument()
     expect(screen.getByText('5')).toBeInTheDocument()
     expect(screen.getByText('2 completed results retained')).toBeInTheDocument()
