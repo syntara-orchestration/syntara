@@ -425,7 +425,13 @@ function renderAAPTaskDetails({
       if (isJobTemplateInputVariablesMode(data)) {
         updateActivity(nodeId, buildExpressionModeActivity(nodeId, data.name, data))
       } else {
-        const job_template_id = validateJobTemplateId(data.job_template_id)
+        // job_template_id can be absent here (e.g. after toggling "Use input variables" off and
+        // back on without re-picking the template). The backend can resolve the template by
+        // job_template_name, so only require a concrete ID when there's no name to fall back on.
+        if (!data.job_template_id && !data.job_template_name) {
+          validateJobTemplateId(data.job_template_id)
+        }
+        const job_template_id = data.job_template_id ? validateJobTemplateId(data.job_template_id) : undefined
         const aapNodeConfig = buildAAPConfig(data)
         updateActivity(
           nodeId,
