@@ -30,7 +30,7 @@ import { users, userIdentities, type UserRead, type UserIdentityRead } from './r
 import { groups, userGroupMemberships, type GroupRead } from './resources/groups'
 
 /** Activity statuses used by retry-from-failure handlers. */
-const MOCK_ACTIVITY_STATUS = { FAILED: 'failed' } as const
+const MOCK_ACTIVITY_STATUS = { COMPLETED: 'completed', FAILED: 'failed' } as const
 
 /** Terminal states the real retry-from-failure endpoint accepts. */
 const RETRY_FROM_FAILURE_STATUSES: ReadonlySet<string> = new Set([
@@ -1914,7 +1914,7 @@ export const handlers = [
     return HttpResponse.json(newExecution, { status: 201 })
   }),
 
-  http.get('/api/v1/executions/:executionId/retry_from_failure_preview', ({ params }) => {
+  http.get('/api/v1/executions/:executionId/retry_from_failure_preview', ({ params, request }) => {
     const executionId = params.executionId as string
     const execution = executions.find((e) => e.id === executionId)
     if (!execution) {
@@ -1931,6 +1931,7 @@ export const handlers = [
         sanitized_replacements: {},
         step_count_by_eligible_point: {},
         total_step_count: 0,
+        retained_result_count: 0,
       })
     }
 
@@ -1952,18 +1953,42 @@ export const handlers = [
         sanitized_replacements: {},
         step_count_by_eligible_point: {},
         total_step_count: 0,
+        retained_result_count: 0,
       })
     }
+
+    const requestedPointIds = new URL(request.url).searchParams.getAll('retry_point_ids')
+    const selectedPointIds = requestedPointIds.length > 0 ? [...new Set(requestedPointIds)].sort() : eligiblePointIds
+    const unknownPointIds = selectedPointIds.filter((id) => !eligiblePointIds.includes(id))
+    if (unknownPointIds.length > 0) {
+      return HttpResponse.json({
+        eligible: false,
+        reason: `Not failed nodes in this execution: ${unknownPointIds.join(', ')}`,
+        eligible_point_ids: selectedPointIds,
+        sanitized_node_ids: [],
+        auto_included_node_ids: [],
+        sanitized_replacements: {},
+        step_count_by_eligible_point: {},
+        total_step_count: 0,
+        retained_result_count: 0,
+      })
+    }
+
+    const retryPointSet = new Set(selectedPointIds)
+    const retainedResultCount = (activityExecutions[executionId] ?? []).filter(
+      (activity) => activity.status === MOCK_ACTIVITY_STATUS.COMPLETED && !retryPointSet.has(activity.activity_name)
+    ).length
 
     return HttpResponse.json({
       eligible: true,
       reason: null,
-      eligible_point_ids: eligiblePointIds,
+      eligible_point_ids: selectedPointIds,
       sanitized_node_ids: [],
       auto_included_node_ids: [],
       sanitized_replacements: {},
-      step_count_by_eligible_point: Object.fromEntries(eligiblePointIds.map((id) => [id, 1])),
-      total_step_count: eligiblePointIds.length,
+      step_count_by_eligible_point: Object.fromEntries(selectedPointIds.map((id) => [id, 1])),
+      total_step_count: selectedPointIds.length,
+      retained_result_count: retainedResultCount,
     })
   }),
 

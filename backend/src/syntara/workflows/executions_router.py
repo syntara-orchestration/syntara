@@ -319,10 +319,19 @@ async def retry_execution(
 async def retry_from_failure_preview(
     execution_id: UUID,
     service: Annotated[ExecutionService, Depends(get_execution_service)],
+    retry_point_ids: Annotated[
+        list[str] | None,
+        Query(
+            description=(
+                "Optional failure points to preview. Repeat the parameter to preview a subset; "
+                "omitting it previews all currently failed points."
+            )
+        ),
+    ] = None,
 ) -> RetryFromFailureValidationResponse:
     """Preview what a retry from failure would do, without mutating state."""
-    logger.info("Previewing retry from failure", execution_id=execution_id)
-    return await service.preview_retry_from_failure(execution_id)
+    logger.info("Previewing retry from failure", execution_id=execution_id, retry_point_ids=retry_point_ids)
+    return await service.preview_retry_from_failure(execution_id, retry_point_ids)
 
 
 @router.post(

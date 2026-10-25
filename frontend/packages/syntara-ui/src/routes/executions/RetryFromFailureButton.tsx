@@ -13,7 +13,7 @@ type RetryFromFailureButtonProps = Readonly<{
 const retryTooltip = permissionTooltip('retry this execution from failure', 'execution:run')
 
 /**
- * "Retry from failure" action for a failed execution.
+ * "Retry run from failure" action for a failed execution.
  *
  * Opens the in-context retry review panel. Rendered only for executions the
  * backend accepts a retry-from-failure for; see `isRetryFromFailureEligible`.
@@ -33,7 +33,7 @@ export function RetryFromFailureButton({ projectId, onClick, asDropdownItem = fa
       tooltipProps={permissionDenied ? { content: retryTooltip } : undefined}
       data-testid="retry-from-failure-button"
     >
-      Retry from failure
+      Retry run from failure
     </DropdownItem>
   ) : (
     <DisabledWithTooltip isDisabled={permissionDenied} content={retryTooltip}>
@@ -43,7 +43,7 @@ export function RetryFromFailureButton({ projectId, onClick, asDropdownItem = fa
         isAriaDisabled={isDisabled}
         data-testid="retry-from-failure-button"
       >
-        Retry from failure
+        Retry run from failure
       </Button>
     </DisabledWithTooltip>
   )

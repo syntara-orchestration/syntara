@@ -14,7 +14,7 @@ from syntara.workflows.services.retry_validation import (
     collect_downstream_node_ids,
     validate_retry_from_failure,
 )
-from syntara.workflows.utils.loop_iteration_names import strip_iteration_suffix
+from syntara.workflows.utils.loop_iteration_names import strip_all_iteration_suffixes, strip_iteration_suffix
 
 TRIGGERS: list[dict[str, Any]] = [{"id": "trigger_1", "type": "manual_trigger", "parameters": {}}]
 NODES: list[dict[str, Any]] = [
@@ -42,6 +42,12 @@ def _definition(
 def test_strip_iteration_suffix() -> None:
     assert strip_iteration_suffix("step_2#iter-3") == "step_2"
     assert strip_iteration_suffix("step_2") == "step_2"
+
+
+def test_strip_all_iteration_suffixes() -> None:
+    assert strip_all_iteration_suffixes("outer#iter-1#iter-0") == "outer"
+    assert strip_all_iteration_suffixes("step_2#iter-3") == "step_2"
+    assert strip_all_iteration_suffixes("step_2") == "step_2"
 
 
 def test_collect_downstream_inclusive() -> None:

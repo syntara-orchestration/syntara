@@ -1,6 +1,7 @@
 import { ExecutionStatusEnum } from '@syntara/contracts'
 import type { ExecutionsAPI } from '@syntara/contracts'
 
+import { getActivityTypeLabel } from '../builder/panels/utils/getUpstreamNodeDisplayName'
 import { parseCompositeKey } from '../workflows/execution/utils/activityState'
 
 type ExecutionStatus = ExecutionsAPI.components['schemas']['ExecutionStatus']
@@ -50,22 +51,26 @@ export function selectedRetryPointId(
 export type RetryPlanPoint = Readonly<{
   id: string
   name: string
+  typeLabel: string
   stepCount: number | undefined
 }>
 
 /** Resolve the preview's retry points to UI names without inferring downstream nodes. */
 export function getRetryPlanPoints(
   preview: RetryFromFailurePreview | undefined,
-  activityNameMap: ReadonlyMap<string, string>
+  activityNameMap: ReadonlyMap<string, string>,
+  activityTypeMap: ReadonlyMap<string, string> = new Map()
 ): RetryPlanPoint[] {
   return eligibleRetryPointIds(preview).map((id) => {
     const { baseId, iteration } = parseCompositeKey(id)
     const baseName = activityNameMap.get(baseId) ?? activityNameMap.get(id) ?? baseId
     const name = iteration === undefined ? baseName : `${baseName} (Iteration ${iteration + 1})`
+    const type = activityTypeMap.get(baseId) ?? activityTypeMap.get(id)
 
     return {
       id,
       name,
+      typeLabel: type ? (getActivityTypeLabel(type) ?? type) : 'Step',
       stepCount: preview?.step_count_by_eligible_point?.[id],
     }
   })

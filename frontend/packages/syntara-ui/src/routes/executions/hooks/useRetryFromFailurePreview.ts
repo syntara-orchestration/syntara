@@ -2,6 +2,7 @@ import { executionsClient } from '../../../client'
 
 type UseRetryFromFailurePreviewParams = {
   executionId: string
+  retryPointIds?: string[]
   /** The preview is only worth fetching once the operator asks for it. */
   enabled: boolean
 }
@@ -13,13 +14,16 @@ type UseRetryFromFailurePreviewParams = {
  * and a `reason` when the backend refuses, so a rejection is data rather than
  * an error state — only transport failures surface as `isError`.
  */
-export function useRetryFromFailurePreview({ executionId, enabled }: UseRetryFromFailurePreviewParams) {
+export function useRetryFromFailurePreview({ executionId, retryPointIds, enabled }: UseRetryFromFailurePreviewParams) {
   /* v8 ignore start -- v8 emits phantom branches from the compiled generic useQuery call */
   const previewQuery = executionsClient.useQuery(
     'get',
     '/executions/{execution_id}/retry_from_failure_preview',
     {
-      params: { path: { execution_id: executionId } },
+      params: {
+        path: { execution_id: executionId },
+        query: retryPointIds?.length ? { retry_point_ids: retryPointIds } : undefined,
+      },
     },
     { enabled, retry: false }
   )

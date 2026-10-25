@@ -67,17 +67,21 @@ describe('getRetryPlanPoints', () => {
         new Map([
           ['node-a', 'First Step'],
           ['node-b', 'Loop Step'],
+        ]),
+        new Map([
+          ['node-a', 'script'],
+          ['node-b', 'loop'],
         ])
       )
     ).toEqual([
-      { id: 'node-a', name: 'First Step', stepCount: 4 },
-      { id: 'node-b#iter-2', name: 'Loop Step (Iteration 3)', stepCount: 2 },
+      { id: 'node-a', name: 'First Step', typeLabel: 'Script', stepCount: 4 },
+      { id: 'node-b#iter-2', name: 'Loop Step (Iteration 3)', typeLabel: 'Loop', stepCount: 2 },
     ])
   })
 
   it('falls back to the source node ID if its display name is unavailable', () => {
     expect(getRetryPlanPoints(preview({ eligible_point_ids: ['unknown-node'] }), new Map())).toEqual([
-      { id: 'unknown-node', name: 'unknown-node', stepCount: undefined },
+      { id: 'unknown-node', name: 'unknown-node', typeLabel: 'Step', stepCount: undefined },
     ])
   })
 })

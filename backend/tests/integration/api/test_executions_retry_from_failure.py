@@ -241,10 +241,8 @@ async def _eligible_execution(session: AsyncSession, workflow: Workflow, user: U
 class TestPreviewRetryFromFailure:
     """Integration tests for GET /executions/{execution_id}/retry_from_failure_preview.
 
-    The preview takes no failure-point selection, so every case here exercises the default
-    (all currently failed nodes). Fixtures below each have a single failed node, which makes the
-    default equivalent to an explicit one-shot selection. Explicit-selection behaviour is covered
-    in TestRetryExecution, which is the only endpoint that accepts one.
+    Without retry_point_ids, the preview exercises the default (all currently failed nodes).
+    Passing repeated retry_point_ids previews the selected subset with exact shared-path counts.
     """
 
     async def test_preview_pass(
@@ -276,6 +274,43 @@ class TestPreviewRetryFromFailure:
         assert data["eligible_point_ids"] == ["step_2"]
         assert data["auto_included_node_ids"] == []
         assert data["sanitized_replacements"] == {}
+
+    async def test_preview_selected_branches_deduplicates_shared_steps_and_counts_retained_results(
+        self, auth_client: AsyncClient, test_db_session: AsyncSession, test_user: User, test_workflow: Workflow
+    ) -> None:
+        nodes = [
+            {"id": "branch_a", "name": "Branch A", "type": "script", "parameters": {}},
+            {"id": "branch_b", "name": "Branch B", "type": "script", "parameters": {}},
+            {"id": "shared", "name": "Shared", "type": "script", "parameters": {}},
+            {"id": "tail", "name": "Tail", "type": "script", "parameters": {}},
+            {"id": "retained", "name": "Retained", "type": "script", "parameters": {}},
+        ]
+        edges = [
+            {"from": "trigger_manual", "to": "branch_a"},
+            {"from": "trigger_manual", "to": "branch_b"},
+            {"from": "trigger_manual", "to": "retained"},
+            {"from": "branch_a", "to": "shared"},
+            {"from": "branch_b", "to": "shared"},
+            {"from": "shared", "to": "tail"},
+        ]
+        await _set_version_definition(test_db_session, test_workflow, nodes, edges)
+        execution = await _create_execution(test_db_session, test_workflow, test_user)
+        await _add_failed_activity(test_db_session, execution, "branch_a")
+        await _add_failed_activity(test_db_session, execution, "branch_b")
+        await _add_completed_activity(test_db_session, execution, "retained")
+
+        response = await auth_client.get(
+            f"/api/v1/executions/{execution.id}/retry_from_failure_preview",
+            params=[("retry_point_ids", "branch_a"), ("retry_point_ids", "branch_b")],
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["eligible"] is True
+        assert data["eligible_point_ids"] == ["branch_a", "branch_b"]
+        assert data["step_count_by_eligible_point"] == {"branch_a": 3, "branch_b": 3}
+        assert data["total_step_count"] == 4
+        assert data["retained_result_count"] == 1
 
     async def test_preview_rejects_non_retryable_state(
         self, auth_client: AsyncClient, test_db_session: AsyncSession, test_user: User, test_workflow: Workflow

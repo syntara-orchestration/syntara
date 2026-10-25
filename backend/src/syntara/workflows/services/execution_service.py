@@ -1267,18 +1267,19 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
             sanitized_replacements=validation.sanitized_replacements,
             step_count_by_eligible_point=validation.step_count_by_eligible_point,
             total_step_count=validation.total_step_count,
+            retained_result_count=validation.retained_result_count,
         )
 
-    async def preview_retry_from_failure(self, execution_id: UUID) -> RetryFromFailureValidationResponse:
+    async def preview_retry_from_failure(
+        self, execution_id: UUID, retry_point_ids: list[str] | None = None
+    ) -> RetryFromFailureValidationResponse:
         """Report whether this execution can be retried, and what would re-run (AAP-92820).
 
         Backs ``GET /executions/{id}/retry-from-failure-preview``. Takes no
-        failure-point selection or overrides: the operator has not chosen any
-        yet, so this reports the default — every currently failed node. The
-        re-run counts for an explicit subset are not derivable from the
-        per-point counts when branches converge into a shared tail, so the UI
-        surfaces exactly what is returned here and lets the retry endpoint
-        reject an unusable selection.
+        input overrides. When ``retry_point_ids`` is omitted, reports the
+        default — every currently failed node. When supplied, reports the
+        validated selection and exact counts for that subset, including
+        deduplicating shared downstream steps.
 
         Never mutates any state. The same validation chain runs again inside
         :meth:`retry_from_failure` for the actual selection, so this preview
@@ -1288,10 +1289,11 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
             ExecutionNotFoundError: If the source execution is gone.
 
         """
-        validation = await validate_retry_from_failure(self.session, execution_id, [])
+        validation = await validate_retry_from_failure(self.session, execution_id, retry_point_ids or [])
         logger.info(
             "Retry preview",
             execution_id=execution_id,
+            retry_point_ids=retry_point_ids,
             eligible=validation.eligible,
             reason=validation.reason,
             eligible_point_count=len(validation.eligible_point_ids),

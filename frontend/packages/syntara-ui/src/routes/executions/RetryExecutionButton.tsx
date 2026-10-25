@@ -78,7 +78,7 @@ export function RetryExecutionButton({
           onClick={() => setIsRetryMenuOpen((isOpen) => !isOpen)}
           isExpanded={isRetryMenuOpen}
         >
-          Retry
+          Retry run
         </MenuToggle>
       )}
     >

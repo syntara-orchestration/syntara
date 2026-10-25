@@ -34,7 +34,25 @@ describe('useRetryFromFailurePreview', () => {
     expect(mockUseQuery).toHaveBeenCalledWith(
       'get',
       '/executions/{execution_id}/retry_from_failure_preview',
-      { params: { path: { execution_id: 'exec-abc' } } },
+      { params: { path: { execution_id: 'exec-abc' }, query: undefined } },
+      expect.objectContaining({ enabled: true })
+    )
+  })
+
+  it('requests an exact preview for selected retry points', () => {
+    renderHook(() =>
+      useRetryFromFailurePreview({ executionId: 'exec-abc', retryPointIds: ['step-a', 'step-b'], enabled: true })
+    )
+
+    expect(mockUseQuery).toHaveBeenCalledWith(
+      'get',
+      '/executions/{execution_id}/retry_from_failure_preview',
+      {
+        params: {
+          path: { execution_id: 'exec-abc' },
+          query: { retry_point_ids: ['step-a', 'step-b'] },
+        },
+      },
       expect.objectContaining({ enabled: true })
     )
   })
@@ -45,7 +63,7 @@ describe('useRetryFromFailurePreview', () => {
     expect(mockUseQuery).toHaveBeenCalledWith(
       'get',
       '/executions/{execution_id}/retry_from_failure_preview',
-      expect.anything(),
+      { params: { path: { execution_id: 'exec-abc' }, query: undefined } },
       expect.objectContaining({ enabled: false })
     )
   })

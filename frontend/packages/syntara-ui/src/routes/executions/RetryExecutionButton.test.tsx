@@ -134,11 +134,11 @@ describe('RetryExecutionButton', () => {
     const onRetryFromFailure = vi.fn()
     renderButton({ retryFromFailure: { projectId: 'project-1', onClick: onRetryFromFailure } })
 
-    await user.click(screen.getByRole('button', { name: 'Retry' }))
-    await user.click(screen.getByRole('menuitem', { name: 'Retry from failure' }))
+    await user.click(screen.getByRole('button', { name: 'Retry run' }))
+    await user.click(screen.getByRole('menuitem', { name: 'Retry run from failure' }))
 
     expect(onRetryFromFailure).toHaveBeenCalledOnce()
-    expect(screen.getByRole('button', { name: 'Retry' })).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.getByRole('button', { name: 'Retry run' })).toHaveAttribute('aria-expanded', 'false')
   })
 
   it('has no accessibility violations', async () => {

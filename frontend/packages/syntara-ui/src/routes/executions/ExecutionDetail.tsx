@@ -92,11 +92,11 @@ function openRetryReview({
   setRetryPanelOpen(true)
 }
 
-/** Build activity name map from workflow definition for resolving approval node names. */
-function useActivityNamesForExecution(
+/** Build activity name and type maps from the retained workflow definition. */
+function useActivityMapsForExecution(
   workflowDefinition: WorkflowDefShape | undefined | null,
   activities: (ActivityData | ActivityExecution)[]
-): Map<string, string> {
+): { nameMap: Map<string, string>; typeMap: Map<string, string> } {
   const activityStates = useMemo(() => {
     const map = new Map<string, ActivityState>()
     for (const activity of activities) {
@@ -108,8 +108,8 @@ function useActivityNamesForExecution(
     return map
   }, [activities])
 
-  const { nameMap } = useActivityNameMap(workflowDefinition, activityStates)
-  return nameMap
+  const { nameMap, typeMap } = useActivityNameMap(workflowDefinition, activityStates)
+  return { nameMap, typeMap }
 }
 
 type Execution = ExecutionsAPI.components['schemas']['ExecutionRead']
@@ -129,6 +129,7 @@ function ExecutionDetailContent({
   approvalPanel,
   retryPanelOpen,
   activityNameMap,
+  activityTypeMap,
   onRetryPanelClose,
   workflow,
   execution,
@@ -149,6 +150,7 @@ function ExecutionDetailContent({
   approvalPanel?: React.ReactNode
   retryPanelOpen: boolean
   activityNameMap: ReadonlyMap<string, string>
+  activityTypeMap: ReadonlyMap<string, string>
   onRetryPanelClose: () => void
   workflow?: ExecutionWorkflow
   execution: Execution | undefined
@@ -179,6 +181,7 @@ function ExecutionDetailContent({
     <RetryFromFailureSidePanel
       executionId={executionId}
       activityNameMap={activityNameMap}
+      activityTypeMap={activityTypeMap}
       selectedNodeId={selectedNodeId}
       onClose={onRetryPanelClose}
     />
@@ -353,7 +356,10 @@ export default function ExecutionDetail() {
 
   useSyncActivityStore(execution, activities)
 
-  const activityNameMap = useActivityNamesForExecution(execution?.workflow_definition, activities)
+  const { nameMap: activityNameMap, typeMap: activityTypeMap } = useActivityMapsForExecution(
+    execution?.workflow_definition,
+    activities
+  )
 
   const stepClick = useExecutionStepClick(executionId)
   const { approvals, currentIndex, currentApproval, isApprovalLoading, handleNodeClick, navigateToIndex } = stepClick
@@ -471,6 +477,7 @@ export default function ExecutionDetail() {
             }
             retryPanelOpen={retryPanelOpen}
             activityNameMap={activityNameMap}
+            activityTypeMap={activityTypeMap}
             onRetryPanelClose={() => setRetryPanelOpen(false)}
             workflow={workflow}
             execution={execution}

@@ -23,7 +23,7 @@ describe('RetryFromFailureButton', () => {
 
   it('renders an enabled retry-from-failure button', () => {
     renderButton()
-    const button = screen.getByRole('button', { name: 'Retry from failure' })
+    const button = screen.getByRole('button', { name: 'Retry run from failure' })
     expect(button).toBeInTheDocument()
     expect(button).toBeEnabled()
   })
@@ -33,7 +33,7 @@ describe('RetryFromFailureButton', () => {
     const onClick = vi.fn()
     renderButton({ onClick })
 
-    await user.click(screen.getByRole('button', { name: 'Retry from failure' }))
+    await user.click(screen.getByRole('button', { name: 'Retry run from failure' }))
 
     expect(onClick).toHaveBeenCalledOnce()
   })
@@ -49,7 +49,7 @@ describe('RetryFromFailureButton', () => {
 
     renderButton()
 
-    const button = screen.getByRole('button', { name: 'Retry from failure' })
+    const button = screen.getByRole('button', { name: 'Retry run from failure' })
     expect(button).toHaveAttribute('aria-disabled', 'true')
   })
 
@@ -58,7 +58,7 @@ describe('RetryFromFailureButton', () => {
 
     renderButton()
 
-    const button = screen.getByRole('button', { name: 'Retry from failure' })
+    const button = screen.getByRole('button', { name: 'Retry run from failure' })
     expect(button).toHaveAttribute('aria-disabled', 'true')
   })
 
@@ -68,7 +68,7 @@ describe('RetryFromFailureButton', () => {
     const onClick = vi.fn()
     renderButton({ onClick })
 
-    await user.click(screen.getByRole('button', { name: 'Retry from failure' }))
+    await user.click(screen.getByRole('button', { name: 'Retry run from failure' }))
 
     expect(onClick).not.toHaveBeenCalled()
   })
@@ -78,7 +78,7 @@ describe('RetryFromFailureButton', () => {
     const user = userEvent.setup()
     const onClick = vi.fn()
     renderButton({ asDropdownItem: true, onClick })
-    const menuItem = screen.getByRole('menuitem', { name: 'Retry from failure' })
+    const menuItem = screen.getByRole('menuitem', { name: 'Retry run from failure' })
 
     expect(menuItem).toHaveAttribute('aria-disabled', 'true')
     await user.click(menuItem)

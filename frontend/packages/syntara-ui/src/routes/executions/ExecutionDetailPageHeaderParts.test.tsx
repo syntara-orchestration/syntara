@@ -359,13 +359,13 @@ describe('ExecutionDetailPageHeaderParts', () => {
         />
       </QueryClientProvider>
     )
-    const retryToggle = screen.getByRole('button', { name: 'Retry' })
+    const retryToggle = screen.getByRole('button', { name: 'Retry run' })
     expect(retryToggle).toBeInTheDocument()
 
     await user.click(retryToggle)
 
     expect(screen.getByRole('menuitem', { name: 'Retry run' })).toBeInTheDocument()
-    expect(screen.getByRole('menuitem', { name: 'Retry from failure' })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: 'Retry run from failure' })).toBeInTheDocument()
     await user.click(screen.getByRole('menuitem', { name: 'Retry run' }))
 
     expect(screen.getByText('Retry run?')).toBeInTheDocument()
@@ -404,13 +404,17 @@ describe('ExecutionDetailPageHeaderParts', () => {
         />
       </QueryClientProvider>
     )
-    const retryToggle = screen.queryByRole('button', { name: 'Retry' })
-    expect(Boolean(retryToggle)).toBe(expected)
-    if (expected && retryToggle) {
+    if (status === 'running') {
+      expect(screen.queryByRole('button', { name: 'Retry run' })).not.toBeInTheDocument()
+    } else {
+      const retryToggle = screen.getByRole('button', { name: 'Retry run' })
       await user.click(retryToggle)
-      expect(screen.getByRole('menuitem', { name: 'Retry from failure' })).toBeInTheDocument()
-    } else if (status === 'cancelled' || status === 'completed') {
-      expect(screen.getByRole('button', { name: 'Retry run' })).toBeInTheDocument()
+      if (expected) {
+        expect(screen.getByRole('menuitem', { name: 'Retry run from failure' })).toBeInTheDocument()
+      } else {
+        expect(screen.queryByRole('menuitem', { name: 'Retry run from failure' })).not.toBeInTheDocument()
+        expect(screen.getByText('Retry run?')).toBeInTheDocument()
+      }
     }
   })
 
