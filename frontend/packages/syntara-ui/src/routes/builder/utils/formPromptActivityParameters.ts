@@ -11,7 +11,6 @@ export type FormPromptActivityParameterInput = {
   fallback_decision?: 'submit' | 'fallback' | null
   submit_label?: string | null
   success_message?: string | null
-  timezone?: string | null
   css_override?: string | null
 }
 
@@ -55,11 +54,6 @@ const OPTIONAL_FORM_PROMPT_FIELDS: OptionalFormPromptField[] = [
   {
     key: 'success_message',
     read: (input) => input.success_message,
-    include: (value) => typeof value === 'string' && value !== '',
-  },
-  {
-    key: 'timezone',
-    read: (input) => input.timezone,
     include: (value) => typeof value === 'string' && value !== '',
   },
   {

@@ -7,13 +7,12 @@ import pytest
 from syntara.core.exceptions import SafeValueError
 from syntara.workflows.models.validation_finding import (
     ValidationCategory,
+    ValidationResult,
     ValidationSeverity,
 )
 from syntara.workflows.validators.workflow_definition import (
     WorkflowValidator,
     _best_branch_messages,
-    _declared_type_for_element_id,
-    _is_misleading_schema_message,
 )
 
 
@@ -518,22 +517,114 @@ class TestCollectFindings:
         assert "'language' is a required property" in messages
         assert "'code' is a required property" in messages
 
-    def test_form_prompt_missing_parameters_does_not_surface_agentic_prompt_errors(
-        self, validator: WorkflowValidator
+    @staticmethod
+    def _schema_violations(result: ValidationResult, node_id: str) -> list[tuple[str, str | None]]:
+        """Return ``(message, field_path)`` for a node's schema findings, in report order."""
+        return [
+            (finding.message, finding.field_path)
+            for finding in result.findings
+            if finding.node_id == node_id and finding.category == ValidationCategory.schema_violation
+        ]
+
+    @pytest.mark.parametrize(
+        ("node_type", "expected"),
+        [
+            ("agentic", [("'prompt' is a required property", "parameters")]),
+            (
+                "script",
+                [
+                    ("'language' is a required property", "parameters"),
+                    ("'code' is a required property", "parameters"),
+                ],
+            ),
+            (
+                "http_request",
+                [
+                    ("'method' is a required property", "parameters"),
+                    ("'url' is a required property", "parameters"),
+                ],
+            ),
+            ("internal_activity", [("'activity' is a required property", "parameters")]),
+            ("form_prompt", [("Field required", "parameters.form_definition")]),
+        ],
+    )
+    def test_empty_parameters_reports_only_that_node_types_required_fields(
+        self,
+        validator: WorkflowValidator,
+        node_type: str,
+        expected: list[tuple[str, str | None]],
     ) -> None:
-        """form_prompt nodes must not get misleading agentic oneOf errors when parameters are absent."""
+        """Each executor reports its own required parameters and nothing from sibling oneOf branches.
+
+        Exact equality is the point: it proves both that the real errors survive and
+        that no other executor's requirements leak onto the node.
+        """
         definition: dict[str, Any] = {
             "schema_version": "2.0.0",
             "name": "test",
             "triggers": [{"id": "t1", "type": "manual_trigger", "parameters": {}}],
-            "nodes": [{"id": "form1", "type": "form_prompt", "name": "Form"}],
-            "edges": [{"from": "t1", "to": "form1"}],
+            "nodes": [{"id": "n1", "type": node_type, "parameters": {}}],
+            "edges": [{"from": "t1", "to": "n1"}],
         }
+
         result = validator.collect_findings(definition)
-        messages = [f.message for f in result.findings if f.node_id == "form1"]
-        assert "'form_definition' is a required property" in messages
-        assert not any("agentic" in m for m in messages)
-        assert "'prompt' is a required property" not in messages
+
+        assert self._schema_violations(result, "n1") == expected
+
+    @pytest.mark.parametrize(
+        ("node_type", "valid_parameters", "expected"),
+        [
+            (
+                "script",
+                {"language": "python", "code": "pass"},
+                [("Additional properties are not allowed ('bogus', 'prompt' were unexpected)", "parameters")],
+            ),
+            (
+                "http_request",
+                {"method": "GET", "url": "https://example.com"},
+                [("Additional properties are not allowed ('bogus', 'prompt' were unexpected)", "parameters")],
+            ),
+            (
+                "form_prompt",
+                {"form_definition": {"fields": [{"value_name": "a", "type": "text", "label": "A"}]}},
+                [
+                    # The form prompt model pass reports each rejected key against its own path.
+                    ("Extra inputs are not permitted", "parameters.prompt"),
+                    ("Extra inputs are not permitted", "parameters.bogus"),
+                ],
+            ),
+        ],
+    )
+    def test_cross_type_parameter_keys_are_rejected_against_the_nodes_own_schema(
+        self,
+        validator: WorkflowValidator,
+        node_type: str,
+        valid_parameters: dict[str, Any],
+        expected: list[tuple[str, str | None]],
+    ) -> None:
+        """A leaked key from another step type is rejected, not treated as that type's schema.
+
+        ``prompt`` stands in for the original report: a form_prompt node carrying an
+        agentic/approval leftover must not be validated as an agentic node.
+        """
+        definition: dict[str, Any] = {
+            "schema_version": "2.0.0",
+            "name": "test",
+            "triggers": [{"id": "t1", "type": "manual_trigger", "parameters": {}}],
+            "nodes": [
+                {
+                    "id": "n1",
+                    "type": node_type,
+                    "name": "Step",
+                    "parameters": {**valid_parameters, "prompt": "leaked", "bogus": 1},
+                }
+            ],
+            "edges": [{"from": "t1", "to": "n1"}],
+        }
+
+        result = validator.collect_findings(definition)
+
+        assert self._schema_violations(result, "n1") == expected
 
     def test_unknown_node_type_surfaces_type_discriminator_messages(self, validator: WorkflowValidator) -> None:
         """Invalid node types must not lose all type-const hints to the misleading-message filter."""
@@ -1204,26 +1295,6 @@ class TestScheduledTriggerConfigFindings:
         assert len(scheduled) == 2
         assert {f.node_id for f in scheduled} == {"sched_a", "sched_b"}
         assert all(f.field_path == "parameters.timezone" for f in scheduled)
-
-
-class TestMisleadingSchemaMessageFilter:
-    """Unit tests for oneOf supplementary message filtering."""
-
-    def test_filters_agentic_prompt_on_form_prompt(self) -> None:
-        assert _is_misleading_schema_message("'prompt' is a required property", "form_prompt") is True
-        assert _is_misleading_schema_message("'agentic' was expected", "form_prompt") is True
-
-    def test_does_not_filter_type_const_for_unknown_authored_type(self) -> None:
-        assert _is_misleading_schema_message("'script' was expected", "not_a_real_executor") is False
-
-    def test_declared_type_resolves_triggers_and_nodes(self) -> None:
-        definition: dict[str, Any] = {
-            "triggers": [{"id": "t1", "type": "manual_trigger"}],
-            "nodes": [{"id": "n1", "type": "script"}],
-        }
-        assert _declared_type_for_element_id(definition, "t1") == "manual_trigger"
-        assert _declared_type_for_element_id(definition, "n1") == "script"
-        assert _declared_type_for_element_id(definition, "missing") is None
 
 
 class TestBestBranchMessages:

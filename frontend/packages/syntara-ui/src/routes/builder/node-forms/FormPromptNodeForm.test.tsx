@@ -220,7 +220,6 @@ describe('FormPromptNodeForm', () => {
             fallback_decision: 'fallback',
             submit_label: 'Send',
             success_message: 'Thanks',
-            timezone: 'America/New_York',
           }}
         />
       )
@@ -242,7 +241,6 @@ describe('FormPromptNodeForm', () => {
           fallback_decision: 'fallback',
           submit_label: 'Send',
           success_message: 'Thanks',
-          timezone: 'America/New_York',
         })
       )
     })
