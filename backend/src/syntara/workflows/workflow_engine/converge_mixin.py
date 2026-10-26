@@ -47,9 +47,15 @@ class WorkflowConvergeMixin:
     _converge_branch_nodes: dict[str, set[str]]
     _timed_out_converge_nodes: set[str]
     _detached_nodes: set[str]
+    retry_context: dict[str, Any]
+    _retry_replay_candidates: set[str]
+    _retry_converge_failure_reasons: dict[str, str]
+    _retry_converge_upstream_failures: dict[str, str]
 
     # Methods provided by OrchestratorWorkflow (resolved via MRO)
     def _are_predecessors_complete(self, node_id: str, graph: WorkflowGraph) -> bool: ...  # type: ignore[empty-body]
+
+    async def _execute_node(self, node: ActivityNode, graph: WorkflowGraph) -> dict[str, Any]: ...  # type: ignore[empty-body]
 
     def _mark_downstream_as_skipped(
         self, start_node_id: str, graph: WorkflowGraph, boundary: set[str] | None = None
@@ -147,6 +153,26 @@ class WorkflowConvergeMixin:
                 if succ_node.type == NodeType.CONVERGE:
                     if succ_id in self.failed_nodes or self.resolver.has_namespace(succ_id):
                         continue
+                    failure_message = self._converge_failure_message(
+                        succ_id,
+                        succ_node,
+                        graph,
+                        upstream_failure_id=failed_node_id,
+                    )
+                    if (
+                        failure_message is not None
+                        and self._is_retry_converge_candidate(succ_id)
+                        and pending_tasks is not None
+                    ):
+                        self._schedule_retry_converge_failure(
+                            succ_id,
+                            succ_node,
+                            graph,
+                            pending_tasks,
+                            failure_message,
+                            upstream_failure_id=failed_node_id,
+                        )
+                        continue
                     self._evaluate_converge_failure(
                         succ_id,
                         succ_node,
@@ -179,37 +205,142 @@ class WorkflowConvergeMixin:
                 When ``None``, only direct predecessor failures are checked.
 
         """
+        error_msg = self._converge_failure_message(
+            converge_id,
+            converge_node,
+            graph,
+            upstream_failure_id=upstream_failure_id,
+        )
+        defer_to_retry = self._is_retry_converge_candidate(converge_id) and pending_tasks is not None
+        if error_msg is not None and not defer_to_retry:
+            self._fail_converge_node(converge_id, error_msg, graph, pending_tasks)
+
+    def _converge_failure_message(
+        self,
+        converge_id: str,
+        converge_node: ActivityNode,
+        graph: WorkflowGraph,
+        *,
+        upstream_failure_id: str | None = None,
+    ) -> str | None:
+        """Return the current gate failure, if enough state already proves one."""
         strategy = converge_node.parameters.get("strategy", ConvergeStrategy.ALL)
         predecessor_ids = graph.get_predecessors(converge_id)
-
         if strategy == ConvergeStrategy.ALL:
             failed_preds = [p for p in predecessor_ids if p in self.failed_nodes and p not in self._cof_failed_nodes]
             if failed_preds:
-                error_msg = (
+                return (
                     f"Converge node {converge_id}: predecessor(s) "
                     f"{', '.join(failed_preds)} failed, "
-                    f"ALL strategy requires every branch to succeed"
+                    "ALL strategy requires every branch to succeed"
                 )
-                self._fail_converge_node(converge_id, error_msg, graph, pending_tasks)
-                return
-
             if upstream_failure_id and upstream_failure_id not in self._cof_failed_nodes:
-                error_msg = (
+                return (
                     f"Converge node {converge_id}: upstream node "
                     f"{upstream_failure_id} failed, "
-                    f"ALL strategy requires every branch to succeed"
+                    "ALL strategy requires every branch to succeed"
                 )
-                self._fail_converge_node(converge_id, error_msg, graph, pending_tasks)
-                return
 
         if self._all_predecessors_terminal(predecessor_ids) and not self._are_predecessors_complete(converge_id, graph):
             n_req = converge_node.parameters.get("n_required", "?")
             successes = self._count_successful_predecessors(predecessor_ids)
-            error_msg = (
+            return (
                 f"Converge node {converge_id}: required {n_req} successful branches, "
                 f"got {successes} (failures excluded)"
             )
-            self._fail_converge_node(converge_id, error_msg, graph, pending_tasks)
+        return None
+
+    def _is_retry_converge_candidate(self, node_id: str) -> bool:
+        """Whether this retry must compare source metadata before failing a gate."""
+        return bool(self.retry_context) and node_id in self._retry_replay_candidates
+
+    def _schedule_retry_converge_failure(
+        self,
+        node_id: str,
+        node: ActivityNode,
+        graph: WorkflowGraph,
+        pending_tasks: dict[str, asyncio.Task[Any]],
+        error_message: str,
+        *,
+        upstream_failure_id: str | None = None,
+    ) -> None:
+        """Defer a retry candidate's gate failure until its source state is compared."""
+        self._retry_converge_failure_reasons[node_id] = error_message
+        if upstream_failure_id is not None:
+            self._retry_converge_upstream_failures[node_id] = upstream_failure_id
+        if node_id in pending_tasks:
+            return
+        pending_tasks[node_id] = asyncio.create_task(self._execute_node(node, graph))
+
+    def _retry_converge_gate_is_decided(
+        self,
+        node_id: str,
+        resolved_parameters: dict[str, Any],
+        graph: WorkflowGraph,
+    ) -> bool:
+        """Whether resolved gate parameters have enough current state to decide."""
+        predecessor_ids = graph.get_predecessors(node_id)
+        strategy = resolved_parameters.get("strategy") or ConvergeStrategy.ALL
+        if strategy != ConvergeStrategy.ANY:
+            upstream_failure_id = self._retry_converge_upstream_failures.get(node_id)
+            if upstream_failure_id and upstream_failure_id not in self._cof_failed_nodes:
+                return True
+            if any(
+                pred_id in self.failed_nodes and pred_id not in self._cof_failed_nodes for pred_id in predecessor_ids
+            ):
+                return True
+            return self._all_predecessors_terminal(predecessor_ids)
+
+        n_required = resolved_parameters.get("n_required")
+        if n_required is not None and self._count_successful_predecessors(predecessor_ids) >= int(n_required):
+            return True
+        return self._all_predecessors_terminal(predecessor_ids)
+
+    def _retry_converge_gate_failure(
+        self,
+        node_id: str,
+        resolved_parameters: dict[str, Any],
+        graph: WorkflowGraph,
+        upstream_failure_id: str | None = None,
+    ) -> str | None:
+        """Re-evaluate a deferred retry gate failure using the resolved config."""
+        predecessor_ids = graph.get_predecessors(node_id)
+        strategy = resolved_parameters.get("strategy") or ConvergeStrategy.ALL
+        is_any = strategy == ConvergeStrategy.ANY
+
+        if not is_any:
+            if upstream_failure_id and upstream_failure_id not in self._cof_failed_nodes:
+                return (
+                    f"Converge node {node_id}: upstream node "
+                    f"{upstream_failure_id} failed, ALL strategy requires every branch to succeed"
+                )
+            failed_branches = [
+                failed_id
+                for failed_id in self.failed_nodes
+                if failed_id in predecessor_ids and failed_id not in self._cof_failed_nodes
+            ]
+            if failed_branches:
+                return (
+                    f"Converge node {node_id}: predecessor path(s) "
+                    f"{', '.join(failed_branches)} failed, "
+                    "ALL strategy requires every branch to succeed"
+                )
+
+        if not self._all_predecessors_terminal(predecessor_ids):
+            return None
+
+        successes = self._count_successful_predecessors(predecessor_ids)
+        if is_any:
+            n_required = resolved_parameters.get("n_required")
+            required = int(n_required) if n_required is not None else len(predecessor_ids) + 1
+        else:
+            required = len(predecessor_ids)
+
+        if successes < required:
+            return (
+                f"Converge node {node_id}: required {required} successful branches, got {successes} (failures excluded)"
+            )
+        return None
 
     def _is_loop_still_iterating(self, node_id: str) -> bool:
         """Return True if ``node_id`` is a loop whose last routing was ``iterate``."""
@@ -299,6 +430,11 @@ class WorkflowConvergeMixin:
         if node_id in self.failed_nodes:
             return True
 
+        failure_message = self._converge_failure_message(node_id, successor, graph)
+        if failure_message is not None and self._is_retry_converge_candidate(node_id):
+            self._retry_converge_failure_reasons[node_id] = failure_message
+            return False
+
         self._evaluate_converge_failure(node_id, successor, graph, pending_tasks)
         if node_id in self.failed_nodes:
             return True
@@ -356,6 +492,15 @@ class WorkflowConvergeMixin:
             if timed_out:
                 error_msg = f"Converge node {node_id} timed out after {timeout_seconds}s waiting for predecessors"
                 workflow.logger.error(error_msg)
+                if self._is_retry_converge_candidate(node_id):
+                    self._schedule_retry_converge_failure(
+                        node_id,
+                        graph.get_node(node_id),
+                        graph,
+                        pending_tasks,
+                        error_msg,
+                    )
+                    return
                 self._fail_converge_node(node_id, error_msg, graph, pending_tasks)
         except Exception as exc:  # noqa: BLE001
             error_msg = f"Converge timeout handler error for {node_id}: {exc}"
