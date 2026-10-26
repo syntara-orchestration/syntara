@@ -26,6 +26,7 @@ class MetricType(str, Enum):
     ERROR = "error"
     FORM_PROMPT_RESUME_DISPATCH_MS = "form_prompt_resume_dispatch_ms"
     FORM_PROMPT_SUBMISSION_HANDOFF_MS = "form_prompt_submission_handoff_ms"
+    FORM_TRIGGER_SUBMISSION_START_MS = "form_trigger_submission_start_ms"
     LLM_DURATION_MS = "llm_duration_ms"
     LLM_STATUS = "llm_status"
     LLM_TOKENS_INPUT = "llm_tokens_input"

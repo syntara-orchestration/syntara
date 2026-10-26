@@ -6,12 +6,12 @@ HTTP/API concerns in the FastAPI endpoints.
 
 from collections.abc import Iterable
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any
+from time import monotonic
+from typing import TYPE_CHECKING, Any, NamedTuple
 from uuid import UUID, uuid4
 
 import jsonschema
 import structlog
-from pydantic import ValidationError
 from referencing.exceptions import Unresolvable
 from sqlalchemy.orm import selectinload
 from sqlalchemy.sql import Select
@@ -31,9 +31,6 @@ from syntara.core.models import User
 from syntara.core.services import BaseService
 from syntara.core.services.extensions import ConvertResourceMixin, EnrichQueryMixin
 from syntara.core.services.user_reference_resolution import UserReferenceResolverMixin
-from syntara.forms.exceptions import FormDataValidationError
-from syntara.forms.models.form_fields import DynamicOptions, FormDefinition, ResolvedOptions
-from syntara.forms.validators.submission import validate_form_submission
 from syntara.metrics.dependencies import get_metrics_recorder
 from syntara.metrics.emission import emit_completion_metrics
 from syntara.metrics.interface_tag import interface_context_var
@@ -48,6 +45,11 @@ from syntara.workflows.exceptions import (
     WorkflowConcurrencyLimitError,
     WorkflowNotFoundError,
     WorkflowNotPublishedError,
+)
+from syntara.workflows.form_trigger import (
+    FormDefinitionMetadata,
+    record_form_trigger_submission,
+    validate_form_trigger_submission,
 )
 from syntara.workflows.json_schema_validation import apply_schema_defaults
 from syntara.workflows.models.activity_execution import (
@@ -83,6 +85,13 @@ if TYPE_CHECKING:
 logger = structlog.stdlib.get_logger(__name__)
 
 MAX_CALLBACK_ERROR_MSG_LENGTH = 500
+
+
+class NormalizedTriggerInput(NamedTuple):
+    """Normalized trigger input, with form metadata when applicable."""
+
+    input_data: dict[str, Any]
+    form_definition_metadata: FormDefinitionMetadata | None
 
 
 async def count_active_executions(session: "AsyncSession") -> int:
@@ -298,65 +307,12 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
             raise TriggerValidationError(msg) from e
 
     @staticmethod
-    def _validate_form_trigger_submission(
-        trigger_node: dict[str, Any],
-        input_data: dict[str, Any],
-        *,
-        workflow_id: UUID | None = None,
-    ) -> dict[str, Any]:
-        """Validate and normalize a form-trigger submission.
-
-        Returns the same cleaned value shape used by form prompt
-        submissions. Form Triggers additionally reject dynamic options because
-        they have no upstream values from which to resolve them.
-        """
-        trigger_node_id = trigger_node.get("id")
-        validation_context = {
-            "workflow_id": workflow_id,
-            "request_id": request_id_context_var.get(),
-            "trigger_node_id": trigger_node_id,
-        }
-        raw_parameters = trigger_node.get("parameters")
-        raw_form_definition = raw_parameters.get("form_definition") if isinstance(raw_parameters, dict) else None
-        try:
-            form_definition = FormDefinition.model_validate(raw_form_definition)
-        except ValidationError as exc:
-            error_count = len(exc.errors())
-            logger.warning(
-                "Form trigger has an invalid form definition",
-                error_type=type(exc).__name__,
-                error_count=error_count,
-                **validation_context,
-            )
-            msg = "Form trigger has an invalid form definition"
-            raise TriggerValidationError(msg) from None
-
-        if any(
-            isinstance(getattr(field, "options", None), (DynamicOptions, ResolvedOptions))
-            for field in form_definition.fields
-        ):
-            logger.error("Form trigger has unsupported dynamic options", **validation_context)
-            msg = "Form trigger form definition contains unsupported dynamic options"
-            raise TriggerValidationError(msg)
-
-        try:
-            return validate_form_submission(form_definition, input_data)
-        except FormDataValidationError as exc:
-            logger.warning(
-                "Form trigger submission validation failed",
-                error_count=len(exc.errors),
-                **validation_context,
-            )
-            # Re-raise with the trigger node id attached for log/diagnostic context.
-            raise FormDataValidationError(exc.errors, form_id=trigger_node_id) from exc
-
-    @staticmethod
     def _normalize_trigger_input(
         trigger_node: dict[str, Any],
         input_data: dict[str, Any],
         *,
         workflow_id: UUID | None = None,
-    ) -> dict[str, Any]:
+    ) -> NormalizedTriggerInput:
         """Validate and normalize trigger input, then enforce its JSONB size limit.
 
         Defaults and normalization can push input over the 1 MiB limit, so
@@ -365,16 +321,16 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
         Form Triggers use their typed form definition. Other trigger types keep
         the existing JSON Schema defaults and validation behavior.
         """
+        form_definition_metadata: FormDefinitionMetadata | None = None
         if trigger_node.get("type") == NodeType.FORM_TRIGGER:
-            input_data = ExecutionService._validate_form_trigger_submission(
-                trigger_node,
-                input_data,
-                workflow_id=workflow_id,
+            input_data, form_definition_metadata = validate_form_trigger_submission(
+                trigger_node, input_data, workflow_id=workflow_id
             )
         else:
             ExecutionService._apply_trigger_schema_defaults(trigger_node, input_data)
 
-        return validate_jsonb_size(input_data, field_name="input_data")
+        input_data = validate_jsonb_size(input_data, field_name="input_data")
+        return NormalizedTriggerInput(input_data=input_data, form_definition_metadata=form_definition_metadata)
 
     async def create_execution(
         self,
@@ -409,6 +365,10 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
             Exception: If Temporal workflow start fails
 
         """
+        # Capture service-entry times for the full execution-creation interval.
+        execution_creation_started_at = datetime.now(UTC)
+        execution_creation_started_monotonic = monotonic()
+
         logger.info("Creating execution for workflow by user", workflow_id=workflow_id, user_id=self.user.id)
 
         recorder = get_metrics_recorder()
@@ -448,16 +408,31 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
         # Step 2: Resolve trigger node and validate/normalize trigger input
         workflow_def = workflow_version.workflow_definition
         trigger_node_id, trigger_node = resolve_trigger_node(workflow_def, trigger_node_id)
-        input_data = self._normalize_trigger_input(trigger_node, input_data, workflow_id=workflow_id)
+        normalized = self._normalize_trigger_input(trigger_node, input_data, workflow_id=workflow_id)
 
-        return await self._start_temporal_and_create_execution(
+        execution = await self._start_temporal_and_create_execution(
             workflow=workflow,
             workflow_version=workflow_version,
-            input_data=input_data,
+            input_data=normalized.input_data,
             trigger_node_id=trigger_node_id,
             recorder=recorder,
             component=component,
         )
+
+        if normalized.form_definition_metadata is not None:
+            record_form_trigger_submission(
+                recorder=recorder,
+                user=self.user,
+                submission_started=execution_creation_started_monotonic,
+                submitted_at=execution_creation_started_at,
+                workflow_id=workflow.id,
+                workflow_name=workflow.name,
+                execution_id=execution.id,
+                trigger_node_id=trigger_node_id,
+                form_definition_metadata=normalized.form_definition_metadata,
+            )
+
+        return execution
 
     async def _start_temporal_and_create_execution(
         self,
@@ -826,7 +801,7 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
                 test_trigger_node,
                 trigger_inputs,
                 workflow_id=workflow_id,
-            )
+            ).input_data
 
         # Convert PreResolvedNodeOutput objects to dicts for Temporal and metadata
         pre_resolved_dicts = {node_id: output.model_dump() for node_id, output in pre_resolved_nodes.items()}

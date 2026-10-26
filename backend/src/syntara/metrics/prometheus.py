@@ -232,6 +232,14 @@ class OrchestratorPrometheusMetrics:
             registry=self.registry,
         )
 
+        self.form_trigger_submission_start_seconds = Histogram(
+            "orchestrator_form_trigger_submission_start_seconds",
+            "Seconds from form trigger submission reaching ExecutionService to the started execution being committed",
+            ["component"],
+            buckets=LATENCY_BUCKETS_MEDIUM,
+            registry=self.registry,
+        )
+
         self.form_prompt_resume_dispatch_seconds = Histogram(
             "orchestrator_form_prompt_resume_dispatch_seconds",
             "Seconds from the Temporal form prompt activity completion to the workflow task that resumes it",

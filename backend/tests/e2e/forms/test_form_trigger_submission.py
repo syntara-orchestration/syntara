@@ -219,11 +219,12 @@ def test_all_supported_form_fields_reach_downstream_consumer(
     final = wait_for_activity_outputs(syntara_api, execution_id, {"consumer"})
     activities = {activity.activity_id: activity for activity in (final.activities or [])}
     downstream = _activity_output(activities["consumer"])["stdout_json"]
-    assert downstream == _ALL_FIELDS_SUBMISSION
+    expected_downstream = {**_ALL_FIELDS_SUBMISSION, "date_value": "2026-02-14"}
+    assert downstream == expected_downstream
     assert isinstance(downstream["number_value"], int)
     assert isinstance(downstream["multi_select_value"], list)
     assert isinstance(downstream["checkbox_value"], bool)
-    assert isinstance(downstream["date_value"], dict)
+    assert isinstance(downstream["date_value"], str)
 
 
 def test_invalid_submission_starts_no_execution_then_valid_submission_completes(
