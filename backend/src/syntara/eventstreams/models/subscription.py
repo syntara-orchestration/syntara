@@ -13,10 +13,11 @@ topics, groups and offsets live on the source configuration and adapter-specific
 state, never on this table.
 """
 
+from datetime import datetime
 from typing import Any, ClassVar
 from uuid import UUID
 
-from sqlalchemy import BigInteger, CheckConstraint, Index, text
+from sqlalchemy import BigInteger, CheckConstraint, DateTime, Index, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Field
 
@@ -35,6 +36,13 @@ class EventSubscription(UserOwnedResource, table=True):
     """
 
     __tablename__ = "event_subscriptions"
+
+    # Placement is operational state, not a user edit. In particular, renewing a
+    # lease must not make the workflow appear edited or change its attribution.
+    __updated_at_exempt_fields__: ClassVar[frozenset[str]] = UserOwnedResource.__updated_at_exempt_fields__ | {
+        "assigned_worker_id",
+        "assignment_lease_until",
+    }
 
     __filterable_fields__: ClassVar[list[str]] = [
         *UserOwnedResource.__filterable_fields__,
@@ -120,7 +128,22 @@ class EventSubscription(UserOwnedResource, table=True):
         description="Actor that last authorized activation; snapshotted into firing metadata",
     )
 
+    assigned_worker_id: UUID | None = Field(
+        default=None,
+        description="Process-incarnation placement owner; a UUID value, not a resource FK",
+    )
+
+    assignment_lease_until: datetime | None = Field(
+        default=None,
+        sa_type=DateTime(timezone=True),  # type: ignore[call-overload]
+        description="Placement lease deadline in database time; set and cleared with the owner",
+    )
+
     __table_args__ = (
+        CheckConstraint(
+            "(assigned_worker_id IS NULL) = (assignment_lease_until IS NULL)",
+            name="ck_event_subscriptions_assignment_pair",
+        ),
         CheckConstraint(
             "active_source_generation > 0",
             name="ck_event_subscriptions_active_generation_positive",
@@ -143,6 +166,17 @@ class EventSubscription(UserOwnedResource, table=True):
             "desired_enabled",
             "retired",
             "id",
+        ),
+        Index(
+            "ix_event_subscriptions_assignment_owner",
+            "assigned_worker_id",
+            postgresql_where=text("assigned_worker_id IS NOT NULL"),
+        ),
+        Index(
+            "ix_event_subscriptions_active_lease_expiry",
+            "assignment_lease_until",
+            "id",
+            postgresql_where=text("desired_enabled = true AND paused = false AND retired = false"),
         ),
         # Project/workflow scoped lookup.
         Index(

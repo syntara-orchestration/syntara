@@ -4,6 +4,7 @@ from uuid import uuid4
 
 import pytest
 from pydantic import ValidationError
+from sqlalchemy import create_mock_engine
 
 from syntara.eventstreams.adapters.kafka_source_configuration import KafkaSourceConfiguration
 from syntara.eventstreams.models.source import EventSubscriptionSource
@@ -12,6 +13,7 @@ from syntara.eventstreams.models.subscription import EventSubscription
 # Columns that would signal a selected-account or standing-execution gate. This
 # story must not introduce any of them (AAP-94316 scope exclusion).
 _FORBIDDEN_SUBSTRINGS = ("account", "execution_principal", "selected", "service_account")
+_POSTGRESQL = create_mock_engine("postgresql://", lambda *_args, **_kwargs: None).dialect
 
 
 def test_subscription_has_no_account_binding_or_execution_columns() -> None:
@@ -63,3 +65,34 @@ def test_source_configuration_round_trips_through_discriminated_union() -> None:
     )
     assert isinstance(source.configuration, KafkaSourceConfiguration)
     assert source.configuration.transport == "kafka"
+
+
+@pytest.mark.parametrize("partition_ids", [[], [0, 0], [-1], [True], [1.0], ["1"]])
+def test_initial_partition_set_rejects_invalid_ids(partition_ids: object) -> None:
+    with pytest.raises(ValidationError):
+        KafkaSourceConfiguration.model_validate(
+            {"topic": "orders", "group_id": "syntara.d.s.1", "initial_partition_ids": partition_ids}
+        )
+
+
+def test_initial_partition_set_is_sorted_and_round_trips_through_jsonb() -> None:
+    configuration = KafkaSourceConfiguration.model_validate(
+        {"topic": "orders", "group_id": "syntara.d.s.1", "initial_partition_ids": [5, 0, 2]}
+    )
+    column_type = EventSubscriptionSource.__table__.c.configuration.type  # type: ignore[attr-defined]
+    stored = column_type.process_bind_param(configuration, _POSTGRESQL)
+
+    assert stored["initial_partition_ids"] == [0, 2, 5]
+    restored = column_type.process_result_value(stored, _POSTGRESQL)
+    assert isinstance(restored, KafkaSourceConfiguration)
+    assert restored.initial_partition_ids == (0, 2, 5)
+
+
+def test_old_configuration_without_partition_set_decodes_as_uncaptured() -> None:
+    column_type = EventSubscriptionSource.__table__.c.configuration.type  # type: ignore[attr-defined]
+    restored = column_type.process_result_value(
+        {"transport": "kafka", "topic": "orders", "group_id": "syntara.d.s.1"}, _POSTGRESQL
+    )
+
+    assert isinstance(restored, KafkaSourceConfiguration)
+    assert restored.initial_partition_ids is None

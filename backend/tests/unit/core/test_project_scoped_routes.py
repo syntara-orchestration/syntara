@@ -41,6 +41,8 @@ _MODEL_TO_ROUTE_SEGMENT: dict[str, str] = {
 # resources and don't need their own project-scoped endpoints.
 _JUNCTION_TABLES: set[str] = {
     "IntegrationProjectAssignment",
+    # Derived from workflow publication; not a standalone CRUD resource.
+    "EventSubscription",
 }
 
 # Models that have a project_id FK but no list route yet.
