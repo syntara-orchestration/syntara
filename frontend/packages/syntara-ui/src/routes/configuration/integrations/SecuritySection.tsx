@@ -7,12 +7,12 @@ import { SynLabel } from '../../../components/labels/SynLabel'
 
 import styles from './IntegrationDetail.module.css'
 
-type IntegrationRead = IntegrationsAPI.components['schemas']['IntegrationRead']
+type IntegrationRead = IntegrationsAPI.components['schemas']['IntegrationReadV2']
 
 export function SecuritySection({
   configuration,
 }: Readonly<{
-  configuration: IntegrationRead['configuration'] | IntegrationRead['kafka_configuration']
+  configuration: IntegrationRead['configuration']
 }>) {
   if (!configuration || !('allow_http' in configuration) || !('insecure_skip_tls_verify' in configuration)) {
     return null

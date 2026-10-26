@@ -45,7 +45,7 @@ import { useAllTools } from './useAllTools'
 import { useFilesMetadata } from './useFilesMetadata'
 import type { MarkPersistedFn } from './useFileUploadState'
 
-type IntegrationRead = IntegrationsAPI.components['schemas']['IntegrationRead']
+type IntegrationRead = IntegrationsAPI.components['schemas']['IntegrationReadV2']
 type ToolWithParameters = ToolManagerAPI.components['schemas']['ToolWithParameters']
 
 export type { AIAgentFormData }

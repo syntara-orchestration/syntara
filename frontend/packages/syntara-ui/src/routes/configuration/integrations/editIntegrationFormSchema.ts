@@ -103,7 +103,7 @@ export const editIntegrationSchema = buildEditSchema(true)
 export type EditIntegrationFormValues = z.infer<typeof editIntegrationSchema>
 
 export type DiscoverResult = IntegrationsAPI.components['schemas']['DiscoverResult']
-export type IntegrationRead = IntegrationsAPI.components['schemas']['IntegrationRead']
+export type IntegrationRead = IntegrationsAPI.components['schemas']['IntegrationReadV2']
 
 function securityFields(values: EditIntegrationFormValues) {
   return {

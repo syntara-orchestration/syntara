@@ -375,7 +375,7 @@ export const handlers = [
     return HttpResponse.json(body)
   }),
 
-  http.get('/api/v1/integrations/:integration_id/tools', ({ request, params }) => {
+  http.get('/api/v2/integrations/:integration_id/tools', ({ request, params }) => {
     const integrationId = params.integration_id as string
     const integration = integrations.find((i) => i.id === integrationId)
     if (!integration) {
@@ -402,7 +402,7 @@ export const handlers = [
     return HttpResponse.json(body)
   }),
 
-  http.patch('/api/v1/integrations/:integration_id/tools/bulk_update', async (req) => {
+  http.patch('/api/v2/integrations/:integration_id/tools/bulk_update', async (req) => {
     const integrationId = req.params.integration_id as string
     const integration = integrations.find((i) => i.id === integrationId)
     if (!integration) {
@@ -424,7 +424,7 @@ export const handlers = [
 
   // ── Integrations ──────────────────────────────────────────────────────────
 
-  http.get('/api/v1/integrations', ({ request }) => {
+  http.get('/api/v2/integrations', ({ request }) => {
     const url = new URL(request.url)
     const nameContains = url.searchParams.get('name[contains]')
     const integrationType = url.searchParams.get('integration_type')
@@ -506,7 +506,7 @@ export const handlers = [
     return HttpResponse.json(paginate(filtered, cursor, limit, includeTotal))
   }),
 
-  http.get('/api/v1/integrations/:integration_id', ({ params }) => {
+  http.get('/api/v2/integrations/:integration_id', ({ params }) => {
     const integration = integrations.find((i) => i.id === params.integration_id)
     if (!integration) {
       return HttpResponse.json(
@@ -523,7 +523,7 @@ export const handlers = [
     return HttpResponse.json(integration)
   }),
 
-  http.post('/api/v1/integrations', async (req) => {
+  http.post('/api/v2/integrations', async (req) => {
     const body = (await req.request.json()) as Record<string, unknown>
     const now = mockDate.now
     const integrationId = uuidv4()
@@ -602,7 +602,7 @@ export const handlers = [
     return HttpResponse.json(newIntegration, { status: 201 })
   }),
 
-  http.patch('/api/v1/integrations/:integration_id', async (req) => {
+  http.patch('/api/v2/integrations/:integration_id', async (req) => {
     const integration = integrations.find((i) => i.id === req.params.integration_id)
     if (!integration) {
       return HttpResponse.json(
@@ -615,7 +615,7 @@ export const handlers = [
     return HttpResponse.json(integration)
   }),
 
-  http.delete('/api/v1/integrations/:integration_id', ({ params }) => {
+  http.delete('/api/v2/integrations/:integration_id', ({ params }) => {
     const index = integrations.findIndex((i) => i.id === params.integration_id)
     if (index === -1) {
       return HttpResponse.json(
@@ -627,7 +627,7 @@ export const handlers = [
     return new HttpResponse(null, { status: 204 })
   }),
 
-  http.get('/api/v1/integrations/:integration_id/projects', ({ params }) => {
+  http.get('/api/v2/integrations/:integration_id/projects', ({ params }) => {
     const integration = integrations.find((i) => i.id === params.integration_id)
     if (!integration) {
       return HttpResponse.json(
@@ -647,7 +647,7 @@ export const handlers = [
     return HttpResponse.json({ resources, next: null, prev: null, total: resources.length })
   }),
 
-  http.post('/api/v1/integrations/:integration_id/projects/:project_id', ({ params }) => {
+  http.post('/api/v2/integrations/:integration_id/projects/:project_id', ({ params }) => {
     const integration = integrations.find((i) => i.id === params.integration_id)
     if (!integration) {
       return HttpResponse.json(
@@ -671,7 +671,7 @@ export const handlers = [
     )
   }),
 
-  http.delete('/api/v1/integrations/:integration_id/projects/:project_id', ({ params }) => {
+  http.delete('/api/v2/integrations/:integration_id/projects/:project_id', ({ params }) => {
     const integration = integrations.find((i) => i.id === params.integration_id)
     if (!integration) {
       return HttpResponse.json(
@@ -686,7 +686,7 @@ export const handlers = [
     return new HttpResponse(null, { status: 204 })
   }),
 
-  http.post('/api/v1/integrations/discover', async (req) => {
+  http.post('/api/v2/integrations/discover', async (req) => {
     const body = (await req.request.json()) as { integration_type?: string }
     if (body.integration_type === IntegrationTypeEnum.LLM_PROVIDER) {
       return HttpResponse.json({
@@ -712,7 +712,7 @@ export const handlers = [
     })
   }),
 
-  http.post('/api/v1/integrations/:integration_id/validate', ({ params }) => {
+  http.post('/api/v2/integrations/:integration_id/validate', ({ params }) => {
     const integration = integrations.find((i) => i.id === params.integration_id)
     if (!integration) {
       return HttpResponse.json(
@@ -726,7 +726,7 @@ export const handlers = [
     return HttpResponse.json({ success: true, checked_at: mockDate.now, error: null })
   }),
 
-  http.post('/api/v1/integrations/:integration_id/refresh', ({ params }) => {
+  http.post('/api/v2/integrations/:integration_id/refresh', ({ params }) => {
     const integration = integrations.find((i) => i.id === params.integration_id)
     if (!integration) {
       return HttpResponse.json(
@@ -745,7 +745,7 @@ export const handlers = [
     })
   }),
 
-  http.get('/api/v1/integrations/:integration_id/models', ({ request, params }) => {
+  http.get('/api/v2/integrations/:integration_id/models', ({ request, params }) => {
     const integrationId = params.integration_id as string
     const integration = integrations.find((i) => i.id === integrationId)
     if (!integration) {
@@ -775,7 +775,7 @@ export const handlers = [
     return HttpResponse.json(paginate(filtered, cursor, limit, includeTotal))
   }),
 
-  http.get('/api/v1/integrations/:integration_id/models/:model_id', ({ params }) => {
+  http.get('/api/v2/integrations/:integration_id/models/:model_id', ({ params }) => {
     const integrationId = params.integration_id as string
     const modelId = params.model_id as string
     const integration = integrations.find((i) => i.id === integrationId)
@@ -795,7 +795,7 @@ export const handlers = [
     return HttpResponse.json(model)
   }),
 
-  http.patch('/api/v1/integrations/:integration_id/models/:model_id', async (req) => {
+  http.patch('/api/v2/integrations/:integration_id/models/:model_id', async (req) => {
     const integrationId = req.params.integration_id as string
     const modelId = req.params.model_id as string
     const integration = integrations.find((i) => i.id === integrationId)
@@ -848,7 +848,7 @@ export const handlers = [
     return HttpResponse.json(model)
   }),
 
-  http.patch('/api/v1/integrations/:integration_id/models/bulk_update', async (req) => {
+  http.patch('/api/v2/integrations/:integration_id/models/bulk_update', async (req) => {
     const integrationId = req.params.integration_id as string
     const integration = integrations.find((i) => i.id === integrationId)
     if (!integration) {

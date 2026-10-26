@@ -11,7 +11,6 @@ from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
     from ..models.aap_configuration import AAPConfiguration
-    from ..models.kafka_configuration import KafkaConfiguration
     from ..models.llm_provider_configuration import LLMProviderConfiguration
     from ..models.mcp_server_configuration_input import MCPServerConfigurationInput
 
@@ -25,17 +24,16 @@ class IntegrationTestConnection:
 
     Attributes:
         integration_type (IntegrationType): Type of external integration.
-        configuration (AAPConfiguration | KafkaConfiguration | LLMProviderConfiguration | MCPServerConfigurationInput):
-            Integration-specific configuration
+        configuration (AAPConfiguration | LLMProviderConfiguration | MCPServerConfigurationInput): Integration-specific
+            configuration
         credential_id (None | Unset | UUID): Credential to use for the connection test
     """
 
     integration_type: IntegrationType
-    configuration: AAPConfiguration | KafkaConfiguration | LLMProviderConfiguration | MCPServerConfigurationInput
+    configuration: AAPConfiguration | LLMProviderConfiguration | MCPServerConfigurationInput
     credential_id: None | Unset | UUID = UNSET
 
     def to_dict(self) -> dict[str, Any]:
-        from ..models.aap_configuration import AAPConfiguration
         from ..models.llm_provider_configuration import LLMProviderConfiguration
         from ..models.mcp_server_configuration_input import MCPServerConfigurationInput
 
@@ -45,8 +43,6 @@ class IntegrationTestConnection:
         if isinstance(self.configuration, MCPServerConfigurationInput):
             configuration = self.configuration.to_dict()
         elif isinstance(self.configuration, LLMProviderConfiguration):
-            configuration = self.configuration.to_dict()
-        elif isinstance(self.configuration, AAPConfiguration):
             configuration = self.configuration.to_dict()
         else:
             configuration = self.configuration.to_dict()
@@ -75,7 +71,6 @@ class IntegrationTestConnection:
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         from ..models.aap_configuration import AAPConfiguration
-        from ..models.kafka_configuration import KafkaConfiguration
         from ..models.llm_provider_configuration import LLMProviderConfiguration
         from ..models.mcp_server_configuration_input import MCPServerConfigurationInput
 
@@ -84,7 +79,7 @@ class IntegrationTestConnection:
 
         def _parse_configuration(
             data: object,
-        ) -> AAPConfiguration | KafkaConfiguration | LLMProviderConfiguration | MCPServerConfigurationInput:
+        ) -> AAPConfiguration | LLMProviderConfiguration | MCPServerConfigurationInput:
             try:
                 if not isinstance(data, dict):
                     raise TypeError()
@@ -101,19 +96,11 @@ class IntegrationTestConnection:
                 return configuration_type_1
             except (TypeError, ValueError, AttributeError, KeyError):
                 pass
-            try:
-                if not isinstance(data, dict):
-                    raise TypeError()
-                configuration_type_2 = AAPConfiguration.from_dict(data)
-
-                return configuration_type_2
-            except (TypeError, ValueError, AttributeError, KeyError):
-                pass
             if not isinstance(data, dict):
                 raise TypeError()
-            configuration_type_3 = KafkaConfiguration.from_dict(data)
+            configuration_type_2 = AAPConfiguration.from_dict(data)
 
-            return configuration_type_3
+            return configuration_type_2
 
         configuration = _parse_configuration(d.pop("configuration"))
 

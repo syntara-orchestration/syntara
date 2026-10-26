@@ -19,7 +19,7 @@ import { StatusLabel } from '../integrations/StatusLabel'
 import { expandableRowIds, hasTrimmedDescription, relatedResourceRowId } from './credentialRelatedTableUtils'
 import { DescriptionExpandableContent } from './DescriptionExpandableContent'
 
-type Integration = IntegrationsAPI.components['schemas']['IntegrationRead']
+type Integration = IntegrationsAPI.components['schemas']['IntegrationReadV2']
 
 type CredentialIntegrationsTabProps = {
   credentialId: string

@@ -10,7 +10,8 @@ import { appBaseUrl, type Page } from '../fixtures'
 
 /** Get the API base URL (proxied through the UI server) */
 export function apiUrl(path: string): string {
-  return new URL(`/api/v1${path}`, appBaseUrl).toString()
+  const version = path === '/integrations' || path.startsWith('/integrations/') ? 'v2' : 'v1'
+  return new URL(`/api/${version}${path}`, appBaseUrl).toString()
 }
 
 const AUTH_ATTEMPTS = 3

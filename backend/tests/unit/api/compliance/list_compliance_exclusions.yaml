@@ -68,6 +68,9 @@ exclusions:
   - operation_id: list_roles
     reason: "Uses simple value filters instead of operator-based pattern - name/scope/policy_name need allOf schema with {eq, contains, starts_with, gt, gte, lt, lte}, is_builtin/project_id need {eq}"
 
+  - operation_id: v2_list_integrations
+    reason: "Retains the existing integration list query contract in v2; integration_type/status/enabled/scope use simple value filters, as in v1."
+
   - operation_id: list_integrations
     reason: "Uses simple value filters instead of operator-based pattern - integration_type/status/enabled/scope need allOf schema with {eq}"
 

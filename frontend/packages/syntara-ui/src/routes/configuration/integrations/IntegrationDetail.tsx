@@ -61,7 +61,7 @@ import { type IntegrationPermissions, useIntegrationPermissions } from './useInt
 import { useItemSelection } from './useItemSelection'
 import { useResourcesSave } from './useResourcesSave'
 
-type IntegrationRead = IntegrationsAPI.components['schemas']['IntegrationRead']
+type IntegrationRead = IntegrationsAPI.components['schemas']['IntegrationReadV2']
 
 function IntegrationProjectsList({ integrationId }: Readonly<{ integrationId: string }>) {
   const { data, isPending } = integrationsClient.useQuery('get', '/integrations/{integration_id}/projects', {
@@ -153,13 +153,7 @@ function IntegrationDetailsTab({
           )}
         </DescriptionList>
       </StackItem>
-      <SecuritySection
-        configuration={
-          integration.integration_type === IntegrationTypeEnum.KAFKA
-            ? integration.kafka_configuration
-            : integration.configuration
-        }
-      />
+      <SecuritySection configuration={integration.configuration} />
     </Stack>
   )
 }
@@ -286,7 +280,7 @@ function getFooterState({
   return { isDirty: toolsDirty, isSaving: isToolsSaving, onSave: handleToolsSave, saveLabel: 'Save tools' }
 }
 
-function hasResourcesTab(integration: IntegrationsAPI.components['schemas']['IntegrationRead']): boolean {
+function hasResourcesTab(integration: IntegrationsAPI.components['schemas']['IntegrationReadV2']): boolean {
   return isLLMProvider(integration) || integration.integration_type === IntegrationTypeEnum.MCP_SERVER
 }
 

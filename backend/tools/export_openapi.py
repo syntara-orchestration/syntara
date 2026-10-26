@@ -237,6 +237,9 @@ def main() -> int:
 
     app = build_spec_app(include_internal=not args.public)
     spec = app.openapi()
+    for path, item in spec.get("paths", {}).items():
+        if path.startswith("/api/v2/"):
+            item["servers"] = [{"url": "/"}]
     apply_rfc9457_media_types(spec)
     _inject_permission_metadata(app, spec)
     _consolidate_identical_input_output_schemas(spec)

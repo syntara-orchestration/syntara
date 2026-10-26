@@ -6,7 +6,7 @@ import { axe } from 'vitest-axe'
 import { CredentialAffectedResourcesWarnings } from './CredentialAffectedResourcesWarnings'
 import { NAMED_DEPENDENCY_LIMIT } from './CredentialDependencySection'
 
-type Integration = IntegrationsAPI.components['schemas']['IntegrationRead']
+type Integration = IntegrationsAPI.components['schemas']['IntegrationReadV2']
 
 const mockWorkflows = [
   { id: 'wf-1', name: 'Workflow One' },

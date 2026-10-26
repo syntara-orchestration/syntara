@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query'
 import { integrationsFetchClient } from '../../../client'
 import { fetchAllPages, MAX_PAGE_SIZE } from '../../../utils/fetchAllPages'
 
-type IntegrationRead = IntegrationsAPI.components['schemas']['IntegrationRead']
+type IntegrationRead = IntegrationsAPI.components['schemas']['IntegrationReadV2']
 
 async function fetchAllEnabledMcpIntegrations(projectId?: string): Promise<IntegrationRead[]> {
   return fetchAllPages<IntegrationRead>((cursor) =>

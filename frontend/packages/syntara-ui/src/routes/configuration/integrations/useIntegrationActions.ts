@@ -8,7 +8,7 @@ import { useAlerts } from '../../../providers/alerts'
 import { getErrorMessage } from '../../../utils/apiErrors'
 import { detachPromise } from '../../../utils/detachPromise'
 
-type IntegrationRead = IntegrationsAPI.components['schemas']['IntegrationRead']
+type IntegrationRead = IntegrationsAPI.components['schemas']['IntegrationReadV2']
 
 export function useIntegrationActions(refetch: () => Promise<unknown>) {
   const navigate = useNavigate()

@@ -16,7 +16,7 @@ vi.mock('../../../client', () => ({
   },
 }))
 
-type IntegrationRead = IntegrationsAPI.components['schemas']['IntegrationRead']
+type IntegrationRead = IntegrationsAPI.components['schemas']['IntegrationReadV2']
 
 type MockMutationCallbacks = {
   onSuccess?: (...args: unknown[]) => void

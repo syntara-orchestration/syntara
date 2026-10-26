@@ -4,7 +4,7 @@ import type { IntegrationsAPI } from '@syntara/contracts'
 import type { CredentialWorkflowRef } from './credentialConstants'
 import { CredentialDependencySection } from './CredentialDependencySection'
 
-type Integration = IntegrationsAPI.components['schemas']['IntegrationRead']
+type Integration = IntegrationsAPI.components['schemas']['IntegrationReadV2']
 
 type CredentialAffectedResourcesWarningsProps = {
   affectedWorkflows: CredentialWorkflowRef[]

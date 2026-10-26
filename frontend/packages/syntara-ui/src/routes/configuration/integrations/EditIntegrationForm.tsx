@@ -354,7 +354,7 @@ export function EditIntegrationForm() {
 
     const integrationType = integration.integration_type ?? IntegrationTypeEnum.MCP_SERVER
 
-    const body: IntegrationsAPI.components['schemas']['IntegrationUpdate'] = {
+    const body: IntegrationsAPI.components['schemas']['IntegrationUpdateV2'] = {
       name: values.name,
       description: values.description || null,
       scope: values.scope,

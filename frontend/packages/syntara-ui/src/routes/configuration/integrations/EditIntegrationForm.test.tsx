@@ -781,8 +781,7 @@ describe('EditIntegrationForm', () => {
       name: 'Production Kafka',
       description: 'Brokers',
       integration_type: 'kafka',
-      configuration: null,
-      kafka_configuration: {
+      configuration: {
         integration_type: 'kafka',
         bootstrap_servers: ['broker.example.com:9093', 'other.example.com:9092'],
         sasl_mechanism: 'SCRAM-SHA-512',
@@ -796,7 +795,7 @@ describe('EditIntegrationForm', () => {
       setupMocks({ integration: mockKafkaIntegration })
     })
 
-    it('shows bootstrap servers from kafka_configuration and hides the API URL', () => {
+    it('shows bootstrap servers from configuration and hides the API URL', () => {
       render(<EditIntegrationForm />, { wrapper })
 
       expect(screen.getByText('Kafka')).toBeInTheDocument()
@@ -871,11 +870,11 @@ describe('EditIntegrationForm', () => {
       expect(patchMutate).not.toHaveBeenCalled()
     })
 
-    it('starts from an empty broker list when kafka_configuration is missing', () => {
+    it('starts from an empty broker list when configuration is missing', () => {
       setupMocks({
         integration: {
           ...mockKafkaIntegration,
-          kafka_configuration: null,
+          configuration: undefined,
         },
       })
       render(<EditIntegrationForm />, { wrapper })
@@ -888,7 +887,7 @@ describe('EditIntegrationForm', () => {
       setupMocks({
         integration: {
           ...mockKafkaIntegration,
-          kafka_configuration: {
+          configuration: {
             integration_type: 'kafka',
             bootstrap_servers: 'broker.example.com:9093',
             sasl_mechanism: '',
