@@ -62,7 +62,6 @@ export function FormPromptNodeDetails({
       parameters.fallback_decision ?? formPromptFallbackDecisionFromBehavior(parameters.fallback_behavior ?? undefined),
     submit_label: parameters.submit_label,
     success_message: parameters.success_message,
-    timezone: parameters.timezone,
     css_override: parameters.css_override,
     settings: taskData.settings,
   }

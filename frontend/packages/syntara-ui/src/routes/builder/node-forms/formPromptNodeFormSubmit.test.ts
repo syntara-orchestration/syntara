@@ -14,7 +14,6 @@ function baseFormData(overrides: Partial<FormPromptFormData> = {}): FormPromptFo
     responder_groups: [],
     submit_label: '  Send  ',
     success_message: '  Done  ',
-    timezone: ' America/New_York ',
     css_override: ' .x { color: red; } ',
     settings: {},
     ...overrides,
@@ -28,7 +27,6 @@ describe('mapFormPromptFormDataToSubmit', () => {
     expect(result.message).toBe('Hello')
     expect(result.submit_label).toBe('Send')
     expect(result.success_message).toBe('Done')
-    expect(result.timezone).toBe('America/New_York')
     expect(result.css_override).toBe('.x { color: red; }')
     expect(result.responder_users).toBeUndefined()
     expect(result.fallback_decision).toBe('submit')

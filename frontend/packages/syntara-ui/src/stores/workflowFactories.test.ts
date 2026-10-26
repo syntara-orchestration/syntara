@@ -1197,7 +1197,6 @@ describe('workflowFactories', () => {
           fallback_decision: 'fallback',
           submit_label: 'Submit',
           success_message: 'Thanks',
-          timezone: 'UTC',
           css_override: '.form { margin: 0; }',
           settings: { continue_on_failure: true },
         })
@@ -1212,7 +1211,6 @@ describe('workflowFactories', () => {
           fallback_decision: 'fallback',
           submit_label: 'Submit',
           success_message: 'Thanks',
-          timezone: 'UTC',
           css_override: '.form { margin: 0; }',
         })
         expect(activity.settings).toEqual({ continue_on_failure: true })
