@@ -12,8 +12,11 @@ import { useWorkflowStoreActions } from '../../../stores/useWorkflowStore'
 import type { Trigger } from '../../../stores/workflowStoreTypes'
 import { parseJsonSchema } from '../../../utils/jsonSafeParse'
 import { isValidWebhookPath, normalizeWebhookPath } from '../../../utils/webhookPath'
+import type { ValidationError } from '../builderReducer'
 import type { TriggerFormData } from '../node-forms/TriggerNodeForm'
 import { TriggerNodeForm } from '../node-forms/TriggerNodeForm'
+import { buildFormTriggerActivityParameters } from '../utils/formTriggerActivityParameters'
+import { readStoredFormDefinition } from '../utils/readStoredFormDefinition'
 
 /**
  * Deep equality check for triggers to prevent marking workflow dirty when no changes are made.
@@ -190,7 +193,96 @@ function buildUpdatedTrigger(data: TriggerFormData, trigger: Trigger, name: stri
       TriggerTypeEnum.EDA_TRIGGER
     )
   }
+  if (data.triggerType === TriggerTypeEnum.FORM_TRIGGER) {
+    if (!data.form_definition) {
+      throw new Error('Add at least one form field')
+    }
+    return {
+      id: trigger.id ?? 'form',
+      type: TriggerTypeEnum.FORM_TRIGGER,
+      name: name ?? 'Form trigger',
+      parameters: buildFormTriggerActivityParameters({
+        form_definition: data.form_definition,
+        message: data.message,
+        submit_label: data.submit_label,
+        success_message: data.success_message,
+        css_override: data.css_override,
+      }),
+    }
+  }
   throw new Error('Invalid trigger type')
+}
+
+function mapScheduledTriggerInitialData(trigger: Trigger): TriggerFormData {
+  const scheduleType = (trigger.parameters?.schedule_type as string) ?? ScheduleTypeEnum.INTERVAL
+  const timezone = trigger.parameters?.timezone as string | undefined
+  const missedSchedulePolicy = trigger.parameters?.missed_schedule_policy as MissedSchedulePolicy | undefined
+  const base = {
+    name: trigger.name,
+    triggerType: TriggerTypeEnum.SCHEDULED,
+    timezone,
+    missedSchedulePolicy,
+  }
+
+  if (scheduleType === ScheduleTypeEnum.CRON) {
+    return {
+      ...base,
+      scheduleType: ScheduleTypeEnum.CRON,
+      cron: trigger.parameters?.cron as string | undefined,
+    }
+  }
+
+  return {
+    ...base,
+    scheduleType: ScheduleTypeEnum.INTERVAL,
+    interval: trigger.parameters?.interval as string | undefined,
+  }
+}
+
+function mapFormTriggerInitialData(trigger: Trigger): TriggerFormData {
+  const params = trigger.parameters ?? {}
+  return {
+    name: trigger.name,
+    triggerType: TriggerTypeEnum.FORM_TRIGGER,
+    form_definition: readStoredFormDefinition(params),
+    message: (params.message as string | undefined) ?? '',
+    submit_label: (params.submit_label as string | undefined) ?? '',
+    success_message: (params.success_message as string | undefined) ?? '',
+    css_override: (params.css_override as string | undefined) ?? '',
+  }
+}
+
+function mapTriggerToInitialFormData(trigger: Trigger): TriggerFormData {
+  if (trigger.type === TriggerTypeEnum.MANUAL_TRIGGER) {
+    return {
+      name: trigger.name,
+      triggerType: TriggerTypeEnum.MANUAL_TRIGGER,
+      inputSchema: serializeInputSchema(trigger.parameters?.input_schema),
+    }
+  }
+
+  if (trigger.type === TriggerTypeEnum.SCHEDULED) {
+    return mapScheduledTriggerInitialData(trigger)
+  }
+
+  if (WEBHOOK_TRIGGER_TYPES.has(trigger.type)) {
+    return {
+      name: trigger.name,
+      triggerType: trigger.type,
+      webhookPath: (trigger.parameters?.webhook_path as string) ?? '',
+      inputSchema: serializeInputSchema(trigger.parameters?.input_schema),
+      authorizedServiceAccountIds: (trigger.parameters?.authorized_service_account_ids as string[] | undefined) ?? [],
+    }
+  }
+
+  if (trigger.type === TriggerTypeEnum.FORM_TRIGGER) {
+    return mapFormTriggerInitialData(trigger)
+  }
+
+  return {
+    name: trigger.name,
+    triggerType: TriggerTypeEnum.MANUAL_TRIGGER,
+  }
 }
 
 type TriggerNodeDetailsProps = Readonly<{
@@ -198,67 +290,21 @@ type TriggerNodeDetailsProps = Readonly<{
   triggerIndex: number
   onClose: () => void
   onHeaderContentChange?: (content: ReactNode | null) => void
+  serverValidationErrors?: ValidationError[]
 }>
 
-export function TriggerNodeDetails({ trigger, triggerIndex, onClose, onHeaderContentChange }: TriggerNodeDetailsProps) {
+export function TriggerNodeDetails({
+  trigger,
+  triggerIndex,
+  onClose,
+  onHeaderContentChange,
+  serverValidationErrors,
+}: TriggerNodeDetailsProps) {
   const { showError } = useAlerts()
   // Use action accessor - component won't re-render when store state changes
   const { updateTrigger } = useWorkflowStoreActions()
 
-  // Extract initial data from trigger — memoized to avoid new object refs on re-render
-  const initialData = useMemo((): TriggerFormData => {
-    if (trigger.type === TriggerTypeEnum.MANUAL_TRIGGER) {
-      return {
-        name: trigger.name,
-        triggerType: TriggerTypeEnum.MANUAL_TRIGGER,
-        inputSchema: serializeInputSchema(trigger.parameters?.input_schema),
-      }
-    }
-
-    if (trigger.type === TriggerTypeEnum.SCHEDULED) {
-      const scheduleType = (trigger.parameters?.schedule_type as string) ?? ScheduleTypeEnum.INTERVAL
-      const timezone = trigger.parameters?.timezone as string | undefined
-      const missedSchedulePolicy = trigger.parameters?.missed_schedule_policy as MissedSchedulePolicy | undefined
-
-      if (scheduleType === ScheduleTypeEnum.INTERVAL) {
-        return {
-          name: trigger.name,
-          triggerType: TriggerTypeEnum.SCHEDULED,
-          scheduleType: ScheduleTypeEnum.INTERVAL,
-          interval: trigger.parameters?.interval as string | undefined,
-          timezone,
-          missedSchedulePolicy,
-        }
-      }
-
-      if (scheduleType === ScheduleTypeEnum.CRON) {
-        return {
-          name: trigger.name,
-          triggerType: TriggerTypeEnum.SCHEDULED,
-          scheduleType: ScheduleTypeEnum.CRON,
-          cron: trigger.parameters?.cron as string | undefined,
-          timezone,
-          missedSchedulePolicy,
-        }
-      }
-    }
-
-    if (WEBHOOK_TRIGGER_TYPES.has(trigger.type)) {
-      return {
-        name: trigger.name,
-        triggerType: trigger.type,
-        webhookPath: (trigger.parameters?.webhook_path as string) ?? '',
-        inputSchema: serializeInputSchema(trigger.parameters?.input_schema),
-        authorizedServiceAccountIds: (trigger.parameters?.authorized_service_account_ids as string[] | undefined) ?? [],
-      }
-    }
-
-    // Default fallback
-    return {
-      name: trigger.name,
-      triggerType: TriggerTypeEnum.MANUAL_TRIGGER,
-    }
-  }, [trigger])
+  const initialData = useMemo(() => mapTriggerToInitialFormData(trigger), [trigger])
 
   const handleSubmit = (data: TriggerFormData) => {
     try {
@@ -278,7 +324,17 @@ export function TriggerNodeDetails({ trigger, triggerIndex, onClose, onHeaderCon
     }
   }
 
+  const formServerErrors = serverValidationErrors?.map((err) => ({
+    fieldPath: err.fieldPath,
+    message: err.message,
+  }))
+
   return (
-    <TriggerNodeForm initialData={initialData} onSubmit={handleSubmit} onHeaderContentChange={onHeaderContentChange} />
+    <TriggerNodeForm
+      initialData={initialData}
+      onSubmit={handleSubmit}
+      onHeaderContentChange={onHeaderContentChange}
+      serverValidationErrors={formServerErrors}
+    />
   )
 }

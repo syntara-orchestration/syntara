@@ -40,6 +40,11 @@ describe('mapFormPromptFormDataToSubmit', () => {
     expect(result.fallback_decision).toBe('submit')
   })
 
+  it('preserves settings.timeout from loaded activity data', () => {
+    const result = mapFormPromptFormDataToSubmit(baseFormData({ settings: { timeout: 900 } }), false)
+    expect(result.settings).toEqual({ timeout: 900 })
+  })
+
   it('keeps fallback_decision when continue-on-failure is effectively enabled', () => {
     const result = mapFormPromptFormDataToSubmit(
       baseFormData({ fallback_decision: 'fallback', settings: { continue_on_failure: true } }),

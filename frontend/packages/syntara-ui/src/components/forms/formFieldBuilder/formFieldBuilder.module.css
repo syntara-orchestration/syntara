@@ -2,6 +2,16 @@
   padding: var(--pf-t--global--spacer--md);
 }
 
+.designOnlyPanel {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.designTab {
+  min-width: 0;
+  max-width: 100%;
+}
+
 .designTab :global(.pf-v6-c-form__label-text) {
   font-weight: var(--pf-t--global--font--weight--body--bold);
 }
@@ -33,7 +43,6 @@
 .dragHandle {
   cursor: grab;
   color: var(--pf-t--global--icon--color--regular);
-  margin-block-start: var(--pf-t--global--spacer--md);
 }
 
 .headerToggle {
@@ -46,6 +55,8 @@
 
 .fieldCard {
   flex-grow: 1;
+  /* Match switch path rows: rectangular outline, PatternFly card body inset (not isPlain). */
+  --pf-v6-c-card--BorderRadius: 0;
 }
 
 .fieldCardBody {

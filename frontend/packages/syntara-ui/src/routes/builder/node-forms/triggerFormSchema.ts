@@ -1,6 +1,7 @@
 import { MissedSchedulePolicyEnum, ScheduleTypeEnum, TriggerTypeEnum, WEBHOOK_TRIGGER_TYPES } from '@syntara/contracts'
 import { z } from 'zod'
 
+import { formDefinitionSchema } from '../../../forms'
 import { safeJSONReviver } from '../../../utils/jsonSafeParse'
 import { parseRepeatingInterval } from '../../../utils/triggerFormatting'
 import { isValidWebhookPath } from '../../../utils/webhookPath'
@@ -32,6 +33,11 @@ const triggerFormSchemaBase = z.object({
   inputSchema: z.string().optional(),
   webhookPath: z.string().optional(),
   authorizedServiceAccountIds: z.array(z.string().uuid()).optional(),
+  form_definition: formDefinitionSchema.optional(),
+  message: z.string().max(2000).optional(),
+  submit_label: z.string().max(64).optional(),
+  success_message: z.string().max(500).optional(),
+  css_override: z.string().max(10000).optional(),
 })
 
 function validateInputSchemaJson(schemaText: string | undefined, ctx: z.RefinementCtx) {
@@ -113,12 +119,12 @@ function validateCronFormat(cron: string | undefined, ctx: z.RefinementCtx) {
 
 export const AUTHORIZED_SERVICE_ACCOUNT_REQUIRED_MESSAGE = 'At least one authorized service account is required'
 
-export const triggerFormSchema = triggerFormSchemaBase.superRefine((data, ctx) => {
-  if (data.triggerType === TriggerTypeEnum.MANUAL_TRIGGER || WEBHOOK_TRIGGER_TYPES.has(data.triggerType)) {
-    validateInputSchemaJson(data.inputSchema, ctx)
-  }
+type TriggerFormSchemaInput = z.infer<typeof triggerFormSchemaBase>
 
-  if (data.triggerType === TriggerTypeEnum.SCHEDULED && data.scheduleType === ScheduleTypeEnum.INTERVAL) {
+function refineScheduledTriggerForm(data: TriggerFormSchemaInput, ctx: z.RefinementCtx) {
+  if (data.triggerType !== TriggerTypeEnum.SCHEDULED) return
+
+  if (data.scheduleType === ScheduleTypeEnum.INTERVAL) {
     if (!data.interval?.trim()) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -128,9 +134,10 @@ export const triggerFormSchema = triggerFormSchemaBase.superRefine((data, ctx) =
     } else {
       validateScheduleInterval(data, ctx)
     }
+    return
   }
 
-  if (data.triggerType === TriggerTypeEnum.SCHEDULED && data.scheduleType === ScheduleTypeEnum.CRON) {
+  if (data.scheduleType === ScheduleTypeEnum.CRON) {
     if (!data.cron?.trim()) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -141,18 +148,45 @@ export const triggerFormSchema = triggerFormSchemaBase.superRefine((data, ctx) =
       validateCronFormat(data.cron, ctx)
     }
   }
+}
 
-  if (WEBHOOK_TRIGGER_TYPES.has(data.triggerType)) {
-    validateWebhookPathFormat(data.webhookPath, ctx)
-    if (!data.authorizedServiceAccountIds?.length) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: AUTHORIZED_SERVICE_ACCOUNT_REQUIRED_MESSAGE,
-        path: ['authorizedServiceAccountIds'],
-      })
-    }
+function refineWebhookStyleTriggerForm(data: TriggerFormSchemaInput, ctx: z.RefinementCtx) {
+  if (!WEBHOOK_TRIGGER_TYPES.has(data.triggerType)) return
+
+  validateWebhookPathFormat(data.webhookPath, ctx)
+  if (!data.authorizedServiceAccountIds?.length) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: AUTHORIZED_SERVICE_ACCOUNT_REQUIRED_MESSAGE,
+      path: ['authorizedServiceAccountIds'],
+    })
   }
-})
+}
+
+function refineFormTriggerForm(data: TriggerFormSchemaInput, ctx: z.RefinementCtx) {
+  if (data.triggerType !== TriggerTypeEnum.FORM_TRIGGER) return
+
+  const fieldCount = data.form_definition?.fields?.length ?? 0
+  if (fieldCount === 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Add at least one form field',
+      path: ['form_definition'],
+    })
+  }
+}
+
+function refineTriggerFormSchema(data: TriggerFormSchemaInput, ctx: z.RefinementCtx) {
+  if (data.triggerType === TriggerTypeEnum.MANUAL_TRIGGER || WEBHOOK_TRIGGER_TYPES.has(data.triggerType)) {
+    validateInputSchemaJson(data.inputSchema, ctx)
+  }
+
+  refineScheduledTriggerForm(data, ctx)
+  refineWebhookStyleTriggerForm(data, ctx)
+  refineFormTriggerForm(data, ctx)
+}
+
+export const triggerFormSchema = triggerFormSchemaBase.superRefine(refineTriggerFormSchema)
 
 export type TriggerFormData = z.infer<typeof triggerFormSchemaBase>
 

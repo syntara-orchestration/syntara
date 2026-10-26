@@ -4,6 +4,7 @@ import { useFormContext } from 'react-hook-form'
 import { useIsVersionView } from '../VersionViewContext'
 
 import { nodeHelp } from './shared/nodeFieldHelp'
+import nodeFormStyles from './shared/nodeFormStyles.module.css'
 
 export type FormPresentationFormFields = {
   submit_label?: string | null
@@ -20,7 +21,7 @@ export function FormPresentationOptionsSection({ idPrefix }: FormPresentationOpt
   const { register } = useFormContext<FormPresentationFormFields>()
 
   return (
-    <Stack hasGutter>
+    <Stack hasGutter className={nodeFormStyles.formPresentationSection}>
       <StackItem>
         <Title headingLevel="h3" size="md">
           Form options

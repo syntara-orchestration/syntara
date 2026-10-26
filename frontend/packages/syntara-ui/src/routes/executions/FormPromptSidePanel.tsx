@@ -1,15 +1,20 @@
 import { Stack, StackItem } from '@patternfly/react-core'
 import type { FormsAPI } from '@syntara/contracts'
-import { useRef } from 'react'
+import { memo, useRef, type RefObject } from 'react'
 
 import { ApprovalNavigationHeader } from '../../components/ApprovalNavigationHeader'
 import { SynPanel } from '../../components/layout/SynPanel'
 import { SidePanelHeader } from '../../components/SidePanelHeader'
 import { useSidePanelFocusOnOpen } from '../../hooks/useSidePanelFocusOnOpen'
 
-import styles from './ApprovalSidePanel.module.css'
+import approvalStyles from './ApprovalSidePanel.module.css'
 import { FORM_PROMPT_RESPOND_PANEL_TITLE } from './formPrompt/formPromptRespondPanelConstants'
+import {
+  FormPromptRespondPanelFooterProvider,
+  useFormPromptRespondPanelFooterSnapshot,
+} from './formPrompt/FormPromptRespondPanelFooter'
 import { FormPromptResponseContent } from './FormPromptResponseContent'
+import styles from './FormPromptSidePanel.module.css'
 
 type FormPromptSummary = FormsAPI.components['schemas']['FormPromptSummary']
 
@@ -27,9 +32,48 @@ type FormPromptSidePanelProps = Readonly<{
   onNavigateNext?: () => void
 }>
 
-export function FormPromptSidePanel({
+export function FormPromptSidePanel(props: FormPromptSidePanelProps) {
+  const panelRootRef = useRef<HTMLElement>(null)
+  useSidePanelFocusOnOpen(true, panelRootRef)
+
+  const promptId = props.formPrompt.id
+  if (!promptId) {
+    return null
+  }
+
+  return (
+    <FormPromptRespondPanelFooterProvider>
+      <FormPromptSidePanelFrame {...props} panelRootRef={panelRootRef} promptId={promptId} />
+    </FormPromptRespondPanelFooterProvider>
+  )
+}
+
+type FormPromptSidePanelFrameProps = FormPromptSidePanelProps &
+  Readonly<{
+    panelRootRef: RefObject<HTMLElement | null>
+    promptId: string
+  }>
+
+function FormPromptSidePanelFrame(props: FormPromptSidePanelFrameProps) {
+  const panelFooter = useFormPromptRespondPanelFooterSnapshot()
+
+  return (
+    <SynPanel
+      hasNoPadding
+      isFullHeight
+      footer={panelFooter}
+      className={approvalStyles.panel}
+      panelMainBodyProps={{
+        style: { flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' },
+      }}
+    >
+      <FormPromptSidePanelBody {...props} />
+    </SynPanel>
+  )
+}
+
+const FormPromptSidePanelBody = memo(function FormPromptSidePanelBody({
   executionId,
-  formPrompt,
   activityNameMap,
   onClose,
   onSubmitted,
@@ -39,45 +83,40 @@ export function FormPromptSidePanel({
   hasNext,
   onNavigatePrev,
   onNavigateNext,
-}: FormPromptSidePanelProps) {
-  const panelRootRef = useRef<HTMLElement>(null)
-  useSidePanelFocusOnOpen(true, panelRootRef)
-
+  panelRootRef,
+  promptId,
+}: FormPromptSidePanelFrameProps) {
   const showNavigation = totalCount !== undefined && totalCount > 1 && onNavigatePrev && onNavigateNext
-  const promptId = formPrompt.id
-  if (!promptId) {
-    return null
-  }
 
   return (
-    <SynPanel hasNoPadding isFullHeight className={styles.panel}>
-      <section ref={panelRootRef} className={styles.panelInner} aria-label={FORM_PROMPT_RESPOND_PANEL_TITLE}>
-        <Stack className={styles.panelStack}>
-          <StackItem className={styles.headerPadding}>
-            {showNavigation ? (
-              <ApprovalNavigationHeader
-                title={FORM_PROMPT_RESPOND_PANEL_TITLE}
-                currentIndex={currentIndex}
-                totalCount={totalCount}
-                hasPrev={hasPrev}
-                hasNext={hasNext}
-                onNavigatePrev={onNavigatePrev}
-                onNavigateNext={onNavigateNext}
-                onClose={onClose}
-                closeAriaLabel="Close form prompt panel"
-                navigatePrevAriaLabel="Previous prompt"
-                navigateNextAriaLabel="Next prompt"
-              />
-            ) : (
-              <SidePanelHeader
-                title={FORM_PROMPT_RESPOND_PANEL_TITLE}
-                onClose={onClose}
-                closeAriaLabel="Close form prompt panel"
-              />
-            )}
-          </StackItem>
+    <section ref={panelRootRef} className={approvalStyles.panelInner} aria-label={FORM_PROMPT_RESPOND_PANEL_TITLE}>
+      <Stack className={approvalStyles.panelStack}>
+        <StackItem className={approvalStyles.headerPadding}>
+          {showNavigation ? (
+            <ApprovalNavigationHeader
+              title={FORM_PROMPT_RESPOND_PANEL_TITLE}
+              currentIndex={currentIndex}
+              totalCount={totalCount}
+              hasPrev={hasPrev}
+              hasNext={hasNext}
+              onNavigatePrev={onNavigatePrev}
+              onNavigateNext={onNavigateNext}
+              onClose={onClose}
+              closeAriaLabel="Close form prompt panel"
+              navigatePrevAriaLabel="Previous prompt"
+              navigateNextAriaLabel="Next prompt"
+            />
+          ) : (
+            <SidePanelHeader
+              title={FORM_PROMPT_RESPOND_PANEL_TITLE}
+              onClose={onClose}
+              closeAriaLabel="Close form prompt panel"
+            />
+          )}
+        </StackItem>
 
-          <StackItem isFilled className={styles.bodyPadding}>
+        <StackItem isFilled className={`${approvalStyles.bodyPadding} ${styles.bodyPadding}`}>
+          <div className={styles.bodyHost}>
             <FormPromptResponseContent
               key={`${executionId}:${promptId}`}
               executionId={executionId}
@@ -85,9 +124,9 @@ export function FormPromptSidePanel({
               activityNameMap={activityNameMap}
               onSubmitted={onSubmitted}
             />
-          </StackItem>
-        </Stack>
-      </section>
-    </SynPanel>
+          </div>
+        </StackItem>
+      </Stack>
+    </section>
   )
-}
+})

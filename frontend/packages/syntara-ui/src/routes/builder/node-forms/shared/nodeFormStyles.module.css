@@ -15,3 +15,45 @@
   text-decoration-style: dashed;
   text-underline-offset: 0.2em;
 }
+
+.formTriggerParameters {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.nodeFormTabsLayout {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.nodeFormTabsBody {
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+.nodeFormParametersStack {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.nodeFormParametersItem {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.formPresentationSection {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.formPresentationSection :global(.pf-v6-c-form__group-control) {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.formPresentationSection :global(textarea.pf-v6-c-form-control) {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}

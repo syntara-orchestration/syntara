@@ -9,6 +9,7 @@ import {
   RhUiConditionNodeIcon,
   RhUiLoopNodeIcon,
   RhUiUserCheckIcon,
+  RhUiDocumentIcon,
   RhUiTaskIcon,
   RhUiTreeViewIcon,
   RhUiClockIcon,
@@ -50,6 +51,12 @@ export const nodeMetadata: Record<string, NodeMetadata> = {
   },
   edaTrigger: {
     icon: EdaIcon,
+    label: 'Trigger',
+    disableTarget: true,
+    expandable: false,
+  },
+  formTrigger: {
+    icon: RhUiDocumentIcon,
     label: 'Trigger',
     disableTarget: true,
     expandable: false,

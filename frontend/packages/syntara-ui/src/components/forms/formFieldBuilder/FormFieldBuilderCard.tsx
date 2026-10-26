@@ -95,7 +95,7 @@ export function FormFieldBuilderCard({
           </Button>
         </FlexItem>
         <FlexItem grow={{ default: 'grow' }}>
-          <Card className={styles.fieldCard} isPlain>
+          <Card isCompact className={styles.fieldCard}>
             <CardBody className={styles.fieldCardBody}>
               {canRemove && (
                 <div className={styles.headerActions}>
