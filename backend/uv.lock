@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = ">=3.12, <3.15"
 resolution-markers = [
     "python_full_version >= '3.14'",
@@ -973,8 +973,8 @@ wheels = [
 
 [[package]]
 name = "execution-plane-client"
-version = "0.1.7.dev2+g5e3dc2dd"
-source = { git = "https://github.com/syntara-orchestration/syntara-execution-plane.git?subdirectory=src%2Fexecution_plane_client&branch=refactor%2Fsdk-workload-protocol#5e3dc2dd4282c5a3cb52e7c8f2f8d66fb2ccd8f1" }
+version = "0.1.8.dev2+g732b7c90e"
+source = { git = "https://github.com/syntara-orchestration/syntara-execution-plane.git?subdirectory=src%2Fexecution_plane_client&rev=732b7c90e3c71fc1709cf3eded2cca06e387349c#732b7c90e3c71fc1709cf3eded2cca06e387349c" }
 dependencies = [
     { name = "pydantic" },
 ]
@@ -4444,7 +4444,7 @@ requires-dist = [
     { name = "boto3-stubs", extras = ["s3"], marker = "extra == 'dev'", specifier = ">=1.35.0" },
     { name = "cachetools", specifier = ">=5.0" },
     { name = "cryptography", specifier = ">=48.0.1" },
-    { name = "execution-plane-client", git = "https://github.com/syntara-orchestration/syntara-execution-plane.git?subdirectory=src%2Fexecution_plane_client&branch=refactor%2Fsdk-workload-protocol" },
+    { name = "execution-plane-client", git = "https://github.com/syntara-orchestration/syntara-execution-plane.git?subdirectory=src%2Fexecution_plane_client&rev=732b7c90e3c71fc1709cf3eded2cca06e387349c" },
     { name = "fastapi", specifier = ">=0.135.0" },
     { name = "fastmcp", marker = "extra == 'dev'", specifier = ">=3.2.0,<4.0.0" },
     { name = "filelock", specifier = ">=4.2.1" },

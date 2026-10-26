@@ -175,6 +175,16 @@ class TestScriptActivityDispatch:
         complete_async.assert_called_once()
 
     @pytest.mark.asyncio
+    async def test_running_response_is_accepted_for_async_completion(self) -> None:
+        _FakeEPClient.responses = [{"id": "00000000-0000-0000-0000-000000000002", "status": "running", "result": None}]
+        with patch.object(activity_module.activity, "raise_complete_async") as complete_async:
+            result = await activity_module.execute_script_activity(
+                {"language": "bash", "code": "sleep 1"}, None, EXECUTION_ID
+            )
+        assert result == {}
+        complete_async.assert_called_once()
+
+    @pytest.mark.asyncio
     async def test_rejected_request_is_non_retryable(self) -> None:
         _FakeEPClient.responses = [ExecutionPlaneRejectedError("request rejected")]
         with pytest.raises(ApplicationError) as exc_info:
