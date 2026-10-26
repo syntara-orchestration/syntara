@@ -3,7 +3,7 @@
 import asyncio
 from collections import deque
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
@@ -24,7 +24,7 @@ from syntara.eventstreams.adapters.kafka_position_store import KafkaInitialPosit
 from syntara.eventstreams.adapters.kafka_record_identity import KafkaRecordIdentity
 from syntara.eventstreams.adapters.kafka_source_configuration import KafkaSourceConfiguration
 from syntara.eventstreams.core.consumer import MAX_POSITION_OFFSET
-from syntara.eventstreams.core.deduplication import DeliveryIdentity, DeliveryState
+from syntara.eventstreams.core.deduplication import DeliveryIdentity, DeliveryState, TerminalDeliveryCache
 from syntara.eventstreams.core.envelope import RawEvent
 from syntara.eventstreams.core.handler import ResolvedDelivery
 from syntara.eventstreams.core.processing import (
@@ -32,6 +32,7 @@ from syntara.eventstreams.core.processing import (
     HeldRecord,
     InspectedRecord,
     PendingContentFailure,
+    RecordProcessingGate,
 )
 from syntara.eventstreams.core.source_metadata import EventSourceMetadata
 from syntara.eventstreams.exceptions import (
@@ -70,6 +71,7 @@ class _Partition:
     inspection_next_offset: int | None = None
     inspection_end_offset: int | None = None
     fence: UUID | None = None
+    reconciled_until: float = 0
 
 
 def raw_event_size(event: RawEvent) -> int:
@@ -100,6 +102,8 @@ class KafkaRecordRunner:
         positions: KafkaInitialPositionService | None = None,
         deliveries: KafkaDeliveryReader | None = None,
         work_semaphore: asyncio.Semaphore | None = None,
+        lookup: TerminalDeliveryCache | None = None,
+        gate: RecordProcessingGate | None = None,
     ) -> None:
         """Compose completed services; callers may share a downstream concurrency bound."""
         if not isinstance(snapshot.configuration, KafkaSourceConfiguration) or (
@@ -111,10 +115,12 @@ class KafkaRecordRunner:
         self._client = client
         self._owner = owner_worker_id
         self._settings = get_settings()
+        self._lookup = lookup
+        self._gate = gate
         self._processing = (
             processing
             if processing is not None
-            else EventRecordProcessingService(session_factory, preparation, admission)
+            else EventRecordProcessingService(session_factory, preparation, admission, lookup=lookup, gate=gate)
         )
         self._deliveries = deliveries if deliveries is not None else KafkaDeliveryReader(session_factory)
         self._positions = (
@@ -152,6 +158,47 @@ class KafkaRecordRunner:
     def queued_bytes(self) -> int:
         """Include in-flight source bytes in the subscription byte bound."""
         return sum(state.byte_count for state in self._partitions.values())
+
+    @property
+    def ready_partitions(self) -> frozenset[int]:
+        """Report partial initialization without making client startup mean readiness."""
+        return frozenset(state.partition for state in self._partitions.values() if state.ready and self._owned(state))
+
+    def _resolution_open(self) -> bool:
+        return self._gate is None or self._gate.resolution_open(self.snapshot) is True
+
+    def _admission_open(self) -> bool:
+        return self._gate is None or self._gate.admission_open(self.snapshot) is True
+
+    def _invalidate_gate(self) -> None:
+        if self._gate is not None:
+            self._gate.dependency_failed(self.snapshot)
+
+    def _cache_admitted(self, state: _Partition) -> bool:
+        return (
+            self._lookup is not None
+            and self._gate is not None
+            and self._active(state)
+            and state.ready
+            and state.eligible
+            and state.reconciled_until > asyncio.get_running_loop().time()
+            and not state.content_gate_unknown
+            and state.pending_failure is None
+            and state.held is None
+            and self._admission_open()
+            and self._resolution_open()
+        )
+
+    def _commit_allowed(self, state: _Partition) -> bool:
+        # Admission/content gates protect the unresolved head. A later hold or
+        # expired admission snapshot cannot invalidate an earlier resolved prefix.
+        return (
+            self._owned(state)
+            and state.ready
+            and state.fence is None
+            and self._resolution_open()
+            and (self._drain_deadline is None or asyncio.get_running_loop().time() < self._drain_deadline)
+        )
 
     def _owned(self, state: _Partition) -> bool:
         return (
@@ -221,7 +268,27 @@ class KafkaRecordRunner:
         if partitions:
             await self._client.pause(partitions, expected_epoch=epoch)
         for partition in partitions:
-            self._partitions[partition] = _Partition(partition=partition, epoch=epoch, closing=self._closing)
+            previous = self._partitions.get(partition)
+            if previous is None:
+                self._partitions[partition] = _Partition(partition=partition, epoch=epoch, closing=self._closing)
+                continue
+            if previous.epoch == epoch:
+                previous.paused = True
+                continue
+            previous.closing = True
+            deadline = asyncio.get_running_loop().time() + self._settings.event_drain_timeout_seconds
+            await self._drain_states([previous], deadline, commit=False)
+            # Retained assignment keeps its initialized boundary and received
+            # queue. An old task cannot mutate this replacement after draining.
+            self._partitions[partition] = replace(
+                previous,
+                epoch=epoch,
+                records=deque(previous.records),
+                task=None,
+                closing=self._closing,
+                paused=True,
+                reconciled_until=0,
+            )
 
     async def on_partitions_revoked(self, partitions: frozenset[int], epoch: int) -> None:
         """Close admission and bound drain without waiting for the fetch loop."""
@@ -240,34 +307,71 @@ class KafkaRecordRunner:
     async def _advance(self, state: _Partition) -> None:
         try:
             async with self._work:
-                # Repair frozen evidence before initialization/admission. These
-                # service calls themselves require no consumer ownership.
-                if not await self._recover_pending(state) or not self._active(state):
+                if not self._active(state):
                     return
-                if not await self._prepare_queue(state):
-                    return
-                if not state.ready:
-                    position = await self._positions.initialize(self._request(state))
-                    if position.status != PositionStatus.READY or position.assignment_epoch != state.epoch:
-                        state.held = self._retry("initialization_unresolved")
+                reconcile = (
+                    self._gate is None
+                    or state.reconciled_until <= asyncio.get_running_loop().time()
+                    or not state.ready
+                    or state.reload_required
+                )
+                # Repair precedes initial admission and each bounded refresh.
+                # A warmed duplicate needs neither this scan nor an eligibility
+                # query; the shared gate can close it immediately between probes.
+                if reconcile:
+                    if not await self._reconcile_partition(state):
                         return
-                    state.ready = True
-                state.eligible = await self._processing.admission_eligible(self.snapshot)
-                if not state.eligible:
-                    state.held = self._retry("admission_closed")
+                elif not await self._prepare_queue(state):
                     return
-                if state.records and self._active(state):
-                    await self._process_head(state)
+                if not state.eligible or not self._admission_open() or not self._resolution_open():
+                    state.held = self._retry(
+                        "admission_closed" if self._resolution_open() else "dependency_unavailable"
+                    )
+                    return
+                await self._process_head(state)
         except asyncio.CancelledError:
             raise
-        except Exception:  # noqa: BLE001 - unexpected failures hold the partition, never reject content
-            state.held = self._retry("processing_unavailable")
-            logger.warning(
-                "event_record_processing_unavailable", source_id=str(self.snapshot.source_id), partition=state.partition
-            )
+        except Exception as exc:  # noqa: BLE001 - unexpected failures hold the partition, never reject content
+            self._processing_failed(state, exc)
         finally:
+            if state.held is not None:
+                state.reconciled_until = 0
             if state.held is not None and state.records and self._owned(state) and state.fence is None:
                 await self._park(state)
+
+    def _processing_failed(self, state: _Partition, failure: Exception) -> None:
+        durable = isinstance(failure, (SQLAlchemyError, OSError, TimeoutError))
+        if durable:
+            self._invalidate_gate()
+        state.held = self._retry("dependency_unavailable" if durable else "processing_unavailable")
+        logger.warning(
+            "event_record_processing_unavailable", source_id=str(self.snapshot.source_id), partition=state.partition
+        )
+
+    async def _reconcile_partition(self, state: _Partition) -> bool:
+        if not await self._recover_pending(state) or not await self._prepare_queue(state):
+            return False
+        if not state.ready:
+            position = await self._positions.initialize(self._request(state))
+            if position.status != PositionStatus.READY or position.assignment_epoch != state.epoch:
+                if position.reason in {
+                    "storage_unavailable",
+                    "source_identity_unavailable",
+                    "source_recreated",
+                    "source_revision_changed",
+                    "waiting_for_source_recovery",
+                    "recovery_hold_unavailable",
+                }:
+                    self._invalidate_gate()
+                state.held = self._retry("initialization_unresolved")
+                return False
+            state.ready = True
+        if self._gate is not None and await self._deliveries.has_content_gate(self.snapshot, state.partition):
+            state.held = HeldRecord(reason="activity_log_unavailable", permanent_content_error=True)
+            return False
+        state.eligible = await self._processing.admission_eligible(self.snapshot)
+        state.reconciled_until = asyncio.get_running_loop().time() + EventSchedulingDefaults.TRANSIENT_PROBE_SECONDS
+        return True
 
     async def _prepare_queue(self, state: _Partition) -> bool:
         if state.reload_required:
@@ -311,9 +415,23 @@ class KafkaRecordRunner:
         return False
 
     async def _process_head(self, state: _Partition) -> None:
+        if not state.records or not self._active(state):
+            return
         event = state.records[0]
         identity = self._identity(event)
-        result = await self._processing.process(self.snapshot, identity, event, self._owner)
+        epoch = state.epoch
+        if self._cache_admitted(state):
+            result = await self._processing.process(self.snapshot, identity, event, self._owner, cache_admitted=True)
+        else:
+            result = await self._processing.process(self.snapshot, identity, event, self._owner)
+        if not self._owned(state) or state.epoch != epoch:
+            return
+        if not state.records or self._identity(state.records[0]) != identity:
+            state.held = self._retry("evidence_mismatch")
+            return
+        if not self._resolution_open():
+            state.held = self._retry("dependency_unavailable")
+            return
         if not isinstance(result, ResolvedDelivery) or result.terminal.identity != identity:
             state.held = result if isinstance(result, HeldRecord) else self._retry("evidence_mismatch")
         elif result.terminal.state == DeliveryState.REJECTED:
@@ -345,7 +463,7 @@ class KafkaRecordRunner:
 
     async def _apply_pending_result(self, state: _Partition, result: ResolvedDelivery | HeldRecord) -> None:
         pending = state.pending_failure
-        if pending is None:
+        if pending is None or not self._owned(state):
             return
         if isinstance(result, HeldRecord):
             state.held = self._retry("queue_capacity") if result.reason == "delivery_evidence_unavailable" else result
@@ -405,9 +523,7 @@ class KafkaRecordRunner:
     def _due(state: _Partition) -> bool:
         return state.held is None or (state.held.retry_at is not None and datetime.now(UTC) >= state.held.retry_at)
 
-    async def _tick(self) -> None:
-        if not self._accepting_work():
-            return
+    def _start_due_tasks(self) -> None:
         for state in tuple(self._partitions.values()):
             if state.task is not None and state.task.done():
                 if not state.task.cancelled():
@@ -422,6 +538,14 @@ class KafkaRecordRunner:
             ):
                 state.held = None
                 state.task = asyncio.create_task(self._advance(state))
+
+    async def _tick(self) -> None:
+        if not self._accepting_work():
+            return
+        if not self._admission_open():
+            await self.close_admission()
+            return
+        self._start_due_tasks()
         await self._commit_positions(tuple(self._partitions.values()))
         candidates: list[int] = []
         epoch = self._client.epoch
@@ -434,6 +558,8 @@ class KafkaRecordRunner:
                 and not state.closing
                 and state.fence is None
                 and state.held is None
+                and self._admission_open()
+                and self._resolution_open()
                 and state.rewind_offset is None
                 and state.pending_failure is None
                 and len(state.records) < self._settings.event_partition_max_records
@@ -442,7 +568,7 @@ class KafkaRecordRunner:
             )
             if await self._pause(state, paused=not available) and available:
                 candidates.append(state.partition)
-        if not self._accepting_work():
+        if not self._accepting_work() or not self._admission_open():
             return
         context = EventSourceMetadata(
             integration_id=self.snapshot.integration_identity,
@@ -499,7 +625,7 @@ class KafkaRecordRunner:
             state = self._partitions.get(partition)
             if state is None or state.epoch != epoch or not self._owned(state):
                 continue
-            if state.fence is not None or state.closing:
+            if state.fence is not None or state.closing or not self._admission_open():
                 self._remember_inspection(state, events)
                 continue
             if state.held is not None or state.pending_failure is not None:
@@ -683,7 +809,7 @@ class KafkaRecordRunner:
             offsets = {
                 state.partition: state.resolved_next_offset
                 for state in states
-                if self._owned(state) and state.fence is None and state.resolved_next_offset is not None
+                if self._commit_allowed(state) and state.resolved_next_offset is not None
             }
             if not offsets:
                 return
@@ -738,6 +864,14 @@ class KafkaRecordRunner:
         await self._drain_states(states, self._drain_deadline, commit=True)
         await self._flush_pending_content(states, self._drain_deadline)
 
+    async def close_admission(self) -> None:
+        """Begin full runner drain after placement loss; preserve frozen handoffs.
+
+        The supervisor supplies lease trust/expiry through the shared gate or
+        calls this port directly. Reopening intake requires a new runner.
+        """
+        await self.drain()
+
     async def _flush_pending_content(self, states: list[_Partition], deadline: float) -> None:
         """Persist staged evidence without starting new workflow admission."""
         try:
@@ -778,6 +912,8 @@ class KafkaRecordRunner:
         if state is None or not self._matches(request, state) or not self._owned(state):
             return DrainEvidence(quiescent=False, retained_evidence_complete=False, permanent_content_error=True)
         state.fence = token
+        self._invalidate_gate()
+        state.reconciled_until = 0
         state.resolved_next_offset = None
         state.rewind_offset = None
         deadline = asyncio.get_running_loop().time() + self._settings.event_drain_timeout_seconds
@@ -804,7 +940,10 @@ class KafkaRecordRunner:
                     or state.pending_failure is not None
                     or (state.held is not None and state.held.permanent_content_error)
                 )
-        except (*_TRANSPORT_ERRORS, SQLAlchemyError, OSError, TimeoutError, ValueError):
+        except SQLAlchemyError:
+            self._invalidate_gate()
+            quiescent, gated = False, True
+        except (*_TRANSPORT_ERRORS, OSError, TimeoutError, ValueError):
             quiescent, gated = False, True
         state.records.clear()
         state.byte_count = 0
@@ -819,7 +958,12 @@ class KafkaRecordRunner:
 
     async def resume_after_recovery(self, request: PositionRequest, *, token: UUID) -> bool:
         """Reopen only after completed recovery and fresh lifecycle/ownership checks."""
-        if self._closing or not await self.is_fenced(request, token=token):
+        if (
+            self._closing
+            or not self._admission_open()
+            or not self._resolution_open()
+            or not await self.is_fenced(request, token=token)
+        ):
             return False
         state = self._partitions[request.partition]
         if (
@@ -835,12 +979,16 @@ class KafkaRecordRunner:
                     return False
                 position = await self._positions.initialize(request)
                 eligible = await self._processing.admission_eligible(self.snapshot)
-        except (*_TRANSPORT_ERRORS, SQLAlchemyError, OSError, TimeoutError, ValueError):
+        except (*_TRANSPORT_ERRORS, SQLAlchemyError, OSError, TimeoutError, ValueError) as exc:
+            if isinstance(exc, SQLAlchemyError):
+                self._invalidate_gate()
             return False
         if (
             position.status != PositionStatus.READY
             or position.assignment_epoch != request.assignment_epoch
             or not eligible
+            or not self._admission_open()
+            or not self._resolution_open()
             or not await self.is_fenced(request, token=token)
         ):
             return False
@@ -850,4 +998,5 @@ class KafkaRecordRunner:
         state.eligible = True
         state.held = None
         state.task = None
+        state.reconciled_until = asyncio.get_running_loop().time() + EventSchedulingDefaults.TRANSIENT_PROBE_SECONDS
         return True
