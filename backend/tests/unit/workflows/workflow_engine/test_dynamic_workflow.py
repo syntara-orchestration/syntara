@@ -61,6 +61,8 @@ def _make_workflow(
     wf._timeout_tasks = {}
     wf._timed_out_converge_nodes = set()
     wf._detached_nodes = set()
+    wf._any_fired_nodes = set()
+    wf._any_fired_tasks = {}
     wf._cof_failed_nodes = set()
     wf._converge_branch_nodes = {}
     wf._has_unhandled_failure = False
@@ -1011,7 +1013,7 @@ class TestConvergeAnyStrategy:
         result = wf._should_skip_successor(converge_node, "node_a", is_loop_iterate, pending, graph)
         assert result is False
         assert "node_b" not in wf.skipped_nodes
-        assert "node_b" in wf._detached_nodes
+        assert "node_b" in wf._any_fired_nodes
 
     def test_any_skips_do_not_count_toward_n_required(self) -> None:
         """Skipped predecessors do not count toward n_required; only successes count."""
