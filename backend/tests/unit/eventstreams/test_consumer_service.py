@@ -4,7 +4,7 @@ import asyncio
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 import pytest_asyncio
@@ -12,11 +12,18 @@ import pytest_asyncio
 from syntara.core.constants import EventSchedulingDefaults, EventWorkerDefaults
 from syntara.eventstreams.adapters.kafka_consumer import KafkaPartitionConsumer
 from syntara.eventstreams.adapters.kafka_record_runner import KafkaRecordRunner
-from syntara.eventstreams.consumer_service import EventWorkerManager
-from syntara.eventstreams.core.runtime import RuntimeFailureCode, RuntimeRevision, RuntimeState
+from syntara.eventstreams.consumer_service import EventWorkerManager, placement_targets
+from syntara.eventstreams.core.runtime import (
+    RuntimeFailureCode,
+    RuntimeRevision,
+    RuntimeState,
+    SubscriptionRuntimeStatus,
+)
 from syntara.eventstreams.models.subscription_snapshot import SubscriptionSnapshot
 from syntara.eventstreams.services.subscription_reader import EventSubscriptionReader
+from syntara.eventstreams.services.worker_resources import EventWorkerResources
 from tests.helpers.eventstream_runtime import IsolatedSubscriptionRunner
+from tests.helpers.eventstream_worker import IsolatedPlacementPool, IsolatedPlacementService
 from tests.unit.eventstreams.test_connection_provider import connection_context
 from tests.unit.eventstreams.test_kafka_consumer import _connection, _mock_consumer
 
@@ -34,17 +41,32 @@ async def manager_context(monkeypatch):
     snapshot = connection_context().snapshot
     reader = AsyncMock(spec=EventSubscriptionReader)
     reader.read.return_value = [snapshot]
+    reader.recovery_holds.return_value = set()
+    pool = IsolatedPlacementPool(snapshot.deployment_id, [snapshot.subscription_id])
+    pool.candidates = lambda: (binding.subscription_id for binding in reader.read.return_value)
+    placement = IsolatedPlacementService(pool, worker_id=UUID(int=1))
+    resources = EventWorkerResources()
     runners, trace = [], []
 
     def construct(binding) -> IsolatedSubscriptionRunner:
+        assert pool.leases[binding.subscription_id].owner == placement.worker
+        pool.trace.append(("construct", binding.subscription_id))
         runner = IsolatedSubscriptionRunner(binding, trace)
         runners.append(runner)
         return runner
 
     factory = AsyncMock(side_effect=construct)
-    manager = EventWorkerManager(reader, factory)
+    manager = EventWorkerManager(reader, factory, placement, resources)
     yield SimpleNamespace(
-        manager=manager, reader=reader, factory=factory, runners=runners, snapshot=snapshot, trace=trace
+        manager=manager,
+        reader=reader,
+        factory=factory,
+        runners=runners,
+        snapshot=snapshot,
+        trace=trace,
+        pool=pool,
+        placement=placement,
+        resources=resources,
     )
     for runner in runners:
         runner.stop_error = None
@@ -381,12 +403,10 @@ async def test_incomplete_retirement_keeps_one_delayed_retry(retiring_context, n
     assert len(retiring_context.scheduled) == 1
     assert retiring_context.stop.await_count == calls
     context.factory.assert_awaited_once()
-    reads = context.reader.read.await_count
     retiring_context.runner.stop_error = None
     handle.cancel()
     retry(*args)
     await eventually(lambda: key not in context.manager._retiring and not context.manager._busy)
-    assert context.reader.read.await_count == reads
     assert key not in context.manager._retirement_retries
     assert retiring_context.runner.stopped
     if next_state == "resumed":
@@ -410,14 +430,16 @@ async def test_shutdown_cancels_delayed_retirement_and_rejects_stale_callback(re
     context.factory.assert_awaited_once()
 
 
-async def test_database_failure_preserves_existing_supervisors(manager_context):
+async def test_database_failure_closes_shared_gate_without_new_starts(manager_context):
     context = manager_context
     await context.manager.start()
     await eventually(lambda: bool(context.runners) and context.runners[0].started)
     context.reader.read.side_effect = OSError("database unavailable")
     context.manager.request_reconcile()
     await eventually(lambda: context.reader.read.await_count >= 2)
-    assert not context.runners[0].stopped
+    assert not context.resources.gate.resolution_open(context.snapshot)
+    assert not context.placement.authority(context.snapshot.subscription_id).is_current()
+    assert context.snapshot.subscription_id in context.manager.owned_subscription_ids
     assert context.factory.await_count == 1
 
 
@@ -443,6 +465,7 @@ async def test_initial_database_failure_does_not_report_ready(manager_context):
     assert not context.manager.ready
     context.reader.read.side_effect = None
     context.reader.read.return_value = []
+    await context.manager._membership._heartbeat()
     context.manager.request_reconcile()
     await eventually(lambda: context.manager.ready)
 
@@ -472,3 +495,331 @@ async def test_shutdown_discards_queued_starts_and_hints(manager_context):
     assert context.reader.read.await_count == calls
     assert context.factory.await_count == 2
     assert all(runner.stopped for runner in context.runners)
+
+
+@pytest.mark.parametrize(
+    ("subscriptions", "replicas", "expected"),
+    [(0, 3, [0, 0, 0]), (1, 3, [1, 0, 0]), (5, 3, [2, 2, 1]), (6, 3, [2, 2, 2]), (3, 1, [3]), (3, 0, [])],
+)
+def test_count_targets_are_deterministic_and_include_zero(subscriptions, replicas, expected):
+    workers = [UUID(int=index + 1) for index in range(replicas)]
+    targets = placement_targets(subscriptions, reversed(workers))
+    assert list(targets.values()) == expected
+    assert list(targets) == workers
+    if replicas:
+        assert sum(targets.values()) == subscriptions
+
+
+async def test_zero_target_is_ready_without_claiming_or_starting(manager_context):
+    context = manager_context
+    other = IsolatedPlacementService(context.pool, worker_id=UUID(int=0))
+    await other.heartbeat_worker(other.worker, draining=False)
+    await context.manager.start()
+    assert context.manager.ready
+    assert not context.manager.owned_subscription_ids
+    assert not context.placement.claim_limits
+    context.factory.assert_not_awaited()
+
+
+async def test_missing_self_membership_closes_shared_gate_without_new_claims(manager_context, monkeypatch):
+    context = manager_context
+    await context.manager.start()
+    await eventually(lambda: bool(context.runners) and context.runners[0].started)
+    monkeypatch.setattr(context.placement, "list_live_workers", AsyncMock(return_value=[]))
+    with pytest.raises(RuntimeError, match="absent from authoritative live membership"):
+        await context.manager.reconcile()
+    assert not context.manager.ready
+    assert not context.resources.scheduling_open
+    assert not context.resources.gate.cache_trusted()
+    assert not context.placement.authority(context.snapshot.subscription_id).is_current()
+    assert context.placement.claim_limits == [1]
+    context.factory.assert_awaited_once()
+
+
+async def test_client_construction_follows_committed_claim(manager_context):
+    context = manager_context
+    await context.manager.start()
+    await eventually(lambda: bool(context.runners) and context.runners[0].started)
+    key = context.snapshot.subscription_id
+    assert context.pool.trace.index(("heartbeat", context.placement.worker.worker_id)) < context.pool.trace.index(
+        ("claim_commit", key)
+    )
+    assert context.pool.trace.index(("claim_commit", key)) < context.pool.trace.index(("construct", key))
+
+
+async def test_uncertain_claim_is_reconciled_before_any_start(manager_context):
+    context = manager_context
+    context.placement.claim_error = True
+    await context.manager.start()
+    context.factory.assert_not_awaited()
+    assert not context.manager.ready
+    key = context.snapshot.subscription_id
+    assert key in context.placement.pending_reconciliation
+    assert context.manager.owned_subscription_ids == {key}
+    assert key in context.manager._retiring
+    assert context.manager._pending[key] is None
+    assert context.manager._work_ready.is_set()
+    assert not context.manager._selected
+    assert not context.manager.subscription_ids
+    await context.manager._fill_deficit(1)
+    assert context.placement.claim_limits == [1]
+    context.factory.assert_not_awaited()
+    context.placement.claim_error = False
+    await context.manager._membership._heartbeat()
+    await eventually(lambda: ("release", key) in context.pool.trace)
+    await context.manager.reconcile()
+    await eventually(lambda: bool(context.runners) and context.runners[0].started)
+    assert (
+        context.pool.trace.index(("reconcile", key))
+        < context.pool.trace.index(("release", key))
+        < context.pool.trace.index(("claim_commit", key))
+        < context.pool.trace.index(("construct", key))
+    )
+    assert context.placement.claim_limits == [1, 1]
+
+
+async def test_connection_failure_retains_lease_and_independent_backoff(manager_context):
+    context = manager_context
+    context.factory.side_effect = OSError("broker unavailable")
+    await context.manager.start()
+    key = context.snapshot.subscription_id
+    await eventually(lambda: key in context.manager._supervisors and not context.manager._busy)
+    supervisor = context.manager._supervisors[key]
+    assert supervisor.status.state == RuntimeState.BACKOFF
+    lease = context.pool.leases[key]
+    await context.manager._membership.renew_owned()
+    assert context.pool.leases[key].owner == lease.owner
+    assert context.pool.leases[key].expires_at >= lease.expires_at
+    assert ("release", key) not in context.pool.trace
+    assert context.placement.claim_limits == [1]
+
+
+async def test_membership_change_moves_only_excess_owned_consumers(manager_context):
+    context = manager_context
+    bindings = [context.snapshot.model_copy(update={"subscription_id": UUID(int=index)}) for index in (10, 20, 30)]
+    context.reader.read.return_value = bindings
+    await context.manager.start()
+    await eventually(lambda: len(context.runners) == 3 and all(r.started for r in context.runners))
+    stable = {runner.snapshot.subscription_id: runner for runner in context.runners}
+    second_placement = IsolatedPlacementService(context.pool, worker_id=UUID(int=2))
+    second_runners = []
+
+    def construct(binding) -> IsolatedSubscriptionRunner:
+        runner = IsolatedSubscriptionRunner(binding, [])
+        second_runners.append(runner)
+        return runner
+
+    second = EventWorkerManager(
+        context.reader, AsyncMock(side_effect=construct), second_placement, EventWorkerResources()
+    )
+    try:
+        await second.start()
+        assert second.ready
+        assert not second_runners  # Unexpired placements are never stolen to meet target.
+        await context.manager.reconcile()
+        await eventually(lambda: UUID(int=30) not in context.manager.owned_subscription_ids)
+        await second.reconcile()
+        await eventually(lambda: len(second_runners) == 1 and second_runners[0].started)
+        await context.manager.reconcile()
+        await second.reconcile()
+        assert context.manager.owned_subscription_ids == {UUID(int=10), UUID(int=20)}
+        assert second.owned_subscription_ids == {UUID(int=30)}
+        assert all(not stable[key].stopped and stable[key].start_calls == 1 for key in (UUID(int=10), UUID(int=20)))
+        assert stable[UUID(int=30)].stopped
+    finally:
+        await second.stop()
+
+
+async def test_rejected_renewal_closes_delayed_start_and_drains(manager_context):
+    context = manager_context
+    release = asyncio.Event()
+
+    def construct(binding) -> IsolatedSubscriptionRunner:
+        runner = IsolatedSubscriptionRunner(binding, context.trace)
+        runner.start_release = release
+        context.runners.append(runner)
+        return runner
+
+    context.factory.side_effect = construct
+    await context.manager.start()
+    await eventually(lambda: bool(context.runners) and context.runners[0].start_entered.is_set())
+    context.reader.read.return_value = []
+    context.placement.reject_renewal = True
+    await context.manager._membership.renew_owned()
+    assert not context.runners[0].accepting
+    await eventually(lambda: context.runners[0].stopped)
+    assert not context.runners[0].open_calls
+    context.factory.assert_awaited_once()
+
+
+async def test_uncertain_renewal_cannot_reopen_before_old_consumer_stops(manager_context):
+    context = manager_context
+    await context.manager.start()
+    await eventually(lambda: bool(context.runners) and context.runners[0].started)
+    runner = context.runners[0]
+    runner.drain_release = asyncio.Event()
+    context.placement.renew_error = True
+    key = context.snapshot.subscription_id
+    try:
+        await context.manager._membership.renew_owned()
+        assert not runner.accepting
+        await eventually(lambda: runner.drain_entered.is_set())
+        await context.manager.reconcile()
+        assert key in context.placement.pending_reconciliation
+        assert not context.placement.authority(key).is_current()
+        context.factory.assert_awaited_once()
+        assert ("release", key) not in context.pool.trace
+    finally:
+        context.placement.renew_error = False
+        runner.drain_release.set()
+    await context.manager._membership._heartbeat()
+    await eventually(lambda: len(context.runners) == 2 and context.runners[1].started)
+    assert runner.stopped
+    starts = [index for index, event in enumerate(context.pool.trace) if event == ("construct", key)]
+    assert context.pool.trace.index(("release", key)) < starts[1]
+
+
+async def test_cancelled_draining_request_is_not_repeated_by_stop(manager_context, monkeypatch):
+    context = manager_context
+    await context.manager.start()
+    await eventually(lambda: bool(context.runners) and context.runners[0].started)
+
+    async def blocked_heartbeat() -> None:
+        await asyncio.Event().wait()
+
+    heartbeat = AsyncMock(side_effect=blocked_heartbeat)
+    monkeypatch.setattr(context.manager._membership, "_heartbeat", heartbeat)
+    with pytest.raises(TimeoutError):
+        async with asyncio.timeout(0.01):
+            await context.manager.begin_shutdown()
+    assert heartbeat.await_count == 1
+    assert context.manager._membership._draining
+    assert not context.resources.accepting
+    await context.manager.stop()
+    assert heartbeat.await_count == 1
+    assert context.runners[0].stopped
+    assert context.manager.membership_task.done()
+
+
+async def test_shutdown_renews_through_drain_and_releases_after_stop(manager_context):
+    context = manager_context
+    await context.manager.start()
+    await eventually(lambda: bool(context.runners) and context.runners[0].started)
+    runner = context.runners[0]
+    runner.drain_release = asyncio.Event()
+    task = asyncio.create_task(context.manager.stop())
+    try:
+        await runner.drain_entered.wait()
+        assert not context.resources.accepting
+        assert context.pool.members[context.placement.worker.worker_id].draining
+        key = context.snapshot.subscription_id
+        assert ("release", key) not in context.pool.trace
+        await context.manager._membership.renew_owned()
+        assert ("renew", key) in context.pool.trace
+        assert not context.manager.membership_task.done()
+    finally:
+        runner.drain_release.set()
+        await task
+    assert runner.stopped
+    assert ("release", key) in context.pool.trace
+    assert context.manager.membership_task.done()
+
+
+async def test_release_failure_leaves_database_lease_to_expire(manager_context):
+    context = manager_context
+    await context.manager.start()
+    await eventually(lambda: bool(context.runners) and context.runners[0].started)
+    context.placement.release_error = True
+    key = context.snapshot.subscription_id
+    await context.manager.stop()
+    assert context.runners[0].stopped
+    assert context.pool.leases[key].owner == context.placement.worker
+    assert key not in context.manager.owned_subscription_ids
+    assert context.pool.trace.count(("release", key)) == 1
+    assert context.manager.membership_task.done()
+
+
+async def test_held_source_starts_one_owned_transport_with_record_intake_closed(manager_context):
+    context = manager_context
+    context.reader.recovery_holds.return_value = {context.snapshot.source_id}
+    await context.manager.start()
+    await eventually(lambda: bool(context.runners) and context.runners[0].started)
+    assert context.manager.ready
+    assert context.manager.owned_subscription_ids == {context.snapshot.subscription_id}
+    assert context.resources.gate.transport_open(context.snapshot)
+    assert not context.resources.gate.admission_open(context.snapshot)
+    assert not context.resources.gate.resolution_open(context.snapshot)
+    await context.manager.reconcile()
+    context.factory.assert_awaited_once()
+    context.reader.recovery_holds.return_value = set()
+    await context.manager.reconcile()
+    assert context.resources.gate.admission_open(context.snapshot)
+    context.factory.assert_awaited_once()
+
+
+async def test_uncertain_lease_does_not_rearm_reconciliation_while_consumer_drains(manager_context):
+    context = manager_context
+    await context.manager.start()
+    await eventually(lambda: bool(context.runners) and context.runners[0].started)
+    runner = context.runners[0]
+    runner.drain_release = asyncio.Event()
+    key = context.snapshot.subscription_id
+    context.placement.authority(key).invalidate()
+    context.placement._pending.add(key)
+    try:
+        await context.manager.reconcile()
+        assert not context.manager._hint.is_set()
+        await runner.drain_entered.wait()
+        before = context.reader.read.await_count
+        for _ in range(3):
+            await context.manager.reconcile()
+            assert key in context.placement.pending_reconciliation
+            assert not context.manager._hint.is_set()
+        assert context.reader.read.await_count == before + 3
+        assert not context.placement.authority(key).is_current()
+        context.factory.assert_awaited_once()
+        assert ("release", key) not in context.pool.trace
+    finally:
+        runner.drain_release.set()
+
+
+async def test_cancelled_shutdown_retains_and_fences_slow_drain_children(manager_context, monkeypatch):
+    context = manager_context
+    await context.manager.start()
+    await eventually(lambda: bool(context.runners) and context.runners[0].started)
+    key = context.snapshot.subscription_id
+    supervisor = context.manager._supervisors[key]
+    stop = supervisor.stop
+    entered, cancelled, release = asyncio.Event(), asyncio.Event(), asyncio.Event()
+
+    async def delayed_stop() -> SubscriptionRuntimeStatus:
+        entered.set()
+        try:
+            await release.wait()
+        except asyncio.CancelledError:
+            cancelled.set()
+            await release.wait()
+        status: SubscriptionRuntimeStatus = await stop()
+        return status
+
+    monkeypatch.setattr(supervisor, "stop", delayed_stop)
+    monkeypatch.setattr(EventWorkerDefaults, "HINT_TIMEOUT_SECONDS", 0.02)
+    task = asyncio.create_task(context.manager.stop())
+    try:
+        await entered.wait()
+        task.cancel()
+        await cancelled.wait()
+        assert not context.manager.membership_task.done()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        assert context.manager.membership_task.done()
+        assert context.manager._drain_tasks
+        assert context.pool.leases[key].owner == context.placement.worker
+        assert ("release", key) not in context.pool.trace
+    finally:
+        release.set()
+        if not task.done():
+            await task
+        await eventually(lambda: not context.manager._drain_tasks)
+    assert context.runners[0].stopped
+    assert ("release", key) not in context.pool.trace

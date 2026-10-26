@@ -51,14 +51,47 @@ async def _monitor(
     if shutdown.is_set():
         return
     reconciliation = manager.reconciliation_task
-    if reconciliation is None:
-        msg = "Event worker reconciliation did not start"
+    membership = manager.membership_task
+    if reconciliation is None or membership is None:
+        msg = "Event worker infrastructure did not start"
         raise RuntimeError(msg)
-    done, _ = await asyncio.wait({reconciliation, stopping}, return_when=asyncio.FIRST_COMPLETED)
-    if reconciliation in done and not shutdown.is_set():
-        await reconciliation
-        msg = "Event worker reconciliation exited unexpectedly"
+    infrastructure = {reconciliation, membership}
+    done, _ = await asyncio.wait({*infrastructure, stopping}, return_when=asyncio.FIRST_COMPLETED)
+    if not shutdown.is_set():
+        for task in done & infrastructure:
+            await task
+        msg = "Event worker infrastructure exited unexpectedly"
         raise RuntimeError(msg)
+
+
+async def _drain_worker(
+    manager: EventWorkerManager,
+    recovery: EventDeliveryRecoveryWorker,
+    resources: EventWorkerResources,
+    lifecycle_tasks: tuple[asyncio.Task[None] | None, asyncio.Task[bool] | None],
+) -> None:
+    """Share one deadline and finish manager cleanup before stopping maintenance."""
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + get_settings().event_drain_timeout_seconds
+    try:
+        async with asyncio.timeout_at(min(deadline, loop.time() + EventWorkerDefaults.PLACEMENT_TIMEOUT_SECONDS)):
+            await manager.begin_shutdown()
+    except Exception:  # noqa: BLE001 - failed membership marking must not skip bounded cleanup
+        resources.database_failed()
+        logger.warning("event_worker_draining_membership_unavailable")
+    tasks: set[asyncio.Task[Any]] = {asyncio.create_task(recovery.stop())}
+    for task in lifecycle_tasks:
+        if task is not None:
+            if not task.done():
+                task.cancel()
+            tasks.add(task)
+    try:
+        await manager.stop(deadline=deadline)
+    finally:
+        try:
+            await settle_worker_tasks(tasks, max(0.0, deadline - loop.time()))
+        finally:
+            await manager.stop_membership()
 
 
 async def run_event_worker(
@@ -102,17 +135,8 @@ async def run_event_worker(
         await _monitor(manager, shutdown, startup, stopping)
     finally:
         close_admission()
-        tasks: set[asyncio.Task[Any]] = {
-            asyncio.create_task(manager.stop()),
-            asyncio.create_task(recovery.stop()),
-        }
-        for task in (startup, stopping):
-            if task is not None:
-                if not task.done():
-                    task.cancel()
-                tasks.add(task)
         try:
-            await settle_worker_tasks(tasks, get_settings().event_drain_timeout_seconds)
+            await _drain_worker(manager, recovery, resources, (startup, stopping))
         finally:
             try:
                 await hints.stop()

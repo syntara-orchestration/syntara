@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from syntara.core.config.base import get_settings
+from syntara.core.constants import EventWorkerDefaults
 from syntara.core.lib.encryption import SecretEncryptor
 from syntara.eventstreams import consumer_entrypoint as entrypoint
 from syntara.eventstreams import consumer_lifecycle as lifecycle
@@ -18,9 +19,13 @@ from syntara.eventstreams.services.subscription_reader import EventSubscriptionR
 from syntara.eventstreams.services.worker_resources import EventWorkerResources
 from syntara.workflows.workflow_engine.services import temporal_execution_service as temporal_module
 from tests.helpers.eventstream_runtime import IsolatedSubscriptionRunner
+from tests.helpers.eventstream_worker import IsolatedPlacementPool, IsolatedPlacementService
+from tests.unit.eventstreams import test_consumer_service as consumer_tests
 from tests.unit.eventstreams.test_connection_provider import connection_context
 from tests.unit.eventstreams.test_consumer_service import eventually
 from tests.unit.eventstreams.test_worker_resources import TrackingSessionFactory
+
+manager_context = consumer_tests.manager_context
 
 
 async def test_composition_shares_one_client_factory_and_resource_limits(monkeypatch):
@@ -29,6 +34,11 @@ async def test_composition_shares_one_client_factory_and_resource_limits(monkeyp
     resources = EventWorkerResources()
     shutdown = asyncio.Event()
     captured = []
+    snapshot = connection_context().snapshot
+    placement = IsolatedPlacementService(IsolatedPlacementPool(snapshot.deployment_id))
+    create_placement = AsyncMock(return_value=placement)
+    redis = MagicMock()
+    redis.disconnect = AsyncMock()
 
     async def run(manager, recovery, shared, hints, **kwargs: object) -> None:
         captured.append(True)
@@ -43,12 +53,21 @@ async def test_composition_shares_one_client_factory_and_resource_limits(monkeyp
         assert recovery._admission._preparation._resources is shared
         assert manager._factory._preparation._resources is shared
         assert hints._request == manager.request_reconcile
+        assert manager._placement is placement
+        assert manager._factory._lookup is recovery._admission._cache
+        assert manager._factory._lookup.cache is redis
+        assert hints._client is redis
+        assert manager._gate is shared.gate
 
     monkeypatch.setattr(entrypoint, "AsyncSessionLocal", sessions)
     monkeypatch.setattr(entrypoint, "run_event_worker", run)
+    monkeypatch.setattr(entrypoint.SubscriptionPlacementService, "create", create_placement)
+    monkeypatch.setattr(entrypoint, "EventWorkerRedisClient", lambda: redis)
     await entrypoint._run_connected(service, SecretEncryptor(b"a" * 32), resources, shutdown)
     assert captured == [True]
     sessions.assert_not_called()
+    create_placement.assert_awaited_once_with(sessions)
+    redis.disconnect.assert_awaited_once()
 
 
 async def test_disabled_process_opens_no_temporal_client(monkeypatch):
@@ -120,11 +139,13 @@ async def test_signal_stops_starts_and_claims_while_recovery_is_independent(monk
     snapshot = connection_context().snapshot
     reader = AsyncMock(spec=EventSubscriptionReader)
     reader.read.return_value = [snapshot]
+    reader.recovery_holds.return_value = set()
     release = asyncio.Event()
     runner = IsolatedSubscriptionRunner(snapshot, [])
     runner.start_release = release
-    manager = EventWorkerManager(reader, AsyncMock(return_value=runner))
     resources = EventWorkerResources()
+    placement = IsolatedPlacementService(IsolatedPlacementPool(snapshot.deployment_id, [snapshot.subscription_id]))
+    manager = EventWorkerManager(reader, AsyncMock(return_value=runner), placement, resources)
     sessions = TrackingSessionFactory()
     store = MagicMock()
     store.claim_due = AsyncMock(return_value=[])
@@ -166,9 +187,11 @@ async def test_signal_stops_starts_and_claims_while_recovery_is_independent(monk
 async def test_recovery_scans_with_zero_active_consumers(monkeypatch):
     reader = AsyncMock(spec=EventSubscriptionReader)
     reader.read.return_value = []
+    reader.recovery_holds.return_value = set()
     factory = AsyncMock()
-    manager = EventWorkerManager(reader, factory)
     resources = EventWorkerResources()
+    placement = IsolatedPlacementService(IsolatedPlacementPool(connection_context().snapshot.deployment_id))
+    manager = EventWorkerManager(reader, factory, placement, resources)
     store = MagicMock()
     store.claim_due = AsyncMock(return_value=[])
     monkeypatch.setattr("syntara.eventstreams.services.recovery_worker.EventDeliveryStore", lambda _session: store)
@@ -180,7 +203,9 @@ async def test_recovery_scans_with_zero_active_consumers(monkeypatch):
     shutdown = asyncio.Event()
     task = asyncio.create_task(lifecycle.run_event_worker(manager, recovery, resources, hints, shutdown_event=shutdown))
     try:
-        await eventually(lambda: manager.ready and store.claim_due.await_count > 0 and redis.disconnect.await_count > 0)
+        await eventually(
+            lambda: manager.ready and store.claim_due.await_count > 0 and redis.pubsub_subscribe.await_count > 0
+        )
         assert not manager.subscription_ids
         factory.assert_not_awaited()
     finally:
@@ -188,3 +213,74 @@ async def test_recovery_scans_with_zero_active_consumers(monkeypatch):
         await task
     assert recovery.draining
     assert not resources.accepting
+    redis.disconnect.assert_not_awaited()  # Only the entrypoint owns the shared pool.
+
+
+async def test_membership_failure_is_monitored_and_closes_process_admission(manager_context, monkeypatch):
+    context = manager_context
+    context.manager._membership._settings = context.manager._membership._settings.model_copy(
+        update={"event_worker_liveness_seconds": 0.02, "event_worker_heartbeat_interval_seconds": 10}
+    )
+    store = MagicMock()
+    store.claim_due = AsyncMock(return_value=[])
+    monkeypatch.setattr("syntara.eventstreams.services.recovery_worker.EventDeliveryStore", lambda _session: store)
+    recovery = EventDeliveryRecoveryWorker(TrackingSessionFactory(), MagicMock(), resources=context.resources)
+    hints = SimpleNamespace(start=MagicMock(), stop=AsyncMock())
+    async with asyncio.timeout(2):
+        with pytest.raises(RuntimeError, match="membership deadline"):
+            await lifecycle.run_event_worker(context.manager, recovery, context.resources, hints)
+    assert not context.resources.accepting
+    assert not context.manager.ready
+    assert context.manager.membership_task.done()
+    hints.stop.assert_awaited_once()
+
+
+async def test_lifecycle_deadline_settles_drain_children_before_hints_close(manager_context, monkeypatch):
+    context = manager_context
+    await context.manager.start()
+    await eventually(lambda: bool(context.runners) and context.runners[0].started)
+    key = context.snapshot.subscription_id
+    supervisor = context.manager._supervisors[key]
+    stop = supervisor.stop
+    entered, cancelled = asyncio.Event(), asyncio.Event()
+    trace = []
+
+    async def blocked_stop() -> None:
+        entered.set()
+        try:
+            await asyncio.Event().wait()
+        finally:
+            assert not context.manager.membership_task.done()
+            trace.append("drain_cancelled")
+            cancelled.set()
+
+    async def close_hints() -> None:
+        assert not context.manager._drain_tasks
+        assert context.manager.membership_task.done()
+        assert ("release", key) not in context.pool.trace
+        trace.append("hints_closed")
+
+    monkeypatch.setattr(supervisor, "stop", blocked_stop)
+    settings = get_settings().model_copy(update={"event_drain_timeout_seconds": 0.02})
+    monkeypatch.setattr(lifecycle, "get_settings", lambda: settings)
+    monkeypatch.setattr(EventWorkerDefaults, "HINT_TIMEOUT_SECONDS", 0.02)
+    recovery = SimpleNamespace(start=MagicMock(), close_claims=MagicMock(), stop=AsyncMock())
+    hints = SimpleNamespace(start=MagicMock(), stop=AsyncMock(side_effect=close_hints))
+    shutdown = asyncio.Event()
+    process = asyncio.create_task(
+        lifecycle.run_event_worker(context.manager, recovery, context.resources, hints, shutdown_event=shutdown)
+    )
+    try:
+        await eventually(lambda: hints.start.called)
+        shutdown.set()
+        await entered.wait()
+        await cancelled.wait()
+        await process
+        assert trace == ["drain_cancelled", "hints_closed"]
+        assert context.pool.leases[key].owner == context.placement.worker
+        recovery.close_claims.assert_called()
+        assert not context.resources.accepting
+    finally:
+        shutdown.set()
+        await process
+        await stop()
