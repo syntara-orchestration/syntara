@@ -54,9 +54,9 @@ def test_placement_migration_preserves_durable_evidence(direction: str) -> None:
         )
 
 
-def test_placement_revision_joins_existing_heads() -> None:
+def test_placement_revision_follows_subscription_head() -> None:
     migration = import_module(_MIGRATION)
     assert migration.__file__ is not None
     scripts = ScriptDirectory(str(Path(migration.__file__).parent.parent))
     assert scripts.get_heads() == [migration.revision]
-    assert set(migration.down_revision) == {"52662dc0e022", "759a689cc69c"}
+    assert migration.down_revision == "759a689cc69c"
