@@ -1,10 +1,12 @@
 """Token-fenced scheduling of prepared executions; no broker operations."""
 
+import asyncio
 import random
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
+import structlog
 from sqlalchemy import func
 from sqlalchemy.exc import SQLAlchemyError
 from sqlmodel import select
@@ -13,7 +15,14 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from syntara.core.config.base import get_settings
 from syntara.core.constants import EventSchedulingDefaults
 from syntara.core.exceptions import SafeValueError
-from syntara.eventstreams.core.deduplication import ClaimLost, DeliveryClaim, TemporalAcceptance, TerminalDelivery
+from syntara.eventstreams.core.deduplication import (
+    ClaimLost,
+    DeliveryClaim,
+    DeliveryState,
+    TemporalAcceptance,
+    TerminalDelivery,
+    TerminalDeliveryCache,
+)
 from syntara.eventstreams.core.handler import (
     BlockedDelivery,
     EventLaunchError,
@@ -34,16 +43,24 @@ from syntara.workflows.models.execution import Execution
 
 type SchedulingResult = ResolvedDelivery | RetryDelivery | BlockedDelivery | ClaimLost
 _STORAGE_ERRORS = (SQLAlchemyError, OSError, TimeoutError)
+logger = structlog.stdlib.get_logger(__name__)
 
 
 class EventAdmissionService:
     """Own separate short transactions around finite, isolated Temporal calls."""
 
-    def __init__(self, session_factory: Callable[..., AsyncSession], launcher: WorkflowLauncher) -> None:
+    def __init__(
+        self,
+        session_factory: Callable[..., AsyncSession],
+        launcher: WorkflowLauncher,
+        *,
+        cache: TerminalDeliveryCache | None = None,
+    ) -> None:
         """Inject the database factory and signed Temporal adapter."""
         self._session_factory = session_factory
         self._launcher = launcher
         self._preparation = EventExecutionPreparationService(session_factory)
+        self._cache = cache
 
     async def schedule(self, prepared: PreparedExecution) -> SchedulingResult:
         """Reload frozen arguments; a caller's mutable dictionaries are never authoritative."""
@@ -55,7 +72,7 @@ class EventAdmissionService:
             try:
                 prepared = await self._reload(claim)
                 if isinstance(prepared, TerminalDelivery):
-                    return ResolvedDelivery(terminal=prepared)
+                    return await self._resolved(prepared)
                 if isinstance(prepared, ClaimLost):
                     return prepared
                 return await self._schedule(prepared)
@@ -93,7 +110,7 @@ class EventAdmissionService:
             retention = await self._verified_retention()
             attempted = await self._record_attempt(prepared, retention)
             if isinstance(attempted, (ClaimLost, TerminalDelivery)):
-                return ResolvedDelivery(terminal=attempted) if isinstance(attempted, TerminalDelivery) else attempted
+                return await self._resolved(attempted) if isinstance(attempted, TerminalDelivery) else attempted
             prepared = prepared.model_copy(update={"claim": attempted})
             acceptance = await self._launcher.start(prepared)
         except EventLaunchError as exc:
@@ -221,19 +238,32 @@ class EventAdmissionService:
             await self._check_runtime(session, prepared, reconciled)
         return reconciled
 
+    async def _resolved(self, terminal: TerminalDelivery) -> ResolvedDelivery:
+        """Populate only committed evidence; optional cache work cannot undo resolution."""
+        if self._cache is not None and terminal.state == DeliveryState.SCHEDULED:
+            try:
+                async with asyncio.timeout(get_settings().event_delivery_cache_timeout_seconds):
+                    # The provider rereads committed evidence and preserves its original expiry.
+                    await self._cache.populate(terminal.identity)
+            except Exception:  # noqa: BLE001 - cache failures cannot invalidate committed confirmation
+                logger.warning("event_delivery_terminal_cache_population_failed")
+        return ResolvedDelivery(terminal=terminal)
+
     async def _confirm(self, prepared: PreparedExecution, acceptance: TemporalAcceptance) -> SchedulingResult:
         try:
             async with self._session_factory() as session, session.begin():
                 result = await EventDeliveryStore(session).finalize_scheduled(prepared.claim, acceptance)
-            return ResolvedDelivery(terminal=result) if isinstance(result, TerminalDelivery) else result
+            return await self._resolved(result) if isinstance(result, TerminalDelivery) else result
         except _STORAGE_ERRORS:
             # A lost commit response may already have resolved scheduling.
             async with self._session_factory() as session, session.begin():
                 store = EventDeliveryStore(session)
                 terminal = await store.lookup_terminal(prepared.claim.identity)
-                if terminal is not None:
-                    return ResolvedDelivery(terminal=terminal)
-                recorded = await store.record_acceptance(prepared.claim, acceptance)
+                recorded = (
+                    terminal if terminal is not None else await store.record_acceptance(prepared.claim, acceptance)
+                )
+            if isinstance(recorded, TerminalDelivery):
+                return await self._resolved(recorded)
             if isinstance(recorded, ClaimLost):
                 return recorded
             return await self._failure(recorded, EventLaunchError(SchedulingFailureCode.STORAGE_UNAVAILABLE))
