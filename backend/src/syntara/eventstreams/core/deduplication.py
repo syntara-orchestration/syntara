@@ -54,11 +54,6 @@ class DeliveryIdentity(DeliveryValue):
         """Return an identity independent of the mutable workflow name."""
         return f"event-v1-{self.digest}"
 
-    @property
-    def cache_key(self) -> str:
-        """Return the optional terminal-reference cache key."""
-        return f"syntara:eventstreams:dedup:v1:{self.digest}"
-
 
 def input_fingerprint(input_data: object, context: object) -> str:
     """Hash frozen Execution input/context without duplicating either in the ledger."""
@@ -223,15 +218,35 @@ class RecoveryEvidenceReservations(Protocol):
         ...
 
 
-class TerminalReferenceCache(Protocol):
-    """Disposable references; hits never replace a PostgreSQL lookup."""
+class TerminalProofStorage(Protocol):
+    """One injected process-owned Redis client; no delivery coordination authority."""
 
-    async def get(self, identity: DeliveryIdentity) -> str | None:
-        """Read an optional terminal identity reference."""
+    async def get(self, key: str) -> str | None:
+        """Read a serialized proof for validation by the delivery provider."""
         ...
 
-    async def put(self, identity: DeliveryIdentity) -> None:
-        """Cache a terminal identity only after its transaction commits."""
+    async def put(self, key: str, value: str, valid_until: datetime) -> None:
+        """Write with an absolute deadline that retries cannot extend."""
+        ...
+
+
+class TerminalDeliveryCache(Protocol):
+    """Use only for verified source/partition tasks behind shared outage/recovery gates.
+
+    A proof supplies historical resolution, never claims, source eligibility,
+    Kafka ownership or permission to bypass a known database outage.
+    """
+
+    async def lookup(self, identity: DeliveryIdentity) -> TerminalDelivery | None:
+        """Read a validated proof first; a miss must inspect authoritative storage.
+
+        None does not prove row absence or grant admission; repository claims
+        must preserve existing unresolved/ungated evidence on the fallback path.
+        """
+        ...
+
+    async def populate(self, identity: DeliveryIdentity) -> None:
+        """After scheduling commit, read committed evidence before best-effort caching."""
         ...
 
 

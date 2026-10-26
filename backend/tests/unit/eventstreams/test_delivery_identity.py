@@ -39,7 +39,6 @@ def test_fixed_vectors(offset: int, digest: str, execution_id: str) -> None:
     assert value.digest == digest
     assert str(value.execution_id) == execution_id
     assert value.temporal_workflow_id == f"event-v1-{digest}"
-    assert value.cache_key == f"syntara:eventstreams:dedup:v1:{digest}"
     assert DeliveryIdentity.model_validate_json(value.model_dump_json()) == value
     assert f'"offset":"{offset}"'.encode() in value.canonical_bytes()
 
