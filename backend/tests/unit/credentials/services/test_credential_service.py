@@ -21,6 +21,7 @@ from syntara.credentials.exceptions import (
     CredentialNotFoundError,
     CredentialValidationError,
 )
+from syntara.credentials.lib.preseed import GA_CREDENTIAL_TYPES
 from syntara.credentials.models.credential import Credential, CredentialCreate, CredentialRead, CredentialUpdate
 from syntara.credentials.models.credential_type import CredentialType
 from syntara.credentials.services.credential_service import (
@@ -389,6 +390,71 @@ class TestGetCredential:
 
 class TestUpdateCredential:
     """Tests for CredentialService.update_credential."""
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("field", ["username", "password"])
+    @pytest.mark.parametrize("value", [None, "", "    "])
+    async def test_patch_rejects_explicitly_cleared_kafka_login_before_storage(
+        self,
+        mock_session: MagicMock,
+        mock_user: MagicMock,
+        mock_secret_service: MagicMock,
+        field: str,
+        value: str | None,
+    ) -> None:
+        kafka_schema = next(item for item in GA_CREDENTIAL_TYPES if item["name"] == "Kafka")
+        credential_type = CredentialType(id=uuid4(), **kafka_schema)
+        credential = Credential(
+            id=uuid4(),
+            name="Kafka login",
+            credential_type_id=credential_type.id,
+            secret_id=uuid4(),
+            project_id=uuid4(),
+            created_by=mock_user.id,
+        )
+        service = CredentialService(mock_session, mock_user, mock_secret_service)
+        mock_result = MagicMock()
+        mock_result.one_or_none.return_value = credential
+        mock_session.exec.return_value = mock_result
+        mock_session.get.side_effect = [None, credential_type]
+
+        with pytest.raises(CredentialValidationError, match=field):
+            await service.update_credential(credential.id, CredentialUpdate(inputs={field: value}))
+
+        mock_secret_service.create_secret.assert_not_awaited()
+        mock_secret_service.update_secret.assert_not_awaited()
+        mock_session.commit.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("inputs", [{}, {"password": ENCRYPTED_SENTINEL}, {"username": ENCRYPTED_SENTINEL}])
+    async def test_patch_preserves_omitted_and_masked_kafka_inputs(
+        self,
+        mock_session: MagicMock,
+        mock_user: MagicMock,
+        mock_secret_service: MagicMock,
+        inputs: dict[str, str],
+    ) -> None:
+        kafka_schema = next(item for item in GA_CREDENTIAL_TYPES if item["name"] == "Kafka")
+        credential_type = CredentialType(id=uuid4(), **kafka_schema)
+        credential = Credential(
+            id=uuid4(),
+            name="Kafka login",
+            credential_type_id=credential_type.id,
+            secret_id=uuid4(),
+            project_id=uuid4(),
+            created_by=mock_user.id,
+        )
+        stored = {"username": "operator", "password": "  secret  "}
+        mock_secret_service.retrieve_secret.return_value = stored
+        service = CredentialService(mock_session, mock_user, mock_secret_service)
+
+        result = await service._apply_credential_inputs_update(
+            credential, CredentialUpdate(inputs=inputs), credential_type
+        )
+
+        assert result == stored
+        mock_secret_service.create_secret.assert_not_awaited()
+        mock_secret_service.update_secret.assert_not_awaited()
 
     @pytest.mark.asyncio
     async def test_encrypted_sentinel_preserves_existing(
@@ -1059,9 +1125,86 @@ class TestValidateInputs:
         with pytest.raises(CredentialValidationError, match="Missing required"):
             _validate_inputs({"token": None}, BEARER_TYPE_INPUTS)
 
+    def test_empty_string_does_not_satisfy_required(self) -> None:
+        with pytest.raises(CredentialValidationError, match="Missing required"):
+            _validate_inputs({"token": ""}, BEARER_TYPE_INPUTS)
+
+    def test_whitespace_only_string_does_not_satisfy_required(self) -> None:
+        with pytest.raises(CredentialValidationError, match="Missing required"):
+            _validate_inputs({"token": "   "}, BEARER_TYPE_INPUTS)
+
+    def test_blank_required_field_reported_among_missing(self) -> None:
+        """A blank required field is named in the error alongside a truly absent one."""
+        with pytest.raises(CredentialValidationError, match="password"):
+            _validate_inputs({"username": "  "}, BASIC_AUTH_TYPE_INPUTS)
+
+    def test_non_blank_string_with_surrounding_whitespace_satisfies_required(self) -> None:
+        # Only whitespace-only values are rejected; a value with meaningful content
+        # plus incidental whitespace is accepted as-is (no trimming/mutation here).
+        _validate_inputs({"token": "  abc  "}, BEARER_TYPE_INPUTS)
+
+    def test_boolean_false_still_satisfies_required(self) -> None:
+        """Blank-string handling must not affect non-string required fields."""
+        boolean_required_inputs = {
+            "fields": [{"id": "verify_ssl", "label": "Verify SSL", "type": "boolean", "secret": False}],
+            "required": ["verify_ssl"],
+        }
+        _validate_inputs({"verify_ssl": False}, boolean_required_inputs)
+
+    def test_min_length_rejects_short_string(self) -> None:
+        min_length_inputs = {
+            "fields": [{"id": "password", "label": "Password", "type": "string", "secret": True, "min_length": 4}],
+            "required": ["password"],
+        }
+        with pytest.raises(CredentialValidationError, match="at least 4 characters"):
+            _validate_inputs({"password": "abc"}, min_length_inputs)
+
+    def test_min_length_accepts_exact_boundary(self) -> None:
+        min_length_inputs = {
+            "fields": [{"id": "password", "label": "Password", "type": "string", "secret": True, "min_length": 4}],
+            "required": ["password"],
+        }
+        _validate_inputs({"password": "abcd"}, min_length_inputs)
+
+    def test_no_min_length_declared_allows_any_length(self) -> None:
+        # BEARER_TYPE_INPUTS has no min_length — a 1-char token must still pass.
+        _validate_inputs({"token": "a"}, BEARER_TYPE_INPUTS)
+
+    def test_kafka_preseed_password_enforces_min_secret_length(self) -> None:
+        """Wires the generic min_length validator to the real Kafka preseed schema.
+
+        Regression test for PR 897 review finding: a Kafka password shorter than
+        credential_scrubber.MIN_SECRET_LENGTH (4) could be saved, then silently
+        skipped by workflow-output value scrubbing, risking a plaintext leak.
+        """
+        from syntara.credentials.lib.preseed import GA_CREDENTIAL_TYPES
+        from syntara.workflows.workflow_engine.utils.credential_scrubber import MIN_SECRET_LENGTH
+
+        kafka_type = next(t for t in GA_CREDENTIAL_TYPES if t["name"] == "Kafka")
+        too_short = "x" * (MIN_SECRET_LENGTH - 1)
+        with pytest.raises(CredentialValidationError, match="at least 4 characters"):
+            _validate_inputs({"username": "u", "password": too_short}, kafka_type["inputs"])
+
+        at_minimum = "x" * MIN_SECRET_LENGTH
+        _validate_inputs({"username": "u", "password": at_minimum}, kafka_type["inputs"])
+
     def test_required_skipped_in_patch_mode(self) -> None:
         # PATCH mode: missing required fields are OK (they're preserved from existing)
         _validate_inputs({}, BEARER_TYPE_INPUTS, allow_sentinel=True)
+
+    def test_patch_rejects_blank_required_string(self) -> None:
+        with pytest.raises(CredentialValidationError, match="cannot be blank: username"):
+            _validate_inputs({"username": ""}, BASIC_AUTH_TYPE_INPUTS, allow_sentinel=True)
+
+    def test_patch_rejects_whitespace_only_required_string(self) -> None:
+        with pytest.raises(CredentialValidationError, match="cannot be blank: username"):
+            _validate_inputs({"username": "   "}, BASIC_AUTH_TYPE_INPUTS, allow_sentinel=True)
+
+    def test_patch_accepts_encrypted_sentinel_for_required_field(self) -> None:
+        _validate_inputs({"password": ENCRYPTED_SENTINEL}, BASIC_AUTH_TYPE_INPUTS, allow_sentinel=True)
+
+    def test_patch_accepts_non_blank_required_value_with_whitespace(self) -> None:
+        _validate_inputs({"username": "  listener  "}, BASIC_AUTH_TYPE_INPUTS, allow_sentinel=True)
 
     def test_unknown_fields_still_rejected_in_patch_mode(self) -> None:
         with pytest.raises(CredentialValidationError, match="Unknown field"):
@@ -1162,9 +1305,10 @@ class TestValidateInputs:
         """Skip validation for $encrypted$ sentinel on PATCH."""
         _validate_inputs({"host": ENCRYPTED_SENTINEL}, HOST_TYPE_INPUTS, allow_sentinel=True)
 
-    def test_host_none_skipped_on_patch(self) -> None:
-        """Skip URL validation when host is None on PATCH (required-field check is separate)."""
-        _validate_inputs({"host": None}, HOST_TYPE_INPUTS, allow_sentinel=True)
+    def test_required_host_none_rejected_on_patch(self) -> None:
+        """An explicit null cannot clear a required host string."""
+        with pytest.raises(CredentialValidationError, match="cannot be blank: host"):
+            _validate_inputs({"host": None}, HOST_TYPE_INPUTS, allow_sentinel=True)
 
     def test_host_non_string_rejected(self) -> None:
         """Reject non-string host value."""

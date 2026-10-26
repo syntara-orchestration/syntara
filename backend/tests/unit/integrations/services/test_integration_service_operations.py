@@ -15,7 +15,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from syntara.core.exceptions import SafeValueError
 from syntara.core.models import User
-from syntara.credentials.exceptions import CredentialDisabledError
+from syntara.credentials.exceptions import CredentialDecryptionError, CredentialDisabledError
 from syntara.credentials.models.credential import Credential
 from syntara.credentials.models.credential_type import CredentialType
 from syntara.integrations.adapters.protocol import (
@@ -523,6 +523,53 @@ class TestValidateIntegration:
         mock_audit.dispatch.assert_called_once()
         event = mock_audit.dispatch.call_args[0][0]
         assert event.error_type == "CredentialDisabledError"
+
+    @pytest.mark.asyncio
+    @patch(f"{SERVICE_MODULE}.AuditEventDispatcher")
+    @patch(f"{SERVICE_MODULE}.create_health_check_adapter")
+    async def test_undecryptable_credential_sets_error_status_and_last_validated_at(
+        self,
+        mock_adapter_factory: MagicMock,
+        mock_audit: MagicMock,
+        test_db_session: AsyncSession,
+        integration_service: IntegrationService,
+    ) -> None:
+        """An undecryptable Kafka credential sets ERROR status instead of propagating unhandled.
+
+        Regression test: CredentialDecryptionError and CredentialValidationError are
+        sibling classes (both subclass CredentialError directly), so catching one does
+        not catch the other. _resolve_credential() raises CredentialDecryptionError when
+        the Kafka credential's secret cannot be decrypted (see kafka_connection.py).
+        """
+        created = await integration_service.create_integration(_mcp_create())
+        integration = await test_db_session.get(Integration, created.id)
+        assert integration is not None
+
+        cred, _ = await _create_credential(test_db_session, integration_service.user, with_secret=False)
+        integration.management_credential_id = cred.id
+        await test_db_session.flush()
+        mock_audit.reset_mock()
+
+        with (
+            patch.object(
+                integration_service,
+                "_resolve_credential",
+                new_callable=AsyncMock,
+                side_effect=CredentialDecryptionError("Kafka credential could not be decrypted"),
+            ),
+            pytest.raises(CredentialDecryptionError),
+        ):
+            await integration_service.validate_integration(created.id)
+
+        refreshed = await test_db_session.get(Integration, created.id)
+        assert refreshed is not None
+        assert refreshed.validation_status == IntegrationStatus.ERROR
+        assert "decrypt" in (refreshed.validation_error or "").lower()
+        assert refreshed.last_validated_at is not None
+        mock_adapter_factory.assert_not_called()
+        mock_audit.dispatch.assert_called_once()
+        event = mock_audit.dispatch.call_args[0][0]
+        assert event.error_type == "CredentialDecryptionError"
 
 
 class TestDiscover:
@@ -1231,6 +1278,52 @@ class TestRefreshIntegrationResources:
         mock_audit.dispatch.assert_called_once()
         event = mock_audit.dispatch.call_args[0][0]
         assert event.error_type == "CredentialDisabledError"
+
+    @pytest.mark.asyncio
+    @patch(f"{SERVICE_MODULE}.AuditEventDispatcher")
+    @patch(f"{SERVICE_MODULE}.create_health_check_adapter")
+    async def test_undecryptable_credential_sets_refresh_error_status(
+        self,
+        mock_adapter_factory: MagicMock,
+        mock_audit: MagicMock,
+        test_db_session: AsyncSession,
+        integration_service: IntegrationService,
+    ) -> None:
+        """An undecryptable Kafka credential sets ERROR refresh status instead of propagating unhandled.
+
+        Regression test: refresh_resources() previously only caught CredentialDisabledError,
+        so both CredentialValidationError and CredentialDecryptionError (sibling classes,
+        neither a subclass of the other) escaped unhandled, leaving refresh_status stale.
+        """
+        created = await integration_service.create_integration(_mcp_create())
+        integration = await test_db_session.get(Integration, created.id)
+        assert integration is not None
+
+        cred, _ = await _create_credential(test_db_session, integration_service.user, with_secret=False)
+        integration.management_credential_id = cred.id
+        await test_db_session.flush()
+        mock_audit.reset_mock()
+
+        with (
+            patch.object(
+                integration_service,
+                "_resolve_credential",
+                new_callable=AsyncMock,
+                side_effect=CredentialDecryptionError("Kafka credential could not be decrypted"),
+            ),
+            pytest.raises(CredentialDecryptionError),
+        ):
+            await integration_service.refresh_resources(created.id)
+
+        refreshed = await test_db_session.get(Integration, created.id)
+        assert refreshed is not None
+        assert refreshed.refresh_status == IntegrationRefreshStatus.ERROR
+        assert "decrypt" in (refreshed.refresh_error or "").lower()
+        assert refreshed.last_refreshed_at is not None
+        mock_adapter_factory.assert_not_called()
+        mock_audit.dispatch.assert_called_once()
+        event = mock_audit.dispatch.call_args[0][0]
+        assert event.error_type == "CredentialDecryptionError"
 
 
 @pytest.mark.ssrf_enforced

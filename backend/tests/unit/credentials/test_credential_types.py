@@ -36,12 +36,13 @@ class TestCredentialTypeModel:
 class TestGACredentialTypes:
     """Tests for GA managed credential type definitions."""
 
-    def test_six_ga_types_defined(self) -> None:
-        assert len(GA_CREDENTIAL_TYPES) == 6
+    def test_ga_types_defined(self) -> None:
+        assert len(GA_CREDENTIAL_TYPES) == 7
 
     @pytest.mark.parametrize(
         "name",
         [
+            "Kafka",
             "HTTP Bearer Token",
             "HTTP Basic Auth",
             "Ansible Automation Platform",
@@ -62,6 +63,18 @@ class TestGACredentialTypes:
             assert "injectors" in type_def
             assert "fields" in type_def["inputs"]
             assert "required" in type_def["inputs"]
+
+    def test_kafka_connection_is_username_and_password_only(self) -> None:
+        kafka = next(item for item in GA_CREDENTIAL_TYPES if item["name"] == "Kafka")
+        fields = kafka["inputs"]["fields"]
+
+        assert [field["id"] for field in fields] == ["username", "password"]
+        assert kafka["inputs"]["required"] == ["username", "password"]
+        assert fields[0]["secret"] is False
+        assert fields[1]["secret"] is True
+        assert kafka["injectors"]["extra_vars"]["auth_type"] == "kafka_connection"
+        assert "connector validation" in kafka["description"]
+        assert "listener runtime" in kafka["description"]
 
     def test_all_have_injector_sections(self) -> None:
         for type_def in GA_CREDENTIAL_TYPES:

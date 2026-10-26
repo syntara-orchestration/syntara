@@ -57,6 +57,7 @@ export function useCredentialFormModal({
 
   const typesQuery = credentialsClient.useQuery('get', '/credential_types')
   const allTypes = useMemo(() => typesQuery.data?.resources ?? [], [typesQuery.data])
+
   const types = useMemo(() => {
     if (!compatibleTypeNames?.length) return allTypes
     return allTypes.filter((t) => compatibleTypeNames.includes(t.name))
