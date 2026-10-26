@@ -437,7 +437,7 @@ For fields where users can select multiple items (e.g., group assignment on user
 - Header includes title and primary actions for the specific resource (pulled from the table row actions)
 - **Title:** Pass the resource name as a plain string to `SynPageHeader` / `title` — no decorative icons in h1
 - **Informational metadata as plain text:** Attributes like credential type, authentication method, or resource category are plain text — not `Label` badges. Use `Label` only when visual distinction or status communication is needed (see §11).
-- **Created / Modified columns in tables:** Use inline `UserTimestamp` mode — `username · date` on one line. Stacked mode is for detail views only.
+- **Created / Modified columns in tables:** Use inline `UserTimestamp` mode — `date by username` on one line (no middle-dot separator). Stacked mode is for detail views only.
 - **User name display:**
   - Table "Name" column: composed display name via `userDisplayName(user)` — `[first_name, last_name].filter(Boolean).join(' ')`
   - Detail pages: separate "First Name" / "Last Name" fields in `DescriptionList`
