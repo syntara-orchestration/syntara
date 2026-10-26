@@ -1,3 +1,4 @@
+// AAP-89685: Clearing pinned Run Step mock data must require confirmation before execution.
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
@@ -225,6 +226,32 @@ describe('RunStepDialog', () => {
 
       // Assert — waits for SUCCESS_AUTO_CLOSE_DELAY_MS timer to fire
       await waitFor(() => expect(onClose).toHaveBeenCalled(), { timeout: 1500 })
+    })
+
+    it('requires confirmation before running with cleared pinned predecessor mock data', async () => {
+      const user = userEvent.setup()
+      const pinnedMockData = { first_action: { result: 'test_value', status: 'ok' } }
+      render(
+        <RunStepDialog
+          {...defaultProps}
+          nodeId="second_action"
+          nodeName="Second action"
+          predecessors={[
+            { id: 'first_action', name: 'First action' },
+            { id: 'trigger-0', name: 'Trigger', isTrigger: true },
+          ]}
+          pinnedMockData={pinnedMockData}
+        />,
+        { wrapper }
+      )
+      await user.click(screen.getByRole('button', { name: 'Use mock data' }))
+      const editor = screen.getByRole('textbox', { name: 'Mock JSON output data' })
+      expect(editor).toHaveValue(JSON.stringify(pinnedMockData, null, 2))
+
+      await user.clear(editor)
+      await user.click(screen.getByRole('button', { name: 'Run' }))
+
+      expect(mockPost).not.toHaveBeenCalled()
     })
 
     it('closes dialog when Cancel is clicked from mock editor', async () => {
