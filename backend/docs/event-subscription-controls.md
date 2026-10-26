@@ -53,6 +53,12 @@ requests retain their decision and holds. Re-authorized continuation may add the
 required acknowledgement or disposition authority at the current recovery revision
 even before a recovery hold exists, without changing the configuration revision
 or silently selecting a different policy or boundary.
+Hold creation and confirmation revalidate the persisted request under the same
+lifecycle and position locks as replacement. A superseded worker attempt cannot
+start with old authority or clear the gap and existing hold; the assigned runner
+then loads and applies the replacement before recovery can finish. If confirmation
+wins the lock first, replacement observes the cleared gap and conflicts instead
+of overwriting the completed decision.
 
 ## Retirement and deletion
 

@@ -5,10 +5,14 @@ verified stop. Rows have no expiry: a lost worker is never evidence of quiescenc
 Recovery requests are consumed by the assigned runner, not the HTTP process.
 """
 
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 from sqlalchemy import BigInteger, CheckConstraint, text
 from sqlmodel import Field, SQLModel
+
+if TYPE_CHECKING:
+    from syntara.eventstreams.adapters.kafka_initial_position import RecoveryRequest
 
 
 class EventSubscriptionRuntime(SQLModel, table=True):
@@ -54,3 +58,16 @@ class EventSubscriptionRecovery(SQLModel, table=True):
         ),
         CheckConstraint("policy IN ('retained_beginning', 'current_end')", name="ck_event_recovery_policy"),
     )
+
+    def matches_request(self, request: "RecoveryRequest") -> bool:
+        """Compare the complete authorized decision with a detached worker request."""
+        return (
+            self.source_id == request.source_id
+            and self.partition == request.partition
+            and self.configuration_revision == request.configuration_revision
+            and self.expected_recovery_revision == request.expected_recovery_revision
+            and self.policy == request.policy.value
+            and self.reason == request.reason
+            and self.acknowledge_duplicate_risk == request.acknowledge_duplicate_risk
+            and self.resolve_unscheduled == request.allow_unscheduled_disposition
+        )

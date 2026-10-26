@@ -50,15 +50,7 @@ class EventRecoveryRequestService:
             row = await session.get(
                 EventSubscriptionRecovery, (request.source_id, request.partition), with_for_update=True
             )
-            if (
-                row is None
-                or row.configuration_revision != request.configuration_revision
-                or row.expected_recovery_revision != request.expected_recovery_revision
-                or row.policy != request.policy.value
-                or row.reason != request.reason
-                or row.acknowledge_duplicate_risk != request.acknowledge_duplicate_risk
-                or row.resolve_unscheduled != request.allow_unscheduled_disposition
-            ):
+            if row is None or not row.matches_request(request):
                 return
             row.completed = result.status == PositionStatus.READY
             row.error_code = result.reason

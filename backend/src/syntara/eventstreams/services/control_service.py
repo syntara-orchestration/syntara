@@ -232,6 +232,8 @@ class EventSubscriptionControlService:
             requested_by=self.user.id,
         )
         if existing is not None:
+            # Confirmation revalidates this decision under the same lifecycle
+            # and position locks before it clears the gap or releases its hold.
             await self.session.delete(existing)
             await self.session.flush()
         self.session.add(request)

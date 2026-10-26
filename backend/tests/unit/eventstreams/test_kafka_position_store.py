@@ -27,6 +27,7 @@ from syntara.eventstreams.core.consumer import (
 )
 from syntara.eventstreams.core.deduplication import ClaimLost, DeliveryExpectation, DeliveryState, RevisionChanged
 from syntara.eventstreams.core.processing import CONTENT_INSPECTION_PENDING
+from syntara.eventstreams.models.control import EventSubscriptionRecovery
 from syntara.eventstreams.models.source import EventSubscriptionSource
 from syntara.eventstreams.models.subscription import EventSubscription
 from syntara.eventstreams.services import deduplication_store
@@ -130,8 +131,10 @@ async def test_pending_recovery_cannot_continue_without_its_active_hold(
 
 
 async def test_stale_recovery_revision_cannot_register_a_hold(monkeypatch: pytest.MonkeyPatch) -> None:
-    factory, _ = session_factory()
-    repository = KafkaInitialPositionStore(factory)
+    session = MagicMock(spec=AsyncSession)
+    session.__aenter__.return_value = session
+    session.get.return_value = None
+    repository = KafkaInitialPositionStore(MagicMock(return_value=session))
     subscription, source = lifecycle()
     position = row(gap=True)
     position.recovery_revision = 3
@@ -147,6 +150,64 @@ async def test_stale_recovery_revision_cannot_register_a_hold(monkeypatch: pytes
     with pytest.raises(KafkaPositionError, match="recovery_revision_changed"):
         await repository.begin_recovery(value)
     reserve.assert_not_awaited()
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("configuration_revision", 3),
+        ("expected_recovery_revision", 1),
+        ("policy", "retained_beginning"),
+        ("reason", "operator_recovery"),
+        ("acknowledge_duplicate_risk", True),
+        ("resolve_unscheduled", True),
+        ("completed", True),
+    ],
+)
+async def test_confirmation_cannot_clear_a_gap_for_a_superseded_request(monkeypatch, field, value):
+    subscription, source = lifecycle()
+    position = row(gap=True)
+    token = UUID(int=42)
+    position.recovery_revision = 1
+    position.recovery_token = token
+    position.pending_boundary = 100
+    position.pending_policy = "current_end"
+    position.pending_reason = "offset_expired"
+    request = RecoveryRequest(
+        **position_request().model_dump(),
+        expected_recovery_revision=0,
+        policy="current_end",
+        reason="offset_expired",
+    )
+    authorized = EventSubscriptionRecovery(
+        source_id=source.id,
+        partition=request.partition,
+        configuration_revision=2,
+        expected_recovery_revision=0,
+        policy="current_end",
+        reason="offset_expired",
+        requested_by=PRINCIPAL,
+    )
+    setattr(authorized, field, value)
+    session = MagicMock(spec=AsyncSession)
+    session.__aenter__.return_value = session
+    session.get.return_value = authorized
+    repository = KafkaInitialPositionStore(MagicMock(return_value=session))
+    monkeypatch.setattr(repository, "_locked", AsyncMock(return_value=(subscription, source, position)))
+    monkeypatch.setattr(repository, "_deliveries", AsyncMock(return_value=[]))
+    release = AsyncMock()
+    monkeypatch.setattr(kafka_position_store, "release_recovery_locked", release)
+    with pytest.raises(KafkaPositionError, match="recovery_request_changed") as failure:
+        await repository.confirm_recovery(request, token, 100)
+    assert failure.value.status == PositionStatus.REVISION_CHANGED
+    release.assert_not_awaited()
+    assert position.recovery_token == token
+    assert position.pending_boundary == 100
+    assert position.gap_detected_at is not None
+    assert position.recovery_confirmed_at is None
+    session.get.assert_awaited_once_with(
+        EventSubscriptionRecovery, (source.id, request.partition), with_for_update=True, populate_existing=True
+    )
 
 
 @pytest.mark.parametrize("prepared", [False, True])

@@ -362,6 +362,27 @@ async def test_stronger_recovery_authority_cannot_replace_a_pending_decision(con
     context.session.commit.assert_not_awaited()
 
 
+async def test_replacement_cannot_overwrite_a_decision_if_confirmation_already_cleared_the_gap(context):
+    context.service._grant = AsyncMock()
+    context.session.get.return_value = SimpleNamespace(gap_detected_at=None, recovery_revision=1)
+    body = SubscriptionRecoveryRequest(
+        configuration_revision=1,
+        source_generation=1,
+        partition=0,
+        expected_recovery_revision=1,
+        policy="current_end",
+        reason="offset_expired",
+        acknowledge_duplicate_risk=True,
+    )
+    with patch("syntara.eventstreams.services.control_service.EventRetirementService") as retirement:
+        retirement.return_value.assert_no_content_gate = AsyncMock()
+        with pytest.raises(EventSubscriptionControlConflictError, match="no_recorded_recovery_gap"):
+            await context.service.recover(context.workflow.id, context.subscription.id, body)
+    context.session.delete.assert_not_awaited()
+    context.session.add.assert_not_called()
+    context.session.commit.assert_not_awaited()
+
+
 async def test_retry_does_not_acknowledge_a_wakeup_that_an_active_claim_could_lose(context):
     row = delivery()
     row.frozen_binding = binding()
