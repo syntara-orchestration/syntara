@@ -47,6 +47,7 @@ class WorkflowConvergeMixin:
     _converge_branch_nodes: dict[str, set[str]]
     _timed_out_converge_nodes: set[str]
     _detached_nodes: set[str]
+    _any_fired_nodes: set[str]
 
     # Methods provided by OrchestratorWorkflow (resolved via MRO)
     def _are_predecessors_complete(self, node_id: str, graph: WorkflowGraph) -> bool: ...  # type: ignore[empty-body]
@@ -327,7 +328,10 @@ class WorkflowConvergeMixin:
                     and branch_node_id in pending_tasks
                     and not self.resolver.has_namespace(branch_node_id)
                 ):
-                    self._detached_nodes.add(branch_node_id)
+                    # Unlike a converge timeout, the converge fired successfully:
+                    # the branch no longer gates scheduling, but its outcome must
+                    # still be recorded (a failing branch yields completed_with_errors).
+                    self._any_fired_nodes.add(branch_node_id)
 
         return False
 
