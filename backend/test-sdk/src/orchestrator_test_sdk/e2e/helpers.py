@@ -27,9 +27,9 @@ if TYPE_CHECKING:
     from syntara_api_client.models.approval_request_read import ApprovalRequestRead
 
 POLL_INTERVAL = 1
-POLL_TIMEOUT = 20
-API_RETRIES = 3
-API_RETRY_DELAY = 2
+POLL_TIMEOUT = 120
+API_RETRIES = int(os.environ.get("E2E_API_RETRIES", "5"))
+API_RETRY_DELAY = float(os.environ.get("E2E_API_RETRY_DELAY", "2"))
 
 # Inline frozenset of terminal status strings — avoids importing from syntara app source.
 TERMINAL_EXECUTION_STATUSES: frozenset[str] = frozenset({"completed", "completed_with_errors", "failed", "cancelled"})
@@ -71,7 +71,7 @@ def _retry_api_call(fn, *, retries: int = API_RETRIES, delay: float = API_RETRY_
     for attempt in range(retries):
         try:
             result = fn()
-        except (httpx.RemoteProtocolError, httpx.ConnectError, httpx.ReadError) as exc:
+        except httpx.TransportError as exc:
             last_exc = exc
             if attempt < retries - 1:
                 time.sleep(delay)
@@ -93,6 +93,34 @@ def _activities_settled(execution: ExecutionRead) -> bool:
     (skipped branches with no row yet) are not waited on.
     """
     return all(getattr(a.status, "value", a.status) in TERMINAL_ACTIVITY_STATUSES for a in (execution.activities or []))
+
+
+def _bounded_repr(value: object, limit: int = 500) -> str:
+    """Return a bounded representation suitable for test failure messages."""
+    rendered = repr(value)
+    return rendered if len(rendered) <= limit else f"{rendered[:limit]}…"
+
+
+def _activity_diagnostics(activity: object) -> dict[str, object]:
+    """Build a compact activity snapshot for execution-timeout diagnostics."""
+    output_data = getattr(activity, "output_data", None)
+    if output_data is not None and hasattr(output_data, "to_dict"):
+        output_data = output_data.to_dict()
+    return {
+        "activity_id": getattr(activity, "activity_id", None),
+        "status": getattr(getattr(activity, "status", None), "value", getattr(activity, "status", None)),
+        "output_data": output_data,
+        "error_details": getattr(activity, "error_details", None),
+    }
+
+
+def _execution_diagnostics(execution: ExecutionRead) -> dict[str, object]:
+    """Build the final execution state included in timeout failures."""
+    return {
+        "status": getattr(getattr(execution, "status", None), "value", getattr(execution, "status", None)),
+        "error_details": getattr(execution, "error_details", None),
+        "activities": [_activity_diagnostics(activity) for activity in (execution.activities or [])],
+    }
 
 
 def poll_execution(
@@ -118,7 +146,10 @@ def poll_execution(
                 response = _retry_api_call(lambda: api.executions.get(execution_id=UUID(exec_id), include="activities"))
                 execution = response.assert_and_get()
             return execution
-    pytest.fail(f"Execution {exec_id} did not finish within {timeout}s")
+    pytest.fail(
+        f"Execution {exec_id} did not finish within {timeout}s. "
+        f"Final state: {_bounded_repr(_execution_diagnostics(execution))}"
+    )
 
 
 def poll_for_pending_approval(

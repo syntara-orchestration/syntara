@@ -66,13 +66,12 @@ spec:
     - name: ao-pr-number
       value: '{{pull_request_number}}'
     # aap-dev branch that can build and deploy the Execution Plane and the
-    # operator from source (ansible/aap-dev#1111). Pinned to the
-    # postgres max_connections=500 branch (ansible/aap-dev#1132) until it
-    # merges — the default 200 is exhausted by the full e2e stack and
-    # Postgres resets backends mid-suite (the stuck-execution stalls
-    # blocking this PR's CI; see aap-dev#1132 for the evidence).
+    # operator from source (ansible/aap-dev#1111). main includes the
+    # postgres max_connections=500 change (ansible/aap-dev#1137), which
+    # prevents the full e2e stack from exhausting the previous default of 200
+    # connections and resetting backends mid-suite.
     - name: aap-dev-revision
-      value: goneri/bump-postgres-max-connections
+      value: main
     # Operator branch that honors ENABLE_EXECUTION_PLANE in
     # {cr-name}-admin-settings; the prebuilt devel bundle ignores it
     # (automation-orchestrator-operator#1573).
@@ -84,9 +83,9 @@ spec:
     # provisioning and removal of ClusterBinding, which this syntara branch
     # depends on. Restore devel once #88 lands.
     - name: ep-revision
-      value: mvp-03-remove-cluster-binding
+      value: refactor/sdk-workload-protocol
     - name: ep-pr-number
-      value: "88"
+      value: 81
   taskRunTemplate:
     serviceAccountName: konflux-integration-runner
   pipelineSpec:
@@ -809,6 +808,15 @@ spec:
                   install -m 644 /tmp/install-syntara-from-src \
                     \$HOME/aap-dev/skaffolding/addons/ao/containers/fragments/ao/install-syntara-from-src
                   grep -q git-core \$HOME/aap-dev/skaffolding/addons/ao/containers/fragments/ao/install-syntara-from-src
+
+                  # Rootless Podman defaults to a 2048 PID limit. Inside Kind,
+                  # systemd applies roughly 15% of that limit to pod cgroups,
+                  # yielding pids.max=307 and fork failures under the full AO
+                  # stack. Raise the limit before deploy-ao creates Kind.
+                  mkdir -p \$HOME/.config/containers
+                  printf '%s\n' '[containers]' 'pids_limit = 65536' \
+                    > \$HOME/.config/containers/containers.conf
+
                   AO_MK=\$HOME/aap-dev/makefiles/ao.mk
                   COMMON_MK=\$HOME/aap-dev/makefiles/common.mk
                   if ! grep -q '^AO_EXECUTION_PLANE' \"\${AO_MK}\"; then
@@ -1110,11 +1118,11 @@ spec:
                   echo ''
 
                   echo '=== myao-execution-plane-worker logs ==='
-                  kubectl logs -n aap27-next deploy/myao-execution-plane-worker --tail=200 2>&1 || true
+                  kubectl logs -n aap27-next deploy/myao-execution-plane-worker --tail=500 2>&1 || true
                   echo ''
 
                   echo '=== myao-execution-plane-api logs ==='
-                  kubectl logs -n aap27-next deploy/myao-execution-plane-api --tail=80 2>&1 || true
+                  kubectl logs -n aap27-next deploy/myao-execution-plane-api --tail=300 2>&1 || true
                   echo ''
 
                   echo '=== dispatcher namespace execution-plane ==='
@@ -1126,11 +1134,53 @@ spec:
                   echo ''
 
                   echo '=== myao-worker logs ==='
-                  kubectl logs -n aap27-next deploy/myao-worker --tail=80 2>&1 || true
+                  kubectl logs -n aap27-next deploy/myao-worker --tail=300 2>&1 || true
                   echo ''
 
                   echo '=== myao-temporal logs ==='
-                  kubectl logs -n aap27-next deploy/myao-temporal --tail=120 2>&1 || true
+                  kubectl logs -n aap27-next deploy/myao-temporal --tail=500 2>&1 || true
+                  echo ''
+
+                  echo '=== myao-backend logs ==='
+                  kubectl logs -n aap27-next deploy/myao-backend --all-containers --tail=500 2>&1 || true
+                  echo ''
+
+                  echo '=== myao-background-worker logs ==='
+                  kubectl logs -n aap27-next deploy/myao-background-worker --all-containers --tail=300 2>&1 || true
+                  echo ''
+
+                  echo '=== PostgreSQL state ==='
+                  kubectl exec -n aap27-next pod/ao-postgres-0 -c postgres -- \
+                    psql -U postgres -d postgres -Atc \"SHOW max_connections; SELECT state, count(*) FROM pg_stat_activity GROUP BY state ORDER BY state;\" 2>&1 || true
+                  kubectl logs -n aap27-next pod/ao-postgres-0 -c postgres --tail=500 2>&1 || true
+                  echo ''
+
+                  echo '=== Kind node PID cgroup state ==='
+                  podman exec 27-next-ao-operator-control-plane sh -c '
+                    printf "node pids.current="; cat /sys/fs/cgroup/pids.current
+                    printf "node pids.max="; cat /sys/fs/cgroup/pids.max
+                    find /sys/fs/cgroup -path "*kubepods*" \( -name pids.current -o -name pids.max \) -print0 |
+                      while IFS= read -r -d "" file; do
+                        printf "%s=" "\$file"
+                        cat "\$file"
+                      done
+                  ' 2>&1 || true
+                  echo ''
+
+                  echo '=== Key pod PID cgroup state ==='
+                  for pod in \$(kubectl get pods -n aap27-next --no-headers 2>/dev/null | awk '\$3 ~ /^Running\$/ {print \$1}'); do
+                    case \"\${pod}\" in
+                      myao-backend-*|myao-worker-*|myao-background-worker-*|myao-temporal-*|ao-postgres-*|myao-execution-plane-*)
+                        echo \"--- \${pod} ---\"
+                        kubectl exec -n aap27-next \"\${pod}\" -- sh -c '
+                          printf "pids.current="
+                          cat /sys/fs/cgroup/pids.current 2>/dev/null || echo unavailable
+                          printf "pids.max="
+                          cat /sys/fs/cgroup/pids.max 2>/dev/null || echo unavailable
+                        ' 2>&1 || true
+                        ;;
+                    esac
+                  done
                   echo ''
 
                   echo '=== Pods with restarts ==='
@@ -1139,6 +1189,10 @@ spec:
 
                   echo '=== Kernel OOM killer logs ==='
                   sudo dmesg -T 2>/dev/null | grep -iE 'oom|killed process|out of memory|memory cgroup' || echo 'No OOM events found'
+                  echo ''
+
+                  echo '=== Kernel PID-limit events ==='
+                  sudo dmesg -T 2>/dev/null | grep -iE 'fork rejected by pids controller|pids.*limit' | tail -200 || echo 'No PID-limit events found'
                   echo ''
 
                   echo '=== Kernel logs (last 200 lines) ==='

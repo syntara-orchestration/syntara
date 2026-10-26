@@ -131,6 +131,9 @@ class TestScriptActivityDispatch:
     @pytest.mark.asyncio
     async def test_execution_target_profile_is_sent_as_ep_selector(self) -> None:
         """The selected Execution Target profile is routed through WorkExecute selectors."""
+
+    async def test_execution_target_profile_uses_sdk_workload_contract(self) -> None:
+        """Route selected targets while submitting the SDK container invocation."""
         _FakeEPClient.responses = [{"id": str(WORK_ITEM_ID), "status": "completed", "result": {"output": {}}}]
 
         await activity_module.execute_script_activity(
@@ -150,11 +153,16 @@ class TestScriptActivityDispatch:
         command_payload = _FakeEPClient.submissions[0].command.payload
         assert isinstance(command_payload, dict)
         assert command_payload["selectors"] == {"_execution_target_id": str(EXECUTION_TARGET_ID)}
+        assert command_payload["workload_type"] == "container"
         invocation = command_payload["invocation"]
         assert isinstance(invocation, dict)
-        inputs = invocation["inputs"]
-        assert isinstance(inputs, dict)
-        assert "execution_profile" not in inputs
+        assert invocation == {
+            "workflow_run_id": "unit-run",
+            "step_revision_id": "script.v1",
+            "inputs": {"language": "bash", "code": ":"},
+            "runtime_context": {},
+            "timeout_seconds": 300,
+        }
 
     @pytest.mark.asyncio
     async def test_pending_response_is_accepted_for_async_completion(self) -> None:

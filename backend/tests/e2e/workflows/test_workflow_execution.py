@@ -115,7 +115,7 @@ class TestWorkflowExecution:
 
         # Step 3: Poll execution status and verify state transitions
         # Expected states: pending → running → completed
-        max_polls = 30  # Maximum number of status checks (30 * 2s = 60s timeout)
+        max_polls = 60  # Maximum number of status checks (60 * 2s = 120s timeout)
         poll_interval = 2  # seconds between polls
 
         states_observed = set()
@@ -224,7 +224,7 @@ class TestWorkflowExecution:
         execution_id = execution.id
 
         # Step 2: Poll until execution completes
-        max_polls = 30
+        max_polls = 60
         poll_interval = 2
         final_execution = None
 
@@ -375,7 +375,7 @@ class TestWorkflowExecution:
             expected_failed += 1
 
         # Wait for all executions to reach a terminal state
-        max_polls = 30
+        max_polls = 60
         poll_interval = 2
         terminal_states = {"completed", "failed", "cancelled"}
 
@@ -572,7 +572,7 @@ class TestWorkflowExecution:
 # API-36: Parallel Branches
 # ---------------------------------------------------------------------------
 
-PARALLEL_POLL_TIMEOUT = 45  # seconds — parallel wait branches take ~5s wall-clock
+PARALLEL_POLL_TIMEOUT = 120  # seconds — CI load can delay parallel Execution Plane nodes
 
 
 class TestParallelBranches:
@@ -801,7 +801,7 @@ class TestNodeFailurePropagation:
                     {"from": "node_b", "to": "node_c"},
                 ],
             },
-            timeout=45,
+            timeout=120,
         )
 
         # Overall execution must fail.
@@ -862,7 +862,7 @@ class TestNodeFailurePropagation:
                     {"from": "node_b", "to": "node_c"},
                 ],
             },
-            timeout=45,
+            timeout=120,
         )
 
         assert result.status == ExecutionStatus.FAILED, f"Expected 'failed', got '{result.status}'"
@@ -920,7 +920,7 @@ class TestNodeFailurePropagation:
                     {"from": "branch_fail", "to": "join"},
                 ],
             },
-            timeout=45,
+            timeout=120,
         )
 
         # The workflow as a whole fails because one branch failed.

@@ -8,7 +8,7 @@ from http import HTTPStatus
 from typing import TYPE_CHECKING, Any, cast
 
 import structlog
-from execution_plane_client.commands.work import NodeInvocation, WorkExecute
+from execution_plane_client.commands.work import WorkExecute, WorkloadInvocation
 from temporalio import activity
 from temporalio.exceptions import ApplicationError
 
@@ -21,11 +21,7 @@ from syntara.execution_plane.client import (
     ExecutionPlaneUnavailableError,
 )
 from syntara.workflows.workflow_engine.activities.common import HEARTBEAT_STOP_MONITOR
-from syntara.workflows.workflow_engine.constants import (
-    DEFAULT_MAX_OUTPUT_BYTES,
-    ENGINE_MAX_OUTPUT_BYTES_KEY,
-    ENGINE_TIMEOUT_SECONDS_KEY,
-)
+from syntara.workflows.workflow_engine.constants import ENGINE_TIMEOUT_SECONDS_KEY
 from syntara.workflows.workflow_engine.models.workflow_definition import (
     ActivityName,
     ExecutionPlaneExecutionProfile,
@@ -45,38 +41,29 @@ __all__ = ["activity", "asyncio", "execute_script_activity"]
 INITIAL_RETRY_DELAY_SECONDS = 0.5
 MAX_RETRY_DELAY_SECONDS = 10.0
 _NODE_TYPE = "script"
+_STEP_REVISION_ID = "script.v1"
 _DEFAULT_TIMEOUT_SECONDS = 300
 _EXECUTION_PROFILE_FIELD = "execution_profile"
 _EXECUTION_TARGET_SELECTOR_FIELD = "_execution_target_id"
 
 
-def _build_invocation(input_config: dict[str, Any], settings: Any, info: Any) -> dict[str, Any]:  # noqa: ANN401
+def _build_invocation(input_config: dict[str, Any], info: Any) -> dict[str, Any]:  # noqa: ANN401
     """Build the versioned SDK request before AO freezes it for activity retries."""
     return {
-        "version": 1,
-        "operation": "execute",
+        "workflow_run_id": info.workflow_run_id,
+        "step_revision_id": _STEP_REVISION_ID,
         "inputs": {
             key: value
             for key, value in input_config.items()
             if not key.startswith("_") and key != _EXECUTION_PROFILE_FIELD
         },
-        "credentials": {"resolved": {}},
-        "workflow_context": {
-            "workflow_id": info.workflow_id,
-            "run_id": info.workflow_run_id,
-            "activity_id": info.activity_id,
-        },
-        "settings": {
-            "workflow_http_request_allowed_hosts": settings.workflow_http_request_allowed_hosts,
-            "aap_poll_interval_seconds": settings.aap_poll_interval_seconds,
-        },
+        "runtime_context": {},
         "timeout_seconds": int(
             input_config.get(
                 ENGINE_TIMEOUT_SECONDS_KEY,
                 input_config.get("timeout") or _DEFAULT_TIMEOUT_SECONDS,
             )
         ),
-        "max_output_bytes": int(input_config.get(ENGINE_MAX_OUTPUT_BYTES_KEY, DEFAULT_MAX_OUTPUT_BYTES)),
     }
 
 
@@ -138,7 +125,7 @@ async def _dispatch_to_ep(  # noqa: C901, PLR0915 - service handoff and Temporal
         raise ApplicationError(msg, type="ConfigError", non_retryable=True)
     try:
         message = WorkExecute(
-            invocation=NodeInvocation.model_validate(_build_invocation(input_config, settings, info)),
+            invocation=WorkloadInvocation.model_validate(_build_invocation(input_config, info)),
             image=image,
             selectors=selectors,
             output_config=output_config,
