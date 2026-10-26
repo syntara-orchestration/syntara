@@ -24,6 +24,11 @@ import { pageHeader } from './helpers/workflow-run'
 import { buildUniqueName, waitForUIReady } from './helpers/workflows'
 import { deleteWorkflowViaApi } from './utils/api'
 
+test.skip(
+  !process.env['SYNTARA_E2E_HAS_TEMPORAL_WORKER'],
+  'Stall detection requires Temporal worker (real backend only)'
+)
+
 test.describe('Stall detection core behavior', () => {
   test('stall detection across all views', async ({ app }) => {
     // Setup: Create workflow with stalling activity

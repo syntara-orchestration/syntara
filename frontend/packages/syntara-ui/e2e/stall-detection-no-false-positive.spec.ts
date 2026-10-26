@@ -3,6 +3,10 @@
  *
  * Validates that activities completing within their expected duration
  * do not trigger stall warnings.
+ *
+ * **Real backend only:** Stall detection requires the Temporal worker's periodic
+ * stall scanner. The mock API marks activities as completed immediately and does
+ * not emit stall/WebSocket updates.
  */
 
 import { test, expect, toAppUrl } from './fixtures'
@@ -15,6 +19,11 @@ import {
 import { pageHeader } from './helpers/workflow-run'
 import { buildUniqueName, waitForUIReady } from './helpers/workflows'
 import { deleteWorkflowViaApi } from './utils/api'
+
+test.skip(
+  !process.env['SYNTARA_E2E_HAS_TEMPORAL_WORKER'],
+  'Stall detection requires Temporal worker (real backend only)'
+)
 
 test.describe('Stall detection false positives', () => {
   test('activity below threshold not flagged', async ({ app }) => {
