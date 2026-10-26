@@ -1,11 +1,11 @@
 import {
+  ActionGroup,
   Alert,
   Button,
   DescriptionList,
   DescriptionListDescription,
   DescriptionListGroup,
   DescriptionListTerm,
-  Divider,
   Spinner,
   Stack,
   StackItem,
@@ -32,6 +32,7 @@ import {
   resolveFormPromptWaitingStartedAt,
 } from './formPrompt/formPromptNodeId'
 import { FormPromptPendingResponseForm } from './formPrompt/FormPromptPendingResponseForm'
+import { FormPromptRespondPanelFooterSlot } from './formPrompt/FormPromptRespondPanelFooter'
 import { formPromptClosedStatusLabel, isFormPromptResponsePending } from './formPrompt/formPromptResponseState'
 import { FormPromptUnresolvedDynamicOptionsAlert } from './formPrompt/FormPromptUnresolvedDynamicOptionsAlert'
 import styles from './FormPromptResponseContent.module.css'
@@ -230,26 +231,21 @@ function FormPromptResponseBody({
       </StackItem>
 
       {isPending && canSubmit ? (
-        <StackItem className={styles.footer}>
-          <Stack hasGutter>
-            <StackItem>
-              <Divider />
-            </StackItem>
-            <StackItem>
-              <DisabledWithTooltip isDisabled={submitDisabled} content={submitTooltip}>
-                <Button
-                  type="submit"
-                  form={responseFormId}
-                  variant="primary"
-                  isDisabled={submitDisabled}
-                  isLoading={submitMutation.isPending}
-                >
-                  {submitLabel}
-                </Button>
-              </DisabledWithTooltip>
-            </StackItem>
-          </Stack>
-        </StackItem>
+        <FormPromptRespondPanelFooterSlot>
+          <ActionGroup>
+            <DisabledWithTooltip isDisabled={submitDisabled} content={submitTooltip}>
+              <Button
+                type="submit"
+                form={responseFormId}
+                variant="primary"
+                isDisabled={submitDisabled}
+                isLoading={submitMutation.isPending}
+              >
+                {submitLabel}
+              </Button>
+            </DisabledWithTooltip>
+          </ActionGroup>
+        </FormPromptRespondPanelFooterSlot>
       ) : null}
     </Stack>
   )
