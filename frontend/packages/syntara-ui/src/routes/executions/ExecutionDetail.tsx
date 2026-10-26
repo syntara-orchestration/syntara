@@ -160,8 +160,10 @@ function ExecutionDetailContent({
   const retryPanel = retryPanelOpen ? (
     <RetryFromFailureSidePanel
       executionId={executionId}
+      activities={activities}
       activityNameMap={activityNameMap}
       activityTypeMap={activityTypeMap}
+      workflowDefinition={workflow?.version.workflow_definition}
       selectedNodeId={selectedStepId}
       onRetryPreviewPointIdsChange={setRetryPreviewPointIds}
       onClose={closeRetryReview}

@@ -1,0 +1,17 @@
+.nodeEditor {
+  border-block-start: 1px solid var(--pf-t--global--border--color--default);
+  padding-block-start: var(--pf-t--global--spacer--md);
+}
+
+.inputPreview {
+  max-block-size: 10rem;
+  overflow: auto;
+  padding: var(--pf-t--global--spacer--sm);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: var(--pf-t--global--background--color--secondary--default);
+}
+
+.validationError {
+  color: var(--pf-t--global--color--status--danger--default);
+}

@@ -6,6 +6,7 @@ import { AppRoute } from '../../app/AppRoute'
 import { SynPanel } from '../../components/layout/SynPanel'
 import { SidePanelHeader } from '../../components/SidePanelHeader'
 import { detachPromise } from '../../utils/detachPromise'
+import type { WorkflowDefShape } from '../builder/ExecutionDetailsPanel'
 
 import { useRetryFromFailure } from './hooks/useRetryFromFailure'
 import { useRetryFromFailurePreview } from './hooks/useRetryFromFailurePreview'
@@ -16,13 +17,17 @@ import {
   selectedRetryPointId,
   type RetryFromFailurePreview,
 } from './retryFromFailure'
+import { RetryFromFailureInputOverrides } from './RetryFromFailureInputOverrides'
 import styles from './RetryFromFailureSidePanel.module.css'
 import { HowRetryWorks, RetryFooter, RetryPlan, type RetryScopeMode } from './RetryFromFailureSidePanelParts'
+import { getRetryInputOverrideTargets, type ExecutionActivity } from './retryInputOverrides'
 
 type RetryFromFailureSidePanelProps = Readonly<{
   executionId: string
+  activities?: ExecutionActivity[]
   activityNameMap: ReadonlyMap<string, string>
   activityTypeMap: ReadonlyMap<string, string>
+  workflowDefinition?: WorkflowDefShape | null
   selectedNodeId?: string | null
   onRetryPreviewPointIdsChange?: (pointIds: string[]) => void
   onClose: () => void
@@ -33,8 +38,10 @@ type RetryPreviewState = ReturnType<typeof useRetryFromFailurePreview>
 /** Full in-context retry review shown beside the source execution. */
 export function RetryFromFailureSidePanel({
   executionId,
+  activities = [],
   activityNameMap,
   activityTypeMap,
+  workflowDefinition,
   selectedNodeId,
   onRetryPreviewPointIdsChange,
   onClose,
@@ -45,6 +52,9 @@ export function RetryFromFailureSidePanel({
   const [scopeModeOverride, setScopeModeOverride] = useState<RetryScopeMode>()
   const [checkedRetryPointIds, setCheckedRetryPointIds] = useState<string[]>([])
   const [shouldAnnounceRetryPlan, setShouldAnnounceRetryPlan] = useState(false)
+  const [inputOverrideDrafts, setInputOverrideDrafts] = useState<Record<string, string>>({})
+  const [inputParameterOverrides, setInputParameterOverrides] = useState<Record<string, Record<string, unknown>>>({})
+  const [inputOverrideErrors, setInputOverrideErrors] = useState<Record<string, string>>({})
 
   const defaultPreviewQuery = useRetryFromFailurePreview({ executionId, enabled: true })
   const defaultPoints = getRetryPlanPoints(defaultPreviewQuery.preview, activityNameMap, activityTypeMap)
@@ -86,16 +96,24 @@ export function RetryFromFailureSidePanel({
     panelRef.current?.focus()
   }, [])
 
+  const inputOverridePointIds =
+    scopeMode === 'all'
+      ? eligibleRetryPointIds(defaultPreviewQuery.preview).filter(
+          (pointId) => !defaultPreviewQuery.preview?.auto_included_node_ids?.includes(pointId)
+        )
+      : requestedRetryPointIds
+  const inputOverrideTargets = activePreview?.eligible
+    ? getRetryInputOverrideTargets(inputOverridePointIds, workflowDefinition, activityNameMap, activities)
+    : []
+  const hasInvalidInputOverride = inputOverrideTargets.some((target) => Boolean(inputOverrideErrors[target.id]))
   const requestedRetryPointIdsKey = requestedRetryPointIds.join('\u0000')
-  const retryPreviewPointIdsKey = getRetryPreviewPointIdsKey(
-    {
-      scopeMode,
-      defaultPreview: defaultPreviewQuery.preview,
-      requestedPointIdsKey: requestedRetryPointIdsKey,
-      isLoading: activeIsLoading,
-      activePreview,
-    }
-  )
+  const retryPreviewPointIdsKey = getRetryPreviewPointIdsKey({
+    scopeMode,
+    defaultPreview: defaultPreviewQuery.preview,
+    requestedPointIdsKey: requestedRetryPointIdsKey,
+    isLoading: activeIsLoading,
+    activePreview,
+  })
   const notifyRetryPreviewPointIdsChange = useEffectEvent((pointIds: string[]) => {
     onRetryPreviewPointIdsChange?.(pointIds)
   })
@@ -114,7 +132,36 @@ export function RetryFromFailureSidePanel({
   const isRetryDisabled =
     !canConfirmRetryFromFailure(activePreview, activeIsLoading, activeIsError) ||
     (scopeMode === 'selected' && requestedRetryPointIds.length === 0) ||
+    hasInvalidInputOverride ||
     retry.isPending
+
+  const updateInputOverrideDraft = (
+    nodeId: string,
+    value: string,
+    parsed: Record<string, unknown> | undefined,
+    error: string | undefined
+  ) => {
+    setInputOverrideDrafts((current) => ({ ...current, [nodeId]: value }))
+    setInputOverrideErrors((current) => {
+      if (error) return { ...current, [nodeId]: error }
+      const next = { ...current }
+      delete next[nodeId]
+      return next
+    })
+    setInputParameterOverrides((current) => {
+      if (parsed) return { ...current, [nodeId]: parsed }
+      const next = { ...current }
+      delete next[nodeId]
+      return next
+    })
+  }
+
+  const submitInputParameterOverrides = Object.fromEntries(
+    inputOverrideTargets.flatMap((target) => {
+      const overrides = inputParameterOverrides[target.id]
+      return overrides && Object.keys(overrides).length > 0 ? [[target.id, overrides] as const] : []
+    })
+  )
 
   const setAllRetryPoints = () => {
     setShouldAnnounceRetryPlan(true)
@@ -140,7 +187,9 @@ export function RetryFromFailureSidePanel({
 
   const footer = (
     <RetryFooter
-      onRetry={() => retry.handleRetry(scopeMode === 'all' ? undefined : requestedRetryPointIds)}
+      onRetry={() =>
+        retry.handleRetry(scopeMode === 'all' ? undefined : requestedRetryPointIds, submitInputParameterOverrides)
+      }
       onCancel={onClose}
       isRetryDisabled={isRetryDisabled}
       isRetryPending={retry.isPending}
@@ -192,6 +241,18 @@ export function RetryFromFailureSidePanel({
                     {retryPlanAnnouncement}
                   </div>
                 </StackItem>
+                {activePreview?.eligible && (
+                  <StackItem>
+                    <RetryFromFailureInputOverrides
+                      executionId={executionId}
+                      targets={inputOverrideTargets}
+                      workflowDefinitionAvailable={workflowDefinition !== undefined && workflowDefinition !== null}
+                      isDisabled={retry.isPending}
+                      drafts={inputOverrideDrafts}
+                      onDraftChange={updateInputOverrideDraft}
+                    />
+                  </StackItem>
+                )}
               </Stack>
             </StackItem>
           </Stack>
