@@ -334,7 +334,7 @@ class KafkaPartitionConsumer:
         try:
             async with asyncio.timeout(timeout_ms / 1000):
                 # aiokafka has no public consumer API for cluster/topic UUIDs.
-                # Keep access to its authenticated transport inside this adapter.
+                # Keep authenticated metadata transport access inside this adapter.
                 # The installed-client compatibility test guards this private boundary.
                 client = consumer._client  # noqa: SLF001 -- authenticated transport boundary, no public metadata-ID API
                 node_id = client.get_random_node()
