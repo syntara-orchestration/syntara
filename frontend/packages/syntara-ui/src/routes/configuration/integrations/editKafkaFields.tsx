@@ -1,10 +1,11 @@
 import { FormGroup, FormHelperText, HelperText, HelperTextItem, TextArea } from '@patternfly/react-core'
 import { RhUiErrorIcon } from '@patternfly/react-icons'
-import { Controller, type useForm } from 'react-hook-form'
+import { Controller, useWatch, type useForm } from 'react-hook-form'
 
 import type { EditIntegrationFormValues } from './editIntegrationFormSchema'
 import { integrationHelp } from './integrationFieldHelp'
 import { KafkaSaslMechanismField } from './kafkaSaslField'
+import { KafkaTransportFields } from './KafkaTransportFields'
 
 function EditBootstrapServersField({
   control,
@@ -58,10 +59,19 @@ export function EditKafkaFields({
   control: ReturnType<typeof useForm<EditIntegrationFormValues>>['control']
   errorMessage: string | undefined
 }>) {
+  const protocol = useWatch({ control, name: 'security_protocol' }) ?? 'SASL_SSL'
   return (
     <>
       <EditBootstrapServersField control={control} errorMessage={errorMessage} />
-      <KafkaSaslMechanismField control={control} name="sasl_mechanism" fieldId="edit-sasl-mechanism" />
+      <KafkaTransportFields
+        control={control}
+        protocolName="security_protocol"
+        plaintextName="allow_plaintext"
+        fieldId="edit-security-protocol"
+      />
+      {protocol === 'SASL_SSL' && (
+        <KafkaSaslMechanismField control={control} name="sasl_mechanism" fieldId="edit-sasl-mechanism" />
+      )}
     </>
   )
 }

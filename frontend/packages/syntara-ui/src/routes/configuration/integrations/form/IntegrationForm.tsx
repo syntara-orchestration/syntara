@@ -28,7 +28,7 @@ import { useAlerts } from '../../../../providers/alerts'
 import { getErrorMessage } from '../../../../utils/apiErrors'
 import { detachPromise } from '../../../../utils/detachPromise'
 import { useDocLink } from '../../../../utils/docs/useDocLink'
-import { CREDENTIAL_REQUIRED_TYPES } from '../integrationFilters'
+import { isIntegrationCredentialRequired } from '../integrationFilters'
 
 import { CredentialStep } from './CredentialStep'
 import { EnableModelsWrapper } from './EnableModelsStep'
@@ -207,7 +207,14 @@ function useDiscoverConnection(getValues: () => IntegrationFormData) {
   const handleTestConnection = useCallback(() => {
     const values = getValues()
     const credId = values.management_credential_id
-    if (!credId && CREDENTIAL_REQUIRED_TYPES.has(values.integration_type)) return
+    if (
+      !credId &&
+      isIntegrationCredentialRequired(
+        values.integration_type,
+        'security_protocol' in values.configuration ? values.configuration.security_protocol : undefined
+      )
+    )
+      return
 
     resetTestState()
 
@@ -304,7 +311,8 @@ export function IntegrationForm() {
   const [isDetailsStepValid, setIsDetailsStepValid] = useState(false)
   const { showAlert } = useAlerts()
   const isLLM = integrationTypeValue === IntegrationTypeEnum.LLM_PROVIDER
-  const isCredentialRequired = CREDENTIAL_REQUIRED_TYPES.has(integrationTypeValue)
+  const protocol = useWatch({ control, name: 'configuration.security_protocol' })
+  const isCredentialRequired = isIntegrationCredentialRequired(integrationTypeValue, protocol)
 
   const onTypeChange = useCallback(
     (newType: string) => {

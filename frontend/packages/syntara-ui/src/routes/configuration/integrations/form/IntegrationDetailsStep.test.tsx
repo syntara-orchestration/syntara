@@ -481,7 +481,7 @@ describe('IntegrationDetailsStep', () => {
       await user.click(screen.getByText('SCRAM-SHA-256'))
       await user.click(screen.getByRole('option', { name: 'SCRAM-SHA-512' }))
 
-      expect(screen.getByText('SCRAM-SHA-512')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'SCRAM-SHA-512' })).toBeInTheDocument()
     })
   })
 

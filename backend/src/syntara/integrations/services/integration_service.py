@@ -30,6 +30,7 @@ from syntara.credentials.lib.injector_resolver import InjectorResolver
 from syntara.credentials.lib.kafka_connection import (
     KAFKA_CONNECTION_TYPE_NAME,
     KafkaSecurityProtocol,
+    kafka_credential_required,
     resolve_connector_kafka_login,
 )
 from syntara.integrations.adapters.factory import create_health_check_adapter
@@ -75,7 +76,7 @@ from syntara.integrations.models.integration import (
     IntegrationUpdate,
     RefreshResult,
 )
-from syntara.integrations.models.integration_configuration import IntegrationConfigurationInputTypes
+from syntara.integrations.models.integration_configuration import IntegrationConfigurationInputTypes, KafkaConfiguration
 from syntara.integrations.models.llm_model import LLMModel
 from syntara.integrations.services.model_profile_lookup import lookup_model_profile
 from syntara.settings.cache.settings_cache import get_runtime_settings
@@ -94,9 +95,15 @@ CREDENTIAL_REQUIRED_TYPES: frozenset[IntegrationType] = frozenset(
     {
         IntegrationType.LLM_PROVIDER,
         IntegrationType.ANSIBLE_AUTOMATION_PLATFORM,
-        IntegrationType.KAFKA,
     }
 )
+
+
+def _credential_required(integration_type: IntegrationType, configuration: IntegrationConfigurationInputTypes) -> bool:
+    if isinstance(configuration, KafkaConfiguration):
+        return kafka_credential_required(configuration.security_protocol)
+    return integration_type in CREDENTIAL_REQUIRED_TYPES
+
 
 _REFRESHABLE_TYPES: frozenset[IntegrationType] = frozenset(
     {
@@ -442,7 +449,7 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
         """
         if data.management_credential_id is not None:
             await self._validate_credential_type(data.integration_type, data.management_credential_id)
-        elif data.integration_type in CREDENTIAL_REQUIRED_TYPES:
+        elif _credential_required(data.integration_type, data.configuration):
             raise IntegrationCredentialRequiredError(data.integration_type.value)
 
         self._validate_configuration_ssrf(data.configuration)
@@ -645,11 +652,16 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
                 raise SafeValueError(msg)
             self._validate_configuration_ssrf(data.configuration)
 
-        if "management_credential_id" in data.model_fields_set:
-            if data.management_credential_id is not None:
-                await self._validate_credential_type(integration.integration_type, data.management_credential_id)
-            elif integration.integration_type in CREDENTIAL_REQUIRED_TYPES:
-                raise IntegrationCredentialRequiredError(integration.integration_type.value)
+        if "management_credential_id" in data.model_fields_set and data.management_credential_id is not None:
+            await self._validate_credential_type(integration.integration_type, data.management_credential_id)
+        credential_id = (
+            data.management_credential_id
+            if "management_credential_id" in data.model_fields_set
+            else integration.management_credential_id
+        )
+        configuration = data.configuration if data.configuration is not None else integration.configuration
+        if credential_id is None and _credential_required(integration.integration_type, configuration):
+            raise IntegrationCredentialRequiredError(integration.integration_type.value)
 
         if data.name is not None and data.name != integration.name:
             await self._raise_if_name_exists(data.name)
@@ -726,7 +738,9 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
         await self.session.flush()
         return await self._to_read_with_counts(integration)
 
-    async def _resolve_credential(self, credential_id: UUID) -> dict[str, object]:
+    async def _resolve_credential(
+        self, credential_id: UUID, *, security_protocol: str = KafkaSecurityProtocol.SASL_SSL
+    ) -> dict[str, object]:
         """Resolve a credential to its extra_vars dict for adapter use.
 
         Fetches the credential, verifies it is enabled, decrypts its secret,
@@ -754,7 +768,7 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
                 self.session,
                 secret_service,
                 management_credential_id=credential_id,
-                security_protocol=KafkaSecurityProtocol.SASL_SSL,
+                security_protocol=security_protocol,
             )
             return dict(login or {})
         logger.debug("Resolving credential", credential_id=str(credential_id), credential_type=cred_type.name)
@@ -878,7 +892,9 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
             )
             raise
 
-        if integration.management_credential_id is None and integration.integration_type in CREDENTIAL_REQUIRED_TYPES:
+        if integration.management_credential_id is None and _credential_required(
+            integration.integration_type, integration.configuration
+        ):
             await self._fail_validation(
                 integration, IntegrationCredentialRequiredError(integration.integration_type.value)
             )
@@ -886,7 +902,14 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
         resolved_credential: dict[str, object] = {}
         if integration.management_credential_id:
             try:
-                resolved_credential = await self._resolve_credential(integration.management_credential_id)
+                resolved_credential = await self._resolve_credential(
+                    integration.management_credential_id,
+                    **(
+                        {"security_protocol": integration.configuration.security_protocol}
+                        if isinstance(integration.configuration, KafkaConfiguration)
+                        else {}
+                    ),
+                )
             except (CredentialDisabledError, CredentialValidationError, CredentialDecryptionError) as exc:
                 await self._fail_validation(integration, exc)
 
@@ -952,12 +975,19 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
         # create/patch, so without this the adapter would hit private/metadata targets.
         self._validate_configuration_ssrf(data.configuration)
 
-        if data.credential_id is None and data.integration_type in CREDENTIAL_REQUIRED_TYPES:
+        if data.credential_id is None and _credential_required(data.integration_type, data.configuration):
             raise IntegrationCredentialRequiredError(data.integration_type.value)
 
         resolved_credential: dict[str, object] = {}
         if data.credential_id is not None:
-            resolved_credential = await self._resolve_credential(data.credential_id)
+            resolved_credential = await self._resolve_credential(
+                data.credential_id,
+                **(
+                    {"security_protocol": data.configuration.security_protocol}
+                    if isinstance(data.configuration, KafkaConfiguration)
+                    else {}
+                ),
+            )
 
         timeout_seconds: int = await get_runtime_settings().get("integrations.connection_test_timeout_seconds")
 

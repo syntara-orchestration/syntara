@@ -413,3 +413,16 @@ class TestKafkaTlsContext:
             context = adapter._ssl_context()
         assert isinstance(context, ssl.SSLContext)
         load_ca.assert_called_once()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(("protocol", "opt_in"), [("SSL", False), ("PLAINTEXT", True)])
+async def test_unauthenticated_transport_does_not_require_a_login(protocol: str, *, opt_in: bool) -> None:
+    config = KafkaConfiguration(bootstrap_servers=_BROKERS, security_protocol=protocol, allow_plaintext=opt_in)
+    client = _client_mock()
+    with patch("syntara.integrations.adapters.kafka.KafkaHealthClient", return_value=client) as constructor:
+        result = await KafkaAdapter(config).validate({}, timeout_seconds=5)
+    assert result.success
+    assert constructor.call_args.kwargs["security_protocol"] == protocol
+    assert constructor.call_args.kwargs["sasl_plain_username"] is None
+    assert (constructor.call_args.kwargs["ssl_context"] is None) == (protocol == "PLAINTEXT")

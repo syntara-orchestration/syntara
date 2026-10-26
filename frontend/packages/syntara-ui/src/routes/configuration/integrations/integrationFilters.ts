@@ -12,7 +12,7 @@ export const CREDENTIAL_TYPES_BY_INTEGRATION: Record<string, string[]> = {
 }
 
 /** Integration types that require a management credential for discovery and validation. */
-export const CREDENTIAL_REQUIRED_TYPES: ReadonlySet<string> = new Set([
+const CREDENTIAL_REQUIRED_TYPES: ReadonlySet<string> = new Set([
   IntegrationTypeEnum.LLM_PROVIDER,
   IntegrationTypeEnum.ANSIBLE_AUTOMATION_PLATFORM,
   IntegrationTypeEnum.KAFKA,
@@ -73,3 +73,7 @@ export const getIntegrationTypeFilterDefinition = (): FilterFieldDefinition => (
   options: Object.entries(INTEGRATION_TYPE_LABELS).map(([value, label]) => ({ value, label })),
   placeholder: 'Filter by integration type',
 })
+
+export function isIntegrationCredentialRequired(type: string, protocol = 'SASL_SSL'): boolean {
+  return type === IntegrationTypeEnum.KAFKA ? protocol === 'SASL_SSL' : CREDENTIAL_REQUIRED_TYPES.has(type)
+}

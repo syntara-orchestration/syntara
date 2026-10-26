@@ -817,7 +817,7 @@ describe('IntegrationDetail', () => {
       render(<IntegrationDetail />, { wrapper })
 
       expect(screen.getByText('Security')).toBeInTheDocument()
-      expect(screen.getByText('HTTPS only')).toBeInTheDocument()
+      expect(screen.getByText('SASL_SSL')).toBeInTheDocument()
     })
   })
 
