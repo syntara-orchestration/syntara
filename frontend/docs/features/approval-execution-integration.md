@@ -174,19 +174,7 @@ On successful submission:
 
 ### Error Handling
 
-Uses `useFormMutationErrorHandler` to map backend errors to form field errors:
-
-```typescript
-const handleError = useFormMutationErrorHandler(setError)
-
-decisionMutation.mutate(
-  { ... },
-  {
-    onSuccess: ...,
-    onError: handleError({ title: 'Failed to submit decision' }),
-  }
-)
-```
+Maps common PATCH failures to friendly alert copy via `getApprovalDecisionSubmitErrorMessage` (409 already resolved, 403 permission denied, 503 service unavailable, default retry message). 503 uses a warning alert; other failures use danger.
 
 ## Approval Detail Content (Standalone View)
 
