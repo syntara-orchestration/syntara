@@ -397,3 +397,121 @@ class FormDefinition(BaseModel):
             msg = f"Duplicate field names are not allowed: {', '.join(sorted(duplicates))}"
             raise SafeValueError(msg)
         return self
+
+
+AuthoredOptionsSource = Annotated[StaticOptions | DynamicOptions, Discriminator("source")]
+"""Option sources a user may author on a form prompt. Excludes engine-produced snapshots."""
+
+
+_TRIGGER_DISALLOWED_SOURCES = {
+    "dynamic": "is not supported on a form trigger. Use 'static'.",
+    "dynamic_resolved": "is not supported on a form trigger. Use 'static'.",
+}
+_PROMPT_DISALLOWED_SOURCES = {
+    "dynamic_resolved": (
+        "is produced by the workflow engine at run time and cannot be authored. Use 'static' or 'dynamic'."
+    ),
+}
+
+
+def _reject_option_sources(
+    raw: object,
+    info: ValidationInfo,
+    *,
+    disallowed: dict[str, str],
+) -> object:
+    """Reject option sources that the authored form type does not allow.
+
+    This runs before option parsing so one unsupported source produces one safe
+    error at the options field, instead of discriminator and extra-key errors.
+    """
+    if isinstance(raw, dict):
+        source = raw.get("source")
+        if isinstance(source, str) and source in disallowed:
+            value_name = info.data.get("value_name", "<unnamed>")
+            msg = f"Field '{value_name}': options source '{source}' {disallowed[source]}"
+            raise SafeValueError(msg)
+    return raw
+
+
+class FormTriggerDropdownField(DropdownField):
+    """Dropdown field on a form trigger. Static options only."""
+
+    options: StaticOptions
+
+    @field_validator("options", mode="before")
+    @classmethod
+    def _static_only(cls, raw: object, info: ValidationInfo) -> object:
+        return _reject_option_sources(raw, info, disallowed=_TRIGGER_DISALLOWED_SOURCES)
+
+
+class FormTriggerMultiSelectField(MultiSelectField):
+    """Multi-select field on a form trigger. Static options only."""
+
+    options: StaticOptions
+
+    @field_validator("options", mode="before")
+    @classmethod
+    def _static_only(cls, raw: object, info: ValidationInfo) -> object:
+        return _reject_option_sources(raw, info, disallowed=_TRIGGER_DISALLOWED_SOURCES)
+
+
+class FormPromptDropdownField(DropdownField):
+    """Dropdown field on a form prompt. Static or dynamic options; not engine-resolved."""
+
+    options: AuthoredOptionsSource
+
+    @field_validator("options", mode="before")
+    @classmethod
+    def _authored_only(cls, raw: object, info: ValidationInfo) -> object:
+        return _reject_option_sources(raw, info, disallowed=_PROMPT_DISALLOWED_SOURCES)
+
+
+class FormPromptMultiSelectField(MultiSelectField):
+    """Multi-select field on a form prompt. Static or dynamic options; not engine-resolved."""
+
+    options: AuthoredOptionsSource
+
+    @field_validator("options", mode="before")
+    @classmethod
+    def _authored_only(cls, raw: object, info: ValidationInfo) -> object:
+        return _reject_option_sources(raw, info, disallowed=_PROMPT_DISALLOWED_SOURCES)
+
+
+FormTriggerField = Annotated[
+    TextField
+    | TextAreaField
+    | MaskedTextField
+    | EmailField
+    | NumberField
+    | CheckboxField
+    | DateField
+    | FormTriggerDropdownField
+    | FormTriggerMultiSelectField,
+    Discriminator("type"),
+]
+
+FormPromptField = Annotated[
+    TextField
+    | TextAreaField
+    | MaskedTextField
+    | EmailField
+    | NumberField
+    | CheckboxField
+    | DateField
+    | FormPromptDropdownField
+    | FormPromptMultiSelectField,
+    Discriminator("type"),
+]
+
+
+class FormTriggerDefinition(FormDefinition):
+    """Authored form definition for a form trigger; options must be static."""
+
+    fields: list[FormTriggerField] = Field(min_length=1, max_length=100)  # type: ignore[assignment]
+
+
+class FormPromptDefinition(FormDefinition):
+    """Authored form definition for a form prompt; resolved snapshots are engine-only."""
+
+    fields: list[FormPromptField] = Field(min_length=1, max_length=100)  # type: ignore[assignment]

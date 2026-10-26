@@ -1066,6 +1066,12 @@ components:
       $ref: ./shared-schemas.yaml#/components/schemas/ApprovalNodeParameters
     FormPromptNodeParameters:
       $ref: ./shared-schemas.yaml#/components/schemas/FormPromptNodeParameters
+    FormPromptDefinition:
+      $ref: ./shared-schemas.yaml#/components/schemas/FormPromptDefinition
+    FormPromptDropdownField:
+      $ref: ./shared-schemas.yaml#/components/schemas/FormPromptDropdownField
+    FormPromptMultiSelectField:
+      $ref: ./shared-schemas.yaml#/components/schemas/FormPromptMultiSelectField
     ConditionNodeParameters:
       $ref: ./shared-schemas.yaml#/components/schemas/ConditionNodeParameters
     SwitchNodeParameters:

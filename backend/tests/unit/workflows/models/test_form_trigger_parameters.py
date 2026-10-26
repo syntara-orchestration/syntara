@@ -76,6 +76,53 @@ class TestFormTriggerParameters:
             "email",
         ]
 
+    @pytest.mark.parametrize("field_type", ["dropdown", "multi_select"])
+    @pytest.mark.parametrize(
+        ("source", "options"),
+        [
+            pytest.param(
+                "dynamic",
+                {
+                    "source": "dynamic",
+                    "expression": "${upstream.options}",
+                    "label_key": "label",
+                    "value_key": "value",
+                },
+                id="dynamic",
+            ),
+            pytest.param(
+                "dynamic_resolved",
+                {"source": "dynamic_resolved", "values": [{"display_label": "East", "value": "east"}]},
+                id="dynamic-resolved",
+            ),
+        ],
+    )
+    def test_non_static_options_are_rejected_standalone(
+        self,
+        field_type: str,
+        source: str,
+        options: dict[str, object],
+    ) -> None:
+        """The parameter model rejects every non-static option source on both selection fields."""
+        parameters = _parameters(
+            {
+                "type": field_type,
+                "value_name": "choice",
+                "label": "Choice",
+                "options": options,
+            }
+        )
+
+        with pytest.raises(ValidationError) as exc_info:
+            FormTriggerParameters.model_validate(parameters)
+
+        assert len(exc_info.value.errors()) == 1
+        error = exc_info.value.errors()[0]
+        assert error["loc"][-1] == "options"
+        assert f"Field 'choice': options source '{source}' is not supported on a form trigger. Use 'static'." in str(
+            exc_info.value
+        )
+
     @pytest.mark.parametrize(
         "parameter",
         ["response_window", "fallback_decision", "responder_users", "responder_groups"],

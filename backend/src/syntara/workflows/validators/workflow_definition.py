@@ -453,11 +453,6 @@ def _collect_form_model_findings(
         parameter_model=FormPromptNodeParameters,
         category=ValidationCategory.form_prompt_configuration,
         element_label="form prompt",
-        unsupported_option_messages={
-            "dynamic_resolved": (
-                "is produced by the workflow engine at run time and cannot be authored. Use 'static' or 'dynamic'."
-            )
-        },
         schema_locations=schema_locations,
     )
     findings.extend(
@@ -467,10 +462,6 @@ def _collect_form_model_findings(
             parameter_model=FormTriggerParameters,
             category=ValidationCategory.form_trigger_configuration,
             element_label="form trigger",
-            unsupported_option_messages={
-                "dynamic": "is not supported on a form trigger. Use 'static'.",
-                "dynamic_resolved": "is not supported on a form trigger. Use 'static'.",
-            },
             schema_locations=schema_locations,
         )
     )
@@ -484,7 +475,6 @@ def _collect_form_model_findings_for_elements(
     parameter_model: type[BaseModel],
     category: ValidationCategory,
     element_label: str,
-    unsupported_option_messages: Mapping[str, str],
     schema_locations: set[tuple[str | None, str | None]],
 ) -> list[ValidationFinding]:
     """Validate one collection of form elements using shared form-model logic."""
@@ -499,14 +489,6 @@ def _collect_form_model_findings_for_elements(
         if not isinstance(parameters, dict):
             continue
 
-        findings.extend(
-            _collect_authored_option_findings(
-                parameters,
-                node_id,
-                category=category,
-                unsupported_option_messages=unsupported_option_messages,
-            )
-        )
         try:
             parameter_model.model_validate(parameters)
         except ValidationError as exc:
@@ -518,9 +500,6 @@ def _collect_form_model_findings_for_elements(
                     schema_locations,
                     configuration_category=category,
                     element_label=element_label,
-                    ignored_safe_error_fragments=tuple(
-                        f"options source '{source}'" for source in unsupported_option_messages
-                    ),
                 )
             )
         except FormDefinitionError as exc:
@@ -533,45 +512,6 @@ def _collect_form_model_findings_for_elements(
                 )
             )
 
-    return findings
-
-
-def _collect_authored_option_findings(
-    parameters: dict[str, Any],
-    node_id: str | None,
-    *,
-    category: ValidationCategory,
-    unsupported_option_messages: Mapping[str, str],
-) -> list[ValidationFinding]:
-    """Report option sources not allowed on this authored form type."""
-    form_definition = parameters.get("form_definition")
-    fields = form_definition.get("fields", []) if isinstance(form_definition, dict) else []
-    if not isinstance(fields, list):
-        return []
-
-    findings: list[ValidationFinding] = []
-    for index, field in enumerate(fields):
-        if not isinstance(field, dict):
-            continue
-        field_type = field.get("type")
-        if not isinstance(field_type, str) or field_type not in {"dropdown", "multi_select"}:
-            continue
-        options = field.get("options")
-        source = options.get("source") if isinstance(options, dict) else None
-        if not isinstance(source, str) or source not in unsupported_option_messages:
-            continue
-
-        value_name = field.get("value_name")
-        field_name = value_name if isinstance(value_name, str) else f"at index {index}"
-        findings.append(
-            ValidationFinding(
-                severity=ValidationSeverity.error,
-                category=category,
-                message=(f"Field '{field_name}': options source '{source}' {unsupported_option_messages[source]}"),
-                node_id=node_id,
-                field_path=f"parameters.form_definition.fields.{index}.options",
-            )
-        )
     return findings
 
 
@@ -658,9 +598,8 @@ def _collect_form_parameter_validation_findings(
     *,
     configuration_category: ValidationCategory,
     element_label: str,
-    ignored_safe_error_fragments: tuple[str, ...],
 ) -> list[ValidationFinding]:
-    """Convert typed form-model errors into safe findings and suppress raw duplicate option errors."""
+    """Convert typed form-model errors into safe workflow findings."""
     findings: list[ValidationFinding] = []
     for error in exc.errors():
         field_type_finding = _form_field_type_finding(
@@ -678,9 +617,6 @@ def _collect_form_parameter_validation_findings(
         safe_error = context.get("error") if isinstance(context, dict) else None
         is_safe_configuration_error = isinstance(safe_error, SafeValueError)
         message = str(safe_error) if is_safe_configuration_error else str(error["msg"])
-        if is_safe_configuration_error and any(fragment in message for fragment in ignored_safe_error_fragments):
-            # The raw-definition pass reports unsupported option sources with field indices.
-            continue
         field_path = _form_validation_field_path(error.get("loc", ()))
 
         # JSON Schema already reports ordinary structural errors at this exact

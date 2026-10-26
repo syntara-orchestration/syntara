@@ -463,18 +463,20 @@ class TestFormPromptFindingPaths:
             "field-2",
         ]
 
-    def test_dynamic_resolved_source_schema_and_model_errors_are_deduplicated(self) -> None:
+    @pytest.mark.parametrize("field_type", ["dropdown", "multi_select"])
+    def test_dynamic_resolved_source_schema_and_model_errors_are_deduplicated(self, field_type: str) -> None:
         workflow_def = _workflow_with_form_prompt(
             [
                 {
-                    "type": "dropdown",
+                    "type": field_type,
                     "value_name": "choice",
                     "label": "Choice",
                     "options": {
                         "source": "dynamic_resolved",
                         "values": [{"display_label": "Choice", "value": "choice"}],
                     },
-                }
+                },
+                {"type": "email", "value_name": "contact", "label": "Contact", "default": "not-an-email"},
             ]
         )
 
@@ -484,6 +486,10 @@ class TestFormPromptFindingPaths:
         assert len(form_findings) == 1
         assert form_findings[0].category == ValidationCategory.form_prompt_configuration
         assert form_findings[0].field_path == "parameters.form_definition.fields.0.options"
+        assert form_findings[0].message == (
+            "Field 'choice': options source 'dynamic_resolved' is produced by the workflow engine at run time and "
+            "cannot be authored. Use 'static' or 'dynamic'."
+        )
 
     def test_missing_form_definition_schema_and_model_errors_are_deduplicated(self) -> None:
         workflow_def = _workflow_with_form_prompt(_VALID_FORM_DEFINITION["fields"])
