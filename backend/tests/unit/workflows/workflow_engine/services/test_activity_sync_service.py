@@ -2648,6 +2648,7 @@ class TestSyncNodesToTerminalStatus:
         """Create a mock ActivityExecution database record."""
         activity = Mock()
         activity.activity_name = activity_name
+        activity.temporal_activity_id = activity_name
         activity.status = status
         activity.started_at = None
         activity.completed_at = None
@@ -2698,6 +2699,62 @@ class TestSyncNodesToTerminalStatus:
         assert activity.completed_at is not None
         assert activity.error_details == "Key 'output' not found in namespace path"
         assert result == {"node-A": "Key 'output' not found in namespace path"}
+
+    @pytest.mark.asyncio
+    async def test_retry_converge_failure_uses_current_run_timestamp(self) -> None:
+        """A converge that fails instead of replaying keeps the retry's timestamp."""
+        activity = self._create_mock_activity_execution("converge_1")
+        session = self._session_with_result([activity])
+        self.mock_session_factory.side_effect = [self._session_context(session)]
+        metadata = self._create_metadata(activity_index_map={"converge_1": 0})
+        metadata.is_retry_from_failure = True
+
+        await self.service._sync_nodes_to_terminal_status(
+            metadata,
+            ["converge_1"],
+            ActivityStatus.FAILED,
+            error_map={"converge_1": "converge gate failed"},
+        )
+
+        assert activity.status == ActivityStatus.FAILED
+        assert activity.started_at is None
+        assert activity.completed_at is not None
+
+    @pytest.mark.asyncio
+    async def test_loop_converge_failure_uses_current_run_timestamp(self) -> None:
+        """A failed nested converge no longer borrows timestamps from its source row."""
+        activity = self._create_mock_activity_execution("converge_1#iter-2#iter-4")
+        session = self._session_with_result([activity])
+        self.mock_session_factory.side_effect = [self._session_context(session)]
+        metadata = self._create_metadata(activity_index_map={"converge_1": 0})
+        metadata.is_retry_from_failure = True
+
+        await self.service._sync_nodes_to_terminal_status(
+            metadata,
+            ["converge_1"],
+            ActivityStatus.FAILED,
+            error_map={"converge_1": "converge gate failed"},
+        )
+
+        assert activity.status == ActivityStatus.FAILED
+        assert activity.started_at is None
+        assert activity.completed_at is not None
+
+    def _session_context(self, session: Mock) -> Mock:
+        context = Mock()
+        context.__aenter__ = AsyncMock(return_value=session)
+        context.__aexit__ = AsyncMock(return_value=False)
+        return context
+
+    @staticmethod
+    def _session_with_result(rows: list[Any]) -> Mock:
+        result = Mock()
+        result.all.return_value = rows
+        session = Mock()
+        session.exec = AsyncMock(return_value=result)
+        session.commit = AsyncMock()
+        session.rollback = AsyncMock()
+        return session
 
     @pytest.mark.asyncio
     async def test_multiple_failed_nodes_all_marked(self) -> None:
@@ -6630,6 +6687,108 @@ class TestReplayedTimestampResolution:
                 "completed_at": datetime(2026, 1, 1, 0, 5, 0, tzinfo=UTC),
             }
         }
+
+    @pytest.mark.asyncio
+    async def test_reexecuted_trigger_uses_source_times_but_keeps_current_outcome(self) -> None:
+        metadata = self._metadata([(1, "trigger", ActivityStatus.COMPLETED)])
+        metadata.activity_definitions_map = {"trigger": {"type": "manual_trigger"}}
+        source = {
+            "started_at": "2026-01-01T00:00:00+00:00",
+            "completed_at": "2026-01-01T00:05:00+00:00",
+        }
+        handle = self._handle(source)
+
+        resolved = await self.service._resolve_replayed_timestamps(metadata, handle)
+
+        assert resolved == {
+            "trigger": {
+                "started_at": datetime(2026, 1, 1, 0, 0, 0, tzinfo=UTC),
+                "completed_at": datetime(2026, 1, 1, 0, 5, 0, tzinfo=UTC),
+            }
+        }
+        activity_data = {
+            "status": ActivityStatus.COMPLETED,
+            "started_at": "retry-start",
+            "completed_at": "retry-end",
+            "output_data": {"fresh": True},
+        }
+        self.service._apply_replayed_state(resolved["trigger"], activity_data)
+
+        assert activity_data == {
+            "status": ActivityStatus.COMPLETED,
+            "started_at": datetime(2026, 1, 1, 0, 0, 0, tzinfo=UTC),
+            "completed_at": datetime(2026, 1, 1, 0, 5, 0, tzinfo=UTC),
+            "output_data": {"fresh": True},
+        }
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("event_status", [ActivityStatus.COMPLETED, ActivityStatus.FAILED])
+    async def test_converge_rerun_keeps_current_run_timestamps(self, event_status: ActivityStatus) -> None:
+        metadata = self._metadata([(1, "converge_1", event_status)])
+        metadata.activity_definitions_map = {"converge_1": {"type": NodeType.CONVERGE}}
+        handle = self._handle()
+
+        resolved = await self.service._resolve_replayed_timestamps(metadata, handle)
+
+        assert resolved == {}
+        self.service.session_factory.assert_not_called()
+        handle.query.assert_not_awaited()
+        handle.execute_update.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_replayed_loop_converge_uses_source_times_for_exact_occurrence(self) -> None:
+        temporal_activity_id = "converge_1_iter_2_iter_4"
+        metadata = self._metadata([(1, "converge_1", ActivityStatus.COMPLETED)])
+        metadata.pending_activity_updates[1]["temporal_activity_id"] = temporal_activity_id
+        metadata.pending_activity_updates[1]["_is_loop_iteration"] = True
+        metadata.pending_activity_updates[1]["_is_retry_node_replay"] = True
+        metadata.activity_definitions_map = {"converge_1": {"type": NodeType.CONVERGE}}
+        handle = self._handle(self.source_times, queried=self.source_times)
+
+        resolved = await self.service._resolve_replayed_timestamps(metadata, handle)
+
+        assert resolved == {
+            temporal_activity_id: {
+                "started_at": datetime(2026, 1, 1, 0, 0, 0, tzinfo=UTC),
+                "completed_at": datetime(2026, 1, 1, 0, 5, 0, tzinfo=UTC),
+            }
+        }
+        handle.query.assert_awaited_once_with("get_replayed_node_timestamps_if_ready", temporal_activity_id)
+
+    @pytest.mark.asyncio
+    async def test_loop_converge_rerun_keeps_retry_times(self) -> None:
+        metadata = self._metadata([(1, "converge_1", ActivityStatus.COMPLETED)])
+        metadata.pending_activity_updates[1]["temporal_activity_id"] = "converge_1_iter_2_iter_4"
+        metadata.pending_activity_updates[1]["_is_loop_iteration"] = True
+        metadata.activity_definitions_map = {"converge_1": {"type": NodeType.CONVERGE}}
+        handle = self._handle()
+        handle.query = AsyncMock(return_value=False)
+
+        assert await self.service._resolve_replayed_timestamps(metadata, handle) == {}
+
+        handle.query.assert_not_awaited()
+        self.service.session_factory.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_converge_rerun_does_not_read_source_timestamps(self) -> None:
+        metadata = self._metadata([(1, "converge_1", ActivityStatus.COMPLETED)])
+        metadata.activity_definitions_map = {"converge_1": {"type": NodeType.CONVERGE}}
+        handle = self._handle()
+
+        assert await self.service._resolve_replayed_timestamps(metadata, handle) == {}
+        self.service.session_factory.assert_not_called()
+        handle.query.assert_not_awaited()
+        handle.execute_update.assert_not_awaited()
+
+    def test_apply_preserves_explicit_none_for_replayed_timestamps(self) -> None:
+        activity_data = {"status": ActivityStatus.COMPLETED, "started_at": "retry", "completed_at": "retry"}
+
+        self.service._apply_replayed_state(
+            {"started_at": None, "completed_at": None, "_preserve_timestamp_values": True},
+            activity_data,
+        )
+
+        assert activity_data == {"status": ActivityStatus.COMPLETED, "started_at": None, "completed_at": None}
 
     @pytest.mark.asyncio
     async def test_the_update_is_used_when_the_query_cannot_answer_yet(self) -> None:
