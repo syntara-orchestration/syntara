@@ -128,6 +128,9 @@ class TestFormTriggerTelemetry:
         assert properties["trigger_node_id"] == "form"
         assert properties["field_count"] == 2
         assert properties["field_types"] == ["number", "text"]
+        anonymous_id = message.get("anonymousId")
+        assert isinstance(anonymous_id, str)
+        assert anonymous_id
         assert message.get("userId") is None
         for key in ("input_data", "response_data", "submitted_by", "user_id", "username", "email"):
             assert key not in properties

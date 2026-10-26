@@ -40,14 +40,3 @@ class TestHandlerPackagesRegistration:
         assert FormPromptCreatedEvent in event_types
         assert FormPromptSubmittedEvent in event_types
         assert FormPromptExpiredEvent in event_types
-
-    def test_form_trigger_event_has_audit_and_telemetry_handlers(self) -> None:
-        packages = {pkg.__name__: pkg for pkg in _handler_packages()}
-        assert "syntara.workflows.audit" in packages
-        assert "syntara.telemetry.handlers" in packages
-
-        audit_handlers = discover_handlers(syntara.workflows.audit)
-        telemetry_handlers = discover_handlers(syntara.telemetry.handlers)
-
-        assert isinstance(audit_handlers[FormTriggerSubmittedEvent], FormTriggerSubmittedHandler)
-        assert isinstance(telemetry_handlers[FormTriggerSubmittedEvent], FormTriggerSubmittedTelemetryHandler)

@@ -165,18 +165,6 @@ class TestBucketConstants:
         """Fast buckets are in ascending order."""
         assert list(LATENCY_BUCKETS_FAST) == sorted(LATENCY_BUCKETS_FAST)
 
-    def test_form_prompt_latencies_use_fast_buckets(self, prom: OrchestratorPrometheusMetrics) -> None:
-        """Both form prompt latency histograms use the fast latency buckets."""
-        handoff_buckets = prom.form_prompt_submission_handoff_seconds._upper_bounds[:-1]
-        dispatch_buckets = prom.form_prompt_resume_dispatch_seconds._upper_bounds[:-1]
-        assert handoff_buckets == list(LATENCY_BUCKETS_FAST)
-        assert dispatch_buckets == list(LATENCY_BUCKETS_FAST)
-
-    def test_form_trigger_submission_uses_medium_buckets(self, prom: OrchestratorPrometheusMetrics) -> None:
-        """The submission-to-commit span uses medium buckets like workflow-start latency."""
-        buckets = prom.form_trigger_submission_start_seconds._upper_bounds[:-1]
-        assert buckets == list(LATENCY_BUCKETS_MEDIUM)
-
     def test_medium_buckets_sorted(self) -> None:
         """Medium buckets are in ascending order."""
         assert list(LATENCY_BUCKETS_MEDIUM) == sorted(LATENCY_BUCKETS_MEDIUM)

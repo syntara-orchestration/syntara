@@ -34,7 +34,7 @@ worker registry includes Python process metrics and the worker's `MetricsRecorde
 - LLM call duration, token usage (input/output), Time-To-First-Token (TTFT)
 - Workflow execution duration, completion rate
 - Form prompt submission handoff and workflow resume dispatch latency
-- Form trigger service-entry-to-execution-commit latency
+- Form trigger submission latency
 - Activity execution success rate
 - Database query response time, connection pool utilization
 - Tool execution duration and success rate
