@@ -29,11 +29,14 @@ def init_workflow_runtime(wf: OrchestratorWorkflow) -> None:
     # times, the source status and the output can each be read independently.
     wf._retry_replay_candidates = set()
     wf._restored_node_timestamps = {}
+    wf._retry_converge_failure_reasons = {}
+    wf._retry_converge_upstream_failures = {}
     wf._restored_node_statuses = {}
     wf._restored_node_outputs = {}
     wf._restored_control_ports = {}
     wf._resolved_control_port_cache = {}
     wf._retry_source_statuses = {}
+    wf._retry_source_timestamps = {}
     # Set in __init__ for a real run. Guarded because some tests build the workflow
     # by hand, and a converge reads it to tell whether a loop predecessor is still
     # iterating, so it must exist even on a workflow with nothing to do with retries.
