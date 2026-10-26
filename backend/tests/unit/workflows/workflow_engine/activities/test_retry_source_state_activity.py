@@ -5,6 +5,7 @@ is one node too broad seeds a node the retry is about to re-execute with the
 previous run's state.
 """
 
+from datetime import UTC, datetime
 from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -16,14 +17,20 @@ from syntara.workflows.workflow_engine.activities.retry_node_replay_activity imp
 )
 
 
-async def _run(rows: list[tuple[str | None, str, str | None]]) -> tuple[dict[str, dict[str, str]], Any]:
-    """Run the activity over ``rows``, returning the mapping and the query used."""
+async def _run(
+    rows: list[tuple[str | None, str, str | None]],
+    *,
+    trigger_timestamps: list[tuple[str | None, datetime | None, datetime | None]] | None = None,
+) -> tuple[dict[str, dict[str, Any]], list[Any]]:
+    """Run the activity, returning its state mapping and projected SQL statements."""
     session = AsyncMock()
-    result = MagicMock()
-    # The activity projects only status and the canonical Temporal ID. Preserve
-    # the input display names here to ensure the implementation does not consult them.
-    result.all.return_value = [(status, temporal_id) for _, status, temporal_id in rows]
-    session.exec.return_value = result
+    status_result = MagicMock()
+    # Preserve display names to ensure source identity comes only from the
+    # canonical Temporal ID.
+    status_result.all.return_value = [(status, temporal_id) for _, status, temporal_id in rows]
+    trigger_result = MagicMock()
+    trigger_result.all.return_value = trigger_timestamps or []
+    session.exec.side_effect = [status_result, trigger_result]
 
     async def mock_get_db():  # noqa: ANN202
         yield session
@@ -34,7 +41,8 @@ async def _run(rows: list[tuple[str | None, str, str | None]]) -> tuple[dict[str
     ):
         states = await fetch_retry_source_state_activity("src-1")
 
-    return states, session.exec.await_args.args[0]
+    queries = [call.args[0] for call in session.exec.await_args_list]
+    return states, queries
 
 
 @pytest.mark.asyncio
@@ -43,6 +51,39 @@ async def test_returns_the_status_for_a_node() -> None:
 
     assert states["activity_statuses"] == {"step_1": "completed"}
     assert states["temporal_activity_statuses"] == {"step_1": "completed"}
+
+
+@pytest.mark.asyncio
+async def test_returns_timestamps_keyed_by_temporal_activity_id() -> None:
+    started_at = datetime(2026, 1, 1, tzinfo=UTC)
+    completed_at = datetime(2026, 1, 1, 0, 5, tzinfo=UTC)
+    states, queries = await _run(
+        [("trigger", "completed", "trigger")],
+        trigger_timestamps=[("trigger", started_at, completed_at)],
+    )
+
+    assert states["temporal_activity_timestamps"] == {
+        "trigger": {
+            "started_at": started_at.isoformat(),
+            "completed_at": completed_at.isoformat(),
+        }
+    }
+    assert "node_type" in str(queries[1])
+    assert "started_at" in str(queries[1])
+    assert "completed_at" in str(queries[1])
+
+
+@pytest.mark.asyncio
+async def test_keeps_missing_times_and_ignores_rows_without_temporal_activity_id() -> None:
+    states, _ = await _run(
+        [],
+        trigger_timestamps=[
+            ("trigger", None, None),
+            (None, datetime(2026, 1, 1, tzinfo=UTC), datetime(2026, 1, 1, 0, 5, tzinfo=UTC)),
+        ],
+    )
+
+    assert states["temporal_activity_timestamps"] == {"trigger": {"started_at": None, "completed_at": None}}
 
 
 @pytest.mark.asyncio
@@ -102,8 +143,8 @@ async def test_temporal_ids_are_the_only_source_status_identity() -> None:
     that only ever uses the status. The cost is invisible in the return value, so
     it is asserted against the statement itself.
     """
-    _, query = await _run([])
-    sql = str(cast("Any", query))
+    _, queries = await _run([])
+    sql = str(cast("Any", queries[0]))
 
     assert "temporal_activity_id" in sql
     assert "activity_name" not in sql
@@ -120,9 +161,9 @@ async def test_reads_rows_as_a_column_tuple() -> None:
     type checking rejects it, so both the shape and the unpacking are pinned here
     to keep the projection from being "simplified" back into an entity select.
     """
-    states, query = await _run([("step_1", "completed", "step_1")])
+    states, queries = await _run([("step_1", "completed", "step_1")])
 
-    assert len(query.selected_columns) == 2
+    assert len(queries[0].selected_columns) == 2
     assert states["activity_statuses"] == {"step_1": "completed"}
 
 

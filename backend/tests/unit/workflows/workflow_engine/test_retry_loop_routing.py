@@ -62,6 +62,8 @@ def _wf(
     wf._retry_loop_record_states = {}
     wf._retry_live_loop_ids = set()
     wf._restored_node_timestamps = {}
+    wf._retry_converge_failure_reasons = {}
+    wf._retry_converge_upstream_failures = {}
     wf._restored_node_statuses = {}
     wf._restored_node_outputs = {}
     wf._retry_source_statuses = {}

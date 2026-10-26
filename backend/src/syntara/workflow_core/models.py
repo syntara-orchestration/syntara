@@ -151,6 +151,7 @@ class ActivityName(StrEnum):
     FETCH_RUNTIME_SETTINGS = "fetch_workflow_runtime_settings"
     VALIDATE_NODE_REFERENCES = "validate_node_references"
     RETRY_SOURCE_STATE = "fetch_retry_source_state"
+    RETRY_CONVERGE_METADATA = "fetch_retry_converge_metadata"
     RETRY_NODE_REPLAY = "replay_retry_node"
     RETRY_LOOP_RECORD_SYNC = "sync_retry_loop_record"
     RETRY_CONTROL_PORTS = "retry_control_ports"

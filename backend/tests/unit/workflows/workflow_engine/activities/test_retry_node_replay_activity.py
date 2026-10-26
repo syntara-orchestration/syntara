@@ -12,6 +12,8 @@ import pytest
 
 from syntara.workflows.models.activity_execution import ActivityStatus
 from syntara.workflows.workflow_engine.activities.retry_node_replay_activity import (
+    _result_digest,
+    fetch_retry_converge_metadata_activity,
     replay_retry_node_activity,
     retry_control_ports,
 )
@@ -549,3 +551,136 @@ async def test_control_ports_ignores_non_dict_control_data() -> None:
     ports = await _run_ports([("cond_1", "not-a-dict"), ("sw_1", {"next_port": "a"})])
 
     assert ports == {"sw_1": "a"}
+
+
+# ---------------------------------------------------------------------------
+# fetch_retry_converge_metadata: source gate + per-branch state for retry replay
+# ---------------------------------------------------------------------------
+
+
+def _metadata_session(rows: list[tuple[Any, ...]]) -> AsyncMock:
+    """A session whose query returns the given (temporal_id, status, in, out, control) rows."""
+    session = AsyncMock()
+    result = MagicMock()
+    result.all.return_value = rows
+    session.exec.return_value = result
+    return session
+
+
+async def _run_metadata(
+    rows: list[tuple[Any, ...]],
+    converge_temporal_id: str,
+    predecessor_temporal_ids: dict[str, str],
+    *,
+    source_execution_id: str = "src-1",
+) -> dict[str, Any] | None:
+    session = _metadata_session(rows)
+
+    async def mock_get_db():  # noqa: ANN202
+        yield session
+
+    with patch(
+        "syntara.workflows.workflow_engine.activities.retry_node_replay_activity.get_db",
+        mock_get_db,
+    ):
+        return await fetch_retry_converge_metadata_activity(
+            source_execution_id, converge_temporal_id, predecessor_temporal_ids
+        )
+
+
+def test_result_digest_is_none_for_none() -> None:
+    """A missing branch output has no digest rather than a digest of ``null``."""
+    assert _result_digest(None) is None
+
+
+def test_result_digest_is_stable_and_order_independent() -> None:
+    """The digest is key-order independent and distinguishes different payloads."""
+    assert _result_digest({"a": 1, "b": 2}) == _result_digest({"b": 2, "a": 1})
+    assert _result_digest({"a": 1}) != _result_digest({"a": 2})
+
+
+@pytest.mark.asyncio
+async def test_converge_metadata_returns_gate_and_branch_state() -> None:
+    """The source converge gate and each direct predecessor's state are returned."""
+    gate = {"strategy": "any", "n_required": 1, "total_branches": 2}
+    rows = [
+        (
+            "join",
+            ActivityStatus.COMPLETED,
+            {"strategy": "any", "n_required": 1},
+            {"branch_count": 2},
+            {"retry_gate_metadata": gate},
+        ),
+        ("b1", ActivityStatus.COMPLETED, {}, {"v": 1}, {}),
+        ("b2", ActivityStatus.FAILED, {}, None, {}),
+    ]
+
+    result = await _run_metadata(rows, "join", {"b1": "b1", "b2": "b2"})
+
+    assert result is not None
+    assert result["converge"] == {
+        "status": "completed",
+        "input_data": {"strategy": "any", "n_required": 1},
+        "output_branch_count": 2,
+        "gate_metadata": gate,
+    }
+    assert result["predecessors"]["b1"] == {"status": "completed", "result_digest": _result_digest({"v": 1})}
+    # A branch with no stored output still reports its status, with a null digest.
+    assert result["predecessors"]["b2"] == {"status": "failed", "result_digest": None}
+
+
+@pytest.mark.asyncio
+async def test_converge_metadata_absent_converge_row_returns_none() -> None:
+    """With no source row for the converge itself there is nothing to compare."""
+    rows: list[tuple[Any, ...]] = [("b1", ActivityStatus.COMPLETED, {}, {"v": 1}, {})]
+
+    assert await _run_metadata(rows, "join", {"b1": "b1"}) is None
+
+
+@pytest.mark.asyncio
+async def test_converge_metadata_missing_predecessor_is_reported_as_unknown() -> None:
+    """A predecessor absent from the source run is explicit, not dropped."""
+    rows: list[tuple[Any, ...]] = [("join", ActivityStatus.COMPLETED, {}, {}, {})]
+
+    result = await _run_metadata(rows, "join", {"b1": "b1"})
+
+    assert result is not None
+    assert result["predecessors"]["b1"] == {"status": None, "result_digest": None}
+    # No recorded gate metadata collapses to an empty mapping, not a crash.
+    assert result["converge"]["gate_metadata"] == {}
+    assert result["converge"]["output_branch_count"] is None
+
+
+@pytest.mark.asyncio
+async def test_converge_metadata_tolerates_non_dict_payloads() -> None:
+    """Null input/output/control columns from older rows degrade to empty mappings."""
+    rows = [("join", ActivityStatus.COMPLETED, None, None, None)]
+
+    result = await _run_metadata(rows, "join", {})
+
+    assert result is not None
+    assert result["converge"]["input_data"] == {"strategy": None, "n_required": None}
+    assert result["converge"]["output_branch_count"] is None
+    assert result["converge"]["gate_metadata"] == {}
+
+
+@pytest.mark.asyncio
+async def test_converge_metadata_accepts_plain_string_statuses() -> None:
+    """A status stored as a plain string (not an enum) is returned verbatim."""
+    rows: list[tuple[Any, ...]] = [
+        ("join", "completed", {}, {}, {}),
+        ("b1", "skipped", {}, {}, {}),
+    ]
+
+    result = await _run_metadata(rows, "join", {"b1": "b1"})
+
+    assert result is not None
+    assert result["converge"]["status"] == "completed"
+    assert result["predecessors"]["b1"]["status"] == "skipped"
+
+
+@pytest.mark.asyncio
+async def test_converge_metadata_short_circuits_on_blank_ids() -> None:
+    """A blank execution or converge id returns None without touching the database."""
+    assert await _run_metadata([], "join", {}, source_execution_id="") is None
+    assert await _run_metadata([("join", ActivityStatus.COMPLETED, {}, {}, {})], "", {}) is None
