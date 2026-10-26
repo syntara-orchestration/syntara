@@ -6,7 +6,8 @@
 }
 
 .dateInput {
-  flex: 1 1 8rem;
+  flex: 0 1 auto;
+  min-width: 8rem;
 }
 
 .timeInput {

@@ -1,6 +1,6 @@
 import type { WorkflowAPI } from '@syntara/contracts'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -12,6 +12,7 @@ import { AlertProvider } from '../../providers/alerts'
 import { ColorSchemeProvider } from '../../providers/theme/ColorSchemeProvider'
 
 import { WorkflowDialogs } from './WorkflowDialogs'
+import { WORKFLOW_LIST_RUN_PREPARING_DELAY_MS } from './workflowListRunResolutionUi'
 
 type Workflow = WorkflowAPI.components['schemas']['WorkflowRead']
 
@@ -44,6 +45,27 @@ vi.mock('../builder/PublishWorkflowDialog', () => ({
 
 vi.mock('../access-management/ProjectFormModal', () => ({
   ProjectFormModal: () => null,
+}))
+
+const mockUseWorkflowPermissions = vi.hoisted(() =>
+  vi.fn(() => ({
+    canCreate: true,
+    canUpdate: true,
+    canDelete: true,
+    canRun: true,
+    isLoading: false,
+    tooltips: {
+      create: '',
+      duplicate: '',
+      update: '',
+      delete: '',
+      run: 'Need execution:run',
+    },
+  }))
+)
+
+vi.mock('./useWorkflowPermissions', () => ({
+  useWorkflowPermissions: mockUseWorkflowPermissions,
 }))
 
 function mockWorkflow(overrides: Partial<Workflow> = {}): Workflow {
@@ -115,9 +137,42 @@ function renderDialogs(overrides: Partial<React.ComponentProps<typeof WorkflowDi
   return { ...render(<WorkflowDialogs {...props} />, { wrapper }), props }
 }
 
+async function clickRunNowWhenReady(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(await screen.findByRole('button', { name: 'Run now' }))
+}
+
+const formTriggerWorkflowDefinition = {
+  triggers: [
+    {
+      id: 'form-1',
+      name: 'Intake',
+      type: 'form_trigger',
+      parameters: {
+        form_definition: {
+          fields: [{ type: 'text', value_name: 'reason', label: 'Reason', required: true }],
+        },
+      },
+    },
+  ],
+}
+
 describe('WorkflowDialogs', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockUseWorkflowPermissions.mockReturnValue({
+      canCreate: true,
+      canUpdate: true,
+      canDelete: true,
+      canRun: true,
+      isLoading: false,
+      tooltips: {
+        create: '',
+        duplicate: '',
+        update: '',
+        delete: '',
+        run: 'Need execution:run',
+      },
+    })
     vi.mocked(workflowFetchClient.GET).mockResolvedValue(
       mockGetResponse({
         id: 'wf-1',
@@ -137,6 +192,7 @@ describe('WorkflowDialogs', () => {
       runDialog: createDialogState(mockWorkflow(), true),
     })
 
+    await screen.findByRole('button', { name: 'Run now' })
     expect(await axe(container)).toHaveNoViolations()
   })
 
@@ -162,7 +218,7 @@ describe('WorkflowDialogs', () => {
     )
     const { container } = renderDialogs({ runDialog: createDialogState(mockWorkflow(), true) })
 
-    await user.click(screen.getByRole('button', { name: 'Run now' }))
+    await clickRunNowWhenReady(user)
     await screen.findByText('Set mock output data for Manual Trigger')
 
     expect(await axe(container)).toHaveNoViolations()
@@ -174,13 +230,128 @@ describe('WorkflowDialogs', () => {
     const runDialog = createDialogState(mockWorkflow(), true)
     renderDialogs({ runDialog, onRunWorkflow })
 
-    await user.click(screen.getByRole('button', { name: 'Run now' }))
+    await clickRunNowWhenReady(user)
 
     await waitFor(() => {
       expect(onRunWorkflow).toHaveBeenCalledWith(expect.objectContaining({ id: 'wf-1' }), {}, 'trigger-1')
     })
     expect(runDialog.close).toHaveBeenCalled()
     expect(screen.queryByText('Set mock output data for Manual Trigger')).not.toBeInTheDocument()
+  })
+
+  it('does not flash the preparing modal when manual trigger resolution is fast', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    try {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+      const onRunWorkflow = vi.fn()
+      renderDialogs({
+        runDialog: createDialogState(mockWorkflow(), true),
+        onRunWorkflow,
+      })
+
+      await clickRunNowWhenReady(user)
+      await vi.advanceTimersByTimeAsync(WORKFLOW_LIST_RUN_PREPARING_DELAY_MS + 50)
+
+      expect(screen.queryByText('Preparing workflow run…')).not.toBeInTheDocument()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('shows preparing state while resolving a form trigger run', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    let resolveGet!: (value: ReturnType<typeof mockGetResponse>) => void
+    vi.mocked(workflowFetchClient.GET).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveGet = resolve
+        })
+    )
+
+    try {
+      renderDialogs({
+        runDialog: createDialogState(mockWorkflow(), true),
+      })
+
+      expect(screen.queryByText('Preparing workflow run…')).not.toBeInTheDocument()
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(WORKFLOW_LIST_RUN_PREPARING_DELAY_MS)
+      })
+      expect(screen.getByText('Preparing workflow run…')).toBeInTheDocument()
+
+      act(() => {
+        resolveGet(
+          mockGetResponse({
+            id: 'wf-1',
+            current_version: 1,
+            published_version_number: 1,
+            version: { workflow_definition: formTriggerWorkflowDefinition },
+          })
+        )
+      })
+
+      expect(await screen.findByRole('heading', { name: 'Run Important Project Workflow' })).toBeInTheDocument()
+      expect(screen.queryByText('Preparing workflow run…')).not.toBeInTheDocument()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('opens the form trigger dialog without the run confirmation step', async () => {
+    vi.mocked(workflowFetchClient.GET).mockResolvedValue(
+      mockGetResponse({
+        id: 'wf-1',
+        current_version: 1,
+        published_version_number: 1,
+        version: {
+          workflow_definition: formTriggerWorkflowDefinition,
+        },
+      })
+    )
+
+    renderDialogs({
+      runDialog: createDialogState(mockWorkflow(), true),
+    })
+
+    expect(await screen.findByRole('heading', { name: 'Run Important Project Workflow' })).toBeInTheDocument()
+    expect(screen.queryByText('Run workflow?')).not.toBeInTheDocument()
+    expect(screen.queryByText('Set mock output data for')).not.toBeInTheDocument()
+  })
+
+  it('disables form trigger submit when execution:run is denied', async () => {
+    mockUseWorkflowPermissions.mockReturnValue({
+      canCreate: true,
+      canUpdate: true,
+      canDelete: true,
+      canRun: false,
+      isLoading: false,
+      tooltips: {
+        create: '',
+        duplicate: '',
+        update: '',
+        delete: '',
+        run: 'Need execution:run',
+      },
+    })
+
+    vi.mocked(workflowFetchClient.GET).mockResolvedValue(
+      mockGetResponse({
+        id: 'wf-1',
+        current_version: 1,
+        published_version_number: 1,
+        version: {
+          workflow_definition: formTriggerWorkflowDefinition,
+        },
+      })
+    )
+
+    renderDialogs({
+      runDialog: createDialogState(mockWorkflow(), true),
+    })
+
+    const submitButton = await screen.findByRole('button', { name: 'Submit' })
+    expect(submitButton).toBeDisabled()
+    expect(screen.getByRole('textbox', { name: 'Reason' })).toBeDisabled()
   })
 
   it('shows RunWorkflowModal when the trigger has an input schema', async () => {
@@ -210,7 +381,7 @@ describe('WorkflowDialogs', () => {
     const runDialog = createDialogState(mockWorkflow(), true)
     renderDialogs({ runDialog, onRunWorkflow })
 
-    await user.click(screen.getByRole('button', { name: 'Run now' }))
+    await clickRunNowWhenReady(user)
 
     expect(await screen.findByText('Set mock output data for Manual Trigger')).toBeInTheDocument()
     expect(onRunWorkflow).not.toHaveBeenCalled()
@@ -246,7 +417,7 @@ describe('WorkflowDialogs', () => {
       onRunWorkflow,
     })
 
-    await user.click(screen.getByRole('button', { name: 'Run now' }))
+    await clickRunNowWhenReady(user)
     expect(await screen.findByText('Set mock output data for Manual Trigger')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Run' }))
@@ -261,7 +432,6 @@ describe('WorkflowDialogs', () => {
   })
 
   it('shows an error and closes when the workflow has no triggers', async () => {
-    const user = userEvent.setup()
     const onRunWorkflow = vi.fn()
     const runDialog = createDialogState(mockWorkflow(), true)
     vi.mocked(workflowFetchClient.GET).mockResolvedValue(
@@ -274,8 +444,6 @@ describe('WorkflowDialogs', () => {
     )
 
     renderDialogs({ runDialog, onRunWorkflow })
-
-    await user.click(screen.getByRole('button', { name: 'Run now' }))
 
     await waitFor(() => {
       expect(screen.getByText('Cannot run workflow')).toBeInTheDocument()
@@ -311,7 +479,7 @@ describe('WorkflowDialogs', () => {
       onRunWorkflow,
     })
 
-    await user.click(screen.getByRole('button', { name: 'Run now' }))
+    await clickRunNowWhenReady(user)
 
     await waitFor(() => {
       expect(onRunWorkflow).toHaveBeenCalledWith(expect.objectContaining({ id: 'wf-1' }), {}, 'trigger-1')
@@ -320,14 +488,11 @@ describe('WorkflowDialogs', () => {
   })
 
   it('shows an error when resolving the trigger throws', async () => {
-    const user = userEvent.setup()
     const onRunWorkflow = vi.fn()
     const runDialog = createDialogState(mockWorkflow(), true)
     vi.mocked(workflowFetchClient.GET).mockRejectedValue(new Error('Network down'))
 
     renderDialogs({ runDialog, onRunWorkflow })
-
-    await user.click(screen.getByRole('button', { name: 'Run now' }))
 
     await waitFor(() => {
       expect(screen.getByText('Cannot run workflow')).toBeInTheDocument()
@@ -366,7 +531,7 @@ describe('WorkflowDialogs', () => {
       onRunWorkflow,
     })
 
-    await user.click(screen.getByRole('button', { name: 'Run now' }))
+    await clickRunNowWhenReady(user)
     expect(await screen.findByText('Set mock output data for Manual Trigger')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Cancel' }))

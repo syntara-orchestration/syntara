@@ -3,13 +3,20 @@ import type { Locator } from '@playwright/test'
 import { FORM_PROMPT_RESPOND_PANEL_TITLE } from '../../src/routes/executions/formPrompt/formPromptRespondPanelConstants'
 import { expect, type Page, toAppUrl } from '../fixtures'
 
+import { MOCK_FORM_RESPONSE_SEED } from './formResponses'
+
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
-/** Execution detail side panel for responding to a pending form step. */
+/** Execution detail side panel body for responding to a pending form step (excludes SynPanel footer). */
 export function formPromptRespondPanelRegion(app: Page): Locator {
   return app.getByRole('region', { name: FORM_PROMPT_RESPOND_PANEL_TITLE })
+}
+
+/** Primary submit action for the respond panel (rendered in SynPanel footer, not inside the region). */
+export function formPromptRespondSubmitButton(app: Page): Locator {
+  return app.getByRole('button', { name: MOCK_FORM_RESPONSE_SEED.customSubmitLabel })
 }
 
 /** Matches `formatElapsedTime` output (e.g. `4s`, `1m 30s`, `2h 0m 5s`). */

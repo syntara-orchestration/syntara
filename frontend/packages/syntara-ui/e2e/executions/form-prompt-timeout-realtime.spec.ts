@@ -12,6 +12,7 @@ import { test, expect } from '../fixtures'
 import {
   activityTableRowByActivityName,
   formPromptRespondPanelRegion,
+  formPromptRespondSubmitButton,
   formPromptWaitingElapsedInPanel,
 } from '../helpers/formPromptPanel'
 import {
@@ -69,7 +70,7 @@ test.describe('Form step timeout and waiting indicators', { tag: '@pr-check' }, 
       await expect(respondPanel.getByText('Waiting', { exact: true })).toBeVisible()
       await expect(formPromptWaitingElapsedInPanel(respondPanel)).toBeVisible()
       await expect(respondPanel.getByText('Running long')).toHaveCount(0)
-      await expect(respondPanel.getByRole('button', { name: 'Submit response' })).toBeVisible()
+      await expect(formPromptRespondSubmitButton(app)).toBeVisible()
     } finally {
       await disposeTimeoutScenario(app, scenario)
     }
