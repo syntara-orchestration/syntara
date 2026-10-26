@@ -21,6 +21,7 @@ from syntara.credentials.exceptions import (
     CredentialNotFoundError,
     CredentialValidationError,
 )
+from syntara.credentials.lib.preseed import GA_CREDENTIAL_TYPES
 from syntara.credentials.models.credential import Credential, CredentialCreate, CredentialRead, CredentialUpdate
 from syntara.credentials.models.credential_type import CredentialType
 from syntara.credentials.services.credential_service import (
@@ -389,6 +390,71 @@ class TestGetCredential:
 
 class TestUpdateCredential:
     """Tests for CredentialService.update_credential."""
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("field", ["username", "password"])
+    @pytest.mark.parametrize("value", [None, "", "    "])
+    async def test_patch_rejects_explicitly_cleared_kafka_login_before_storage(
+        self,
+        mock_session: MagicMock,
+        mock_user: MagicMock,
+        mock_secret_service: MagicMock,
+        field: str,
+        value: str | None,
+    ) -> None:
+        kafka_schema = next(item for item in GA_CREDENTIAL_TYPES if item["name"] == "Kafka")
+        credential_type = CredentialType(id=uuid4(), **kafka_schema)
+        credential = Credential(
+            id=uuid4(),
+            name="Kafka login",
+            credential_type_id=credential_type.id,
+            secret_id=uuid4(),
+            project_id=uuid4(),
+            created_by=mock_user.id,
+        )
+        service = CredentialService(mock_session, mock_user, mock_secret_service)
+        mock_result = MagicMock()
+        mock_result.one_or_none.return_value = credential
+        mock_session.exec.return_value = mock_result
+        mock_session.get.side_effect = [None, credential_type]
+
+        with pytest.raises(CredentialValidationError, match=field):
+            await service.update_credential(credential.id, CredentialUpdate(inputs={field: value}))
+
+        mock_secret_service.create_secret.assert_not_awaited()
+        mock_secret_service.update_secret.assert_not_awaited()
+        mock_session.commit.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("inputs", [{}, {"password": ENCRYPTED_SENTINEL}, {"username": ENCRYPTED_SENTINEL}])
+    async def test_patch_preserves_omitted_and_masked_kafka_inputs(
+        self,
+        mock_session: MagicMock,
+        mock_user: MagicMock,
+        mock_secret_service: MagicMock,
+        inputs: dict[str, str],
+    ) -> None:
+        kafka_schema = next(item for item in GA_CREDENTIAL_TYPES if item["name"] == "Kafka")
+        credential_type = CredentialType(id=uuid4(), **kafka_schema)
+        credential = Credential(
+            id=uuid4(),
+            name="Kafka login",
+            credential_type_id=credential_type.id,
+            secret_id=uuid4(),
+            project_id=uuid4(),
+            created_by=mock_user.id,
+        )
+        stored = {"username": "operator", "password": "  secret  "}
+        mock_secret_service.retrieve_secret.return_value = stored
+        service = CredentialService(mock_session, mock_user, mock_secret_service)
+
+        result = await service._apply_credential_inputs_update(
+            credential, CredentialUpdate(inputs=inputs), credential_type
+        )
+
+        assert result == stored
+        mock_secret_service.create_secret.assert_not_awaited()
+        mock_secret_service.update_secret.assert_not_awaited()
 
     @pytest.mark.asyncio
     async def test_encrypted_sentinel_preserves_existing(
@@ -1239,9 +1305,10 @@ class TestValidateInputs:
         """Skip validation for $encrypted$ sentinel on PATCH."""
         _validate_inputs({"host": ENCRYPTED_SENTINEL}, HOST_TYPE_INPUTS, allow_sentinel=True)
 
-    def test_host_none_skipped_on_patch(self) -> None:
-        """Skip URL validation when host is None on PATCH (required-field check is separate)."""
-        _validate_inputs({"host": None}, HOST_TYPE_INPUTS, allow_sentinel=True)
+    def test_required_host_none_rejected_on_patch(self) -> None:
+        """An explicit null cannot clear a required host string."""
+        with pytest.raises(CredentialValidationError, match="cannot be blank: host"):
+            _validate_inputs({"host": None}, HOST_TYPE_INPUTS, allow_sentinel=True)
 
     def test_host_non_string_rejected(self) -> None:
         """Reject non-string host value."""

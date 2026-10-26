@@ -194,7 +194,7 @@ def _reject_explicit_blank_required(
     *,
     allow_sentinel: bool,
 ) -> None:
-    """Reject a required string that a PATCH sets to whitespace.
+    """Reject a required string that a PATCH explicitly clears.
 
     Omitted fields and the ``$encrypted$`` sentinel stay stored. This runs
     only for PATCH, where the create-time required check is skipped.
@@ -212,12 +212,14 @@ def _reject_explicit_blank_required(
 
 
 def _is_blank_required_string(field_id: str, value: Any, field_defs: dict[str, Any]) -> bool:  # noqa: ANN401
-    """Return True when a required string field holds only whitespace.
+    """Return True when a required string field is null or holds only whitespace.
 
     Scoped to type == "string" so boolean False and numeric 0 remain valid
     "provided" values, consistent with _validate_field_constraints' _is_provided.
     """
-    return field_defs.get(field_id, {}).get("type") == "string" and isinstance(value, str) and not value.strip()
+    return field_defs.get(field_id, {}).get("type") == "string" and (
+        value is None or (isinstance(value, str) and not value.strip())
+    )
 
 
 def _validate_inputs(
