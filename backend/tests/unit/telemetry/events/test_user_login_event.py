@@ -72,14 +72,15 @@ class TestUserLoginTelemetryEventSegmentConversion:
         segment_event = event.to_segment_event()
         assert segment_event["event"] == "user_login"
 
-    def test_to_segment_event_contains_all_fields(self) -> None:
+    def test_to_segment_event_contains_all_fields(self, override_settings) -> None:
         event = UserLoginTelemetryEvent(
             user_id_hash=VALID_USER_ID_HASH,
             amr=["fed"],
             idp="okta",
             entitlement_id="ent-123",
         )
-        segment_event = event.to_segment_event()
+        with override_settings(container_image_version="img-tag"):
+            segment_event = event.to_segment_event()
         props = segment_event["properties"]
         assert props == {
             "user_id_hash": VALID_USER_ID_HASH,

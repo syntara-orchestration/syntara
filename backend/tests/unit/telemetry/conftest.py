@@ -1,6 +1,10 @@
 """Shared fixtures for telemetry unit tests."""
 
+from collections.abc import Generator
+
 import pytest
+
+from syntara.telemetry.events.base import _get_container_image_version
 
 # Common test data constants
 VALID_WORKFLOW_EXECUTION_ID = "550e8400-e29b-41d4-a716-446655440000"
@@ -25,3 +29,11 @@ def valid_node_hash() -> str:
 def sample_node_def() -> dict[str, str]:
     """Return a sample node definition for telemetry tests."""
     return SAMPLE_NODE_DEF.copy()
+
+
+@pytest.fixture(autouse=True)
+def isolate_container_image_version_cache() -> Generator[None, None, None]:
+    """Keep a process-lifetime production cache from coupling independent tests."""
+    _get_container_image_version.cache_clear()
+    yield
+    _get_container_image_version.cache_clear()
