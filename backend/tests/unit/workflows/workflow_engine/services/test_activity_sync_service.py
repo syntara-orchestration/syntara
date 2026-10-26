@@ -6689,6 +6689,39 @@ class TestReplayedTimestampResolution:
         }
 
     @pytest.mark.asyncio
+    async def test_reexecuted_trigger_uses_source_times_but_keeps_current_outcome(self) -> None:
+        metadata = self._metadata([(1, "trigger", ActivityStatus.COMPLETED)])
+        metadata.activity_definitions_map = {"trigger": {"type": "manual_trigger"}}
+        source = {
+            "started_at": "2026-01-01T00:00:00+00:00",
+            "completed_at": "2026-01-01T00:05:00+00:00",
+        }
+        handle = self._handle(source)
+
+        resolved = await self.service._resolve_replayed_timestamps(metadata, handle)
+
+        assert resolved == {
+            "trigger": {
+                "started_at": datetime(2026, 1, 1, 0, 0, 0, tzinfo=UTC),
+                "completed_at": datetime(2026, 1, 1, 0, 5, 0, tzinfo=UTC),
+            }
+        }
+        activity_data = {
+            "status": ActivityStatus.COMPLETED,
+            "started_at": "retry-start",
+            "completed_at": "retry-end",
+            "output_data": {"fresh": True},
+        }
+        self.service._apply_replayed_state(resolved["trigger"], activity_data)
+
+        assert activity_data == {
+            "status": ActivityStatus.COMPLETED,
+            "started_at": datetime(2026, 1, 1, 0, 0, 0, tzinfo=UTC),
+            "completed_at": datetime(2026, 1, 1, 0, 5, 0, tzinfo=UTC),
+            "output_data": {"fresh": True},
+        }
+
+    @pytest.mark.asyncio
     @pytest.mark.parametrize("event_status", [ActivityStatus.COMPLETED, ActivityStatus.FAILED])
     async def test_converge_rerun_keeps_current_run_timestamps(self, event_status: ActivityStatus) -> None:
         metadata = self._metadata([(1, "converge_1", event_status)])

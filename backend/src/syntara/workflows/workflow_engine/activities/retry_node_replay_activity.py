@@ -30,6 +30,7 @@ with workflow.unsafe.imports_passed_through():
     from syntara.core.database.session import get_db
     from syntara.core.exceptions import SafeValueError
     from syntara.workflows.models.activity_execution import ActivityExecution, ActivityStatus
+    from syntara.workflows.workflow_engine.models.workflow_definition import NodeType
     from syntara.workflows.workflow_engine.utils.loop_iteration_ids import (
         join_loop_iteration_id,
         strip_loop_iteration_suffixes,
@@ -262,17 +263,23 @@ async def replay_retry_node_activity(
 
 
 @activity.defn(name="fetch_retry_source_state")
-async def fetch_retry_source_state_activity(source_execution_id: str) -> dict[str, dict[str, str]]:
-    """Return source statuses, projected so no payload is read.
+async def fetch_retry_source_state_activity(source_execution_id: str) -> dict[str, dict[str, Any]]:
+    """Return source statuses and trigger timestamps without loading payloads.
 
-    Only the three columns this needs are selected. ``input_data`` and
-    ``output_data`` are unbounded JSONB, and selecting the whole row deserializes
-    both for every activity in the source execution — on the workflow's critical
-    path, before any node has dispatched. The sibling replay activity projects its
-    own query for the same reason.
+    Statuses are projected for every source activity so retry classification can
+    happen before traversal. Timestamps are queried only for trigger rows because
+    they are the one executed node whose source times are displayed on retry. The
+    unbounded input and output JSONB columns are never selected.
     """
     states: dict[str, str] = {}
     temporal_states: dict[str, str] = {}
+    temporal_timestamps: dict[str, dict[str, str | None]] = {}
+    trigger_types = (
+        NodeType.MANUAL_TRIGGER,
+        NodeType.SCHEDULED_TRIGGER,
+        NodeType.WEBHOOK_TRIGGER,
+        NodeType.EDA_TRIGGER,
+    )
     async for session in get_db():
         rows = (
             await session.exec(
@@ -288,9 +295,30 @@ async def fetch_retry_source_state_activity(source_execution_id: str) -> dict[st
                 status_value = ActivityStatus(status).value
                 states[strip_loop_iteration_suffixes(temporal_activity_id)] = status_value
                 temporal_states[temporal_activity_id] = status_value
+
+        trigger_rows = (
+            await session.exec(
+                select(
+                    ActivityExecution.temporal_activity_id,
+                    ActivityExecution.started_at,
+                    ActivityExecution.completed_at,
+                ).where(
+                    ActivityExecution.execution_id == source_execution_id,
+                    col(ActivityExecution.node_type).in_(trigger_types),
+                )
+            )
+        ).all()
+        for temporal_activity_id, started_at, completed_at in trigger_rows:
+            if temporal_activity_id:
+                temporal_timestamps[temporal_activity_id] = {
+                    "started_at": started_at.isoformat() if started_at else None,
+                    "completed_at": completed_at.isoformat() if completed_at else None,
+                }
+
     return {
         "activity_statuses": states,
         "temporal_activity_statuses": temporal_states,
+        "temporal_activity_timestamps": temporal_timestamps,
     }
 
 

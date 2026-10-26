@@ -124,6 +124,7 @@ class WorkflowRetryMixin:
     node_control_data: dict[str, dict[str, Any]]
     _retry_source_statuses: dict[str, str]
     _retry_source_temporal_statuses: dict[str, str]
+    _retry_source_timestamps: dict[str, dict[str, str | None]]
     _retry_selected_failure_paths: dict[str, list[list[int]]]
     skipped_nodes: set[str]
     node_inputs: dict[str, dict[str, Any]]
@@ -182,6 +183,7 @@ class WorkflowRetryMixin:
         self._resolved_control_port_cache: dict[str, str | None] = {}
         self._retry_source_statuses: dict[str, str] = {}
         self._retry_source_temporal_statuses: dict[str, str] = {}
+        self._retry_source_timestamps: dict[str, dict[str, str | None]] = {}
         self._retry_selected_failure_paths: dict[str, list[list[int]]] = {}
         # Filled from the graph by _prepare_retry; selected retry points use loop
         # ancestry to keep their enclosing controller in replay mode.
@@ -216,6 +218,7 @@ class WorkflowRetryMixin:
         # is only for graph-wide classification and is projected from those IDs.
         self._retry_source_statuses = source_state["activity_statuses"]
         self._retry_source_temporal_statuses = source_state["temporal_activity_statuses"]
+        self._retry_source_timestamps = source_state.get("temporal_activity_timestamps", {})
         self._retry_selected_failure_paths = self._selected_failure_iteration_paths()
         # Persisted routing, read before anything classifies. Restorable-node
         # selection and _should_restore_node are both synchronous, so the branch a

@@ -267,6 +267,13 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
             )
             raise SafeValueError(msg)
 
+        # The trigger still executes on retry-from-failure because it establishes
+        # the current run's trigger namespace. Restore only its source timestamps
+        # for display; do not restore its output, status, or execution result.
+        source_timestamps = getattr(self, "_retry_source_timestamps", {}).get(trigger_node.id)
+        if self.retry_context and source_timestamps is not None:
+            self._restored_node_timestamps[trigger_node.id] = dict(source_timestamps)
+
         # Dispatch dynamically by trigger type (activity name matches node type for triggers)
         trigger_result = await workflow.execute_activity(
             trigger_node.type,
