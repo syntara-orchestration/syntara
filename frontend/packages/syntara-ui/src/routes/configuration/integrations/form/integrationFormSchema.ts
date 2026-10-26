@@ -210,7 +210,7 @@ export const PROVIDER_HINT_OPTIONS = [
   { value: LLMProviderHintEnum.CUSTOM, label: 'Custom' },
 ] as const
 
-type ApiConfiguration = NonNullable<IntegrationsAPI.components['schemas']['IntegrationCreate']['configuration']>
+type ApiConfiguration = NonNullable<IntegrationsAPI.components['schemas']['IntegrationCreateV2']['configuration']>
 
 /** Map form configuration to the API shape. Kafka brokers are a list, not the textarea string. */
 export function toApiConfiguration(configuration: IntegrationFormData['configuration']): ApiConfiguration {

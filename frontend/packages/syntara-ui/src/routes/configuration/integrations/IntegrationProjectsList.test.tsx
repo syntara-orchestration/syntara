@@ -118,7 +118,7 @@ vi.mock('./useIntegrationPermissions', () => ({
   }),
 }))
 
-type IntegrationRead = IntegrationsAPI.components['schemas']['IntegrationRead']
+type IntegrationRead = IntegrationsAPI.components['schemas']['IntegrationReadV2']
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: false } },

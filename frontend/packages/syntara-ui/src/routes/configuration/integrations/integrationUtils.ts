@@ -2,7 +2,7 @@ import type { IntegrationsAPI } from '@syntara/contracts'
 import { IntegrationTypeEnum, LLMProviderHintEnum } from '@syntara/contracts'
 import { z } from 'zod'
 
-type IntegrationRead = IntegrationsAPI.components['schemas']['IntegrationRead']
+type IntegrationRead = IntegrationsAPI.components['schemas']['IntegrationReadV2']
 
 const integrationTypeSchema = z.discriminatedUnion('integration_type', [
   z.object({ integration_type: z.literal(IntegrationTypeEnum.MCP_SERVER) }),
@@ -18,9 +18,6 @@ const PROVIDER_DEFAULT_URLS: Record<string, string> = {
 }
 
 export function getStoredConfiguration(integration: IntegrationRead) {
-  if (integration.integration_type === IntegrationTypeEnum.KAFKA) {
-    return integration.kafka_configuration ?? null
-  }
   return integration.configuration
 }
 

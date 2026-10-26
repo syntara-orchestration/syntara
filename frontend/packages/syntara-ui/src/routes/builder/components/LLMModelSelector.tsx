@@ -22,7 +22,7 @@ import styles from './LLMModelSelector.module.css'
 import { resolveFormGroupLabelHelp } from './resolveFormGroupLabelHelp'
 import { TypeaheadMenuToggle } from './TypeaheadMenuToggle'
 
-type IntegrationRead = IntegrationsAPI.components['schemas']['IntegrationRead']
+type IntegrationRead = IntegrationsAPI.components['schemas']['IntegrationReadV2']
 type LLMModelRead = IntegrationsAPI.components['schemas']['LLMModelRead']
 
 export type LLMModelSelection = {

@@ -20,7 +20,7 @@ export function ResourcesTabContent({
   canUpdate,
   updateTooltip,
 }: Readonly<{
-  integration: IntegrationsAPI.components['schemas']['IntegrationRead']
+  integration: IntegrationsAPI.components['schemas']['IntegrationReadV2']
   isLLM: boolean
   modelsState: ReturnType<typeof useIntegrationModelsState>
   tools: Tool[]
@@ -28,7 +28,7 @@ export function ResourcesTabContent({
   toolEnabledCount: number
   handleSelectTool: (id: string, enabled: boolean) => void
   refetchTools: () => Promise<unknown>
-  onRefreshed: () => Promise<IntegrationsAPI.components['schemas']['IntegrationRead'] | undefined>
+  onRefreshed: () => Promise<IntegrationsAPI.components['schemas']['IntegrationReadV2'] | undefined>
   canUpdate: boolean
   updateTooltip?: string
 }>) {

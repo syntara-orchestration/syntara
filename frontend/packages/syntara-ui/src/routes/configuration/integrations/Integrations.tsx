@@ -42,7 +42,7 @@ import { StatusLabel } from './StatusLabel'
 import { useIntegrationActions } from './useIntegrationActions'
 import { useIntegrationPermissions } from './useIntegrationPermissions'
 
-type IntegrationRead = IntegrationsAPI.components['schemas']['IntegrationRead']
+type IntegrationRead = IntegrationsAPI.components['schemas']['IntegrationReadV2']
 
 function buildRowActions(
   integration: IntegrationRead,

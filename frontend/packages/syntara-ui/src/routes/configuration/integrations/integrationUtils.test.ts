@@ -10,7 +10,7 @@ import {
   isLLMProvider,
 } from './integrationUtils'
 
-type IntegrationRead = IntegrationsAPI.components['schemas']['IntegrationRead']
+type IntegrationRead = IntegrationsAPI.components['schemas']['IntegrationReadV2']
 
 const integrationDefaults: IntegrationRead = {
   id: 'int-1',
@@ -100,8 +100,7 @@ describe('integrationUtils', () => {
     it('joins Kafka bootstrap servers', () => {
       const integration = buildIntegration({
         integration_type: 'kafka',
-        configuration: null,
-        kafka_configuration: {
+        configuration: {
           integration_type: 'kafka',
           bootstrap_servers: ['broker.example.com:9093', 'other.example.com:9092'],
         },
@@ -112,8 +111,7 @@ describe('integrationUtils', () => {
     it('returns an empty string when a Kafka integration has no stored configuration', () => {
       const integration = buildIntegration({
         integration_type: 'kafka',
-        configuration: null,
-        kafka_configuration: null,
+        configuration: undefined,
       })
       expect(getBaseUrl(integration)).toBe('')
     })

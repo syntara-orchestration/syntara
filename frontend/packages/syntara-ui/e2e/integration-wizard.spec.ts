@@ -60,7 +60,7 @@ test.describe('Create Integration Wizard', () => {
         await app.getByRole('button', { name: 'Next' }).click()
 
         await expect(app.getByRole('button', { name: 'Save integration' })).toBeVisible()
-        const responsePromise = app.waitForResponse('**/api/v1/integrations')
+        const responsePromise = app.waitForResponse('**/api/v2/integrations')
         await app.getByRole('button', { name: 'Save integration' }).click()
         const response = await responsePromise
         integrationId = ((await response.json()) as { id?: string }).id ?? null
@@ -120,7 +120,7 @@ test.describe('Create Integration Wizard', () => {
         await app.getByRole('button', { name: 'Next' }).click()
 
         await expect(app.getByRole('button', { name: 'Save integration' })).toBeVisible()
-        const responsePromise = app.waitForResponse('**/api/v1/integrations')
+        const responsePromise = app.waitForResponse('**/api/v2/integrations')
         await app.getByRole('button', { name: 'Save integration' }).click()
         const response = await responsePromise
         integrationId = ((await response.json()) as { id?: string }).id ?? null
@@ -170,7 +170,7 @@ test.describe('Create Integration Wizard', () => {
 
         const saveButton = app.getByRole('button', { name: 'Save integration' })
         await expect(saveButton).toBeEnabled({ timeout: 30_000 })
-        const responsePromise = app.waitForResponse('**/api/v1/integrations')
+        const responsePromise = app.waitForResponse('**/api/v2/integrations')
         await saveButton.click()
         const response = await responsePromise
         integrationId = ((await response.json()) as { id?: string }).id ?? null
@@ -221,7 +221,7 @@ test('credential created inline during wizard persists after wizard abandonment'
     await expect(projectOption).toBeVisible()
     await projectOption.click()
 
-    await dialog.getByPlaceholder('Enter API key').fill('sk-orphan-test-key')
+    await dialog.getByRole('textbox', { name: 'API Key', exact: true }).fill('sk-orphan-test-key')
 
     const createButton = dialog.getByRole('button', { name: /create credential/i })
     await expect(createButton).toBeEnabled()
@@ -315,7 +315,7 @@ test('discovery failure shows error state, retry after correction succeeds', asy
     await app.getByRole('button', { name: 'Health check credential', exact: true }).click()
     await app.getByRole('option', { name: credName }).click()
 
-    await app.route('**/api/v1/integrations/discover', (route) =>
+    await app.route('**/api/v2/integrations/discover', (route) =>
       route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -333,11 +333,11 @@ test('discovery failure shows error state, retry after correction succeeds', asy
     await app.getByRole('button', { name: 'Next' }).click()
     await expect(app.getByRole('heading', { name: /connection test failed/i })).toBeVisible()
 
-    await app.unroute('**/api/v1/integrations/discover')
+    await app.unroute('**/api/v2/integrations/discover')
 
     await app.getByRole('button', { name: 'Retry connection' }).click()
     await expect(app.getByRole('button', { name: 'Save integration' })).toBeEnabled({ timeout: 30_000 })
-    const responsePromise = app.waitForResponse('**/api/v1/integrations')
+    const responsePromise = app.waitForResponse('**/api/v2/integrations')
     await app.getByRole('button', { name: 'Save integration' }).click()
     const response = await responsePromise
     integrationId = ((await response.json()) as { id?: string }).id ?? null

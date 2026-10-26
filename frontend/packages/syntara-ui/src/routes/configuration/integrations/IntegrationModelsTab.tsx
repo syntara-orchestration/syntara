@@ -23,7 +23,7 @@ import styles from './IntegrationDetail.module.css'
 import { getIntegrationNameFilterDefinition } from './integrationFilters'
 import { ModelRow } from './ModelRow'
 
-type IntegrationRead = IntegrationsAPI.components['schemas']['IntegrationRead']
+type IntegrationRead = IntegrationsAPI.components['schemas']['IntegrationReadV2']
 type IntegrationRefreshStatus = IntegrationsAPI.components['schemas']['IntegrationRefreshStatus']
 type LLMModelRead = IntegrationsAPI.components['schemas']['LLMModelRead']
 

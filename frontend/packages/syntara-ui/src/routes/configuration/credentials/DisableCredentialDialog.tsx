@@ -6,7 +6,7 @@ import { SynConfirmationDialog } from '../../../components/dialogs/SynConfirmati
 import { CredentialAffectedResourcesWarnings } from './CredentialAffectedResourcesWarnings'
 import type { Credential, CredentialWorkflowRef } from './credentialConstants'
 
-type Integration = IntegrationsAPI.components['schemas']['IntegrationRead']
+type Integration = IntegrationsAPI.components['schemas']['IntegrationReadV2']
 
 type DisableCredentialDialogProps = {
   credential: Credential | null

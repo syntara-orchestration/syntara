@@ -39,7 +39,7 @@ const mockIntegration = {
   last_successful_refresh_at: '2024-01-01T00:00:00Z',
   refresh_status: 'warning',
   refresh_error: 'Default model no longer offered',
-} as IntegrationsAPI.components['schemas']['IntegrationRead']
+} as IntegrationsAPI.components['schemas']['IntegrationReadV2']
 
 function createModelsState(overrides: Record<string, unknown> = {}) {
   return {

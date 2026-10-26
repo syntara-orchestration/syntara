@@ -15,13 +15,13 @@ export interface paths {
      * List integrations
      * @description List integrations with filtering and pagination.
      */
-    get: operations['list_integrations']
+    get: operations['v2_list_integrations']
     put?: never
     /**
      * Create integration
      * @description Create a new integration.
      */
-    post: operations['create_integration']
+    post: operations['v2_create_integration']
     delete?: never
     options?: never
     head?: never
@@ -39,21 +39,21 @@ export interface paths {
      * Get integration
      * @description Get an integration by ID.
      */
-    get: operations['get_integration']
+    get: operations['v2_get_integration']
     put?: never
     post?: never
     /**
      * Delete integration
      * @description Delete an integration.
      */
-    delete: operations['delete_integration']
+    delete: operations['v2_delete_integration']
     options?: never
     head?: never
     /**
      * Update integration
      * @description Update an integration.
      */
-    patch: operations['update_integration']
+    patch: operations['v2_update_integration']
     trace?: never
   }
   '/integrations/discover': {
@@ -74,7 +74,7 @@ export interface paths {
      *     including discovered tools (with parameters) or models. No integration
      *     is persisted.
      */
-    post: operations['discover_integration_connection']
+    post: operations['v2_discover_integration_connection']
     delete?: never
     options?: never
     head?: never
@@ -98,7 +98,7 @@ export interface paths {
      *     adapter's validate() method, updates the integration's status fields,
      *     and returns the result. No tool sync is performed.
      */
-    post: operations['validate_integration']
+    post: operations['v2_validate_integration']
     delete?: never
     options?: never
     head?: never
@@ -122,27 +122,7 @@ export interface paths {
      *     Tool records in the database. Updates refresh_status and last_refreshed_at
      *     on the integration. Only supported for mcp_server integration types.
      */
-    post: operations['refresh_resources']
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/integrations/{integration_id}/projects': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /**
-     * List integration projects
-     * @description List project assignments for an integration.
-     */
-    get: operations['list_integration_projects']
-    put?: never
-    post?: never
+    post: operations['v2_refresh_resources']
     delete?: never
     options?: never
     head?: never
@@ -162,12 +142,32 @@ export interface paths {
      * Assign integration project
      * @description Assign a project to a project-scoped integration.
      */
-    post: operations['assign_integration_project']
+    post: operations['v2_assign_integration_project']
     /**
      * Unassign integration project
      * @description Remove a project assignment from an integration.
      */
-    delete: operations['unassign_integration_project']
+    delete: operations['v2_unassign_integration_project']
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/integrations/{integration_id}/projects': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * List integration projects
+     * @description List project assignments for an integration.
+     */
+    get: operations['v2_list_integration_projects']
+    put?: never
+    post?: never
+    delete?: never
     options?: never
     head?: never
     patch?: never
@@ -184,37 +184,13 @@ export interface paths {
      * List integration models
      * @description List LLM models for an integration with filtering, sorting, and pagination.
      */
-    get: operations['list_integration_models']
+    get: operations['v2_list_integration_models']
     put?: never
     post?: never
     delete?: never
     options?: never
     head?: never
     patch?: never
-    trace?: never
-  }
-  '/integrations/{integration_id}/models/{model_id}': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /**
-     * Get integration model
-     * @description Get an LLM model by ID.
-     */
-    get: operations['get_integration_model']
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    /**
-     * Update integration model
-     * @description Update an LLM model (enable/disable).
-     */
-    patch: operations['update_integration_model']
     trace?: never
   }
   '/integrations/{integration_id}/models/bulk_update': {
@@ -234,7 +210,31 @@ export interface paths {
      * Bulk update integration models
      * @description Bulk enable/disable LLM models.
      */
-    patch: operations['bulk_update_integration_models']
+    patch: operations['v2_bulk_update_integration_models']
+    trace?: never
+  }
+  '/integrations/{integration_id}/models/{model_id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Get integration model
+     * @description Get an LLM model by ID.
+     */
+    get: operations['v2_get_integration_model']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    /**
+     * Update integration model
+     * @description Update an LLM model (enable/disable).
+     */
+    patch: operations['v2_update_integration_model']
     trace?: never
   }
   '/integrations/{integration_id}/tools': {
@@ -248,37 +248,13 @@ export interface paths {
      * List Integration Tools
      * @description List tools for an integration with filtering, sorting, and pagination.
      */
-    get: operations['list_integration_tools']
+    get: operations['v2_list_integration_tools']
     put?: never
     post?: never
     delete?: never
     options?: never
     head?: never
     patch?: never
-    trace?: never
-  }
-  '/integrations/{integration_id}/tools/{tool_id}': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /**
-     * Get Integration Tool
-     * @description Get a tool by ID, scoped to an integration.
-     */
-    get: operations['get_integration_tool']
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    /**
-     * Update Integration Tool
-     * @description Update a tool (enable/disable), scoped to an integration.
-     */
-    patch: operations['update_integration_tool']
     trace?: never
   }
   '/integrations/{integration_id}/tools/bulk_update': {
@@ -298,7 +274,31 @@ export interface paths {
      * Bulk Update Integration Tools
      * @description Bulk enable/disable tools for an integration.
      */
-    patch: operations['bulk_update_integration_tools']
+    patch: operations['v2_bulk_update_integration_tools']
+    trace?: never
+  }
+  '/integrations/{integration_id}/tools/{tool_id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Get Integration Tool
+     * @description Get a tool by ID, scoped to an integration.
+     */
+    get: operations['v2_get_integration_tool']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    /**
+     * Update Integration Tool
+     * @description Update a tool (enable/disable), scoped to an integration.
+     */
+    patch: operations['v2_update_integration_tool']
     trace?: never
   }
 }
@@ -306,61 +306,253 @@ export type webhooks = Record<string, never>
 export interface components {
   schemas: {
     /**
-     * IntegrationType
-     * @description Type of external integration.
-     * @enum {string}
+     * AAPConfiguration
+     * @description Configuration for Ansible Automation Platform integrations.
      */
-    IntegrationType: 'mcp_server' | 'llm_provider' | 'ansible_automation_platform' | 'kafka'
-    /**
-     * IntegrationStatus
-     * @description Validation status of an integration.
-     * @enum {string}
-     */
-    IntegrationStatus: 'unknown' | 'validating' | 'available' | 'error'
-    /**
-     * IntegrationScope
-     * @description Visibility scope of an integration.
-     * @enum {string}
-     */
-    IntegrationScope: 'global' | 'project'
-    /**
-     * IntegrationProjectAssignmentRead
-     * @description Read schema for a single project assignment.
-     */
-    IntegrationProjectAssignmentRead: {
+    AAPConfiguration: {
       /**
-       * Project Id
-       * Format: uuid
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
        */
-      project_id: string
-      /** Project Name */
-      project_name: string
+      integration_type: 'ansible_automation_platform'
       /**
-       * Created At
+       * AAP URL
+       * Format: uri
+       * @description URL of the Ansible Automation Platform
+       */
+      base_url: string
+      /**
+       * Allow Http
+       * @description Allow HTTP (unencrypted) connections. Loopback addresses are always permitted over HTTP.
+       * @default false
+       */
+      allow_http?: boolean
+      /**
+       * Insecure Skip Tls Verify
+       * @description Disable TLS certificate verification for connections to this integration.
+       * @default false
+       */
+      insecure_skip_tls_verify?: boolean
+      /**
+       * Ca Certificate
+       * @description PEM-encoded CA certificate to trust for this integration's TLS connections.
+       */
+      ca_certificate?: string | null
+    }
+    /**
+     * DiscoverResult
+     * @description Result of a resource-discovery operation (discover endpoint).
+     *
+     *     Returned by the unsaved-connection test (POST /integrations/discover)
+     *     and used internally by refresh_resources() to drive tool sync.
+     */
+    DiscoverResult: {
+      /** Success */
+      success: boolean
+      /**
+       * Checked At
        * Format: date-time
        */
-      created_at: string
-    }
-    IntegrationProjectAssignmentListResponse: components['schemas']['ResourcesResponseBase'] & {
-      /** Resources */
-      resources: components['schemas']['IntegrationProjectAssignmentRead'][]
+      checked_at: string
+      /** Error */
+      error?: string | null
+      error_type?: components['schemas']['HealthCheckErrorType'] | null
+      /** Discovered Tools */
+      discovered_tools?: components['schemas']['DiscoveredTool'][] | null
+      /** Discovered Models */
+      discovered_models?: components['schemas']['DiscoveredLLMModel'][] | null
     }
     /**
-     * IntegrationListResponse
-     * @description Paginated list response for integrations.
+     * DiscoveredLLMModel
+     * @description A model discovered from an LLM provider.
      */
-    IntegrationListResponse: components['schemas']['ResourcesResponseBase'] & {
-      /**
-       * Resources
-       * @description Array of resources in current page
-       */
-      resources: components['schemas']['IntegrationRead'][]
+    DiscoveredLLMModel: {
+      /** Id */
+      id: string
+      /** Name */
+      name: string
+      /** Description */
+      description?: string | null
     }
     /**
-     * IntegrationCreate
+     * DiscoveredTool
+     * @description A tool discovered from an MCP server.
+     *
+     *     Carries parameter information so that _sync_mcp_tools() can do a full
+     *     upsert without re-fetching from MCP.
+     */
+    DiscoveredTool: {
+      /** Name */
+      name: string
+      /** Description */
+      description?: string | null
+      /** Parameters */
+      parameters?: components['schemas']['DiscoveredToolParameter'][] | null
+    }
+    /**
+     * DiscoveredToolParameter
+     * @description A parameter belonging to a discovered tool.
+     */
+    DiscoveredToolParameter: {
+      /** Name */
+      name: string
+      /**
+       * Type
+       * @default string
+       */
+      type?: string
+      /**
+       * Description
+       * @default
+       */
+      description?: string
+      /**
+       * Required
+       * @default false
+       */
+      required?: boolean
+    }
+    /**
+     * ErrorData
+     * @description RFC 9457 Problem Details format for error event data.
+     *     This model is used for streaming error events and follows the RFC 9457 Problem Details specification. It provides machine-readable and human-readable error information with consistent structure.
+     *     Attributes:
+     *         type: URI reference identifying the problem type
+     *         title: Short, human-readable summary of the problem
+     *         detail: Human-readable explanation specific to this occurrence
+     *         code: Machine-readable error code for programmatic handling
+     *         retryable: Whether this error can be retried by creating a new invocation
+     *         instance: Optional URI reference identifying the specific occurrence
+     * @example {
+     *       "type": "https://api.example.com/errors/llm-error",
+     *       "title": "LLM Rate Limit Exceeded",
+     *       "detail": "OpenRouter API rate limit exceeded. Please try again in a few moments.",
+     *       "code": "RATE_LIMIT_EXCEEDED",
+     *       "retryable": true,
+     *       "instance": "/invocations/550e8400-e29b-41d4-a716-446655440000"
+     *     }
+     * @example {
+     *       "type": "https://api.example.com/errors/timeout-error",
+     *       "title": "Streaming Timeout",
+     *       "detail": "LLM streaming timed out after 30 seconds",
+     *       "code": "STREAM_TIMEOUT",
+     *       "retryable": true,
+     *       "instance": "/invocations/550e8400-e29b-41d4-a716-446655440000"
+     *     }
+     */
+    ErrorData: {
+      /**
+       * Type
+       * @description URI reference identifying the problem type
+       * @example https://api.example.com/errors/llm-error
+       */
+      type: string
+      /**
+       * Title
+       * @description Short, human-readable summary of the problem
+       * @example LLM Service Unavailable
+       */
+      title: string
+      /**
+       * Detail
+       * @description Human-readable explanation specific to this occurrence
+       * @example OpenRouter API returned error: rate limit exceeded. Please try again in a few moments.
+       */
+      detail: string
+      /**
+       * Code
+       * @description Machine-readable error code for programmatic handling
+       * @example RATE_LIMIT_EXCEEDED
+       */
+      code: string
+      /**
+       * Retryable
+       * @description Whether this error can be retried by creating a new invocation
+       * @example true
+       */
+      retryable: boolean
+      /**
+       * Instance
+       * @description Optional URI reference identifying the specific occurrence
+       * @example /invocations/550e8400-e29b-41d4-a716-446655440000
+       */
+      instance?: string | null
+    }
+    /**
+     * HealthCheckErrorType
+     * @description Classification of health check failures.
+     * @enum {string}
+     */
+    HealthCheckErrorType: 'auth_failure' | 'connection_error' | 'rate_limit' | 'ssl_error' | 'timeout'
+    /**
+     * InitialModelSelection
+     * @description A model from the discover step with the user's enabled/disabled choice.
+     */
+    InitialModelSelection: {
+      /**
+       * Model Id
+       * @description Provider model identifier from discover
+       */
+      model_id: string
+      /**
+       * Name
+       * @description Human-readable display name
+       */
+      name: string
+      /**
+       * Description
+       * @description Model description
+       */
+      description?: string | null
+      /**
+       * Enabled
+       * @description Whether the user enabled this model
+       * @default true
+       */
+      enabled?: boolean
+      /**
+       * Is Default
+       * @description Whether this is the default model
+       * @default false
+       */
+      is_default?: boolean
+    }
+    /**
+     * InitialToolSelection
+     * @description A tool from the discover step with the user's enabled/disabled choice.
+     */
+    InitialToolSelection: {
+      /**
+       * Name
+       * @description Tool name as returned by the discover endpoint
+       */
+      name: string
+      /**
+       * Description
+       * @description Tool description
+       */
+      description?: string | null
+      /**
+       * Enabled
+       * @description Whether the user enabled this tool
+       * @default true
+       */
+      enabled?: boolean
+      /**
+       * Parameters
+       * @description Tool parameters from discovery
+       */
+      parameters?:
+        | {
+            [key: string]: unknown
+          }[]
+        | null
+    }
+    /**
+     * IntegrationCreateV2
      * @description Schema for creating a new integration.
      */
-    IntegrationCreate: {
+    IntegrationCreateV2: {
       /**
        * Name
        * @description Human-readable name for the integration
@@ -372,7 +564,7 @@ export interface components {
        */
       description?: string | null
       /** @description Type of external integration */
-      integration_type: components['schemas']['IntegrationType']
+      integration_type: components['schemas']['IntegrationTypeV2']
       /**
        * Configuration
        * @description Integration-specific configuration
@@ -417,74 +609,235 @@ export interface components {
       discovered_models?: components['schemas']['InitialModelSelection'][] | null
     }
     /**
-     * InitialToolSelection
-     * @description A tool from the discover step with the user's enabled/disabled choice.
+     * IntegrationListResponseV2
+     * @description Paginated list response for integrations.
+     * @example {
+     *       "next": "eyJpZCI6InV1aWQifQ",
+     *       "total": 150
+     *     }
+     * @example {
+     *       "next": "eyJpZCI6Im5leHQifQ",
+     *       "prev": "eyJpZCI6InByZXYifQ"
+     *     }
      */
-    InitialToolSelection: {
+    IntegrationListResponseV2: {
+      /**
+       * Next
+       * @description Cursor for next page of results
+       */
+      next?: string | null
+      /**
+       * Prev
+       * @description Cursor for previous page of results
+       */
+      prev?: string | null
+      /**
+       * Total
+       * @description Total count of resources (only when include_total=true)
+       */
+      total?: number | null
+      /**
+       * Resources
+       * @description Array of resources in current page
+       */
+      resources: components['schemas']['IntegrationReadV2'][]
+    }
+    IntegrationProjectAssignmentListResponse: components['schemas']['ResourcesResponseBase'] & {
+      /** Resources */
+      resources: components['schemas']['IntegrationProjectAssignmentRead'][]
+    }
+    /**
+     * IntegrationProjectAssignmentRead
+     * @description Read schema for a single project assignment.
+     */
+    IntegrationProjectAssignmentRead: {
+      /**
+       * Project Id
+       * Format: uuid
+       */
+      project_id: string
+      /** Project Name */
+      project_name: string
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string
+    }
+    /**
+     * IntegrationReadV2
+     * @description Schema for integration API responses.
+     */
+    IntegrationReadV2: {
+      /**
+       * Resource ID
+       * Format: uuid
+       * @description Unique identifier for the resource
+       * @example 550e8400-e29b-41d4-a716-446655440000
+       */
+      readonly id?: string
+      /**
+       * Created At
+       * Format: date-time
+       * @description Timestamp when resource was created
+       * @example 2025-10-09T12:00:00Z
+       */
+      readonly created_at?: string
+      /**
+       * Updated At
+       * Format: date-time
+       * @description Timestamp when resource was last updated
+       * @example 2025-10-09T12:30:00Z
+       */
+      readonly updated_at?: string
+      /**
+       * Labels
+       * @description Key-value pairs for resource labeling and filtering
+       * @default {}
+       * @example {
+       *       "environment": "production",
+       *       "region": "us-east-1",
+       *       "team": "platform"
+       *     }
+       */
+      labels?: {
+        [key: string]: string
+      }
+      /**
+       * Created By
+       * @description User who created the integration
+       */
+      readonly created_by?: components['schemas']['UserReference'] | null
+      /**
+       * Updated By
+       * @description User who last modified the integration
+       */
+      readonly updated_by?: components['schemas']['UserReference'] | null
       /**
        * Name
-       * @description Tool name as returned by the discover endpoint
+       * @description Human-readable name for the resource
+       * @example Authentication Service
        */
       name: string
       /**
        * Description
-       * @description Tool description
+       * @description Detailed description of the resource
+       * @example Handles user authentication and authorization workflows
        */
       description?: string | null
+      integration_type: components['schemas']['IntegrationTypeV2']
       /**
        * Enabled
-       * @description Whether the user enabled this tool
        * @default true
        */
       enabled?: boolean
+      /** @default unknown */
+      validation_status?: components['schemas']['IntegrationStatus']
+      /** @default global */
+      scope?: components['schemas']['IntegrationScope']
       /**
-       * Parameters
-       * @description Tool parameters from discovery
+       * Configuration
+       * @description Integration-specific configuration
        */
-      parameters?:
-        | {
-            [key: string]: unknown
-          }[]
-        | null
+      configuration:
+        | components['schemas']['MCPServerConfigurationInput']
+        | components['schemas']['LLMProviderConfiguration']
+        | components['schemas']['AAPConfiguration']
+        | components['schemas']['KafkaConfiguration']
+      /** Management Credential Id */
+      management_credential_id?: string | null
+      /** Last Validated At */
+      last_validated_at?: string | null
+      /** Validation Error */
+      validation_error?: string | null
+      refresh_status?: components['schemas']['IntegrationRefreshStatus'] | null
+      /** Last Refreshed At */
+      last_refreshed_at?: string | null
+      /** Last Successful Refresh At */
+      last_successful_refresh_at?: string | null
+      /** Refresh Error */
+      refresh_error?: string | null
+      /**
+       * Project Ids
+       * @description IDs of projects this integration is assigned to (empty for global scope)
+       */
+      project_ids?: string[]
+      /**
+       * Total Tool Count
+       * @description Total number of tools linked to this integration
+       * @default 0
+       */
+      total_tool_count?: number
+      /**
+       * Enabled Tool Count
+       * @description Number of enabled tools linked to this integration
+       * @default 0
+       */
+      enabled_tool_count?: number
+      /**
+       * Total Model Count
+       * @description Total number of models linked to this integration
+       * @default 0
+       */
+      total_model_count?: number
+      /**
+       * Enabled Model Count
+       * @description Number of enabled models linked to this integration
+       * @default 0
+       */
+      enabled_model_count?: number
     }
     /**
-     * InitialModelSelection
-     * @description A model from the discover step with the user's enabled/disabled choice.
+     * IntegrationRefreshStatus
+     * @description Status of the last resource-refresh operation for an integration.
+     * @enum {string}
      */
-    InitialModelSelection: {
+    IntegrationRefreshStatus: 'refreshing' | 'available' | 'warning' | 'error'
+    /**
+     * IntegrationScope
+     * @description Visibility scope of an integration.
+     * @enum {string}
+     */
+    IntegrationScope: 'global' | 'project'
+    /**
+     * IntegrationStatus
+     * @description Validation status of an integration.
+     * @enum {string}
+     */
+    IntegrationStatus: 'unknown' | 'validating' | 'available' | 'error'
+    /**
+     * IntegrationTestConnectionV2
+     * @description Schema for testing a connection without saving an integration.
+     */
+    IntegrationTestConnectionV2: {
+      /** @description Type of external integration */
+      integration_type: components['schemas']['IntegrationTypeV2']
       /**
-       * Model Id
-       * @description Provider model identifier from discover
+       * Configuration
+       * @description Integration-specific configuration
        */
-      model_id: string
+      configuration:
+        | components['schemas']['MCPServerConfigurationInput']
+        | components['schemas']['LLMProviderConfiguration']
+        | components['schemas']['AAPConfiguration']
+        | components['schemas']['KafkaConfiguration']
       /**
-       * Name
-       * @description Human-readable display name
+       * Credential Id
+       * @description Credential to use for the connection test
        */
-      name: string
-      /**
-       * Description
-       * @description Model description
-       */
-      description?: string | null
-      /**
-       * Enabled
-       * @description Whether the user enabled this model
-       * @default true
-       */
-      enabled?: boolean
-      /**
-       * Is Default
-       * @description Whether this is the default model
-       * @default false
-       */
-      is_default?: boolean
+      credential_id?: string | null
     }
     /**
-     * IntegrationUpdate
+     * IntegrationTypeV2
+     * @description Type of external integration.
+     * @enum {string}
+     */
+    IntegrationTypeV2: 'mcp_server' | 'llm_provider' | 'ansible_automation_platform' | 'kafka'
+    /**
+     * IntegrationUpdateV2
      * @description Schema for partially updating an integration (user-facing).
      */
-    IntegrationUpdate: {
+    IntegrationUpdateV2: {
       /**
        * Name
        * @description Human-readable name for the integration
@@ -528,233 +881,31 @@ export interface components {
       } | null
     }
     /**
-     * IntegrationTestConnection
-     * @description Schema for testing a connection without saving an integration.
-     */
-    IntegrationTestConnection: {
-      /** @description Type of external integration */
-      integration_type: components['schemas']['IntegrationType']
-      /**
-       * Configuration
-       * @description Integration-specific configuration
-       */
-      configuration:
-        | components['schemas']['MCPServerConfigurationInput']
-        | components['schemas']['LLMProviderConfiguration']
-        | components['schemas']['AAPConfiguration']
-        | components['schemas']['KafkaConfiguration']
-      /**
-       * Credential Id
-       * @description Credential to use for the connection test
-       */
-      credential_id?: string | null
-    }
-    /** @description Schema for integration API responses. */
-    IntegrationRead: components['schemas']['NamedResource'] & {
-      /**
-       * Created By
-       * @description User who created the integration
-       */
-      readonly created_by?: components['schemas']['UserReference'] | null
-      /**
-       * Updated By
-       * @description User who last modified the integration
-       */
-      readonly updated_by?: components['schemas']['UserReference'] | null
-      integration_type: components['schemas']['IntegrationType']
-      /**
-       * Enabled
-       * @default true
-       */
-      enabled?: boolean
-      /** @default unknown */
-      validation_status?: components['schemas']['IntegrationStatus']
-      /** @default global */
-      scope?: components['schemas']['IntegrationScope']
-      /**
-       * Configuration
-       * @description Integration-specific configuration
-       */
-      configuration:
-        | (
-            | components['schemas']['MCPServerConfigurationInput']
-            | components['schemas']['LLMProviderConfiguration']
-            | components['schemas']['AAPConfiguration']
-          )
-        | null
-      /** @description Kafka broker configuration. Present only when integration_type is kafka, so the configuration union above stays compatible with existing clients. */
-      kafka_configuration?: components['schemas']['KafkaConfiguration'] | null
-      /** Last Validated At */
-      last_validated_at?: string | null
-      /** Management Credential Id */
-      management_credential_id?: string | null
-      /** Validation Error */
-      validation_error?: string | null
-      refresh_status?: components['schemas']['IntegrationRefreshStatus'] | null
-      /** Last Refreshed At */
-      last_refreshed_at?: string | null
-      /** Last Successful Refresh At */
-      last_successful_refresh_at?: string | null
-      /** Refresh Error */
-      refresh_error?: string | null
-      /**
-       * Project Ids
-       * @description IDs of projects this integration is assigned to (empty for global scope)
-       */
-      project_ids?: string[]
-      /**
-       * Total Tool Count
-       * @description Total number of tools linked to this integration
-       * @default 0
-       */
-      total_tool_count?: number
-      /**
-       * Enabled Tool Count
-       * @description Number of enabled tools linked to this integration
-       * @default 0
-       */
-      enabled_tool_count?: number
-      /**
-       * Total Model Count
-       * @description Total number of models linked to this integration
-       * @default 0
-       */
-      total_model_count?: number
-      /**
-       * Enabled Model Count
-       * @description Number of enabled models linked to this integration
-       * @default 0
-       */
-      enabled_model_count?: number
-    }
-    /**
-     * MCPServerConfigurationInput
-     * @description Admin-provided fields for MCP server integrations (used by create/patch).
-     */
-    MCPServerConfigurationInput: {
-      /**
-       * @description discriminator enum property added by openapi-typescript
-       * @enum {string}
-       */
-      integration_type: 'mcp_server'
-      /**
-       * Base Url
-       * Format: uri
-       * @description Base URL for the MCP server
-       */
-      base_url: string
-      /**
-       * Allow Http
-       * @description Allow HTTP (unencrypted) connections. Loopback addresses are always permitted over HTTP.
-       * @default false
-       */
-      allow_http?: boolean
-      /**
-       * Insecure Skip Tls Verify
-       * @description Disable TLS certificate verification for connections to this integration.
-       * @default false
-       */
-      insecure_skip_tls_verify?: boolean
-      /**
-       * Ca Certificate
-       * @description PEM-encoded CA certificate to trust for this integration's TLS connections.
-       */
-      ca_certificate?: string | null
-    }
-    /**
-     * LLMProviderHint
-     * @description LLM provider backend type.
-     * @enum {string}
-     */
-    LLMProviderHint: 'red_hat_ai' | 'openai' | 'anthropic' | 'gemini' | 'custom'
-    /**
-     * LLMProviderConfiguration
-     * @description Configuration for LLM provider integrations.
-     */
-    LLMProviderConfiguration: {
-      /**
-       * @description discriminator enum property added by openapi-typescript
-       * @enum {string}
-       */
-      integration_type: 'llm_provider'
-      /** @description LLM provider backend type */
-      provider_hint: components['schemas']['LLMProviderHint']
-      /**
-       * Base Url
-       * Format: uri
-       * @description Base URL for the LLM provider API. Required for red_hat_ai and custom providers.
-       */
-      base_url?: string | null
-      /**
-       * Allow Http
-       * @description Allow HTTP (unencrypted) connections. Loopback addresses are always permitted over HTTP.
-       * @default false
-       */
-      allow_http?: boolean
-      /**
-       * Insecure Skip Tls Verify
-       * @description Disable TLS certificate verification for connections to this integration.
-       * @default false
-       */
-      insecure_skip_tls_verify?: boolean
-      /**
-       * Ca Certificate
-       * @description PEM-encoded CA certificate to trust for this integration's TLS connections.
-       */
-      ca_certificate?: string | null
-    }
-    /**
-     * AAPConfiguration
-     * @description Configuration for Ansible Automation Platform integrations.
-     */
-    AAPConfiguration: {
-      /**
-       * @description discriminator enum property added by openapi-typescript
-       * @enum {string}
-       */
-      integration_type: 'ansible_automation_platform'
-      /**
-       * AAP URL
-       * Format: uri
-       * @description URL of the Ansible Automation Platform
-       */
-      base_url: string
-      /**
-       * Allow Http
-       * @description Allow HTTP (unencrypted) connections. Loopback addresses are always permitted over HTTP.
-       * @default false
-       */
-      allow_http?: boolean
-      /**
-       * Insecure Skip Tls Verify
-       * @description Disable TLS certificate verification for connections to this integration.
-       * @default false
-       */
-      insecure_skip_tls_verify?: boolean
-      /**
-       * Ca Certificate
-       * @description PEM-encoded CA certificate to trust for this integration's TLS connections.
-       */
-      ca_certificate?: string | null
-    }
-    /**
-     * KafkaSaslMechanism
-     * @description SASL mechanism used with the Kafka credential username and password.
-     *
-     *     Cloud brokers such as Aiven use SCRAM-SHA-256. PLAIN remains available
-     *     for clusters that authenticate that way.
-     * @enum {string}
-     */
-    KafkaSaslMechanism: 'PLAIN' | 'SCRAM-SHA-256' | 'SCRAM-SHA-512'
-    /**
      * KafkaConfiguration
      * @description Configuration for a Kafka cluster integration.
      *
      *     Broker addresses live here. The username and password stay on the
-     *     linked Kafka credential. Kafka uses SASL_SSL and rejects allow_http
-     *     because it would select SASL_PLAINTEXT.
+     *     linked Kafka credential when SASL_SSL is selected. Unauthenticated SSL
+     *     and explicitly opted-in PLAINTEXT do not require a credential.
      */
     KafkaConfiguration: {
+      /**
+       * Allow Http
+       * @description Allow HTTP (unencrypted) connections. Loopback addresses are always permitted over HTTP.
+       * @default false
+       */
+      allow_http?: boolean
+      /**
+       * Insecure Skip Tls Verify
+       * @description Disable TLS certificate verification for connections to this integration.
+       * @default false
+       */
+      insecure_skip_tls_verify?: boolean
+      /**
+       * Ca Certificate
+       * @description PEM-encoded CA certificate to trust for this integration's TLS connections.
+       */
+      ca_certificate?: string | null
       /**
        * @description discriminator enum property added by openapi-typescript
        * @enum {string}
@@ -766,162 +917,74 @@ export interface components {
        */
       bootstrap_servers: string[]
       /**
+       * @description Kafka transport: SASL_SSL, SSL, or explicitly opted-in PLAINTEXT.
+       * @default SASL_SSL
+       */
+      security_protocol?: components['schemas']['KafkaSecurityProtocol']
+      /**
+       * Allow Plaintext
+       * @description Explicitly allow unauthenticated, unencrypted PLAINTEXT connections.
+       * @default false
+       */
+      allow_plaintext?: boolean
+      /**
        * @description SASL mechanism for the username and password on the linked credential.
        * @default SCRAM-SHA-256
        */
       sasl_mechanism?: components['schemas']['KafkaSaslMechanism']
-      /**
-       * Allow Http
-       * @description Allow HTTP (unencrypted) connections. Loopback addresses are always permitted over HTTP.
-       * @default false
-       */
-      allow_http?: boolean
-      /**
-       * Insecure Skip Tls Verify
-       * @description Disable TLS certificate verification for connections to this integration.
-       * @default false
-       */
-      insecure_skip_tls_verify?: boolean
-      /**
-       * Ca Certificate
-       * @description PEM-encoded CA certificate to trust for this integration's TLS connections.
-       */
-      ca_certificate?: string | null
     }
     /**
-     * DiscoveredLLMModel
-     * @description A model discovered from an LLM provider.
-     */
-    DiscoveredLLMModel: {
-      /** Id */
-      id: string
-      /** Name */
-      name: string
-      /** Description */
-      description?: string | null
-    }
-    /**
-     * DiscoveredToolParameter
-     * @description A parameter belonging to a discovered tool.
-     */
-    DiscoveredToolParameter: {
-      /** Name */
-      name: string
-      /**
-       * Type
-       * @default string
-       */
-      type?: string
-      /**
-       * Description
-       * @default
-       */
-      description?: string
-      /**
-       * Required
-       * @default false
-       */
-      required?: boolean
-    }
-    /**
-     * DiscoveredTool
-     * @description A tool discovered from an MCP server.
+     * KafkaSaslMechanism
+     * @description SASL mechanism used with the Kafka credential username and password.
      *
-     *     Carries parameter information so that _sync_mcp_tools() can do a full
-     *     upsert without re-fetching from MCP.
-     */
-    DiscoveredTool: {
-      /** Name */
-      name: string
-      /** Description */
-      description?: string | null
-      /** Parameters */
-      parameters?: components['schemas']['DiscoveredToolParameter'][] | null
-    }
-    /**
-     * HealthCheckErrorType
-     * @description Classification of health check failures.
+     *     Cloud brokers such as Aiven use SCRAM-SHA-256. PLAIN remains available
+     *     for clusters that authenticate that way.
      * @enum {string}
      */
-    HealthCheckErrorType: 'auth_failure' | 'connection_error' | 'rate_limit' | 'ssl_error' | 'timeout'
+    KafkaSaslMechanism: 'PLAIN' | 'SCRAM-SHA-256' | 'SCRAM-SHA-512'
     /**
-     * ValidateResult
-     * @description Result of a lightweight connectivity ping (validate endpoint).
-     *
-     *     Contains only connection-health fields. No resource discovery fields.
-     */
-    ValidateResult: {
-      /** Success */
-      success: boolean
-      /**
-       * Checked At
-       * Format: date-time
-       */
-      checked_at: string
-      /** Error */
-      error?: string | null
-      error_type?: components['schemas']['HealthCheckErrorType'] | null
-    }
-    /**
-     * DiscoverResult
-     * @description Result of a resource-discovery operation (discover endpoint).
-     *
-     *     Returned by the unsaved-connection test (POST /integrations/discover)
-     *     and used internally by refresh_resources() to drive tool sync.
-     */
-    DiscoverResult: {
-      /** Success */
-      success: boolean
-      /**
-       * Checked At
-       * Format: date-time
-       */
-      checked_at: string
-      /** Error */
-      error?: string | null
-      error_type?: components['schemas']['HealthCheckErrorType'] | null
-      /** Discovered Tools */
-      discovered_tools?: components['schemas']['DiscoveredTool'][] | null
-      /** Discovered Models */
-      discovered_models?: components['schemas']['DiscoveredLLMModel'][] | null
-    }
-    /**
-     * IntegrationRefreshStatus
-     * @description Status of the last resource-refresh operation for an integration.
+     * KafkaSecurityProtocol
+     * @description Transport modes that decide whether a Kafka credential is required.
      * @enum {string}
      */
-    IntegrationRefreshStatus: 'refreshing' | 'available' | 'warning' | 'error'
+    KafkaSecurityProtocol: 'PLAINTEXT' | 'SSL' | 'SASL_SSL'
     /**
-     * RefreshResult
-     * @description Result returned by POST /integrations/{id}/refresh.
-     *
-     *     Covers both MCP tool and LLM model refreshes. ``missing_count``
-     *     reflects resources no longer offered by the provider: MCP tools are
-     *     marked MISSING and LLM models are counted as missing. Rows are
-     *     preserved and ``enabled`` is never changed by discovery (it is
-     *     admin-controlled).
+     * LLMModelBulkUpdate
+     * @description Schema for bulk-updating LLM models.
      */
-    RefreshResult: {
+    LLMModelBulkUpdate: {
       /**
-       * Synced Count
-       * @description Number of new resource records created
+       * Model Ids
+       * @description Model IDs to update
        */
-      synced_count: number
+      model_ids: string[]
+      /**
+       * Enabled
+       * @description New enabled state
+       */
+      enabled: boolean
+    }
+    /**
+     * LLMModelBulkUpdateResponse
+     * @description Response for bulk LLM model update.
+     */
+    LLMModelBulkUpdateResponse: {
       /**
        * Updated Count
-       * @description Number of existing resource records updated
+       * @description Number of models updated
        */
       updated_count: number
       /**
-       * Missing Count
-       * @description Number of resources no longer offered by the provider
+       * Skipped Count
+       * @description Number of model IDs not found in integration
        */
-      missing_count: number
+      skipped_count: number
       /**
-       * Refreshed At
-       * @description Timestamp when the refresh completed
+       * Updated At
+       * Format: date-time
+       * @description Timestamp of the update
        */
-      refreshed_at?: string | null
+      updated_at: string
     }
     /**
      * LLMModelListResponse
@@ -973,6 +1036,92 @@ export interface components {
       created_at?: string | null
       /** Updated At */
       updated_at?: string | null
+    }
+    /**
+     * LLMModelUpdate
+     * @description Schema for updating an LLM model (enable/disable, set as default).
+     */
+    LLMModelUpdate: {
+      /** Enabled */
+      enabled?: boolean | null
+      /** Is Default */
+      is_default?: boolean | null
+    }
+    /**
+     * LLMProviderConfiguration
+     * @description Configuration for LLM provider integrations.
+     */
+    LLMProviderConfiguration: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      integration_type: 'llm_provider'
+      /** @description LLM provider backend type */
+      provider_hint: components['schemas']['LLMProviderHint']
+      /**
+       * Base Url
+       * Format: uri
+       * @description Base URL for the LLM provider API. Required for red_hat_ai and custom providers.
+       */
+      base_url?: string | null
+      /**
+       * Allow Http
+       * @description Allow HTTP (unencrypted) connections. Loopback addresses are always permitted over HTTP.
+       * @default false
+       */
+      allow_http?: boolean
+      /**
+       * Insecure Skip Tls Verify
+       * @description Disable TLS certificate verification for connections to this integration.
+       * @default false
+       */
+      insecure_skip_tls_verify?: boolean
+      /**
+       * Ca Certificate
+       * @description PEM-encoded CA certificate to trust for this integration's TLS connections.
+       */
+      ca_certificate?: string | null
+    }
+    /**
+     * LLMProviderHint
+     * @description LLM provider backend type.
+     * @enum {string}
+     */
+    LLMProviderHint: 'red_hat_ai' | 'openai' | 'anthropic' | 'gemini' | 'custom'
+    /**
+     * MCPServerConfigurationInput
+     * @description Admin-provided fields for MCP server integrations (used by create/patch).
+     */
+    MCPServerConfigurationInput: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      integration_type: 'mcp_server'
+      /**
+       * Base Url
+       * Format: uri
+       * @description Base URL for the MCP server
+       */
+      base_url: string
+      /**
+       * Allow Http
+       * @description Allow HTTP (unencrypted) connections. Loopback addresses are always permitted over HTTP.
+       * @default false
+       */
+      allow_http?: boolean
+      /**
+       * Insecure Skip Tls Verify
+       * @description Disable TLS certificate verification for connections to this integration.
+       * @default false
+       */
+      insecure_skip_tls_verify?: boolean
+      /**
+       * Ca Certificate
+       * @description PEM-encoded CA certificate to trust for this integration's TLS connections.
+       */
+      ca_certificate?: string | null
     }
     /**
      * ModelCapabilityProfile
@@ -1033,44 +1182,70 @@ export interface components {
       temperature?: boolean | null
     }
     /**
-     * LLMModelUpdate
-     * @description Schema for updating an LLM model (enable/disable, set as default).
+     * RefreshResult
+     * @description Result returned by POST /integrations/{id}/refresh.
+     *
+     *     Covers both MCP tool and LLM model refreshes. ``missing_count``
+     *     reflects resources no longer offered by the provider: MCP tools are
+     *     marked MISSING and LLM models are counted as missing. Rows are
+     *     preserved and ``enabled`` is never changed by discovery (it is
+     *     admin-controlled).
      */
-    LLMModelUpdate: {
-      /** Enabled */
-      enabled?: boolean | null
-      /** Is Default */
-      is_default?: boolean | null
+    RefreshResult: {
+      /**
+       * Synced Count
+       * @description Number of new resource records created
+       */
+      synced_count: number
+      /**
+       * Updated Count
+       * @description Number of existing resource records updated
+       */
+      updated_count: number
+      /**
+       * Missing Count
+       * @description Number of resources no longer offered by the provider
+       */
+      missing_count: number
+      /**
+       * Refreshed At
+       * @description Timestamp when the refresh completed
+       */
+      refreshed_at?: string | null
     }
     /**
-     * LLMModelBulkUpdate
-     * @description Schema for bulk-updating LLM models.
+     * ToolBulkUpdate
+     * @description Request model for bulk updating tool status.
+     *
+     *     Attributes:
+     *         tool_ids: List of tool UUIDs to update (max 50)
+     *         enabled: Enable or disable the Tool.
      */
-    LLMModelBulkUpdate: {
+    ToolBulkUpdate: {
       /**
-       * Model Ids
-       * @description Model IDs to update
+       * Tool Ids
+       * @description List of tool UUIDs to update (max 50)
        */
-      model_ids: string[]
+      tool_ids: string[]
       /**
        * Enabled
-       * @description New enabled state
+       * @description Enable/disable the Tool
        */
       enabled: boolean
     }
     /**
-     * LLMModelBulkUpdateResponse
-     * @description Response for bulk LLM model update.
+     * ToolBulkUpdateResponse
+     * @description Response model for bulk tool update.
      */
-    LLMModelBulkUpdateResponse: {
+    ToolBulkUpdateResponse: {
       /**
        * Updated Count
-       * @description Number of models updated
+       * @description Number of tools updated
        */
       updated_count: number
       /**
        * Skipped Count
-       * @description Number of model IDs not found in integration
+       * @description Number of tool IDs not found or not in scope
        */
       skipped_count: number
       /**
@@ -1098,6 +1273,74 @@ export interface components {
        * @description Array of resources in current page
        */
       resources: components['schemas']['ToolWithParameters'][]
+    }
+    ToolParameter: components['schemas']['BaseResource'] & {
+      /**
+       * Tool Id
+       * Format: uuid
+       */
+      tool_id: string
+      /**
+       * Name
+       * @description Parameter name
+       */
+      name: string
+      /** @description Parameter type */
+      type: components['schemas']['ToolParameterType']
+      /**
+       * Description
+       * @description Parameter description
+       */
+      description: string
+      /**
+       * Required
+       * @description Whether this parameter is required
+       */
+      required: boolean
+      /**
+       * Default Value
+       * @description Default value for the parameter
+       */
+      default_value?: {
+        [key: string]: unknown
+      } | null
+      /**
+       * Example Value
+       * @description Example value for the parameter
+       */
+      example_value?: {
+        [key: string]: unknown
+      } | null
+    }
+    /**
+     * ToolParameterType
+     * @description Parameter types for tools.
+     * @enum {string}
+     */
+    ToolParameterType: 'string' | 'number' | 'boolean' | 'object' | 'array'
+    /**
+     * ToolStatus
+     * @description Status of a tool.
+     * @enum {string}
+     */
+    ToolStatus: 'available' | 'missing' | 'error'
+    /**
+     * ToolUpdate
+     * @description Model for updating tool configuration.
+     */
+    ToolUpdate: {
+      /**
+       * Enabled
+       * @description Whether the tool is enabled
+       */
+      enabled?: boolean | null
+      /** @description Current status of the tool */
+      status?: components['schemas']['ToolStatus'] | null
+      /**
+       * Refresh Error
+       * @description Error message from last refresh attempt
+       */
+      refresh_error?: string | null
     }
     ToolWithParameters: components['schemas']['NamedResource'] & {
       /**
@@ -1154,64 +1397,50 @@ export interface components {
       parameters: components['schemas']['ToolParameter'][]
     }
     /**
-     * ToolUpdate
-     * @description Model for updating tool configuration.
+     * UserReference
+     * @description Minimal user identification for embedding in other resources.
+     *     The name is resolved from the database when the response is built, not
+     *     stored alongside the id, so it always reflects the principal's current
+     *     name. Renaming a user therefore changes the name shown for their past actions.
      */
-    ToolUpdate: {
+    UserReference: {
       /**
-       * Enabled
-       * @description Whether the tool is enabled
+       * Format: uuid
+       * @description User's unique identifier
        */
-      enabled?: boolean | null
-      /** @description Current status of the tool */
-      status?: components['schemas']['ToolStatus'] | null
-      /**
-       * Refresh Error
-       * @description Error message from last refresh attempt
-       */
-      refresh_error?: string | null
+      id: string
+      /** @description Principal's current display name, resolved when the response is built. Not a username: for a user this is their first and last name, falling back to the username when both are blank; for a service account it is the account name; for an internal service it is derived from the certificate CN. */
+      name: string
+      /** @description Kind of principal this reference points at. Only `user` references have a user detail page; `deleted_user` / `deleted_service_account` are hard-deleted principals that are still recorded as the actor. */
+      type: components['schemas']['UserReferenceType']
     }
     /**
-     * ToolBulkUpdate
-     * @description Request model for bulk updating tool status.
+     * UserReferenceType
+     * @description Kind of principal a UserReference points at.
      *
-     *     Attributes:
-     *         tool_ids: List of tool UUIDs to update (max 50)
-     *         enabled: Enable or disable the Tool.
+     *     Only ``user`` references have a user detail page. ``deleted_user`` and
+     *     ``deleted_service_account`` mark principals that were hard-deleted but are
+     *     still recorded as the actor.
+     * @enum {string}
      */
-    ToolBulkUpdate: {
-      /**
-       * Tool Ids
-       * @description List of tool UUIDs to update (max 50)
-       */
-      tool_ids: string[]
-      /**
-       * Enabled
-       * @description Enable/disable the Tool
-       */
-      enabled: boolean
-    }
+    UserReferenceType: 'user' | 'service_account' | 'service' | 'system' | 'deleted_user' | 'deleted_service_account'
     /**
-     * ToolBulkUpdateResponse
-     * @description Response model for bulk tool update.
+     * ValidateResult
+     * @description Result of a lightweight connectivity ping (validate endpoint).
+     *
+     *     Contains only connection-health fields. No resource discovery fields.
      */
-    ToolBulkUpdateResponse: {
+    ValidateResult: {
+      /** Success */
+      success: boolean
       /**
-       * Updated Count
-       * @description Number of tools updated
-       */
-      updated_count: number
-      /**
-       * Skipped Count
-       * @description Number of tool IDs not found or not in scope
-       */
-      skipped_count: number
-      /**
-       * Updated At
+       * Checked At
        * Format: date-time
-       * @description Timestamp of the update
        */
-      updated_at: string
+      checked_at: string
+      /** Error */
+      error?: string | null
+      error_type?: components['schemas']['HealthCheckErrorType'] | null
     }
     /**
      * Paginated Response Base
@@ -1300,150 +1529,6 @@ export interface components {
        * @example Handles user authentication and authorization workflows
        */
       description?: string | null
-    }
-    /**
-     * UserReferenceType
-     * @description Kind of principal a UserReference points at.
-     *
-     *     Only ``user`` references have a user detail page. ``deleted_user`` and
-     *     ``deleted_service_account`` mark principals that were hard-deleted but are
-     *     still recorded as the actor.
-     * @enum {string}
-     */
-    UserReferenceType: 'user' | 'service_account' | 'service' | 'system' | 'deleted_user' | 'deleted_service_account'
-    /**
-     * UserReference
-     * @description Minimal user identification for embedding in other resources.
-     *     The name is resolved from the database when the response is built, not
-     *     stored alongside the id, so it always reflects the principal's current
-     *     name. Renaming a user therefore changes the name shown for their past actions.
-     */
-    UserReference: {
-      /**
-       * Format: uuid
-       * @description User's unique identifier
-       */
-      id: string
-      /** @description Principal's current display name, resolved when the response is built. Not a username: for a user this is their first and last name, falling back to the username when both are blank; for a service account it is the account name; for an internal service it is derived from the certificate CN. */
-      name: string
-      /** @description Kind of principal this reference points at. Only `user` references have a user detail page; `deleted_user` / `deleted_service_account` are hard-deleted principals that are still recorded as the actor. */
-      type: components['schemas']['UserReferenceType']
-    }
-    /**
-     * ErrorData
-     * @description RFC 9457 Problem Details format for error event data.
-     *     This model is used for streaming error events and follows the RFC 9457 Problem Details specification. It provides machine-readable and human-readable error information with consistent structure.
-     *     Attributes:
-     *         type: URI reference identifying the problem type
-     *         title: Short, human-readable summary of the problem
-     *         detail: Human-readable explanation specific to this occurrence
-     *         code: Machine-readable error code for programmatic handling
-     *         retryable: Whether this error can be retried by creating a new invocation
-     *         instance: Optional URI reference identifying the specific occurrence
-     * @example {
-     *       "type": "https://api.example.com/errors/llm-error",
-     *       "title": "LLM Rate Limit Exceeded",
-     *       "detail": "OpenRouter API rate limit exceeded. Please try again in a few moments.",
-     *       "code": "RATE_LIMIT_EXCEEDED",
-     *       "retryable": true,
-     *       "instance": "/invocations/550e8400-e29b-41d4-a716-446655440000"
-     *     }
-     * @example {
-     *       "type": "https://api.example.com/errors/timeout-error",
-     *       "title": "Streaming Timeout",
-     *       "detail": "LLM streaming timed out after 30 seconds",
-     *       "code": "STREAM_TIMEOUT",
-     *       "retryable": true,
-     *       "instance": "/invocations/550e8400-e29b-41d4-a716-446655440000"
-     *     }
-     */
-    ErrorData: {
-      /**
-       * Type
-       * @description URI reference identifying the problem type
-       * @example https://api.example.com/errors/llm-error
-       */
-      type: string
-      /**
-       * Title
-       * @description Short, human-readable summary of the problem
-       * @example LLM Service Unavailable
-       */
-      title: string
-      /**
-       * Detail
-       * @description Human-readable explanation specific to this occurrence
-       * @example OpenRouter API returned error: rate limit exceeded. Please try again in a few moments.
-       */
-      detail: string
-      /**
-       * Code
-       * @description Machine-readable error code for programmatic handling
-       * @example RATE_LIMIT_EXCEEDED
-       */
-      code: string
-      /**
-       * Retryable
-       * @description Whether this error can be retried by creating a new invocation
-       * @example true
-       */
-      retryable: boolean
-      /**
-       * Instance
-       * @description Optional URI reference identifying the specific occurrence
-       * @example /invocations/550e8400-e29b-41d4-a716-446655440000
-       */
-      instance?: string | null
-    }
-    /**
-     * ToolStatus
-     * @description Status of a tool.
-     * @enum {string}
-     */
-    ToolStatus: 'available' | 'missing' | 'error'
-    /**
-     * ToolParameterType
-     * @description Parameter types for tools.
-     * @enum {string}
-     */
-    ToolParameterType: 'string' | 'number' | 'boolean' | 'object' | 'array'
-    ToolParameter: components['schemas']['BaseResource'] & {
-      /**
-       * Tool Id
-       * Format: uuid
-       */
-      tool_id: string
-      /**
-       * Name
-       * @description Parameter name
-       */
-      name: string
-      /** @description Parameter type */
-      type: components['schemas']['ToolParameterType']
-      /**
-       * Description
-       * @description Parameter description
-       */
-      description: string
-      /**
-       * Required
-       * @description Whether this parameter is required
-       */
-      required: boolean
-      /**
-       * Default Value
-       * @description Default value for the parameter
-       */
-      default_value?: {
-        [key: string]: unknown
-      } | null
-      /**
-       * Example Value
-       * @description Example value for the parameter
-       */
-      example_value?: {
-        [key: string]: unknown
-      } | null
     }
   }
   responses: {
@@ -1594,42 +1679,33 @@ export interface components {
       }
     }
   }
-  parameters: {
-    /** @description Maximum number of results per page */
-    limitParam: number
-    /** @description Pagination cursor from previous response */
-    cursorParam: string | null
-    /** @description Sort parameter (e.g., 'name', '-created_at') */
-    sortParam: string | null
-    /** @description Include total count in response (expensive) */
-    includeTotalParam: boolean
-  }
+  parameters: never
   requestBodies: never
   headers: never
   pathItems: never
 }
 export type $defs = Record<string, never>
 export interface operations {
-  list_integrations: {
+  v2_list_integrations: {
     parameters: {
       query?: {
         /** @description Maximum number of results per page */
-        limit?: components['parameters']['limitParam']
+        limit?: number
         /** @description Pagination cursor from previous response */
-        cursor?: components['parameters']['cursorParam']
+        cursor?: string | null
         /** @description Sort parameter (e.g., 'name', '-created_at') */
-        sort?: components['parameters']['sortParam']
+        sort?: string | null
         /** @description Include total count in response (expensive) */
-        include_total?: components['parameters']['includeTotalParam']
+        include_total?: boolean
         /** @description Filter by integration type */
-        integration_type?: components['schemas']['IntegrationType'] | null
+        integration_type?: components['schemas']['IntegrationTypeV2'] | null
         /** @description Filter by validation status */
         validation_status?: components['schemas']['IntegrationStatus'] | null
         /** @description Filter by enabled status */
         enabled?: boolean | null
         /** @description Filter by visibility scope */
         scope?: components['schemas']['IntegrationScope'] | null
-        /** @description Filter by management credential ID (credential used for admin operations like validation and tool/model discovery) */
+        /** @description Filter by management credential ID */
         management_credential_id?: string | null
         /** @description Filter to integrations that are global or assigned to this project. Restricted to projects the user has RBAC access to; querying inaccessible projects returns only global integrations. */
         project_id?: string | null
@@ -1646,7 +1722,7 @@ export interface operations {
           [name: string]: unknown
         }
         content: {
-          'application/json': components['schemas']['IntegrationListResponse']
+          'application/json': components['schemas']['IntegrationListResponseV2']
         }
       }
       400: components['responses']['BadRequestError']
@@ -1659,7 +1735,7 @@ export interface operations {
       500: components['responses']['InternalServerError']
     }
   }
-  create_integration: {
+  v2_create_integration: {
     parameters: {
       query?: never
       header?: never
@@ -1668,7 +1744,7 @@ export interface operations {
     }
     requestBody: {
       content: {
-        'application/json': components['schemas']['IntegrationCreate']
+        'application/json': components['schemas']['IntegrationCreateV2']
       }
     }
     responses: {
@@ -1678,7 +1754,7 @@ export interface operations {
           [name: string]: unknown
         }
         content: {
-          'application/json': components['schemas']['IntegrationRead']
+          'application/json': components['schemas']['IntegrationReadV2']
         }
       }
       400: components['responses']['BadRequestError']
@@ -1691,7 +1767,7 @@ export interface operations {
       500: components['responses']['InternalServerError']
     }
   }
-  get_integration: {
+  v2_get_integration: {
     parameters: {
       query?: never
       header?: never
@@ -1708,7 +1784,7 @@ export interface operations {
           [name: string]: unknown
         }
         content: {
-          'application/json': components['schemas']['IntegrationRead']
+          'application/json': components['schemas']['IntegrationReadV2']
         }
       }
       400: components['responses']['BadRequestError']
@@ -1721,7 +1797,7 @@ export interface operations {
       500: components['responses']['InternalServerError']
     }
   }
-  delete_integration: {
+  v2_delete_integration: {
     parameters: {
       query?: never
       header?: never
@@ -1749,7 +1825,7 @@ export interface operations {
       500: components['responses']['InternalServerError']
     }
   }
-  update_integration: {
+  v2_update_integration: {
     parameters: {
       query?: never
       header?: never
@@ -1760,7 +1836,7 @@ export interface operations {
     }
     requestBody: {
       content: {
-        'application/json': components['schemas']['IntegrationUpdate']
+        'application/json': components['schemas']['IntegrationUpdateV2']
       }
     }
     responses: {
@@ -1770,7 +1846,7 @@ export interface operations {
           [name: string]: unknown
         }
         content: {
-          'application/json': components['schemas']['IntegrationRead']
+          'application/json': components['schemas']['IntegrationReadV2']
         }
       }
       400: components['responses']['BadRequestError']
@@ -1783,7 +1859,7 @@ export interface operations {
       500: components['responses']['InternalServerError']
     }
   }
-  discover_integration_connection: {
+  v2_discover_integration_connection: {
     parameters: {
       query?: never
       header?: never
@@ -1792,7 +1868,7 @@ export interface operations {
     }
     requestBody: {
       content: {
-        'application/json': components['schemas']['IntegrationTestConnection']
+        'application/json': components['schemas']['IntegrationTestConnectionV2']
       }
     }
     responses: {
@@ -1815,7 +1891,7 @@ export interface operations {
       500: components['responses']['InternalServerError']
     }
   }
-  validate_integration: {
+  v2_validate_integration: {
     parameters: {
       query?: never
       header?: never
@@ -1845,7 +1921,7 @@ export interface operations {
       500: components['responses']['InternalServerError']
     }
   }
-  refresh_resources: {
+  v2_refresh_resources: {
     parameters: {
       query?: never
       header?: never
@@ -1875,46 +1951,7 @@ export interface operations {
       500: components['responses']['InternalServerError']
     }
   }
-  list_integration_projects: {
-    parameters: {
-      query?: {
-        /** @description Maximum number of results per page */
-        limit?: components['parameters']['limitParam']
-        /** @description Pagination cursor from previous response */
-        cursor?: components['parameters']['cursorParam']
-        /** @description Sort parameter (e.g., 'name', '-created_at') */
-        sort?: components['parameters']['sortParam']
-        /** @description Include total count in response (expensive) */
-        include_total?: components['parameters']['includeTotalParam']
-      }
-      header?: never
-      path: {
-        integration_id: string
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['IntegrationProjectAssignmentListResponse']
-        }
-      }
-      400: components['responses']['BadRequestError']
-      401: components['responses']['UnauthorizedError']
-      403: components['responses']['ForbiddenError']
-      404: components['responses']['NotFoundError']
-      409: components['responses']['ConflictError']
-      422: components['responses']['ValidationError']
-      429: components['responses']['RateLimitError']
-      500: components['responses']['InternalServerError']
-    }
-  }
-  assign_integration_project: {
+  v2_assign_integration_project: {
     parameters: {
       query?: never
       header?: never
@@ -1945,7 +1982,7 @@ export interface operations {
       500: components['responses']['InternalServerError']
     }
   }
-  unassign_integration_project: {
+  v2_unassign_integration_project: {
     parameters: {
       query?: never
       header?: never
@@ -1974,17 +2011,56 @@ export interface operations {
       500: components['responses']['InternalServerError']
     }
   }
-  list_integration_models: {
+  v2_list_integration_projects: {
     parameters: {
       query?: {
         /** @description Maximum number of results per page */
-        limit?: components['parameters']['limitParam']
+        limit?: number
         /** @description Pagination cursor from previous response */
-        cursor?: components['parameters']['cursorParam']
+        cursor?: string | null
+        /** @description Sort parameter (e.g., 'created_at', '-created_at') */
+        sort?: string | null
+        /** @description Include total count in response (expensive) */
+        include_total?: boolean
+      }
+      header?: never
+      path: {
+        integration_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['IntegrationProjectAssignmentListResponse']
+        }
+      }
+      400: components['responses']['BadRequestError']
+      401: components['responses']['UnauthorizedError']
+      403: components['responses']['ForbiddenError']
+      404: components['responses']['NotFoundError']
+      409: components['responses']['ConflictError']
+      422: components['responses']['ValidationError']
+      429: components['responses']['RateLimitError']
+      500: components['responses']['InternalServerError']
+    }
+  }
+  v2_list_integration_models: {
+    parameters: {
+      query?: {
+        /** @description Maximum number of results per page */
+        limit?: number
+        /** @description Pagination cursor from previous response */
+        cursor?: string | null
         /** @description Sort parameter (e.g., 'name', '-created_at') */
         sort?: string | null
         /** @description Include total count in response (expensive) */
-        include_total?: components['parameters']['includeTotalParam']
+        include_total?: boolean
       }
       header?: never
       path: {
@@ -2013,7 +2089,41 @@ export interface operations {
       500: components['responses']['InternalServerError']
     }
   }
-  get_integration_model: {
+  v2_bulk_update_integration_models: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        integration_id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['LLMModelBulkUpdate']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['LLMModelBulkUpdateResponse']
+        }
+      }
+      400: components['responses']['BadRequestError']
+      401: components['responses']['UnauthorizedError']
+      403: components['responses']['ForbiddenError']
+      404: components['responses']['NotFoundError']
+      409: components['responses']['ConflictError']
+      422: components['responses']['ValidationError']
+      429: components['responses']['RateLimitError']
+      500: components['responses']['InternalServerError']
+    }
+  }
+  v2_get_integration_model: {
     parameters: {
       query?: never
       header?: never
@@ -2044,7 +2154,7 @@ export interface operations {
       500: components['responses']['InternalServerError']
     }
   }
-  update_integration_model: {
+  v2_update_integration_model: {
     parameters: {
       query?: never
       header?: never
@@ -2079,51 +2189,17 @@ export interface operations {
       500: components['responses']['InternalServerError']
     }
   }
-  bulk_update_integration_models: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        integration_id: string
-      }
-      cookie?: never
-    }
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['LLMModelBulkUpdate']
-      }
-    }
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['LLMModelBulkUpdateResponse']
-        }
-      }
-      400: components['responses']['BadRequestError']
-      401: components['responses']['UnauthorizedError']
-      403: components['responses']['ForbiddenError']
-      404: components['responses']['NotFoundError']
-      409: components['responses']['ConflictError']
-      422: components['responses']['ValidationError']
-      429: components['responses']['RateLimitError']
-      500: components['responses']['InternalServerError']
-    }
-  }
-  list_integration_tools: {
+  v2_list_integration_tools: {
     parameters: {
       query?: {
         /** @description Maximum number of results per page */
-        limit?: components['parameters']['limitParam']
+        limit?: number
         /** @description Pagination cursor from previous response */
-        cursor?: components['parameters']['cursorParam']
+        cursor?: string | null
         /** @description Sort parameter (e.g., 'name', '-created_at') */
-        sort?: components['parameters']['sortParam']
+        sort?: string | null
         /** @description Include total count in response (expensive) */
-        include_total?: components['parameters']['includeTotalParam']
+        include_total?: boolean
       }
       header?: never
       path: {
@@ -2152,7 +2228,41 @@ export interface operations {
       500: components['responses']['InternalServerError']
     }
   }
-  get_integration_tool: {
+  v2_bulk_update_integration_tools: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        integration_id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ToolBulkUpdate']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ToolBulkUpdateResponse']
+        }
+      }
+      400: components['responses']['BadRequestError']
+      401: components['responses']['UnauthorizedError']
+      403: components['responses']['ForbiddenError']
+      404: components['responses']['NotFoundError']
+      409: components['responses']['ConflictError']
+      422: components['responses']['ValidationError']
+      429: components['responses']['RateLimitError']
+      500: components['responses']['InternalServerError']
+    }
+  }
+  v2_get_integration_tool: {
     parameters: {
       query?: never
       header?: never
@@ -2183,7 +2293,7 @@ export interface operations {
       500: components['responses']['InternalServerError']
     }
   }
-  update_integration_tool: {
+  v2_update_integration_tool: {
     parameters: {
       query?: never
       header?: never
@@ -2206,40 +2316,6 @@ export interface operations {
         }
         content: {
           'application/json': components['schemas']['ToolWithParameters']
-        }
-      }
-      400: components['responses']['BadRequestError']
-      401: components['responses']['UnauthorizedError']
-      403: components['responses']['ForbiddenError']
-      404: components['responses']['NotFoundError']
-      409: components['responses']['ConflictError']
-      422: components['responses']['ValidationError']
-      429: components['responses']['RateLimitError']
-      500: components['responses']['InternalServerError']
-    }
-  }
-  bulk_update_integration_tools: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        integration_id: string
-      }
-      cookie?: never
-    }
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['ToolBulkUpdate']
-      }
-    }
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ToolBulkUpdateResponse']
         }
       }
       400: components['responses']['BadRequestError']

@@ -29,7 +29,7 @@ import { detachPromise } from '../../../utils/detachPromise'
 
 import styles from './IntegrationDetail.module.css'
 
-type IntegrationRead = IntegrationsAPI.components['schemas']['IntegrationRead']
+type IntegrationRead = IntegrationsAPI.components['schemas']['IntegrationReadV2']
 
 type IntegrationResourcesTabProps = Readonly<{
   integrationId: string

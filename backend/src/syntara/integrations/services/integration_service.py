@@ -122,9 +122,12 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
         session: AsyncSession,
         user: User,
         secret_service: SecretService | None = None,
+        *,
+        include_kafka: bool = True,
     ) -> None:
         """Initialize with database session, current user, and optional secret service."""
         super().__init__(session, user, convert_resource_mixin=IntegrationConvertResourceMixin())
+        self._include_kafka = include_kafka
         self._secret_service = secret_service
 
     def _is_duplicate_name_error(self, e: IntegrityError) -> bool:
@@ -226,7 +229,7 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
         result = await self.session.exec(query)
         integration = result.one_or_none()
 
-        if not integration:
+        if not integration or (not self._include_kafka and integration.integration_type == IntegrationType.KAFKA):
             raise IntegrationNotFoundError(integration_id)
 
         return integration
@@ -541,7 +544,18 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
             )
             id_restriction = self._intersect_id_restrictions(id_restriction, project_scoped_ids)
 
-        filtered_params = [(k, v) for k, v in query_params_items if k != "project_id"] if query_params_items else None
+        filtered_params = [(k, v) for k, v in query_params_items if k != "project_id"] if query_params_items else []
+        if not self._include_kafka:
+            # Enforce the legacy type restriction in the paginated/count query,
+            # rather than filtering a fetched page or loading every legacy ID.
+            legacy_types = {kind.value for kind in IntegrationType if kind != IntegrationType.KAFKA}
+            requested_types = dict(filtered_params).get("integration_type[in]")
+            if requested_types is not None:
+                legacy_types &= {value.strip() for value in requested_types.split(",")}
+            if not legacy_types:
+                id_restriction = []
+            filtered_params = [(k, v) for k, v in filtered_params if k != "integration_type[in]"]
+            filtered_params.append(("integration_type[in]", ",".join(sorted(legacy_types))))
 
         response = await self.list_resources(
             model=Integration,

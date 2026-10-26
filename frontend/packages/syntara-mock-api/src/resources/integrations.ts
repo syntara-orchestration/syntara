@@ -3,7 +3,7 @@ import { IntegrationStatusEnum, IntegrationTypeEnum } from '@syntara/contracts'
 
 import { mockDate } from './mockDates'
 
-type IntegrationRead = IntegrationsAPI.components['schemas']['IntegrationRead']
+type IntegrationRead = IntegrationsAPI.components['schemas']['IntegrationReadV2']
 
 const MOCK_USER_1_REF = { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'user-1', type: 'user' as const }
 

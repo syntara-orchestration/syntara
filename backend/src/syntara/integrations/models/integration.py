@@ -24,22 +24,23 @@ from syntara.core.utils.sqlmodel import DiscriminatedJSONB, postgres_enum_column
 from syntara.integrations.models.integration_configuration import (
     IntegrationConfiguration,
     IntegrationConfigurationInputTypes,
-    IntegrationConfigurationReadTypes,
     IntegrationConfigurationTypes,
-    KafkaConfiguration,
 )
 
 _ENABLED_DESCRIPTION = "Whether the integration is active"
 _CONFIGURATION_DESCRIPTION = "Integration-specific configuration"
 
 
-class IntegrationType(StrEnum):
+class IntegrationTypeV2(StrEnum):
     """Type of external integration."""
 
     MCP_SERVER = "mcp_server"
     LLM_PROVIDER = "llm_provider"
     ANSIBLE_AUTOMATION_PLATFORM = "ansible_automation_platform"
     KAFKA = "kafka"
+
+
+IntegrationType = IntegrationTypeV2
 
 
 class IntegrationStatus(StrEnum):
@@ -307,7 +308,7 @@ class InitialModelSelection(SQLModel):
     is_default: bool = Field(default=False, description="Whether this is the default model")
 
 
-class IntegrationCreate(SQLModel):
+class IntegrationCreateV2(SQLModel):
     """Schema for creating a new integration."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")  # type: ignore[assignment]
@@ -388,15 +389,10 @@ class IntegrationCreate(SQLModel):
         return self
 
 
-def _is_kafka_configuration(config: object) -> bool:
-    if isinstance(config, KafkaConfiguration):
-        return True
-    if isinstance(config, dict):
-        return config.get("integration_type") == IntegrationType.KAFKA.value
-    return getattr(config, "integration_type", None) == IntegrationType.KAFKA.value
+IntegrationCreate = IntegrationCreateV2
 
 
-class IntegrationRead(UserReferenceFieldsMixin, NamedResource, UserOwnedResource):
+class IntegrationReadV2(UserReferenceFieldsMixin, NamedResource, UserOwnedResource):
     """Schema for integration API responses."""
 
     created_by: UserReference | UUID | str | None = Field(default=None, description="User who created the integration")  # type: ignore[assignment]
@@ -413,43 +409,10 @@ class IntegrationRead(UserReferenceFieldsMixin, NamedResource, UserOwnedResource
     enabled: bool = True
     validation_status: IntegrationStatus = IntegrationStatus.UNKNOWN
     scope: IntegrationScope = IntegrationScope.GLOBAL
-    configuration: IntegrationConfigurationReadTypes | None = Field(
+    configuration: IntegrationConfigurationTypes = Field(
         description=_CONFIGURATION_DESCRIPTION,
         discriminator="integration_type",
     )
-    kafka_configuration: KafkaConfiguration | None = Field(
-        default=None,
-        description=(
-            "Kafka broker configuration. Present only when integration_type is kafka, "
-            "so the configuration union above stays compatible with existing clients."
-        ),
-    )
-
-    @model_validator(mode="before")
-    @classmethod
-    def relocate_kafka_configuration(cls, data: Any) -> Any:  # noqa: ANN401 - Pydantic validator accepts arbitrary input
-        """Keep Kafka off the response configuration union.
-
-        Stored rows and create payloads put the Kafka object on configuration.
-        Responses expose it as kafka_configuration and leave configuration empty.
-        """
-        config = data.get("configuration") if isinstance(data, dict) else getattr(data, "configuration", None)
-        if not _is_kafka_configuration(config):
-            return data
-        if isinstance(data, dict):
-            relocated = dict(data)
-            relocated["configuration"] = None
-            relocated["kafka_configuration"] = config
-            return relocated
-        values: dict[str, Any] = {}
-        for name in cls.model_fields:
-            if name == "configuration":
-                values[name] = None
-            elif name == "kafka_configuration":
-                values[name] = config
-            elif hasattr(data, name):
-                values[name] = getattr(data, name)
-        return values
 
     management_credential_id: UUID | None = None
     last_validated_at: datetime | None = None
@@ -468,7 +431,10 @@ class IntegrationRead(UserReferenceFieldsMixin, NamedResource, UserOwnedResource
     enabled_model_count: int = Field(default=0, description="Number of enabled models linked to this integration")
 
 
-class IntegrationUpdate(SQLModel):
+IntegrationRead = IntegrationReadV2
+
+
+class IntegrationUpdateV2(SQLModel):
     """Schema for partially updating an integration (user-facing)."""
 
     name: str | None = Field(
@@ -501,6 +467,9 @@ class IntegrationUpdate(SQLModel):
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")  # type: ignore[assignment]
 
 
+IntegrationUpdate = IntegrationUpdateV2
+
+
 class IntegrationSystemUpdate(SQLModel):
     """Internal schema for validation worker updates to system-managed fields."""
 
@@ -518,7 +487,7 @@ class IntegrationSystemUpdate(SQLModel):
         return self
 
 
-class IntegrationTestConnection(SQLModel):
+class IntegrationTestConnectionV2(SQLModel):
     """Schema for testing a connection without saving an integration."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")  # type: ignore[assignment]
@@ -544,8 +513,14 @@ class IntegrationTestConnection(SQLModel):
         return self
 
 
-class IntegrationListResponse(ResourcesResponse[IntegrationRead]):
+IntegrationTestConnection = IntegrationTestConnectionV2
+
+
+class IntegrationListResponseV2(ResourcesResponse[IntegrationRead]):
     """Paginated list response for integrations."""
+
+
+IntegrationListResponse = IntegrationListResponseV2
 
 
 class RefreshResult(SQLModel):

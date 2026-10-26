@@ -27,7 +27,7 @@ const mockAffectedWorkflows = [
   { id: 'wf-2', name: 'Workflow Two' },
 ]
 
-type Integration = IntegrationsAPI.components['schemas']['IntegrationRead']
+type Integration = IntegrationsAPI.components['schemas']['IntegrationReadV2']
 
 const mockAffectedIntegrations = [
   { id: 'int-1', name: 'GitHub Copilot' },

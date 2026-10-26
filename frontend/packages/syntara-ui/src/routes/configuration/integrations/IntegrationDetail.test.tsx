@@ -133,7 +133,7 @@ vi.mock('./useIntegrationPermissions', () => ({
   useIntegrationPermissions: () => mockPermissions,
 }))
 
-type IntegrationRead = IntegrationsAPI.components['schemas']['IntegrationRead']
+type IntegrationRead = IntegrationsAPI.components['schemas']['IntegrationReadV2']
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: false } },
@@ -793,8 +793,7 @@ describe('IntegrationDetail', () => {
       name: 'Production Kafka',
       description: 'Kafka cluster used for event listeners',
       integration_type: 'kafka',
-      configuration: null,
-      kafka_configuration: {
+      configuration: {
         integration_type: 'kafka',
         bootstrap_servers: ['broker.example.com:9093', 'other.example.com:9092'],
         allow_http: false,
@@ -805,7 +804,7 @@ describe('IntegrationDetail', () => {
       total_tool_count: 0,
     }
 
-    it('shows bootstrap servers from kafka_configuration', () => {
+    it('shows bootstrap servers from configuration', () => {
       setupDefaultMocks({ integration: mockKafkaIntegration })
       render(<IntegrationDetail />, { wrapper })
 
@@ -813,7 +812,7 @@ describe('IntegrationDetail', () => {
       expect(screen.getByText('broker.example.com:9093, other.example.com:9092')).toBeInTheDocument()
     })
 
-    it('shows Security section from kafka_configuration', () => {
+    it('shows Security section from configuration', () => {
       setupDefaultMocks({ integration: mockKafkaIntegration })
       render(<IntegrationDetail />, { wrapper })
 

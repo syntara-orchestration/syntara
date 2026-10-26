@@ -464,9 +464,9 @@ class TestKafkaConfiguration:
 
 
 class TestIntegrationReadKafkaConfiguration:
-    """Kafka stays off the response configuration union."""
+    """V2 exposes Kafka through the standard configuration field."""
 
-    def test_moves_kafka_configuration_off_the_response_union(self) -> None:
+    def test_keeps_kafka_configuration_in_the_v2_response(self) -> None:
         read = IntegrationRead.model_validate(
             {
                 "name": "Production Kafka",
@@ -477,9 +477,8 @@ class TestIntegrationReadKafkaConfiguration:
                 },
             }
         )
-        assert read.configuration is None
-        assert read.kafka_configuration is not None
-        assert read.kafka_configuration.bootstrap_servers == ["broker.example.com:9093"]
+        assert isinstance(read.configuration, KafkaConfiguration)
+        assert read.configuration.bootstrap_servers == ["broker.example.com:9093"]
 
     def test_reads_kafka_from_an_attribute_object(self) -> None:
         class StoredIntegration:
@@ -488,9 +487,8 @@ class TestIntegrationReadKafkaConfiguration:
             configuration = KafkaConfiguration(bootstrap_servers=["broker.example.com:9093"])
 
         read = IntegrationRead.model_validate(StoredIntegration())
-        assert read.configuration is None
-        assert read.kafka_configuration is not None
-        assert read.kafka_configuration.bootstrap_servers == ["broker.example.com:9093"]
+        assert isinstance(read.configuration, KafkaConfiguration)
+        assert read.configuration.bootstrap_servers == ["broker.example.com:9093"]
 
     def test_leaves_other_configurations_in_place(self) -> None:
         read = IntegrationRead.model_validate(
@@ -503,8 +501,7 @@ class TestIntegrationReadKafkaConfiguration:
                 },
             }
         )
-        assert read.kafka_configuration is None
-        assert read.configuration is not None
+        assert isinstance(read.configuration, MCPServerConfiguration)
         assert read.configuration.base_url == "https://example.com"
 
 
@@ -543,3 +540,18 @@ class TestIntegrationSortableFields:
             "enabled",
             "last_validated_at",
         ]
+
+
+@pytest.mark.parametrize("protocol", ["SSL", "SASL_SSL"])
+def test_encrypted_kafka_transports(protocol: str) -> None:
+    config = KafkaConfiguration(bootstrap_servers=["broker.example.com:9093"], security_protocol=protocol)
+    assert config.security_protocol == protocol
+
+
+def test_plaintext_requires_separate_opt_in() -> None:
+    with pytest.raises(ValueError, match="allow_plaintext"):
+        KafkaConfiguration(bootstrap_servers=["broker.example.com:9092"], security_protocol="PLAINTEXT")
+    config = KafkaConfiguration(
+        bootstrap_servers=["broker.example.com:9092"], security_protocol="PLAINTEXT", allow_plaintext=True
+    )
+    assert config.allow_plaintext

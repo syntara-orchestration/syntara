@@ -6,7 +6,7 @@ import type { Credential, CredentialWorkflowRef } from './credentialConstants'
 import { useCredentialIntegrationCheck } from './useCredentialIntegrationCheck'
 import { useCredentialWorkflowCheck } from './useCredentialWorkflowCheck'
 
-type Integration = IntegrationsAPI.components['schemas']['IntegrationRead']
+type Integration = IntegrationsAPI.components['schemas']['IntegrationReadV2']
 
 type DeleteCredentialState = {
   credentialToDelete: Credential | null

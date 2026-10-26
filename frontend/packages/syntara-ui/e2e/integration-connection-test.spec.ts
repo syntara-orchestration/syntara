@@ -86,7 +86,7 @@ test.describe('Integration Wizard @pr-check', () => {
         await expect(app.locator('table tbody tr')).not.toHaveCount(0, { timeout: 10_000 })
 
         // Save the integration — capture the API response to get the ID
-        const responsePromise = app.waitForResponse('**/api/v1/integrations')
+        const responsePromise = app.waitForResponse('**/api/v2/integrations')
         await app.getByRole('button', { name: 'Save integration' }).click()
         const response = await responsePromise
         expect(response.status()).toBe(201)
@@ -115,7 +115,7 @@ test.describe('Integration Wizard @pr-check', () => {
       // Intercept the discover endpoint to inject an auth_failure response.
       // The E2E concern is the UI's handling of auth_failure; the backend's
       // 401/403 → auth_failure classification is covered by backend unit tests.
-      await app.route('**/api/v1/integrations/discover', async (route) => {
+      await app.route('**/api/v2/integrations/discover', async (route) => {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
@@ -227,7 +227,7 @@ test.describe('Integration Wizard @pr-check', () => {
       // A real timeout would require waiting 10 seconds; the backend's timeout
       // enforcement is covered by backend unit tests. Here we verify the UI
       // correctly surfaces timeout classification as distinct from auth_failure.
-      await app.route('**/api/v1/integrations/discover', async (route) => {
+      await app.route('**/api/v2/integrations/discover', async (route) => {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
@@ -291,7 +291,7 @@ test.describe('Integration Wizard @pr-check', () => {
       // the LLM adapter's HTTP client rejects — here we inject the expected response to
       // test the UI's handling of TLS error classification, distinct from connection_error
       // and auth_failure.
-      await app.route('**/api/v1/integrations/discover', async (route) => {
+      await app.route('**/api/v2/integrations/discover', async (route) => {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
@@ -492,7 +492,7 @@ test.describe('Integration Wizard @pr-check', () => {
         // These error types require specific network conditions not reliably available
         // in the dev environment. We mock GET /integrations/{id} to inject the expected
         // integration state and verify the detail page renders each classification correctly.
-        const routePattern = `**/api/v1/integrations/${integrationId}`
+        const routePattern = `**/api/v2/integrations/${integrationId}`
         for (const { errorMsg } of [
           { errorMsg: 'Authentication failed: the provided credential was rejected.' },
           { errorMsg: "TLS certificate verification failed: unable to verify the server's certificate." },
