@@ -9,6 +9,7 @@ memory and PostgreSQL.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 
 from syntara.core.cache.base import redis_error_handler, redis_operation_with_backoff
@@ -56,6 +57,36 @@ class CacheMixin:
                 await client.setex(key, ttl_seconds, value)
 
         await redis_operation_with_backoff(_setex, "cache_setex", key=key)
+
+    async def cache_set_until(
+        self, key: str, valid_until: datetime, value: str, *, only_if_absent: bool = False
+    ) -> None:
+        """Store with SET/PXAT; callers bound the whole operation with a deadline.
+
+        Pool acquisition and retries happen inside that caller's timeout. Retries
+        reuse the original absolute expiry and never refresh a proof's lifetime.
+        Milliseconds are rounded down so Redis cannot expire after valid_until.
+        Immutable-proof callers use only_if_absent to preserve an existing
+        entry's original deadline even when a later writer has longer settings.
+        """
+        if valid_until.tzinfo is None or valid_until.utcoffset() is None:
+            msg = "Cache deadline must be timezone-aware"
+            raise ValueError(msg)
+        if valid_until <= datetime.now(UTC):
+            return
+        deadline_ms = (valid_until - datetime(1970, 1, 1, tzinfo=UTC)) // timedelta(milliseconds=1)
+        client = self._ensure_connected()
+
+        async def _set_until() -> None:
+            if valid_until <= datetime.now(UTC):
+                return
+            async with redis_error_handler("cache_set_until", key=key):
+                if only_if_absent:
+                    await client.set(key, value, pxat=deadline_ms, nx=True)
+                else:
+                    await client.set(key, value, pxat=deadline_ms)
+
+        await redis_operation_with_backoff(_set_until, "cache_set_until", key=key)
 
     async def cache_delete(self, key: str) -> bool:
         """Delete *key*.  Returns ``True`` if the key existed.

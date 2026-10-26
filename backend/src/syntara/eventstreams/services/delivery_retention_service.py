@@ -11,7 +11,6 @@ from sqlalchemy import func
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from syntara.core.config.base import get_settings
 from syntara.core.constants import EventDeliveryDefaults, FieldLimits
 from syntara.eventstreams.core.deduplication import (
     CleanupCandidate,
@@ -23,6 +22,7 @@ from syntara.eventstreams.core.deduplication import (
 )
 from syntara.eventstreams.models.delivery import EventDelivery
 from syntara.eventstreams.models.recovery_hold import EventDeliveryRecoveryHold
+from syntara.eventstreams.services.delivery_cache_policy import DeliveryEvidencePolicy
 from syntara.eventstreams.services.subscription_service import lock_source_lifecycle
 
 logger = structlog.stdlib.get_logger(__name__)
@@ -37,15 +37,23 @@ class EventDeliveryRetentionService:
         *,
         verifier: CommittedPositionVerifier | None = None,
         retention_seconds: int | None = None,
+        policy: DeliveryEvidencePolicy | None = None,
     ) -> None:
         """Inject the committed-position port; absent verification always retains evidence."""
-        retention = get_settings().event_delivery_retention_seconds if retention_seconds is None else retention_seconds
-        if not isinstance(retention, int) or isinstance(retention, bool) or retention <= 0:
+        if retention_seconds is not None and (
+            not isinstance(retention_seconds, int) or isinstance(retention_seconds, bool) or retention_seconds <= 0
+        ):
             msg = "Delivery retention must be a positive integer"
+            raise ValueError(msg)
+        if policy is not None and retention_seconds is not None and policy.retention_seconds != retention_seconds:
+            msg = "Cleanup retention must match the shared delivery evidence policy"
             raise ValueError(msg)
         self.session_factory = session_factory
         self.verifier = verifier
-        self.retention_seconds = retention
+        self.policy = (
+            DeliveryEvidencePolicy.from_settings(retention_seconds=retention_seconds) if policy is None else policy
+        )
+        self.retention_seconds = self.policy.retention_seconds
 
     async def reserve_recovery(self, source_id: UUID, *, token: UUID | None = None) -> RecoveryReservation | None:
         """Commit a hold before recovery depends on evidence or changes any boundary.
@@ -119,7 +127,7 @@ class EventDeliveryRetentionService:
         ):
             return None
         now = cast("datetime", (await session.exec(select(func.clock_timestamp()))).one())
-        if now - row.resolved_at < timedelta(seconds=self.retention_seconds):
+        if now < self.policy.cleanup_after(row.resolved_at):
             return None
         hold = (
             await session.exec(

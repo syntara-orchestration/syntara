@@ -1,18 +1,22 @@
 """Retention orchestration and fail-closed verification without external services."""
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from syntara.core.config.base import Settings
 from syntara.eventstreams.core.deduplication import (
     CleanupCandidate,
     CommittedPositionUnavailableError,
     CommittedPositionVerifier,
 )
+from syntara.eventstreams.services import delivery_cache_policy, delivery_retention_service
 from syntara.eventstreams.services.delivery_retention_service import EventDeliveryRetentionService
+from tests.unit.eventstreams.test_deduplication_store import delivery
 from tests.unit.eventstreams.test_delivery_identity import identity
+from tests.unit.eventstreams.test_terminal_proof import EPOCH, NOW, policy
 
 
 def session_factory() -> tuple[MagicMock, list[MagicMock]]:
@@ -113,3 +117,47 @@ async def test_cleanup_is_bounded(limit: int) -> None:
     service = EventDeliveryRetentionService(MagicMock(), retention_seconds=3600)
     with pytest.raises(ValueError, match="batch size"):
         await service.cleanup(limit=limit)
+
+
+def test_cleanup_rejects_a_conflicting_shared_retention_policy() -> None:
+    with pytest.raises(ValueError, match="match the shared"):
+        EventDeliveryRetentionService(MagicMock(), retention_seconds=10, policy=policy(retention_seconds=3600))
+
+
+def test_enabled_cleanup_cannot_implicitly_shorten_deployment_retention(monkeypatch: pytest.MonkeyPatch) -> None:
+    settings = Settings(
+        event_delivery_cache_enabled=True,
+        event_delivery_cache_epoch=EPOCH,
+        event_delivery_cache_clock_error_bound_seconds=0.25,
+    )
+    monkeypatch.setattr(delivery_cache_policy, "get_settings", lambda: settings)
+    with pytest.raises(ValueError, match="deployment retention"):
+        EventDeliveryRetentionService(MagicMock(), retention_seconds=10)
+    service = EventDeliveryRetentionService(MagicMock())
+    assert service.retention_seconds == settings.event_delivery_retention_seconds
+    assert service.policy.enabled
+
+
+@pytest.mark.parametrize("at_deadline", [False, True])
+async def test_cleanup_retains_evidence_through_proof_expiry_and_skew(
+    monkeypatch: pytest.MonkeyPatch, *, at_deadline: bool
+) -> None:
+    shared = policy(ttl_seconds=120, retention_seconds=30)
+    row = delivery()
+    row.state = "scheduled"
+    row.resolved_at = NOW
+    now = shared.proof_deadline(NOW) if at_deadline else NOW + timedelta(seconds=10)
+    subscription = MagicMock(id=identity().subscription_id, workflow_id=identity().workflow_id)
+    source = MagicMock()
+    monkeypatch.setattr(
+        delivery_retention_service, "lock_source_lifecycle", AsyncMock(return_value=(subscription, source))
+    )
+    session = MagicMock(spec=AsyncSession)
+    row_result = MagicMock()
+    row_result.one_or_none.return_value = row
+    clock_result = MagicMock()
+    clock_result.one.return_value = now
+    session.exec.side_effect = [row_result, clock_result]
+    service = EventDeliveryRetentionService(MagicMock(), policy=shared)
+    assert await service._candidate(session, identity()) is None
+    session.delete.assert_not_awaited()
