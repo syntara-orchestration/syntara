@@ -81,6 +81,18 @@ def _make_workflow(
     return wf
 
 
+def test_initialize_state_initializes_retry_source_timestamps() -> None:
+    wf = OrchestratorWorkflow.__new__(OrchestratorWorkflow)
+
+    wf._initialize_state(
+        execution_id="execution-1",
+        workflow_metadata={"retry": {"retry_from_execution_id": "source-execution"}},
+    )
+
+    assert wf.retry_context == {"retry_from_execution_id": "source-execution"}
+    assert wf._retry_source_timestamps == {}
+
+
 def _build_diamond_graph() -> WorkflowGraph:
     """Build: trigger -> A + B -> C (diamond, C has two predecessors)."""
     backend = InMemoryGraphBackend()
@@ -447,6 +459,37 @@ class TestUnselectedTriggerSkipping:
         )
 
         assert len(wf.skipped_nodes) == 0
+
+    @pytest.mark.asyncio
+    async def test_retry_reexecutes_trigger_but_preserves_source_timestamps(self) -> None:
+        backend = InMemoryGraphBackend()
+        backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
+        graph = WorkflowGraph(backend)
+
+        wf = _make_workflow()
+        wf.retry_context = {"retry_from_execution_id": "source-execution"}
+        wf._retry_source_timestamps = {
+            "trigger": {
+                "started_at": "2026-01-01T00:00:00+00:00",
+                "completed_at": "2026-01-01T00:05:00+00:00",
+            }
+        }
+
+        with patch(
+            "syntara.workflows.workflow_engine.dynamic_workflow.workflow.execute_activity",
+            new_callable=AsyncMock,
+            return_value={"output": {"status": "ok"}},
+        ) as execute_activity:
+            await wf._execute_trigger(
+                trigger_node_id="trigger",
+                trigger_inputs={"key": "value"},
+                graph=graph,
+                pending_tasks={},
+            )
+
+        execute_activity.assert_awaited_once()
+        assert wf._restored_node_timestamps["trigger"] == wf._retry_source_timestamps["trigger"]
+        assert wf.resolver.get_namespace("trigger") == {"status": "ok"}
 
     @pytest.mark.asyncio
     async def test_trigger_payload_not_registered_as_input_aliases(self) -> None:
