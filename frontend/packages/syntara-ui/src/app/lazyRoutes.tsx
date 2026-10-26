@@ -18,7 +18,7 @@ export const EditIntegration = lazy(() =>
 export const Settings = lazy(() => import('../routes/configuration/settings/Settings'))
 export const Glossary = lazy(() => import('../routes/documentation/glossary/Glossary'))
 export const FeatureFlagDemo = lazy(() =>
-  import('../routes/feature-flags/FeatureFlagDemo').then((m) => ({ default: m.FeatureFlagDemo }))
+  import('../routes/feature-flags/feature-flag-demo-page').then((m) => ({ default: m.FeatureFlagDemo }))
 )
 export const Approvals = lazy(() => import('../routes/approvals/Approvals'))
 export const AccessManagement = lazy(() =>

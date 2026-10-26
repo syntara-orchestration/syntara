@@ -6,20 +6,20 @@ import { FeatureFlagsContext } from './feature-flags-context'
 
 /** Returns the current feature flag configuration from the provider. */
 export function useFeatureFlags(): FeatureFlagConfig {
-  const overrides = use(FeatureFlagsContext)
-  if (overrides === null) {
+  const featureFlags = use(FeatureFlagsContext)
+  if (featureFlags === null) {
     throw new Error('useFeatureFlags must be used within FeatureFlagsProvider')
   }
 
-  return overrides
+  return featureFlags
 }
 
 /** Returns whether a registered feature flag is enabled in the current app snapshot. */
 export function useFeatureFlag(flagName: FeatureFlag): boolean {
-  const overrides = use(FeatureFlagsContext)
-  if (overrides === null) {
+  const featureFlags = use(FeatureFlagsContext)
+  if (featureFlags === null) {
     throw new Error('useFeatureFlag must be used within FeatureFlagsProvider')
   }
 
-  return overrides[flagName] === true
+  return featureFlags[flagName] === true
 }

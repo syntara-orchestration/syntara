@@ -13,7 +13,7 @@ import { axe } from 'vitest-axe'
 import { AppRoute } from '../app/AppRoute'
 import type { AppRouterContext } from '../app/routes/__root'
 import { guardFeatureFlagDemoRoute } from '../app/routes/feature-flag-demo'
-import { FeatureFlagDemo } from '../routes/feature-flags/FeatureFlagDemo'
+import { FeatureFlagDemo } from '../routes/feature-flags/feature-flag-demo-page'
 
 import { toFeatureFlagKey } from './feature-flags'
 
