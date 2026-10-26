@@ -10,6 +10,7 @@ import structlog
 from syntara.core.config.base import get_settings
 from syntara.core.constants import EventSchedulingDefaults
 from syntara.core.exceptions import SyntaraError
+from syntara.eventstreams.core.placement import PlacementAuthority
 from syntara.eventstreams.core.runtime import (
     RuntimeFailureCode,
     RuntimeRevision,
@@ -37,10 +38,17 @@ class SubscriptionSupervisor:
     source identity, group position, or permanent-content evidence is changed.
     """
 
-    def __init__(self, subscription_id: UUID, runner_factory: SubscriptionRunnerFactory) -> None:
+    def __init__(
+        self, subscription_id: UUID, runner_factory: SubscriptionRunnerFactory, *, placement: PlacementAuthority
+    ) -> None:
         """Keep retry/circuit state local and reuse the existing drain deadline."""
+        if placement.subscription_id != subscription_id:
+            msg = "Placement belongs to a different subscription"
+            raise ValueError(msg)
         self._subscription_id = subscription_id
         self._factory = runner_factory
+        self._placement = placement
+        self._placement_task: asyncio.Task[None] | None = None
         self._drain_timeout = get_settings().event_drain_timeout_seconds
         self._lock = asyncio.Lock()
         self._desired: SubscriptionSnapshot | None = None
@@ -50,7 +58,10 @@ class SubscriptionSupervisor:
         self._applied: RuntimeRevision | None = None
         self._task: asyncio.Task[None] | None = None
         self._startup_task: asyncio.Task[None] | None = None
+        self._cleanup_task: asyncio.Task[None] | None = None
+        self._drain_task: asyncio.Task[None] | None = None
         self._starting = False
+        self._local_contention = False
         self._draining = False
         self._closed = False
         self._failure: SubscriptionRuntimeError | None = None
@@ -75,7 +86,13 @@ class SubscriptionSupervisor:
             state = RuntimeState.DRAINING
             reason = RuntimeFailureCode.STOP_INCOMPLETE.value if self._stop_retry_at is not None else None
         elif not self._closed:
-            if self._failure is not None:
+            if self._desired is not None and self._active(self._desired) and not self._placement.is_current():
+                state = RuntimeState.DRAINING if self._placement.local_in_use else RuntimeState.BLOCKED
+                reason = RuntimeFailureCode.PLACEMENT_LOST.value
+            elif self._local_contention and self._desired is not None and self._active(self._desired):
+                state = RuntimeState.BLOCKED
+                reason = RuntimeFailureCode.LOCAL_RUNNER_BUSY.value
+            elif self._failure is not None:
                 state = RuntimeState.BACKOFF if self._failure.transient and not circuit else RuntimeState.BLOCKED
                 reason = self._failure.code.value
             elif self._starting:
@@ -101,9 +118,13 @@ class SubscriptionSupervisor:
         if snapshot.subscription_id != self._subscription_id:
             msg = "Snapshot belongs to a different subscription"
             raise ValueError(msg)
+        if snapshot.deployment_id != self._placement.worker.deployment_id:
+            msg = "Snapshot belongs to a different deployment"
+            raise ValueError(msg)
         # Publish desire before waiting for an earlier start/drain. Recheck it
         # after every replacement so a superseded request cannot start a client.
         self._desired = snapshot
+        self._watch_placement()
         if not self._active(snapshot):
             self._interrupt_startup()
             deadline = asyncio.get_running_loop().time() + self._drain_timeout
@@ -126,6 +147,36 @@ class SubscriptionSupervisor:
             # Repeated control requests must not cancel startup's cleanup again.
             if not task.cancelling():
                 task.cancel()
+
+    def _watch_placement(self) -> None:
+        if (
+            not self._closed
+            and self._placement.is_current()
+            and (self._placement_task is None or self._placement_task.done())
+        ):
+            self._placement_task = asyncio.create_task(self._observe_placement())
+
+    async def _observe_placement(self) -> None:
+        await self._placement.wait_lost()
+        await self.placement_lost()
+
+    async def placement_lost(self) -> SubscriptionRuntimeStatus:
+        """Manager/watchdog hook: close admission independently of slow startup.
+
+        The runner's synchronous guard already rejects new intake. This port
+        pauses/drains/stops locally; it never cancels a Temporal execution or
+        changes a delivery token, evidence, or placement row.
+        """
+        self._placement.invalidate()
+        self._interrupt_startup()
+        deadline = asyncio.get_running_loop().time() + self._drain_timeout
+        try:
+            async with asyncio.timeout_at(deadline), self._lock:
+                await self._stop_current(force=True, deadline=deadline)
+        except TimeoutError:
+            self._draining = True
+            self._stop_failed()
+        return self.status
 
     def _clear_failure(self) -> None:
         self._failure = None
@@ -166,6 +217,9 @@ class SubscriptionSupervisor:
             snapshot = self._desired
             revision = RuntimeRevision.from_snapshot(snapshot)
             active = self._active(snapshot)
+            if not self._placement.is_current():
+                await self._stop_current(deadline=deadline)
+                return
             if deadline is not None and active:
                 return  # A superseded inactive request must not start newer active work.
             target = (revision, active)
@@ -194,11 +248,15 @@ class SubscriptionSupervisor:
                 return
 
     async def _start_runner(self, snapshot: SubscriptionSnapshot, revision: RuntimeRevision) -> None:
+        if not self._placement.reserve_local(self):
+            self._local_contention = self._placement.is_current()
+            return
+        self._local_contention = False
         self._starting = True
         self._startup_task = asyncio.create_task(self._open_runner(snapshot, revision))
         try:
             await self._startup_task
-            if self._closed or self._desired != snapshot:
+            if self._closed or self._desired != snapshot or not self._placement.is_current():
                 await self._stop_current(force=True)
                 return
             self._failure = None
@@ -208,7 +266,9 @@ class SubscriptionSupervisor:
         except asyncio.CancelledError:
             await self._stop_current(force=True)
             caller = asyncio.current_task()
-            if (caller is not None and caller.cancelling()) or (not self._closed and self._desired == snapshot):
+            if (caller is not None and caller.cancelling()) or (
+                not self._closed and self._desired == snapshot and self._placement.is_current()
+            ):
                 raise
         except Exception as exc:  # noqa: BLE001 - isolate failures to this subscription
             self._record_failure(exc)
@@ -222,9 +282,14 @@ class SubscriptionSupervisor:
         self._runner, self._runner_revision = runner, revision
         if runner.snapshot != snapshot:
             raise SubscriptionRuntimeError(RuntimeFailureCode.CONFIGURATION_UNAVAILABLE)
-        if self._closed or self._desired != snapshot:
+        runner.bind_placement(self._placement.is_current)
+        if self._closed or self._desired != snapshot or not self._placement.is_current():
             return
         await runner.start()
+        if self._closed or self._desired != snapshot or not self._placement.is_current():
+            return
+        if not runner.open_admission():
+            raise SubscriptionRuntimeError(RuntimeFailureCode.PLACEMENT_LOST)
         self._applied = revision
 
     async def _serve(self, runner: SubscriptionRunner) -> None:
@@ -245,38 +310,79 @@ class SubscriptionSupervisor:
         runner = self._runner
         if runner is None:
             self._draining = False
+            self._local_contention = False
             self._stop_retry_at = None
+            self._placement.local_stopped(self)
             return True
-        if not force and self._stop_retry_at is not None and _utc_now() < self._stop_retry_at:
+        if (
+            not force
+            and self._stop_retry_at is not None
+            and _utc_now() < self._stop_retry_at
+            and (self._cleanup_task is None or not self._cleanup_task.done())
+        ):
             return False
         self._draining = True
         if deadline is None:
             deadline = asyncio.get_running_loop().time() + self._drain_timeout
+        if self._cleanup_task is None:
+            self._cleanup_task = asyncio.create_task(self._close_runner(runner, self._task, deadline))
+            self._cleanup_task.add_done_callback(self._cleanup_settled)
         try:
-            try:
-                async with asyncio.timeout_at(deadline):
-                    await runner.drain()
-            except Exception:  # noqa: BLE001 - stop must still close the client after failed drain
-                logger.warning("event_subscription_drain_incomplete", subscription_id=str(self._subscription_id))
-            async with asyncio.timeout_at(deadline):
-                await runner.stop()
-            task = self._task
-            if task is not None and not task.done():
-                task.cancel()
-                _, pending = await asyncio.wait({task}, timeout=max(0.0, deadline - asyncio.get_running_loop().time()))
-                if pending:
-                    return self._stop_failed()
+            # Observe cleanup without directly awaiting a port that may delay
+            # cancellation. Timeout/caller cancellation never drops ownership
+            # of the still-running cleanup or starts a second stop operation.
+            _, pending = await asyncio.wait(
+                {self._cleanup_task}, timeout=max(0.0, deadline - asyncio.get_running_loop().time())
+            )
+            if pending:
+                return self._stop_failed()
+            self._cleanup_task.result()
         except asyncio.CancelledError:
             self._stop_retry_at = _utc_now() + timedelta(seconds=EventSchedulingDefaults.TRANSIENT_PROBE_SECONDS)
             raise
         except Exception:  # noqa: BLE001 - retain this runner until stop is verified
+            self._cleanup_task = None  # Settled failure may be retried; pending cleanup is always retained.
             return self._stop_failed()
+        self._cleanup_task = None
+        self._drain_task = None
         self._runner = None
         self._runner_revision = self._applied = None
         self._task = None
         self._draining = False
         self._stop_retry_at = None
+        self._placement.local_stopped(self)
         return True
+
+    @staticmethod
+    def _cleanup_settled(task: asyncio.Task[None]) -> None:
+        if not task.cancelled():
+            task.exception()
+
+    async def _close_runner(
+        self, runner: SubscriptionRunner, serving: asyncio.Task[None] | None, deadline: float
+    ) -> None:
+        if self._drain_task is None:
+            closing = runner.drain() if self._placement.is_current() else runner.close_admission()
+            self._drain_task = asyncio.create_task(closing)
+            self._drain_task.add_done_callback(self._cleanup_settled)
+        draining = self._drain_task
+        try:
+            _, pending = await asyncio.wait({draining}, timeout=max(0.0, deadline - asyncio.get_running_loop().time()))
+            if pending:
+                draining.cancel()
+                logger.warning("event_subscription_drain_incomplete", subscription_id=str(self._subscription_id))
+            elif not draining.cancelled() and draining.exception() is not None:
+                logger.warning("event_subscription_drain_incomplete", subscription_id=str(self._subscription_id))
+            # Always attempt client stop, even if drain exhausted its budget or
+            # delays cancellation. The observer remains bounded, and this task
+            # retains the local reservation until BOTH operations have settled.
+            await runner.stop()
+        finally:
+            await asyncio.gather(draining, return_exceptions=True)
+        if serving is not None:
+            if not serving.done():
+                serving.cancel()
+            await asyncio.gather(serving, return_exceptions=True)
 
     def _stop_failed(self) -> bool:
         self._stop_retry_at = _utc_now() + timedelta(seconds=EventSchedulingDefaults.TRANSIENT_PROBE_SECONDS)
@@ -285,6 +391,7 @@ class SubscriptionSupervisor:
 
     async def retry(self) -> SubscriptionRuntimeStatus:
         """Explicitly retry local setup/teardown after correction; never clear durable holds."""
+        self._watch_placement()
         async with self._lock:
             self._clear_failure()
             self._stop_retry_at = None
@@ -307,10 +414,23 @@ class SubscriptionSupervisor:
             async with asyncio.timeout_at(deadline), self._lock:
                 if drain_only and self._runner is not None:
                     self._draining = True
-                    await self._runner.drain()
+                    if self._drain_task is None:
+                        self._drain_task = asyncio.create_task(self._runner.drain())
+                        self._drain_task.add_done_callback(self._cleanup_settled)
+                    _, pending = await asyncio.wait(
+                        {self._drain_task}, timeout=max(0.0, deadline - asyncio.get_running_loop().time())
+                    )
+                    if pending:
+                        self._stop_failed()
+                    else:
+                        self._drain_task.result()
                 else:
                     await self._stop_current(force=True, deadline=deadline)
         except Exception:  # noqa: BLE001 - retain startup/runner ownership when shutdown is incomplete
             self._draining = True
             self._stop_failed()
+        if self._placement_task is not None and self._placement_task is not asyncio.current_task():
+            self._placement_task.cancel()
+            self._placement_task.add_done_callback(self._cleanup_settled)
+            await asyncio.wait({self._placement_task}, timeout=max(0.0, deadline - asyncio.get_running_loop().time()))
         return self.status

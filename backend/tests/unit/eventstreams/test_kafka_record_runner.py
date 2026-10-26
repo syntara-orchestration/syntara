@@ -1110,7 +1110,7 @@ async def test_public_status_waits_for_first_assignment_before_reporting_active(
     client.topic, client.group_id = snapshot.configuration.topic, snapshot.configuration.group_id
     client.epoch, client.assignment = 0, frozenset()
     client.fetch.return_value = {}
-    runner: KafkaRecordRunner = KafkaRecordRunner(
+    runner = KafkaRecordRunner(
         snapshot,
         client,
         MagicMock(),
@@ -1220,3 +1220,68 @@ async def test_startup_errors_leave_adapter_with_safe_retry_classification(harne
     assert caught.value.transient is transient
     assert str(caught.value) == "connection_unavailable"
     harness.client.stop.assert_awaited_once()
+
+
+async def test_supervised_startup_keeps_admission_closed_until_explicit_authorization(harness):
+    runner = harness.runner
+    permitted = [True]
+    runner._started = False
+    runner.bind_placement(lambda: permitted[0])
+    await runner.start()
+    await runner._enqueue({0: [event(harness, 41)]}, 7)
+    assert runner.queued_records == 0
+    assert runner.open_admission()
+    await runner._enqueue({0: [event(harness, 41)]}, 7)
+    assert runner.queued_records == 1
+    permitted[0] = False
+    await runner._advance(runner._partitions[0])
+    harness.processing.process.assert_not_awaited()
+    assert not runner.open_admission()
+
+
+async def test_placement_loss_preserves_admitted_handoff_and_assignment_checked_drain_commit(harness):
+    runner = harness.runner
+    permitted = [True]
+    runner._started = False
+    runner.bind_placement(lambda: permitted[0])
+    await runner.start()
+    assert runner.open_admission()
+    entered, release = asyncio.Event(), asyncio.Event()
+    admitted = []
+
+    async def complete(_snapshot, identity, _record, _owner, *, admission_guard) -> ResolvedDelivery:
+        assert admission_guard()
+        admitted.append(identity)
+        entered.set()
+        await release.wait()
+        return terminal(identity)
+
+    harness.processing.process.side_effect = complete
+    await runner._enqueue({0: [event(harness, 41)]}, 7)
+    state = runner._partitions[0]
+    state.task = asyncio.create_task(runner._advance(state))
+    await entered.wait()
+    permitted[0] = False
+    closing = asyncio.create_task(runner.close_admission())
+    release.set()
+    await asyncio.gather(closing, state.task)
+    assert admitted == [runner._identity(event(harness, 41))]
+    harness.client.commit.assert_awaited_with({0: 42}, expected_epoch=7)
+    harness.client.pause.assert_awaited()
+    assert not runner._accepting_work()
+    assert runner._drain_deadline is not None
+
+
+@pytest.mark.parametrize("reason", ["assignment", "deadline"])
+async def test_placement_loss_never_bypasses_assignment_or_drain_deadline(harness, monkeypatch, reason):
+    runner = harness.runner
+    state = runner._partitions[0]
+    state.resolved_next_offset = 42
+    monkeypatch.setattr(runner, "_placement_authority", lambda: False)
+    if reason == "assignment":
+        harness.client.epoch += 1
+    else:
+        runner._drain_deadline = asyncio.get_running_loop().time() - 1
+    await runner._commit_positions((state,))
+    harness.client.commit.assert_not_awaited()
+    assert state.resolved_next_offset == 42

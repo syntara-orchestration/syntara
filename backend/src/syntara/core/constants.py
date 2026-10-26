@@ -87,6 +87,15 @@ class EventRunnerDefaults:
     DRAIN_TIMEOUT_SECONDS = 20
 
 
+class EventPlacementDefaults:
+    """Unvalidated placement tuning; independent of delivery claim leases."""
+
+    HEARTBEAT_INTERVAL_SECONDS = 20
+    WORKER_LIVENESS_SECONDS = 60
+    SUBSCRIPTION_LEASE_SECONDS = 60
+    MAX_CLAIM_BATCH = 100
+
+
 class EventDeliveryDefaults:
     """Delivery ownership and minimum evidence retention; independent lifetimes."""
 

@@ -1,5 +1,6 @@
 """Transport-neutral local runtime contracts, without scheduling authority."""
 
+from collections.abc import Callable
 from datetime import datetime
 from enum import StrEnum
 from typing import Protocol
@@ -30,6 +31,8 @@ class RuntimeFailureCode(StrEnum):
     CONNECTION_UNAVAILABLE = "connection_unavailable"
     RUNNER_FAILED = "runner_failed"
     STOP_INCOMPLETE = "stop_incomplete"
+    PLACEMENT_LOST = "placement_lost"
+    LOCAL_RUNNER_BUSY = "local_runner_busy"
 
 
 class SubscriptionRuntimeError(SyntaraError):
@@ -94,6 +97,18 @@ class SubscriptionRunner(Protocol):
         """Observe initialization/holds without exposing transport internals."""
         ...
 
+    def bind_placement(self, permits_admission: Callable[[], bool]) -> None:
+        """Hold admission closed and install the live placement guard before startup."""
+        ...
+
+    def open_admission(self) -> bool:
+        """Open only under the current guard, after the supervisor rechecks startup."""
+        ...
+
+    async def close_admission(self) -> None:
+        """Pause and bound drain after placement loss; preserve admitted delivery tokens."""
+        ...
+
     async def start(self) -> None:
         """Start idempotently; classify configuration/connection failures safely."""
         ...
@@ -117,7 +132,8 @@ class SubscriptionRunnerFactory(Protocol):
     async def __call__(self, snapshot: SubscriptionSnapshot) -> SubscriptionRunner:
         """Resolve the initial binding; classify failures with SubscriptionRuntimeError.
 
-        Return an unstarted runner for exactly this snapshot. Clean up any
+        Return an unstarted runner for exactly this snapshot; startup must not
+        open intake before open_admission. Clean up any
         resources if construction fails before returning. Do not open a database
         transaction across client startup or install live credential refresh.
         """

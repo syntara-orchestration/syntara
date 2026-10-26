@@ -32,6 +32,7 @@ from sqlalchemy.engine import URL, make_url
 from syntara.core.config.event_delivery import validate_delivery_cache_trust_inputs
 from syntara.core.constants import (
     EventDeliveryDefaults,
+    EventPlacementDefaults,
     EventRunnerDefaults,
     EventSchedulingDefaults,
     EventStreamLimits,
@@ -1480,6 +1481,32 @@ class EventStreamSettings(BaseSettings):
     These defaults require release transport validation and do not guarantee
     that complete workflow start arguments fit downstream transport limits.
     """
+
+    event_worker_heartbeat_interval_seconds: int = Field(
+        default=EventPlacementDefaults.HEARTBEAT_INTERVAL_SECONDS,
+        gt=0,
+        description="Unvalidated process membership/placement renewal cadence",
+    )
+    event_worker_liveness_seconds: int = Field(
+        default=EventPlacementDefaults.WORKER_LIVENESS_SECONDS,
+        gt=0,
+        description="Unvalidated database-time worker membership lifetime",
+    )
+    event_subscription_lease_seconds: int = Field(
+        default=EventPlacementDefaults.SUBSCRIPTION_LEASE_SECONDS,
+        gt=0,
+        description="Unvalidated placement lifetime; independent of delivery claim leases",
+    )
+
+    @model_validator(mode="after")
+    def validate_placement_intervals(self) -> Self:
+        """Require renewal margin; deployment latency/failure testing is still needed."""
+        if min(self.event_worker_liveness_seconds, self.event_subscription_lease_seconds) <= (
+            self.event_worker_heartbeat_interval_seconds
+        ):
+            msg = "Worker liveness and placement lease must exceed the heartbeat interval"
+            raise SafeValueError(msg)
+        return self
 
     event_fetch_max_records: int = Field(
         default=EventRunnerDefaults.FETCH_MAX_RECORDS,
