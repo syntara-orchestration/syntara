@@ -75,7 +75,8 @@ function createDialogState<T>(item: T | null = null, isOpen = false): DialogStat
 }
 
 function mockGetResponse(data: Record<string, unknown> | undefined, error?: Record<string, unknown>) {
-  return { data, error, response: new Response() } as never
+  const status = data && !error ? 200 : 500
+  return { data, error, response: new Response(null, { status }) } as never
 }
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
@@ -319,7 +320,7 @@ describe('WorkflowDialogs', () => {
     expect(screen.queryByText('Set mock output data for Manual Trigger')).not.toBeInTheDocument()
   })
 
-  it('shows an error when resolving the trigger throws', async () => {
+  it('shows a friendly default when resolving the trigger throws', async () => {
     const user = userEvent.setup()
     const onRunWorkflow = vi.fn()
     const runDialog = createDialogState(mockWorkflow(), true)
@@ -331,7 +332,51 @@ describe('WorkflowDialogs', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Cannot run workflow')).toBeInTheDocument()
-      expect(screen.getByText('Network down')).toBeInTheDocument()
+      expect(screen.getByText('Could not load trigger details for this workflow. Try again.')).toBeInTheDocument()
+    })
+    expect(onRunWorkflow).not.toHaveBeenCalled()
+    expect(runDialog.close).toHaveBeenCalled()
+  })
+
+  it('shows a deleted-workflow message when the workflow fetch returns 404', async () => {
+    const user = userEvent.setup()
+    const onRunWorkflow = vi.fn()
+    const runDialog = createDialogState(mockWorkflow(), true)
+    vi.mocked(workflowFetchClient.GET).mockResolvedValue({
+      data: undefined,
+      error: { detail: 'Not Found' },
+      response: new Response(null, { status: 404 }),
+    } as never)
+
+    renderDialogs({ runDialog, onRunWorkflow })
+
+    await user.click(screen.getByRole('button', { name: 'Run now' }))
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('This workflow may have been deleted. Refresh the page and try again.')
+      ).toBeInTheDocument()
+    })
+    expect(onRunWorkflow).not.toHaveBeenCalled()
+    expect(runDialog.close).toHaveBeenCalled()
+  })
+
+  it('shows a permission message when the workflow fetch returns 403', async () => {
+    const user = userEvent.setup()
+    const onRunWorkflow = vi.fn()
+    const runDialog = createDialogState(mockWorkflow(), true)
+    vi.mocked(workflowFetchClient.GET).mockResolvedValue({
+      data: undefined,
+      error: { detail: 'Forbidden' },
+      response: new Response(null, { status: 403 }),
+    } as never)
+
+    renderDialogs({ runDialog, onRunWorkflow })
+
+    await user.click(screen.getByRole('button', { name: 'Run now' }))
+
+    await waitFor(() => {
+      expect(screen.getByText('You do not have permission to run this workflow.')).toBeInTheDocument()
     })
     expect(onRunWorkflow).not.toHaveBeenCalled()
     expect(runDialog.close).toHaveBeenCalled()

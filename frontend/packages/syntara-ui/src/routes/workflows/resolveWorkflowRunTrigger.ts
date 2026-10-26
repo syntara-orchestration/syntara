@@ -3,6 +3,8 @@ import type { WorkflowAPI } from '@syntara/contracts'
 import { workflowFetchClient } from '../../client'
 import { activitiesReferenceTrigger } from '../builder/utils/triggerReferenceCheck'
 
+import { assertWorkflowRunTriggerDetailsLoaded } from './workflowRunTriggerDetailsError'
+
 type Workflow = WorkflowAPI.components['schemas']['WorkflowRead']
 
 type TriggerLike = {
@@ -65,10 +67,12 @@ function buildRunTrigger(trigger: TriggerLike, triggers: TriggerLike[], definiti
 export async function resolveWorkflowRunTrigger(workflow: Workflow): Promise<WorkflowRunTrigger | null> {
   if (!workflow.id) return null
 
-  const { data: detail, error } = await workflowFetchClient.GET('/workflows/{workflow_id}', {
+  const workflowDetailResult = await workflowFetchClient.GET('/workflows/{workflow_id}', {
     params: { path: { workflow_id: workflow.id } },
   })
-  if (error || !detail) return null
+  assertWorkflowRunTriggerDetailsLoaded(workflowDetailResult)
+  const detail = workflowDetailResult.data
+  if (!detail) return null
 
   const publishedVersionNumber = workflow.published_version_number ?? detail.published_version_number
   const currentVersionNumber = detail.current_version
