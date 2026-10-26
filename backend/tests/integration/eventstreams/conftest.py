@@ -146,7 +146,7 @@ async def delivery_context(
     test_user: User,
     test_project_id: UUID,
 ) -> DeliveryContext:
-    """Project a published trigger through AAP-94316 before testing delivery storage."""
+    """Project a published trigger before testing delivery storage."""
     integration = Integration(
         name=f"delivery-kafka-{uuid4().hex[:8]}",
         integration_type=IntegrationType.KAFKA,
