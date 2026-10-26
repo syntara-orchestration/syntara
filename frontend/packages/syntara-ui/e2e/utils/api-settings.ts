@@ -57,6 +57,6 @@ export async function updateSettingViaApi(
     throw new Error(`PATCH /settings returned ${resp.status()}: ${body}`)
   }
 
-  const result = (await resp.json()) as Array<{ version: number }>
-  return { version: result[0].version }
+  const result = (await resp.json()) as { resources: Array<{ version: number }> }
+  return { version: result.resources[0].version }
 }

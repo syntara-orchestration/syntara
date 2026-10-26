@@ -3815,7 +3815,7 @@ export const handlers = [
       updated.push(setting)
     }
 
-    return HttpResponse.json(updated)
+    return HttpResponse.json({ resources: updated })
   }),
 
   http.patch('/api/v1/settings/:key', async (req) => {
