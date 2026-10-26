@@ -42,6 +42,8 @@ const BASE_INTEGRATION: IntegrationRead = {
 
 function makeFormValues(overrides?: Partial<EditIntegrationFormValues>): EditIntegrationFormValues {
   return {
+    security_protocol: 'SASL_SSL',
+    allow_plaintext: false,
     name: 'Test',
     description: '',
     integration_type: 'mcp_server',

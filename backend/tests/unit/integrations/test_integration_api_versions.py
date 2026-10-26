@@ -205,3 +205,32 @@ def test_regenerated_v1_client_preserves_the_original_enum_filter() -> None:
         IntegrationType.LLM_PROVIDER,
         IntegrationType.ANSIBLE_AUTOMATION_PLATFORM,
     }
+
+
+@pytest.mark.asyncio
+async def test_v1_writes_keep_configuration_and_partial_update_semantics(auth_client: AsyncClient) -> None:
+    """Legacy clients can still create and edit their original integration types."""
+    from unittest.mock import patch
+
+    payload = {
+        "name": "Legacy MCP write",
+        "integration_type": "mcp_server",
+        "configuration": {"integration_type": "mcp_server", "base_url": "https://example.com"},
+    }
+    with patch("syntara.integrations.services.integration_service.validate_integration_configuration_no_ssrf"):
+        created = await auth_client.post("/api/v1/integrations", json=payload)
+    assert created.status_code == 201
+    original = created.json()
+    parser = _load_old_model("integration_read")
+    assert parser.IntegrationRead.from_dict(original).configuration.base_url == "https://example.com"
+    updated = await auth_client.patch(f"/api/v1/integrations/{original['id']}", json={"description": "Updated by v1"})
+    assert updated.status_code == 200
+    assert updated.json()["name"] == original["name"]
+    assert updated.json()["configuration"] == original["configuration"]
+    assert updated.json()["description"] == "Updated by v1"
+
+    mismatched = await auth_client.post(
+        "/api/v1/integrations",
+        json={**payload, "configuration": {"integration_type": "llm_provider", "provider_hint": "openai"}},
+    )
+    assert mismatched.status_code == 422

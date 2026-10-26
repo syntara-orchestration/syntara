@@ -46,7 +46,7 @@ import { EditSecurityFields } from './EditSecurityFields'
 import { ScopeFields } from './form/ScopeFields'
 import { integrationHelp } from './integrationFieldHelp'
 import {
-  CREDENTIAL_REQUIRED_TYPES,
+  isIntegrationCredentialRequired,
   CREDENTIAL_TYPES_BY_INTEGRATION,
   INTEGRATION_TYPE_LABELS,
   PROVIDER_HINT_LABELS,
@@ -65,7 +65,7 @@ const CREDENTIAL_DESCRIPTION: Record<string, string> = {
   [IntegrationTypeEnum.ANSIBLE_AUTOMATION_PLATFORM]:
     'This credential is used to verify the connection to the Ansible Automation Platform. Workflow credentials are configured separately in the workflow builder.',
   [IntegrationTypeEnum.KAFKA]:
-    'This credential is the Kafka login used to verify that the brokers are reachable. Workflow credentials are configured separately in the workflow builder.',
+    'SASL_SSL uses this Kafka login to verify the brokers. SSL and PLAINTEXT allow the credential to be omitted. Workflow credentials are configured separately in the workflow builder.',
 }
 
 function configurationFormFields(config: ReturnType<typeof getStoredConfiguration>) {
@@ -75,6 +75,8 @@ function configurationFormFields(config: ReturnType<typeof getStoredConfiguratio
       config && 'bootstrap_servers' in config && Array.isArray(config.bootstrap_servers)
         ? formatBootstrapServers(config.bootstrap_servers)
         : '',
+    security_protocol: config && 'security_protocol' in config ? (config.security_protocol ?? 'SASL_SSL') : 'SASL_SSL',
+    allow_plaintext: config && 'allow_plaintext' in config ? Boolean(config.allow_plaintext) : false,
     sasl_mechanism:
       config && 'sasl_mechanism' in config && config.sasl_mechanism
         ? config.sasl_mechanism
@@ -112,7 +114,8 @@ function EditIntegrationFormFields({
   const { control } = useFormContext<EditIntegrationFormValues>()
   const { errors } = useFormState({ control })
   const isKafka = integration.integration_type === IntegrationTypeEnum.KAFKA
-  const isCredentialRequired = CREDENTIAL_REQUIRED_TYPES.has(integration.integration_type ?? '')
+  const protocol = useWatch({ control, name: 'security_protocol' })
+  const isCredentialRequired = isIntegrationCredentialRequired(integration.integration_type ?? '', protocol)
   const isTestDisabled = (isCredentialRequired && !credentialId) || isTesting
   const isAnsibleAutomationPlatform = integration.integration_type === IntegrationTypeEnum.ANSIBLE_AUTOMATION_PLATFORM
   const isLLM = isLLMProvider(integration)
@@ -166,7 +169,7 @@ function EditIntegrationFormFields({
 
       {isKafka && <EditKafkaFields control={control} errorMessage={errors.bootstrap_servers?.message} />}
 
-      <EditSecurityFields showAllowHttp={!isKafka} />
+      {(!isKafka || protocol !== 'PLAINTEXT') && <EditSecurityFields showAllowHttp={!isKafka} />}
 
       <ScopeFields<EditIntegrationFormValues>
         scope={scope}
@@ -312,6 +315,8 @@ export function EditIntegrationForm() {
       base_url: '',
       bootstrap_servers: '',
       sasl_mechanism: DEFAULT_KAFKA_SASL_MECHANISM,
+      security_protocol: 'SASL_SSL',
+      allow_plaintext: false,
       allow_http: false,
       insecure_skip_tls_verify: false,
       ca_certificate: null,

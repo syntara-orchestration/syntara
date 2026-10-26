@@ -805,7 +805,7 @@ describe('EditIntegrationForm', () => {
       )
       expect(screen.getByText('SCRAM-SHA-512')).toBeInTheDocument()
       expect(screen.queryByRole('textbox', { name: /api url/i })).not.toBeInTheDocument()
-      expect(screen.getByText(/Kafka login used to verify that the brokers are reachable/i)).toBeInTheDocument()
+      expect(screen.getByText(/SASL_SSL uses this Kafka login/i)).toBeInTheDocument()
     })
 
     it('hides Allow HTTP so the connection stays SASL_SSL', async () => {
@@ -846,6 +846,8 @@ describe('EditIntegrationForm', () => {
                 integration_type: 'kafka',
                 bootstrap_servers: ['broker.example.com:9093', 'other.example.com:9092'],
                 sasl_mechanism: 'PLAIN',
+                security_protocol: 'SASL_SSL',
+                allow_plaintext: false,
                 allow_http: false,
                 insecure_skip_tls_verify: true,
                 ca_certificate: null,

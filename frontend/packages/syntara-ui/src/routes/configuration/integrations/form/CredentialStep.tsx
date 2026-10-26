@@ -1,11 +1,11 @@
 import { Button, Content, ContentVariants, Form, FormGroup, Title } from '@patternfly/react-core'
 import { IntegrationTypeEnum } from '@syntara/contracts'
-import type { UseFormSetValue } from 'react-hook-form'
+import { useWatch, type UseFormSetValue } from 'react-hook-form'
 
 import { SynFormField } from '../../../../components/forms/SynFormField'
 import { CredentialSelector } from '../../../builder/components/CredentialSelector'
 import { integrationHelp } from '../integrationFieldHelp'
-import { CREDENTIAL_REQUIRED_TYPES, CREDENTIAL_TYPES_BY_INTEGRATION } from '../integrationFilters'
+import { isIntegrationCredentialRequired, CREDENTIAL_TYPES_BY_INTEGRATION } from '../integrationFilters'
 
 import type { IntegrationFormData } from './integrationFormSchema'
 import styles from './WizardSteps.module.css'
@@ -18,7 +18,7 @@ const STEP_DESCRIPTION: Record<string, string> = {
   [IntegrationTypeEnum.ANSIBLE_AUTOMATION_PLATFORM]:
     'This credential is used to verify that the Ansible Automation Platform is reachable and the token is valid. Workflow credentials are configured separately in the workflow builder.',
   [IntegrationTypeEnum.KAFKA]:
-    'This credential is the Kafka login used to verify that the brokers are reachable. Workflow credentials are configured separately in the workflow builder.',
+    'SASL_SSL uses this Kafka login to verify the brokers. SSL and PLAINTEXT allow the credential to be omitted. Workflow credentials are configured separately in the workflow builder.',
 }
 
 type CredentialStepProps = Readonly<{
@@ -38,7 +38,10 @@ export function CredentialStep({
   onTestConnection,
   onCredentialChange,
 }: CredentialStepProps) {
-  const isRequired = CREDENTIAL_REQUIRED_TYPES.has(integrationTypeValue)
+  const protocol =
+    useWatch<IntegrationFormData, 'configuration.security_protocol'>({ name: 'configuration.security_protocol' }) ??
+    'SASL_SSL'
+  const isRequired = isIntegrationCredentialRequired(integrationTypeValue, protocol)
   const isTestDisabled = isRequired ? !credentialId || isTesting : isTesting
 
   return (
