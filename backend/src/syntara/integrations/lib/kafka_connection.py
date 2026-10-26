@@ -1,4 +1,4 @@
-"""Short-lived Kafka health connections with address pinning.
+"""Short-lived Kafka health connections with address pinning and metadata checks.
 
 Only this connection's event-loop view changes. The real loop and aiokafka's
 module globals are never patched. aiokafka remains responsible for Kafka framing,
@@ -124,8 +124,9 @@ class _PinnedKafkaConnection(AIOKafkaConnection):  # type: ignore[misc]
 class KafkaHealthClient:
     """Read one metadata response without starting a background metadata client.
 
-    No advertised broker is contacted by this check. Each call resolves and
-    pins its own socket without a process-wide recorder or background client.
+    No advertised broker is contacted by this check. All advertised endpoints
+    must pass policy before success; any later health check resolves and pins
+    its own socket again. This also avoids aiokafka's process-wide recorder race.
     """
 
     def __init__(
@@ -154,14 +155,18 @@ class KafkaHealthClient:
         self._connection: _PinnedKafkaConnection | None = None
 
     async def bootstrap(self) -> None:
-        """Authenticate and read metadata without a background client."""
+        """Authenticate and reject unsafe metadata before reporting success."""
         last_error: Exception | None = None
         for host, port, _ in collect_hosts(self._servers):
             conn = _PinnedKafkaConnection(host, port, **self._kwargs)
             self._connection = conn
             try:
                 await conn.connect()
-                await conn.send(MetadataRequest([]))
+                metadata = await conn.send(MetadataRequest([]))
+                for broker in metadata.brokers:
+                    # Metadata v0/v1 contain (node_id, host, port); later
+                    # versions append rack, which is irrelevant to the policy.
+                    await approved_broker_addresses(broker[1], broker[2])
                 return
             except (OSError, KafkaError, TimeoutError) as exc:
                 last_error = exc

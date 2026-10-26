@@ -54,6 +54,28 @@ async def test_socket_is_pinned_and_keeps_tls_hostname() -> None:
 
 
 @pytest.mark.asyncio
+async def test_metadata_address_is_rejected_before_success() -> None:
+    conn = MagicMock()
+    conn.connect = AsyncMock()
+    conn.send = AsyncMock(return_value=SimpleNamespace(brokers=[(1, "169.254.169.254", 9093)]))
+    conn.close = AsyncMock()
+    with patch("syntara.integrations.lib.kafka_connection._PinnedKafkaConnection", return_value=conn):
+        client = KafkaHealthClient(
+            bootstrap_servers=["broker.example.com:9093"],
+            client_id="test",
+            security_protocol="SSL",
+            sasl_mechanism="PLAIN",
+            sasl_plain_username=None,
+            sasl_plain_password=None,
+            ssl_context=None,
+            request_timeout_ms=1000,
+        )
+        with pytest.raises(ValueError):
+            await client.bootstrap()
+    conn.close.assert_awaited_once()
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("port", [0, 65536, -1])
 async def test_metadata_ports_are_validated(port: int) -> None:
     with pytest.raises(ValueError):
@@ -87,6 +109,79 @@ async def test_pinned_connection_uses_upstream_streams_and_closes() -> None:
             if closed is not None:
                 await closed
     finally:
+        server.close()
+        await server.wait_closed()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("advertised_host", "accepted"), [("169.254.169.254", False), ("::1", False), ("fd00::1", False), ("8.8.8.8", True)]
+)
+async def test_wire_metadata_checks_advertised_brokers(advertised_host: str, *, accepted: bool) -> None:
+    """Decode a real metadata response and accept only permitted broker addresses."""
+    import socket
+    import struct
+
+    from aiokafka.protocol.admin import ApiVersionResponse_v0
+    from aiokafka.protocol.metadata import MetadataResponse_v0
+
+    async def respond(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+        try:
+            for _ in range(2):
+                size = struct.unpack(">i", await reader.readexactly(4))[0]
+                request = await reader.readexactly(size)
+                api_key = struct.unpack(">h", request[:2])[0]
+                correlation_id = struct.unpack(">i", request[4:8])[0]
+                response = (
+                    ApiVersionResponse_v0(0, [(18, 0, 0), (3, 0, 0)])
+                    if api_key == 18
+                    else MetadataResponse_v0([(1, advertised_host, 9093)], [])
+                )
+                body = struct.pack(">i", correlation_id) + response.encode()
+                writer.write(struct.pack(">i", len(body)) + body)
+                await writer.drain()
+            await reader.read()
+        finally:
+            writer.close()
+            await writer.wait_closed()
+
+    server = await asyncio.start_server(respond, "127.0.0.1", 0)
+    port = server.sockets[0].getsockname()[1]
+    original_resolve = socket.getaddrinfo
+
+    def resolve(host: str, port: int, *args: object, **kwargs: object) -> object:
+        return original_resolve("127.0.0.1" if host == "broker.example.com" else host, port)
+
+    client = KafkaHealthClient(
+        bootstrap_servers=[f"broker.example.com:{port}"],
+        client_id="test",
+        security_protocol="PLAINTEXT",
+        sasl_mechanism="PLAIN",
+        sasl_plain_username=None,
+        sasl_plain_password=None,
+        ssl_context=None,
+        request_timeout_ms=1000,
+    )
+    try:
+        with (
+            patch("socket.getaddrinfo", resolve),
+            patch(
+                "syntara.integrations.lib.kafka_connection.get_settings",
+                return_value=SimpleNamespace(integration_url_allowed_hosts=["broker.example.com"]),
+            ),
+            patch(
+                "syntara.integrations.lib.url_validation.get_settings",
+                return_value=SimpleNamespace(integration_url_allowed_hosts=["broker.example.com"]),
+            ),
+        ):
+            async with asyncio.timeout(3):
+                if accepted:
+                    await client.bootstrap()
+                else:
+                    with pytest.raises(ValueError):
+                        await client.bootstrap()
+    finally:
+        await client.close()
         server.close()
         await server.wait_closed()
 
