@@ -319,7 +319,13 @@ paths:
       tags:
         - Integrations
       summary: Discover integration connection
-      description: 'Test a connection and discover resources without saving an integration. #magic___^_^___line #magic___^_^___line Accepts integration configuration and a credential ID, resolves the #magic___^_^___line credential, runs the adapter''s discover() method, and returns the result #magic___^_^___line including discovered tools (with parameters) or models. No integration #magic___^_^___line is persisted.'
+      description: |-
+        Test a connection and discover resources without saving an integration.
+
+        Accepts integration configuration and a credential ID, resolves the
+        credential, runs the adapter's discover() method, and returns the result
+        including discovered tools (with parameters) or models. No integration
+        is persisted.
       operationId: v2_discover_integration_connection
       requestBody:
         content:
@@ -360,7 +366,12 @@ paths:
       tags:
         - Integrations
       summary: Validate integration
-      description: 'Validate a saved integration with a lightweight connectivity ping. #magic___^_^___line #magic___^_^___line Resolves the management credential, dispatches to the type-specific #magic___^_^___line adapter''s validate() method, updates the integration''s status fields, #magic___^_^___line and returns the result. No tool sync is performed.'
+      description: |-
+        Validate a saved integration with a lightweight connectivity ping.
+
+        Resolves the management credential, dispatches to the type-specific
+        adapter's validate() method, updates the integration's status fields,
+        and returns the result. No tool sync is performed.
       operationId: v2_validate_integration
       security:
         - bearerAuth: []
@@ -403,7 +414,12 @@ paths:
       tags:
         - Integrations
       summary: Refresh resources
-      description: 'Sync resources (tools) for a saved integration from the external service. #magic___^_^___line #magic___^_^___line Connects to the MCP server, fetches the current tool list, and upserts #magic___^_^___line Tool records in the database. Updates refresh_status and last_refreshed_at #magic___^_^___line on the integration. Only supported for mcp_server integration types.'
+      description: |-
+        Sync resources (tools) for a saved integration from the external service.
+
+        Connects to the MCP server, fetches the current tool list, and upserts
+        Tool records in the database. Updates refresh_status and last_refreshed_at
+        on the integration. Only supported for mcp_server integration types.
       operationId: v2_refresh_resources
       security:
         - bearerAuth: []
@@ -1563,7 +1579,12 @@ components:
       required:
         - bootstrap_servers
       title: KafkaConfiguration
-      description: 'Configuration for a Kafka cluster integration. #magic___^_^___line #magic___^_^___line Broker addresses live here. The username and password stay on the #magic___^_^___line linked Kafka credential when SASL_SSL is selected. Unauthenticated SSL #magic___^_^___line and explicitly opted-in PLAINTEXT do not require a credential.'
+      description: |-
+        Configuration for a Kafka cluster integration.
+
+        Broker addresses live here. The username and password stay on the
+        linked Kafka credential when SASL_SSL is selected. Unauthenticated SSL
+        and explicitly opted-in PLAINTEXT do not require a credential.
     KafkaSaslMechanism:
       type: string
       enum:
@@ -1571,7 +1592,11 @@ components:
         - SCRAM-SHA-256
         - SCRAM-SHA-512
       title: KafkaSaslMechanism
-      description: 'SASL mechanism used with the Kafka credential username and password. #magic___^_^___line #magic___^_^___line Cloud brokers such as Aiven use SCRAM-SHA-256. PLAIN remains available #magic___^_^___line for clusters that authenticate that way.'
+      description: |-
+        SASL mechanism used with the Kafka credential username and password.
+
+        Cloud brokers such as Aiven use SCRAM-SHA-256. PLAIN remains available
+        for clusters that authenticate that way.
     KafkaSecurityProtocol:
       type: string
       enum:
