@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { axe } from 'vitest-axe'
 
+import { createEmptyFormDefinition } from '../../../components/forms/formFieldBuilder/createDefaultField'
 import type { Trigger } from '../../../stores/workflowStoreTypes'
 import { expectStringContaining } from '../../../test/test-helpers'
 import * as TriggerNodeFormModule from '../node-forms/TriggerNodeForm'
@@ -1182,6 +1183,32 @@ describe('TriggerNodeDetails Component', () => {
       const { container } = render(<TriggerNodeDetails trigger={trigger} triggerIndex={0} onClose={mockOnClose} />)
       const results = await axe(container)
       expect(results).toHaveNoViolations()
+    })
+  })
+
+  describe('Form Trigger', () => {
+    it('renders TriggerNodeForm with form trigger parameters', () => {
+      const formDefinition = createEmptyFormDefinition()
+      const trigger = {
+        id: 'form',
+        type: TriggerTypeEnum.FORM_TRIGGER,
+        name: 'Intake',
+        parameters: {
+          form_definition: formDefinition,
+          message: 'Please fill in the form',
+          submit_label: 'Start',
+          success_message: 'Submitted',
+        },
+      }
+
+      render(<TriggerNodeDetails trigger={trigger} triggerIndex={0} onClose={mockOnClose} />)
+
+      const initialDataText = screen.getByTestId('initial-data').textContent ?? '{}'
+      expect(initialDataText).toContain('"triggerType":"form_trigger"')
+      expect(initialDataText).toContain('"message":"Please fill in the form"')
+      expect(initialDataText).toContain('"submit_label":"Start"')
+      expect(initialDataText).toContain('"success_message":"Submitted"')
+      expect(initialDataText).toContain('"form_definition"')
     })
   })
 

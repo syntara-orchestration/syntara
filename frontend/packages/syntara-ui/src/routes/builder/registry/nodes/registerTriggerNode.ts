@@ -1,20 +1,22 @@
-import { RhUiCalendarIcon, RhUiLanguageIcon, RhUiPlayIcon } from '@patternfly/react-icons'
+import { RhUiCalendarIcon, RhUiDocumentIcon, RhUiLanguageIcon, RhUiPlayIcon } from '@patternfly/react-icons'
 import { type ScheduleType, TriggerTypeEnum, WEBHOOK_TRIGGER_TYPES } from '@syntara/contracts'
 
 import EdaIcon from '../../../../assets/eda.svg?react'
+import { createEmptyFormDefinition } from '../../../../components/forms/formFieldBuilder/createDefaultField'
 import { RegistryNodeId } from '../../../../constants'
+import { useWorkflowStore } from '../../../../stores/useWorkflowStore'
 import {
+  createEdaTrigger,
+  createFormTrigger,
   createManualTrigger,
   createScheduledTrigger,
-  createEdaTrigger,
   createWebhookTrigger,
-  useWorkflowStore,
-} from '../../../../stores/useWorkflowStore'
+} from '../../../../stores/workflowFactories'
 import { parseJsonSchema } from '../../../../utils/jsonSafeParse'
 import { normalizeWebhookPath } from '../../../../utils/webhookPath'
-import type { TriggerFormData } from '../../hooks/useNodeCreation'
+import type { TriggerFormData } from '../../node-forms/triggerFormSchema'
 import { TriggerNodeForm } from '../../node-forms/TriggerNodeForm'
-import { buildNamedTrigger } from '../../utils/nodeCreationHelpers'
+import { buildNamedFormTrigger, buildNamedTrigger } from '../../utils/nodeCreationHelpers'
 import { getDefaultNodeBaseName } from '../../utils/nodeNaming'
 import { createCustomNode } from '../helpers/nodeTemplates'
 import { NodeRegistry } from '../NodeRegistry'
@@ -31,7 +33,7 @@ export default function registerTriggerNode() {
         icon: RhUiPlayIcon,
         category: 'trigger',
         description: 'Start workflow execution with manual, scheduled, or event triggers',
-        keywords: ['start', 'begin', 'manual', 'schedule', 'event', 'webhook', 'api', 'http', 'eda'],
+        keywords: ['start', 'begin', 'manual', 'schedule', 'event', 'webhook', 'api', 'http', 'eda', 'form'],
         order: 100,
         selectionTitle: 'Select a trigger node',
         subtypes: [
@@ -67,11 +69,36 @@ export default function registerTriggerNode() {
             formTitle: 'Configure EDA Trigger',
             initialData: { triggerType: TriggerTypeEnum.EDA_TRIGGER },
           },
+          {
+            id: RegistryNodeId.TRIGGER_FORM,
+            label: 'Form trigger',
+            icon: RhUiDocumentIcon,
+            description: 'Workflow will start after a user submits a configured form.',
+            formTitle: 'Configure Form Trigger',
+            initialData: { triggerType: TriggerTypeEnum.FORM_TRIGGER },
+          },
         ],
         formComponent: TriggerNodeForm,
       },
       (data, onSuccess, onError) => {
         try {
+          if (data.triggerType === TriggerTypeEnum.FORM_TRIGGER) {
+            const { trigger } = buildNamedFormTrigger(data.name, (triggerId, name) =>
+              createFormTrigger({
+                id: triggerId,
+                name,
+                form_definition: data.form_definition ?? createEmptyFormDefinition(),
+                message: data.message,
+                submit_label: data.submit_label,
+                success_message: data.success_message,
+                css_override: data.css_override,
+              })
+            )
+            useWorkflowStore.getState().addTrigger(trigger)
+            onSuccess()
+            return
+          }
+
           const baseName = getDefaultNodeBaseName({ nodeTypeId: RegistryNodeId.TRIGGER, label: 'Trigger' })
           const { trigger } = buildNamedTrigger(baseName, data.name, (triggerId, name) => {
             if (data.triggerType === TriggerTypeEnum.MANUAL_TRIGGER) {

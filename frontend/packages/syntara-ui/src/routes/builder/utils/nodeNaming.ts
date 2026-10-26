@@ -4,7 +4,7 @@ import { generateUUID } from '../../../utils/generateUUID'
 
 function getExistingNodeNames(): string[] {
   const workflow = useWorkflowStore.getState().currentWorkflow
-  const activities = workflow?.workflow.activities ?? []
+  const activities = workflow?.workflow?.activities ?? []
   const triggers = workflow?.triggers ?? []
 
   const activityNames = activities
@@ -22,7 +22,7 @@ function generateRandomSuffix(): string {
   return generateUUID().replace(/-/g, '').slice(0, 8)
 }
 
-function makeUniqueName(baseName: string, existingNames: string[]): string {
+export function makeUniqueName(baseName: string, existingNames: string[]): string {
   const normalizedBaseName = baseName.trim()
   if (!normalizedBaseName) {
     return `Node-${generateRandomSuffix()}`
