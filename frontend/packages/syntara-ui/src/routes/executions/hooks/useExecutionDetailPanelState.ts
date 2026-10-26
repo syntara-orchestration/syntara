@@ -77,7 +77,6 @@ export function useExecutionDetailPanelState({
     formPromptPanel,
     approvalNavigation,
     formPromptNavigation,
-    workflowDefinitionForSidePanel: workflowDefinitionForInteractions,
     hasOpenExecutionSidePanel,
     ...interactions,
   }

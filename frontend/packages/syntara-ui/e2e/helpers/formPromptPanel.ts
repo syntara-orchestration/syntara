@@ -1,9 +1,22 @@
 import type { Locator } from '@playwright/test'
 
+import { FORM_PROMPT_RESPOND_PANEL_TITLE } from '../../src/routes/executions/formPrompt/formPromptRespondPanelConstants'
 import { expect, type Page, toAppUrl } from '../fixtures'
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+/** Execution detail side panel for responding to a pending form step. */
+export function formPromptRespondPanelRegion(app: Page): Locator {
+  return app.getByRole('region', { name: FORM_PROMPT_RESPOND_PANEL_TITLE })
+}
+
+/** Matches `formatElapsedTime` output (e.g. `4s`, `1m 30s`, `2h 0m 5s`). */
+export const FORM_PROMPT_WAITING_ELAPSED_PATTERN = /^(\d+h\s)?(\d+m\s)?\d+s$/
+
+export function formPromptWaitingElapsedInPanel(panel: Locator): Locator {
+  return panel.getByText(FORM_PROMPT_WAITING_ELAPSED_PATTERN, { exact: true })
 }
 
 /**
@@ -58,7 +71,10 @@ export async function waitForFormPromptPanel(
 ): Promise<void> {
   const timeout = options?.timeout ?? 30_000
   await expect(app).toHaveURL(/form_prompt=/)
-  await expect(app.getByRole('heading', { name: 'Respond to prompt' })).toBeVisible({ timeout })
+  await expect(formPromptRespondPanelRegion(app)).toBeVisible({ timeout })
+  await expect(app.getByRole('heading', { name: FORM_PROMPT_RESPOND_PANEL_TITLE })).toBeVisible({
+    timeout,
+  })
   if (options?.expectedMessage) {
     await expect(app.getByText(options.expectedMessage)).toBeVisible({ timeout })
   }
