@@ -2,7 +2,7 @@
 
 Carries all arguments needed to build an ``AIOKafkaConsumer`` without
 importing credential-resolution or Integration-lookup logic. The
-connection provider service (AAP-94561) is responsible for populating
+connection provider service is responsible for populating
 these from a ``SubscriptionSnapshot``; the transport adapter accepts
 this type as a ready-to-use input.
 """
