@@ -67,59 +67,6 @@ src/syntara/{domain}/
 
 This project uses `uv` for dependency management and provides a comprehensive Makefile for development tasks.
 
-### Control-plane event subscription worker
-
-Kafka ingestion runs independently of the API and Temporal execution workers:
-
-```bash
-APP_EVENTSTREAM_ENABLED=true uv run python -m syntara.eventstreams.consumer_entrypoint
-```
-
-The switch defaults to `false`. The process uses the existing database settings,
-secret encryption key, signed/TLS Temporal client configuration, and Kafka
-Integration/runtime Credential resources. Kafka connections follow the existing
-Integration SASL_SSL, username/password, CA, and TLS verification options.
-
-Each process reconciles every active subscription at startup, on best-effort
-hints, and every 30 seconds with 10% jitter. It keeps one local consumer per
-active subscription; Kafka assigns partitions. Readiness is exposed through
-`EventWorkerManager.ready` after the first successful authoritative database
-reconciliation, without waiting for broker connections. An enabled process with
-no subscriptions remains healthy and idle. HTTP probes and operational routes
-are outside this process API.
-
-Startup/replacement work is limited to eight concurrent tasks with a 30-second
-attempt deadline. Preparation and finalization each have a shared limit of eight.
-`APP_EVENT_PROCESSING_CONCURRENCY` (default `8`) bounds downstream work across
-all local consumers and the independent prepared-delivery recovery scanner.
-Database connections use the existing bounded pool settings. Every concurrent
-operation opens its own session; database transactions do not span broker or
-Temporal calls. These are resource bounds, not measured throughput guarantees.
-
-The optional Redis receiver listens on
-`syntara:eventstreams:subscription_changes`. A message is only a wakeup: its
-payload is ignored and PostgreSQL is reread. Embedders can call
-`EventWorkerManager.request_reconcile()` directly. Lost hints or unavailable
-Redis do not prevent authoritative reconciliation. Publication-side hint sending
-is outside this change; periodic reconciliation works without any publisher.
-
-Prepared recovery runs without active consumers, including for paused,
-unpublished, and retired sources. During initial Temporal connection setup,
-SIGINT/SIGTERM close admission and stop connection startup; consumers and recovery
-have not started yet. Once the running lifecycle installs its signal handlers,
-SIGINT/SIGTERM stop reconciliation/replacement and new recovery claims before
-closing admission. The process then delegates drain to supervisors/runners and recovery within
-`APP_EVENT_DRAIN_TIMEOUT_SECONDS` (default `20`), preserving unresolved evidence.
-Only currently assigned consumers may commit Kafka positions. Redis closes after
-drain, Temporal client references follow the existing SDK-managed cleanup
-pattern, and the database engine is disposed afterward.
-
-This command adds no operator/compose packaging, execution-plane deployment,
-autoscaling, per-subscription deployments, Visibility system, filtering, or Publish.
-No database or public API schema changes are required. To stop this process,
-drain it and disable the switch; retain the existing delivery/Execution evidence
-and apply the upstream migration downgrade safeguards separately.
-
 ### Prerequisites
 
 - Python (3.12, 3.13, or 3.14)
@@ -139,6 +86,32 @@ and apply the upstream migration downgrade safeguards separately.
    cd syntara/backend
    make install
    ```
+
+### Control-plane Kafka Worker
+
+Run the standalone consumer process from `backend/` after installing dependencies
+and applying database migrations:
+
+```bash
+APP_EVENTSTREAM_ENABLED=true uv run python -m syntara.eventstreams.consumer_entrypoint
+```
+
+Use the existing database, encryption-key, signing-key, and Temporal TLS settings
+in `.env`. Each process registers a fresh UUID and claims a fair share of active
+subscriptions through PostgreSQL placement leases. Redis hints and terminal-proof
+caching are optional; PostgreSQL remains authoritative.
+
+Readiness follows registration and the first successful authoritative
+reconciliation, including when the process owns no subscriptions. Broker
+connections start independently. Prepared-delivery recovery also runs when no
+consumer is owned.
+
+SIGINT/SIGTERM close reconciliation, recovery claims, and admission immediately.
+Cleanup marks membership draining and retains heartbeats and lease renewals through
+bounded consumer drain. Consumers stop before their leases are released. A failed
+draining write is retried best effort; if PostgreSQL stays unavailable, peers must
+wait for membership expiry. Unresolved work is retained, and shared clients close
+after bounded cleanup.
 
 ### Dependency Management
 

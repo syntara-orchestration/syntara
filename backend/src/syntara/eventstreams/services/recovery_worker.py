@@ -7,6 +7,7 @@ from contextlib import nullcontext
 from typing import TYPE_CHECKING
 
 import structlog
+from sqlalchemy.exc import SQLAlchemyError
 
 from syntara.core.constants import EventDeliveryDefaults, FieldLimits
 from syntara.core.workers.periodic import PeriodicWorker
@@ -114,7 +115,7 @@ class EventDeliveryRecoveryWorker:
         if self._in_flight is not None and not self._in_flight.done():
             try:
                 async with asyncio.timeout(DRAIN_TIMEOUT_SECONDS):
-                    await self._in_flight
+                    await asyncio.shield(self._in_flight)
             except (TimeoutError, asyncio.CancelledError):
                 logger.warning(
                     "event_delivery_recovery_drain_timeout",
@@ -140,12 +141,17 @@ class EventDeliveryRecoveryWorker:
     async def _claim_and_recover_one(self) -> SchedulingResult | None:
         """Claim a single due delivery and recover it immediately."""
         async with self._resources.processing if self._resources is not None else nullcontext():
-            if self._draining:
+            if self._draining or (self._resources is not None and not self._resources.scheduling_open):
                 return None
-            async with self._session_factory() as session, session.begin():
-                if self._draining:
-                    return None  # type: ignore[unreachable]  # changed during session/transaction entry
-                claims = await EventDeliveryStore(session).claim_due(self._worker_id, limit=1, prepared_only=True)
+            try:
+                async with self._session_factory() as session, session.begin():
+                    if self._draining or (self._resources is not None and not self._resources.scheduling_open):
+                        return None
+                    claims = await EventDeliveryStore(session).claim_due(self._worker_id, limit=1, prepared_only=True)
+            except (SQLAlchemyError, OSError, TimeoutError):
+                if self._resources is not None:
+                    self._resources.database_failed()
+                raise
             if not claims:
                 return None
             return await self._admission.recover_claim(claims[0])

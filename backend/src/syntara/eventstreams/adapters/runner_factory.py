@@ -2,6 +2,7 @@
 
 from collections.abc import Callable
 
+from sqlalchemy.exc import SQLAlchemyError
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from syntara.core.lib.encryption import SecretEncryptor
@@ -12,6 +13,7 @@ from syntara.eventstreams.adapters.kafka_consumer import KafkaPartitionConsumer
 from syntara.eventstreams.adapters.kafka_record_runner import KafkaRecordRunner
 from syntara.eventstreams.adapters.kafka_source_configuration import KafkaSourceConfiguration
 from syntara.eventstreams.core.connection import ResolvedKafkaConnection
+from syntara.eventstreams.core.deduplication import TerminalDeliveryCache
 from syntara.eventstreams.core.runtime import RuntimeFailureCode, SubscriptionRunner, SubscriptionRuntimeError
 from syntara.eventstreams.models.subscription_snapshot import SubscriptionSnapshot
 from syntara.eventstreams.services.admission_service import EventAdmissionService
@@ -37,6 +39,7 @@ class ManagedRunnerFactory:
         encryptor: SecretEncryptor,
         *,
         owner_worker_id: str,
+        lookup: TerminalDeliveryCache | None = None,
     ) -> None:
         """Receive process-scoped dependencies; no request or shared session is retained."""
         self._session_factory = session_factory
@@ -45,11 +48,33 @@ class ManagedRunnerFactory:
         self._resources = resources
         self._encryptor = encryptor
         self._owner = owner_worker_id
+        self._lookup = lookup
 
     async def __call__(self, snapshot: SubscriptionSnapshot) -> SubscriptionRunner:
         """Return one unstarted transport runner for the exact immutable binding."""
         if snapshot.transport != "kafka" or not isinstance(snapshot.configuration, KafkaSourceConfiguration):
             raise SubscriptionRuntimeError(RuntimeFailureCode.CONFIGURATION_UNAVAILABLE)
+        try:
+            connection = await self._resolve_connection(snapshot)
+        except SQLAlchemyError as exc:
+            self._resources.database_failed()
+            raise SubscriptionRuntimeError(RuntimeFailureCode.CONNECTION_UNAVAILABLE, transient=True) from exc
+        except (OSError, TimeoutError) as exc:
+            raise SubscriptionRuntimeError(RuntimeFailureCode.CONNECTION_UNAVAILABLE, transient=True) from exc
+        client = KafkaPartitionConsumer(connection, snapshot.configuration, client_id=self._owner)
+        return KafkaRecordRunner(
+            snapshot,
+            client,
+            self._session_factory,
+            self._preparation,
+            self._admission,
+            owner_worker_id=self._owner,
+            work_semaphore=self._resources.processing,
+            lookup=self._lookup,
+            gate=self._resources.gate,
+        )
+
+    async def _resolve_connection(self, snapshot: SubscriptionSnapshot) -> ResolvedKafkaConnection:
         async with self._session_factory() as session, session.begin():
             secrets = SecretService(session, self._encryptor, DatabaseBackend(session))
             await EventConnectionProvider(session, secret_service=secrets).resolve_revision(snapshot)
@@ -71,13 +96,4 @@ class ManagedRunnerFactory:
                 sasl_plain_password=password,
                 ssl_context=KafkaAdapter(config)._ssl_context(),  # noqa: SLF001 - reuse Integration TLS semantics
             )
-        client = KafkaPartitionConsumer(connection, snapshot.configuration, client_id=self._owner)
-        return KafkaRecordRunner(
-            snapshot,
-            client,
-            self._session_factory,
-            self._preparation,
-            self._admission,
-            owner_worker_id=self._owner,
-            work_semaphore=self._resources.processing,
-        )
+        return connection  # noqa: RET504 - session must close before client construction

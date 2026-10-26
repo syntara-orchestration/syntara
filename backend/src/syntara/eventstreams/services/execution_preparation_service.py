@@ -107,11 +107,19 @@ class EventExecutionPreparationService:
         start Temporal or commit an offset from the exception.
         """
         async with self._resources.preparation if self._resources is not None else nullcontext():
-            if claim is None and self._resources is not None and not self._resources.accepting:
+            if (
+                claim is None
+                and self._resources is not None
+                and (not self._resources.accepting or not self._resources.scheduling_open)
+            ):
                 return PreparationBlocked()
             try:
                 async with self._session_factory() as session, session.begin():
-                    if claim is None and self._resources is not None and not self._resources.accepting:
+                    if (
+                        claim is None
+                        and self._resources is not None
+                        and (not self._resources.accepting or not self._resources.scheduling_open)
+                    ):
                         return PreparationBlocked()
                     result = _require_prepared(
                         await self._prepare(session, snapshot, identity, envelope, owner_worker_id, claim)

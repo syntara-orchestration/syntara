@@ -4,6 +4,7 @@ import asyncio
 from datetime import UTC, datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
+from uuid import UUID, uuid4
 
 import pytest
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -11,11 +12,16 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from syntara.core.config.base import get_settings
 from syntara.eventstreams import consumer_lifecycle as lifecycle
 from syntara.eventstreams.consumer_service import EventWorkerManager
-from syntara.eventstreams.core.deduplication import DeliveryState
+from syntara.eventstreams.core.deduplication import DeliveryState, RecoveryReservation
+from syntara.eventstreams.core.placement import WorkerIdentity
+from syntara.eventstreams.core.preparation import PreparedExecution
 from syntara.eventstreams.models.delivery import EventDelivery
+from syntara.eventstreams.models.recovery_hold import EventDeliveryRecoveryHold
 from syntara.eventstreams.models.source import EventSubscriptionSource
 from syntara.eventstreams.models.subscription import EventSubscription
 from syntara.eventstreams.services.admission_service import EventAdmissionService
+from syntara.eventstreams.services.delivery_retention_service import EventDeliveryRetentionService
+from syntara.eventstreams.services.placement_service import SubscriptionPlacementService
 from syntara.eventstreams.services.recovery_worker import EventDeliveryRecoveryWorker
 from syntara.eventstreams.services.subscription_reader import EventSubscriptionReader
 from syntara.eventstreams.services.worker_resources import EventWorkerResources
@@ -23,6 +29,9 @@ from syntara.workflows.models.execution import Execution
 from syntara.workflows.models.workflow import Workflow
 from tests.helpers.eventstream_runtime import IsolatedSubscriptionRunner
 from tests.integration.eventstreams import test_execution_scheduling
+from tests.integration.eventstreams.conftest import DeliveryContext
+from tests.integration.eventstreams.test_execution_preparation import envelope
+from tests.integration.eventstreams.test_execution_preparation import service as preparation_service
 
 pytestmark = pytest.mark.integration
 scheduling_context = test_execution_scheduling.scheduling_context
@@ -34,7 +43,7 @@ async def eventually(predicate) -> None:
             await asyncio.sleep(0)
 
 
-async def disable(context, state):
+async def disable(context: DeliveryContext, state: str) -> None:
     async with context.session_factory() as session, session.begin():
         subscription = await session.get(EventSubscription, context.snapshot.subscription_id)
         assert subscription is not None
@@ -65,33 +74,67 @@ async def test_reader_tracks_persisted_active_state(delivery_context, state):
         sessions.append(session)
         return session
 
-    reader = EventSubscriptionReader(factory)
+    reader = EventSubscriptionReader(factory, deployment_id=context.snapshot.deployment_id)
     snapshots = await asyncio.gather(*(reader.read() for _ in range(3)))
     assert all(rows == [context.snapshot] for rows in snapshots)
     assert len({id(session) for session in sessions}) == 3
     assert all(not session.in_transaction() for session in sessions)
+    foreign = EventSubscriptionReader(factory, deployment_id=uuid4())
+    assert await foreign.read() == []
     await disable(context, state)
     assert await reader.read() == []
 
 
-async def test_each_process_reconciles_one_local_client_and_stops_on_hint(delivery_context):
+async def test_recovery_hold_reader_is_scoped_to_the_process_deployment(delivery_context):
+    context = delivery_context
+    retention = EventDeliveryRetentionService(context.session_factory)
+    reservation = await retention.reserve_recovery(context.snapshot.source_id)
+    assert reservation is not None
+    reader = EventSubscriptionReader(context.session_factory, deployment_id=context.snapshot.deployment_id)
+    foreign = EventSubscriptionReader(context.session_factory, deployment_id=uuid4())
+    try:
+        assert await reader.recovery_holds() == {context.snapshot.source_id}
+        assert await foreign.recovery_holds() == set()
+    finally:
+        assert await retention.release_recovery(reservation)
+
+
+async def test_processes_share_one_committed_placement_and_stop_on_hint(delivery_context):
     context = delivery_context
     runners = []
 
-    def construct(snapshot) -> IsolatedSubscriptionRunner:
+    async def construct(snapshot) -> IsolatedSubscriptionRunner:
+        async with context.session_factory() as session:
+            subscription = await session.get(EventSubscription, snapshot.subscription_id)
+            assert subscription is not None
+            assert subscription.assigned_worker_id == providers[0].worker.worker_id
+            assert subscription.assignment_lease_until is not None
         runner = IsolatedSubscriptionRunner(snapshot, [])
         runners.append(runner)
         return runner
 
     factories = [AsyncMock(side_effect=construct), AsyncMock(side_effect=construct)]
-    managers = [EventWorkerManager(EventSubscriptionReader(context.session_factory), factory) for factory in factories]
+    providers = [await SubscriptionPlacementService.create(context.session_factory) for _ in range(2)]
+    providers.sort(key=lambda provider: provider.worker.worker_id)
+    managers = [
+        EventWorkerManager(
+            EventSubscriptionReader(context.session_factory, deployment_id=provider.worker.deployment_id),
+            factory,
+            provider,
+            EventWorkerResources(),
+        )
+        for factory, provider in zip(factories, providers, strict=True)
+    ]
     try:
-        await asyncio.gather(*(manager.start() for manager in managers))
-        await eventually(lambda: len(runners) == 2 and all(runner.started for runner in runners))
+        for manager in managers:
+            await manager.start()
+        await eventually(lambda: len(runners) == 1 and runners[0].started)
         await asyncio.gather(*(manager.reconcile() for manager in managers))
-        assert all(factory.await_count == 1 for factory in factories)
+        assert factories[0].await_count == 1
+        factories[1].assert_not_awaited()
         assert all(manager.ready for manager in managers)
-        assert runners[0].snapshot.configuration == runners[1].snapshot.configuration
+        assert managers[0].owned_subscription_ids == {context.snapshot.subscription_id}
+        assert not managers[1].owned_subscription_ids
         await disable(context, "paused")
         for manager in managers:
             manager.request_reconcile()
@@ -102,12 +145,38 @@ async def test_each_process_reconciles_one_local_client_and_stops_on_hint(delive
         await asyncio.gather(*(manager.stop() for manager in managers))
 
 
-@pytest.mark.parametrize("state", ["paused", "unpublished", "retired", "blocked_startup"])
+async def _prepare_recovery_state(
+    context: test_execution_scheduling.SchedulingContext, state: str
+) -> tuple[EventDeliveryRetentionService, RecoveryReservation | None]:
+    if state in {"paused", "unpublished", "retired"}:
+        await disable(context.delivery, state)
+    retention = EventDeliveryRetentionService(context.delivery.session_factory)
+    reservation = None
+    if state == "recovery_hold":
+        await disable(context.delivery, "paused")
+        reservation = await retention.reserve_recovery(context.delivery.snapshot.source_id)
+        assert reservation is not None
+    await context.delivery.expire(context.prepared.claim)
+    return retention, reservation
+
+
+async def _wait_for_scheduled(context: test_execution_scheduling.SchedulingContext) -> None:
+    async with asyncio.timeout(5):
+        while True:
+            async with context.delivery.session_factory() as session:
+                row = await session.get(EventDelivery, context.prepared.claim.identity.digest)
+                assert row is not None
+                if row.state == DeliveryState.SCHEDULED:
+                    break
+            await asyncio.sleep(0)
+
+
+@pytest.mark.parametrize(
+    "state", ["paused", "unpublished", "retired", "blocked_startup", "zero_target", "recovery_hold"]
+)
 async def test_scanner_recovers_independently_of_consumers(scheduling_context, state):
     context = scheduling_context
-    if state != "blocked_startup":
-        await disable(context.delivery, state)
-    await context.delivery.expire(context.prepared.claim)
+    retention, reservation = await _prepare_recovery_state(context, state)
     release = asyncio.Event()
     runners = []
 
@@ -118,8 +187,21 @@ async def test_scanner_recovers_independently_of_consumers(scheduling_context, s
         return runner
 
     factory = AsyncMock(side_effect=construct)
-    manager = EventWorkerManager(EventSubscriptionReader(context.delivery.session_factory), factory)
     resources = EventWorkerResources()
+    placement = await SubscriptionPlacementService.create(context.delivery.session_factory)
+    other = None
+    if state == "zero_target":
+        other = SubscriptionPlacementService(
+            context.delivery.session_factory,
+            WorkerIdentity(deployment_id=placement.worker.deployment_id, worker_id=UUID(int=0)),
+        )
+        await other.heartbeat_worker(other.worker, draining=False)
+    manager = EventWorkerManager(
+        EventSubscriptionReader(context.delivery.session_factory, deployment_id=placement.worker.deployment_id),
+        factory,
+        placement,
+        resources,
+    )
     admission = EventAdmissionService(context.delivery.session_factory, context.temporal, resources=resources)
     recovery = EventDeliveryRecoveryWorker(
         context.delivery.session_factory,
@@ -134,14 +216,7 @@ async def test_scanner_recovers_independently_of_consumers(scheduling_context, s
         lifecycle.run_event_worker(manager, recovery, resources, hints, shutdown_event=shutdown)
     )
     try:
-        async with asyncio.timeout(5):
-            while True:
-                async with context.delivery.session_factory() as session:
-                    row = await session.get(EventDelivery, context.prepared.claim.identity.digest)
-                    assert row is not None
-                    if row.state == DeliveryState.SCHEDULED:
-                        break
-                await asyncio.sleep(0)
+        await _wait_for_scheduled(context)
         assert manager.ready
         assert len(context.temporal.starts) == 1
         assert context.temporal.starts[0].workflow_arguments() == context.prepared.workflow_arguments()
@@ -150,22 +225,34 @@ async def test_scanner_recovers_independently_of_consumers(scheduling_context, s
             assert not runners[0].started
         else:
             factory.assert_not_awaited()
+            assert not manager.owned_subscription_ids
         async with context.delivery.session_factory() as session:
             execution = await session.get(Execution, context.prepared.execution_id)
             assert execution is not None
             assert execution.execution_metadata["event_delivery"]["scheduling_state"] == "confirmed"
+            if reservation is not None:
+                hold = await session.get(EventDeliveryRecoveryHold, reservation.token)
+                assert hold is not None
+                assert hold.released_at is None
     finally:
         shutdown.set()
         await process
         release.set()
+        if other is not None:
+            await other.heartbeat_worker(other.worker, draining=True)
+        if reservation is not None:
+            assert await retention.release_recovery(reservation)
 
 
 async def test_shutdown_stops_claims_and_preserves_waiting_preparation(scheduling_context, monkeypatch):
     context = scheduling_context
-    await disable(context.delivery, "paused")
     await context.delivery.expire(context.prepared.claim)
-    second = await context.delivery.claim(42, prepare=True)
-    await context.delivery.expire(second)
+    second = await preparation_service(context.delivery).prepare_delivery(
+        context.delivery.snapshot, context.delivery.identity(42), await envelope(context.delivery, offset=42), "first"
+    )
+    assert isinstance(second, PreparedExecution)
+    await context.delivery.expire(second.claim)
+    await disable(context.delivery, "paused")
     entered, release = asyncio.Event(), asyncio.Event()
 
     async def block() -> None:
@@ -175,7 +262,13 @@ async def test_shutdown_stops_claims_and_preserves_waiting_preparation(schedulin
     context.temporal.before_first_start = block
     resources = EventWorkerResources()
     resources.processing = asyncio.Semaphore(1)
-    manager = EventWorkerManager(EventSubscriptionReader(context.delivery.session_factory), AsyncMock())
+    placement = await SubscriptionPlacementService.create(context.delivery.session_factory)
+    manager = EventWorkerManager(
+        EventSubscriptionReader(context.delivery.session_factory, deployment_id=placement.worker.deployment_id),
+        AsyncMock(),
+        placement,
+        resources,
+    )
     admission = EventAdmissionService(context.delivery.session_factory, context.temporal, resources=resources)
     recovery = EventDeliveryRecoveryWorker(
         context.delivery.session_factory,
@@ -201,11 +294,11 @@ async def test_shutdown_stops_claims_and_preserves_waiting_preparation(schedulin
         await process
         assert len(context.temporal.starts) == 1
         async with context.delivery.session_factory() as session:
-            row = await session.get(EventDelivery, second.identity.digest)
+            row = await session.get(EventDelivery, second.claim.identity.digest)
             assert row is not None
             assert row.state == DeliveryState.IN_PROGRESS
-            assert row.frozen_binding == second.binding
-            assert row.claim_token == second.token
+            assert row.frozen_binding == second.claim.binding
+            assert row.claim_token == second.claim.token
     finally:
         release.set()
         shutdown.set()

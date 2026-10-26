@@ -6,26 +6,19 @@ from collections.abc import Callable
 
 import structlog
 
-from syntara.core.cache.base import BaseRedisClient
-from syntara.core.cache.pubsub_client import PubSubMixin
 from syntara.core.constants import EventWorkerDefaults
+from syntara.eventstreams.services.worker_redis import EventWorkerRedisClient
 
 logger = structlog.stdlib.get_logger(__name__)
-
-
-class EventHintRedisClient(BaseRedisClient, PubSubMixin):
-    """Reuse platform Redis configuration and bounded connection pools."""
-
-    _client_name = "event-subscription-hints"
 
 
 class SubscriptionHintListener:
     """Listen independently of reconciliation; lost or unavailable hints are harmless."""
 
-    def __init__(self, request_reconcile: Callable[[], None], client: EventHintRedisClient | None = None) -> None:
-        """Inject a wakeup callback and optionally an isolated Redis client."""
+    def __init__(self, request_reconcile: Callable[[], None], client: EventWorkerRedisClient) -> None:
+        """Borrow the process-owned event Redis client without owning its pool."""
         self._request = request_reconcile
-        self._client = client if client is not None else EventHintRedisClient()
+        self._client = client
         self._task: asyncio.Task[None] | None = None
         self._closed = False
 
@@ -54,14 +47,13 @@ class SubscriptionHintListener:
                     async with asyncio.timeout(EventWorkerDefaults.HINT_TIMEOUT_SECONDS):
                         if pubsub is not None:
                             await pubsub.aclose()  # type: ignore[no-untyped-call]  # Redis PubSub SDK boundary
-                        await self._client.disconnect()
                 except Exception:  # noqa: BLE001 - cleanup of an unavailable optional dependency is best effort
                     logger.warning("event_subscription_hints_close_incomplete")
             if not self._closed:
                 await asyncio.sleep(EventWorkerDefaults.RECONCILE_INTERVAL_SECONDS)
 
     async def stop(self) -> None:
-        """Stop wakeups and close the process-owned Redis connection pool."""
+        """Stop wakeups and close only this listener's Pub/Sub subscription."""
         self._closed = True
         if self._task is not None:
             self._task.cancel()

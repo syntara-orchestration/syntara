@@ -2,7 +2,6 @@
 
 import asyncio
 import signal
-from uuid import uuid4
 
 import structlog
 
@@ -16,10 +15,15 @@ from syntara.eventstreams.consumer_lifecycle import run_event_worker, settle_wor
 from syntara.eventstreams.consumer_service import EventWorkerManager
 from syntara.eventstreams.handlers.workflow_launcher import TemporalWorkflowLauncher
 from syntara.eventstreams.services.admission_service import EventAdmissionService
+from syntara.eventstreams.services.delivery_cache import EventDeliveryTerminalLookup
+from syntara.eventstreams.services.delivery_cache_policy import DeliveryEvidencePolicy
 from syntara.eventstreams.services.execution_preparation_service import EventExecutionPreparationService
+from syntara.eventstreams.services.placement_service import SubscriptionPlacementService
 from syntara.eventstreams.services.recovery_worker import EventDeliveryRecoveryWorker
 from syntara.eventstreams.services.subscription_hints import SubscriptionHintListener
 from syntara.eventstreams.services.subscription_reader import EventSubscriptionReader
+from syntara.eventstreams.services.worker_gate import EventWorkerGate
+from syntara.eventstreams.services.worker_redis import EventWorkerRedisClient
 from syntara.eventstreams.services.worker_resources import EventWorkerResources
 from syntara.workflows.workflow_engine.services.temporal_execution_service import (
     TemporalExecutionService,
@@ -36,19 +40,39 @@ async def _run_connected(
     shutdown: asyncio.Event,
 ) -> None:
     """Compose completed services without owning or sharing an AsyncSession."""
-    owner = f"event-worker-{uuid4()}"
+    async with asyncio.timeout(EventWorkerDefaults.PLACEMENT_TIMEOUT_SECONDS):
+        placement = await SubscriptionPlacementService.create(AsyncSessionLocal)
+    owner = f"event-worker-{placement.worker.worker_id}"
+    gate = EventWorkerGate(placement)
+    resources.gate = gate
+    redis = EventWorkerRedisClient()
+    cache = EventDeliveryTerminalLookup(
+        AsyncSessionLocal, cache=redis, policy=DeliveryEvidencePolicy.from_settings(), clock_is_safe=gate.cache_trusted
+    )
     launcher = TemporalWorkflowLauncher(temporal)
     preparation = EventExecutionPreparationService(AsyncSessionLocal, resources=resources)
-    admission = EventAdmissionService(AsyncSessionLocal, launcher, resources=resources)
+    admission = EventAdmissionService(AsyncSessionLocal, launcher, resources=resources, cache=cache)
     factory = ManagedRunnerFactory(
-        AsyncSessionLocal, preparation, admission, resources, encryptor, owner_worker_id=owner
+        AsyncSessionLocal, preparation, admission, resources, encryptor, owner_worker_id=owner, lookup=cache
     )
-    manager = EventWorkerManager(EventSubscriptionReader(AsyncSessionLocal), factory)
+    manager = EventWorkerManager(
+        EventSubscriptionReader(AsyncSessionLocal, deployment_id=placement.worker.deployment_id),
+        factory,
+        placement,
+        resources,
+    )
     recovery = EventDeliveryRecoveryWorker(
         AsyncSessionLocal, launcher, worker_id=owner, admission=admission, resources=resources
     )
-    hints = SubscriptionHintListener(manager.request_reconcile)
-    await run_event_worker(manager, recovery, resources, hints, shutdown_event=shutdown)
+    hints = SubscriptionHintListener(manager.request_reconcile, redis)
+    try:
+        await run_event_worker(manager, recovery, resources, hints, shutdown_event=shutdown)
+    finally:
+        try:
+            async with asyncio.timeout(EventWorkerDefaults.HINT_TIMEOUT_SECONDS):
+                await redis.disconnect()
+        except Exception:  # noqa: BLE001 - optional Redis cleanup cannot skip Temporal/database cleanup
+            logger.warning("event_worker_redis_close_incomplete")
 
 
 async def _connect_temporal(shutdown: asyncio.Event) -> TemporalExecutionService | None:

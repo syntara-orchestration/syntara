@@ -24,6 +24,7 @@ from syntara.workflows.models.execution import Execution
 from syntara.workflows.models.workflow import Workflow
 from tests.integration.eventstreams.conftest import AvailableCapacity, DeliveryContext
 from tests.integration.eventstreams.test_execution_preparation import envelope
+from tests.integration.eventstreams.test_execution_preparation import service as preparation_service
 from tests.integration.eventstreams.test_execution_scheduling import IsolatedTemporal
 
 pytestmark = pytest.mark.integration
@@ -154,7 +155,11 @@ async def test_failure_isolation_across_deliveries(recovery_worker) -> None:
     worker, context, temporal, prepared = recovery_worker
     await context.expire(prepared.claim)
 
-    good_claim = await context.claim(42, prepare=True)
+    good_prepared = await preparation_service(context).prepare_delivery(
+        context.snapshot, context.identity(42), await envelope(context, offset=42), "first"
+    )
+    assert isinstance(good_prepared, PreparedExecution)
+    good_claim = good_prepared.claim
     await context.expire(good_claim)
 
     temporal.fail_starts = True
@@ -216,7 +221,11 @@ async def test_drain_during_blocked_temporal_prevents_further_claims(
     worker, context, temporal, prepared = recovery_worker
     await context.expire(prepared.claim)
 
-    second_claim = await context.claim(42, prepare=True)
+    second_prepared = await preparation_service(context).prepare_delivery(
+        context.snapshot, context.identity(42), await envelope(context, offset=42), "first"
+    )
+    assert isinstance(second_prepared, PreparedExecution)
+    second_claim = second_prepared.claim
     await context.expire(second_claim)
 
     temporal_blocked = asyncio.Event()
@@ -236,6 +245,7 @@ async def test_drain_during_blocked_temporal_prevents_further_claims(
             await worker.drain()
 
         assert worker.draining
+        assert not execute_task.done()
 
         temporal_release.set()
         await execute_task

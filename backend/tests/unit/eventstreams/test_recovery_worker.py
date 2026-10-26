@@ -168,19 +168,22 @@ async def test_drain_sets_flag_and_awaits_in_flight() -> None:
 @pytest.mark.asyncio
 async def test_drain_timeout_does_not_hang() -> None:
     worker, _ = _worker()
+    release = asyncio.Event()
 
     async def never_finish() -> None:
-        await asyncio.sleep(3600)
+        await release.wait()
 
     task = asyncio.create_task(never_finish())
     worker._in_flight = task
 
-    with patch("syntara.eventstreams.services.recovery_worker.DRAIN_TIMEOUT_SECONDS", 0.01):
-        await worker.drain()
-
-    assert worker.draining
-    task.cancel()
-    await asyncio.gather(task, return_exceptions=True)
+    try:
+        with patch("syntara.eventstreams.services.recovery_worker.DRAIN_TIMEOUT_SECONDS", 0.01):
+            await worker.drain()
+        assert worker.draining
+        assert not task.done()
+    finally:
+        release.set()
+        await asyncio.gather(task, return_exceptions=True)
 
 
 @pytest.mark.asyncio

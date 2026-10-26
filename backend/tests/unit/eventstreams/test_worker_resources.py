@@ -11,6 +11,7 @@ from syntara.eventstreams.core.preparation import PreparationBlocked, PreparedEx
 from syntara.eventstreams.services.admission_service import EventAdmissionService
 from syntara.eventstreams.services.execution_preparation_service import EventExecutionPreparationService
 from syntara.eventstreams.services.recovery_worker import EventDeliveryRecoveryWorker
+from syntara.eventstreams.services.worker_gate import EventWorkerGate
 from syntara.eventstreams.services.worker_resources import EventWorkerResources
 from tests.unit.eventstreams.test_consumer_service import eventually
 from tests.unit.eventstreams.test_execution_preparation_service import preparation_context
@@ -50,11 +51,68 @@ class TrackingSessionFactory:
         return session
 
 
-async def test_shared_preparation_bounds_sessions_and_rechecks_closed_admission(monkeypatch):
+@pytest.fixture
+def healthy_gate() -> MagicMock:
+    gate = MagicMock(spec=EventWorkerGate)
+    gate.scheduling_open = True
+    return gate
+
+
+def test_missing_gate_preserves_failures_and_closed_admission_until_composed():
+    resources = EventWorkerResources()
+    assert not resources.scheduling_open
+    resources.database_failed()
+    resources.close_admission()
+    gate = MagicMock(spec=EventWorkerGate)
+    gate.scheduling_open = False
+    resources.gate = gate
+    gate.database_failed.assert_called_once()
+    gate.close_admission.assert_called_once()
+    assert not resources.scheduling_open
+    assert not resources.accepting
+
+
+@pytest.mark.parametrize("remove_gate", [False, True])
+def test_installed_gate_cannot_be_replaced_to_clear_database_failure(remove_gate):
+    gate = EventWorkerGate(MagicMock(), clock=lambda: 100.0)
+    gate.membership_confirmed(160.0, generation=gate.generation)
+    assert gate.reconciled([], set(), generation=gate.generation, started=100.0)
+    resources = EventWorkerResources(gate)
+    assert resources.scheduling_open
+    resources.database_failed()
+    assert not resources.scheduling_open
+    replacement = None if remove_gate else MagicMock(spec=EventWorkerGate)
+    if replacement is not None:
+        replacement.scheduling_open = True
+    with pytest.raises(ValueError, match="already installed"):
+        resources.gate = replacement
+    assert resources.gate is gate
+    assert not resources.scheduling_open
+    resources.gate = gate
+    assert not resources.scheduling_open
+
+
+async def test_missing_gate_blocks_preparation_scheduling_and_recovery_claims(monkeypatch):
+    context = preparation_context(monkeypatch)
+    resources = EventWorkerResources()
+    sessions, launcher = MagicMock(), MagicMock()
+    preparation = EventExecutionPreparationService(sessions, resources=resources)
+    result = await preparation.prepare_delivery(context.snapshot, context.identity, context.envelope, "worker")
+    assert isinstance(result, PreparationBlocked)
+    admission = EventAdmissionService(sessions, launcher, resources=resources)
+    assert isinstance(await admission.recover_claim(context.claim), BlockedDelivery)
+    recovery = EventDeliveryRecoveryWorker(sessions, launcher, admission=admission, resources=resources)
+    assert await recovery._claim_and_recover_one() is None
+    sessions.assert_not_called()
+    launcher.start.assert_not_called()
+    launcher.describe.assert_not_called()
+
+
+async def test_shared_preparation_bounds_sessions_and_rechecks_closed_admission(monkeypatch, healthy_gate):
     context = preparation_context(monkeypatch)
     prepared = await context.prepare()
     assert isinstance(prepared, PreparedExecution)
-    resources = EventWorkerResources()
+    resources = EventWorkerResources(healthy_gate)
     resources.preparation = asyncio.Semaphore(2)
     sessions = TrackingSessionFactory()
     service = EventExecutionPreparationService(sessions, resources=resources)
@@ -86,8 +144,8 @@ async def test_shared_preparation_bounds_sessions_and_rechecks_closed_admission(
     assert isinstance(recovered, PreparedExecution)
 
 
-async def test_finalization_limit_is_shared_across_services(monkeypatch):
-    resources = EventWorkerResources()
+async def test_finalization_limit_is_shared_across_services(monkeypatch, healthy_gate):
+    resources = EventWorkerResources(healthy_gate)
     resources.finalization = asyncio.Semaphore(1)
     services = [EventAdmissionService(MagicMock(), MagicMock(), resources=resources) for _ in range(2)]
     entered = []
@@ -110,11 +168,13 @@ async def test_finalization_limit_is_shared_across_services(monkeypatch):
 
 @pytest.mark.parametrize("close_during", ["session", "transaction"])
 @pytest.mark.parametrize("existing_claim", [False, True])
-async def test_preparation_rechecks_admission_after_session_entry(monkeypatch, close_during, existing_claim):
+async def test_preparation_rechecks_admission_after_session_entry(
+    monkeypatch, close_during, existing_claim, healthy_gate
+):
     context = preparation_context(monkeypatch)
     prepared = await context.prepare()
     assert isinstance(prepared, PreparedExecution)
-    resources = EventWorkerResources()
+    resources = EventWorkerResources(healthy_gate)
     session: MagicMock = MagicMock(spec=AsyncSession)
     session.__aenter__.return_value = session
     entry = session if close_during == "session" else session.begin.return_value
@@ -166,8 +226,8 @@ async def test_recovery_rechecks_claim_fence_after_session_entry(monkeypatch, cl
     session.begin.return_value.__aexit__.assert_awaited_once()
 
 
-async def test_recovery_waiting_for_shared_work_does_not_claim_after_close():
-    resources = EventWorkerResources()
+async def test_recovery_waiting_for_shared_work_does_not_claim_after_close(healthy_gate):
+    resources = EventWorkerResources(healthy_gate)
     resources.processing = asyncio.Semaphore(0)
     sessions = MagicMock()
     worker = EventDeliveryRecoveryWorker(sessions, MagicMock(), resources=resources)
@@ -180,7 +240,7 @@ async def test_recovery_waiting_for_shared_work_does_not_claim_after_close():
     sessions.assert_not_called()
 
 
-async def test_recovery_closes_claim_session_before_admission(monkeypatch):
+async def test_recovery_closes_claim_session_before_admission(monkeypatch, healthy_gate):
     sessions = TrackingSessionFactory()
     claim = MagicMock()
     store = MagicMock()
@@ -195,6 +255,8 @@ async def test_recovery_closes_claim_session_before_admission(monkeypatch):
 
     admission = MagicMock()
     admission.recover_claim = AsyncMock(side_effect=recover)
-    worker = EventDeliveryRecoveryWorker(sessions, MagicMock(), admission=admission, resources=EventWorkerResources())
+    worker = EventDeliveryRecoveryWorker(
+        sessions, MagicMock(), admission=admission, resources=EventWorkerResources(healthy_gate)
+    )
     await worker._claim_and_recover_one()
     store.claim_due.assert_awaited_once_with("recovery-scanner", limit=1, prepared_only=True)
