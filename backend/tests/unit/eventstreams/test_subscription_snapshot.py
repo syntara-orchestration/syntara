@@ -131,3 +131,27 @@ def test_none_input_schema_is_preserved() -> None:
     snapshot = SubscriptionSnapshot.from_models(subscription, _source(subscription))
 
     assert snapshot.input_schema is None
+
+
+def test_captured_partition_set_is_recursively_immutable_and_detached() -> None:
+    subscription = _subscription()
+    source = _source(subscription)
+    partition_ids = [4, 0, 2]
+    source.configuration = KafkaSourceConfiguration.model_validate(
+        {**source.configuration.model_dump(), "initial_partition_ids": partition_ids}
+    )
+    snapshot = SubscriptionSnapshot.from_models(subscription, source)
+
+    partition_ids.append(9)
+    assert snapshot.configuration.initial_partition_ids == (0, 2, 4)
+    with pytest.raises(TypeError):
+        snapshot.configuration.initial_partition_ids[0] = 99  # type: ignore[index]
+    with pytest.raises(ValidationError, match="frozen_instance"):
+        snapshot.configuration.initial_partition_ids = (99,)
+
+    dumped = snapshot.model_dump(mode="json")
+    assert dumped["configuration"]["initial_partition_ids"] == [0, 2, 4]
+    dumped["configuration"]["initial_partition_ids"].append(10)
+    source.configuration = KafkaSourceConfiguration(topic="other", group_id="replacement")
+    assert snapshot.configuration.initial_partition_ids == (0, 2, 4)
+    assert SubscriptionSnapshot.model_validate_json(snapshot.model_dump_json()) == snapshot

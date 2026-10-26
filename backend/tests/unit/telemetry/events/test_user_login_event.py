@@ -72,6 +72,7 @@ class TestUserLoginTelemetryEventSegmentConversion:
         segment_event = event.to_segment_event()
         assert segment_event["event"] == "user_login"
 
+    @pytest.mark.usefixtures("telemetry_image_version")
     def test_to_segment_event_contains_all_fields(self) -> None:
         event = UserLoginTelemetryEvent(
             user_id_hash=VALID_USER_ID_HASH,

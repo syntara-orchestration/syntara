@@ -86,6 +86,7 @@ class TestNewUserEventSegmentConversion:
         segment_event = event.to_segment_event()
         assert segment_event["event"] == "new_user"
 
+    @pytest.mark.usefixtures("telemetry_image_version")
     def test_to_segment_event_contains_all_fields(self) -> None:
         event = NewUserEvent(
             user_id_hash=VALID_USER_ID_HASH,

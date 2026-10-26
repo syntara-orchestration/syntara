@@ -1,6 +1,6 @@
 """Typed Kafka source configuration; no Kafka client is required."""
 
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import Field, field_validator
 
@@ -26,6 +26,25 @@ class KafkaSourceConfiguration(EventSourceConfiguration):
     group_id: str = Field(min_length=1, max_length=_MAX_GROUP_ID_LENGTH, repr=False)
     cluster_id: str | None = None
     topic_id: str | None = None
+    # Tuple storage keeps the frozen configuration recursively immutable, while
+    # JSON serialization retains the proposal's array/set representation.
+    # None is legacy/uncaptured state, never inferred from current assignment.
+    initial_partition_ids: tuple[Annotated[int, Field(strict=True, ge=0)], ...] | None = Field(
+        default=None,
+        min_length=1,
+        description="System-managed first verified topic partition set; absent until captured",
+    )
+
+    @field_validator("initial_partition_ids")
+    @classmethod
+    def validate_initial_partition_ids(cls, value: tuple[int, ...] | None) -> tuple[int, ...] | None:
+        """Require a unique set representation and serialize it in stable order."""
+        if value is None:
+            return None
+        if len(set(value)) != len(value):
+            msg = "initial_partition_ids must contain unique partition IDs"
+            raise ValueError(msg)
+        return tuple(sorted(value))
 
     @field_validator("topic")
     @classmethod
