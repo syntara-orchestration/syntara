@@ -13,7 +13,7 @@ from __future__ import annotations
 import asyncio
 import ssl
 from datetime import UTC, datetime
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, Protocol, cast
 
 import structlog
 from aiokafka import client as aiokafka_client
@@ -31,6 +31,9 @@ from syntara.integrations.adapters.protocol import (
 from syntara.integrations.models.integration import IntegrationType
 from syntara.integrations.models.integration_configuration import KafkaConfiguration  # noqa: TC001
 
+if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
+
 logger = structlog.stdlib.get_logger(__name__)
 
 _CLIENT_ID = "syntara-kafka-integration"
@@ -38,6 +41,12 @@ _MS_PER_SECOND = 1000
 # bootstrap() calls the module-level create_conn. Serializing the recorder swap
 # keeps concurrent validates from restoring the wrong function.
 _BOOTSTRAP_LOCK = asyncio.Lock()
+
+
+class _KafkaClientModule(Protocol):
+    """Type the internal connection hook aiokafka neither exports nor annotates."""
+
+    create_conn: Callable[..., Awaitable[object]]
 
 
 class KafkaAdapter:
@@ -218,7 +227,8 @@ async def _bootstrap(client: AIOKafkaClient, timeout_seconds: int) -> None:
     loop when the caller's deadline expires.
     """
     captured: list[BaseException] = []
-    original_create_conn = aiokafka_client.create_conn
+    client_module = cast("_KafkaClientModule", aiokafka_client)
+    original_create_conn = client_module.create_conn
 
     async def _recording_create_conn(*args: object, **kwargs: object) -> object:
         try:
@@ -228,7 +238,7 @@ async def _bootstrap(client: AIOKafkaClient, timeout_seconds: int) -> None:
             raise
 
     async with _BOOTSTRAP_LOCK:
-        aiokafka_client.create_conn = cast("Any", _recording_create_conn)
+        client_module.create_conn = _recording_create_conn
         try:
             async with asyncio.timeout(timeout_seconds):
                 await client.bootstrap()
@@ -237,7 +247,7 @@ async def _bootstrap(client: AIOKafkaClient, timeout_seconds: int) -> None:
                 raise captured[-1] from None
             raise
         finally:
-            aiokafka_client.create_conn = original_create_conn
+            client_module.create_conn = original_create_conn
 
 
 def _sasl_login(resolved_credential: dict[str, Any]) -> tuple[str, str] | None:

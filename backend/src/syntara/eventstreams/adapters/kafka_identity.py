@@ -18,7 +18,13 @@ from aiokafka.protocol.api import Request, RequestStruct, Response
 from aiokafka.protocol.metadata import MetadataRequest_v2, MetadataRequest_v4, MetadataRequestStruct
 from aiokafka.protocol.types import Boolean, CompactArray, CompactString, Int16, Int32, Schema, TaggedFields
 
-from syntara.eventstreams.core.consumer import IdentityObservation, IdentityStatus, SourceIdentityObservation
+from syntara.eventstreams.core.consumer import (
+    IdentityObservation,
+    IdentityStatus,
+    PartitionSetObservation,
+    PartitionSetStatus,
+    SourceIdentityObservation,
+)
 
 if TYPE_CHECKING:
     from io import BytesIO
@@ -167,8 +173,44 @@ class SourceMetadataRequest(Request[IdentityRequestStruct]):
         return request_struct_class(topics=[] if version == 0 else None)
 
 
+def _decode_partitions(topic_row: dict[str, object]) -> PartitionSetObservation:
+    """Validate every partition in the broker's full-topic metadata snapshot."""
+    error_code = topic_row.get("error_code")
+    if type(error_code) is not int:
+        return PartitionSetObservation(status=PartitionSetStatus.UNCERTAIN, error="topic error code missing or invalid")
+    if error_code != 0:
+        return PartitionSetObservation(status=PartitionSetStatus.UNAVAILABLE, error="topic metadata lookup failed")
+    return _decode_partition_rows(topic_row.get("partitions"))
+
+
+def _decode_partition_rows(rows: object) -> PartitionSetObservation:
+    """Reject partial or malformed membership without filtering failed rows."""
+    if not isinstance(rows, list) or not rows:
+        return PartitionSetObservation(status=PartitionSetStatus.UNCERTAIN, error="partition metadata missing or empty")
+    partition_ids: list[int] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            return PartitionSetObservation(status=PartitionSetStatus.UNCERTAIN, error="invalid partition metadata")
+        partition = row.get("partition")
+        error = row.get("error_code")
+        if type(partition) is not int or not 0 <= partition <= (1 << 31) - 1 or type(error) is not int:
+            return PartitionSetObservation(status=PartitionSetStatus.UNCERTAIN, error="invalid partition metadata")
+        if error != 0:
+            return PartitionSetObservation(
+                status=PartitionSetStatus.UNAVAILABLE, error="partition metadata lookup failed"
+            )
+        partition_ids.append(partition)
+    # Sorting also detects duplicates and gaps without silently deduplicating.
+    ids = tuple(sorted(partition_ids))
+    if any(partition != index for index, partition in enumerate(ids)):
+        return PartitionSetObservation(
+            status=PartitionSetStatus.UNCERTAIN, error="partition metadata duplicate or incomplete"
+        )
+    return PartitionSetObservation(status=PartitionSetStatus.VERIFIED, partition_ids=ids)
+
+
 def decode_source_identity(response: Response, *, topic: str, epoch: int) -> SourceIdentityObservation:
-    """Decode exact-topic evidence without comparing it to saved identities."""
+    """Decode independent identity and full-topic partition evidence."""
     data = response.to_object()
     cluster_id = data.get("cluster_id")
     if response.API_VERSION < MetadataRequest_v2.API_VERSION:
@@ -178,12 +220,21 @@ def decode_source_identity(response: Response, *, topic: str, epoch: int) -> Sou
     else:
         cluster = IdentityObservation(status=IdentityStatus.UNCERTAIN, error="cluster identifier missing")
 
-    topics = [row for row in data["topics"] if row.get("name", row.get("topic")) == topic]
+    rows = data.get("topics")
+    if not isinstance(rows, list) or any(
+        not isinstance(row, dict) or not isinstance(row.get("name", row.get("topic")), str) for row in rows
+    ):
+        rows = []
+    topics = [row for row in rows if row.get("name", row.get("topic")) == topic]
     identity = IdentityObservation(
         status=IdentityStatus.UNCERTAIN, error="exact topic missing or ambiguous in metadata"
     )
+    partitions = PartitionSetObservation(
+        status=PartitionSetStatus.UNCERTAIN, error="exact topic missing or ambiguous in metadata"
+    )
     if len(topics) == 1:
         row = topics[0]
+        partitions = _decode_partitions(row)
         error_code = row.get("error_code")
         if type(error_code) is not int:
             identity = IdentityObservation(status=IdentityStatus.UNCERTAIN, error="topic error code missing or invalid")
@@ -202,4 +253,6 @@ def decode_source_identity(response: Response, *, topic: str, epoch: int) -> Sou
                 )
             else:
                 identity = IdentityObservation(status=IdentityStatus.UNCERTAIN, error="topic identifier missing")
-    return SourceIdentityObservation(topic=topic, assignment_epoch=epoch, cluster_id=cluster, topic_id=identity)
+    return SourceIdentityObservation(
+        topic=topic, assignment_epoch=epoch, cluster_id=cluster, topic_id=identity, partitions=partitions
+    )

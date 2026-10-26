@@ -33,6 +33,8 @@ from syntara.eventstreams.core.consumer import (
     CommittedPositionResult,
     IdentityObservation,
     IdentityStatus,
+    PartitionSetObservation,
+    PartitionSetStatus,
     RebalanceCallback,
     SourceIdentityObservation,
 )
@@ -147,8 +149,16 @@ class KafkaPartitionConsumer:
             group_id=self._source_config.group_id,
             security_protocol=self._connection.security_protocol,
             sasl_mechanism=self._connection.sasl_mechanism,
-            sasl_plain_username=self._connection.sasl_plain_username,
-            sasl_plain_password=self._connection.sasl_plain_password,
+            sasl_plain_username=(
+                self._connection.sasl_plain_username.get_secret_value()
+                if self._connection.sasl_plain_username is not None
+                else None
+            ),
+            sasl_plain_password=(
+                self._connection.sasl_plain_password.get_secret_value()
+                if self._connection.sasl_plain_password is not None
+                else None
+            ),
             ssl_context=self._connection.ssl_context,
             enable_auto_commit=False,
             auto_offset_reset="none",
@@ -178,19 +188,19 @@ class KafkaPartitionConsumer:
         Raises ``KafkaTransportError`` if the client fails to shut down.
         The client reference is cleared regardless so a failed stop does
         not leave a stale handle.  Safe to call when already stopped.
+        Revoke callbacks can drain using their current ownership/epoch until
+        the client finishes stopping; final cleanup then invalidates that epoch.
         """
-        if self._running:
-            self._epoch += 1
-        self._running = False
         consumer = self._consumer
-        if consumer is None:
-            self._assignment = frozenset()
-            return
         try:
-            await consumer.stop()
+            if consumer is not None:
+                await consumer.stop()
         except KafkaError as exc:
             raise KafkaTransportError(_sanitize(str(exc))) from None
         finally:
+            if self._running:
+                self._epoch += 1
+            self._running = False
             self._consumer = None
             self._assignment = frozenset()
 
@@ -306,12 +316,14 @@ class KafkaPartitionConsumer:
         expected_epoch: int,
         timeout_ms: int = 5000,
     ) -> SourceIdentityObservation:
-        """Observe cluster and exact-topic IDs; never infer an identity match.
+        """Observe cluster/topic IDs and the complete exact-topic partition set.
 
         Uses the consumer's authenticated client for one bounded, version-
         negotiated Metadata request. The request cannot create topics. Status
         is independent per identifier: unsupported protocol, unknown topic,
         unavailable lookup and uncertain/missing evidence are distinct.
+        Partition membership is independently verified, even without topic-ID
+        support. It comes from fresh metadata, never assignment or fetched data.
 
         Epoch checks before/after I/O reject a superseded assignment, including
         stop/restart. A caller must still use current ownership and the same
@@ -323,6 +335,7 @@ class KafkaPartitionConsumer:
             async with asyncio.timeout(timeout_ms / 1000):
                 # aiokafka has no public consumer API for cluster/topic UUIDs.
                 # Keep access to its authenticated transport inside this adapter.
+                # The installed-client compatibility test guards this private boundary.
                 client = consumer._client  # noqa: SLF001 -- authenticated transport boundary, no public metadata-ID API
                 node_id = client.get_random_node()
                 if node_id is None:
@@ -342,10 +355,13 @@ class KafkaPartitionConsumer:
                 assignment_epoch=expected_epoch,
                 cluster_id=IdentityObservation(status=IdentityStatus.UNAVAILABLE, error="metadata lookup failed"),
                 topic_id=IdentityObservation(status=IdentityStatus.UNKNOWN_TOPIC, error="topic is unknown to broker"),
+                partitions=PartitionSetObservation(
+                    status=PartitionSetStatus.UNAVAILABLE, error="topic is unknown to broker"
+                ),
             )
         except KafkaError:
             result = self._identity_failure(expected_epoch, IdentityStatus.UNAVAILABLE, "metadata lookup failed")
-        except (AttributeError, KeyError, TypeError, ValueError):
+        except (AttributeError, IndexError, KeyError, TypeError, ValueError):
             result = self._identity_failure(expected_epoch, IdentityStatus.UNCERTAIN, "invalid metadata response")
         self._require_observation_epoch(expected_epoch, timeout_ms)
         return result
@@ -403,7 +419,16 @@ class KafkaPartitionConsumer:
     def _identity_failure(self, epoch: int, status: IdentityStatus, error: str) -> SourceIdentityObservation:
         evidence = IdentityObservation(status=status, error=error)
         return SourceIdentityObservation(
-            topic=self.topic, assignment_epoch=epoch, cluster_id=evidence, topic_id=evidence
+            topic=self.topic,
+            assignment_epoch=epoch,
+            cluster_id=evidence,
+            topic_id=evidence,
+            partitions=PartitionSetObservation(
+                status=PartitionSetStatus.UNCERTAIN
+                if status == IdentityStatus.UNCERTAIN
+                else PartitionSetStatus.UNAVAILABLE,
+                error=error,
+            ),
         )
 
     async def pause(self, partitions: Iterable[int], *, expected_epoch: int) -> None:

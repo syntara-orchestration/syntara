@@ -9,7 +9,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import UUID
 
 import pytest
-from aiokafka import TopicPartition
+from aiokafka import AIOKafkaConsumer, TopicPartition
+from aiokafka.client import AIOKafkaClient
 from aiokafka.coordinator.assignors.roundrobin import RoundRobinPartitionAssignor
 from aiokafka.errors import (
     KafkaConnectionError,
@@ -18,14 +19,21 @@ from aiokafka.errors import (
     UnknownTopicOrPartitionError,
     UnsupportedVersionError,
 )
+from aiokafka.protocol.metadata import MetadataResponse_v0
 from aiokafka.structs import OffsetAndMetadata
-from pydantic import ValidationError
+from pydantic import SecretStr, ValidationError
 
 from syntara.eventstreams.adapters.kafka_consumer import KafkaPartitionConsumer, _RebalanceListener, _sanitize
 from syntara.eventstreams.adapters.kafka_identity import MetadataResponseV10, SourceMetadataRequest
 from syntara.eventstreams.adapters.kafka_source_configuration import KafkaSourceConfiguration
 from syntara.eventstreams.core.connection import ResolvedKafkaConnection
-from syntara.eventstreams.core.consumer import MAX_POSITION_OFFSET, IdentityStatus, PositionStatus, RebalanceCallback
+from syntara.eventstreams.core.consumer import (
+    MAX_POSITION_OFFSET,
+    IdentityStatus,
+    PartitionSetStatus,
+    PositionStatus,
+    RebalanceCallback,
+)
 from syntara.eventstreams.exceptions import (
     ConsumerNotRunningError,
     KafkaTransportError,
@@ -118,8 +126,10 @@ async def test_client_constructed_with_mandated_config(mock_aiokafka: MagicMock)
     assert kwargs["security_protocol"] == "SASL_SSL"
     assert kwargs["sasl_mechanism"] == "SCRAM-SHA-256"
     assert kwargs["bootstrap_servers"] == conn.bootstrap_servers
-    assert kwargs["sasl_plain_username"] == conn.sasl_plain_username
-    assert kwargs["sasl_plain_password"] == conn.sasl_plain_password
+    assert conn.sasl_plain_username is not None
+    assert conn.sasl_plain_password is not None
+    assert kwargs["sasl_plain_username"] == conn.sasl_plain_username.get_secret_value()
+    assert kwargs["sasl_plain_password"] == conn.sasl_plain_password.get_secret_value()
     assert kwargs["ssl_context"] is conn.ssl_context
     assert kwargs["partition_assignment_strategy"] == (RoundRobinPartitionAssignor,)
     args, subscribe_kwargs = mock_aiokafka.return_value.subscribe.call_args
@@ -173,6 +183,68 @@ async def test_stop_raises_on_shutdown_error(mock_aiokafka: MagicMock) -> None:
 
     assert not bool(adapter.is_running)
     assert adapter._consumer is None
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("commit_fails", [False, True], ids=["drained", "drain-failed"])
+async def test_stop_allows_revoke_drain_before_final_cleanup(mock_aiokafka: MagicMock, *, commit_fails: bool) -> None:
+    """Shutdown keeps the assigned epoch valid while a revoke callback drains."""
+    callback_epoch: int | None = None
+
+    class _DrainCallback:
+        async def on_partitions_assigned(self, partitions: frozenset[int], epoch: int) -> None:
+            pass
+
+        async def on_partitions_revoked(self, partitions: frozenset[int], epoch: int) -> None:
+            nonlocal callback_epoch
+            callback_epoch = epoch
+            assert adapter.is_running
+            await adapter.seek(0, 100, expected_epoch=epoch)
+            await adapter.commit(dict.fromkeys(partitions, 100), expected_epoch=epoch)
+
+    adapter = KafkaPartitionConsumer(_connection(), _source_config(), rebalance_callback=_DrainCallback())
+    listener = await _start_with_partitions(adapter, mock_aiokafka, {0})
+    assigned_epoch = adapter.epoch
+    consumer = mock_aiokafka.return_value
+
+    async def revoke_during_stop() -> None:
+        await listener.on_partitions_revoked({TopicPartition(adapter.topic, 0)})
+
+    consumer.stop.side_effect = revoke_during_stop
+    if commit_fails:
+        consumer.commit.side_effect = KafkaError("drain commit failed")
+        with pytest.raises(KafkaTransportError):
+            await adapter.stop()
+    else:
+        await adapter.stop()
+
+    assert callback_epoch == assigned_epoch
+    consumer.seek.assert_called_once_with(TopicPartition(adapter.topic, 0), 100)
+    consumer.commit.assert_awaited_once_with({TopicPartition(adapter.topic, 0): OffsetAndMetadata(100, "")})
+    assert not adapter.is_running
+    assert adapter._consumer is None
+    assert adapter.assignment == frozenset()
+    assert adapter.epoch > assigned_epoch
+    with pytest.raises(ConsumerNotRunningError):
+        await adapter.commit({0: 101}, expected_epoch=assigned_epoch)
+    with pytest.raises(StaleEpochError):
+        await adapter.observe_source_identity(expected_epoch=assigned_epoch)
+    await adapter.stop()
+    consumer.stop.assert_awaited_once()
+
+
+@pytest.mark.anyio
+async def test_cancelled_stop_still_invalidates_assignment(mock_aiokafka: MagicMock) -> None:
+    adapter = KafkaPartitionConsumer(_connection(), _source_config())
+    await _start_with_partitions(adapter, mock_aiokafka, {0})
+    epoch = adapter.epoch
+    mock_aiokafka.return_value.stop.side_effect = asyncio.CancelledError
+    with pytest.raises(asyncio.CancelledError):
+        await adapter.stop()
+    assert not adapter.is_running
+    assert adapter._consumer is None
+    assert adapter.assignment == frozenset()
+    assert adapter.epoch > epoch
 
 
 @pytest.mark.anyio
@@ -599,18 +671,52 @@ async def test_start_wraps_kafka_error(mock_aiokafka: MagicMock) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_connection_repr_redacts_secrets() -> None:
+@pytest.mark.parametrize("representation", ["repr", "str", "dict", "model_dump", "json_dump", "model_dump_json"])
+def test_connection_outputs_redact_secrets(representation: str) -> None:
     conn = ResolvedKafkaConnection(
         bootstrap_servers=["broker:9092"],
         security_protocol="SASL_SSL",
         sasl_mechanism="SCRAM-SHA-256",
-        sasl_plain_username="user",
+        sasl_plain_username="private-runtime-principal",
         sasl_plain_password="supersecret",  # noqa: S106
         ssl_context=None,
     )
-    r = repr(conn)
-    assert "supersecret" not in r
-    assert "***" in r
+    output = {
+        "repr": repr(conn),
+        "str": str(conn),
+        "dict": str(dict(conn)),
+        "model_dump": str(conn.model_dump()),
+        "json_dump": str(conn.model_dump(mode="json")),
+        "model_dump_json": conn.model_dump_json(),
+    }[representation]
+    assert "supersecret" not in output
+    assert "private-runtime-principal" not in output
+    assert isinstance(conn.sasl_plain_username, SecretStr)
+    assert isinstance(conn.sasl_plain_password, SecretStr)
+    assert str(conn) == repr(conn)
+    # Explicit include requests must not override the credential exclusion.
+    assert conn.model_dump(include={"sasl_plain_username", "sasl_plain_password"}) == {}
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("authenticated", [False, True])
+async def test_credentials_are_unwrapped_only_for_consumer_construction(
+    mock_aiokafka: MagicMock, *, authenticated: bool
+) -> None:
+    username = "private-runtime-principal" if authenticated else None
+    password = "  secret with spaces  " if authenticated else None
+    connection = ResolvedKafkaConnection(
+        bootstrap_servers=["broker:9092"],
+        security_protocol="SASL_SSL" if authenticated else "SSL",
+        sasl_plain_username=username,
+        sasl_plain_password=password,
+    )
+    adapter = KafkaPartitionConsumer(connection, _source_config())
+    await adapter.start()
+    kwargs = mock_aiokafka.call_args.kwargs
+    assert kwargs["sasl_plain_username"] == username
+    assert kwargs["sasl_plain_password"] == password
+    await adapter.stop()
 
 
 def test_connection_frozen() -> None:
@@ -699,6 +805,8 @@ async def test_observation_timeouts_cancel_pending_io(mock_aiokafka: MagicMock, 
         consumer._client.send.side_effect = pending
         identity = await adapter.observe_source_identity(expected_epoch=adapter.epoch, timeout_ms=1)
         assert identity.topic_id.status == IdentityStatus.UNAVAILABLE
+        assert identity.partitions.status == PartitionSetStatus.UNAVAILABLE
+        assert identity.partitions.partition_ids is None
     assert cancelled.is_set()
     await adapter.stop()
 
@@ -721,6 +829,8 @@ async def test_observations_reject_assignment_changes_during_io(
         else:
             await adapter.stop()
             await adapter.start()
+        if operation == "identity":
+            return MetadataResponse_v0(brokers=[], topics=[(0, adapter.topic, [(0, 0, 1, [1], [1])])])
         return {TopicPartition(adapter.topic, 0): 10} if operation != "committed" else 10
 
     consumer = mock_aiokafka.return_value
@@ -772,13 +882,108 @@ async def test_identity_failures_never_claim_verified_identifiers(
     assert result.topic_id.status == status
     assert result.cluster_id.status != IdentityStatus.VERIFIED
     assert result.topic_id.value is None
+    assert result.partitions.status == (
+        PartitionSetStatus.UNCERTAIN if status == IdentityStatus.UNCERTAIN else PartitionSetStatus.UNAVAILABLE
+    )
+    assert result.partitions.partition_ids is None
     assert "s3cret" not in result.model_dump_json()
     assert "broker:9092" not in result.model_dump_json()
     consumer._client.get_random_node.return_value = None
     consumer._client.send.reset_mock()
     result = await adapter.observe_source_identity(expected_epoch=adapter.epoch)
     assert result.topic_id.status == IdentityStatus.UNAVAILABLE
+    assert result.partitions.status == PartitionSetStatus.UNAVAILABLE
+    assert result.partitions.partition_ids is None
     consumer._client.send.assert_not_awaited()
+    await adapter.stop()
+
+
+@pytest.mark.anyio
+async def test_metadata_observes_full_topic_and_added_partitions(mock_aiokafka: MagicMock) -> None:
+    """Membership is refreshed independently of assignment and without moving offsets."""
+    adapter = KafkaPartitionConsumer(_connection(), _source_config())
+    await _start_with_partitions(adapter, mock_aiokafka, {1})
+    consumer = mock_aiokafka.return_value
+    epoch = adapter.epoch
+    observations = []
+    for count in (3, 4):
+        consumer._client.send.return_value = MetadataResponseV10(
+            throttle_time_ms=0,
+            brokers=[],
+            cluster_id="cluster-A",
+            controller_id=1,
+            topics=[
+                (
+                    0,
+                    adapter.topic,
+                    UUID(int=1),
+                    False,
+                    [(0, partition, 1, 7, [1], [1], [], {}) for partition in range(count)],
+                    0,
+                    {},
+                )
+            ],
+            cluster_authorized_operations=0,
+            tags={},
+        )
+        result = await adapter.observe_source_identity(expected_epoch=epoch)
+        assert result.partitions.status == PartitionSetStatus.VERIFIED
+        assert result.partitions.partition_ids == tuple(range(count))
+        assert result.assignment_epoch == epoch
+        observations.append(result)
+    assert observations[0].partitions.partition_ids == (0, 1, 2)
+    assert consumer._client.send.await_count == 2
+    assert adapter.assignment == frozenset({1})
+    for call in consumer._client.send.call_args_list:
+        node, request = call.args
+        assert node == 1
+        assert isinstance(request, SourceMetadataRequest)
+        assert request.prepare({3: (0, 10)}).to_object()["allow_auto_topic_creation"] is False
+    consumer.seek.assert_not_called()
+    consumer.commit.assert_not_awaited()
+    consumer.getmany.assert_not_awaited()
+    await adapter.stop()
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    "error", [KafkaError("password=s3cret"), ValueError("password=s3cret"), IndexError("password=s3cret")]
+)
+async def test_failed_metadata_io_still_rejects_stale_epoch(mock_aiokafka: MagicMock, error: Exception) -> None:
+    adapter = KafkaPartitionConsumer(_connection(), _source_config())
+    listener = await _start_with_partitions(adapter, mock_aiokafka, {0})
+    epoch = adapter.epoch
+
+    async def revoked(*args: object) -> None:
+        await listener.on_partitions_revoked({TopicPartition(adapter.topic, 0)})
+        raise error
+
+    mock_aiokafka.return_value._client.send.side_effect = revoked
+    with pytest.raises(StaleEpochError):
+        await adapter.observe_source_identity(expected_epoch=epoch)
+    await adapter.stop()
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    "topics",
+    [
+        [(0,)],
+        [(0, "events.test", [(0, 0)])],
+        [(0, "events.test", [(0, 0, 1, [1], [1]), (0,)])],
+    ],
+)
+async def test_short_metadata_rows_return_sanitized_uncertain_evidence(
+    mock_aiokafka: MagicMock, topics: list[tuple[object, ...]]
+) -> None:
+    """Real schema traversal can fail before membership validation runs."""
+    adapter = KafkaPartitionConsumer(_connection(), _source_config())
+    await _start_with_partitions(adapter, mock_aiokafka, {0})
+    mock_aiokafka.return_value._client.send.return_value = MetadataResponse_v0(brokers=[], topics=topics)
+    result = await adapter.observe_source_identity(expected_epoch=adapter.epoch)
+    assert result.partitions.status == PartitionSetStatus.UNCERTAIN
+    assert result.partitions.partition_ids is None
+    assert result.partitions.error == "invalid metadata response"
     await adapter.stop()
 
 
@@ -811,3 +1016,32 @@ async def test_identity_observation_uses_authenticated_transport_without_grantin
     consumer.seek.assert_not_called()
     consumer.commit.assert_not_awaited()
     await adapter.stop()
+
+
+@pytest.mark.anyio
+async def test_installed_aiokafka_metadata_transport_contract() -> None:
+    """Guard the private client boundary against changes in the pinned dependency."""
+    connection = _connection().model_copy(update={"ssl_context": ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)})
+    adapter = KafkaPartitionConsumer(connection, _source_config())
+    # Keep real consumer construction/subscription/cleanup; prevent network startup.
+    with patch.object(AIOKafkaConsumer, "start", new_callable=AsyncMock):
+        await adapter.start()
+    try:
+        consumer = adapter._consumer
+        assert isinstance(consumer, AIOKafkaConsumer)
+        client = consumer._client
+        assert isinstance(client, AIOKafkaClient)
+        response = MetadataResponse_v0(brokers=[], topics=[(0, adapter.topic, [(0, 0, 1, [1], [1])])])
+        with (
+            patch.object(client, "get_random_node", autospec=True, return_value=1),
+            patch.object(client, "send", autospec=True, return_value=response) as send,
+        ):
+            result = await adapter.observe_source_identity(expected_epoch=adapter.epoch)
+        assert result.partitions.status == PartitionSetStatus.VERIFIED
+        assert result.partitions.partition_ids == (0,)
+        node, request = send.call_args.args
+        assert node == 1
+        assert isinstance(request, SourceMetadataRequest)
+        assert request.topic == adapter.topic
+    finally:
+        await adapter.stop()

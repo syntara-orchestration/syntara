@@ -110,8 +110,44 @@ class IdentityObservation(SQLModel):
         return self
 
 
+class PartitionSetStatus(StrEnum):
+    """Evidence for the complete exact-topic partition set, independent of IDs."""
+
+    VERIFIED = "verified"
+    UNAVAILABLE = "unavailable"
+    UNCERTAIN = "uncertain"
+
+
+class PartitionSetObservation(SQLModel):
+    """Immutable topic membership from metadata, never consumer assignment.
+
+    Only verified evidence carries IDs. Kafka partition IDs form a non-empty
+    contiguous set starting at zero; gaps and duplicates cannot prove membership.
+    """
+
+    status: PartitionSetStatus
+    partition_ids: tuple[Annotated[int, Field(strict=True, ge=0, le=(1 << 31) - 1)], ...] | None = None
+    error: str | None = None
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid", frozen=True)  # type: ignore[assignment]
+
+    @model_validator(mode="after")
+    def validate_membership(self) -> Self:
+        """Reject empty, duplicate or incomplete verified partition evidence."""
+        if self.status == PartitionSetStatus.VERIFIED:
+            if not self.partition_ids or any(
+                partition != index for index, partition in enumerate(sorted(self.partition_ids))
+            ):
+                msg = "Verified membership requires the complete nonempty partition set"
+                raise ValueError(msg)
+        elif self.partition_ids is not None:
+            msg = "Unverified membership cannot carry partition IDs"
+            raise ValueError(msg)
+        return self
+
+
 class SourceIdentityObservation(SQLModel):
-    """Cluster/topic evidence from one request under a checked assignment epoch.
+    """Cluster/topic IDs and membership from one epoch-checked metadata request.
 
     Callers compare identifiers and decide recovery policy. Before using this
     observation after another await, they must still check ownership/epoch via
@@ -122,6 +158,7 @@ class SourceIdentityObservation(SQLModel):
     assignment_epoch: int
     cluster_id: IdentityObservation
     topic_id: IdentityObservation
+    partitions: PartitionSetObservation
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid", frozen=True)  # type: ignore[assignment]
 

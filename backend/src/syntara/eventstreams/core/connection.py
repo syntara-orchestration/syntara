@@ -12,18 +12,22 @@ from __future__ import annotations
 import ssl
 from typing import Any, ClassVar
 
-from pydantic import ConfigDict
+from pydantic import ConfigDict, Field, SecretStr
 from sqlmodel import SQLModel
 
 
 class ResolvedKafkaConnection(SQLModel):
-    """Immutable, redacted connection parameters for one Kafka consumer."""
+    """Immutable connection parameters with runtime-only, protected credentials.
+
+    SASL secrets are excluded from serialization. Only consumer construction
+    unwraps them for the authenticated Kafka client.
+    """
 
     bootstrap_servers: list[str]
     security_protocol: str
     sasl_mechanism: str | None = None
-    sasl_plain_username: str | None = None
-    sasl_plain_password: str | None = None
+    sasl_plain_username: SecretStr | None = Field(default=None, exclude=True)
+    sasl_plain_password: SecretStr | None = Field(default=None, exclude=True)
     ssl_context: Any | None = None
 
     model_config: ClassVar[ConfigDict] = ConfigDict(  # type: ignore[assignment]
@@ -42,6 +46,10 @@ class ResolvedKafkaConnection(SQLModel):
             f"sasl_plain_password={'***' if self.sasl_plain_password else None!r}, "
             f"ssl_context={'<SSLContext>' if self.ssl_context else None!r})"
         )
+
+    def __str__(self) -> str:
+        """Use the same redacted representation for formatted/logged values."""
+        return repr(self)
 
     def has_ssl_context(self) -> bool:
         """Return whether an SSL context is present."""

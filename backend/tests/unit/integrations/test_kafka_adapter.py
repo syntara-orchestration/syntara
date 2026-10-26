@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import ssl
 import time
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -15,6 +15,9 @@ from aiokafka.errors import AuthenticationFailedError, KafkaConnectionError, Kaf
 from syntara.integrations.adapters.kafka import KafkaAdapter
 from syntara.integrations.adapters.protocol import HealthCheckErrorType, IntegrationAdapter
 from syntara.integrations.models.integration_configuration import KafkaConfiguration
+
+if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
 
 _BROKERS = ["broker.example.com:9093"]
 _USERNAME = "kafka-user"
@@ -255,7 +258,7 @@ class TestKafkaRealBootstrap:
         attempts = 0
         attempt_finished = False
         closed: list[AIOKafkaClient] = []
-        real_close = AIOKafkaClient.close
+        real_close = cast("Callable[[AIOKafkaClient], Awaitable[None]]", AIOKafkaClient.close)
 
         async def hang_create_conn(*_args: object, **_kwargs: object) -> None:
             nonlocal attempts, attempt_finished
