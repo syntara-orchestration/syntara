@@ -16,8 +16,6 @@ from datetime import UTC, datetime
 from typing import Any, cast
 
 import structlog
-from aiokafka import client as aiokafka_client
-from aiokafka.client import AIOKafkaClient
 from aiokafka.errors import KafkaConnectionError, KafkaError, KafkaTimeoutError
 
 from syntara.integrations.adapters.factory import register_health_check_adapter
@@ -26,6 +24,7 @@ from syntara.integrations.adapters.protocol import (
     HealthCheckErrorType,
     ValidateResult,
 )
+from syntara.integrations.lib.kafka_connection import KafkaHealthClient
 from syntara.integrations.models.integration import IntegrationType
 from syntara.integrations.models.integration_configuration import KafkaConfiguration  # noqa: TC001
 
@@ -35,9 +34,6 @@ _KAFKA_USERNAME_KEY = "kafka_username"
 _KAFKA_PASSWORD_KEY = "kafka_password"  # noqa: S105
 _CLIENT_ID = "syntara-kafka-integration"
 _MS_PER_SECOND = 1000
-# bootstrap() calls the module-level create_conn. Serializing the recorder swap
-# keeps concurrent validates from restoring the wrong function.
-_BOOTSTRAP_LOCK = asyncio.Lock()
 
 
 class KafkaAdapter:
@@ -122,7 +118,7 @@ class KafkaAdapter:
                 bootstrap_servers=self._config.bootstrap_servers,
             )
 
-        client = AIOKafkaClient(
+        client = KafkaHealthClient(
             bootstrap_servers=list(self._config.bootstrap_servers),
             client_id=_CLIENT_ID,
             security_protocol="SASL_SSL",
@@ -207,37 +203,14 @@ class KafkaAdapter:
         )
 
 
-async def _bootstrap(client: AIOKafkaClient, timeout_seconds: int) -> None:
-    """Bootstrap every broker under one deadline and keep the original failure.
+async def _bootstrap(client: KafkaHealthClient, timeout_seconds: int) -> None:
+    """Bound DNS, socket setup, authentication, and metadata by one deadline.
 
-    ``request_timeout_ms`` is a fresh budget for each broker. ``bootstrap`` then
-    catches that attempt's error and, once every broker has failed, raises a
-    generic ``KafkaConnectionError`` with no cause. Record the connection-layer
-    exception and raise it instead, so a bad password, a certificate failure,
-    and a timeout stay distinguishable. ``asyncio.timeout`` cancels the whole
-    loop when the caller's deadline expires.
+    Each health client owns its connections. There is no global recorder or
+    lock to leak between concurrent calls or consume an unbounded queue wait.
     """
-    captured: list[BaseException] = []
-    original_create_conn = aiokafka_client.create_conn
-
-    async def _recording_create_conn(*args: object, **kwargs: object) -> object:
-        try:
-            return await original_create_conn(*args, **kwargs)
-        except Exception as exc:
-            captured.append(exc)
-            raise
-
-    async with _BOOTSTRAP_LOCK:
-        aiokafka_client.create_conn = cast("Any", _recording_create_conn)
-        try:
-            async with asyncio.timeout(timeout_seconds):
-                await client.bootstrap()
-        except KafkaConnectionError:
-            if captured:
-                raise captured[-1] from None
-            raise
-        finally:
-            aiokafka_client.create_conn = original_create_conn
+    async with asyncio.timeout(timeout_seconds):
+        await client.bootstrap()
 
 
 def _sasl_login(resolved_credential: dict[str, Any]) -> tuple[str, str] | None:
@@ -262,7 +235,7 @@ def _classify_kafka_error(exc: KafkaError) -> tuple[HealthCheckErrorType, str]:
     return HealthCheckErrorType.CONNECTION_ERROR, "Unable to connect to Kafka"
 
 
-async def _close_client(client: AIOKafkaClient) -> None:
+async def _close_client(client: KafkaHealthClient) -> None:
     try:
         await client.close()
     except Exception:
