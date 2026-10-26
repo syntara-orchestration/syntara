@@ -8,6 +8,7 @@ import { axe } from 'vitest-axe'
 import { credentialsClient } from '../../../../client'
 import { AlertProvider } from '../../../../providers/alerts'
 import { useSelectableProjects } from '../../../access/useAllProjects'
+import type { Credential } from '../credentialConstants'
 
 import { CredentialFormModal } from './CredentialFormModal'
 import {
@@ -140,13 +141,18 @@ const mockCredential = {
 
 describe('CredentialFormModal', () => {
   let mockMutate: ReturnType<typeof vi.fn>
+  let detailCredential: Credential
 
   beforeEach(() => {
     vi.clearAllMocks()
     mockMutate = vi.fn()
 
     typesQueryState = mockCredentialTypesQuery(mockTypes)
-    installCredentialTypesQueryMock(() => typesQueryState)
+    detailCredential = mockCredential
+    installCredentialTypesQueryMock(
+      () => typesQueryState,
+      () => detailCredential
+    )
     vi.mocked(credentialsClient.useMutation).mockReturnValue(
       asCredentialMutationResult(mockCredentialMutation(mockMutate))
     )
@@ -695,6 +701,7 @@ describe('CredentialFormModal', () => {
         updated_at: '2026-03-01T00:00:00Z',
       } as const
 
+      detailCredential = aapCredential
       render(<CredentialFormModal isOpen onClose={vi.fn()} credentialToEdit={aapCredential} />, { wrapper })
 
       // Basic Auth should be selected — the toggle displays the active group label
@@ -781,6 +788,7 @@ describe('CredentialFormModal', () => {
     })
 
     it('keeps the stored password out of the readable field', () => {
+      detailCredential = kafkaCredential
       render(<CredentialFormModal isOpen onClose={vi.fn()} credentialToEdit={kafkaCredential} />, { wrapper })
 
       const password = screen.getByLabelText('Password', { selector: 'input' })
@@ -791,6 +799,7 @@ describe('CredentialFormModal', () => {
 
     it('preserves the masked password when the username changes', async () => {
       const user = userEvent.setup()
+      detailCredential = kafkaCredential
       render(<CredentialFormModal isOpen onClose={vi.fn()} credentialToEdit={kafkaCredential} />, { wrapper })
 
       const username = screen.getByLabelText('Username', { selector: 'input' })

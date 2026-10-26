@@ -2,6 +2,9 @@ import { Button, Form, Modal, ModalBody, ModalFooter, ModalHeader } from '@patte
 import { RhUiAddIcon } from '@patternfly/react-icons'
 import { useCallback } from 'react'
 
+import { credentialsClient } from '../../../../client'
+import { SynErrorState } from '../../../../components/states/SynErrorState'
+import { SynLoadingState } from '../../../../components/states/SynLoadingState'
 import { useSynForm } from '../../../../hooks/useSynForm'
 import { detachPromise } from '../../../../utils/detachPromise'
 import type { Credential } from '../credentialConstants'
@@ -57,7 +60,8 @@ export function CredentialFormModal({
     <Modal isOpen={isOpen} onClose={handleClose} variant="medium">
       <ModalHeader title={title} />
       {isOpen && (
-        <CredentialFormModalContent
+        <CredentialFormModalLoader
+          key={credentialToEdit?.id ?? 'create'}
           form={form}
           isOpen={isOpen}
           credentialToEdit={credentialToEdit}
@@ -83,6 +87,45 @@ type CredentialFormModalContentProps = {
   defaultProjectId?: string
   compatibleTypeNames?: string[]
   onSuccess?: () => void
+}
+
+function CredentialFormModalLoader(props: Readonly<CredentialFormModalContentProps>) {
+  if (!props.credentialToEdit) return <CredentialFormModalContent {...props} />
+  return <CredentialEditFormLoader {...props} credentialToEdit={props.credentialToEdit} />
+}
+
+function CredentialEditFormLoader(props: Readonly<CredentialFormModalContentProps & { credentialToEdit: Credential }>) {
+  const query = credentialsClient.useQuery('get', '/credentials/{credential_id}', {
+    params: { path: { credential_id: props.credentialToEdit.id ?? '' } },
+  })
+
+  // Once mounted, the editor owns its draft. Background refetches must not
+  // unmount it or replace the values it initialized from the first response.
+  if (query.data) return <CredentialFormModalContent {...props} credentialToEdit={query.data} />
+
+  return (
+    <>
+      <ModalBody>
+        {query.isError ? (
+          <SynErrorState
+            title="Unable to load credential"
+            message={query.error}
+            onRetry={() => detachPromise(query.refetch())}
+          />
+        ) : (
+          <SynLoadingState />
+        )}
+      </ModalBody>
+      <ModalFooter>
+        <Button variant="primary" isDisabled>
+          Save credential
+        </Button>
+        <Button variant="link" onClick={props.form.handleClose}>
+          Cancel
+        </Button>
+      </ModalFooter>
+    </>
+  )
 }
 
 function CredentialFormModalContent({

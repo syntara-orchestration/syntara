@@ -1,6 +1,7 @@
 import { vi } from 'vitest'
 
 import { credentialsClient } from '../../../../client'
+import type { Credential } from '../credentialConstants'
 
 export type CredentialTypeFixture = {
   id: string
@@ -64,6 +65,14 @@ export function asCredentialMutationResult(
   return mock
 }
 
-export function installCredentialTypesQueryMock(getState: () => CredentialTypesQueryMock): void {
-  vi.mocked(credentialsClient.useQuery).mockImplementation(() => getState())
+export function installCredentialTypesQueryMock(
+  getState: () => CredentialTypesQueryMock,
+  getDetail?: () => Credential
+): void {
+  vi.mocked(credentialsClient.useQuery).mockImplementation((_method, path) => {
+    if (path === '/credentials/{credential_id}' && getDetail) {
+      return { ...getState(), data: getDetail() }
+    }
+    return getState()
+  })
 }
