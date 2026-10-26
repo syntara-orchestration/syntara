@@ -8,6 +8,8 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from syntara.eventstreams.adapters import kafka_position_store
 from syntara.eventstreams.adapters.kafka_initial_position import (
+    GapReason,
+    InitializationKind,
     PositionRequest,
     PositionStatus,
     RecoveryPolicy,
@@ -372,3 +374,203 @@ def test_superseded_token_cannot_mutate_a_replacement_with_an_adjacent_revision(
     )
     with pytest.raises(KafkaPositionError, match="recovery_revision_changed"):
         KafkaInitialPositionStore._pending(position, value, UUID(int=42))
+
+
+async def test_first_full_topic_capture_is_saved_once_and_later_metadata_cannot_expand_it(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    factory, _ = session_factory()
+    repository = KafkaInitialPositionStore(factory)
+    subscription, source = lifecycle()
+    subscription.desired_enabled = True
+    monkeypatch.setattr(repository, "_locked", AsyncMock(return_value=(subscription, source, None)))
+    monkeypatch.setattr(repository, "_held", AsyncMock(return_value=False))
+    history = AsyncMock(return_value=False)
+    monkeypatch.setattr(repository, "_has_initialization_history", history)
+    first = await repository.capture_initial_partitions(position_request(), observation())
+    expanded = observation().model_copy(
+        update={"partitions": PartitionSetObservation(status=PartitionSetStatus.VERIFIED, partition_ids=(0, 1, 2, 3))}
+    )
+    winner = await repository.capture_initial_partitions(position_request(), expanded)
+    assert first.initial_partition_ids == (0, 1, 2)
+    assert winner.initial_partition_ids == first.initial_partition_ids
+    assert source.configuration.initial_partition_ids == first.initial_partition_ids
+    history.assert_awaited_once()
+
+
+async def test_capture_reloads_a_winning_set_that_differs_from_current_metadata(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    factory, _ = session_factory()
+    repository = KafkaInitialPositionStore(factory)
+    subscription, source = lifecycle()
+    subscription.desired_enabled = True
+    source.configuration = source.configuration.model_copy(update={"initial_partition_ids": (0, 1)})
+    monkeypatch.setattr(repository, "_locked", AsyncMock(return_value=(subscription, source, None)))
+    monkeypatch.setattr(repository, "_held", AsyncMock(return_value=False))
+    history = AsyncMock()
+    monkeypatch.setattr(repository, "_has_initialization_history", history)
+    winner = await repository.capture_initial_partitions(position_request(), observation())
+    assert winner.initial_partition_ids == (0, 1)
+    assert KafkaInitialPositionStore.initialization_kind(winner, 2) == InitializationKind.ADDED_PARTITION
+    history.assert_not_awaited()
+
+
+@pytest.mark.parametrize("retained_row", [False, True])
+async def test_missing_first_set_with_historical_evidence_cannot_be_reconstructed(
+    monkeypatch: pytest.MonkeyPatch, *, retained_row: bool
+) -> None:
+    factory, _ = session_factory()
+    repository = KafkaInitialPositionStore(factory)
+    subscription, source = lifecycle()
+    subscription.desired_enabled = True
+    position = row(boundary=75) if retained_row else None
+    if position is not None:
+        position.initialization_kind = None
+    monkeypatch.setattr(repository, "_locked", AsyncMock(return_value=(subscription, source, position)))
+    monkeypatch.setattr(repository, "_held", AsyncMock(return_value=False))
+    monkeypatch.setattr(repository, "_has_initialization_history", AsyncMock(return_value=True))
+    with pytest.raises(KafkaPositionError, match=GapReason.INITIALIZATION_HISTORY_UNAVAILABLE.value):
+        await repository.capture_initial_partitions(position_request(), observation())
+    assert source.configuration.initial_partition_ids is None
+    if position is not None:
+        assert position.initial_next_offset == 75
+        assert position.initialization_kind is None
+
+
+@pytest.mark.parametrize("status", [PartitionSetStatus.UNAVAILABLE, PartitionSetStatus.UNCERTAIN])
+async def test_capture_requires_verified_complete_topic_membership(
+    status: PartitionSetStatus, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    factory, _ = session_factory()
+    repository = KafkaInitialPositionStore(factory)
+    subscription, source = lifecycle()
+    subscription.desired_enabled = True
+    monkeypatch.setattr(repository, "_locked", AsyncMock(return_value=(subscription, source, None)))
+    monkeypatch.setattr(repository, "_held", AsyncMock(return_value=False))
+    value = observation().model_copy(update={"partitions": PartitionSetObservation(status=status)})
+    with pytest.raises(KafkaPositionError, match="topic_partitions_unavailable"):
+        await repository.capture_initial_partitions(position_request(), value)
+    assert source.configuration.initial_partition_ids is None
+
+
+async def test_kind_mismatch_is_rejected_before_boundary_insert(monkeypatch: pytest.MonkeyPatch) -> None:
+    session = MagicMock(spec=AsyncSession)
+    session.__aenter__.return_value = session
+    repository = KafkaInitialPositionStore(MagicMock(return_value=session))
+    subscription, source = lifecycle()
+    subscription.desired_enabled = True
+    source.configuration = source.configuration.model_copy(update={"initial_partition_ids": (0, 1, 2)})
+    monkeypatch.setattr(repository, "_locked", AsyncMock(return_value=(subscription, source, None)))
+    monkeypatch.setattr(repository, "_held", AsyncMock(return_value=False))
+    with pytest.raises(KafkaPositionError, match="initialization_kind_changed"):
+        await repository.choose_initial(
+            position_request(), observation(), 0, initialization_kind=InitializationKind.ADDED_PARTITION
+        )
+    session.execute.assert_not_awaited()
+
+
+async def test_retained_delivery_without_position_refuses_initial_boundary_insert(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session = MagicMock(spec=AsyncSession)
+    session.__aenter__.return_value = session
+    retained = MagicMock()
+    retained.first.return_value = delivery().identity_digest
+    session.exec.return_value = retained
+    repository = KafkaInitialPositionStore(MagicMock(return_value=session))
+    subscription, source = lifecycle()
+    subscription.desired_enabled = True
+    source.configuration = source.configuration.model_copy(update={"initial_partition_ids": (0, 1)})
+    monkeypatch.setattr(repository, "_locked", AsyncMock(return_value=(subscription, source, None)))
+    monkeypatch.setattr(repository, "_held", AsyncMock(return_value=False))
+    with pytest.raises(KafkaPositionError, match=GapReason.INITIALIZATION_HISTORY_UNAVAILABLE.value) as failure:
+        await repository.choose_initial(
+            position_request(), observation(), 0, initialization_kind=InitializationKind.ADDED_PARTITION
+        )
+    assert failure.value.status == PositionStatus.BLOCKED
+    session.exec.assert_awaited_once()
+    retained.first.assert_called_once_with()
+    session.execute.assert_not_awaited()
+    session.flush.assert_not_awaited()
+
+
+@pytest.mark.parametrize(
+    ("partition", "kind"),
+    [(0, InitializationKind.ADDED_PARTITION), (2, InitializationKind.FIRST_ACTIVATION)],
+)
+async def test_kind_membership_mismatch_refuses_initial_confirmation(
+    partition: int, kind: InitializationKind, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    session = MagicMock(spec=AsyncSession)
+    session.__aenter__.return_value = session
+    repository = KafkaInitialPositionStore(MagicMock(return_value=session))
+    subscription, source = lifecycle()
+    subscription.desired_enabled = True
+    source.configuration = source.configuration.model_copy(update={"initial_partition_ids": (0, 1)})
+    position = row(confirmed=False, boundary=50)
+    position.partition = partition
+    position.initialization_kind = kind.value
+    monkeypatch.setattr(repository, "_locked", AsyncMock(return_value=(subscription, source, position)))
+    monkeypatch.setattr(repository, "_held", AsyncMock(return_value=False))
+    with pytest.raises(KafkaPositionError, match=GapReason.INITIALIZATION_HISTORY_UNAVAILABLE.value) as failure:
+        await repository.confirm_initial(position_request().model_copy(update={"partition": partition}), boundary=50)
+    assert failure.value.status == PositionStatus.RECOVERY_GAP
+    assert position.initial_commit_confirmed_at is None
+    assert position.initial_next_offset == 50
+    assert source.initialized_at is None
+    session.exec.assert_not_awaited()
+    session.flush.assert_not_awaited()
+
+
+async def test_source_initialization_waits_for_all_first_members_and_survives_an_addition(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session = MagicMock(spec=AsyncSession)
+    session.__aenter__.return_value = session
+    result = MagicMock()
+    result.one.return_value = NOW
+    result.all.return_value = [0]
+    session.exec.return_value = result
+    repository = KafkaInitialPositionStore(MagicMock(return_value=session))
+    subscription, source = lifecycle()
+    subscription.desired_enabled = True
+    source.configuration = source.configuration.model_copy(update={"initial_partition_ids": (0, 1)})
+    first = row(confirmed=False)
+    monkeypatch.setattr(repository, "_locked", AsyncMock(return_value=(subscription, source, first)))
+    monkeypatch.setattr(repository, "_held", AsyncMock(return_value=False))
+    await repository.confirm_initial(position_request().model_copy(update={"partition": 0}), boundary=50)
+    assert first.initial_commit_confirmed_at == NOW
+    assert source.initialized_at is None
+    second = row(confirmed=False)
+    second.partition = 1
+    result.all.return_value = [0, 1]
+    monkeypatch.setattr(repository, "_locked", AsyncMock(return_value=(subscription, source, second)))
+    await repository.confirm_initial(position_request().model_copy(update={"partition": 1}), boundary=50)
+    assert source.initialized_at == NOW
+    added = row(confirmed=False, boundary=7)
+    added.partition = 2
+    added.initialization_kind = InitializationKind.ADDED_PARTITION.value
+    monkeypatch.setattr(repository, "_locked", AsyncMock(return_value=(subscription, source, added)))
+    await repository.confirm_initial(position_request(), boundary=7)
+    assert added.initial_commit_confirmed_at == NOW
+    assert source.initialized_at == NOW
+
+
+async def test_legacy_revision_fence_blocks_capture_even_without_surviving_rows(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session = MagicMock(spec=AsyncSession)
+    session.__aenter__.return_value = session
+    repository = KafkaInitialPositionStore(MagicMock(return_value=session))
+    subscription, source = lifecycle()
+    subscription.desired_enabled = True
+    source.delivery_evidence_revision = 1
+    monkeypatch.setattr(repository, "_locked", AsyncMock(return_value=(subscription, source, None)))
+    monkeypatch.setattr(repository, "_held", AsyncMock(return_value=False))
+    with pytest.raises(KafkaPositionError, match=GapReason.INITIALIZATION_HISTORY_UNAVAILABLE.value) as failure:
+        await repository.capture_initial_partitions(position_request(), observation())
+    assert failure.value.status == PositionStatus.BLOCKED
+    assert source.configuration.initial_partition_ids is None
+    session.exec.assert_not_awaited()
+    session.execute.assert_not_awaited()

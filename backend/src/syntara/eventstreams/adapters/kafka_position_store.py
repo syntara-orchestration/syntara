@@ -1,7 +1,8 @@
 """Short PostgreSQL transactions for Kafka partition initialization and recovery."""
 
 from collections.abc import Callable
-from typing import TYPE_CHECKING, cast
+from datetime import datetime
+from typing import cast
 from uuid import UUID, uuid4
 
 from sqlalchemy import BigInteger, and_, func, not_, or_
@@ -13,6 +14,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from syntara.core.constants import FieldLimits
 from syntara.eventstreams.adapters.kafka_initial_position import (
     GapReason,
+    InitializationKind,
     KafkaPartitionInitialPosition,
     PositionRequest,
     PositionStatus,
@@ -21,7 +23,7 @@ from syntara.eventstreams.adapters.kafka_initial_position import (
     RecoveryRequest,
 )
 from syntara.eventstreams.adapters.kafka_source_configuration import KafkaSourceConfiguration
-from syntara.eventstreams.core.consumer import IdentityStatus, SourceIdentityObservation
+from syntara.eventstreams.core.consumer import IdentityStatus, PartitionSetStatus, SourceIdentityObservation
 from syntara.eventstreams.core.deduplication import (
     DeliveryClaim,
     DeliveryExpectation,
@@ -37,9 +39,6 @@ from syntara.eventstreams.services.deduplication_store import EventDeliveryStore
 from syntara.eventstreams.services.delivery_retention_service import release_recovery_locked, reserve_recovery_locked
 from syntara.eventstreams.services.subscription_service import lock_source_lifecycle
 from syntara.workflows.models.execution import Execution
-
-if TYPE_CHECKING:
-    from datetime import datetime
 
 _FENCED_BY_GAP_RECOVERY = "fenced_by_gap_recovery"
 
@@ -61,6 +60,7 @@ class PositionContext(PositionValue):
     position: KafkaPartitionInitialPosition | None
     active: bool
     recovery_held: bool
+    source_initialized_at: datetime | None = None
 
 
 class KafkaInitialPositionStore:
@@ -142,6 +142,75 @@ class KafkaInitialPositionStore:
             )
         ).first() is not None
 
+    @staticmethod
+    def _partitions(request: PositionRequest, observation: SourceIdentityObservation) -> tuple[int, ...]:
+        if observation.assignment_epoch != request.assignment_epoch:
+            msg = "assignment_lost"
+            raise KafkaPositionError(msg, PositionStatus.OWNERSHIP_LOST)
+        evidence = observation.partitions
+        if evidence.status != PartitionSetStatus.VERIFIED or not evidence.partition_ids:
+            msg = "topic_partitions_unavailable"
+            raise KafkaPositionError(msg)
+        if request.partition not in evidence.partition_ids:
+            raise KafkaPositionError(GapReason.SOURCE_RECREATED.value, PositionStatus.RECOVERY_GAP)
+        return tuple(sorted(evidence.partition_ids))
+
+    @staticmethod
+    async def _has_initialization_history(session: AsyncSession, source: EventSubscriptionSource) -> bool:
+        if source.initialized_at is not None or source.delivery_evidence_revision:
+            return True
+        positions = (
+            await session.exec(
+                select(KafkaPartitionInitialPosition.source_id)
+                .where(col(KafkaPartitionInitialPosition.source_id) == source.id)
+                .limit(1)
+            )
+        ).first()
+        if positions is not None:
+            return True
+        return (
+            await session.exec(
+                select(EventDelivery.source_id).where(col(EventDelivery.source_id) == source.id).limit(1)
+            )
+        ).first() is not None
+
+    async def capture_initial_partitions(
+        self, request: PositionRequest, observation: SourceIdentityObservation
+    ) -> KafkaSourceConfiguration:
+        """Save a complete first snapshot once; assignment never defines membership."""
+        async with self._session_factory() as session, session.begin():
+            subscription, source, row = await self._locked(session, request)
+            if not subscription.desired_enabled or subscription.paused or await self._held(session, source.id):
+                msg = "admission_closed"
+                raise KafkaPositionError(msg)
+            self._identity(source, observation)
+            partitions = self._partitions(request, observation)
+            if source.configuration.initial_partition_ids is None:
+                if await self._has_initialization_history(session, source):
+                    status = PositionStatus.BLOCKED if row is None else PositionStatus.RECOVERY_GAP
+                    raise KafkaPositionError(GapReason.INITIALIZATION_HISTORY_UNAVAILABLE.value, status)
+                source.configuration = source.configuration.model_copy(update={"initial_partition_ids": partitions})
+                await session.flush()
+            result = source.configuration
+        return result  # noqa: RET504 - the winning set must commit before any boundary is selected
+
+    @staticmethod
+    def initialization_kind(configuration: KafkaSourceConfiguration, partition: int) -> InitializationKind:
+        """Classify only against saved historical membership, never current assignment."""
+        if configuration.initial_partition_ids is None:
+            msg = GapReason.INITIALIZATION_HISTORY_UNAVAILABLE.value
+            raise KafkaPositionError(msg)
+        return (
+            InitializationKind.FIRST_ACTIVATION
+            if partition in configuration.initial_partition_ids
+            else InitializationKind.ADDED_PARTITION
+        )
+
+    @classmethod
+    def _validate_kind(cls, source: EventSubscriptionSource, row: KafkaPartitionInitialPosition) -> None:
+        if row.initialization_kind != cls.initialization_kind(source.configuration, row.partition):
+            raise KafkaPositionError(GapReason.INITIALIZATION_HISTORY_UNAVAILABLE.value, PositionStatus.RECOVERY_GAP)
+
     async def read(self, request: PositionRequest) -> PositionContext:
         """Load committed context, including pending initialization/recovery."""
         async with self._session_factory() as session, session.begin():
@@ -151,11 +220,17 @@ class KafkaInitialPositionStore:
                 position=None if row is None else self._copy(row),
                 active=subscription.desired_enabled and not subscription.paused,
                 recovery_held=await self._held(session, source.id),
+                source_initialized_at=source.initialized_at,
             )
         return result  # noqa: RET504 - boundary evidence is usable only after commit
 
     async def choose_initial(
-        self, request: PositionRequest, observation: SourceIdentityObservation, boundary: int
+        self,
+        request: PositionRequest,
+        observation: SourceIdentityObservation,
+        boundary: int,
+        *,
+        initialization_kind: InitializationKind,
     ) -> KafkaPartitionInitialPosition:
         """Insert once, reload the winner, and populate verified source identifiers once."""
         async with self._session_factory() as session, session.begin():
@@ -164,16 +239,41 @@ class KafkaInitialPositionStore:
                 msg = "admission_closed"
                 raise KafkaPositionError(msg)
             self._identity(source, observation)
+            self._partitions(request, observation)
             if row is None:
+                if initialization_kind != self.initialization_kind(source.configuration, request.partition):
+                    msg = "initialization_kind_changed"
+                    raise KafkaPositionError(msg, PositionStatus.REVISION_CHANGED)
+                retained = (
+                    await session.exec(
+                        select(EventDelivery.identity_digest)
+                        .where(
+                            col(EventDelivery.source_id) == source.id,
+                            col(EventDelivery.transport) == "kafka",
+                            col(EventDelivery.record_identity)["partition"].as_integer() == request.partition,
+                        )
+                        .limit(1)
+                    )
+                ).first()
+                if retained is not None:
+                    msg = GapReason.INITIALIZATION_HISTORY_UNAVAILABLE.value
+                    raise KafkaPositionError(msg)
                 await session.execute(
                     insert(KafkaPartitionInitialPosition)
-                    .values(source_id=source.id, partition=request.partition, initial_next_offset=boundary)
+                    .values(
+                        source_id=source.id,
+                        partition=request.partition,
+                        initialization_kind=initialization_kind.value,
+                        initial_next_offset=boundary,
+                    )
                     .on_conflict_do_nothing(index_elements=["source_id", "partition"])
                 )
                 _, _, row = await self._locked(session, request)
             if row is None:
                 msg = "initial_boundary_unavailable"
                 raise KafkaPositionError(msg)
+            if row.initialization_kind is not None:
+                self._validate_kind(source, row)
             await session.flush()
             result = self._copy(row)
         return result  # noqa: RET504 - boundary evidence is usable only after commit
@@ -183,6 +283,7 @@ class KafkaInitialPositionStore:
         async with self._session_factory() as session, session.begin():
             _, source, _ = await self._locked(session, request)
             self._identity(source, observation)
+            self._partitions(request, observation)
 
     async def record_missing_initial(
         self, request: PositionRequest, observed_group_offset: int
@@ -240,9 +341,28 @@ class KafkaInitialPositionStore:
                 msg = "initial_confirmation_conflict"
                 raise KafkaPositionError(msg)
             if row.initial_commit_confirmed_at is None:
+                self._validate_kind(source, row)
                 now = cast("datetime", (await session.exec(select(func.clock_timestamp()))).one())
                 row.initial_commit_confirmed_at = now
-                source.initialized_at = source.initialized_at or now
+                await self._complete_first_activation(session, source, now)
+
+    @staticmethod
+    async def _complete_first_activation(session: AsyncSession, source: EventSubscriptionSource, now: datetime) -> None:
+        if source.initialized_at is not None or source.configuration.initial_partition_ids is None:
+            return
+        await session.flush()
+        confirmed = (
+            await session.exec(
+                select(KafkaPartitionInitialPosition.partition).where(
+                    col(KafkaPartitionInitialPosition.source_id) == source.id,
+                    col(KafkaPartitionInitialPosition.partition).in_(source.configuration.initial_partition_ids),
+                    col(KafkaPartitionInitialPosition.initialization_kind) == InitializationKind.FIRST_ACTIVATION.value,
+                    col(KafkaPartitionInitialPosition.initial_commit_confirmed_at).is_not(None),
+                )
+            )
+        ).all()
+        if set(confirmed) == set(source.configuration.initial_partition_ids):
+            source.initialized_at = now
 
     @staticmethod
     def _pending(
@@ -510,7 +630,6 @@ class KafkaInitialPositionStore:
                 raise KafkaPositionError(msg)
             row.recovery_boundary = boundary
             row.recovery_confirmed_at = cast("datetime", (await session.exec(select(func.clock_timestamp()))).one())
-            source.initialized_at = source.initialized_at or row.recovery_confirmed_at
             row.recovery_policy = row.pending_policy
             row.recovery_reason = row.pending_reason
             row.duplicate_risk_acknowledged = row.pending_duplicate_risk_acknowledged
@@ -521,3 +640,4 @@ class KafkaInitialPositionStore:
             row.recovery_token = None
             row.gap_detected_at = None
             row.gap_reason = None
+            await self._complete_first_activation(session, source, row.recovery_confirmed_at)

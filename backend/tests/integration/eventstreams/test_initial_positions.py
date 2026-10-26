@@ -19,6 +19,7 @@ from syntara.core.constants import FieldLimits
 from syntara.eventstreams.adapters import kafka_position_store
 from syntara.eventstreams.adapters.kafka_consumer import KafkaPartitionConsumer
 from syntara.eventstreams.adapters.kafka_initial_position import (
+    InitializationKind,
     KafkaPartitionInitialPosition,
     PositionRequest,
     PositionStatus,
@@ -30,6 +31,7 @@ from syntara.eventstreams.adapters.kafka_initial_position_service import KafkaIn
 from syntara.eventstreams.adapters.kafka_position_control import (
     DrainEvidence,
     PartitionRecoveryControl,
+    RecoveryCacheCoordination,
 )
 from syntara.eventstreams.adapters.kafka_position_store import KafkaInitialPositionStore
 from syntara.eventstreams.core.consumer import (
@@ -73,6 +75,7 @@ class Scenario:
     client: MagicMock = field(default_factory=lambda: MagicMock(spec=KafkaPartitionConsumer))
     admission: MagicMock = field(default_factory=lambda: MagicMock(spec=EventAdmissionService))
     control: MagicMock = field(default_factory=lambda: MagicMock(spec=PartitionRecoveryControl))
+    cache_coordination: MagicMock = field(default_factory=lambda: MagicMock(spec=RecoveryCacheCoordination))
 
     def __post_init__(self) -> None:
         """Bind controlled broker observations to the real persisted source."""
@@ -99,6 +102,7 @@ class Scenario:
             quiescent=True, retained_evidence_complete=True, permanent_content_error=False
         )
         self.control.is_fenced.return_value = True
+        self.cache_coordination.is_coordinated.return_value = True
 
     @property
     def store(self) -> KafkaInitialPositionStore:
@@ -106,7 +110,9 @@ class Scenario:
 
     @property
     def service(self) -> KafkaInitialPositionService:
-        return KafkaInitialPositionService(self.store, self.client, self.admission, self.control)
+        return KafkaInitialPositionService(
+            self.store, self.client, self.admission, self.control, cache_coordination=self.cache_coordination
+        )
 
     def request(self, partition: int = 0) -> PositionRequest:
         snapshot = self.context.snapshot
@@ -158,8 +164,13 @@ async def test_first_winning_boundary_is_unique_and_reused_after_interruption(
     scenario = Scenario(delivery_context)
     request = scenario.request()
     observation = scenario.client.observe_source_identity.return_value
-    first = await scenario.store.choose_initial(request, observation, 100)
-    winner = await scenario.store.choose_initial(request, observation, 150)
+    await scenario.store.capture_initial_partitions(request, observation)
+    first = await scenario.store.choose_initial(
+        request, observation, 100, initialization_kind=InitializationKind.FIRST_ACTIVATION
+    )
+    winner = await scenario.store.choose_initial(
+        request, observation, 150, initialization_kind=InitializationKind.FIRST_ACTIVATION
+    )
     assert first.initial_next_offset == winner.initial_next_offset == 100
     scenario.ends[0] = 200
     result = await scenario.service.initialize(request)
@@ -216,7 +227,9 @@ async def test_interrupted_confirmation_keeps_hold_and_reconciles_recorded_bound
     scenario = Scenario(delivery_context)
     await scenario.gap()
     store = scenario.store
-    service = KafkaInitialPositionService(store, scenario.client, scenario.admission, scenario.control)
+    service = KafkaInitialPositionService(
+        store, scenario.client, scenario.admission, scenario.control, cache_coordination=scenario.cache_coordination
+    )
     confirm = store.confirm_recovery
 
     async def unavailable(*_args: object) -> None:
@@ -309,9 +322,14 @@ async def test_expired_prepared_claim_stays_unresolved_when_temporal_repair_is_a
 async def test_concurrent_initializers_share_one_winning_boundary(delivery_context: DeliveryContext) -> None:
     scenario = Scenario(delivery_context)
     observation = scenario.client.observe_source_identity.return_value
+    await scenario.store.capture_initial_partitions(scenario.request(), observation)
     first, second = await asyncio.gather(
-        scenario.store.choose_initial(scenario.request(), observation, 80),
-        scenario.store.choose_initial(scenario.request(), observation, 90),
+        scenario.store.choose_initial(
+            scenario.request(), observation, 80, initialization_kind=InitializationKind.FIRST_ACTIVATION
+        ),
+        scenario.store.choose_initial(
+            scenario.request(), observation, 90, initialization_kind=InitializationKind.FIRST_ACTIVATION
+        ),
     )
     assert first.initial_next_offset == second.initial_next_offset
     assert first.initial_next_offset in {80, 90}
@@ -593,7 +611,10 @@ async def test_missing_initial_metadata_persists_unknown_history_and_can_recover
     assert context.position.observed_group_next_offset == 75
     assert context.position.authorized_lower_boundary is None
     winner = await scenario.store.choose_initial(
-        scenario.request(), scenario.client.observe_source_identity.return_value, 100
+        scenario.request(),
+        scenario.client.observe_source_identity.return_value,
+        100,
+        initialization_kind=InitializationKind.FIRST_ACTIVATION,
     )
     assert winner.initial_next_offset is None
     recovered = await scenario.service.recover(scenario.recovery(policy=policy), owner_worker_id="recovery")
@@ -631,9 +652,17 @@ async def test_missing_metadata_recording_and_initialization_keep_the_same_winne
     delivery_context: DeliveryContext,
 ) -> None:
     scenario = Scenario(delivery_context)
+    await scenario.store.capture_initial_partitions(
+        scenario.request(), scenario.client.observe_source_identity.return_value
+    )
     missing, initialized = await asyncio.gather(
         scenario.store.record_missing_initial(scenario.request(), 75),
-        scenario.store.choose_initial(scenario.request(), scenario.client.observe_source_identity.return_value, 100),
+        scenario.store.choose_initial(
+            scenario.request(),
+            scenario.client.observe_source_identity.return_value,
+            100,
+            initialization_kind=InitializationKind.FIRST_ACTIVATION,
+        ),
     )
     assert missing.initial_next_offset == initialized.initial_next_offset
     assert missing.initial_metadata_missing == initialized.initial_metadata_missing
@@ -952,6 +981,187 @@ async def test_followup_migration_preserves_existing_known_boundaries(delivery_c
     migration = importlib.import_module(
         "syntara.core.database.migrations.versions.2b07573473d7_preserve_unknown_initial_boundaries_and_"
     )
+    kinds = importlib.import_module(
+        "syntara.core.database.migrations.versions.91f4c2e8a6bd_add_kafka_partition_initialization_kind"
+    )
+
+    def roundtrip(connection: Connection) -> None:
+        with Operations.context(MigrationContext.configure(connection)):
+            kinds.downgrade()
+            migration.downgrade()
+            migration.upgrade()
+            kinds.upgrade()
+
+    async with delivery_context.session_factory() as session, session.begin():
+        # Simulate a pre-kind row; its real historical boundary must survive unchanged.
+        await session.execute(
+            update(KafkaPartitionInitialPosition)
+            .where(col(KafkaPartitionInitialPosition.source_id) == scenario.request().source_id)
+            .values(initialization_kind=None)
+        )
+        connection = await session.connection()
+        await connection.run_sync(roundtrip)
+    state = await scenario.store.read(scenario.request())
+    assert state.position is not None
+    assert state.position.initial_next_offset == 100
+    assert state.position.initial_commit_confirmed_at is not None
+    assert not state.position.initial_metadata_missing
+    assert state.position.observed_group_next_offset is None
+    assert state.position.initialization_kind is None
+
+
+async def test_first_set_exceeds_assignment_and_addition_does_not_complete_first_activation(
+    delivery_context: DeliveryContext,
+) -> None:
+    scenario = Scenario(delivery_context)
+    scenario.client.assignment = frozenset({0})
+    assert (await scenario.service.initialize(scenario.request())).next_offset == 100
+    first = await scenario.store.read(scenario.request())
+    assert first.configuration.initial_partition_ids == (0, 1)
+    assert first.source_initialized_at is None
+    observation = scenario.client.observe_source_identity.return_value
+    scenario.client.observe_source_identity.return_value = observation.model_copy(
+        update={"partitions": PartitionSetObservation(status=PartitionSetStatus.VERIFIED, partition_ids=(0, 1, 2))}
+    )
+    scenario.client.assignment = frozenset({0, 2})
+    scenario.beginnings[2], scenario.ends[2] = 7, 10
+    assert (await scenario.service.initialize(scenario.request(2))).next_offset == 7
+    added = await scenario.store.read(scenario.request(2))
+    assert added.position is not None
+    assert added.position.initialization_kind == InitializationKind.ADDED_PARTITION.value
+    assert added.source_initialized_at is None
+    assert (await scenario.service.initialize(scenario.request())).status == PositionStatus.READY
+    scenario.client.assignment = frozenset({0, 1, 2})
+    assert (await scenario.service.initialize(scenario.request(1))).next_offset == 120
+    completed = await scenario.store.read(scenario.request())
+    assert completed.source_initialized_at is not None
+    assert completed.configuration.initial_partition_ids == (0, 1)
+    scenario.client.observe_source_identity.return_value = observation.model_copy(
+        update={"partitions": PartitionSetObservation(status=PartitionSetStatus.VERIFIED, partition_ids=(0, 1, 2, 3))}
+    )
+    scenario.client.assignment = frozenset({0, 1, 2, 3})
+    scenario.beginnings[3], scenario.ends[3] = 0, 3
+    assert (await scenario.service.initialize(scenario.request(3))).next_offset == 0
+    after_growth = await scenario.store.read(scenario.request())
+    assert after_growth.source_initialized_at == completed.source_initialized_at
+    assert after_growth.configuration.initial_partition_ids == (0, 1)
+
+
+async def test_competing_full_topic_captures_reload_the_first_winning_set(delivery_context: DeliveryContext) -> None:
+    scenario = Scenario(delivery_context)
+    older = scenario.client.observe_source_identity.return_value
+    newer = older.model_copy(
+        update={"partitions": PartitionSetObservation(status=PartitionSetStatus.VERIFIED, partition_ids=(0, 1, 2))}
+    )
+    first, second = await asyncio.gather(
+        scenario.store.capture_initial_partitions(scenario.request(), older),
+        scenario.store.capture_initial_partitions(scenario.request(), newer),
+    )
+    assert first.initial_partition_ids == second.initial_partition_ids
+    assert first.initial_partition_ids in {(0, 1), (0, 1, 2)}
+    saved = await scenario.store.read(scenario.request())
+    assert saved.configuration.initial_partition_ids == first.initial_partition_ids
+    assert saved.position is None
+
+
+async def test_capture_survives_crash_before_row_save_and_later_addition_starts_at_zero(
+    delivery_context: DeliveryContext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    scenario = Scenario(delivery_context)
+    store = scenario.store
+    monkeypatch.setattr(store, "choose_initial", MagicMock(side_effect=SQLAlchemyError("interrupted")))
+    service = KafkaInitialPositionService(store, scenario.client, scenario.admission, scenario.control)
+    assert (await service.initialize(scenario.request())).status == PositionStatus.BLOCKED
+    captured = await store.read(scenario.request())
+    assert captured.position is None
+    assert captured.configuration.initial_partition_ids == (0, 1)
+    observation = scenario.client.observe_source_identity.return_value
+    scenario.client.observe_source_identity.return_value = observation.model_copy(
+        update={"partitions": PartitionSetObservation(status=PartitionSetStatus.VERIFIED, partition_ids=(0, 1, 2))}
+    )
+    scenario.client.assignment = frozenset({0, 2})
+    scenario.beginnings[2], scenario.ends[2] = 0, 3
+    added = await scenario.service.initialize(scenario.request(2))
+    assert added.next_offset == 0
+    saved = await scenario.store.read(scenario.request(2))
+    assert saved.position is not None
+    assert saved.position.initial_next_offset == 0
+    assert saved.position.initialization_kind == InitializationKind.ADDED_PARTITION.value
+    assert saved.configuration.initial_partition_ids == (0, 1)
+
+
+async def test_legacy_membership_blocks_without_rewriting_real_historical_boundaries(
+    delivery_context: DeliveryContext,
+) -> None:
+    scenario = Scenario(delivery_context)
+    assert (await scenario.service.initialize(scenario.request())).next_offset == 100
+    async with delivery_context.session_factory() as session, session.begin():
+        source = await session.get(EventSubscriptionSource, scenario.request().source_id, with_for_update=True)
+        assert source is not None
+        source.configuration = source.configuration.model_copy(update={"initial_partition_ids": None})
+        await session.execute(
+            update(KafkaPartitionInitialPosition)
+            .where(col(KafkaPartitionInitialPosition.source_id) == source.id)
+            .values(initialization_kind=None)
+        )
+    scenario.commits[0] = 150
+    scenario.ends[0] = 200
+    blocked = await scenario.service.initialize(scenario.request())
+    assert blocked.status == PositionStatus.RECOVERY_GAP
+    assert blocked.reason == "initialization_history_unavailable"
+    saved = await scenario.store.read(scenario.request())
+    assert saved.configuration.initial_partition_ids is None
+    assert saved.position is not None
+    assert saved.position.initial_next_offset == 100
+    assert saved.position.initialization_kind is None
+    scenario.client.commit.reset_mock()
+    recovered = await scenario.service.recover(
+        scenario.recovery(policy=RecoveryPolicy.CURRENT_END), owner_worker_id="repair"
+    )
+    assert recovered.next_offset == 200
+    resumed = await scenario.store.read(scenario.request())
+    assert resumed.configuration.initial_partition_ids is None
+    assert resumed.position is not None
+    assert resumed.position.initial_next_offset == 100
+    assert resumed.position.initialization_kind is None
+
+
+async def test_kind_migration_refuses_to_erase_classified_boundaries(delivery_context: DeliveryContext) -> None:
+    scenario = Scenario(delivery_context)
+    await scenario.service.initialize(scenario.request())
+    migration = importlib.import_module(
+        "syntara.core.database.migrations.versions.91f4c2e8a6bd_add_kafka_partition_initialization_kind"
+    )
+
+    def downgrade(connection: Connection) -> None:
+        with Operations.context(MigrationContext.configure(connection)):
+            migration.downgrade()
+
+    with pytest.raises(RuntimeError, match="Unsafe downgrade"):
+        async with delivery_context.session_factory() as session, session.begin():
+            connection = await session.connection()
+            await connection.run_sync(downgrade)
+
+
+async def test_invalid_initialization_kind_is_rejected_by_database(delivery_context: DeliveryContext) -> None:
+    scenario = Scenario(delivery_context)
+    await scenario.service.initialize(scenario.request())
+    with pytest.raises(DBAPIError):
+        async with delivery_context.session_factory() as session, session.begin():
+            await session.execute(
+                update(KafkaPartitionInitialPosition)
+                .where(col(KafkaPartitionInitialPosition.source_id) == scenario.request().source_id)
+                .values(initialization_kind="historical_guess")
+            )
+
+
+async def test_kind_migration_fences_uncaptured_legacy_sources_even_without_position_rows(
+    delivery_context: DeliveryContext,
+) -> None:
+    scenario = Scenario(delivery_context)
+    migration = importlib.import_module(
+        "syntara.core.database.migrations.versions.91f4c2e8a6bd_add_kafka_partition_initialization_kind"
+    )
 
     def roundtrip(connection: Connection) -> None:
         with Operations.context(MigrationContext.configure(connection)):
@@ -961,9 +1171,27 @@ async def test_followup_migration_preserves_existing_known_boundaries(delivery_c
     async with delivery_context.session_factory() as session, session.begin():
         connection = await session.connection()
         await connection.run_sync(roundtrip)
-    state = await scenario.store.read(scenario.request())
-    assert state.position is not None
-    assert state.position.initial_next_offset == 100
-    assert state.position.initial_commit_confirmed_at is not None
-    assert not state.position.initial_metadata_missing
-    assert state.position.observed_group_next_offset is None
+    blocked = await scenario.service.initialize(scenario.request())
+    assert blocked.status == PositionStatus.BLOCKED
+    assert blocked.reason == "initialization_history_unavailable"
+    saved = await scenario.store.read(scenario.request())
+    assert saved.configuration.initial_partition_ids is None
+    assert saved.position is None
+    scenario.client.commit.assert_not_awaited()
+
+
+async def test_backward_recovery_keeps_its_hold_until_external_cache_coordination(
+    delivery_context: DeliveryContext,
+) -> None:
+    scenario = Scenario(delivery_context)
+    await scenario.gap()
+    scenario.client.commit.reset_mock()
+    scenario.cache_coordination.is_coordinated.return_value = False
+    blocked = await scenario.service.recover(scenario.recovery(), owner_worker_id="repair")
+    assert blocked.reason == "cache_epoch_coordination_required"
+    saved = await scenario.store.read(scenario.request())
+    assert saved.recovery_held
+    assert saved.position is not None
+    assert saved.position.pending_boundary == 0
+    assert saved.position.recovery_confirmed_at is None
+    scenario.client.commit.assert_not_awaited()

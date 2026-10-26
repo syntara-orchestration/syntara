@@ -36,6 +36,14 @@ class GapReason(StrEnum):
     BELOW_AUTHORIZED_BOUNDARY = "below_authorized_boundary"
     SOURCE_RECREATED = "source_recreated"
     INITIAL_METADATA_MISSING = "initial_metadata_missing"
+    INITIALIZATION_HISTORY_UNAVAILABLE = "initialization_history_unavailable"
+
+
+class InitializationKind(StrEnum):
+    """Immutable first-set membership, never inferred for historical rows."""
+
+    FIRST_ACTIVATION = "first_activation"
+    ADDED_PARTITION = "added_partition"
 
 
 class RecoveryPolicy(StrEnum):
@@ -101,6 +109,7 @@ class KafkaPartitionInitialPositionRead(PositionValue):
 
     source_id: UUID
     partition: int
+    initialization_kind: InitializationKind | None
     initial_next_offset: Offset | None
     initialized_at: datetime | None
     initial_metadata_missing: bool
@@ -134,6 +143,8 @@ class KafkaPartitionInitialPosition(SQLModel, table=True):
 
     source_id: UUID = Field(foreign_key="event_subscription_sources.id", ondelete="RESTRICT", primary_key=True)
     partition: int = Field(primary_key=True)
+    # NULL retains legacy/unknown membership; only new initialization assigns a kind.
+    initialization_kind: str | None = Field(default=None, max_length=32)
     initial_next_offset: int | None = Field(default=None, sa_type=BigInteger)
     initialized_at: datetime | None = Field(default_factory=lambda: datetime.now(UTC), sa_type=DateTime(timezone=True))  # type: ignore[call-overload]
     initial_metadata_missing: bool = Field(default=False, sa_column_kwargs={"server_default": text("false")})
@@ -158,6 +169,14 @@ class KafkaPartitionInitialPosition(SQLModel, table=True):
     superseded_recovery_boundary: int | None = Field(default=None, sa_type=BigInteger)
 
     __table_args__ = (
+        CheckConstraint(
+            "initialization_kind IS NULL OR initialization_kind IN ('first_activation', 'added_partition')",
+            name="ck_kafka_initial_kind",
+        ),
+        CheckConstraint(
+            "initialization_kind IS NULL OR NOT initial_metadata_missing",
+            name="ck_kafka_initial_kind_evidence",
+        ),
         CheckConstraint("partition >= 0", name="ck_kafka_initial_partition"),
         CheckConstraint("initial_next_offset >= 0", name="ck_kafka_initial_offset"),
         CheckConstraint("observed_group_next_offset >= 0", name="ck_kafka_observed_group_offset"),

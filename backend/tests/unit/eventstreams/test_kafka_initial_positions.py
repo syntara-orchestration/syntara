@@ -14,6 +14,7 @@ from syntara.core.constants import EventDeliveryDefaults, EventSchedulingDefault
 from syntara.eventstreams.adapters.kafka_consumer import KafkaPartitionConsumer
 from syntara.eventstreams.adapters.kafka_initial_position import (
     GapReason,
+    InitializationKind,
     KafkaPartitionInitialPosition,
     KafkaPartitionInitialPositionRead,
     PositionRequest,
@@ -27,6 +28,7 @@ from syntara.eventstreams.adapters.kafka_initial_position_service import KafkaIn
 from syntara.eventstreams.adapters.kafka_position_control import (
     DrainEvidence,
     PartitionRecoveryControl,
+    RecoveryCacheCoordination,
 )
 from syntara.eventstreams.adapters.kafka_position_store import (
     KafkaInitialPositionStore,
@@ -58,6 +60,7 @@ def row(*, confirmed: bool = True, gap: bool = False, boundary: int = 50) -> Kaf
     return KafkaPartitionInitialPosition(
         source_id=UUID(int=1),
         partition=0,
+        initialization_kind=InitializationKind.FIRST_ACTIVATION.value,
         initial_next_offset=boundary,
         initialized_at=NOW,
         initial_commit_confirmed_at=NOW if confirmed else None,
@@ -75,11 +78,14 @@ class Harness:
     beginning: int = 20
     end: int = 100
     held: bool = False
+    initial_partition_ids: tuple[int, ...] | None = (0, 1)
+    metadata_partition_ids: tuple[int, ...] = (0, 1)
     trace: list[str] = field(default_factory=list)
     client: MagicMock = field(default_factory=lambda: MagicMock(spec=KafkaPartitionConsumer))
     store: MagicMock = field(default_factory=lambda: MagicMock(spec=KafkaInitialPositionStore))
     admission: MagicMock = field(default_factory=lambda: MagicMock(spec=EventAdmissionService))
     control: MagicMock = field(default_factory=lambda: MagicMock(spec=PartitionRecoveryControl))
+    cache_coordination: MagicMock = field(default_factory=lambda: MagicMock(spec=RecoveryCacheCoordination))
 
     def __post_init__(self) -> None:
         """Connect isolated clients to the in-memory test evidence."""
@@ -101,9 +107,12 @@ class Harness:
             assignment_epoch=7,
             cluster_id=IdentityObservation(status=IdentityStatus.VERIFIED, value="cluster"),
             topic_id=IdentityObservation(status=IdentityStatus.VERIFIED, value="topic"),
-            partitions=PartitionSetObservation(status=PartitionSetStatus.VERIFIED, partition_ids=(0, 1)),
+            partitions=PartitionSetObservation(
+                status=PartitionSetStatus.VERIFIED, partition_ids=self.metadata_partition_ids
+            ),
         )
         self.store.read.side_effect = self.read
+        self.store.capture_initial_partitions.side_effect = self.capture
         self.store.choose_initial.side_effect = self.choose
         self.store.record_missing_initial.side_effect = self.record_missing_initial
         self.store.confirm_initial.side_effect = self.confirm_initial
@@ -118,14 +127,19 @@ class Harness:
             quiescent=True, retained_evidence_complete=True, permanent_content_error=False
         )
         self.control.is_fenced.return_value = True
+        self.cache_coordination.is_coordinated.return_value = True
 
     @property
     def service(self) -> KafkaInitialPositionService:
-        return KafkaInitialPositionService(self.store, self.client, self.admission, self.control)
+        return KafkaInitialPositionService(
+            self.store, self.client, self.admission, self.control, cache_coordination=self.cache_coordination
+        )
 
     async def read(self, _request: PositionRequest) -> PositionContext:
         return PositionContext(
-            configuration=KafkaSourceConfiguration(topic="orders", group_id="syntara.test"),
+            configuration=KafkaSourceConfiguration(
+                topic="orders", group_id="syntara.test", initial_partition_ids=self.initial_partition_ids
+            ),
             position=self.position,
             active=True,
             recovery_held=self.held,
@@ -144,13 +158,31 @@ class Harness:
         return {p: CommittedPositionResult.verified(p, self.beginning) for p in partitions}
 
     async def read_end(self, partitions: list[int], **_kwargs: object) -> dict[int, CommittedPositionResult]:
+        self.trace.append("read_bounds")
         return {p: CommittedPositionResult.verified(p, self.end) for p in partitions}
 
+    async def capture(
+        self, _request: PositionRequest, observation: SourceIdentityObservation
+    ) -> KafkaSourceConfiguration:
+        self.trace.append("capture_first_set")
+        if self.initial_partition_ids is None:
+            self.initial_partition_ids = observation.partitions.partition_ids
+        return KafkaSourceConfiguration(
+            topic="orders", group_id="syntara.test", initial_partition_ids=self.initial_partition_ids
+        )
+
     async def choose(
-        self, _request: PositionRequest, _observation: SourceIdentityObservation, boundary: int
+        self,
+        value: PositionRequest,
+        _observation: SourceIdentityObservation,
+        boundary: int,
+        *,
+        initialization_kind: InitializationKind,
     ) -> KafkaPartitionInitialPosition:
         self.trace.append("save_initial")
         self.position = row(confirmed=False, boundary=boundary)
+        self.position.partition = value.partition
+        self.position.initialization_kind = initialization_kind.value
         return self.position
 
     async def record_missing_initial(self, _request: PositionRequest, offset: int) -> KafkaPartitionInitialPosition:
@@ -270,7 +302,7 @@ async def test_initialization_persists_before_seek_and_confirms_before_permissio
 async def test_concurrent_initializer_uses_the_saved_winning_boundary() -> None:
     h = Harness()
 
-    async def winner(*_args: object) -> KafkaPartitionInitialPosition:
+    async def winner(*_args: object, **_kwargs: object) -> KafkaPartitionInitialPosition:
         h.position = row(confirmed=False, boundary=40)
         return h.position
 
@@ -515,6 +547,7 @@ def test_metadata_read_schema_serializes_all_boundaries_without_internal_tokens(
     assert value["initial_next_offset"] == "9223372036854775807"
     assert value["recovery_boundary"] == "20"
     assert value["pending_boundary"] == "30"
+    assert value["initialization_kind"] == "first_activation"
     assert "recovery_token" not in value
 
 
@@ -760,5 +793,138 @@ def test_unknown_initial_and_replacement_evidence_serialize_losslessly() -> None
     data = KafkaPartitionInitialPositionRead.from_position(position).model_dump(mode="json")
     assert data["initial_next_offset"] is None
     assert data["initialized_at"] is None
+    assert data["initialization_kind"] is None
     assert data["observed_group_next_offset"] == "9223372036854775807"
     assert data["superseded_recovery_boundary"] == "9007199254740993"
+
+
+async def test_first_topic_set_is_saved_before_bounds_and_is_larger_than_assignment() -> None:
+    h = Harness(initial_partition_ids=None)
+    h.client.assignment = frozenset({0})
+    result = await h.service.initialize(request())
+    assert result.status == PositionStatus.READY
+    assert result.next_offset == 100
+    assert h.initial_partition_ids == (0, 1)
+    assert h.trace.index("capture_first_set") < h.trace.index("read_bounds") < h.trace.index("save_initial")
+
+
+@pytest.mark.parametrize("beginning", [0, 7])
+async def test_added_partition_uses_retained_beginning_even_during_first_activation(beginning: int) -> None:
+    h = Harness(initial_partition_ids=(0,), beginning=beginning, end=beginning + 3)
+    result = await h.service.initialize(request(1))
+    assert result.status == PositionStatus.READY
+    assert result.next_offset == beginning
+    assert h.position is not None
+    assert h.position.initialization_kind == InitializationKind.ADDED_PARTITION.value
+    assert h.position.initial_next_offset == beginning
+    assert h.initial_partition_ids == (0,)
+    h.client.commit.assert_awaited_once_with({1: beginning}, expected_epoch=7)
+
+
+async def test_crash_after_capture_does_not_expand_first_set_before_any_row_exists() -> None:
+    h = Harness(initial_partition_ids=None, metadata_partition_ids=(0,))
+    h.store.choose_initial.side_effect = SQLAlchemyError("interrupted")
+    assert (await h.service.initialize(request())).status == PositionStatus.BLOCKED
+    assert h.position is None
+    assert h.initial_partition_ids == (0,)
+    observation = h.client.observe_source_identity.return_value
+    h.client.observe_source_identity.return_value = observation.model_copy(
+        update={"partitions": PartitionSetObservation(status=PartitionSetStatus.VERIFIED, partition_ids=(0, 1))}
+    )
+    h.store.choose_initial.side_effect = h.choose
+    h.beginning, h.end = 0, 3
+    result = await h.service.initialize(request(1))
+    assert result.next_offset == 0
+    assert h.initial_partition_ids == (0,)
+
+
+@pytest.mark.parametrize("established", [False, True])
+async def test_added_partition_never_reselects_a_saved_or_established_boundary(*, established: bool) -> None:
+    position = row(confirmed=established, boundary=0)
+    position.partition = 1
+    position.initialization_kind = InitializationKind.ADDED_PARTITION.value
+    h = Harness(position=position, initial_partition_ids=(0,), beginning=2, end=3)
+    result = await h.service.initialize(request(1))
+    assert result.status == PositionStatus.RECOVERY_GAP
+    assert result.reason == (GapReason.MISSING_COMMIT if established else GapReason.OUT_OF_RANGE).value
+    assert position.initial_next_offset == 0
+    h.store.choose_initial.assert_not_awaited()
+    h.client.commit.assert_not_awaited()
+
+
+async def test_legacy_boundary_without_original_membership_is_not_reclassified() -> None:
+    position = row(boundary=50)
+    position.initialization_kind = None
+    h = Harness(position=position, initial_partition_ids=None, committed=75)
+    result = await h.service.initialize(request())
+    assert result.status == PositionStatus.RECOVERY_GAP
+    assert result.reason == GapReason.INITIALIZATION_HISTORY_UNAVAILABLE.value
+    assert position.initial_next_offset == 50
+    assert position.initialization_kind is None
+    h.store.capture_initial_partitions.assert_not_awaited()
+    h.client.commit.assert_not_awaited()
+
+
+async def test_backward_recovery_without_cache_coordination_remains_closed() -> None:
+    h = Harness(position=row(gap=True))
+    service = KafkaInitialPositionService(h.store, h.client, h.admission, h.control)
+    result = await service.recover(recovery(), owner_worker_id="repair")
+    assert result.reason == "cache_epoch_coordination_required"
+    assert h.held
+    h.store.reconcile_claims.assert_not_awaited()
+    h.store.confirm_recovery.assert_not_awaited()
+    h.client.commit.assert_not_awaited()
+
+
+async def test_forward_recovery_preserves_outcomes_without_cache_epoch_rotation() -> None:
+    h = Harness(position=row(gap=True))
+    h.cache_coordination.is_coordinated.return_value = False
+    result = await h.service.recover(recovery(policy=RecoveryPolicy.CURRENT_END), owner_worker_id="repair")
+    assert result.status == PositionStatus.READY
+    h.cache_coordination.is_coordinated.assert_not_awaited()
+
+
+async def test_cache_coordination_loss_after_kafka_commit_keeps_recovery_unconfirmed() -> None:
+    h = Harness(position=row(gap=True))
+    h.cache_coordination.is_coordinated.side_effect = [True, True, False]
+    result = await h.service.recover(recovery(), owner_worker_id="repair")
+    assert result.reason == "cache_epoch_coordination_required"
+    assert h.committed == 20
+    assert h.held
+    h.store.confirm_recovery.assert_not_awaited()
+    h.cache_coordination.is_coordinated.assert_awaited_with(
+        recovery(), token=UUID(int=42), recovery_revision=1, boundary=20
+    )
+
+
+@pytest.mark.parametrize("kind", [None, *InitializationKind])
+def test_read_schema_preserves_known_and_legacy_initialization_kinds(kind: InitializationKind | None) -> None:
+    position = row(boundary=2**63 - 1)
+    position.initialization_kind = None if kind is None else kind.value
+    value = KafkaPartitionInitialPositionRead.from_position(position)
+    assert value.initialization_kind == kind
+    data = value.model_dump(mode="json")
+    assert data["initial_next_offset"] == "9223372036854775807"
+    assert data["initialization_kind"] == (None if kind is None else kind.value)
+
+
+def test_read_schema_rejects_unrecognized_kind_and_table_preserves_legacy_nullability() -> None:
+    data = KafkaPartitionInitialPositionRead.from_position(row()).model_dump()
+    data["initialization_kind"] = "historical_guess"
+    with pytest.raises(ValidationError):
+        KafkaPartitionInitialPositionRead.model_validate(data)
+    table = KafkaPartitionInitialPosition.__table__  # type: ignore[attr-defined]
+    assert table.c.initialization_kind.nullable
+    checks = {constraint.name for constraint in table.constraints}
+    assert {"ck_kafka_initial_kind", "ck_kafka_initial_kind_evidence"} <= checks
+
+
+async def test_unknown_history_requires_coordination_even_for_current_end_recovery() -> None:
+    h = Harness()
+    await h.record_missing_initial(request(), 75)
+    h.cache_coordination.is_coordinated.return_value = False
+    result = await h.service.recover(recovery(policy=RecoveryPolicy.CURRENT_END), owner_worker_id="repair")
+    assert result.reason == "cache_epoch_coordination_required"
+    assert h.held
+    h.store.reconcile_claims.assert_not_awaited()
+    h.client.commit.assert_not_awaited()
