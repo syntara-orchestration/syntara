@@ -40,7 +40,7 @@ from syntara.workflows.exceptions import (
     WorkflowNotFoundError,
     WorkflowNotPublishedError,
 )
-from syntara.workflows.json_schema_validation import apply_schema_defaults
+from syntara.workflows.json_schema_validation import NO_REF_REGISTRY, apply_schema_defaults
 from syntara.workflows.models.activity_execution import (
     ActivityExecution,
     ActivityExecutionListResponse,
@@ -234,14 +234,14 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
         trigger_node: dict[str, Any],
         input_data: dict[str, Any],
     ) -> None:
-        """Apply input_schema defaults and validate trigger input data.
+        """Validate trigger inputs, applying defaults except for event envelopes.
 
-        Extracts the trigger's ``input_schema``, fills in missing default
-        values, then validates the result against *input_data* directly.
+        Event Subscribe validates only the envelope payload without mutation.
+        Other triggers fill missing defaults and validate input_data directly.
 
         Args:
             trigger_node: Trigger node dict from the workflow definition.
-            input_data: Mutable input dict — modified in place.
+            input_data: Trigger input dict; event envelopes remain unchanged.
 
         Raises:
             TriggerValidationError: If input_data fails schema validation.
@@ -253,10 +253,16 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
 
         trigger_type = trigger_node.get("type", "")
         trigger_node_id = trigger_node.get("id")
-        target = input_data
 
         try:
-            apply_schema_defaults(target, input_schema)
+            if trigger_type == NodeType.EVENT_SUBSCRIBE_TRIGGER:
+                if "payload" not in input_data:
+                    msg = "Event Subscribe input must contain a payload"
+                    raise TriggerValidationError(msg)
+                jsonschema.Draft7Validator.check_schema(input_schema)
+                jsonschema.Draft7Validator(input_schema, registry=NO_REF_REGISTRY).validate(input_data["payload"])
+            else:
+                apply_schema_defaults(input_data, input_schema)
         except jsonschema.ValidationError as e:
             logger.warning(
                 "Trigger input validation failed",
@@ -351,7 +357,7 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
             schema_version=workflow_version.schema_version,
         )
 
-        # Step 2: Resolve trigger node and apply input_schema defaults
+        # Step 2: Resolve the trigger and validate its inputs
         workflow_def = workflow_version.workflow_definition
         trigger_node_id, trigger_node = resolve_trigger_node(workflow_def, trigger_node_id)
         self._apply_trigger_schema_defaults(trigger_node, input_data)

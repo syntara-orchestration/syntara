@@ -44,6 +44,7 @@ def _make_service(
     svc.session = session
     svc.user = user
     svc.opa_client = MagicMock(spec=AuthzEvaluator) if with_opa else None
+    svc.is_cert_authenticated = False
     return svc, session
 
 
