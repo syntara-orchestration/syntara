@@ -315,7 +315,7 @@ async def test_restored_control_result_reads_the_replay_under_the_node_id(mock_w
     await wf._restore_node_state(node, graph)
 
     assert mock_wf.execute_activity.await_args.kwargs["activity_id"] == "cond_1"
-    assert mock_wf.execute_activity.await_args.kwargs["args"] == ["src-1", "cond_1", "cond_1"]
+    assert mock_wf.execute_activity.await_args.kwargs["args"] == ["src-1", "cond_1", "cond_1", False]
 
 
 def test_replayed_timestamps_are_addressable_by_the_full_temporal_path() -> None:
@@ -611,6 +611,32 @@ async def test_no_prefetched_port_still_falls_back_to_inference(mock_wf: MagicMo
 # replay for, and waits if so. A node listed but never replayed costs the
 # monitor a serial 5s wait for a timestamp that is never written. These assert
 # the set through _prepare_retry, which is what populates it.
+
+
+async def test_prepare_retry_caches_source_trigger_timestamps_without_making_it_a_candidate(
+    mock_wf: MagicMock,
+) -> None:
+    wf = _make_workflow({"retry_from_execution_id": "src-1", "eligible_point_ids": ["step_2"]})
+    graph = _condition_graph()
+    timestamps = {
+        "trigger": {
+            "started_at": "2026-01-01T00:00:00+00:00",
+            "completed_at": "2026-01-01T00:05:00+00:00",
+        }
+    }
+    mock_wf.execute_activity.side_effect = [
+        {
+            "activity_statuses": {"step_2": ActivityStatus.FAILED.value},
+            "temporal_activity_statuses": {"step_2": ActivityStatus.FAILED.value},
+            "temporal_activity_timestamps": timestamps,
+        },
+        {},
+    ]
+
+    await wf._prepare_retry(graph)
+
+    assert wf._retry_source_timestamps == timestamps
+    assert "trigger" not in wf._retry_replay_candidates
 
 
 async def test_a_loop_stays_a_candidate_until_the_loop_probe_runs(
