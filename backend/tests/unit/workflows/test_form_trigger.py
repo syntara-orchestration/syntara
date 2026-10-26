@@ -206,4 +206,3 @@ class TestFormTriggerSubmissionFailures:
 
         with pytest.raises(TriggerValidationError, match="form definition"):
             validate_form_trigger_submission(trigger, {})
-
