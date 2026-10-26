@@ -288,6 +288,36 @@ describe('AAPNodeForm', () => {
     expect(screen.getByDisplayValue('Deploy App')).toBeInTheDocument()
   })
 
+  // AAP-92038: imported workflows only carry the portable organization_name/job_template_name
+  // pair (job_template_id is stripped so workflows remain portable across AAP environments).
+  // Once the job template list has loaded and contains a name match, the form should resolve
+  // job_template_id itself instead of waiting for the user to re-pick the same values.
+  it('resolves job_template_id from job_template_name when a workflow is imported without an id', () => {
+    const mockSelectJobTemplate = vi.fn()
+    mockUseAAPBrowser.mockReturnValue({
+      ...createMockAAPBrowser(defaultTemplateDetail),
+      selectJobTemplate: mockSelectJobTemplate,
+    })
+
+    renderWithHeader(
+      <AAPNodeForm
+        onSubmit={mockOnSubmit}
+        onCancel={vi.fn()}
+        initialData={{
+          name: 'Existing Job',
+          organization_name: 'Default',
+          job_template_name: 'Deploy App',
+          // job_template_id intentionally omitted, matching imported-workflow data
+        }}
+      />
+    )
+
+    // baseMockAAPBrowserData.jobTemplates already contains { id: 10, name: 'Deploy App' },
+    // so the form should resolve and select that id automatically to load the template
+    // detail (and thus the prompt-on-launch dynamic fields), without the user re-selecting it.
+    expect(mockSelectJobTemplate).toHaveBeenCalledWith(10)
+  })
+
   it('passes projectId to CredentialSelector', async () => {
     const user = userEvent.setup()
     const useAllCredentialsMock = vi.mocked(useAllCredentials)
