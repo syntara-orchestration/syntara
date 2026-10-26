@@ -43,6 +43,12 @@ class TestNewCatalogEntries:
         assert d.value_type == SettingValueType.BOOLEAN
         assert d.default_value is False
 
+    def test_workflow_engine_max_loop_iterations_default(self) -> None:
+        d = _catalog_by_key["workflow_engine.max_loop_iterations"]
+        assert d.category == SettingCategory.WORKFLOW_EXECUTION
+        assert d.value_type == SettingValueType.INTEGER
+        assert d.default_value == 1000
+
     def test_no_new_settings_require_restart(self) -> None:
         for key in _NEW_KEYS:
             d = _catalog_by_key[key]

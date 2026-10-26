@@ -650,7 +650,7 @@ SETTINGS_CATALOG: list[SettingDefinition] = [
         name="Max loop iterations",
         category=SettingCategory.WORKFLOW_EXECUTION,
         value_type=SettingValueType.INTEGER,
-        default_value=10000,
+        default_value=1000,
         description=(
             "Safety limit that prevents runaway loop execution inside "
             "workflows. If a loop node exceeds this number of iterations, "

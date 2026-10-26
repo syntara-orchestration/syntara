@@ -33,7 +33,7 @@ function makeSettingsResponse(overrides: Record<string, unknown> = {}) {
     'workflow_engine.retry_initial_interval': 1,
     'workflow_engine.retry_max_interval': 60,
     'workflow_engine.retry_backoff_coefficient': 2.0,
-    'workflow_engine.max_loop_iterations': 10000,
+    'workflow_engine.max_loop_iterations': 1000,
     ...overrides,
   }
   return {
@@ -87,7 +87,7 @@ describe('useWorkflowEngineDefaults', () => {
     await waitFor(() => expect(result.current.defaults).not.toBeNull())
 
     expect(result.current.defaults!.continueOnFailure).toBe(false)
-    expect(result.current.defaults!.maxLoopIterations).toBe(10000)
+    expect(result.current.defaults!.maxLoopIterations).toBe(1000)
     expect(result.current.defaults!.convergeWaitDuration).toBe(86400)
   })
 

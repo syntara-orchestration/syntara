@@ -401,7 +401,7 @@ export const settings: RuntimeSetting[] = [
     category: 'workflow_execution',
     group: 'Execution',
     value_type: 'integer',
-    default_value: 10000,
+    default_value: 1000,
     validation_schema: { min: 1 } as unknown as Record<string, never>,
   }),
   makeSetting({
