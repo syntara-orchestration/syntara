@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 from datetime import UTC, datetime
 from types import SimpleNamespace
+from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
@@ -23,6 +24,11 @@ from syntara.eventstreams.core.handler import (
     SchedulingFailureCode,
 )
 from syntara.eventstreams.services.recovery_worker import EventDeliveryRecoveryWorker
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from syntara.eventstreams.services.admission_service import SchedulingResult
 
 
 def _identity(offset: int = 0) -> DeliveryIdentity:
@@ -51,7 +57,7 @@ def _resolved(identity: DeliveryIdentity) -> ResolvedDelivery:
 
 
 def _worker(
-    results_sequence: list[object | None] | None = None,
+    results_sequence: Sequence[SchedulingResult | None] | None = None,
     *,
     batch_limit: int = 10,
 ) -> tuple[EventDeliveryRecoveryWorker, AsyncMock]:
@@ -73,7 +79,7 @@ def _worker(
         worker = EventDeliveryRecoveryWorker(session_factory, launcher, batch_limit=batch_limit, worker_id="test")
     sequence = results_sequence if results_sequence is not None else [None]
     mock_claim_recover = AsyncMock(side_effect=sequence)
-    worker._claim_and_recover_one = mock_claim_recover  # type: ignore[assignment]
+    worker._claim_and_recover_one = mock_claim_recover  # type: ignore[method-assign]
     return worker, mock_claim_recover
 
 
@@ -193,7 +199,7 @@ async def test_stop_drains_before_periodic_stop() -> None:
 
     periodic_mock.stop = mock_periodic_stop
     worker._periodic = periodic_mock
-    worker.drain = mock_drain  # type: ignore[assignment]
+    worker.drain = mock_drain  # type: ignore[method-assign]
     await worker.stop()
     assert call_order == ["drain", "periodic_stop"]
 
@@ -204,7 +210,7 @@ async def test_stop_during_active_tick_drains_in_flight() -> None:
     worker, _ = _worker()
     tick_started = asyncio.Event()
     tick_release = asyncio.Event()
-    drained = False
+    stopped = asyncio.Event()
 
     async def slow_tick() -> None:
         tick_started.set()
@@ -214,20 +220,19 @@ async def test_stop_during_active_tick_drains_in_flight() -> None:
     worker._in_flight = task
 
     async def do_stop() -> None:
-        nonlocal drained
         await worker.stop()
-        drained = True
+        stopped.set()
 
     worker._periodic = MagicMock()
     worker._periodic.stop = AsyncMock()
 
     stop_task = asyncio.create_task(do_stop())
     await tick_started.wait()
-    assert not drained
+    assert not stopped.is_set()
     assert worker.draining
     tick_release.set()
     await stop_task
-    assert drained
+    assert stopped.is_set()
     worker._periodic.stop.assert_awaited_once()
 
 
@@ -293,7 +298,7 @@ async def test_drain_mid_tick_stops_further_claims() -> None:
 
     call_count = 0
 
-    async def drain_after_first() -> object | None:
+    async def drain_after_first() -> SchedulingResult | None:
         nonlocal call_count
         call_count += 1
         if call_count == 1:
@@ -304,7 +309,7 @@ async def test_drain_mid_tick_stops_further_claims() -> None:
         return None
 
     worker, _ = _worker()
-    worker._claim_and_recover_one = AsyncMock(side_effect=drain_after_first)  # type: ignore[assignment]
+    worker._claim_and_recover_one = AsyncMock(side_effect=drain_after_first)  # type: ignore[method-assign]
     count = await worker.tick()
     assert count == 2
     assert call_count == 2

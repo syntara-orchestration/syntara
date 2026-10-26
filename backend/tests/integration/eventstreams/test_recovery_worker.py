@@ -28,11 +28,18 @@ from tests.integration.eventstreams.test_execution_scheduling import IsolatedTem
 
 pytestmark = pytest.mark.integration
 
+type RecoveryWorkerContext = tuple[
+    EventDeliveryRecoveryWorker,
+    DeliveryContext,
+    IsolatedTemporal,
+    PreparedExecution,
+]
+
 
 @pytest_asyncio.fixture
 async def recovery_worker(
     delivery_context: DeliveryContext,
-) -> tuple[EventDeliveryRecoveryWorker, DeliveryContext, IsolatedTemporal, PreparedExecution]:
+) -> RecoveryWorkerContext:
     """Prepare one delivery and create a worker pointing at the same DB and Temporal adapter."""
     context = delivery_context
     async with context.session_factory() as session, session.begin():
@@ -163,7 +170,7 @@ async def test_failure_isolation_across_deliveries(recovery_worker) -> None:
 
 
 async def test_periodic_execution_holds_no_transaction_during_temporal_calls(
-    recovery_worker,
+    recovery_worker: RecoveryWorkerContext,
 ) -> None:
     """No scanner-owned transaction may remain open during Temporal RPCs."""
     worker, context, temporal, prepared = recovery_worker
@@ -183,9 +190,8 @@ async def test_periodic_execution_holds_no_transaction_during_temporal_calls(
             lock_free_during_rpc = bool(result.scalar())
         return await original_start(p)
 
-    temporal.start = checking_start
-
-    await worker._periodic._execute_cycle()
+    with patch.object(temporal, "start", checking_start):
+        await worker._periodic._execute_cycle()
 
     assert lock_free_during_rpc is True, "Advisory lock held during Temporal RPC"
     assert len(temporal.starts) == 1
@@ -204,7 +210,7 @@ async def test_concurrent_scanners_claim_independently(recovery_worker) -> None:
 
 
 async def test_drain_during_blocked_temporal_prevents_further_claims(
-    recovery_worker,
+    recovery_worker: RecoveryWorkerContext,
 ) -> None:
     """Drain while Temporal call is blocked stops new claims; evidence survives timeout."""
     worker, context, temporal, prepared = recovery_worker
@@ -222,22 +228,22 @@ async def test_drain_during_blocked_temporal_prevents_further_claims(
         await temporal_release.wait()
         return await original_start(p)
 
-    temporal.start = blocking_start
+    with patch.object(temporal, "start", blocking_start):
+        execute_task = asyncio.create_task(worker._periodic._execute_cycle())
+        await temporal_blocked.wait()
 
-    execute_task = asyncio.create_task(worker._periodic._execute_cycle())
-    await temporal_blocked.wait()
+        with patch("syntara.eventstreams.services.recovery_worker.DRAIN_TIMEOUT_SECONDS", 0.05):
+            await worker.drain()
 
-    with patch("syntara.eventstreams.services.recovery_worker.DRAIN_TIMEOUT_SECONDS", 0.05):
-        await worker.drain()
+        assert worker.draining
 
-    assert worker.draining
-
-    temporal_release.set()
-    await execute_task
+        temporal_release.set()
+        await execute_task
 
     assert len(temporal.starts) == 1
 
     async with context.session_factory() as session:
         second = await session.get(EventDelivery, second_claim.identity.digest)
+        assert second is not None
         assert second.state == DeliveryState.IN_PROGRESS
         assert second.frozen_binding is not None
