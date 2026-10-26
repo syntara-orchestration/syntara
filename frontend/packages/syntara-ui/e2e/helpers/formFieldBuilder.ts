@@ -340,7 +340,7 @@ export type FormPromptStoredParameters = {
   responder_users?: string[]
   responder_groups?: string[]
   settings?: { continue_on_failure?: boolean }
-  /** Node-level settings.timeout (Settings tab — running-long threshold). */
+  /** Node-level settings.timeout when present on saved workflows (no longer editable in builder). */
   activity_timeout?: number | null
 }
 
