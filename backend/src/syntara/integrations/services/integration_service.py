@@ -739,7 +739,7 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
         return await self._to_read_with_counts(integration)
 
     async def _resolve_credential(
-        self, credential_id: UUID, *, security_protocol: str = KafkaSecurityProtocol.SASL_SSL
+        self, credential_id: UUID, *, security_protocol: str | None = None
     ) -> dict[str, object]:
         """Resolve a credential to its extra_vars dict for adapter use.
 
@@ -749,7 +749,7 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
         Raises:
             IntegrationCredentialNotFoundError: If the credential or its type is not found.
             CredentialDisabledError: If the credential is disabled.
-            CredentialValidationError: If a Kafka-backed credential fails its login rules.
+            CredentialValidationError: If a Kafka connection receives an invalid credential.
             CredentialDecryptionError: If the credential's secret cannot be decrypted.
             RuntimeError: If SecretService is not available.
 
@@ -762,13 +762,18 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
         credential, cred_type = await fetch_credential_with_type(self.session, credential_id)
         if not credential.enabled:
             raise CredentialDisabledError(credential.name)
-        if cred_type.name == KAFKA_CONNECTION_TYPE_NAME:
+        # A Kafka configuration must use the Kafka validator even when the
+        # supplied credential has another type. SSL/PLAINTEXT allow omission,
+        # but every credential supplied for them must still be valid.
+        if security_protocol is not None or cred_type.name == KAFKA_CONNECTION_TYPE_NAME:
             logger.debug("Resolving Kafka management credential", credential_id=str(credential_id))
             login = await resolve_connector_kafka_login(
                 self.session,
                 secret_service,
                 management_credential_id=credential_id,
-                security_protocol=security_protocol,
+                security_protocol=security_protocol
+                if security_protocol is not None
+                else KafkaSecurityProtocol.SASL_SSL,
             )
             return dict(login or {})
         logger.debug("Resolving credential", credential_id=str(credential_id), credential_type=cred_type.name)
