@@ -54,9 +54,9 @@ class TestTriggerInputDispatch:
         normalized = ExecutionService._normalize_trigger_input(trigger, submitted)
 
         assert normalized.input_data == {"count": 42.0}
-        assert normalized.form_schema is not None
-        assert normalized.form_schema.field_types == ["number"]
-        assert normalized.form_schema.field_count == 1
+        assert normalized.form_definition_metadata is not None
+        assert normalized.form_definition_metadata.field_types == ["number"]
+        assert normalized.form_definition_metadata.field_count == 1
         assert submitted == {"count": "42"}
 
     def test_manual_trigger_keeps_json_schema_defaults_in_place(self) -> None:
@@ -75,7 +75,7 @@ class TestTriggerInputDispatch:
         normalized = ExecutionService._normalize_trigger_input(trigger, submitted)
 
         assert normalized.input_data is submitted
-        assert normalized.form_schema is None
+        assert normalized.form_definition_metadata is None
         assert submitted == {"name": "default-name"}
 
     @pytest.mark.parametrize("trigger_type", ["manual_trigger", "webhook_trigger", "eda_trigger"])
@@ -88,7 +88,7 @@ class TestTriggerInputDispatch:
         )
 
         assert normalized.input_data is submitted
-        assert normalized.form_schema is None
+        assert normalized.form_definition_metadata is None
         assert submitted == {"untouched": "value"}
 
 

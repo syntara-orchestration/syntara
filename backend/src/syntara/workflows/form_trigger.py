@@ -31,7 +31,7 @@ if TYPE_CHECKING:
 logger = structlog.stdlib.get_logger(__name__)
 
 
-class FormSchemaSummary(NamedTuple):
+class FormDefinitionMetadata(NamedTuple):
     """Field metadata from a form trigger definition, for observability only.
 
     ``field_count`` is the number of fields in the form definition.
@@ -46,10 +46,10 @@ def validate_form_trigger_submission(
     input_data: dict[str, Any],
     *,
     workflow_id: UUID | None = None,
-) -> tuple[dict[str, Any], FormSchemaSummary]:
+) -> tuple[dict[str, Any], FormDefinitionMetadata]:
     """Validate and normalize a form-trigger submission.
 
-    Returns the cleaned input data and its schema summary. The cleaned values
+    Returns the cleaned input data and its form-definition metadata. The cleaned values
     use the same shape as form prompt submissions. Form Triggers additionally
     reject dynamic options because they have no upstream values from which to
     resolve them.
@@ -86,7 +86,7 @@ def validate_form_trigger_submission(
     try:
         cleaned_input = validate_form_submission(form_definition, input_data)
         field_types = sorted({str(field.type) for field in form_definition.fields})
-        return cleaned_input, FormSchemaSummary(
+        return cleaned_input, FormDefinitionMetadata(
             field_types=field_types,
             field_count=len(form_definition.fields),
         )
@@ -110,7 +110,7 @@ def record_form_trigger_submission(
     workflow_name: str,
     execution_id: UUID,
     trigger_node_id: str,
-    form_schema: FormSchemaSummary,
+    form_definition_metadata: FormDefinitionMetadata,
 ) -> None:
     """Record submission latency and dispatch the metadata-only audit event."""
     try:
@@ -132,8 +132,8 @@ def record_form_trigger_submission(
                 trigger_node_id=trigger_node_id,
                 submitted_by=user.id,
                 submitted_at=submitted_at,
-                field_count=form_schema.field_count,
-                field_types=form_schema.field_types,
+                field_count=form_definition_metadata.field_count,
+                field_types=form_definition_metadata.field_types,
                 principal_type=user.__dict__.get("__principal_type__"),
             )
         )

@@ -47,7 +47,7 @@ from syntara.workflows.exceptions import (
     WorkflowNotPublishedError,
 )
 from syntara.workflows.form_trigger import (
-    FormSchemaSummary,
+    FormDefinitionMetadata,
     record_form_trigger_submission,
     validate_form_trigger_submission,
 )
@@ -91,7 +91,7 @@ class NormalizedTriggerInput(NamedTuple):
     """Normalized trigger input, with form metadata when applicable."""
 
     input_data: dict[str, Any]
-    form_schema: FormSchemaSummary | None
+    form_definition_metadata: FormDefinitionMetadata | None
 
 
 async def count_active_executions(session: "AsyncSession") -> int:
@@ -321,16 +321,16 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
         Form Triggers use their typed form definition. Other trigger types keep
         the existing JSON Schema defaults and validation behavior.
         """
-        form_schema: FormSchemaSummary | None = None
+        form_definition_metadata: FormDefinitionMetadata | None = None
         if trigger_node.get("type") == NodeType.FORM_TRIGGER:
-            input_data, form_schema = validate_form_trigger_submission(
+            input_data, form_definition_metadata = validate_form_trigger_submission(
                 trigger_node, input_data, workflow_id=workflow_id
             )
         else:
             ExecutionService._apply_trigger_schema_defaults(trigger_node, input_data)
 
         input_data = validate_jsonb_size(input_data, field_name="input_data")
-        return NormalizedTriggerInput(input_data=input_data, form_schema=form_schema)
+        return NormalizedTriggerInput(input_data=input_data, form_definition_metadata=form_definition_metadata)
 
     async def create_execution(
         self,
@@ -365,8 +365,9 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
             Exception: If Temporal workflow start fails
 
         """
-        submitted_at = datetime.now(UTC)
-        submission_started = monotonic()
+        # Capture service-entry times for the full execution-creation interval.
+        execution_creation_started_at = datetime.now(UTC)
+        execution_creation_started_monotonic = monotonic()
 
         logger.info("Creating execution for workflow by user", workflow_id=workflow_id, user_id=self.user.id)
 
@@ -418,17 +419,17 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
             component=component,
         )
 
-        if normalized.form_schema is not None:
+        if normalized.form_definition_metadata is not None:
             record_form_trigger_submission(
                 recorder=recorder,
                 user=self.user,
-                submission_started=submission_started,
-                submitted_at=submitted_at,
+                submission_started=execution_creation_started_monotonic,
+                submitted_at=execution_creation_started_at,
                 workflow_id=workflow.id,
                 workflow_name=workflow.name,
                 execution_id=execution.id,
                 trigger_node_id=trigger_node_id,
-                form_schema=normalized.form_schema,
+                form_definition_metadata=normalized.form_definition_metadata,
             )
 
         return execution
