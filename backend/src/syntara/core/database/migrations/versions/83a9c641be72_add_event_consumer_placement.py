@@ -1,11 +1,11 @@
 """add event consumer placement
 
 Revision ID: 83a9c641be72
-Revises: 52662dc0e022, 759a689cc69c
+Revises: 759a689cc69c
 Create Date: 2026-10-26 12:44:41.143862
 
-Generated from SQLModel metadata against a disposable PostgreSQL database at
-both previous heads. The paired-null CHECK is CUSTOM because Alembic does not
+Generated from SQLModel metadata against a disposable PostgreSQL database.
+The paired-null CHECK is CUSTOM because Alembic does not
 autogenerate check-constraint changes on existing tables.
 
 Existing subscriptions remain unassigned (both new fields NULL). There is no
@@ -44,7 +44,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "83a9c641be72"
-down_revision: str | Sequence[str] | None = ("52662dc0e022", "759a689cc69c")
+down_revision: str | Sequence[str] | None = "759a689cc69c"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
