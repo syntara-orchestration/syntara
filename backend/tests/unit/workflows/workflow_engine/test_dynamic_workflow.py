@@ -1015,6 +1015,55 @@ class TestConvergeAnyStrategy:
         assert "node_b" not in wf.skipped_nodes
         assert "node_b" in wf._any_fired_nodes
 
+    def test_any_fired_branch_failure_is_recorded(self) -> None:
+        """A branch still in flight when an ANY converge fires keeps its outcome.
+
+        Regression test for test_converge_any_2_of_3_strategy on the
+        concurrent-dispatch Execution Plane: with branch_a and branch_b
+        completed, the 2-of-3 gate fires while branch_c is still running.
+        branch_c then fails (exit 1). The failure must be recorded in
+        failed_nodes — it is what drives completed_with_errors — instead of
+        being dropped because the branch no longer gates scheduling.
+
+        Before the fix, the branch was moved to _detached_nodes and its task
+        dropped from the pending loop, so _process_completed_task silently
+        discarded the result and the execution reported plain 'completed'.
+        """
+        graph = _build_three_branch_converge_graph({"strategy": "any", "n_required": 2})
+        converge_node = graph.get_node("converge_node")
+        wf = _make_workflow()
+        wf._build_converge_branch_nodes_index(graph)
+        wf.resolver.set_namespace("node_a", {"status": "completed"})
+        wf.resolver.set_namespace("node_b", {"status": "completed"})
+
+        async def fail_after_the_converge_fires() -> dict[str, Any]:
+            error = RuntimeError("exit 1")
+            raise error
+
+        loop = asyncio.new_event_loop()
+        try:
+            pending: dict[str, asyncio.Task[Any]] = {
+                # branch_c is in flight when node_b's completion fires the gate
+                "node_c": loop.create_task(fail_after_the_converge_fires()),
+            }
+            # node_b completing satisfies the 2-of-3 gate: the converge fires
+            # while branch_c is still running
+            is_loop_iterate = False
+            result = wf._should_skip_successor(converge_node, "node_b", is_loop_iterate, pending, graph)
+            assert result is False
+
+            wf._remove_detached_tasks(pending)
+            loop.run_until_complete(wf._process_pending_tasks(pending, graph))
+
+            # The any-fired branch's failure is recorded — it is what drives
+            # completed_with_errors in _build_result.
+            assert "node_c" in wf.failed_nodes, (
+                "branch_c failed after the converge fired; the failure must not be dropped"
+            )
+            assert wf.failed_nodes["node_c"] == "exit 1"
+        finally:
+            loop.close()
+
     def test_any_skips_do_not_count_toward_n_required(self) -> None:
         """Skipped predecessors do not count toward n_required; only successes count."""
         graph = self._build_any_converge_graph({"strategy": "any", "n_required": 2})
