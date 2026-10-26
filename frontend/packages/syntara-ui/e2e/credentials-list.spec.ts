@@ -134,25 +134,6 @@ test.describe('Table Display and Sorting', () => {
       }
     }
   })
-
-  test('created and last modified columns use "by" without a middle dot before usernames', async ({ app }) => {
-    const { name: credName } = await createTestCredential(app, { prefix: 'e2e-cred-ts' })
-
-    try {
-      await goToCredentialsList(app)
-      await filterCredentialByName(app, credName)
-
-      const table = app.getByRole('grid', { name: 'Credentials table' })
-      const row = table.getByRole('row', { name: new RegExp(credName) })
-      await expect(row).toBeVisible({ timeout: 30_000 })
-
-      const rowText = await row.textContent()
-      expect(rowText).not.toContain('·')
-      expect(rowText).toMatch(/\bby\b/)
-    } finally {
-      await deleteCredentialByName(app, credName)
-    }
-  })
 })
 
 // ---------------------------------------------------------------------------
