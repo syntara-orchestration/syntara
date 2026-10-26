@@ -6,6 +6,7 @@ from collections import deque
 from collections.abc import Callable
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, timedelta
+from typing import TypedDict
 from uuid import UUID
 
 import structlog
@@ -52,6 +53,10 @@ from syntara.eventstreams.services.record_processing_service import EventRecordP
 
 logger = structlog.stdlib.get_logger(__name__)
 _TRANSPORT_ERRORS = (ConsumerNotRunningError, KafkaTransportError, OwnershipRevokedError, StaleEpochError)
+
+
+class _ProcessingGuardArguments(TypedDict, total=False):
+    admission_guard: Callable[[], bool]
 
 
 @dataclass
@@ -147,6 +152,8 @@ class KafkaRecordRunner:
         self._stop_lock = asyncio.Lock()
         self._closing = False
         self._started = False
+        self._placement_authority: Callable[[], bool] | None = None
+        self._placement_enabled = True
         self._stopped = False
         self._drain_deadline: float | None = None
         self._fetching: frozenset[int] = frozenset()
@@ -173,7 +180,25 @@ class KafkaRecordRunner:
         return self._gate is None or self._gate.resolution_open(self.snapshot) is True
 
     def _admission_open(self) -> bool:
-        return self._gate is None or self._gate.admission_open(self.snapshot) is True
+        return self._placement_open() and (self._gate is None or self._gate.admission_open(self.snapshot) is True)
+
+    def bind_placement(self, permits_admission: Callable[[], bool]) -> None:
+        """Hold admission closed throughout supervised factory/client startup."""
+        if self._started:
+            msg = "Placement must be bound before runner startup"
+            raise ValueError(msg)
+        self._placement_authority = permits_admission
+        self._placement_enabled = False
+
+    def _placement_open(self) -> bool:
+        return self._placement_enabled and (self._placement_authority is None or self._placement_authority() is True)
+
+    def open_admission(self) -> bool:
+        """Open intake after the supervisor checks a confirmed current lease."""
+        if self._closing or self._stopped or self._placement_authority is None or not self._placement_authority():
+            return False
+        self._placement_enabled = True
+        return True
 
     def _invalidate_gate(self) -> None:
         if self._gate is not None:
@@ -443,7 +468,12 @@ class KafkaRecordRunner:
         return self._owned(state) and state.fence is None and not state.closing and self._accepting_work()
 
     def _accepting_work(self) -> bool:
-        return not self._closing and not self._stopped
+        return not self._closing and not self._stopped and self._placement_open()
+
+    def _processing_guard(self) -> _ProcessingGuardArguments:
+        # Keep the guard scoped to this invocation, including injected/shared
+        # processing providers. Prepared recovery never requires this guard.
+        return {} if self._placement_authority is None else {"admission_guard": self._accepting_work}
 
     async def _recover_pending(self, state: _Partition) -> bool:
         for _ in range(FieldLimits.MAX_ITEMS_PER_PAGE):
@@ -470,9 +500,13 @@ class KafkaRecordRunner:
         identity = self._identity(event)
         epoch = state.epoch
         if self._cache_admitted(state):
-            result = await self._processing.process(self.snapshot, identity, event, self._owner, cache_admitted=True)
+            result = await self._processing.process(
+                self.snapshot, identity, event, self._owner, cache_admitted=True, **self._processing_guard()
+            )
         else:
-            result = await self._processing.process(self.snapshot, identity, event, self._owner)
+            result = await self._processing.process(
+                self.snapshot, identity, event, self._owner, **self._processing_guard()
+            )
         if not self._owned(state) or state.epoch != epoch:
             return
         if not state.records or self._identity(state.records[0]) != identity:
@@ -505,7 +539,7 @@ class KafkaRecordRunner:
             await self._processing.process(self.snapshot, pending.identity, None, self._owner)
             if pending.failure is None
             else await self._processing.hold_content_failure(
-                self.snapshot, pending.identity, pending.failure, self._owner
+                self.snapshot, pending.identity, pending.failure, self._owner, **self._processing_guard()
             )
         )
         await self._apply_pending_result(state, result)
@@ -723,9 +757,13 @@ class KafkaRecordRunner:
                 if state.task is not None and state.task is not asyncio.current_task() and not state.task.done():
                     await asyncio.shield(state.task)
                 if work_held:
-                    return await self._processing.inspect_only(self.snapshot, self._identity(event), event, self._owner)
+                    return await self._processing.inspect_only(
+                        self.snapshot, self._identity(event), event, self._owner, **self._processing_guard()
+                    )
                 async with self._work:
-                    return await self._processing.inspect_only(self.snapshot, self._identity(event), event, self._owner)
+                    return await self._processing.inspect_only(
+                        self.snapshot, self._identity(event), event, self._owner, **self._processing_guard()
+                    )
         except TimeoutError:
             return self._retry("inspection_unavailable")
 

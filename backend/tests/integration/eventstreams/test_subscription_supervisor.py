@@ -27,7 +27,7 @@ from syntara.eventstreams.services.subscription_supervisor import SubscriptionSu
 from syntara.workflows.models.execution import Execution
 from syntara.workflows.models.workflow import Workflow
 from syntara.workflows.models.workflow_version import WorkflowVersion
-from tests.helpers.eventstream_runtime import IsolatedSubscriptionRunner
+from tests.helpers.eventstream_runtime import IsolatedSubscriptionRunner, confirmed_placement
 from tests.integration.eventstreams import test_execution_scheduling
 from tests.integration.eventstreams.test_execution_scheduling import SchedulingContext
 
@@ -79,7 +79,8 @@ async def runtime(scheduling_context):
         return runner
 
     factory = AsyncMock(side_effect=construct)
-    supervisor = SubscriptionSupervisor(scheduling_context.delivery.snapshot.subscription_id, factory)
+    snapshot = scheduling_context.delivery.snapshot
+    supervisor = SubscriptionSupervisor(snapshot.subscription_id, factory, placement=confirmed_placement(snapshot))
     try:
         yield SimpleNamespace(
             context=scheduling_context, supervisor=supervisor, factory=factory, runners=runners, trace=trace

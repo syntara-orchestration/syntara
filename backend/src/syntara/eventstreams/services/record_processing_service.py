@@ -94,9 +94,12 @@ class EventRecordProcessingService:
         if self._gate is not None:
             self._gate.dependency_failed(snapshot)
 
-    def _admission_open(self, snapshot: SubscriptionSnapshot) -> bool:
-        return self._gate is None or (
-            self._gate.admission_open(snapshot) is True and self._gate.resolution_open(snapshot) is True
+    def _admission_open(
+        self, snapshot: SubscriptionSnapshot, admission_guard: Callable[[], bool] | None = None
+    ) -> bool:
+        return (admission_guard is None or admission_guard() is True) and (
+            self._gate is None
+            or (self._gate.admission_open(snapshot) is True and self._gate.resolution_open(snapshot) is True)
         )
 
     async def admission_eligible(self, snapshot: SubscriptionSnapshot) -> bool:
@@ -165,6 +168,7 @@ class EventRecordProcessingService:
         owner_worker_id: str,
         *,
         cache_admitted: bool = False,
+        admission_guard: Callable[[], bool] | None = None,
     ) -> RecordResult:
         """Inspect evidence before reevaluation; recovery may omit the source event."""
         try:
@@ -176,7 +180,13 @@ class EventRecordProcessingService:
                 return self._hold("admission_closed")
             existing = await self._existing(identity, cache_admitted=cache_admitted)
             return await self._process_existing(
-                snapshot, identity, event, owner_worker_id, existing, cache_admitted=cache_admitted
+                snapshot,
+                identity,
+                event,
+                owner_worker_id,
+                existing,
+                cache_admitted=cache_admitted,
+                admission_guard=admission_guard,
             )
         except (SQLAlchemyError, OSError, TimeoutError):
             self._dependency_failed(snapshot)
@@ -193,6 +203,7 @@ class EventRecordProcessingService:
         existing: TerminalDelivery | EventDelivery | None,
         *,
         cache_admitted: bool,
+        admission_guard: Callable[[], bool] | None,
     ) -> RecordResult:
         if isinstance(existing, TerminalDelivery):
             if cache_admitted and self._gate is not None and self._gate.resolution_open(snapshot) is not True:
@@ -204,7 +215,7 @@ class EventRecordProcessingService:
             return HeldRecord(reason="activity_log_unavailable", permanent_content_error=True)
         if existing is not None and existing.last_error_code == CONTENT_INSPECTION_PENDING and event is None:
             return self._hold(CONTENT_INSPECTION_PENDING)
-        return await self._process_new(snapshot, identity, event, owner_worker_id)
+        return await self._process_new(snapshot, identity, event, owner_worker_id, admission_guard=admission_guard)
 
     async def hold_content_failure(
         self,
@@ -212,6 +223,8 @@ class EventRecordProcessingService:
         identity: DeliveryIdentity,
         failure: EventDecodeFailure,
         owner_worker_id: str,
+        *,
+        admission_guard: Callable[[], bool] | None = None,
     ) -> RecordResult:
         """Persist a bounded content error when its source bytes cannot be queued.
 
@@ -226,28 +239,50 @@ class EventRecordProcessingService:
                 return await self._prepare_and_schedule(snapshot, identity, None, owner_worker_id)
             if existing is not None and existing.last_error_code in _CONTENT_CODES:
                 return HeldRecord(reason="activity_log_unavailable", permanent_content_error=True)
-            if not await self.admission_eligible(snapshot):
+            if not await self.admission_eligible(snapshot) or not self._admission_open(snapshot, admission_guard):
                 return self._hold("admission_closed")
-            return await self._block_content(snapshot, identity, failure, owner_worker_id)
+            return await self._block_content(
+                snapshot, identity, failure, owner_worker_id, admission_guard=admission_guard
+            )
         except (SQLAlchemyError, OSError, TimeoutError, SyntaraError, ValueError) as exc:
             if isinstance(exc, (SQLAlchemyError, OSError, TimeoutError)):
                 self._dependency_failed(snapshot)
             return self._hold("dependency_unavailable")
 
     async def _process_new(
-        self, snapshot: SubscriptionSnapshot, identity: DeliveryIdentity, event: RawEvent | None, owner_worker_id: str
+        self,
+        snapshot: SubscriptionSnapshot,
+        identity: DeliveryIdentity,
+        event: RawEvent | None,
+        owner_worker_id: str,
+        *,
+        admission_guard: Callable[[], bool] | None = None,
     ) -> RecordResult:
         if event is None:
             return self._hold("delivery_evidence_unavailable")
-        if not self._admission_open(snapshot) or not await self.admission_eligible(snapshot):
+        if (
+            not self._admission_open(snapshot, admission_guard)
+            or not await self.admission_eligible(snapshot)
+            or not self._admission_open(snapshot, admission_guard)
+        ):
             return self._hold("admission_closed")
-        decoded = await self._inspect_content(snapshot, identity, event, owner_worker_id, keep_pending=True)
+        decoded = await self._inspect_content(
+            snapshot, identity, event, owner_worker_id, keep_pending=True, admission_guard=admission_guard
+        )
         if not isinstance(decoded, EventDecodeSuccess):
             return decoded
-        return await self._prepare_and_schedule(snapshot, identity, decoded.envelope, owner_worker_id)
+        return await self._prepare_and_schedule(
+            snapshot, identity, decoded.envelope, owner_worker_id, admission_guard=admission_guard
+        )
 
     async def inspect_only(
-        self, snapshot: SubscriptionSnapshot, identity: DeliveryIdentity, event: RawEvent, owner_worker_id: str
+        self,
+        snapshot: SubscriptionSnapshot,
+        identity: DeliveryIdentity,
+        event: RawEvent,
+        owner_worker_id: str,
+        *,
+        admission_guard: Callable[[], bool] | None = None,
     ) -> RecordResult | InspectedRecord:
         """Inspect delivered content behind a fence without new workflow admission."""
         try:
@@ -258,7 +293,9 @@ class EventRecordProcessingService:
                 return await self._prepare_and_schedule(snapshot, identity, None, owner_worker_id)
             if existing is not None and existing.last_error_code in _CONTENT_CODES:
                 return HeldRecord(reason="activity_log_unavailable", permanent_content_error=True)
-            result = await self._inspect_content(snapshot, identity, event, owner_worker_id)
+            result = await self._inspect_content(
+                snapshot, identity, event, owner_worker_id, admission_guard=admission_guard
+            )
             return InspectedRecord(identity=identity) if isinstance(result, EventDecodeSuccess) else result
         except (SQLAlchemyError, OSError, TimeoutError):
             self._dependency_failed(snapshot)
@@ -286,8 +323,11 @@ class EventRecordProcessingService:
         owner_worker_id: str,
         *,
         keep_pending: bool = False,
+        admission_guard: Callable[[], bool] | None = None,
     ) -> EventDecodeSuccess | RecordResult:
         async with self._session_factory() as session, session.begin():
+            if admission_guard is not None and admission_guard() is not True:
+                return self._hold("admission_closed")
             acquired = await EventDeliveryStore(session).acquire_inspection(
                 identity,
                 DeliveryExpectation(
@@ -319,14 +359,18 @@ class EventRecordProcessingService:
         identity: DeliveryIdentity,
         envelope: WorkflowEventEnvelope | None,
         owner_worker_id: str,
+        *,
+        admission_guard: Callable[[], bool] | None = None,
     ) -> RecordResult:
-        if envelope is not None and not self._admission_open(snapshot):
+        if envelope is not None and not self._admission_open(snapshot, admission_guard):
             return self._hold("admission_closed")
         prepared = await self._preparation.prepare_delivery(snapshot, identity, envelope, owner_worker_id)
         if isinstance(prepared, TerminalDelivery):
             return self._terminal(prepared)
         if isinstance(prepared, EventDecodeFailure):
-            return await self._block_content(snapshot, identity, prepared, owner_worker_id)
+            return await self._block_content(
+                snapshot, identity, prepared, owner_worker_id, admission_guard=admission_guard
+            )
         if isinstance(prepared, ClaimBusy):
             return HeldRecord(reason="claim_busy", retry_at=prepared.lease_until)
         if not isinstance(prepared, PreparedExecution):
@@ -352,7 +396,11 @@ class EventRecordProcessingService:
         identity: DeliveryIdentity,
         failure: EventDecodeFailure,
         owner_worker_id: str,
+        *,
+        admission_guard: Callable[[], bool] | None = None,
     ) -> RecordResult:
         """Commit safe unresolved evidence, never an internal rejection shortcut."""
-        result = await self._inspect_content(snapshot, identity, failure, owner_worker_id)
+        result = await self._inspect_content(
+            snapshot, identity, failure, owner_worker_id, admission_guard=admission_guard
+        )
         return self._hold("inspection_evidence_mismatch") if isinstance(result, EventDecodeSuccess) else result

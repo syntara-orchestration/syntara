@@ -3,6 +3,7 @@
 import asyncio
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
+from typing import cast
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
@@ -19,6 +20,7 @@ from syntara.eventstreams.adapters.kafka_initial_position import PositionResult,
 from syntara.eventstreams.adapters.kafka_initial_position_service import KafkaInitialPositionService
 from syntara.eventstreams.adapters.kafka_record_runner import KafkaRecordRunner
 from syntara.eventstreams.core.handler import ResolvedDelivery
+from syntara.eventstreams.core.placement import PlacementAuthority
 from syntara.eventstreams.core.preparation import PreparedExecution
 from syntara.eventstreams.core.runtime import (
     RunnerStatus,
@@ -35,7 +37,7 @@ from syntara.eventstreams.services.record_processing_service import EventRecordP
 from syntara.eventstreams.services.recovery_service import EventExecutionRecoveryService
 from syntara.eventstreams.services.subscription_supervisor import SubscriptionSupervisor
 from syntara.workflows.models.execution import Execution
-from tests.helpers.eventstream_runtime import IsolatedSubscriptionRunner
+from tests.helpers.eventstream_runtime import IsolatedSubscriptionRunner, confirmed_placement
 from tests.unit.eventstreams.test_connection_provider import connection_context
 from tests.unit.eventstreams.test_execution_preparation_service import preparation_context
 from tests.unit.eventstreams.test_record_processing_service import terminal
@@ -58,7 +60,8 @@ async def harness(monkeypatch):
         return runner
 
     factory = AsyncMock(side_effect=spawn)
-    supervisor = SubscriptionSupervisor(snapshot.subscription_id, factory)
+    placement = confirmed_placement(snapshot)
+    supervisor = SubscriptionSupervisor(snapshot.subscription_id, factory, placement=placement)
     supervisors = [supervisor]
     yield SimpleNamespace(
         snapshot=snapshot,
@@ -69,6 +72,7 @@ async def harness(monkeypatch):
         trace=trace,
         now=now,
         supervisors=supervisors,
+        placement=placement,
     )
     for runner in runners:
         runner.stop_error = None
@@ -350,7 +354,11 @@ async def test_one_subscription_failure_does_not_stop_another_supervisor(harness
     context.factory.side_effect = OSError("PRIVATE connection error")
     assert (await context.supervisor.apply(context.snapshot)).state == RuntimeState.BACKOFF
     healthy_snapshot = context.snapshot.model_copy(update={"subscription_id": uuid4()})
-    healthy = SubscriptionSupervisor(healthy_snapshot.subscription_id, AsyncMock(side_effect=context.spawn))
+    healthy = SubscriptionSupervisor(
+        healthy_snapshot.subscription_id,
+        AsyncMock(side_effect=context.spawn),
+        placement=confirmed_placement(healthy_snapshot),
+    )
     context.supervisors.append(healthy)
     assert (await healthy.apply(healthy_snapshot)).state == RuntimeState.ACTIVE
     runner = context.runners[0]
@@ -366,6 +374,10 @@ async def test_drain_deadline_still_stops_old_runner_before_replacement(harness)
     old.drain_release = asyncio.Event()
     replacement = harness.snapshot.model_copy(update={"configuration_revision": 2})
     status = await asyncio.wait_for(harness.supervisor.apply(replacement), timeout=1)
+    if status.state == RuntimeState.DRAINING:
+        assert harness.placement.local_in_use
+        await asyncio.wait_for(harness.supervisor._cleanup_task, timeout=1)
+        status = await harness.supervisor.apply(replacement)
     assert old.stopped
     assert not old.accepting
     assert status.applied_revision.configuration_revision == 2
@@ -677,25 +689,30 @@ async def test_factory_returning_wrong_binding_is_stopped_without_start(harness)
     assert runner.stopped
 
 
-@pytest.mark.parametrize("change", ["paused", "unpublished", "retired", "revision"])
+@pytest.mark.parametrize("change", ["paused", "unpublished", "retired", "revision", "placement"])
 async def test_frozen_work_remains_discoverable_by_consumer_independent_recovery(harness, monkeypatch, change):
     context = preparation_context(monkeypatch)
     prepared = await context.prepare()
     assert isinstance(prepared, PreparedExecution)
     execution = context.rows[Execution]
     frozen = execution.model_dump()
-    supervisor = SubscriptionSupervisor(context.snapshot.subscription_id, harness.factory)
+    supervisor = SubscriptionSupervisor(
+        context.snapshot.subscription_id, harness.factory, placement=confirmed_placement(context.snapshot)
+    )
     harness.supervisors.append(supervisor)
     await supervisor.apply(context.snapshot)
     updates = {"configuration_revision": context.snapshot.configuration_revision + 1}
-    if change == "revision":
+    if change == "placement":
+        await supervisor.placement_lost()
+    elif change == "revision":
         updates.update(published_version_id=uuid4(), runtime_credential_id=uuid4())
     else:
         updates.update(desired_enabled=False)
         if change != "unpublished":
             updates[change] = True
-    await supervisor.apply(context.snapshot.model_copy(update=updates))
-    if change != "revision":
+    if change != "placement":
+        await supervisor.apply(context.snapshot.model_copy(update=updates))
+    if change not in {"revision", "placement"}:
         assert supervisor.status.state == RuntimeState.STOPPED
     context.store.claim_due.return_value = [prepared.claim]
     monkeypatch.setattr(recovery_module, "EventDeliveryStore", lambda _session: context.store)
@@ -717,3 +734,251 @@ async def test_frozen_work_remains_discoverable_by_consumer_independent_recovery
     assert execution.model_dump() == frozen
     assert context.events.count("freeze") == 1
     assert harness.factory.await_count == (2 if change == "revision" else 1)
+
+
+async def test_no_factory_or_restart_without_current_confirmed_placement(harness):
+    harness.placement.invalidate()
+    assert (await harness.supervisor.apply(harness.snapshot)).reason == "placement_lost"
+    await harness.supervisor.retry()
+    await harness.supervisor.apply(harness.snapshot.model_copy(update={"configuration_revision": 2}))
+    harness.factory.assert_not_awaited()
+
+
+async def test_local_contention_is_blocked_until_the_previous_supervisor_confirms_stop(harness):
+    await harness.supervisor.apply(harness.snapshot)
+    old_runner = harness.runners[0]
+    factory = AsyncMock(side_effect=harness.spawn)
+    contender = SubscriptionSupervisor(harness.snapshot.subscription_id, factory, placement=harness.placement)
+    harness.supervisors.append(contender)
+
+    statuses = await asyncio.gather(*(contender.apply(harness.snapshot) for _ in range(3)))
+    statuses.append(await contender.retry())
+    for status in statuses:
+        assert status.desired_active
+        assert status.state == RuntimeState.BLOCKED
+        assert status.reason == RuntimeFailureCode.LOCAL_RUNNER_BUSY.value
+        assert status.applied_revision is None
+        assert status.failure_count == 0
+    factory.assert_not_awaited()
+    assert old_runner.accepting
+    assert harness.placement.is_current()
+
+    await harness.supervisor.stop()
+    assert old_runner.stopped
+    assert not harness.placement.local_in_use
+    status = await contender.apply(harness.snapshot)
+    assert status.state == RuntimeState.ACTIVE
+    assert status.reason is None
+    factory.assert_awaited_once_with(harness.snapshot)
+    assert harness.placement.is_current()
+
+
+async def test_inactive_target_clears_previous_local_contention(harness):
+    previous = object()
+    assert harness.placement.reserve_local(previous)
+    try:
+        status = await harness.supervisor.apply(harness.snapshot)
+        assert status.reason == RuntimeFailureCode.LOCAL_RUNNER_BUSY.value
+        inactive = harness.snapshot.model_copy(update={"paused": True})
+        status = await harness.supervisor.apply(inactive)
+        assert status.state == RuntimeState.STOPPED
+        assert status.reason is None
+        assert not status.desired_active
+        assert harness.placement.local_in_use
+        harness.factory.assert_not_awaited()
+    finally:
+        harness.placement.local_stopped(previous)
+
+
+def test_constructor_requires_matching_subscription_authority():
+    snapshot = connection_context().snapshot
+    wrong = PlacementAuthority(confirmed_placement(snapshot).worker, uuid4())
+    with pytest.raises(ValueError, match="different subscription"):
+        SubscriptionSupervisor(snapshot.subscription_id, AsyncMock(), placement=wrong)
+
+
+async def test_other_deployment_is_rejected_before_publishing_desire(harness):
+    with pytest.raises(ValueError, match="different deployment"):
+        await harness.supervisor.apply(harness.snapshot.model_copy(update={"deployment_id": uuid4()}))
+    assert harness.supervisor.status.desired_revision is None
+    harness.factory.assert_not_awaited()
+
+
+@pytest.mark.parametrize("stage", ["factory", "runner_start"])
+async def test_delayed_startup_losing_placement_never_opens_admission(harness, monkeypatch, stage):
+    entered, release = asyncio.Event(), asyncio.Event()
+
+    async def delayed() -> None:
+        entered.set()
+        try:
+            await release.wait()
+        except asyncio.CancelledError:
+            await release.wait()  # Deliberately model a startup that settles late.
+
+    async def factory(snapshot) -> IsolatedSubscriptionRunner:
+        runner = cast("IsolatedSubscriptionRunner", harness.spawn(snapshot))
+        if stage == "factory":
+            await delayed()
+        else:
+            original_start = runner.start
+
+            async def start() -> None:
+                await delayed()
+                await original_start()
+
+            monkeypatch.setattr(runner, "start", start)
+        return runner
+
+    harness.factory.side_effect = factory
+    starting = asyncio.create_task(harness.supervisor.apply(harness.snapshot))
+    await entered.wait()
+    try:
+        status = await harness.supervisor.placement_lost()
+        assert status.state == RuntimeState.DRAINING
+        assert harness.placement.local_in_use
+        assert not harness.runners[0].accepting
+    finally:
+        release.set()
+        await asyncio.gather(starting, return_exceptions=True)
+    runner = harness.runners[0]
+    assert runner.stopped
+    assert runner.open_calls == 0
+    assert not runner.run_entered.is_set()
+    assert not harness.placement.local_in_use
+    await harness.supervisor.retry()
+    harness.factory.assert_awaited_once()
+
+
+async def test_lease_loss_closes_intake_before_async_stop_and_prevents_restart(harness):
+    await harness.supervisor.apply(harness.snapshot)
+    runner = harness.runners[0]
+    await runner.run_entered.wait()
+    harness.placement.invalidate()
+    assert not runner.accepting  # No scheduling opportunity is needed to close admission.
+    await asyncio.wait_for(harness.supervisor._placement_task, timeout=1)
+    assert runner.stopped
+    assert not harness.placement.local_in_use
+    await harness.supervisor.apply(harness.snapshot)
+    await harness.supervisor.retry()
+    harness.factory.assert_awaited_once()
+
+
+async def test_local_expiry_watchdog_does_not_depend_on_manager_reapply(harness, monkeypatch):
+    lease = harness.placement.lease
+    clock = [0.0]
+    monkeypatch.setattr(harness.placement, "_clock", lambda: clock[0])
+    harness.placement.confirm(lease, request_started=0.0)
+    await harness.supervisor.apply(harness.snapshot)
+    clock[0] = 60.0
+    # Wake the existing waiter as an independent renewal/liveness loop would;
+    # wait_lost also installs its own timeout for normal monotonic time.
+    harness.placement._changed.set()
+    await asyncio.wait_for(harness.supervisor._placement_task, timeout=1)
+    assert harness.runners[0].stopped
+    assert harness.supervisor.status.reason == "placement_lost"
+
+
+async def test_connection_backoff_keeps_owned_placement_without_release_reclaim(harness):
+    lease = harness.placement.lease
+    harness.factory.side_effect = OSError("unavailable")
+    assert (await harness.supervisor.apply(harness.snapshot)).state == RuntimeState.BACKOFF
+    assert harness.placement.is_current()
+    assert harness.placement.lease is lease
+    assert not harness.placement.local_in_use
+    harness.now[0] = harness.supervisor.status.retry_at
+    harness.factory.side_effect = harness.spawn
+    assert (await harness.supervisor.apply(harness.snapshot)).state == RuntimeState.ACTIVE
+    assert harness.placement.lease is lease
+
+
+async def test_failed_local_stop_blocks_reconfirmation_and_new_supervisor(harness):
+    await harness.supervisor.apply(harness.snapshot)
+    runner = harness.runners[0]
+    runner.stop_error = OSError("stop incomplete")
+    lease = harness.placement.lease
+    await harness.supervisor.placement_lost()
+    assert harness.placement.local_in_use
+    assert not harness.placement.confirm(lease, request_started=harness.placement._clock())
+    other_factory = AsyncMock(side_effect=harness.spawn)
+    other = SubscriptionSupervisor(harness.snapshot.subscription_id, other_factory, placement=harness.placement)
+    harness.supervisors.append(other)
+    await other.apply(harness.snapshot)
+    other_factory.assert_not_awaited()
+    runner.stop_error = None
+    await harness.supervisor.retry()
+    assert not harness.placement.local_in_use
+    assert harness.placement.confirm(lease, request_started=harness.placement._clock())
+    await other.apply(harness.snapshot)
+    other_factory.assert_awaited_once()
+
+
+@pytest.mark.parametrize("hook", ["stop", "drain"])
+async def test_shutdown_returns_at_its_bound_and_retains_slow_stop_ownership(harness, monkeypatch, hook):
+    await harness.supervisor.apply(harness.snapshot)
+    runner = harness.runners[0]
+    await runner.run_entered.wait()
+    entered, release = asyncio.Event(), asyncio.Event()
+    original_stop = runner.stop
+
+    async def slow_stop() -> None:
+        entered.set()
+        try:
+            await release.wait()
+        except asyncio.CancelledError:
+            await release.wait()
+        await original_stop()
+
+    monkeypatch.setattr(runner, "stop", slow_stop)
+    try:
+        if hook == "drain":
+            await asyncio.wait_for(harness.supervisor.drain(), timeout=0.2)
+        status = await asyncio.wait_for(harness.supervisor.stop(), timeout=0.2)
+        await asyncio.wait_for(entered.wait(), timeout=0.2)
+        assert status.state == RuntimeState.DRAINING
+        assert harness.placement.local_in_use
+        cleanup = harness.supervisor._cleanup_task
+        assert cleanup is not None
+        assert not cleanup.done()
+        await asyncio.wait_for(harness.supervisor.stop(), timeout=0.2)
+        assert harness.supervisor._cleanup_task is cleanup
+        assert harness.placement.local_in_use
+    finally:
+        release.set()
+        if harness.supervisor._cleanup_task is not None:
+            await asyncio.wait_for(harness.supervisor._cleanup_task, timeout=1)
+        await harness.supervisor.stop()
+    assert runner.stopped
+    assert not harness.placement.local_in_use
+    harness.factory.assert_awaited_once()
+
+
+async def test_drain_ignoring_cancellation_cannot_hold_the_loss_hook_or_prevent_stop_attempt(harness, monkeypatch):
+    await harness.supervisor.apply(harness.snapshot)
+    runner = harness.runners[0]
+    release, stop_entered = asyncio.Event(), asyncio.Event()
+    original_stop = runner.stop
+
+    async def slow_drain() -> None:
+        try:
+            await release.wait()
+        except asyncio.CancelledError:
+            await release.wait()
+
+    async def stop() -> None:
+        stop_entered.set()
+        await original_stop()
+
+    monkeypatch.setattr(runner, "close_admission", slow_drain)
+    monkeypatch.setattr(runner, "stop", stop)
+    try:
+        status = await asyncio.wait_for(harness.supervisor.placement_lost(), timeout=0.2)
+        assert status.state == RuntimeState.DRAINING
+        await asyncio.wait_for(stop_entered.wait(), timeout=0.2)
+        assert harness.placement.local_in_use
+        assert not harness.placement.confirm(harness.placement.lease, request_started=harness.placement._clock())
+    finally:
+        release.set()
+        if harness.supervisor._cleanup_task is not None:
+            await asyncio.wait_for(harness.supervisor._cleanup_task, timeout=1)
+        await harness.supervisor.stop()
+    assert not harness.placement.local_in_use

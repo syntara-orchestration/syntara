@@ -1,9 +1,30 @@
 """Isolated lifecycle runner for subscription supervision tests; no broker I/O."""
 
 import asyncio
+import time
+from collections.abc import Callable
+from datetime import UTC, datetime, timedelta
 
+from syntara.eventstreams.core.placement import PlacementAuthority, SubscriptionPlacementLease, WorkerIdentity
 from syntara.eventstreams.core.runtime import RunnerStatus, RuntimeRevision, RuntimeState
 from syntara.eventstreams.models.subscription_snapshot import SubscriptionSnapshot
+
+
+def confirmed_placement(snapshot: SubscriptionSnapshot) -> PlacementAuthority:
+    """Inject confirmed ownership to isolate supervisor tests from placement persistence."""
+    worker = WorkerIdentity(deployment_id=snapshot.deployment_id)
+    authority = PlacementAuthority(worker, snapshot.subscription_id)
+    now = datetime.now(UTC)
+    authority.confirm(
+        SubscriptionPlacementLease(
+            subscription_id=snapshot.subscription_id,
+            owner=worker,
+            confirmed_at=now,
+            expires_at=now + timedelta(seconds=60),
+        ),
+        request_started=time.monotonic(),
+    )
+    return authority
 
 
 class IsolatedSubscriptionRunner:
@@ -23,7 +44,9 @@ class IsolatedSubscriptionRunner:
         self.run_entered = asyncio.Event()
         self.drain_entered = asyncio.Event()
         self.exited = asyncio.Event()
-        self.accepting = False
+        self._accepting = False
+        self._placement: Callable[[], bool] | None = None
+        self.open_calls = 0
         self.started = False
         self.stopped = False
         self.start_calls = 0
@@ -35,6 +58,22 @@ class IsolatedSubscriptionRunner:
         """Return the transport-neutral view supplied to the supervisor."""
         return self.observation
 
+    @property
+    def accepting(self) -> bool:
+        """Observe synchronous admission closure before asynchronous stop finishes."""
+        return self._accepting and (self._placement is None or self._placement())
+
+    def bind_placement(self, permits_admission: Callable[[], bool]) -> None:
+        """Install authority before startup without opening admission."""
+        self._placement = permits_admission
+        self._accepting = False
+
+    def open_admission(self) -> bool:
+        """Allow tests to distinguish client startup from admitted processing."""
+        self.open_calls += 1
+        self._accepting = not self.stopped and self._placement is not None and self._placement()
+        return self._accepting
+
     async def start(self) -> None:
         """Permit a test to hold or fail startup without opening any connection."""
         if self.started:
@@ -45,7 +84,8 @@ class IsolatedSubscriptionRunner:
             await self.start_release.wait()
         if self.start_error is not None:
             raise self.start_error
-        self.started = self.accepting = True
+        self.started = True
+        self._accepting = self._placement is None
         self.observation = RunnerStatus(state=RuntimeState.ACTIVE)
         self.trace.append(("start", RuntimeRevision.from_snapshot(self.snapshot)))
 
@@ -62,7 +102,7 @@ class IsolatedSubscriptionRunner:
     async def drain(self) -> None:
         """Close admission before a controllable drain wait."""
         self.drain_calls += 1
-        self.accepting = False
+        self._accepting = False
         self.observation = RunnerStatus(state=RuntimeState.DRAINING)
         self.drain_entered.set()
         self.trace.append(("drain", RuntimeRevision.from_snapshot(self.snapshot)))
@@ -75,10 +115,14 @@ class IsolatedSubscriptionRunner:
         if self.stopped:
             return
         self.stop_calls += 1
-        self.accepting = False
+        self._accepting = False
         if self.stop_error is not None:
             raise self.stop_error
         self.stopped = True
         self.observation = RunnerStatus(state=RuntimeState.STOPPED)
         self.trace.append(("stop", RuntimeRevision.from_snapshot(self.snapshot)))
         self.exited.set()
+
+    async def close_admission(self) -> None:
+        """Use the same bounded-drain port as the real runner."""
+        await self.drain()
