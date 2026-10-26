@@ -102,6 +102,15 @@ class TestResourceActionsRegistry:
         for rt, actions in get_resource_actions().items():
             assert len(actions) == len(set(actions)), f"Duplicate actions in '{rt}'"
 
+    def test_workflow_node_registered_with_write_only(self) -> None:
+        """The node-kind registry contributes workflow_node with write only (ANSTRAT-2533)."""
+        registry = get_resource_actions()
+        assert registry["workflow_node"] == ["write"]
+
+    def test_workflow_node_write_pair_registered(self) -> None:
+        assert "workflow_node:write" in get_all_resource_action_pairs()
+        assert "workflow_node:execute" not in get_all_resource_action_pairs()
+
 
 # ============================================================================
 # get_all_resource_action_pairs
@@ -434,6 +443,12 @@ class TestGetProjectEligibleResourceTypes:
 
         result = get_project_eligible_resource_types()
         assert "project" in result
+
+    def test_workflow_node_is_project_eligible(self) -> None:
+        from syntara.authz.resource_actions import get_project_eligible_resource_types
+
+        result = get_project_eligible_resource_types()
+        assert "workflow_node" in result
 
     def test_raises_before_initialization(self) -> None:
         import syntara.authz.resource_actions as mod

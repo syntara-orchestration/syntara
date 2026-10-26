@@ -165,6 +165,99 @@ async def test_duplicate_policy_name_returns_409(
 
 
 # ============================================================================
+# Node-kind statement validation (ANSTRAT-2533)
+# ============================================================================
+
+
+@pytest.mark.asyncio
+async def test_create_policy_with_unknown_node_kind_returns_422(
+    auth_client: AsyncClient,
+    test_db_session: AsyncSession,
+    test_user: User,
+) -> None:
+    """A workflow_node statement with an unknown kind label is rejected (422)."""
+    await _make_admin(test_db_session, test_user)
+
+    response = await auth_client.post(
+        "/api/v1/policies",
+        json={
+            "name": "node-kind-unknown",
+            "statements": [
+                {
+                    "effect": "allow",
+                    "actions": ["workflow_node:write"],
+                    "scope": "any",
+                    "conditions": {"resource_labels": {"kind": "bogus"}},
+                }
+            ],
+        },
+    )
+    assert response.status_code == 422
+    body = response.json()
+    assert body["code"] == "INVALID_RESOURCE_ACTION"
+    assert "Unknown node kind 'bogus'" in body["detail"]
+
+
+@pytest.mark.asyncio
+async def test_create_policy_with_unknown_node_kind_in_labels_not_returns_422(
+    auth_client: AsyncClient,
+    test_db_session: AsyncSession,
+    test_user: User,
+) -> None:
+    """Unknown kinds are also rejected in resource_labels_not conditions."""
+    await _make_admin(test_db_session, test_user)
+
+    response = await auth_client.post(
+        "/api/v1/policies",
+        json={
+            "name": "node-kind-unknown-not",
+            "statements": [
+                {
+                    "effect": "allow",
+                    "actions": ["workflow_node:write"],
+                    "scope": "any",
+                    "conditions": {"resource_labels_not": {"kind": "bogus"}},
+                }
+            ],
+        },
+    )
+    assert response.status_code == 422
+    body = response.json()
+    assert body["code"] == "INVALID_RESOURCE_ACTION"
+    assert "Unknown node kind 'bogus'" in body["detail"]
+
+
+@pytest.mark.asyncio
+async def test_create_policy_with_node_kind_statement_succeeds(
+    auth_client: AsyncClient,
+    test_db_session: AsyncSession,
+    test_user: User,
+) -> None:
+    """A workflow_node statement with a registered kind is accepted."""
+    await _make_admin(test_db_session, test_user)
+
+    response = await auth_client.post(
+        "/api/v1/policies",
+        json={
+            "name": "node-kind-valid",
+            "statements": [
+                {
+                    "effect": "allow",
+                    "actions": ["workflow_node:write"],
+                    "scope": "any",
+                    "conditions": {"resource_labels": {"kind": "script"}},
+                }
+            ],
+        },
+    )
+    assert response.status_code == 201
+    policy_id = response.json()["id"]
+
+    response = await auth_client.delete(f"/api/v1/policies/{policy_id}")
+    assert response.status_code == 204
+
+
+# ============================================================================
 # Authorization Enforcement
 # ============================================================================
 

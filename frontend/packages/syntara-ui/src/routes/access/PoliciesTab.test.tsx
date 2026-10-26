@@ -278,6 +278,28 @@ describe('PoliciesTab', () => {
     expect(screen.getByText('workflow:write')).toBeInTheDocument()
   })
 
+  it('renders workflow_node statements in the Statements column', () => {
+    setupPoliciesQuery([
+      {
+        ...samplePolicies[0],
+        name: 'step-type-policy',
+        statements: [
+          {
+            scope: 'any',
+            effect: 'allow',
+            actions: ['workflow_node:write'],
+            conditions: { resource_labels: { kind: 'script' } },
+          },
+        ],
+      },
+    ])
+
+    render(<PoliciesTab />, { wrapper })
+
+    expect(screen.getByText('step-type-policy')).toBeInTheDocument()
+    expect(screen.getByText('workflow_node:write')).toBeInTheDocument()
+  })
+
   it('renders — for policies with no statements', () => {
     setupPoliciesQuery([{ ...samplePolicies[0], statements: [] }])
 

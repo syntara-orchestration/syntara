@@ -5020,6 +5020,7 @@ export const handlers = [
         user: ['create', 'delete', 'read', 'update'],
         user_identity: ['create', 'delete', 'read'],
         workflow: ['create', 'delete', 'read', 'update'],
+        workflow_node: ['write'],
       },
     })
   }),

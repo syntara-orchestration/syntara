@@ -158,3 +158,8 @@ class InvalidResourceActionError(SyntaraError):
 @fastapi_exception(handler=_invalid_action_handler)
 class DenyEffectNotSupportedError(SyntaraError):
     """Raised when a policy statement uses effect='deny', which is not yet supported."""
+
+
+@fastapi_exception(handler=_invalid_action_handler)
+class InvalidNodeKindError(SyntaraError):
+    """Raised when a ``workflow_node`` policy statement names an unknown node kind."""

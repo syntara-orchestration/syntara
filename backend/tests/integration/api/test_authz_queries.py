@@ -1042,5 +1042,8 @@ async def test_resource_actions_returns_catalog(
     assert "create" in ra["workflow"]
     assert "delete" in ra["credential"]
 
+    # workflow_node (node kinds) is registered with the write action only (ANSTRAT-2533)
+    assert ra["workflow_node"] == ["write"]
+
     for actions in ra.values():
         assert len(actions) > 0

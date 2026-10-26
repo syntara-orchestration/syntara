@@ -13,6 +13,7 @@ from syntara.authz.audit.policy_lifecycle import PolicyLifecycleEvent
 from syntara.authz.exceptions import (
     BuiltinProtectionError,
     DenyEffectNotSupportedError,
+    InvalidNodeKindError,
     InvalidResourceActionError,
     PolicyNameConflictError,
     PolicyNotFoundError,
@@ -83,6 +84,15 @@ class PolicyService(BaseService):
             raise InvalidResourceActionError(msg)
 
     @staticmethod
+    def _validate_node_kind_statements(statements: list[dict[str, Any]]) -> None:
+        """Reject ``workflow_node`` statements whose ``kind`` label is unknown."""
+        from syntara.workflows.node_kinds import validate_node_kind_statements  # noqa: PLC0415
+
+        error = validate_node_kind_statements(statements)
+        if error:
+            raise InvalidNodeKindError(error)
+
+    @staticmethod
     def _validate_no_deny_effect(statements: list[dict[str, Any]]) -> None:
         """Reject deny-effect statements (AAP-74620).
 
@@ -120,6 +130,7 @@ class PolicyService(BaseService):
 
         self._validate_no_deny_effect(statements)
         self._validate_resource_actions(statements)
+        self._validate_node_kind_statements(statements)
         if project_id is not None:
             self._validate_project_statements(statements)
         if is_builtin_policy(name):
@@ -446,6 +457,7 @@ class PolicyService(BaseService):
         if statements is not None:
             self._validate_no_deny_effect(statements)
             self._validate_resource_actions(statements)
+            self._validate_node_kind_statements(statements)
             if policy.project_id is not None:
                 self._validate_project_statements(statements)
             policy.statements = statements

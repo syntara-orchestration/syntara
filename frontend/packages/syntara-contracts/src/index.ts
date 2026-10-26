@@ -41,4 +41,5 @@ export {
 }
 
 export * from './interfaces.js'
+export * from './nodeKinds.js'
 export { type OutputFieldDef, NODE_OUTPUT_SCHEMAS, getNodeOutputSchema } from './node-output-schemas.js'
