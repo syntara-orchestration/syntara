@@ -11,7 +11,7 @@ from syntara.eventstreams.models.source import EventSubscriptionSource
 from syntara.eventstreams.models.subscription import EventSubscription
 
 # Columns that would signal a selected-account or standing-execution gate. This
-# story must not introduce any of them (AAP-94316 scope exclusion).
+# story must not introduce any of them (scope exclusion).
 _FORBIDDEN_SUBSTRINGS = ("account", "execution_principal", "selected", "service_account")
 _POSTGRESQL = create_mock_engine("postgresql://", lambda *_args, **_kwargs: None).dialect
 
