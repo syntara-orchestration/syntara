@@ -39,3 +39,32 @@ async def test_create_without_credential_and_switch_to_sasl(
         unchanged = await service.get_integration(created.id)
         assert isinstance(unchanged.configuration, KafkaConfiguration)
         assert unchanged.configuration.security_protocol == protocol
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("protocol", ["SSL", "PLAINTEXT", "SASL_SSL"])
+async def test_supplied_credential_must_be_kafka_for_every_transport(protocol: str) -> None:
+    """Optional authentication does not make an unrelated credential valid."""
+    from unittest.mock import AsyncMock, MagicMock
+    from uuid import uuid4
+
+    from syntara.credentials.exceptions import CredentialValidationError
+    from syntara.credentials.models.credential import Credential
+    from syntara.credentials.models.credential_type import CredentialType
+
+    credential = MagicMock(spec=Credential)
+    credential.enabled = True
+    credential.secret_id = uuid4()
+    credential.credential_type_id = uuid4()
+    cred_type = MagicMock(spec=CredentialType)
+    cred_type.name = "HTTP Bearer Token"
+    cred_type.injectors = {}
+    session = AsyncMock(spec=AsyncSession)
+    session.get.side_effect = [credential, cred_type, credential, cred_type]
+    secrets = AsyncMock()
+    secrets.retrieve_secret.return_value = {}
+    service = IntegrationService(session, MagicMock(spec=User), secrets)
+
+    with pytest.raises(CredentialValidationError, match="not a Kafka credential"):
+        await service._resolve_credential(uuid4(), security_protocol=protocol)
+    secrets.retrieve_secret.assert_not_awaited()
