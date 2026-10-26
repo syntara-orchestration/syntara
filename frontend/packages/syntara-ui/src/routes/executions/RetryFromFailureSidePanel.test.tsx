@@ -114,7 +114,7 @@ describe('RetryFromFailureSidePanel', () => {
     expect(screen.getByText('3')).toBeInTheDocument()
     await user.click(screen.getByTestId('retry-from-failure-confirm'))
 
-    expect(mockHandleRetry).toHaveBeenCalledWith(['step-2'])
+    expect(mockHandleRetry).toHaveBeenCalledWith(['step-2'], {})
   })
 
   it('previews an exact selected subset and retries only the checked failure points', async () => {
@@ -168,7 +168,7 @@ describe('RetryFromFailureSidePanel', () => {
     )
 
     await user.click(screen.getByTestId('retry-from-failure-confirm'))
-    expect(mockHandleRetry).toHaveBeenCalledWith(['step-1', 'step-2'])
+    expect(mockHandleRetry).toHaveBeenCalledWith(['step-1', 'step-2'], {})
   })
 
   it('requires a selected failure point before showing a subset plan', async () => {
@@ -297,7 +297,7 @@ describe('RetryFromFailureSidePanel', () => {
     expect(screen.getByText('Second Step')).toBeInTheDocument()
     await user.click(screen.getByTestId('retry-from-failure-confirm'))
 
-    expect(mockHandleRetry).toHaveBeenCalledWith(undefined)
+    expect(mockHandleRetry).toHaveBeenCalledWith(undefined, {})
   })
 
   it('disables retry and cancel while the retry request is pending', () => {
