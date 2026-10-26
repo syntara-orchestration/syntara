@@ -19,6 +19,7 @@ from syntara.eventstreams.models.delivery import EventDelivery
 from syntara.eventstreams.models.recovery_hold import EventDeliveryRecoveryHold
 from syntara.eventstreams.models.source import EventSubscriptionSource
 from syntara.eventstreams.services.delivery_cache import EventDeliveryTerminalLookup
+from syntara.eventstreams.services.delivery_cache_policy import DeliveryEvidencePolicy
 from syntara.eventstreams.services.delivery_retention_service import EventDeliveryRetentionService
 
 if TYPE_CHECKING:
@@ -217,18 +218,23 @@ async def test_cleanup_batch_is_bounded(delivery_context: DeliveryContext) -> No
         assert (await session.exec(select(func.count()).select_from(EventDelivery))).one() == 1
 
 
-async def test_stale_cache_is_checked_against_real_database(delivery_context: DeliveryContext) -> None:
+async def test_invalid_proof_falls_back_without_caching_internal_rejection(delivery_context: DeliveryContext) -> None:
     context = delivery_context
     cache = AsyncMock()
     cache.get.return_value = context.identity().digest
-    lookup = EventDeliveryTerminalLookup(context.session_factory, cache=cache)
+    policy = DeliveryEvidencePolicy(enabled=True, cache_epoch=uuid4(), clock_error_bound_seconds=0.25)
+    lookup = EventDeliveryTerminalLookup(context.session_factory, cache=cache, policy=policy)
     assert await lookup.lookup(context.identity()) is None
     await terminal(context)
     cache.put.side_effect = TimeoutError()
     result = await lookup.lookup(context.identity())
-    assert result is not None
-    assert result.state == DeliveryState.REJECTED
-    cache.put.assert_awaited_once()
+    assert result is None
+    async with context.session_factory() as session, session.begin():
+        row = await session.get(EventDelivery, context.identity().digest)
+        assert row is not None
+        assert row.state == DeliveryState.REJECTED
+    assert cache.get.await_count == 2
+    cache.put.assert_not_awaited()
 
 
 async def test_downgrade_refuses_retained_evidence(delivery_context: DeliveryContext) -> None:
