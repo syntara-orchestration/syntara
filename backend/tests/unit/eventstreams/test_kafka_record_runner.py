@@ -1104,7 +1104,9 @@ async def test_overlapping_stop_calls_share_successful_client_shutdown(harness) 
     assert harness.client.stop.await_count == 1
 
 
-async def test_public_status_waits_for_first_assignment_before_reporting_active(harness):
+async def test_public_status_waits_for_first_assignment_before_reporting_active(
+    harness: SimpleNamespace,
+) -> None:
     snapshot = harness.runner.snapshot
     client = MagicMock(spec=KafkaPartitionConsumer)
     client.topic, client.group_id = snapshot.configuration.topic, snapshot.configuration.group_id
@@ -1124,17 +1126,21 @@ async def test_public_status_waits_for_first_assignment_before_reporting_active(
 
     try:
         await runner.start()
-        assert runner.status.state == RuntimeState.STARTING
+        startup_status = runner.status
+        assert startup_status.state == RuntimeState.STARTING
         harness.positions.initialize.assert_not_awaited()
         await runner.on_partitions_assigned(frozenset(), client.epoch)
-        assert runner.status.state == RuntimeState.ACTIVE
+        empty_assignment_status = runner.status
+        assert empty_assignment_status.state == RuntimeState.ACTIVE
         harness.positions.initialize.assert_not_awaited()
         client.epoch, client.assignment = 1, frozenset({0})
         await runner.on_partitions_assigned(client.assignment, client.epoch)
-        assert runner.status.state == RuntimeState.STARTING
+        assigned_status = runner.status
+        assert assigned_status.state == RuntimeState.STARTING
         await runner._advance(runner._partitions[0])
         harness.positions.initialize.assert_awaited_once()
-        assert runner.status.state == RuntimeState.ACTIVE
+        ready_status = runner.status
+        assert ready_status.state == RuntimeState.ACTIVE
     finally:
         await runner.stop()
 
