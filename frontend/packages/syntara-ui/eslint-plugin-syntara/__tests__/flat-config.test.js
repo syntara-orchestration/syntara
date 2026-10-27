@@ -675,10 +675,6 @@ describe('flat ESLint config rule inheritance', () => {
       'src/routes/access-management/groupFieldHelp.test.tsx',
       "import { SearchIcon } from '@patternfly/react-icons'; export { SearchIcon }"
     )
-    const deprecatedImportMessages = await lintMessages(
-      'src/routes/access-management/AssignRoleModal.tsx',
-      "import { useLocation } from 'wouter'; export { useLocation }"
-    )
     const bridgeImportMessages = await lintMessages(
       'src/routes/access-management/AssignRoleModal.tsx',
       "import { useNavigate } from '../hooks/routing/useNavigate'; export { useNavigate }"
@@ -692,8 +688,8 @@ describe('flat ESLint config rule inheritance', () => {
       "import { Workflow } from '@syntara/contracts/src/workflow-api'; export { Workflow }"
     )
     const routingBridgeMessages = await lintMessages(
-      'src/hooks/routing/useNavigate.ts',
-      "import { useLocation } from 'wouter'; export { useLocation }"
+      'src/hooks/routing/Link.tsx',
+      "import { Link as TanStackLink } from '@tanstack/react-router'; export { TanStackLink }"
     )
     const synLinkMessages = await lintMessages(
       'src/components/SynLink.tsx',
@@ -704,11 +700,6 @@ describe('flat ESLint config rule inheritance', () => {
       iconSourceMessages.some((message) => message.ruleId === 'no-restricted-imports' && message.severity === 1)
     ).toBe(true)
     expect(iconTestMessages.some((message) => message.ruleId === 'no-restricted-imports')).toBe(false)
-    expect(
-      deprecatedImportMessages.some(
-        (message) => message.ruleId === '@typescript-eslint/no-restricted-imports' && message.severity === 1
-      )
-    ).toBe(true)
     expect(bridgeImportMessages.some((message) => message.ruleId === '@typescript-eslint/no-restricted-imports')).toBe(
       true
     )
