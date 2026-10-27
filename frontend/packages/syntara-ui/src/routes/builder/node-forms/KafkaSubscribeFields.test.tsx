@@ -91,6 +91,21 @@ beforeEach(() => {
 })
 
 describe('Kafka Subscribe form', () => {
+  it('explains fixed first-activation, added-partition, resumption, and commit policies', () => {
+    renderKafka()
+
+    expect(
+      screen.getByText(
+        'Each subscription uses a platform-managed group. ' +
+          'Partitions present at first activation start with new messages at the visible-end boundary saved when each partition initializes. ' +
+          'Partitions added later start at their earliest retained message. ' +
+          'Initialized partitions resume from valid committed offsets. ' +
+          'Missing or invalid established checkpoints require recovery; they do not reset automatically. ' +
+          'Auto-commit is off. Commit follows durable scheduling or resolution, without waiting for workflow completion.'
+      )
+    ).toBeInTheDocument()
+  })
+
   it('loads visible Kafka Integrations scoped to the workflow project and separates identity from authentication', async () => {
     renderKafka()
     expect(await screen.findByRole('button', { name: 'Kafka Integration' })).toBeInTheDocument()

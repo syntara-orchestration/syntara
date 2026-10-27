@@ -108,8 +108,11 @@ export function KafkaSubscribeFields({
       </StackItem>
       <StackItem>
         <Content component={ContentVariants.p}>
-          Defaults: a platform-managed group initially reads new messages, then resumes from committed offsets.
-          Auto-commit is off. Commit follows durable handoff or resolution, without waiting for workflow completion.
+          Each subscription uses a platform-managed group. Partitions present at first activation start with new
+          messages at the visible-end boundary saved when each partition initializes. Partitions added later start at
+          their earliest retained message. Initialized partitions resume from valid committed offsets. Missing or
+          invalid established checkpoints require recovery; they do not reset automatically. Auto-commit is off. Commit
+          follows durable scheduling or resolution, without waiting for workflow completion.
         </Content>
       </StackItem>
       <StackItem>

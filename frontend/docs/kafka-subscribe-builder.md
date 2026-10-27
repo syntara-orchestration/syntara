@@ -55,10 +55,23 @@ results, including pending results for an earlier configuration.
 
 ## Fixed reading behavior
 
-The platform manages a separate group for each subscription. Initial reading starts
-at the new-message boundary; subsequent reads resume from committed offsets.
-Auto-commit is disabled. Offsets are committed after durable handoff or another
-durable resolution, without waiting for workflow completion.
+The platform manages a separate group for each subscription and fixes its reading
+policies:
+
+- Partitions in the saved first-activation set start with new messages at their
+  saved visible-end boundary. Each boundary is selected when that partition
+  initializes, rather than when Publish is clicked, and is reused after a setup
+  interruption.
+- Partitions added outside that saved set start at their earliest retained message,
+  including messages produced before discovery. This also applies if discovery
+  happens while first activation is still incomplete. The earliest retained offset
+  can be greater than zero.
+- Initialized partitions resume from valid committed group offsets on restart,
+  re-enable, or republish. Missing or invalid established checkpoints block reading
+  and require recovery; they never trigger an automatic reset to latest or earliest.
+
+Auto-commit is disabled. Offsets are committed after durable workflow scheduling
+or another durable resolution, without waiting for workflow completion.
 
 ## Validation
 
