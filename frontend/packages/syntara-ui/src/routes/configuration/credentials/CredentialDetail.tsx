@@ -48,6 +48,11 @@ import { useDisableCredentialState } from './useDisableCredentialState'
 
 type CredentialTab = 'details' | 'workflows' | 'integrations'
 const ALL_CREDENTIAL_TABS: CredentialTab[] = ['details', 'workflows', 'integrations']
+const CREDENTIAL_TAB_PANEL_LABELS: Readonly<Record<CredentialTab, string>> = {
+  details: 'Details',
+  workflows: 'Workflows',
+  integrations: 'Integrations',
+}
 
 type CredentialDetailTabContextValue = {
   credential: Credential
@@ -71,7 +76,7 @@ export function CredentialDetailsTabRoute() {
     useCredentialDetailTabContext()
 
   return (
-    <Stack hasGutter style={{ padding: 'var(--pf-t--global--spacer--lg)' }}>
+    <Stack hasGutter className={styles.detailsTabContent}>
       <StackItem>
         <DescriptionList isHorizontal>
           <SynDetail label="Name">{credential.name}</SynDetail>
@@ -473,6 +478,8 @@ export default function CredentialDetail() {
               validTabs={validTabs}
               aria-label="Credential details"
               renderPanel={() => <Outlet />}
+              routePanelLayout="detail"
+              tabPanelLabels={CREDENTIAL_TAB_PANEL_LABELS}
             >
               <Tab eventKey="details" title="Details" />
 
