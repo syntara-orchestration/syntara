@@ -25,7 +25,7 @@ import { SynTextAreaField } from '../../components/forms/SynTextAreaField'
 import { SynPanel } from '../../components/layout/SynPanel'
 import { useSynForm } from '../../hooks/useSynForm'
 import { useAlerts } from '../../providers/alerts'
-import { getErrorStatus } from '../../utils/apiErrors'
+import { isServiceUnavailableError } from '../../utils/apiErrors'
 import { detachPromise } from '../../utils/detachPromise'
 import { lookupMapByApprovalNodeId } from '../approvals/approvalNodeId'
 import { ApprovalSummaryList } from '../approvals/ApprovalSummaryList'
@@ -137,7 +137,7 @@ export function ApprovalReviewView({ approval, activityNameMap, onClose }: Appro
         },
         onError: (error) => {
           const message = getApprovalDecisionSubmitErrorMessage(error)
-          if (getErrorStatus(error) === 503) {
+          if (isServiceUnavailableError(error)) {
             showWarning({ title: message })
             return
           }

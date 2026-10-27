@@ -266,6 +266,20 @@ describe('ApprovalReviewView', () => {
     expect(mockShowError).not.toHaveBeenCalled()
   })
 
+  it('shows warning when mutation fails with temporal unavailable error code', async () => {
+    const user = userEvent.setup()
+    mockMutate.mockImplementation((_data: unknown, callbacks: { onError: (error: unknown) => void }) => {
+      callbacks.onError({ code: 'TEMPORAL_UNAVAILABLE', detail: 'Temporal worker unreachable' })
+    })
+
+    render(<ApprovalReviewView {...defaultProps} />, { wrapper: createWrapper() })
+
+    await user.click(screen.getByRole('button', { name: 'Submit decision' }))
+
+    expect(mockShowWarning).toHaveBeenCalledWith({ title: APPROVAL_DECISION_SERVICE_UNAVAILABLE_MESSAGE })
+    expect(mockShowError).not.toHaveBeenCalled()
+  })
+
   it('shows default friendly error for unknown failures', async () => {
     const user = userEvent.setup()
     mockMutate.mockImplementation((_data: unknown, callbacks: { onError: (error: unknown) => void }) => {

@@ -21,8 +21,23 @@ describe('getApprovalDecisionSubmitErrorMessage', () => {
     )
   })
 
+  it('maps authorization error codes without http status to permission message', () => {
+    expect(
+      getApprovalDecisionSubmitErrorMessage({
+        code: 'AUTHORIZATION_DENIED',
+        detail: 'Not authorized to decide this approval',
+      })
+    ).toBe(APPROVAL_DECISION_FORBIDDEN_MESSAGE)
+  })
+
   it('maps 503 to service unavailable message', () => {
     expect(getApprovalDecisionSubmitErrorMessage({ status: 503, detail: 'Unavailable' })).toBe(
+      APPROVAL_DECISION_SERVICE_UNAVAILABLE_MESSAGE
+    )
+  })
+
+  it('maps temporal unavailable error code to service unavailable message', () => {
+    expect(getApprovalDecisionSubmitErrorMessage({ code: 'TEMPORAL_UNAVAILABLE', detail: 'Worker down' })).toBe(
       APPROVAL_DECISION_SERVICE_UNAVAILABLE_MESSAGE
     )
   })
