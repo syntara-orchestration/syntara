@@ -329,7 +329,7 @@ export function SynListPanelTabs({
     : children) as unknown as React.ReactNode
 
   return (
-    <StackItem>
+    <StackItem isFilled={!!renderPanel} className={renderPanel ? styles.tabsWithPanel : undefined}>
       <SynUrlTabs
         basePath={basePath}
         defaultTab={defaultTab}
