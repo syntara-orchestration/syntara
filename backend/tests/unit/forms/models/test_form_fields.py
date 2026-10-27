@@ -17,6 +17,8 @@ from syntara.forms.models.form_fields import (
     DynamicOptions,
     EmailField,
     FormDefinition,
+    FormPromptDefinition,
+    FormTriggerDefinition,
     MaskedTextField,
     MultiSelectField,
     NumberField,
@@ -233,6 +235,92 @@ class TestFormDefinition:
     def test_distinct_field_names_allowed(self) -> None:
         """Distinct value_names pass."""
         assert len(_form(_text(), _text(value_name="other")).fields) == 2
+
+
+class TestAuthoredFormDefinitions:
+    """Authored prompt/trigger models narrow the shared runtime form model."""
+
+    def test_prompt_and_trigger_keep_shared_non_selection_field_types(self) -> None:
+        fields = [
+            _text(type="text", value_name="text_value"),
+            _text(type="textarea", value_name="textarea_value"),
+            _text(type="masked_text", value_name="masked_value"),
+            _text(type="email", value_name="email_value"),
+            _text(type="number", value_name="number_value"),
+            _text(type="checkbox", value_name="checkbox_value"),
+            {"type": "date", "value_name": "date_value", "label": "Date"},
+        ]
+        runtime_definition = FormDefinition.model_validate({"fields": fields})
+        expected_field_types = [(field.type, type(field)) for field in runtime_definition.fields]
+
+        for definition_model in (FormPromptDefinition, FormTriggerDefinition):
+            authored_definition = definition_model.model_validate({"fields": fields})
+
+            assert [(field.type, type(field)) for field in authored_definition.fields] == expected_field_types
+
+    def test_prompt_allows_dynamic_options_but_rejects_resolved_options(self) -> None:
+        dynamic = FormPromptDefinition.model_validate(
+            {
+                "fields": [
+                    _text(
+                        type="dropdown",
+                        options={
+                            "source": "dynamic",
+                            "expression": "${upstream.options}",
+                            "label_key": "label",
+                            "value_key": "value",
+                        },
+                    )
+                ]
+            }
+        )
+
+        field = dynamic.fields[0]
+        assert isinstance(field, DropdownField)
+        assert isinstance(field.options, DynamicOptions)
+
+        with pytest.raises(ValidationError, match="Use 'static' or 'dynamic'"):
+            FormPromptDefinition.model_validate(
+                {
+                    "fields": [
+                        _text(
+                            type="dropdown",
+                            options={
+                                "source": "dynamic_resolved",
+                                "values": [{"display_label": "East", "value": "east"}],
+                            },
+                        )
+                    ]
+                }
+            )
+
+    def test_trigger_allows_static_options_but_rejects_non_static_options(self) -> None:
+        static = FormTriggerDefinition.model_validate(
+            {
+                "fields": [
+                    _text(
+                        type="dropdown",
+                        options={"source": "static", "values": [{"display_label": "East", "value": "east"}]},
+                    )
+                ]
+            }
+        )
+
+        field = static.fields[0]
+        assert isinstance(field, DropdownField)
+        assert isinstance(field.options, StaticOptions)
+
+        for options in (
+            {
+                "source": "dynamic",
+                "expression": "${upstream.options}",
+                "label_key": "label",
+                "value_key": "value",
+            },
+            {"source": "dynamic_resolved", "values": [{"display_label": "East", "value": "east"}]},
+        ):
+            with pytest.raises(ValidationError, match="is not supported on a form trigger"):
+                FormTriggerDefinition.model_validate({"fields": [_text(type="dropdown", options=options)]})
 
 
 class TestStaticOptionDefaults:

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import date as calendar_date
-from typing import Annotated, Literal
+from typing import Annotated, ClassVar, Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import BaseModel, ConfigDict, Discriminator, Field, ValidationInfo, field_validator, model_validator
@@ -291,7 +291,18 @@ class ResolvedOptions(BaseModel):
 OptionsSource = Annotated[StaticOptions | DynamicOptions | ResolvedOptions, Discriminator("source")]
 
 
-class DropdownField(FormFieldBase):
+class _OptionSourceValidationMixin(FormFieldBase):
+    """Apply an authored option-source policy configured by a selection field subclass."""
+
+    _DISALLOWED_OPTION_SOURCES: ClassVar[dict[str, str]] = {}
+
+    @field_validator("options", mode="before", check_fields=False)
+    @classmethod
+    def _validate_option_source(cls, raw: object, info: ValidationInfo) -> object:
+        return _reject_option_sources(raw, info, disallowed=cls._DISALLOWED_OPTION_SOURCES)
+
+
+class DropdownField(_OptionSourceValidationMixin):
     """Dropdown field."""
 
     type: Literal["dropdown"]
@@ -318,7 +329,7 @@ class DropdownField(FormFieldBase):
         return default
 
 
-class MultiSelectField(FormFieldBase):
+class MultiSelectField(_OptionSourceValidationMixin):
     """Multi-select field."""
 
     type: Literal["multi_select"]
@@ -343,7 +354,7 @@ class MultiSelectField(FormFieldBase):
         return defaults
 
 
-FormField = Annotated[
+CommonFormField = (
     TextField
     | TextAreaField
     | MaskedTextField
@@ -351,10 +362,9 @@ FormField = Annotated[
     | NumberField
     | CheckboxField
     | DateField
-    | DropdownField
-    | MultiSelectField,
-    Discriminator("type"),
-]
+)
+
+FormField = Annotated[CommonFormField | DropdownField | MultiSelectField, Discriminator("type")]
 
 # Discriminator values for FormField and OptionsSource unions.
 # Used by validators to normalize Pydantic error paths by stripping union tags.
@@ -437,74 +447,47 @@ def _reject_option_sources(
 class FormTriggerDropdownField(DropdownField):
     """Dropdown field on a form trigger. Static options only."""
 
+    _DISALLOWED_OPTION_SOURCES: ClassVar[dict[str, str]] = _TRIGGER_DISALLOWED_SOURCES
     options: StaticOptions
-
-    @field_validator("options", mode="before")
-    @classmethod
-    def _static_only(cls, raw: object, info: ValidationInfo) -> object:
-        return _reject_option_sources(raw, info, disallowed=_TRIGGER_DISALLOWED_SOURCES)
 
 
 class FormTriggerMultiSelectField(MultiSelectField):
     """Multi-select field on a form trigger. Static options only."""
 
+    _DISALLOWED_OPTION_SOURCES: ClassVar[dict[str, str]] = _TRIGGER_DISALLOWED_SOURCES
     options: StaticOptions
-
-    @field_validator("options", mode="before")
-    @classmethod
-    def _static_only(cls, raw: object, info: ValidationInfo) -> object:
-        return _reject_option_sources(raw, info, disallowed=_TRIGGER_DISALLOWED_SOURCES)
 
 
 class FormPromptDropdownField(DropdownField):
     """Dropdown field on a form prompt. Static or dynamic options; not engine-resolved."""
 
+    _DISALLOWED_OPTION_SOURCES: ClassVar[dict[str, str]] = _PROMPT_DISALLOWED_SOURCES
     options: AuthoredOptionsSource
-
-    @field_validator("options", mode="before")
-    @classmethod
-    def _authored_only(cls, raw: object, info: ValidationInfo) -> object:
-        return _reject_option_sources(raw, info, disallowed=_PROMPT_DISALLOWED_SOURCES)
 
 
 class FormPromptMultiSelectField(MultiSelectField):
     """Multi-select field on a form prompt. Static or dynamic options; not engine-resolved."""
 
+    _DISALLOWED_OPTION_SOURCES: ClassVar[dict[str, str]] = _PROMPT_DISALLOWED_SOURCES
     options: AuthoredOptionsSource
-
-    @field_validator("options", mode="before")
-    @classmethod
-    def _authored_only(cls, raw: object, info: ValidationInfo) -> object:
-        return _reject_option_sources(raw, info, disallowed=_PROMPT_DISALLOWED_SOURCES)
 
 
 FormTriggerField = Annotated[
-    TextField
-    | TextAreaField
-    | MaskedTextField
-    | EmailField
-    | NumberField
-    | CheckboxField
-    | DateField
+    CommonFormField
     | FormTriggerDropdownField
     | FormTriggerMultiSelectField,
     Discriminator("type"),
 ]
 
 FormPromptField = Annotated[
-    TextField
-    | TextAreaField
-    | MaskedTextField
-    | EmailField
-    | NumberField
-    | CheckboxField
-    | DateField
+    CommonFormField
     | FormPromptDropdownField
     | FormPromptMultiSelectField,
     Discriminator("type"),
 ]
 
 
+# Override the runtime field union with authored unions; list invariance requires these assignment ignores.
 class FormTriggerDefinition(FormDefinition):
     """Authored form definition for a form trigger; options must be static."""
 
