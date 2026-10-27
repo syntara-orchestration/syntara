@@ -20,7 +20,6 @@ export type WorkflowsListViewProps = Readonly<{
   isPending: boolean
   error: unknown
   onRetry: () => void
-  isFetching?: boolean
   sortedWorkflows: Workflow[]
   hasActiveFilters: boolean
   filterFieldDefinitions: FilterFieldDefinition[]
@@ -46,7 +45,6 @@ export function WorkflowsListView({
   isPending,
   error,
   onRetry,
-  isFetching,
   sortedWorkflows,
   hasActiveFilters,
   filterFieldDefinitions,
@@ -74,7 +72,6 @@ export function WorkflowsListView({
       tabKey={tabKey}
       tabLabel={tabLabel}
       isPending={isPending}
-      isFetching={isFetching}
       error={error}
       errorTitle="Error loading workflows"
       onRetry={onRetry}

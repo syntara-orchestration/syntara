@@ -144,4 +144,4 @@ For request/response schemas and field definitions, see the OpenAPI spec for `PO
 - [Node Settings](node-settings.md) — retry policies and per-node configuration
 - [Switch Node](switch-node.md) — condition node branching
 - [Error Handling Strategy](../error-handling-strategy.md) — RFC 9457 compliance, `DetailedValidationProblemDetail` pipeline
-- [Zustand Architecture](../../../frontend/docs/zustand-architecture.md) — `validationErrorCount` store patterns and state management
+- [Zustand Architecture](../../frontend/zustand-architecture.md) — `validationErrorCount` store patterns and state management

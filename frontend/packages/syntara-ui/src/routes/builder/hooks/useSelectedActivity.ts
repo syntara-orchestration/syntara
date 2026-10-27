@@ -3,7 +3,7 @@ import { useCallback, useMemo, useState } from 'react'
 import type { ActivityState } from '../../workflows/execution/types'
 import { parseCompositeKey } from '../../workflows/execution/utils/activityState'
 import type { ActivityOrderItem } from '../ExecutionActivityTable'
-import { resolveNodeName } from '../useActivityNameMap'
+import { resolveStepName } from '../useActivityNameMap'
 
 type UseSelectedActivityOptions = {
   selectedNodeId: string | null | undefined
@@ -47,8 +47,8 @@ export function useSelectedActivity(opts: UseSelectedActivityOptions) {
   }, [selectedActivityKey, selectedNodeId])
 
   const matchedActivity = useMemo(() => activityOrder.find((a) => a.id === effectiveKey), [activityOrder, effectiveKey])
-  const displayNodeName =
-    selectedNodeNameProp ?? matchedActivity?.name ?? resolveNodeName(nameMap, effectiveKey) ?? null
+  const displayStepName =
+    selectedNodeNameProp ?? matchedActivity?.name ?? resolveStepName(nameMap, effectiveKey) ?? null
   const selectedNodeState = effectiveKey ? activityStates.get(effectiveKey) : undefined
   const selectedNodeType = matchedActivity?.type
 
@@ -61,5 +61,5 @@ export function useSelectedActivity(opts: UseSelectedActivityOptions) {
     [onNodeSelect]
   )
 
-  return { resolvedNodeId, effectiveKey, displayNodeName, selectedNodeState, selectedNodeType, handleRowClick }
+  return { resolvedNodeId, effectiveKey, displayStepName, selectedNodeState, selectedNodeType, handleRowClick }
 }

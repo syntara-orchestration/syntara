@@ -278,5 +278,5 @@ Task C ↗
 ## Related Documentation
 
 - [Main Architecture Guide](../../../../../../../docs/architecture.md)
-- [Workflow Builder Internals](../../../../../../../docs/architecture.md#builder-internals-advanced)
+- [Workflow Builder Internals](../../../../../../../docs/architecture.md#builder-internals-advanced-registry-edges-and-graph-semantics)
 - [Execution Visualizer Protocol](../../../../../../../docs/execution-visualizer-protocol.md)

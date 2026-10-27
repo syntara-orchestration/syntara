@@ -1,5 +1,5 @@
 import { ExecutorTypeEnum } from '@syntara/contracts'
-import { render, screen } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { NodeProps } from '@xyflow/react'
 import { Position, ReactFlowProvider } from '@xyflow/react'
@@ -15,13 +15,15 @@ vi.mock('@xyflow/react', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@xyflow/react')>()
   return {
     ...actual,
-    useStore: (selector: (s: { transform: [number, number, number] }) => unknown) =>
-      selector({ transform: [0, 0, viewportState.zoom] }),
+    useStore: (selector: (s: { transform: [number, number, number]; nodesConnectable: boolean }) => unknown) =>
+      selector({ transform: [0, 0, viewportState.zoom], nodesConnectable: true }),
     useUpdateNodeInternals: () => vi.fn(),
   }
 })
 
 import { SynStep } from './SynStep'
+import { SynStepBody } from './SynStepBody'
+import { SynStepExpandedAllContext } from './SynStepExpandedAllContext'
 
 function renderWithFlow(ui: ReactElement) {
   return render(<ReactFlowProvider>{ui}</ReactFlowProvider>)
@@ -60,23 +62,27 @@ describe('SynStep semantic zoom', () => {
     )
 
     expect(screen.getByText('Detailed body')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'T, Task Agent' })).not.toBeInTheDocument()
+    expect(screen.queryByText('T')).not.toBeInTheDocument()
   })
 
-  it('renders semantic color block when zoom is at threshold', () => {
+  it('renders icon-only semantic zoom tile when zoom is at threshold', () => {
     viewportState.zoom = 0.5
     renderWithFlow(
       <SynStep
         nodeProps={baseNodeProps}
         topBarColor="var(--pf-t--global--color--nonstatus--blue--200)"
         semanticZoomSummary={{ title: 'Analyze', typeLabel: 'Task Agent' }}
+        semanticZoomIcon={<span data-testid="semantic-zoom-icon" />}
       >
         <span>Detailed body</span>
       </SynStep>
     )
 
     expect(screen.queryByText('Detailed body')).not.toBeInTheDocument()
+    expect(screen.queryByText('Analyze')).not.toBeInTheDocument()
+    expect(screen.queryByText('Task Agent')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Analyze, Task Agent' })).toBeInTheDocument()
+    expect(screen.getByTestId('semantic-zoom-icon')).toBeInTheDocument()
   })
 
   it('semantic zoom layout has no accessibility violations', async () => {
@@ -92,6 +98,84 @@ describe('SynStep semantic zoom', () => {
     )
 
     expect(await axe(container)).toHaveNoViolations()
+  })
+
+  it('uses tile width and semantic-zoom connection handles at low zoom', () => {
+    viewportState.zoom = 0.5
+    renderWithFlow(
+      <SynStep
+        rootTestId="syn-step-semantic-zoom"
+        nodeProps={{ ...baseNodeProps, selected: true }}
+        semanticZoomSummary={{ title: 'Branch', typeLabel: 'Condition' }}
+        semanticZoomIcon={<span data-testid="semantic-zoom-icon" />}
+        semanticZoomMenuActions={[{ id: 'view-details', label: 'Edit', onClick: vi.fn() }]}
+        semanticZoomBranchSources={[{ id: 'true', ariaLabel: 'True branch output' }]}
+        style={{ borderTopLeftRadius: '8px' }}
+        enableStart
+        enableEnd
+        disableSource
+        reverseHandles
+      >
+        <span>Detailed body</span>
+      </SynStep>
+    )
+
+    expect(screen.getByTestId('syn-step-semantic-zoom')).toHaveStyle({ width: '224px' })
+    expect(screen.getByTestId('semantic-zoom-icon')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Branch, Condition' })).toBeInTheDocument()
+    expect(screen.getByLabelText('True branch output')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Edit Branch' })).toBeInTheDocument()
+  })
+
+  it('shows execution and validation badges on semantic zoom tiles', () => {
+    viewportState.zoom = 0.5
+    const nodeProps = {
+      ...baseNodeProps,
+      data: { ...baseNodeProps.data, __validationError: true },
+    } as unknown as NodeProps
+
+    renderWithFlow(
+      <SynStep
+        nodeProps={nodeProps}
+        semanticZoomSummary={{ title: 'Analyze', typeLabel: 'Task Agent' }}
+        executionState={{ status: 'failed' }}
+      >
+        <span>Detailed body</span>
+      </SynStep>
+    )
+
+    expect(screen.getByRole('img', { name: 'Error' })).toBeInTheDocument()
+    expect(screen.getByTestId('validation-error-badge')).toBeInTheDocument()
+  })
+
+  it('renders dashed-border semantic zoom tile when placeholder styling is set', () => {
+    viewportState.zoom = 0.5
+    renderWithFlow(
+      <SynStep
+        nodeProps={{ ...baseNodeProps, selected: true }}
+        hasDashedBorder
+        semanticZoomSummary={{ title: 'Pick type', typeLabel: 'Generic' }}
+      >
+        <span>Detailed body</span>
+      </SynStep>
+    )
+
+    expect(screen.getByRole('button', { name: 'Pick type, Generic' })).toBeInTheDocument()
+  })
+
+  it('omits trigger pill radius on semantic zoom tiles', () => {
+    viewportState.zoom = 0.5
+    renderWithFlow(
+      <SynStep
+        nodeProps={baseNodeProps}
+        semanticZoomSummary={{ title: 'Trigger', typeLabel: 'Webhook' }}
+        style={{ borderTopLeftRadius: '75px', borderBottomLeftRadius: '75px' }}
+      >
+        <span>Detailed body</span>
+      </SynStep>
+    )
+
+    expect(screen.getByRole('button', { name: 'Trigger, Webhook' })).toBeInTheDocument()
   })
 })
 
@@ -218,12 +302,29 @@ describe('SynStep validation and interaction', () => {
   })
 
   it('responds to expandAll and collapseAll events', () => {
+    const expandAllEvent = new EventTarget()
+    const collapseAllEvent = new EventTarget()
+
     renderWithFlow(
-      <SynStep nodeProps={baseNodeProps} collapsible>
-        <span>Content</span>
-      </SynStep>
+      <SynStepExpandedAllContext.Provider value={{ expandAllEvent, collapseAllEvent }}>
+        <SynStep nodeProps={baseNodeProps} collapsible>
+          <SynStepBody>
+            <span>Content</span>
+          </SynStepBody>
+        </SynStep>
+      </SynStepExpandedAllContext.Provider>
     )
 
+    expect(screen.getByText('Content')).toBeInTheDocument()
+
+    act(() => {
+      collapseAllEvent.dispatchEvent(new Event('collapseAll'))
+    })
+    expect(screen.queryByText('Content')).not.toBeInTheDocument()
+
+    act(() => {
+      expandAllEvent.dispatchEvent(new Event('expandAll'))
+    })
     expect(screen.getByText('Content')).toBeInTheDocument()
   })
 

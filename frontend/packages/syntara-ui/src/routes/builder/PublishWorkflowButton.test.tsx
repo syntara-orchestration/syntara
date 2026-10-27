@@ -197,27 +197,27 @@ describe('PublishWorkflowButton', () => {
     expect(await axe(container)).toHaveNoViolations()
   })
 
-  it('button is aria-disabled when isNodeEditorOpen is true', () => {
-    render(<PublishWorkflowButton {...defaultProps} isNodeEditorOpen={true} />)
+  it('button is aria-disabled when isStepEditorOpen is true', () => {
+    render(<PublishWorkflowButton {...defaultProps} isStepEditorOpen={true} />)
 
     expect(screen.getByRole('button', { name: /Publish workflow/i })).toHaveAttribute('aria-disabled', 'true')
   })
 
-  it('shows "finish editing" tooltip when isNodeEditorOpen is true', async () => {
+  it('shows "finish editing" tooltip when isStepEditorOpen is true', async () => {
     const user = userEvent.setup()
 
-    render(<PublishWorkflowButton {...defaultProps} isNodeEditorOpen={true} />)
+    render(<PublishWorkflowButton {...defaultProps} isStepEditorOpen={true} />)
 
     await user.hover(screen.getByRole('button', { name: /Publish workflow/i }))
 
     expect(await screen.findByText('Finish editing the current step before publishing')).toBeInTheDocument()
   })
 
-  it('does not call handleVerify when isNodeEditorOpen is true', async () => {
+  it('does not call handleVerify when isStepEditorOpen is true', async () => {
     const user = userEvent.setup()
     const handleVerify = vi.fn()
 
-    render(<PublishWorkflowButton {...defaultProps} handleVerify={handleVerify} isNodeEditorOpen={true} />)
+    render(<PublishWorkflowButton {...defaultProps} handleVerify={handleVerify} isStepEditorOpen={true} />)
 
     await user.click(screen.getByRole('button', { name: /Publish workflow/i }))
 
@@ -227,7 +227,7 @@ describe('PublishWorkflowButton', () => {
   it('shows permission tooltip over node-editor tooltip when canEdit is false', async () => {
     const user = userEvent.setup()
 
-    render(<PublishWorkflowButton {...defaultProps} canEdit={false} isNodeEditorOpen={true} />)
+    render(<PublishWorkflowButton {...defaultProps} canEdit={false} isStepEditorOpen={true} />)
 
     await user.hover(screen.getByRole('button', { name: /Publish workflow/i }))
 

@@ -14,7 +14,7 @@ type SaveWorkflowButtonProps = Readonly<{
   onSave: () => void
   canEdit: boolean
   editTooltip: string
-  isNodeEditorOpen?: boolean
+  isStepEditorOpen?: boolean
 }>
 
 export function SaveWorkflowButton({
@@ -25,9 +25,9 @@ export function SaveWorkflowButton({
   onSave,
   canEdit,
   editTooltip,
-  isNodeEditorOpen,
+  isStepEditorOpen,
 }: SaveWorkflowButtonProps) {
-  const isDisabled = !canEdit || isPending || (!isDirty && !isNew) || !!isNodeEditorOpen
+  const isDisabled = !canEdit || isPending || (!isDirty && !isNew) || !!isStepEditorOpen
   const lastSavedDate = toDisplayDate(lastSavedAt)
   const lastSavedText = lastSavedDate ? (
     <>
@@ -41,7 +41,7 @@ export function SaveWorkflowButton({
   let disabledTooltip: ReactNode
   if (!canEdit) {
     disabledTooltip = editTooltip
-  } else if (isNodeEditorOpen && lastSavedText) {
+  } else if (isStepEditorOpen && lastSavedText) {
     disabledTooltip = (
       <>
         Finish editing the current step before saving
@@ -49,7 +49,7 @@ export function SaveWorkflowButton({
         {lastSavedText}
       </>
     )
-  } else if (isNodeEditorOpen) {
+  } else if (isStepEditorOpen) {
     disabledTooltip = 'Finish editing the current step before saving'
   } else {
     disabledTooltip = lastSavedText ?? 'Save workflow'

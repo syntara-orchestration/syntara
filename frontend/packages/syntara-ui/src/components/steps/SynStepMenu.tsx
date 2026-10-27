@@ -3,11 +3,11 @@ import type { DropdownProps, MenuToggleElement } from '@patternfly/react-core'
 import { RhUiEllipsisVerticalFillIcon } from '@patternfly/react-icons'
 import { isValidElement, useState, type MouseEvent } from 'react'
 
-import type { NodeMenuAction } from '../../routes/workflows/canvas/nodes/hooks/useNodeMenuActions'
+import type { StepMenuAction } from '../../routes/workflows/canvas/nodes/hooks/useStepMenuActions'
 import { IconLabel } from '../IconLabel'
 
 type SynStepMenuProps = {
-  menuActions: NodeMenuAction[]
+  menuActions: StepMenuAction[]
   className?: string
   style?: React.CSSProperties
   /**
@@ -21,9 +21,9 @@ type SynStepMenuProps = {
 }
 
 /**
- * Shared component for node action menus (kebab menu).
+ * Shared component for step action menus (kebab menu).
  * Handles PatternFly Dropdown with proper event propagation prevention
- * to avoid triggering node click handlers.
+ * to avoid triggering canvas selection handlers.
  */
 export function SynStepMenu(props: Readonly<SynStepMenuProps>) {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
@@ -33,7 +33,7 @@ export function SynStepMenu(props: Readonly<SynStepMenuProps>) {
   }
 
   return (
-    <div data-testid="node-menu-wrapper" className={`nodrag nopan ${props.className ?? ''}`} style={props.style}>
+    <div data-testid="step-menu-wrapper" className={`nodrag nopan ${props.className ?? ''}`} style={props.style}>
       <Dropdown
         isOpen={isMenuOpen}
         onOpenChange={(isOpen) => setIsMenuOpen(isOpen)}
@@ -67,7 +67,7 @@ export function SynStepMenu(props: Readonly<SynStepMenuProps>) {
             }
             return (
               <DropdownItem
-                data-testid={`node-menu-item-${action.id}`}
+                data-testid={`step-menu-item-${action.id}`}
                 key={action.id}
                 onClick={(event: MouseEvent) => {
                   // The menu is portaled to document.body, but the click still bubbles

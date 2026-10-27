@@ -10,7 +10,7 @@ import { type Page } from '../fixtures'
 import { test, expect, toAppUrl } from '../fixtures'
 import { applyApprovalNameFilter, dismissConnectionBanner, navigateToApprovalAndOpen } from '../helpers/approvals'
 import { APP_TITLE } from '../helpers/appTitle'
-import { addApprovalNodeWithBranch } from '../helpers/v2-nodes'
+import { addApprovalStepWithBranch } from '../helpers/v2-steps'
 import { runWorkflowFromBuilder, waitForExecutionPaused } from '../helpers/workflow-run'
 import { buildUniqueName, openWorkflowInBuilder } from '../helpers/workflows'
 import {
@@ -497,7 +497,7 @@ test.describe('Approval Workflow Operations', () => {
 
     try {
       // Add approval node with a unique name so we can find it in the approvals list
-      await addApprovalNodeWithBranch(app, approvalNodeName)
+      await addApprovalStepWithBranch(app, approvalNodeName)
       await app.getByRole('button', { name: 'Save workflow' }).click()
       await runWorkflowFromBuilder(app)
       const executionId = app.url().match(/\/executions\/([^/?]+)/)?.[1]

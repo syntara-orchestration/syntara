@@ -17,7 +17,7 @@ const { mockNavigate } = vi.hoisted(() => ({
   mockNavigate: vi.fn(),
 }))
 
-const wouterMock = vi.hoisted((): { credentialId: string | undefined } => ({
+const routeStateMock = vi.hoisted((): { credentialId: string | undefined } => ({
   credentialId: '1',
 }))
 
@@ -99,7 +99,7 @@ vi.mock('@tanstack/react-router', async () => {
     useParams: vi.fn(() => ({ credentialId: '1' })),
     useRouterState: (opts?: { select?: (s: { location: { pathname: string; searchStr: string } }) => unknown }) => {
       const state = {
-        location: { pathname: `/configuration/credentials/${wouterMock.credentialId ?? ''}`, searchStr: '' },
+        location: { pathname: `/configuration/credentials/${routeStateMock.credentialId ?? ''}`, searchStr: '' },
       }
       return opts?.select ? opts.select(state) : state
     },
@@ -229,7 +229,7 @@ describe('CredentialDetail', () => {
   let mockMutate: ReturnType<typeof vi.fn>
 
   beforeEach(() => {
-    wouterMock.credentialId = '1'
+    routeStateMock.credentialId = '1'
     disableCredentialHookMock.reset()
     vi.clearAllMocks()
     queryClient.clear()
@@ -598,7 +598,7 @@ describe('CredentialDetail', () => {
   })
 
   it('renders invalid credential shell when route has no credential id', () => {
-    wouterMock.credentialId = undefined
+    routeStateMock.credentialId = undefined
     vi.mocked(useParams).mockReturnValueOnce({ credentialId: undefined as unknown as string })
 
     render(<CredentialDetail />, { wrapper })

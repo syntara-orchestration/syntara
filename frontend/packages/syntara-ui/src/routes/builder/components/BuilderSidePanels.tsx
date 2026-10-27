@@ -4,7 +4,7 @@ import { memo } from 'react'
 
 import type { PaginationFooterProps } from '../../../components/table/PaginationFooter'
 import type { FilterConfig } from '../../../types/filters'
-import { AddNodePanel } from '../AddNodePanel'
+import { AddStepPanel } from '../AddStepPanel'
 import type { BuilderAction } from '../builderReducer'
 import { WorkflowHistoryCard } from '../WorkflowHistoryCard'
 import { WorkflowSidepanel } from '../WorkflowSidepanel'
@@ -13,12 +13,12 @@ type Execution = ExecutionsAPI.components['schemas']['ExecutionRead']
 type WorkflowWithVersion = WorkflowAPI.components['schemas']['WorkflowReadWithVersion']
 
 type BuilderSidePanelsProps = {
-  isAddNodePanelOpen: boolean
-  isNodeEditorOpen: boolean
+  isAddStepPanelOpen: boolean
+  isStepEditorOpen: boolean
   canEdit: boolean
   sourceNodeId: string | null
   replacementNodeId: string | null
-  hasNoWorkflowNodes: boolean
+  hasNoWorkflowSteps: boolean
   dispatch: React.Dispatch<BuilderAction>
   historyCardOpen: boolean
   isNew: boolean
@@ -35,12 +35,12 @@ type BuilderSidePanelsProps = {
 }
 
 export const BuilderSidePanels = memo(function BuilderSidePanels({
-  isAddNodePanelOpen,
-  isNodeEditorOpen,
+  isAddStepPanelOpen,
+  isStepEditorOpen,
   canEdit,
   sourceNodeId,
   replacementNodeId,
-  hasNoWorkflowNodes,
+  hasNoWorkflowSteps,
   dispatch,
   historyCardOpen,
   isNew,
@@ -57,24 +57,24 @@ export const BuilderSidePanels = memo(function BuilderSidePanels({
 }: Readonly<BuilderSidePanelsProps>) {
   return (
     <>
-      {isAddNodePanelOpen && !isNodeEditorOpen && canEdit && (
+      {isAddStepPanelOpen && !isStepEditorOpen && canEdit && (
         <FlexItem style={{ flexShrink: 0, alignSelf: 'stretch' }}>
-          <AddNodePanel
+          <AddStepPanel
             onClose={() => dispatch({ type: 'CLOSE_ADD_NODE_PANEL' })}
-            onSelectNode={(nodeTypeId, nodeSubtypeId) =>
+            onSelectStep={(stepTypeId, stepSubtypeId) =>
               dispatch({
                 type: 'OPEN_NODE_EDITOR_ADD',
-                payload: { nodeTypeId, nodeSubtypeId: nodeSubtypeId ?? null },
+                payload: { stepTypeId, stepSubtypeId: stepSubtypeId ?? null },
               })
             }
             sourceNodeId={sourceNodeId}
             replacementNodeId={replacementNodeId}
-            hasNoWorkflowNodes={hasNoWorkflowNodes}
+            hasNoWorkflowSteps={hasNoWorkflowSteps}
           />
         </FlexItem>
       )}
 
-      {!isNodeEditorOpen && historyCardOpen && !isNew && (
+      {!isStepEditorOpen && historyCardOpen && !isNew && (
         <FlexItem style={{ flexShrink: 0, alignSelf: 'stretch' }}>
           <WorkflowHistoryCard
             executions={executions}
@@ -87,7 +87,7 @@ export const BuilderSidePanels = memo(function BuilderSidePanels({
         </FlexItem>
       )}
 
-      {!isNodeEditorOpen && detailsOpen && workflow && (
+      {!isStepEditorOpen && detailsOpen && workflow && (
         <FlexItem style={{ flexShrink: 0, alignSelf: 'stretch' }}>
           <WorkflowSidepanel
             workflow={workflow}

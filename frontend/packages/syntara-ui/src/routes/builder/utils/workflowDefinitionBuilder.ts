@@ -195,7 +195,7 @@ function transformConditionForBackend(condition: string | undefined): string | u
  * Consolidates condition, switch, approval, and converge transforms
  * so both `buildWorkflowDefinition` and version-duplication share one path.
  */
-export function transformNodeParameters(type: string, parameters: Record<string, unknown>): Record<string, unknown> {
+export function transformStepParameters(type: string, parameters: Record<string, unknown>): Record<string, unknown> {
   let result = parameters
 
   if ((type === ActivityTypeEnum.CONDITION || type === ActivityTypeEnum.LOOP) && typeof result.condition === 'string') {
@@ -286,7 +286,7 @@ export function buildWorkflowDefinition(params: {
       const sanitizedNodeName = a.name?.replace(CONTROL_CHAR_PATTERN, '')
       const inputs = hasInputs(a) ? a.inputs : undefined
 
-      const parameters = transformNodeParameters(a.type, a.parameters ?? {})
+      const parameters = transformStepParameters(a.type, a.parameters ?? {})
 
       return {
         id: a.id,

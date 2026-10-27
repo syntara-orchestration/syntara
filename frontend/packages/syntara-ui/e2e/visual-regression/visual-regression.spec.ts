@@ -8,7 +8,7 @@
  */
 import { test, expect, toAppUrl } from '../fixtures'
 import { APP_TITLE } from '../helpers/appTitle'
-import { addNodePanel } from '../helpers/workflows'
+import { addStepPanel } from '../helpers/workflows'
 
 // Allow 0.01 (1%) pixel diff to tolerate sub-pixel text rendering / anti-aliasing noise
 const screenshotOptions = { maxDiffPixelRatio: 0.01 } as const
@@ -33,39 +33,39 @@ test.describe('Visual regression — PF6 token migration', { tag: '@local-only' 
     await expect(app).toHaveScreenshot('glossary-page.png', screenshotOptions)
   })
 
-  test('trigger node on canvas', async ({ app }) => {
+  test('trigger step on canvas', async ({ app }) => {
     await app.goto(toAppUrl('/workflow-builder/new'))
-    await expect(app.getByRole('heading', { name: 'Select a trigger node' })).toBeVisible()
+    await expect(app.getByRole('heading', { name: 'Select a trigger step' })).toBeVisible()
 
     // Add a manual trigger so a TriggerNode renders on the canvas
     await app.getByRole('button', { name: 'Manual trigger' }).click()
     await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Visual test trigger')
     await app.getByRole('button', { name: 'Create' }).click()
 
-    // Screenshot the canvas area with the trigger node
+    // Screenshot the canvas area with the trigger step
     const canvas = app.locator('.react-flow')
     await expect(canvas).toBeVisible()
-    await expect(canvas).toHaveScreenshot('trigger-node-canvas.png', screenshotOptions)
+    await expect(canvas).toHaveScreenshot('trigger-step-canvas.png', screenshotOptions)
   })
 
-  test('condition node with expression group', async ({ app }) => {
+  test('condition step with expression group', async ({ app }) => {
     await app.goto(toAppUrl('/workflow-builder/new'))
-    await expect(app.getByRole('heading', { name: 'Select a trigger node' })).toBeVisible()
+    await expect(app.getByRole('heading', { name: 'Select a trigger step' })).toBeVisible()
 
     // Add manual trigger first
     await app.getByRole('button', { name: 'Manual trigger' }).click()
     await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Trigger')
     await app.getByRole('button', { name: 'Create' }).click()
 
-    // Add a condition node to show ExpressionGroup
+    // Add a condition step to show ExpressionGroup
     const addStepBtn = app.getByRole('button', { name: 'Add connected step' })
     await addStepBtn.waitFor({ state: 'visible' })
     await addStepBtn.click()
-    const panel = addNodePanel(app)
+    const panel = addStepPanel(app)
     await expect(panel).toHaveCount(1)
     await panel.getByRole('button', { name: 'Logic', exact: true }).click()
 
-    // After clicking Logic, the panel heading changes to "Select a logic node"
+    // After clicking Logic, the panel heading changes to "Select a logic step"
     await app.getByRole('button', { name: 'Conditional', exact: true }).click()
 
     // Wait for the condition form to render
@@ -75,7 +75,7 @@ test.describe('Visual regression — PF6 token migration', { tag: '@local-only' 
 
   test('scheduled trigger with schedule builder', async ({ app }) => {
     await app.goto(toAppUrl('/workflow-builder/new'))
-    await expect(app.getByRole('heading', { name: 'Select a trigger node' })).toBeVisible()
+    await expect(app.getByRole('heading', { name: 'Select a trigger step' })).toBeVisible()
 
     // Add a scheduled trigger
     await app.getByRole('button', { name: 'Schedule trigger' }).click()

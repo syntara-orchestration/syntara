@@ -8,11 +8,11 @@ This document describes the error handling implementation in the Syntara UI, inc
 
 1. [Overview](#overview)
 2. [Error Parsing Utilities](#error-parsing-utilities)
-3. [Query State Hook](#query-state-hook)
-4. [Mutation Error Handlers](#mutation-error-handlers)
+3. [Query Error Handling](#query-error-handling)
+4. [Mutation Error Handling](#mutation-error-handling)
 5. [503 Service Unavailable Handling](#503-service-unavailable-handling)
-6. [Error Components](#error-components)
-7. [Usage Examples](#usage-examples)
+6. [File Structure](#file-structure)
+7. [Testing](#testing)
 
 ---
 
@@ -243,14 +243,14 @@ For consistent shape and client-side validation, forms can use **Zod** with **@h
 - **Type inference**: Use `z.infer<typeof schema>` for the form type instead of hand-written interfaces.
 - **Backend errors unchanged**: `useFormMutationErrorHandler` and `getValidationFieldErrors` still map 422 field errors to the form; Zod handles client-side rules only.
 
-**Reusable helpers (builder step forms live under `node-forms/`):**
+**Reusable helpers (builder step forms live under `step-forms/`):**
 
-- **`node-forms/shared/formSchemaUtils.ts`** — Re-exports **`zodResolver`** from `@hookform/resolvers/zod` and **`optionalNumber`** for fields with `valueAsNumber` that can be NaN. Step forms in `node-forms/` import `zodResolver` and `optionalNumber` from `./shared/formSchemaUtils`. Use `zodResolver(schema, undefined, { mode: 'sync' })` with your Zod schema (import `z` from `'zod'`).
+- **`step-forms/shared/formSchemaUtils.ts`** — Re-exports **`zodResolver`** from `@hookform/resolvers/zod` and **`optionalNumber`** for fields with `valueAsNumber` that can be NaN. Step forms in `step-forms/` import `zodResolver` and `optionalNumber` from `./shared/formSchemaUtils`. Use `zodResolver(schema, undefined, { mode: 'sync' })` with your Zod schema (import `z` from `'zod'`).
 
 **Where it's used:**
 
 - **Integration form:** `packages/syntara-ui/src/routes/configuration/integrations/form/integrationFormSchema.ts` and `IntegrationForm.tsx` (imports `zodResolver` from `@hookform/resolvers/zod`).
-- **Step forms (builder):** Each has a schema file in `packages/syntara-ui/src/routes/builder/node-forms/` and uses `zodResolver(schema, undefined, { mode: 'sync' })` from `shared/formSchemaUtils.ts`:
+- **Step forms (builder):** Each has a schema file in `packages/syntara-ui/src/routes/builder/step-forms/` and uses `zodResolver(schema, undefined, { mode: 'sync' })` from `shared/formSchemaUtils.ts`:
   - Task Agent (`aiAgentFormSchema.ts`), Approval (`approvalFormSchema.ts`), Action (`actionFormSchema.ts`), Loop (`loopFormSchema.ts`), AAP (`aapFormSchema.ts`), Condition (`conditionFormSchema.ts`), Converge (`convergeFormSchema.ts`), Trigger (`triggerFormSchema.ts`).
 
 ### Direct Usage with getErrorMessage

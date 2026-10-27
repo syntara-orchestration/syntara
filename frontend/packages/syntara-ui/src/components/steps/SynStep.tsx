@@ -1,20 +1,21 @@
 import { Icon, Label } from '@patternfly/react-core'
 import { RhUiWarningFillIcon } from '@patternfly/react-icons'
-import { ExecutorTypeEnum, type TaskActivity } from '@syntara/contracts'
-import { Handle, type NodeProps, Position } from '@xyflow/react'
+import type { NodeProps } from '@xyflow/react'
 import React, { useEffect, useMemo, useState } from 'react'
 
-import { FlowNodeType } from '../../constants'
 import { ExecutionStatusBadge } from '../../routes/builder/components/ExecutionStatusBadge'
-import { targetHandleStyle, sourceHandleStyle } from '../../routes/workflows/canvas/nodes/common/handleStyle'
 import { useSemanticZoom } from '../../routes/workflows/canvas/nodes/hooks/useSemanticZoom'
-import { NODE_TYPE_COLORS } from '../../routes/workflows/canvas/nodeTypeColors'
+import type { StepMenuAction } from '../../routes/workflows/canvas/nodes/hooks/useStepMenuActions'
+import { SEMANTIC_ZOOM_TILE_HANDLE_TOP_PX } from '../../routes/workflows/canvas/semanticZoom'
 import type { SemanticZoomBranchSource } from '../../routes/workflows/canvas/semanticZoomTypes'
+import { STEP_TYPE_COLORS } from '../../routes/workflows/canvas/stepTypeColors'
 import type { ActivityStatus } from '../../routes/workflows/execution/types'
 import { SynPanel } from '../layout/SynPanel'
 
+import { SynStepConnectionHandles } from './SynStepConnectionHandles'
 import { SynStepExpandedAllContext } from './SynStepExpandedAllContext'
 import { SynStepExpandedContext } from './SynStepExpandedContext'
+import { getSynStepNodeWidth } from './synStepNodeWidth'
 import { SynStepSemanticZoomBody } from './SynStepSemanticZoomBody'
 
 type ExecutionState = {
@@ -24,9 +25,6 @@ type ExecutionState = {
   error_details?: string
   retry_count?: number
 }
-
-const DEFAULT_NODE_WIDTH = 240
-const WIDE_NODE_WIDTH = 360
 
 const NODE_BOTTOM_BADGE_STYLE: React.CSSProperties = {
   position: 'absolute',
@@ -77,26 +75,6 @@ function ValidationErrorBadge() {
   )
 }
 
-const isWideTaskNode = (nodeProps: NodeProps) => {
-  if (nodeProps.type === FlowNodeType.GENERIC) {
-    return true
-  }
-
-  if (nodeProps.type !== FlowNodeType.TASK && nodeProps.type !== FlowNodeType.TASK_REVERSED) {
-    return false
-  }
-
-  const data = nodeProps.data as TaskActivity | undefined
-  if (!data) return false
-
-  // In v2, activity.type IS the executor directly (no task.executor wrapper)
-  if (data.type === ExecutorTypeEnum.AGENTIC) {
-    return true
-  }
-
-  return false
-}
-
 // eslint-disable-next-line complexity
 export function SynStep(props: {
   children: React.ReactNode
@@ -115,9 +93,13 @@ export function SynStep(props: {
   showExecutionBadge?: boolean
   /** Optional color for the type indicator bar at the top of the node (PatternFly token or CSS color) */
   topBarColor?: string
-  /** When zoomed out, used for tooltip text on the compact color block */
+  /** When zoomed out, title and type label for the semantic zoom label panel */
   semanticZoomSummary?: { title: string; typeLabel: string }
-  /** Branch source handles at semantic zoom (no labels; stacked on the bar edge) */
+  /** Step icon shown in the semantic zoom tile (same as the detailed header icon). */
+  semanticZoomIcon?: React.ReactNode
+  /** Kebab menu actions for semantic zoom (Edit uses the view-details action when present). */
+  semanticZoomMenuActions?: readonly StepMenuAction[]
+  /** Branch source handles at semantic zoom (no labels; stacked on the tile edge) */
   semanticZoomBranchSources?: readonly SemanticZoomBranchSource[]
   /** Optional stable hook for tests (e.g. canvas node root) */
   rootTestId?: string
@@ -129,7 +111,7 @@ export function SynStep(props: {
   const hasSemanticZoomSummary = props.semanticZoomSummary !== undefined
   const isSemanticZoom = useSemanticZoom(hasSemanticZoomSummary)
 
-  const semanticFillColor = props.topBarColor ?? NODE_TYPE_COLORS.generic
+  const semanticFillColor = props.topBarColor ?? STEP_TYPE_COLORS.generic
 
   const barRadiusStyle = useMemo(() => {
     const s = props.style
@@ -140,6 +122,12 @@ export function SynStep(props: {
       borderBottomLeftRadius: s.borderBottomLeftRadius,
     }
   }, [props.style])
+
+  const semanticZoomTileStyle = useMemo(() => {
+    if (!barRadiusStyle) return undefined
+    if (barRadiusStyle.borderTopLeftRadius === '75px') return undefined
+    return barRadiusStyle
+  }, [barRadiusStyle])
 
   useEffect(() => {
     if (!isCollapsible) return
@@ -159,7 +147,9 @@ export function SynStep(props: {
   }, [expandAllEvent, collapseAllEvent, expandedContext, isCollapsible])
 
   const isSelected = props.nodeProps.selected
-  const nodeWidth = isWideTaskNode(props.nodeProps) ? WIDE_NODE_WIDTH : DEFAULT_NODE_WIDTH
+  const nodeWidth = getSynStepNodeWidth(isSemanticZoom, props.nodeProps)
+
+  const semanticZoomHandleTop = SEMANTIC_ZOOM_TILE_HANDLE_TOP_PX
   const summary = props.semanticZoomSummary
   const mockDataPinned =
     (props.nodeProps.data as { metadata?: { __mockDataPinned?: boolean } }).metadata?.__mockDataPinned === true
@@ -176,7 +166,10 @@ export function SynStep(props: {
     ...(isSemanticZoom
       ? {
           borderWidth: 0,
-          ...props.style,
+          background: 'transparent',
+          boxShadow: 'none',
+          height: 'auto',
+          minHeight: 0,
         }
       : {
           // Type indicator: top border in type color (structural, always present — not conditional on
@@ -252,16 +245,18 @@ export function SynStep(props: {
           <SynStepSemanticZoomBody
             title={summary.title}
             typeLabel={summary.typeLabel}
-            backgroundColor={semanticFillColor}
+            accentColor={semanticFillColor}
+            icon={props.semanticZoomIcon}
+            menuActions={props.semanticZoomMenuActions}
             branchSources={props.semanticZoomBranchSources}
             selected={isSelected}
             hasDashedBorder={props.hasDashedBorder ?? false}
-            barStyle={barRadiusStyle}
+            tileStyle={semanticZoomTileStyle}
           />
         ) : (
           props.children
         )}
-        {!isSemanticZoom && props.showExecutionBadge !== false && props.executionState && (
+        {props.showExecutionBadge !== false && props.executionState && (
           <ExecutionStatusBadge
             status={props.executionState?.status ?? 'pending'}
             retryCount={props.executionState?.retry_count}
@@ -275,39 +270,16 @@ export function SynStep(props: {
             </Label>
           </div>
         )}
-        {!isSemanticZoom && hasValidationError && <ValidationErrorBadge />}
-        {!props.disableTarget && (
-          <Handle
-            type="target"
-            id="target"
-            position={props.reverseHandles ? Position.Right : Position.Left}
-            style={targetHandleStyle}
-          />
-        )}
-        {!props.disableSource && (
-          <Handle
-            type="source"
-            id="source"
-            position={props.reverseHandles ? Position.Left : Position.Right}
-            style={sourceHandleStyle}
-          />
-        )}
-        {props.enableStart && (
-          <Handle type="source" id="start" position={Position.Right} style={{ ...sourceHandleStyle, top: '85%' }} />
-        )}
-        {props.enableEnd && (
-          <Handle
-            type="target"
-            id="end"
-            position={Position.Left}
-            style={{
-              ...targetHandleStyle,
-              top: '50%', // Same position as main target handle
-              opacity: 0, // Invisible
-              pointerEvents: 'none', // Non-interactive
-            }}
-          />
-        )}
+        {hasValidationError && <ValidationErrorBadge />}
+        <SynStepConnectionHandles
+          isSemanticZoom={isSemanticZoom}
+          semanticZoomHandleTop={semanticZoomHandleTop}
+          disableTarget={props.disableTarget}
+          disableSource={props.disableSource}
+          enableStart={props.enableStart}
+          enableEnd={props.enableEnd}
+          reverseHandles={props.reverseHandles}
+        />
       </SynPanel>
     </SynStepExpandedContext.Provider>
   )

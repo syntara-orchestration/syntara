@@ -11,16 +11,16 @@ This file provides guidance to AI coding assistants when working in the frontend
      advisory — read them on-demand per the triggers below. See
      ../.github/AI_AGENT_POLICY.md. -->
 
-| Trigger                                                                             | Skill file to read                                                                        |
-| ----------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| **Before implementing, reviewing, or refactoring any frontend code**                | `.agents/skills/frontend-specialist/SKILL.md`                                             |
-| **Before writing or modifying any component, page, or UI code**                     | `.agents/skills/frontend-patternfly-ux/SKILL.md`                                          |
-| **Before writing or reviewing any test file** (unit, integration, or accessibility) | `.agents/skills/frontend-testing-guidelines/SKILL.md`                                     |
-| **Before writing or reviewing any E2E / Playwright test**                           | `.agents/skills/frontend-playwright-e2e/SKILL.md`                                         |
-| **Before committing code or reporting a task as done**                              | `.agents/skills/frontend-pr-review/SKILL.md` (self-review against PR checklist)           |
-| **Before writing or modifying any component, hook, or pattern**                     | `.agents/skills/frontend-coding-standards/SKILL.md`                                       |
-| **Before writing code using React, Zod, Zustand, Vitest, Vite, or TanStack Query**  | `.agents/skills/frontend-library-references/SKILL.md` (fetch the relevant `llms.txt` URL) |
-| **Before an accessibility audit or drafting a11y bugs beyond axe-core**             | `.agents/skills/frontend-a11y-audit/SKILL.md`                                             |
+| Trigger                                                                                             | Skill file to read                                                                        |
+| --------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| **Before implementing, reviewing, or refactoring any frontend code**                                | `.agents/skills/frontend-specialist/SKILL.md`                                             |
+| **Before writing or modifying any component, page, or UI code**                                     | `.agents/skills/frontend-patternfly-ux/SKILL.md`                                          |
+| **Before writing or reviewing any test file** (unit, integration, or accessibility)                 | `.agents/skills/frontend-testing-guidelines/SKILL.md`                                     |
+| **Before writing or reviewing any E2E / Playwright test**                                           | `.agents/skills/frontend-playwright-e2e/SKILL.md`                                         |
+| **Before committing code or reporting a task as done**                                              | `.agents/skills/frontend-pr-review/SKILL.md` (self-review against PR checklist)           |
+| **Before writing or modifying any component, hook, or pattern**                                     | `.agents/skills/frontend-coding-standards/SKILL.md`                                       |
+| **Before writing code using React, Zod, Zustand, Vitest, Vite, TanStack Query, or TanStack Router** | `.agents/skills/frontend-library-references/SKILL.md` (fetch the relevant `llms.txt` URL) |
+| **Before an accessibility audit or drafting a11y bugs beyond axe-core**                             | `.agents/skills/frontend-a11y-audit/SKILL.md`                                             |
 
 ### Storybook MCP and PatternFly MCP (when available)
 
@@ -116,7 +116,7 @@ The items below cover patterns ESLint **cannot** catch:
 19. **No mutable counters in `.map()`** -- do not use `let` counters inside `.map()` or `.forEach()`; pre-compute indices immutably or use the callback's index parameter
 20. **Never use `eslint-disable`** -- do not add `eslint-disable` or `eslint-disable-next-line` to new or modified code. Every rule catches a real problem; fix the code so the rule passes. Pre-existing suppressions are tech debt being cleaned up. See [`.agents/skills/frontend-coding-standards/SKILL.md`](../.agents/skills/frontend-coding-standards/SKILL.md) §28
 21. **Conditional hook execution uses wrapper components** -- hooks must be called unconditionally per React rules; if a hook's result is used conditionally, extract to a wrapper component that is conditionally rendered (see [`.agents/skills/frontend-coding-standards/SKILL.md`](../.agents/skills/frontend-coding-standards/SKILL.md) §29)
-22. **Leverage existing libraries before custom code** -- all async server state must use TanStack Query (`useQuery`/`useMutation`/`useQueries`), not manual `useEffect` + `useState` + `fetch`; forms must use react-hook-form + Zod; styling must use PatternFly + CSS modules. Do not reimplement what the tech stack already provides (see [`.agents/skills/frontend-coding-standards/SKILL.md`](../.agents/skills/frontend-coding-standards/SKILL.md) §30)
+22. **Leverage existing libraries before custom code** -- all async server state must use TanStack Query (`useQuery`/`useMutation`/`useQueries`), not manual `useEffect` + `useState` + `fetch`; use `refetchInterval` for query polling, not hand-rolled timer/effect loops. Forms must use react-hook-form + Zod; styling must use PatternFly + CSS modules. Do not reimplement what the tech stack already provides (see [`.agents/skills/frontend-coding-standards/SKILL.md`](../.agents/skills/frontend-coding-standards/SKILL.md) §30)
 23. **No `// TODO` comments in shipped code** -- surfaced as a lint warning via `no-warning-comments` (warn, not error; does not block CI but is flagged during review). Deferred work belongs in an issue, not buried in source. If a follow-up is needed, create a ticket and reference it inline (e.g., `// Inline type until #12345`). See [`.agents/skills/frontend-coding-standards/SKILL.md`](../.agents/skills/frontend-coding-standards/SKILL.md) §32
 24. **New routes must set `requiredPermissions` and/or `routePermission`** -- every route with access requirements needs permission fields in `navigationItems.tsx`; create/edit routes need a `routePermission` for `ProtectedRoute` guard (see [`docs/permissions-rbac.md`](docs/permissions-rbac.md))
 25. **New write actions must use `DisabledWithTooltip` + permission hook** -- never expose ungated create/edit/delete buttons; use a domain `use*Permissions` hook and `permissionTooltip()` for copy (see [`docs/permissions-rbac.md`](docs/permissions-rbac.md))
@@ -129,6 +129,7 @@ The items below cover patterns ESLint **cannot** catch:
 32. **No new `useContext`** -- React 19 reads context with `use(Context)`; do not add `useContext` (see [`.agents/skills/frontend-coding-standards/SKILL.md`](../.agents/skills/frontend-coding-standards/SKILL.md) §39)
 33. **Prefer `useOptimistic` for clear toggle/counter mutations** -- update UI inside a `startTransition` Action with `mutateAsync`; do not hand-roll pending mirror state for simple before/after mutations (see [`.agents/skills/frontend-coding-standards/SKILL.md`](../.agents/skills/frontend-coding-standards/SKILL.md) §40)
 34. **No new barrel files in `src/`** -- do not create a file that only re-exports from other files. Import directly from the source file instead. ESLint enforces this at `warn` (`barrel-files/avoid-barrel-files`), scoped to `src/**/*.{ts,tsx}` -- new `src/` code must not add a new warning. Does not apply to `e2e/` or other non-production directories (see [`.agents/skills/frontend-coding-standards/SKILL.md`](../.agents/skills/frontend-coding-standards/SKILL.md) §43)
+35. **Use TanStack Router for URL search state** -- see [URL Search State](../.agents/skills/frontend-coding-standards/SKILL.md#url-search-state) for `validateSearch`, `useSearch`, `useNavigate`, and list-filter patterns
 
 ### Feature Preservation Rules
 
@@ -151,7 +152,8 @@ The items below cover patterns ESLint **cannot** catch:
 ```bash
 # Development
 npm start                  # Start all services (UI, mock API)
-npm run start:ui           # Start UI only
+npm run start:ui           # Start the UI package dev script (Vite + Storybook)
+npm run start:e2e --prefix packages/syntara-ui # Start Vite only for E2E
 npm run start:mock-api     # Start mock API only
 
 # Testing
@@ -164,7 +166,7 @@ npm run e2e:visual-regression:update # Same, with --update-snapshots (see packag
 
 # E2E test suite tags — Playwright tags that control where each test runs:
 #   @pr-check      Fast critical-path tests; select with --grep @pr-check
-#   @local-only    Visual regression tests; excluded from all CI automatically
+#   @local-only    Mock-dependent audits/local screenshots; not a blanket CI exclusion
 # Full rules: .agents/skills/frontend-playwright-e2e/SKILL.md → "Test Suite Tags"
 
 For a known flaky test that needs temporary quarantine from CI, follow the
@@ -219,7 +221,7 @@ For how the UI is structured, see these comprehensive guides:
 | **New here / onboarding**           | [`docs/ai-assisted-development.md`](docs/ai-assisted-development.md) -- AI agent prompts, screenshot workflow, full example                                                                                                                                                                                                                                                |
 | **API integration**                 | [`docs/data-flow.md`](docs/data-flow.md) -- OpenAPI contracts and type-safe clients                                                                                                                                                                                                                                                                                        |
 | **Workflow transformations**        | [`docs/data-flow.md`](docs/data-flow.md) -- Nested to flat conversions                                                                                                                                                                                                                                                                                                     |
-| **Step registry (`NodeRegistry`)**  | [`docs/architecture.md`](docs/architecture.md) -- auto-discovery of step types                                                                                                                                                                                                                                                                                             |
+| **Step registry (`StepRegistry`)**  | [`docs/architecture.md`](docs/architecture.md) -- auto-discovery of step types                                                                                                                                                                                                                                                                                             |
 | **Builder internals**               | [`docs/architecture.md`](docs/architecture.md) -- "Builder internals (advanced)"                                                                                                                                                                                                                                                                                           |
 | **State management**                | [`docs/zustand-architecture.md`](docs/zustand-architecture.md) -- Zustand guide                                                                                                                                                                                                                                                                                            |
 | **WebSocket / real-time**           | [`docs/websocket-architecture.md`](docs/websocket-architecture.md) -- multi-channel infrastructure                                                                                                                                                                                                                                                                         |
@@ -234,9 +236,9 @@ For how the UI is structured, see these comprehensive guides:
 | **Error handling patterns**         | [`docs/error-handling.md`](docs/error-handling.md) -- RFC 9457, error utilities, retry support                                                                                                                                                                                                                                                                             |
 | **Testing standards**               | [`.agents/skills/frontend-testing-guidelines/SKILL.md`](../.agents/skills/frontend-testing-guidelines/SKILL.md) -- coverage, queries, accessibility                                                                                                                                                                                                                        |
 | **Visual regression testing**       | [`packages/syntara-ui/VISUAL_REGRESSION.md`](packages/syntara-ui/VISUAL_REGRESSION.md) -- page registry, baselines, manual-only workflow                                                                                                                                                                                                                                   |
-| **New workflow step type**          | `packages/syntara-ui/src/routes/builder/registry/nodes/QUICK_START.md`                                                                                                                                                                                                                                                                                                     |
+| **New workflow step type**          | `packages/syntara-ui/src/routes/builder/registry/steps/QUICK_START.md`                                                                                                                                                                                                                                                                                                     |
 | **UX / PatternFly design system**   | [`.agents/skills/frontend-patternfly-ux/SKILL.md`](../.agents/skills/frontend-patternfly-ux/SKILL.md) -- PF6 patterns                                                                                                                                                                                                                                                      |
-| **Library docs / llms.txt links**   | [`.agents/skills/frontend-library-references/SKILL.md`](../.agents/skills/frontend-library-references/SKILL.md) -- fetch before writing React, Zod, Zustand, Vitest, Vite, or TanStack Query code                                                                                                                                                                          |
+| **Library docs / llms.txt links**   | [`.agents/skills/frontend-library-references/SKILL.md`](../.agents/skills/frontend-library-references/SKILL.md) -- fetch before writing React, Zod, Zustand, Vitest, Vite, TanStack Query, or TanStack Router code                                                                                                                                                         |
 | **Permission gating / RBAC**        | [`docs/permissions-rbac.md`](docs/permissions-rbac.md) -- `useCanI`, `DisabledWithTooltip`, `ProtectedRoute`, nav filtering, mock API roles, ungated inventory                                                                                                                                                                                                             |
 | **Page content frame (`SynPanel`)** | `packages/syntara-ui/src/components/layout/SynPanel.tsx` -- `Panel` -> `PanelMain` -> `PanelMainBody`; see JSDoc (glass vs `opaqueFloatingFill` vs `variant="raised"`) and [patternfly-react#12372](https://github.com/patternfly/patternfly-react/pull/12372). Stack sibling panels with `SynPanelStack` (do not wrap them in `overflow: hidden`; it clips `box-shadow`). |
 | **Documentation links**             | [`.agents/skills/frontend-coding-standards/SKILL.md`](../.agents/skills/frontend-coding-standards/SKILL.md) -- `useDocLink` hook, `DocKey` type, community vs extended URL resolution                                                                                                                                                                                      |
@@ -260,7 +262,7 @@ See: [`docs/data-flow.md`](docs/data-flow.md) — "Type-Safe API Clients"
 
 1. Add route constant to `packages/syntara-ui/src/app/AppRoute.tsx`
 2. Add navigation item to `packages/syntara-ui/src/app/navigationItems.tsx` with lazy-loaded component
-3. The router auto-discovers it from `navigationItems` — no manual route config needed
+3. The router auto-discovers it from `navigationItems` — no manual route config needed. If the route owns URL search state, declare it with `validateSearch` and use TanStack Router APIs to read and update it.
 4. In the page component, render `<title>{toPageTitle(['Page Name'])}</title>` as the first child of `<SynPage>`; import `toPageTitle` from `src/utils/toPageTitle`
 5. Run `npm run route-baseline:update` and commit the regenerated `manifest.gen.json`
 
@@ -369,7 +371,7 @@ See: [`docs/architecture.md`](docs/architecture.md#api-filtering-architecture) �
 
 - **React DevTools**: Inspect component props and Zustand state
 - **Console**: `useWorkflowStore.getState()` to inspect workflow store
-- Steps not appearing → check `NodeRegistry`; edges not connecting → verify handle IDs; state not updating → check store actions
+- Steps not appearing → check `StepRegistry`; edges not connecting → verify handle IDs; state not updating → check store actions
 
 #### How do I format dates?
 

@@ -13,17 +13,19 @@
 
 import { test, expect, toAppUrl, type Page } from '../fixtures'
 import { buildUniqueName, openBuilderById } from '../helpers/workflows'
-import { apiRequest, createWorkflowViaApi, deleteWorkflowViaApi, ensureProject, getAuthToken } from '../utils/api'
+import {
+  apiRequest,
+  createWorkflowViaApi,
+  deleteWorkflowViaApi,
+  ensureProject,
+  getAuthToken,
+  pollExecutionStatus,
+} from '../utils/api'
 
 const TERMINAL_STATUSES = ['completed', 'failed', 'cancelled']
 
-async function pollExecutionUntilDone(page: Page, executionId: string, token: string): Promise<void> {
-  await expect(async () => {
-    const resp = await apiRequest(page, 'get', `/executions/${executionId}`, { token })
-    const exec = (await resp.json()) as { status: string }
-    expect(TERMINAL_STATUSES).toContain(exec.status)
-  }).toPass({ timeout: 60_000, intervals: [2_000] })
-}
+/** Podman Compose E2E and merge queue runs need more headroom for Temporal to finish under load. */
+const TERMINAL_POLL_TIMEOUT_MS = process.env.CI ? 180_000 : 90_000
 
 let workflowId: string | null = null
 let completedExecutionId: string | null = null
@@ -60,7 +62,10 @@ test.beforeAll(async ({ browser }) => {
     if (runResp.ok()) {
       const body = (await runResp.json()) as { id: string }
       completedExecutionId = body.id
-      await pollExecutionUntilDone(page, completedExecutionId, token)
+      await pollExecutionStatus(page, completedExecutionId, TERMINAL_STATUSES, {
+        token,
+        timeout: TERMINAL_POLL_TIMEOUT_MS,
+      })
     }
   } finally {
     await page.close()

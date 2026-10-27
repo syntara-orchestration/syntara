@@ -13,7 +13,7 @@ import { buildUniqueName, clickAddConnectedStep, selectProjectIfRequired } from 
 import { ensureProject } from './utils/api'
 
 /**
- * Navigate to the workflow builder and add an API action node form
+ * Navigate to the workflow builder and add an API action step form
  * where the credential selector is visible.
  *
  * Flow: New workflow → Manual trigger → Add connected step → Action → REST API
@@ -21,7 +21,7 @@ import { ensureProject } from './utils/api'
 async function navigateToApiActionForm(app: Page) {
   const project = await ensureProject(app)
   await app.goto(toAppUrl('/workflow-builder/new'))
-  await expect(app.getByRole('heading', { name: 'Select a trigger node' })).toBeVisible()
+  await expect(app.getByRole('heading', { name: 'Select a trigger step' })).toBeVisible()
 
   await selectProjectIfRequired(app, project?.name)
 
@@ -46,7 +46,7 @@ async function navigateToApiActionForm(app: Page) {
 }
 
 test.describe('Credential Selector', () => {
-  test('credential selector appears in API action node form', async ({ app }) => {
+  test('credential selector appears in API action step form', async ({ app }) => {
     // Arrange & Act
     await navigateToApiActionForm(app)
 

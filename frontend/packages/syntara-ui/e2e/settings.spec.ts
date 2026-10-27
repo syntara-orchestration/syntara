@@ -30,6 +30,7 @@
 
 import { createUnavailableGuard, type Page, expect, test, toAppUrl } from './fixtures'
 import { APP_TITLE } from './helpers/appTitle'
+import { navigateViaSystemAdministrationMenu } from './helpers/docked-nav'
 import { apiRequest } from './utils/api'
 
 /** Navigate to settings and click the Context Manager tab. */
@@ -283,9 +284,7 @@ test.describe('Settings', () => {
     await app.goto(toAppUrl('/workflows'))
     await expect(app).toHaveURL(/workflows/)
 
-    // Open System Administration flyout and click Settings
-    await app.getByRole('button', { name: 'System Administration' }).click()
-    await app.getByRole('menuitem', { name: 'Settings' }).click()
+    await navigateViaSystemAdministrationMenu(app, 'Settings')
 
     // Verify navigation
     await expect(app).toHaveURL(/system-administration\/settings/)

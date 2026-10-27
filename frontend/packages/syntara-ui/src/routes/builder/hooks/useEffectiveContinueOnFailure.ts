@@ -40,7 +40,7 @@ export function resolveEffectiveContinueOnFailure(
 }
 
 /**
- * Watches the node form's continue-on-failure setting and the admin default,
+ * Watches the step form's continue-on-failure setting and the admin default,
  * then returns the engine-equivalent effective value.
  */
 export function useEffectiveContinueOnFailure(): EffectiveContinueOnFailure {

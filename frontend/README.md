@@ -95,12 +95,12 @@ npm run gen
 - Ensure you're using Node.js 22+
 - Run `npm ci` instead of `npm install`
 - Check that all dependencies are installed correctly
-- Refer to [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines
+- Refer to the [Frontend contributor guide](../docs/frontend-contributing.md) for contribution guidelines
 - Check out [AGENTS.md](AGENTS.md) for comprehensive development information
 
 ## Project Documentation
 
-- [Contributing Guidelines](CONTRIBUTING.md)
+- [Contributing Guidelines](../docs/frontend-contributing.md)
 - [Developer Guide](DEVELOPER_GUIDE.md)
 - [Architecture Overview](docs/architecture.md)
 - [Data Flow & API Contracts](docs/data-flow.md)
@@ -185,7 +185,7 @@ Code quality and coverage are tracked via SonarCloud. SonarCloud analysis runs a
 
 ## Contributing
 
-We welcome contributions! Please read our [Contributing Guidelines](CONTRIBUTING.md) for details on how to get started, our development process, and how you can contribute.
+We welcome contributions! Please read our [Contributing Guidelines](../docs/frontend-contributing.md) for details on how to get started, our development process, and how you can contribute.
 
 ## Technology Stack
 
@@ -194,7 +194,7 @@ We welcome contributions! Please read our [Contributing Guidelines](CONTRIBUTING
 - React 19 with TypeScript
 - Vite build tool
 - PatternFly 6
-- Wouter (routing)
+- TanStack Router (routing)
 - TanStack Query (data fetching)
 - openapi-fetch + openapi-react-query (type-safe API client)
 - Fuse.js (fuzzy search)
