@@ -83,6 +83,31 @@ async def test_stale_result_cannot_complete_an_amended_request(context):
     assert not context.row.completed
 
 
+@pytest.mark.parametrize("policy", ["retained_beginning", "current_end"])
+async def test_control_recovery_keeps_external_cache_maintenance_required_for_evidence_change(context, policy):
+    context.row.policy = policy
+    context.row.expected_recovery_revision = 0
+    context.row.acknowledge_duplicate_risk = True
+    request = await context.service.read(context.snapshot, 0, 7)
+    h = Harness(position=row(gap=True))
+    h.cache_coordination = None
+    original_boundary = h.position.initial_next_offset
+    result = await h.service.recover(request, owner_worker_id="worker")
+    await context.service.record(request, result)
+    assert h.position.initial_next_offset == original_boundary
+    if policy == "retained_beginning":
+        assert result.status == PositionStatus.BLOCKED
+        assert context.row.error_code == "cache_epoch_coordination_required"
+        assert not context.row.completed
+        assert h.held
+        assert h.position.gap_detected_at is not None
+        h.client.commit.assert_not_awaited()
+    else:
+        assert result.status == PositionStatus.READY
+        assert context.row.completed
+        assert not h.held
+
+
 @pytest.fixture
 def recovery_harness(context, monkeypatch) -> Harness:
     """Use real hold/confirmation transactions with isolated SQL and broker ports."""

@@ -13,6 +13,8 @@ from syntara.authz.exceptions import AuthorizationDeniedError
 from syntara.authz.models.project import Project
 from syntara.core.models import User
 from syntara.eventstreams.adapters.kafka_initial_position import KafkaPartitionInitialPosition
+from syntara.eventstreams.core.placement import SubscriptionPlacementLease
+from syntara.eventstreams.core.runtime import RuntimeState
 from syntara.eventstreams.exceptions import EventSubscriptionControlConflictError, EventSubscriptionNotFoundError
 from syntara.eventstreams.models.control import EventSubscriptionRecovery, EventSubscriptionRuntime
 from syntara.eventstreams.models.controls import (
@@ -27,6 +29,7 @@ from syntara.eventstreams.models.subscription_snapshot import SubscriptionSnapsh
 from syntara.eventstreams.services.connection_provider import EventConnectionProvider
 from syntara.eventstreams.services.deduplication_store import EventDeliveryStore
 from syntara.eventstreams.services.retirement_service import EventRetirementService, reject_content_gates
+from syntara.eventstreams.services.runtime_placement import confirmed_placements
 from syntara.workflows.models.workflow import Workflow
 from syntara.workflows.services.workflow_service import WorkflowService
 
@@ -289,6 +292,7 @@ class EventSubscriptionControlService:
         source: EventSubscriptionSource,
         *,
         runtimes: list[EventSubscriptionRuntime] | None = None,
+        placements: dict[UUID, SubscriptionPlacementLease] | None = None,
     ) -> SubscriptionControlResponse:
         """Only acknowledgements from all registered participants establish convergence."""
         if runtimes is None:
@@ -306,29 +310,38 @@ class EventSubscriptionControlService:
             and not subscription.retired
             and source.retired_at is None
         )
+        current = None
+        if active:
+            if placements is None:
+                placements = await confirmed_placements(self.session, [(subscription, source)])
+            lease = placements.get(subscription.id)
+            current = next(
+                (
+                    row
+                    for row in runtimes
+                    if lease is not None
+                    and row.source_id == source.id
+                    and row.worker_id == str(lease.owner.worker_id)
+                    and not row.stopped
+                ),
+                None,
+            )
         applied = (
             (
-                bool(runtimes)
-                and all(
-                    row.stopped
-                    or (
-                        row.source_id == source.id
-                        and row.applied_revision == subscription.configuration_revision
-                        and row.applied_published_version_id == subscription.published_version_id
-                    )
-                    for row in runtimes
-                )
-                and any(
-                    not row.stopped
-                    and row.source_id == source.id
-                    and row.applied_revision == subscription.configuration_revision
-                    and row.applied_published_version_id == subscription.published_version_id
-                    for row in runtimes
-                )
+                current is not None
+                and current.applied_revision == subscription.configuration_revision
+                and current.applied_published_version_id == subscription.published_version_id
+                and not current.permanent_content_error
+                and all(row is current or row.stopped for row in runtimes)
             )
             if active
             else all(row.stopped for row in runtimes)
         )
+        state = RuntimeState(current.runtime_state) if current is not None else None
+        if any(row.permanent_content_error for row in runtimes):
+            state = RuntimeState.BLOCKED
+        elif not active:
+            state = RuntimeState.STOPPED if applied else RuntimeState.DRAINING
         return SubscriptionControlResponse(
             subscription_id=subscription.id,
             source_id=source.id,
@@ -336,4 +349,5 @@ class EventSubscriptionControlService:
             source_generation=source.generation,
             convergence="applied" if applied else "pending",
             applied_revision=subscription.configuration_revision if applied else None,
+            runtime_state=state,
         )

@@ -43,7 +43,7 @@ async def _run_connected(
     """Compose completed services without owning or sharing an AsyncSession."""
     async with asyncio.timeout(EventWorkerDefaults.PLACEMENT_TIMEOUT_SECONDS):
         placement = await SubscriptionPlacementService.create(AsyncSessionLocal)
-    owner = f"event-worker-{placement.worker.worker_id}"
+    owner = str(placement.worker.worker_id)
     gate = EventWorkerGate(placement)
     resources.gate = gate
     redis = EventWorkerRedisClient()
@@ -61,7 +61,7 @@ async def _run_connected(
         factory,
         placement,
         resources,
-        controls=EventRuntimeControlService(AsyncSessionLocal, owner),
+        controls=EventRuntimeControlService(AsyncSessionLocal, placement.worker),
     )
     recovery = EventDeliveryRecoveryWorker(
         AsyncSessionLocal, launcher, worker_id=owner, admission=admission, resources=resources

@@ -22,7 +22,7 @@ from syntara.eventstreams.adapters.kafka_delivery_reader import KafkaDeliveryRea
 from syntara.eventstreams.adapters.kafka_initial_position import PositionRequest, PositionResult, PositionStatus
 from syntara.eventstreams.adapters.kafka_initial_position_service import KafkaInitialPositionService
 from syntara.eventstreams.adapters.kafka_metadata import KafkaSourceMetadata
-from syntara.eventstreams.adapters.kafka_position_control import DrainEvidence
+from syntara.eventstreams.adapters.kafka_position_control import DrainEvidence, RecoveryCacheCoordination
 from syntara.eventstreams.adapters.kafka_position_store import KafkaInitialPositionStore
 from syntara.eventstreams.adapters.kafka_record_identity import KafkaRecordIdentity
 from syntara.eventstreams.adapters.kafka_source_configuration import KafkaSourceConfiguration
@@ -117,6 +117,7 @@ class KafkaRecordRunner:
         lookup: TerminalDeliveryCache | None = None,
         gate: RecordProcessingGate | None = None,
         recovery_requests: EventRecoveryRequestService | None = None,
+        cache_coordination: RecoveryCacheCoordination | None = None,
     ) -> None:
         """Compose completed services; callers may share a downstream concurrency bound."""
         if not isinstance(snapshot.configuration, KafkaSourceConfiguration) or (
@@ -140,7 +141,13 @@ class KafkaRecordRunner:
         self._positions = (
             positions
             if positions is not None
-            else KafkaInitialPositionService(KafkaInitialPositionStore(session_factory), client, admission, self)
+            else KafkaInitialPositionService(
+                KafkaInitialPositionStore(session_factory),
+                client,
+                admission,
+                self,
+                cache_coordination=cache_coordination,
+            )
         )
         self.retention = EventDeliveryRetentionService(
             session_factory, verifier=KafkaCommittedPositionVerifier(client, snapshot, self._deliveries)

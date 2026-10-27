@@ -25,6 +25,9 @@ class EventSubscriptionRuntime(SQLModel, table=True):
     configuration_revision: int = Field(sa_type=BigInteger)
     applied_revision: int | None = Field(default=None, sa_type=BigInteger)
     applied_published_version_id: UUID | None = None
+    runtime_state: str = Field(
+        default="starting", max_length=32, sa_column_kwargs={"server_default": text("'starting'")}
+    )
     stopped: bool = Field(default=False, sa_column_kwargs={"server_default": text("false")})
     permanent_content_error: bool = Field(default=False, sa_column_kwargs={"server_default": text("false")})
 

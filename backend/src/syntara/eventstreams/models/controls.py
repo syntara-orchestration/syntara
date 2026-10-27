@@ -8,6 +8,7 @@ from pydantic import Field as ValueField
 from sqlmodel import SQLModel
 
 from syntara.eventstreams.adapters.kafka_initial_position import RecoveryPolicy
+from syntara.eventstreams.core.runtime import RuntimeState
 
 
 class SubscriptionControlRequest(SQLModel):
@@ -46,3 +47,4 @@ class SubscriptionControlResponse(SQLModel):
     source_generation: int
     convergence: Literal["pending", "applied"]
     applied_revision: int | None = None
+    runtime_state: RuntimeState | None = None

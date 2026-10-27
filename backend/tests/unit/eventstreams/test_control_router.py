@@ -54,6 +54,8 @@ def test_controls_dispatch_strict_revision_checked_requests(control_client, acti
         "input_data",
         "selected_account_id",
         "assignment_epoch",
+        "cache_epoch",
+        "cache_coordination",
         "allow_unscheduled_disposition",
     ],
 )

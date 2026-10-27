@@ -16,7 +16,8 @@ from tests.unit.eventstreams.test_connection_provider import connection_context
 
 
 @pytest.mark.parametrize("skip_verification", [False, True])
-async def test_factory_reuses_existing_authentication_and_tls(monkeypatch, *, skip_verification):
+@pytest.mark.parametrize("external_coordination", [False, True])
+async def test_factory_reuses_existing_authentication_and_tls(monkeypatch, *, skip_verification, external_coordination):
     context = connection_context()
     context.session.__aenter__.return_value = context.session
     context.integration.configuration.insecure_skip_tls_verify = skip_verification
@@ -45,6 +46,7 @@ async def test_factory_reuses_existing_authentication_and_tls(monkeypatch, *, sk
     resources = EventWorkerResources()
     resources.gate = MagicMock()
     lookup = MagicMock()
+    coordination = MagicMock() if external_coordination else None
     preparation, admission = MagicMock(), MagicMock()
     factory = module.ManagedRunnerFactory(
         sessions,
@@ -54,6 +56,7 @@ async def test_factory_reuses_existing_authentication_and_tls(monkeypatch, *, sk
         SecretEncryptor(b"a" * 32),
         owner_worker_id="test-worker",
         lookup=lookup,
+        cache_coordination=coordination,
     )
     assert await factory(context.snapshot) is runner
     assert len(clients) == 1
@@ -62,6 +65,7 @@ async def test_factory_reuses_existing_authentication_and_tls(monkeypatch, *, sk
     assert build_runner.call_args.kwargs["work_semaphore"] is resources.processing
     assert build_runner.call_args.kwargs["lookup"] is lookup
     assert build_runner.call_args.kwargs["gate"] is resources.gate
+    assert build_runner.call_args.kwargs["cache_coordination"] is coordination
 
 
 async def test_unavailable_binding_creates_no_transport_client(monkeypatch):

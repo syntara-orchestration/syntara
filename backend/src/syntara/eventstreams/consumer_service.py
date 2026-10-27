@@ -368,6 +368,9 @@ class EventWorkerManager:
         authority = self._placement.authority(key)
         if not authority.is_current() or not self._gate.transport_open(snapshot):
             return
+        lease = authority.lease
+        if lease is None:
+            return
         if not await self._register(key, snapshot):
             return
         supervisor = self._supervisors.get(key)
@@ -381,11 +384,12 @@ class EventWorkerManager:
             self._supervisors[key] = supervisor
         status = await supervisor.apply(snapshot)
         if self._controls is not None:
-            await self._controls.acknowledge(snapshot, status)
+            await self._controls.acknowledge(snapshot, status, lease=lease)
 
     async def _register(self, key: UUID, snapshot: SubscriptionSnapshot) -> bool:
         if self._controls is not None and self._registered.get(key) != snapshot:
-            if not await self._controls.register(snapshot):
+            lease = self._placement.authority(key).lease
+            if lease is None or not await self._controls.register(snapshot, lease):
                 return False
             self._registered[key] = snapshot
         return True

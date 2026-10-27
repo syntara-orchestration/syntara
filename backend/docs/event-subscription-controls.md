@@ -34,7 +34,12 @@ checks remain in the existing workflow and unsaved-preflight paths.
 ## Convergence and fencing
 
 Workers register a durable source participant before constructing a consumer,
-under the same workflow/subscription/source locks used for admission. Consumers
+under the same workflow/subscription/source locks used for admission. Registration
+and start acknowledgement must match the current database-confirmed placement
+owner, deployment, unexpired lease and live, non-draining process membership.
+The process UUID is shared by placement, runtime participation and delivery work.
+A renewal can require a fresh acknowledgement; it never changes configuration
+revision or user attribution. Consumers
 reconcile PostgreSQL revisions. A successful local startup records its applied
 revision; verified shutdown acknowledges the participant. Status reports pending
 until all registered participants have converged, including older source
@@ -42,9 +47,21 @@ generations. A missing worker, elapsed timeout or expired delivery lease cannot
 acknowledge shutdown. These rows coordinate lifecycle safety and do not assign
 Kafka partitions or provide Visibility/activity storage.
 
+Active convergence requires the current confirmed owner to acknowledge the exact
+source, publication and revision. Every prior participant must also acknowledge
+stopping, including participants from replaced sources. Expired membership or
+placement only removes active authority; it never removes participant rows or
+proves that a consumer, cache writer or RPC has stopped. Verified stop reports
+remain admissible after lease loss. Prepared delivery verification/finalization
+and token-fenced handoff recovery remain independent of placement leases.
+
 List and detail responses include historical source generations, initialization and gap
 metadata, queued recovery requests, and desired/applied convergence. Internal
 recovery hold tokens and credentials are excluded.
+`runtime_state` reports the current owner's observed state separately from
+configuration convergence. `applied` can coexist with `starting` while partitions
+initialize; `initialization_kind`, saved `initial_partition_ids`, and per-partition
+confirmation values retain that distinction. Offsets remain decimal strings.
 
 Recovery executes through the current assigned runner and the existing boundary
 service. Persisted recovery holds close cross-process admission and protect
@@ -59,6 +76,17 @@ start with old authority or clear the gap and existing hold; the assigned runner
 then loads and applies the replacement before recovery can finish. If confirmation
 wins the lock first, replacement observes the cleared gap and conflicts instead
 of overwriting the completed decision.
+
+Recovery that corrects or invalidates retained terminal evidence uses the existing
+`RecoveryCacheCoordination` guard. The default API/worker composition cannot attest
+external maintenance and remains blocked with `cache_epoch_coordination_required`.
+Before reopening, the deployment must close admission, drain old consumers and
+cache readers/writers, rotate the externally managed cache epoch and reconcile
+durable evidence. A trusted coordinator can be injected at runtime composition;
+the control body accepts neither an epoch nor an acknowledgement of this external
+prerequisite. A configured epoch, expired placement, disabled local cache or key
+deletion alone cannot satisfy it. Forward gap recovery that preserves terminal
+outcomes skips this evidence-changing guard and does not rotate or rewrite proofs.
 
 ## Retirement and deletion
 

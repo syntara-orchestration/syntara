@@ -35585,6 +35585,10 @@ components:
             - type: integer
             - type: 'null'
           title: Applied Revision
+        runtime_state:
+          anyOf:
+            - $ref: '#/components/schemas/RuntimeState'
+            - type: 'null'
       type: object
       required:
         - id
@@ -38203,6 +38207,17 @@ components:
         - source_generation
       title: SubscriptionControlRequest
       description: Compare-and-set against the published projection and source generation.
+    RuntimeState:
+      type: string
+      enum:
+        - stopped
+        - starting
+        - active
+        - draining
+        - backoff
+        - blocked
+      title: RuntimeState
+      description: Local convergence, distinct from desired state and durable delivery outcomes.
     SubscriptionControlResponse:
       properties:
         subscription_id:
@@ -38230,6 +38245,10 @@ components:
             - type: integer
             - type: 'null'
           title: Applied Revision
+        runtime_state:
+          anyOf:
+            - $ref: '#/components/schemas/RuntimeState'
+            - type: 'null'
       type: object
       required:
         - subscription_id

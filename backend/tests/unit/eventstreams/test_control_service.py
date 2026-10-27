@@ -1,6 +1,6 @@
 """Control dispatch, revision conflicts, exceptional grants and global convergence."""
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
@@ -10,6 +10,8 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from syntara.authz.exceptions import AuthorizationDeniedError
 from syntara.authz.role_conventions import BUILTIN_POLICIES
+from syntara.eventstreams.core.placement import SubscriptionPlacementLease, WorkerIdentity
+from syntara.eventstreams.core.runtime import RuntimeState
 from syntara.eventstreams.exceptions import EventSubscriptionControlConflictError, EventSubscriptionNotFoundError
 from syntara.eventstreams.models.control import EventSubscriptionRecovery, EventSubscriptionRuntime
 from syntara.eventstreams.models.controls import (
@@ -17,8 +19,9 @@ from syntara.eventstreams.models.controls import (
     SubscriptionRecoveryRequest,
     SubscriptionRetireRequest,
 )
+from syntara.eventstreams.services import control_service as control_module
 from syntara.eventstreams.services.control_service import EventSubscriptionControlService
-from tests.unit.eventstreams.test_deduplication_store import binding, delivery
+from tests.unit.eventstreams.test_deduplication_store import NOW, binding, delivery
 from tests.unit.eventstreams.test_subscription_snapshot import _source, _subscription
 
 
@@ -26,6 +29,14 @@ from tests.unit.eventstreams.test_subscription_snapshot import _source, _subscri
 def context(monkeypatch):
     subscription = _subscription()
     source = _source(subscription)
+    worker = WorkerIdentity(deployment_id=source.deployment_id)
+    subscription.assigned_worker_id = worker.worker_id
+    subscription.assignment_lease_until = NOW + timedelta(seconds=60)
+    lease = SubscriptionPlacementLease(
+        subscription_id=subscription.id, owner=worker, confirmed_at=NOW, expires_at=subscription.assignment_lease_until
+    )
+    placements = AsyncMock(return_value={subscription.id: lease})
+    monkeypatch.setattr(control_module, "confirmed_placements", placements)
     workflow = SimpleNamespace(
         id=subscription.workflow_id,
         project_id=subscription.project_id,
@@ -49,6 +60,8 @@ def context(monkeypatch):
         user=user,
         service=service,
         body=SubscriptionControlRequest(configuration_revision=1, source_generation=1),
+        worker=worker,
+        placements=placements,
     )
 
 
@@ -79,7 +92,7 @@ async def test_matching_configuration_revision_does_not_prove_new_publication_wa
     context.session.exec.return_value.all.return_value = [
         EventSubscriptionRuntime(
             source_id=context.source.id,
-            worker_id="old-publication",
+            worker_id=str(context.worker.worker_id),
             configuration_revision=1,
             applied_revision=1,
             applied_published_version_id=uuid4(),
@@ -88,6 +101,53 @@ async def test_matching_configuration_revision_does_not_prove_new_publication_wa
     response = await context.service.response(context.subscription, context.source)
     assert response.convergence == "pending"
     assert response.applied_revision is None
+
+
+@pytest.mark.parametrize("drained", [False, True])
+async def test_convergence_requires_current_owner_and_prior_participant_stop_evidence(context, drained):
+    current = EventSubscriptionRuntime(
+        source_id=context.source.id,
+        worker_id=str(context.worker.worker_id),
+        configuration_revision=1,
+        applied_revision=1,
+        applied_published_version_id=context.subscription.published_version_id,
+        runtime_state="active",
+    )
+    previous = current.model_copy(update={"worker_id": str(uuid4()), "stopped": drained})
+    response = await context.service.response(context.subscription, context.source, runtimes=[previous, current])
+    assert response.convergence == ("applied" if drained else "pending")
+    assert response.runtime_state == RuntimeState.ACTIVE
+    assert previous.stopped is drained
+
+
+async def test_no_confirmed_owner_cannot_reuse_old_applied_or_manufacture_stopped_evidence(context):
+    context.placements.return_value = {}
+    old = EventSubscriptionRuntime(
+        source_id=context.source.id,
+        worker_id=str(context.worker.worker_id),
+        configuration_revision=1,
+        applied_revision=1,
+        applied_published_version_id=context.subscription.published_version_id,
+        runtime_state="active",
+    )
+    response = await context.service.response(context.subscription, context.source, runtimes=[old])
+    assert response.convergence == "pending"
+    assert response.runtime_state is None
+    assert not old.stopped
+
+
+async def test_applied_configuration_does_not_claim_initialization_finished(context):
+    current = EventSubscriptionRuntime(
+        source_id=context.source.id,
+        worker_id=str(context.worker.worker_id),
+        configuration_revision=1,
+        applied_revision=1,
+        applied_published_version_id=context.subscription.published_version_id,
+        runtime_state="starting",
+    )
+    response = await context.service.response(context.subscription, context.source, runtimes=[current])
+    assert response.convergence == "applied"
+    assert response.runtime_state == RuntimeState.STARTING
 
 
 @pytest.mark.parametrize("action", ["resume", "retry"])
@@ -107,6 +167,9 @@ async def test_activation_controls_cannot_bypass_publication_or_retirement(conte
 
 
 async def test_retry_preserves_context_and_dispatches_to_existing_recovery_store(context):
+    context.subscription.assigned_worker_id = None
+    context.subscription.assignment_lease_until = None
+    context.placements.return_value = {}
     frozen = context.subscription.model_dump(exclude={"configuration_revision", "updated_by"})
     row = delivery()
     row.frozen_binding = binding()

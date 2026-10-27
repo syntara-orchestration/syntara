@@ -1,5 +1,6 @@
 """Source contract alignment and preflight authorization boundaries."""
 
+from datetime import timedelta
 from pathlib import Path
 from types import SimpleNamespace
 from typing import cast
@@ -15,6 +16,7 @@ from syntara.authz.exceptions import AuthorizationDeniedError
 from syntara.core.exceptions import SafeValueError
 from syntara.eventstreams.adapters.kafka_initial_position import KafkaPartitionInitialPosition
 from syntara.eventstreams.adapters.kafka_parameters import KafkaSubscribeParameters
+from syntara.eventstreams.models.consumer_worker import EventConsumerWorker
 from syntara.eventstreams.models.control import EventSubscriptionRecovery, EventSubscriptionRuntime
 from syntara.eventstreams.models.responses import (
     EventSubscriptionListParams,
@@ -111,9 +113,14 @@ async def test_list_populates_lifecycle_state_and_all_worker_convergence(service
     first = _subscription(active_source_generation=2, paused=status == "paused")
     second = _subscription(workflow_id=first.workflow_id, project_id=first.project_id)
     current, previous, other = _source(first, generation=2), _source(first), _source(second)
+    current.configuration = current.configuration.model_copy(update={"initial_partition_ids": (0, 2)})
+    first.assigned_worker_id, second.assigned_worker_id = uuid4(), uuid4()
+    first.assignment_lease_until = second.assignment_lease_until = NOW + timedelta(seconds=60)
     previous.retired_at = NOW
     positions = [
-        KafkaPartitionInitialPosition(source_id=previous.id, partition=0, initial_next_offset=2**60),
+        KafkaPartitionInitialPosition(
+            source_id=previous.id, partition=0, initial_next_offset=2**60, initialization_kind="added_partition"
+        ),
         KafkaPartitionInitialPosition(source_id=other.id, partition=1, initial_next_offset=9),
     ]
     request = EventSubscriptionRecovery(
@@ -128,7 +135,7 @@ async def test_list_populates_lifecycle_state_and_all_worker_convergence(service
     participants = [
         EventSubscriptionRuntime(
             source_id=current.id,
-            worker_id="current",
+            worker_id=str(first.assigned_worker_id),
             configuration_revision=1,
             applied_revision=None if status == "lagging" else 1,
             applied_published_version_id=uuid4() if status == "old_publication" else first.published_version_id,
@@ -142,7 +149,7 @@ async def test_list_populates_lifecycle_state_and_all_worker_convergence(service
         ),
         EventSubscriptionRuntime(
             source_id=other.id,
-            worker_id="other",
+            worker_id=str(second.assigned_worker_id),
             configuration_revision=1,
             applied_revision=1,
             applied_published_version_id=second.published_version_id,
@@ -150,7 +157,18 @@ async def test_list_populates_lifecycle_state_and_all_worker_convergence(service
     ]
     session = MagicMock(spec=AsyncSession)
     results = []
-    for rows in ([previous, other, current], positions, [request], participants):
+    members = [
+        (
+            EventConsumerWorker(
+                worker_id=sub.assigned_worker_id,
+                deployment_id=source.deployment_id,
+                heartbeat_until=NOW + timedelta(seconds=60),
+            ),
+            NOW,
+        )
+        for sub, source in [(first, current), (second, other)]
+    ]
+    for rows in ([previous, other, current], positions, [request], participants, members):
         result = MagicMock()
         result.all.return_value = rows
         results.append(result)
@@ -189,7 +207,12 @@ async def test_list_populates_lifecycle_state_and_all_worker_convergence(service
     assert second_read.convergence == "applied"
     assert second_read.applied_revision == 1
     assert "recovery_token" not in first_read.initialization[0].model_dump()
-    assert session.exec.await_count == 4
+    serialized = first_read.model_dump(mode="json")
+    assert serialized["source"]["configuration"]["initial_partition_ids"] == [0, 2]
+    assert serialized["initialization"][0]["initialization_kind"] == "added_partition"
+    assert serialized["initialization"][0]["initial_next_offset"] == str(2**60)
+    assert serialized["runtime_state"] == ("stopped" if status == "paused" else "starting")
+    assert session.exec.await_count == 5
 
 
 async def test_empty_list_does_not_query_lifecycle_state(service, monkeypatch):

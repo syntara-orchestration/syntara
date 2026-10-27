@@ -551,6 +551,7 @@ export interface components {
       convergence?: 'pending' | 'applied'
       /** Applied Revision */
       applied_revision?: number | null
+      runtime_state?: components['schemas']['RuntimeState'] | null
     }
     /**
      * EventSubscriptionSourceRead
@@ -2696,6 +2697,12 @@ export interface components {
       source_generation: number
     }
     /**
+     * RuntimeState
+     * @description Local convergence, distinct from desired state and durable delivery outcomes.
+     * @enum {string}
+     */
+    RuntimeState: 'stopped' | 'starting' | 'active' | 'draining' | 'backoff' | 'blocked'
+    /**
      * SubscriptionControlResponse
      * @description A committed action; pending is not proof that every consumer has stopped.
      */
@@ -2721,6 +2728,7 @@ export interface components {
       convergence: 'pending' | 'applied'
       /** Applied Revision */
       applied_revision?: number | null
+      runtime_state?: components['schemas']['RuntimeState'] | null
     }
     /**
      * SubscriptionRecoveryRequest

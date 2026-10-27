@@ -28,6 +28,7 @@ from syntara.eventstreams.models.responses import (
 from syntara.eventstreams.models.source import EventSubscriptionSource
 from syntara.eventstreams.models.subscription import EventSubscription
 from syntara.eventstreams.services.control_service import EventSubscriptionControlService
+from syntara.eventstreams.services.runtime_placement import confirmed_placements
 from syntara.integrations.lib.url_validation import validate_integration_configuration_no_ssrf
 from syntara.integrations.models.integration import Integration
 from syntara.integrations.models.integration_configuration import KafkaConfiguration
@@ -186,12 +187,19 @@ class EventSubscriptionInspectionService(BaseService):
         participants: dict[UUID, list[EventSubscriptionRuntime]] = {item.id: [] for item in subscriptions}
         for runtime in runtimes:
             participants[source_owners[runtime.source_id]].append(runtime)
+        placements = await confirmed_placements(
+            self.session, [(subscription, current_sources[subscription.id]) for subscription in subscriptions]
+        )
         for subscription in subscriptions:
             convergence = await self.controls.response(
-                subscription, current_sources[subscription.id], runtimes=participants[subscription.id]
+                subscription,
+                current_sources[subscription.id],
+                runtimes=participants[subscription.id],
+                placements=placements,
             )
             response = responses[subscription.id]
             response.convergence, response.applied_revision = convergence.convergence, convergence.applied_revision
+            response.runtime_state = convergence.runtime_state
         return responses
 
     async def test_unsaved(

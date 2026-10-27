@@ -853,7 +853,9 @@ async def test_consumer_acknowledges_pause_only_after_verified_stop(manager_cont
     await eventually(
         lambda: any(call.args[1].state == RuntimeState.STOPPED for call in controls.acknowledge.await_args_list)
     )
-    controls.register.assert_awaited_once_with(context.snapshot)
+    assert controls.register.await_count == 1
+    assert controls.register.call_args.args[0] == context.snapshot
+    assert controls.register.call_args.args[1].owner == context.placement.worker
 
 
 async def test_source_replacement_acknowledges_old_runtime_before_registering_new_placement(manager_context):
@@ -863,11 +865,11 @@ async def test_source_replacement_acknowledges_old_runtime_before_registering_ne
     controls = AsyncMock(spec=EventRuntimeControlService)
     events = []
 
-    async def register(snapshot: SubscriptionSnapshot) -> bool:
+    async def register(snapshot: SubscriptionSnapshot, _lease) -> bool:
         events.append(("register", snapshot.source_id))
         return True
 
-    async def acknowledge(snapshot: SubscriptionSnapshot, status: SubscriptionRuntimeStatus) -> None:
+    async def acknowledge(snapshot: SubscriptionSnapshot, status: SubscriptionRuntimeStatus, *, lease=None) -> None:
         if status.state == RuntimeState.STOPPED:
             events.append(("stopped", snapshot.source_id))
 

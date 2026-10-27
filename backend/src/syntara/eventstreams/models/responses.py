@@ -11,6 +11,7 @@ from syntara.core.models.base import BaseListParams
 from syntara.core.models.pagination import ResourcesResponse
 from syntara.eventstreams.adapters.kafka_initial_position import KafkaPartitionInitialPositionRead
 from syntara.eventstreams.adapters.source_configuration import SourceConfiguration
+from syntara.eventstreams.core.runtime import RuntimeState
 
 
 class EventSubscriptionRecoveryRead(SQLModel):
@@ -64,6 +65,7 @@ class EventSubscriptionRead(SQLModel):
     recovery: list[EventSubscriptionRecoveryRead] = []
     convergence: Literal["pending", "applied"] = "pending"
     applied_revision: int | None = None
+    runtime_state: RuntimeState | None = None
 
 
 EventSubscriptionListResponse = ResourcesResponse[EventSubscriptionRead]
