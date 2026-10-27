@@ -23,6 +23,7 @@ import { detachPromise } from '../../../utils/detachPromise'
 import { accessClient } from '../../access/accessClient'
 
 import { CreateCredentialModal } from './CreateCredentialModal'
+import styles from './CredentialsTab.module.css'
 import { RotateDialogBody } from './RotateDialogBody'
 import { DEFAULT_GRACE_PERIOD, GRACE_PERIOD_OPTIONS } from './rotateDialogUtils'
 import { RotationGraceIndicator } from './RotationGraceIndicator'
@@ -258,22 +259,24 @@ function CredentialsTable({
     <>
       <Thead>
         <Tr>
-          <Th width={25} sort={getSortParams(0)}>
+          <Th width={20} sort={getSortParams(0)}>
             Client ID
           </Th>
-          <Th width={15} sort={getSortParams(1)}>
+          <Th width={10} sort={getSortParams(1)} modifier="nowrap">
             Created
           </Th>
-          <Th width={15} sort={getSortParams(2)}>
+          <Th width={10} sort={getSortParams(2)} modifier="nowrap">
             Last used
           </Th>
-          <Th width={15} sort={getSortParams(3)}>
+          <Th width={10} sort={getSortParams(3)} modifier="nowrap">
             Expires
           </Th>
-          <Th width={10} sort={getSortParams(4)}>
+          <Th width={15} sort={getSortParams(4)} modifier="nowrap">
             State
           </Th>
-          <Th width={10} screenReaderText="Rotation status" />
+          <Th width={25} modifier="nowrap">
+            Rotation
+          </Th>
           <Th width={10} screenReaderText="Actions" />
         </Tr>
       </Thead>
@@ -292,7 +295,7 @@ function CredentialsTable({
               <DateCell dateString={cred.last_used_at} />
             </Td>
             <Td dataLabel="Expires">{cred.expires_at ? formatExpirationDate(cred.expires_at) : 'Never'}</Td>
-            <Td dataLabel="State">
+            <Td dataLabel="State" modifier="nowrap">
               <Switch
                 id={`cred-state-${cred.id}`}
                 label={cred.status === 'active' ? 'Enabled' : 'Disabled'}
@@ -302,7 +305,7 @@ function CredentialsTable({
                 aria-disabled={!permissions.canUpdate || undefined}
               />
             </Td>
-            <Td dataLabel="Rotation status">
+            <Td dataLabel="Rotation status" modifier="nowrap" className={styles.rotationCell}>
               <RotationGraceIndicator oldSecretValidUntil={cred.old_secret_valid_until} />
             </Td>
             <Td isActionCell>
