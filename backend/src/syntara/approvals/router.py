@@ -3,7 +3,7 @@
 from typing import TYPE_CHECKING, Annotated
 from uuid import UUID
 
-from fastapi import Depends, Request, status
+from fastapi import Depends, HTTPException, Request, status
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 if TYPE_CHECKING:
@@ -27,6 +27,11 @@ from syntara.core.models import User
 from syntara.core.syntara_router import SyntaraRouter
 
 router = SyntaraRouter(prefix="/approvals", tags=["Approvals"])
+
+# Temporary migration guard: workflow-created approvals use the domain-owned
+# activity. Keeping this endpoint disabled makes accidental legacy HTTP creation
+# fail loudly while the new path is being validated.
+_APPROVAL_CREATION_API_DISABLED = True
 
 _ALL_ROLES = ["admin", "auditor", "user", "project-admin", "project-user", "project-auditor"]
 
@@ -137,6 +142,11 @@ async def create_approval(
     directly by end users.
 
     """
+    if _APPROVAL_CREATION_API_DISABLED:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Approval request creation API is temporarily disabled; use the workflow activity.",
+        )
     return await service.create(request)
 
 

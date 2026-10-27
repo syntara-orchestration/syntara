@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING
 from syntara.audit.handler import AuditEventHandler
 from syntara.audit.models.audit_event import AuditEvent, EventCategory, EventSeverity, EventStatus
 from syntara.audit.models.structured_data import AuditContextData
-from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName, WorkflowTerminalStatus
+from syntara.workflow_runtime.engines.temporal.models.workflow_definition import ActivityName, WorkflowTerminalStatus
 
 if TYPE_CHECKING:
     from uuid import UUID

@@ -19,11 +19,11 @@ from temporalio import activity
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 
+from syntara.workflow_runtime.engines.temporal.dynamic_workflow import OrchestratorWorkflow
+from syntara.workflow_runtime.engines.temporal.models.workflow_definition import ActivityName
 from syntara.workflows.workflow_engine.activities.converge import converge
 from syntara.workflows.workflow_engine.activities.manual_trigger import manual_trigger
 from syntara.workflows.workflow_engine.activities.runtime_settings_activity import fetch_workflow_runtime_settings
-from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkflow
-from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName
 
 _expire_calls: list[tuple[str, str | None]] = []
 
@@ -89,6 +89,22 @@ async def _test_multi_approval_activity(
         await asyncio.sleep(3600)
         return {"output": {}}
     return {"output": {"decision": "approved", "decided_by": "tester", "decided_at": "2026-01-01T00:00:00Z"}}
+
+
+@activity.defn(name="execute_registered_activity_v1")
+async def _test_registered_approval(request: dict[str, Any]) -> dict[str, Any]:
+    """Use controlled handlers for time-skipping tests of the new dispatch path."""
+    inputs = request["input"]
+    if request["name"] == "approval.request" and request.get("operation") == "expire":
+        return await _test_expire_approval_activity(request["execution_id"], inputs.get("node_id"))
+    if request["name"] == "approval.request" and request.get("operation") == "cancel":
+        return {"output": {"cancelled_count": 0}}
+    handler = (
+        _test_multi_approval_activity
+        if inputs["approval_node_id"].startswith("approval_f") or inputs["approval_node_id"] == "approval_slow"
+        else _test_approval_activity
+    )
+    return await handler(**inputs)
 
 
 def _create_multi_approval_workflow_yaml() -> dict[str, Any]:
@@ -232,7 +248,9 @@ class TestApprovalTimeoutIntegration:
         task_queue = "approval-timeout-queue"
         _expire_calls.clear()
 
-        from syntara.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
+        from syntara.workflow_runtime.engines.temporal.services.temporal_execution_service import (
+            TemporalExecutionService,
+        )
 
         async with Worker(
             temporal_env.client,
@@ -242,6 +260,7 @@ class TestApprovalTimeoutIntegration:
                 manual_trigger,
                 _test_approval_activity,
                 _test_expire_approval_activity,
+                _test_registered_approval,
                 _test_script_activity,
                 fetch_workflow_runtime_settings,
             ],
@@ -278,7 +297,9 @@ class TestApprovalTimeoutIntegration:
         task_queue = f"approval-cof-{fallback_decision}-queue"
         _expire_calls.clear()
 
-        from syntara.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
+        from syntara.workflow_runtime.engines.temporal.services.temporal_execution_service import (
+            TemporalExecutionService,
+        )
 
         async with Worker(
             temporal_env.client,
@@ -288,6 +309,7 @@ class TestApprovalTimeoutIntegration:
                 manual_trigger,
                 _test_approval_activity,
                 _test_expire_approval_activity,
+                _test_registered_approval,
                 _test_script_activity,
                 fetch_workflow_runtime_settings,
             ],
@@ -333,12 +355,14 @@ class TestApprovalTimeoutIntegration:
         task_queue = "multi-approval-completion-queue"
         _expire_calls.clear()
 
-        from syntara.workflows.workflow_engine.activities.approval_activity import fail_detached_approval_activity
-        from syntara.workflows.workflow_engine.services.activity_sync_registry import (
+        from syntara.workflow_runtime.engines.temporal.services.activity_sync_registry import (
             get_activity_sync_service,
             set_activity_sync_service,
         )
-        from syntara.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
+        from syntara.workflow_runtime.engines.temporal.services.temporal_execution_service import (
+            TemporalExecutionService,
+        )
+        from syntara.workflows.workflow_engine.activities.approval_activity import fail_detached_approval_activity
 
         # fail_detached_approval_activity is a local activity invoked by direct function
         # reference from the workflow, so it can't be swapped out via Worker registration
@@ -362,6 +386,7 @@ class TestApprovalTimeoutIntegration:
                     manual_trigger,
                     _test_multi_approval_activity,
                     _test_expire_approval_activity,
+                    _test_registered_approval,
                     _test_script_activity,
                     fetch_workflow_runtime_settings,
                     fail_detached_approval_activity,

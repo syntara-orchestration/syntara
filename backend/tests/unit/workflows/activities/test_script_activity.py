@@ -747,7 +747,7 @@ class TestSanitizeEnvValue:
 
     def test_exceeds_max_length_raises(self) -> None:
         from syntara.core.exceptions import SafeValueError
-        from syntara.workflows.workflow_engine import constants
+        from syntara.workflow_runtime.engines.temporal import constants
 
         with pytest.raises(SafeValueError, match="maximum length"):
             _sanitize_env_value("x" * (constants.MAX_ENV_VAR_LENGTH + 1))

@@ -13,7 +13,7 @@ import yaml
 
 from syntara.core.config.base import get_settings
 from syntara.core.exceptions import SafeValueError
-from syntara.workflows.workflow_engine.services.temporal_execution_service import (
+from syntara.workflow_runtime.engines.temporal.services.temporal_execution_service import (
     TemporalExecutionService,
     create_temporal_execution_service,
 )
@@ -272,7 +272,9 @@ class TestCreateTemporalExecutionService:
         """Test creating execution service with default parameters."""
         mock_client = Mock()
 
-        with patch("syntara.workflows.workflow_engine.services.temporal_execution_service.Client") as mock_client_class:
+        with patch(
+            "syntara.workflow_runtime.engines.temporal.services.temporal_execution_service.Client"
+        ) as mock_client_class:
             mock_client_class.connect = AsyncMock(return_value=mock_client)
 
             service = await create_temporal_execution_service()
@@ -293,7 +295,9 @@ class TestCreateTemporalExecutionService:
         """Test creating execution service with custom parameters."""
         mock_client = Mock()
 
-        with patch("syntara.workflows.workflow_engine.services.temporal_execution_service.Client") as mock_client_class:
+        with patch(
+            "syntara.workflow_runtime.engines.temporal.services.temporal_execution_service.Client"
+        ) as mock_client_class:
             mock_client_class.connect = AsyncMock(return_value=mock_client)
 
             service = await create_temporal_execution_service(

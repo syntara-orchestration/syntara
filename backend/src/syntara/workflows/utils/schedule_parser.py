@@ -18,6 +18,7 @@ from temporalio.client import (
 )
 
 from syntara.core.exceptions import SafeValueError
+from syntara.workflow_runtime.engines.temporal.models.workflow_definition import MissedSchedulePolicy, ScheduleType
 from syntara.workflows.utils.iso8601_interval import (
     parse_iso8601_duration as parse_iso8601_duration,  # noqa: PLC0414 - re-exported for callers/tests
 )
@@ -25,7 +26,6 @@ from syntara.workflows.utils.iso8601_interval import (
     parse_iso8601_repeating_interval,
     validate_calendar_step,
 )
-from syntara.workflows.workflow_engine.models.workflow_definition import MissedSchedulePolicy, ScheduleType
 
 # Catchup window for missed schedule policies
 _CATCHUP_WINDOW_SKIP = timedelta(seconds=1)

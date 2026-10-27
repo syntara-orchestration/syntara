@@ -15,13 +15,14 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkflow
+from syntara.workflow_runtime.engines.temporal.dynamic_workflow import OrchestratorWorkflow
 
 
 def _make_minimal_workflow() -> OrchestratorWorkflow:
     """Create an OrchestratorWorkflow with only what the cancel path touches."""
     wf = OrchestratorWorkflow.__new__(OrchestratorWorkflow)
     wf.execution_id = "11111111-2222-3333-4444-555555555555"
+    wf._project_id = "22222222-3333-4444-5555-666666666666"
     return wf
 
 
@@ -35,7 +36,7 @@ async def test_cancel_agentic_invocations_swallows_activity_failure(node_id: str
     """
     wf = _make_minimal_workflow()
 
-    with patch("syntara.workflows.workflow_engine.dynamic_workflow.workflow") as mock_wf:
+    with patch("syntara.workflow_runtime.engines.temporal.dynamic_workflow.workflow") as mock_wf:
         # A real stdlib logger, exactly like the one Temporal injects. A MagicMock
         # would accept any kwarg and hide the defect this test exists to catch.
         mock_wf.logger = logging.getLogger("test.cancel_agentic")
@@ -59,7 +60,7 @@ async def test_cancel_agentic_invocations_swallows_temporal_cancellation() -> No
 
     wf = _make_minimal_workflow()
 
-    with patch("syntara.workflows.workflow_engine.dynamic_workflow.workflow") as mock_wf:
+    with patch("syntara.workflow_runtime.engines.temporal.dynamic_workflow.workflow") as mock_wf:
         mock_wf.logger = logging.getLogger("test.cancel_agentic")
         mock_wf.execute_activity = AsyncMock(side_effect=TemporalCancelledError("cancelled"))
         mock_wf.info.return_value = MagicMock(workflow_id="test-wf-id")
@@ -72,7 +73,7 @@ async def test_cancel_agentic_invocations_returns_cleanly_on_success() -> None:
     """The happy path still awaits the activity and returns without logging a warning."""
     wf = _make_minimal_workflow()
 
-    with patch("syntara.workflows.workflow_engine.dynamic_workflow.workflow") as mock_wf:
+    with patch("syntara.workflow_runtime.engines.temporal.dynamic_workflow.workflow") as mock_wf:
         mock_wf.logger = logging.getLogger("test.cancel_agentic")
         mock_wf.execute_activity = AsyncMock(return_value={"attempted_count": 0})
         mock_wf.info.return_value = MagicMock(workflow_id="test-wf-id")

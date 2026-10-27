@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import asdict
-from typing import TYPE_CHECKING, Any, TypedDict
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 if TYPE_CHECKING:
@@ -24,19 +24,10 @@ import structlog
 from temporalio import activity
 from temporalio.exceptions import ApplicationError
 
-from syntara.workflows.workflow_engine.constants import INTERNAL_ACTIVITY_HEARTBEAT_INTERVAL_SECONDS
-from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName
+from syntara.workflow_runtime.engines.temporal.constants import INTERNAL_ACTIVITY_HEARTBEAT_INTERVAL_SECONDS
+from syntara.workflow_runtime.engines.temporal.models.workflow_definition import ActivityName
 
 logger = structlog.stdlib.get_logger(__name__)
-
-
-class InvocationExecutionInput(TypedDict):
-    """Wire format for the Agent Execution builtin workflow input."""
-
-    invocation_id: str
-    actor_id: str
-    actor_username: str | None
-    actor_type: str | None
 
 
 async def _run_document_conversion(operation_input: dict[str, Any]) -> dict[str, Any]:
@@ -50,35 +41,6 @@ async def _run_document_conversion(operation_input: dict[str, Any]) -> dict[str,
     task = DocumentConversionTask()
     result = await task.convert(UUID(file_id))
     return {"output": {"status": result.name}}
-
-
-async def _run_invocation_execution(operation_input: InvocationExecutionInput) -> dict[str, Any]:
-    invocation_id = operation_input.get("invocation_id")
-    if not invocation_id:
-        msg = "invocation_execution requires 'invocation_id'"
-        raise ApplicationError(msg, non_retryable=True)
-
-    from syntara.agent_orchestrator.executor.invocation_executor import InvocationExecutor  # noqa: PLC0415
-    from syntara.audit.emitter import AuditActorContext  # noqa: PLC0415
-    from syntara.core.models.principal import PrincipalType  # noqa: PLC0415
-
-    actor_context: AuditActorContext | None = None
-    if actor_id := operation_input.get("actor_id"):
-        actor_type = operation_input.get("actor_type")
-        actor_context = AuditActorContext(
-            actor_id=UUID(actor_id),
-            actor_username=operation_input.get("actor_username"),
-            actor_type=PrincipalType(actor_type) if actor_type else None,
-        )
-
-    from syntara.agent_orchestrator.exceptions import InvocationCancelledError  # noqa: PLC0415
-
-    executor = InvocationExecutor()
-    try:
-        await executor.execute_invocation(UUID(invocation_id), actor_context=actor_context)
-    except InvocationCancelledError as exc:
-        raise ApplicationError(str(exc), type="InvocationCancelledError", non_retryable=True) from exc
-    return {"output": {"status": "completed"}}
 
 
 async def _heartbeat_until_cancelled() -> None:
@@ -125,7 +87,6 @@ async def _run_integration_resource_discovery(operation_input: dict[str, Any]) -
 
 _DISPATCH: dict[str, Callable[..., Awaitable[dict[str, Any]]]] = {
     "document_conversion": _run_document_conversion,
-    "invocation_execution": _run_invocation_execution,
     "integration_health_check": _run_integration_health_check,
     "integration_resource_discovery": _run_integration_resource_discovery,
 }

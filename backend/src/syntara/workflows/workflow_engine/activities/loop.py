@@ -6,7 +6,7 @@ import structlog
 from temporalio import activity
 from temporalio.exceptions import ApplicationError
 
-from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName, LoopOutput, LoopType
+from syntara.workflow_runtime.engines.temporal.models.workflow_definition import ActivityName, LoopOutput, LoopType
 
 logger = structlog.stdlib.get_logger(__name__)
 

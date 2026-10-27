@@ -17,7 +17,7 @@ from syntara.core.database.session import AsyncSessionLocal
 from syntara.integrations.lib.url_validation import validate_integration_configuration_no_ssrf
 from syntara.integrations.models.integration import Integration, IntegrationType
 from syntara.integrations.models.integration_configuration import AAPConfiguration
-from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName
+from syntara.workflow_runtime.engines.temporal.models.workflow_definition import ActivityName
 
 logger = structlog.stdlib.get_logger(__name__)
 

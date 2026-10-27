@@ -20,11 +20,11 @@ import pytest
 from pydantic import SecretStr, ValidationError
 from temporalio.exceptions import ApplicationError
 
-from syntara.workflows.workflow_engine import constants
+from syntara.workflow_runtime.engines.temporal import constants
+from syntara.workflow_runtime.engines.temporal.models import AAPWorkflowJobTemplateExecutorParameters
 from syntara.workflows.workflow_engine.activities.aap_workflow_job_template_activity import (
     execute_aap_workflow_job_template_activity,
 )
-from syntara.workflows.workflow_engine.models import AAPWorkflowJobTemplateExecutorParameters
 
 # Test constants
 TEST_AAP_URL = "http://test.aap"
@@ -902,8 +902,8 @@ class TestBuildLaunchBody:
 
     def test_includes_inventory_when_provided(self) -> None:
         """Should include inventory ID in body when provided."""
+        from syntara.workflow_runtime.engines.temporal.models import AAPWorkflowJobTemplateExecutorParameters
         from syntara.workflows.workflow_engine.activities.aap_workflow_job_template_activity import _build_launch_body
-        from syntara.workflows.workflow_engine.models import AAPWorkflowJobTemplateExecutorParameters
 
         config = AAPWorkflowJobTemplateExecutorParameters(workflow_job_template_id=1)
         body = _build_launch_body(config, inventory_id=42)
@@ -912,8 +912,8 @@ class TestBuildLaunchBody:
 
     def test_skips_inventory_when_none(self) -> None:
         """Should not include inventory in body when None."""
+        from syntara.workflow_runtime.engines.temporal.models import AAPWorkflowJobTemplateExecutorParameters
         from syntara.workflows.workflow_engine.activities.aap_workflow_job_template_activity import _build_launch_body
-        from syntara.workflows.workflow_engine.models import AAPWorkflowJobTemplateExecutorParameters
 
         config = AAPWorkflowJobTemplateExecutorParameters(workflow_job_template_id=1)
         body = _build_launch_body(config, inventory_id=None)
@@ -922,8 +922,8 @@ class TestBuildLaunchBody:
 
     def test_skips_empty_extra_vars_dict(self) -> None:
         """Should not include extra_vars when empty dict."""
+        from syntara.workflow_runtime.engines.temporal.models import AAPWorkflowJobTemplateExecutorParameters
         from syntara.workflows.workflow_engine.activities.aap_workflow_job_template_activity import _build_launch_body
-        from syntara.workflows.workflow_engine.models import AAPWorkflowJobTemplateExecutorParameters
 
         config = AAPWorkflowJobTemplateExecutorParameters(workflow_job_template_id=1, extra_vars={})
         body = _build_launch_body(config, inventory_id=None)
@@ -932,8 +932,8 @@ class TestBuildLaunchBody:
 
     def test_includes_non_empty_extra_vars_dict(self) -> None:
         """Should include extra_vars when non-empty dict."""
+        from syntara.workflow_runtime.engines.temporal.models import AAPWorkflowJobTemplateExecutorParameters
         from syntara.workflows.workflow_engine.activities.aap_workflow_job_template_activity import _build_launch_body
-        from syntara.workflows.workflow_engine.models import AAPWorkflowJobTemplateExecutorParameters
 
         config = AAPWorkflowJobTemplateExecutorParameters(workflow_job_template_id=1, extra_vars={"key": "value"})
         body = _build_launch_body(config, inventory_id=None)
@@ -942,8 +942,8 @@ class TestBuildLaunchBody:
 
     def test_includes_all_fields_when_provided(self) -> None:
         """Should include all fields when provided with truthy values."""
+        from syntara.workflow_runtime.engines.temporal.models import AAPWorkflowJobTemplateExecutorParameters
         from syntara.workflows.workflow_engine.activities.aap_workflow_job_template_activity import _build_launch_body
-        from syntara.workflows.workflow_engine.models import AAPWorkflowJobTemplateExecutorParameters
 
         config = AAPWorkflowJobTemplateExecutorParameters(
             workflow_job_template_id=1,

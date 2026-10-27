@@ -18,8 +18,8 @@ from temporalio.exceptions import ApplicationError
 
 from syntara.core.config.base import get_settings
 from syntara.core.exceptions import SafeValueError
-from syntara.workflows.workflow_engine import constants
-from syntara.workflows.workflow_engine.models.workflow_definition import (
+from syntara.workflow_runtime.engines.temporal import constants
+from syntara.workflow_runtime.engines.temporal.models.workflow_definition import (
     ActivityName,
     ScriptExecutorParameters,
     ScriptOutput,

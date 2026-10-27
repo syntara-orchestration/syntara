@@ -1,7 +1,7 @@
 """Tests for ALLOWED_TRIGGER_TYPES in dynamic_workflow."""
 
-from syntara.workflows.workflow_engine.dynamic_workflow import ALLOWED_TRIGGER_TYPES
-from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName
+from syntara.workflow_runtime.engines.temporal.dynamic_workflow import ALLOWED_TRIGGER_TYPES
+from syntara.workflow_runtime.engines.temporal.models.workflow_definition import ActivityName
 
 
 async def test_allowed_trigger_types_are_valid_triggers() -> None:

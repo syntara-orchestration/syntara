@@ -7,7 +7,7 @@ from temporalio import activity
 
 from syntara.settings.cache.settings_cache import get_runtime_settings
 from syntara.settings.catalog import SETTINGS_CATALOG
-from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName
+from syntara.workflow_runtime.engines.temporal.models.workflow_definition import ActivityName
 
 _WORKFLOW_ENGINE_KEYS: list[str] = [entry.key for entry in SETTINGS_CATALOG if entry.key.startswith("workflow_engine.")]
 

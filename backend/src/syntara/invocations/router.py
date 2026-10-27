@@ -36,10 +36,14 @@ from syntara.core.jsonb_limits import validate_jsonb_size
 from syntara.core.models import User
 from syntara.core.syntara_router import SyntaraRouter
 from syntara.core.utils.session_factory import create_session_factory_from_request
+from syntara.workflow_runtime.engines.temporal.services.temporal_execution_service import TemporalExecutionService
 from syntara.workflows.executions_router import get_temporal_execution_service
-from syntara.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
 
 router = SyntaraRouter(prefix="/invocations", tags=["Invocation"])
+
+# Temporary migration guard: workflow agentic nodes create invocations through
+# the invocation-owned activity instead of this HTTP API.
+_INVOCATION_CREATION_API_DISABLED = True
 
 
 logger = structlog.stdlib.get_logger(__name__)
@@ -209,6 +213,11 @@ async def create_invocation(
         HTTPException: 503 if LLM not configured
 
     """
+    if _INVOCATION_CREATION_API_DISABLED:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Invocation creation API is temporarily disabled; use the workflow activity.",
+        )
     return await service.create_invocation(
         prompt=request_body.prompt,
         session_id=request_body.session_id,
@@ -247,6 +256,11 @@ async def create_invocation_chat(
         HTTPException: 400 for validation errors, 503 if LLM not configured
 
     """
+    if _INVOCATION_CREATION_API_DISABLED:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Invocation creation API is temporarily disabled; use the workflow activity.",
+        )
     prompt, session_id = _validate_multipart_required_fields(form.prompt, form.session_id)
     context_data: dict[str, object] | None = json.loads(form.context_data) if form.context_data else None
     if context_data is not None:

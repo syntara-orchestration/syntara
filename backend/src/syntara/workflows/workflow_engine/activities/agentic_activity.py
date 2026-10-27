@@ -16,10 +16,10 @@ from temporalio import activity, workflow
 from temporalio.exceptions import ApplicationError, CancelledError
 
 from syntara.settings.cache.settings_cache import get_runtime_settings
-from syntara.workflows.workflow_engine import constants
-from syntara.workflows.workflow_engine.models import AgenticExecutorParameters
-from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName, NodeType
-from syntara.workflows.workflow_engine.utils.credential_scrubber import ensure_resolved_credentials_dict
+from syntara.workflow_runtime.engines.temporal import constants
+from syntara.workflow_runtime.engines.temporal.models import AgenticExecutorParameters
+from syntara.workflow_runtime.engines.temporal.models.workflow_definition import ActivityName, NodeType
+from syntara.workflow_runtime.engines.temporal.utils.credential_scrubber import ensure_resolved_credentials_dict
 
 from .common import HEARTBEAT_PARTIAL_OUTPUT_KEY, HEARTBEAT_STOP_MONITOR, ActivityExecutionError
 

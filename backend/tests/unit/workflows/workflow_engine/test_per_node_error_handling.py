@@ -15,10 +15,10 @@ from unittest.mock import MagicMock, patch
 import pytest
 from temporalio.exceptions import ApplicationError
 
+from syntara.workflow_runtime.engines.temporal.dynamic_workflow import OrchestratorWorkflow
+from syntara.workflow_runtime.engines.temporal.graph import ActivityNode, WorkflowGraph
+from syntara.workflow_runtime.engines.temporal.graph_backend import InMemoryGraphBackend
 from syntara.workflows.utils.namespace_resolver import NamespaceResolver
-from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkflow
-from syntara.workflows.workflow_engine.graph import ActivityNode, WorkflowGraph
-from syntara.workflows.workflow_engine.graph_backend import InMemoryGraphBackend
 from tests.unit.workflows.workflow_engine.conftest import init_workflow_runtime
 
 
@@ -26,7 +26,7 @@ from tests.unit.workflows.workflow_engine.conftest import init_workflow_runtime
 def _mock_workflow_logger() -> Generator[None]:
     """Mock Temporal workflow logger to avoid 'Not in workflow event loop' errors."""
     mock_logger = MagicMock()
-    with patch("syntara.workflows.workflow_engine.dynamic_workflow.workflow") as mock_wf:
+    with patch("syntara.workflow_runtime.engines.temporal.dynamic_workflow.workflow") as mock_wf:
         mock_wf.logger = mock_logger
         yield
 

@@ -21,6 +21,7 @@ from syntara.authz.engine import VisibilityResult
 from syntara.core.database.session import get_db
 from syntara.core.models import User
 from syntara.core.syntara_router import NO_PERMISSION, SyntaraRouter
+from syntara.workflow_runtime.engines.temporal.services.temporal_execution_service import TemporalExecutionService
 from syntara.workflows.error_handlers import build_validation_problem_response
 from syntara.workflows.exceptions import WorkflowDefinitionInvalidError
 from syntara.workflows.executions_router import get_temporal_execution_service
@@ -50,7 +51,6 @@ from syntara.workflows.models.execution import ExecutionRead, TestExecutionCreat
 from syntara.workflows.models.workflow_definition import WorkflowDefinition
 from syntara.workflows.services import ExecutionService, WorkflowService
 from syntara.workflows.validators import get_system_continue_on_failure, workflow_validator
-from syntara.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
 
 
 def _has_validation_issues(result: ValidationResult) -> bool:

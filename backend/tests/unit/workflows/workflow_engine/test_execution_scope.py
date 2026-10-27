@@ -6,10 +6,10 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from syntara.workflow_runtime.engines.temporal.dynamic_workflow import OrchestratorWorkflow
+from syntara.workflow_runtime.engines.temporal.graph import WorkflowGraph
+from syntara.workflow_runtime.engines.temporal.graph_backend import InMemoryGraphBackend
 from syntara.workflows.utils.namespace_resolver import NamespaceResolver
-from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkflow
-from syntara.workflows.workflow_engine.graph import WorkflowGraph
-from syntara.workflows.workflow_engine.graph_backend import InMemoryGraphBackend
 from tests.unit.workflows.workflow_engine.conftest import init_workflow_runtime
 
 
@@ -17,8 +17,8 @@ from tests.unit.workflows.workflow_engine.conftest import init_workflow_runtime
 def _mock_temporal_workflow() -> Generator[MagicMock]:
     mock_logger = MagicMock()
     with (
-        patch("syntara.workflows.workflow_engine.dynamic_workflow.workflow") as mock_wf,
-        patch("syntara.workflows.workflow_engine.converge_mixin.workflow", mock_wf),
+        patch("syntara.workflow_runtime.engines.temporal.dynamic_workflow.workflow") as mock_wf,
+        patch("syntara.workflow_runtime.engines.temporal.converge_mixin.workflow", mock_wf),
     ):
         mock_wf.logger = mock_logger
         mock_wf.info.return_value = MagicMock(workflow_id="test-wf-id")

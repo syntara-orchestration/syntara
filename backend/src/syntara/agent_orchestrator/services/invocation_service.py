@@ -25,8 +25,8 @@ from sqlmodel import col, select, update
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 if TYPE_CHECKING:
+    from syntara.workflow_runtime.engines.temporal.services.temporal_execution_service import TemporalExecutionService
     from syntara.workflows.services.execution_service import ExecutionService
-    from syntara.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
 
 from syntara.agent_orchestrator.models import (
     Invocation,
@@ -122,86 +122,6 @@ class InvocationService(BaseService):
             raise SafeValueError(msg)
 
         return existing_files
-
-    async def _start_builtin_workflows(
-        self,
-        invocation: Invocation,
-        file_ids: list[str] | None = None,
-    ) -> None:
-        """Start built-in workflows for this invocation.
-
-        Starts the agent execution workflow and, if file_ids are provided,
-        document conversion workflows. Workflows are started via Temporal
-        (non-blocking RPC) so this returns quickly.
-
-        The agent execution's id is recorded on ``invocation.agent_execution_id``
-        so cancellation can reach its Temporal workflow by primary key instead
-        of scanning ``executions.input_data``.
-
-        Args:
-            invocation: Invocation to execute
-            file_ids: Optional file UUIDs to convert
-
-        """
-        if not self.execution_service:
-            return
-
-        invocation_id = invocation.id
-
-        from syntara.workflows.constants import (  # noqa: PLC0415
-            BUILTIN_PROJECT_NAME,
-            BUILTIN_WORKFLOW_AGENT_EXECUTION,
-            BUILTIN_WORKFLOW_DOCUMENT_CONVERSION,
-        )
-        from syntara.workflows.exceptions import BuiltinWorkflowMissingError, WorkflowNotFoundError  # noqa: PLC0415
-
-        if file_ids:
-            for file_id in file_ids:
-                try:
-                    await self.execution_service.create_execution_by_name(
-                        workflow_name=BUILTIN_WORKFLOW_DOCUMENT_CONVERSION,
-                        input_data={"file_id": file_id},
-                        project_name=BUILTIN_PROJECT_NAME,
-                    )
-                except WorkflowNotFoundError:
-                    logger.warning("Builtin workflow 'Document Conversion' not found, skipping")
-
-        try:
-            agent_execution = await self.execution_service.create_execution_by_name(
-                workflow_name=BUILTIN_WORKFLOW_AGENT_EXECUTION,
-                # invocation_id stays in input_data: it is the builtin workflow's
-                # trigger binding (${trigger.invocation_id}), which the worker
-                # needs.  agent_execution_id below is the reverse link, used for
-                # cancellation.
-                input_data={
-                    "invocation_id": str(invocation_id),
-                    "actor_id": str(self.user.id),
-                    "actor_username": self.user.username,
-                    "actor_type": self.user.__principal_type__.value,
-                },
-                project_name=BUILTIN_PROJECT_NAME,
-            )
-        except WorkflowNotFoundError as exc:
-            raise BuiltinWorkflowMissingError(BUILTIN_WORKFLOW_AGENT_EXECUTION) from exc
-
-        # Link the invocation to the execution now running it.  Dirty-attribute
-        # flush emits an UPDATE of this column alone, so a concurrent worker
-        # write of `status` cannot be clobbered.
-        #
-        # Best-effort: the invocation is already committed and the Temporal
-        # workflow is already started, so raising here would 500 a request whose
-        # side effects have all happened.  A NULL link only means the cancel
-        # path cannot reach the Temporal workflow for this invocation.
-        try:
-            invocation.agent_execution_id = agent_execution.id
-            await self.session.commit()
-        except Exception:
-            await self.session.rollback()
-            logger.exception(
-                "Failed to link invocation to agent execution",
-                invocation_id=invocation_id,
-                agent_execution_id=agent_execution.id,
-            )
 
     async def create_invocation(
         self,
@@ -337,9 +257,6 @@ class InvocationService(BaseService):
                 )
             )
             raise
-
-        # Start builtin workflows AFTER successful commit
-        await self._start_builtin_workflows(invocation, file_ids=new_file_ids or None)
 
         return invocation
 
@@ -508,10 +425,6 @@ class InvocationService(BaseService):
         invocation.completed_at = now
         invocation.checkpoint_data = checkpoint_data
 
-        # Note: Document conversion workflows will complete harmlessly even for
-        # cancelled invocations. The builtin workflow running this invocation is
-        # cancelled below, via _cancel_agent_execution.
-
         cleaned_file_ids: list[UUID] = []
         try:
             await self.session.commit()
@@ -522,11 +435,6 @@ class InvocationService(BaseService):
             # terminal cancelled stream event is published by
             # orchestration_service when the agent actually stops.
             await self._signal_cancellation(invocation_id)
-
-            # Stop the builtin workflow running this invocation so it does not
-            # linger as a RUNNING execution.  The DB status above is what
-            # actually stops the agent; this is the tidy-up.
-            await self._cancel_agent_execution(invocation_id)
 
             # Clean up files AFTER the signal is sent.  The agent may still be
             # executing a tool at this point (see _cancellation_watcher known
@@ -588,7 +496,7 @@ class InvocationService(BaseService):
 
         Best-effort: Redis failures are logged but do not prevent cancellation.
         """
-        from syntara.workflows.workflow_engine.constants import AGENT_EXECUTION_TIMEOUT_SECONDS  # noqa: PLC0415
+        from syntara.workflow_runtime.engines.temporal.constants import AGENT_EXECUTION_TIMEOUT_SECONDS  # noqa: PLC0415
 
         cancel_key_ttl_seconds = AGENT_EXECUTION_TIMEOUT_SECONDS
         try:

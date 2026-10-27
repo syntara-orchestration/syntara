@@ -1,6 +1,9 @@
 """Tests for ScriptExecutorParameters environment coercion."""
 
-from syntara.workflows.workflow_engine.models.workflow_definition import ScriptExecutorParameters, ScriptLanguage
+from syntara.workflow_runtime.engines.temporal.models.workflow_definition import (
+    ScriptExecutorParameters,
+    ScriptLanguage,
+)
 
 
 class TestScriptExecutorParametersEnvironmentCoercion:

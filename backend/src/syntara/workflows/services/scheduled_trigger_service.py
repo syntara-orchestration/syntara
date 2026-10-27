@@ -34,6 +34,8 @@ from temporalio.service import RPCError, RPCStatusCode
 
 from syntara.core.config.base import get_settings
 from syntara.core.tls.temporal import build_temporal_tls_config
+from syntara.workflow_runtime.engines.temporal.models.workflow_definition import NodeType, ScheduledTriggerConfig
+from syntara.workflow_runtime.engines.temporal.workflow_auth import build_auth_header
 from syntara.workflows.exceptions import ScheduledTriggerSyncError, TriggerValidationError
 from syntara.workflows.utils.schedule_parser import (
     SCHEDULE_ID_PREFIX,
@@ -42,8 +44,6 @@ from syntara.workflows.utils.schedule_parser import (
     config_to_temporal_schedule,
 )
 from syntara.workflows.validators import collect_scheduled_trigger_config_findings
-from syntara.workflows.workflow_engine.models.workflow_definition import NodeType, ScheduledTriggerConfig
-from syntara.workflows.workflow_engine.workflow_auth import build_auth_header
 
 logger = structlog.stdlib.get_logger(__name__)
 

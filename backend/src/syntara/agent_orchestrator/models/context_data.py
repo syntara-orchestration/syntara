@@ -26,12 +26,12 @@ from pydantic import (
 )
 from pydantic_core import CoreSchema, core_schema
 
-from syntara.workflows.json_schema_validation import validate_json_schema_definition
-from syntara.workflows.workflow_engine.models.workflow_definition import (
+from syntara.workflow_runtime.engines.temporal.models.workflow_definition import (
     IntegrationConnectionConfig,
     validate_tool_selection_coherence,
     validate_uuid_or_template,
 )
+from syntara.workflows.json_schema_validation import validate_json_schema_definition
 
 logger = structlog.stdlib.get_logger(__name__)
 

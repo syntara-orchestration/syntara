@@ -19,7 +19,7 @@ from temporalio import activity
 from temporalio.exceptions import ApplicationError, CancelledError
 
 from syntara.core.exceptions import SafeValueError
-from syntara.workflows.workflow_engine.utils.credential_scrubber import ensure_resolved_credentials_dict
+from syntara.workflow_runtime.engines.temporal.utils.credential_scrubber import ensure_resolved_credentials_dict
 
 from .common import (
     DEFAULT_RETRYABLE_ERROR_CODES,
@@ -33,7 +33,7 @@ if TYPE_CHECKING:
     from httpx._client import UseClientDefault
 
     from syntara.core.config.base import Settings
-    from syntara.workflows.workflow_engine.models.aap_types import AAPResourceType
+    from syntara.workflow_runtime.engines.temporal.models.aap_types import AAPResourceType
 
 logger = structlog.stdlib.get_logger(__name__)
 

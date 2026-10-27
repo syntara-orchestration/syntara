@@ -16,11 +16,11 @@ from pydantic import field_validator
 from sqlmodel import Field
 
 from syntara.telemetry.events.base import BaseTelemetryEvent
-from syntara.workflows.models.execution import ExecutionMode  # noqa: TC001
-from syntara.workflows.workflow_engine.models.workflow_definition import (  # noqa: TC001
+from syntara.workflow_runtime.engines.temporal.models.workflow_definition import (  # noqa: TC001
     ActivityTerminalStatus,
     NodeType,
 )
+from syntara.workflows.models.execution import ExecutionMode  # noqa: TC001
 
 _SHA256_PATTERN = re.compile(r"^[a-f0-9]{64}$", re.IGNORECASE)
 

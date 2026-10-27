@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from syntara.workflows.workflow_engine.expression_resolver import safe_eval_condition
+from syntara.workflow_runtime.engines.temporal.expression_resolver import safe_eval_condition
 
 
 class TestBooleanLiterals:
@@ -226,7 +226,7 @@ class TestOrphanedExpressionResolverRemoved:
     """The unused ExpressionResolver / template_resolution path must stay gone."""
 
     def test_expression_resolver_class_removed(self) -> None:
-        import syntara.workflows.workflow_engine.expression_resolver as mod
+        import syntara.workflow_runtime.engines.temporal.expression_resolver as mod
 
         assert not hasattr(mod, "ExpressionResolver")
 

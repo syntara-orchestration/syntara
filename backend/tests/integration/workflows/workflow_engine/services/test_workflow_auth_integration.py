@@ -22,16 +22,16 @@ from temporalio.exceptions import ApplicationError
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 
+from syntara.workflow_runtime.engines.temporal.client_interceptor import WorkflowAuthClientInterceptor
+from syntara.workflow_runtime.engines.temporal.dynamic_workflow import OrchestratorWorkflow
+from syntara.workflow_runtime.engines.temporal.interceptors.auth_interceptor import WorkflowAuthInterceptor
+from syntara.workflow_runtime.engines.temporal.scheduled_launcher import ScheduledWorkflowLauncher
+from syntara.workflow_runtime.engines.temporal.services.temporal_execution_service import TemporalExecutionService
+from syntara.workflow_runtime.engines.temporal.workflow_auth import build_auth_header, init_signing_key
 from syntara.workflows.utils.schedule_parser import build_schedule_execution_workflow_id
 from syntara.workflows.workflow_engine.activities.manual_trigger import manual_trigger
 from syntara.workflows.workflow_engine.activities.runtime_settings_activity import fetch_workflow_runtime_settings
 from syntara.workflows.workflow_engine.activities.script_activity import execute_script_activity
-from syntara.workflows.workflow_engine.client_interceptor import WorkflowAuthClientInterceptor
-from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkflow
-from syntara.workflows.workflow_engine.interceptors.auth_interceptor import WorkflowAuthInterceptor
-from syntara.workflows.workflow_engine.scheduled_launcher import ScheduledWorkflowLauncher
-from syntara.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
-from syntara.workflows.workflow_engine.workflow_auth import build_auth_header, init_signing_key
 
 TASK_QUEUE = "test-auth-queue"
 

@@ -31,13 +31,13 @@ if TYPE_CHECKING:
 from syntara.core.config.base import get_settings
 from syntara.core.database.session import AsyncSessionLocal
 from syntara.core.workers.periodic import PeriodicWorker
+from syntara.workflow_runtime.engines.temporal.models.workflow_definition import NodeType
 from syntara.workflows.models.workflow import Workflow
 from syntara.workflows.models.workflow_version import WorkflowVersion
 from syntara.workflows.services.scheduled_trigger_service import (
     ScheduledTriggerService,
 )
 from syntara.workflows.utils.schedule_parser import build_schedule_id
-from syntara.workflows.workflow_engine.models.workflow_definition import NodeType
 
 logger = structlog.stdlib.get_logger(__name__)
 

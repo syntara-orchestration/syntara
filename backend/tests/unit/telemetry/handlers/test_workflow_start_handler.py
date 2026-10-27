@@ -5,9 +5,9 @@ from uuid import uuid4
 
 from syntara.telemetry.events.workflow_execution import WorkflowExecutionStartEvent
 from syntara.telemetry.handlers.workflow_start import WorkflowStartTelemetryHandler
+from syntara.workflow_runtime.engines.temporal.models.workflow_definition import ActivityName
 from syntara.workflows.audit.execution_started import WorkflowStartEvent
 from syntara.workflows.models.execution import ExecutionMode
-from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName
 
 
 class TestWorkflowStartTelemetryHandler:

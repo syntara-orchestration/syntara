@@ -6,12 +6,12 @@ from typing import Any
 import pytest
 from temporalio.exceptions import ApplicationError
 
-from syntara.workflows.workflow_engine.activities.common import (
-    ActivityExecutionError,
-)
-from syntara.workflows.workflow_engine.signals.processor import (
+from syntara.workflow_runtime.engines.temporal.signals.processor import (
     EMPTY_SIGNAL_ERROR_MESSAGE,
     WorkflowSignalProcessor,
+)
+from syntara.workflows.workflow_engine.activities.common import (
+    ActivityExecutionError,
 )
 
 

@@ -13,7 +13,6 @@
         "type": "string",
         "enum": [
           "document_conversion",
-          "invocation_execution",
           "integration_health_check",
           "integration_resource_discovery"
         ],

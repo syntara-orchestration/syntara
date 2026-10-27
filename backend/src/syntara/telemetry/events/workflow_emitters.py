@@ -12,13 +12,13 @@ from typing import TYPE_CHECKING, Any
 import structlog
 
 from syntara.audit.dispatcher import AuditEventDispatcher
-from syntara.workflows.audit.node_execution import NodeExecutedEvent
-from syntara.workflows.models.activity_execution import TERMINAL_ACTIVITY_STATUSES, ActivityStatus
-from syntara.workflows.models.execution import ExecutionStatus
-from syntara.workflows.workflow_engine.models.workflow_definition import (
+from syntara.workflow_runtime.engines.temporal.models.workflow_definition import (
     ActivityTerminalStatus,
     WorkflowTerminalStatus,
 )
+from syntara.workflows.audit.node_execution import NodeExecutedEvent
+from syntara.workflows.models.activity_execution import TERMINAL_ACTIVITY_STATUSES, ActivityStatus
+from syntara.workflows.models.execution import ExecutionStatus
 
 if TYPE_CHECKING:
     from uuid import UUID

@@ -12,12 +12,14 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-import syntara.workflows.workflow_engine.services.temporal_worker
-from syntara.workflows.workflow_engine.client_interceptor import WorkflowAuthClientInterceptor
-from syntara.workflows.workflow_engine.interceptors.auth_interceptor import WorkflowAuthInterceptor
-from syntara.workflows.workflow_engine.interceptors.credential_output_interceptor import CredentialOutputInterceptor
-from syntara.workflows.workflow_engine.interceptors.monitoring_interceptor import MonitoringWorkflowInterceptor
-from syntara.workflows.workflow_engine.services.temporal_worker import (
+import syntara.workflow_runtime.engines.temporal.services.temporal_worker
+from syntara.workflow_runtime.engines.temporal.client_interceptor import WorkflowAuthClientInterceptor
+from syntara.workflow_runtime.engines.temporal.interceptors.auth_interceptor import WorkflowAuthInterceptor
+from syntara.workflow_runtime.engines.temporal.interceptors.credential_output_interceptor import (
+    CredentialOutputInterceptor,
+)
+from syntara.workflow_runtime.engines.temporal.interceptors.monitoring_interceptor import MonitoringWorkflowInterceptor
+from syntara.workflow_runtime.engines.temporal.services.temporal_worker import (
     TemporalWorkerService,
     get_worker,
     start_worker,
@@ -95,10 +97,12 @@ class TestTemporalWorkerServiceStart:
 
         with (
             patch(
-                "syntara.workflows.workflow_engine.services.temporal_worker.Client.connect",
+                "syntara.workflow_runtime.engines.temporal.services.temporal_worker.Client.connect",
                 new=AsyncMock(return_value=mock_client),
             ),
-            patch("syntara.workflows.workflow_engine.services.temporal_worker.Worker", return_value=mock_worker),
+            patch(
+                "syntara.workflow_runtime.engines.temporal.services.temporal_worker.Worker", return_value=mock_worker
+            ),
             patch("asyncio.create_task", side_effect=mock_create_task),
         ):
             await service.start()
@@ -138,11 +142,11 @@ class TestTemporalWorkerServiceStart:
 
         with (
             patch(
-                "syntara.workflows.workflow_engine.services.temporal_worker.Client.connect",
+                "syntara.workflow_runtime.engines.temporal.services.temporal_worker.Client.connect",
                 new=AsyncMock(return_value=mock_client),
             ) as mock_connect,
             patch(
-                "syntara.workflows.workflow_engine.services.temporal_worker.Worker", return_value=mock_worker
+                "syntara.workflow_runtime.engines.temporal.services.temporal_worker.Worker", return_value=mock_worker
             ) as mock_worker_class,
             patch("asyncio.create_task", side_effect=mock_create_task),
         ):
@@ -183,14 +187,14 @@ class TestTemporalWorkerServiceStart:
 
         with (
             patch(
-                "syntara.workflows.workflow_engine.services.temporal_worker.init_signing_key",
+                "syntara.workflow_runtime.engines.temporal.services.temporal_worker.init_signing_key",
             ) as mock_init_signing_key,
             patch(
-                "syntara.workflows.workflow_engine.services.temporal_worker.Client.connect",
+                "syntara.workflow_runtime.engines.temporal.services.temporal_worker.Client.connect",
                 new=AsyncMock(return_value=mock_client),
             ) as mock_connect,
             patch(
-                "syntara.workflows.workflow_engine.services.temporal_worker.Worker",
+                "syntara.workflow_runtime.engines.temporal.services.temporal_worker.Worker",
                 return_value=mock_worker,
             ) as mock_worker_class,
             patch("asyncio.create_task", side_effect=mock_create_task),
@@ -240,11 +244,11 @@ class TestTemporalWorkerServiceStart:
 
         with (
             patch(
-                "syntara.workflows.workflow_engine.services.temporal_worker.Client.connect",
+                "syntara.workflow_runtime.engines.temporal.services.temporal_worker.Client.connect",
                 new=AsyncMock(return_value=mock_client),
             ),
             patch(
-                "syntara.workflows.workflow_engine.services.temporal_worker.Worker", return_value=mock_worker
+                "syntara.workflow_runtime.engines.temporal.services.temporal_worker.Worker", return_value=mock_worker
             ) as mock_worker_class,
             patch("asyncio.create_task", side_effect=mock_create_task),
         ):
@@ -284,11 +288,11 @@ class TestTemporalWorkerServiceStart:
 
         with (
             patch(
-                "syntara.workflows.workflow_engine.services.temporal_worker.Client.connect",
+                "syntara.workflow_runtime.engines.temporal.services.temporal_worker.Client.connect",
                 new=AsyncMock(return_value=mock_client),
             ),
             patch(
-                "syntara.workflows.workflow_engine.services.temporal_worker.Worker", return_value=mock_worker
+                "syntara.workflow_runtime.engines.temporal.services.temporal_worker.Worker", return_value=mock_worker
             ) as mock_worker_class,
             patch("asyncio.create_task", side_effect=mock_create_task),
         ):
@@ -309,7 +313,7 @@ class TestTemporalWorkerServiceStart:
 
         connection_error = ConnectionError("Connection failed")
         with patch(
-            "syntara.workflows.workflow_engine.services.temporal_worker.Client.connect",
+            "syntara.workflow_runtime.engines.temporal.services.temporal_worker.Client.connect",
             new=AsyncMock(side_effect=connection_error),
         ):
             with pytest.raises(ConnectionError, match="Connection failed"):
@@ -331,11 +335,11 @@ class TestTemporalWorkerServiceStart:
         worker_error = RuntimeError("Worker creation failed")
         with (
             patch(
-                "syntara.workflows.workflow_engine.services.temporal_worker.Client.connect",
+                "syntara.workflow_runtime.engines.temporal.services.temporal_worker.Client.connect",
                 new=AsyncMock(return_value=mock_client),
             ),
             patch(
-                "syntara.workflows.workflow_engine.services.temporal_worker.Worker",
+                "syntara.workflow_runtime.engines.temporal.services.temporal_worker.Worker",
                 side_effect=worker_error,
             ),
             pytest.raises(RuntimeError, match="Worker creation failed"),
@@ -429,10 +433,12 @@ class TestTemporalWorkerServiceContextManager:
 
         with (
             patch(
-                "syntara.workflows.workflow_engine.services.temporal_worker.Client.connect",
+                "syntara.workflow_runtime.engines.temporal.services.temporal_worker.Client.connect",
                 new=AsyncMock(return_value=mock_client),
             ),
-            patch("syntara.workflows.workflow_engine.services.temporal_worker.Worker", return_value=mock_worker),
+            patch(
+                "syntara.workflow_runtime.engines.temporal.services.temporal_worker.Worker", return_value=mock_worker
+            ),
         ):
             # Override the worker.run to return our mock task
             mock_worker.run.return_value = None
@@ -474,10 +480,12 @@ class TestTemporalWorkerServiceContextManager:
 
         with (
             patch(
-                "syntara.workflows.workflow_engine.services.temporal_worker.Client.connect",
+                "syntara.workflow_runtime.engines.temporal.services.temporal_worker.Client.connect",
                 new=AsyncMock(return_value=mock_client),
             ),
-            patch("syntara.workflows.workflow_engine.services.temporal_worker.Worker", return_value=mock_worker),
+            patch(
+                "syntara.workflow_runtime.engines.temporal.services.temporal_worker.Worker", return_value=mock_worker
+            ),
         ):
             # Override the worker.run to return our mock task
             mock_worker.run.return_value = None
@@ -498,7 +506,7 @@ class TestGlobalWorkerManagement:
     async def test_start_worker_first_time(self) -> None:
         """Test starting the global worker for the first time."""
         # Reset global worker state
-        syntara.workflows.workflow_engine.services.temporal_worker._get_worker_registry().set_worker(None)
+        syntara.workflow_runtime.engines.temporal.services.temporal_worker._get_worker_registry().set_worker(None)
 
         mock_client = MagicMock()
         mock_worker = MagicMock()
@@ -517,11 +525,11 @@ class TestGlobalWorkerManagement:
 
         with (
             patch(
-                "syntara.workflows.workflow_engine.services.temporal_worker.Client.connect",
+                "syntara.workflow_runtime.engines.temporal.services.temporal_worker.Client.connect",
                 new=AsyncMock(return_value=mock_client),
             ),
             patch(
-                "syntara.workflows.workflow_engine.services.temporal_worker.Worker", return_value=mock_worker
+                "syntara.workflow_runtime.engines.temporal.services.temporal_worker.Worker", return_value=mock_worker
             ) as mock_worker_class,
             patch("asyncio.create_task", side_effect=mock_create_task),
         ):
@@ -543,7 +551,7 @@ class TestGlobalWorkerManagement:
             assert kwargs["max_concurrent_activities"] == 50
 
         # Cleanup
-        syntara.workflows.workflow_engine.services.temporal_worker._get_worker_registry().set_worker(None)
+        syntara.workflow_runtime.engines.temporal.services.temporal_worker._get_worker_registry().set_worker(None)
 
     @pytest.mark.asyncio
     async def test_start_worker_respects_activity_concurrency_override(self) -> None:
@@ -563,11 +571,11 @@ class TestGlobalWorkerManagement:
 
         with (
             patch(
-                "syntara.workflows.workflow_engine.services.temporal_worker.Client.connect",
+                "syntara.workflow_runtime.engines.temporal.services.temporal_worker.Client.connect",
                 new=AsyncMock(return_value=mock_client),
             ),
             patch(
-                "syntara.workflows.workflow_engine.services.temporal_worker.Worker", return_value=mock_worker
+                "syntara.workflow_runtime.engines.temporal.services.temporal_worker.Worker", return_value=mock_worker
             ) as mock_worker_class,
             patch("asyncio.create_task", side_effect=mock_create_task),
         ):
@@ -582,7 +590,7 @@ class TestGlobalWorkerManagement:
             _, kwargs = mock_worker_class.call_args
             assert kwargs["max_concurrent_activities"] == 10
 
-        syntara.workflows.workflow_engine.services.temporal_worker._get_worker_registry().set_worker(None)
+        syntara.workflow_runtime.engines.temporal.services.temporal_worker._get_worker_registry().set_worker(None)
 
     @pytest.mark.asyncio
     async def test_start_worker_already_running(self) -> None:
@@ -591,7 +599,9 @@ class TestGlobalWorkerManagement:
         existing_worker = TemporalWorkerService(
             temporal_address="test-address", namespace="test-namespace", task_queue="test-queue"
         )
-        syntara.workflows.workflow_engine.services.temporal_worker._get_worker_registry().set_worker(existing_worker)
+        syntara.workflow_runtime.engines.temporal.services.temporal_worker._get_worker_registry().set_worker(
+            existing_worker
+        )
 
         worker = await start_worker()
 
@@ -599,7 +609,7 @@ class TestGlobalWorkerManagement:
         assert worker == existing_worker
 
         # Cleanup
-        syntara.workflows.workflow_engine.services.temporal_worker._get_worker_registry().set_worker(None)
+        syntara.workflow_runtime.engines.temporal.services.temporal_worker._get_worker_registry().set_worker(None)
 
     @pytest.mark.asyncio
     async def test_stop_worker_when_running(self) -> None:
@@ -607,7 +617,9 @@ class TestGlobalWorkerManagement:
         # Set up running worker
         mock_service = MagicMock()
         mock_service.stop = AsyncMock()
-        syntara.workflows.workflow_engine.services.temporal_worker._get_worker_registry().set_worker(mock_service)
+        syntara.workflow_runtime.engines.temporal.services.temporal_worker._get_worker_registry().set_worker(
+            mock_service
+        )
 
         await stop_worker()
 
@@ -615,17 +627,23 @@ class TestGlobalWorkerManagement:
         mock_service.stop.assert_called_once()
 
         # Verify global reference cleared
-        assert syntara.workflows.workflow_engine.services.temporal_worker._get_worker_registry().get_worker() is None
+        assert (
+            syntara.workflow_runtime.engines.temporal.services.temporal_worker._get_worker_registry().get_worker()
+            is None
+        )
 
     @pytest.mark.asyncio
     async def test_stop_worker_when_not_running(self) -> None:
         """Test stopping worker when none is running."""
-        syntara.workflows.workflow_engine.services.temporal_worker._get_worker_registry().set_worker(None)
+        syntara.workflow_runtime.engines.temporal.services.temporal_worker._get_worker_registry().set_worker(None)
 
         # Should not raise any errors
         await stop_worker()
 
-        assert syntara.workflows.workflow_engine.services.temporal_worker._get_worker_registry().get_worker() is None
+        assert (
+            syntara.workflow_runtime.engines.temporal.services.temporal_worker._get_worker_registry().get_worker()
+            is None
+        )
 
     def test_get_worker_when_running(self) -> None:
         """Test getting the worker when it's running."""
@@ -633,18 +651,20 @@ class TestGlobalWorkerManagement:
         mock_service = TemporalWorkerService(
             temporal_address="test-address", namespace="test-namespace", task_queue="test-queue"
         )
-        syntara.workflows.workflow_engine.services.temporal_worker._get_worker_registry().set_worker(mock_service)
+        syntara.workflow_runtime.engines.temporal.services.temporal_worker._get_worker_registry().set_worker(
+            mock_service
+        )
 
         worker = get_worker()
 
         assert worker == mock_service
 
         # Cleanup
-        syntara.workflows.workflow_engine.services.temporal_worker._get_worker_registry().set_worker(None)
+        syntara.workflow_runtime.engines.temporal.services.temporal_worker._get_worker_registry().set_worker(None)
 
     def test_get_worker_when_not_running(self) -> None:
         """Test getting worker when none is running."""
-        syntara.workflows.workflow_engine.services.temporal_worker._get_worker_registry().set_worker(None)
+        syntara.workflow_runtime.engines.temporal.services.temporal_worker._get_worker_registry().set_worker(None)
 
         worker = get_worker()
 
@@ -680,12 +700,14 @@ class TestTemporalWorkerServiceLogging:
 
         with (
             patch(
-                "syntara.workflows.workflow_engine.services.temporal_worker.Client.connect",
+                "syntara.workflow_runtime.engines.temporal.services.temporal_worker.Client.connect",
                 new=AsyncMock(return_value=mock_client),
             ),
-            patch("syntara.workflows.workflow_engine.services.temporal_worker.Worker", return_value=mock_worker),
+            patch(
+                "syntara.workflow_runtime.engines.temporal.services.temporal_worker.Worker", return_value=mock_worker
+            ),
             patch("asyncio.create_task", side_effect=mock_create_task),
-            patch("syntara.workflows.workflow_engine.services.temporal_worker.logger") as mock_logger,
+            patch("syntara.workflow_runtime.engines.temporal.services.temporal_worker.logger") as mock_logger,
         ):
             await service.start()
 
@@ -710,7 +732,7 @@ class TestTemporalWorkerServiceLogging:
         mock_task = asyncio.create_task(mock_worker_run())
         service._worker_task = mock_task
 
-        with patch("syntara.workflows.workflow_engine.services.temporal_worker.logger") as mock_logger:
+        with patch("syntara.workflow_runtime.engines.temporal.services.temporal_worker.logger") as mock_logger:
             await service.stop()
 
             # Verify shutdown logs were called
@@ -727,10 +749,10 @@ class TestTemporalWorkerServiceLogging:
         connection_error = ConnectionError("Connection failed")
         with (
             patch(
-                "syntara.workflows.workflow_engine.services.temporal_worker.Client.connect",
+                "syntara.workflow_runtime.engines.temporal.services.temporal_worker.Client.connect",
                 new=AsyncMock(side_effect=connection_error),
             ),
-            patch("syntara.workflows.workflow_engine.services.temporal_worker.logger") as mock_logger,
+            patch("syntara.workflow_runtime.engines.temporal.services.temporal_worker.logger") as mock_logger,
         ):
             with pytest.raises(ConnectionError, match="Connection failed"):
                 await service.start()
@@ -762,12 +784,14 @@ class TestStartupReconciliation:
 
         with (
             patch(
-                "syntara.workflows.workflow_engine.services.temporal_worker.Client.connect",
+                "syntara.workflow_runtime.engines.temporal.services.temporal_worker.Client.connect",
                 new=AsyncMock(return_value=mock_client),
             ),
-            patch("syntara.workflows.workflow_engine.services.temporal_worker.Worker", return_value=mock_worker),
             patch(
-                "syntara.workflows.workflow_engine.services.temporal_worker.ActivitySyncService",
+                "syntara.workflow_runtime.engines.temporal.services.temporal_worker.Worker", return_value=mock_worker
+            ),
+            patch(
+                "syntara.workflow_runtime.engines.temporal.services.temporal_worker.ActivitySyncService",
                 return_value=mock_sync_service,
             ),
             patch("asyncio.create_task"),
@@ -841,7 +865,7 @@ class TestBackgroundWorkerConfiguration:
             patch("syntara.workflows.background_worker.run_worker", side_effect=mock_run_worker),
             patch("syntara.workflows.background_worker.validate_encryption_key_at_startup"),
             patch(
-                "syntara.workflows.workflow_engine.models.workflow_definition._get_valid_timezones",
+                "syntara.workflow_runtime.engines.temporal.models.workflow_definition._get_valid_timezones",
                 return_value=["UTC"],
             ),
         ):
@@ -893,11 +917,11 @@ class TestActivityQueueingBehavior:
 
         with (
             patch(
-                "syntara.workflows.workflow_engine.services.temporal_worker.Client.connect",
+                "syntara.workflow_runtime.engines.temporal.services.temporal_worker.Client.connect",
                 new=AsyncMock(return_value=mock_client),
             ),
             patch(
-                "syntara.workflows.workflow_engine.services.temporal_worker.Worker", return_value=mock_worker
+                "syntara.workflow_runtime.engines.temporal.services.temporal_worker.Worker", return_value=mock_worker
             ) as mock_worker_class,
             patch("asyncio.create_task", side_effect=mock_create_task),
         ):

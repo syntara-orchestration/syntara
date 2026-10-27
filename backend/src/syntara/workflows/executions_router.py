@@ -4,7 +4,7 @@ from typing import Annotated
 from uuid import UUID
 
 import structlog
-from fastapi import Depends, Query, Request, Response, status
+from fastapi import Depends, HTTPException, Query, Request, Response, status
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 from temporalio.service import RPCError
@@ -17,6 +17,10 @@ from syntara.authz.models.project import Project
 from syntara.core.database.session import get_db
 from syntara.core.models import User
 from syntara.core.syntara_router import NO_PERMISSION, SyntaraRouter
+from syntara.workflow_runtime.engines.temporal.services.temporal_execution_service import (
+    TemporalExecutionService,
+    create_temporal_execution_service,
+)
 from syntara.workflows.models import ActivitySignalPayload, ExecutionListParams, SignalResponse
 from syntara.workflows.models.activity_execution import ActivityExecutionListResponse
 from syntara.workflows.models.execution import (
@@ -27,14 +31,15 @@ from syntara.workflows.models.execution import (
 )
 from syntara.workflows.models.query_params import ActivityListParams, ExecutionIncludeParams
 from syntara.workflows.services import ExecutionService
-from syntara.workflows.workflow_engine.services.temporal_execution_service import (
-    TemporalExecutionService,
-    create_temporal_execution_service,
-)
 
 logger = structlog.stdlib.get_logger(__name__)
 
 router = SyntaraRouter(prefix="/executions", tags=["Executions"])
+
+# Temporary migration guard: workflow activities now complete through the
+# runtime completion inbox. Keep the legacy HTTP signal route visible in the
+# API while making accidental callback use fail loudly.
+_WORKFLOW_SIGNAL_API_DISABLED = True
 
 _exec_perm_read = PermissionChecker(
     "execution",
@@ -378,6 +383,12 @@ async def signal_activity(
         HTTPException: 500 if signal fails
 
     """
+    if _WORKFLOW_SIGNAL_API_DISABLED:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Workflow activity signal API is temporarily disabled; use the registered activity completion path.",
+        )
+
     logger.info(
         "Sending signal to activity in execution",
         activity_id=activity_id,

@@ -18,6 +18,8 @@ from syntara.auth.exceptions import InvalidTokenError
 from syntara.auth.services.token_service import TokenPayload
 from syntara.core.constants import WebhookLimits
 from syntara.core.models import User
+from syntara.workflow_runtime.engines.temporal.models.workflow_definition import NodeType
+from syntara.workflow_runtime.engines.temporal.services.temporal_execution_service import TemporalExecutionService
 from syntara.workflows.exceptions import (
     PayloadTooLargeError,
     TemporalUnavailableError,
@@ -32,8 +34,6 @@ from syntara.workflows.webhook_router import (
     receive_eda_webhook,
     receive_webhook,
 )
-from syntara.workflows.workflow_engine.models.workflow_definition import NodeType
-from syntara.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
 
 # ============================================================================
 # _check_payload_size tests

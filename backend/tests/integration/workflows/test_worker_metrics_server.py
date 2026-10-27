@@ -30,7 +30,7 @@ import pytest
 from syntara.core.config.base import get_settings
 
 if TYPE_CHECKING:
-    from syntara.workflows.workflow_engine.services.temporal_worker import TemporalWorkerService
+    from syntara.workflow_runtime.engines.temporal.services.temporal_worker import TemporalWorkerService
 
 
 def _free_port() -> int:

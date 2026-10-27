@@ -192,6 +192,8 @@ class ApprovalRequest(BaseApprovalRequest, table=True):
         description="Temporal activity ID to signal when this request is decided",
     )
 
+    completion_ref: UUID | None = Field(default=None, index=True)
+
     # Relationships
     decider: "User" = Relationship(
         sa_relationship_kwargs={

@@ -22,7 +22,7 @@ from syntara.agent_orchestrator.executor.invocation_executor import InvocationEx
 from syntara.agent_orchestrator.models import InvocationStatus
 from syntara.agent_orchestrator.models.context_data import InvocationContextData, InvocationMetadata
 from syntara.agent_orchestrator.services.orchestration_service import OrchestrationService
-from syntara.workflows.workflow_engine.models.workflow_definition import IntegrationConnectionConfig
+from syntara.workflow_runtime.engines.temporal.models.workflow_definition import IntegrationConnectionConfig
 
 
 def _make_executor(mock_session: MagicMock | None = None) -> InvocationExecutor:
@@ -120,7 +120,7 @@ class TestIntegrationConnectionConfig:
     """Tests for IntegrationConnectionConfig model in AgenticExecutorParameters."""
 
     def test_mcp_connection_config_validates(self) -> None:
-        from syntara.workflows.workflow_engine.models.workflow_definition import IntegrationConnectionConfig
+        from syntara.workflow_runtime.engines.temporal.models.workflow_definition import IntegrationConnectionConfig
 
         conn = IntegrationConnectionConfig(
             integration_id="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
@@ -130,7 +130,7 @@ class TestIntegrationConnectionConfig:
         assert conn.credential_id == "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
 
     def test_agentic_executor_config_accepts_integration_connections(self) -> None:
-        from syntara.workflows.workflow_engine.models.workflow_definition import AgenticExecutorParameters
+        from syntara.workflow_runtime.engines.temporal.models.workflow_definition import AgenticExecutorParameters
 
         config = AgenticExecutorParameters.model_validate(
             {
@@ -148,13 +148,13 @@ class TestIntegrationConnectionConfig:
         assert config.integration_connections[0].integration_id == "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
 
     def test_agentic_executor_config_without_integration_connections(self) -> None:
-        from syntara.workflows.workflow_engine.models.workflow_definition import AgenticExecutorParameters
+        from syntara.workflow_runtime.engines.temporal.models.workflow_definition import AgenticExecutorParameters
 
         config = AgenticExecutorParameters.model_validate({"prompt": "Test"})
         assert config.integration_connections is None
 
     def test_agentic_executor_config_with_multiple_connections(self) -> None:
-        from syntara.workflows.workflow_engine.models.workflow_definition import AgenticExecutorParameters
+        from syntara.workflow_runtime.engines.temporal.models.workflow_definition import AgenticExecutorParameters
 
         config = AgenticExecutorParameters.model_validate(
             {

@@ -5,9 +5,9 @@ from uuid import uuid4
 
 from syntara.telemetry.events.workflow_execution import WorkflowExecutionCompletedEvent
 from syntara.telemetry.handlers.workflow_completed import WorkflowCompletedTelemetryHandler
+from syntara.workflow_runtime.engines.temporal.models.workflow_definition import ActivityName, WorkflowTerminalStatus
 from syntara.workflows.audit.execution_completed import WorkflowCompletedEvent
 from syntara.workflows.models.execution import ExecutionMode
-from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName, WorkflowTerminalStatus
 
 
 class TestWorkflowCompletedTelemetryHandler:

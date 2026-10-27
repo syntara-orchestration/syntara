@@ -18,16 +18,16 @@ from temporalio.exceptions import ApplicationError, CancelledError
 
 from syntara.core.config.base import get_settings
 from syntara.core.lib.tls_utils import build_integration_httpx_verify
+from syntara.workflow_runtime.engines.temporal import constants
+from syntara.workflow_runtime.engines.temporal.models import AAPWorkflowJobTemplateExecutorParameters
+from syntara.workflow_runtime.engines.temporal.models.aap_types import AAPResourceType
+from syntara.workflow_runtime.engines.temporal.models.workflow_definition import AAPWorkflowJobTemplateOutput
 from syntara.workflows.audit.aap_job_execution import (
     emit_completed,
     emit_failed,
     emit_launched,
     is_failure_status,
 )
-from syntara.workflows.workflow_engine import constants
-from syntara.workflows.workflow_engine.models import AAPWorkflowJobTemplateExecutorParameters
-from syntara.workflows.workflow_engine.models.aap_types import AAPResourceType
-from syntara.workflows.workflow_engine.models.workflow_definition import AAPWorkflowJobTemplateOutput
 
 from .aap_common import (
     AAP_JOB_TERMINAL_STATUSES,

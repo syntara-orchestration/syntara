@@ -62,6 +62,9 @@ from syntara.core.models.user_reference import UserReferenceType
 from syntara.core.services import BaseService, GroupMembershipService
 from syntara.core.services.extensions import ConvertResourceMixin, EnrichQueryMixin
 from syntara.core.services.user_reference_resolution import UserReferenceResolverMixin
+from syntara.workflow_runtime.completion import CompletionService
+from syntara.workflow_runtime.contracts import ActivityError
+from syntara.workflow_runtime.models import ActivityCompletion
 
 logger = structlog.stdlib.get_logger(__name__)
 
@@ -96,6 +99,7 @@ class ApprovalServiceConvertResourceMixin(ConvertResourceMixin):
                 "approver_user_records",
                 "approver_group_records",
                 "temporal_activity_id",
+                "completion_ref",
             }
         )
 
@@ -402,11 +406,14 @@ class ApprovalService(UserReferenceResolverMixin, BaseService):
     async def create(
         self,
         request: ApprovalCreateRequest,
+        *,
+        completion_ref: UUID | None = None,
     ) -> ApprovalRequestRead:
         """Create a new approval request.
 
         Args:
             request: Typed approval creation request
+            completion_ref: Private runtime reference for a registered activity.
 
         Returns:
             Created approval request
@@ -465,6 +472,7 @@ class ApprovalService(UserReferenceResolverMixin, BaseService):
             workflow_context=workflow_context_dict,
             loop_iteration_path=request.loop_iteration_path or _EMPTY_LOOP_PATH,
             temporal_activity_id=request.temporal_activity_id or request.approval_node_id,
+            completion_ref=completion_ref,
         )
 
         self.session.add(approval)
@@ -487,6 +495,8 @@ class ApprovalService(UserReferenceResolverMixin, BaseService):
                 ApprovalApproverGroup(approval_id=approval.id, group_id=group_id)
                 for group_id in request.approver_group_ids
             )
+
+        await self._defer_request(approval)
 
         try:
             await self.session.commit()
@@ -548,6 +558,71 @@ class ApprovalService(UserReferenceResolverMixin, BaseService):
         read = cast("ApprovalRequestRead", self.convert_resource_mixin.convert_resource(approval))
         await self.resolve_user_references([read])
         return read
+
+    async def _defer_request(self, approval: ApprovalRequest) -> None:
+        """Publish an approval and its runtime handoff in the same transaction."""
+        if approval.completion_ref is not None:
+            await CompletionService(self.session).defer(
+                approval.completion_ref,
+                execution_id=approval.execution_id,
+                project_id=approval.project_id,
+                external_operation_id=str(approval.id),
+            )
+
+    async def attach_activity(self, request: ApprovalCreateRequest, reference: UUID) -> ApprovalRequestRead:
+        """Bind a retry to the same approval without replacing an existing decision."""
+        query = (
+            select(ApprovalRequest)
+            .where(
+                ApprovalRequest.execution_id == request.execution_id,
+                ApprovalRequest.project_id == request.project_id,
+                ApprovalRequest.approval_node_id == request.approval_node_id,
+                ApprovalRequest.loop_iteration_path == request.loop_iteration_path,
+            )
+            .with_for_update()
+        )
+        approval = (await self.session.exec(query)).one()
+        completion = await self.session.get(ActivityCompletion, reference)
+        if completion is None or completion.state != "reserved":
+            msg = "Approval attempt is no longer active"
+            raise ActivityError(msg)
+        if approval.status == ApprovalRequestStatus.PENDING:
+            approval.completion_ref = reference
+            self.session.add(approval)
+            await CompletionService(self.session).defer(
+                reference,
+                execution_id=approval.execution_id,
+                project_id=approval.project_id,
+                external_operation_id=str(approval.id),
+            )
+            await self.session.commit()
+        return await self.get(approval.id)
+
+    async def _enqueue_completion(
+        self, approval: ApprovalRequest, status: ApprovalRequestStatus, notes: str | None, decided_at: datetime
+    ) -> None:
+        """Persist decision delivery in the same transaction as the business decision."""
+        if approval.completion_ref is None:
+            return
+        completion = CompletionService(self.session)
+        if status in {ApprovalRequestStatus.APPROVED, ApprovalRequestStatus.REJECTED}:
+            await completion.complete(
+                approval.completion_ref,
+                execution_id=approval.execution_id,
+                project_id=approval.project_id,
+                output={
+                    "decision": status.value,
+                    "decided_by": self.user.username,
+                    "decided_at": decided_at.isoformat(),
+                    "decision_notes": notes,
+                },
+            )
+        else:
+            # Cleanup must succeed even if the engine attempt has already timed out.
+            row = await self.session.get(ActivityCompletion, approval.completion_ref)
+            if row is not None and row.state in {"reserved", "received"}:
+                row.state = "obsolete"
+                self.session.add(row)
 
     async def delete(
         self,
@@ -664,6 +739,7 @@ class ApprovalService(UserReferenceResolverMixin, BaseService):
                 raise ApprovalAlreadyDecidedError(approval_id, approval.status)
             raise ApprovalNotFoundError(approval_id)
 
+        await self._enqueue_completion(approval, status_enum, request.notes, decided_at)
         await self.session.commit()
 
         # Refresh the in-memory object to reflect database state after UPDATE
@@ -697,28 +773,28 @@ class ApprovalService(UserReferenceResolverMixin, BaseService):
 
         # Send signal to workflow engine (best-effort, never blocks the response)
         signal_error: str | None = None
-        try:
-            async with WorkflowApiClient() as client:
-                await client.send_approval_signal(
-                    execution_id=approval.execution_id,
-                    approval_node_id=approval.approval_node_id,
-                    decision=request.status,
+        if approval.completion_ref is None:
+            try:
+                async with WorkflowApiClient() as client:
+                    await client.send_approval_signal(
+                        execution_id=approval.execution_id,
+                        approval_node_id=approval.approval_node_id,
+                        decision=request.status,
+                        approval_id=approval_id,
+                        decided_by=self.user.username,
+                        decided_at=(approval.decided_at or datetime.now(UTC)).isoformat(),
+                        decision_notes=request.notes,
+                        temporal_activity_id=approval.temporal_activity_id,
+                    )
+            except Exception as e:  # noqa: BLE001
+                signal_error = "Workflow signal delivery failed"
+                logger.warning(
+                    "Failed to send approval signal",
                     approval_id=approval_id,
-                    decided_by=self.user.username,
-                    decided_at=(approval.decided_at or datetime.now(UTC)).isoformat(),
-                    decision_notes=request.notes,
-                    temporal_activity_id=approval.temporal_activity_id,
+                    execution_id=approval.execution_id,
+                    error=str(e),
+                    exc_info=True,
                 )
-        except Exception as e:  # noqa: BLE001
-            signal_error = "Workflow signal delivery failed"
-            logger.warning(
-                "Failed to send approval signal",
-                approval_id=approval_id,
-                execution_id=approval.execution_id,
-                error=str(e),
-                exc_info=True,
-            )
-
         # Eagerly load relationships to avoid lazy-load in async context
         await self._refresh_approval_relationships(approval)
 
@@ -865,12 +941,18 @@ class ApprovalService(UserReferenceResolverMixin, BaseService):
                     error=str(e),
                 )
 
-        # Collect tasks for successful decisions with approved/rejected status only
+        if not any(
+            result.success and approvals[decision.approval_id].completion_ref is None
+            for result, decision in zip(results, decisions, strict=False)
+        ):
+            return
+        # Legacy approvals keep their callback path until historical runs finish.
         async with WorkflowApiClient() as client:
             tasks = [
                 send_single_signal(client, decision)
                 for result_obj, decision in zip(results, decisions, strict=False)
                 if result_obj.success
+                and approvals[decision.approval_id].completion_ref is None
                 and decision.status in (BatchApprovalDecisionStatus.APPROVED, BatchApprovalDecisionStatus.REJECTED)
             ]
 
@@ -923,7 +1005,15 @@ class ApprovalService(UserReferenceResolverMixin, BaseService):
                     )
                 )
 
-        # Commit all changes at once
+        # Queue completion outside the per-item error handler: a delivery write failure
+        # must roll back the decision, rather than commit an undeliverable outcome.
+        for result_obj, decision in zip(results, request.decisions, strict=True):
+            if result_obj.success:
+                approval = approvals[decision.approval_id]
+                await self._enqueue_completion(
+                    approval, approval.status, decision.notes, approval.decided_at or datetime.now(UTC)
+                )
+        # Commit decisions and their delivery intents together.
         await self.session.commit()
 
         # Send workflow signals for successful decisions

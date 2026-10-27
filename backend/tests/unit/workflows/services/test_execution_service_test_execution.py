@@ -14,6 +14,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from syntara.core.exceptions import SafeValueError
 from syntara.core.models import User
 from syntara.metrics.interface_tag import interface_context_var
+from syntara.workflow_runtime.engines.temporal.models.workflow_definition import NodeType
 from syntara.workflows.exceptions import WorkflowNotFoundError
 from syntara.workflows.models.execution import (
     ExecutionMode,
@@ -24,7 +25,6 @@ from syntara.workflows.models.execution import (
 from syntara.workflows.models.workflow import Workflow
 from syntara.workflows.models.workflow_version import WorkflowVersion
 from syntara.workflows.services.execution_service import ExecutionService
-from syntara.workflows.workflow_engine.models.workflow_definition import NodeType
 
 
 def _make_mock_workflow(

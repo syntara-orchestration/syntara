@@ -19,6 +19,8 @@ from referencing.jsonschema import DRAFT202012
 from syntara.core.constants import JsonbLimits
 from syntara.core.exceptions import SafeValueError
 from syntara.schemas import SCHEMA_DIR
+from syntara.workflow_runtime.engines.temporal.graph_backend import InMemoryGraphBackend
+from syntara.workflow_runtime.engines.temporal.models.workflow_definition import NodeType, ScheduledTriggerConfig
 from syntara.workflows.models.validation_finding import (
     ValidationCategory,
     ValidationFinding,
@@ -26,8 +28,6 @@ from syntara.workflows.models.validation_finding import (
     ValidationSeverity,
 )
 from syntara.workflows.validators.template_expressions import check_template_expressions
-from syntara.workflows.workflow_engine.graph_backend import InMemoryGraphBackend
-from syntara.workflows.workflow_engine.models.workflow_definition import NodeType, ScheduledTriggerConfig
 
 _SCHEMA_DIR = SCHEMA_DIR / "workflows" / "v2"
 _BASE_URI = "https://automation.example.com/schemas/workflows/v2/"

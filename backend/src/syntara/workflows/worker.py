@@ -16,11 +16,14 @@ Environment Variables:
 """
 
 import asyncio
+from functools import partial
 
 from syntara.core.config.base import validate_encryption_key_at_startup
 from syntara.core.logging.lifecycle import start_loggers, stop_loggers
+from syntara.workers.registration import build_activity_registry
+from syntara.workflow_runtime.engines.temporal.services.temporal_worker import start_worker, stop_worker
 from syntara.workflows.worker_lifecycle import run_worker
-from syntara.workflows.workflow_engine.services.temporal_worker import start_worker, stop_worker
+from syntara.workflows.workflow_engine.activities.registry import ACTIVITY_REGISTRY
 
 __all__ = ["stop_worker"]  # re-exported for backward compat with tests and external callers
 
@@ -32,11 +35,20 @@ async def main() -> None:
     """Run the Temporal workflow worker."""
     validate_encryption_key_at_startup()
     # Fail fast if timezone data is missing (AAP-86297)
-    from syntara.workflows.workflow_engine.models.workflow_definition import _get_valid_timezones  # noqa: PLC0415
+    from syntara.workflow_runtime.engines.temporal.models.workflow_definition import (  # noqa: PLC0415
+        _get_valid_timezones,
+    )
 
     _get_valid_timezones()
     try:
-        await run_worker(start_worker, worker_name="orchestrator-workflow-worker")
+        await run_worker(
+            partial(
+                start_worker,
+                activity_registry=ACTIVITY_REGISTRY,
+                registered_activity_registry=build_activity_registry(),
+            ),
+            worker_name="orchestrator-workflow-worker",
+        )
     finally:
         stop_loggers()
 

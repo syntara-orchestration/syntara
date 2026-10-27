@@ -5,7 +5,7 @@ from typing import Any
 import structlog
 from temporalio import activity
 
-from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName, ConvergeOutput
+from syntara.workflow_runtime.engines.temporal.models.workflow_definition import ActivityName, ConvergeOutput
 
 logger = structlog.stdlib.get_logger(__name__)
 

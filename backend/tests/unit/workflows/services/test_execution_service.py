@@ -16,6 +16,7 @@ from syntara.core.models import User
 from syntara.core.models.pagination import ResourcesResponseBase
 from syntara.core.models.user_reference import UserReference, UserReferenceType
 from syntara.metrics.interface_tag import interface_context_var
+from syntara.workflow_runtime.engines.temporal.models.workflow_definition import NodeType
 from syntara.workflows.exceptions import (
     ExecutionNotFoundError,
     TriggerValidationError,
@@ -26,7 +27,6 @@ from syntara.workflows.models.execution import Execution, ExecutionRead, Executi
 from syntara.workflows.models.workflow import Workflow
 from syntara.workflows.models.workflow_version import WorkflowVersion
 from syntara.workflows.services.execution_service import ExecutionService, count_active_executions
-from syntara.workflows.workflow_engine.models.workflow_definition import NodeType
 
 
 def _exec_results(*results: object, users: object = ()) -> object:
@@ -1804,7 +1804,7 @@ class TestHandleActivityCallback(TestExecutionServiceBase):
     @pytest.mark.asyncio
     async def test_failed_callback_uses_empty_signal_fallback_when_message_missing(self) -> None:
         """Empty/missing callback error.message uses the SIGNAL-02 fallback on the production path."""
-        from syntara.workflows.workflow_engine.signals.processor import EMPTY_SIGNAL_ERROR_MESSAGE
+        from syntara.workflow_runtime.engines.temporal.signals.processor import EMPTY_SIGNAL_ERROR_MESSAGE
 
         service, mock_temporal = self._make_service()
         service.get_execution = AsyncMock(return_value=self._mock_execution())  # type: ignore[method-assign]
@@ -1821,7 +1821,7 @@ class TestHandleActivityCallback(TestExecutionServiceBase):
     @pytest.mark.asyncio
     async def test_failed_callback_uses_empty_signal_fallback_for_whitespace_message(self) -> None:
         """Whitespace-only callback error.message uses the SIGNAL-02 fallback."""
-        from syntara.workflows.workflow_engine.signals.processor import EMPTY_SIGNAL_ERROR_MESSAGE
+        from syntara.workflow_runtime.engines.temporal.signals.processor import EMPTY_SIGNAL_ERROR_MESSAGE
 
         service, mock_temporal = self._make_service()
         service.get_execution = AsyncMock(return_value=self._mock_execution())  # type: ignore[method-assign]
