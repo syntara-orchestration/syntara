@@ -93,13 +93,21 @@ def _build_fanout_graph() -> WorkflowGraph:
     return WorkflowGraph(backend)
 
 
-def _build_fanin_graph() -> WorkflowGraph:
+def _build_fanin_graph(converge_outputs: dict[str, str] | None = None) -> WorkflowGraph:
     """Build: trigger -> node_a + node_b -> converge_node -> node_c."""
     backend = InMemoryGraphBackend()
     backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
     backend.add_node("node_a", {"id": "node_a", "type": "script", "parameters": {}})
     backend.add_node("node_b", {"id": "node_b", "type": "script", "parameters": {}})
-    backend.add_node("converge_node", {"id": "converge_node", "type": "converge", "parameters": {}})
+    backend.add_node(
+        "converge_node",
+        {
+            "id": "converge_node",
+            "type": "converge",
+            "parameters": {},
+            "outputs": converge_outputs,
+        },
+    )
     backend.add_node("node_c", {"id": "node_c", "type": "script", "parameters": {}})
     backend.add_edge("trigger", "node_a", None)
     backend.add_edge("trigger", "node_b", None)
@@ -741,6 +749,16 @@ class TestFanInConverge:
         assert "converge_node" in wf.failed_nodes
         assert wf._has_unhandled_failure is True
         assert "node_c" in wf.skipped_nodes
+
+    def test_fail_converge_node_preserves_valid_output_mapping(self) -> None:
+        """Converge failure fallback keeps mapped aliases for recovery steps."""
+        wf = _make_workflow()
+        graph = _build_fanin_graph()
+        graph = _build_fanin_graph({"branches": "${result.branch_count}"})
+
+        wf._fail_converge_node("converge_node", "timed out", graph, pending_tasks=None)
+
+        assert wf.resolver.get_namespace("converge_node")["branches"] is None
 
     def test_fail_converge_node_cof_from_predecessor_failure(self) -> None:
         """CoF on converge works when triggered by a predecessor failure (not timeout)."""

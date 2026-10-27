@@ -12,6 +12,7 @@ from typing import Any
 from temporalio import workflow
 
 with workflow.unsafe.imports_passed_through():
+    from syntara.workflow_core.output_mapping import OutputMappingError
     from syntara.workflow_runtime.engines.temporal.node_settings_resolver import (
         resolve_continue_on_failure,
         resolve_wait_duration,
@@ -21,6 +22,7 @@ from syntara.workflow_core.graph import ActivityNode, WorkflowGraph
 from syntara.workflow_core.models import (
     NODE_OUTPUT_MODELS,
     ConvergeStrategy,
+    NodeOutput,
     NodeType,
 )
 from syntara.workflow_core.utils.namespace_resolver import NamespaceResolver
@@ -50,6 +52,16 @@ class WorkflowConvergeMixin:
 
     # Methods provided by OrchestratorWorkflow (resolved via MRO)
     def _are_predecessors_complete(self, node_id: str, graph: WorkflowGraph) -> bool: ...  # type: ignore[empty-body]
+
+    @staticmethod
+    def _build_failure_output(
+        output_model_class: type[NodeOutput], output_config: dict[str, str] | None
+    ) -> dict[str, Any]:
+        """Apply failure output mapping without allowing an invalid mapping to fail the workflow task."""
+        try:
+            return output_model_class().dump(output_config)
+        except OutputMappingError:
+            return output_model_class().model_dump()
 
     def _mark_downstream_as_skipped(
         self, start_node_id: str, graph: WorkflowGraph, boundary: set[str] | None = None
@@ -255,9 +267,7 @@ class WorkflowConvergeMixin:
         self.failed_nodes[node_id] = error_msg
         self.skipped_nodes.discard(node_id)
         output_model_class = NODE_OUTPUT_MODELS.get(node.type)
-        # Failure handling runs in workflow code, so avoid evaluating the user
-        # mapping again after an activity has already reported its error.
-        fail_output = output_model_class().model_dump() if output_model_class else {}
+        fail_output = self._build_failure_output(output_model_class, node.outputs) if output_model_class else {}
         fail_output["status"] = "failed"
         fail_output["error"] = error_msg
         self.resolver.set_namespace(node_id, fail_output)
