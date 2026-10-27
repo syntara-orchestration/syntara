@@ -1,4 +1,4 @@
-import { Spinner } from '@patternfly/react-core'
+import { Content, Spinner } from '@patternfly/react-core'
 import {
   Background,
   BackgroundVariant,
@@ -8,6 +8,7 @@ import {
   type EdgeChange,
   type NodeChange,
   type NodeMouseHandler,
+  type OnBeforeDelete,
   type OnConnectEnd,
   type OnConnectStart,
   type OnNodeDrag,
@@ -16,9 +17,11 @@ import {
   useStore,
   useUpdateNodeInternals,
 } from '@xyflow/react'
-import { useLayoutEffect, useRef } from 'react'
+import { useCallback, useLayoutEffect, useRef } from 'react'
 
+import { SynConfirmationDialog } from '../../components/dialogs/SynConfirmationDialog'
 import { FlowNodeType } from '../../constants'
+import { useDialogState } from '../../hooks/useDialogState'
 import { CanvasControls } from '../workflows/canvas/CanvasControls'
 import { type NodeType } from '../workflows/canvas/nodes/NodeType'
 import { SEMANTIC_ZOOM_MAX_SCALE } from '../workflows/canvas/semanticZoom'
@@ -57,6 +60,11 @@ type BuilderFlowCanvasProps = {
 type SemanticZoomStoreState = {
   isSemanticZoom: boolean
   nodeIds: string[]
+}
+
+type PendingNodeDeletion = {
+  nodeCount: number
+  resolve: (confirmed: boolean) => void
 }
 
 /** Reads whether the canvas is at or below the semantic-zoom scale, and the IDs of its non-placeholder nodes. */
@@ -127,6 +135,29 @@ export function BuilderFlowCanvas({
   disableSpacePanning,
   onLayout,
 }: Readonly<BuilderFlowCanvasProps>) {
+  const {
+    isOpen: isDeleteDialogOpen,
+    item: pendingDeletion,
+    open: openDeleteDialog,
+    close: closeDeleteDialog,
+  } = useDialogState<PendingNodeDeletion>()
+  const onBeforeDelete = useCallback<OnBeforeDelete<NodeType, EdgeType>>(
+    ({ nodes: nodesToDelete }) => {
+      if (isReadOnly || isDeleteDialogOpen) return Promise.resolve(false)
+      if (nodesToDelete.length === 0) return Promise.resolve(true)
+
+      return new Promise<boolean>((resolve) => {
+        openDeleteDialog({ nodeCount: nodesToDelete.length, resolve })
+      })
+    },
+    [isReadOnly, isDeleteDialogOpen, openDeleteDialog]
+  )
+  const resolveDeletion = (confirmed: boolean) => {
+    pendingDeletion?.resolve(confirmed && !isReadOnly)
+    closeDeleteDialog()
+  }
+  const isMultiDelete = (pendingDeletion?.nodeCount ?? 0) > 1
+
   return (
     <div
       ref={containerRef}
@@ -149,6 +180,7 @@ export function BuilderFlowCanvas({
         onNodeDrag={onNodeDrag}
         onNodeDragStop={onNodeDragStop}
         onEdgesChange={onEdgesChange}
+        onBeforeDelete={onBeforeDelete}
         onNodesDelete={onNodesDelete}
         onNodeClick={onNodeClick}
         onConnect={onConnect}
@@ -175,6 +207,22 @@ export function BuilderFlowCanvas({
         <CanvasControls onLayout={onLayout} hideLayout={isReadOnly} />
         {!isReadOnly && <UndoRedoControls />}
       </ReactFlow>
+      <SynConfirmationDialog
+        isOpen={isDeleteDialogOpen}
+        onClose={() => resolveDeletion(false)}
+        onConfirm={() => resolveDeletion(true)}
+        title={isMultiDelete ? 'Delete steps?' : 'Delete step?'}
+        confirmLabel="Delete"
+        confirmVariant="danger"
+        titleIconVariant="warning"
+      >
+        <Content component="p">
+          {isMultiDelete
+            ? 'The selected steps and their connections will be deleted from this workflow.'
+            : 'The selected step and its connections will be deleted from this workflow.'}{' '}
+          You can undo this action.
+        </Content>
+      </SynConfirmationDialog>
     </div>
   )
 }
