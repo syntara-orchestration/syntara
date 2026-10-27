@@ -466,6 +466,11 @@ export interface components {
       cluster_id?: string | null
       /** Topic Id */
       topic_id?: string | null
+      /**
+       * Initial Partition Ids
+       * @description System-managed first verified topic partition set; absent until captured
+       */
+      initial_partition_ids?: number[] | null
     }
     /**
      * KafkaSubscribeParameters

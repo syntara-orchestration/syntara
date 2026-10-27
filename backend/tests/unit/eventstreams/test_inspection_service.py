@@ -1,19 +1,54 @@
-"""Denied references must stop preflight before decryption or broker access."""
+"""Source contract alignment and preflight authorization boundaries."""
 
+from pathlib import Path
 from types import SimpleNamespace
 from typing import cast
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
+import yaml
+from fastapi.encoders import jsonable_encoder
 
 from syntara.authz.exceptions import AuthorizationDeniedError
 from syntara.core.exceptions import SafeValueError
 from syntara.eventstreams.adapters.kafka_parameters import KafkaSubscribeParameters
+from syntara.eventstreams.models.responses import EventSubscriptionSourceRead
 from syntara.eventstreams.services.inspection_service import EventSubscriptionInspectionService
 from syntara.integrations.models.integration_configuration import KafkaConfiguration
 
 MODULE = "syntara.eventstreams.services.inspection_service"
+
+
+@pytest.mark.parametrize(
+    "spec_path",
+    [
+        "syntara/schemas/workflows/v2/openapi.yaml",
+        "syntara/schemas/openapi.yaml",
+        "syntara/schemas/openapi-public.yaml",
+        "syntara/schemas/openapi-public.json",
+        "cli/orchestrator_cli/openapi.yaml",
+    ],
+)
+def test_source_read_partition_set_schema_matches_provider(spec_path: str) -> None:
+    """Every public contract exposes the inherited optional partition set."""
+    runtime = jsonable_encoder(
+        EventSubscriptionSourceRead.model_json_schema(
+            mode="serialization", ref_template="#/components/schemas/{model}"
+        ),
+        exclude_none=True,
+    )
+    spec = Path(__file__).resolve().parents[3] / "src" / spec_path
+    schemas = yaml.safe_load(spec.read_text())["components"]["schemas"]
+
+    assert (
+        schemas["EventSubscriptionSourceRead"]["properties"]["configuration"] == runtime["properties"]["configuration"]
+    )
+    assert (
+        schemas["KafkaSourceConfiguration"]["properties"]["initial_partition_ids"]
+        == runtime["$defs"]["KafkaSourceConfiguration"]["properties"]["initial_partition_ids"]
+    )
+    assert "initial_partition_ids" not in schemas["KafkaSourceConfiguration"]["required"]
 
 
 @pytest.fixture

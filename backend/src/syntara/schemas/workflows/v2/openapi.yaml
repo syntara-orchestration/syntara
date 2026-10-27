@@ -1233,6 +1233,16 @@ components:
             - type: string
             - type: 'null'
           title: Topic Id
+        initial_partition_ids:
+          anyOf:
+            - type: array
+              items:
+                type: integer
+                minimum: 0
+              minItems: 1
+            - type: 'null'
+          title: Initial Partition Ids
+          description: System-managed first verified topic partition set; absent until captured
       additionalProperties: false
       type: object
       required:

@@ -9,8 +9,16 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from syntara.eventstreams.models.responses import EventSubscriptionTestResponse
+from syntara.eventstreams.adapters.kafka_source_configuration import KafkaSourceConfiguration
+from syntara.eventstreams.models.responses import (
+    EventSubscriptionListResponse,
+    EventSubscriptionRead,
+    EventSubscriptionTestResponse,
+)
+from syntara.eventstreams.models.source import EventSubscriptionSource
+from syntara.eventstreams.models.subscription import EventSubscription
 from syntara.eventstreams.router import _read, _update, get_inspection_service, router
+from syntara.eventstreams.services.inspection_service import EventSubscriptionInspectionService
 
 
 @pytest.fixture
@@ -41,6 +49,55 @@ def test_list_rejects_invalid_bounds(client: TestClient, service: AsyncMock, que
     service.list_current.assert_not_called()
 
 
+@pytest.mark.parametrize("read_route", ["list", "detail"])
+@pytest.mark.parametrize("partition_ids", [None, [0, 2, 5]], ids=["legacy", "captured"])
+def test_read_routes_preserve_initial_partition_set(
+    client: TestClient, service: AsyncMock, read_route: str, partition_ids: list[int] | None
+) -> None:
+    """Real shaping and HTTP serialization preserve captured sets and missing legacy data."""
+    stored_configuration = {"transport": "kafka", "topic": "alerts", "group_id": "syntara.test"}
+    configuration = KafkaSourceConfiguration.model_validate(
+        stored_configuration
+        if partition_ids is None
+        else {**stored_configuration, "initial_partition_ids": partition_ids}
+    )
+    subscription = EventSubscription(
+        workflow_id=uuid4(),
+        project_id=uuid4(),
+        trigger_node_id="incoming",
+        published_version_id=uuid4(),
+        active_source_generation=1,
+        configuration_revision=1,
+        created_by=uuid4(),
+    )
+    integration_id = uuid4()
+    source = EventSubscriptionSource(
+        subscription_id=subscription.id,
+        deployment_id=uuid4(),
+        generation=1,
+        integration_id=integration_id,
+        integration_identity=integration_id,
+        transport="kafka",
+        configuration=configuration,
+    )
+    shaped = EventSubscriptionInspectionService._shape(subscription, source)
+    service.get_current.return_value = shaped
+    service.list_current.return_value = EventSubscriptionListResponse(resources=[shaped])
+    url = f"/api/v1/workflows/{subscription.workflow_id}/event-subscriptions"
+
+    response = client.get(url if read_route == "list" else f"{url}/{subscription.id}")
+
+    assert response.status_code == 200, response.text
+    resource = response.json()["resources"][0] if read_route == "list" else response.json()
+    assert resource["source"]["configuration"] == {
+        **stored_configuration,
+        "cluster_id": None,
+        "topic_id": None,
+        "initial_partition_ids": partition_ids,
+    }
+    assert EventSubscriptionRead.model_validate(resource) == shaped
+
+
 def test_unsaved_flat_request_delegates(client: TestClient, service: AsyncMock) -> None:
     workflow_id = uuid4()
     data = {"topic": "alerts", "integration_id": str(uuid4()), "credential_id": str(uuid4())}
@@ -57,6 +114,7 @@ def test_unsaved_flat_request_delegates(client: TestClient, service: AsyncMock) 
         {"selected_account_id": str(uuid4())},
         {"source": {"topic": "alerts"}},
         {"transport": "kafka"},
+        {"initial_partition_ids": [0, 2, 5]},
         {"credential_id": None},
     ],
 )
