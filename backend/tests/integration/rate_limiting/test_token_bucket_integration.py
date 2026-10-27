@@ -7,8 +7,10 @@ timing) using a real Redis instance spun up by testcontainers.
 from __future__ import annotations
 
 import asyncio
+import time
 import uuid
 from typing import TYPE_CHECKING
+from unittest.mock import patch
 
 import pytest
 import pytest_asyncio
@@ -82,21 +84,24 @@ class TestTokenRefill:
 
     @pytest.mark.asyncio
     async def test_partial_refill_after_wait(self, rate_limit_client: RateLimitRedisClient) -> None:
-        """After exhausting a 10-token / 2s bucket, waiting ~1s refills ~5 tokens."""
+        """Advancing a 10-token / 2s bucket by 1.1s refills five tokens."""
         user = _unique_user()
         tb = TokenBucket(redis_client=rate_limit_client)
 
-        for _ in range(10):
-            await tb.consume(user_id=user, max_tokens=10, window_seconds=2)
+        with patch("syntara.rate_limiting.token_bucket.time") as clock:
+            clock.time.return_value = time.time()
 
-        denied = await tb.consume(user_id=user, max_tokens=10, window_seconds=2)
-        assert denied.allowed is False
+            for _ in range(10):
+                await tb.consume(user_id=user, max_tokens=10, window_seconds=2)
 
-        await asyncio.sleep(1.1)
+            denied = await tb.consume(user_id=user, max_tokens=10, window_seconds=2)
+            assert denied.allowed is False
 
-        result = await tb.consume(user_id=user, max_tokens=10, window_seconds=2)
-        assert result.allowed is True
-        assert result.remaining >= 3
+            clock.time.return_value += 1.1
+
+            result = await tb.consume(user_id=user, max_tokens=10, window_seconds=2)
+            assert result.allowed is True
+            assert result.remaining == 4
 
     @pytest.mark.asyncio
     async def test_full_refill_after_window(self, rate_limit_client: RateLimitRedisClient) -> None:
@@ -104,17 +109,20 @@ class TestTokenRefill:
         user = _unique_user()
         tb = TokenBucket(redis_client=rate_limit_client)
 
-        for _ in range(5):
-            await tb.consume(user_id=user, max_tokens=5, window_seconds=1)
+        with patch("syntara.rate_limiting.token_bucket.time") as clock:
+            clock.time.return_value = time.time()
 
-        denied = await tb.consume(user_id=user, max_tokens=5, window_seconds=1)
-        assert denied.allowed is False
+            for _ in range(5):
+                await tb.consume(user_id=user, max_tokens=5, window_seconds=1)
 
-        await asyncio.sleep(1.1)
+            denied = await tb.consume(user_id=user, max_tokens=5, window_seconds=1)
+            assert denied.allowed is False
 
-        result = await tb.consume(user_id=user, max_tokens=5, window_seconds=1)
-        assert result.allowed is True
-        assert result.remaining == 4
+            clock.time.return_value += 1.1
+
+            result = await tb.consume(user_id=user, max_tokens=5, window_seconds=1)
+            assert result.allowed is True
+            assert result.remaining == 4
 
 
 class TestUserIsolation:
