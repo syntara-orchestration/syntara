@@ -192,7 +192,6 @@ def _register_all() -> None:
     from syntara.audit.seed import seed_audit_metadata  # noqa: PLC0415
     from syntara.authz.seed import seed_groups_project_admin  # noqa: PLC0415
     from syntara.credentials.lib.preseed import preseed_credential_types  # noqa: PLC0415
-    from syntara.seed.qa_detail_tabs import seed_qa_detail_tabs  # noqa: PLC0415
     from syntara.settings.seeder import seed_settings_with_session  # noqa: PLC0415
     from syntara.workflows.seed_builtin import seed_builtin_workflows  # noqa: PLC0415
 
@@ -230,15 +229,6 @@ def _register_all() -> None:
             func=seed_builtin_workflows,
             depends_on=("authz",),
             description="Seed built-in workflows (document conversion, invocation execution)",
-        )
-    )
-    _register(
-        SeederRegistration(
-            name="qa_detail_tabs",
-            func=seed_qa_detail_tabs,
-            depends_on=("authz",),
-            optional=True,
-            description="Create disposable user and credential records for nested detail-tab QA",
         )
     )
 
