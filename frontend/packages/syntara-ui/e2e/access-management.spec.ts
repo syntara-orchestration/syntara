@@ -321,6 +321,10 @@ test.describe('Access Management — User Detail Tabs', () => {
     await groupsTab.click()
     await expect(app).toHaveURL(new RegExp(`${userDetailUrl}/groups$`))
     await expect(groupsTab).toHaveAttribute('aria-selected', 'true')
+    const groupsPanel = app.getByRole('tabpanel', { name: 'groups' })
+    await expect(groupsPanel).toHaveCSS('display', 'flex')
+    await expect(groupsPanel).toHaveCSS('flex-grow', '1')
+    await expect(groupsPanel).toHaveCSS('min-height', '0px')
 
     // Click Assignments sub-tab. Its visible label differs from its URL segment.
     const assignmentsTab = app.getByRole('tab', { name: /Assignments/i })
@@ -336,6 +340,14 @@ test.describe('Access Management — User Detail Tabs', () => {
 
     // A direct URL selects the matching child route.
     await app.goto(toAppUrl(`${userDetailUrl}/roles`))
+    await expect(app).toHaveURL(new RegExp(`${userDetailUrl}/roles$`))
+    await expect(assignmentsTab).toHaveAttribute('aria-selected', 'true')
+
+    // Unknown tab segments stay within the detail layout and route to Details.
+    await app.goto(toAppUrl(`${userDetailUrl}/not-a-tab`))
+    await expect(app).toHaveURL(new RegExp(`${userDetailUrl}/details$`))
+    await expect(detailsTab).toHaveAttribute('aria-selected', 'true')
+    await app.goBack()
     await expect(app).toHaveURL(new RegExp(`${userDetailUrl}/roles$`))
     await expect(assignmentsTab).toHaveAttribute('aria-selected', 'true')
   })

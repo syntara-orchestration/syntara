@@ -6,6 +6,8 @@ import { useUnsavedChanges } from '../../app/useUnsavedChanges'
 import { useUrlTab } from '../../hooks/useUrlTab'
 import { detachPromise } from '../../utils/detachPromise'
 
+import styles from './SynUrlTabs.module.css'
+
 type UrlTabsProps = Omit<TabsProps, 'activeKey' | 'onSelect' | 'ref' | 'children'> & {
   /**
    * Tab children (`<Tab>` elements). Typed as `ReactNode` to accept pre-cloned Tab arrays from
@@ -146,6 +148,7 @@ export function SynUrlTabs({
           id={`${uid}-panel-${key}`}
           role="tabpanel"
           aria-label={key}
+          className={renderPanel && key === activeTab ? styles.routePanel : undefined}
           hidden={key !== activeTab ? true : undefined}
         >
           {renderPanel && key === activeTab ? renderPanel(activeTab) : null}

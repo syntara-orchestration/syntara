@@ -49,6 +49,17 @@ const credentialIntegrationsRoute = createRoute({
   component: makeRouteComponent(<CredentialIntegrationsTabRoute />),
 })
 
+const credentialUnknownTabRoute = createRoute({
+  getParentRoute: () => credentialDetailRoute,
+  path: '$tab',
+  beforeLoad: ({ params }) =>
+    redirect({
+      to: '/configuration/credentials/$credentialId/details',
+      params: { credentialId: params.credentialId },
+      replace: true,
+    }),
+})
+
 export const configurationRoutes = [
   createRoute({
     getParentRoute: () => rootRoute,
@@ -92,5 +103,6 @@ export const configurationRoutes = [
     credentialDetailsRoute,
     credentialWorkflowsRoute,
     credentialIntegrationsRoute,
+    credentialUnknownTabRoute,
   ]),
 ]

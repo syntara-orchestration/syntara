@@ -1,4 +1,4 @@
-import { createRoute } from '@tanstack/react-router'
+import { createRoute, redirect } from '@tanstack/react-router'
 
 import {
   AccessManagement,
@@ -66,6 +66,17 @@ const userCheckAccessTabRoute = createRoute({
   component: makeRouteComponent(<UserDetailTabRoute />),
 })
 
+const userDetailUnknownTabRoute = createRoute({
+  getParentRoute: () => userDetailRoute,
+  path: '$tab',
+  beforeLoad: ({ params }) =>
+    redirect({
+      to: '/system-administration/access-management/users/$userId/details',
+      params: { userId: params.userId },
+      replace: true,
+    }),
+})
+
 export const accessManagementRoutes = [
   createRoute({
     getParentRoute: () => rootRoute,
@@ -102,6 +113,7 @@ export const accessManagementRoutes = [
     userAssignmentsTabRoute,
     userPermissionsTabRoute,
     userCheckAccessTabRoute,
+    userDetailUnknownTabRoute,
   ]),
   createRoute({
     getParentRoute: () => rootRoute,
