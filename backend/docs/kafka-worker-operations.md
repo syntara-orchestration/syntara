@@ -21,7 +21,9 @@ recovery; recovery waits for a compatible worker to return.
 
 Keep terminal retention identical across every process sharing the database.
 For a retention change, pause subscriptions, drain and stop the whole pool, then
-restart it with one consistent value before resuming intake. Do not start a
+apply the [cache maintenance procedure](#cache-maintenance), including external
+epoch rotation before shorter cleanup bounds, and restart with one consistent
+value before resuming intake. Do not start a
 second pool with a different retention value against the same database. Automatic
 deployment rollout controls are part of the deferred M2 operator integration.
 
@@ -31,6 +33,9 @@ root and backend `.env.example`, and local compose worker agree:
 | Environment variable | Default |
 | --- | ---: |
 | `APP_EVENTSTREAM_ENABLED` | `false` |
+| `APP_EVENT_MAX_VALUE_BYTES` | `262144` |
+| `APP_EVENT_MAX_ENVELOPE_BYTES` | `1048576` |
+| `APP_EVENT_MAX_HEADERS` | `128` |
 | `APP_EVENT_WORKER_HEARTBEAT_INTERVAL_SECONDS` | `20` |
 | `APP_EVENT_WORKER_LIVENESS_SECONDS` | `60` |
 | `APP_EVENT_SUBSCRIPTION_LEASE_SECONDS` | `60` |
@@ -60,11 +65,20 @@ Terminal-proof caching remains disabled even when Redis is configured. Enabling
 it requires an externally managed, nonzero epoch and an established clock-error
 bound below the configured skew margin. Compose inherits those optional trust
 inputs from the caller without supplying a default epoch or clock bound.
+Retain the same epoch across ordinary process/pod restarts. Do not generate an
+epoch per startup or keep its authority solely in PostgreSQL being restored.
+An explicitly enabled cache with missing/invalid trust inputs fails Settings
+validation; leave caching disabled until those inputs can be established.
 The proof window is capped by terminal retention; see
 [record runner cache safeguards](kafka-record-runner.md#duplicate-lookup-and-shared-gates).
+TTL is measured from the original terminal resolution, not the latest read or
+repopulation. The timeout bounds the total operation, including connection
+acquisition and any retries, rather than granting a new deadline per attempt.
 
-Local compose's `stop_grace_period` is 60 seconds, longer than the default drain
-deadline of 20 seconds. Reserve extra time for hint/client/database cleanup.
+Local compose's `stop_grace_period` is 60 seconds. Keep termination grace longer
+than the configured drain deadline **plus** membership/lease release and shared
+client/database cleanup. The default drain is 20 seconds; the remaining grace is
+cleanup headroom, not a validated worst-case shutdown guarantee.
 When increasing the drain deadline, also increase `stop_grace_period`.
 
 Queues and raw-byte bounds apply per subscription; processing concurrency is
@@ -124,66 +138,165 @@ metadata after bootstrap. Network controls must account for all advertised
 endpoints. Private broker hostnames must also be allowed by the
 application's Integration SSRF policy on the API and Kafka worker.
 
-The internal `EventWorkerManager.ready` state becomes true after registration and
-the first successful authoritative reconciliation, including when it owns no subscriptions.
-It does not wait for customer broker connections. Broker failures are isolated
-to subscription retries. Readiness closes when shutdown starts. SIGTERM closes
-new intake/recovery claims and drains within the configured deadline. Membership
-heartbeats and owned placement leases continue through bounded consumer drain;
-consumers stop before leases are released. Unresolved evidence is preserved on
-timeout. Deployment probe endpoints and exec commands are
-deferred to M2; the local compose worker does not install a health probe.
+Startup uses the stable installation/deployment namespace and a fresh worker
+process UUID. It registers/heartbeats membership before claiming a fair share of
+active subscriptions, then reconciles authoritative configuration and starts
+only locally owned consumers. Heartbeats and placement renewal run independently
+of the existing 30-second reconciliation with 10% jitter. Claims, placement leases
+and Kafka group assignment have separate authority and lifetime rules.
+
+The internal `EventWorkerManager.ready` state follows registration and the first
+successful authoritative reconciliation, including a zero target or no owned
+subscriptions. Such workers remain healthy and idle while membership and
+prepared recovery continue. Readiness does not wait for customer brokers; broker
+failure stays within subscription retries. Deployment probe endpoints and exec
+commands are deferred to M2; local compose installs no worker health probe.
+
+For graceful scale-down, close admission/reconciliation and new placement/recovery
+claims, mark membership draining, and keep heartbeats and owned-lease renewals
+running while consumers and prepared work drain. Confirm consumer stop before
+owner-checked placement release; then stop heartbeat/renewal tasks and shared
+clients. If cleanup cannot confirm stop/release, retain unresolved evidence and
+let peers observe lease/membership expiry. Never clear a live owner's lease to
+speed up failover. Crash takeover also waits for expiry, reconciliation/startup
+and Kafka rebalance; heartbeat duration alone is not a failover-time promise.
 
 ## Sizing and rollout
 
-With R workers and S active subscriptions, PostgreSQL placement normally
-distributes the S subscription consumers across the R processes. **R × S** is an
-all-workers/all-subscriptions planning envelope, not the expected steady-state
-client count under placement. Allow for temporary takeover/drain overlap; a lease
-is not strict execution fencing. Each client can hold several broker connections
-and background tasks. Budget broker connections, file descriptors, TLS/SASL load,
-per-subscription queues and database pools across all R processes before scaling.
-Shared processing limits are per process, so their pool-wide upper bound grows with R.
+With R live, non-draining workers and S active subscriptions, placement normally
+runs **S consumers across the fleet**, with no worker owning more than
+**ceil(S/R)** after convergence. Targets differ by at most one and sum to S:
 
-1. Keep activation closed while introducing the database migrations and a backend
-   image containing the completed worker. Run compatible API and Temporal
-   execution workers before starting the local Kafka worker.
-2. Configure matching encryption/signing material, trusted TLS, database access,
-   Temporal retention and broker egress. Keep `APP_EVENTSTREAM_ENABLED=false` until
-   dependencies and persisted state are safe.
-3. Explicitly enable the local worker following the [local Kafka example](../samples/kafka/README.md).
-   Confirm reconciliation and review per-subscription controls before resuming intake.
-4. For supported application rollback, pause subscriptions, wait for persisted
-   worker shutdown acknowledgements, then drain/stop the pool before changing
-   binaries. Keep compatible recovery/cleanup code whenever unresolved or pending
-   inspection evidence exists. Do not downgrade schemas beneath their safety
-   guards.
+| Subscriptions | Workers | Consumers per worker |
+| ---: | ---: | --- |
+| 100 | 3 | `34, 33, 33` |
+| 2 | 3 | `1, 1, 0` |
+| 0 | 3 | `0, 0, 0` |
+
+This balances subscription counts, not traffic. A hot subscription must fit one
+worker; extra replicas do not split it into multiple slots or spread its load.
+There is no load-aware placement or autoscaling. Each consumer can open multiple
+broker connections. Allow temporary takeover/drain overlap during membership
+changes: placement leases are not strict execution fencing, and a new owner
+still needs Kafka assignment and valid delivery claims. Budget actual owned
+queues, file descriptors, TLS/SASL capacity and per-process database pools.
+Processing concurrency is shared per worker, not a fleet-wide throughput guarantee.
+
+1. Apply the additive membership/placement, delivery and initialization models
+   before running code that requires them. Deploy compatible API and Temporal
+   execution workers, configuration and TLS/signing/decryption material.
+2. Close admission and pause subscriptions through revision-checked controls.
+   Drain and **fully stop every old all-subscription worker** before starting
+   lease-based workers. Never mix these topologies during upgrade or rollback.
+3. With old workers and recovery loops stopped, clear only obsolete operational
+   membership/placement for this deployment as described below. Preserve source
+   and group identities, saved boundaries, delivery claims and frozen Execution
+   evidence. Clearing placement is not a replacement for stopping old workers.
+4. Keep feature activation and terminal caching disabled until database, Kafka,
+   Temporal history retention and broker egress are safe. Explicitly start the
+   compatible pool using the [local example](../samples/kafka/README.md), then
+   reconcile state before resuming selected subscriptions.
+5. Enable terminal caching separately, only with compatible readers/writers,
+   shared trust inputs and the operational checks required for that deployment.
+   Disabling it returns duplicate lookup to PostgreSQL without changing identities.
+
+For application rollback, close admission and fully drain/stop the current pool
+before changing topology or binaries. Disable caching before using readers/writers
+that do not understand the proof schema/epoch; drain old cache users and rotate
+the external namespace before later re-enablement. Clear only obsolete
+membership/placement with all workers stopped. Retain compatible recovery and
+cleanup code while unresolved, ambiguous or pending-inspection evidence exists.
+Never down-migrate schemas beneath those guards or delete evidence to permit it.
 
 See [event subscription controls](event-subscription-controls.md) for revision-
 checked actions and durable acknowledgements, and [record runner recovery](kafka-record-runner.md)
 for pending-inspection rollback safeguards.
 
+## Partition initialization and upgrade ambiguity
+
+First activation persists the complete first verified topic partition set,
+independently of the current consumer assignment. Members of that immutable set
+start at the `read_committed` visible end. A partition outside the saved set starts
+at its earliest retained offset, which may be nonzero, including when discovered
+before first activation finishes or after pause/restart. Save initialization kind
+and boundary once; retries reuse the winning saved boundary rather than selecting
+a newer end or beginning. A valid Kafka group checkpoint governs normal resumption.
+
+An established partition with a missing, expired or out-of-range checkpoint is a
+recovery gap. Do not reclassify it as newly added, fall back to its initial offset,
+or automatically reset to latest. A saved incomplete boundary lost to retention
+also requires explicit recovery.
+
+Legacy sources can lack their original saved partition set or initialization
+kind. The additive migration preserves that ambiguity and existing boundaries;
+it does not reconstruct history from today's metadata. An unknown old set must
+remain blocked for guarded recovery or controlled source replacement when
+history cannot be established. Never infer original membership from current
+assignment/metadata or overwrite it to unblock a rollout. See
+[initialization compatibility](eventstreams/kafka-initialization.md#historical-compatibility-and-migration).
+
+## Cache maintenance
+
+Redis eviction, expiry or loss alone needs neither database recovery nor a new
+cache epoch: proofs miss and PostgreSQL supplies/repopulates known outcomes.
+Do not change shared Redis persistence, eviction, authentication or connection
+requirements for this feature. Never use `FLUSHDB` or `FLUSHALL` for Kafka
+maintenance, recovery or tests against shared Redis.
+
+Before shortening cache TTL or terminal retention, or changing the clock-skew
+margin, close admission and drain/stop old consumers, cache readers/writers and
+cleanup processes. Rotate the deployment-managed epoch outside PostgreSQL, then
+install compatible settings on every worker and cleanup process before shorter
+cleanup bounds take effect. Restart and reconcile before reopening admission.
+Do not trust a local disabled flag or deletion of old keys as proof that every
+old reader/writer is fenced. Old/delayed writes must stay in an unreachable old
+namespace. Longer retention does not extend existing cached proofs.
+
 ## Recovery before reactivation
 
-1. Close new activation/admission. If the database is available, pause affected
-   subscriptions through the revision-checked controls and wait for shutdown
-   acknowledgements. Stop the entire Kafka pool before restoring infrastructure;
-   prepared recovery also uses Temporal and must not race a restore.
-2. Restore PostgreSQL with subscription/source identities, generations, group IDs,
+1. Close activation/admission. Where available, pause subscriptions through
+   revision-checked controls and await shutdown acknowledgements. Drain and stop
+   **all** old consumers, recovery loops, cache readers/writers and cleanup workers
+   before restore; prepared recovery must not race database/Temporal restoration.
+2. Fence old cache users and rotate this feature's externally managed UUID epoch
+   outside the PostgreSQL backup/restore domain. Do not restore or reuse the old
+   epoch, mint one per process, or change the persisted installation/deployment ID.
+3. Restore PostgreSQL with subscription/source identities, generations, group IDs,
    initial partition boundaries, claims, recovery holds and delivery/Execution
    evidence. Preserve the credential encryption key and required signing material.
-3. Recover Kafka with matching cluster/topic identities, partitions, retained records
+4. Clear restored operational worker membership and subscription placement for
+   the affected deployment while every worker remains stopped. Clear only
+   `event_consumer_workers` rows and the paired `assigned_worker_id` /
+   `assignment_lease_until` fields on its subscriptions. Preserve delivery claim
+   tokens, recovery holds, source/group identities, initialization boundaries and
+   frozen/terminal delivery/Execution evidence. This is not permission to clear
+   delivery claims or operational recovery decisions.
+5. Recover Kafka with matching cluster/topic identities, partitions, retained records
    and committed consumer-group positions. Recover Temporal namespace/history and
    existing workflow IDs consistently with database Execution evidence. If the
    consistency or source history is uncertain, leave activation closed.
-4. Redis can be rebuilt empty. It must not be used to infer restored delivery state.
-   If terminal-proof caching was enabled, coordinate a fresh externally managed
-   cache epoch while all workers remain stopped before restarting against restored
-   evidence. Do not reuse a pre-restore epoch or allow old writers to repopulate it.
-5. Only after database, Kafka and Temporal recovery is safe, start compatible Kafka
-   workers with subscriptions still paused. Prepared recovery runs independently of
-   active consumers. Review unresolved evidence and use the guarded recovery
-   controls before resuming normal intake. With every Kafka worker stopped this work waits.
+6. Redis proof entries may be discarded/repopulated within the feature namespace;
+   preserve other features' data. A restored cache hit cannot establish database
+   consistency, and no old reader/writer may remain trusted.
+7. Only after PostgreSQL/Kafka/Temporal evidence is consistent, start compatible
+   workers with fresh process UUIDs, the new external epoch and subscriptions still
+   paused. Register/heartbeat and reconcile before reopening admission. Prepared
+   recovery runs without active consumers; it waits when the whole pool is stopped.
+
+The [manual placement reset example](../samples/kafka/reset-placement.example.sql)
+is limited to step 4, also applicable to obsolete topology state during rollout.
+It is never run by setup, migrations or compose. Set `KAFKA_DEPLOYMENT_ID` to the
+existing persisted `Installation.id` for the affected deployment, configure the
+normal PostgreSQL maintenance connection, and verify all stop/epoch prerequisites
+above before an administrator runs it from the repository root:
+
+```bash
+psql --set=ON_ERROR_STOP=on --set=deployment_id="$KAFKA_DEPLOYMENT_ID" \
+  --file=backend/samples/kafka/reset-placement.example.sql
+```
+
+This example does not perform a restore, rotate an epoch or establish evidence
+consistency. Those steps remain explicit administrator responsibilities.
 
 Never reset/delete consumer groups, replace initial boundaries, advance offsets
 manually, delete unresolved deliveries, clear claims as a shortcut, or delete
@@ -193,7 +306,9 @@ recovery controls when retention/compaction removed a required source window.
 ## Verification boundary
 
 Unit tests cover the existing worker composition and independent recovery,
-settings, local compose defaults and disposable fixture configuration. They do
+settings, local compose defaults, disposable fixture configuration and the manual
+example's deployment-scoped mutation boundary. The SQL example is not executed
+against PostgreSQL by these checks. They do
 not establish live deployment, TLS/broker interoperability or restore safety.
 Operator CRDs, deployment builders, reconciliation and deployment probe packaging
 are deferred to M2 and are not covered by this Syntara change.

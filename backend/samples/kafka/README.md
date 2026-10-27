@@ -58,6 +58,12 @@ Use `integration.example.json` as the Integration create-body template:
    `syntara-fixture`, using that Integration and runtime Credential. Leave its
    generated consumer-group identity and initial boundary under application control.
 
+The saved first partition set starts at the `read_committed` visible end; newly
+added partitions start at their earliest retained offset. Retries preserve saved
+boundaries. Missing established checkpoints or unknown legacy first-set history
+need guarded recovery, never an automatic reset to latest. See
+[partition operating guidance](../../docs/kafka-worker-operations.md#partition-initialization-and-upgrade-ambiguity).
+
 Enable the independent worker explicitly; the flag remains false by default:
 
 ```bash
@@ -79,6 +85,15 @@ deferred to M2. The profiles are separate so
 using the worker never provisions a customer broker. Compose's worker grace is
 60 seconds; keep it longer than any overridden drain deadline.
 
+Compose passes through the existing placement heartbeat/liveness/lease settings
+and proof-cache options. Terminal caching remains disabled by default. Its epoch
+and clock-error bound have no generated defaults: if caching is explicitly
+enabled, supply a trusted UUID kept outside PostgreSQL restore and a validated
+clock bound below the skew margin. Reuse that epoch across ordinary restarts.
+Shorter TTL/retention or changed skew needs coordinated drain and external epoch
+rotation before shorter cleanup. Ordinary Redis eviction/loss needs neither
+database recovery nor epoch rotation; never flush shared Redis.
+
 To stop the example, first pause/retire its subscription through normal controls,
 then stop the worker with its grace period and remove only the disposable broker:
 
@@ -94,3 +109,10 @@ Do not run broad volume-removal commands against a stack containing evidence you
 need. See [worker operations](../../docs/kafka-worker-operations.md) for recovery
 ordering and retention safeguards. Live startup, TLS compatibility and workflow
 execution of this fixture remain later verification work.
+
+`reset-placement.example.sql` is a manual operational-state example linked from
+the [restore procedure](../../docs/kafka-worker-operations.md#recovery-before-reactivation).
+It is never part of disposable broker initialization, setup or compose startup.
+It requires every old worker/cache reader/writer to be stopped, external epoch
+coordination, and the existing deployment UUID. It clears only that deployment's
+membership and active-generation placement; delivery claims and evidence remain.
