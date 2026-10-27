@@ -391,7 +391,7 @@ describe('AssignRoleModal', () => {
       })
     })
 
-    // AAP-92801: selecting a project (which resets roleIds with shouldValidate)
+    // Selecting a project (which resets roleIds with shouldValidate)
     // surfaces "Select at least one role" before the user has touched the role
     // picker at all; selecting a role right after should clear it immediately.
     it('clears role error after choosing a project and then a role for a service account', async () => {
