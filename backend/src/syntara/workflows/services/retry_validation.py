@@ -1,7 +1,7 @@
 """Pre-retry validation for retry-from-failure (AAP-92820).
 
   Shared by ``GET /executions/{id}/retry-from-failure-preview`` (pure verdict,
-  no state mutation, reports the default selection) and
+  no state mutation, reports the default or requested selection) and
   ``POST /executions/{id}/retry-from-failure`` (re-validates the caller's
   selection independently before doing any work, so the retry endpoint is safe
   to call directly).

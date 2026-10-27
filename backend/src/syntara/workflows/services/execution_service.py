@@ -1297,6 +1297,7 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
             eligible=validation.eligible,
             reason=validation.reason,
             eligible_point_count=len(validation.eligible_point_ids),
+            retained_result_count=validation.retained_result_count,
         )
         return self._to_preview_response(validation)
 

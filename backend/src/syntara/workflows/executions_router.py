@@ -308,10 +308,11 @@ async def retry_execution(
     operation_id="retry_from_failure_preview",
     summary="Preview retry from failure",
     description="Report whether an execution can be retried from its failure points, and what would re-run. "
-    "Returns the eligible retry points, the re-run step count for each of them, and the deduplicated total "
-    "across all of them. Purely informational: the failure-point selection and any input parameter overrides "
-    "are supplied to the retry endpoint, which re-validates them independently and rejects anything "
-    "unusable. Never mutates any state.",
+    "An optional retry_point_ids query parameter previews a selected subset; when omitted, the preview uses "
+    "all currently failed nodes. Returns the eligible retry points, the re-run step count for each, the "
+    "deduplicated total, and completed results retained outside the retry paths. Purely informational: the "
+    "retry endpoint independently re-validates the selection and any input parameter overrides. "
+    "Never mutates any state.",
     response_model=RetryFromFailureValidationResponse,
     response_description="Retry preview",
     dependencies=[Depends(_exec_perm_run)],

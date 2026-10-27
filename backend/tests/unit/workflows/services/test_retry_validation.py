@@ -152,6 +152,7 @@ async def test_validate_retry_passes_clean_path() -> None:
     assert verdict.eligible_point_ids == ["step_2"]
     assert verdict.step_count_by_eligible_point == {"step_2": 2}
     assert verdict.total_step_count == 2
+    assert verdict.retained_result_count == 1
 
 
 @pytest.mark.asyncio

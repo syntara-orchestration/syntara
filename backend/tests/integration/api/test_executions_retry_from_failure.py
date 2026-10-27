@@ -249,6 +249,7 @@ class TestPreviewRetryFromFailure:
         self, auth_client: AsyncClient, test_db_session: AsyncSession, test_user: User, test_workflow: Workflow
     ) -> None:
         execution = await _eligible_execution(test_db_session, test_workflow, test_user)
+        await _add_completed_activity(test_db_session, execution, "trigger_manual", node_type=NodeType.MANUAL_TRIGGER)
 
         response = await auth_client.get(f"/api/v1/executions/{execution.id}/retry_from_failure_preview")
 
@@ -259,6 +260,27 @@ class TestPreviewRetryFromFailure:
         assert data["eligible_point_ids"] == ["step_2"]
         assert data["step_count_by_eligible_point"] == {"step_2": 2}
         assert data["total_step_count"] == 2
+        assert data["retained_result_count"] == 1
+
+    async def test_preview_uses_explicit_selection_to_calculate_subset_counts(
+        self, auth_client: AsyncClient, test_db_session: AsyncSession, test_user: User, test_workflow: Workflow
+    ) -> None:
+        execution = await _eligible_execution(test_db_session, test_workflow, test_user)
+        await _add_failed_activity(test_db_session, execution, "step_1")
+        await _add_completed_activity(test_db_session, execution, "trigger_manual", node_type=NodeType.MANUAL_TRIGGER)
+
+        response = await auth_client.get(
+            f"/api/v1/executions/{execution.id}/retry_from_failure_preview",
+            params={"retry_point_ids": ["step_2"]},
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["eligible"] is True
+        assert data["eligible_point_ids"] == ["step_2"]
+        assert data["step_count_by_eligible_point"] == {"step_2": 2}
+        assert data["total_step_count"] == 2
+        assert data["retained_result_count"] == 1
 
     async def test_preview_empty_selection_defaults_to_all_failed(
         self, auth_client: AsyncClient, test_db_session: AsyncSession, test_user: User, test_workflow: Workflow
@@ -610,11 +632,7 @@ class TestRetryExecution:
     async def test_retry_rejects_unknown_failure_point_returns_409(
         self, auth_client: AsyncClient, test_db_session: AsyncSession, test_user: User, test_workflow: Workflow
     ) -> None:
-        """Only the retry endpoint accepts a selection, so it owns selection validation.
-
-        The preview takes no selection and therefore cannot reject an unknown point; that
-        check lives here, where a caller can actually supply one.
-        """
+        """The retry endpoint re-validates an explicit selection before creating a run."""
         execution = await _eligible_execution(test_db_session, test_workflow, test_user)
 
         response = await auth_client.post(
@@ -666,14 +684,10 @@ class TestRetryExecution:
         assert data["code"] == "EXECUTION_NOT_RETRYABLE_FROM_FAILURE"
         assert "step_1" in data["detail"]
 
-    async def test_preview_rejects_a_body(
+    async def test_preview_rejects_unknown_explicit_retry_point(
         self, auth_client: AsyncClient, test_db_session: AsyncSession, test_user: User, test_workflow: Workflow
     ) -> None:
-        """The preview takes no selection: a supplied one is ignored, never honoured.
-
-        Locks in that a GET carries no failure-point input, so the endpoint can never be
-        coerced into validating a subset whose re-run count it did not compute.
-        """
+        """An explicit preview selection is validated against the source execution's failures."""
         execution = await _eligible_execution(test_db_session, test_workflow, test_user)
 
         response = await auth_client.get(
@@ -683,7 +697,6 @@ class TestRetryExecution:
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
-        # The unknown point in the query string is not a selection, so eligibility is unaffected
-        # and the reported set is still the default (all currently failed nodes).
-        assert data["eligible"] is True
-        assert data["eligible_point_ids"] == ["step_2"]
+        assert data["eligible"] is False
+        assert data["eligible_point_ids"] == ["step_3"]
+        assert "step_3" in data["reason"]
