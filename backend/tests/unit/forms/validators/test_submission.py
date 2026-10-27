@@ -1,7 +1,7 @@
 """Unit tests for form submission validation and coercion."""
 
 from datetime import datetime, tzinfo
-from typing import Any, Self, get_args
+from typing import Any, Self, cast, get_args
 
 import pytest
 
@@ -87,6 +87,37 @@ class TestSubmissionFlow:
         cleaned = validate_form_submission(form, {"name": empty})
 
         assert cleaned == {"name": ""}
+
+    @pytest.mark.parametrize(
+        ("field_type", "empty", "overrides", "expected"),
+        [
+            ("text", "", {"default": "prefilled"}, ""),
+            ("textarea", [], {"default": "prefilled"}, ""),
+            ("masked_text", None, {"default": "prefilled"}, ""),
+            ("email", "", {"default": "user@example.com"}, ""),
+            ("date", "", {"default": {"date": "2026-01-05"}}, ""),
+            ("number", "", {"default": 7}, None),
+            ("dropdown", [], {"options": _STATIC_OPTIONS, "default": "a"}, None),
+            ("checkbox", None, {"default": True}, False),
+            ("multi_select", [], {"options": _STATIC_OPTIONS, "default": ["a"]}, []),
+        ],
+    )
+    def test_explicit_empty_normalizes_to_field_output_type(
+        self,
+        field_type: str,
+        empty: Any,  # noqa: ANN401
+        overrides: dict[str, Any],
+        expected: Any,  # noqa: ANN401
+    ) -> None:
+        """Every field type emits its canonical empty without applying its default."""
+        form = _form(_field(field_type, "answer", **overrides))
+
+        assert validate_form_submission(form, {"answer": empty}) == {"answer": expected}
+
+    def test_empty_value_normalization_asserts_for_unknown_field_type(self) -> None:
+        """The exhaustive fallback fails if an unknown field kind reaches normalization."""
+        with pytest.raises(AssertionError, match="Expected code to be unreachable"):
+            submission_module._empty_value_for_field(cast("FormField", object()))
 
     @pytest.mark.parametrize("empty", ["", [], None])
     def test_required_explicit_empty_value_does_not_use_default(self, empty: Any) -> None:  # noqa: ANN401
