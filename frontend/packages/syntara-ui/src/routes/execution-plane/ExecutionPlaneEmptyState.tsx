@@ -9,11 +9,9 @@ export function ExecutionPlaneEmptyState({ canConfigure = true }: Readonly<{ can
   return (
     <SynEmptyStateNoData
       title="No execution targets yet"
-      description="Configure an OpenShift integration to register an execution target on the Execution Plane."
-      buttonText={canConfigure ? 'Configure integration' : undefined}
-      addData={
-        canConfigure ? () => detachPromise(navigate({ to: AppRoute.Configuration.Integrations.Configure })) : undefined
-      }
+      description="Configure an execution target to register compute capacity on the installed OpenShift cluster."
+      buttonText={canConfigure ? 'Configure execution target' : undefined}
+      addData={canConfigure ? () => detachPromise(navigate({ to: AppRoute.ExecutionPlane.Create })) : undefined}
     />
   )
 }

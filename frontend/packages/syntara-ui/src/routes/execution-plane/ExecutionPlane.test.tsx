@@ -118,6 +118,9 @@ describe('ExecutionPlane', () => {
 
     expect(await screen.findByRole('heading', { level: 1, name: 'Execution Plane' })).toBeInTheDocument()
     expectPageTitle(['Execution Plane'])
+    expect(
+      screen.getByText('Configure execution plane workers, groups, and connectivity for on-cluster workload execution.')
+    ).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Prod OpenShift West' })).toHaveAttribute('href', '/execution-plane/et-001')
     expect(screen.getByRole('link', { name: 'Staging OpenShift' })).toHaveAttribute('href', '/execution-plane/et-002')
     expect(screen.getByText('cl-001')).toBeInTheDocument()
@@ -298,7 +301,7 @@ describe('ExecutionPlane', () => {
     render(<ExecutionPlane />, { wrapper })
 
     expect(await screen.findByText('No execution targets yet')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Configure integration' })).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: 'Configure execution target' }).length).toBeGreaterThan(0)
   })
 
   it('hides configure action in empty state when user cannot create execution targets', async () => {
@@ -308,7 +311,7 @@ describe('ExecutionPlane', () => {
     render(<ExecutionPlane />, { wrapper })
 
     expect(await screen.findByText('No execution targets yet')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Configure integration' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Configure execution target' })).not.toBeInTheDocument()
   })
 
   it('shows filter-empty state and toolbar when filters are active but no targets match', async () => {

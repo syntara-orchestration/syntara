@@ -1,6 +1,6 @@
 import { createRoute } from '@tanstack/react-router'
 
-import { ExecutionPlane, ExecutionTargetDetail } from '../lazyRoutes'
+import { CreateExecutionTarget, ExecutionPlane, ExecutionTargetDetail } from '../lazyRoutes'
 import { makeRouteComponent } from '../makeRouteComponent'
 import { listSearchParams } from '../routeSearchParams'
 
@@ -14,6 +14,14 @@ export const executionPlaneRoutes = [
     path: '/execution-plane',
     validateSearch: executionPlaneSearch,
     component: makeRouteComponent(<ExecutionPlane />, { action: 'read', resourceType: 'execution_target' }),
+  }),
+  createRoute({
+    getParentRoute: () => rootRoute,
+    path: '/execution-plane/create',
+    component: makeRouteComponent(<CreateExecutionTarget />, {
+      action: 'create',
+      resourceType: 'execution_target',
+    }),
   }),
   createRoute({
     getParentRoute: () => rootRoute,

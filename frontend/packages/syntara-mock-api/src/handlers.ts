@@ -14,7 +14,11 @@ import {
   WorkflowVersionStatusEnum,
 } from '@syntara/contracts'
 import { credentials, credentialTypes, credentialWorkflows } from './resources/credentials'
-import { executionTargets, MOCK_DELETE_CONFLICT_LABEL } from './resources/executionTargets'
+import {
+  executionTargets,
+  INSTALLED_EXECUTION_PLANE_CLUSTER_ID,
+  MOCK_DELETE_CONFLICT_LABEL,
+} from './resources/executionTargets'
 import { integrations } from './resources/integrations'
 import { models } from './resources/models'
 import { workflows } from './resources/workflows'
@@ -568,10 +572,6 @@ export const handlers = [
     return HttpResponse.json(target)
   }),
 
-  /**
-   * Minimal POST for E2E self-containment (create-then-delete). The Create PR owns
-   * the full form-oriented handler; merge should keep the richer create validation.
-   */
   http.post('/api/execution_plane/v1/execution_targets', async ({ request }) => {
     const username = getUsernameFromRequest(request)
     if (username !== 'admin') {
@@ -589,12 +589,19 @@ export const handlers = [
 
     const body = (await request.json()) as {
       name?: string
-      placement?: { namespace?: string; node_selectors?: string[]; tolerations?: string[] }
+      placement?: {
+        type?: 'kubernetes'
+        namespace?: string
+        node_selectors?: string[]
+        tolerations?: string[]
+      }
       labels?: Record<string, string>
       is_default?: boolean
     }
+
     const name = body.name?.trim() ?? ''
     const namespace = body.placement?.namespace?.trim() ?? ''
+
     if (!name || !namespace) {
       return HttpResponse.json(
         {
@@ -608,15 +615,45 @@ export const handlers = [
       )
     }
 
-    const seedClusterId = executionTargets[0]?.cluster_id ?? 'b1000000-0000-4000-8000-000000000001'
-    const seedEndpoint = executionTargets[0]?.endpoint ?? 'https://api.openshift.example.com:6443'
+    if (executionTargets.some((target) => target.name.toLowerCase() === name.toLowerCase())) {
+      return HttpResponse.json(
+        {
+          type: 'https://api.example.com/errors/conflict',
+          title: 'Conflict',
+          detail: `An execution target named "${name}" already exists`,
+          code: 'CONFLICT',
+          retryable: false,
+        },
+        { status: 409 }
+      )
+    }
+
+    const openshiftIntegrations = integrations.filter((item) => item.integration_type === IntegrationTypeEnum.OPENSHIFT)
+    if (openshiftIntegrations.length !== 1) {
+      return HttpResponse.json(
+        {
+          type: 'https://api.example.com/errors/conflict',
+          title: 'Conflict',
+          detail: 'Expected exactly one installed Execution Plane cluster',
+          code: 'CONFLICT',
+          retryable: false,
+        },
+        { status: 409 }
+      )
+    }
+
+    const openshiftIntegration = openshiftIntegrations[0]
+    const clusterId = openshiftIntegration?.id ?? INSTALLED_EXECUTION_PLANE_CLUSTER_ID
     const id = uuidv4()
     const created = {
       id,
-      cluster_id: seedClusterId,
+      cluster_id: clusterId,
       name,
       backend_type: 'kubernetes',
-      endpoint: seedEndpoint,
+      endpoint:
+        openshiftIntegration?.configuration && 'base_url' in openshiftIntegration.configuration
+          ? String(openshiftIntegration.configuration.base_url)
+          : 'https://api.openshift.example.com:6443',
       placement: {
         type: 'kubernetes' as const,
         namespace,
@@ -627,14 +664,21 @@ export const handlers = [
       enabled: true,
       is_default: body.is_default ?? false,
       status_message: null,
-      labels: body.labels ?? {},
+      labels: {
+        ...(body.labels ?? {}),
+        ...(openshiftIntegration ? { integration_id: openshiftIntegration.id } : {}),
+      },
       created_at: mockDate.now,
       last_ran_at: null,
     }
+
     executionTargets.unshift(created)
+
     return HttpResponse.json(created, {
       status: 201,
-      headers: { Location: `/api/execution_plane/v1/execution_targets/${id}` },
+      headers: {
+        Location: `/api/execution_plane/v1/execution_targets/${id}`,
+      },
     })
   }),
 
