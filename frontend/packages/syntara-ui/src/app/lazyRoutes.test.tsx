@@ -1,26 +1,11 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import { Suspense } from 'react'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, it, vi } from 'vitest'
 
-import {
-  AccessManagement,
-  AddIdentityProvider,
-  Approvals,
-  Authentication,
-  Workflows,
-  BuilderEdit,
-  BuilderNew,
-  EditIdentityProvider,
-  ExecutionDetail,
-  Executions,
-  Glossary,
-  IntegrationForm,
-  Integrations,
-  SettingsCategoryRoute,
-} from './lazyRoutes'
+import * as lazyRouteComponents from './lazyRoutes'
 
-// Stub every route component so lazy resolution succeeds without
-// pulling in the full dependency tree of each page.
+// Stub route components so the test exercises the lazy import mappings without
+// pulling in each route's data hooks and page dependencies.
 vi.mock('../routes/workflows/Workflows', () => ({ default: () => <div>Workflows</div> }))
 vi.mock('../routes/builder/BuilderNew', () => ({ default: () => <div>BuilderNew</div> }))
 vi.mock('../routes/builder/BuilderEdit', () => ({ default: () => <div>BuilderEdit</div> }))
@@ -29,9 +14,14 @@ vi.mock('../routes/executions/ExecutionDetail', () => ({ default: () => <div>Exe
 vi.mock('../routes/configuration/integrations/form/IntegrationForm', () => ({
   IntegrationForm: () => <div>IntegrationForm</div>,
 }))
-vi.mock('../routes/configuration/integrations/Integrations', () => ({
-  default: () => <div>Integrations</div>,
+vi.mock('../routes/configuration/integrations/Integrations', () => ({ default: () => <div>Integrations</div> }))
+vi.mock('../routes/configuration/integrations/IntegrationDetail', () => ({
+  IntegrationDetail: () => <div>IntegrationDetail</div>,
 }))
+vi.mock('../routes/configuration/integrations/EditIntegrationForm', () => ({
+  EditIntegrationForm: () => <div>EditIntegration</div>,
+}))
+vi.mock('../routes/configuration/settings/Settings', () => ({ default: () => <div>Settings</div> }))
 vi.mock('../routes/configuration/settings/SettingsCategoryRoute', () => ({
   SettingsCategoryRoute: () => <div>SettingsCategoryRoute</div>,
 }))
@@ -46,58 +36,88 @@ vi.mock('../routes/access-management/authentication/Authentication', () => ({
 vi.mock('../routes/access-management/authentication/identity-providers/AddIdentityProvider', () => ({
   AddIdentityProvider: () => <div>AddIdentityProvider</div>,
 }))
+vi.mock('../routes/access-management/authentication/identity-providers/IdentityProviderDetail', () => ({
+  IdentityProviderDetail: () => <div>IdentityProviderDetail</div>,
+}))
 vi.mock('../routes/access-management/authentication/identity-providers/EditIdentityProvider', () => ({
   EditIdentityProvider: () => <div>EditIdentityProvider</div>,
 }))
+vi.mock('../routes/access-management/authentication/identity-providers/EditGroupMapping', () => ({
+  EditGroupMapping: () => <div>EditGroupMapping</div>,
+}))
+vi.mock('../routes/access-management/users/CreateUser', () => ({ CreateUser: () => <div>CreateUser</div> }))
+vi.mock('../routes/access-management/users/UserDetail', () => ({
+  UserDetail: () => <div>UserDetail</div>,
+  UserDetailTabRoute: () => <div>UserDetailTabRoute</div>,
+}))
+vi.mock('../routes/access-management/users/MyProfile', () => ({ MyProfile: () => <div>MyProfile</div> }))
+vi.mock('../routes/access-management/users/EditUser', () => ({ EditUser: () => <div>EditUser</div> }))
+vi.mock('../routes/access-management/users/TransferIdentityWizard', () => ({
+  TransferIdentityWizard: () => <div>TransferIdentityWizard</div>,
+}))
+vi.mock('../routes/access-management/groups/GroupDetail', () => ({ GroupDetail: () => <div>GroupDetail</div> }))
+vi.mock('../routes/access-management/projects/ProjectDetail', () => ({ ProjectDetail: () => <div>ProjectDetail</div> }))
+vi.mock('../routes/access-management/service-accounts/ServiceAccountDetail', () => ({
+  ServiceAccountDetail: () => <div>ServiceAccountDetail</div>,
+}))
+vi.mock('../routes/configuration/credentials/Credentials', () => ({ default: () => <div>Credentials</div> }))
+vi.mock('../routes/configuration/credentials/CredentialDetail', () => ({
+  default: () => <div>CredentialDetail</div>,
+  CredentialDetailsTabRoute: () => <div>CredentialDetailsTabRoute</div>,
+  CredentialWorkflowsTabRoute: () => <div>CredentialWorkflowsTabRoute</div>,
+  CredentialIntegrationsTabRoute: () => <div>CredentialIntegrationsTabRoute</div>,
+}))
+
+const lazyRouteNames = [
+  'Workflows',
+  'BuilderNew',
+  'BuilderEdit',
+  'Executions',
+  'ExecutionDetail',
+  'IntegrationForm',
+  'Integrations',
+  'IntegrationDetail',
+  'EditIntegration',
+  'Settings',
+  'SettingsCategoryRoute',
+  'Glossary',
+  'Approvals',
+  'AccessManagement',
+  'Authentication',
+  'AddIdentityProvider',
+  'IdentityProviderDetail',
+  'EditIdentityProvider',
+  'EditGroupMapping',
+  'CreateUser',
+  'UserDetail',
+  'UserDetailTabRoute',
+  'MyProfile',
+  'EditUser',
+  'TransferIdentityWizard',
+  'GroupDetail',
+  'ProjectDetail',
+  'ServiceAccountDetail',
+  'Credentials',
+  'CredentialDetail',
+  'CredentialDetailsTabRoute',
+  'CredentialWorkflowsTabRoute',
+  'CredentialIntegrationsTabRoute',
+] as const
 
 describe('lazyRoutes', () => {
-  it('exports all lazy components', () => {
-    const components = [
-      Workflows,
-      BuilderNew,
-      BuilderEdit,
-      Executions,
-      ExecutionDetail,
-      IntegrationForm,
-      Integrations,
-      SettingsCategoryRoute,
-      Glossary,
-      Approvals,
-      AccessManagement,
-      Authentication,
-      AddIdentityProvider,
-      EditIdentityProvider,
-    ]
-    for (const component of components) {
-      expect(component).toBeDefined()
-    }
+  it('covers every lazy route export', () => {
+    expect(Object.keys(lazyRouteComponents).sort()).toEqual([...lazyRouteNames].sort())
   })
 
-  describe('lazy components resolve correctly', () => {
-    it.each([
-      ['Workflows', Workflows, 'Workflows'],
-      ['BuilderNew', BuilderNew, 'BuilderNew'],
-      ['BuilderEdit', BuilderEdit, 'BuilderEdit'],
-      ['Executions', Executions, 'Executions'],
-      ['ExecutionDetail', ExecutionDetail, 'ExecutionDetail'],
-      ['IntegrationForm', IntegrationForm, 'IntegrationForm'],
-      ['Integrations', Integrations, 'Integrations'],
-      ['SettingsCategoryRoute', SettingsCategoryRoute, 'SettingsCategoryRoute'],
-      ['Glossary', Glossary, 'Glossary'],
-      ['Approvals', Approvals, 'Approvals'],
-      ['AccessManagement', AccessManagement, 'AccessManagement'],
-      ['Authentication', Authentication, 'Authentication'],
-      ['AddIdentityProvider', AddIdentityProvider, 'AddIdentityProvider'],
-      ['EditIdentityProvider', EditIdentityProvider, 'EditIdentityProvider'],
-    ] as const)('resolves %s', async (_name, Component, expectedText) => {
-      render(
-        <Suspense fallback={<div>loading</div>}>
-          <Component />
-        </Suspense>
-      )
-      await waitFor(() => {
-        expect(screen.getByText(expectedText)).toBeInTheDocument()
-      })
-    })
+  it.each(lazyRouteNames)('resolves %s', async (name) => {
+    const Component = lazyRouteComponents[name]
+
+    render(
+      <Suspense fallback={<div>loading</div>}>
+        <Component />
+      </Suspense>
+    )
+
+    expect(await screen.findByText(name)).toBeInTheDocument()
   })
 })

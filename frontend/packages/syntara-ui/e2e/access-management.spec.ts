@@ -321,10 +321,8 @@ test.describe('Access Management — User Detail Tabs', () => {
     await groupsTab.click()
     await expect(app).toHaveURL(new RegExp(`${userDetailUrl}/groups$`))
     await expect(groupsTab).toHaveAttribute('aria-selected', 'true')
-    const groupsPanel = app.getByRole('tabpanel', { name: 'groups' })
-    await expect(groupsPanel).toHaveCSS('display', 'flex')
-    await expect(groupsPanel).toHaveCSS('flex-grow', '1')
-    await expect(groupsPanel).toHaveCSS('min-height', '0px')
+    const groupsPanel = app.getByRole('tabpanel', { name: 'Groups' })
+    await expect(groupsPanel).toBeVisible()
 
     // Click Assignments sub-tab. Its visible label differs from its URL segment.
     const assignmentsTab = app.getByRole('tab', { name: /Assignments/i })
@@ -332,6 +330,10 @@ test.describe('Access Management — User Detail Tabs', () => {
     await assignmentsTab.click()
     await expect(app).toHaveURL(new RegExp(`${userDetailUrl}/roles$`))
     await expect(assignmentsTab).toHaveAttribute('aria-selected', 'true')
+    const assignmentsPanel = app.getByRole('tabpanel', { name: 'Assignments' })
+    await expect(assignmentsPanel).toBeVisible()
+    await expect(app.getByRole('tabpanel')).toHaveCount(1)
+    expect(await assignmentsTab.getAttribute('aria-controls')).toBe(await assignmentsPanel.getAttribute('id'))
 
     // Browser history restores the previous nested tab and its selection.
     await app.goBack()

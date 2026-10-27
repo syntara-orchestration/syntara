@@ -118,10 +118,8 @@ test.describe('Credential Detail Page & Workflows Tab', () => {
       // Assert - The selected tab and the URL stay in sync
       await expect(app).toHaveURL(/\/workflows$/)
       await expect(workflowsTab).toHaveAttribute('aria-selected', 'true')
-      const workflowsPanel = app.getByRole('tabpanel', { name: 'workflows' })
-      await expect(workflowsPanel).toHaveCSS('display', 'flex')
-      await expect(workflowsPanel).toHaveCSS('flex-grow', '1')
-      await expect(workflowsPanel).toHaveCSS('min-height', '0px')
+      const workflowsPanel = app.getByRole('tabpanel', { name: 'Workflows' })
+      await expect(workflowsPanel).toBeVisible()
 
       // Assert - Workflows tab content loaded (table or empty state)
       const workflowsTable = app.getByRole('grid', { name: 'Workflows using this credential' })

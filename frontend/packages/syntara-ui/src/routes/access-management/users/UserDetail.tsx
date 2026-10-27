@@ -195,6 +195,14 @@ function UserDetailsTab({
 }
 
 type UserTab = 'details' | 'groups' | 'identities' | 'roles' | 'permissions' | 'check-access'
+const USER_DETAIL_TAB_PANEL_LABELS: Readonly<Record<UserTab, string>> = {
+  details: 'Details',
+  groups: 'Groups',
+  identities: 'Identities',
+  roles: 'Assignments',
+  permissions: 'Permissions',
+  'check-access': 'Check my access',
+}
 
 function computeVisibleTabs({
   canReadGroups,
@@ -249,6 +257,8 @@ function UserDetailTabBar({
       validTabs={validTabs}
       aria-label="User details"
       renderPanel={renderPanel}
+      routePanelLayout="detail"
+      tabPanelLabels={USER_DETAIL_TAB_PANEL_LABELS}
     >
       <Tab eventKey="details" title={<TabTitleText>Details</TabTitleText>} />
       {validTabs.includes('groups') && (
@@ -299,6 +309,7 @@ function UserDetailTabContent({
   currentUserId,
   identitiesData,
   isOwnProfile,
+  isNestedRoute = false,
 }: Readonly<{
   activeTab: string
   validTabs: UserTab[]
@@ -307,6 +318,7 @@ function UserDetailTabContent({
   currentUserId: string | undefined
   identitiesData: Pick<UserIdentity, 'provider_name' | 'identity_provider_id'>[]
   isOwnProfile: boolean
+  isNestedRoute?: boolean
 }>) {
   return (
     <>
@@ -325,8 +337,8 @@ function UserDetailTabContent({
         <RoleAssignmentsPanel
           principalType={RolePrincipalType.USER}
           principalId={userId}
-          tabKey="roles"
-          tabLabel="Assignments"
+          tabKey={isNestedRoute ? undefined : 'roles'}
+          tabLabel={isNestedRoute ? undefined : 'Assignments'}
         />
       )}
       {activeTab === 'permissions' && isOwnProfile && <MyPermissionsView />}
@@ -350,7 +362,7 @@ const UserDetailTabContext = createContext<UserDetailTabContextValue | null>(nul
 export function UserDetailTabRoute() {
   const context = use(UserDetailTabContext)
   if (!context) throw new Error('User detail tab routes must be rendered inside UserDetail')
-  return <UserDetailTabContent {...context} />
+  return <UserDetailTabContent {...context} isNestedRoute />
 }
 
 export type UserDetailProps = {

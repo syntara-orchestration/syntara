@@ -49,9 +49,9 @@ type RoleAssignmentsPanelProps = {
   principalType: RolePrincipalType
   principalId: string
   hiddenColumns?: RoleAssignmentColumnKey[]
-  /** When rendered inside `SynListPanelTabs`, pass the tab `eventKey` for tabpanel ARIA. */
+  /** Tab key for the `SynListPanelView` wrapper when rendered as an inline `SynListPanelTabs` panel. */
   tabKey?: string
-  /** Accessible name for the tab panel; required when `tabKey` is set. */
+  /** Accessible name for that wrapper; required when `tabKey` is set. */
   tabLabel?: string
 }
 

@@ -304,6 +304,10 @@ export type SynListPanelTabsProps = Omit<TabsProps, 'activeKey' | 'onSelect' | '
   children: ReactNode
   /** Render the active nested route in the selected tab panel. */
   renderPanel?: (activeTab: string) => ReactNode
+  /** Accessible panel names by tab key. Unlisted panels use their tab key as a fallback. */
+  tabPanelLabels?: Readonly<Record<string, string>>
+  /** Applies the full-height spacing layout used by nested detail tabs. */
+  routePanelLayout?: 'detail'
 }
 
 /** URL-driven tabs for use inside `SynListPanel`. */
@@ -313,6 +317,8 @@ export function SynListPanelTabs({
   validTabs,
   children,
   renderPanel,
+  tabPanelLabels,
+  routePanelLayout,
   ...tabsProps
 }: SynListPanelTabsProps) {
   const tabCtx = useSynListPanelTabContext()
@@ -335,6 +341,8 @@ export function SynListPanelTabs({
         defaultTab={defaultTab}
         validTabs={validTabs}
         renderPanel={renderPanel}
+        tabPanelLabels={tabPanelLabels}
+        routePanelLayout={routePanelLayout}
         {...tabsProps}
       >
         {clonedChildren}

@@ -7,6 +7,7 @@ import { axe } from 'vitest-axe'
 import { routerTestState } from '../../test/setup'
 
 import { SynUrlTabs } from './SynUrlTabs'
+import styles from './SynUrlTabs.module.css'
 
 describe('SynUrlTabs', () => {
   beforeEach(() => {
@@ -107,6 +108,42 @@ describe('SynUrlTabs', () => {
     )
 
     expect(routerTestState.navigate).not.toHaveBeenCalled()
+  })
+
+  it('uses the provided human-readable label for a nested route panel', () => {
+    render(
+      <SynUrlTabs
+        basePath="/base"
+        tabPanelLabels={{ 'tab-a': 'Tab A' }}
+        renderPanel={(activeTab) => <div>Route content for {activeTab}</div>}
+        aria-label="Test tabs"
+      >
+        <Tab eventKey="tab-a" title="Tab A" />
+        <Tab eventKey="tab-b" title="Tab B" />
+      </SynUrlTabs>
+    )
+
+    expect(screen.getByRole('tabpanel', { name: 'Tab A' })).toHaveTextContent('Route content for tab-a')
+  })
+
+  it('only applies the detail panel layout when requested', () => {
+    const renderTabs = (routePanelLayout?: 'detail') => (
+      <SynUrlTabs
+        basePath="/base"
+        routePanelLayout={routePanelLayout}
+        renderPanel={() => <div>Route content</div>}
+        aria-label="Test tabs"
+      >
+        <Tab eventKey="tab-a" title="Tab A" />
+      </SynUrlTabs>
+    )
+
+    const { rerender } = render(renderTabs())
+    const panel = screen.getByRole('tabpanel', { name: 'tab-a' })
+    expect(panel).not.toHaveClass(styles.routePanel)
+
+    rerender(renderTabs('detail'))
+    expect(screen.getByRole('tabpanel', { name: 'tab-a' })).toHaveClass(styles.routePanel)
   })
 
   it('redirects to first validTab when no defaultTab is provided', async () => {
