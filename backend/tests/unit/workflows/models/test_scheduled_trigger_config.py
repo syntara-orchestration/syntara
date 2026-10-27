@@ -202,6 +202,15 @@ class TestCronExpressionValidation:
                 cron="every day at 9am",
             )
 
+    @pytest.mark.parametrize("cron", ["\u0660 \u0669 * * *", "\uff10 \uff19 * * *"])
+    async def test_rejects_non_ascii_cron_digits(self, cron: str) -> None:
+        """Cron fields must use ASCII digits accepted by Temporal."""
+        with pytest.raises((ValidationError, ValueError)):
+            ScheduledTriggerConfig(
+                schedule_type=ScheduleType.CRON,
+                cron=cron,
+            )
+
     async def test_rejects_cron_with_special_chars(self) -> None:
         """Cron with special characters should be rejected."""
         with pytest.raises((ValidationError, ValueError)):
