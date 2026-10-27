@@ -95,11 +95,14 @@ def _build_diamond_graph() -> WorkflowGraph:
     return WorkflowGraph(backend)
 
 
-def _build_chain_graph() -> WorkflowGraph:
+def _build_chain_graph(node_a_outputs: dict[str, str] | None = None) -> WorkflowGraph:
     """Build: trigger -> A -> B -> C (three-node chain)."""
     backend = InMemoryGraphBackend()
     backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
-    backend.add_node("node_a", {"id": "node_a", "type": "script", "parameters": {}})
+    backend.add_node(
+        "node_a",
+        {"id": "node_a", "type": "script", "parameters": {}, "outputs": node_a_outputs},
+    )
     backend.add_node("node_b", {"id": "node_b", "type": "script", "parameters": {}})
     backend.add_node("node_c", {"id": "node_c", "type": "script", "parameters": {}})
     backend.add_edge("trigger", "node_a", None)
@@ -1293,11 +1296,21 @@ class TestExtractFailureOutput:
         """Failure fallback must not evaluate an already-invalid output mapping."""
         wf = _make_workflow()
         graph = _build_chain_graph()
-        graph.get_node("node_a").outputs = {"value": "${result.stdout_json.value}"}
+        graph = _build_chain_graph({"value": "${result.stdout_json.value}"})
 
         result = wf._extract_failure_output("node_a", None, graph)
 
         assert result["stdout_json"] is None
+
+    def test_valid_mapping_is_preserved_in_workflow_failure_handling(self) -> None:
+        """Failure fallback must retain aliases used by downstream recovery steps."""
+        wf = _make_workflow()
+        graph = _build_chain_graph()
+        graph = _build_chain_graph({"value": "${result.stdout}"})
+
+        result = wf._extract_failure_output("node_a", None, graph)
+
+        assert result == {"value": None}
 
 
 class TestEvaluatePredecessor:
