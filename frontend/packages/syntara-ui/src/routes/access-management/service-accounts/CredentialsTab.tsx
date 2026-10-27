@@ -23,7 +23,6 @@ import { detachPromise } from '../../../utils/detachPromise'
 import { accessClient } from '../../access/accessClient'
 
 import { CreateCredentialModal } from './CreateCredentialModal'
-import styles from './CredentialsTab.module.css'
 import { RotateDialogBody } from './RotateDialogBody'
 import { DEFAULT_GRACE_PERIOD, GRACE_PERIOD_OPTIONS } from './rotateDialogUtils'
 import { RotationGraceIndicator } from './RotationGraceIndicator'
@@ -305,7 +304,7 @@ function CredentialsTable({
                 aria-disabled={!permissions.canUpdate || undefined}
               />
             </Td>
-            <Td dataLabel="Rotation status" modifier="nowrap" className={styles.rotationCell}>
+            <Td dataLabel="Rotation status" modifier="nowrap">
               <RotationGraceIndicator oldSecretValidUntil={cred.old_secret_valid_until} />
             </Td>
             <Td isActionCell>
