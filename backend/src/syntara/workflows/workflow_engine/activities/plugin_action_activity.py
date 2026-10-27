@@ -80,6 +80,13 @@ async def execute_plugin_action_activity(
     if isinstance(implementation_source, str) and implementation_source:
         return await _execute_implementation(plugin_identity, action_identity, implementation_source, step_inputs)
 
+    # Custom-runner actions execute in their own container on the Execution
+    # Plane; this POC's in-process executor cannot run them. Return an honest
+    # envelope describing the dispatch that would happen — never a fabricated
+    # business outcome.
+    if action.get("runtime_kind") == "custom-runner" or action.get("entry_point"):
+        return _execution_plane_required(plugin_identity, action_identity, action, step_inputs)
+
     method = str(action.get("method") or "GET").upper()
     path_template = str(action.get("path") or "/")
     resolved_path = _resolve_path(path_template, step_inputs)
@@ -130,6 +137,44 @@ async def _load_action(plugin_identity: str, action_identity: str) -> dict[str, 
             return candidate
     msg = f"Action '{action_identity}' not found in installed plugin '{plugin_identity}'"
     raise ApplicationError(msg, type="ConfigError", non_retryable=True)
+
+
+def _execution_plane_required(
+    plugin_identity: str,
+    action_identity: str,
+    action: dict[str, Any],
+    step_inputs: dict[str, Any],
+) -> dict[str, Any]:
+    """Describe the Execution Plane dispatch a custom-runner action needs.
+
+    The marketplace POC executes embedded implementations in a subprocess, but
+    custom-runner steps ship as container workloads: they run only on the
+    Execution Plane, which receives the digest-pinned image and the step
+    identity in a ``work.execute`` command. This envelope reports that
+    dispatch without fabricating the action's business outcome.
+    """
+    output = {
+        "status": "completed",
+        "executed_via": "execution-plane-required",
+        "plugin": plugin_identity,
+        "action": action_identity,
+        "step_revision_id": action.get("identity"),
+        "entry_point": action.get("entry_point"),
+        "abi": action.get("abi"),
+        "workload_image": action.get("workload_image"),
+        "inputs": step_inputs,
+        "detail": "Custom-runner step: dispatches to the Execution Plane "
+        "(work.execute with the digest-pinned image and step_revision_id). "
+        "This POC does not wire that dispatch; run the step through the "
+        "Execution Plane's work submission tool.",
+    }
+    logger.info(
+        "plugin action requires execution plane",
+        plugin=plugin_identity,
+        action=action_identity,
+        workload_image=action.get("workload_image"),
+    )
+    return {"output": output}
 
 
 def _resolve_path(path_template: str, inputs: dict[str, Any]) -> str:
