@@ -68,7 +68,8 @@
     "vite": "^8.3.1",
     "playwright-core": "1.63.0",
     "playwright": "1.63.0",
-    "qs": "^6.16.0"
+    "qs": "^6.16.0",
+    "seroval": "^1.6.8"
   },
   "devDependencies": {
     "@emnapi/core": "2.0.0-alpha.3",
