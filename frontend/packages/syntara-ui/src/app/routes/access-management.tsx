@@ -2,13 +2,30 @@ import { createRoute } from '@tanstack/react-router'
 
 import {
   AccessManagement,
+  AccessManagementCheckAccessRoute,
+  AccessManagementTokenRevocationRoute,
+  AssignmentsTab,
   CreateUser,
   EditUser,
   GroupDetail,
+  GroupDetailAssignmentsTabRoute,
+  GroupDetailDetailsTabRoute,
+  GroupDetailMembersTabRoute,
+  GroupDetailUnknownTabRoute,
+  PoliciesTab,
   ProjectDetail,
+  ProjectDetailAssignmentsTabRoute,
+  ProjectDetailDetailsTabRoute,
+  ProjectDetailUnknownTabRoute,
+  ProjectDetailWorkflowsTabRoute,
+  RolesTab,
   ServiceAccountDetail,
   TransferIdentityWizard,
   UserDetail,
+  UsersTab,
+  GroupsTab,
+  ProjectsTab,
+  ServiceAccountsTab,
 } from '../lazyRoutes'
 import { makeRouteComponent } from '../makeRouteComponent'
 import { listSearchParams } from '../routeSearchParams'
@@ -17,19 +34,136 @@ import { rootRoute } from './__root'
 
 const accessMgmtSearch = listSearchParams.catch({})
 
+const accessManagementRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/system-administration/access-management',
+  validateSearch: accessMgmtSearch,
+  component: makeRouteComponent(<AccessManagement />),
+})
+
+const accessManagementTabRoutes = [
+  createRoute({
+    getParentRoute: () => accessManagementRoute,
+    path: '/users',
+    validateSearch: accessMgmtSearch,
+    component: makeRouteComponent(<UsersTab />),
+  }),
+  createRoute({
+    getParentRoute: () => accessManagementRoute,
+    path: '/groups',
+    validateSearch: accessMgmtSearch,
+    component: makeRouteComponent(<GroupsTab />),
+  }),
+  createRoute({
+    getParentRoute: () => accessManagementRoute,
+    path: '/projects',
+    validateSearch: accessMgmtSearch,
+    component: makeRouteComponent(<ProjectsTab />),
+  }),
+  createRoute({
+    getParentRoute: () => accessManagementRoute,
+    path: '/policies',
+    validateSearch: accessMgmtSearch,
+    component: makeRouteComponent(<PoliciesTab />),
+  }),
+  createRoute({
+    getParentRoute: () => accessManagementRoute,
+    path: '/roles',
+    component: makeRouteComponent(<RolesTab />),
+  }),
+  createRoute({
+    getParentRoute: () => accessManagementRoute,
+    path: '/service-accounts',
+    validateSearch: accessMgmtSearch,
+    component: makeRouteComponent(<ServiceAccountsTab />),
+  }),
+  createRoute({
+    getParentRoute: () => accessManagementRoute,
+    path: '/assignments',
+    component: makeRouteComponent(<AssignmentsTab />),
+  }),
+  createRoute({
+    getParentRoute: () => accessManagementRoute,
+    path: '/check-access',
+    component: makeRouteComponent(<AccessManagementCheckAccessRoute />),
+  }),
+  createRoute({
+    getParentRoute: () => accessManagementRoute,
+    path: '/token-revocation',
+    component: makeRouteComponent(<AccessManagementTokenRevocationRoute />),
+  }),
+]
+
+const groupDetailRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/system-administration/access-management/groups/$groupId',
+  component: makeRouteComponent(<GroupDetail />),
+})
+
+const groupDetailTabRoutes = [
+  createRoute({
+    getParentRoute: () => groupDetailRoute,
+    path: '/',
+    component: makeRouteComponent(<GroupDetailDetailsTabRoute />),
+  }),
+  createRoute({
+    getParentRoute: () => groupDetailRoute,
+    path: '/details',
+    component: makeRouteComponent(<GroupDetailDetailsTabRoute />),
+  }),
+  createRoute({
+    getParentRoute: () => groupDetailRoute,
+    path: '/members',
+    component: makeRouteComponent(<GroupDetailMembersTabRoute />),
+  }),
+  createRoute({
+    getParentRoute: () => groupDetailRoute,
+    path: '/roles',
+    component: makeRouteComponent(<GroupDetailAssignmentsTabRoute />),
+  }),
+  createRoute({
+    getParentRoute: () => groupDetailRoute,
+    path: '/$tab',
+    component: makeRouteComponent(<GroupDetailUnknownTabRoute />),
+  }),
+]
+
+const projectDetailRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/system-administration/access-management/projects/$projectId',
+  component: makeRouteComponent(<ProjectDetail />),
+})
+
+const projectDetailTabRoutes = [
+  createRoute({
+    getParentRoute: () => projectDetailRoute,
+    path: '/',
+    component: makeRouteComponent(<ProjectDetailDetailsTabRoute />),
+  }),
+  createRoute({
+    getParentRoute: () => projectDetailRoute,
+    path: '/details',
+    component: makeRouteComponent(<ProjectDetailDetailsTabRoute />),
+  }),
+  createRoute({
+    getParentRoute: () => projectDetailRoute,
+    path: '/workflows',
+    component: makeRouteComponent(<ProjectDetailWorkflowsTabRoute />),
+  }),
+  createRoute({
+    getParentRoute: () => projectDetailRoute,
+    path: '/role-assignments',
+    component: makeRouteComponent(<ProjectDetailAssignmentsTabRoute />),
+  }),
+  createRoute({
+    getParentRoute: () => projectDetailRoute,
+    path: '/$tab',
+    component: makeRouteComponent(<ProjectDetailUnknownTabRoute />),
+  }),
+]
+
 export const accessManagementRoutes = [
-  createRoute({
-    getParentRoute: () => rootRoute,
-    path: '/system-administration/access-management',
-    validateSearch: accessMgmtSearch,
-    component: makeRouteComponent(<AccessManagement />),
-  }),
-  createRoute({
-    getParentRoute: () => rootRoute,
-    path: '/system-administration/access-management/users',
-    validateSearch: accessMgmtSearch,
-    component: makeRouteComponent(<AccessManagement />),
-  }),
+  accessManagementRoute.addChildren(accessManagementTabRoutes),
   createRoute({
     getParentRoute: () => rootRoute,
     path: '/system-administration/access-management/users/create',
@@ -55,55 +189,8 @@ export const accessManagementRoutes = [
     path: '/system-administration/access-management/users/$userId/$tab',
     component: makeRouteComponent(<UserDetail />),
   }),
-  createRoute({
-    getParentRoute: () => rootRoute,
-    path: '/system-administration/access-management/groups',
-    validateSearch: accessMgmtSearch,
-    component: makeRouteComponent(<AccessManagement />),
-  }),
-  createRoute({
-    getParentRoute: () => rootRoute,
-    path: '/system-administration/access-management/groups/$groupId',
-    component: makeRouteComponent(<GroupDetail />),
-  }),
-  createRoute({
-    getParentRoute: () => rootRoute,
-    path: '/system-administration/access-management/groups/$groupId/$tab',
-    component: makeRouteComponent(<GroupDetail />),
-  }),
-  createRoute({
-    getParentRoute: () => rootRoute,
-    path: '/system-administration/access-management/policies',
-    validateSearch: accessMgmtSearch,
-    component: makeRouteComponent(<AccessManagement />),
-  }),
-  createRoute({
-    getParentRoute: () => rootRoute,
-    path: '/system-administration/access-management/roles',
-    component: makeRouteComponent(<AccessManagement />),
-  }),
-  createRoute({
-    getParentRoute: () => rootRoute,
-    path: '/system-administration/access-management/projects',
-    validateSearch: accessMgmtSearch,
-    component: makeRouteComponent(<AccessManagement />),
-  }),
-  createRoute({
-    getParentRoute: () => rootRoute,
-    path: '/system-administration/access-management/projects/$projectId',
-    component: makeRouteComponent(<ProjectDetail />),
-  }),
-  createRoute({
-    getParentRoute: () => rootRoute,
-    path: '/system-administration/access-management/projects/$projectId/$tab',
-    component: makeRouteComponent(<ProjectDetail />),
-  }),
-  createRoute({
-    getParentRoute: () => rootRoute,
-    path: '/system-administration/access-management/service-accounts',
-    validateSearch: accessMgmtSearch,
-    component: makeRouteComponent(<AccessManagement />),
-  }),
+  groupDetailRoute.addChildren(groupDetailTabRoutes),
+  projectDetailRoute.addChildren(projectDetailTabRoutes),
   createRoute({
     getParentRoute: () => rootRoute,
     path: '/system-administration/access-management/service-accounts/$serviceAccountId',
@@ -113,20 +200,5 @@ export const accessManagementRoutes = [
     getParentRoute: () => rootRoute,
     path: '/system-administration/access-management/service-accounts/$serviceAccountId/$tab',
     component: makeRouteComponent(<ServiceAccountDetail />),
-  }),
-  createRoute({
-    getParentRoute: () => rootRoute,
-    path: '/system-administration/access-management/assignments',
-    component: makeRouteComponent(<AccessManagement />),
-  }),
-  createRoute({
-    getParentRoute: () => rootRoute,
-    path: '/system-administration/access-management/check-access',
-    component: makeRouteComponent(<AccessManagement />),
-  }),
-  createRoute({
-    getParentRoute: () => rootRoute,
-    path: '/system-administration/access-management/token-revocation',
-    component: makeRouteComponent(<AccessManagement />),
   }),
 ]

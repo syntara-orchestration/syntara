@@ -1,5 +1,5 @@
 import { Tab } from '@patternfly/react-core'
-import { useNavigate, useRouterState } from '@tanstack/react-router'
+import { Outlet, useNavigate, useRouterState } from '@tanstack/react-router'
 import { useLayoutEffect, useMemo } from 'react'
 
 import { AppRoute } from '../../app/AppRoute'
@@ -7,23 +7,13 @@ import { breadcrumbsAccessManagementHub } from '../../app/breadcrumbBuilders'
 import { SynPage, SynPageBody } from '../../components/layout/SynPage'
 import { SynPageHeader } from '../../components/layout/SynPageHeader'
 import { SynPanel } from '../../components/layout/SynPanel'
-import { SynListPanel, SynListPanelTabs, SynListPanelView } from '../../components/panels/list/SynListPanel'
+import { SynListPanel, SynListPanelTabs } from '../../components/panels/list/SynListPanel'
 import { SynEmptyStateAccessDenied } from '../../components/states/SynEmptyStateAccessDenied'
 import { SynPageTitle } from '../../components/SynPageTitle'
-import { useUrlTab } from '../../hooks/useUrlTab'
 import { detachPromise } from '../../utils/detachPromise'
 import { useDocLink } from '../../utils/docs/useDocLink'
-import { AssignmentsTab } from '../access/AssignmentsTab'
-import { CheckAccessTab } from '../access/CheckAccessTab'
-import { PoliciesTab } from '../access/PoliciesTab'
-import { RolesTab } from '../access/RolesTab'
 
-import { GroupsTab } from './GroupsTab'
-import { ProjectsTab } from './ProjectsTab'
-import { ServiceAccountsTab } from './service-accounts/ServiceAccountsTab'
-import { TokenRevocationTab } from './token-revocation/TokenRevocation'
 import { useAccessManagementPermissions } from './useAccessManagementPermissions'
-import { UsersTab } from './UsersTab'
 
 type AccessTab =
   | 'users'
@@ -52,8 +42,6 @@ const allTabDefs: TabDef[] = [
 
 const basePath = AppRoute.AccessManagement.Root
 
-const noop = () => {}
-
 export function AccessManagement() {
   const accessDocLink = useDocLink('accessControl')
   const location = useRouterState({ select: (s) => s.location.pathname })
@@ -71,8 +59,6 @@ export function AccessManagement() {
     canAccessPage,
     isLoading,
   } = useAccessManagementPermissions()
-
-  const [activeTab] = useUrlTab<AccessTab>(basePath, 'users')
 
   const validTabDefs = useMemo<TabDef[]>(() => {
     if (isLoading) return allTabDefs
@@ -140,40 +126,7 @@ export function AccessManagement() {
               <Tab key={tab.key} eventKey={tab.key} title={tab.label} />
             ))}
           </SynListPanelTabs>
-
-          {activeTab === 'users' && <UsersTab />}
-          {activeTab === 'groups' && <GroupsTab />}
-          {activeTab === 'projects' && <ProjectsTab />}
-          {activeTab === 'policies' && <PoliciesTab />}
-          {activeTab === 'roles' && <RolesTab />}
-          {activeTab === 'service-accounts' && <ServiceAccountsTab />}
-          {activeTab === 'assignments' && <AssignmentsTab />}
-          {activeTab === 'check-access' && (
-            <SynListPanelView
-              tabKey="check-access"
-              tabLabel="Check access"
-              isPending={false}
-              error={null}
-              isEmpty={false}
-              hasActiveFilters={false}
-              onRetry={noop}
-              onClearAllFilters={noop}
-              body={<CheckAccessTab />}
-            />
-          )}
-          {activeTab === 'token-revocation' && (
-            <SynListPanelView
-              tabKey="token-revocation"
-              tabLabel="Token revocation"
-              isPending={false}
-              error={null}
-              isEmpty={false}
-              hasActiveFilters={false}
-              onRetry={noop}
-              onClearAllFilters={noop}
-              body={<TokenRevocationTab />}
-            />
-          )}
+          <Outlet />
         </SynListPanel>
       </SynPageBody>
     </SynPage>
