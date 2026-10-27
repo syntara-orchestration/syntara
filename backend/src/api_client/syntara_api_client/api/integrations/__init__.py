@@ -175,3 +175,43 @@ class IntegrationsApi:
     async def async_bulk_update_tools(self, **kwargs: Any) -> Response[Any]:
         endpoint_module = self._load_endpoint_module("bulk_update_integration_tools")
         return await endpoint_module.asyncio_detailed(client=self._client, **kwargs)
+
+    def list_kafka(self, **kwargs: Any) -> Response[Any]:
+        endpoint_module = self._load_endpoint_module("list_kafka_integrations")
+        return endpoint_module.sync_detailed(client=self._client, **kwargs)
+
+    async def async_list_kafka(self, **kwargs: Any) -> Response[Any]:
+        endpoint_module = self._load_endpoint_module("list_kafka_integrations")
+        return await endpoint_module.asyncio_detailed(client=self._client, **kwargs)
+
+    def create_kafka(self, **kwargs: Any) -> Response[Any]:
+        endpoint_module = self._load_endpoint_module("create_kafka_integration")
+        return endpoint_module.sync_detailed(client=self._client, **kwargs)
+
+    async def async_create_kafka(self, **kwargs: Any) -> Response[Any]:
+        endpoint_module = self._load_endpoint_module("create_kafka_integration")
+        return await endpoint_module.asyncio_detailed(client=self._client, **kwargs)
+
+    def discover_kafka_connection(self, **kwargs: Any) -> Response[Any]:
+        endpoint_module = self._load_endpoint_module("discover_kafka_integration_connection")
+        return endpoint_module.sync_detailed(client=self._client, **kwargs)
+
+    async def async_discover_kafka_connection(self, **kwargs: Any) -> Response[Any]:
+        endpoint_module = self._load_endpoint_module("discover_kafka_integration_connection")
+        return await endpoint_module.asyncio_detailed(client=self._client, **kwargs)
+
+    def get_kafka(self, **kwargs: Any) -> Response[Any]:
+        endpoint_module = self._load_endpoint_module("get_kafka_integration")
+        return endpoint_module.sync_detailed(client=self._client, **kwargs)
+
+    async def async_get_kafka(self, **kwargs: Any) -> Response[Any]:
+        endpoint_module = self._load_endpoint_module("get_kafka_integration")
+        return await endpoint_module.asyncio_detailed(client=self._client, **kwargs)
+
+    def update_kafka(self, **kwargs: Any) -> Response[Any]:
+        endpoint_module = self._load_endpoint_module("update_kafka_integration")
+        return endpoint_module.sync_detailed(client=self._client, **kwargs)
+
+    async def async_update_kafka(self, **kwargs: Any) -> Response[Any]:
+        endpoint_module = self._load_endpoint_module("update_kafka_integration")
+        return await endpoint_module.asyncio_detailed(client=self._client, **kwargs)

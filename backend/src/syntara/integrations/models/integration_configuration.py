@@ -14,6 +14,7 @@ from pydantic import ConfigDict, Field, field_validator, model_validator
 from sqlmodel import SQLModel
 
 from syntara.core.lib.url_validation import validate_endpoint_url, validate_host_url
+from syntara.credentials.lib.kafka_connection import KafkaSecurityProtocol
 
 
 class LLMProviderHint(StrEnum):
@@ -189,8 +190,8 @@ class KafkaConfiguration(IntegrationSecurityMixin):
     """Configuration for a Kafka cluster integration.
 
     Broker addresses live here. The username and password stay on the
-    linked Kafka credential. Kafka uses SASL_SSL and rejects allow_http
-    because it would select SASL_PLAINTEXT.
+    linked Kafka credential when SASL_SSL is selected. Unauthenticated SSL
+    and explicitly opted-in PLAINTEXT do not require a credential.
     """
 
     integration_type: Literal["kafka"] = "kafka"
@@ -199,6 +200,16 @@ class KafkaConfiguration(IntegrationSecurityMixin):
         min_length=1,
         max_length=_MAX_BOOTSTRAP_SERVERS,
         description="Kafka bootstrap servers as host:port (or [ipv6]:port) values.",
+    )
+
+    security_protocol: KafkaSecurityProtocol = Field(
+        default=KafkaSecurityProtocol.SASL_SSL,
+        description="Kafka transport: SASL_SSL, SSL, or explicitly opted-in PLAINTEXT.",
+    )
+
+    allow_plaintext: bool = Field(
+        default=False,
+        description="Explicitly allow unauthenticated, unencrypted PLAINTEXT connections.",
     )
 
     sasl_mechanism: KafkaSaslMechanism = Field(
@@ -216,6 +227,9 @@ class KafkaConfiguration(IntegrationSecurityMixin):
         """
         if self.allow_http:
             msg = "Kafka does not support SASL_PLAINTEXT. Use SASL_SSL."
+            raise ValueError(msg)
+        if self.security_protocol == KafkaSecurityProtocol.PLAINTEXT and not self.allow_plaintext:
+            msg = "PLAINTEXT requires allow_plaintext=true."
             raise ValueError(msg)
         self.bootstrap_servers = [parse_bootstrap_server(server) for server in self.bootstrap_servers]
         return self
@@ -241,12 +255,10 @@ class AAPConfiguration(IntegrationSecurityMixin):
         return self
 
 
-# Response union stays the pre-Kafka set. Adding a member there is an
-# error-level OpenAPI breaking change (response-property-one-of-added).
-# Kafka is carried on IntegrationRead.kafka_configuration instead.
+# The v1 input/read union remains frozen at the original integration types.
+# The expanded v2 contract and storage union include Kafka.
 IntegrationConfigurationReadTypes = MCPServerConfigurationInput | LLMProviderConfiguration | AAPConfiguration
-# DB column and create/patch/discover requests. A new request oneOf member is
-# not an error-level breaking change.
+# DB column and v2 create/patch/discover/read payloads.
 IntegrationConfigurationTypes = IntegrationConfigurationReadTypes | KafkaConfiguration
 IntegrationConfiguration = Annotated[
     IntegrationConfigurationTypes,

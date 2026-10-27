@@ -22,6 +22,7 @@ from syntara.integrations.models.integration_configuration import (
     KafkaConfiguration,
     LLMProviderConfiguration,
     MCPServerConfiguration,
+    MCPServerConfigurationInput,
 )
 
 
@@ -464,9 +465,9 @@ class TestKafkaConfiguration:
 
 
 class TestIntegrationReadKafkaConfiguration:
-    """Kafka stays off the response configuration union."""
+    """Internal responses retain Kafka configuration; the public Kafka resource has its own contract."""
 
-    def test_moves_kafka_configuration_off_the_response_union(self) -> None:
+    def test_retains_kafka_configuration(self) -> None:
         read = IntegrationRead.model_validate(
             {
                 "name": "Production Kafka",
@@ -477,9 +478,8 @@ class TestIntegrationReadKafkaConfiguration:
                 },
             }
         )
-        assert read.configuration is None
-        assert read.kafka_configuration is not None
-        assert read.kafka_configuration.bootstrap_servers == ["broker.example.com:9093"]
+        assert isinstance(read.configuration, KafkaConfiguration)
+        assert read.configuration.bootstrap_servers == ["broker.example.com:9093"]
 
     def test_reads_kafka_from_an_attribute_object(self) -> None:
         class StoredIntegration:
@@ -488,9 +488,8 @@ class TestIntegrationReadKafkaConfiguration:
             configuration = KafkaConfiguration(bootstrap_servers=["broker.example.com:9093"])
 
         read = IntegrationRead.model_validate(StoredIntegration())
-        assert read.configuration is None
-        assert read.kafka_configuration is not None
-        assert read.kafka_configuration.bootstrap_servers == ["broker.example.com:9093"]
+        assert isinstance(read.configuration, KafkaConfiguration)
+        assert read.configuration.bootstrap_servers == ["broker.example.com:9093"]
 
     def test_leaves_other_configurations_in_place(self) -> None:
         read = IntegrationRead.model_validate(
@@ -503,8 +502,7 @@ class TestIntegrationReadKafkaConfiguration:
                 },
             }
         )
-        assert read.kafka_configuration is None
-        assert read.configuration is not None
+        assert isinstance(read.configuration, MCPServerConfigurationInput)
         assert read.configuration.base_url == "https://example.com"
 
 

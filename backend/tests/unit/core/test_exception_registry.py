@@ -2,8 +2,10 @@
 # ruff: noqa: N818, A001  # Exception names don't need Error suffix in tests, BaseException shadowing is fine
 
 import importlib
+from collections.abc import Generator
 from unittest.mock import Mock, patch
 
+import pytest
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
@@ -13,6 +15,17 @@ from syntara.core.exception_registry import (
     fastapi_exception,
     register_exceptions,
 )
+
+
+@pytest.fixture(autouse=True)
+def preserve_exception_registry() -> Generator[None, None, None]:
+    """Registry mutation tests must not remove handlers needed by later tests."""
+    original = _exception_registry.copy()
+    try:
+        yield
+    finally:
+        _exception_registry.clear()
+        _exception_registry.update(original)
 
 
 class TestFastAPIExceptionDecorator:

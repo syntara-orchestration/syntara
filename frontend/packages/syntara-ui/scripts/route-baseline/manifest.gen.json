@@ -77,6 +77,24 @@
     },
     {
       "kind": "page",
+      "parameters": ["integrationId"],
+      "sources": ["appRoute", "navigation", "router"],
+      "template": "/configuration/integrations/kafka/$integrationId"
+    },
+    {
+      "kind": "page",
+      "parameters": ["integrationId", "tab"],
+      "sources": ["appRoute", "navigation", "router"],
+      "template": "/configuration/integrations/kafka/$integrationId/$tab"
+    },
+    {
+      "kind": "page",
+      "parameters": ["integrationId"],
+      "sources": ["appRoute", "navigation", "router"],
+      "template": "/configuration/integrations/kafka/$integrationId/edit"
+    },
+    {
+      "kind": "page",
       "parameters": [],
       "sources": ["appRoute", "navigation", "router"],
       "template": "/executions"

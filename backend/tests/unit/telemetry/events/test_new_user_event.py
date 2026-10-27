@@ -86,15 +86,15 @@ class TestNewUserEventSegmentConversion:
         segment_event = event.to_segment_event()
         assert segment_event["event"] == "new_user"
 
-    @pytest.mark.usefixtures("telemetry_image_version")
-    def test_to_segment_event_contains_all_fields(self) -> None:
+    def test_to_segment_event_contains_all_fields(self, override_settings) -> None:
         event = NewUserEvent(
             user_id_hash=VALID_USER_ID_HASH,
             amr=["fed"],
             idp="okta",
             entitlement_id="ent-123",
         )
-        segment_event = event.to_segment_event()
+        with override_settings(container_image_version="img-tag"):
+            segment_event = event.to_segment_event()
         assert segment_event["event"] == "new_user"
         props = segment_event["properties"]
         assert props == {

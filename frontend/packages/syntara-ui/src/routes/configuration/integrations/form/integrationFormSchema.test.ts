@@ -390,6 +390,8 @@ describe('integrationFormSchema', () => {
 
       const configuration = toApiConfiguration({
         integration_type: 'kafka',
+        security_protocol: 'SASL_SSL',
+        allow_plaintext: false,
         bootstrap_servers: 'broker.example.com:9093',
         sasl_mechanism: 'SCRAM-SHA-256',
         ...securityDefaults,
@@ -510,6 +512,8 @@ describe('integrationFormSchema', () => {
         {
           integration_type: 'kafka',
           bootstrap_servers: '',
+          security_protocol: 'SASL_SSL',
+          allow_plaintext: false,
           sasl_mechanism: 'SCRAM-SHA-256',
           ...expectedSecurityDefaults,
         },

@@ -93,6 +93,18 @@ export const NAV_ITEMS: TNavigationItem[] = [
             hidden: true,
           },
           {
+            label: 'Edit Kafka Integration',
+            path: AppRoute.Configuration.Integrations.KafkaEdit,
+            hidden: true,
+            routePermission: { action: 'update', resourceType: 'integration' },
+          },
+          { label: 'Kafka Integration Detail', path: AppRoute.Configuration.Integrations.KafkaDetail, hidden: true },
+          {
+            label: 'Kafka Integration Detail Tab',
+            path: AppRoute.Configuration.Integrations.KafkaDetailTab,
+            hidden: true,
+          },
+          {
             label: 'Integration Detail Tab',
             path: AppRoute.Configuration.Integrations.DetailTab,
             hidden: true,

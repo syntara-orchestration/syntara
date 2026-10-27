@@ -28,7 +28,7 @@ import { useAlerts } from '../../../../providers/alerts'
 import { getErrorMessage } from '../../../../utils/apiErrors'
 import { detachPromise } from '../../../../utils/detachPromise'
 import { useDocLink } from '../../../../utils/docs/useDocLink'
-import { CREDENTIAL_REQUIRED_TYPES } from '../integrationFilters'
+import { isIntegrationCredentialRequired } from '../integrationFilters'
 
 import { CredentialStep } from './CredentialStep'
 import { EnableModelsWrapper } from './EnableModelsStep'
@@ -142,14 +142,14 @@ function WizardNavFooter({
   )
 }
 
-function useDiscoverConnection(getValues: () => IntegrationFormData) {
+function useDiscoverConnection(getValues: () => IntegrationFormData, integrationType: string) {
   const [testResult, setTestResult] = useState<DiscoverResult | null>(null)
   const [selectedToolNames, setSelectedToolNames] = useState<Set<string>>(new Set())
   const [selectedModels, setSelectedModels] = useState<Map<string, InitialModelSelection>>(new Map())
 
   const { mutate: testConnection, isPending: isTesting } = integrationsClient.useMutation(
     'post',
-    '/integrations/discover'
+    integrationType === IntegrationTypeEnum.KAFKA ? '/kafka_integrations/discover' : '/integrations/discover'
   )
   const { showAlert } = useAlerts()
 
@@ -207,19 +207,25 @@ function useDiscoverConnection(getValues: () => IntegrationFormData) {
   const handleTestConnection = useCallback(() => {
     const values = getValues()
     const credId = values.management_credential_id
-    if (!credId && CREDENTIAL_REQUIRED_TYPES.has(values.integration_type)) return
+    if (
+      !credId &&
+      isIntegrationCredentialRequired(
+        values.integration_type,
+        'security_protocol' in values.configuration ? values.configuration.security_protocol : undefined
+      )
+    )
+      return
 
     resetTestState()
 
     const isLLMType = values.integration_type === IntegrationTypeEnum.LLM_PROVIDER
+    const configuration = toApiConfiguration(values.configuration)
+    const body =
+      configuration.integration_type === IntegrationTypeEnum.KAFKA
+        ? { integration_type: IntegrationTypeEnum.KAFKA, configuration, credential_id: credId ?? undefined }
+        : { integration_type: configuration.integration_type, configuration, credential_id: credId ?? undefined }
     testConnection(
-      {
-        body: {
-          integration_type: values.integration_type,
-          configuration: toApiConfiguration(values.configuration),
-          credential_id: credId ?? undefined,
-        },
-      },
+      { body },
       {
         onSuccess: (result) => handleDiscoverSuccess(result, isLLMType),
         onError: (error: unknown) => {
@@ -299,12 +305,13 @@ export function IntegrationForm() {
     isTesting,
     resetTestState,
     handleTestConnection,
-  } = useDiscoverConnection(getValues)
+  } = useDiscoverConnection(getValues, integrationTypeValue)
 
   const [isDetailsStepValid, setIsDetailsStepValid] = useState(false)
   const { showAlert } = useAlerts()
   const isLLM = integrationTypeValue === IntegrationTypeEnum.LLM_PROVIDER
-  const isCredentialRequired = CREDENTIAL_REQUIRED_TYPES.has(integrationTypeValue)
+  const protocol = useWatch({ control, name: 'configuration.security_protocol' })
+  const isCredentialRequired = isIntegrationCredentialRequired(integrationTypeValue, protocol)
 
   const onTypeChange = useCallback(
     (newType: string) => {
