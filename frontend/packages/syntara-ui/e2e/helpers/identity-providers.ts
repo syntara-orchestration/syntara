@@ -48,7 +48,7 @@ export async function gotoIdentityProviderDetail(
 /** Open the Add OIDC provider wizard on the provider configuration step. */
 export async function gotoAddOidcProviderWizard(app: Page): Promise<void> {
   await gotoIdentityProvidersList(app)
-  await app.getByRole('button', { name: /Add OIDC provider/i }).click()
+  await app.getByRole('link', { name: /Add OIDC provider/i }).click()
   await expect(app.getByRole('heading', { level: 1, name: 'Add OIDC provider' })).toBeVisible()
 }
 

@@ -93,15 +93,15 @@ test.describe('Access Management — Create button labels', () => {
     await app.getByRole('tab', { name: /Users/i }).click()
     await expect(app).toHaveURL(new RegExp(`${ACCESS_URL}/users`))
 
-    const createButton = app.getByRole('button', { name: 'Create user' })
-    await expect(createButton).toBeVisible()
-    await createButton.click()
+    const createLink = app.getByRole('link', { name: 'Create user' })
+    await expect(createLink).toBeVisible()
+    await createLink.click()
 
     await expect(app).toHaveURL(new RegExp(`${ACCESS_URL}/users/create`))
     await expect(app.getByRole('heading', { name: 'Create user' })).toBeVisible()
     await expect(app.getByRole('button', { name: 'Create user' })).toBeVisible()
 
-    await app.getByRole('button', { name: 'Cancel' }).click()
+    await app.getByRole('link', { name: 'Cancel' }).click()
     await expect(app).toHaveURL(new RegExp(`${ACCESS_URL}/users`))
   })
 

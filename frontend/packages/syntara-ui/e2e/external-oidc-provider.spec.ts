@@ -22,7 +22,7 @@ test.describe('IdP configuration — keycloak external OIDC', () => {
     await app.goto(toAppUrl('/system-administration/authentication'))
     await expect(app.getByRole('heading', { level: 1, name: 'Identity Providers' })).toBeVisible()
 
-    await app.getByRole('button', { name: /Add OIDC provider/i }).click()
+    await app.getByRole('link', { name: /Add OIDC provider/i }).click()
     await expect(app.getByRole('heading', { level: 1, name: 'Add OIDC provider' })).toBeVisible()
 
     await app.getByRole('button', { name: /Select a provider template/i }).click()
