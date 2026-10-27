@@ -712,14 +712,6 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
         await self.session.flush()
         return await self._to_read_with_counts(integration)
 
-    async def resolve_credential(self, credential_id: UUID) -> dict[str, object]:
-        """Resolve an explicitly authorized credential for an adapter caller.
-
-        Callers must enforce visibility, project scope and credential:use before
-        invoking this secret-resolution boundary. No management fallback occurs.
-        """
-        return await self._resolve_credential(credential_id)
-
     async def _resolve_credential(self, credential_id: UUID) -> dict[str, object]:
         """Resolve a credential to its extra_vars dict for adapter use.
 

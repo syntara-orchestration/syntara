@@ -1,5 +1,6 @@
 """Preflight sends non-creating metadata only and never claims runtime ACLs."""
 
+import ssl
 from types import SimpleNamespace
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -62,8 +63,27 @@ async def test_failures_are_sanitized_and_close_connections(error: Exception, co
         result = await preflight(CONFIG, CREDENTIAL, "alerts")
     assert not result.success
     assert result.error_code == code
+    assert result.connection == ("failed" if code == "connection_failed" else "verified")
     assert "private-value" not in result.model_dump_json()
     conn.close.assert_awaited_once()
+
+
+@pytest.mark.parametrize(
+    ("error", "code"),
+    [
+        (ssl.SSLError("private-value"), "tls_failed"),
+        (IncompatibleBrokerVersion("old"), "safe_metadata_unsupported"),
+    ],
+)
+async def test_handshake_failures_keep_their_error_code(error: Exception, code: str) -> None:
+    """Bootstrap errors must not be collapsed into a generic connection failure."""
+    with patch(f"{MODULE}.create_conn", side_effect=error) as create:
+        result = await preflight(CONFIG, CREDENTIAL, "alerts")
+    assert not result.success
+    assert result.error_code == code
+    assert result.connection == ("failed" if code == "tls_failed" else "unverified")
+    assert "private-value" not in result.model_dump_json()
+    create.assert_called_once()
 
 
 @pytest.mark.parametrize(

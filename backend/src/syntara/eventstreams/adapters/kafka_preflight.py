@@ -46,6 +46,9 @@ async def _connect(config: KafkaConfiguration, options: dict[str, Any]) -> AIOKa
     for host, port, _ in collect_hosts(list(config.bootstrap_servers), randomize=False):
         try:
             return await create_conn(host, port, **options)
+        except (ssl.SSLError, IncompatibleBrokerVersion):
+            # Classified by the caller. Both subclass the fallback errors below.
+            raise
         except (OSError, KafkaError):
             continue
     return None
@@ -103,8 +106,10 @@ async def test_kafka_connection(
     except (IncompatibleBrokerVersion, NotImplementedError):
         result.error_code = "safe_metadata_unsupported"
     except ssl.SSLError:
+        result.connection = "failed"
         result.error_code = "tls_failed"
     except (OSError, KafkaError):
+        result.connection = "failed"
         result.error_code = "connection_failed"
     finally:
         if connection is not None:

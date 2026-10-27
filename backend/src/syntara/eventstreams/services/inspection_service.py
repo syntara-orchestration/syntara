@@ -9,6 +9,7 @@ from sqlmodel import col, select
 
 from syntara.core.exceptions import SafeValueError
 from syntara.core.services import BaseService
+from syntara.credentials.lib.kafka_connection import KafkaSecurityProtocol, resolve_listener_kafka_login
 from syntara.eventstreams.adapters.kafka_parameters import KafkaSubscribeParameters
 from syntara.eventstreams.adapters.kafka_preflight import test_kafka_connection
 from syntara.eventstreams.exceptions import EventSubscriptionNotFoundError
@@ -24,7 +25,6 @@ from syntara.eventstreams.models.subscription import EventSubscription
 from syntara.integrations.lib.url_validation import validate_integration_configuration_no_ssrf
 from syntara.integrations.models.integration import Integration
 from syntara.integrations.models.integration_configuration import KafkaConfiguration
-from syntara.integrations.services.integration_service import IntegrationService
 from syntara.workflows.services.workflow_service import WorkflowService
 
 if TYPE_CHECKING:
@@ -42,10 +42,10 @@ class EventSubscriptionInspectionService(BaseService):
     def __init__(
         self, session: "AsyncSession", user: "User", evaluator: "AuthzEvaluator", secret_service: "SecretService"
     ) -> None:
-        """Reuse workflow resource checks and platform credential resolution."""
+        """Reuse workflow resource checks and the listener credential resolver."""
         super().__init__(session, user)
         self.workflows = WorkflowService(session, user, evaluator)
-        self.integrations = IntegrationService(session, user, secret_service)
+        self.secret_service = secret_service
 
     @staticmethod
     def _shape(subscription: EventSubscription, source: EventSubscriptionSource) -> EventSubscriptionRead:
@@ -151,5 +151,10 @@ class EventSubscriptionInspectionService(BaseService):
         except ValueError as exc:
             msg = "bootstrap_servers must not resolve to a private, reserved, or cloud metadata address."
             raise SafeValueError(msg) from exc
-        credential = await self.integrations.resolve_credential(parameters.credential_id)
-        return await test_kafka_connection(integration.configuration, credential, parameters.topic)
+        credential = await resolve_listener_kafka_login(
+            self.session,
+            self.secret_service,
+            runtime_credential_id=parameters.credential_id,
+            security_protocol=KafkaSecurityProtocol.SASL_SSL,
+        )
+        return await test_kafka_connection(integration.configuration, credential or {}, parameters.topic)

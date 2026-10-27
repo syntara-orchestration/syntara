@@ -58,8 +58,6 @@ def service() -> EventSubscriptionInspectionService:
     instance.workflows = MagicMock()
     instance.workflows.get_workflow_by_id = AsyncMock(return_value=SimpleNamespace(id=uuid4(), project_id=uuid4()))
     instance.workflows.validate_event_subscribe_access = AsyncMock()
-    instance.integrations = MagicMock()
-    instance.integrations.resolve_credential = AsyncMock()
     return instance
 
 
@@ -68,9 +66,13 @@ async def test_denied_reference_never_decrypts_or_connects(service: EventSubscri
     cast("MagicMock", service.workflows).validate_event_subscribe_access.side_effect = AuthorizationDeniedError(
         "Denied"
     )
-    with patch(f"{MODULE}.test_kafka_connection") as probe, pytest.raises(AuthorizationDeniedError):
+    with (
+        patch(f"{MODULE}.resolve_listener_kafka_login", new_callable=AsyncMock) as resolve,
+        patch(f"{MODULE}.test_kafka_connection") as probe,
+        pytest.raises(AuthorizationDeniedError),
+    ):
         await service.test_unsaved(uuid4(), params)
-    cast("MagicMock", service.integrations).resolve_credential.assert_not_called()
+    resolve.assert_not_called()
     probe.assert_not_called()
 
 
@@ -86,9 +88,10 @@ async def test_rebound_broker_never_decrypts_or_connects(service: EventSubscript
             return_value=SimpleNamespace(integration_url_allowed_hosts=[]),
         ),
         patch("socket.getaddrinfo", return_value=[(None, None, None, None, ("192.168.1.10", 9093))]),
+        patch(f"{MODULE}.resolve_listener_kafka_login", new_callable=AsyncMock) as resolve,
         patch(f"{MODULE}.test_kafka_connection") as probe,
         pytest.raises(SafeValueError, match="bootstrap_servers must not resolve"),
     ):
         await service.test_unsaved(uuid4(), params)
-    cast("MagicMock", service.integrations).resolve_credential.assert_not_called()
+    resolve.assert_not_called()
     probe.assert_not_called()

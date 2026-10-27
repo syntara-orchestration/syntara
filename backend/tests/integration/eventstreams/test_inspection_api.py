@@ -147,16 +147,19 @@ async def scenario(
     role = Role(name=f"designer-{uuid4().hex[:8]}", policy_names=[policy.name])
     session.add_all([policy, role])
     session.add(RoleAssignment(principal_id=test_user.id, role_name=role.name, project_id=test_project_id))
-    credential_type = CredentialType(
-        name="Kafka-connection",
-        inputs={},
-        managed=True,
-        injectors={
-            "extra_vars": {"kafka_username": "{{username}}", "kafka_password": "{{password}}"},
-        },
-    )
-    session.add(credential_type)
-    await session.flush()
+    existing_type = await session.exec(select(CredentialType).where(CredentialType.name == "Kafka"))
+    credential_type = existing_type.first()
+    if credential_type is None:
+        credential_type = CredentialType(
+            name="Kafka",
+            inputs={},
+            managed=True,
+            injectors={
+                "extra_vars": {"kafka_username": "{{username}}", "kafka_password": "{{password}}"},
+            },
+        )
+        session.add(credential_type)
+        await session.flush()
     secrets = SecretService(session, SecretEncryptor(OLD_KEY), DatabaseBackend(session))
     credentials = []
     for name, password in [("runtime", _RUNTIME_PASSWORD), ("management", _MANAGEMENT_PASSWORD)]:
@@ -421,7 +424,7 @@ async def test_preflight_rejects_blocked_broker_before_credential_resolution(sce
     scenario.integration.configuration = KafkaConfiguration(bootstrap_servers=["169.254.169.254:9093"])
     await scenario.session.commit()
     with (
-        patch("syntara.integrations.services.integration_service.IntegrationService.resolve_credential") as resolve,
+        patch("syntara.eventstreams.services.inspection_service.resolve_listener_kafka_login") as resolve,
         patch(f"{_KAFKA_MODULE}.create_conn") as connect,
     ):
         response = await scenario.client.post(f"{scenario.url}/test", json=scenario.parameters())
