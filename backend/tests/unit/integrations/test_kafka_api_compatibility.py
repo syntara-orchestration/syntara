@@ -1,4 +1,4 @@
-"""V1 clients remain usable while v2 lists Kafka alongside existing types."""
+"""Original v1 clients stay compatible with the separate Kafka resource."""
 
 import importlib.util
 import sys
@@ -20,7 +20,6 @@ from syntara.authz.engine import AllowedProjectsResult
 from syntara.core.database.session import get_db
 from syntara.core.models import User
 from syntara.integrations import router as current
-from syntara.integrations.legacy_router import router as legacy_router
 from syntara.integrations.models.integration import Integration, IntegrationType
 from syntara.integrations.models.integration_configuration import KafkaConfiguration, MCPServerConfigurationInput
 
@@ -29,14 +28,13 @@ from syntara.integrations.models.integration_configuration import KafkaConfigura
 async def auth_client(test_db_session: AsyncSession, test_user: User) -> AsyncGenerator[AsyncClient, None]:
     """Exercise the real routers and service without unrelated background workers."""
     app = FastAPI()
-    app.include_router(legacy_router, prefix="/api/v1")
-    app.include_router(current.router, prefix="/api/v2")
+    app.include_router(current.router, prefix="/api/v1")
     app.dependency_overrides[get_db] = lambda: test_db_session
     app.dependency_overrides[get_current_user] = lambda: test_user
     app.dependency_overrides[current.integration_read_visibility] = lambda: AllowedProjectsResult(
         all_projects=True, project_ids=[]
     )
-    for route in [*legacy_router.routes, *current.router.routes]:
+    for route in current.router.routes:
         for dep in getattr(route, "dependencies", []):
             if isinstance(dep.dependency, (PermissionChecker, VisibilityFilter)):
                 app.dependency_overrides[dep.dependency] = lambda: None
@@ -60,7 +58,7 @@ def _load_old_model(filename: str) -> ModuleType:
 
 
 @pytest.mark.asyncio
-async def test_old_client_parses_v1_pages_while_v2_includes_kafka(
+async def test_old_client_parses_pages_while_kafka_is_separate(
     auth_client: AsyncClient, test_db_session: AsyncSession, test_user: User
 ) -> None:
     legacy = [
@@ -109,15 +107,15 @@ async def test_old_client_parses_v1_pages_while_v2_includes_kafka(
     assert excluded.json()["resources"] == []
     assert excluded.json()["total"] == 0
 
-    combined = await auth_client.get("/api/v2/integrations", params={"sort": "name", "include_total": "true"})
+    combined = await auth_client.get("/api/v1/kafka-integrations", params={"sort": "name", "include_total": "true"})
     assert combined.status_code == 200
-    assert combined.json()["total"] == 3
+    assert combined.json()["total"] == 1
     rows = combined.json()["resources"]
-    assert [row["integration_type"] for row in rows] == ["mcp_server", "kafka", "mcp_server"]
-    assert rows[1]["configuration"]["security_protocol"] == "SSL"
-    assert "kafka_configuration" not in rows[1]
+    assert [row["integration_type"] for row in rows] == ["kafka"]
+    assert rows[0]["configuration"]["security_protocol"] == "SSL"
+    assert "kafka_configuration" not in rows[0]
     assert (await auth_client.get(f"/api/v1/integrations/{kafka.id}")).status_code == 404
-    assert (await auth_client.get(f"/api/v2/integrations/{kafka.id}")).status_code == 200
+    assert (await auth_client.get(f"/api/v1/kafka-integrations/{kafka.id}")).status_code == 200
 
 
 @pytest.mark.asyncio
@@ -130,53 +128,6 @@ async def test_v1_rejects_kafka_create_and_discovery(auth_client: AsyncClient) -
     payload = {"integration_type": "kafka", "configuration": configuration}
     assert (await auth_client.post("/api/v1/integrations", json={**payload, "name": "Kafka"})).status_code == 422
     assert (await auth_client.post("/api/v1/integrations/discover", json=payload)).status_code == 422
-
-
-@pytest.mark.parametrize("base_path", ["", "/api/v1", "/deployment/api/v1", "/deployment/api/v2"])
-def test_generated_v2_client_selects_v2_and_preserves_deployment_prefix(base_path: str) -> None:
-    """Path-level version selection must not append v2 beneath a v1 base URL."""
-    import httpx
-    from syntara_api_client.api.integrations import v2_list_integrations
-    from syntara_api_client.client import AuthenticatedClient
-
-    prefix = base_path.split("/api/")[0]
-    requests: list[httpx.Request] = []
-
-    def respond(request: httpx.Request) -> httpx.Response:
-        requests.append(request)
-        return httpx.Response(200, json={"resources": [], "next": None, "prev": None, "total": 0})
-
-    with httpx.Client(base_url=f"https://example.com{base_path}", transport=httpx.MockTransport(respond)) as transport:
-        client = AuthenticatedClient(base_url=f"https://example.com{base_path}", token=str(uuid4())).set_httpx_client(
-            transport
-        )
-        response = v2_list_integrations.sync_detailed(client=client)
-    assert response.status_code == 200
-    assert requests[0].url.path == f"{prefix}/api/v2/integrations"
-
-
-@pytest.mark.asyncio
-async def test_generated_async_v2_client_selects_v2() -> None:
-    """The async Python client follows the same versioned URL rule."""
-    import httpx
-    from syntara_api_client.api.integrations import v2_list_integrations
-    from syntara_api_client.client import AuthenticatedClient
-
-    requests: list[httpx.Request] = []
-
-    def respond(request: httpx.Request) -> httpx.Response:
-        requests.append(request)
-        return httpx.Response(200, json={"resources": [], "next": None, "prev": None, "total": 0})
-
-    async with httpx.AsyncClient(
-        base_url="https://example.com/deployment/api/v1", transport=httpx.MockTransport(respond)
-    ) as transport:
-        client = AuthenticatedClient(
-            base_url="https://example.com/deployment/api/v1", token=str(uuid4())
-        ).set_async_httpx_client(transport)
-        response = await v2_list_integrations.asyncio_detailed(client=client)
-    assert response.status_code == 200
-    assert requests[0].url.path == "/deployment/api/v2/integrations"
 
 
 def test_regenerated_v1_client_preserves_the_original_enum_filter() -> None:
@@ -234,3 +185,110 @@ async def test_v1_writes_keep_configuration_and_partial_update_semantics(auth_cl
         json={**payload, "configuration": {"integration_type": "llm_provider", "provider_hint": "openai"}},
     )
     assert mismatched.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_kafka_writes_are_isolated_and_preserve_omitted_fields(auth_client: AsyncClient) -> None:
+    """Kafka-only writes do not widen the original v1 request contract."""
+    from unittest.mock import patch
+
+    configuration = {
+        "integration_type": "kafka",
+        "bootstrap_servers": ["broker.example.com:9093"],
+        "security_protocol": "SSL",
+    }
+    payload = {
+        "name": "Kafka additive API",
+        "configuration": {
+            "integration_type": "kafka",
+            "bootstrap_servers": ["broker.example.com:9093"],
+            "security_protocol": "SSL",
+        },
+    }
+    with patch("syntara.integrations.services.integration_service.validate_integration_configuration_no_ssrf"):
+        created = await auth_client.post("/api/v1/kafka-integrations", json=payload)
+    assert created.status_code == 201
+    row = created.json()
+    assert row["integration_type"] == "kafka"
+    assert row["management_credential_id"] is None
+    assert row["configuration"]["security_protocol"] == "SSL"
+    updated = await auth_client.patch(f"/api/v1/kafka-integrations/{row['id']}", json={"description": "Edited"})
+    assert updated.status_code == 200
+    assert updated.json()["configuration"] == row["configuration"]
+    assert (
+        await auth_client.patch(f"/api/v1/integrations/{row['id']}", json={"description": "Legacy"})
+    ).status_code == 404
+    assert (
+        await auth_client.post("/api/v1/kafka-integrations", json={**payload, "integration_type": "mcp_server"})
+    ).status_code == 422
+    no_sasl_login = await auth_client.patch(
+        f"/api/v1/kafka-integrations/{row['id']}",
+        json={"configuration": {**configuration, "security_protocol": "SASL_SSL"}},
+    )
+    assert no_sasl_login.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_kafka_resource_cannot_read_or_update_legacy_id(
+    auth_client: AsyncClient, test_db_session: AsyncSession, test_user: User
+) -> None:
+    legacy = Integration(
+        name="Legacy isolation",
+        integration_type=IntegrationType.MCP_SERVER,
+        configuration=MCPServerConfigurationInput(base_url="https://example.com"),
+        created_by=test_user.id,
+        updated_by=test_user.id,
+    )
+    test_db_session.add(legacy)
+    await test_db_session.commit()
+    assert (await auth_client.get(f"/api/v1/kafka-integrations/{legacy.id}")).status_code == 404
+    assert (
+        await auth_client.patch(f"/api/v1/kafka-integrations/{legacy.id}", json={"enabled": False})
+    ).status_code == 404
+    excluded = await auth_client.get(
+        "/api/v1/kafka-integrations", params={"integration_type[in]": "mcp_server", "include_total": "true"}
+    )
+    assert excluded.status_code == 200
+    assert excluded.json()["resources"] == []
+    assert excluded.json()["total"] == 0
+
+
+@pytest.mark.asyncio
+async def test_kafka_filters_and_totals_apply_before_pagination(
+    auth_client: AsyncClient, test_db_session: AsyncSession, test_user: User
+) -> None:
+    """Exercise the shared v1 filter contract on the isolated Kafka collection."""
+    rows = [
+        Integration(
+            name=name,
+            enabled=enabled,
+            integration_type=IntegrationType.KAFKA,
+            configuration=KafkaConfiguration(bootstrap_servers=["broker.example.com:9093"], security_protocol="SSL"),
+            created_by=test_user.id,
+            updated_by=test_user.id,
+        )
+        for name, enabled in [("A orders", True), ("B orders", True), ("C orders", False), ("Other", True)]
+    ]
+    rows.append(
+        Integration(
+            name="A orders legacy",
+            integration_type=IntegrationType.MCP_SERVER,
+            configuration=MCPServerConfigurationInput(base_url="https://example.com"),
+            created_by=test_user.id,
+            updated_by=test_user.id,
+        )
+    )
+    test_db_session.add_all(rows)
+    await test_db_session.commit()
+    params = {"limit": "1", "sort": "name", "include_total": "true", "enabled": "true", "name[contains]": "orders"}
+    first = await auth_client.get("/api/v1/kafka-integrations", params=params)
+    assert first.status_code == 200
+    page = first.json()
+    assert page["total"] == 2
+    assert [item["name"] for item in page["resources"]] == ["A orders"]
+    assert page["next"]
+    second = await auth_client.get("/api/v1/kafka-integrations", params={**params, "cursor": page["next"]})
+    assert second.status_code == 200
+    assert second.json()["total"] == 2
+    assert [item["name"] for item in second.json()["resources"]] == ["B orders"]
+    assert second.json()["next"] is None

@@ -12,7 +12,7 @@ import styles from './AAPIntegrationSelector.module.css'
 import { IntegrationRequiredHelper } from './IntegrationRequiredHelper'
 import { TypeaheadMenuToggle } from './TypeaheadMenuToggle'
 
-type IntegrationRead = IntegrationsAPI.components['schemas']['IntegrationReadV2']
+type IntegrationRead = IntegrationsAPI.components['schemas']['IntegrationRead']
 
 export type AAPIntegrationSelectorProps = {
   value?: string

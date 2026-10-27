@@ -6,17 +6,12 @@ from typing import Any, TypeVar
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
-T = TypeVar("T", bound="IntegrationReadV2Labels")
+T = TypeVar("T", bound="KafkaIntegrationCreateLabels")
 
 
 @_attrs_define
-class IntegrationReadV2Labels:
-    """Key-value pairs for resource labeling and filtering
-
-    Example:
-        {'environment': 'production', 'region': 'us-east-1', 'team': 'platform'}
-
-    """
+class KafkaIntegrationCreateLabels:
+    """ """
 
     additional_properties: dict[str, str] = _attrs_field(init=False, factory=dict)
 
@@ -29,10 +24,10 @@ class IntegrationReadV2Labels:
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         d = dict(src_dict)
-        integration_read_v2_labels = cls()
+        kafka_integration_create_labels = cls()
 
-        integration_read_v2_labels.additional_properties = d
-        return integration_read_v2_labels
+        kafka_integration_create_labels.additional_properties = d
+        return kafka_integration_create_labels
 
     @property
     def additional_keys(self) -> list[str]:

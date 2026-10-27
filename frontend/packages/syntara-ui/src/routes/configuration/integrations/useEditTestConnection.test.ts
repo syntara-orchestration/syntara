@@ -1,8 +1,8 @@
-import type { IntegrationsAPI } from '@syntara/contracts'
 import { act, renderHook } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { EditIntegrationFormValues } from './editIntegrationFormSchema'
+import type { IntegrationRead } from './integrationTypes'
 import { useEditTestConnection } from './useEditTestConnection'
 
 const mockShowAlert = vi.fn()
@@ -17,8 +17,6 @@ vi.mock('../../../client', () => ({
     useMutation: vi.fn(() => ({ mutate: mockMutate, isPending: false })),
   },
 }))
-
-type IntegrationRead = IntegrationsAPI.components['schemas']['IntegrationReadV2']
 
 const BASE_INTEGRATION: IntegrationRead = {
   id: 'int-1',

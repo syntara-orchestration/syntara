@@ -1,6 +1,6 @@
 import { Truncate } from '@patternfly/react-core'
 import { Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
-import type { IntegrationsAPI } from '@syntara/contracts'
+import { IntegrationTypeEnum } from '@syntara/contracts'
 import { useMemo } from 'react'
 
 import { AppRoute } from '../../../app/AppRoute'
@@ -14,22 +14,28 @@ import { useClientPagination } from '../../../hooks/useClientPagination'
 import { useExpandableRowIds } from '../../../hooks/useExpandableRowIds'
 import { detachPromise } from '../../../utils/detachPromise'
 import { INTEGRATION_TYPE_LABELS } from '../integrations/integrationFilters'
+import type { IntegrationRead } from '../integrations/integrationTypes'
 import { StatusLabel } from '../integrations/StatusLabel'
 
 import { expandableRowIds, hasTrimmedDescription, relatedResourceRowId } from './credentialRelatedTableUtils'
 import { DescriptionExpandableContent } from './DescriptionExpandableContent'
 
-type Integration = IntegrationsAPI.components['schemas']['IntegrationReadV2']
+type Integration = IntegrationRead
 
 type CredentialIntegrationsTabProps = {
   credentialId: string
+  isKafkaCredential?: boolean
 }
 
 const INTEGRATION_COLUMN_COUNT = 6
 const noop = () => {}
 
-function integrationHref(integrationId: string): string {
-  return AppRoute.Configuration.Integrations.Detail.replace(':integrationId', integrationId)
+function integrationHref(integration: Integration): string {
+  return (
+    integration.integration_type === IntegrationTypeEnum.KAFKA
+      ? AppRoute.Configuration.Integrations.KafkaDetail
+      : AppRoute.Configuration.Integrations.Detail
+  ).replace(':integrationId', integration.id ?? '')
 }
 
 function integrationScopeLabel(scope: Integration['scope']): string {
@@ -88,7 +94,7 @@ function IntegrationsTable({
                 }
               />
               <Td dataLabel="Integration name">
-                <LinkCell href={integrationHref(integration.id ?? '')}>
+                <LinkCell href={integrationHref(integration)}>
                   <Truncate content={integration.name} />
                 </LinkCell>
               </Td>
@@ -120,14 +126,17 @@ function IntegrationsTable({
   )
 }
 
-export function CredentialIntegrationsTab({ credentialId }: Readonly<CredentialIntegrationsTabProps>) {
+export function CredentialIntegrationsTab({
+  credentialId,
+  isKafkaCredential = false,
+}: Readonly<CredentialIntegrationsTabProps>) {
   const { paginate, getFooterProps } = useClientPagination()
 
-  const query = integrationsClient.useQuery('get', '/integrations', {
+  const query = integrationsClient.useQuery('get', isKafkaCredential ? '/kafka-integrations' : '/integrations', {
     params: { query: { management_credential_id: credentialId } },
   })
   const integrations = query.data?.resources ?? []
-  const paginatedIntegrations = paginate(integrations)
+  const paginatedIntegrations = paginate<Integration>(integrations)
   const expandableIds = useMemo(() => expandableRowIds(paginatedIntegrations, 'integration'), [paginatedIntegrations])
   const { expandedRows, allRowsExpanded, handleToggleRow, handleCollapseAll } = useExpandableRowIds(expandableIds)
 

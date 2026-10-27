@@ -31,16 +31,13 @@ _ENABLED_DESCRIPTION = "Whether the integration is active"
 _CONFIGURATION_DESCRIPTION = "Integration-specific configuration"
 
 
-class IntegrationTypeV2(StrEnum):
+class IntegrationType(StrEnum):
     """Type of external integration."""
 
     MCP_SERVER = "mcp_server"
     LLM_PROVIDER = "llm_provider"
     ANSIBLE_AUTOMATION_PLATFORM = "ansible_automation_platform"
     KAFKA = "kafka"
-
-
-IntegrationType = IntegrationTypeV2
 
 
 class IntegrationStatus(StrEnum):
@@ -308,7 +305,7 @@ class InitialModelSelection(SQLModel):
     is_default: bool = Field(default=False, description="Whether this is the default model")
 
 
-class IntegrationCreateV2(SQLModel):
+class IntegrationCreate(SQLModel):
     """Schema for creating a new integration."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")  # type: ignore[assignment]
@@ -389,10 +386,7 @@ class IntegrationCreateV2(SQLModel):
         return self
 
 
-IntegrationCreate = IntegrationCreateV2
-
-
-class IntegrationReadV2(UserReferenceFieldsMixin, NamedResource, UserOwnedResource):
+class IntegrationReadBase(UserReferenceFieldsMixin, NamedResource, UserOwnedResource):
     """Schema for integration API responses."""
 
     created_by: UserReference | UUID | str | None = Field(default=None, description="User who created the integration")  # type: ignore[assignment]
@@ -405,15 +399,9 @@ class IntegrationReadV2(UserReferenceFieldsMixin, NamedResource, UserOwnedResour
         **UserOwnedResource.FIELD_SCHEMA_EXTRAS,
     }
 
-    integration_type: IntegrationType
     enabled: bool = True
     validation_status: IntegrationStatus = IntegrationStatus.UNKNOWN
     scope: IntegrationScope = IntegrationScope.GLOBAL
-    configuration: IntegrationConfigurationTypes = Field(
-        description=_CONFIGURATION_DESCRIPTION,
-        discriminator="integration_type",
-    )
-
     management_credential_id: UUID | None = None
     last_validated_at: datetime | None = None
     validation_error: str | None = None
@@ -431,10 +419,17 @@ class IntegrationReadV2(UserReferenceFieldsMixin, NamedResource, UserOwnedResour
     enabled_model_count: int = Field(default=0, description="Number of enabled models linked to this integration")
 
 
-IntegrationRead = IntegrationReadV2
+class IntegrationRead(IntegrationReadBase):
+    """Internal response supporting all integration types."""
+
+    integration_type: IntegrationType
+    configuration: IntegrationConfigurationTypes = Field(
+        description=_CONFIGURATION_DESCRIPTION,
+        discriminator="integration_type",
+    )
 
 
-class IntegrationUpdateV2(SQLModel):
+class IntegrationUpdate(SQLModel):
     """Schema for partially updating an integration (user-facing)."""
 
     name: str | None = Field(
@@ -467,9 +462,6 @@ class IntegrationUpdateV2(SQLModel):
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")  # type: ignore[assignment]
 
 
-IntegrationUpdate = IntegrationUpdateV2
-
-
 class IntegrationSystemUpdate(SQLModel):
     """Internal schema for validation worker updates to system-managed fields."""
 
@@ -487,7 +479,7 @@ class IntegrationSystemUpdate(SQLModel):
         return self
 
 
-class IntegrationTestConnectionV2(SQLModel):
+class IntegrationTestConnection(SQLModel):
     """Schema for testing a connection without saving an integration."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")  # type: ignore[assignment]
@@ -513,14 +505,8 @@ class IntegrationTestConnectionV2(SQLModel):
         return self
 
 
-IntegrationTestConnection = IntegrationTestConnectionV2
-
-
-class IntegrationListResponseV2(ResourcesResponse[IntegrationRead]):
+class IntegrationListResponse(ResourcesResponse[IntegrationRead]):
     """Paginated list response for integrations."""
-
-
-IntegrationListResponse = IntegrationListResponseV2
 
 
 class RefreshResult(SQLModel):

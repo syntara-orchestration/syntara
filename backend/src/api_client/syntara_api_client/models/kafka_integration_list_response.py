@@ -9,24 +9,24 @@ from attrs import field as _attrs_field
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
-    from ..models.integration_read_v2 import IntegrationReadV2
+    from ..models.kafka_integration_read import KafkaIntegrationRead
 
 
-T = TypeVar("T", bound="IntegrationListResponseV2")
+T = TypeVar("T", bound="KafkaIntegrationListResponse")
 
 
 @_attrs_define
-class IntegrationListResponseV2:
-    """Paginated list response for integrations.
+class KafkaIntegrationListResponse:
+    """Paginated Kafka-only results.
 
     Attributes:
-        resources (list[IntegrationReadV2]): Array of resources in current page
+        resources (list[KafkaIntegrationRead]): Array of resources in current page
         next_ (None | str | Unset): Cursor for next page of results
         prev (None | str | Unset): Cursor for previous page of results
         total (int | None | Unset): Total count of resources (only when include_total=true)
     """
 
-    resources: list[IntegrationReadV2]
+    resources: list[KafkaIntegrationRead]
     next_: None | str | Unset = UNSET
     prev: None | str | Unset = UNSET
     total: int | None | Unset = UNSET
@@ -74,13 +74,13 @@ class IntegrationListResponseV2:
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
-        from ..models.integration_read_v2 import IntegrationReadV2
+        from ..models.kafka_integration_read import KafkaIntegrationRead
 
         d = dict(src_dict)
         resources = []
         _resources = d.pop("resources")
         for resources_item_data in _resources:
-            resources_item = IntegrationReadV2.from_dict(resources_item_data)
+            resources_item = KafkaIntegrationRead.from_dict(resources_item_data)
 
             resources.append(resources_item)
 
@@ -111,15 +111,15 @@ class IntegrationListResponseV2:
 
         total = _parse_total(d.pop("total", UNSET))
 
-        integration_list_response_v2 = cls(
+        kafka_integration_list_response = cls(
             resources=resources,
             next_=next_,
             prev=prev,
             total=total,
         )
 
-        integration_list_response_v2.additional_properties = d
-        return integration_list_response_v2
+        kafka_integration_list_response.additional_properties = d
+        return kafka_integration_list_response
 
     @property
     def additional_keys(self) -> list[str]:

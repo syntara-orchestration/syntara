@@ -41,10 +41,8 @@ describe('KafkaTransportFields', () => {
     const { container } = render(<Wrapper />)
     await user.click(screen.getByRole('button', { name: 'Security protocol' }))
     await user.click(screen.getByRole('option', { name: /^PLAINTEXT/ }))
-    let results: Awaited<ReturnType<typeof axe>>
     await act(async () => {
-      results = await axe(container)
+      expect(await axe(container)).toHaveNoViolations()
     })
-    expect(results!).toHaveNoViolations()
   })
 })

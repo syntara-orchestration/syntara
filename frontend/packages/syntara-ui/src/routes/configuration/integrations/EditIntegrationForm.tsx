@@ -9,14 +9,12 @@ import {
   FormGroup,
   Title,
 } from '@patternfly/react-core'
-import type { IntegrationsAPI } from '@syntara/contracts'
 import { IntegrationTypeEnum } from '@syntara/contracts'
 import { useQueryClient } from '@tanstack/react-query'
-import { useNavigate, useParams } from '@tanstack/react-router'
+import { useNavigate, useParams, useRouterState } from '@tanstack/react-router'
 import { useEffect, useMemo, useRef } from 'react'
 import { useFormContext, useFormState, useWatch, type UseFormSetValue } from 'react-hook-form'
 
-import { AppRoute } from '../../../app/AppRoute'
 import { breadcrumbsIntegrationEdit } from '../../../app/breadcrumbBuilders'
 import { integrationsClient } from '../../../client'
 import { SynDetail } from '../../../components/details/SynDetail'
@@ -51,7 +49,7 @@ import {
   INTEGRATION_TYPE_LABELS,
   PROVIDER_HINT_LABELS,
 } from './integrationFilters'
-import { getProviderHint, getStoredConfiguration, isLLMProvider } from './integrationUtils'
+import { getIntegrationPaths, getProviderHint, getStoredConfiguration, isLLMProvider } from './integrationUtils'
 import { formatBootstrapServers } from './kafkaBootstrapServers'
 import { DEFAULT_KAFKA_SASL_MECHANISM } from './kafkaSasl'
 import { useEditTestConnection } from './useEditTestConnection'
@@ -251,14 +249,27 @@ function EditFormFooter({ isSaving, onCancel }: Readonly<{ isSaving: boolean; on
   )
 }
 
+function getIntegrationUpdateFields(values: EditIntegrationFormValues) {
+  return {
+    name: values.name,
+    description: values.description || null,
+    scope: values.scope,
+    management_credential_id: values.management_credential_id,
+  }
+}
+
 export function EditIntegrationForm() {
   const { integrationId }: { integrationId: string } = useParams({ strict: false })
+  const isKafkaRoute = useRouterState({
+    select: (state) => state.location.pathname.startsWith('/configuration/integrations/kafka/'),
+  })
+  const { resourcePath, detailPath } = getIntegrationPaths(isKafkaRoute, integrationId)
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { showAlert } = useAlerts()
   const docLink = useDocLink('integrations')
 
-  const query = integrationsClient.useQuery('get', '/integrations/{integration_id}', {
+  const query = integrationsClient.useQuery('get', resourcePath, {
     params: { path: { integration_id: integrationId ?? '' } },
   })
   const integration = query.data
@@ -277,7 +288,6 @@ export function EditIntegrationForm() {
 
   const { syncAssignments } = useProjectAssignmentSync()
 
-  const detailPath = AppRoute.Configuration.Integrations.Detail.replace(':integrationId', integrationId ?? '')
   const breadcrumbs = breadcrumbsIntegrationEdit(integration?.name ?? 'Integration', detailPath)
 
   const schema = useMemo(() => {
@@ -347,10 +357,15 @@ export function EditIntegrationForm() {
     body: 'You have unsaved changes to this integration. Your changes will be lost if you leave.',
   })
 
-  const { mutateAsync: patchIntegration, isPending: isSaving } = integrationsClient.useMutation(
+  const { mutateAsync: patchIntegration, isPending: isLegacySaving } = integrationsClient.useMutation(
     'patch',
     '/integrations/{integration_id}'
   )
+  const { mutateAsync: patchKafkaIntegration, isPending: isKafkaSaving } = integrationsClient.useMutation(
+    'patch',
+    '/kafka-integrations/{integration_id}'
+  )
+  const isSaving = isLegacySaving || isKafkaSaving
 
   const { handleTestConnection, isTesting } = useEditTestConnection(integration, getValues)
 
@@ -359,23 +374,23 @@ export function EditIntegrationForm() {
 
     const integrationType = integration.integration_type ?? IntegrationTypeEnum.MCP_SERVER
 
-    const body: IntegrationsAPI.components['schemas']['IntegrationUpdateV2'] = {
-      name: values.name,
-      description: values.description || null,
-      scope: values.scope,
-      configuration: buildConfiguration(
-        integrationType,
-        values,
-        isLLMProvider(integration) ? getProviderHint(integration) : undefined
-      ),
-      management_credential_id: values.management_credential_id,
-    }
+    const configuration = buildConfiguration(
+      integrationType,
+      values,
+      isLLMProvider(integration) ? getProviderHint(integration) : undefined
+    )
+    const common = getIntegrationUpdateFields(values)
 
     detachPromise(
       (async () => {
         try {
-          await patchIntegration({ params: { path: { integration_id: integrationId } }, body })
-          await queryClient.invalidateQueries({ queryKey: ['get', '/integrations/{integration_id}'] })
+          const params = { path: { integration_id: integrationId } }
+          if (configuration.integration_type === IntegrationTypeEnum.KAFKA) {
+            await patchKafkaIntegration({ params, body: { ...common, configuration } })
+          } else {
+            await patchIntegration({ params, body: { ...common, configuration } })
+          }
+          await queryClient.invalidateQueries({ queryKey: ['get', resourcePath] })
           await queryClient.invalidateQueries({ queryKey: ['get', '/integrations/{integration_id}/projects'] })
 
           let variant: 'success' | 'warning' = 'success'

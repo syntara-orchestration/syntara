@@ -10,47 +10,38 @@ from ..models.integration_scope import IntegrationScope
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
-    from ..models.aap_configuration import AAPConfiguration
-    from ..models.integration_update_v2_labels_type_0 import IntegrationUpdateV2LabelsType0
     from ..models.kafka_configuration import KafkaConfiguration
-    from ..models.llm_provider_configuration import LLMProviderConfiguration
-    from ..models.mcp_server_configuration_input import MCPServerConfigurationInput
+    from ..models.kafka_integration_update_labels_type_0 import KafkaIntegrationUpdateLabelsType0
 
 
-T = TypeVar("T", bound="IntegrationUpdateV2")
+T = TypeVar("T", bound="KafkaIntegrationUpdate")
 
 
 @_attrs_define
-class IntegrationUpdateV2:
-    """Schema for partially updating an integration (user-facing).
+class KafkaIntegrationUpdate:
+    """Patch Kafka settings, preserving omitted fields.
 
     Attributes:
-        name (None | str | Unset): Human-readable name for the integration
-        description (None | str | Unset): Detailed description of the integration
-        configuration (AAPConfiguration | KafkaConfiguration | LLMProviderConfiguration | MCPServerConfigurationInput |
-            None | Unset): Integration-specific configuration
-        management_credential_id (None | Unset | UUID): Optional credential for admin operations
-        enabled (bool | None | Unset): Whether the integration is active
-        scope (IntegrationScope | None | Unset): Visibility scope: global or project
-        labels (IntegrationUpdateV2LabelsType0 | None | Unset): Key-value labels
+        name (None | str | Unset):
+        description (None | str | Unset):
+        configuration (KafkaConfiguration | None | Unset):
+        management_credential_id (None | Unset | UUID):
+        enabled (bool | None | Unset):
+        scope (IntegrationScope | None | Unset):
+        labels (KafkaIntegrationUpdateLabelsType0 | None | Unset):
     """
 
     name: None | str | Unset = UNSET
     description: None | str | Unset = UNSET
-    configuration: (
-        AAPConfiguration | KafkaConfiguration | LLMProviderConfiguration | MCPServerConfigurationInput | None | Unset
-    ) = UNSET
+    configuration: KafkaConfiguration | None | Unset = UNSET
     management_credential_id: None | Unset | UUID = UNSET
     enabled: bool | None | Unset = UNSET
     scope: IntegrationScope | None | Unset = UNSET
-    labels: IntegrationUpdateV2LabelsType0 | None | Unset = UNSET
+    labels: KafkaIntegrationUpdateLabelsType0 | None | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
-        from ..models.aap_configuration import AAPConfiguration
-        from ..models.integration_update_v2_labels_type_0 import IntegrationUpdateV2LabelsType0
         from ..models.kafka_configuration import KafkaConfiguration
-        from ..models.llm_provider_configuration import LLMProviderConfiguration
-        from ..models.mcp_server_configuration_input import MCPServerConfigurationInput
+        from ..models.kafka_integration_update_labels_type_0 import KafkaIntegrationUpdateLabelsType0
 
         name: None | str | Unset
         if isinstance(self.name, Unset):
@@ -67,12 +58,6 @@ class IntegrationUpdateV2:
         configuration: dict[str, Any] | None | Unset
         if isinstance(self.configuration, Unset):
             configuration = UNSET
-        elif isinstance(self.configuration, MCPServerConfigurationInput):
-            configuration = self.configuration.to_dict()
-        elif isinstance(self.configuration, LLMProviderConfiguration):
-            configuration = self.configuration.to_dict()
-        elif isinstance(self.configuration, AAPConfiguration):
-            configuration = self.configuration.to_dict()
         elif isinstance(self.configuration, KafkaConfiguration):
             configuration = self.configuration.to_dict()
         else:
@@ -103,7 +88,7 @@ class IntegrationUpdateV2:
         labels: dict[str, Any] | None | Unset
         if isinstance(self.labels, Unset):
             labels = UNSET
-        elif isinstance(self.labels, IntegrationUpdateV2LabelsType0):
+        elif isinstance(self.labels, KafkaIntegrationUpdateLabelsType0):
             labels = self.labels.to_dict()
         else:
             labels = self.labels
@@ -130,11 +115,8 @@ class IntegrationUpdateV2:
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
-        from ..models.aap_configuration import AAPConfiguration
-        from ..models.integration_update_v2_labels_type_0 import IntegrationUpdateV2LabelsType0
         from ..models.kafka_configuration import KafkaConfiguration
-        from ..models.llm_provider_configuration import LLMProviderConfiguration
-        from ..models.mcp_server_configuration_input import MCPServerConfigurationInput
+        from ..models.kafka_integration_update_labels_type_0 import KafkaIntegrationUpdateLabelsType0
 
         d = dict(src_dict)
 
@@ -156,16 +138,7 @@ class IntegrationUpdateV2:
 
         description = _parse_description(d.pop("description", UNSET))
 
-        def _parse_configuration(
-            data: object,
-        ) -> (
-            AAPConfiguration
-            | KafkaConfiguration
-            | LLMProviderConfiguration
-            | MCPServerConfigurationInput
-            | None
-            | Unset
-        ):
+        def _parse_configuration(data: object) -> KafkaConfiguration | None | Unset:
             if data is None:
                 return data
             if isinstance(data, Unset):
@@ -173,44 +146,12 @@ class IntegrationUpdateV2:
             try:
                 if not isinstance(data, dict):
                     raise TypeError()
-                configuration_type_0_type_0 = MCPServerConfigurationInput.from_dict(data)
+                configuration_type_0 = KafkaConfiguration.from_dict(data)
 
-                return configuration_type_0_type_0
+                return configuration_type_0
             except (TypeError, ValueError, AttributeError, KeyError):
                 pass
-            try:
-                if not isinstance(data, dict):
-                    raise TypeError()
-                configuration_type_0_type_1 = LLMProviderConfiguration.from_dict(data)
-
-                return configuration_type_0_type_1
-            except (TypeError, ValueError, AttributeError, KeyError):
-                pass
-            try:
-                if not isinstance(data, dict):
-                    raise TypeError()
-                configuration_type_0_type_2 = AAPConfiguration.from_dict(data)
-
-                return configuration_type_0_type_2
-            except (TypeError, ValueError, AttributeError, KeyError):
-                pass
-            try:
-                if not isinstance(data, dict):
-                    raise TypeError()
-                configuration_type_0_type_3 = KafkaConfiguration.from_dict(data)
-
-                return configuration_type_0_type_3
-            except (TypeError, ValueError, AttributeError, KeyError):
-                pass
-            return cast(
-                AAPConfiguration
-                | KafkaConfiguration
-                | LLMProviderConfiguration
-                | MCPServerConfigurationInput
-                | None
-                | Unset,
-                data,
-            )
+            return cast(KafkaConfiguration | None | Unset, data)
 
         configuration = _parse_configuration(d.pop("configuration", UNSET))
 
@@ -257,7 +198,7 @@ class IntegrationUpdateV2:
 
         scope = _parse_scope(d.pop("scope", UNSET))
 
-        def _parse_labels(data: object) -> IntegrationUpdateV2LabelsType0 | None | Unset:
+        def _parse_labels(data: object) -> KafkaIntegrationUpdateLabelsType0 | None | Unset:
             if data is None:
                 return data
             if isinstance(data, Unset):
@@ -265,16 +206,16 @@ class IntegrationUpdateV2:
             try:
                 if not isinstance(data, dict):
                     raise TypeError()
-                labels_type_0 = IntegrationUpdateV2LabelsType0.from_dict(data)
+                labels_type_0 = KafkaIntegrationUpdateLabelsType0.from_dict(data)
 
                 return labels_type_0
             except (TypeError, ValueError, AttributeError, KeyError):
                 pass
-            return cast(IntegrationUpdateV2LabelsType0 | None | Unset, data)
+            return cast(KafkaIntegrationUpdateLabelsType0 | None | Unset, data)
 
         labels = _parse_labels(d.pop("labels", UNSET))
 
-        integration_update_v2 = cls(
+        kafka_integration_update = cls(
             name=name,
             description=description,
             configuration=configuration,
@@ -284,4 +225,4 @@ class IntegrationUpdateV2:
             labels=labels,
         )
 
-        return integration_update_v2
+        return kafka_integration_update

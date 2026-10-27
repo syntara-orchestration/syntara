@@ -64,7 +64,7 @@ test.describe('Credential Detail Edge Cases', () => {
 test('integration fetch error in disable dialog shows warning', async ({ app }) => {
   const { name } = await createTestCredential(app, { prefix: 'e2e-int-error' })
   try {
-    await app.route('**/api/v2/integrations*', (route) =>
+    await app.route('**/api/v1/integrations*', (route) =>
       route.fulfill({
         status: 500,
         contentType: 'application/json',
@@ -83,7 +83,7 @@ test('integration fetch error in disable dialog shows warning', async ({ app }) 
     await expect(dialog.getByRole('button', { name: 'Disable credential' })).toBeVisible()
     await expect(dialog.getByRole('button', { name: 'Disable credential' })).toBeEnabled()
   } finally {
-    await app.unroute('**/api/v2/integrations*')
+    await app.unroute('**/api/v1/integrations*')
     await deleteCredentialByName(app, name)
   }
 })

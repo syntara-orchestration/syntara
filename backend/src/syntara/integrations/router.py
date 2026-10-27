@@ -11,7 +11,6 @@ import syntara.integrations.adapters.aap  # register AAP adapter
 import syntara.integrations.adapters.kafka  # register Kafka adapter
 import syntara.integrations.adapters.llm_provider  # register LLM provider adapter
 import syntara.integrations.adapters.mcp_server  # noqa: F401 — register MCP adapter
-from syntara.api.constants import API_V2_PATH_PREFIX
 from syntara.audit.decorators import audit
 from syntara.audit.models.audit_event import EventCategory
 from syntara.auth import get_current_user
@@ -27,20 +26,39 @@ from syntara.core.syntara_router import SyntaraRouter
 from syntara.integrations.adapters.protocol import DiscoverResult, ValidateResult
 from syntara.integrations.exceptions import IntegrationNotFoundError, IntegrationTypeMismatchError
 from syntara.integrations.models import (
-    IntegrationCreate,
-    IntegrationListParams,
-    IntegrationListResponse,
     IntegrationProjectAssignmentListParams,
     IntegrationProjectAssignmentListResponse,
     IntegrationProjectAssignmentRead,
-    IntegrationRead,
-    IntegrationUpdate,
 )
 from syntara.integrations.models.integration import (
     Integration,
-    IntegrationTestConnection,
     IntegrationType,
     RefreshResult,
+)
+from syntara.integrations.models.integration import (
+    IntegrationCreate as InternalCreate,
+)
+from syntara.integrations.models.integration import (
+    IntegrationTestConnection as InternalTestConnection,
+)
+from syntara.integrations.models.integration import (
+    IntegrationUpdate as InternalUpdate,
+)
+from syntara.integrations.models.kafka_integration import (
+    KafkaIntegrationCreate,
+    KafkaIntegrationListParams,
+    KafkaIntegrationListResponse,
+    KafkaIntegrationRead,
+    KafkaIntegrationTestConnection,
+    KafkaIntegrationUpdate,
+)
+from syntara.integrations.models.legacy_integration import (
+    IntegrationCreate,
+    IntegrationListParams,
+    IntegrationListResponse,
+    IntegrationRead,
+    IntegrationTestConnection,
+    IntegrationUpdate,
 )
 from syntara.integrations.models.llm_model import (
     LLMModelBulkUpdate,
@@ -62,8 +80,6 @@ from syntara.tool_manager.models.tool_bulk_update import ToolBulkUpdate, ToolBul
 from syntara.tool_manager.services.tool_service import ToolService
 
 router = SyntaraRouter(tags=["Integrations"])
-router.api_version = "v2"
-router.openapi_spec_name = "v2.openapi"
 
 
 # ============================================================================
@@ -88,19 +104,34 @@ _perm_tool_update = PermissionChecker("tool", "update")
 
 
 def get_integration_service(
-    request: Request,
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> IntegrationService:
     """Dependency provider for IntegrationService."""
     secret_service = create_secret_service(db)
+    return IntegrationService(db, current_user, secret_service)
+
+
+def get_legacy_integration_service(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> IntegrationService:
+    """Keep Kafka outside the original contract, including pagination and totals."""
     return IntegrationService(
         db,
         current_user,
-        secret_service,
-        include_kafka=request.url.path.removeprefix(request.scope.get("root_path", "")).startswith(
-            f"{API_V2_PATH_PREFIX}/"
-        ),
+        create_secret_service(db),
+        integration_types=frozenset(kind for kind in IntegrationType if kind != IntegrationType.KAFKA),
+    )
+
+
+def get_kafka_integration_service(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> IntegrationService:
+    """Restrict Kafka resource IDs and list queries to Kafka."""
+    return IntegrationService(
+        db, current_user, create_secret_service(db), integration_types=frozenset({IntegrationType.KAFKA})
     )
 
 
@@ -166,31 +197,33 @@ async def integration_read_visibility(
     summary="Create integration",
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(_perm_create)],
-    operation_id="v2_create_integration",
+    operation_id="create_integration",
 )
 @audit(EventCategory.USER_ACTION, event_action="integration_create")
 async def create_integration(
     data: IntegrationCreate,
-    service: Annotated[IntegrationService, Depends(get_integration_service)],
+    service: Annotated[IntegrationService, Depends(get_legacy_integration_service)],
 ) -> IntegrationRead:
     """Create a new integration."""
-    return await service.create_integration(data)
+    return IntegrationRead.model_validate(
+        (await service.create_integration(InternalCreate.model_validate(data.model_dump()))).model_dump()
+    )
 
 
 @router.get(
     "/integrations",
     summary="List integrations",
     dependencies=[Depends(_read_gate), Depends(_read_all_scope)],
-    operation_id="v2_list_integrations",
+    operation_id="list_integrations",
 )
 async def list_integrations(
     request: Request,
-    service: Annotated[IntegrationService, Depends(get_integration_service)],
+    service: Annotated[IntegrationService, Depends(get_legacy_integration_service)],
     params: Annotated[IntegrationListParams, Query()],
     allowed_projects: Annotated[AllowedProjectsResult, Depends(integration_read_visibility)],
 ) -> IntegrationListResponse:
     """List integrations with filtering and pagination."""
-    return await service.list_integrations(
+    result = await service.list_integrations(
         limit=params.limit,
         cursor=params.cursor,
         sort=params.sort,
@@ -200,20 +233,24 @@ async def list_integrations(
         project_id=params.project_id,
     )
 
+    return IntegrationListResponse.model_validate(result.model_dump())
+
 
 @router.get(
     "/integrations/{integration_id}",
     summary="Get integration",
     dependencies=[Depends(_read_gate), Depends(_read_all_scope)],
-    operation_id="v2_get_integration",
+    operation_id="get_integration",
 )
 async def get_integration(
     integration_id: UUID,
-    service: Annotated[IntegrationService, Depends(get_integration_service)],
+    service: Annotated[IntegrationService, Depends(get_legacy_integration_service)],
     allowed_projects: Annotated[AllowedProjectsResult, Depends(integration_read_visibility)],
 ) -> IntegrationRead:
     """Get an integration by ID."""
-    return await service.get_integration(integration_id, allowed_projects=allowed_projects)
+    return IntegrationRead.model_validate(
+        (await service.get_integration(integration_id, allowed_projects=allowed_projects)).model_dump()
+    )
 
 
 # No VisibilityFilter on update/delete: these are admin-only permissions,
@@ -222,16 +259,22 @@ async def get_integration(
     "/integrations/{integration_id}",
     summary="Update integration",
     dependencies=[Depends(_perm_update)],
-    operation_id="v2_update_integration",
+    operation_id="update_integration",
 )
 @audit(EventCategory.USER_ACTION, event_action="integration_update", capture_args={"integration_id"})
 async def update_integration(
     integration_id: UUID,
     data: IntegrationUpdate,
-    service: Annotated[IntegrationService, Depends(get_integration_service)],
+    service: Annotated[IntegrationService, Depends(get_legacy_integration_service)],
 ) -> IntegrationRead:
     """Update an integration."""
-    return await service.update_integration(integration_id, data)
+    return IntegrationRead.model_validate(
+        (
+            await service.update_integration(
+                integration_id, InternalUpdate.model_validate(data.model_dump(exclude_unset=True))
+            )
+        ).model_dump()
+    )
 
 
 @router.delete(
@@ -239,7 +282,7 @@ async def update_integration(
     summary="Delete integration",
     status_code=status.HTTP_204_NO_CONTENT,
     dependencies=[Depends(_perm_delete)],
-    operation_id="v2_delete_integration",
+    operation_id="delete_integration",
 )
 @audit(EventCategory.USER_ACTION, event_action="integration_delete", capture_args={"integration_id"})
 async def delete_integration(
@@ -254,12 +297,12 @@ async def delete_integration(
     "/integrations/discover",
     summary="Discover integration connection",
     dependencies=[Depends(_perm_discover)],
-    operation_id="v2_discover_integration_connection",
+    operation_id="discover_integration_connection",
 )
 @audit(EventCategory.USER_ACTION, event_action="integration_discover")
 async def discover_integration_connection(
     data: IntegrationTestConnection,
-    service: Annotated[IntegrationService, Depends(get_integration_service)],
+    service: Annotated[IntegrationService, Depends(get_legacy_integration_service)],
 ) -> DiscoverResult:
     """Test a connection and discover resources without saving an integration.
 
@@ -268,14 +311,14 @@ async def discover_integration_connection(
     including discovered tools (with parameters) or models. No integration
     is persisted.
     """
-    return await service.discover(data)
+    return await service.discover(InternalTestConnection.model_validate(data.model_dump()))
 
 
 @router.post(
     "/integrations/{integration_id}/validate",
     summary="Validate integration",
     dependencies=[Depends(_perm_validate)],
-    operation_id="v2_validate_integration",
+    operation_id="validate_integration",
 )
 @audit(EventCategory.USER_ACTION, event_action="integration_validate", capture_args={"integration_id"})
 async def validate_integration(
@@ -295,7 +338,7 @@ async def validate_integration(
     "/integrations/{integration_id}/refresh",
     summary="Refresh resources",
     dependencies=[Depends(_perm_refresh)],
-    operation_id="v2_refresh_resources",
+    operation_id="refresh_resources",
 )
 @audit(EventCategory.USER_ACTION, event_action="integration_refresh", capture_args={"integration_id"})
 async def refresh_resources(
@@ -321,7 +364,7 @@ async def refresh_resources(
     summary="Assign integration project",
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(_perm_update)],
-    operation_id="v2_assign_integration_project",
+    operation_id="assign_integration_project",
 )
 @audit(
     EventCategory.USER_ACTION,
@@ -342,7 +385,7 @@ async def assign_integration_project(
     summary="Unassign integration project",
     status_code=status.HTTP_204_NO_CONTENT,
     dependencies=[Depends(_perm_update)],
-    operation_id="v2_unassign_integration_project",
+    operation_id="unassign_integration_project",
 )
 @audit(
     EventCategory.USER_ACTION,
@@ -362,7 +405,7 @@ async def unassign_integration_project(
     "/integrations/{integration_id}/projects",
     summary="List integration projects",
     dependencies=[Depends(_read_gate), Depends(_read_all_scope)],
-    operation_id="v2_list_integration_projects",
+    operation_id="list_integration_projects",
 )
 async def list_integration_projects(
     integration_id: UUID,
@@ -474,7 +517,7 @@ async def _require_visible_llm_provider(
     "/integrations/{integration_id}/models",
     summary="List integration models",
     dependencies=[Depends(_model_read_gate), Depends(_require_visible_llm_provider)],
-    operation_id="v2_list_integration_models",
+    operation_id="list_integration_models",
 )
 async def list_integration_models(
     integration_id: UUID,
@@ -497,7 +540,7 @@ async def list_integration_models(
     "/integrations/{integration_id}/models/bulk_update",
     summary="Bulk update integration models",
     dependencies=[Depends(_perm_model_update), Depends(_require_llm_provider)],
-    operation_id="v2_bulk_update_integration_models",
+    operation_id="bulk_update_integration_models",
 )
 @audit(EventCategory.USER_ACTION, event_action="model_bulk_update")
 async def bulk_update_integration_models(
@@ -513,7 +556,7 @@ async def bulk_update_integration_models(
     "/integrations/{integration_id}/models/{model_id}",
     summary="Get integration model",
     dependencies=[Depends(_model_read_gate), Depends(_require_visible_llm_provider)],
-    operation_id="v2_get_integration_model",
+    operation_id="get_integration_model",
 )
 async def get_integration_model(
     integration_id: UUID,
@@ -528,7 +571,7 @@ async def get_integration_model(
     "/integrations/{integration_id}/models/{model_id}",
     summary="Update integration model",
     dependencies=[Depends(_perm_model_update), Depends(_require_llm_provider)],
-    operation_id="v2_update_integration_model",
+    operation_id="update_integration_model",
 )
 @audit(EventCategory.USER_ACTION, event_action="model_update", capture_args={"model_id"})
 async def update_integration_model(
@@ -575,7 +618,7 @@ async def _require_visible_mcp_server(
 @router.get(
     "/integrations/{integration_id}/tools",
     dependencies=[Depends(_tool_read_gate), Depends(_require_visible_mcp_server)],
-    operation_id="v2_list_integration_tools",
+    operation_id="list_integration_tools",
 )
 async def list_integration_tools(
     integration_id: UUID,
@@ -597,7 +640,7 @@ async def list_integration_tools(
 @router.patch(
     "/integrations/{integration_id}/tools/bulk_update",
     dependencies=[Depends(_perm_tool_update), Depends(_require_visible_mcp_server)],
-    operation_id="v2_bulk_update_integration_tools",
+    operation_id="bulk_update_integration_tools",
 )
 @audit(EventCategory.USER_ACTION, event_action="tool_bulk_update")
 async def bulk_update_integration_tools(
@@ -612,7 +655,7 @@ async def bulk_update_integration_tools(
 @router.get(
     "/integrations/{integration_id}/tools/{tool_id}",
     dependencies=[Depends(_tool_read_gate), Depends(_require_visible_mcp_server)],
-    operation_id="v2_get_integration_tool",
+    operation_id="get_integration_tool",
 )
 async def get_integration_tool(
     integration_id: UUID,
@@ -626,7 +669,7 @@ async def get_integration_tool(
 @router.patch(
     "/integrations/{integration_id}/tools/{tool_id}",
     dependencies=[Depends(_perm_tool_update), Depends(_require_visible_mcp_server)],
-    operation_id="v2_update_integration_tool",
+    operation_id="update_integration_tool",
 )
 @audit(EventCategory.USER_ACTION, event_action="tool_update", capture_args={"tool_id"})
 async def update_integration_tool(
@@ -637,3 +680,90 @@ async def update_integration_tool(
 ) -> ToolWithParameters:
     """Update a tool (enable/disable), scoped to an integration."""
     return await service.update_tool_for_integration(integration_id, tool_id, data)
+
+
+@router.get(
+    "/kafka-integrations",
+    dependencies=[Depends(_read_gate), Depends(_read_all_scope)],
+    operation_id="list_kafka_integrations",
+)
+async def list_kafka_integrations(
+    request: Request,
+    service: Annotated[IntegrationService, Depends(get_kafka_integration_service)],
+    params: Annotated[KafkaIntegrationListParams, Query()],
+    allowed_projects: Annotated[AllowedProjectsResult, Depends(integration_read_visibility)],
+) -> KafkaIntegrationListResponse:
+    """List Kafka connections with filtering, pagination, and project visibility."""
+    result = await service.list_integrations(
+        limit=params.limit,
+        cursor=params.cursor,
+        sort=params.sort,
+        query_params_items=request.query_params.items(),
+        include_total=params.include_total,
+        allowed_projects=allowed_projects,
+        project_id=params.project_id,
+    )
+    return KafkaIntegrationListResponse.model_validate(result.model_dump())
+
+
+@router.post(
+    "/kafka-integrations",
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(_perm_create)],
+    operation_id="create_kafka_integration",
+)
+@audit(EventCategory.USER_ACTION, event_action="integration_create")
+async def create_kafka_integration(
+    data: KafkaIntegrationCreate,
+    service: Annotated[IntegrationService, Depends(get_kafka_integration_service)],
+) -> KafkaIntegrationRead:
+    """Create a Kafka connection using the shared integration service."""
+    result = await service.create_integration(InternalCreate.model_validate(data.model_dump()))
+    return KafkaIntegrationRead.model_validate(result.model_dump())
+
+
+@router.post(
+    "/kafka-integrations/discover",
+    dependencies=[Depends(_perm_discover)],
+    operation_id="discover_kafka_integration_connection",
+)
+@audit(EventCategory.USER_ACTION, event_action="integration_discover")
+async def discover_kafka_integration_connection(
+    data: KafkaIntegrationTestConnection,
+    service: Annotated[IntegrationService, Depends(get_kafka_integration_service)],
+) -> DiscoverResult:
+    """Test a Kafka connection without saving it."""
+    return await service.discover(InternalTestConnection.model_validate(data.model_dump()))
+
+
+@router.get(
+    "/kafka-integrations/{integration_id}",
+    dependencies=[Depends(_read_gate), Depends(_read_all_scope)],
+    operation_id="get_kafka_integration",
+)
+async def get_kafka_integration(
+    integration_id: UUID,
+    service: Annotated[IntegrationService, Depends(get_kafka_integration_service)],
+    allowed_projects: Annotated[AllowedProjectsResult, Depends(integration_read_visibility)],
+) -> KafkaIntegrationRead:
+    """Get a Kafka connection visible to the caller."""
+    result = await service.get_integration(integration_id, allowed_projects=allowed_projects)
+    return KafkaIntegrationRead.model_validate(result.model_dump())
+
+
+@router.patch(
+    "/kafka-integrations/{integration_id}",
+    dependencies=[Depends(_perm_update)],
+    operation_id="update_kafka_integration",
+)
+@audit(EventCategory.USER_ACTION, event_action="integration_update", capture_args={"integration_id"})
+async def update_kafka_integration(
+    integration_id: UUID,
+    data: KafkaIntegrationUpdate,
+    service: Annotated[IntegrationService, Depends(get_kafka_integration_service)],
+) -> KafkaIntegrationRead:
+    """Update a Kafka connection, preserving omitted settings."""
+    result = await service.update_integration(
+        integration_id, InternalUpdate.model_validate(data.model_dump(exclude_unset=True))
+    )
+    return KafkaIntegrationRead.model_validate(result.model_dump())

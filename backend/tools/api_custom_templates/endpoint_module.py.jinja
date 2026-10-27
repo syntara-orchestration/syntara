@@ -119,15 +119,7 @@ def sync_detailed(
         {% endif %}
     )
 
-{% if endpoint.path.startswith("/api/v2/") %}
-    httpx_client = client.get_httpx_client()
-    # Path-level servers select v2 while existing clients may use a v1 base URL.
-    api_root = httpx_client.base_url.path.rstrip("/").rsplit("/api/", 1)[0].removesuffix("/api")
-    kwargs["url"] = httpx_client.base_url.copy_with(path=f"{api_root}{kwargs['url']}")
-    response = httpx_client.request(
-{% else %}
     response = client.get_httpx_client().request(
-{% endif %}
         **kwargs,
     )
 
@@ -153,15 +145,7 @@ async def asyncio_detailed(
         {{ kwargs(endpoint, include_client=False) }}
     )
 
-{% if endpoint.path.startswith("/api/v2/") %}
-    httpx_client = client.get_async_httpx_client()
-    # Preserve any deployment prefix while selecting the endpoint's API version.
-    api_root = httpx_client.base_url.path.rstrip("/").rsplit("/api/", 1)[0].removesuffix("/api")
-    kwargs["url"] = httpx_client.base_url.copy_with(path=f"{api_root}{kwargs['url']}")
-    response = await httpx_client.request(
-{% else %}
     response = await client.get_async_httpx_client().request(
-{% endif %}
         **kwargs
     )
 

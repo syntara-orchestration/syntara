@@ -1,4 +1,4 @@
-"""Frozen v1 integration contract. Expanded integration types live in v2."""
+"""Original integration contract. Kafka has a separate v1 resource."""
 
 from datetime import datetime
 from enum import StrEnum
@@ -221,7 +221,7 @@ class IntegrationListResponse(ResourcesResponse[IntegrationRead]):
     """Paginated list response for integrations."""
 
 
-class IntegrationListParamsV1(BaseListParams):
+class IntegrationListParams(BaseListParams):
     """Query parameters for integration list endpoint."""
 
     integration_type: IntegrationType | None = Field(default=None, description="Filter by integration type")
@@ -235,10 +235,3 @@ class IntegrationListParamsV1(BaseListParams):
         "Restricted to projects the user has RBAC access to; querying inaccessible projects "
         "returns only global integrations.",
     )
-
-
-IntegrationCreateV1 = IntegrationCreate
-IntegrationReadV1 = IntegrationRead
-IntegrationUpdateV1 = IntegrationUpdate
-IntegrationTestConnectionV1 = IntegrationTestConnection
-IntegrationListResponseV1 = IntegrationListResponse

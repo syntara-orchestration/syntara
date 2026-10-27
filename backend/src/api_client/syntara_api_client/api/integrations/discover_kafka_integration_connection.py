@@ -5,21 +5,21 @@ import httpx
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
+from ...models.discover_result import DiscoverResult
 from ...models.error_data import ErrorData
-from ...models.integration_create_v2 import IntegrationCreateV2
-from ...models.integration_read_v2 import IntegrationReadV2
+from ...models.kafka_integration_test_connection import KafkaIntegrationTestConnection
 from ...types import Response
 
 
 def _get_kwargs(
     *,
-    body: IntegrationCreateV2,
+    body: KafkaIntegrationTestConnection,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
     _kwargs: dict[str, Any] = {
         "method": "post",
-        "url": "/api/v2/integrations",
+        "url": "/kafka-integrations/discover",
     }
 
     _kwargs["json"] = body.to_dict()
@@ -32,11 +32,11 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> ErrorData | IntegrationReadV2 | None:
-    if response.status_code == 201:
-        response_201 = IntegrationReadV2.from_dict(response.json())
+) -> DiscoverResult | ErrorData | None:
+    if response.status_code == 200:
+        response_200 = DiscoverResult.from_dict(response.json())
 
-        return response_201
+        return response_200
 
     if response.status_code == 400:
         response_400 = ErrorData.from_dict(response.json())
@@ -86,7 +86,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[ErrorData | IntegrationReadV2]:
+) -> Response[DiscoverResult | ErrorData]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -100,32 +100,28 @@ def _build_response(
 def sync_detailed(
     *,
     client: AuthenticatedClient,
-    body: IntegrationCreateV2,
-) -> Response[ErrorData | IntegrationReadV2]:
-    """Create integration
+    body: KafkaIntegrationTestConnection,
+) -> Response[DiscoverResult | ErrorData]:
+    """Discover Kafka Integration Connection
 
-     Create a new integration.
+     Test a Kafka connection without saving it.
 
     Args:
-        body (IntegrationCreateV2): Schema for creating a new integration.
+        body (KafkaIntegrationTestConnection): Test a Kafka connection without persisting it.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ErrorData | IntegrationReadV2]
+        Response[DiscoverResult | ErrorData]
     """
 
     kwargs = _get_kwargs(
         body=body,
     )
 
-    httpx_client = client.get_httpx_client()
-    # Path-level servers select v2 while existing clients may use a v1 base URL.
-    api_root = httpx_client.base_url.path.rstrip("/").rsplit("/api/", 1)[0].removesuffix("/api")
-    kwargs["url"] = httpx_client.base_url.copy_with(path=f"{api_root}{kwargs['url']}")
-    response = httpx_client.request(
+    response = client.get_httpx_client().request(
         **kwargs,
     )
 
@@ -135,21 +131,21 @@ def sync_detailed(
 def sync(
     *,
     client: AuthenticatedClient,
-    body: IntegrationCreateV2,
-) -> ErrorData | IntegrationReadV2 | None:
-    """Create integration
+    body: KafkaIntegrationTestConnection,
+) -> DiscoverResult | ErrorData | None:
+    """Discover Kafka Integration Connection
 
-     Create a new integration.
+     Test a Kafka connection without saving it.
 
     Args:
-        body (IntegrationCreateV2): Schema for creating a new integration.
+        body (KafkaIntegrationTestConnection): Test a Kafka connection without persisting it.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        ErrorData | IntegrationReadV2
+        DiscoverResult | ErrorData
     """
 
     return sync_detailed(
@@ -161,32 +157,28 @@ def sync(
 async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
-    body: IntegrationCreateV2,
-) -> Response[ErrorData | IntegrationReadV2]:
-    """Create integration
+    body: KafkaIntegrationTestConnection,
+) -> Response[DiscoverResult | ErrorData]:
+    """Discover Kafka Integration Connection
 
-     Create a new integration.
+     Test a Kafka connection without saving it.
 
     Args:
-        body (IntegrationCreateV2): Schema for creating a new integration.
+        body (KafkaIntegrationTestConnection): Test a Kafka connection without persisting it.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ErrorData | IntegrationReadV2]
+        Response[DiscoverResult | ErrorData]
     """
 
     kwargs = _get_kwargs(
         body=body,
     )
 
-    httpx_client = client.get_async_httpx_client()
-    # Preserve any deployment prefix while selecting the endpoint's API version.
-    api_root = httpx_client.base_url.path.rstrip("/").rsplit("/api/", 1)[0].removesuffix("/api")
-    kwargs["url"] = httpx_client.base_url.copy_with(path=f"{api_root}{kwargs['url']}")
-    response = await httpx_client.request(**kwargs)
+    response = await client.get_async_httpx_client().request(**kwargs)
 
     return _build_response(client=client, response=response)
 
@@ -194,21 +186,21 @@ async def asyncio_detailed(
 async def asyncio(
     *,
     client: AuthenticatedClient,
-    body: IntegrationCreateV2,
-) -> ErrorData | IntegrationReadV2 | None:
-    """Create integration
+    body: KafkaIntegrationTestConnection,
+) -> DiscoverResult | ErrorData | None:
+    """Discover Kafka Integration Connection
 
-     Create a new integration.
+     Test a Kafka connection without saving it.
 
     Args:
-        body (IntegrationCreateV2): Schema for creating a new integration.
+        body (KafkaIntegrationTestConnection): Test a Kafka connection without persisting it.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        ErrorData | IntegrationReadV2
+        DiscoverResult | ErrorData
     """
 
     return (

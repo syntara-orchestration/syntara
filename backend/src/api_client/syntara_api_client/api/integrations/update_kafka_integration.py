@@ -7,22 +7,21 @@ import httpx
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.error_data import ErrorData
-from ...models.tool_update import ToolUpdate
-from ...models.tool_with_parameters import ToolWithParameters
+from ...models.kafka_integration_read import KafkaIntegrationRead
+from ...models.kafka_integration_update import KafkaIntegrationUpdate
 from ...types import Response
 
 
 def _get_kwargs(
     integration_id: UUID,
-    tool_id: UUID,
     *,
-    body: ToolUpdate,
+    body: KafkaIntegrationUpdate,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
     _kwargs: dict[str, Any] = {
         "method": "patch",
-        "url": f"/api/v2/integrations/{integration_id}/tools/{tool_id}",
+        "url": f"/kafka-integrations/{integration_id}",
     }
 
     _kwargs["json"] = body.to_dict()
@@ -35,9 +34,9 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> ErrorData | ToolWithParameters | None:
+) -> ErrorData | KafkaIntegrationRead | None:
     if response.status_code == 200:
-        response_200 = ToolWithParameters.from_dict(response.json())
+        response_200 = KafkaIntegrationRead.from_dict(response.json())
 
         return response_200
 
@@ -89,7 +88,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[ErrorData | ToolWithParameters]:
+) -> Response[ErrorData | KafkaIntegrationRead]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -102,39 +101,32 @@ def _build_response(
 
 def sync_detailed(
     integration_id: UUID,
-    tool_id: UUID,
     *,
     client: AuthenticatedClient,
-    body: ToolUpdate,
-) -> Response[ErrorData | ToolWithParameters]:
-    """Update Integration Tool
+    body: KafkaIntegrationUpdate,
+) -> Response[ErrorData | KafkaIntegrationRead]:
+    """Update Kafka Integration
 
-     Update a tool (enable/disable), scoped to an integration.
+     Update a Kafka connection, preserving omitted settings.
 
     Args:
         integration_id (UUID):
-        tool_id (UUID):
-        body (ToolUpdate): Model for updating tool configuration.
+        body (KafkaIntegrationUpdate): Patch Kafka settings, preserving omitted fields.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ErrorData | ToolWithParameters]
+        Response[ErrorData | KafkaIntegrationRead]
     """
 
     kwargs = _get_kwargs(
         integration_id=integration_id,
-        tool_id=tool_id,
         body=body,
     )
 
-    httpx_client = client.get_httpx_client()
-    # Path-level servers select v2 while existing clients may use a v1 base URL.
-    api_root = httpx_client.base_url.path.rstrip("/").rsplit("/api/", 1)[0].removesuffix("/api")
-    kwargs["url"] = httpx_client.base_url.copy_with(path=f"{api_root}{kwargs['url']}")
-    response = httpx_client.request(
+    response = client.get_httpx_client().request(
         **kwargs,
     )
 
@@ -143,31 +135,28 @@ def sync_detailed(
 
 def sync(
     integration_id: UUID,
-    tool_id: UUID,
     *,
     client: AuthenticatedClient,
-    body: ToolUpdate,
-) -> ErrorData | ToolWithParameters | None:
-    """Update Integration Tool
+    body: KafkaIntegrationUpdate,
+) -> ErrorData | KafkaIntegrationRead | None:
+    """Update Kafka Integration
 
-     Update a tool (enable/disable), scoped to an integration.
+     Update a Kafka connection, preserving omitted settings.
 
     Args:
         integration_id (UUID):
-        tool_id (UUID):
-        body (ToolUpdate): Model for updating tool configuration.
+        body (KafkaIntegrationUpdate): Patch Kafka settings, preserving omitted fields.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        ErrorData | ToolWithParameters
+        ErrorData | KafkaIntegrationRead
     """
 
     return sync_detailed(
         integration_id=integration_id,
-        tool_id=tool_id,
         client=client,
         body=body,
     ).parsed
@@ -175,71 +164,61 @@ def sync(
 
 async def asyncio_detailed(
     integration_id: UUID,
-    tool_id: UUID,
     *,
     client: AuthenticatedClient,
-    body: ToolUpdate,
-) -> Response[ErrorData | ToolWithParameters]:
-    """Update Integration Tool
+    body: KafkaIntegrationUpdate,
+) -> Response[ErrorData | KafkaIntegrationRead]:
+    """Update Kafka Integration
 
-     Update a tool (enable/disable), scoped to an integration.
+     Update a Kafka connection, preserving omitted settings.
 
     Args:
         integration_id (UUID):
-        tool_id (UUID):
-        body (ToolUpdate): Model for updating tool configuration.
+        body (KafkaIntegrationUpdate): Patch Kafka settings, preserving omitted fields.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ErrorData | ToolWithParameters]
+        Response[ErrorData | KafkaIntegrationRead]
     """
 
     kwargs = _get_kwargs(
         integration_id=integration_id,
-        tool_id=tool_id,
         body=body,
     )
 
-    httpx_client = client.get_async_httpx_client()
-    # Preserve any deployment prefix while selecting the endpoint's API version.
-    api_root = httpx_client.base_url.path.rstrip("/").rsplit("/api/", 1)[0].removesuffix("/api")
-    kwargs["url"] = httpx_client.base_url.copy_with(path=f"{api_root}{kwargs['url']}")
-    response = await httpx_client.request(**kwargs)
+    response = await client.get_async_httpx_client().request(**kwargs)
 
     return _build_response(client=client, response=response)
 
 
 async def asyncio(
     integration_id: UUID,
-    tool_id: UUID,
     *,
     client: AuthenticatedClient,
-    body: ToolUpdate,
-) -> ErrorData | ToolWithParameters | None:
-    """Update Integration Tool
+    body: KafkaIntegrationUpdate,
+) -> ErrorData | KafkaIntegrationRead | None:
+    """Update Kafka Integration
 
-     Update a tool (enable/disable), scoped to an integration.
+     Update a Kafka connection, preserving omitted settings.
 
     Args:
         integration_id (UUID):
-        tool_id (UUID):
-        body (ToolUpdate): Model for updating tool configuration.
+        body (KafkaIntegrationUpdate): Patch Kafka settings, preserving omitted fields.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        ErrorData | ToolWithParameters
+        ErrorData | KafkaIntegrationRead
     """
 
     return (
         await asyncio_detailed(
             integration_id=integration_id,
-            tool_id=tool_id,
             client=client,
             body=body,
         )

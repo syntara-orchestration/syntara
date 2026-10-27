@@ -28,6 +28,7 @@ type InitialToolSelection = {
 type InitialModelSelection = IntegrationsAPI.components['schemas']['InitialModelSelection']
 
 export function useCreateIntegration({ handleError, onBeforeNavigate }: UseCreateIntegrationOptions) {
+  const { mutateAsync: createKafkaIntegration } = integrationsClient.useMutation('post', '/kafka-integrations')
   const { mutateAsync: createIntegration } = integrationsClient.useMutation('post', '/integrations')
   const { syncAssignments } = useProjectAssignmentSync()
   const queryClient = useQueryClient()
@@ -41,25 +42,43 @@ export function useCreateIntegration({ handleError, onBeforeNavigate }: UseCreat
     ) => {
       const context = formData.name ? `Integration "${formData.name}"` : undefined
       const navigateToList = () => {
-        detachPromise(tanstackRouter.navigate({ to: AppRoute.Configuration.Integrations.Root }))
+        detachPromise(
+          tanstackRouter.navigate(
+            formData.integration_type === IntegrationTypeEnum.KAFKA
+              ? {
+                  to: AppRoute.Configuration.Integrations.Root,
+                  search: { integration_type: IntegrationTypeEnum.KAFKA },
+                }
+              : { to: AppRoute.Configuration.Integrations.Root }
+          )
+        )
       }
 
       detachPromise(
         (async () => {
           try {
-            const created = await createIntegration({
-              body: {
-                name: formData.name,
-                description: formData.description ?? undefined,
-                integration_type: formData.integration_type,
-                configuration: toApiConfiguration(formData.configuration),
-                management_credential_id: formData.management_credential_id ?? undefined,
-                scope: formData.scope,
-                discovered_tools:
-                  formData.integration_type === IntegrationTypeEnum.MCP_SERVER ? (discoveredTools ?? null) : null,
-                discovered_models: discoveredModels ?? null,
-              },
-            })
+            const configuration = toApiConfiguration(formData.configuration)
+            const common = {
+              name: formData.name,
+              description: formData.description ?? undefined,
+              management_credential_id: formData.management_credential_id ?? undefined,
+              scope: formData.scope,
+            }
+            const created =
+              configuration.integration_type === IntegrationTypeEnum.KAFKA
+                ? await createKafkaIntegration({
+                    body: { ...common, integration_type: configuration.integration_type, configuration },
+                  })
+                : await createIntegration({
+                    body: {
+                      ...common,
+                      integration_type: configuration.integration_type,
+                      configuration,
+                      discovered_tools:
+                        formData.integration_type === IntegrationTypeEnum.MCP_SERVER ? (discoveredTools ?? null) : null,
+                      discovered_models: discoveredModels ?? null,
+                    },
+                  })
 
             if (formData.scope === 'project' && formData.project_ids.length > 0 && created.id) {
               const result = await syncAssignments(created.id, [], formData.project_ids)
@@ -92,6 +111,6 @@ export function useCreateIntegration({ handleError, onBeforeNavigate }: UseCreat
         })()
       )
     },
-    [createIntegration, syncAssignments, queryClient, handleError, showAlert, onBeforeNavigate]
+    [createIntegration, createKafkaIntegration, syncAssignments, queryClient, handleError, showAlert, onBeforeNavigate]
   )
 }

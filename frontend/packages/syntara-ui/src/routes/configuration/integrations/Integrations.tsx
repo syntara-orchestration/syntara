@@ -2,7 +2,7 @@ import { Badge, Button, Switch, Tooltip, Truncate } from '@patternfly/react-core
 import { RhUiAddIcon, RhUiCheckCircleIcon, RhUiTrashIcon } from '@patternfly/react-icons'
 import { Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
 import type { ThProps } from '@patternfly/react-table'
-import type { IntegrationsAPI } from '@syntara/contracts'
+import { IntegrationTypeEnum } from '@syntara/contracts'
 import { useNavigate } from '@tanstack/react-router'
 import { useMemo } from 'react'
 
@@ -37,12 +37,11 @@ import {
   getIntegrationTypeFilterDefinition,
 } from './integrationFilters'
 import { integrationDefaultSort, integrationTableColumns } from './integrationTableColumns'
+import type { IntegrationRead } from './integrationTypes'
 import { getBaseUrl, getEnabledResourceCount } from './integrationUtils'
 import { StatusLabel } from './StatusLabel'
 import { useIntegrationActions } from './useIntegrationActions'
 import { useIntegrationPermissions } from './useIntegrationPermissions'
-
-type IntegrationRead = IntegrationsAPI.components['schemas']['IntegrationReadV2']
 
 function buildRowActions(
   integration: IntegrationRead,
@@ -114,7 +113,10 @@ function IntegrationsTableContent({
           <Tr key={integration.id}>
             <Td dataLabel="Name">
               <LinkCell
-                href={AppRoute.Configuration.Integrations.Detail.replace(':integrationId', integration.id ?? '')}
+                href={(integration.integration_type === IntegrationTypeEnum.KAFKA
+                  ? AppRoute.Configuration.Integrations.KafkaDetail
+                  : AppRoute.Configuration.Integrations.Detail
+                ).replace(':integrationId', integration.id ?? '')}
               >
                 <Truncate content={integration.name ?? ''} />
               </LinkCell>
@@ -200,11 +202,14 @@ export default function Integrations() {
     []
   )
 
+  const { integration_type: selectedType, ...kafkaQueryParams } = queryParams
+  const listPath = selectedType === IntegrationTypeEnum.KAFKA ? '/kafka-integrations' : '/integrations'
+
   const query = integrationsClient.useQuery(
     'get',
-    '/integrations',
+    listPath,
     {
-      params: { query: queryParams },
+      params: { query: listPath === '/kafka-integrations' ? kafkaQueryParams : queryParams },
     },
     {
       refetchInterval: 30_000,
@@ -267,14 +272,12 @@ export default function Integrations() {
             onClearAllFilters={handleClearAllFilters}
             noDataState={<IntegrationEmptyState canCreate={permissions.canCreate} />}
             toolbar={
-              !isEmpty || hasActiveFilters ? (
-                <SynListPanelToolbar
-                  filters={filters}
-                  filterDefinitions={filterFieldDefinitions}
-                  onFilterChange={handleFilterChange}
-                  clearAllFilters={handleClearAllFilters}
-                />
-              ) : undefined
+              <SynListPanelToolbar
+                filters={filters}
+                filterDefinitions={filterFieldDefinitions}
+                onFilterChange={handleFilterChange}
+                clearAllFilters={handleClearAllFilters}
+              />
             }
             body={
               <SynListPanelTable caption="Integrations" footer={getFooterProps(query.data)} useFixedLayout={false}>

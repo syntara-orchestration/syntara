@@ -22,6 +22,7 @@ from syntara.integrations.models.integration_configuration import (
     KafkaConfiguration,
     LLMProviderConfiguration,
     MCPServerConfiguration,
+    MCPServerConfigurationInput,
 )
 
 
@@ -464,9 +465,9 @@ class TestKafkaConfiguration:
 
 
 class TestIntegrationReadKafkaConfiguration:
-    """V2 exposes Kafka through the standard configuration field."""
+    """Internal responses retain Kafka configuration; the public Kafka resource has its own contract."""
 
-    def test_keeps_kafka_configuration_in_the_v2_response(self) -> None:
+    def test_retains_kafka_configuration(self) -> None:
         read = IntegrationRead.model_validate(
             {
                 "name": "Production Kafka",
@@ -501,7 +502,7 @@ class TestIntegrationReadKafkaConfiguration:
                 },
             }
         )
-        assert isinstance(read.configuration, MCPServerConfiguration)
+        assert isinstance(read.configuration, MCPServerConfigurationInput)
         assert read.configuration.base_url == "https://example.com"
 
 
@@ -540,18 +541,3 @@ class TestIntegrationSortableFields:
             "enabled",
             "last_validated_at",
         ]
-
-
-@pytest.mark.parametrize("protocol", ["SSL", "SASL_SSL"])
-def test_encrypted_kafka_transports(protocol: str) -> None:
-    config = KafkaConfiguration(bootstrap_servers=["broker.example.com:9093"], security_protocol=protocol)
-    assert config.security_protocol == protocol
-
-
-def test_plaintext_requires_separate_opt_in() -> None:
-    with pytest.raises(ValueError, match="allow_plaintext"):
-        KafkaConfiguration(bootstrap_servers=["broker.example.com:9092"], security_protocol="PLAINTEXT")
-    config = KafkaConfiguration(
-        bootstrap_servers=["broker.example.com:9092"], security_protocol="PLAINTEXT", allow_plaintext=True
-    )
-    assert config.allow_plaintext

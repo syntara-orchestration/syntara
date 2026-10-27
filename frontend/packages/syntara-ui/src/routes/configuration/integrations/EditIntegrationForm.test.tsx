@@ -44,6 +44,7 @@ vi.mock('./useProjectAssignmentSync', () => ({
 }))
 
 const mockNavigate = vi.fn()
+let mockPathname = '/configuration/integrations/int-1/edit'
 
 vi.mock('@tanstack/react-router', async () => {
   const actual = await vi.importActual('@tanstack/react-router')
@@ -52,6 +53,8 @@ vi.mock('@tanstack/react-router', async () => {
     ...actual,
     Link: MockLink,
     useNavigate: () => mockNavigate,
+    useRouterState: (options: { select: (state: { location: { pathname: string } }) => unknown }) =>
+      options.select({ location: { pathname: mockPathname } }),
     useParams: vi.fn(() => ({ integrationId: 'int-1' })),
   }
 })
@@ -181,7 +184,7 @@ function setupMutationMocks(patchMutateAsync?: ReturnType<typeof vi.fn>, discove
   const patchAsync = patchMutateAsync ?? vi.fn().mockResolvedValue({})
   const discover = discoverMutate ?? vi.fn()
   vi.mocked(integrationsClient.useMutation).mockImplementation((_method: string, path: string) => {
-    if (path === '/integrations/discover') {
+    if (path === '/integrations/discover' || path === '/kafka-integrations/discover') {
       return { mutate: discover, mutateAsync: discover, isPending: false, isError: false } as never
     }
     return { mutate: vi.fn(), mutateAsync: patchAsync, isPending: false, isError: false } as never
@@ -192,6 +195,7 @@ function setupMutationMocks(patchMutateAsync?: ReturnType<typeof vi.fn>, discove
 describe('EditIntegrationForm', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockPathname = '/configuration/integrations/int-1/edit'
     setupMocks()
     setupMutationMocks()
   })
@@ -792,6 +796,7 @@ describe('EditIntegrationForm', () => {
     }
 
     beforeEach(() => {
+      mockPathname = '/configuration/integrations/kafka/int-kafka-1/edit'
       setupMocks({ integration: mockKafkaIntegration })
     })
 

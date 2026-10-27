@@ -1,28 +1,25 @@
 from http import HTTPStatus
 from typing import Any
-from uuid import UUID
 
 import httpx
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.error_data import ErrorData
-from ...models.llm_model_read import LLMModelRead
-from ...models.llm_model_update import LLMModelUpdate
+from ...models.kafka_integration_create import KafkaIntegrationCreate
+from ...models.kafka_integration_read import KafkaIntegrationRead
 from ...types import Response
 
 
 def _get_kwargs(
-    integration_id: UUID,
-    model_id: UUID,
     *,
-    body: LLMModelUpdate,
+    body: KafkaIntegrationCreate,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
     _kwargs: dict[str, Any] = {
-        "method": "patch",
-        "url": f"/api/v2/integrations/{integration_id}/models/{model_id}",
+        "method": "post",
+        "url": "/kafka-integrations",
     }
 
     _kwargs["json"] = body.to_dict()
@@ -35,11 +32,11 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> ErrorData | LLMModelRead | None:
-    if response.status_code == 200:
-        response_200 = LLMModelRead.from_dict(response.json())
+) -> ErrorData | KafkaIntegrationRead | None:
+    if response.status_code == 201:
+        response_201 = KafkaIntegrationRead.from_dict(response.json())
 
-        return response_200
+        return response_201
 
     if response.status_code == 400:
         response_400 = ErrorData.from_dict(response.json())
@@ -89,7 +86,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[ErrorData | LLMModelRead]:
+) -> Response[ErrorData | KafkaIntegrationRead]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -101,40 +98,31 @@ def _build_response(
 
 
 def sync_detailed(
-    integration_id: UUID,
-    model_id: UUID,
     *,
     client: AuthenticatedClient,
-    body: LLMModelUpdate,
-) -> Response[ErrorData | LLMModelRead]:
-    """Update integration model
+    body: KafkaIntegrationCreate,
+) -> Response[ErrorData | KafkaIntegrationRead]:
+    """Create Kafka Integration
 
-     Update an LLM model (enable/disable).
+     Create a Kafka connection using the shared integration service.
 
     Args:
-        integration_id (UUID):
-        model_id (UUID):
-        body (LLMModelUpdate): Schema for updating an LLM model (enable/disable, set as default).
+        body (KafkaIntegrationCreate): Create a Kafka connection without extending the original
+            integration union.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ErrorData | LLMModelRead]
+        Response[ErrorData | KafkaIntegrationRead]
     """
 
     kwargs = _get_kwargs(
-        integration_id=integration_id,
-        model_id=model_id,
         body=body,
     )
 
-    httpx_client = client.get_httpx_client()
-    # Path-level servers select v2 while existing clients may use a v1 base URL.
-    api_root = httpx_client.base_url.path.rstrip("/").rsplit("/api/", 1)[0].removesuffix("/api")
-    kwargs["url"] = httpx_client.base_url.copy_with(path=f"{api_root}{kwargs['url']}")
-    response = httpx_client.request(
+    response = client.get_httpx_client().request(
         **kwargs,
     )
 
@@ -142,104 +130,85 @@ def sync_detailed(
 
 
 def sync(
-    integration_id: UUID,
-    model_id: UUID,
     *,
     client: AuthenticatedClient,
-    body: LLMModelUpdate,
-) -> ErrorData | LLMModelRead | None:
-    """Update integration model
+    body: KafkaIntegrationCreate,
+) -> ErrorData | KafkaIntegrationRead | None:
+    """Create Kafka Integration
 
-     Update an LLM model (enable/disable).
+     Create a Kafka connection using the shared integration service.
 
     Args:
-        integration_id (UUID):
-        model_id (UUID):
-        body (LLMModelUpdate): Schema for updating an LLM model (enable/disable, set as default).
+        body (KafkaIntegrationCreate): Create a Kafka connection without extending the original
+            integration union.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        ErrorData | LLMModelRead
+        ErrorData | KafkaIntegrationRead
     """
 
     return sync_detailed(
-        integration_id=integration_id,
-        model_id=model_id,
         client=client,
         body=body,
     ).parsed
 
 
 async def asyncio_detailed(
-    integration_id: UUID,
-    model_id: UUID,
     *,
     client: AuthenticatedClient,
-    body: LLMModelUpdate,
-) -> Response[ErrorData | LLMModelRead]:
-    """Update integration model
+    body: KafkaIntegrationCreate,
+) -> Response[ErrorData | KafkaIntegrationRead]:
+    """Create Kafka Integration
 
-     Update an LLM model (enable/disable).
+     Create a Kafka connection using the shared integration service.
 
     Args:
-        integration_id (UUID):
-        model_id (UUID):
-        body (LLMModelUpdate): Schema for updating an LLM model (enable/disable, set as default).
+        body (KafkaIntegrationCreate): Create a Kafka connection without extending the original
+            integration union.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ErrorData | LLMModelRead]
+        Response[ErrorData | KafkaIntegrationRead]
     """
 
     kwargs = _get_kwargs(
-        integration_id=integration_id,
-        model_id=model_id,
         body=body,
     )
 
-    httpx_client = client.get_async_httpx_client()
-    # Preserve any deployment prefix while selecting the endpoint's API version.
-    api_root = httpx_client.base_url.path.rstrip("/").rsplit("/api/", 1)[0].removesuffix("/api")
-    kwargs["url"] = httpx_client.base_url.copy_with(path=f"{api_root}{kwargs['url']}")
-    response = await httpx_client.request(**kwargs)
+    response = await client.get_async_httpx_client().request(**kwargs)
 
     return _build_response(client=client, response=response)
 
 
 async def asyncio(
-    integration_id: UUID,
-    model_id: UUID,
     *,
     client: AuthenticatedClient,
-    body: LLMModelUpdate,
-) -> ErrorData | LLMModelRead | None:
-    """Update integration model
+    body: KafkaIntegrationCreate,
+) -> ErrorData | KafkaIntegrationRead | None:
+    """Create Kafka Integration
 
-     Update an LLM model (enable/disable).
+     Create a Kafka connection using the shared integration service.
 
     Args:
-        integration_id (UUID):
-        model_id (UUID):
-        body (LLMModelUpdate): Schema for updating an LLM model (enable/disable, set as default).
+        body (KafkaIntegrationCreate): Create a Kafka connection without extending the original
+            integration union.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        ErrorData | LLMModelRead
+        ErrorData | KafkaIntegrationRead
     """
 
     return (
         await asyncio_detailed(
-            integration_id=integration_id,
-            model_id=model_id,
             client=client,
             body=body,
         )

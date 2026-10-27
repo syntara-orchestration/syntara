@@ -3,7 +3,7 @@ import { useMemo } from 'react'
 
 import { integrationsClient } from '../../../client'
 
-type Integration = IntegrationsAPI.components['schemas']['IntegrationReadV2']
+type Integration = IntegrationsAPI.components['schemas']['IntegrationRead']
 
 type CredentialIntegrationCheck = {
   affectedIntegrations: Integration[]

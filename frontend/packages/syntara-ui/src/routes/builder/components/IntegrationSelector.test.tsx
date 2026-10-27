@@ -18,7 +18,7 @@ vi.mock('../../../client', () => ({
   },
 }))
 
-type IntegrationRead = IntegrationsAPI.components['schemas']['IntegrationReadV2']
+type IntegrationRead = IntegrationsAPI.components['schemas']['IntegrationRead']
 
 const mockIntegrations = [
   {

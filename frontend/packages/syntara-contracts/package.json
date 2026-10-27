@@ -15,7 +15,7 @@
     "gen:local:auth": "openapi-typescript ../../../backend/src/syntara/schemas/auth/openapi.yaml --output ./src/auth-api.ts --default-non-nullable false",
     "gen:local:users": "openapi-typescript ../../../backend/src/syntara/schemas/users/openapi.yaml --output ./src/users-api.ts --default-non-nullable false",
     "gen:local:identity-providers": "openapi-typescript ../../../backend/src/syntara/schemas/identity_providers/openapi.yaml --output ./src/identity-providers-api.ts --default-non-nullable false",
-    "gen:local:integrations": "openapi-typescript ../../../backend/src/syntara/schemas/integrations/v2.openapi.yaml --output ./src/integrations-api.ts --default-non-nullable false",
+    "gen:local:integrations": "openapi-typescript ../../../backend/src/syntara/schemas/integrations/openapi.yaml --output ./src/integrations-api.ts --default-non-nullable false",
     "gen:local:tool-manager": "openapi-typescript ../../../backend/src/syntara/schemas/tool_manager/openapi.yaml --output ./src/tool-manager.ts --default-non-nullable false",
     "gen:local:workflow": "openapi-typescript ../../../backend/src/syntara/schemas/workflows/v2/openapi.yaml --output ./src/workflow-api.ts --default-non-nullable false",
     "gen:local:files": "openapi-typescript ../../../backend/src/syntara/schemas/files/openapi.yaml --output ./src/files-api.ts --default-non-nullable false",

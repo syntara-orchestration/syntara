@@ -454,7 +454,10 @@ export default function CredentialDetail() {
                   </>
                 }
               >
-                <CredentialIntegrationsTab credentialId={credential.id} />
+                <CredentialIntegrationsTab
+                  credentialId={credential.id}
+                  isKafkaCredential={credType?.name === 'Kafka'}
+                />
               </Tab>
             )}
           </SynUrlTabs>

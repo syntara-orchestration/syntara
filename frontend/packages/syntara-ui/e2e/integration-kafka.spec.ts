@@ -30,7 +30,7 @@ test.describe('Kafka transport configuration', () => {
           'true'
         )
         const responsePromise = app.waitForResponse(
-          (response) => response.url().endsWith('/api/v2/integrations') && response.request().method() === 'POST'
+          (response) => response.url().endsWith('/api/v1/kafka-integrations') && response.request().method() === 'POST'
         )
         await app.getByRole('button', { name: 'Save integration', exact: true }).click()
         const response = await responsePromise
@@ -44,6 +44,26 @@ test.describe('Kafka transport configuration', () => {
         expect(saved.configuration.security_protocol).toBe(protocol)
         expect(saved.configuration.allow_plaintext).toBe(protocol === 'PLAINTEXT')
         expect(saved.management_credential_id).toBeNull()
+        await expect(app.getByRole('link', { name, exact: true })).toBeVisible()
+        await app.getByRole('link', { name, exact: true }).click()
+        await expect(app).toHaveURL(new RegExp(`/configuration/integrations/kafka/${id}`))
+        await app.reload()
+        await expect(app.getByRole('heading', { name, exact: true })).toBeVisible()
+        await app.getByRole('button', { name: 'Edit integration', exact: true }).click()
+        await expect(app.getByRole('textbox', { name: 'Name', exact: true })).toHaveValue(name)
+        await app.getByRole('textbox', { name: 'Name', exact: true }).fill(`${name}-updated`)
+        const patchResponse = app.waitForResponse(
+          (response) =>
+            response.url().endsWith(`/api/v1/kafka-integrations/${id}`) && response.request().method() === 'PATCH'
+        )
+        await app.getByRole('button', { name: 'Save integration', exact: true }).click()
+        expect((await patchResponse).ok()).toBeTruthy()
+        await expect(app.getByRole('heading', { name: `${name}-updated`, exact: true })).toBeVisible()
+        await app.screenshot({ path: `/private/tmp/pr898-kafka-${protocol.toLowerCase()}-detail.png`, fullPage: true })
+        await app.goto(toAppUrl('/configuration/integrations'))
+        await expect(app.getByRole('link', { name: `${name}-updated`, exact: true })).toHaveCount(0)
+        await app.goto(toAppUrl('/configuration/integrations?integration_type=kafka'))
+        await expect(app.getByRole('link', { name: `${name}-updated`, exact: true })).toBeVisible()
       } finally {
         if (id) await deleteIntegrationViaApi(app, id)
       }

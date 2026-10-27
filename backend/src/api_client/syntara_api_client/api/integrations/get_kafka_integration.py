@@ -1,5 +1,5 @@
 from http import HTTPStatus
-from typing import Any, cast
+from typing import Any
 from uuid import UUID
 
 import httpx
@@ -7,6 +7,7 @@ import httpx
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.error_data import ErrorData
+from ...models.kafka_integration_read import KafkaIntegrationRead
 from ...types import Response
 
 
@@ -14,17 +15,20 @@ def _get_kwargs(
     integration_id: UUID,
 ) -> dict[str, Any]:
     _kwargs: dict[str, Any] = {
-        "method": "delete",
-        "url": f"/api/v2/integrations/{integration_id}",
+        "method": "get",
+        "url": f"/kafka-integrations/{integration_id}",
     }
 
     return _kwargs
 
 
-def _parse_response(*, client: AuthenticatedClient | Client, response: httpx.Response) -> Any | ErrorData | None:
-    if response.status_code == 204:
-        response_204 = cast(Any, None)
-        return response_204
+def _parse_response(
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> ErrorData | KafkaIntegrationRead | None:
+    if response.status_code == 200:
+        response_200 = KafkaIntegrationRead.from_dict(response.json())
+
+        return response_200
 
     if response.status_code == 400:
         response_400 = ErrorData.from_dict(response.json())
@@ -72,7 +76,9 @@ def _parse_response(*, client: AuthenticatedClient | Client, response: httpx.Res
         return None
 
 
-def _build_response(*, client: AuthenticatedClient | Client, response: httpx.Response) -> Response[Any | ErrorData]:
+def _build_response(
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> Response[ErrorData | KafkaIntegrationRead]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -87,10 +93,10 @@ def sync_detailed(
     integration_id: UUID,
     *,
     client: AuthenticatedClient,
-) -> Response[Any | ErrorData]:
-    """Delete integration
+) -> Response[ErrorData | KafkaIntegrationRead]:
+    """Get Kafka Integration
 
-     Delete an integration.
+     Get a Kafka connection visible to the caller.
 
     Args:
         integration_id (UUID):
@@ -100,18 +106,14 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Any | ErrorData]
+        Response[ErrorData | KafkaIntegrationRead]
     """
 
     kwargs = _get_kwargs(
         integration_id=integration_id,
     )
 
-    httpx_client = client.get_httpx_client()
-    # Path-level servers select v2 while existing clients may use a v1 base URL.
-    api_root = httpx_client.base_url.path.rstrip("/").rsplit("/api/", 1)[0].removesuffix("/api")
-    kwargs["url"] = httpx_client.base_url.copy_with(path=f"{api_root}{kwargs['url']}")
-    response = httpx_client.request(
+    response = client.get_httpx_client().request(
         **kwargs,
     )
 
@@ -122,10 +124,10 @@ def sync(
     integration_id: UUID,
     *,
     client: AuthenticatedClient,
-) -> Any | ErrorData | None:
-    """Delete integration
+) -> ErrorData | KafkaIntegrationRead | None:
+    """Get Kafka Integration
 
-     Delete an integration.
+     Get a Kafka connection visible to the caller.
 
     Args:
         integration_id (UUID):
@@ -135,7 +137,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Any | ErrorData
+        ErrorData | KafkaIntegrationRead
     """
 
     return sync_detailed(
@@ -148,10 +150,10 @@ async def asyncio_detailed(
     integration_id: UUID,
     *,
     client: AuthenticatedClient,
-) -> Response[Any | ErrorData]:
-    """Delete integration
+) -> Response[ErrorData | KafkaIntegrationRead]:
+    """Get Kafka Integration
 
-     Delete an integration.
+     Get a Kafka connection visible to the caller.
 
     Args:
         integration_id (UUID):
@@ -161,18 +163,14 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Any | ErrorData]
+        Response[ErrorData | KafkaIntegrationRead]
     """
 
     kwargs = _get_kwargs(
         integration_id=integration_id,
     )
 
-    httpx_client = client.get_async_httpx_client()
-    # Preserve any deployment prefix while selecting the endpoint's API version.
-    api_root = httpx_client.base_url.path.rstrip("/").rsplit("/api/", 1)[0].removesuffix("/api")
-    kwargs["url"] = httpx_client.base_url.copy_with(path=f"{api_root}{kwargs['url']}")
-    response = await httpx_client.request(**kwargs)
+    response = await client.get_async_httpx_client().request(**kwargs)
 
     return _build_response(client=client, response=response)
 
@@ -181,10 +179,10 @@ async def asyncio(
     integration_id: UUID,
     *,
     client: AuthenticatedClient,
-) -> Any | ErrorData | None:
-    """Delete integration
+) -> ErrorData | KafkaIntegrationRead | None:
+    """Get Kafka Integration
 
-     Delete an integration.
+     Get a Kafka connection visible to the caller.
 
     Args:
         integration_id (UUID):
@@ -194,7 +192,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Any | ErrorData
+        ErrorData | KafkaIntegrationRead
     """
 
     return (

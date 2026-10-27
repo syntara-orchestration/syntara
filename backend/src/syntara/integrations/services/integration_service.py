@@ -130,11 +130,11 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
         user: User,
         secret_service: SecretService | None = None,
         *,
-        include_kafka: bool = True,
+        integration_types: frozenset[IntegrationType] | None = None,
     ) -> None:
         """Initialize with database session, current user, and optional secret service."""
         super().__init__(session, user, convert_resource_mixin=IntegrationConvertResourceMixin())
-        self._include_kafka = include_kafka
+        self._integration_types = integration_types
         self._secret_service = secret_service
 
     def _is_duplicate_name_error(self, e: IntegrityError) -> bool:
@@ -236,7 +236,9 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
         result = await self.session.exec(query)
         integration = result.one_or_none()
 
-        if not integration or (not self._include_kafka and integration.integration_type == IntegrationType.KAFKA):
+        if not integration or (
+            self._integration_types is not None and integration.integration_type not in self._integration_types
+        ):
             raise IntegrationNotFoundError(integration_id)
 
         return integration
@@ -552,10 +554,10 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
             id_restriction = self._intersect_id_restrictions(id_restriction, project_scoped_ids)
 
         filtered_params = [(k, v) for k, v in query_params_items if k != "project_id"] if query_params_items else []
-        if not self._include_kafka:
-            # Enforce the legacy type restriction in the paginated/count query,
+        if self._integration_types is not None:
+            # Enforce the endpoint type restriction in the paginated/count query,
             # rather than filtering a fetched page or loading every legacy ID.
-            legacy_types = {kind.value for kind in IntegrationType if kind != IntegrationType.KAFKA}
+            legacy_types = {kind.value for kind in self._integration_types}
             requested_types = dict(filtered_params).get("integration_type[in]")
             if requested_types is not None:
                 legacy_types &= {value.strip() for value in requested_types.split(",")}

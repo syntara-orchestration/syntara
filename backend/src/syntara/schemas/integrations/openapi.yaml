@@ -1011,6 +1011,308 @@ paths:
       tags:
         - Integrations
 
+  /kafka-integrations:
+    get:
+      tags:
+        - Integrations
+      summary: List Kafka Integrations
+      description: List Kafka connections with filtering, pagination, and project visibility.
+      operationId: list_kafka_integrations
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            maximum: 100
+            exclusiveMinimum: 0
+            description: Maximum number of results per page
+            default: 20
+            title: Limit
+          description: Maximum number of results per page
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+              - type: 'null'
+            description: Pagination cursor from previous response
+            title: Cursor
+          description: Pagination cursor from previous response
+        - name: sort
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+                pattern: ^-?[a-z][a-z0-9_]*$
+              - type: 'null'
+            description: Sort parameter (e.g., 'name', '-created_at')
+            title: Sort
+          description: Sort parameter (e.g., 'name', '-created_at')
+        - name: include_total
+          in: query
+          required: false
+          schema:
+            type: boolean
+            description: Include total count in response (expensive)
+            default: false
+            title: Include Total
+          description: Include total count in response (expensive)
+        - name: validation_status
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - $ref: '#/components/schemas/IntegrationStatus'
+              - type: 'null'
+            description: Filter by validation status
+            title: Validation Status
+          description: Filter by validation status
+        - name: enabled
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: boolean
+              - type: 'null'
+            description: Filter by enabled status
+            title: Enabled
+          description: Filter by enabled status
+        - name: scope
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - $ref: '#/components/schemas/IntegrationScope'
+              - type: 'null'
+            description: Filter by visibility scope
+            title: Scope
+          description: Filter by visibility scope
+        - name: management_credential_id
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+                format: uuid
+              - type: 'null'
+            description: Filter by management credential ID
+            title: Management Credential Id
+          description: Filter by management credential ID
+        - name: project_id
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+                format: uuid
+              - type: 'null'
+            description: Filter to integrations that are global or assigned to this project. Restricted to projects the user has RBAC access to; querying inaccessible projects returns only global integrations.
+            title: Project Id
+          description: Filter to integrations that are global or assigned to this project. Restricted to projects the user has RBAC access to; querying inaccessible projects returns only global integrations.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KafkaIntegrationListResponse'
+        '400':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/BadRequestError
+        '401':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError
+        '403':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError
+        '404':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/NotFoundError
+        '409':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/ConflictError
+        '422':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/ValidationError
+        '429':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/RateLimitError
+        '500':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/InternalServerError
+      x-app-permission:
+        resource: integration
+        action: read
+    post:
+      tags:
+        - Integrations
+      summary: Create Kafka Integration
+      description: Create a Kafka connection using the shared integration service.
+      operationId: create_kafka_integration
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/KafkaIntegrationCreate'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KafkaIntegrationRead'
+        '400':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/BadRequestError
+        '401':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError
+        '403':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError
+        '404':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/NotFoundError
+        '409':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/ConflictError
+        '422':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/ValidationError
+        '429':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/RateLimitError
+        '500':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/InternalServerError
+      x-app-permission:
+        resource: integration
+        action: create
+  /kafka-integrations/discover:
+    post:
+      tags:
+        - Integrations
+      summary: Discover Kafka Integration Connection
+      description: Test a Kafka connection without saving it.
+      operationId: discover_kafka_integration_connection
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/KafkaIntegrationTestConnection'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiscoverResult'
+        '400':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/BadRequestError
+        '401':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError
+        '403':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError
+        '404':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/NotFoundError
+        '409':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/ConflictError
+        '422':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/ValidationError
+        '429':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/RateLimitError
+        '500':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/InternalServerError
+      security:
+        - bearerAuth: []
+      x-app-permission:
+        resource: integration
+        action: discover
+  /kafka-integrations/{integration_id}:
+    get:
+      tags:
+        - Integrations
+      summary: Get Kafka Integration
+      description: Get a Kafka connection visible to the caller.
+      operationId: get_kafka_integration
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: integration_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Integration Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KafkaIntegrationRead'
+        '400':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/BadRequestError
+        '401':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError
+        '403':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError
+        '404':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/NotFoundError
+        '409':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/ConflictError
+        '422':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/ValidationError
+        '429':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/RateLimitError
+        '500':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/InternalServerError
+      x-app-permission:
+        resource: integration
+        action: read
+    patch:
+      tags:
+        - Integrations
+      summary: Update Kafka Integration
+      description: Update a Kafka connection, preserving omitted settings.
+      operationId: update_kafka_integration
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: integration_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Integration Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/KafkaIntegrationUpdate'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KafkaIntegrationRead'
+        '400':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/BadRequestError
+        '401':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError
+        '403':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError
+        '404':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/NotFoundError
+        '409':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/ConflictError
+        '422':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/ValidationError
+        '429':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/RateLimitError
+        '500':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/InternalServerError
+      x-app-permission:
+        resource: integration
+        action: update
+
 components:
   schemas:
     IntegrationType:
@@ -1578,6 +1880,74 @@ components:
       title: AAPConfiguration
       type: object
 
+    KafkaSaslMechanism:
+      type: string
+      title: KafkaSaslMechanism
+      description: |-
+        SASL mechanism used with the Kafka credential username and password.
+
+        Cloud brokers such as Aiven use SCRAM-SHA-256. PLAIN remains available
+        for clusters that authenticate that way.
+      enum:
+        - PLAIN
+        - SCRAM-SHA-256
+        - SCRAM-SHA-512
+
+    KafkaConfiguration:
+      properties:
+        allow_http:
+          type: boolean
+          title: Allow Http
+          description: Allow HTTP (unencrypted) connections. Loopback addresses are always permitted over HTTP.
+          default: false
+        insecure_skip_tls_verify:
+          type: boolean
+          title: Insecure Skip Tls Verify
+          description: Disable TLS certificate verification for connections to this integration.
+          default: false
+        ca_certificate:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Ca Certificate
+          description: PEM-encoded CA certificate to trust for this integration's TLS connections.
+        integration_type:
+          type: string
+          const: kafka
+          title: Integration Type
+          default: kafka
+        bootstrap_servers:
+          items:
+            type: string
+          type: array
+          maxItems: 20
+          minItems: 1
+          title: Bootstrap Servers
+          description: Kafka bootstrap servers as host:port (or [ipv6]:port) values.
+        security_protocol:
+          $ref: '#/components/schemas/KafkaSecurityProtocol'
+          description: 'Kafka transport: SASL_SSL, SSL, or explicitly opted-in PLAINTEXT.'
+          default: SASL_SSL
+        allow_plaintext:
+          type: boolean
+          title: Allow Plaintext
+          description: Explicitly allow unauthenticated, unencrypted PLAINTEXT connections.
+          default: false
+        sasl_mechanism:
+          $ref: '#/components/schemas/KafkaSaslMechanism'
+          description: SASL mechanism for the username and password on the linked credential.
+          default: SCRAM-SHA-256
+      additionalProperties: false
+      type: object
+      required:
+        - bootstrap_servers
+      title: KafkaConfiguration
+      description: |-
+        Configuration for a Kafka cluster integration.
+
+        Broker addresses live here. The username and password stay on the
+        linked Kafka credential when SASL_SSL is selected. Unauthenticated SSL
+        and explicitly opted-in PLAINTEXT do not require a credential.
     DiscoveredLLMModel:
       description: A model discovered from an LLM provider.
       properties:
@@ -2057,6 +2427,321 @@ components:
       $ref: '../tool_manager/openapi.yaml#/components/schemas/ToolBulkUpdate'
     ToolBulkUpdateResponse:
       $ref: '../tool_manager/openapi.yaml#/components/schemas/ToolBulkUpdateResponse'
+
+    KafkaSecurityProtocol:
+      type: string
+      enum:
+        - PLAINTEXT
+        - SSL
+        - SASL_SSL
+      title: KafkaSecurityProtocol
+      description: Transport modes that decide whether a Kafka credential is required.
+
+    KafkaIntegrationCreate:
+      properties:
+        name:
+          type: string
+          maxLength: 255
+          minLength: 1
+          title: Name
+        description:
+          anyOf:
+            - type: string
+              maxLength: 2000
+            - type: 'null'
+          title: Description
+        integration_type:
+          type: string
+          const: kafka
+          title: Integration Type
+          default: kafka
+        configuration:
+          $ref: '#/components/schemas/KafkaConfiguration'
+        management_credential_id:
+          anyOf:
+            - type: string
+              format: uuid
+            - type: 'null'
+          title: Management Credential Id
+        enabled:
+          type: boolean
+          title: Enabled
+          default: true
+        scope:
+          $ref: '#/components/schemas/IntegrationScope'
+          default: global
+        labels:
+          additionalProperties:
+            type: string
+          type: object
+          title: Labels
+      additionalProperties: false
+      type: object
+      required:
+        - name
+        - configuration
+      title: KafkaIntegrationCreate
+      description: Create a Kafka connection without extending the original integration union.
+
+    KafkaIntegrationListResponse:
+      properties:
+        next:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Next
+          description: Cursor for next page of results
+        prev:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Prev
+          description: Cursor for previous page of results
+        total:
+          anyOf:
+            - type: integer
+              minimum: 0.0
+            - type: 'null'
+          title: Total
+          description: Total count of resources (only when include_total=true)
+        resources:
+          items:
+            $ref: '#/components/schemas/KafkaIntegrationRead'
+          type: array
+          maxItems: 100
+          title: Resources
+          description: Array of resources in current page
+      type: object
+      required:
+        - resources
+      title: KafkaIntegrationListResponse
+      description: Paginated Kafka-only results.
+      examples:
+        - next: eyJpZCI6InV1aWQifQ
+          total: 150
+        - next: eyJpZCI6Im5leHQifQ
+          prev: eyJpZCI6InByZXYifQ
+
+    KafkaIntegrationRead:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Resource ID
+          description: Unique identifier for the resource
+          readOnly: true
+          example: 550e8400-e29b-41d4-a716-446655440000
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+          description: Timestamp when resource was created
+          readOnly: true
+          example: '2025-10-09T12:00:00Z'
+        updated_at:
+          type: string
+          format: date-time
+          title: Updated At
+          description: Timestamp when resource was last updated
+          readOnly: true
+          example: '2025-10-09T12:30:00Z'
+        labels:
+          additionalProperties:
+            type: string
+          type: object
+          title: Labels
+          description: Key-value pairs for resource labeling and filtering
+          default: {}
+          example:
+            environment: production
+            region: us-east-1
+            team: platform
+        created_by:
+          anyOf:
+            - $ref: '../base/shared-resources.openapi.yaml#/components/schemas/UserReference'
+            - type: 'null'
+          title: Created By
+          description: User who created the integration
+          readOnly: true
+        updated_by:
+          anyOf:
+            - $ref: '../base/shared-resources.openapi.yaml#/components/schemas/UserReference'
+            - type: 'null'
+          title: Updated By
+          description: User who last modified the integration
+          readOnly: true
+        name:
+          type: string
+          maxLength: 255
+          minLength: 1
+          title: Name
+          description: Human-readable name for the resource
+          example: Authentication Service
+        description:
+          anyOf:
+            - type: string
+              maxLength: 2000
+            - type: 'null'
+          title: Description
+          description: Detailed description of the resource
+          example: Handles user authentication and authorization workflows
+        enabled:
+          type: boolean
+          title: Enabled
+          default: true
+        validation_status:
+          $ref: '#/components/schemas/IntegrationStatus'
+          default: unknown
+        scope:
+          $ref: '#/components/schemas/IntegrationScope'
+          default: global
+        management_credential_id:
+          anyOf:
+            - type: string
+              format: uuid
+            - type: 'null'
+          title: Management Credential Id
+        last_validated_at:
+          anyOf:
+            - type: string
+              format: date-time
+            - type: 'null'
+          title: Last Validated At
+        validation_error:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Validation Error
+        refresh_status:
+          anyOf:
+            - $ref: '#/components/schemas/IntegrationRefreshStatus'
+            - type: 'null'
+        last_refreshed_at:
+          anyOf:
+            - type: string
+              format: date-time
+            - type: 'null'
+          title: Last Refreshed At
+        last_successful_refresh_at:
+          anyOf:
+            - type: string
+              format: date-time
+            - type: 'null'
+          title: Last Successful Refresh At
+        refresh_error:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Refresh Error
+        project_ids:
+          items:
+            type: string
+            format: uuid
+          type: array
+          title: Project Ids
+          description: IDs of projects this integration is assigned to (empty for global scope)
+        total_tool_count:
+          type: integer
+          title: Total Tool Count
+          description: Total number of tools linked to this integration
+          default: 0
+        enabled_tool_count:
+          type: integer
+          title: Enabled Tool Count
+          description: Number of enabled tools linked to this integration
+          default: 0
+        total_model_count:
+          type: integer
+          title: Total Model Count
+          description: Total number of models linked to this integration
+          default: 0
+        enabled_model_count:
+          type: integer
+          title: Enabled Model Count
+          description: Number of enabled models linked to this integration
+          default: 0
+        integration_type:
+          type: string
+          const: kafka
+          title: Integration Type
+        configuration:
+          $ref: '#/components/schemas/KafkaConfiguration'
+      additionalProperties: false
+      type: object
+      required:
+        - name
+        - integration_type
+        - configuration
+      title: KafkaIntegrationRead
+      description: Kafka connection with its broker settings in configuration.
+    KafkaIntegrationTestConnection:
+      properties:
+        integration_type:
+          type: string
+          const: kafka
+          title: Integration Type
+          default: kafka
+        configuration:
+          $ref: '#/components/schemas/KafkaConfiguration'
+        credential_id:
+          anyOf:
+            - type: string
+              format: uuid
+            - type: 'null'
+          title: Credential Id
+      additionalProperties: false
+      type: object
+      required:
+        - configuration
+      title: KafkaIntegrationTestConnection
+      description: Test a Kafka connection without persisting it.
+
+    KafkaIntegrationUpdate:
+      properties:
+        name:
+          anyOf:
+            - type: string
+              maxLength: 255
+              minLength: 1
+            - type: 'null'
+          title: Name
+        description:
+          anyOf:
+            - type: string
+              maxLength: 2000
+            - type: 'null'
+          title: Description
+        configuration:
+          anyOf:
+            - $ref: '#/components/schemas/KafkaConfiguration'
+            - type: 'null'
+        management_credential_id:
+          anyOf:
+            - type: string
+              format: uuid
+            - type: 'null'
+          title: Management Credential Id
+        enabled:
+          anyOf:
+            - type: boolean
+            - type: 'null'
+          title: Enabled
+        scope:
+          anyOf:
+            - $ref: '#/components/schemas/IntegrationScope'
+            - type: 'null'
+        labels:
+          anyOf:
+            - additionalProperties:
+                type: string
+              type: object
+            - type: 'null'
+          title: Labels
+      additionalProperties: false
+      type: object
+      title: KafkaIntegrationUpdate
+      description: Patch Kafka settings, preserving omitted fields.
+
 
   securitySchemes:
     bearerAuth:
