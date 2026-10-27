@@ -110,8 +110,9 @@ class TestOutputMappingErrors:
 
     def test_model_dump_mapping_failure_is_non_retryable(self) -> None:
         """Model-based activity outputs preserve the Temporal error contract."""
+        output = ScriptOutput()
         with pytest.raises(ApplicationError) as exc_info:
-            dump_output(ScriptOutput(), {"value": "${result.stdout_json.value}"})
+            dump_output(output, {"value": "${result.stdout_json.value}"})
 
         assert exc_info.value.type == "OutputMappingError"
         assert exc_info.value.non_retryable is True

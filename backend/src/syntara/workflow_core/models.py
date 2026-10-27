@@ -1060,7 +1060,7 @@ class MissedSchedulePolicy(StrEnum):
 
 # Standard 5-field cron: minute hour day-of-month month day-of-week
 # Each field allows digits, ranges (1-5), lists (1,3,5), steps (*/5), and wildcards (*)
-_CRON_FIELD = r"(\*|[0-9]+(?:-[0-9]+)?(?:,[0-9]+(?:-[0-9]+)?)*)(?:/[0-9]+)?"
+_CRON_FIELD = r"(\*|\d+(?:-\d+)?(?:,\d+(?:-\d+)?)*)(?:/\d+)?"
 _CRON_PATTERN = re.compile(rf"^\s*{_CRON_FIELD}\s+{_CRON_FIELD}\s+{_CRON_FIELD}\s+{_CRON_FIELD}\s+{_CRON_FIELD}\s*$")
 
 _CRON_RANGES: list[tuple[str, int, int]] = [
@@ -1071,7 +1071,7 @@ _CRON_RANGES: list[tuple[str, int, int]] = [
     ("day-of-week", 0, 7),
 ]
 
-_CRON_NUMERIC = re.compile(r"[0-9]+")
+_CRON_NUMERIC = re.compile(r"\d+")
 
 
 def _validate_cron_ranges(expr: str) -> None:
