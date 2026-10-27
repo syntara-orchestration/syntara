@@ -1,13 +1,11 @@
 import { DescriptionList, StackItem, Title } from '@patternfly/react-core'
 import { RhUiWarningIcon } from '@patternfly/react-icons'
-import type { IntegrationsAPI } from '@syntara/contracts'
 
 import { SynDetail } from '../../../components/details/SynDetail'
 import { SynLabel } from '../../../components/labels/SynLabel'
 
 import styles from './IntegrationDetail.module.css'
-
-type IntegrationRead = IntegrationsAPI.components['schemas']['IntegrationReadV2']
+import type { IntegrationRead } from './integrationTypes'
 
 export function SecuritySection({
   configuration,

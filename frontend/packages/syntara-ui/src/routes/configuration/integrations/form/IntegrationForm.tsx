@@ -142,14 +142,14 @@ function WizardNavFooter({
   )
 }
 
-function useDiscoverConnection(getValues: () => IntegrationFormData) {
+function useDiscoverConnection(getValues: () => IntegrationFormData, integrationType: string) {
   const [testResult, setTestResult] = useState<DiscoverResult | null>(null)
   const [selectedToolNames, setSelectedToolNames] = useState<Set<string>>(new Set())
   const [selectedModels, setSelectedModels] = useState<Map<string, InitialModelSelection>>(new Map())
 
   const { mutate: testConnection, isPending: isTesting } = integrationsClient.useMutation(
     'post',
-    '/integrations/discover'
+    integrationType === IntegrationTypeEnum.KAFKA ? '/kafka-integrations/discover' : '/integrations/discover'
   )
   const { showAlert } = useAlerts()
 
@@ -219,14 +219,13 @@ function useDiscoverConnection(getValues: () => IntegrationFormData) {
     resetTestState()
 
     const isLLMType = values.integration_type === IntegrationTypeEnum.LLM_PROVIDER
+    const configuration = toApiConfiguration(values.configuration)
+    const body =
+      configuration.integration_type === IntegrationTypeEnum.KAFKA
+        ? { integration_type: IntegrationTypeEnum.KAFKA, configuration, credential_id: credId ?? undefined }
+        : { integration_type: configuration.integration_type, configuration, credential_id: credId ?? undefined }
     testConnection(
-      {
-        body: {
-          integration_type: values.integration_type,
-          configuration: toApiConfiguration(values.configuration),
-          credential_id: credId ?? undefined,
-        },
-      },
+      { body },
       {
         onSuccess: (result) => handleDiscoverSuccess(result, isLLMType),
         onError: (error: unknown) => {
@@ -306,7 +305,7 @@ export function IntegrationForm() {
     isTesting,
     resetTestState,
     handleTestConnection,
-  } = useDiscoverConnection(getValues)
+  } = useDiscoverConnection(getValues, integrationTypeValue)
 
   const [isDetailsStepValid, setIsDetailsStepValid] = useState(false)
   const { showAlert } = useAlerts()

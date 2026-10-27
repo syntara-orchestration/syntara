@@ -14,7 +14,7 @@ import {
 } from '@patternfly/react-core'
 import { RhUiSyncIcon, RhUiWarningIcon } from '@patternfly/react-icons'
 import { Thead, Tbody, Tr, Th, Td } from '@patternfly/react-table'
-import type { IntegrationsAPI, Tool } from '@syntara/contracts'
+import type { Tool } from '@syntara/contracts'
 import { useMemo, useState } from 'react'
 
 import { integrationsClient } from '../../../client'
@@ -28,8 +28,7 @@ import { formatTimeAgo } from '../../../utils/dateUtils'
 import { detachPromise } from '../../../utils/detachPromise'
 
 import styles from './IntegrationDetail.module.css'
-
-type IntegrationRead = IntegrationsAPI.components['schemas']['IntegrationReadV2']
+import type { IntegrationRead } from './integrationTypes'
 
 type IntegrationResourcesTabProps = Readonly<{
   integrationId: string

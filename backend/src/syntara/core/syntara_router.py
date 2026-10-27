@@ -27,10 +27,6 @@ NO_PERMISSION = Depends(_NoPermissionSentinel())
 class SyntaraRouter(APIRouter):
     """APIRouter subclass used by all Syntara domain routers.
 
-    The route scanner limits scanning to this type. Discovery uses
-    ``api_version`` and ``openapi_spec_name`` to register versioned routes
-    with their matching domain contract.
+    Currently identical to ``APIRouter`` in behaviour; the type is used
+    by the route scanner to limit scanning to Syntara-owned routes.
     """
-
-    api_version: str = "v1"
-    openapi_spec_name: str | None = None

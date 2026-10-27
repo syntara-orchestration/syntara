@@ -47,6 +47,3 @@ EXCLUDED_PATHS: frozenset[str] = frozenset(
 # control is network isolation, which is NOT enforced in this repository.
 # Read backend/docs/internal-path-prefix.md before adding a path here.
 EXCLUDED_PATH_PREFIXES: tuple[str, ...] = ("/_internal/", "/api_docs/")
-
-# v2 currently exposes the expanded integration contract alongside v1.
-API_V2_PATH_PREFIX = "/api/v2"

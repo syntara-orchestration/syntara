@@ -7,10 +7,9 @@ import httpx
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.error_data import ErrorData
-from ...models.integration_list_response_v2 import IntegrationListResponseV2
 from ...models.integration_scope import IntegrationScope
 from ...models.integration_status import IntegrationStatus
-from ...models.integration_type_v2 import IntegrationTypeV2
+from ...models.kafka_integration_list_response import KafkaIntegrationListResponse
 from ...types import UNSET, Response, Unset
 
 
@@ -20,7 +19,6 @@ def _get_kwargs(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
-    integration_type: IntegrationTypeV2 | None | Unset = UNSET,
     validation_status: IntegrationStatus | None | Unset = UNSET,
     enabled: bool | None | Unset = UNSET,
     scope: IntegrationScope | None | Unset = UNSET,
@@ -49,15 +47,6 @@ def _get_kwargs(
     params["sort"] = json_sort
 
     params["include_total"] = include_total
-
-    json_integration_type: None | str | Unset
-    if isinstance(integration_type, Unset):
-        json_integration_type = UNSET
-    elif isinstance(integration_type, IntegrationTypeV2):
-        json_integration_type = integration_type.value
-    else:
-        json_integration_type = integration_type
-    params["integration_type"] = json_integration_type
 
     json_validation_status: None | str | Unset
     if isinstance(validation_status, Unset):
@@ -106,7 +95,7 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "get",
-        "url": "/api/v2/integrations",
+        "url": "/kafka-integrations",
         "params": params,
     }
 
@@ -115,9 +104,9 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> ErrorData | IntegrationListResponseV2 | None:
+) -> ErrorData | KafkaIntegrationListResponse | None:
     if response.status_code == 200:
-        response_200 = IntegrationListResponseV2.from_dict(response.json())
+        response_200 = KafkaIntegrationListResponse.from_dict(response.json())
 
         return response_200
 
@@ -169,7 +158,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[ErrorData | IntegrationListResponseV2]:
+) -> Response[ErrorData | KafkaIntegrationListResponse]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -187,24 +176,22 @@ def sync_detailed(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
-    integration_type: IntegrationTypeV2 | None | Unset = UNSET,
     validation_status: IntegrationStatus | None | Unset = UNSET,
     enabled: bool | None | Unset = UNSET,
     scope: IntegrationScope | None | Unset = UNSET,
     management_credential_id: None | Unset | UUID = UNSET,
     project_id: None | Unset | UUID = UNSET,
     additional_params: dict[str, Any] | None = None,
-) -> Response[ErrorData | IntegrationListResponseV2]:
-    """List integrations
+) -> Response[ErrorData | KafkaIntegrationListResponse]:
+    """List Kafka Integrations
 
-     List integrations with filtering and pagination.
+     List Kafka connections with filtering, pagination, and project visibility.
 
     Args:
         limit (int | Unset): Maximum number of results per page Default: 20.
         cursor (None | str | Unset): Pagination cursor from previous response
         sort (None | str | Unset): Sort parameter (e.g., 'name', '-created_at')
         include_total (bool | Unset): Include total count in response (expensive) Default: False.
-        integration_type (IntegrationTypeV2 | None | Unset): Filter by integration type
         validation_status (IntegrationStatus | None | Unset): Filter by validation status
         enabled (bool | None | Unset): Filter by enabled status
         scope (IntegrationScope | None | Unset): Filter by visibility scope
@@ -218,7 +205,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ErrorData | IntegrationListResponseV2]
+        Response[ErrorData | KafkaIntegrationListResponse]
     """
 
     kwargs = _get_kwargs(
@@ -226,7 +213,6 @@ def sync_detailed(
         cursor=cursor,
         sort=sort,
         include_total=include_total,
-        integration_type=integration_type,
         validation_status=validation_status,
         enabled=enabled,
         scope=scope,
@@ -235,11 +221,7 @@ def sync_detailed(
         additional_params=additional_params,
     )
 
-    httpx_client = client.get_httpx_client()
-    # Path-level servers select v2 while existing clients may use a v1 base URL.
-    api_root = httpx_client.base_url.path.rstrip("/").rsplit("/api/", 1)[0].removesuffix("/api")
-    kwargs["url"] = httpx_client.base_url.copy_with(path=f"{api_root}{kwargs['url']}")
-    response = httpx_client.request(
+    response = client.get_httpx_client().request(
         **kwargs,
     )
 
@@ -253,23 +235,21 @@ def sync(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
-    integration_type: IntegrationTypeV2 | None | Unset = UNSET,
     validation_status: IntegrationStatus | None | Unset = UNSET,
     enabled: bool | None | Unset = UNSET,
     scope: IntegrationScope | None | Unset = UNSET,
     management_credential_id: None | Unset | UUID = UNSET,
     project_id: None | Unset | UUID = UNSET,
-) -> ErrorData | IntegrationListResponseV2 | None:
-    """List integrations
+) -> ErrorData | KafkaIntegrationListResponse | None:
+    """List Kafka Integrations
 
-     List integrations with filtering and pagination.
+     List Kafka connections with filtering, pagination, and project visibility.
 
     Args:
         limit (int | Unset): Maximum number of results per page Default: 20.
         cursor (None | str | Unset): Pagination cursor from previous response
         sort (None | str | Unset): Sort parameter (e.g., 'name', '-created_at')
         include_total (bool | Unset): Include total count in response (expensive) Default: False.
-        integration_type (IntegrationTypeV2 | None | Unset): Filter by integration type
         validation_status (IntegrationStatus | None | Unset): Filter by validation status
         enabled (bool | None | Unset): Filter by enabled status
         scope (IntegrationScope | None | Unset): Filter by visibility scope
@@ -283,7 +263,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        ErrorData | IntegrationListResponseV2
+        ErrorData | KafkaIntegrationListResponse
     """
 
     return sync_detailed(
@@ -292,7 +272,6 @@ def sync(
         cursor=cursor,
         sort=sort,
         include_total=include_total,
-        integration_type=integration_type,
         validation_status=validation_status,
         enabled=enabled,
         scope=scope,
@@ -308,23 +287,21 @@ async def asyncio_detailed(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
-    integration_type: IntegrationTypeV2 | None | Unset = UNSET,
     validation_status: IntegrationStatus | None | Unset = UNSET,
     enabled: bool | None | Unset = UNSET,
     scope: IntegrationScope | None | Unset = UNSET,
     management_credential_id: None | Unset | UUID = UNSET,
     project_id: None | Unset | UUID = UNSET,
-) -> Response[ErrorData | IntegrationListResponseV2]:
-    """List integrations
+) -> Response[ErrorData | KafkaIntegrationListResponse]:
+    """List Kafka Integrations
 
-     List integrations with filtering and pagination.
+     List Kafka connections with filtering, pagination, and project visibility.
 
     Args:
         limit (int | Unset): Maximum number of results per page Default: 20.
         cursor (None | str | Unset): Pagination cursor from previous response
         sort (None | str | Unset): Sort parameter (e.g., 'name', '-created_at')
         include_total (bool | Unset): Include total count in response (expensive) Default: False.
-        integration_type (IntegrationTypeV2 | None | Unset): Filter by integration type
         validation_status (IntegrationStatus | None | Unset): Filter by validation status
         enabled (bool | None | Unset): Filter by enabled status
         scope (IntegrationScope | None | Unset): Filter by visibility scope
@@ -338,7 +315,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ErrorData | IntegrationListResponseV2]
+        Response[ErrorData | KafkaIntegrationListResponse]
     """
 
     kwargs = _get_kwargs(
@@ -346,7 +323,6 @@ async def asyncio_detailed(
         cursor=cursor,
         sort=sort,
         include_total=include_total,
-        integration_type=integration_type,
         validation_status=validation_status,
         enabled=enabled,
         scope=scope,
@@ -354,11 +330,7 @@ async def asyncio_detailed(
         project_id=project_id,
     )
 
-    httpx_client = client.get_async_httpx_client()
-    # Preserve any deployment prefix while selecting the endpoint's API version.
-    api_root = httpx_client.base_url.path.rstrip("/").rsplit("/api/", 1)[0].removesuffix("/api")
-    kwargs["url"] = httpx_client.base_url.copy_with(path=f"{api_root}{kwargs['url']}")
-    response = await httpx_client.request(**kwargs)
+    response = await client.get_async_httpx_client().request(**kwargs)
 
     return _build_response(client=client, response=response)
 
@@ -370,23 +342,21 @@ async def asyncio(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
-    integration_type: IntegrationTypeV2 | None | Unset = UNSET,
     validation_status: IntegrationStatus | None | Unset = UNSET,
     enabled: bool | None | Unset = UNSET,
     scope: IntegrationScope | None | Unset = UNSET,
     management_credential_id: None | Unset | UUID = UNSET,
     project_id: None | Unset | UUID = UNSET,
-) -> ErrorData | IntegrationListResponseV2 | None:
-    """List integrations
+) -> ErrorData | KafkaIntegrationListResponse | None:
+    """List Kafka Integrations
 
-     List integrations with filtering and pagination.
+     List Kafka connections with filtering, pagination, and project visibility.
 
     Args:
         limit (int | Unset): Maximum number of results per page Default: 20.
         cursor (None | str | Unset): Pagination cursor from previous response
         sort (None | str | Unset): Sort parameter (e.g., 'name', '-created_at')
         include_total (bool | Unset): Include total count in response (expensive) Default: False.
-        integration_type (IntegrationTypeV2 | None | Unset): Filter by integration type
         validation_status (IntegrationStatus | None | Unset): Filter by validation status
         enabled (bool | None | Unset): Filter by enabled status
         scope (IntegrationScope | None | Unset): Filter by visibility scope
@@ -400,7 +370,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        ErrorData | IntegrationListResponseV2
+        ErrorData | KafkaIntegrationListResponse
     """
 
     return (
@@ -410,7 +380,6 @@ async def asyncio(
             cursor=cursor,
             sort=sort,
             include_total=include_total,
-            integration_type=integration_type,
             validation_status=validation_status,
             enabled=enabled,
             scope=scope,

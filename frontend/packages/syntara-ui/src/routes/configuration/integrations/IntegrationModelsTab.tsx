@@ -21,9 +21,9 @@ import { detachPromise } from '../../../utils/detachPromise'
 
 import styles from './IntegrationDetail.module.css'
 import { getIntegrationNameFilterDefinition } from './integrationFilters'
+import type { IntegrationRead } from './integrationTypes'
 import { ModelRow } from './ModelRow'
 
-type IntegrationRead = IntegrationsAPI.components['schemas']['IntegrationReadV2']
 type IntegrationRefreshStatus = IntegrationsAPI.components['schemas']['IntegrationRefreshStatus']
 type LLMModelRead = IntegrationsAPI.components['schemas']['LLMModelRead']
 

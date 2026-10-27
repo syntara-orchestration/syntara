@@ -299,7 +299,7 @@ describe('Integrations Component', () => {
       render(<Integrations />, { wrapper })
 
       // Check for empty state message (no filters active, so shows empty state not filter empty)
-      expect(screen.getByText('No integrations yet')).toBeInTheDocument()
+      expect(screen.getByText('No integrations in this view')).toBeInTheDocument()
       // Multiple "Configure integration" buttons exist (header + empty state), so use getAllByText
       expect(screen.getAllByText('Configure integration').length).toBeGreaterThan(0)
     })
@@ -318,7 +318,7 @@ describe('Integrations Component', () => {
       render(<Integrations />, { wrapper })
 
       expect(screen.getByText('No results found')).toBeInTheDocument()
-      expect(screen.queryByText('No integrations yet')).not.toBeInTheDocument()
+      expect(screen.queryByText('No integrations in this view')).not.toBeInTheDocument()
     })
   })
 
@@ -746,6 +746,35 @@ describe('Integrations Component', () => {
       await waitFor(() => {
         expect(screen.getByText(/No integrations/)).toBeInTheDocument()
       })
+    })
+  })
+
+  describe('Kafka catalog selection', () => {
+    it('queries the separate Kafka endpoint when the type filter is Kafka', () => {
+      mockSearchParams.set('integration_type', 'kafka')
+      mockSearchParams.set('name[contains]', 'orders')
+      render(<Integrations />, { wrapper })
+      const kafkaCall = vi
+        .mocked(integrationsClient.useQuery)
+        .mock.calls.find(([, path]) => path === '/kafka-integrations')
+      expect(kafkaCall?.[2]).toMatchObject({ params: { query: { 'name[contains]': 'orders' } } })
+      expect(kafkaCall?.[2]).not.toMatchObject({ params: { query: { integration_type: 'kafka' } } })
+    })
+
+    it('keeps the type filter available when the default catalog is empty', async () => {
+      vi.mocked(integrationsClient.useQuery).mockReturnValue({
+        data: { resources: [] },
+        isPending: false,
+        isError: false,
+        error: null,
+        refetch: vi.fn(),
+      })
+      const user = userEvent.setup()
+      render(<Integrations />, { wrapper })
+      await user.click(screen.getByRole('button', { name: 'Name' }))
+      await user.click(await screen.findByRole('option', { name: 'Integration type' }))
+      await user.click(screen.getByRole('button', { name: 'Filter by integration type' }))
+      expect(await screen.findByRole('option', { name: 'Kafka' })).toBeVisible()
     })
   })
 
@@ -1630,7 +1659,7 @@ describe('Integrations Component', () => {
 
       render(<Integrations />, { wrapper })
 
-      expect(screen.getByText('No integrations yet')).toBeInTheDocument()
+      expect(screen.getByText('No integrations in this view')).toBeInTheDocument()
       expect(screen.queryByRole('button', { name: 'Configure integration' })).not.toBeInTheDocument()
     })
   })

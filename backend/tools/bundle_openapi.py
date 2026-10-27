@@ -432,13 +432,10 @@ def _merge_sub_spec(
         spec_data, spec_path.parent, shared_refs=local_shared_refs, current_file=resolved_spec_path
     )
 
-    versioned = any(server.get("url") == "/api/v2" for server in spec_data.get("servers", []))
     for path_key, path_item in resolved.get("paths", {}).items():
-        merged_key = f"/api/v2{path_key}" if versioned else path_key
-        merged_item = {**path_item, "servers": [{"url": "/"}]} if versioned else path_item
-        if merged_key in merged_paths:
-            raise ValueError(f"Path collision: '{merged_key}' defined in {spec_path} and a previously merged spec.")
-        merged_paths[merged_key] = merged_item
+        if path_key in merged_paths:
+            raise ValueError(f"Path collision: '{path_key}' defined in {spec_path} and a previously merged spec.")
+        merged_paths[path_key] = path_item
 
     components = _strip_self_ref_exports(resolved.get("components", {}))
     # Drop parameters: inlined at usage sites above; FastAPI never emits components/parameters.

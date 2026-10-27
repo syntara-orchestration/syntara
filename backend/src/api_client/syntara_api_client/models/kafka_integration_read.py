@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import datetime
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar, cast
+from typing import TYPE_CHECKING, Any, Literal, TypeVar, cast
 from uuid import UUID
 
 from attrs import define as _attrs_define
@@ -11,34 +11,33 @@ from dateutil.parser import isoparse
 from ..models.integration_refresh_status import IntegrationRefreshStatus
 from ..models.integration_scope import IntegrationScope
 from ..models.integration_status import IntegrationStatus
-from ..models.integration_type_v2 import IntegrationTypeV2
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
-    from ..models.aap_configuration import AAPConfiguration
-    from ..models.integration_read_v2_labels import IntegrationReadV2Labels
     from ..models.kafka_configuration import KafkaConfiguration
-    from ..models.llm_provider_configuration import LLMProviderConfiguration
-    from ..models.mcp_server_configuration_input import MCPServerConfigurationInput
+    from ..models.kafka_integration_read_labels import KafkaIntegrationReadLabels
     from ..models.user_reference import UserReference
 
 
-T = TypeVar("T", bound="IntegrationReadV2")
+T = TypeVar("T", bound="KafkaIntegrationRead")
 
 
 @_attrs_define
-class IntegrationReadV2:
-    """Schema for integration API responses.
+class KafkaIntegrationRead:
+    """Kafka connection with its broker settings in configuration.
 
     Attributes:
         name (str): Human-readable name for the resource Example: Authentication Service.
-        integration_type (IntegrationTypeV2): Type of external integration.
-        configuration (AAPConfiguration | KafkaConfiguration | LLMProviderConfiguration | MCPServerConfigurationInput):
-            Integration-specific configuration
+        integration_type (Literal['kafka']):
+        configuration (KafkaConfiguration): Configuration for a Kafka cluster integration.
+
+            Broker addresses live here. The username and password stay on the
+            linked Kafka credential when SASL_SSL is selected. Unauthenticated SSL
+            and explicitly opted-in PLAINTEXT do not require a credential.
         id (UUID | Unset): Unique identifier for the resource Example: 550e8400-e29b-41d4-a716-446655440000.
         created_at (datetime.datetime | Unset): Timestamp when resource was created Example: 2025-10-09T12:00:00Z.
         updated_at (datetime.datetime | Unset): Timestamp when resource was last updated Example: 2025-10-09T12:30:00Z.
-        labels (IntegrationReadV2Labels | Unset): Key-value pairs for resource labeling and filtering Example:
+        labels (KafkaIntegrationReadLabels | Unset): Key-value pairs for resource labeling and filtering Example:
             {'environment': 'production', 'region': 'us-east-1', 'team': 'platform'}.
         created_by (None | Unset | UserReference): User who created the integration
         updated_by (None | Unset | UserReference): User who last modified the integration
@@ -62,12 +61,12 @@ class IntegrationReadV2:
     """
 
     name: str
-    integration_type: IntegrationTypeV2
-    configuration: AAPConfiguration | KafkaConfiguration | LLMProviderConfiguration | MCPServerConfigurationInput
+    integration_type: Literal["kafka"]
+    configuration: KafkaConfiguration
     id: UUID | Unset = UNSET
     created_at: datetime.datetime | Unset = UNSET
     updated_at: datetime.datetime | Unset = UNSET
-    labels: IntegrationReadV2Labels | Unset = UNSET
+    labels: KafkaIntegrationReadLabels | Unset = UNSET
     created_by: None | Unset | UserReference = UNSET
     updated_by: None | Unset | UserReference = UNSET
     description: None | str | Unset = UNSET
@@ -88,24 +87,13 @@ class IntegrationReadV2:
     enabled_model_count: int | Unset = 0
 
     def to_dict(self) -> dict[str, Any]:
-        from ..models.aap_configuration import AAPConfiguration
-        from ..models.llm_provider_configuration import LLMProviderConfiguration
-        from ..models.mcp_server_configuration_input import MCPServerConfigurationInput
         from ..models.user_reference import UserReference
 
         name = self.name
 
-        integration_type = self.integration_type.value
+        integration_type = self.integration_type
 
-        configuration: dict[str, Any]
-        if isinstance(self.configuration, MCPServerConfigurationInput):
-            configuration = self.configuration.to_dict()
-        elif isinstance(self.configuration, LLMProviderConfiguration):
-            configuration = self.configuration.to_dict()
-        elif isinstance(self.configuration, AAPConfiguration):
-            configuration = self.configuration.to_dict()
-        else:
-            configuration = self.configuration.to_dict()
+        configuration = self.configuration.to_dict()
 
         id: str | Unset = UNSET
         if not isinstance(self.id, Unset):
@@ -280,52 +268,18 @@ class IntegrationReadV2:
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
-        from ..models.aap_configuration import AAPConfiguration
-        from ..models.integration_read_v2_labels import IntegrationReadV2Labels
         from ..models.kafka_configuration import KafkaConfiguration
-        from ..models.llm_provider_configuration import LLMProviderConfiguration
-        from ..models.mcp_server_configuration_input import MCPServerConfigurationInput
+        from ..models.kafka_integration_read_labels import KafkaIntegrationReadLabels
         from ..models.user_reference import UserReference
 
         d = dict(src_dict)
         name = d.pop("name")
 
-        integration_type = IntegrationTypeV2(d.pop("integration_type"))
+        integration_type = cast(Literal["kafka"], d.pop("integration_type"))
+        if integration_type != "kafka":
+            raise ValueError(f"integration_type must match const 'kafka', got '{integration_type}'")
 
-        def _parse_configuration(
-            data: object,
-        ) -> AAPConfiguration | KafkaConfiguration | LLMProviderConfiguration | MCPServerConfigurationInput:
-            try:
-                if not isinstance(data, dict):
-                    raise TypeError()
-                configuration_type_0 = MCPServerConfigurationInput.from_dict(data)
-
-                return configuration_type_0
-            except (TypeError, ValueError, AttributeError, KeyError):
-                pass
-            try:
-                if not isinstance(data, dict):
-                    raise TypeError()
-                configuration_type_1 = LLMProviderConfiguration.from_dict(data)
-
-                return configuration_type_1
-            except (TypeError, ValueError, AttributeError, KeyError):
-                pass
-            try:
-                if not isinstance(data, dict):
-                    raise TypeError()
-                configuration_type_2 = AAPConfiguration.from_dict(data)
-
-                return configuration_type_2
-            except (TypeError, ValueError, AttributeError, KeyError):
-                pass
-            if not isinstance(data, dict):
-                raise TypeError()
-            configuration_type_3 = KafkaConfiguration.from_dict(data)
-
-            return configuration_type_3
-
-        configuration = _parse_configuration(d.pop("configuration"))
+        configuration = KafkaConfiguration.from_dict(d.pop("configuration"))
 
         _id = d.pop("id", UNSET)
         id: UUID | Unset
@@ -349,11 +303,11 @@ class IntegrationReadV2:
             updated_at = isoparse(_updated_at)
 
         _labels = d.pop("labels", UNSET)
-        labels: IntegrationReadV2Labels | Unset
+        labels: KafkaIntegrationReadLabels | Unset
         if isinstance(_labels, Unset):
             labels = UNSET
         else:
-            labels = IntegrationReadV2Labels.from_dict(_labels)
+            labels = KafkaIntegrationReadLabels.from_dict(_labels)
 
         def _parse_created_by(data: object) -> None | Unset | UserReference:
             if data is None:
@@ -534,7 +488,7 @@ class IntegrationReadV2:
 
         enabled_model_count = d.pop("enabled_model_count", UNSET)
 
-        integration_read_v2 = cls(
+        kafka_integration_read = cls(
             name=name,
             integration_type=integration_type,
             configuration=configuration,
@@ -562,4 +516,4 @@ class IntegrationReadV2:
             enabled_model_count=enabled_model_count,
         )
 
-        return integration_read_v2
+        return kafka_integration_read

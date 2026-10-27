@@ -176,154 +176,42 @@ class IntegrationsApi:
         endpoint_module = self._load_endpoint_module("bulk_update_integration_tools")
         return await endpoint_module.asyncio_detailed(client=self._client, **kwargs)
 
-    def v2_list(self, **kwargs: Any) -> Response[Any]:
-        endpoint_module = self._load_endpoint_module("v2_list_integrations")
+    def list_kafka(self, **kwargs: Any) -> Response[Any]:
+        endpoint_module = self._load_endpoint_module("list_kafka_integrations")
         return endpoint_module.sync_detailed(client=self._client, **kwargs)
 
-    async def async_v2_list(self, **kwargs: Any) -> Response[Any]:
-        endpoint_module = self._load_endpoint_module("v2_list_integrations")
+    async def async_list_kafka(self, **kwargs: Any) -> Response[Any]:
+        endpoint_module = self._load_endpoint_module("list_kafka_integrations")
         return await endpoint_module.asyncio_detailed(client=self._client, **kwargs)
 
-    def v2_create(self, **kwargs: Any) -> Response[Any]:
-        endpoint_module = self._load_endpoint_module("v2_create_integration")
+    def create_kafka(self, **kwargs: Any) -> Response[Any]:
+        endpoint_module = self._load_endpoint_module("create_kafka_integration")
         return endpoint_module.sync_detailed(client=self._client, **kwargs)
 
-    async def async_v2_create(self, **kwargs: Any) -> Response[Any]:
-        endpoint_module = self._load_endpoint_module("v2_create_integration")
+    async def async_create_kafka(self, **kwargs: Any) -> Response[Any]:
+        endpoint_module = self._load_endpoint_module("create_kafka_integration")
         return await endpoint_module.asyncio_detailed(client=self._client, **kwargs)
 
-    def v2_get(self, **kwargs: Any) -> Response[Any]:
-        endpoint_module = self._load_endpoint_module("v2_get_integration")
+    def discover_kafka_connection(self, **kwargs: Any) -> Response[Any]:
+        endpoint_module = self._load_endpoint_module("discover_kafka_integration_connection")
         return endpoint_module.sync_detailed(client=self._client, **kwargs)
 
-    async def async_v2_get(self, **kwargs: Any) -> Response[Any]:
-        endpoint_module = self._load_endpoint_module("v2_get_integration")
+    async def async_discover_kafka_connection(self, **kwargs: Any) -> Response[Any]:
+        endpoint_module = self._load_endpoint_module("discover_kafka_integration_connection")
         return await endpoint_module.asyncio_detailed(client=self._client, **kwargs)
 
-    def v2_delete(self, **kwargs: Any) -> Response[Any]:
-        endpoint_module = self._load_endpoint_module("v2_delete_integration")
+    def get_kafka(self, **kwargs: Any) -> Response[Any]:
+        endpoint_module = self._load_endpoint_module("get_kafka_integration")
         return endpoint_module.sync_detailed(client=self._client, **kwargs)
 
-    async def async_v2_delete(self, **kwargs: Any) -> Response[Any]:
-        endpoint_module = self._load_endpoint_module("v2_delete_integration")
+    async def async_get_kafka(self, **kwargs: Any) -> Response[Any]:
+        endpoint_module = self._load_endpoint_module("get_kafka_integration")
         return await endpoint_module.asyncio_detailed(client=self._client, **kwargs)
 
-    def v2_update(self, **kwargs: Any) -> Response[Any]:
-        endpoint_module = self._load_endpoint_module("v2_update_integration")
+    def update_kafka(self, **kwargs: Any) -> Response[Any]:
+        endpoint_module = self._load_endpoint_module("update_kafka_integration")
         return endpoint_module.sync_detailed(client=self._client, **kwargs)
 
-    async def async_v2_update(self, **kwargs: Any) -> Response[Any]:
-        endpoint_module = self._load_endpoint_module("v2_update_integration")
-        return await endpoint_module.asyncio_detailed(client=self._client, **kwargs)
-
-    def v2_discover_connection(self, **kwargs: Any) -> Response[Any]:
-        endpoint_module = self._load_endpoint_module("v2_discover_integration_connection")
-        return endpoint_module.sync_detailed(client=self._client, **kwargs)
-
-    async def async_v2_discover_connection(self, **kwargs: Any) -> Response[Any]:
-        endpoint_module = self._load_endpoint_module("v2_discover_integration_connection")
-        return await endpoint_module.asyncio_detailed(client=self._client, **kwargs)
-
-    def v2_validate(self, **kwargs: Any) -> Response[Any]:
-        endpoint_module = self._load_endpoint_module("v2_validate_integration")
-        return endpoint_module.sync_detailed(client=self._client, **kwargs)
-
-    async def async_v2_validate(self, **kwargs: Any) -> Response[Any]:
-        endpoint_module = self._load_endpoint_module("v2_validate_integration")
-        return await endpoint_module.asyncio_detailed(client=self._client, **kwargs)
-
-    def v2_refresh_resources(self, **kwargs: Any) -> Response[Any]:
-        endpoint_module = self._load_endpoint_module("v2_refresh_resources")
-        return endpoint_module.sync_detailed(client=self._client, **kwargs)
-
-    async def async_v2_refresh_resources(self, **kwargs: Any) -> Response[Any]:
-        endpoint_module = self._load_endpoint_module("v2_refresh_resources")
-        return await endpoint_module.asyncio_detailed(client=self._client, **kwargs)
-
-    def v2_assign_project(self, **kwargs: Any) -> Response[Any]:
-        endpoint_module = self._load_endpoint_module("v2_assign_integration_project")
-        return endpoint_module.sync_detailed(client=self._client, **kwargs)
-
-    async def async_v2_assign_project(self, **kwargs: Any) -> Response[Any]:
-        endpoint_module = self._load_endpoint_module("v2_assign_integration_project")
-        return await endpoint_module.asyncio_detailed(client=self._client, **kwargs)
-
-    def v2_unassign_project(self, **kwargs: Any) -> Response[Any]:
-        endpoint_module = self._load_endpoint_module("v2_unassign_integration_project")
-        return endpoint_module.sync_detailed(client=self._client, **kwargs)
-
-    async def async_v2_unassign_project(self, **kwargs: Any) -> Response[Any]:
-        endpoint_module = self._load_endpoint_module("v2_unassign_integration_project")
-        return await endpoint_module.asyncio_detailed(client=self._client, **kwargs)
-
-    def v2_list_projects(self, **kwargs: Any) -> Response[Any]:
-        endpoint_module = self._load_endpoint_module("v2_list_integration_projects")
-        return endpoint_module.sync_detailed(client=self._client, **kwargs)
-
-    async def async_v2_list_projects(self, **kwargs: Any) -> Response[Any]:
-        endpoint_module = self._load_endpoint_module("v2_list_integration_projects")
-        return await endpoint_module.asyncio_detailed(client=self._client, **kwargs)
-
-    def v2_list_models(self, **kwargs: Any) -> Response[Any]:
-        endpoint_module = self._load_endpoint_module("v2_list_integration_models")
-        return endpoint_module.sync_detailed(client=self._client, **kwargs)
-
-    async def async_v2_list_models(self, **kwargs: Any) -> Response[Any]:
-        endpoint_module = self._load_endpoint_module("v2_list_integration_models")
-        return await endpoint_module.asyncio_detailed(client=self._client, **kwargs)
-
-    def v2_bulk_update_models(self, **kwargs: Any) -> Response[Any]:
-        endpoint_module = self._load_endpoint_module("v2_bulk_update_integration_models")
-        return endpoint_module.sync_detailed(client=self._client, **kwargs)
-
-    async def async_v2_bulk_update_models(self, **kwargs: Any) -> Response[Any]:
-        endpoint_module = self._load_endpoint_module("v2_bulk_update_integration_models")
-        return await endpoint_module.asyncio_detailed(client=self._client, **kwargs)
-
-    def v2_get_model(self, **kwargs: Any) -> Response[Any]:
-        endpoint_module = self._load_endpoint_module("v2_get_integration_model")
-        return endpoint_module.sync_detailed(client=self._client, **kwargs)
-
-    async def async_v2_get_model(self, **kwargs: Any) -> Response[Any]:
-        endpoint_module = self._load_endpoint_module("v2_get_integration_model")
-        return await endpoint_module.asyncio_detailed(client=self._client, **kwargs)
-
-    def v2_update_model(self, **kwargs: Any) -> Response[Any]:
-        endpoint_module = self._load_endpoint_module("v2_update_integration_model")
-        return endpoint_module.sync_detailed(client=self._client, **kwargs)
-
-    async def async_v2_update_model(self, **kwargs: Any) -> Response[Any]:
-        endpoint_module = self._load_endpoint_module("v2_update_integration_model")
-        return await endpoint_module.asyncio_detailed(client=self._client, **kwargs)
-
-    def v2_list_tools(self, **kwargs: Any) -> Response[Any]:
-        endpoint_module = self._load_endpoint_module("v2_list_integration_tools")
-        return endpoint_module.sync_detailed(client=self._client, **kwargs)
-
-    async def async_v2_list_tools(self, **kwargs: Any) -> Response[Any]:
-        endpoint_module = self._load_endpoint_module("v2_list_integration_tools")
-        return await endpoint_module.asyncio_detailed(client=self._client, **kwargs)
-
-    def v2_bulk_update_tools(self, **kwargs: Any) -> Response[Any]:
-        endpoint_module = self._load_endpoint_module("v2_bulk_update_integration_tools")
-        return endpoint_module.sync_detailed(client=self._client, **kwargs)
-
-    async def async_v2_bulk_update_tools(self, **kwargs: Any) -> Response[Any]:
-        endpoint_module = self._load_endpoint_module("v2_bulk_update_integration_tools")
-        return await endpoint_module.asyncio_detailed(client=self._client, **kwargs)
-
-    def v2_get_tool(self, **kwargs: Any) -> Response[Any]:
-        endpoint_module = self._load_endpoint_module("v2_get_integration_tool")
-        return endpoint_module.sync_detailed(client=self._client, **kwargs)
-
-    async def async_v2_get_tool(self, **kwargs: Any) -> Response[Any]:
-        endpoint_module = self._load_endpoint_module("v2_get_integration_tool")
-        return await endpoint_module.asyncio_detailed(client=self._client, **kwargs)
-
-    def v2_update_tool(self, **kwargs: Any) -> Response[Any]:
-        endpoint_module = self._load_endpoint_module("v2_update_integration_tool")
-        return endpoint_module.sync_detailed(client=self._client, **kwargs)
-
-    async def async_v2_update_tool(self, **kwargs: Any) -> Response[Any]:
-        endpoint_module = self._load_endpoint_module("v2_update_integration_tool")
+    async def async_update_kafka(self, **kwargs: Any) -> Response[Any]:
+        endpoint_module = self._load_endpoint_module("update_kafka_integration")
         return await endpoint_module.asyncio_detailed(client=self._client, **kwargs)

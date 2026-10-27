@@ -32,7 +32,6 @@ from syntara.api.constants import (
     API_DOCS_V1_REDOC_PATH,
     API_V1_PATH_PREFIX,
     API_V1_VERSION,
-    API_V2_PATH_PREFIX,
 )
 from syntara.audit.lifecycle import start_audit_subsystems, stop_audit_subsystems
 from syntara.audit.middleware import AuditMiddleware
@@ -672,7 +671,6 @@ async def api_discovery(
         "current_version": API_V1_PATH_PREFIX,
         "available_versions": {
             "v1": API_V1_PATH_PREFIX,
-            "v2": API_V2_PATH_PREFIX,
         },
     }
 
@@ -690,14 +688,6 @@ async def api_v1_root(
         for route in iter_api_routes(app)
         if route.path.startswith(API_V1_PATH_PREFIX) and route.name != api_v1_root.__name__
     }
-
-
-@app.get(API_V2_PATH_PREFIX, tags=["API Discovery"], include_in_schema=False)
-async def api_v2_root(
-    current_user: Annotated[User, Depends(get_current_user)],  # noqa: ARG001
-) -> dict[str, Any]:
-    """List the integrations endpoints exposed by API v2."""
-    return {route.name: route.path for route in iter_api_routes(app) if route.path.startswith(f"{API_V2_PATH_PREFIX}/")}
 
 
 @app.get("/api/v1/version", tags=["API Discovery"])

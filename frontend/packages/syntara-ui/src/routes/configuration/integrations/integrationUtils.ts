@@ -1,8 +1,9 @@
-import type { IntegrationsAPI } from '@syntara/contracts'
 import { IntegrationTypeEnum, LLMProviderHintEnum } from '@syntara/contracts'
 import { z } from 'zod'
 
-type IntegrationRead = IntegrationsAPI.components['schemas']['IntegrationReadV2']
+import { AppRoute } from '../../../app/AppRoute'
+
+import type { IntegrationRead } from './integrationTypes'
 
 const integrationTypeSchema = z.discriminatedUnion('integration_type', [
   z.object({ integration_type: z.literal(IntegrationTypeEnum.MCP_SERVER) }),
@@ -61,4 +62,23 @@ export function getEnabledResourceCount(integration: IntegrationRead): number {
 export function getResourceNoun(integration: IntegrationRead, plural = true): string {
   if (isLLMProvider(integration)) return plural ? 'models' : 'model'
   return plural ? 'tools' : 'tool'
+}
+
+export function getIntegrationPaths(isKafka: boolean, integrationId: string) {
+  const routes = isKafka
+    ? {
+        resourcePath: '/kafka-integrations/{integration_id}' as const,
+        detail: AppRoute.Configuration.Integrations.KafkaDetail,
+        edit: AppRoute.Configuration.Integrations.KafkaEdit,
+      }
+    : {
+        resourcePath: '/integrations/{integration_id}' as const,
+        detail: AppRoute.Configuration.Integrations.Detail,
+        edit: AppRoute.Configuration.Integrations.Edit,
+      }
+  return {
+    resourcePath: routes.resourcePath,
+    detailPath: routes.detail.replace(':integrationId', integrationId),
+    editPath: routes.edit.replace(':integrationId', integrationId),
+  }
 }

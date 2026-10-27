@@ -3,11 +3,15 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
+if TYPE_CHECKING:
+    from collections.abc import Generator
+
 from syntara.integrations.adapters.factory import (
+    _ADAPTER_REGISTRY,
     _clear_registry,
     create_health_check_adapter,
     register_health_check_adapter,
@@ -26,6 +30,18 @@ from syntara.integrations.models.integration_configuration import (
     LLMProviderConfiguration,
     MCPServerConfiguration,
 )
+
+
+@pytest.fixture(autouse=True)
+def preserve_adapter_registry() -> Generator[None, None, None]:
+    """Factory mutation tests must not remove real adapters needed by later tests."""
+    original = _ADAPTER_REGISTRY.copy()
+    try:
+        yield
+    finally:
+        _clear_registry()
+        _ADAPTER_REGISTRY.update(original)
+
 
 # ---------------------------------------------------------------------------
 # Stub adapters for testing — demonstrate the full protocol pattern

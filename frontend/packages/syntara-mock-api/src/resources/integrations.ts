@@ -1,9 +1,11 @@
-import type * as IntegrationsAPI from '@syntara/contracts/src/integrations-api.js'
+import type { IntegrationsAPI } from '@syntara/contracts'
 import { IntegrationStatusEnum, IntegrationTypeEnum } from '@syntara/contracts'
 
 import { mockDate } from './mockDates'
 
-type IntegrationRead = IntegrationsAPI.components['schemas']['IntegrationReadV2']
+type IntegrationRead =
+  | IntegrationsAPI.components['schemas']['IntegrationRead']
+  | IntegrationsAPI.components['schemas']['KafkaIntegrationRead']
 
 const MOCK_USER_1_REF = { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'user-1', type: 'user' as const }
 
@@ -259,8 +261,7 @@ export const integrations: IntegrationRead[] = [
     enabled: true,
     validation_status: IntegrationStatusEnum.AVAILABLE,
     scope: 'global',
-    configuration: null,
-    kafka_configuration: {
+    configuration: {
       integration_type: 'kafka',
       bootstrap_servers: ['broker.example.com:9093'],
       allow_http: false,

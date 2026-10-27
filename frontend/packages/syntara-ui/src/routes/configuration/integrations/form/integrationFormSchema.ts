@@ -1,7 +1,8 @@
-import { IntegrationTypeEnum, LLMProviderHintEnum, type IntegrationsAPI } from '@syntara/contracts'
+import { IntegrationTypeEnum, LLMProviderHintEnum } from '@syntara/contracts'
 import { z } from 'zod'
 
 import { PROVIDERS_REQUIRING_BASE_URL } from '../integrationFilters'
+import type { IntegrationConfiguration } from '../integrationTypes'
 import { bootstrapServersFieldError, parseBootstrapServers } from '../kafkaBootstrapServers'
 import { DEFAULT_KAFKA_SASL_MECHANISM } from '../kafkaSasl'
 
@@ -226,7 +227,7 @@ export const PROVIDER_HINT_OPTIONS = [
   { value: LLMProviderHintEnum.CUSTOM, label: 'Custom' },
 ] as const
 
-type ApiConfiguration = NonNullable<IntegrationsAPI.components['schemas']['IntegrationCreateV2']['configuration']>
+type ApiConfiguration = IntegrationConfiguration
 
 /** Map form configuration to the API shape. Kafka brokers are a list, not the textarea string. */
 export function toApiConfiguration(configuration: IntegrationFormData['configuration']): ApiConfiguration {

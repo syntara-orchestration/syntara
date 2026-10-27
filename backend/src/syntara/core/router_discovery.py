@@ -33,7 +33,6 @@ import structlog
 from fastapi import APIRouter, FastAPI
 from filelock import FileLock
 
-from syntara.api.constants import API_V2_PATH_PREFIX
 from syntara.core.config.base import get_settings
 from syntara.core.exceptions import SyntaraError
 from syntara.core.router import validate_routes
@@ -310,8 +309,7 @@ def register_routers(
 
     for router_info in routers:
         try:
-            route_prefix = API_V2_PATH_PREFIX if getattr(router_info.router, "api_version", "v1") == "v2" else prefix
-            app.include_router(router_info.router, prefix=route_prefix)
+            app.include_router(router_info.router, prefix=prefix)
             logger.info(
                 "Registered router",
                 domain=router_info.domain,
@@ -467,10 +465,7 @@ def _build_schema_file_list(routers: list[RouterInfo]) -> list[str]:
         # Build schema filename from router prefix.
         # Primary routers (prefix="") -> openapi.{ext}
         # Sub-routers (prefix="executions_") -> executions.openapi.{ext}
-        explicit_spec = getattr(router_info.router, "openapi_spec_name", None)
-        if explicit_spec:
-            schema_filename_template = f"{explicit_spec}.{{ext}}"
-        elif router_prefix:
+        if router_prefix:
             descriptor = router_prefix.rstrip("_")
             schema_filename_template = f"{descriptor}.openapi.{{ext}}"
         else:

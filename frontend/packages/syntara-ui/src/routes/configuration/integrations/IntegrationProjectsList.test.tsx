@@ -1,4 +1,4 @@
-import type { IntegrationsAPI, Tool } from '@syntara/contracts'
+import type { Tool } from '@syntara/contracts'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen, act } from '@testing-library/react'
 import type { ReactNode } from 'react'
@@ -9,6 +9,7 @@ import { credentialsClient, integrationsClient } from '../../../client'
 import { AlertProvider } from '../../../providers/alerts'
 
 import { IntegrationDetail } from './IntegrationDetail'
+import type { IntegrationRead } from './integrationTypes'
 
 vi.mock('../../../client', () => ({
   integrationsClient: {
@@ -117,8 +118,6 @@ vi.mock('./useIntegrationPermissions', () => ({
     },
   }),
 }))
-
-type IntegrationRead = IntegrationsAPI.components['schemas']['IntegrationReadV2']
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: false } },

@@ -20,7 +20,7 @@ import { projectIdParam } from '../../../utils/queryParams'
 
 import { resolveFormGroupLabelHelp } from './resolveFormGroupLabelHelp'
 
-type IntegrationRead = IntegrationsAPI.components['schemas']['IntegrationReadV2']
+type IntegrationRead = IntegrationsAPI.components['schemas']['IntegrationRead']
 type IntegrationStatus = (typeof IntegrationStatusEnum)[keyof typeof IntegrationStatusEnum]
 
 const STATUS_CONFIG: Record<

@@ -6,11 +6,11 @@ from typing import Any, TypeVar
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
-T = TypeVar("T", bound="IntegrationUpdateV2LabelsType0")
+T = TypeVar("T", bound="KafkaIntegrationUpdateLabelsType0")
 
 
 @_attrs_define
-class IntegrationUpdateV2LabelsType0:
+class KafkaIntegrationUpdateLabelsType0:
     """ """
 
     additional_properties: dict[str, str] = _attrs_field(init=False, factory=dict)
@@ -24,10 +24,10 @@ class IntegrationUpdateV2LabelsType0:
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         d = dict(src_dict)
-        integration_update_v2_labels_type_0 = cls()
+        kafka_integration_update_labels_type_0 = cls()
 
-        integration_update_v2_labels_type_0.additional_properties = d
-        return integration_update_v2_labels_type_0
+        kafka_integration_update_labels_type_0.additional_properties = d
+        return kafka_integration_update_labels_type_0
 
     @property
     def additional_keys(self) -> list[str]:
