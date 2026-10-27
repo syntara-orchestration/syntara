@@ -64,7 +64,7 @@ export function StatementsCell({ statements }: Readonly<StatementsCellProps>) {
   return (
     <Stack hasGutter>
       {statements.map((stmt) => (
-        <StackItem key={`${stmt.effect}-${stmt.scope}-${stmt.actions.join('-')}`}>
+        <StackItem key={JSON.stringify(stmt)}>
           <Flex gap={{ default: 'gapXs' }} alignItems={{ default: 'alignItemsCenter' }} flexWrap={{ default: 'wrap' }}>
             <FlexItem>
               <SynLabel color={stmt.effect === 'allow' ? 'green' : 'red'}>
@@ -83,6 +83,25 @@ export function StatementsCell({ statements }: Readonly<StatementsCellProps>) {
                 ))}
               </LabelGroup>
             </FlexItem>
+            {stmt.actions.some((action) => action.startsWith('step_type:')) &&
+              Object.entries(stmt.conditions ?? {}).map(([condition, labels]) => {
+                if (
+                  (condition !== 'resource_labels' && condition !== 'resource_labels_not') ||
+                  typeof labels !== 'object' ||
+                  labels === null ||
+                  !('kind' in labels) ||
+                  typeof labels.kind !== 'string'
+                ) {
+                  return null
+                }
+                return (
+                  <FlexItem key={condition}>
+                    <SynLabel color="grey">
+                      Step type{condition === 'resource_labels_not' ? ' except' : ''}: {labels.kind}
+                    </SynLabel>
+                  </FlexItem>
+                )
+              })}
           </Flex>
         </StackItem>
       ))}

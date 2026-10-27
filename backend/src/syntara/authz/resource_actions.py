@@ -213,6 +213,7 @@ def build_resource_actions(app: FastAPI) -> dict[str, list[str]]:
        registered ``APIRoute`` dependencies.
     2. ``BUILTIN_POLICIES`` entries (captures pairs like ``role-assignment:read``
        that are enforced via inline ``authorize()`` calls rather than route deps).
+    3. The explicit step-type authoring pair, which has no routes of its own.
 
     The result is sorted (resource types alphabetically, actions within each
     resource type alphabetically) to produce a deterministic, API-friendly
@@ -225,9 +226,12 @@ def build_resource_actions(app: FastAPI) -> dict[str, list[str]]:
     from syntara.authz.dependencies import PermissionChecker, ProjectScopeFilter, VisibilityFilter  # noqa: PLC0415
     from syntara.authz.role_conventions import BUILTIN_POLICIES  # noqa: PLC0415
     from syntara.core.router_discovery import iter_api_routes  # noqa: PLC0415
+    from syntara.workflows.node_kinds import NODE_ACTION_WRITE, NODE_RESOURCE_TYPE  # noqa: PLC0415
 
     pairs: set[tuple[str, str]] = set()
-    project_eligible: set[str] = {"project"}
+    # Step types live inside workflow definitions and have no routes to scan.
+    pairs.add((NODE_RESOURCE_TYPE, NODE_ACTION_WRITE))
+    project_eligible: set[str] = {"project", NODE_RESOURCE_TYPE}
 
     for route in iter_api_routes(app):
         for dep in _iter_route_deps(route):

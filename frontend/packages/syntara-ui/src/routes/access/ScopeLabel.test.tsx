@@ -3,12 +3,62 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import { axe } from 'vitest-axe'
 
-import { PolicyTypeLabel, ProjectLabel, ScopeLabel } from './ScopeLabel'
+import { PolicyTypeLabel, ProjectLabel, ScopeLabel, StatementsCell } from './ScopeLabel'
+import type { PolicyStatement } from './types'
+
+const stepStatement: PolicyStatement = {
+  effect: 'allow',
+  actions: ['step_type:write'],
+  scope: 'project',
+  conditions: { resource_labels: { kind: 'script' } },
+}
 
 const projectNameMap = new Map([
   ['proj-1', 'Alpha Project'],
   ['proj-2', 'Beta Project'],
 ])
+
+describe('StatementsCell step types', () => {
+  it('shows the step type alongside its action and scope', () => {
+    render(<StatementsCell statements={[stepStatement]} />)
+    expect(screen.getByText('Step type: script')).toBeInTheDocument()
+    expect(screen.getByText('step_type:write')).toBeInTheDocument()
+    expect(screen.getByText('scope: project')).toBeInTheDocument()
+  })
+
+  it('distinguishes excluded step types', () => {
+    render(
+      <StatementsCell statements={[{ ...stepStatement, conditions: { resource_labels_not: { kind: 'script' } } }]} />
+    )
+    expect(screen.getByText('Step type except: script')).toBeInTheDocument()
+  })
+
+  it.each([{}, { resource_labels: null }, { resource_labels: { kind: [] } }, { unrelated: { kind: 'script' } }])(
+    'omits a step label for absent or malformed kind conditions %j',
+    (conditions) => {
+      render(<StatementsCell statements={[{ ...stepStatement, conditions }]} />)
+      expect(screen.queryByText('Step type: script')).not.toBeInTheDocument()
+      expect(screen.getByText('step_type:write')).toBeInTheDocument()
+    }
+  )
+
+  it('does not interpret kind labels on other resource types', () => {
+    render(<StatementsCell statements={[{ ...stepStatement, actions: ['workflow:read'] }]} />)
+    expect(screen.queryByText('Step type: script')).not.toBeInTheDocument()
+    expect(screen.getByText('workflow:read')).toBeInTheDocument()
+  })
+
+  it('renders multiple kinds with the same action and scope accessibly', async () => {
+    const { container } = render(
+      <StatementsCell
+        statements={[stepStatement, { ...stepStatement, conditions: { resource_labels: { kind: 'manual_trigger' } } }]}
+      />
+    )
+    expect(screen.getByText('Step type: script')).toBeInTheDocument()
+    expect(screen.getByText('Step type: manual_trigger')).toBeInTheDocument()
+    expect(await axe(container)).toHaveNoViolations()
+  })
+})
 
 describe('PolicyTypeLabel', () => {
   it('has no accessibility violations for built-in policy', async () => {

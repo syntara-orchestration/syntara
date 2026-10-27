@@ -41,4 +41,5 @@ export {
 }
 
 export * from './interfaces.js'
+export { RegistryStepId, type RegistryStepIdUnion, NODE_KIND_BY_REGISTRY_ID } from './node-kinds.js'
 export { type OutputFieldDef, NODE_OUTPUT_SCHEMAS, getNodeOutputSchema } from './node-output-schemas.js'

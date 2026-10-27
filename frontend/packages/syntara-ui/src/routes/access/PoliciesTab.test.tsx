@@ -278,6 +278,25 @@ describe('PoliciesTab', () => {
     expect(screen.getByText('workflow:write')).toBeInTheDocument()
   })
 
+  it('shows a step type in the table and preserves it in the policy definition', async () => {
+    const user = userEvent.setup()
+    const statements = [
+      {
+        effect: 'allow',
+        scope: 'project',
+        actions: ['step_type:write'],
+        conditions: { resource_labels: { kind: 'script' } },
+      },
+    ]
+    setupPoliciesQuery([{ ...samplePolicies[1], statements }])
+    render(<PoliciesTab />, { wrapper })
+
+    expect(screen.getByText('Step type: script')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Kebab toggle' }))
+    await user.click(await screen.findByRole('menuitem', { name: /view policy definition/i }))
+    expect(within(screen.getByRole('dialog')).getByText(/"resource_labels":\{"kind":"script"\}/)).toBeInTheDocument()
+  })
+
   it('renders — for policies with no statements', () => {
     setupPoliciesQuery([{ ...samplePolicies[0], statements: [] }])
 
