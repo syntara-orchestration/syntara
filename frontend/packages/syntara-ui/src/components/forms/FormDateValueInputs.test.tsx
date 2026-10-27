@@ -17,7 +17,7 @@ describe('FormDateValueInputs', () => {
       />
     )
 
-    expect(screen.getByRole('textbox', { name: 'Due date' })).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'Due date' })).toHaveAttribute('placeholder', 'MM/DD/YYYY')
   })
 
   it('has no accessibility violations for date and time', async () => {
