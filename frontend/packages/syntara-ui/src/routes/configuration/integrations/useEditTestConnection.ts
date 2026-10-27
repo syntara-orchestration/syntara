@@ -7,7 +7,7 @@ import { getErrorMessage } from '../../../utils/apiErrors'
 
 import type { DiscoverResult, EditIntegrationFormValues, IntegrationRead } from './editIntegrationFormSchema'
 import { buildConfiguration } from './editIntegrationFormSchema'
-import { CREDENTIAL_REQUIRED_TYPES } from './integrationFilters'
+import { isIntegrationCredentialRequired } from './integrationFilters'
 import { isLLMProvider, getProviderHint } from './integrationUtils'
 
 export function useEditTestConnection(
@@ -17,29 +17,34 @@ export function useEditTestConnection(
   const { showAlert } = useAlerts()
   const { mutate: testConnection, isPending: isTesting } = integrationsClient.useMutation(
     'post',
-    '/integrations/discover'
+    integration?.integration_type === IntegrationTypeEnum.KAFKA
+      ? '/kafka_integrations/discover'
+      : '/integrations/discover'
   )
 
   const handleTestConnection = useCallback(() => {
     const values = getValues()
     const credId = values.management_credential_id
-    if (!integration || (!credId && CREDENTIAL_REQUIRED_TYPES.has(integration.integration_type))) return
+    if (
+      !integration ||
+      (!credId && isIntegrationCredentialRequired(integration.integration_type, values.security_protocol))
+    )
+      return
 
     const integrationType = integration.integration_type ?? IntegrationTypeEnum.MCP_SERVER
     const isLLMType = integrationType === IntegrationTypeEnum.LLM_PROVIDER
 
+    const configuration = buildConfiguration(
+      integrationType,
+      values,
+      isLLMProvider(integration) ? getProviderHint(integration) : undefined
+    )
+    const body =
+      configuration.integration_type === IntegrationTypeEnum.KAFKA
+        ? { integration_type: IntegrationTypeEnum.KAFKA, configuration, credential_id: credId ?? undefined }
+        : { integration_type: configuration.integration_type, configuration, credential_id: credId ?? undefined }
     testConnection(
-      {
-        body: {
-          integration_type: integrationType,
-          configuration: buildConfiguration(
-            integrationType,
-            values,
-            isLLMProvider(integration) ? getProviderHint(integration) : undefined
-          ),
-          credential_id: credId ?? undefined,
-        },
-      },
+      { body },
       {
         onSuccess: (result: DiscoverResult) => {
           if (result.success) {

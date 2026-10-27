@@ -1,8 +1,8 @@
-import type { IntegrationsAPI } from '@syntara/contracts'
 import { act, renderHook } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { EditIntegrationFormValues } from './editIntegrationFormSchema'
+import type { IntegrationRead } from './integrationTypes'
 import { useEditTestConnection } from './useEditTestConnection'
 
 const mockShowAlert = vi.fn()
@@ -17,8 +17,6 @@ vi.mock('../../../client', () => ({
     useMutation: vi.fn(() => ({ mutate: mockMutate, isPending: false })),
   },
 }))
-
-type IntegrationRead = IntegrationsAPI.components['schemas']['IntegrationRead']
 
 const BASE_INTEGRATION: IntegrationRead = {
   id: 'int-1',
@@ -42,6 +40,8 @@ const BASE_INTEGRATION: IntegrationRead = {
 
 function makeFormValues(overrides?: Partial<EditIntegrationFormValues>): EditIntegrationFormValues {
   return {
+    security_protocol: 'SASL_SSL',
+    allow_plaintext: false,
     name: 'Test',
     description: '',
     integration_type: 'mcp_server',

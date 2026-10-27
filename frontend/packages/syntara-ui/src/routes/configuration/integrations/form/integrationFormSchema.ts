@@ -1,7 +1,8 @@
-import { IntegrationTypeEnum, LLMProviderHintEnum, type IntegrationsAPI } from '@syntara/contracts'
+import { IntegrationTypeEnum, LLMProviderHintEnum } from '@syntara/contracts'
 import { z } from 'zod'
 
 import { PROVIDERS_REQUIRING_BASE_URL } from '../integrationFilters'
+import type { IntegrationConfiguration } from '../integrationTypes'
 import { bootstrapServersFieldError, parseBootstrapServers } from '../kafkaBootstrapServers'
 import { DEFAULT_KAFKA_SASL_MECHANISM } from '../kafkaSasl'
 
@@ -81,6 +82,8 @@ const kafkaSchema = z.object({
     .object({
       integration_type: z.literal(IntegrationTypeEnum.KAFKA),
       bootstrap_servers: z.string(),
+      security_protocol: z.enum(['SASL_SSL', 'SSL', 'PLAINTEXT']).default('SASL_SSL'),
+      allow_plaintext: z.boolean().default(false),
       sasl_mechanism: z.enum(['PLAIN', 'SCRAM-SHA-256', 'SCRAM-SHA-512']),
       ...securityFields,
     })
@@ -88,6 +91,13 @@ const kafkaSchema = z.object({
       const error = bootstrapServersFieldError(data.bootstrap_servers)
       if (error) {
         ctx.addIssue({ code: z.ZodIssueCode.custom, message: error, path: ['bootstrap_servers'] })
+      }
+      if (data.security_protocol === 'PLAINTEXT' && !data.allow_plaintext) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Confirm that unencrypted connections are allowed',
+          path: ['allow_plaintext'],
+        })
       }
       if (data.allow_http) {
         ctx.addIssue({
@@ -164,7 +174,12 @@ export function getStep1Fields(integrationType: string, scope?: string): string[
     case IntegrationTypeEnum.LLM_PROVIDER:
       return [...shared, 'configuration.provider_hint', 'configuration.base_url']
     case IntegrationTypeEnum.KAFKA:
-      return [...shared, 'configuration.bootstrap_servers']
+      return [
+        ...shared,
+        'configuration.bootstrap_servers',
+        'configuration.security_protocol',
+        'configuration.allow_plaintext',
+      ]
     default:
       return shared
   }
@@ -190,6 +205,8 @@ export function getDefaultConfiguration(integrationType: string): IntegrationFor
         integration_type: 'kafka' as const,
         bootstrap_servers: '',
         sasl_mechanism: DEFAULT_KAFKA_SASL_MECHANISM,
+        security_protocol: 'SASL_SSL',
+        allow_plaintext: false,
         ...SECURITY_DEFAULTS,
       }
     default:
@@ -210,7 +227,7 @@ export const PROVIDER_HINT_OPTIONS = [
   { value: LLMProviderHintEnum.CUSTOM, label: 'Custom' },
 ] as const
 
-type ApiConfiguration = NonNullable<IntegrationsAPI.components['schemas']['IntegrationCreate']['configuration']>
+type ApiConfiguration = IntegrationConfiguration
 
 /** Map form configuration to the API shape. Kafka brokers are a list, not the textarea string. */
 export function toApiConfiguration(configuration: IntegrationFormData['configuration']): ApiConfiguration {
@@ -219,6 +236,8 @@ export function toApiConfiguration(configuration: IntegrationFormData['configura
       integration_type: IntegrationTypeEnum.KAFKA,
       bootstrap_servers: parseBootstrapServers(configuration.bootstrap_servers),
       sasl_mechanism: configuration.sasl_mechanism,
+      security_protocol: configuration.security_protocol,
+      allow_plaintext: configuration.allow_plaintext,
       allow_http: false,
       insecure_skip_tls_verify: configuration.insecure_skip_tls_verify,
       ca_certificate: configuration.ca_certificate,

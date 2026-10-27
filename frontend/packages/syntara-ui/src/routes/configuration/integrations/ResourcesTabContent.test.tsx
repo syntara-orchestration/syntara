@@ -1,9 +1,10 @@
-import type { IntegrationsAPI, Tool } from '@syntara/contracts'
+import type { Tool } from '@syntara/contracts'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
+import type { IntegrationRead } from './integrationTypes'
 import { ResourcesTabContent } from './ResourcesTabContent'
 
 const capturedModelsProps: Record<string, unknown> = {}
@@ -39,7 +40,7 @@ const mockIntegration = {
   last_successful_refresh_at: '2024-01-01T00:00:00Z',
   refresh_status: 'warning',
   refresh_error: 'Default model no longer offered',
-} as IntegrationsAPI.components['schemas']['IntegrationRead']
+} as IntegrationRead
 
 function createModelsState(overrides: Record<string, unknown> = {}) {
   return {

@@ -30,6 +30,7 @@ from syntara.credentials.lib.injector_resolver import InjectorResolver
 from syntara.credentials.lib.kafka_connection import (
     KAFKA_CONNECTION_TYPE_NAME,
     KafkaSecurityProtocol,
+    kafka_credential_required,
     resolve_connector_kafka_login,
 )
 from syntara.integrations.adapters.factory import create_health_check_adapter
@@ -75,7 +76,7 @@ from syntara.integrations.models.integration import (
     IntegrationUpdate,
     RefreshResult,
 )
-from syntara.integrations.models.integration_configuration import IntegrationConfigurationInputTypes
+from syntara.integrations.models.integration_configuration import IntegrationConfigurationInputTypes, KafkaConfiguration
 from syntara.integrations.models.llm_model import LLMModel
 from syntara.integrations.services.model_profile_lookup import lookup_model_profile
 from syntara.settings.cache.settings_cache import get_runtime_settings
@@ -94,9 +95,15 @@ CREDENTIAL_REQUIRED_TYPES: frozenset[IntegrationType] = frozenset(
     {
         IntegrationType.LLM_PROVIDER,
         IntegrationType.ANSIBLE_AUTOMATION_PLATFORM,
-        IntegrationType.KAFKA,
     }
 )
+
+
+def _credential_required(integration_type: IntegrationType, configuration: IntegrationConfigurationInputTypes) -> bool:
+    if isinstance(configuration, KafkaConfiguration):
+        return kafka_credential_required(configuration.security_protocol)
+    return integration_type in CREDENTIAL_REQUIRED_TYPES
+
 
 _REFRESHABLE_TYPES: frozenset[IntegrationType] = frozenset(
     {
@@ -122,9 +129,12 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
         session: AsyncSession,
         user: User,
         secret_service: SecretService | None = None,
+        *,
+        integration_types: frozenset[IntegrationType] | None = None,
     ) -> None:
         """Initialize with database session, current user, and optional secret service."""
         super().__init__(session, user, convert_resource_mixin=IntegrationConvertResourceMixin())
+        self._integration_types = integration_types
         self._secret_service = secret_service
 
     def _is_duplicate_name_error(self, e: IntegrityError) -> bool:
@@ -226,7 +236,9 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
         result = await self.session.exec(query)
         integration = result.one_or_none()
 
-        if not integration:
+        if not integration or (
+            self._integration_types is not None and integration.integration_type not in self._integration_types
+        ):
             raise IntegrationNotFoundError(integration_id)
 
         return integration
@@ -439,7 +451,7 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
         """
         if data.management_credential_id is not None:
             await self._validate_credential_type(data.integration_type, data.management_credential_id)
-        elif data.integration_type in CREDENTIAL_REQUIRED_TYPES:
+        elif _credential_required(data.integration_type, data.configuration):
             raise IntegrationCredentialRequiredError(data.integration_type.value)
 
         self._validate_configuration_ssrf(data.configuration)
@@ -541,7 +553,18 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
             )
             id_restriction = self._intersect_id_restrictions(id_restriction, project_scoped_ids)
 
-        filtered_params = [(k, v) for k, v in query_params_items if k != "project_id"] if query_params_items else None
+        filtered_params = [(k, v) for k, v in query_params_items if k != "project_id"] if query_params_items else []
+        if self._integration_types is not None:
+            # Enforce the endpoint type restriction in the paginated/count query,
+            # rather than filtering a fetched page or loading every legacy ID.
+            legacy_types = {kind.value for kind in self._integration_types}
+            requested_types = dict(filtered_params).get("integration_type[in]")
+            if requested_types is not None:
+                legacy_types &= {value.strip() for value in requested_types.split(",")}
+            if not legacy_types:
+                id_restriction = []
+            filtered_params = [(k, v) for k, v in filtered_params if k != "integration_type[in]"]
+            filtered_params.append(("integration_type[in]", ",".join(sorted(legacy_types))))
 
         response = await self.list_resources(
             model=Integration,
@@ -631,11 +654,16 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
                 raise SafeValueError(msg)
             self._validate_configuration_ssrf(data.configuration)
 
-        if "management_credential_id" in data.model_fields_set:
-            if data.management_credential_id is not None:
-                await self._validate_credential_type(integration.integration_type, data.management_credential_id)
-            elif integration.integration_type in CREDENTIAL_REQUIRED_TYPES:
-                raise IntegrationCredentialRequiredError(integration.integration_type.value)
+        if "management_credential_id" in data.model_fields_set and data.management_credential_id is not None:
+            await self._validate_credential_type(integration.integration_type, data.management_credential_id)
+        credential_id = (
+            data.management_credential_id
+            if "management_credential_id" in data.model_fields_set
+            else integration.management_credential_id
+        )
+        configuration = data.configuration if data.configuration is not None else integration.configuration
+        if credential_id is None and _credential_required(integration.integration_type, configuration):
+            raise IntegrationCredentialRequiredError(integration.integration_type.value)
 
         if data.name is not None and data.name != integration.name:
             await self._raise_if_name_exists(data.name)
@@ -712,7 +740,9 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
         await self.session.flush()
         return await self._to_read_with_counts(integration)
 
-    async def _resolve_credential(self, credential_id: UUID) -> dict[str, object]:
+    async def _resolve_credential(
+        self, credential_id: UUID, *, security_protocol: str | None = None
+    ) -> dict[str, object]:
         """Resolve a credential to its extra_vars dict for adapter use.
 
         Fetches the credential, verifies it is enabled, decrypts its secret,
@@ -721,7 +751,7 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
         Raises:
             IntegrationCredentialNotFoundError: If the credential or its type is not found.
             CredentialDisabledError: If the credential is disabled.
-            CredentialValidationError: If a Kafka-backed credential fails its login rules.
+            CredentialValidationError: If a Kafka connection receives an invalid credential.
             CredentialDecryptionError: If the credential's secret cannot be decrypted.
             RuntimeError: If SecretService is not available.
 
@@ -734,13 +764,18 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
         credential, cred_type = await fetch_credential_with_type(self.session, credential_id)
         if not credential.enabled:
             raise CredentialDisabledError(credential.name)
-        if cred_type.name == KAFKA_CONNECTION_TYPE_NAME:
+        # A Kafka configuration must use the Kafka validator even when the
+        # supplied credential has another type. SSL/PLAINTEXT allow omission,
+        # but every credential supplied for them must still be valid.
+        if security_protocol is not None or cred_type.name == KAFKA_CONNECTION_TYPE_NAME:
             logger.debug("Resolving Kafka management credential", credential_id=str(credential_id))
             login = await resolve_connector_kafka_login(
                 self.session,
                 secret_service,
                 management_credential_id=credential_id,
-                security_protocol=KafkaSecurityProtocol.SASL_SSL,
+                security_protocol=security_protocol
+                if security_protocol is not None
+                else KafkaSecurityProtocol.SASL_SSL,
             )
             return dict(login or {})
         logger.debug("Resolving credential", credential_id=str(credential_id), credential_type=cred_type.name)
@@ -864,7 +899,9 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
             )
             raise
 
-        if integration.management_credential_id is None and integration.integration_type in CREDENTIAL_REQUIRED_TYPES:
+        if integration.management_credential_id is None and _credential_required(
+            integration.integration_type, integration.configuration
+        ):
             await self._fail_validation(
                 integration, IntegrationCredentialRequiredError(integration.integration_type.value)
             )
@@ -872,7 +909,14 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
         resolved_credential: dict[str, object] = {}
         if integration.management_credential_id:
             try:
-                resolved_credential = await self._resolve_credential(integration.management_credential_id)
+                resolved_credential = await self._resolve_credential(
+                    integration.management_credential_id,
+                    **(
+                        {"security_protocol": integration.configuration.security_protocol}
+                        if isinstance(integration.configuration, KafkaConfiguration)
+                        else {}
+                    ),
+                )
             except (CredentialDisabledError, CredentialValidationError, CredentialDecryptionError) as exc:
                 await self._fail_validation(integration, exc)
 
@@ -938,12 +982,19 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
         # create/patch, so without this the adapter would hit private/metadata targets.
         self._validate_configuration_ssrf(data.configuration)
 
-        if data.credential_id is None and data.integration_type in CREDENTIAL_REQUIRED_TYPES:
+        if data.credential_id is None and _credential_required(data.integration_type, data.configuration):
             raise IntegrationCredentialRequiredError(data.integration_type.value)
 
         resolved_credential: dict[str, object] = {}
         if data.credential_id is not None:
-            resolved_credential = await self._resolve_credential(data.credential_id)
+            resolved_credential = await self._resolve_credential(
+                data.credential_id,
+                **(
+                    {"security_protocol": data.configuration.security_protocol}
+                    if isinstance(data.configuration, KafkaConfiguration)
+                    else {}
+                ),
+            )
 
         timeout_seconds: int = await get_runtime_settings().get("integrations.connection_test_timeout_seconds")
 

@@ -44,6 +44,7 @@ vi.mock('./useProjectAssignmentSync', () => ({
 }))
 
 const mockNavigate = vi.fn()
+let mockPathname = '/configuration/integrations/int-1/edit'
 
 vi.mock('@tanstack/react-router', async () => {
   const actual = await vi.importActual('@tanstack/react-router')
@@ -52,6 +53,8 @@ vi.mock('@tanstack/react-router', async () => {
     ...actual,
     Link: MockLink,
     useNavigate: () => mockNavigate,
+    useRouterState: (options: { select: (state: { location: { pathname: string } }) => unknown }) =>
+      options.select({ location: { pathname: mockPathname } }),
     useParams: vi.fn(() => ({ integrationId: 'int-1' })),
   }
 })
@@ -181,7 +184,7 @@ function setupMutationMocks(patchMutateAsync?: ReturnType<typeof vi.fn>, discove
   const patchAsync = patchMutateAsync ?? vi.fn().mockResolvedValue({})
   const discover = discoverMutate ?? vi.fn()
   vi.mocked(integrationsClient.useMutation).mockImplementation((_method: string, path: string) => {
-    if (path === '/integrations/discover') {
+    if (path === '/integrations/discover' || path === '/kafka_integrations/discover') {
       return { mutate: discover, mutateAsync: discover, isPending: false, isError: false } as never
     }
     return { mutate: vi.fn(), mutateAsync: patchAsync, isPending: false, isError: false } as never
@@ -192,6 +195,7 @@ function setupMutationMocks(patchMutateAsync?: ReturnType<typeof vi.fn>, discove
 describe('EditIntegrationForm', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockPathname = '/configuration/integrations/int-1/edit'
     setupMocks()
     setupMutationMocks()
   })
@@ -781,8 +785,7 @@ describe('EditIntegrationForm', () => {
       name: 'Production Kafka',
       description: 'Brokers',
       integration_type: 'kafka',
-      configuration: null,
-      kafka_configuration: {
+      configuration: {
         integration_type: 'kafka',
         bootstrap_servers: ['broker.example.com:9093', 'other.example.com:9092'],
         sasl_mechanism: 'SCRAM-SHA-512',
@@ -793,10 +796,11 @@ describe('EditIntegrationForm', () => {
     }
 
     beforeEach(() => {
+      mockPathname = '/configuration/integrations/kafka/int-kafka-1/edit'
       setupMocks({ integration: mockKafkaIntegration })
     })
 
-    it('shows bootstrap servers from kafka_configuration and hides the API URL', () => {
+    it('shows bootstrap servers from configuration and hides the API URL', () => {
       render(<EditIntegrationForm />, { wrapper })
 
       expect(screen.getByText('Kafka')).toBeInTheDocument()
@@ -806,7 +810,7 @@ describe('EditIntegrationForm', () => {
       )
       expect(screen.getByText('SCRAM-SHA-512')).toBeInTheDocument()
       expect(screen.queryByRole('textbox', { name: /api url/i })).not.toBeInTheDocument()
-      expect(screen.getByText(/Kafka login used to verify that the brokers are reachable/i)).toBeInTheDocument()
+      expect(screen.getByText(/SASL_SSL uses this Kafka login/i)).toBeInTheDocument()
     })
 
     it('hides Allow HTTP so the connection stays SASL_SSL', async () => {
@@ -847,6 +851,8 @@ describe('EditIntegrationForm', () => {
                 integration_type: 'kafka',
                 bootstrap_servers: ['broker.example.com:9093', 'other.example.com:9092'],
                 sasl_mechanism: 'PLAIN',
+                security_protocol: 'SASL_SSL',
+                allow_plaintext: false,
                 allow_http: false,
                 insecure_skip_tls_verify: true,
                 ca_certificate: null,
@@ -871,11 +877,11 @@ describe('EditIntegrationForm', () => {
       expect(patchMutate).not.toHaveBeenCalled()
     })
 
-    it('starts from an empty broker list when kafka_configuration is missing', () => {
+    it('starts from an empty broker list when configuration is missing', () => {
       setupMocks({
         integration: {
           ...mockKafkaIntegration,
-          kafka_configuration: null,
+          configuration: undefined,
         },
       })
       render(<EditIntegrationForm />, { wrapper })
@@ -888,7 +894,7 @@ describe('EditIntegrationForm', () => {
       setupMocks({
         integration: {
           ...mockKafkaIntegration,
-          kafka_configuration: {
+          configuration: {
             integration_type: 'kafka',
             bootstrap_servers: 'broker.example.com:9093',
             sasl_mechanism: '',

@@ -64,15 +64,24 @@ def test_import_syntara_preloads_regopy_before_greenlet():
     assert "ORDER-OK" in result.stdout
 
 
-def test_missing_libatomic_is_tolerated_and_recorded(tmp_path):
-    """The known UBI loader gap (PR #560) must not break ``import syntara``."""
+@pytest.mark.parametrize(
+    "module",
+    ["syntara", "syntara.credentials.lib.kafka_connection", "tests.integration.fixtures.tools"],
+)
+def test_missing_libatomic_is_tolerated_and_recorded(tmp_path: Path, module: str) -> None:
+    """The UBI loader gap must not break model and E2E fixture imports."""
     (tmp_path / "regopy.py").write_text(f'raise OSError("{_UBI_LOADER_ERROR}")\n')
     result = _run_python(
-        """
+        f"""
+        import importlib
+        import sys
+
+        importlib.import_module({module!r})
         import syntara
 
         assert syntara._REGOPY_PRELOAD_ERROR is not None
         assert "cannot open shared object file" in syntara._REGOPY_PRELOAD_ERROR
+        assert "syntara.authz._rego_runtime" not in sys.modules
         print("SENTINEL-OK")
         """,
         extra_pythonpath=tmp_path,
