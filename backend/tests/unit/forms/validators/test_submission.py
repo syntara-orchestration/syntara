@@ -80,11 +80,36 @@ class TestSubmissionFlow:
         assert cleaned == {}
 
     @pytest.mark.parametrize("empty", ["", [], None])
-    def test_empty_values_treated_as_absent(self, empty: Any) -> None:  # noqa: ANN401
-        """Empty string/list/None normalize to absent."""
-        cleaned = validate_form_submission(_form(_field("text", "name")), {"name": empty})
+    def test_explicit_empty_value_clears_default(self, empty: Any) -> None:  # noqa: ANN401
+        """An explicit empty clears a text default and normalizes to a string."""
+        form = _form(_field("text", "name", default="anon"))
 
-        assert cleaned == {}
+        cleaned = validate_form_submission(form, {"name": empty})
+
+        assert cleaned == {"name": ""}
+
+    @pytest.mark.parametrize("empty", ["", [], None])
+    def test_required_explicit_empty_value_does_not_use_default(self, empty: Any) -> None:  # noqa: ANN401
+        """Explicit empties clear defaults but cannot satisfy a required field."""
+        form = _form(_field("text", "name", default="anon", required=True))
+
+        errors = _errors(form, {"name": empty})
+
+        assert [(error.field, error.code) for error in errors] == [("name", "required")]
+
+    def test_required_field_uses_nonempty_default_when_omitted(self) -> None:
+        """An omitted required field can be satisfied by its nonempty default."""
+        form = _form(_field("text", "name", default="anon", required=True))
+
+        assert validate_form_submission(form, {}) == {"name": "anon"}
+
+    def test_required_field_rejects_empty_default(self) -> None:
+        """The selected default must also be nonempty for a required field."""
+        form = _form(_field("text", "name", default="", required=True))
+
+        errors = _errors(form, {})
+
+        assert [(error.field, error.code) for error in errors] == [("name", "required")]
 
     def test_default_applied_when_absent(self) -> None:
         """A default fills in for an absent field."""

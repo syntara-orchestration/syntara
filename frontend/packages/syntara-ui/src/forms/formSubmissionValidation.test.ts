@@ -80,9 +80,10 @@ describe('validateFormSubmission', () => {
     expect(cleaned).toEqual({})
   })
 
-  it.each(['', [], null] as const)('treats empty values as absent for non-checkbox fields', (empty) => {
-    const cleaned = validateFormSubmission(form(field(FormFieldTypeEnum.TEXT, 'name')), { name: empty })
-    expect(cleaned).toEqual({})
+  it.each(['', [], null] as const)('normalizes explicit empty values without applying defaults', (empty) => {
+    const definition = form(field(FormFieldTypeEnum.TEXT, 'name', { default: 'anon' }))
+    const cleaned = validateFormSubmission(definition, { name: empty })
+    expect(cleaned).toEqual({ name: '' })
   })
 
   it('applies defaults when a field is absent', () => {
@@ -223,7 +224,7 @@ describe('validateFormSubmission', () => {
   it('rejects non-finite numbers and non-boolean checkbox payloads', () => {
     const definition = form(field(FormFieldTypeEnum.NUMBER, 'n'), field(FormFieldTypeEnum.CHECKBOX, 'c'))
 
-    expectValidationErrors(definition, { n: Number.NaN, c: null }, [
+    expectValidationErrors(definition, { n: Number.NaN, c: {} }, [
       ['n', 'type'],
       ['c', 'type'],
     ])
