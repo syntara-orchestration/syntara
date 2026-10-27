@@ -1,7 +1,7 @@
 """add event subscription operational controls
 
 Revision ID: 4469722de5b7
-Revises: 2b07573473d7
+Revises: 91f4c2e8a6bd
 Create Date: 2026-10-22 16:51:25.960083
 
 Stop existing ingestion/recovery workers before upgrading, then restart with
@@ -18,7 +18,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "4469722de5b7"
-down_revision: str | Sequence[str] | None = "2b07573473d7"
+down_revision: str | Sequence[str] | None = "91f4c2e8a6bd"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

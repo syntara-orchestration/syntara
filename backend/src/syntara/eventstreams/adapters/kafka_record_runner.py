@@ -116,8 +116,6 @@ class KafkaRecordRunner:
         work_semaphore: asyncio.Semaphore | None = None,
         lookup: TerminalDeliveryCache | None = None,
         gate: RecordProcessingGate | None = None,
-
-
         recovery_requests: EventRecoveryRequestService | None = None,
     ) -> None:
         """Compose completed services; callers may share a downstream concurrency bound."""
@@ -361,9 +359,12 @@ class KafkaRecordRunner:
             previous = self._partitions.get(partition)
             if previous is None:
                 self._partitions[partition] = _Partition(
-                    partition=partition, epoch=epoch, closing=self._closing,
+                    partition=partition,
+                    epoch=epoch,
+                    closing=self._closing,
                     held=HeldRecord(reason="activity_log_unavailable", permanent_content_error=True)
-                    if self._retained_content_gate else None,
+                    if self._retained_content_gate
+                    else None,
                 )
                 continue
             if previous.epoch == epoch:

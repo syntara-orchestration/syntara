@@ -23,8 +23,6 @@ from syntara.credentials.models.credential import Credential
 from syntara.credentials.models.credential_type import CredentialType
 from syntara.eventstreams.adapters.kafka_initial_position import KafkaPartitionInitialPosition
 from syntara.eventstreams.models.consumer_worker import EventConsumerWorker
-
-
 from syntara.eventstreams.models.control import EventSubscriptionRecovery, EventSubscriptionRuntime
 from syntara.eventstreams.models.delivery import EventDelivery
 from syntara.eventstreams.models.delivery_capacity import EventDeliveryCapacity

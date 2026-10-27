@@ -15,9 +15,12 @@ from syntara.authz.exceptions import AuthorizationDeniedError
 from syntara.core.exceptions import SafeValueError
 from syntara.eventstreams.adapters.kafka_initial_position import KafkaPartitionInitialPosition
 from syntara.eventstreams.adapters.kafka_parameters import KafkaSubscribeParameters
-from syntara.eventstreams.models.responses import EventSubscriptionSourceRead
 from syntara.eventstreams.models.control import EventSubscriptionRecovery, EventSubscriptionRuntime
-from syntara.eventstreams.models.responses import EventSubscriptionListParams, EventSubscriptionListResponse
+from syntara.eventstreams.models.responses import (
+    EventSubscriptionListParams,
+    EventSubscriptionListResponse,
+    EventSubscriptionSourceRead,
+)
 from syntara.eventstreams.services.inspection_service import EventSubscriptionInspectionService
 from syntara.integrations.models.integration_configuration import KafkaConfiguration
 from tests.unit.eventstreams.test_deduplication_store import NOW

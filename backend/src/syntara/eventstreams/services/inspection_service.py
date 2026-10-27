@@ -9,8 +9,6 @@ from sqlmodel import col, select
 from syntara.core.exceptions import SafeValueError
 from syntara.core.services import BaseService
 from syntara.credentials.lib.kafka_connection import KafkaSecurityProtocol, resolve_listener_kafka_login
-
-
 from syntara.eventstreams.adapters.kafka_initial_position import (
     KafkaPartitionInitialPosition,
     KafkaPartitionInitialPositionRead,

@@ -2618,7 +2618,18 @@ export interface components {
      * @enum {string}
      */
     GapReason:
-      'missing_commit' | 'out_of_range' | 'below_authorized_boundary' | 'source_recreated' | 'initial_metadata_missing'
+      | 'missing_commit'
+      | 'out_of_range'
+      | 'below_authorized_boundary'
+      | 'source_recreated'
+      | 'initial_metadata_missing'
+      | 'initialization_history_unavailable'
+    /**
+     * InitializationKind
+     * @description Immutable first-set membership, never inferred for historical rows.
+     * @enum {string}
+     */
+    InitializationKind: 'first_activation' | 'added_partition'
     /**
      * KafkaPartitionInitialPositionRead
      * @description Lossless metadata schema for later read/control callers; no route is added.
@@ -2631,6 +2642,7 @@ export interface components {
       source_id: string
       /** Partition */
       partition: number
+      initialization_kind: components['schemas']['InitializationKind'] | null
       /** Initial Next Offset */
       initial_next_offset: string | null
       /** Initialized At */

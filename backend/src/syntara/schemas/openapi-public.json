@@ -56006,10 +56006,20 @@
           "out_of_range",
           "below_authorized_boundary",
           "source_recreated",
-          "initial_metadata_missing"
+          "initial_metadata_missing",
+          "initialization_history_unavailable"
         ],
         "title": "GapReason",
         "description": "Safe persisted explanations; no broker messages or customer payloads."
+      },
+      "InitializationKind": {
+        "type": "string",
+        "enum": [
+          "first_activation",
+          "added_partition"
+        ],
+        "title": "InitializationKind",
+        "description": "Immutable first-set membership, never inferred for historical rows."
       },
       "KafkaPartitionInitialPositionRead": {
         "properties": {
@@ -56021,6 +56031,16 @@
           "partition": {
             "type": "integer",
             "title": "Partition"
+          },
+          "initialization_kind": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/InitializationKind"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "initial_next_offset": {
             "anyOf": [
@@ -56215,6 +56235,7 @@
         "required": [
           "source_id",
           "partition",
+          "initialization_kind",
           "initial_next_offset",
           "initialized_at",
           "initial_metadata_missing",
