@@ -39,12 +39,14 @@ test.describe('Stall detection global settings', () => {
   test('workflow inherits global expected_duration', async ({ app }) => {
     let originalValue: number | string | boolean | null = null
     let originalVersion: number | undefined
+    let defaultValue: number | string | boolean | null = null
 
     try {
       // Read current setting value and version for cleanup
       const current = await getSettingViaApi(app, SETTING_KEY)
       originalValue = current.value
       originalVersion = current.version
+      defaultValue = current.default_value
 
       // Set global expected duration to 3 seconds
       await updateSettingViaApi(app, SETTING_KEY, 3)
@@ -87,9 +89,13 @@ test.describe('Stall detection global settings', () => {
       }
     } finally {
       // Restore original setting value using latest version
+      // If original value was null (the default), restore to default value to avoid HTTP 422
       if (originalVersion !== undefined) {
         const latest = await getSettingViaApi(app, SETTING_KEY)
-        await updateSettingViaApi(app, SETTING_KEY, originalValue, latest.version)
+        const restoreValue = originalValue ?? defaultValue
+        if (restoreValue !== null) {
+          await updateSettingViaApi(app, SETTING_KEY, restoreValue, latest.version)
+        }
       }
     }
   })

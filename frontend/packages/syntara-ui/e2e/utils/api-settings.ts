@@ -11,7 +11,11 @@ import { apiRequest, getAuthToken } from './api-core'
 export async function getSettingViaApi(
   app: Page,
   key: string
-): Promise<{ value: number | string | boolean | null; version: number }> {
+): Promise<{
+  value: number | string | boolean | null
+  version: number
+  default_value: number | string | boolean | null
+}> {
   const token = await getAuthToken(app)
   if (!token) throw new Error('getSettingViaApi: could not obtain auth token')
 
@@ -21,7 +25,11 @@ export async function getSettingViaApi(
     throw new Error(`GET /settings/${key} returned ${resp.status()}: ${body}`)
   }
 
-  const body = (await resp.json()) as { value: number | string | boolean | null; version: number }
+  const body = (await resp.json()) as {
+    value: number | string | boolean | null
+    version: number
+    default_value: number | string | boolean | null
+  }
   return body
 }
 

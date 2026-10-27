@@ -46,7 +46,8 @@ test.describe('Stall detection false positives', () => {
       await waitForUIReady(app)
 
       // Wait for Activity 1 to complete
-      await expect(pageHeader(app).getByText('Completed')).toBeVisible({ timeout: 30_000 })
+      // Activity sleeps for 2 seconds, but allow time for execution startup and Temporal processing
+      await expect(pageHeader(app).getByText('Completed')).toBeVisible({ timeout: 60_000 })
 
       // Wait 15s to allow at least one worker scan cycle
       await app.waitForTimeout(15_000)

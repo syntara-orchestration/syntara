@@ -50,7 +50,8 @@ test.describe('Stall detection core behavior', () => {
       await waitForUIReady(app)
 
       // Assert: Activity is running (no stall yet) — proves WebSocket will deliver change
-      await expect(app.getByText('Activity 1')).toBeVisible({ timeout: 15_000 })
+      const activityRow = app.getByRole('row').filter({ hasText: 'Activity 1' })
+      await expect(activityRow).toBeVisible({ timeout: 15_000 })
       await assertNoStallWarning(app, 'Activity 1')
       await assertNoExecutionDelayedBadge(pageHeader(app))
 

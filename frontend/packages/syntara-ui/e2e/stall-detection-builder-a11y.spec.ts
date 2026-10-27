@@ -49,7 +49,8 @@ test.describe('Stall detection builder and accessibility', () => {
       await waitForUIReady(app)
 
       // Wait for stall detection
-      await waitForActivityStallWarning(app, 'Activity 1', 30_000)
+      // Timeout matches stall-detection-core: allows for periodic worker scan (10s interval) + execution startup
+      await waitForActivityStallWarning(app, 'Activity 1', 40_000)
 
       // Navigate back to builder to test execution panel
       await app.goto(toAppUrl(`/workflow-builder/${id}`))
