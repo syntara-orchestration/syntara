@@ -132,7 +132,7 @@ export function CredentialIntegrationsTab({
 }: Readonly<CredentialIntegrationsTabProps>) {
   const { paginate, getFooterProps } = useClientPagination()
 
-  const query = integrationsClient.useQuery('get', isKafkaCredential ? '/kafka-integrations' : '/integrations', {
+  const query = integrationsClient.useQuery('get', isKafkaCredential ? '/kafka_integrations' : '/integrations', {
     params: { query: { management_credential_id: credentialId } },
   })
   const integrations = query.data?.resources ?? []

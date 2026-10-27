@@ -12502,7 +12502,7 @@ paths:
         - bearerAuth: []
       tags:
         - Integrations
-  /kafka-integrations:
+  /kafka_integrations:
     get:
       tags:
         - Integrations
@@ -12835,7 +12835,7 @@ paths:
       x-app-permission:
         resource: integration
         action: create
-  /kafka-integrations/discover:
+  /kafka_integrations/discover:
     post:
       tags:
         - Integrations
@@ -12958,7 +12958,7 @@ paths:
       x-app-permission:
         resource: integration
         action: discover
-  /kafka-integrations/{integration_id}:
+  /kafka_integrations/{integration_id}:
     get:
       tags:
         - Integrations

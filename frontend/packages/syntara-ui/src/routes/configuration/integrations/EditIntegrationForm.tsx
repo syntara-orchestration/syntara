@@ -363,7 +363,7 @@ export function EditIntegrationForm() {
   )
   const { mutateAsync: patchKafkaIntegration, isPending: isKafkaSaving } = integrationsClient.useMutation(
     'patch',
-    '/kafka-integrations/{integration_id}'
+    '/kafka_integrations/{integration_id}'
   )
   const isSaving = isLegacySaving || isKafkaSaving
 

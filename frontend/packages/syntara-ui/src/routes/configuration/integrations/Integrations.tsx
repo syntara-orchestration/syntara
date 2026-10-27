@@ -203,13 +203,13 @@ export default function Integrations() {
   )
 
   const { integration_type: selectedType, ...kafkaQueryParams } = queryParams
-  const listPath = selectedType === IntegrationTypeEnum.KAFKA ? '/kafka-integrations' : '/integrations'
+  const listPath = selectedType === IntegrationTypeEnum.KAFKA ? '/kafka_integrations' : '/integrations'
 
   const query = integrationsClient.useQuery(
     'get',
     listPath,
     {
-      params: { query: listPath === '/kafka-integrations' ? kafkaQueryParams : queryParams },
+      params: { query: listPath === '/kafka_integrations' ? kafkaQueryParams : queryParams },
     },
     {
       refetchInterval: 30_000,

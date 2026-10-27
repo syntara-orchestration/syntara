@@ -19,7 +19,7 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "post",
-        "url": "/kafka-integrations/discover",
+        "url": "/kafka_integrations/discover",
     }
 
     _kwargs["json"] = body.to_dict()

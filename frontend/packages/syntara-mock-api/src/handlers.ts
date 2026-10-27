@@ -424,7 +424,7 @@ export const handlers = [
 
   // ── Integrations ──────────────────────────────────────────────────────────
 
-  ...(['integrations', 'kafka-integrations'] as const).map((resource) =>
+  ...(['integrations', 'kafka_integrations'] as const).map((resource) =>
     http.get(`/api/v1/${resource}`, ({ request }) => {
       const url = new URL(request.url)
       const nameContains = url.searchParams.get('name[contains]')
@@ -437,7 +437,7 @@ export const handlers = [
       const includeTotal = url.searchParams.get('include_total') === 'true'
 
       let filtered = integrations.filter(
-        (i) => (i.integration_type === IntegrationTypeEnum.KAFKA) === (resource === 'kafka-integrations')
+        (i) => (i.integration_type === IntegrationTypeEnum.KAFKA) === (resource === 'kafka_integrations')
       )
       if (nameContains) {
         const lower = nameContains.toLowerCase()
@@ -510,12 +510,12 @@ export const handlers = [
     })
   ),
 
-  ...(['integrations', 'kafka-integrations'] as const).map((resource) =>
+  ...(['integrations', 'kafka_integrations'] as const).map((resource) =>
     http.get(`/api/v1/${resource}/:integration_id`, ({ params }) => {
       const integration = integrations.find(
         (i) =>
           i.id === params.integration_id &&
-          (i.integration_type === IntegrationTypeEnum.KAFKA) === (resource === 'kafka-integrations')
+          (i.integration_type === IntegrationTypeEnum.KAFKA) === (resource === 'kafka_integrations')
       )
       if (!integration) {
         return HttpResponse.json(
@@ -533,10 +533,10 @@ export const handlers = [
     })
   ),
 
-  ...(['integrations', 'kafka-integrations'] as const).map((resource) =>
+  ...(['integrations', 'kafka_integrations'] as const).map((resource) =>
     http.post(`/api/v1/${resource}`, async (req) => {
       const body = (await req.request.json()) as Record<string, unknown>
-      if ((body.integration_type === IntegrationTypeEnum.KAFKA) !== (resource === 'kafka-integrations')) {
+      if ((body.integration_type === IntegrationTypeEnum.KAFKA) !== (resource === 'kafka_integrations')) {
         return HttpResponse.json({ title: 'Invalid integration type', code: 'VALIDATION_ERROR' }, { status: 422 })
       }
       const now = mockDate.now
@@ -617,12 +617,12 @@ export const handlers = [
     })
   ),
 
-  ...(['integrations', 'kafka-integrations'] as const).map((resource) =>
+  ...(['integrations', 'kafka_integrations'] as const).map((resource) =>
     http.patch(`/api/v1/${resource}/:integration_id`, async (req) => {
       const integration = integrations.find(
         (i) =>
           i.id === req.params.integration_id &&
-          (i.integration_type === IntegrationTypeEnum.KAFKA) === (resource === 'kafka-integrations')
+          (i.integration_type === IntegrationTypeEnum.KAFKA) === (resource === 'kafka_integrations')
       )
       if (!integration) {
         return HttpResponse.json(
@@ -707,10 +707,10 @@ export const handlers = [
     return new HttpResponse(null, { status: 204 })
   }),
 
-  ...(['integrations', 'kafka-integrations'] as const).map((resource) =>
+  ...(['integrations', 'kafka_integrations'] as const).map((resource) =>
     http.post(`/api/v1/${resource}/discover`, async (req) => {
       const body = (await req.request.json()) as { integration_type?: string }
-      if ((body.integration_type === IntegrationTypeEnum.KAFKA) !== (resource === 'kafka-integrations')) {
+      if ((body.integration_type === IntegrationTypeEnum.KAFKA) !== (resource === 'kafka_integrations')) {
         return HttpResponse.json({ title: 'Invalid integration type', code: 'VALIDATION_ERROR' }, { status: 422 })
       }
       if (body.integration_type === IntegrationTypeEnum.LLM_PROVIDER) {
@@ -725,7 +725,7 @@ export const handlers = [
           ],
         })
       }
-      if (resource === 'kafka-integrations')
+      if (resource === 'kafka_integrations')
         return HttpResponse.json({
           success: true,
           checked_at: mockDate.now,

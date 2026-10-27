@@ -67,7 +67,7 @@ export function getResourceNoun(integration: IntegrationRead, plural = true): st
 export function getIntegrationPaths(isKafka: boolean, integrationId: string) {
   const routes = isKafka
     ? {
-        resourcePath: '/kafka-integrations/{integration_id}' as const,
+        resourcePath: '/kafka_integrations/{integration_id}' as const,
         detail: AppRoute.Configuration.Integrations.KafkaDetail,
         edit: AppRoute.Configuration.Integrations.KafkaEdit,
       }

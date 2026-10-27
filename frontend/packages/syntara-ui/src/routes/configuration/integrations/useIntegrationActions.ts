@@ -25,7 +25,7 @@ export function useIntegrationActions(refetch: () => Promise<unknown>) {
   const { mutate: deleteIntegration } = integrationsClient.useMutation('delete', '/integrations/{integration_id}')
   const { mutate: patchKafkaIntegration } = integrationsClient.useMutation(
     'patch',
-    '/kafka-integrations/{integration_id}'
+    '/kafka_integrations/{integration_id}'
   )
   const { mutate: patchIntegration } = integrationsClient.useMutation('patch', '/integrations/{integration_id}')
 

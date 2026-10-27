@@ -301,7 +301,7 @@ export interface paths {
     patch: operations['bulk_update_integration_tools']
     trace?: never
   }
-  '/kafka-integrations': {
+  '/kafka_integrations': {
     parameters: {
       query?: never
       header?: never
@@ -325,7 +325,7 @@ export interface paths {
     patch?: never
     trace?: never
   }
-  '/kafka-integrations/discover': {
+  '/kafka_integrations/discover': {
     parameters: {
       query?: never
       header?: never
@@ -345,7 +345,7 @@ export interface paths {
     patch?: never
     trace?: never
   }
-  '/kafka-integrations/{integration_id}': {
+  '/kafka_integrations/{integration_id}': {
     parameters: {
       query?: never
       header?: never

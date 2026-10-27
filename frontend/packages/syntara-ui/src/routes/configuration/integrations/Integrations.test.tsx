@@ -756,7 +756,7 @@ describe('Integrations Component', () => {
       render(<Integrations />, { wrapper })
       const kafkaCall = vi
         .mocked(integrationsClient.useQuery)
-        .mock.calls.find(([, path]) => path === '/kafka-integrations')
+        .mock.calls.find(([, path]) => path === '/kafka_integrations')
       expect(kafkaCall?.[2]).toMatchObject({ params: { query: { 'name[contains]': 'orders' } } })
       expect(kafkaCall?.[2]).not.toMatchObject({ params: { query: { integration_type: 'kafka' } } })
     })

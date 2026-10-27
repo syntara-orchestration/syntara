@@ -30,7 +30,7 @@ test.describe('Kafka transport configuration', () => {
           'true'
         )
         const responsePromise = app.waitForResponse(
-          (response) => response.url().endsWith('/api/v1/kafka-integrations') && response.request().method() === 'POST'
+          (response) => response.url().endsWith('/api/v1/kafka_integrations') && response.request().method() === 'POST'
         )
         await app.getByRole('button', { name: 'Save integration', exact: true }).click()
         const response = await responsePromise
@@ -54,7 +54,7 @@ test.describe('Kafka transport configuration', () => {
         await app.getByRole('textbox', { name: 'Name', exact: true }).fill(`${name}-updated`)
         const patchResponse = app.waitForResponse(
           (response) =>
-            response.url().endsWith(`/api/v1/kafka-integrations/${id}`) && response.request().method() === 'PATCH'
+            response.url().endsWith(`/api/v1/kafka_integrations/${id}`) && response.request().method() === 'PATCH'
         )
         await app.getByRole('button', { name: 'Save integration', exact: true }).click()
         expect((await patchResponse).ok()).toBeTruthy()
