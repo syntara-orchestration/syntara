@@ -24,9 +24,9 @@ test.describe('Workflows - Create New Workflow', () => {
       await app.goto(toAppUrl('/workflows'))
       await expect(app.getByRole('heading', { level: 1, name: 'Workflows' })).toBeVisible()
 
-      const createButton = app.getByRole('button', { name: 'Create workflow' })
-      await expect(createButton).toBeVisible()
-      await createButton.click()
+      const createLink = app.getByRole('link', { name: 'Create workflow' })
+      await expect(createLink).toBeVisible()
+      await createLink.click()
 
       await expect(app).toHaveURL(/workflow-builder\/new/)
       await expect(app.getByRole('heading', { name: 'Select a trigger step' })).toBeVisible()
@@ -67,7 +67,7 @@ test.describe('Workflows - Create New Workflow', () => {
     await app.goto(toAppUrl('/workflows'))
     await expect(app.getByRole('heading', { level: 1, name: 'Workflows' })).toBeVisible()
 
-    await app.getByRole('button', { name: 'Create workflow' }).click()
+    await app.getByRole('link', { name: 'Create workflow' }).click()
 
     await expect(app).toHaveURL(/workflow-builder\/new/)
 
@@ -109,7 +109,7 @@ test.describe('Workflows - Create New Workflow', () => {
     try {
       // Create workflow via Create button
       await app.goto(toAppUrl('/workflows'))
-      await app.getByRole('button', { name: 'Create workflow' }).click()
+      await app.getByRole('link', { name: 'Create workflow' }).click()
 
       await expect(app).toHaveURL(/workflow-builder\/new/)
       await app.getByRole('button', { name: 'Manual trigger' }).click()
@@ -138,7 +138,7 @@ test.describe('Workflows - Create New Workflow', () => {
     try {
       // Create first workflow
       await app.goto(toAppUrl('/workflows'))
-      await app.getByRole('button', { name: 'Create workflow' }).click()
+      await app.getByRole('link', { name: 'Create workflow' }).click()
       await expect(app).toHaveURL(/workflow-builder\/new/)
 
       await app.getByRole('button', { name: 'Manual trigger' }).click()
@@ -153,7 +153,7 @@ test.describe('Workflows - Create New Workflow', () => {
 
       // Go back and create second workflow
       await app.goto(toAppUrl('/workflows'))
-      await app.getByRole('button', { name: 'Create workflow' }).click()
+      await app.getByRole('link', { name: 'Create workflow' }).click()
       await expect(app).toHaveURL(/workflow-builder\/new/)
 
       await app.getByRole('button', { name: 'Manual trigger' }).click()
