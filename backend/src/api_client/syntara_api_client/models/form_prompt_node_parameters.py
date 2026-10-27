@@ -9,7 +9,7 @@ from ..models.form_prompt_node_parameters_fallback_decision_type_0 import FormPr
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
-    from ..models.form_definition import FormDefinition
+    from ..models.form_prompt_definition import FormPromptDefinition
 
 
 T = TypeVar("T", bound="FormPromptNodeParameters")
@@ -20,7 +20,8 @@ class FormPromptNodeParameters:
     """Parameters for form prompt nodes.
 
     Attributes:
-        form_definition (FormDefinition): Complete form definition with fields and metadata.
+        form_definition (FormPromptDefinition): Authored form definition for a form prompt; resolved snapshots are
+            engine-only.
         message (None | str | Unset): Message shown above the form. Supports ${...} template expressions.
         responder_users (list[str] | None | Unset): Usernames allowed to respond. Empty/omitted = any user with
             form_prompt:submit.
@@ -35,7 +36,7 @@ class FormPromptNodeParameters:
         css_override (None | str | Unset): Custom CSS applied to the form view.
     """
 
-    form_definition: FormDefinition
+    form_definition: FormPromptDefinition
     message: None | str | Unset = UNSET
     responder_users: list[str] | None | Unset = UNSET
     responder_groups: list[str] | None | Unset = UNSET
@@ -132,10 +133,10 @@ class FormPromptNodeParameters:
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
-        from ..models.form_definition import FormDefinition
+        from ..models.form_prompt_definition import FormPromptDefinition
 
         d = dict(src_dict)
-        form_definition = FormDefinition.from_dict(d.pop("form_definition"))
+        form_definition = FormPromptDefinition.from_dict(d.pop("form_definition"))
 
         def _parse_message(data: object) -> None | str | Unset:
             if data is None:

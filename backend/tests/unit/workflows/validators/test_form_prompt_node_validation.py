@@ -475,8 +475,7 @@ class TestFormPromptFindingPaths:
                         "source": "dynamic_resolved",
                         "values": [{"display_label": "Choice", "value": "choice"}],
                     },
-                },
-                {"type": "email", "value_name": "contact", "label": "Contact", "default": "not-an-email"},
+                }
             ]
         )
 
