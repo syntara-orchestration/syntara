@@ -354,15 +354,7 @@ class MultiSelectField(_OptionSourceValidationMixin):
         return defaults
 
 
-CommonFormField = (
-    TextField
-    | TextAreaField
-    | MaskedTextField
-    | EmailField
-    | NumberField
-    | CheckboxField
-    | DateField
-)
+CommonFormField = TextField | TextAreaField | MaskedTextField | EmailField | NumberField | CheckboxField | DateField
 
 FormField = Annotated[CommonFormField | DropdownField | MultiSelectField, Discriminator("type")]
 
@@ -473,16 +465,12 @@ class FormPromptMultiSelectField(MultiSelectField):
 
 
 FormTriggerField = Annotated[
-    CommonFormField
-    | FormTriggerDropdownField
-    | FormTriggerMultiSelectField,
+    CommonFormField | FormTriggerDropdownField | FormTriggerMultiSelectField,
     Discriminator("type"),
 ]
 
 FormPromptField = Annotated[
-    CommonFormField
-    | FormPromptDropdownField
-    | FormPromptMultiSelectField,
+    CommonFormField | FormPromptDropdownField | FormPromptMultiSelectField,
     Discriminator("type"),
 ]
 
