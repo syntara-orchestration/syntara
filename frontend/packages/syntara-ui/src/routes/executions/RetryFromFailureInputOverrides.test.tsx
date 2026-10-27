@@ -195,10 +195,10 @@ describe('RetryFromFailureInputOverrides', () => {
     await enterDraft(user, '{')
     const invalidJsonMessage = screen.getByText('Enter a valid JSON object.')
     expect(invalidJsonMessage).toBeInTheDocument()
-    expect(screen.getByRole('textbox', { name: 'Parameters to override for Deploy step' })).toHaveAttribute(
-      'aria-describedby',
-      invalidJsonMessage.id
-    )
+    const editor = screen.getByRole('textbox', { name: 'Parameters to override for Deploy step' })
+    const describedById = editor.getAttribute('aria-describedby')
+    const describedByElement = describedById ? document.getElementById(describedById) : null
+    expect(describedByElement?.textContent).toContain('Enter a valid JSON object.')
     expect(onDraftChange).toHaveBeenLastCalledWith('step-a', '{', undefined, 'Enter a valid JSON object.')
 
     for (const value of ['null', '[]', '42']) {
