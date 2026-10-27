@@ -1,9 +1,10 @@
 """Integration tests for retry_from_failure endpoints (AAP-92820)."""
 
 import uuid
-from collections.abc import Generator
+from collections.abc import Awaitable, Callable, Generator
 from typing import Any
 from unittest.mock import AsyncMock, Mock
+from uuid import uuid4
 
 import pytest
 from fastapi import status
@@ -11,6 +12,7 @@ from httpx import AsyncClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from syntara.authz.models import Policy, Role, RoleAssignment
 from syntara.core.models import User
 from syntara.workflows.models.activity_execution import ActivityExecution, ActivityStatus
 from syntara.workflows.models.execution import Execution, ExecutionMode, ExecutionStatus
@@ -235,6 +237,28 @@ async def _eligible_execution(session: AsyncSession, workflow: Workflow, user: U
     execution = await _create_execution(session, workflow, user)
     await _add_failed_activity(session, execution)
     return execution
+
+
+async def _make_execution_run_only_user(
+    session: AsyncSession,
+    user_factory: Callable[..., Awaitable[User]],
+) -> User:
+    """Create a user who can run executions but cannot update workflows."""
+    user = await user_factory(username=f"retry-runner-{uuid4().hex[:8]}")
+    policy_name = f"retry-execution-run-{uuid4().hex[:8]}"
+    role_name = f"retry-execution-runner-{uuid4().hex[:8]}"
+    session.add(
+        Policy(
+            name=policy_name,
+            statements=[{"effect": "allow", "actions": ["execution:run"], "scope": "any"}],
+            labels={},
+        )
+    )
+    session.add(Role(name=role_name, policy_names=[policy_name], labels={}))
+    await session.flush()
+    session.add(RoleAssignment(principal_id=user.id, role_name=role_name))
+    await session.commit()
+    return user
 
 
 @pytest.mark.asyncio
@@ -504,6 +528,55 @@ class TestRetryExecution:
         _, kwargs = mock_temporal_service.start_workflow.call_args
         assert kwargs["workflow_metadata"]["retry"]["retry_from_execution_id"] == str(execution.id)
         assert kwargs["workflow_metadata"]["retry"]["eligible_point_ids"] == ["step_2"]
+
+    async def test_retry_without_overrides_requires_only_execution_run(
+        self,
+        auth_client: AsyncClient,
+        test_db_session: AsyncSession,
+        user_factory: Callable[..., Awaitable[User]],
+        auth_as: Callable[[User], None],
+        test_workflow: Workflow,
+        mock_temporal_service: Mock,
+    ) -> None:
+        """A run-only user can retry when they do not override workflow inputs."""
+        run_only_user = await _make_execution_run_only_user(test_db_session, user_factory)
+        execution = await _eligible_execution(test_db_session, test_workflow, run_only_user)
+        auth_as(run_only_user)
+
+        response = await auth_client.post(
+            f"/api/v1/executions/{execution.id}/retry_from_failure",
+            json={"retry_point_ids": ["step_2"]},
+        )
+
+        assert response.status_code == status.HTTP_201_CREATED
+        mock_temporal_service.start_workflow.assert_called_once()
+
+    async def test_retry_input_overrides_require_workflow_update_permission(
+        self,
+        auth_client: AsyncClient,
+        test_db_session: AsyncSession,
+        user_factory: Callable[..., Awaitable[User]],
+        auth_as: Callable[[User], None],
+        test_workflow: Workflow,
+        mock_temporal_service: Mock,
+    ) -> None:
+        """A run-only user cannot override inputs or create a retry execution."""
+        run_only_user = await _make_execution_run_only_user(test_db_session, user_factory)
+        execution = await _eligible_execution(test_db_session, test_workflow, run_only_user)
+        auth_as(run_only_user)
+
+        response = await auth_client.post(
+            f"/api/v1/executions/{execution.id}/retry_from_failure",
+            json={"retry_point_ids": ["step_2"], "input_parameter_overrides": {"step_2": {"code": "exit 0"}}},
+        )
+
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.json()["detail"] == "Not authorized to perform update on workflow"
+        mock_temporal_service.start_workflow.assert_not_called()
+        retries = await test_db_session.exec(
+            select(Execution).where(Execution.retried_from_execution_id == execution.id)
+        )
+        assert retries.first() is None
 
     async def test_retry_uses_retained_version_not_current(
         self,
