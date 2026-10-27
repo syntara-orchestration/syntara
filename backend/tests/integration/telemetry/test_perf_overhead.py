@@ -164,9 +164,17 @@ class TestTelemetryOverhead:
                 await _run_baseline(5)
                 await _run_with_telemetry(registry, 5)
 
-                # Measure
-                baseline = await _run_baseline(_ITERATIONS)
-                with_telemetry = await _run_with_telemetry(registry, _ITERATIONS)
+                # Pair measurements closely so changes in shared-runner load
+                # affect both modes. Alternate order to balance first-run bias.
+                baseline: list[float] = []
+                with_telemetry: list[float] = []
+                for iteration in range(_ITERATIONS):
+                    if iteration % 2 == 0:
+                        baseline.extend(await _run_baseline(1))
+                        with_telemetry.extend(await _run_with_telemetry(registry, 1))
+                    else:
+                        with_telemetry.extend(await _run_with_telemetry(registry, 1))
+                        baseline.extend(await _run_baseline(1))
 
                 mean_baseline = statistics.mean(baseline)
                 mean_telemetry = statistics.mean(with_telemetry)
