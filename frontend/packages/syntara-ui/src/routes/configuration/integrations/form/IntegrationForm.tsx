@@ -149,7 +149,7 @@ function useDiscoverConnection(getValues: () => IntegrationFormData, integration
 
   const { mutate: testConnection, isPending: isTesting } = integrationsClient.useMutation(
     'post',
-    integrationType === IntegrationTypeEnum.KAFKA ? '/kafka-integrations/discover' : '/integrations/discover'
+    integrationType === IntegrationTypeEnum.KAFKA ? '/kafka_integrations/discover' : '/integrations/discover'
   )
   const { showAlert } = useAlerts()
 

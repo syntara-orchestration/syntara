@@ -107,7 +107,7 @@ async def test_old_client_parses_pages_while_kafka_is_separate(
     assert excluded.json()["resources"] == []
     assert excluded.json()["total"] == 0
 
-    combined = await auth_client.get("/api/v1/kafka-integrations", params={"sort": "name", "include_total": "true"})
+    combined = await auth_client.get("/api/v1/kafka_integrations", params={"sort": "name", "include_total": "true"})
     assert combined.status_code == 200
     assert combined.json()["total"] == 1
     rows = combined.json()["resources"]
@@ -115,7 +115,7 @@ async def test_old_client_parses_pages_while_kafka_is_separate(
     assert rows[0]["configuration"]["security_protocol"] == "SSL"
     assert "kafka_configuration" not in rows[0]
     assert (await auth_client.get(f"/api/v1/integrations/{kafka.id}")).status_code == 404
-    assert (await auth_client.get(f"/api/v1/kafka-integrations/{kafka.id}")).status_code == 200
+    assert (await auth_client.get(f"/api/v1/kafka_integrations/{kafka.id}")).status_code == 200
 
 
 @pytest.mark.asyncio
@@ -206,23 +206,23 @@ async def test_kafka_writes_are_isolated_and_preserve_omitted_fields(auth_client
         },
     }
     with patch("syntara.integrations.services.integration_service.validate_integration_configuration_no_ssrf"):
-        created = await auth_client.post("/api/v1/kafka-integrations", json=payload)
+        created = await auth_client.post("/api/v1/kafka_integrations", json=payload)
     assert created.status_code == 201
     row = created.json()
     assert row["integration_type"] == "kafka"
     assert row["management_credential_id"] is None
     assert row["configuration"]["security_protocol"] == "SSL"
-    updated = await auth_client.patch(f"/api/v1/kafka-integrations/{row['id']}", json={"description": "Edited"})
+    updated = await auth_client.patch(f"/api/v1/kafka_integrations/{row['id']}", json={"description": "Edited"})
     assert updated.status_code == 200
     assert updated.json()["configuration"] == row["configuration"]
     assert (
         await auth_client.patch(f"/api/v1/integrations/{row['id']}", json={"description": "Legacy"})
     ).status_code == 404
     assert (
-        await auth_client.post("/api/v1/kafka-integrations", json={**payload, "integration_type": "mcp_server"})
+        await auth_client.post("/api/v1/kafka_integrations", json={**payload, "integration_type": "mcp_server"})
     ).status_code == 422
     no_sasl_login = await auth_client.patch(
-        f"/api/v1/kafka-integrations/{row['id']}",
+        f"/api/v1/kafka_integrations/{row['id']}",
         json={"configuration": {**configuration, "security_protocol": "SASL_SSL"}},
     )
     assert no_sasl_login.status_code == 422
@@ -241,12 +241,12 @@ async def test_kafka_resource_cannot_read_or_update_legacy_id(
     )
     test_db_session.add(legacy)
     await test_db_session.commit()
-    assert (await auth_client.get(f"/api/v1/kafka-integrations/{legacy.id}")).status_code == 404
+    assert (await auth_client.get(f"/api/v1/kafka_integrations/{legacy.id}")).status_code == 404
     assert (
-        await auth_client.patch(f"/api/v1/kafka-integrations/{legacy.id}", json={"enabled": False})
+        await auth_client.patch(f"/api/v1/kafka_integrations/{legacy.id}", json={"enabled": False})
     ).status_code == 404
     excluded = await auth_client.get(
-        "/api/v1/kafka-integrations", params={"integration_type[in]": "mcp_server", "include_total": "true"}
+        "/api/v1/kafka_integrations", params={"integration_type[in]": "mcp_server", "include_total": "true"}
     )
     assert excluded.status_code == 200
     assert excluded.json()["resources"] == []
@@ -281,13 +281,13 @@ async def test_kafka_filters_and_totals_apply_before_pagination(
     test_db_session.add_all(rows)
     await test_db_session.commit()
     params = {"limit": "1", "sort": "name", "include_total": "true", "enabled": "true", "name[contains]": "orders"}
-    first = await auth_client.get("/api/v1/kafka-integrations", params=params)
+    first = await auth_client.get("/api/v1/kafka_integrations", params=params)
     assert first.status_code == 200
     page = first.json()
     assert page["total"] == 2
     assert [item["name"] for item in page["resources"]] == ["A orders"]
     assert page["next"]
-    second = await auth_client.get("/api/v1/kafka-integrations", params={**params, "cursor": page["next"]})
+    second = await auth_client.get("/api/v1/kafka_integrations", params={**params, "cursor": page["next"]})
     assert second.status_code == 200
     assert second.json()["total"] == 2
     assert [item["name"] for item in second.json()["resources"]] == ["B orders"]

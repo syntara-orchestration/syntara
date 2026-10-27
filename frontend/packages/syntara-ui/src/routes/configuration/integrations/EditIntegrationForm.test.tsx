@@ -184,7 +184,7 @@ function setupMutationMocks(patchMutateAsync?: ReturnType<typeof vi.fn>, discove
   const patchAsync = patchMutateAsync ?? vi.fn().mockResolvedValue({})
   const discover = discoverMutate ?? vi.fn()
   vi.mocked(integrationsClient.useMutation).mockImplementation((_method: string, path: string) => {
-    if (path === '/integrations/discover' || path === '/kafka-integrations/discover') {
+    if (path === '/integrations/discover' || path === '/kafka_integrations/discover') {
       return { mutate: discover, mutateAsync: discover, isPending: false, isError: false } as never
     }
     return { mutate: vi.fn(), mutateAsync: patchAsync, isPending: false, isError: false } as never

@@ -18103,7 +18103,7 @@
         ]
       }
     },
-    "/kafka-integrations": {
+    "/kafka_integrations": {
       "get": {
         "tags": [
           "Integrations"
@@ -18606,7 +18606,7 @@
         }
       }
     },
-    "/kafka-integrations/discover": {
+    "/kafka_integrations/discover": {
       "post": {
         "tags": [
           "Integrations"
@@ -18785,7 +18785,7 @@
         }
       }
     },
-    "/kafka-integrations/{integration_id}": {
+    "/kafka_integrations/{integration_id}": {
       "get": {
         "tags": [
           "Integrations"

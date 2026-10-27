@@ -18,7 +18,7 @@ export function useEditTestConnection(
   const { mutate: testConnection, isPending: isTesting } = integrationsClient.useMutation(
     'post',
     integration?.integration_type === IntegrationTypeEnum.KAFKA
-      ? '/kafka-integrations/discover'
+      ? '/kafka_integrations/discover'
       : '/integrations/discover'
   )
 

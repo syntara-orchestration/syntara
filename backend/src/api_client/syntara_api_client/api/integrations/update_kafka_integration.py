@@ -21,7 +21,7 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "patch",
-        "url": f"/kafka-integrations/{integration_id}",
+        "url": f"/kafka_integrations/{integration_id}",
     }
 
     _kwargs["json"] = body.to_dict()

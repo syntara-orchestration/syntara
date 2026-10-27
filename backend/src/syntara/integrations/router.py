@@ -683,7 +683,7 @@ async def update_integration_tool(
 
 
 @router.get(
-    "/kafka-integrations",
+    "/kafka_integrations",
     dependencies=[Depends(_read_gate), Depends(_read_all_scope)],
     operation_id="list_kafka_integrations",
 )
@@ -707,7 +707,7 @@ async def list_kafka_integrations(
 
 
 @router.post(
-    "/kafka-integrations",
+    "/kafka_integrations",
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(_perm_create)],
     operation_id="create_kafka_integration",
@@ -723,7 +723,7 @@ async def create_kafka_integration(
 
 
 @router.post(
-    "/kafka-integrations/discover",
+    "/kafka_integrations/discover",
     dependencies=[Depends(_perm_discover)],
     operation_id="discover_kafka_integration_connection",
 )
@@ -737,7 +737,7 @@ async def discover_kafka_integration_connection(
 
 
 @router.get(
-    "/kafka-integrations/{integration_id}",
+    "/kafka_integrations/{integration_id}",
     dependencies=[Depends(_read_gate), Depends(_read_all_scope)],
     operation_id="get_kafka_integration",
 )
@@ -752,7 +752,7 @@ async def get_kafka_integration(
 
 
 @router.patch(
-    "/kafka-integrations/{integration_id}",
+    "/kafka_integrations/{integration_id}",
     dependencies=[Depends(_perm_update)],
     operation_id="update_kafka_integration",
 )

@@ -28,7 +28,7 @@ type InitialToolSelection = {
 type InitialModelSelection = IntegrationsAPI.components['schemas']['InitialModelSelection']
 
 export function useCreateIntegration({ handleError, onBeforeNavigate }: UseCreateIntegrationOptions) {
-  const { mutateAsync: createKafkaIntegration } = integrationsClient.useMutation('post', '/kafka-integrations')
+  const { mutateAsync: createKafkaIntegration } = integrationsClient.useMutation('post', '/kafka_integrations')
   const { mutateAsync: createIntegration } = integrationsClient.useMutation('post', '/integrations')
   const { syncAssignments } = useProjectAssignmentSync()
   const queryClient = useQueryClient()
