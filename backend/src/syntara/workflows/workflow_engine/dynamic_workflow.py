@@ -377,7 +377,7 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         if is_cancellation:
             namespace_entry["status"] = "cancelled"
             self._cancelled_node = node_id
-            # TODO(https://redhat.atlassian.net/browse/AAP-86855): cancelled nodes are not in failed_nodes
+            # TODO: cancelled nodes are not in failed_nodes  # noqa: TD002, TD003
             # or skipped_nodes, so _mark_downstream_as_skipped is a no-op (it
             # requires predecessors in one of those sets), converge ALL-strategy
             # treats the cancelled branch as successful, and

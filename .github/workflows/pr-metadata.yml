@@ -1,0 +1,81 @@
+---
+# Enforce the PR metadata conventions documented in AGENTS.md:
+#
+# - PR title ("Commit Messages and PR Titles"): Conventional Commits format.
+#   PR titles become the squash-merge commit subject, so they follow the same
+#   rules as commit messages, plus: no square brackets and no internal Jira
+#   keys. Style issues (length, casing, trailing period) are warnings only.
+# - PR description ("No Jira References in Code or Docs"): Jira work items are
+#   referenced by plain issue key, never by Jira URL.
+#
+# Uses `pull_request` (read-only token, no secrets) and passes the title and
+# body through env vars, so fork PRs and untrusted text are safe to evaluate.
+name: PR Metadata
+
+on:
+  pull_request:
+    # `edited` fires for both title and description changes.
+    types: [opened, edited, reopened, synchronize]
+  # Reported so these can be required checks; the jobs are skipped in the merge
+  # queue (the metadata was already validated on the PR) and GitHub treats a
+  # skipped required check as satisfied.
+  merge_group:
+    branches: [devel, early-access]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-metadata-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pr-title:
+    name: PR title
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: '22.13.0'
+          cache: 'npm'
+          cache-dependency-path: .github/scripts/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: .github/scripts
+
+      - name: Check PR title
+        run: npm run check:pr-title
+        working-directory: .github/scripts
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+
+  pr-description:
+    name: PR description
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: '22.13.0'
+          cache: 'npm'
+          cache-dependency-path: .github/scripts/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: .github/scripts
+
+      - name: Check PR description
+        run: npm run check:pr-description
+        working-directory: .github/scripts
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
