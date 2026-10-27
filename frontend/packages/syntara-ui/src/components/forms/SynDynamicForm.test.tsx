@@ -159,6 +159,9 @@ describe('SynDynamicForm', () => {
     const count = screen.getByRole('spinbutton', { name: 'Count' })
     expect(count).toHaveValue(5)
 
+    await user.clear(count)
+    expect(count).toHaveValue(null)
+
     await user.type(count, '5')
     expect(count).toHaveValue(5)
 
