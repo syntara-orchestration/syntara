@@ -85,8 +85,8 @@ describe('EditKafkaFields', () => {
     await user.click(screen.getByText('SCRAM-SHA-256'))
     await user.click(screen.getByRole('option', { name: 'PLAIN' }))
 
-    expect(screen.getByText('PLAIN')).toBeInTheDocument()
-    expect(screen.queryByRole('option', { name: 'SCRAM-SHA-512' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'PLAIN' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'PLAIN' })).toHaveAttribute('aria-expanded', 'false')
   })
 
   it('has no accessibility violations', async () => {

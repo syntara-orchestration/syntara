@@ -9,11 +9,12 @@ from typing import Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
-from aiokafka.client import AIOKafkaClient
+from aiokafka import client as aiokafka_client
 from aiokafka.errors import AuthenticationFailedError, KafkaConnectionError, KafkaError, KafkaTimeoutError
 
 from syntara.integrations.adapters.kafka import KafkaAdapter
 from syntara.integrations.adapters.protocol import HealthCheckErrorType, IntegrationAdapter
+from syntara.integrations.lib.kafka_connection import KafkaHealthClient
 from syntara.integrations.models.integration_configuration import KafkaConfiguration
 
 _BROKERS = ["broker.example.com:9093"]
@@ -62,7 +63,7 @@ class TestKafkaValidateSuccess:
     ) -> None:
         """A completed bootstrap returns success=True and closes the client."""
         client = _client_mock()
-        with patch("syntara.integrations.adapters.kafka.AIOKafkaClient", return_value=client) as constructor:
+        with patch("syntara.integrations.adapters.kafka.KafkaHealthClient", return_value=client) as constructor:
             adapter = KafkaAdapter(kafka_config)
             result = await adapter.validate(resolved_credential, timeout_seconds=10)
 
@@ -89,7 +90,7 @@ class TestKafkaValidateSuccess:
         client = _client_mock()
         password_with_spaces = f"  {_PASSWORD}  "
         credential = {**resolved_credential, "kafka_password": password_with_spaces}
-        with patch("syntara.integrations.adapters.kafka.AIOKafkaClient", return_value=client) as constructor:
+        with patch("syntara.integrations.adapters.kafka.KafkaHealthClient", return_value=client) as constructor:
             result = await KafkaAdapter(kafka_config).validate(credential, timeout_seconds=10)
 
         assert result.success is True
@@ -104,7 +105,7 @@ class TestKafkaValidateSuccess:
             sasl_mechanism="SCRAM-SHA-256",
             allow_http=True,
         )
-        with patch("syntara.integrations.adapters.kafka.AIOKafkaClient") as constructor:
+        with patch("syntara.integrations.adapters.kafka.KafkaHealthClient") as constructor:
             result = await KafkaAdapter(config).validate(resolved_credential, timeout_seconds=5)
 
         assert result.success is False
@@ -118,7 +119,7 @@ class TestKafkaValidateSuccess:
         """A cluster that uses SASL/PLAIN sends that mechanism to the client."""
         config = KafkaConfiguration(bootstrap_servers=_BROKERS, sasl_mechanism="PLAIN")
         client = _client_mock()
-        with patch("syntara.integrations.adapters.kafka.AIOKafkaClient", return_value=client) as constructor:
+        with patch("syntara.integrations.adapters.kafka.KafkaHealthClient", return_value=client) as constructor:
             result = await KafkaAdapter(config).validate(resolved_credential, timeout_seconds=5)
 
         assert result.success is True
@@ -142,7 +143,7 @@ class TestKafkaValidateAuth:
         self, kafka_config: KafkaConfiguration, credential: dict[str, Any]
     ) -> None:
         """Blank username or password returns AUTH_FAILURE without constructing a client."""
-        with patch("syntara.integrations.adapters.kafka.AIOKafkaClient") as constructor:
+        with patch("syntara.integrations.adapters.kafka.KafkaHealthClient") as constructor:
             result = await KafkaAdapter(kafka_config).validate(credential, timeout_seconds=10)
 
         constructor.assert_not_called()
@@ -158,7 +159,7 @@ class TestKafkaValidateErrors:
         """A broker timeout is reported as TIMEOUT and the client is closed."""
         client = _client_mock()
         client.bootstrap.side_effect = KafkaTimeoutError("timed out")
-        with patch("syntara.integrations.adapters.kafka.AIOKafkaClient", return_value=client):
+        with patch("syntara.integrations.adapters.kafka.KafkaHealthClient", return_value=client):
             result = await KafkaAdapter(kafka_config).validate(resolved_credential, timeout_seconds=3)
 
         assert result.success is False
@@ -170,7 +171,7 @@ class TestKafkaValidateErrors:
         """An SSL failure is reported as SSL_ERROR."""
         client = _client_mock()
         client.bootstrap.side_effect = ssl.SSLError("certificate verify failed")
-        with patch("syntara.integrations.adapters.kafka.AIOKafkaClient", return_value=client):
+        with patch("syntara.integrations.adapters.kafka.KafkaHealthClient", return_value=client):
             result = await KafkaAdapter(kafka_config).validate(resolved_credential, timeout_seconds=3)
 
         assert result.success is False
@@ -183,7 +184,7 @@ class TestKafkaValidateErrors:
         """A broker connection failure is reported as CONNECTION_ERROR."""
         client = _client_mock()
         client.bootstrap.side_effect = KafkaConnectionError("connection refused")
-        with patch("syntara.integrations.adapters.kafka.AIOKafkaClient", return_value=client):
+        with patch("syntara.integrations.adapters.kafka.KafkaHealthClient", return_value=client):
             result = await KafkaAdapter(kafka_config).validate(resolved_credential, timeout_seconds=3)
 
         assert result.success is False
@@ -196,7 +197,7 @@ class TestKafkaValidateErrors:
         """A SASL failure is reported as AUTH_FAILURE."""
         client = _client_mock()
         client.bootstrap.side_effect = KafkaError("SaslAuthenticationFailed")
-        with patch("syntara.integrations.adapters.kafka.AIOKafkaClient", return_value=client):
+        with patch("syntara.integrations.adapters.kafka.KafkaHealthClient", return_value=client):
             result = await KafkaAdapter(kafka_config).validate(resolved_credential, timeout_seconds=3)
 
         assert result.success is False
@@ -207,8 +208,8 @@ class TestKafkaValidateErrors:
 class TestKafkaRealBootstrap:
     """bootstrap() itself, with the failure injected at the connection layer.
 
-    Mocking ``AIOKafkaClient.bootstrap`` skips the loop that catches each
-    broker's error and replaces it with a generic KafkaConnectionError.
+    Keep the real broker-attempt loop so connection errors and the overall
+    deadline are exercised below the adapter mock boundary.
     """
 
     @pytest.mark.asyncio
@@ -241,7 +242,7 @@ class TestKafkaRealBootstrap:
             raise failure
 
         config = KafkaConfiguration(bootstrap_servers=["broker-a.example:9093", "broker-b.example:9093"])
-        with patch("aiokafka.client.create_conn", fail_create_conn):
+        with patch("syntara.integrations.lib.kafka_connection._PinnedKafkaConnection.connect", fail_create_conn):
             result = await KafkaAdapter(config).validate(resolved_credential, timeout_seconds=1)
 
         assert attempts == 2
@@ -254,8 +255,8 @@ class TestKafkaRealBootstrap:
         """One deadline covers every broker, and cancelling the attempt closes the client."""
         attempts = 0
         attempt_finished = False
-        closed: list[AIOKafkaClient] = []
-        real_close = AIOKafkaClient.close
+        closed: list[KafkaHealthClient] = []
+        real_close = KafkaHealthClient.close
 
         async def hang_create_conn(*_args: object, **_kwargs: object) -> None:
             nonlocal attempts, attempt_finished
@@ -263,15 +264,15 @@ class TestKafkaRealBootstrap:
             await asyncio.sleep(8)
             attempt_finished = True
 
-        async def spy_close(self: AIOKafkaClient) -> None:
+        async def spy_close(self: KafkaHealthClient) -> None:
             closed.append(self)
             await real_close(self)
 
         config = KafkaConfiguration(bootstrap_servers=["broker-a.example:9093", "broker-b.example:9093"])
         started = time.monotonic()
         with (
-            patch("aiokafka.client.create_conn", hang_create_conn),
-            patch.object(AIOKafkaClient, "close", spy_close),
+            patch("syntara.integrations.lib.kafka_connection._PinnedKafkaConnection.connect", hang_create_conn),
+            patch.object(KafkaHealthClient, "close", spy_close),
         ):
             result = await KafkaAdapter(config).validate(resolved_credential, timeout_seconds=1)
         elapsed = time.monotonic() - started
@@ -285,6 +286,87 @@ class TestKafkaRealBootstrap:
         assert len(closed) == 1
 
 
+class TestKafkaConcurrentValidation:
+    """Concurrent health checks leave module globals alone and keep caller deadlines."""
+
+    @pytest.mark.asyncio
+    async def test_overlapping_checks_never_replace_the_connection_factory(
+        self, kafka_config: KafkaConfiguration, resolved_credential: dict[str, Any]
+    ) -> None:
+        entered = asyncio.Event()
+        release = asyncio.Event()
+        attempts = 0
+
+        async def fail_connection(*_args: object, **_kwargs: object) -> None:
+            nonlocal attempts
+            attempts += 1
+            if attempts == 1:
+                entered.set()
+                await release.wait()
+            msg = "password rejected"
+            raise AuthenticationFailedError(msg)
+
+        original_factory = aiokafka_client.create_conn
+        with patch("syntara.integrations.lib.kafka_connection._PinnedKafkaConnection.connect", fail_connection):
+            first = asyncio.create_task(KafkaAdapter(kafka_config).validate(resolved_credential, 5))
+            await entered.wait()
+            second = asyncio.create_task(KafkaAdapter(kafka_config).validate(resolved_credential, 5))
+            await asyncio.sleep(0)
+            release.set()
+            results = await asyncio.gather(first, second)
+            assert aiokafka_client.create_conn is original_factory
+
+            third = await KafkaAdapter(kafka_config).validate(resolved_credential, 5)
+            assert aiokafka_client.create_conn is original_factory
+
+        assert attempts == 3
+        assert all(result.error_type == HealthCheckErrorType.AUTH_FAILURE for result in [*results, third])
+
+    @pytest.mark.asyncio
+    async def test_slow_check_does_not_delay_another_checks_timeout(
+        self, kafka_config: KafkaConfiguration, resolved_credential: dict[str, Any]
+    ) -> None:
+        entered = asyncio.Event()
+        release = asyncio.Event()
+        attempts = 0
+        closed: list[KafkaHealthClient] = []
+        original_close = KafkaHealthClient.close
+
+        async def wait_for_release(*_args: object, **_kwargs: object) -> None:
+            nonlocal attempts
+            attempts += 1
+            entered.set()
+            await release.wait()
+            msg = "closed"
+            raise KafkaConnectionError(msg)
+
+        async def close_client(client: KafkaHealthClient) -> None:
+            closed.append(client)
+            await original_close(client)
+
+        original_factory = aiokafka_client.create_conn
+        with (
+            patch("syntara.integrations.lib.kafka_connection._PinnedKafkaConnection.connect", wait_for_release),
+            patch.object(KafkaHealthClient, "close", close_client),
+        ):
+            first = asyncio.create_task(KafkaAdapter(kafka_config).validate(resolved_credential, 5))
+            await entered.wait()
+            started = time.monotonic()
+            try:
+                second = await KafkaAdapter(kafka_config).validate(resolved_credential, 1)
+                elapsed = time.monotonic() - started
+                assert second.error_type == HealthCheckErrorType.TIMEOUT
+                assert elapsed < 2
+                assert not first.done()
+                assert attempts == 2
+            finally:
+                release.set()
+                await first
+            assert aiokafka_client.create_conn is original_factory
+
+        assert len(closed) == 2
+
+
 class TestKafkaDiscover:
     """discover() is a connectivity check with no resources."""
 
@@ -294,7 +376,7 @@ class TestKafkaDiscover:
     ) -> None:
         """A successful discover returns empty tool and model lists."""
         client = _client_mock()
-        with patch("syntara.integrations.adapters.kafka.AIOKafkaClient", return_value=client):
+        with patch("syntara.integrations.adapters.kafka.KafkaHealthClient", return_value=client):
             result = await KafkaAdapter(kafka_config).discover(resolved_credential, timeout_seconds=10)
 
         assert result.success is True
@@ -310,7 +392,7 @@ class TestKafkaTlsContext:
         """insecure_skip_tls_verify builds a context that does not check certificates."""
         config = KafkaConfiguration(bootstrap_servers=_BROKERS, insecure_skip_tls_verify=True)
         client = _client_mock()
-        with patch("syntara.integrations.adapters.kafka.AIOKafkaClient", return_value=client) as constructor:
+        with patch("syntara.integrations.adapters.kafka.KafkaHealthClient", return_value=client) as constructor:
             await KafkaAdapter(config).validate(resolved_credential, timeout_seconds=5)
 
         context = constructor.call_args.kwargs["ssl_context"]
@@ -331,3 +413,16 @@ class TestKafkaTlsContext:
             context = adapter._ssl_context()
         assert isinstance(context, ssl.SSLContext)
         load_ca.assert_called_once()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(("protocol", "opt_in"), [("SSL", False), ("PLAINTEXT", True)])
+async def test_unauthenticated_transport_does_not_require_a_login(protocol: str, *, opt_in: bool) -> None:
+    config = KafkaConfiguration(bootstrap_servers=_BROKERS, security_protocol=protocol, allow_plaintext=opt_in)
+    client = _client_mock()
+    with patch("syntara.integrations.adapters.kafka.KafkaHealthClient", return_value=client) as constructor:
+        result = await KafkaAdapter(config).validate({}, timeout_seconds=5)
+    assert result.success
+    assert constructor.call_args.kwargs["security_protocol"] == protocol
+    assert constructor.call_args.kwargs["sasl_plain_username"] is None
+    assert (constructor.call_args.kwargs["ssl_context"] is None) == (protocol == "PLAINTEXT")

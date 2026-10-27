@@ -270,6 +270,8 @@ describe('buildEditSchema', () => {
 
 describe('buildConfiguration', () => {
   const baseValues = {
+    security_protocol: 'SASL_SSL' as const,
+    allow_plaintext: false,
     name: 'Test',
     description: '',
     integration_type: 'mcp_server',
@@ -299,6 +301,8 @@ describe('buildConfiguration', () => {
         integration_type: 'kafka',
         bootstrap_servers: ['broker.example.com:9093', 'other.example.com:9092'],
         sasl_mechanism: 'SCRAM-SHA-256',
+        security_protocol: 'SASL_SSL',
+        allow_plaintext: false,
         ...expectedSecurityDefaults,
       })
     })
@@ -398,4 +402,15 @@ describe('buildConfiguration', () => {
       })
     })
   })
+})
+
+it('requires explicit plaintext opt-in for Kafka edits', () => {
+  const data = {
+    ...validMcp,
+    integration_type: 'kafka',
+    bootstrap_servers: 'broker.example.com:9092',
+    security_protocol: 'PLAINTEXT',
+  }
+  expect(schema.safeParse(data).success).toBe(false)
+  expect(schema.safeParse({ ...data, allow_plaintext: true }).success).toBe(true)
 })

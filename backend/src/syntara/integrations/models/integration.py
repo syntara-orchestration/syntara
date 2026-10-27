@@ -24,13 +24,21 @@ from syntara.core.utils.sqlmodel import DiscriminatedJSONB, postgres_enum_column
 from syntara.integrations.models.integration_configuration import (
     IntegrationConfiguration,
     IntegrationConfigurationInputTypes,
-    IntegrationConfigurationReadTypes,
     IntegrationConfigurationTypes,
-    KafkaConfiguration,
 )
 
 _ENABLED_DESCRIPTION = "Whether the integration is active"
 _CONFIGURATION_DESCRIPTION = "Integration-specific configuration"
+
+
+def validate_configuration_type(integration_type: str, configuration_type: str) -> None:
+    """Require the discriminator to match the selected integration type."""
+    if configuration_type != integration_type:
+        msg = (
+            f"integration_type '{integration_type}' does not match "
+            f"configuration.integration_type '{configuration_type}'"
+        )
+        raise ValueError(msg)
 
 
 class IntegrationType(StrEnum):
@@ -307,8 +315,8 @@ class InitialModelSelection(SQLModel):
     is_default: bool = Field(default=False, description="Whether this is the default model")
 
 
-class IntegrationCreate(SQLModel):
-    """Schema for creating a new integration."""
+class IntegrationCreateBase(SQLModel):
+    """Shared creation fields and discovery-selection validation."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")  # type: ignore[assignment]
 
@@ -322,13 +330,6 @@ class IntegrationCreate(SQLModel):
         default=None,
         max_length=FieldLimits.DESCRIPTION_MAX_LENGTH,
         description="Detailed description of the integration",
-    )
-
-    integration_type: IntegrationType = Field(description="Type of external integration")
-
-    configuration: IntegrationConfigurationInputTypes = Field(
-        description=_CONFIGURATION_DESCRIPTION,
-        discriminator="integration_type",
     )
 
     management_credential_id: UUID | None = Field(
@@ -356,17 +357,11 @@ class IntegrationCreate(SQLModel):
         description="Models discovered during setup with enabled/disabled selections",
     )
 
-    @model_validator(mode="after")
-    def validate_type_matches_configuration(self) -> "IntegrationCreate":
-        """Ensure integration_type and configuration.integration_type agree."""
-        if self.configuration.integration_type != self.integration_type.value:
-            msg = (
-                f"integration_type '{self.integration_type.value}' does not match "
-                f"configuration.integration_type '{self.configuration.integration_type}'"
-            )
-            raise ValueError(msg)
+    def validate_discovery_selection(self, integration_type: str, configuration_type: str) -> None:
+        """Validate matching types and unique, type-appropriate discovery selections."""
+        validate_configuration_type(integration_type, configuration_type)
         if self.discovered_tools:
-            if self.integration_type != IntegrationType.MCP_SERVER:
+            if integration_type != IntegrationType.MCP_SERVER:
                 msg = "discovered_tools is only supported for mcp_server integrations"
                 raise ValueError(msg)
             names = [t.name for t in self.discovered_tools]
@@ -374,7 +369,7 @@ class IntegrationCreate(SQLModel):
                 msg = "discovered_tools contains duplicate tool names"
                 raise ValueError(msg)
         if self.discovered_models:
-            if self.integration_type != IntegrationType.LLM_PROVIDER:
+            if integration_type != IntegrationType.LLM_PROVIDER:
                 msg = "discovered_models is only supported for llm_provider integrations"
                 raise ValueError(msg)
             model_ids = [m.model_id for m in self.discovered_models]
@@ -385,18 +380,26 @@ class IntegrationCreate(SQLModel):
             if default_count > 1:
                 msg = "discovered_models contains multiple default models; at most one is allowed"
                 raise ValueError(msg)
+
+
+class IntegrationCreate(IntegrationCreateBase):
+    """Schema for creating a new integration."""
+
+    integration_type: IntegrationType = Field(description="Type of external integration")
+
+    configuration: IntegrationConfigurationInputTypes = Field(
+        description=_CONFIGURATION_DESCRIPTION,
+        discriminator="integration_type",
+    )
+
+    @model_validator(mode="after")
+    def validate_type_matches_configuration(self) -> "IntegrationCreate":
+        """Ensure integration_type and configuration.integration_type agree."""
+        self.validate_discovery_selection(self.integration_type.value, self.configuration.integration_type)
         return self
 
 
-def _is_kafka_configuration(config: object) -> bool:
-    if isinstance(config, KafkaConfiguration):
-        return True
-    if isinstance(config, dict):
-        return config.get("integration_type") == IntegrationType.KAFKA.value
-    return getattr(config, "integration_type", None) == IntegrationType.KAFKA.value
-
-
-class IntegrationRead(UserReferenceFieldsMixin, NamedResource, UserOwnedResource):
+class IntegrationReadBase(UserReferenceFieldsMixin, NamedResource, UserOwnedResource):
     """Schema for integration API responses."""
 
     created_by: UserReference | UUID | str | None = Field(default=None, description="User who created the integration")  # type: ignore[assignment]
@@ -409,48 +412,9 @@ class IntegrationRead(UserReferenceFieldsMixin, NamedResource, UserOwnedResource
         **UserOwnedResource.FIELD_SCHEMA_EXTRAS,
     }
 
-    integration_type: IntegrationType
     enabled: bool = True
     validation_status: IntegrationStatus = IntegrationStatus.UNKNOWN
     scope: IntegrationScope = IntegrationScope.GLOBAL
-    configuration: IntegrationConfigurationReadTypes | None = Field(
-        description=_CONFIGURATION_DESCRIPTION,
-        discriminator="integration_type",
-    )
-    kafka_configuration: KafkaConfiguration | None = Field(
-        default=None,
-        description=(
-            "Kafka broker configuration. Present only when integration_type is kafka, "
-            "so the configuration union above stays compatible with existing clients."
-        ),
-    )
-
-    @model_validator(mode="before")
-    @classmethod
-    def relocate_kafka_configuration(cls, data: Any) -> Any:  # noqa: ANN401 - Pydantic validator accepts arbitrary input
-        """Keep Kafka off the response configuration union.
-
-        Stored rows and create payloads put the Kafka object on configuration.
-        Responses expose it as kafka_configuration and leave configuration empty.
-        """
-        config = data.get("configuration") if isinstance(data, dict) else getattr(data, "configuration", None)
-        if not _is_kafka_configuration(config):
-            return data
-        if isinstance(data, dict):
-            relocated = dict(data)
-            relocated["configuration"] = None
-            relocated["kafka_configuration"] = config
-            return relocated
-        values: dict[str, Any] = {}
-        for name in cls.model_fields:
-            if name == "configuration":
-                values[name] = None
-            elif name == "kafka_configuration":
-                values[name] = config
-            elif hasattr(data, name):
-                values[name] = getattr(data, name)
-        return values
-
     management_credential_id: UUID | None = None
     last_validated_at: datetime | None = None
     validation_error: str | None = None
@@ -468,8 +432,18 @@ class IntegrationRead(UserReferenceFieldsMixin, NamedResource, UserOwnedResource
     enabled_model_count: int = Field(default=0, description="Number of enabled models linked to this integration")
 
 
-class IntegrationUpdate(SQLModel):
-    """Schema for partially updating an integration (user-facing)."""
+class IntegrationRead(IntegrationReadBase):
+    """Internal response supporting all integration types."""
+
+    integration_type: IntegrationType
+    configuration: IntegrationConfigurationTypes = Field(
+        description=_CONFIGURATION_DESCRIPTION,
+        discriminator="integration_type",
+    )
+
+
+class IntegrationUpdateBase(SQLModel):
+    """Shared fields for partially updating an integration."""
 
     name: str | None = Field(
         default=None,
@@ -484,12 +458,6 @@ class IntegrationUpdate(SQLModel):
         description="Detailed description of the integration",
     )
 
-    configuration: IntegrationConfigurationInputTypes | None = Field(
-        default=None,
-        description=_CONFIGURATION_DESCRIPTION,
-        discriminator="integration_type",
-    )
-
     management_credential_id: UUID | None = Field(default=None, description="Optional credential for admin operations")
 
     enabled: bool | None = Field(default=None, description=_ENABLED_DESCRIPTION)
@@ -499,6 +467,16 @@ class IntegrationUpdate(SQLModel):
     labels: dict[str, str] | None = Field(default=None, description="Key-value labels")
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")  # type: ignore[assignment]
+
+
+class IntegrationUpdate(IntegrationUpdateBase):
+    """Schema for partially updating an integration (user-facing)."""
+
+    configuration: IntegrationConfigurationInputTypes | None = Field(
+        default=None,
+        description=_CONFIGURATION_DESCRIPTION,
+        discriminator="integration_type",
+    )
 
 
 class IntegrationSystemUpdate(SQLModel):
@@ -518,10 +496,16 @@ class IntegrationSystemUpdate(SQLModel):
         return self
 
 
-class IntegrationTestConnection(SQLModel):
-    """Schema for testing a connection without saving an integration."""
+class IntegrationTestConnectionBase(SQLModel):
+    """Shared credential field and strict input handling for connection tests."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")  # type: ignore[assignment]
+
+    credential_id: UUID | None = Field(default=None, description="Credential to use for the connection test")
+
+
+class IntegrationTestConnection(IntegrationTestConnectionBase):
+    """Schema for testing a connection without saving an integration."""
 
     integration_type: IntegrationType = Field(description="Type of external integration")
 
@@ -530,17 +514,10 @@ class IntegrationTestConnection(SQLModel):
         discriminator="integration_type",
     )
 
-    credential_id: UUID | None = Field(default=None, description="Credential to use for the connection test")
-
     @model_validator(mode="after")
     def validate_type_matches_configuration(self) -> "IntegrationTestConnection":
         """Ensure integration_type and configuration.integration_type agree."""
-        if self.configuration.integration_type != self.integration_type.value:
-            msg = (
-                f"integration_type '{self.integration_type.value}' does not match "
-                f"configuration.integration_type '{self.configuration.integration_type}'"
-            )
-            raise ValueError(msg)
+        validate_configuration_type(self.integration_type.value, self.configuration.integration_type)
         return self
 
 
