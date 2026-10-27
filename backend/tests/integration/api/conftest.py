@@ -220,18 +220,11 @@ def _mock_evaluator(monkeypatch: pytest.MonkeyPatch) -> None:
     mock_evaluator = AsyncMock()
     mock_evaluator.evaluate = MagicMock(side_effect=_opa_evaluate_cli)
 
-    def _mock_getter(request: Any = None) -> AsyncMock:  # noqa: ANN401
-        return mock_evaluator
-
-    monkeypatch.setattr("syntara.authz.dependencies.get_authz_evaluator", _mock_getter)
-    monkeypatch.setattr("syntara.authz.dependencies.get_authz_evaluator", _mock_getter)
-    monkeypatch.setattr("syntara.authz.router.get_authz_evaluator", _mock_getter)
-    monkeypatch.setattr("syntara.authz.role_assignment_router.get_authz_evaluator", _mock_getter)
-    monkeypatch.setattr("syntara.workflows.executions_router.get_authz_evaluator", _mock_getter)
-
-    # Also override via FastAPI dependency_overrides so Depends(...) resolves correctly.
-    app.dependency_overrides[get_authz_evaluator] = lambda: mock_evaluator
-    app.dependency_overrides[get_authz_evaluator] = lambda: mock_evaluator
+    # Update the evaluator, not the provider function captured by Depends().
+    monkeypatch.setattr(app.state, "authz_evaluator", mock_evaluator, raising=False)
+    overrides = app.dependency_overrides.copy()
+    overrides[get_authz_evaluator] = lambda: mock_evaluator
+    monkeypatch.setattr(app, "dependency_overrides", overrides)
 
 
 def mcp_payload(name: str | None = None, scope: str = "global") -> dict[str, object]:

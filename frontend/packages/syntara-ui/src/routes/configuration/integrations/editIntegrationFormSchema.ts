@@ -31,12 +31,25 @@ function validateUrl(
 }
 
 function refineKafka(
-  data: { integration_type: string; bootstrap_servers?: string; allow_http: boolean },
+  data: {
+    integration_type: string
+    bootstrap_servers?: string
+    allow_http: boolean
+    security_protocol: string
+    allow_plaintext: boolean
+  },
   ctx: z.RefinementCtx
 ) {
   if (data.integration_type !== IntegrationTypeEnum.KAFKA) return
   const err = bootstrapServersFieldError(data.bootstrap_servers ?? '')
   if (err) ctx.addIssue({ code: z.ZodIssueCode.custom, message: err, path: ['bootstrap_servers'] })
+  if (data.security_protocol === 'PLAINTEXT' && !data.allow_plaintext) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Confirm that unencrypted connections are allowed',
+      path: ['allow_plaintext'],
+    })
+  }
   if (data.allow_http) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
@@ -54,6 +67,8 @@ export function buildEditSchema(requiresBaseUrl: boolean) {
       integration_type: z.string(),
       base_url: z.string().optional(),
       bootstrap_servers: z.string().optional(),
+      security_protocol: z.enum(['SASL_SSL', 'SSL', 'PLAINTEXT']).default('SASL_SSL'),
+      allow_plaintext: z.boolean().default(false),
       sasl_mechanism: z.enum(['PLAIN', 'SCRAM-SHA-256', 'SCRAM-SHA-512']).optional(),
       allow_http: z.boolean(),
       insecure_skip_tls_verify: z.boolean(),
@@ -103,8 +118,7 @@ export const editIntegrationSchema = buildEditSchema(true)
 export type EditIntegrationFormValues = z.infer<typeof editIntegrationSchema>
 
 export type DiscoverResult = IntegrationsAPI.components['schemas']['DiscoverResult']
-export type IntegrationRead = IntegrationsAPI.components['schemas']['IntegrationRead']
-
+export type { IntegrationRead } from './integrationTypes'
 function securityFields(values: EditIntegrationFormValues) {
   return {
     allow_http: values.allow_http,
@@ -118,6 +132,8 @@ export function buildConfiguration(integrationType: string, values: EditIntegrat
     return {
       integration_type: IntegrationTypeEnum.KAFKA,
       bootstrap_servers: parseBootstrapServers(values.bootstrap_servers ?? ''),
+      security_protocol: values.security_protocol,
+      allow_plaintext: values.allow_plaintext,
       sasl_mechanism: values.sasl_mechanism ?? DEFAULT_KAFKA_SASL_MECHANISM,
       ...securityFields(values),
       allow_http: false,

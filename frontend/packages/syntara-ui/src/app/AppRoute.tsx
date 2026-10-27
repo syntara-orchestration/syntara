@@ -22,6 +22,9 @@ export const AppRoute = {
       Detail: '/configuration/integrations/:integrationId',
       DetailTab: '/configuration/integrations/:integrationId/:tab',
       Edit: '/configuration/integrations/:integrationId/edit',
+      KafkaDetail: '/configuration/integrations/kafka/:integrationId',
+      KafkaDetailTab: '/configuration/integrations/kafka/:integrationId/:tab',
+      KafkaEdit: '/configuration/integrations/kafka/:integrationId/edit',
     },
     Credentials: {
       Root: '/configuration/credentials',

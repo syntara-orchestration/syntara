@@ -1,10 +1,11 @@
-import type { IntegrationsAPI, Tool } from '@syntara/contracts'
+import type { Tool } from '@syntara/contracts'
 
 import { SynPanelContentStack } from '../../../components/layout/SynPanelContentStack'
 
 import styles from './IntegrationDetail.module.css'
 import { IntegrationModelsTab } from './IntegrationModelsTab'
 import { IntegrationResourcesTab } from './IntegrationResourcesTab'
+import type { IntegrationRead } from './integrationTypes'
 import type { useIntegrationModelsState } from './useIntegrationModelsState'
 
 export function ResourcesTabContent({
@@ -20,7 +21,7 @@ export function ResourcesTabContent({
   canUpdate,
   updateTooltip,
 }: Readonly<{
-  integration: IntegrationsAPI.components['schemas']['IntegrationRead']
+  integration: IntegrationRead
   isLLM: boolean
   modelsState: ReturnType<typeof useIntegrationModelsState>
   tools: Tool[]
@@ -28,7 +29,7 @@ export function ResourcesTabContent({
   toolEnabledCount: number
   handleSelectTool: (id: string, enabled: boolean) => void
   refetchTools: () => Promise<unknown>
-  onRefreshed: () => Promise<IntegrationsAPI.components['schemas']['IntegrationRead'] | undefined>
+  onRefreshed: () => Promise<IntegrationRead | undefined>
   canUpdate: boolean
   updateTooltip?: string
 }>) {

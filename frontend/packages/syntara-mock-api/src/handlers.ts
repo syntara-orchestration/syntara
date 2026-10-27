@@ -424,196 +424,217 @@ export const handlers = [
 
   // ── Integrations ──────────────────────────────────────────────────────────
 
-  http.get('/api/v1/integrations', ({ request }) => {
-    const url = new URL(request.url)
-    const nameContains = url.searchParams.get('name[contains]')
-    const integrationType = url.searchParams.get('integration_type')
-    const validationStatus = url.searchParams.get('validation_status')
-    const enabledParam = url.searchParams.get('enabled')
-    const sort = url.searchParams.get('sort')
-    const cursor = url.searchParams.get('cursor')
-    const limit = parseInt(url.searchParams.get('limit') || '20', 10)
-    const includeTotal = url.searchParams.get('include_total') === 'true'
+  ...(['integrations', 'kafka_integrations'] as const).map((resource) =>
+    http.get(`/api/v1/${resource}`, ({ request }) => {
+      const url = new URL(request.url)
+      const nameContains = url.searchParams.get('name[contains]')
+      const integrationType = url.searchParams.get('integration_type')
+      const validationStatus = url.searchParams.get('validation_status')
+      const enabledParam = url.searchParams.get('enabled')
+      const sort = url.searchParams.get('sort')
+      const cursor = url.searchParams.get('cursor')
+      const limit = parseInt(url.searchParams.get('limit') || '20', 10)
+      const includeTotal = url.searchParams.get('include_total') === 'true'
 
-    let filtered = [...integrations]
-    if (nameContains) {
-      const lower = nameContains.toLowerCase()
-      filtered = filtered.filter((i) => (i.name ?? '').toLowerCase().includes(lower))
-    }
-    if (integrationType) {
-      filtered = filtered.filter((i) => i.integration_type === integrationType)
-    }
-    if (validationStatus) {
-      filtered = filtered.filter((i) => i.validation_status === validationStatus)
-    }
-    if (enabledParam !== null) {
-      const enabled = enabledParam === 'true'
-      filtered = filtered.filter((i) => i.enabled === enabled)
-    }
-    const managementCredentialId = url.searchParams.get('management_credential_id')
-    if (managementCredentialId) {
-      filtered = filtered.filter((i) => i.management_credential_id === managementCredentialId)
-    }
-    const projectId = url.searchParams.get('project_id')
-    if (projectId) {
-      filtered = filtered.filter((i) => i.scope === 'global' || (i.project_ids && i.project_ids.includes(projectId)))
-    }
-
-    if (sort) {
-      const isDesc = sort.startsWith('-')
-      const field = isDesc ? sort.slice(1) : sort
-      filtered.sort((a, b) => {
-        let aVal: string
-        let bVal: string
-        switch (field) {
-          case 'name':
-            aVal = a.name ?? ''
-            bVal = b.name ?? ''
-            break
-          case 'validation_status':
-            aVal = a.validation_status ?? ''
-            bVal = b.validation_status ?? ''
-            break
-          case 'integration_type':
-            aVal = a.integration_type ?? ''
-            bVal = b.integration_type ?? ''
-            break
-          case 'enabled':
-            aVal = a.enabled ? '1' : '0'
-            bVal = b.enabled ? '1' : '0'
-            break
-          case 'last_validated_at':
-            aVal = a.last_validated_at ?? ''
-            bVal = b.last_validated_at ?? ''
-            break
-          case 'created_at':
-            aVal = a.created_at ?? ''
-            bVal = b.created_at ?? ''
-            break
-          case 'updated_at':
-            aVal = a.updated_at ?? ''
-            bVal = b.updated_at ?? ''
-            break
-          default:
-            aVal = a.name ?? ''
-            bVal = b.name ?? ''
-        }
-        const cmp = aVal.localeCompare(bVal)
-        return isDesc ? -cmp : cmp
-      })
-    }
-
-    return HttpResponse.json(paginate(filtered, cursor, limit, includeTotal))
-  }),
-
-  http.get('/api/v1/integrations/:integration_id', ({ params }) => {
-    const integration = integrations.find((i) => i.id === params.integration_id)
-    if (!integration) {
-      return HttpResponse.json(
-        {
-          type: 'https://api.example.com/errors/not-found',
-          title: 'Not Found',
-          detail: `Integration ${params.integration_id as string} not found`,
-          code: 'NOT_FOUND',
-          retryable: false,
-        },
-        { status: 404 }
+      let filtered = integrations.filter(
+        (i) => (i.integration_type === IntegrationTypeEnum.KAFKA) === (resource === 'kafka_integrations')
       )
-    }
-    return HttpResponse.json(integration)
-  }),
-
-  http.post('/api/v1/integrations', async (req) => {
-    const body = (await req.request.json()) as Record<string, unknown>
-    const now = mockDate.now
-    const integrationId = uuidv4()
-
-    const discoveredTools = body.discovered_tools as
-      Array<{ name: string; description?: string; enabled?: boolean }> | undefined
-    let enabledToolCount = 0
-    if (discoveredTools && discoveredTools.length > 0) {
-      for (const dt of discoveredTools) {
-        const enabled = dt.enabled !== false
-        if (enabled) enabledToolCount++
-        tools.push({
-          id: uuidv4(),
-          name: dt.name,
-          namespaced_name: dt.name,
-          integration_id: integrationId,
-          enabled,
-          parameters: [],
-          created_at: now,
-          updated_at: now,
-        } as Tool)
+      if (nameContains) {
+        const lower = nameContains.toLowerCase()
+        filtered = filtered.filter((i) => (i.name ?? '').toLowerCase().includes(lower))
       }
-    }
+      if (integrationType) {
+        filtered = filtered.filter((i) => i.integration_type === integrationType)
+      }
+      if (validationStatus) {
+        filtered = filtered.filter((i) => i.validation_status === validationStatus)
+      }
+      if (enabledParam !== null) {
+        const enabled = enabledParam === 'true'
+        filtered = filtered.filter((i) => i.enabled === enabled)
+      }
+      const managementCredentialId = url.searchParams.get('management_credential_id')
+      if (managementCredentialId) {
+        filtered = filtered.filter((i) => i.management_credential_id === managementCredentialId)
+      }
+      const projectId = url.searchParams.get('project_id')
+      if (projectId) {
+        filtered = filtered.filter((i) => i.scope === 'global' || (i.project_ids && i.project_ids.includes(projectId)))
+      }
 
-    const discoveredModels = body.discovered_models as
-      | Array<{ model_id: string; name: string; description?: string; enabled?: boolean; is_default?: boolean }>
-      | undefined
-    let enabledModelCount = 0
-    if (discoveredModels && discoveredModels.length > 0) {
-      for (const dm of discoveredModels) {
-        const enabled = dm.enabled !== false
-        if (enabled) enabledModelCount++
-        models.push({
-          id: uuidv4(),
-          integration_id: integrationId,
-          model_id: dm.model_id,
-          name: dm.name,
-          description: dm.description ?? null,
-          enabled,
-          is_default: dm.is_default ?? false,
-          last_refreshed_at: now,
-          created_at: now,
-          updated_at: now,
+      if (sort) {
+        const isDesc = sort.startsWith('-')
+        const field = isDesc ? sort.slice(1) : sort
+        filtered.sort((a, b) => {
+          let aVal: string
+          let bVal: string
+          switch (field) {
+            case 'name':
+              aVal = a.name ?? ''
+              bVal = b.name ?? ''
+              break
+            case 'validation_status':
+              aVal = a.validation_status ?? ''
+              bVal = b.validation_status ?? ''
+              break
+            case 'integration_type':
+              aVal = a.integration_type ?? ''
+              bVal = b.integration_type ?? ''
+              break
+            case 'enabled':
+              aVal = a.enabled ? '1' : '0'
+              bVal = b.enabled ? '1' : '0'
+              break
+            case 'last_validated_at':
+              aVal = a.last_validated_at ?? ''
+              bVal = b.last_validated_at ?? ''
+              break
+            case 'created_at':
+              aVal = a.created_at ?? ''
+              bVal = b.created_at ?? ''
+              break
+            case 'updated_at':
+              aVal = a.updated_at ?? ''
+              bVal = b.updated_at ?? ''
+              break
+            default:
+              aVal = a.name ?? ''
+              bVal = b.name ?? ''
+          }
+          const cmp = aVal.localeCompare(bVal)
+          return isDesc ? -cmp : cmp
         })
       }
-    }
 
-    const newIntegration = {
-      id: integrationId,
-      name: body.name ?? '',
-      description: body.description ?? null,
-      integration_type: body.integration_type ?? IntegrationTypeEnum.MCP_SERVER,
-      enabled: true,
-      validation_status: IntegrationStatusEnum.UNKNOWN,
-      scope: body.scope ?? 'global',
-      configuration: body.configuration ?? { integration_type: IntegrationTypeEnum.MCP_SERVER, base_url: '' },
-      management_credential_id: (body.management_credential_id as string) ?? null,
-      last_validated_at: null,
-      validation_error: null,
-      refresh_status: null,
-      last_refreshed_at: null,
-      refresh_error: null,
-      total_tool_count: discoveredTools?.length ?? 0,
-      enabled_tool_count: enabledToolCount,
-      total_model_count: discoveredModels?.length ?? 0,
-      enabled_model_count: enabledModelCount,
-      created_at: now,
-      updated_at: now,
-      created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'user-1', type: 'user' as const },
-      updated_by: null,
-      deleted_at: null,
-      deleted_by: null,
-      labels: {},
-    }
-    integrations.push(newIntegration as (typeof integrations)[number])
-    return HttpResponse.json(newIntegration, { status: 201 })
-  }),
+      return HttpResponse.json(paginate(filtered, cursor, limit, includeTotal))
+    })
+  ),
 
-  http.patch('/api/v1/integrations/:integration_id', async (req) => {
-    const integration = integrations.find((i) => i.id === req.params.integration_id)
-    if (!integration) {
-      return HttpResponse.json(
-        { type: 'https://api.example.com/errors/not-found', title: 'Not Found', code: 'NOT_FOUND', retryable: false },
-        { status: 404 }
+  ...(['integrations', 'kafka_integrations'] as const).map((resource) =>
+    http.get(`/api/v1/${resource}/:integration_id`, ({ params }) => {
+      const integration = integrations.find(
+        (i) =>
+          i.id === params.integration_id &&
+          (i.integration_type === IntegrationTypeEnum.KAFKA) === (resource === 'kafka_integrations')
       )
-    }
-    const body = (await req.request.json()) as Record<string, unknown>
-    Object.assign(integration, body, { updated_at: mockDate.now })
-    return HttpResponse.json(integration)
-  }),
+      if (!integration) {
+        return HttpResponse.json(
+          {
+            type: 'https://api.example.com/errors/not-found',
+            title: 'Not Found',
+            detail: `Integration ${params.integration_id as string} not found`,
+            code: 'NOT_FOUND',
+            retryable: false,
+          },
+          { status: 404 }
+        )
+      }
+      return HttpResponse.json(integration)
+    })
+  ),
+
+  ...(['integrations', 'kafka_integrations'] as const).map((resource) =>
+    http.post(`/api/v1/${resource}`, async (req) => {
+      const body = (await req.request.json()) as Record<string, unknown>
+      if ((body.integration_type === IntegrationTypeEnum.KAFKA) !== (resource === 'kafka_integrations')) {
+        return HttpResponse.json({ title: 'Invalid integration type', code: 'VALIDATION_ERROR' }, { status: 422 })
+      }
+      const now = mockDate.now
+      const integrationId = uuidv4()
+
+      const discoveredTools = body.discovered_tools as
+        Array<{ name: string; description?: string; enabled?: boolean }> | undefined
+      let enabledToolCount = 0
+      if (discoveredTools && discoveredTools.length > 0) {
+        for (const dt of discoveredTools) {
+          const enabled = dt.enabled !== false
+          if (enabled) enabledToolCount++
+          tools.push({
+            id: uuidv4(),
+            name: dt.name,
+            namespaced_name: dt.name,
+            integration_id: integrationId,
+            enabled,
+            parameters: [],
+            created_at: now,
+            updated_at: now,
+          } as Tool)
+        }
+      }
+
+      const discoveredModels = body.discovered_models as
+        | Array<{ model_id: string; name: string; description?: string; enabled?: boolean; is_default?: boolean }>
+        | undefined
+      let enabledModelCount = 0
+      if (discoveredModels && discoveredModels.length > 0) {
+        for (const dm of discoveredModels) {
+          const enabled = dm.enabled !== false
+          if (enabled) enabledModelCount++
+          models.push({
+            id: uuidv4(),
+            integration_id: integrationId,
+            model_id: dm.model_id,
+            name: dm.name,
+            description: dm.description ?? null,
+            enabled,
+            is_default: dm.is_default ?? false,
+            last_refreshed_at: now,
+            created_at: now,
+            updated_at: now,
+          })
+        }
+      }
+
+      const newIntegration = {
+        id: integrationId,
+        name: body.name ?? '',
+        description: body.description ?? null,
+        integration_type: body.integration_type ?? IntegrationTypeEnum.MCP_SERVER,
+        enabled: true,
+        validation_status: IntegrationStatusEnum.UNKNOWN,
+        scope: body.scope ?? 'global',
+        configuration: body.configuration ?? { integration_type: IntegrationTypeEnum.MCP_SERVER, base_url: '' },
+        management_credential_id: (body.management_credential_id as string) ?? null,
+        last_validated_at: null,
+        validation_error: null,
+        refresh_status: null,
+        last_refreshed_at: null,
+        refresh_error: null,
+        total_tool_count: discoveredTools?.length ?? 0,
+        enabled_tool_count: enabledToolCount,
+        total_model_count: discoveredModels?.length ?? 0,
+        enabled_model_count: enabledModelCount,
+        created_at: now,
+        updated_at: now,
+        created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'user-1', type: 'user' as const },
+        updated_by: null,
+        deleted_at: null,
+        deleted_by: null,
+        labels: {},
+      }
+      integrations.push(newIntegration as (typeof integrations)[number])
+      return HttpResponse.json(newIntegration, { status: 201 })
+    })
+  ),
+
+  ...(['integrations', 'kafka_integrations'] as const).map((resource) =>
+    http.patch(`/api/v1/${resource}/:integration_id`, async (req) => {
+      const integration = integrations.find(
+        (i) =>
+          i.id === req.params.integration_id &&
+          (i.integration_type === IntegrationTypeEnum.KAFKA) === (resource === 'kafka_integrations')
+      )
+      if (!integration) {
+        return HttpResponse.json(
+          { type: 'https://api.example.com/errors/not-found', title: 'Not Found', code: 'NOT_FOUND', retryable: false },
+          { status: 404 }
+        )
+      }
+      const body = (await req.request.json()) as Record<string, unknown>
+      Object.assign(integration, body, { updated_at: mockDate.now })
+      return HttpResponse.json(integration)
+    })
+  ),
 
   http.delete('/api/v1/integrations/:integration_id', ({ params }) => {
     const index = integrations.findIndex((i) => i.id === params.integration_id)
@@ -686,31 +707,43 @@ export const handlers = [
     return new HttpResponse(null, { status: 204 })
   }),
 
-  http.post('/api/v1/integrations/discover', async (req) => {
-    const body = (await req.request.json()) as { integration_type?: string }
-    if (body.integration_type === IntegrationTypeEnum.LLM_PROVIDER) {
+  ...(['integrations', 'kafka_integrations'] as const).map((resource) =>
+    http.post(`/api/v1/${resource}/discover`, async (req) => {
+      const body = (await req.request.json()) as { integration_type?: string }
+      if ((body.integration_type === IntegrationTypeEnum.KAFKA) !== (resource === 'kafka_integrations')) {
+        return HttpResponse.json({ title: 'Invalid integration type', code: 'VALIDATION_ERROR' }, { status: 422 })
+      }
+      if (body.integration_type === IntegrationTypeEnum.LLM_PROVIDER) {
+        return HttpResponse.json({
+          success: true,
+          checked_at: mockDate.now,
+          error: null,
+          discovered_models: [
+            { id: 'granite-3.3-8b-instruct', name: 'granite-3.3-8b-instruct', description: '128k context' },
+            { id: 'granite-3.3-2b-instruct', name: 'granite-3.3-2b-instruct', description: '128k context' },
+            { id: 'granite-code-8b', name: 'granite-code-8b', description: '8k context' },
+          ],
+        })
+      }
+      if (resource === 'kafka_integrations')
+        return HttpResponse.json({
+          success: true,
+          checked_at: mockDate.now,
+          discovered_tools: [],
+          discovered_models: [],
+        })
       return HttpResponse.json({
         success: true,
         checked_at: mockDate.now,
         error: null,
-        discovered_models: [
-          { id: 'granite-3.3-8b-instruct', name: 'granite-3.3-8b-instruct', description: '128k context' },
-          { id: 'granite-3.3-2b-instruct', name: 'granite-3.3-2b-instruct', description: '128k context' },
-          { id: 'granite-code-8b', name: 'granite-code-8b', description: '8k context' },
+        discovered_tools: [
+          { name: 'get_repo', description: 'Get repository details', parameters: [] },
+          { name: 'create_pr', description: 'Create a pull request', parameters: [] },
+          { name: 'list_issues', description: 'List repository issues', parameters: [] },
         ],
       })
-    }
-    return HttpResponse.json({
-      success: true,
-      checked_at: mockDate.now,
-      error: null,
-      discovered_tools: [
-        { name: 'get_repo', description: 'Get repository details', parameters: [] },
-        { name: 'create_pr', description: 'Create a pull request', parameters: [] },
-        { name: 'list_issues', description: 'List repository issues', parameters: [] },
-      ],
     })
-  }),
+  ),
 
   http.post('/api/v1/integrations/:integration_id/validate', ({ params }) => {
     const integration = integrations.find((i) => i.id === params.integration_id)

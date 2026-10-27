@@ -24,6 +24,7 @@ import { SynSelect } from '../../../../components/SynSelect'
 import { integrationHelp } from '../integrationFieldHelp'
 import { PROVIDERS_HIDING_BASE_URL, PROVIDERS_REQUIRING_BASE_URL } from '../integrationFilters'
 import { KafkaSaslMechanismField } from '../kafkaSaslField'
+import { KafkaTransportFields } from '../KafkaTransportFields'
 
 import { INTEGRATION_TYPE_OPTIONS, PROVIDER_HINT_OPTIONS, type IntegrationFormData } from './integrationFormSchema'
 import { ScopeFields } from './ScopeFields'
@@ -292,6 +293,9 @@ export function IntegrationDetailsStep({ setValue, onTypeChange }: IntegrationDe
 
   const isLLM = integrationType === IntegrationTypeEnum.LLM_PROVIDER
   const isAAP = integrationType === IntegrationTypeEnum.ANSIBLE_AUTOMATION_PLATFORM
+  const kafkaProtocol =
+    useWatch<IntegrationFormData, 'configuration.security_protocol'>({ name: 'configuration.security_protocol' }) ??
+    'SASL_SSL'
   const isKafka = integrationType === IntegrationTypeEnum.KAFKA
   const typeConfig = detailsTypeConfig(integrationType, providerHint)
 
@@ -416,10 +420,20 @@ export function IntegrationDetailsStep({ setValue, onTypeChange }: IntegrationDe
           />
         )}
         {typeConfig.showBootstrapServers && (
-          <KafkaSaslMechanismField control={control} name="configuration.sasl_mechanism" fieldId="sasl-mechanism" />
+          <>
+            <KafkaTransportFields
+              control={control}
+              protocolName="configuration.security_protocol"
+              plaintextName="configuration.allow_plaintext"
+              fieldId="security-protocol"
+            />
+            {kafkaProtocol === 'SASL_SSL' && (
+              <KafkaSaslMechanismField control={control} name="configuration.sasl_mechanism" fieldId="sasl-mechanism" />
+            )}
+          </>
         )}
 
-        <SecurityFields showAllowHttp={!isKafka} />
+        {(!isKafka || kafkaProtocol !== 'PLAINTEXT') && <SecurityFields showAllowHttp={!isKafka} />}
 
         <ScopeFields<IntegrationFormData>
           scope={scope}

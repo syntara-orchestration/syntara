@@ -50,6 +50,21 @@ export const configurationRoutes = [
   }),
   createRoute({
     getParentRoute: () => rootRoute,
+    path: '/configuration/integrations/kafka/$integrationId/edit',
+    component: makeRouteComponent(<EditIntegration />, { action: 'update', resourceType: 'integration' }),
+  }),
+  createRoute({
+    getParentRoute: () => rootRoute,
+    path: '/configuration/integrations/kafka/$integrationId',
+    component: makeRouteComponent(<IntegrationDetail />, { action: 'read', resourceType: 'integration' }),
+  }),
+  createRoute({
+    getParentRoute: () => rootRoute,
+    path: '/configuration/integrations/kafka/$integrationId/$tab',
+    component: makeRouteComponent(<IntegrationDetail />, { action: 'read', resourceType: 'integration' }),
+  }),
+  createRoute({
+    getParentRoute: () => rootRoute,
     path: '/configuration/credentials',
     validateSearch: credentialsSearch,
     component: makeRouteComponent(<Credentials />),

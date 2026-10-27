@@ -1,4 +1,5 @@
 import type { IntegrationsAPI } from '@syntara/contracts'
+type IntegrationRead = IntegrationsAPI.components['schemas']['IntegrationRead']
 import { describe, expect, it } from 'vitest'
 
 import {
@@ -9,8 +10,6 @@ import {
   getTotalResourceCount,
   isLLMProvider,
 } from './integrationUtils'
-
-type IntegrationRead = IntegrationsAPI.components['schemas']['IntegrationRead']
 
 const integrationDefaults: IntegrationRead = {
   id: 'int-1',
@@ -98,24 +97,15 @@ describe('integrationUtils', () => {
     })
 
     it('joins Kafka bootstrap servers', () => {
-      const integration = buildIntegration({
-        integration_type: 'kafka',
-        configuration: null,
-        kafka_configuration: {
-          integration_type: 'kafka',
+      const integration = {
+        ...integrationDefaults,
+        integration_type: 'kafka' as const,
+        configuration: {
+          integration_type: 'kafka' as const,
           bootstrap_servers: ['broker.example.com:9093', 'other.example.com:9092'],
         },
-      })
+      }
       expect(getBaseUrl(integration)).toBe('broker.example.com:9093, other.example.com:9092')
-    })
-
-    it('returns an empty string when a Kafka integration has no stored configuration', () => {
-      const integration = buildIntegration({
-        integration_type: 'kafka',
-        configuration: null,
-        kafka_configuration: null,
-      })
-      expect(getBaseUrl(integration)).toBe('')
     })
 
     it('returns empty string when configuration is undefined', () => {

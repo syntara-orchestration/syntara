@@ -76,14 +76,14 @@ class TestWorkflowVersionCreatedEventSegmentConversion:
         segment_event = event.to_segment_event()
         assert segment_event["event"] == "workflow_version_created"
 
-    @pytest.mark.usefixtures("telemetry_image_version")
-    def test_to_segment_event_contains_all_fields(self) -> None:
+    def test_to_segment_event_contains_all_fields(self, override_settings) -> None:
         event = WorkflowVersionCreatedEvent(
             workflow_id=VALID_WORKFLOW_ID,
             version=5,
             entitlement_id="ent-123",
         )
-        segment_event = event.to_segment_event()
+        with override_settings(container_image_version="img-tag"):
+            segment_event = event.to_segment_event()
         assert segment_event["event"] == "workflow_version_created"
         props = segment_event["properties"]
         assert props == {

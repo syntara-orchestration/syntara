@@ -8,8 +8,8 @@ export function IntegrationEmptyState({ canCreate = true }: Readonly<{ canCreate
   const navigate = useNavigate()
   return (
     <SynEmptyStateNoData
-      title="No integrations yet"
-      description="Configure integrations to connect external tools and services for use in workflows."
+      title="No integrations in this view"
+      description="Select Kafka in the Integration type filter to view Kafka connections, or configure a new integration."
       buttonText={canCreate ? 'Configure integration' : undefined}
       addData={
         canCreate ? () => detachPromise(navigate({ to: AppRoute.Configuration.Integrations.Configure })) : undefined

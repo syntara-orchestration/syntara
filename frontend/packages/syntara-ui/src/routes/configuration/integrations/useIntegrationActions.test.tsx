@@ -1,4 +1,3 @@
-import type { IntegrationsAPI } from '@syntara/contracts'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { renderHook, act } from '@testing-library/react'
 import type { ReactNode } from 'react'
@@ -8,6 +7,7 @@ import { integrationsClient } from '../../../client'
 import { AlertProvider } from '../../../providers/alerts'
 import { routerTestState } from '../../../test/setup'
 
+import type { IntegrationRead } from './integrationTypes'
 import { useIntegrationActions } from './useIntegrationActions'
 
 vi.mock('../../../client', () => ({
@@ -15,8 +15,6 @@ vi.mock('../../../client', () => ({
     useMutation: vi.fn(),
   },
 }))
-
-type IntegrationRead = IntegrationsAPI.components['schemas']['IntegrationRead']
 
 type MockMutationCallbacks = {
   onSuccess?: (...args: unknown[]) => void

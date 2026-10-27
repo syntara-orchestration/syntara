@@ -14,13 +14,13 @@ describe('IntegrationEmptyState', () => {
   it('renders empty state message', () => {
     render(<IntegrationEmptyState />)
 
-    expect(screen.getByText('No integrations yet')).toBeInTheDocument()
+    expect(screen.getByText('No integrations in this view')).toBeInTheDocument()
   })
 
   it('renders description text', () => {
     render(<IntegrationEmptyState />)
 
-    expect(screen.getByText(/Configure integrations to connect external tools and services/i)).toBeInTheDocument()
+    expect(screen.getByText(/Select Kafka in the Integration type filter/i)).toBeInTheDocument()
   })
 
   it('renders configure integration button', () => {
