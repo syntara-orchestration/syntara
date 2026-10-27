@@ -1,4 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { createMemoryHistory, createRootRoute, createRoute, createRouter, RouterProvider } from '@tanstack/react-router'
 import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
@@ -11,7 +12,7 @@ import { accessClient, accessFetchClient } from '../../access/accessClient'
 import { AUTH_TYPE_FEDERATED } from '../adminConstants'
 import { useUserPermissions } from '../useUserPermissions'
 
-import { UserDetail } from './UserDetail'
+import { UserDetail, UserDetailTabRoute } from './UserDetail'
 import { computeRoleAssignmentCount } from './userDetailUtils'
 
 // ---------------------------------------------------------------------------
@@ -163,9 +164,33 @@ const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: false } },
 })
 
+function createUserDetailTestRouter(children: ReactNode) {
+  const rootRoute = createRootRoute()
+  const userDetailRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    path: '/system-administration/access-management/users/$userId',
+    component: () => children,
+  })
+  const tabPaths = ['/', 'details', 'groups', 'identities', 'roles', 'permissions', 'check-access'] as const
+  const tabRoutes = tabPaths.map((path) =>
+    createRoute({
+      getParentRoute: () => userDetailRoute,
+      path,
+      component: UserDetailTabRoute,
+    })
+  )
+
+  return createRouter({
+    routeTree: rootRoute.addChildren([userDetailRoute.addChildren(tabRoutes)]),
+    history: createMemoryHistory({ initialEntries: [routerTestState.pathname] }),
+  })
+}
+
 const wrapper = ({ children }: { children: ReactNode }) => (
   <QueryClientProvider client={queryClient}>
-    <AlertProvider>{children}</AlertProvider>
+    <AlertProvider>
+      <RouterProvider router={createUserDetailTestRouter(children)} />
+    </AlertProvider>
   </QueryClientProvider>
 )
 

@@ -97,13 +97,23 @@ test.describe('Credential Detail Page & Workflows Tab', () => {
       await navigateToCredentialDetail(app, name)
 
       // Act - Click Workflows tab
-      await app.getByRole('tab', { name: /Workflows/ }).click()
+      const workflowsTab = app.getByRole('tab', { name: /Workflows/ })
+      await workflowsTab.click()
+
+      // Assert - The selected tab and the URL stay in sync
+      await expect(app).toHaveURL(/\/workflows$/)
+      await expect(workflowsTab).toHaveAttribute('aria-selected', 'true')
 
       // Assert - Workflows tab content loaded (table or empty state)
       const workflowsTable = app.getByRole('grid', { name: 'Workflows using this credential' })
       const emptyState = app.getByRole('heading', { name: 'No workflows yet' })
       const errorState = app.getByText('Failed to load workflows')
       await expect(workflowsTable.or(emptyState).or(errorState)).toBeVisible()
+
+      // Browser history returns to the default Details route.
+      await app.goBack()
+      await expect(app).toHaveURL(/\/configuration\/credentials\/[^/]+$/)
+      await expect(app.getByRole('tab', { name: 'Details' })).toHaveAttribute('aria-selected', 'true')
     } finally {
       await deleteCredentialByName(app, name)
     }

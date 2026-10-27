@@ -2,6 +2,9 @@ import { createRoute, redirect } from '@tanstack/react-router'
 
 import {
   CredentialDetail,
+  CredentialDetailsTabRoute,
+  CredentialIntegrationsTabRoute,
+  CredentialWorkflowsTabRoute,
   Credentials,
   EditIntegration,
   IntegrationDetail,
@@ -15,6 +18,36 @@ import { rootRoute } from './__root'
 
 const credentialsSearch = listSearchParams.catch({})
 const integrationsSearch = listSearchParams.catch({})
+
+const credentialDetailRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/configuration/credentials/$credentialId',
+  component: makeRouteComponent(<CredentialDetail />),
+})
+
+const credentialDetailsIndexRoute = createRoute({
+  getParentRoute: () => credentialDetailRoute,
+  path: '/',
+  component: makeRouteComponent(<CredentialDetailsTabRoute />),
+})
+
+const credentialDetailsRoute = createRoute({
+  getParentRoute: () => credentialDetailRoute,
+  path: 'details',
+  component: makeRouteComponent(<CredentialDetailsTabRoute />),
+})
+
+const credentialWorkflowsRoute = createRoute({
+  getParentRoute: () => credentialDetailRoute,
+  path: 'workflows',
+  component: makeRouteComponent(<CredentialWorkflowsTabRoute />),
+})
+
+const credentialIntegrationsRoute = createRoute({
+  getParentRoute: () => credentialDetailRoute,
+  path: 'integrations',
+  component: makeRouteComponent(<CredentialIntegrationsTabRoute />),
+})
 
 export const configurationRoutes = [
   createRoute({
@@ -54,14 +87,10 @@ export const configurationRoutes = [
     validateSearch: credentialsSearch,
     component: makeRouteComponent(<Credentials />),
   }),
-  createRoute({
-    getParentRoute: () => rootRoute,
-    path: '/configuration/credentials/$credentialId',
-    component: makeRouteComponent(<CredentialDetail />),
-  }),
-  createRoute({
-    getParentRoute: () => rootRoute,
-    path: '/configuration/credentials/$credentialId/$tab',
-    component: makeRouteComponent(<CredentialDetail />),
-  }),
+  credentialDetailRoute.addChildren([
+    credentialDetailsIndexRoute,
+    credentialDetailsRoute,
+    credentialWorkflowsRoute,
+    credentialIntegrationsRoute,
+  ]),
 ]

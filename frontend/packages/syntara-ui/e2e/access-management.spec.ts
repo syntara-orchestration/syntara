@@ -309,24 +309,35 @@ test.describe('Access Management — User Detail Tabs', () => {
 
     // Users tab filter placeholder is "Filter by username", not "Filter by name". Go by seeded ID.
     const seededUser = seededUsers.latest()
-    await app.goto(toAppUrl(`${ACCESS_URL}/users/${seededUser.id}`))
-    await expect(app).toHaveURL(new RegExp(`${ACCESS_URL}/users/${seededUser.id}`))
+    const userDetailUrl = `${ACCESS_URL}/users/${seededUser.id}`
+    await app.goto(toAppUrl(userDetailUrl))
+    await expect(app).toHaveURL(new RegExp(`${userDetailUrl}$`))
+    const detailsTab = app.getByRole('tab', { name: /Details/i })
+    await expect(detailsTab).toHaveAttribute('aria-selected', 'true')
 
-    // Click Groups sub-tab if available
+    // Click Groups sub-tab and verify its selected state and nested URL.
     const groupsTab = app.getByRole('tab', { name: /Groups/i })
-    const hasGroupsTab = (await groupsTab.count()) > 0
-    if (hasGroupsTab) {
-      await groupsTab.click()
-      await expect(app).toHaveURL(/\/groups$/)
-    }
+    await expect(groupsTab).toBeVisible()
+    await groupsTab.click()
+    await expect(app).toHaveURL(new RegExp(`${userDetailUrl}/groups$`))
+    await expect(groupsTab).toHaveAttribute('aria-selected', 'true')
 
-    // Click Roles sub-tab if available
-    const rolesTab = app.getByRole('tab', { name: /Roles/i })
-    const hasRolesTab = (await rolesTab.count()) > 0
-    if (hasRolesTab) {
-      await rolesTab.click()
-      await expect(app).toHaveURL(/\/roles$/)
-    }
+    // Click Assignments sub-tab. Its visible label differs from its URL segment.
+    const assignmentsTab = app.getByRole('tab', { name: /Assignments/i })
+    await expect(assignmentsTab).toBeVisible()
+    await assignmentsTab.click()
+    await expect(app).toHaveURL(new RegExp(`${userDetailUrl}/roles$`))
+    await expect(assignmentsTab).toHaveAttribute('aria-selected', 'true')
+
+    // Browser history restores the previous nested tab and its selection.
+    await app.goBack()
+    await expect(app).toHaveURL(new RegExp(`${userDetailUrl}/groups$`))
+    await expect(groupsTab).toHaveAttribute('aria-selected', 'true')
+
+    // A direct URL selects the matching child route.
+    await app.goto(toAppUrl(`${userDetailUrl}/roles`))
+    await expect(app).toHaveURL(new RegExp(`${userDetailUrl}/roles$`))
+    await expect(assignmentsTab).toHaveAttribute('aria-selected', 'true')
   })
 })
 
