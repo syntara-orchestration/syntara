@@ -177,14 +177,7 @@ export function BuilderFlowCanvas({
         <SemanticZoomNodeInternalsUpdater />
         <EdgeMarkers />
         {retryPreviewNodeIds.map((nodeId) => (
-          <NodeToolbar
-            key={nodeId}
-            nodeId={nodeId}
-            isVisible
-            position={Position.Bottom}
-            align="start"
-            offset={20}
-          >
+          <NodeToolbar key={nodeId} nodeId={nodeId} isVisible position={Position.Bottom} align="start" offset={20}>
             <SynLabel color="blue">Retry origin</SynLabel>
           </NodeToolbar>
         ))}

@@ -179,7 +179,7 @@ describe('RetryFromFailureInputOverrides', () => {
       },
       undefined
     )
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(screen.queryByText('Enter a valid JSON object.')).not.toBeInTheDocument()
 
     await enterDraft(user, '{}')
 
@@ -193,12 +193,17 @@ describe('RetryFromFailureInputOverrides', () => {
     await expandEditor(user)
 
     await enterDraft(user, '{')
-    expect(screen.getByRole('alert')).toHaveTextContent('Enter a valid JSON object.')
+    const invalidJsonMessage = screen.getByText('Enter a valid JSON object.')
+    expect(invalidJsonMessage).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'Parameters to override for Deploy step' })).toHaveAttribute(
+      'aria-describedby',
+      invalidJsonMessage.id
+    )
     expect(onDraftChange).toHaveBeenLastCalledWith('step-a', '{', undefined, 'Enter a valid JSON object.')
 
     for (const value of ['null', '[]', '42']) {
       await enterDraft(user, value)
-      expect(screen.getByRole('alert')).toHaveTextContent('Enter a JSON object of parameter names and values.')
+      expect(screen.getByText('Enter a JSON object of parameter names and values.')).toBeInTheDocument()
       expect(onDraftChange).toHaveBeenLastCalledWith(
         'step-a',
         value,
@@ -215,10 +220,10 @@ describe('RetryFromFailureInputOverrides', () => {
     await expandEditor(user)
 
     await enterDraft(user, '{"unknown":1}')
-    expect(screen.getByRole('alert')).toHaveTextContent('Unknown parameter: unknown.')
+    expect(screen.getByText('Unknown parameter: unknown.')).toBeInTheDocument()
 
     await enterDraft(user, '{"unknown":1,"another":2}')
-    expect(screen.getByRole('alert')).toHaveTextContent('Unknown parameters: unknown, another.')
+    expect(screen.getByText('Unknown parameters: unknown, another.')).toBeInTheDocument()
   })
 
   it('disables the editor while the retry is pending', async () => {

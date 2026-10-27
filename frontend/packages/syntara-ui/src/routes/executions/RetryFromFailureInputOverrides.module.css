@@ -11,7 +11,3 @@
   overflow-wrap: anywhere;
   background: var(--pf-t--global--background--color--secondary--default);
 }
-
-.validationError {
-  color: var(--pf-t--global--color--status--danger--default);
-}

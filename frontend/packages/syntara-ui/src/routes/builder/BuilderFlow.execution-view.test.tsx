@@ -37,9 +37,7 @@ vi.mock('@xyflow/react', async (importOriginal) => {
     ReactFlow: (props: Record<string, unknown>) => {
       latestReactFlowProps = props
       const previewNodeIds = Children.toArray(props.children as ReactNode).flatMap((child) =>
-        isValidElement<{ nodeId?: string }>(child) && typeof child.props.nodeId === 'string'
-          ? [child.props.nodeId]
-          : []
+        isValidElement<{ nodeId?: string }>(child) && typeof child.props.nodeId === 'string' ? [child.props.nodeId] : []
       )
       return (
         <div data-testid="reactflow">

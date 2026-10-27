@@ -4,6 +4,9 @@ import {
   ContentVariants,
   ExpandableSection,
   FormGroup,
+  FormHelperText,
+  HelperText,
+  HelperTextItem,
   Spinner,
   Stack,
   StackItem,
@@ -121,6 +124,7 @@ function RetryInputOverrideEditor({
       )
     : undefined
   const { error } = parseOverrideDraft(draft, target.parameterNames)
+  const helperTextId = `${fieldId}-helper-text`
 
   function renderPreviousInputs() {
     if (activityQuery.isPending) {
@@ -158,6 +162,7 @@ function RetryInputOverrideEditor({
           <TextArea
             id={`${fieldId}-override`}
             aria-label={`Parameters to override for ${target.name}`}
+            aria-describedby={helperTextId}
             value={draft}
             onChange={handleChange}
             isDisabled={isDisabled}
@@ -165,15 +170,13 @@ function RetryInputOverrideEditor({
             rows={5}
             validated={error ? 'error' : 'default'}
           />
-          {error ? (
-            <Content component={ContentVariants.small} className={styles.validationError} role="alert">
-              {error}
-            </Content>
-          ) : (
-            <Content component={ContentVariants.small}>
-              Allowed parameters: {target.parameterNames.join(', ')}. Values must be valid JSON.
-            </Content>
-          )}
+          <FormHelperText>
+            <HelperText isLiveRegion>
+              <HelperTextItem id={helperTextId} variant={error ? 'error' : 'default'}>
+                {error ?? `Allowed parameters: ${target.parameterNames.join(', ')}. Values must be valid JSON.`}
+              </HelperTextItem>
+            </HelperText>
+          </FormHelperText>
         </FormGroup>
       </StackItem>
     </Stack>
