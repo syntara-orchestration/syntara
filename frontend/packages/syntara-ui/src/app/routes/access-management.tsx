@@ -12,20 +12,21 @@ import {
   GroupDetailDetailsTabRoute,
   GroupDetailMembersTabRoute,
   GroupDetailUnknownTabRoute,
+  GroupsTab,
   PoliciesTab,
   ProjectDetail,
   ProjectDetailAssignmentsTabRoute,
   ProjectDetailDetailsTabRoute,
   ProjectDetailUnknownTabRoute,
   ProjectDetailWorkflowsTabRoute,
+  ProjectsTab,
   RolesTab,
   ServiceAccountDetail,
+  ServiceAccountsTab,
   TransferIdentityWizard,
   UserDetail,
+  UserDetailTabRoute,
   UsersTab,
-  GroupsTab,
-  ProjectsTab,
-  ServiceAccountsTab,
 } from '../lazyRoutes'
 import { makeRouteComponent } from '../makeRouteComponent'
 import { listSearchParams } from '../routeSearchParams'
@@ -91,6 +92,50 @@ const accessManagementTabRoutes = [
     getParentRoute: () => accessManagementRoute,
     path: '/token-revocation',
     component: makeRouteComponent(<AccessManagementTokenRevocationRoute />),
+  }),
+]
+
+const userDetailRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/system-administration/access-management/users/$userId',
+  component: makeRouteComponent(<UserDetail />),
+})
+
+const userDetailTabRoutes = [
+  createRoute({
+    getParentRoute: () => userDetailRoute,
+    path: '/',
+    component: makeRouteComponent(<UserDetailTabRoute />),
+  }),
+  createRoute({
+    getParentRoute: () => userDetailRoute,
+    path: 'details',
+    component: makeRouteComponent(<UserDetailTabRoute />),
+  }),
+  createRoute({
+    getParentRoute: () => userDetailRoute,
+    path: 'groups',
+    component: makeRouteComponent(<UserDetailTabRoute />),
+  }),
+  createRoute({
+    getParentRoute: () => userDetailRoute,
+    path: 'identities',
+    component: makeRouteComponent(<UserDetailTabRoute />),
+  }),
+  createRoute({
+    getParentRoute: () => userDetailRoute,
+    path: 'roles',
+    component: makeRouteComponent(<UserDetailTabRoute />),
+  }),
+  createRoute({
+    getParentRoute: () => userDetailRoute,
+    path: 'permissions',
+    component: makeRouteComponent(<UserDetailTabRoute />),
+  }),
+  createRoute({
+    getParentRoute: () => userDetailRoute,
+    path: 'check-access',
+    component: makeRouteComponent(<UserDetailTabRoute />),
   }),
 ]
 
@@ -179,16 +224,7 @@ export const accessManagementRoutes = [
     path: '/system-administration/access-management/users/$userId/transfer-identity',
     component: makeRouteComponent(<TransferIdentityWizard />),
   }),
-  createRoute({
-    getParentRoute: () => rootRoute,
-    path: '/system-administration/access-management/users/$userId',
-    component: makeRouteComponent(<UserDetail />),
-  }),
-  createRoute({
-    getParentRoute: () => rootRoute,
-    path: '/system-administration/access-management/users/$userId/$tab',
-    component: makeRouteComponent(<UserDetail />),
-  }),
+  userDetailRoute.addChildren(userDetailTabRoutes),
   groupDetailRoute.addChildren(groupDetailTabRoutes),
   projectDetailRoute.addChildren(projectDetailTabRoutes),
   createRoute({

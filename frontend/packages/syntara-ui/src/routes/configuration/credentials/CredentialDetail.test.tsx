@@ -1,5 +1,12 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { useParams } from '@tanstack/react-router'
+import {
+  createMemoryHistory,
+  createRootRoute,
+  createRoute,
+  createRouter,
+  RouterProvider,
+  useParams,
+} from '@tanstack/react-router'
 import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
@@ -10,7 +17,11 @@ import { credentialsClient } from '../../../client'
 import { AlertProvider } from '../../../providers/alerts'
 import { accessFetchClient } from '../../access/accessClient'
 
-import CredentialDetail from './CredentialDetail'
+import CredentialDetail, {
+  CredentialDetailsTabRoute,
+  CredentialIntegrationsTabRoute,
+  CredentialWorkflowsTabRoute,
+} from './CredentialDetail'
 import { useCredentialPermissions } from './useCredentialPermissions'
 
 const { mockNavigate } = vi.hoisted(() => ({
@@ -175,9 +186,49 @@ const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: false } },
 })
 
+function createCredentialDetailTestRouter(children: ReactNode) {
+  const rootRoute = createRootRoute()
+  const credentialRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    path: '/configuration/credentials/$credentialId',
+    component: () => children,
+  })
+  const detailsIndexRoute = createRoute({
+    getParentRoute: () => credentialRoute,
+    path: '/',
+    component: CredentialDetailsTabRoute,
+  })
+  const detailsRoute = createRoute({
+    getParentRoute: () => credentialRoute,
+    path: 'details',
+    component: CredentialDetailsTabRoute,
+  })
+  const workflowsRoute = createRoute({
+    getParentRoute: () => credentialRoute,
+    path: 'workflows',
+    component: CredentialWorkflowsTabRoute,
+  })
+  const integrationsRoute = createRoute({
+    getParentRoute: () => credentialRoute,
+    path: 'integrations',
+    component: CredentialIntegrationsTabRoute,
+  })
+
+  return createRouter({
+    routeTree: rootRoute.addChildren([
+      credentialRoute.addChildren([detailsIndexRoute, detailsRoute, workflowsRoute, integrationsRoute]),
+    ]),
+    history: createMemoryHistory({
+      initialEntries: [`/configuration/credentials/${routeStateMock.credentialId ?? '1'}`],
+    }),
+  })
+}
+
 const wrapper = ({ children }: { children: ReactNode }) => (
   <QueryClientProvider client={queryClient}>
-    <AlertProvider>{children}</AlertProvider>
+    <AlertProvider>
+      <RouterProvider router={createCredentialDetailTestRouter(children)} />
+    </AlertProvider>
   </QueryClientProvider>
 )
 

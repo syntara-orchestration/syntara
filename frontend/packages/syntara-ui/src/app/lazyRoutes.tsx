@@ -87,6 +87,11 @@ export const UserDetail = lazy(() =>
     default: m.UserDetail,
   }))
 )
+export const UserDetailTabRoute = lazy(() =>
+  import('../routes/access-management/users/UserDetail').then((m) => ({
+    default: m.UserDetailTabRoute,
+  }))
+)
 export const MyProfile = lazy(() =>
   import('../routes/access-management/users/MyProfile').then((m) => ({
     default: m.MyProfile,
@@ -168,3 +173,18 @@ export const ServiceAccountDetail = lazy(() =>
 )
 export const Credentials = lazy(() => import('../routes/configuration/credentials/Credentials'))
 export const CredentialDetail = lazy(() => import('../routes/configuration/credentials/CredentialDetail'))
+export const CredentialDetailsTabRoute = lazy(() =>
+  import('../routes/configuration/credentials/CredentialDetail').then((m) => ({
+    default: m.CredentialDetailsTabRoute,
+  }))
+)
+export const CredentialWorkflowsTabRoute = lazy(() =>
+  import('../routes/configuration/credentials/CredentialDetail').then((m) => ({
+    default: m.CredentialWorkflowsTabRoute,
+  }))
+)
+export const CredentialIntegrationsTabRoute = lazy(() =>
+  import('../routes/configuration/credentials/CredentialDetail').then((m) => ({
+    default: m.CredentialIntegrationsTabRoute,
+  }))
+)
