@@ -4,11 +4,13 @@ import {
   createRootRoute,
   createRoute,
   createRouter,
+  Outlet,
   RouterProvider,
   useParams,
 } from '@tanstack/react-router'
 import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { createContext, use } from 'react'
 import type { ReactNode } from 'react'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { axe } from 'vitest-axe'
@@ -186,12 +188,18 @@ const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: false } },
 })
 
-function createCredentialDetailTestRouter(children: ReactNode) {
-  const rootRoute = createRootRoute()
+const credentialDetailTestPageContext = createContext<ReactNode>(null)
+
+function CredentialDetailTestPage() {
+  return use(credentialDetailTestPageContext)
+}
+
+function createCredentialDetailTestRouter() {
+  const rootRoute = createRootRoute({ component: Outlet })
   const credentialRoute = createRoute({
     getParentRoute: () => rootRoute,
     path: '/configuration/credentials/$credentialId',
-    component: () => children,
+    component: CredentialDetailTestPage,
   })
   const detailsIndexRoute = createRoute({
     getParentRoute: () => credentialRoute,
@@ -224,10 +232,19 @@ function createCredentialDetailTestRouter(children: ReactNode) {
   })
 }
 
+let credentialDetailTestRouter: ReturnType<typeof createCredentialDetailTestRouter>
+
+async function loadCredentialDetailTestRouter() {
+  credentialDetailTestRouter = createCredentialDetailTestRouter()
+  await credentialDetailTestRouter.load()
+}
+
 const wrapper = ({ children }: { children: ReactNode }) => (
   <QueryClientProvider client={queryClient}>
     <AlertProvider>
-      <RouterProvider router={createCredentialDetailTestRouter(children)} />
+      <credentialDetailTestPageContext.Provider value={children}>
+        <RouterProvider router={credentialDetailTestRouter} />
+      </credentialDetailTestPageContext.Provider>
     </AlertProvider>
   </QueryClientProvider>
 )
@@ -279,7 +296,7 @@ function mockQuery(
 describe('CredentialDetail', () => {
   let mockMutate: ReturnType<typeof vi.fn>
 
-  beforeEach(() => {
+  beforeEach(async () => {
     routeStateMock.credentialId = '1'
     disableCredentialHookMock.reset()
     vi.clearAllMocks()
@@ -291,6 +308,7 @@ describe('CredentialDetail', () => {
     vi.mocked(credentialsClient.useQuery).mockImplementation(mockQuery())
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(credentialsClient.useMutation).mockReturnValue({ mutate: mockMutate, isPending: false } as any)
+    await loadCredentialDetailTestRouter()
   })
 
   it('has no accessibility violations', async () => {
