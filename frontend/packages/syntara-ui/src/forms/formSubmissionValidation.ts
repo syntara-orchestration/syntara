@@ -37,7 +37,7 @@ function emptyValueForField(field: FormField): FormSubmissionData[string] {
       return []
     default: {
       const exhaustive: never = field
-      return exhaustive
+      throw new Error(`Unsupported form field type: ${String(exhaustive)}`)
     }
   }
 }

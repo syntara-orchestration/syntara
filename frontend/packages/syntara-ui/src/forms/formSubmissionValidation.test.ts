@@ -86,6 +86,30 @@ describe('validateFormSubmission', () => {
     expect(cleaned).toEqual({ name: '' })
   })
 
+  it.each([
+    [FormFieldTypeEnum.TEXT, '', { default: 'prefilled' }, ''],
+    [FormFieldTypeEnum.TEXTAREA, [], { default: 'prefilled' }, ''],
+    [FormFieldTypeEnum.MASKED_TEXT, null, { default: 'prefilled' }, ''],
+    [FormFieldTypeEnum.EMAIL, '', { default: 'user@example.com' }, ''],
+    [FormFieldTypeEnum.DATE, '', { default: { date: '2026-01-05' } }, ''],
+    [FormFieldTypeEnum.NUMBER, '', { default: 7 }, null],
+    [FormFieldTypeEnum.DROPDOWN, [], { options: staticOptions, default: 'a' }, null],
+    [FormFieldTypeEnum.CHECKBOX, null, { default: true }, false],
+    [FormFieldTypeEnum.MULTI_SELECT, [], { options: staticOptions, default: ['a'] }, []],
+  ] as const)('normalizes an empty %s value to its field output type', (fieldType, empty, overrides, expected) => {
+    const definition = form(field(fieldType, 'answer', overrides))
+
+    expect(validateFormSubmission(definition, { answer: empty })).toEqual({ answer: expected })
+  })
+
+  it('throws if an unsupported runtime field type reaches empty-value normalization', () => {
+    const invalidDefinition = {
+      fields: [{ type: 'unsupported', value_name: 'answer', label: 'Answer' }],
+    } as unknown as ReturnType<typeof form>
+
+    expect(() => validateFormSubmission(invalidDefinition, { answer: '' })).toThrow('Unsupported form field type')
+  })
+
   it('applies defaults when a field is absent', () => {
     const cleaned = validateFormSubmission(form(field(FormFieldTypeEnum.TEXT, 'name', { default: 'anon' })), {})
     expect(cleaned).toEqual({ name: 'anon' })
