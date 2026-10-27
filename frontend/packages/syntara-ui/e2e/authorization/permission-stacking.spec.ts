@@ -42,7 +42,7 @@ test.describe('AAP-76530: Permission Stacking', () => {
       await loginAsUser(writerPage, writer)
       await writerPage.goto(toAppUrl('/workflows'))
       await expect(writerPage.getByRole('heading', { level: 1, name: /Workflows/i })).toBeVisible({ timeout: 15_000 })
-      await expect(writerPage.getByRole('button', { name: /Create workflow/i })).toBeVisible()
+      await expect(writerPage.getByRole('link', { name: /Create workflow/i })).toBeVisible()
     } finally {
       await writerCtx.close()
       await cleanupPersona(app, writer)

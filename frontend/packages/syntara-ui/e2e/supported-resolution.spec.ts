@@ -152,7 +152,7 @@ test.describe('React Flow viewport guard', () => {
     await app.goto(toAppUrl(AppRoute.WorkflowBuilder.New))
     await expect(app.getByRole('navigation', { name: 'Main navigation' })).toBeVisible()
     await expect(reactFlowViewportEmptyState(app)).toBeVisible()
-    await expect(app.getByRole('button', { name: REACT_FLOW_VIEWPORT_EMPTY_STATE.returnLabel })).toBeVisible()
+    await expect(app.getByRole('link', { name: REACT_FLOW_VIEWPORT_EMPTY_STATE.returnLabel })).toBeVisible()
     await expect(app.getByPlaceholder('Workflow name')).not.toBeVisible()
     await expect(app.getByRole('button', { name: /^Add step$/ })).not.toBeVisible()
     await expect(app.locator('.react-flow')).not.toBeVisible()
@@ -200,7 +200,7 @@ test.describe('React Flow viewport guard', () => {
   test('Return to Workflows navigates from builder empty state', async ({ app }) => {
     await app.setViewportSize({ width: MIN_SUPPORTED_VIEWPORT.width - 1, height: 720 })
     await app.goto(toAppUrl(AppRoute.WorkflowBuilder.New))
-    await app.getByRole('button', { name: REACT_FLOW_VIEWPORT_EMPTY_STATE.returnLabel }).click()
+    await app.getByRole('link', { name: REACT_FLOW_VIEWPORT_EMPTY_STATE.returnLabel }).click()
     await expect(app).toHaveURL(/\/workflows$/)
     await expect(app.getByRole('heading', { level: 1, name: 'Workflows' })).toBeVisible()
   })

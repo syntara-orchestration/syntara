@@ -249,11 +249,7 @@ function UserMenuDropdown({ showTooltip }: Readonly<{ showTooltip: boolean }>) {
         popperProps={{ placement: 'right-start', preventOverflow: true, enableFlip: false }}
       >
         <DropdownList>
-          <DropdownItem
-            key="profile"
-            to={AppRoute.MyProfile.Root}
-            onClick={handleProfileClick}
-          >
+          <DropdownItem key="profile" to={AppRoute.MyProfile.Root} onClick={handleProfileClick}>
             My Profile
           </DropdownItem>
           <DropdownItem key="logout" onClick={handleLogoutClick}>
