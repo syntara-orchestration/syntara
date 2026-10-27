@@ -16,6 +16,7 @@ export const AppRoute = {
   },
   ExecutionPlane: {
     Root: '/execution-plane',
+    Create: '/execution-plane/create',
     Detail: '/execution-plane/:executionTargetId',
   },
   Configuration: {

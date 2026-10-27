@@ -14,7 +14,7 @@ import {
   WorkflowVersionStatusEnum,
 } from '@syntara/contracts'
 import { credentials, credentialTypes, credentialWorkflows } from './resources/credentials'
-import { executionTargets } from './resources/executionTargets'
+import { executionTargets, INSTALLED_EXECUTION_PLANE_CLUSTER_ID } from './resources/executionTargets'
 import { integrations } from './resources/integrations'
 import { models } from './resources/models'
 import { workflows } from './resources/workflows'
@@ -566,6 +566,116 @@ export const handlers = [
       )
     }
     return HttpResponse.json(target)
+  }),
+
+  http.post('/api/execution_plane/v1/execution_targets', async ({ request }) => {
+    const username = getUsernameFromRequest(request)
+    if (username !== 'admin') {
+      return HttpResponse.json(
+        {
+          type: 'https://api.example.com/errors/forbidden',
+          title: 'Forbidden',
+          detail: 'Insufficient permissions for execution_target:create',
+          code: 'FORBIDDEN',
+          retryable: false,
+        },
+        { status: 403 }
+      )
+    }
+
+    const body = (await request.json()) as {
+      name?: string
+      placement?: {
+        type?: 'kubernetes'
+        namespace?: string
+        node_selectors?: string[]
+        tolerations?: string[]
+      }
+      labels?: Record<string, string>
+      is_default?: boolean
+    }
+
+    const name = body.name?.trim() ?? ''
+    const namespace = body.placement?.namespace?.trim() ?? ''
+
+    if (!name || !namespace) {
+      return HttpResponse.json(
+        {
+          type: 'https://api.example.com/errors/validation-error',
+          title: 'Validation Error',
+          detail: 'name and placement.namespace are required',
+          code: 'VALIDATION_ERROR',
+          retryable: false,
+        },
+        { status: 422 }
+      )
+    }
+
+    if (executionTargets.some((target) => target.name.toLowerCase() === name.toLowerCase())) {
+      return HttpResponse.json(
+        {
+          type: 'https://api.example.com/errors/conflict',
+          title: 'Conflict',
+          detail: `An execution target named "${name}" already exists`,
+          code: 'CONFLICT',
+          retryable: false,
+        },
+        { status: 409 }
+      )
+    }
+
+    const openshiftIntegrations = integrations.filter((item) => item.integration_type === IntegrationTypeEnum.OPENSHIFT)
+    if (openshiftIntegrations.length !== 1) {
+      return HttpResponse.json(
+        {
+          type: 'https://api.example.com/errors/conflict',
+          title: 'Conflict',
+          detail: 'Expected exactly one installed Execution Plane cluster',
+          code: 'CONFLICT',
+          retryable: false,
+        },
+        { status: 409 }
+      )
+    }
+
+    const openshiftIntegration = openshiftIntegrations[0]
+    const clusterId = openshiftIntegration?.id ?? INSTALLED_EXECUTION_PLANE_CLUSTER_ID
+    const id = uuidv4()
+    const created = {
+      id,
+      cluster_id: clusterId,
+      name,
+      backend_type: 'kubernetes',
+      endpoint:
+        openshiftIntegration?.configuration && 'base_url' in openshiftIntegration.configuration
+          ? String(openshiftIntegration.configuration.base_url)
+          : 'https://api.openshift.example.com:6443',
+      placement: {
+        type: 'kubernetes' as const,
+        namespace,
+        node_selectors: body.placement?.node_selectors ?? [],
+        tolerations: body.placement?.tolerations ?? [],
+      },
+      status: 'registering',
+      enabled: true,
+      is_default: body.is_default ?? false,
+      status_message: null,
+      labels: {
+        ...(body.labels ?? {}),
+        ...(openshiftIntegration ? { integration_id: openshiftIntegration.id } : {}),
+      },
+      created_at: mockDate.now,
+      last_ran_at: null,
+    }
+
+    executionTargets.unshift(created)
+
+    return HttpResponse.json(created, {
+      status: 201,
+      headers: {
+        Location: `/api/execution_plane/v1/execution_targets/${id}`,
+      },
+    })
   }),
 
   http.get('/api/v1/integrations', ({ request }) => {
