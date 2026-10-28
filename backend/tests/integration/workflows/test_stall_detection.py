@@ -9,14 +9,16 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, patch
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 
+from syntara.workflows.models import Workflow, WorkflowVersion
 from syntara.workflows.models.activity_execution import ActivityExecution, ActivityStatus
 from syntara.workflows.models.execution import Execution, ExecutionStatus
 from syntara.workflows.workers.stall_detection import detect_stalled_activities
 from syntara.workflows.workflow_engine.models.workflow_definition import NodeType
+from tests.helpers.workflow import create_minimal_workflow_definition
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import async_sessionmaker
@@ -28,6 +30,7 @@ if TYPE_CHECKING:
 async def _seed_activity(
     session: AsyncSession,
     user: User,
+    project_id: UUID,
     *,
     status: ActivityStatus = ActivityStatus.RUNNING,
     expected_duration: int | None = 60,
@@ -35,13 +38,35 @@ async def _seed_activity(
     stall_alert_at: datetime | None = None,
 ) -> ActivityExecution:
     """Create a test activity execution in the database."""
+    # Create workflow
+    workflow = Workflow(
+        id=uuid4(),
+        name="test-workflow",
+        created_by=user.id,
+        project_id=project_id,
+    )
+    session.add(workflow)
+    await session.flush()
+
+    # Create workflow version
+    workflow_version = WorkflowVersion(
+        id=uuid4(),
+        workflow_id=workflow.id,
+        version=1,
+        schema_version="2.0.0",
+        workflow_definition=create_minimal_workflow_definition(name="test-workflow"),
+        created_by=user.id,
+    )
+    session.add(workflow_version)
+    await session.flush()
+
     # Create parent execution
     execution = Execution(
         id=uuid4(),
-        workflow_id=uuid4(),
-        workflow_name="test-workflow",
-        trigger_type="manual_trigger",
-        trigger_id="trigger_1",
+        workflow_id=workflow.id,
+        workflow_version_id=workflow_version.id,
+        temporal_workflow_id=f"test-execution-{uuid4()}",
+        project_id=project_id,
         status=ExecutionStatus.RUNNING,
         actor_id=user.id,
     )
@@ -75,6 +100,7 @@ class TestStallDetectionScanner:
         test_db_session: AsyncSession,
         test_db_session_factory: async_sessionmaker[AsyncSession],
         test_user: User,
+        test_project_id: UUID,
     ) -> None:
         """Scanner selects and claims overdue running activity against real PostgreSQL."""
         now = datetime.now(UTC)
@@ -83,6 +109,7 @@ class TestStallDetectionScanner:
         activity = await _seed_activity(
             test_db_session,
             test_user,
+            test_project_id,
             status=ActivityStatus.RUNNING,
             expected_duration=60,
             started_at=started_at,
@@ -107,6 +134,7 @@ class TestStallDetectionScanner:
         test_db_session: AsyncSession,
         test_db_session_factory: async_sessionmaker[AsyncSession],
         test_user: User,
+        test_project_id: UUID,
     ) -> None:
         """Scanner ignores activities that haven't exceeded expected duration."""
         now = datetime.now(UTC)
@@ -115,6 +143,7 @@ class TestStallDetectionScanner:
         activity = await _seed_activity(
             test_db_session,
             test_user,
+            test_project_id,
             status=ActivityStatus.RUNNING,
             expected_duration=120,  # Expects 120s, not stalled yet
             started_at=started_at,
@@ -134,11 +163,13 @@ class TestStallDetectionScanner:
         test_db_session: AsyncSession,
         test_db_session_factory: async_sessionmaker[AsyncSession],
         test_user: User,
+        test_project_id: UUID,
     ) -> None:
         """Scanner SQL WHERE clause filters out NULL expected_duration."""
         activity = await _seed_activity(
             test_db_session,
             test_user,
+            test_project_id,
             status=ActivityStatus.RUNNING,
             expected_duration=None,  # NULL
             started_at=datetime.now(UTC) - timedelta(hours=2),
@@ -157,11 +188,13 @@ class TestStallDetectionScanner:
         test_db_session: AsyncSession,
         test_db_session_factory: async_sessionmaker[AsyncSession],
         test_user: User,
+        test_project_id: UUID,
     ) -> None:
         """Scanner SQL WHERE clause filters out NULL started_at."""
         activity = await _seed_activity(
             test_db_session,
             test_user,
+            test_project_id,
             status=ActivityStatus.RUNNING,
             expected_duration=60,
             started_at=None,  # NULL
@@ -180,12 +213,14 @@ class TestStallDetectionScanner:
         test_db_session: AsyncSession,
         test_db_session_factory: async_sessionmaker[AsyncSession],
         test_user: User,
+        test_project_id: UUID,
     ) -> None:
         """Scanner SQL WHERE clause filters by status = RUNNING."""
         for status in [ActivityStatus.PENDING, ActivityStatus.COMPLETED, ActivityStatus.FAILED]:
             await _seed_activity(
                 test_db_session,
                 test_user,
+                test_project_id,
                 status=status,
                 expected_duration=60,
                 started_at=datetime.now(UTC) - timedelta(seconds=120),
@@ -201,12 +236,14 @@ class TestStallDetectionScanner:
         test_db_session: AsyncSession,
         test_db_session_factory: async_sessionmaker[AsyncSession],
         test_user: User,
+        test_project_id: UUID,
     ) -> None:
         """Scanner SQL WHERE clause filters out existing stall_alert_at (deduplication)."""
         now = datetime.now(UTC)
         activity = await _seed_activity(
             test_db_session,
             test_user,
+            test_project_id,
             status=ActivityStatus.RUNNING,
             expected_duration=60,
             started_at=now - timedelta(seconds=120),
@@ -226,6 +263,7 @@ class TestStallDetectionScanner:
         test_db_session: AsyncSession,
         test_db_session_factory: async_sessionmaker[AsyncSession],
         test_user: User,
+        test_project_id: UUID,
     ) -> None:
         """Running the scanner twice claims an activity only once."""
         now = datetime.now(UTC)
@@ -234,6 +272,7 @@ class TestStallDetectionScanner:
         activity = await _seed_activity(
             test_db_session,
             test_user,
+            test_project_id,
             status=ActivityStatus.RUNNING,
             expected_duration=60,
             started_at=started_at,
@@ -264,6 +303,7 @@ class TestStallDetectionScanner:
         test_db_session: AsyncSession,
         test_db_session_factory: async_sessionmaker[AsyncSession],
         test_user: User,
+        test_project_id: UUID,
     ) -> None:
         """stall_alert_at is never cleared, even if activity later completes.
 
@@ -277,6 +317,7 @@ class TestStallDetectionScanner:
         activity = await _seed_activity(
             test_db_session,
             test_user,
+            test_project_id,
             status=ActivityStatus.RUNNING,
             expected_duration=60,
             started_at=started_at,
@@ -309,6 +350,7 @@ class TestStallDetectionScanner:
         test_db_session: AsyncSession,
         test_db_session_factory: async_sessionmaker[AsyncSession],
         test_user: User,
+        test_project_id: UUID,
     ) -> None:
         """Scanner claims all eligible activities in a single batch."""
         now = datetime.now(UTC)
@@ -319,6 +361,7 @@ class TestStallDetectionScanner:
             activity = await _seed_activity(
                 test_db_session,
                 test_user,
+                test_project_id,
                 status=ActivityStatus.RUNNING,
                 expected_duration=60,
                 started_at=started_at,
@@ -347,6 +390,7 @@ class TestStallDetectionScanner:
         test_db_session: AsyncSession,
         test_db_session_factory: async_sessionmaker[AsyncSession],
         test_user: User,
+        test_project_id: UUID,
     ) -> None:
         """UPDATE...RETURNING returns mapped ActivityExecution instances with accessible attributes."""
         now = datetime.now(UTC)
@@ -356,6 +400,7 @@ class TestStallDetectionScanner:
         activity = await _seed_activity(
             test_db_session,
             test_user,
+            test_project_id,
             status=ActivityStatus.RUNNING,
             expected_duration=60,
             started_at=started_at,
@@ -402,6 +447,7 @@ class TestStallDetectionScanner:
         test_db_session: AsyncSession,
         test_db_session_factory: async_sessionmaker[AsyncSession],
         test_user: User,
+        test_project_id: UUID,
     ) -> None:
         """Two concurrent scanner invocations claim each row exactly once."""
         import asyncio
@@ -415,6 +461,7 @@ class TestStallDetectionScanner:
             activity = await _seed_activity(
                 test_db_session,
                 test_user,
+                test_project_id,
                 status=ActivityStatus.RUNNING,
                 expected_duration=60,
                 started_at=started_at,
