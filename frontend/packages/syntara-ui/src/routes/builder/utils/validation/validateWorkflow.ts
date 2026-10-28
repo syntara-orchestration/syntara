@@ -8,6 +8,7 @@ import { validateConvergeInputs } from './rules/validateConvergeInputs'
 import { validateFormPromptConnections } from './rules/validateFormPromptConnections'
 import { validateFormPromptFallbackBehavior } from './rules/validateFormPromptFallbackBehavior'
 import { validateFormPromptFormDefinition } from './rules/validateFormPromptFormDefinition'
+import { validateFormTriggerFormDefinition } from './rules/validateFormTriggerFormDefinition'
 import { validateLoopNodes } from './rules/validateLoopNodes'
 import { validateNoDanglingNodes } from './rules/validateNoDanglingNodes'
 import { validateNoGenericNodes } from './rules/validateNoGenericNodes'
@@ -23,6 +24,7 @@ const ERROR_RULES: ValidationRule[] = [
   validateFormPromptConnections,
   validateFormPromptFallbackBehavior,
   validateFormPromptFormDefinition,
+  validateFormTriggerFormDefinition,
   validateConvergeInputs,
   validateLoopNodes,
   validateNoGenericNodes,

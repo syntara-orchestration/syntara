@@ -51,7 +51,7 @@ describe('buildFormPromptActivityParameters', () => {
     expect(() => buildFormPromptActivityParameters({ form_definition: invalid })).toThrow()
   })
 
-  it('repairs date fields with time but no timezone before building parameters', () => {
+  it('preserves date fields with time but no timezone before building parameters', () => {
     const form_definition: FormDefinition = {
       fields: [
         {
@@ -70,7 +70,7 @@ describe('buildFormPromptActivityParameters', () => {
     expect(field).toMatchObject({
       type: 'date',
       include_time: true,
-      include_timezone: true,
+      include_timezone: false,
     })
   })
 })

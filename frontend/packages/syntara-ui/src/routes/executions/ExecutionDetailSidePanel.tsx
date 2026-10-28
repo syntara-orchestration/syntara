@@ -1,7 +1,6 @@
 import type { Approval, FormsAPI } from '@syntara/contracts'
 
 import { ApprovalSidePanel } from './ApprovalSidePanel'
-import type { WorkflowDefinitionLike } from './formPrompt/resolveCanvasNodeType'
 import { FormPromptSidePanel } from './FormPromptSidePanel'
 import type { useApprovalNavigation } from './hooks/useApprovalNavigation'
 
@@ -19,7 +18,6 @@ type ExecutionDetailSidePanelProps = Readonly<{
   activityNameMap: Map<string, string>
   onFormPromptClose: () => void
   onFormPromptSubmitted: () => void
-  workflowDefinition?: WorkflowDefinitionLike
   approvalPanelOpen: boolean
   currentApproval: Approval | null | undefined
   approvalMessage: string | null | undefined
@@ -41,7 +39,6 @@ export function ExecutionDetailSidePanel({
   activityNameMap,
   onFormPromptClose,
   onFormPromptSubmitted,
-  workflowDefinition,
   approvalPanelOpen,
   currentApproval,
   approvalMessage,
@@ -60,7 +57,6 @@ export function ExecutionDetailSidePanel({
         activityNameMap={activityNameMap}
         onClose={onFormPromptClose}
         onSubmitted={onFormPromptSubmitted}
-        workflowDefinition={workflowDefinition}
         currentIndex={formPromptIndex}
         totalCount={formPromptCount}
         hasPrev={formPromptNavigation.hasPrev}

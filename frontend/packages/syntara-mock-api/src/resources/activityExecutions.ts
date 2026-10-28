@@ -328,6 +328,23 @@ export const activityExecutions: Record<string, ActivityExecutionMockSeed[]> = {
       iteration: 1,
     },
   ],
+  'exec-form-prompt-textarea-layout': [
+    {
+      id: 'act-fp-textarea-layout',
+      created_at: mockDate.minutesAgo10,
+      updated_at: mockDate.minutesAgo10,
+      execution_id: 'exec-form-prompt-textarea-layout',
+      activity_name: 'layout_check',
+      status: 'waiting',
+      started_at: mockDate.minutesAgo10,
+      completed_at: null,
+      input_data: {} as Record<string, unknown>,
+      output_data: null,
+      error_details: null,
+      retry_count: 0,
+      iteration: null,
+    },
+  ],
   'exec-form-prompt': [
     {
       id: 'act-fp-1',

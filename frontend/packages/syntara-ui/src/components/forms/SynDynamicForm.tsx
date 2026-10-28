@@ -1,5 +1,5 @@
 import { Button, Content, ContentVariants, Form, Stack, StackItem } from '@patternfly/react-core'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 
 import {
@@ -18,6 +18,10 @@ import { buildDefaultValues } from './dynamicForm/buildDefaultValues'
 import { SynDynamicFormField } from './dynamicForm/SynDynamicFormField'
 import type { SynDynamicFormProps } from './SynDynamicForm.types'
 import { SynForm } from './SynForm'
+
+function formResetKey(definition: SynDynamicFormProps['definition'], initialValues?: FormSubmissionInput): string {
+  return `${JSON.stringify(definition)}\0${JSON.stringify(initialValues ?? null)}`
+}
 
 /**
  * Renders an interactive prompt / workflow form from a backend {@link FormDefinition}.
@@ -38,6 +42,7 @@ export function SynDynamicForm({
   hideSubmitButton = false,
   id,
   'data-testid': dataTestId,
+  textAreaControlClassName,
 }: Readonly<SynDynamicFormProps>) {
   const definitionError = useMemo(() => {
     try {
@@ -57,7 +62,13 @@ export function SynDynamicForm({
   const { handleSubmit, reset, setError } = form
   const [isSubmitting, setIsSubmitting] = useState(false)
 
+  const lastResetKeyRef = useRef<string | null>(null)
   useEffect(() => {
+    const nextKey = formResetKey(definition, initialValues)
+    if (lastResetKeyRef.current === nextKey) {
+      return
+    }
+    lastResetKeyRef.current = nextKey
     reset(buildDefaultValues(definition, initialValues))
   }, [definition, initialValues, reset])
 
@@ -109,6 +120,7 @@ export function SynDynamicForm({
                     field={field}
                     isDisabled={fieldsDisabled}
                     resolveDynamicOptions={resolveDynamicOptions}
+                    textAreaControlClassName={textAreaControlClassName}
                   />
                 )
                 return (

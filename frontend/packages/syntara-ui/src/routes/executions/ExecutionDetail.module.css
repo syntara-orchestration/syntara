@@ -1,4 +1,5 @@
 .approvalPanelSlot {
   flex-shrink: 0;
   align-self: stretch;
+  min-width: 0;
 }

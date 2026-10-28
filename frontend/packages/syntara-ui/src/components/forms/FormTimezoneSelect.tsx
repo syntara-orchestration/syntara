@@ -9,19 +9,23 @@ import {
   TextInputGroupUtilities,
 } from '@patternfly/react-core'
 import { RhUiCloseIcon } from '@patternfly/react-icons'
-import { useCallback, useMemo, useState } from 'react'
+import { type MouseEvent, type Ref, useCallback, useMemo, useRef, useState } from 'react'
 
 import { getIanaTimezones } from '../../utils/timezoneList'
 import { SynSelect } from '../SynSelect'
 
+/** Props for an optional, searchable IANA timezone selector. */
 type FormTimezoneSelectProps = Readonly<{
+  /** ID applied to the typeahead input. */
   id: string
+  /** Selected IANA timezone, or an empty string when no timezone is selected. */
   value: string
+  /** Called with the selected timezone, or an empty string when cleared. */
   onChange: (timezone: string) => void
+  /** Disables the selector and its clear action. */
   isDisabled?: boolean
+  /** Accessible name for the timezone input and select. */
   ariaLabel?: string
-  allowEmpty?: boolean
-  emptyOptionLabel?: string
 }>
 
 export function FormTimezoneSelect({
@@ -30,17 +34,16 @@ export function FormTimezoneSelect({
   onChange,
   isDisabled,
   ariaLabel = 'Time zone',
-  allowEmpty = false,
-  emptyOptionLabel = 'No time zone',
 }: FormTimezoneSelectProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [filter, setFilter] = useState('')
+  const inputRef = useRef<HTMLInputElement>(null)
 
   const timezones = useMemo(() => getIanaTimezones(), [])
   const filtered = filter ? timezones.filter((tz) => tz.toLowerCase().includes(filter.toLowerCase())) : timezones
 
   const handleSelect = useCallback(
-    (_event: React.MouseEvent | undefined, selected: string | number | undefined) => {
+    (_event: MouseEvent<Element> | undefined, selected: string | number | undefined) => {
       if (selected === undefined) {
         return
       }
@@ -51,59 +54,88 @@ export function FormTimezoneSelect({
     [onChange]
   )
 
+  const handleOpenChange = useCallback((open: boolean) => {
+    setIsOpen(open)
+    if (!open) {
+      setFilter('')
+    }
+  }, [])
+
   const toggle = useCallback(
-    (toggleRef: React.Ref<MenuToggleElement>) => (
+    (toggleRef: Ref<MenuToggleElement>) => (
       <MenuToggle
         ref={toggleRef}
-        onClick={() => setIsOpen((prev) => !prev)}
+        variant="typeahead"
+        onClick={() => setIsOpen((previous) => !previous)}
         isExpanded={isOpen}
         isFullWidth
         isDisabled={isDisabled}
         aria-label={ariaLabel}
       >
-        {value || 'Select time zone'}
+        <TextInputGroup isPlain isDisabled={isDisabled}>
+          <TextInputGroupMain
+            inputId={id}
+            value={isOpen ? filter : value}
+            onChange={(_event, nextFilter) => {
+              setFilter(nextFilter)
+              if (!isOpen) {
+                setIsOpen(true)
+              }
+            }}
+            onClick={(event) => {
+              event.stopPropagation()
+              if (!isOpen) {
+                setIsOpen(true)
+              }
+            }}
+            placeholder="Select time zone"
+            aria-label={ariaLabel}
+            autoComplete="off"
+            innerRef={inputRef}
+          />
+          {(value || filter) && !isDisabled && (
+            <TextInputGroupUtilities>
+              <Button
+                variant="plain"
+                onClick={(event) => {
+                  event.stopPropagation()
+                  onChange('')
+                  setFilter('')
+                  inputRef.current?.focus()
+                }}
+                aria-label="Clear time zone"
+              >
+                <RhUiCloseIcon />
+              </Button>
+            </TextInputGroupUtilities>
+          )}
+        </TextInputGroup>
       </MenuToggle>
     ),
-    [ariaLabel, isDisabled, isOpen, value]
+    [ariaLabel, filter, id, isDisabled, isOpen, onChange, value]
   )
 
   return (
     <SynSelect
       id={id}
-      isOpen={isOpen}
-      selected={value}
-      onSelect={handleSelect}
-      onOpenChange={(open) => {
-        setIsOpen(open)
-        if (!open) {
-          setFilter('')
-        }
-      }}
-      toggle={toggle}
       aria-label={ariaLabel}
+      isOpen={isOpen}
+      onOpenChange={handleOpenChange}
+      onSelect={handleSelect}
+      selected={value}
+      shouldFocusToggleOnSelect={false}
+      toggle={toggle}
     >
-      <TextInputGroup>
-        <TextInputGroupMain
-          value={filter}
-          onChange={(_event, val) => setFilter(val)}
-          placeholder="Filter timezones"
-          aria-label="Filter timezones"
-        />
-        {filter && (
-          <TextInputGroupUtilities>
-            <Button variant="plain" onClick={() => setFilter('')} aria-label="Clear timezone filter">
-              <RhUiCloseIcon />
-            </Button>
-          </TextInputGroupUtilities>
+      <SelectList aria-label="Time zone options">
+        {filtered.length === 0 ? (
+          <SelectOption isDisabled>No time zones match &quot;{filter}&quot;</SelectOption>
+        ) : (
+          filtered.slice(0, 50).map((timezone) => (
+            <SelectOption key={timezone} value={timezone} isSelected={timezone === value}>
+              {timezone}
+            </SelectOption>
+          ))
         )}
-      </TextInputGroup>
-      <SelectList aria-label="Timezone options">
-        {allowEmpty && <SelectOption value="">{emptyOptionLabel}</SelectOption>}
-        {filtered.slice(0, 50).map((tz) => (
-          <SelectOption key={tz} value={tz}>
-            {tz}
-          </SelectOption>
-        ))}
       </SelectList>
     </SynSelect>
   )

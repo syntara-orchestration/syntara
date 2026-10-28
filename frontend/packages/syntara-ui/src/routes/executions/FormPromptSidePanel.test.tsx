@@ -4,13 +4,28 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
+import { FORM_PROMPT_RESPOND_PANEL_TITLE } from './formPrompt/formPromptRespondPanelConstants'
 import { FormPromptSidePanel } from './FormPromptSidePanel'
 
-vi.mock('./FormPromptResponseContent', () => ({
-  FormPromptResponseContent: ({ formPromptId }: { formPromptId: string }) => (
-    <div aria-label="Form prompt response">Prompt {formPromptId}</div>
-  ),
+const mockFormPromptResponseOptions = vi.hoisted(() => ({
+  includeFooterSlot: false,
 }))
+
+vi.mock('./FormPromptResponseContent', async () => {
+  const { FormPromptRespondPanelFooterSlot } = await import('./formPrompt/FormPromptRespondPanelFooter')
+  return {
+    FormPromptResponseContent: ({ formPromptId }: { formPromptId: string }) => (
+      <div aria-label="Form prompt response">
+        Prompt {formPromptId}
+        {mockFormPromptResponseOptions.includeFooterSlot ? (
+          <FormPromptRespondPanelFooterSlot>
+            <button type="button">Submit response</button>
+          </FormPromptRespondPanelFooterSlot>
+        ) : null}
+      </div>
+    ),
+  }
+})
 
 const mockFormPrompt: FormsAPI.components['schemas']['FormPromptSummary'] = {
   id: 'fp-1',
@@ -22,14 +37,43 @@ const mockFormPrompt: FormsAPI.components['schemas']['FormPromptSummary'] = {
   temporal_activity_id: 'act-1',
 }
 
+function queryPanelFooter(container: HTMLElement) {
+  return container.querySelector('.pf-v6-c-panel__footer')
+}
+
 describe('FormPromptSidePanel', () => {
   it('renders respond header and content', () => {
     render(
       <FormPromptSidePanel executionId="exec-1" formPrompt={mockFormPrompt} onClose={vi.fn()} onSubmitted={vi.fn()} />
     )
 
-    expect(screen.getByRole('heading', { name: 'Respond to prompt' })).toBeInTheDocument()
-    expect(screen.getByLabelText('Form prompt response')).toHaveTextContent('Prompt fp-1')
+    expect(screen.getByRole('region', { name: FORM_PROMPT_RESPOND_PANEL_TITLE })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: FORM_PROMPT_RESPOND_PANEL_TITLE })).toBeInTheDocument()
+    expect(screen.getByLabelText('Form prompt response')).toHaveTextContent(/Prompt fp-1/)
+  })
+
+  it('omits SynPanel footer when no submit actions are projected', () => {
+    mockFormPromptResponseOptions.includeFooterSlot = false
+
+    const { container } = render(
+      <FormPromptSidePanel executionId="exec-1" formPrompt={mockFormPrompt} onClose={vi.fn()} onSubmitted={vi.fn()} />
+    )
+
+    expect(screen.queryByRole('button', { name: 'Submit response' })).not.toBeInTheDocument()
+    expect(queryPanelFooter(container)).toBeNull()
+  })
+
+  it('projects respond actions into the SynPanel footer', async () => {
+    mockFormPromptResponseOptions.includeFooterSlot = true
+
+    const { container } = render(
+      <FormPromptSidePanel executionId="exec-1" formPrompt={mockFormPrompt} onClose={vi.fn()} onSubmitted={vi.fn()} />
+    )
+
+    const responseRegion = screen.getByLabelText('Form prompt response')
+    const submitButton = await screen.findByRole('button', { name: 'Submit response' })
+    expect(responseRegion).not.toContainElement(submitButton)
+    expect(queryPanelFooter(container)).not.toBeNull()
   })
 
   it('calls onClose when close is clicked', async () => {
@@ -62,6 +106,78 @@ describe('FormPromptSidePanel', () => {
 
     expect(screen.getByRole('button', { name: 'Previous prompt' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Next prompt' })).toBeInTheDocument()
+  })
+
+  it('calls navigation handlers when prev and next are clicked', async () => {
+    const user = userEvent.setup()
+    const onNavigatePrev = vi.fn()
+    const onNavigateNext = vi.fn()
+
+    render(
+      <FormPromptSidePanel
+        executionId="exec-1"
+        formPrompt={mockFormPrompt}
+        onClose={vi.fn()}
+        onSubmitted={vi.fn()}
+        currentIndex={1}
+        totalCount={3}
+        hasPrev
+        hasNext
+        onNavigatePrev={onNavigatePrev}
+        onNavigateNext={onNavigateNext}
+      />
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Previous prompt' }))
+    await user.click(screen.getByRole('button', { name: 'Next prompt' }))
+    expect(onNavigatePrev).toHaveBeenCalledOnce()
+    expect(onNavigateNext).toHaveBeenCalledOnce()
+  })
+
+  it('renders the simple header when navigation is unavailable', () => {
+    render(
+      <FormPromptSidePanel
+        executionId="exec-1"
+        formPrompt={mockFormPrompt}
+        onClose={vi.fn()}
+        onSubmitted={vi.fn()}
+        totalCount={2}
+      />
+    )
+
+    expect(screen.getByRole('heading', { name: FORM_PROMPT_RESPOND_PANEL_TITLE })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Previous prompt' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Next prompt' })).not.toBeInTheDocument()
+  })
+
+  it('renders the simple header when only one prompt is in the queue', () => {
+    render(
+      <FormPromptSidePanel
+        executionId="exec-1"
+        formPrompt={mockFormPrompt}
+        onClose={vi.fn()}
+        onSubmitted={vi.fn()}
+        totalCount={1}
+        onNavigatePrev={vi.fn()}
+        onNavigateNext={vi.fn()}
+      />
+    )
+
+    expect(screen.queryByRole('button', { name: 'Previous prompt' })).not.toBeInTheDocument()
+  })
+
+  it('forwards optional content props to the response surface', () => {
+    render(
+      <FormPromptSidePanel
+        executionId="exec-1"
+        formPrompt={mockFormPrompt}
+        activityNameMap={new Map([['collect_input', 'Collect input']])}
+        onClose={vi.fn()}
+        onSubmitted={vi.fn()}
+      />
+    )
+
+    expect(screen.getByLabelText('Form prompt response')).toHaveTextContent(/Prompt fp-1/)
   })
 
   it('returns null when form prompt id is missing', () => {

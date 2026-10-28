@@ -17,12 +17,18 @@ const staticPriorityOptions = {
     { display_label: 'High', value: 'high' },
   ],
 }
+const NUMBER_FIELD_LABEL = 'Count'
 
 function renderWithQueryClient(ui: ReactNode) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   })
-  return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>)
+  const view = render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>)
+  return {
+    ...view,
+    rerender: (next: ReactNode) =>
+      view.rerender(<QueryClientProvider client={queryClient}>{next}</QueryClientProvider>),
+  }
 }
 
 describe('SynDynamicForm', () => {
@@ -137,6 +143,84 @@ describe('SynDynamicForm', () => {
     })
   })
 
+  it('keeps a number field empty after clearing and blurring it', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+
+    const definition = parseFormDefinition({
+      fields: [
+        { type: FormFieldTypeEnum.NUMBER, value_name: 'count', label: 'Count' },
+        { type: FormFieldTypeEnum.TEXT, value_name: 'name', label: 'Name', required: true },
+      ],
+    })
+
+    renderWithQueryClient(<SynDynamicForm definition={definition} onSubmit={onSubmit} submitLabel="Send" />)
+
+    const count = screen.getByRole('spinbutton', { name: 'Count' })
+    expect(count).toHaveValue(null)
+
+    await user.type(count, '5')
+    expect(count).toHaveValue(5)
+
+    await user.clear(count)
+    await user.tab()
+    expect(count).toHaveValue(null)
+
+    await user.type(screen.getByRole('textbox', { name: 'Name' }), 'Ada')
+    await user.click(screen.getByRole('button', { name: 'Send' }))
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith({ name: 'Ada' })
+    })
+  })
+
+  it.each([
+    { buttonLabel: 'Plus', expectedValue: 1 },
+    { buttonLabel: 'Minus', expectedValue: -1 },
+  ])('applies $buttonLabel to an empty number field from zero', async ({ buttonLabel, expectedValue }) => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+    const definition = parseFormDefinition({
+      fields: [{ type: FormFieldTypeEnum.NUMBER, value_name: 'count', label: NUMBER_FIELD_LABEL }],
+    })
+
+    renderWithQueryClient(<SynDynamicForm definition={definition} onSubmit={onSubmit} submitLabel="Send" />)
+
+    const count = screen.getByRole('spinbutton', { name: NUMBER_FIELD_LABEL })
+    expect(count).toHaveValue(null)
+
+    await user.click(screen.getByRole('button', { name: buttonLabel }))
+    expect(count).toHaveValue(expectedValue)
+
+    await user.click(screen.getByRole('button', { name: 'Send' }))
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith({ count: expectedValue })
+    })
+  })
+
+  it('accepts a negative number typed into a number field', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+
+    const definition = parseFormDefinition({
+      fields: [{ type: FormFieldTypeEnum.NUMBER, value_name: 'offset', label: 'Offset', default: 0 }],
+    })
+
+    renderWithQueryClient(<SynDynamicForm definition={definition} onSubmit={onSubmit} submitLabel="Send" />)
+
+    const offset = screen.getByRole('spinbutton', { name: 'Offset' })
+    await user.clear(offset)
+    await user.type(offset, '-12')
+    expect(offset).toHaveValue(-12)
+
+    await user.click(screen.getByRole('button', { name: 'Send' }))
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith({ offset: -12 })
+    })
+  })
+
   it('preserves other date components when a component changes', async () => {
     const user = userEvent.setup()
     const onSubmit = vi.fn()
@@ -161,9 +245,9 @@ describe('SynDynamicForm', () => {
       />
     )
 
-    await user.click(screen.getByRole('button', { name: 'Schedule time zone' }))
-    await user.type(screen.getByRole('textbox', { name: 'Filter timezones' }), 'Europe/Paris')
-    await user.click(screen.getByRole('option', { name: 'Europe/Paris' }))
+    await user.click(screen.getByRole('textbox', { name: 'Schedule time zone' }))
+    await user.type(screen.getByRole('textbox', { name: 'Schedule time zone' }), 'Europe/Paris')
+    await user.click(await screen.findByRole('option', { name: 'Europe/Paris' }))
     await user.click(screen.getByRole('button', { name: 'Submit' }))
 
     await waitFor(() => {
@@ -191,8 +275,7 @@ describe('SynDynamicForm', () => {
       <SynDynamicForm definition={definition} initialValues={{ zone: { timezone: 'UTC' } }} onSubmit={onSubmit} />
     )
 
-    await user.click(screen.getByRole('button', { name: 'Zone time zone' }))
-    await user.click(screen.getByRole('option', { name: 'No time zone' }))
+    await user.click(screen.getByRole('button', { name: 'Clear time zone' }))
     await user.click(screen.getByRole('button', { name: 'Submit' }))
 
     await waitFor(() => {
@@ -357,5 +440,23 @@ describe('SynDynamicForm', () => {
 
     const results = await axe(container)
     expect(results).toHaveNoViolations()
+  })
+
+  it('keeps user input when an equivalent definition object is passed again', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+    const definition = parseFormDefinition({
+      fields: [{ type: FormFieldTypeEnum.TEXT, value_name: 'name', label: 'Name' }],
+    })
+    const { rerender } = renderWithQueryClient(
+      <SynDynamicForm definition={definition} onSubmit={onSubmit} hideSubmitButton />
+    )
+
+    await user.type(screen.getByRole('textbox', { name: 'Name' }), 'kept')
+
+    const equivalentDefinition = parseFormDefinition(JSON.parse(JSON.stringify(definition)) as typeof definition)
+    rerender(<SynDynamicForm definition={equivalentDefinition} onSubmit={onSubmit} hideSubmitButton />)
+
+    expect(screen.getByRole('textbox', { name: 'Name' })).toHaveValue('kept')
   })
 })

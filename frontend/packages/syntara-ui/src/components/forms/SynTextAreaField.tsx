@@ -48,6 +48,8 @@ export type SynTextAreaFieldProps<
   ariaLabel?: string
   /** Called after the field value changes (user input). */
   onValueChange?: () => void
+  /** Applied to the PatternFly `TextArea` root (the resizable form-control wrapper in PF6). */
+  className?: string
 }
 
 /**
@@ -85,6 +87,7 @@ export function SynTextAreaField<
   isDisabled,
   ariaLabel,
   onValueChange,
+  className,
 }: Readonly<SynTextAreaFieldProps<TFieldValues, TName>>) {
   const resolvedFieldId = fieldId ?? name
 
@@ -100,6 +103,7 @@ export function SynTextAreaField<
     >
       {({ field, fieldState }) => (
         <TextArea
+          className={className}
           id={resolvedFieldId}
           placeholder={placeholder}
           validated={fieldState.error ? 'error' : 'default'}

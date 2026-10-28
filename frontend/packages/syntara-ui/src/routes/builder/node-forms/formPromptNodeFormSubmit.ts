@@ -10,7 +10,6 @@ export function mapFormPromptFormDataToSubmit(
 ): FormPromptFormSubmitData {
   const submitLabel = data.submit_label?.trim()
   const successMessage = data.success_message?.trim()
-  const timezone = data.timezone?.trim()
   const cssOverride = data.css_override?.trim()
 
   const effectiveCof = resolveEffectiveContinueOnFailure(data.settings?.continue_on_failure, systemContinueOnFailure)
@@ -26,7 +25,6 @@ export function mapFormPromptFormDataToSubmit(
     fallback_decision: fallbackDecision,
     ...(submitLabel ? { submit_label: submitLabel } : {}),
     ...(successMessage ? { success_message: successMessage } : {}),
-    ...(timezone ? { timezone } : {}),
     ...(cssOverride ? { css_override: cssOverride } : {}),
     settings: persistNodeSettings(data.settings),
   }

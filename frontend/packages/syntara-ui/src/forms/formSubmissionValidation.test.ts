@@ -331,15 +331,8 @@ describe('date field submission', () => {
 
   it.each([
     [{}, { date: '2026-01-05' }],
-    [{ include_timezone: true }, { date: '2026-01-05', timezone: 'America/New_York' }],
-    [
-      { include_time: true, include_timezone: true },
-      { date: '2026-01-05', time: '14:30', timezone: 'America/New_York' },
-    ],
-    [
-      { include_date: false, include_time: true, include_timezone: true },
-      { time: '14:30', timezone: 'America/New_York' },
-    ],
+    [{ include_time: true }, { date: '2026-01-05', time: '14:30' }],
+    [{ include_date: false, include_time: true }, { time: '14:30' }],
     [{ include_date: false, include_timezone: true }, { timezone: 'America/New_York' }],
   ])('round-trips a complete submission for %o', (toggles, submitted) => {
     expect(validateFormSubmission(dateForm(toggles), { start: submitted })).toEqual({ start: submitted })

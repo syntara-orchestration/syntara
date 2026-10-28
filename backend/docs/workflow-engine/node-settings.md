@@ -91,7 +91,11 @@ System defaults by node type:
 | `aap_workflow_job_template` | `workflow_engine.aap_timeout_seconds` | 3600 |
 | `agentic` | `workflow_engine.agentic_timeout_seconds` | 300 |
 
-Nodes not in this table (`converge`, `loop`, `wait`, `condition`, `switch`) use dedicated config fields for timing (e.g., `wait_duration` for converge, `duration` for wait).
+Nodes not in this table (`converge`, `loop`, `wait`, `condition`, `switch`, `form_prompt`) use
+dedicated config fields for timing. A form prompt's deadline comes from `parameters.response_window`,
+falling back to `workflow_engine.form_prompt_response_window_seconds`; `settings.timeout` does not
+set that deadline. See
+[Form Prompt Current Limitations](../form-prompts/form-prompt-overview.md#current-limitations).
 
 ```yaml
 settings:
@@ -117,7 +121,9 @@ settings:
     backoff_coefficient: 2.0
 ```
 
-**Why only Full tier?** Retry is only applicable to nodes that make HTTP requests where the engine can classify transient vs permanent errors. Other node types either handle retry internally (agentic, approval) or have no retry semantics (script, control nodes).
+**Why only Full tier?** Retry is applicable to HTTP executor nodes, where the engine can
+classify transient vs. permanent failures. Other nodes either retry internally (`agentic`,
+`approval`, `form_prompt`) or have no retry semantics (`script`, control nodes).
 
 ## Resolution Order
 
@@ -143,7 +149,7 @@ Settings validation happens at two layers:
 NodeSettingsBase
   → NodeSettingsCof (+continue_on_failure)        ← converge, loop
     → NodeSettingsCofDisabled (+disabled)            ← wait
-      → NodeSettingsNoRetry (+timeout)             ← script, agentic, approval
+      → NodeSettingsNoRetry (+timeout)             ← script, agentic, approval, form_prompt
         → NodeSettingsFull (+retry_policy)          ← http_request, aap_*
 ```
 

@@ -14,7 +14,6 @@ function baseFormData(overrides: Partial<FormPromptFormData> = {}): FormPromptFo
     responder_groups: [],
     submit_label: '  Send  ',
     success_message: '  Done  ',
-    timezone: ' America/New_York ',
     css_override: ' .x { color: red; } ',
     settings: {},
     ...overrides,
@@ -28,7 +27,6 @@ describe('mapFormPromptFormDataToSubmit', () => {
     expect(result.message).toBe('Hello')
     expect(result.submit_label).toBe('Send')
     expect(result.success_message).toBe('Done')
-    expect(result.timezone).toBe('America/New_York')
     expect(result.css_override).toBe('.x { color: red; }')
     expect(result.responder_users).toBeUndefined()
     expect(result.fallback_decision).toBe('submit')
@@ -40,6 +38,11 @@ describe('mapFormPromptFormDataToSubmit', () => {
       false
     )
     expect(result.fallback_decision).toBe('submit')
+  })
+
+  it('preserves settings.timeout from loaded activity data', () => {
+    const result = mapFormPromptFormDataToSubmit(baseFormData({ settings: { timeout: 900 } }), false)
+    expect(result.settings).toEqual({ timeout: 900 })
   })
 
   it('keeps fallback_decision when continue-on-failure is effectively enabled', () => {

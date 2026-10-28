@@ -59,4 +59,6 @@ export type SynDynamicFormProps = {
   hideSubmitButton?: boolean
   id?: string
   'data-testid'?: string
+  /** Optional class on textarea PF form-control wrappers (e.g. bounded resize in form-step respond panel). */
+  textAreaControlClassName?: string
 }

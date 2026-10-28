@@ -48,6 +48,7 @@ class TestMetricType:
             "ACTIVITY_DURATION",
             "FORM_PROMPT_SUBMISSION_HANDOFF",
             "FORM_PROMPT_RESUME_DISPATCH",
+            "FORM_TRIGGER_SUBMISSION_START",
             # Agent
             "AGENT_ROUTING_DURATION",
             "AGENT_INVOCATION_DURATION",
@@ -100,6 +101,7 @@ class TestMetricType:
         assert MetricType.LLM_DURATION.value == "llm_duration_ms"
         assert MetricType.FORM_PROMPT_SUBMISSION_HANDOFF.value == "form_prompt_submission_handoff_ms"
         assert MetricType.FORM_PROMPT_RESUME_DISPATCH.value == "form_prompt_resume_dispatch_ms"
+        assert MetricType.FORM_TRIGGER_SUBMISSION_START.value == "form_trigger_submission_start_ms"
         assert isinstance(MetricType.LLM_DURATION, str)
 
     def test_metric_type_from_value(self) -> None:
@@ -151,6 +153,8 @@ class TestMetricType:
         assert MetricType.WORKFLOW_DURATION in METRIC_CATEGORIES[MetricsCategoryType.WORKFLOW]
         assert MetricType.FORM_PROMPT_SUBMISSION_HANDOFF in METRIC_CATEGORIES[MetricsCategoryType.WORKFLOW]
         assert MetricType.FORM_PROMPT_RESUME_DISPATCH in METRIC_CATEGORIES[MetricsCategoryType.WORKFLOW]
+        assert MetricType.FORM_TRIGGER_SUBMISSION_START in METRIC_CATEGORIES[MetricsCategoryType.WORKFLOW]
+        assert MetricType.FORM_TRIGGER_SUBMISSION_START in METRIC_CATEGORIES[MetricsCategoryType.EXECUTION_SERVICE]
         assert MetricType.AGENT_ROUTING_DURATION in METRIC_CATEGORIES[MetricsCategoryType.AGENT]
         assert MetricType.ERROR in METRIC_CATEGORIES[MetricsCategoryType.ERROR]
         assert MetricType.API_RESPONSE_TIME in METRIC_CATEGORIES[MetricsCategoryType.API]

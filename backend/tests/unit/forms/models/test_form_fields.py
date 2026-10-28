@@ -333,37 +333,53 @@ class TestDateFieldComponents:
         assert field.included_components() == ("date",)
 
     @pytest.mark.parametrize(
-        ("toggles", "expected"),
+        ("components", "expected"),
         [
-            ({}, ("date",)),
-            ({"include_timezone": True}, ("date", "timezone")),
-            ({"include_time": True, "include_timezone": True}, ("date", "time", "timezone")),
-            ({"include_date": False, "include_time": True, "include_timezone": True}, ("time", "timezone")),
-            ({"include_date": False, "include_timezone": True}, ("timezone",)),
+            ((True, False, False), ("date",)),
+            ((False, True, False), ("time",)),
+            ((False, False, True), ("timezone",)),
+            ((True, True, False), ("date", "time")),
+            ((False, True, True), ("time", "timezone")),
+            ((True, True, True), ("date", "time", "timezone")),
         ],
     )
-    def test_valid_combinations(self, toggles: dict[str, bool], expected: tuple[str, ...]) -> None:
-        """Every combination that pairs a time with a timezone is accepted."""
-        field = DateField.model_validate(_date(**toggles))
+    def test_valid_combinations(self, components: tuple[bool, bool, bool], expected: tuple[str, ...]) -> None:
+        """Each valid combination of included components is accepted."""
+        include_date, include_time, include_timezone = components
+        field = DateField.model_validate(
+            _date(
+                include_date=include_date,
+                include_time=include_time,
+                include_timezone=include_timezone,
+            )
+        )
 
         assert field.included_components() == expected
 
     @pytest.mark.parametrize(
-        "toggles",
+        ("components", "message"),
         [
-            {"include_time": True},
-            {"include_date": False, "include_time": True},
+            (
+                (False, False, False),
+                r"at least one of include_date, include_time, or include_timezone must be true",
+            ),
+            (
+                (True, False, True),
+                r"Select a time when both a date and timezone are included\.",
+            ),
         ],
     )
-    def test_time_requires_timezone(self, toggles: dict[str, bool]) -> None:
-        """A wall-clock time is ambiguous without the zone it is read in."""
-        with pytest.raises(ValidationError, match=r"include_timezone is required when include_time is true"):
-            DateField.model_validate(_date(**toggles))
-
-    def test_at_least_one_component_required(self) -> None:
-        """A field that collects nothing cannot be answered at all."""
-        with pytest.raises(ValidationError, match=r"at least one of include_date"):
-            DateField.model_validate(_date(include_date=False))
+    def test_invalid_combinations(self, components: tuple[bool, bool, bool], message: str) -> None:
+        """Empty selections and date plus timezone without time are rejected."""
+        include_date, include_time, include_timezone = components
+        with pytest.raises(ValidationError, match=message):
+            DateField.model_validate(
+                _date(
+                    include_date=include_date,
+                    include_time=include_time,
+                    include_timezone=include_timezone,
+                )
+            )
 
 
 class TestDateFieldDefault:
@@ -392,7 +408,7 @@ class TestDateFieldDefault:
     def test_partial_default_rejected(self) -> None:
         """A default is substituted wholesale, so an incomplete one is useless."""
         with pytest.raises(ValidationError, match=r"default is missing timezone"):
-            DateField.model_validate(_date(include_timezone=True, default={"date": "2026-01-05"}))
+            DateField.model_validate(_date(include_date=False, include_timezone=True, default={}))
 
     def test_default_for_uncollected_component_rejected(self) -> None:
         """Defaulting a component the field never asks for is an authoring mistake."""

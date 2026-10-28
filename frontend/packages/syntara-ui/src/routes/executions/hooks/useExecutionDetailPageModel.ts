@@ -147,7 +147,6 @@ export function useExecutionDetailPageModel() {
     selectedNodeId,
     selectedNodeName,
     hasOpenExecutionSidePanel: panelState.hasOpenExecutionSidePanel,
-    workflowDefinitionForSidePanel: panelState.workflowDefinitionForSidePanel,
   }
 }
 
