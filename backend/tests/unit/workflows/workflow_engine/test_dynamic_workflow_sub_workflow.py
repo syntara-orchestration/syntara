@@ -27,9 +27,11 @@ from syntara.workflows.workflow_engine.activities.sub_workflow_setup_activity im
     SubWorkflowSetupActivity,
 )
 from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkflow
-from syntara.workflows.workflow_engine.graph import ActivityNode
+from syntara.workflows.workflow_engine.graph import _NODE_SETTINGS_CLASS, ActivityNode
 from syntara.workflows.workflow_engine.models.workflow_definition import (
+    NODE_OUTPUT_MODELS,
     ActivityName,
+    NodeSettingsNoRetry,
     NodeType,
     SubWorkflowOutput,
 )
@@ -603,8 +605,6 @@ class TestSubWorkflowModels:
         assert ActivityName.SUB_WORKFLOW.value == "execute_sub_workflow_activity"
 
     def test_output_model_registered(self) -> None:
-        from syntara.workflows.workflow_engine.models.workflow_definition import NODE_OUTPUT_MODELS
-
         assert NodeType.SUB_WORKFLOW in NODE_OUTPUT_MODELS
         assert NODE_OUTPUT_MODELS[NodeType.SUB_WORKFLOW] is SubWorkflowOutput
 
@@ -616,9 +616,6 @@ class TestSubWorkflowModels:
         assert output.ErrorMessage is None
 
     def test_node_settings_class_registered(self) -> None:
-        from syntara.workflows.workflow_engine.graph import _NODE_SETTINGS_CLASS
-        from syntara.workflows.workflow_engine.models.workflow_definition import NodeSettingsNoRetry
-
         assert NodeType.SUB_WORKFLOW in _NODE_SETTINGS_CLASS
         assert _NODE_SETTINGS_CLASS[NodeType.SUB_WORKFLOW] is NodeSettingsNoRetry
 
