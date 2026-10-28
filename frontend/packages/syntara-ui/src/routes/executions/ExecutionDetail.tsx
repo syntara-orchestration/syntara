@@ -160,6 +160,7 @@ function ExecutionDetailContent({
   const retryPanel = retryPanelOpen ? (
     <RetryFromFailureSidePanel
       executionId={executionId}
+      executionProjectId={execution?.project_id}
       activities={activities}
       activityNameMap={activityNameMap}
       activityTypeMap={activityTypeMap}

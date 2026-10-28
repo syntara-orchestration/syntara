@@ -1,10 +1,11 @@
-import { Stack, StackItem, Title, TitleSizes } from '@patternfly/react-core'
+import { HelperText, HelperTextItem, Stack, StackItem, Title, TitleSizes } from '@patternfly/react-core'
 import { useNavigate } from '@tanstack/react-router'
 import { useEffect, useEffectEvent, useId, useLayoutEffect, useRef, useState } from 'react'
 
 import { AppRoute } from '../../app/AppRoute'
 import { SynPanel } from '../../components/layout/SynPanel'
 import { SidePanelHeader } from '../../components/SidePanelHeader'
+import { useCanI } from '../../hooks/useCanI'
 import { detachPromise } from '../../utils/detachPromise'
 import type { WorkflowDefShape } from '../builder/ExecutionDetailsPanel'
 
@@ -24,6 +25,7 @@ import { getRetryInputOverrideTargets, type ExecutionActivity } from './retryInp
 
 type RetryFromFailureSidePanelProps = Readonly<{
   executionId: string
+  executionProjectId?: string
   activities?: ExecutionActivity[]
   activityNameMap: ReadonlyMap<string, string>
   activityTypeMap: ReadonlyMap<string, string>
@@ -38,6 +40,7 @@ type RetryPreviewState = ReturnType<typeof useRetryFromFailurePreview>
 /** Full in-context retry review shown beside the source execution. */
 export function RetryFromFailureSidePanel({
   executionId,
+  executionProjectId,
   activities = [],
   activityNameMap,
   activityTypeMap,
@@ -47,6 +50,10 @@ export function RetryFromFailureSidePanel({
   onClose,
 }: RetryFromFailureSidePanelProps) {
   const navigate = useNavigate()
+  const { allowed: canOverrideInputs } = useCanI('update', 'workflow', {
+    resourceProject: executionProjectId,
+    enabled: Boolean(executionProjectId),
+  })
   const scopeId = useId()
   const panelRef = useRef<HTMLElement | null>(null)
   const [scopeModeOverride, setScopeModeOverride] = useState<RetryScopeMode>()
@@ -241,9 +248,10 @@ export function RetryFromFailureSidePanel({
                     {retryPlanAnnouncement}
                   </div>
                 </StackItem>
-                {activePreview?.eligible && (
+                {activePreview?.eligible && inputOverrideTargets.length > 0 && (
                   <StackItem>
-                    <RetryFromFailureInputOverrides
+                    <RetryInputOverridesPanel
+                      canOverrideInputs={canOverrideInputs}
                       executionId={executionId}
                       targets={inputOverrideTargets}
                       workflowDefinitionAvailable={workflowDefinition !== undefined && workflowDefinition !== null}
@@ -329,6 +337,36 @@ function getRetainedResultSummary(retainedCount: number | undefined): string {
   if (retainedCount === undefined) return 'The number of retained results is unavailable.'
   const resultLabel = retainedCount === 1 ? 'result' : 'results'
   return `${retainedCount} completed ${resultLabel} retained.`
+}
+
+function RetryInputOverridesPanel({
+  canOverrideInputs,
+  ...props
+}: Readonly<{
+  canOverrideInputs: boolean
+  executionId: string
+  targets: ReturnType<typeof getRetryInputOverrideTargets>
+  workflowDefinitionAvailable: boolean
+  isDisabled: boolean
+  drafts: Record<string, string>
+  onDraftChange: (
+    nodeId: string,
+    value: string,
+    parsed: Record<string, unknown> | undefined,
+    error: string | undefined
+  ) => void
+}>) {
+  if (!canOverrideInputs) {
+    return (
+      <HelperText>
+        <HelperTextItem variant="warning">
+          Workflow edit permission is required to override retry inputs.
+        </HelperTextItem>
+      </HelperText>
+    )
+  }
+
+  return <RetryFromFailureInputOverrides {...props} />
 }
 
 function getSelectedPointIds(

@@ -45,6 +45,31 @@ async function openRetryActionsMenu(app: Page): Promise<void> {
   await app.getByRole('button', { name: 'Retry' }).click()
 }
 
+/** Stub only workflow edit permission; let the mock API answer every other check. */
+async function stubWorkflowEditPermission(app: Page, allowed: boolean): Promise<void> {
+  await app.route('**/api/v1/authz/can_i', async (route) => {
+    const payload: unknown = route.request().postDataJSON()
+    const isWorkflowUpdateCheck =
+      typeof payload === 'object' &&
+      payload !== null &&
+      'action' in payload &&
+      payload.action === 'update' &&
+      'resource_type' in payload &&
+      payload.resource_type === 'workflow'
+
+    if (isWorkflowUpdateCheck) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ allowed }),
+      })
+      return
+    }
+
+    await route.continue()
+  })
+}
+
 /**
  * Scan only the retry panel. The execution detail page embeds a ReactFlow
  * canvas and PatternFly tabs with pre-existing, unrelated axe findings, so a
@@ -77,6 +102,7 @@ test.describe('Retry from failure', () => {
 
   test.describe('Retry review panel', () => {
     test('opens the retry plan and cancel closes it without retrying', async ({ app }) => {
+      await stubWorkflowEditPermission(app, true)
       await openExecutionDetail(app, FAILED_EXECUTION_ID)
 
       await openRetryActionsMenu(app)
@@ -87,6 +113,7 @@ test.describe('Retry from failure', () => {
       await expect(panel.getByRole('heading', { name: 'Retry run from failure' })).toBeVisible()
       await expect(panel.getByRole('heading', { name: 'How retry works' })).toBeVisible()
       await expect(panel.getByRole('heading', { name: 'Retry plan' })).toBeVisible()
+      await expect(panel.getByRole('button', { name: 'Change inputs before retry' })).toBeVisible()
 
       await panel.getByRole('button', { name: 'Cancel' }).click()
       await expect(panel).not.toBeVisible()
@@ -115,6 +142,21 @@ test.describe('Retry from failure', () => {
 
       await expect(app.getByTestId('retried-from-badge')).toBeVisible()
       await expect(app.getByTestId('retried-from-badge')).toContainText('Retried from:')
+    })
+
+    test('allows a normal retry but hides input overrides without workflow edit permission', async ({ app }) => {
+      await stubWorkflowEditPermission(app, false)
+
+      await openExecutionDetail(app, FAILED_EXECUTION_ID)
+      await openRetryActionsMenu(app)
+      await app.getByTestId('retry-from-failure-button').click()
+
+      const panel = app.getByRole('complementary', { name: 'Retry run from failure review' })
+      await expect(panel).toBeVisible()
+      await expect(panel.getByText('Workflow edit permission is required to override retry inputs.')).toBeVisible()
+      await expect(panel.getByRole('button', { name: 'Change inputs before retry' })).toHaveCount(0)
+      await panel.getByTestId('retry-from-failure-confirm').click()
+      await expect(app.getByText('Retry started')).toBeVisible()
     })
   })
 
