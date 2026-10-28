@@ -40,11 +40,28 @@ class EventSubscriptionInspectionService(BaseService):
     """No persistence, publication or consumer activation operations."""
 
     def __init__(
-        self, session: "AsyncSession", user: "User", evaluator: "AuthzEvaluator", secret_service: "SecretService"
+        self,
+        session: "AsyncSession",
+        user: "User",
+        evaluator: "AuthzEvaluator",
+        secret_service: "SecretService",
+        *,
+        is_cert_authenticated: bool = False,
     ) -> None:
-        """Reuse workflow resource checks and the listener credential resolver."""
+        """Reuse workflow resource checks and the listener credential resolver.
+
+        Args:
+            session: Database session.
+            user: The authenticated user (or service principal).
+            evaluator: Authorization evaluator for in-service authz checks.
+            secret_service: Secret resolver for credential decryption.
+            is_cert_authenticated: True when the caller authenticated via a service
+                certificate. Forwarded to WorkflowService so OPA checks in
+                validate_event_subscribe_access honour the cert-auth bypass.
+
+        """
         super().__init__(session, user)
-        self.workflows = WorkflowService(session, user, evaluator)
+        self.workflows = WorkflowService(session, user, evaluator, is_cert_authenticated=is_cert_authenticated)
         self.secret_service = secret_service
 
     @staticmethod

@@ -29,12 +29,19 @@ _update = PermissionChecker("workflow", "update", resource_model=Workflow, resou
 
 
 def get_inspection_service(
+    request: Request,
     db: Annotated[AsyncSession, Depends(get_db)],
     user: Annotated[User, Depends(get_current_user)],
     evaluator: Annotated[AuthzEvaluator, Depends(get_authz_evaluator)],
 ) -> EventSubscriptionInspectionService:
     """Compose request-scoped read and validation dependencies."""
-    return EventSubscriptionInspectionService(db, user, evaluator, create_secret_service(db))
+    return EventSubscriptionInspectionService(
+        db,
+        user,
+        evaluator,
+        create_secret_service(db),
+        is_cert_authenticated=getattr(request.state, "is_cert_authenticated", False),
+    )
 
 
 @router.get(
