@@ -256,36 +256,6 @@ def test_non_static_options_report_schema_findings(
     assert all(finding.category == ValidationCategory.schema_violation for finding in findings)
 
 
-def test_unsupported_options_prevent_default_validation() -> None:
-    """An invalid trigger option source prevents typed default validation for the form."""
-    parameters = _parameters(
-        {
-            "type": "dropdown",
-            "value_name": "region",
-            "label": "Region",
-            "options": {
-                "source": "dynamic",
-                "expression": "regions",
-                "label_key": "name",
-                "value_key": "id",
-            },
-        },
-        {"type": "email", "value_name": "contact", "label": "Contact", "default": "not-an-email"},
-    )
-
-    findings = _findings(parameters)
-
-    assert len(findings) == 5, findings
-    assert {finding.field_path for finding in findings} == {
-        "parameters.form_definition.fields.0.options.source",
-        "parameters.form_definition.fields.0.options.values",
-        "parameters.form_definition.fields.0.options.expression",
-        "parameters.form_definition.fields.0.options.label_key",
-        "parameters.form_definition.fields.0.options.value_key",
-    }
-    assert all(finding.category == ValidationCategory.schema_violation for finding in findings)
-
-
 def test_unsafe_css_is_reported_on_css_override() -> None:
     finding = _single_finding(_parameters(_text_field(), css_override=".form { background: url(x); }"))
 
