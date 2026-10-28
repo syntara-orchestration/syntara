@@ -1,4 +1,4 @@
-import { ExecutorTypeEnum } from '@syntara/contracts'
+import { ActivityTypeEnum, ExecutorTypeEnum } from '@syntara/contracts'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { RegistryStepId } from '../../../../constants'
@@ -96,7 +96,7 @@ describe('registerActionStep', () => {
       onError
     )
 
-    expect(mockAddActivity).toHaveBeenCalled()
+    expect(mockAddActivity).toHaveBeenCalledWith(expect.objectContaining({ type: ActivityTypeEnum.SCRIPT }))
     expect(onSuccess).toHaveBeenCalledWith(expect.any(String))
     expect(onError).not.toHaveBeenCalled()
   })
@@ -127,7 +127,7 @@ describe('registerActionStep', () => {
       onError
     )
 
-    expect(mockAddActivity).toHaveBeenCalled()
+    expect(mockAddActivity).toHaveBeenCalledWith(expect.objectContaining({ type: ActivityTypeEnum.HTTP_REQUEST }))
     expect(onSuccess).toHaveBeenCalledWith(expect.any(String))
     expect(onError).not.toHaveBeenCalled()
   })

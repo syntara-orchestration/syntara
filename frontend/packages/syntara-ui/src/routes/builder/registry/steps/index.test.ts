@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { NODE_KIND_BY_REGISTRY_ID, RegistryStepId, TriggerTypeEnum } from '@syntara/contracts'
+import { RegistryStepId, TriggerTypeEnum } from '@syntara/contracts'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { StepRegistry, type StepSubtypeDefinition } from '../StepRegistry'
@@ -17,7 +17,7 @@ const nodeTypeCatalog = JSON.parse(
   )
 ) as { node_types: { type: string }[] }
 // Internal activities have no user-facing palette entry.
-const BACKEND_ONLY_KINDS = new Set(['internal_activity'])
+const BACKEND_ONLY_STEP_TYPES = new Set(['internal_activity'])
 
 vi.mock('../../../../stores/useWorkflowStore', () => ({
   useWorkflowStore: {
@@ -71,34 +71,27 @@ describe('registerAllSteps (index)', () => {
     const { registerAllSteps } = await import('./index')
     registerAllSteps()
 
-    expect(StepRegistry.get('trigger')).toBeDefined()
-    expect(StepRegistry.get('action')).toBeDefined()
-    expect(StepRegistry.get('agent')).toBeDefined()
-    expect(StepRegistry.get('approval')).toBeDefined()
+    expect(StepRegistry.get(RegistryStepId.TRIGGER)).toBeDefined()
+    expect(StepRegistry.get(RegistryStepId.ACTION)).toBeDefined()
+    expect(StepRegistry.get(RegistryStepId.AGENT)).toBeDefined()
+    expect(StepRegistry.get(RegistryStepId.APPROVAL)).toBeDefined()
   })
 
-  it('maps every backend step type exactly once except explicitly backend-only kinds', () => {
-    const kinds = Object.values(NODE_KIND_BY_REGISTRY_ID)
-    expect(new Set(kinds).size).toBe(kinds.length)
-    expect([...kinds].sort()).toEqual(
-      nodeTypeCatalog.node_types
-        .map(({ type }) => type)
-        .filter((kind) => !BACKEND_ONLY_KINDS.has(kind))
-        .sort()
-    )
-    expect(nodeTypeCatalog.node_types.map(({ type }) => type)).toEqual(expect.arrayContaining([...BACKEND_ONLY_KINDS]))
-  })
-
-  it('uses the shared mapping for every concrete registered step and subtype', async () => {
+  it('registers every backend step type exactly once except explicitly backend-only types', async () => {
     const { registerAllSteps } = await import('./index')
     registerAllSteps()
 
     const concreteSteps = StepRegistry.getAll().flatMap<StepSubtypeDefinition>((step) => step.subtypes ?? [step])
-    expect(concreteSteps.map(({ id }) => id).sort()).toEqual(Object.keys(NODE_KIND_BY_REGISTRY_ID).sort())
-    expect(Object.fromEntries(concreteSteps.map(({ id, nodeKind }) => [id, nodeKind]))).toEqual(
-      NODE_KIND_BY_REGISTRY_ID
+    const stepIds = concreteSteps.map(({ id }) => id)
+    expect(new Set(stepIds).size).toBe(stepIds.length)
+    expect(stepIds.sort()).toEqual(
+      nodeTypeCatalog.node_types
+        .map(({ type }) => type)
+        .filter((type) => !BACKEND_ONLY_STEP_TYPES.has(type))
+        .sort()
     )
-    expect(StepRegistry.get(RegistryStepId.TRIGGER)?.nodeKind).toBeNull()
-    expect(StepRegistry.get(RegistryStepId.GENERIC)?.nodeKind).toBeNull()
+    expect(nodeTypeCatalog.node_types.map(({ type }) => type)).toEqual(
+      expect.arrayContaining([...BACKEND_ONLY_STEP_TYPES])
+    )
   })
 })

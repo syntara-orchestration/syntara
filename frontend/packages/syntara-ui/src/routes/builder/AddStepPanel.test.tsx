@@ -2,6 +2,8 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { RegistryStepId } from '../../constants'
+
 import { AddStepPanel, AddStepPanelHeader } from './AddStepPanel'
 
 const { mockStepRegistryGetAll, mockStepRegistryGet } = vi.hoisted(() => ({
@@ -38,7 +40,7 @@ const mockStepTypes = [
     onSubmit: vi.fn(),
     subtypes: [
       {
-        id: 'trigger-manual',
+        id: RegistryStepId.TRIGGER_MANUAL,
         label: 'Manual',
         icon: () => <div>ManualIcon</div>,
       },
@@ -194,7 +196,7 @@ describe('AddStepPanel Component', () => {
     await user.click(screen.getByRole('button', { name: 'Trigger' }))
     await user.click(screen.getByRole('button', { name: 'Manual' }))
 
-    expect(mockOnSelectStep).toHaveBeenCalledWith('trigger', 'trigger-manual')
+    expect(mockOnSelectStep).toHaveBeenCalledWith(RegistryStepId.TRIGGER, RegistryStepId.TRIGGER_MANUAL)
   })
 
   it('shows back button for subtype list and returns to main list', async () => {

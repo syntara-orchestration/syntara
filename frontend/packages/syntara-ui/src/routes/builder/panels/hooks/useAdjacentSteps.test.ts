@@ -2,6 +2,8 @@ import { renderHook } from '@testing-library/react'
 import type { Edge, Node } from '@xyflow/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { RegistryStepId } from '../../../../constants'
+
 import { useAdjacentSteps } from './useAdjacentSteps'
 
 const flowGraph = vi.hoisted(() => ({
@@ -45,7 +47,7 @@ describe('useAdjacentSteps', () => {
     const { result } = renderHook(() => useAdjacentSteps('trigger-0'))
 
     expect(result.current.downstream).toMatchObject([
-      { id: 'check-value', name: 'Check Value', type: 'script', iconId: 'action-script' },
+      { id: 'check-value', name: 'Check Value', type: 'script', iconId: RegistryStepId.ACTION_SCRIPT },
     ])
   })
 

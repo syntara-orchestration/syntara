@@ -1,7 +1,6 @@
 import type { ComponentType, ReactNode } from 'react'
 
 import type { StepCategory } from './categories'
-import { resolveNodeKind } from './nodeKindMapping'
 
 /**
  * Base form props that all step forms must accept
@@ -18,8 +17,6 @@ export type BaseStepFormProps<TData = unknown> = {
 export type StepSubtypeDefinition<TFormData = unknown> = {
   /** Unique identifier for this subtype */
   id: string
-  /** Backend step type, resolved during registration; containers have no kind. */
-  nodeKind?: ReturnType<typeof resolveNodeKind>
   /** Display label in UI */
   label: string
   /** Icon component to display */
@@ -49,8 +46,6 @@ export type StepSubtypeDefinition<TFormData = unknown> = {
 export type StepTypeDefinition<TFormData = unknown> = {
   /** Unique identifier for this step type */
   id: string
-  /** Backend step type, resolved during registration; containers have no kind. */
-  nodeKind?: ReturnType<typeof resolveNodeKind>
 
   /** Display label in UI */
   label: string
@@ -109,8 +104,6 @@ class StepRegistryClass {
       enabled: true,
       order: 100,
       ...definition,
-      nodeKind: resolveNodeKind(definition.id),
-      subtypes: definition.subtypes?.map((subtype) => ({ ...subtype, nodeKind: resolveNodeKind(subtype.id) })),
     } as StepTypeDefinition)
   }
 

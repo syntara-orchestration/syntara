@@ -1,6 +1,7 @@
 import type { ComponentType } from 'react'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 
+import { RegistryStepId } from '../../../constants'
 import { getCanvasStepIconDescriptor } from '../../workflows/canvas/nodes/stepIconResolver'
 
 import { resolveIconForStep, resolveIconForType } from './stepIcons'
@@ -28,16 +29,21 @@ describe('stepIcons', () => {
   it('resolves icons for registry node types and subtypes', () => {
     mockStepRegistryGetAll.mockReturnValue([
       {
-        id: 'action',
+        id: RegistryStepId.ACTION,
         icon: IconA,
-        subtypes: [{ id: 'action-script', icon: IconB }],
+        subtypes: [{ id: RegistryStepId.ACTION_SCRIPT, icon: IconB }],
       },
     ] as never[])
 
-    expect(resolveIconForType({ stepTypeId: 'action' })).toEqual({ icon: IconA, id: 'action' })
-    expect(resolveIconForType({ stepTypeId: 'action', stepSubtypeId: 'action-script' })).toEqual({
+    expect(resolveIconForType({ stepTypeId: RegistryStepId.ACTION })).toEqual({
+      icon: IconA,
+      id: RegistryStepId.ACTION,
+    })
+    expect(
+      resolveIconForType({ stepTypeId: RegistryStepId.ACTION, stepSubtypeId: RegistryStepId.ACTION_SCRIPT })
+    ).toEqual({
       icon: IconB,
-      id: 'action-script',
+      id: RegistryStepId.ACTION_SCRIPT,
     })
   })
 
@@ -49,7 +55,7 @@ describe('stepIcons', () => {
   })
 
   it('delegates node icon resolution to the canvas resolver', () => {
-    vi.mocked(getCanvasStepIconDescriptor).mockReturnValue({ icon: IconA, id: 'logic-condition' })
+    vi.mocked(getCanvasStepIconDescriptor).mockReturnValue({ icon: IconA, id: RegistryStepId.LOGIC_CONDITION })
 
     const result = resolveIconForStep(
       {
@@ -61,6 +67,6 @@ describe('stepIcons', () => {
     )
 
     expect(getCanvasStepIconDescriptor).toHaveBeenCalled()
-    expect(result).toEqual({ icon: IconA, id: 'logic-condition' })
+    expect(result).toEqual({ icon: IconA, id: RegistryStepId.LOGIC_CONDITION })
   })
 })
