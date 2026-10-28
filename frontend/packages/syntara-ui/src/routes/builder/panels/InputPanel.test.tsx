@@ -1144,7 +1144,7 @@ describe('InputPanel', () => {
       expect(screen.getByText('mocked_value')).toBeInTheDocument()
     })
 
-    // AAP-89684: for a previously-run (existing) node, pinning new mock data on an
+    // For a previously-run (existing) node, pinning new mock data on an
     // upstream node must immediately be reflected in this node's Input panel, taking
     // precedence over the upstream's last actual execution output.
     it('shows upstream currently pinned outputMock instead of stale execution data for existing nodes', () => {

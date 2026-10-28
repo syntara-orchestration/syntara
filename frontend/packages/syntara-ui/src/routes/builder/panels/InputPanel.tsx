@@ -77,7 +77,7 @@ function computeEffectiveUpstream(params: {
 
 /**
  * Merge three data sources into a single input map. Precedence (highest wins):
- * 1. Real execution data (base layer, kept when present)
+ * 1. Real execution data (base layer, unless overridden by upstream output mock)
  * 2. Pinned output mocks from upstream nodes (override a same-upstream execution
  *    entry, since a currently pinned mock is more current than a past run's output)
  * 3. Input mocks for the current node (fill remaining gaps, highest precedence)
