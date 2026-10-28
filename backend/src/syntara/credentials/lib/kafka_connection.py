@@ -6,13 +6,12 @@ required and loads the login from the credential id the caller supplied.
 """
 
 from enum import StrEnum
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from syntara.core.lib.encryption import EncryptionError
-from syntara.core.services.secret_service import SecretService
 from syntara.credentials.exceptions import (
     CredentialDecryptionError,
     CredentialDisabledError,
@@ -20,6 +19,9 @@ from syntara.credentials.exceptions import (
 )
 from syntara.credentials.models.credential import Credential
 from syntara.credentials.models.credential_type import CredentialType
+
+if TYPE_CHECKING:
+    from syntara.core.services.secret_service import SecretService
 
 KAFKA_CONNECTION_TYPE_NAME = "Kafka"
 KAFKA_USERNAME_KEY = "kafka_username"
@@ -97,7 +99,7 @@ def resolve_supplied_kafka_login(
 
 async def _load_supplied_kafka_login(
     session: AsyncSession,
-    secret_service: SecretService,
+    secret_service: "SecretService",
     *,
     credential_id: UUID | None,
     security_protocol: str,
@@ -142,7 +144,7 @@ async def _load_supplied_kafka_login(
 
 async def resolve_connector_kafka_login(
     session: AsyncSession,
-    secret_service: SecretService,
+    secret_service: "SecretService",
     *,
     management_credential_id: UUID | None,
     security_protocol: str,
@@ -162,7 +164,7 @@ async def resolve_connector_kafka_login(
 
 async def resolve_listener_kafka_login(
     session: AsyncSession,
-    secret_service: SecretService,
+    secret_service: "SecretService",
     *,
     runtime_credential_id: UUID | None,
     security_protocol: str,

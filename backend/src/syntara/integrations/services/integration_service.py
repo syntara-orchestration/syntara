@@ -1,5 +1,6 @@
 """Integration Service for database operations and business logic."""
 
+import asyncio
 from collections.abc import Iterable
 from datetime import UTC, datetime, timedelta
 from typing import NoReturn
@@ -30,6 +31,7 @@ from syntara.credentials.lib.injector_resolver import InjectorResolver
 from syntara.credentials.lib.kafka_connection import (
     KAFKA_CONNECTION_TYPE_NAME,
     KafkaSecurityProtocol,
+    kafka_credential_required,
     resolve_connector_kafka_login,
 )
 from syntara.integrations.adapters.factory import create_health_check_adapter
@@ -75,7 +77,7 @@ from syntara.integrations.models.integration import (
     IntegrationUpdate,
     RefreshResult,
 )
-from syntara.integrations.models.integration_configuration import IntegrationConfigurationInputTypes
+from syntara.integrations.models.integration_configuration import IntegrationConfigurationInputTypes, KafkaConfiguration
 from syntara.integrations.models.llm_model import LLMModel
 from syntara.integrations.services.model_profile_lookup import lookup_model_profile
 from syntara.settings.cache.settings_cache import get_runtime_settings
@@ -87,6 +89,7 @@ ALLOWED_CREDENTIAL_TYPES: dict[IntegrationType, frozenset[str]] = {
     IntegrationType.MCP_SERVER: frozenset({"HTTP Bearer Token"}),
     IntegrationType.LLM_PROVIDER: frozenset({"LLM Provider"}),
     IntegrationType.ANSIBLE_AUTOMATION_PLATFORM: frozenset({"Ansible Automation Platform"}),
+    IntegrationType.KAFKA: frozenset({"Kafka"}),
 }
 
 CREDENTIAL_REQUIRED_TYPES: frozenset[IntegrationType] = frozenset(
@@ -95,6 +98,13 @@ CREDENTIAL_REQUIRED_TYPES: frozenset[IntegrationType] = frozenset(
         IntegrationType.ANSIBLE_AUTOMATION_PLATFORM,
     }
 )
+
+
+def _credential_required(integration_type: IntegrationType, configuration: IntegrationConfigurationInputTypes) -> bool:
+    if isinstance(configuration, KafkaConfiguration):
+        return kafka_credential_required(configuration.security_protocol)
+    return integration_type in CREDENTIAL_REQUIRED_TYPES
+
 
 _REFRESHABLE_TYPES: frozenset[IntegrationType] = frozenset(
     {
@@ -120,9 +130,12 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
         session: AsyncSession,
         user: User,
         secret_service: SecretService | None = None,
+        *,
+        integration_types: frozenset[IntegrationType] | None = None,
     ) -> None:
         """Initialize with database session, current user, and optional secret service."""
         super().__init__(session, user, convert_resource_mixin=IntegrationConvertResourceMixin())
+        self._integration_types = integration_types
         self._secret_service = secret_service
 
     def _is_duplicate_name_error(self, e: IntegrityError) -> bool:
@@ -224,7 +237,9 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
         result = await self.session.exec(query)
         integration = result.one_or_none()
 
-        if not integration:
+        if not integration or (
+            self._integration_types is not None and integration.integration_type not in self._integration_types
+        ):
             raise IntegrationNotFoundError(integration_id)
 
         return integration
@@ -404,11 +419,15 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
             include_total=include_total,
         )
 
-    def _validate_configuration_ssrf(self, configuration: IntegrationConfigurationInputTypes) -> None:
-        """Reject a base_url that resolves to a private, reserved, or cloud metadata address.
+    async def _validate_configuration_ssrf(
+        self, configuration: IntegrationConfigurationInputTypes, *, runtime: bool = False
+    ) -> None:
+        """Reject an address that resolves to a private, reserved, or cloud metadata address.
 
         Called at write time (create/patch) and again in this service's outbound
         entrypoints (discover/validate/refresh) as defense in depth against DNS re-pointing.
+        Kafka runtime checks instead run at its pinned connection boundary. DNS
+        validation here runs off the event loop, including create/patch checks.
         The same policy is re-run at the runtime outbound boundaries that read the stored
         base_url directly (AAP proxy, workflow AAP resolution, LLM invocation, MCP tool
         connect); all boundaries route through the shared
@@ -418,10 +437,15 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
         configuration model validators because those also run when configurations are
         deserialized from the database on every read.
         """
+        # Kafka runtime checks resolve and pin addresses inside the adapter's
+        # timeout. Rechecking here would add an unbounded DNS pass before it.
+        if runtime and isinstance(configuration, KafkaConfiguration):
+            return
         try:
-            validate_integration_configuration_no_ssrf(configuration)
+            await asyncio.to_thread(validate_integration_configuration_no_ssrf, configuration)
         except ValueError as e:
-            msg = "base_url must not resolve to a private, reserved, or cloud metadata address."
+            target = "bootstrap_servers" if getattr(configuration, "bootstrap_servers", None) else "base_url"
+            msg = f"{target} must not resolve to a private, reserved, or cloud metadata address."
             raise SafeValueError(msg) from e
 
     async def create_integration(self, data: IntegrationCreate) -> IntegrationRead:
@@ -436,10 +460,10 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
         """
         if data.management_credential_id is not None:
             await self._validate_credential_type(data.integration_type, data.management_credential_id)
-        elif data.integration_type in CREDENTIAL_REQUIRED_TYPES:
+        elif _credential_required(data.integration_type, data.configuration):
             raise IntegrationCredentialRequiredError(data.integration_type.value)
 
-        self._validate_configuration_ssrf(data.configuration)
+        await self._validate_configuration_ssrf(data.configuration)
 
         integration = Integration(
             name=data.name,
@@ -538,7 +562,18 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
             )
             id_restriction = self._intersect_id_restrictions(id_restriction, project_scoped_ids)
 
-        filtered_params = [(k, v) for k, v in query_params_items if k != "project_id"] if query_params_items else None
+        filtered_params = [(k, v) for k, v in query_params_items if k != "project_id"] if query_params_items else []
+        if self._integration_types is not None:
+            # Enforce the endpoint type restriction in the paginated/count query,
+            # rather than filtering a fetched page or loading every legacy ID.
+            legacy_types = {kind.value for kind in self._integration_types}
+            requested_types = dict(filtered_params).get("integration_type[in]")
+            if requested_types is not None:
+                legacy_types &= {value.strip() for value in requested_types.split(",")}
+            if not legacy_types:
+                id_restriction = []
+            filtered_params = [(k, v) for k, v in filtered_params if k != "integration_type[in]"]
+            filtered_params.append(("integration_type[in]", ",".join(sorted(legacy_types))))
 
         response = await self.list_resources(
             model=Integration,
@@ -626,13 +661,18 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
                     f"does not match integration type '{integration.integration_type.value}'"
                 )
                 raise SafeValueError(msg)
-            self._validate_configuration_ssrf(data.configuration)
+            await self._validate_configuration_ssrf(data.configuration)
 
-        if "management_credential_id" in data.model_fields_set:
-            if data.management_credential_id is not None:
-                await self._validate_credential_type(integration.integration_type, data.management_credential_id)
-            elif integration.integration_type in CREDENTIAL_REQUIRED_TYPES:
-                raise IntegrationCredentialRequiredError(integration.integration_type.value)
+        if "management_credential_id" in data.model_fields_set and data.management_credential_id is not None:
+            await self._validate_credential_type(integration.integration_type, data.management_credential_id)
+        credential_id = (
+            data.management_credential_id
+            if "management_credential_id" in data.model_fields_set
+            else integration.management_credential_id
+        )
+        configuration = data.configuration if data.configuration is not None else integration.configuration
+        if credential_id is None and _credential_required(integration.integration_type, configuration):
+            raise IntegrationCredentialRequiredError(integration.integration_type.value)
 
         if data.name is not None and data.name != integration.name:
             await self._raise_if_name_exists(data.name)
@@ -709,7 +749,9 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
         await self.session.flush()
         return await self._to_read_with_counts(integration)
 
-    async def _resolve_credential(self, credential_id: UUID) -> dict[str, object]:
+    async def _resolve_credential(
+        self, credential_id: UUID, *, security_protocol: str | None = None
+    ) -> dict[str, object]:
         """Resolve a credential to its extra_vars dict for adapter use.
 
         Fetches the credential, verifies it is enabled, decrypts its secret,
@@ -718,7 +760,7 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
         Raises:
             IntegrationCredentialNotFoundError: If the credential or its type is not found.
             CredentialDisabledError: If the credential is disabled.
-            CredentialValidationError: If a Kafka-backed credential fails its login rules.
+            CredentialValidationError: If a Kafka connection receives an invalid credential.
             CredentialDecryptionError: If the credential's secret cannot be decrypted.
             RuntimeError: If SecretService is not available.
 
@@ -731,13 +773,18 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
         credential, cred_type = await fetch_credential_with_type(self.session, credential_id)
         if not credential.enabled:
             raise CredentialDisabledError(credential.name)
-        if cred_type.name == KAFKA_CONNECTION_TYPE_NAME:
+        # A Kafka configuration must use the Kafka validator even when the
+        # supplied credential has another type. SSL/PLAINTEXT allow omission,
+        # but every credential supplied for them must still be valid.
+        if security_protocol is not None or cred_type.name == KAFKA_CONNECTION_TYPE_NAME:
             logger.debug("Resolving Kafka management credential", credential_id=str(credential_id))
             login = await resolve_connector_kafka_login(
                 self.session,
                 secret_service,
                 management_credential_id=credential_id,
-                security_protocol=KafkaSecurityProtocol.SASL_SSL,
+                security_protocol=security_protocol
+                if security_protocol is not None
+                else KafkaSecurityProtocol.SASL_SSL,
             )
             return dict(login or {})
         logger.debug("Resolving credential", credential_id=str(credential_id), credential_type=cred_type.name)
@@ -861,7 +908,9 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
             )
             raise
 
-        if integration.management_credential_id is None and integration.integration_type in CREDENTIAL_REQUIRED_TYPES:
+        if integration.management_credential_id is None and _credential_required(
+            integration.integration_type, integration.configuration
+        ):
             await self._fail_validation(
                 integration, IntegrationCredentialRequiredError(integration.integration_type.value)
             )
@@ -869,7 +918,14 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
         resolved_credential: dict[str, object] = {}
         if integration.management_credential_id:
             try:
-                resolved_credential = await self._resolve_credential(integration.management_credential_id)
+                resolved_credential = await self._resolve_credential(
+                    integration.management_credential_id,
+                    **(
+                        {"security_protocol": integration.configuration.security_protocol}
+                        if isinstance(integration.configuration, KafkaConfiguration)
+                        else {}
+                    ),
+                )
             except (CredentialDisabledError, CredentialValidationError, CredentialDecryptionError) as exc:
                 await self._fail_validation(integration, exc)
 
@@ -878,12 +934,12 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
         await self.session.commit()
 
         timeout_seconds: int = await get_runtime_settings().get("integrations.connection_test_timeout_seconds")
-        # Re-check at call time (defense in depth): the stored base_url passed the write-time
-        # check, but DNS could have been re-pointed to a private/metadata target since.
-        self._validate_configuration_ssrf(integration.configuration)
-        adapter = create_health_check_adapter(integration.integration_type, integration.configuration)
 
         try:
+            # Keep non-Kafka SSRF errors inside the handler that persists ERROR.
+            # Kafka checks run at its socket boundary under the adapter timeout.
+            await self._validate_configuration_ssrf(integration.configuration, runtime=True)
+            adapter = create_health_check_adapter(integration.integration_type, integration.configuration)
             result = await adapter.validate(resolved_credential, timeout_seconds)
 
             integration = await self._get_or_raise(integration_id, for_update=True)
@@ -932,14 +988,21 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
         """
         # Reject SSRF-prone base_url before any outbound request. discover() bypasses
         # create/patch, so without this the adapter would hit private/metadata targets.
-        self._validate_configuration_ssrf(data.configuration)
+        await self._validate_configuration_ssrf(data.configuration, runtime=True)
 
-        if data.credential_id is None and data.integration_type in CREDENTIAL_REQUIRED_TYPES:
+        if data.credential_id is None and _credential_required(data.integration_type, data.configuration):
             raise IntegrationCredentialRequiredError(data.integration_type.value)
 
         resolved_credential: dict[str, object] = {}
         if data.credential_id is not None:
-            resolved_credential = await self._resolve_credential(data.credential_id)
+            resolved_credential = await self._resolve_credential(
+                data.credential_id,
+                **(
+                    {"security_protocol": data.configuration.security_protocol}
+                    if isinstance(data.configuration, KafkaConfiguration)
+                    else {}
+                ),
+            )
 
         timeout_seconds: int = await get_runtime_settings().get("integrations.connection_test_timeout_seconds")
 
@@ -1020,13 +1083,13 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
         await self.session.commit()
 
         timeout_seconds: int = await get_runtime_settings().get("integrations.connection_test_timeout_seconds")
-        # Re-check at call time (defense in depth): the stored base_url passed the write-time
-        # check, but DNS could have been re-pointed to a private/metadata target since.
-        self._validate_configuration_ssrf(integration.configuration)
-        adapter = create_health_check_adapter(integration.integration_type, integration.configuration)
 
         synced = updated = missing = 0
         try:
+            # Same placement as validate: a DNS/SSRF failure must reach the
+            # handler that records refresh ERROR instead of leaving REFRESHING.
+            await self._validate_configuration_ssrf(integration.configuration, runtime=True)
+            adapter = create_health_check_adapter(integration.integration_type, integration.configuration)
             discover_result = await adapter.discover(resolved_credential, timeout_seconds)
 
             if not discover_result.success:

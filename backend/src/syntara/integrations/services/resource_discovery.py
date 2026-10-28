@@ -23,6 +23,7 @@ if TYPE_CHECKING:
 from sqlmodel import col, or_, select
 
 import syntara.integrations.adapters.aap
+import syntara.integrations.adapters.kafka  # register Kafka adapter
 import syntara.integrations.adapters.llm_provider
 import syntara.integrations.adapters.mcp_server  # noqa: F401 — register adapters in the worker process
 from syntara.core.config.base import get_settings
@@ -36,7 +37,7 @@ from syntara.settings.cache.settings_cache import get_runtime_settings
 
 logger = structlog.stdlib.get_logger(__name__)
 
-# Only these types have discoverable resources; AAP gateway is a no-op.
+# Only these types have discoverable resources. AAP and Kafka are connectivity checks.
 _REFRESHABLE_TYPES = (IntegrationType.MCP_SERVER, IntegrationType.LLM_PROVIDER)
 
 

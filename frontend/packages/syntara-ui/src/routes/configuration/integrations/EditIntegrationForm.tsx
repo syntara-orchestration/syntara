@@ -9,14 +9,12 @@ import {
   FormGroup,
   Title,
 } from '@patternfly/react-core'
-import type { IntegrationsAPI } from '@syntara/contracts'
 import { IntegrationTypeEnum } from '@syntara/contracts'
 import { useQueryClient } from '@tanstack/react-query'
-import { useNavigate, useParams } from '@tanstack/react-router'
+import { useNavigate, useParams, useRouterState } from '@tanstack/react-router'
 import { useEffect, useMemo, useRef } from 'react'
-import { useWatch, type UseFormSetValue } from 'react-hook-form'
+import { useFormContext, useFormState, useWatch, type UseFormSetValue } from 'react-hook-form'
 
-import { AppRoute } from '../../../app/AppRoute'
 import { breadcrumbsIntegrationEdit } from '../../../app/breadcrumbBuilders'
 import { integrationsClient } from '../../../client'
 import { SynDetail } from '../../../components/details/SynDetail'
@@ -40,18 +38,20 @@ import { CredentialSelector } from '../../builder/components/CredentialSelector'
 import styles from './EditIntegrationForm.module.css'
 import type { EditIntegrationFormValues, IntegrationRead } from './editIntegrationFormSchema'
 import { buildConfiguration, buildEditSchema, editIntegrationSchema } from './editIntegrationFormSchema'
+import { EditKafkaFields } from './editKafkaFields'
+import { editFormRequiresBaseUrl, shouldHideBaseUrl, usesServiceName } from './editKafkaForm'
 import { EditSecurityFields } from './EditSecurityFields'
 import { ScopeFields } from './form/ScopeFields'
 import { integrationHelp } from './integrationFieldHelp'
 import {
-  CREDENTIAL_REQUIRED_TYPES,
+  isIntegrationCredentialRequired,
   CREDENTIAL_TYPES_BY_INTEGRATION,
   INTEGRATION_TYPE_LABELS,
   PROVIDER_HINT_LABELS,
-  PROVIDERS_HIDING_BASE_URL,
-  PROVIDERS_REQUIRING_BASE_URL,
 } from './integrationFilters'
-import { getProviderHint, isLLMProvider } from './integrationUtils'
+import { getIntegrationPaths, getProviderHint, getStoredConfiguration, isLLMProvider } from './integrationUtils'
+import { formatBootstrapServers } from './kafkaBootstrapServers'
+import { DEFAULT_KAFKA_SASL_MECHANISM } from './kafkaSasl'
 import { useEditTestConnection } from './useEditTestConnection'
 import { useProjectAssignmentSync } from './useProjectAssignmentSync'
 
@@ -62,6 +62,34 @@ const CREDENTIAL_DESCRIPTION: Record<string, string> = {
     'This credential is used to verify the connection to this integration and perform periodic health checks. Workflow credentials are configured separately in the workflow builder.',
   [IntegrationTypeEnum.ANSIBLE_AUTOMATION_PLATFORM]:
     'This credential is used to verify the connection to the Ansible Automation Platform. Workflow credentials are configured separately in the workflow builder.',
+  [IntegrationTypeEnum.KAFKA]:
+    'SASL_SSL uses this Kafka login to verify the brokers. SSL and PLAINTEXT allow the credential to be omitted. Workflow credentials are configured separately in the workflow builder.',
+}
+
+function configurationFormFields(config: ReturnType<typeof getStoredConfiguration>) {
+  return {
+    base_url: config && 'base_url' in config ? String(config.base_url ?? '') : '',
+    bootstrap_servers:
+      config && 'bootstrap_servers' in config && Array.isArray(config.bootstrap_servers)
+        ? formatBootstrapServers(config.bootstrap_servers)
+        : '',
+    security_protocol: config && 'security_protocol' in config ? (config.security_protocol ?? 'SASL_SSL') : 'SASL_SSL',
+    allow_plaintext: config && 'allow_plaintext' in config ? Boolean(config.allow_plaintext) : false,
+    sasl_mechanism:
+      config && 'sasl_mechanism' in config && config.sasl_mechanism
+        ? config.sasl_mechanism
+        : DEFAULT_KAFKA_SASL_MECHANISM,
+    insecure_skip_tls_verify:
+      config && 'insecure_skip_tls_verify' in config ? Boolean(config.insecure_skip_tls_verify) : false,
+    ca_certificate: config && 'ca_certificate' in config ? (config.ca_certificate ?? null) : null,
+  }
+}
+
+function allowHttpForEdit(integration: IntegrationRead): boolean {
+  if (integration.integration_type === IntegrationTypeEnum.KAFKA) return false
+  const config = integration.configuration
+  if (!config || !('allow_http' in config)) return false
+  return Boolean(config.allow_http)
 }
 
 type FormFieldsProps = Readonly<{
@@ -81,11 +109,16 @@ function EditIntegrationFormFields({
   setValue,
   onTestConnection,
 }: FormFieldsProps) {
-  const isCredentialRequired = CREDENTIAL_REQUIRED_TYPES.has(integration.integration_type ?? '')
+  const { control } = useFormContext<EditIntegrationFormValues>()
+  const { errors } = useFormState({ control })
+  const isKafka = integration.integration_type === IntegrationTypeEnum.KAFKA
+  const protocol = useWatch({ control, name: 'security_protocol' })
+  const isCredentialRequired = isIntegrationCredentialRequired(integration.integration_type ?? '', protocol)
   const isTestDisabled = (isCredentialRequired && !credentialId) || isTesting
   const isAnsibleAutomationPlatform = integration.integration_type === IntegrationTypeEnum.ANSIBLE_AUTOMATION_PLATFORM
   const isLLM = isLLMProvider(integration)
-  const hideBaseUrl = isLLM && PROVIDERS_HIDING_BASE_URL.has(getProviderHint(integration))
+  const hideBaseUrl = shouldHideBaseUrl(integration)
+  const nameUsesServiceLabel = usesServiceName(isLLM, integration.integration_type)
 
   const credentialDescription =
     CREDENTIAL_DESCRIPTION[integration.integration_type ?? ''] ?? CREDENTIAL_DESCRIPTION[IntegrationTypeEnum.MCP_SERVER]
@@ -109,10 +142,10 @@ function EditIntegrationFormFields({
 
       <SynTextField<EditIntegrationFormValues, 'name'>
         name="name"
-        label={isLLM ? 'Name' : 'Server name / ID'}
+        label={nameUsesServiceLabel ? 'Name' : 'Server name / ID'}
         fieldId="edit-name"
         isRequired
-        labelHelp={isLLM ? integrationHelp.name : integrationHelp.serverName}
+        labelHelp={nameUsesServiceLabel ? integrationHelp.name : integrationHelp.serverName}
       />
 
       <SynTextAreaField<EditIntegrationFormValues, 'description'>
@@ -132,7 +165,9 @@ function EditIntegrationFormFields({
         />
       )}
 
-      <EditSecurityFields />
+      {isKafka && <EditKafkaFields control={control} errorMessage={errors.bootstrap_servers?.message} />}
+
+      {(!isKafka || protocol !== 'PLAINTEXT') && <EditSecurityFields showAllowHttp={!isKafka} />}
 
       <ScopeFields<EditIntegrationFormValues>
         scope={scope}
@@ -214,14 +249,27 @@ function EditFormFooter({ isSaving, onCancel }: Readonly<{ isSaving: boolean; on
   )
 }
 
+function getIntegrationUpdateFields(values: EditIntegrationFormValues) {
+  return {
+    name: values.name,
+    description: values.description || null,
+    scope: values.scope,
+    management_credential_id: values.management_credential_id,
+  }
+}
+
 export function EditIntegrationForm() {
   const { integrationId }: { integrationId: string } = useParams({ strict: false })
+  const isKafkaRoute = useRouterState({
+    select: (state) => state.location.pathname.startsWith('/configuration/integrations/kafka/'),
+  })
+  const { resourcePath, detailPath } = getIntegrationPaths(isKafkaRoute, integrationId)
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { showAlert } = useAlerts()
   const docLink = useDocLink('integrations')
 
-  const query = integrationsClient.useQuery('get', '/integrations/{integration_id}', {
+  const query = integrationsClient.useQuery('get', resourcePath, {
     params: { path: { integration_id: integrationId ?? '' } },
   })
   const integration = query.data
@@ -240,15 +288,11 @@ export function EditIntegrationForm() {
 
   const { syncAssignments } = useProjectAssignmentSync()
 
-  const detailPath = AppRoute.Configuration.Integrations.Detail.replace(':integrationId', integrationId ?? '')
   const breadcrumbs = breadcrumbsIntegrationEdit(integration?.name ?? 'Integration', detailPath)
 
   const schema = useMemo(() => {
     if (!integration) return editIntegrationSchema
-    const requiresBaseUrl = isLLMProvider(integration)
-      ? PROVIDERS_REQUIRING_BASE_URL.has(getProviderHint(integration))
-      : true
-    return buildEditSchema(requiresBaseUrl)
+    return buildEditSchema(editFormRequiresBaseUrl(integration))
   }, [integration])
 
   useEffect(() => {
@@ -258,16 +302,14 @@ export function EditIntegrationForm() {
 
   const formValues = useMemo<EditIntegrationFormValues | undefined>(() => {
     if (!integration) return undefined
-    const config = integration.configuration
+    const config = getStoredConfiguration(integration)
     const projectIds = integration.scope === 'project' ? initialProjectIds : []
     return {
       name: integration.name ?? '',
       description: integration.description ?? '',
       integration_type: integration.integration_type ?? IntegrationTypeEnum.MCP_SERVER,
-      base_url: 'base_url' in config ? String(config.base_url ?? '') : '',
-      allow_http: 'allow_http' in config ? Boolean(config.allow_http) : false,
-      insecure_skip_tls_verify: 'insecure_skip_tls_verify' in config ? Boolean(config.insecure_skip_tls_verify) : false,
-      ca_certificate: 'ca_certificate' in config ? (config.ca_certificate ?? null) : null,
+      ...configurationFormFields(config),
+      allow_http: allowHttpForEdit(integration),
       scope: (integration.scope as 'global' | 'project') ?? 'global',
       project_ids: projectIds,
       management_credential_id: integration.management_credential_id ?? null,
@@ -281,6 +323,10 @@ export function EditIntegrationForm() {
       description: '',
       integration_type: '',
       base_url: '',
+      bootstrap_servers: '',
+      sasl_mechanism: DEFAULT_KAFKA_SASL_MECHANISM,
+      security_protocol: 'SASL_SSL',
+      allow_plaintext: false,
       allow_http: false,
       insecure_skip_tls_verify: false,
       ca_certificate: null,
@@ -311,10 +357,15 @@ export function EditIntegrationForm() {
     body: 'You have unsaved changes to this integration. Your changes will be lost if you leave.',
   })
 
-  const { mutateAsync: patchIntegration, isPending: isSaving } = integrationsClient.useMutation(
+  const { mutateAsync: patchIntegration, isPending: isLegacySaving } = integrationsClient.useMutation(
     'patch',
     '/integrations/{integration_id}'
   )
+  const { mutateAsync: patchKafkaIntegration, isPending: isKafkaSaving } = integrationsClient.useMutation(
+    'patch',
+    '/kafka_integrations/{integration_id}'
+  )
+  const isSaving = isLegacySaving || isKafkaSaving
 
   const { handleTestConnection, isTesting } = useEditTestConnection(integration, getValues)
 
@@ -323,23 +374,23 @@ export function EditIntegrationForm() {
 
     const integrationType = integration.integration_type ?? IntegrationTypeEnum.MCP_SERVER
 
-    const body: IntegrationsAPI.components['schemas']['IntegrationUpdate'] = {
-      name: values.name,
-      description: values.description || null,
-      scope: values.scope,
-      configuration: buildConfiguration(
-        integrationType,
-        values,
-        isLLMProvider(integration) ? getProviderHint(integration) : undefined
-      ),
-      management_credential_id: values.management_credential_id,
-    }
+    const configuration = buildConfiguration(
+      integrationType,
+      values,
+      isLLMProvider(integration) ? getProviderHint(integration) : undefined
+    )
+    const common = getIntegrationUpdateFields(values)
 
     detachPromise(
       (async () => {
         try {
-          await patchIntegration({ params: { path: { integration_id: integrationId } }, body })
-          await queryClient.invalidateQueries({ queryKey: ['get', '/integrations/{integration_id}'] })
+          const params = { path: { integration_id: integrationId } }
+          if (configuration.integration_type === IntegrationTypeEnum.KAFKA) {
+            await patchKafkaIntegration({ params, body: { ...common, configuration } })
+          } else {
+            await patchIntegration({ params, body: { ...common, configuration } })
+          }
+          await queryClient.invalidateQueries({ queryKey: ['get', resourcePath] })
           await queryClient.invalidateQueries({ queryKey: ['get', '/integrations/{integration_id}/projects'] })
 
           let variant: 'success' | 'warning' = 'success'

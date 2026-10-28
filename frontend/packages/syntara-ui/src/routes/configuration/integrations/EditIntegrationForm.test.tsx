@@ -44,6 +44,7 @@ vi.mock('./useProjectAssignmentSync', () => ({
 }))
 
 const mockNavigate = vi.fn()
+let mockPathname = '/configuration/integrations/int-1/edit'
 
 vi.mock('@tanstack/react-router', async () => {
   const actual = await vi.importActual('@tanstack/react-router')
@@ -52,6 +53,8 @@ vi.mock('@tanstack/react-router', async () => {
     ...actual,
     Link: MockLink,
     useNavigate: () => mockNavigate,
+    useRouterState: (options: { select: (state: { location: { pathname: string } }) => unknown }) =>
+      options.select({ location: { pathname: mockPathname } }),
     useParams: vi.fn(() => ({ integrationId: 'int-1' })),
   }
 })
@@ -181,7 +184,7 @@ function setupMutationMocks(patchMutateAsync?: ReturnType<typeof vi.fn>, discove
   const patchAsync = patchMutateAsync ?? vi.fn().mockResolvedValue({})
   const discover = discoverMutate ?? vi.fn()
   vi.mocked(integrationsClient.useMutation).mockImplementation((_method: string, path: string) => {
-    if (path === '/integrations/discover') {
+    if (path === '/integrations/discover' || path === '/kafka_integrations/discover') {
       return { mutate: discover, mutateAsync: discover, isPending: false, isError: false } as never
     }
     return { mutate: vi.fn(), mutateAsync: patchAsync, isPending: false, isError: false } as never
@@ -192,6 +195,7 @@ function setupMutationMocks(patchMutateAsync?: ReturnType<typeof vi.fn>, discove
 describe('EditIntegrationForm', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockPathname = '/configuration/integrations/int-1/edit'
     setupMocks()
     setupMutationMocks()
   })
@@ -771,6 +775,136 @@ describe('EditIntegrationForm', () => {
       render(<EditIntegrationForm />, { wrapper })
 
       expect(screen.getByRole('textbox', { name: /api url/i })).toHaveValue('')
+    })
+  })
+
+  describe('Kafka', () => {
+    const mockKafkaIntegration = {
+      ...mockIntegration,
+      id: 'int-kafka',
+      name: 'Production Kafka',
+      description: 'Brokers',
+      integration_type: 'kafka',
+      configuration: {
+        integration_type: 'kafka',
+        bootstrap_servers: ['broker.example.com:9093', 'other.example.com:9092'],
+        sasl_mechanism: 'SCRAM-SHA-512',
+        allow_http: false,
+        insecure_skip_tls_verify: true,
+        ca_certificate: null,
+      },
+    }
+
+    beforeEach(() => {
+      mockPathname = '/configuration/integrations/kafka/int-kafka-1/edit'
+      setupMocks({ integration: mockKafkaIntegration })
+    })
+
+    it('shows bootstrap servers from configuration and hides the API URL', () => {
+      render(<EditIntegrationForm />, { wrapper })
+
+      expect(screen.getByText('Kafka')).toBeInTheDocument()
+      expect(screen.getByRole('textbox', { name: 'Name' })).toHaveValue('Production Kafka')
+      expect(screen.getByRole('textbox', { name: 'Bootstrap servers' })).toHaveValue(
+        'broker.example.com:9093\nother.example.com:9092'
+      )
+      expect(screen.getByText('SCRAM-SHA-512')).toBeInTheDocument()
+      expect(screen.queryByRole('textbox', { name: /api url/i })).not.toBeInTheDocument()
+      expect(screen.getByText(/SASL_SSL uses this Kafka login/i)).toBeInTheDocument()
+    })
+
+    it('hides Allow HTTP so the connection stays SASL_SSL', async () => {
+      const user = userEvent.setup()
+      render(<EditIntegrationForm />, { wrapper })
+
+      await user.click(screen.getByText('Security'))
+
+      expect(screen.queryByRole('checkbox', { name: /allow http connections/i })).not.toBeInTheDocument()
+      expect(screen.getByRole('checkbox', { name: /disable tls certificate verification/i })).toBeChecked()
+    })
+
+    it('requires a credential before the connection can be tested', async () => {
+      const user = userEvent.setup()
+      render(<EditIntegrationForm />, { wrapper })
+
+      expect(screen.getByRole('button', { name: 'Test connection' })).toHaveAttribute('aria-disabled', 'true')
+
+      await user.click(screen.getByTestId('select-credential'))
+
+      expect(screen.getByRole('button', { name: 'Test connection' })).not.toHaveAttribute('aria-disabled', 'true')
+    })
+
+    it('saves the broker list and the selected SASL mechanism', async () => {
+      const { patchMutate } = setupMutationMocks()
+      const user = userEvent.setup()
+      render(<EditIntegrationForm />, { wrapper })
+
+      await user.click(screen.getByText('SCRAM-SHA-512'))
+      await user.click(screen.getByRole('option', { name: 'PLAIN' }))
+      await user.click(screen.getByRole('button', { name: 'Save integration' }))
+
+      await waitFor(() => {
+        expect(patchMutate).toHaveBeenCalledWith(
+          expect.objectContaining({
+            body: expect.objectContaining({
+              configuration: {
+                integration_type: 'kafka',
+                bootstrap_servers: ['broker.example.com:9093', 'other.example.com:9092'],
+                sasl_mechanism: 'PLAIN',
+                security_protocol: 'SASL_SSL',
+                allow_plaintext: false,
+                allow_http: false,
+                insecure_skip_tls_verify: true,
+                ca_certificate: null,
+              },
+            }) as Record<string, unknown>,
+          })
+        )
+      })
+    })
+
+    it('shows the bootstrap validation error and does not save', async () => {
+      const { patchMutate } = setupMutationMocks()
+      const user = userEvent.setup()
+      render(<EditIntegrationForm />, { wrapper })
+
+      await user.clear(screen.getByRole('textbox', { name: 'Bootstrap servers' }))
+      await user.click(screen.getByRole('button', { name: 'Save integration' }))
+
+      await waitFor(() => {
+        expect(screen.getByText('At least one bootstrap server is required')).toBeInTheDocument()
+      })
+      expect(patchMutate).not.toHaveBeenCalled()
+    })
+
+    it('starts from an empty broker list when configuration is missing', () => {
+      setupMocks({
+        integration: {
+          ...mockKafkaIntegration,
+          configuration: undefined,
+        },
+      })
+      render(<EditIntegrationForm />, { wrapper })
+
+      expect(screen.getByRole('textbox', { name: 'Bootstrap servers' })).toHaveValue('')
+      expect(screen.getByText('SCRAM-SHA-256')).toBeInTheDocument()
+    })
+
+    it('ignores a bootstrap value that is not a list and falls back when SASL is blank', () => {
+      setupMocks({
+        integration: {
+          ...mockKafkaIntegration,
+          configuration: {
+            integration_type: 'kafka',
+            bootstrap_servers: 'broker.example.com:9093',
+            sasl_mechanism: '',
+          },
+        },
+      })
+      render(<EditIntegrationForm />, { wrapper })
+
+      expect(screen.getByRole('textbox', { name: 'Bootstrap servers' })).toHaveValue('')
+      expect(screen.getByText('SCRAM-SHA-256')).toBeInTheDocument()
     })
   })
 

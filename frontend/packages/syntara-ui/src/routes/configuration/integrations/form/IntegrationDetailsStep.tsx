@@ -15,13 +15,16 @@ import {
 } from '@patternfly/react-core'
 import { IntegrationTypeEnum } from '@syntara/contracts'
 import { type ReactNode, type Ref, useCallback, useState } from 'react'
-import { useWatch, type UseFormSetValue } from 'react-hook-form'
+import { useFormContext, useWatch, type UseFormSetValue } from 'react-hook-form'
 
 import { SynFormField } from '../../../../components/forms/SynFormField'
+import { SynTextAreaField } from '../../../../components/forms/SynTextAreaField'
 import { SynTextField } from '../../../../components/forms/SynTextField'
 import { SynSelect } from '../../../../components/SynSelect'
 import { integrationHelp } from '../integrationFieldHelp'
 import { PROVIDERS_HIDING_BASE_URL, PROVIDERS_REQUIRING_BASE_URL } from '../integrationFilters'
+import { KafkaSaslMechanismField } from '../kafkaSaslField'
+import { KafkaTransportFields } from '../KafkaTransportFields'
 
 import { INTEGRATION_TYPE_OPTIONS, PROVIDER_HINT_OPTIONS, type IntegrationFormData } from './integrationFormSchema'
 import { ScopeFields } from './ScopeFields'
@@ -137,7 +140,10 @@ function IntegrationTypeSelect({
   )
 }
 
-function SecurityFields() {
+function SecurityFields({
+  allowHttpDescription = 'Permits unencrypted HTTP URLs for this integration',
+  showAllowHttp = true,
+}: Readonly<{ allowHttpDescription?: string; showAllowHttp?: boolean }>) {
   const [isExpanded, setIsExpanded] = useState(false)
   const skipTlsVerify = useWatch<IntegrationFormData, 'configuration.insecure_skip_tls_verify'>({
     name: 'configuration.insecure_skip_tls_verify',
@@ -151,23 +157,25 @@ function SecurityFields() {
       isIndented
     >
       <div className={styles.securityFields}>
-        <SynFormField<IntegrationFormData, 'configuration.allow_http'>
-          name="configuration.allow_http"
-          label="Allow HTTP connections"
-          fieldId="allow-http"
-          hideFormGroupLabel
-          hideFooter
-        >
-          {({ field }) => (
-            <Checkbox
-              id="allow-http"
-              label="Allow HTTP connections"
-              description="Permits unencrypted HTTP URLs for this integration"
-              isChecked={field.value}
-              onChange={(_event, checked) => field.onChange(checked)}
-            />
-          )}
-        </SynFormField>
+        {showAllowHttp && (
+          <SynFormField<IntegrationFormData, 'configuration.allow_http'>
+            name="configuration.allow_http"
+            label="Allow HTTP connections"
+            fieldId="allow-http"
+            hideFormGroupLabel
+            hideFooter
+          >
+            {({ field }) => (
+              <Checkbox
+                id="allow-http"
+                label="Allow HTTP connections"
+                description={allowHttpDescription}
+                isChecked={field.value}
+                onChange={(_event, checked) => field.onChange(checked)}
+              />
+            )}
+          </SynFormField>
+        )}
         <SynFormField<IntegrationFormData, 'configuration.insecure_skip_tls_verify'>
           name="configuration.insecure_skip_tls_verify"
           label="Disable TLS certificate verification"
@@ -221,12 +229,60 @@ function SecurityFields() {
   )
 }
 
+type DetailsTypeConfig = {
+  nameLabel: string
+  namePlaceholder: string
+  showProviderHint: boolean
+  hideBaseUrl: boolean
+  showBootstrapServers: boolean
+  requireBaseUrl: boolean
+  baseUrlPlaceholder: string
+}
+
+function detailsTypeConfig(integrationType: string, providerHint: unknown): DetailsTypeConfig {
+  if (integrationType === IntegrationTypeEnum.LLM_PROVIDER) {
+    return {
+      nameLabel: 'Name',
+      namePlaceholder: 'Enter provider name',
+      showProviderHint: true,
+      hideBaseUrl: typeof providerHint === 'string' && PROVIDERS_HIDING_BASE_URL.has(providerHint),
+      showBootstrapServers: false,
+      requireBaseUrl: typeof providerHint === 'string' && PROVIDERS_REQUIRING_BASE_URL.has(providerHint),
+      baseUrlPlaceholder: 'https://api.example.com/v1',
+    }
+  }
+  if (integrationType === IntegrationTypeEnum.KAFKA) {
+    return {
+      nameLabel: 'Name',
+      namePlaceholder: 'Enter cluster name',
+      showProviderHint: false,
+      hideBaseUrl: true,
+      showBootstrapServers: true,
+      requireBaseUrl: false,
+      baseUrlPlaceholder: '',
+    }
+  }
+  return {
+    nameLabel: 'Server name / ID',
+    namePlaceholder: 'Enter server name / ID',
+    showProviderHint: false,
+    hideBaseUrl: false,
+    showBootstrapServers: false,
+    requireBaseUrl: true,
+    baseUrlPlaceholder:
+      integrationType === IntegrationTypeEnum.ANSIBLE_AUTOMATION_PLATFORM
+        ? 'e.g. https://aap.example.com'
+        : 'https://mcp-server.example.com/mcp',
+  }
+}
+
 type IntegrationDetailsStepProps = Readonly<{
   setValue: UseFormSetValue<IntegrationFormData>
   onTypeChange: (newType: string) => void
 }>
 
 export function IntegrationDetailsStep({ setValue, onTypeChange }: IntegrationDetailsStepProps) {
+  const { control } = useFormContext<IntegrationFormData>()
   const scope = useWatch<IntegrationFormData, 'scope'>({ name: 'scope' })
   const integrationType = useWatch<IntegrationFormData, 'integration_type'>({ name: 'integration_type' })
   const providerHint = useWatch<IntegrationFormData, 'configuration.provider_hint'>({
@@ -237,23 +293,11 @@ export function IntegrationDetailsStep({ setValue, onTypeChange }: IntegrationDe
 
   const isLLM = integrationType === IntegrationTypeEnum.LLM_PROVIDER
   const isAAP = integrationType === IntegrationTypeEnum.ANSIBLE_AUTOMATION_PLATFORM
-  const typeConfig = isLLM
-    ? {
-        nameLabel: 'Name',
-        namePlaceholder: 'Enter provider name',
-        showProviderHint: true,
-        hideBaseUrl: typeof providerHint === 'string' && PROVIDERS_HIDING_BASE_URL.has(providerHint),
-        requireBaseUrl: typeof providerHint === 'string' && PROVIDERS_REQUIRING_BASE_URL.has(providerHint),
-        baseUrlPlaceholder: 'https://api.example.com/v1',
-      }
-    : {
-        nameLabel: 'Server name / ID',
-        namePlaceholder: 'Enter server name / ID',
-        showProviderHint: false,
-        hideBaseUrl: false,
-        requireBaseUrl: true,
-        baseUrlPlaceholder: isAAP ? 'e.g. https://aap.example.com' : 'https://mcp-server.example.com/mcp',
-      }
+  const kafkaProtocol =
+    useWatch<IntegrationFormData, 'configuration.security_protocol'>({ name: 'configuration.security_protocol' }) ??
+    'SASL_SSL'
+  const isKafka = integrationType === IntegrationTypeEnum.KAFKA
+  const typeConfig = detailsTypeConfig(integrationType, providerHint)
 
   const renderTypeToggle = useCallback(
     (toggleRef: Ref<MenuToggleElement>) => (
@@ -316,7 +360,7 @@ export function IntegrationDetailsStep({ setValue, onTypeChange }: IntegrationDe
           fieldId="name"
           placeholder={typeConfig.namePlaceholder}
           isRequired
-          labelHelp={isLLM ? integrationHelp.name : integrationHelp.serverName}
+          labelHelp={isLLM || isKafka ? integrationHelp.name : integrationHelp.serverName}
         />
         <SynTextField<IntegrationFormData, 'description'>
           name="description"
@@ -362,8 +406,34 @@ export function IntegrationDetailsStep({ setValue, onTypeChange }: IntegrationDe
             labelHelp={isAAP ? integrationHelp.aapUrl : integrationHelp.apiUrl}
           />
         )}
+        {typeConfig.showBootstrapServers && (
+          <SynTextAreaField<IntegrationFormData, 'configuration.bootstrap_servers'>
+            name="configuration.bootstrap_servers"
+            label="Bootstrap servers"
+            fieldId="bootstrap-servers"
+            isRequired
+            labelHelp={integrationHelp.kafkaBootstrapServers}
+            placeholder={'broker.example.com:9093\nother.example.com:9092'}
+            ariaLabel="Bootstrap servers"
+            resizeOrientation="vertical"
+            rows={4}
+          />
+        )}
+        {typeConfig.showBootstrapServers && (
+          <>
+            <KafkaTransportFields
+              control={control}
+              protocolName="configuration.security_protocol"
+              plaintextName="configuration.allow_plaintext"
+              fieldId="security-protocol"
+            />
+            {kafkaProtocol === 'SASL_SSL' && (
+              <KafkaSaslMechanismField control={control} name="configuration.sasl_mechanism" fieldId="sasl-mechanism" />
+            )}
+          </>
+        )}
 
-        <SecurityFields />
+        {(!isKafka || kafkaProtocol !== 'PLAINTEXT') && <SecurityFields showAllowHttp={!isKafka} />}
 
         <ScopeFields<IntegrationFormData>
           scope={scope}

@@ -1,4 +1,5 @@
 import type { IntegrationsAPI } from '@syntara/contracts'
+type IntegrationRead = IntegrationsAPI.components['schemas']['IntegrationRead']
 import { describe, expect, it } from 'vitest'
 
 import {
@@ -9,8 +10,6 @@ import {
   getTotalResourceCount,
   isLLMProvider,
 } from './integrationUtils'
-
-type IntegrationRead = IntegrationsAPI.components['schemas']['IntegrationRead']
 
 const integrationDefaults: IntegrationRead = {
   id: 'int-1',
@@ -95,6 +94,18 @@ describe('integrationUtils', () => {
         configuration: { integration_type: 'ansible_automation_platform', base_url: 'https://gateway.example.com' },
       })
       expect(getBaseUrl(integration)).toBe('https://gateway.example.com')
+    })
+
+    it('joins Kafka bootstrap servers', () => {
+      const integration = {
+        ...integrationDefaults,
+        integration_type: 'kafka' as const,
+        configuration: {
+          integration_type: 'kafka' as const,
+          bootstrap_servers: ['broker.example.com:9093', 'other.example.com:9092'],
+        },
+      }
+      expect(getBaseUrl(integration)).toBe('broker.example.com:9093, other.example.com:9092')
     })
 
     it('returns empty string when configuration is undefined', () => {

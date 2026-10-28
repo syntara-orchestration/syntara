@@ -160,6 +160,7 @@ export const IntegrationTypeEnum = {
   MCP_SERVER: 'mcp_server',
   LLM_PROVIDER: 'llm_provider',
   ANSIBLE_AUTOMATION_PLATFORM: 'ansible_automation_platform',
+  KAFKA: 'kafka',
 } as const
 
 /**

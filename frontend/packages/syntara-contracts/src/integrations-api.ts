@@ -301,6 +301,74 @@ export interface paths {
     patch: operations['bulk_update_integration_tools']
     trace?: never
   }
+  '/kafka_integrations': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * List Kafka Integrations
+     * @description List Kafka connections with filtering, pagination, and project visibility.
+     */
+    get: operations['list_kafka_integrations']
+    put?: never
+    /**
+     * Create Kafka Integration
+     * @description Create a Kafka connection using the shared integration service.
+     */
+    post: operations['create_kafka_integration']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/kafka_integrations/discover': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Discover Kafka Integration Connection
+     * @description Test a Kafka connection without saving it.
+     */
+    post: operations['discover_kafka_integration_connection']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/kafka_integrations/{integration_id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Get Kafka Integration
+     * @description Get a Kafka connection visible to the caller.
+     */
+    get: operations['get_kafka_integration']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    /**
+     * Update Kafka Integration
+     * @description Update a Kafka connection, preserving omitted settings.
+     */
+    patch: operations['update_kafka_integration']
+    trace?: never
+  }
 }
 export type webhooks = Record<string, never>
 export interface components {
@@ -730,6 +798,69 @@ export interface components {
       ca_certificate?: string | null
     }
     /**
+     * KafkaSaslMechanism
+     * @description SASL mechanism used with the Kafka credential username and password.
+     *
+     *     Cloud brokers such as Aiven use SCRAM-SHA-256. PLAIN remains available
+     *     for clusters that authenticate that way.
+     * @enum {string}
+     */
+    KafkaSaslMechanism: 'PLAIN' | 'SCRAM-SHA-256' | 'SCRAM-SHA-512'
+    /**
+     * KafkaConfiguration
+     * @description Configuration for a Kafka cluster integration.
+     *
+     *     Broker addresses live here. The username and password stay on the
+     *     linked Kafka credential when SASL_SSL is selected. Unauthenticated SSL
+     *     and explicitly opted-in PLAINTEXT do not require a credential.
+     */
+    KafkaConfiguration: {
+      /**
+       * Allow Http
+       * @description Allow HTTP (unencrypted) connections. Loopback addresses are always permitted over HTTP.
+       * @default false
+       */
+      allow_http?: boolean
+      /**
+       * Insecure Skip Tls Verify
+       * @description Disable TLS certificate verification for connections to this integration.
+       * @default false
+       */
+      insecure_skip_tls_verify?: boolean
+      /**
+       * Ca Certificate
+       * @description PEM-encoded CA certificate to trust for this integration's TLS connections.
+       */
+      ca_certificate?: string | null
+      /**
+       * Integration Type
+       * @default kafka
+       * @constant
+       */
+      integration_type?: 'kafka'
+      /**
+       * Bootstrap Servers
+       * @description Kafka bootstrap servers as host:port (or [ipv6]:port) values.
+       */
+      bootstrap_servers: string[]
+      /**
+       * @description Kafka transport: SASL_SSL, SSL, or explicitly opted-in PLAINTEXT.
+       * @default SASL_SSL
+       */
+      security_protocol?: components['schemas']['KafkaSecurityProtocol']
+      /**
+       * Allow Plaintext
+       * @description Explicitly allow unauthenticated, unencrypted PLAINTEXT connections.
+       * @default false
+       */
+      allow_plaintext?: boolean
+      /**
+       * @description SASL mechanism for the username and password on the linked credential.
+       * @default SCRAM-SHA-256
+       */
+      sasl_mechanism?: components['schemas']['KafkaSaslMechanism']
+    }
+    /**
      * DiscoveredLLMModel
      * @description A model discovered from an LLM provider.
      */
@@ -1153,6 +1284,230 @@ export interface components {
        * @description Timestamp of the update
        */
       updated_at: string
+    }
+    /**
+     * KafkaSecurityProtocol
+     * @description Transport modes that decide whether a Kafka credential is required.
+     * @enum {string}
+     */
+    KafkaSecurityProtocol: 'PLAINTEXT' | 'SSL' | 'SASL_SSL'
+    /**
+     * KafkaIntegrationCreate
+     * @description Create a Kafka connection without extending the original integration union.
+     */
+    KafkaIntegrationCreate: {
+      /** Name */
+      name: string
+      /** Description */
+      description?: string | null
+      /**
+       * Integration Type
+       * @default kafka
+       * @constant
+       */
+      integration_type?: 'kafka'
+      configuration: components['schemas']['KafkaConfiguration']
+      /** Management Credential Id */
+      management_credential_id?: string | null
+      /**
+       * Enabled
+       * @default true
+       */
+      enabled?: boolean
+      /** @default global */
+      scope?: components['schemas']['IntegrationScope']
+      /** Labels */
+      labels?: {
+        [key: string]: string
+      }
+    }
+    /**
+     * KafkaIntegrationListResponse
+     * @description Paginated Kafka-only results.
+     * @example {
+     *       "next": "eyJpZCI6InV1aWQifQ",
+     *       "total": 150
+     *     }
+     * @example {
+     *       "next": "eyJpZCI6Im5leHQifQ",
+     *       "prev": "eyJpZCI6InByZXYifQ"
+     *     }
+     */
+    KafkaIntegrationListResponse: {
+      /**
+       * Next
+       * @description Cursor for next page of results
+       */
+      next?: string | null
+      /**
+       * Prev
+       * @description Cursor for previous page of results
+       */
+      prev?: string | null
+      /**
+       * Total
+       * @description Total count of resources (only when include_total=true)
+       */
+      total?: number | null
+      /**
+       * Resources
+       * @description Array of resources in current page
+       */
+      resources: components['schemas']['KafkaIntegrationRead'][]
+    }
+    /**
+     * KafkaIntegrationRead
+     * @description Kafka connection with its broker settings in configuration.
+     */
+    KafkaIntegrationRead: {
+      /**
+       * Resource ID
+       * Format: uuid
+       * @description Unique identifier for the resource
+       * @example 550e8400-e29b-41d4-a716-446655440000
+       */
+      readonly id?: string
+      /**
+       * Created At
+       * Format: date-time
+       * @description Timestamp when resource was created
+       * @example 2025-10-09T12:00:00Z
+       */
+      readonly created_at?: string
+      /**
+       * Updated At
+       * Format: date-time
+       * @description Timestamp when resource was last updated
+       * @example 2025-10-09T12:30:00Z
+       */
+      readonly updated_at?: string
+      /**
+       * Labels
+       * @description Key-value pairs for resource labeling and filtering
+       * @default {}
+       * @example {
+       *       "environment": "production",
+       *       "region": "us-east-1",
+       *       "team": "platform"
+       *     }
+       */
+      labels?: {
+        [key: string]: string
+      }
+      /**
+       * Created By
+       * @description User who created the integration
+       */
+      readonly created_by?: components['schemas']['UserReference'] | null
+      /**
+       * Updated By
+       * @description User who last modified the integration
+       */
+      readonly updated_by?: components['schemas']['UserReference'] | null
+      /**
+       * Name
+       * @description Human-readable name for the resource
+       * @example Authentication Service
+       */
+      name: string
+      /**
+       * Description
+       * @description Detailed description of the resource
+       * @example Handles user authentication and authorization workflows
+       */
+      description?: string | null
+      /**
+       * Enabled
+       * @default true
+       */
+      enabled?: boolean
+      /** @default unknown */
+      validation_status?: components['schemas']['IntegrationStatus']
+      /** @default global */
+      scope?: components['schemas']['IntegrationScope']
+      /** Management Credential Id */
+      management_credential_id?: string | null
+      /** Last Validated At */
+      last_validated_at?: string | null
+      /** Validation Error */
+      validation_error?: string | null
+      refresh_status?: components['schemas']['IntegrationRefreshStatus'] | null
+      /** Last Refreshed At */
+      last_refreshed_at?: string | null
+      /** Last Successful Refresh At */
+      last_successful_refresh_at?: string | null
+      /** Refresh Error */
+      refresh_error?: string | null
+      /**
+       * Project Ids
+       * @description IDs of projects this integration is assigned to (empty for global scope)
+       */
+      project_ids?: string[]
+      /**
+       * Total Tool Count
+       * @description Total number of tools linked to this integration
+       * @default 0
+       */
+      total_tool_count?: number
+      /**
+       * Enabled Tool Count
+       * @description Number of enabled tools linked to this integration
+       * @default 0
+       */
+      enabled_tool_count?: number
+      /**
+       * Total Model Count
+       * @description Total number of models linked to this integration
+       * @default 0
+       */
+      total_model_count?: number
+      /**
+       * Enabled Model Count
+       * @description Number of enabled models linked to this integration
+       * @default 0
+       */
+      enabled_model_count?: number
+      /**
+       * Integration Type
+       * @constant
+       */
+      integration_type: 'kafka'
+      configuration: components['schemas']['KafkaConfiguration']
+    }
+    /**
+     * KafkaIntegrationTestConnection
+     * @description Test a Kafka connection without persisting it.
+     */
+    KafkaIntegrationTestConnection: {
+      /**
+       * Integration Type
+       * @default kafka
+       * @constant
+       */
+      integration_type?: 'kafka'
+      configuration: components['schemas']['KafkaConfiguration']
+      /** Credential Id */
+      credential_id?: string | null
+    }
+    /**
+     * KafkaIntegrationUpdate
+     * @description Patch Kafka settings, preserving omitted fields.
+     */
+    KafkaIntegrationUpdate: {
+      /** Name */
+      name?: string | null
+      /** Description */
+      description?: string | null
+      configuration?: components['schemas']['KafkaConfiguration'] | null
+      /** Management Credential Id */
+      management_credential_id?: string | null
+      /** Enabled */
+      enabled?: boolean | null
+      scope?: components['schemas']['IntegrationScope'] | null
+      /** Labels */
+      labels?: {
+        [key: string]: string
+      } | null
     }
     /**
      * Paginated Response Base
@@ -2181,6 +2536,181 @@ export interface operations {
         }
         content: {
           'application/json': components['schemas']['ToolBulkUpdateResponse']
+        }
+      }
+      400: components['responses']['BadRequestError']
+      401: components['responses']['UnauthorizedError']
+      403: components['responses']['ForbiddenError']
+      404: components['responses']['NotFoundError']
+      409: components['responses']['ConflictError']
+      422: components['responses']['ValidationError']
+      429: components['responses']['RateLimitError']
+      500: components['responses']['InternalServerError']
+    }
+  }
+  list_kafka_integrations: {
+    parameters: {
+      query?: {
+        /** @description Maximum number of results per page */
+        limit?: number
+        /** @description Pagination cursor from previous response */
+        cursor?: string | null
+        /** @description Sort parameter (e.g., 'name', '-created_at') */
+        sort?: string | null
+        /** @description Include total count in response (expensive) */
+        include_total?: boolean
+        /** @description Filter by validation status */
+        validation_status?: components['schemas']['IntegrationStatus'] | null
+        /** @description Filter by enabled status */
+        enabled?: boolean | null
+        /** @description Filter by visibility scope */
+        scope?: components['schemas']['IntegrationScope'] | null
+        /** @description Filter by management credential ID */
+        management_credential_id?: string | null
+        /** @description Filter to integrations that are global or assigned to this project. Restricted to projects the user has RBAC access to; querying inaccessible projects returns only global integrations. */
+        project_id?: string | null
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['KafkaIntegrationListResponse']
+        }
+      }
+      400: components['responses']['BadRequestError']
+      401: components['responses']['UnauthorizedError']
+      403: components['responses']['ForbiddenError']
+      404: components['responses']['NotFoundError']
+      409: components['responses']['ConflictError']
+      422: components['responses']['ValidationError']
+      429: components['responses']['RateLimitError']
+      500: components['responses']['InternalServerError']
+    }
+  }
+  create_kafka_integration: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['KafkaIntegrationCreate']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['KafkaIntegrationRead']
+        }
+      }
+      400: components['responses']['BadRequestError']
+      401: components['responses']['UnauthorizedError']
+      403: components['responses']['ForbiddenError']
+      404: components['responses']['NotFoundError']
+      409: components['responses']['ConflictError']
+      422: components['responses']['ValidationError']
+      429: components['responses']['RateLimitError']
+      500: components['responses']['InternalServerError']
+    }
+  }
+  discover_kafka_integration_connection: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['KafkaIntegrationTestConnection']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['DiscoverResult']
+        }
+      }
+      400: components['responses']['BadRequestError']
+      401: components['responses']['UnauthorizedError']
+      403: components['responses']['ForbiddenError']
+      404: components['responses']['NotFoundError']
+      409: components['responses']['ConflictError']
+      422: components['responses']['ValidationError']
+      429: components['responses']['RateLimitError']
+      500: components['responses']['InternalServerError']
+    }
+  }
+  get_kafka_integration: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        integration_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['KafkaIntegrationRead']
+        }
+      }
+      400: components['responses']['BadRequestError']
+      401: components['responses']['UnauthorizedError']
+      403: components['responses']['ForbiddenError']
+      404: components['responses']['NotFoundError']
+      409: components['responses']['ConflictError']
+      422: components['responses']['ValidationError']
+      429: components['responses']['RateLimitError']
+      500: components['responses']['InternalServerError']
+    }
+  }
+  update_kafka_integration: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        integration_id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['KafkaIntegrationUpdate']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['KafkaIntegrationRead']
         }
       }
       400: components['responses']['BadRequestError']

@@ -14,9 +14,8 @@ import {
   Tooltip,
 } from '@patternfly/react-core'
 import { RhUiCheckCircleIcon, RhUiEditIcon, RhUiTrashIcon, RhUiWarningIcon } from '@patternfly/react-icons'
-import type { IntegrationsAPI } from '@syntara/contracts'
 import { IntegrationTypeEnum } from '@syntara/contracts'
-import { useNavigate, useParams } from '@tanstack/react-router'
+import { useNavigate, useParams, useRouterState } from '@tanstack/react-router'
 
 import { AppRoute } from '../../../app/AppRoute'
 import { breadcrumbsIntegrationDetail, breadcrumbsIntegrationDetailEarlyShell } from '../../../app/breadcrumbBuilders'
@@ -43,7 +42,9 @@ import { useDocLink } from '../../../utils/docs/useDocLink'
 import styles from './IntegrationDetail.module.css'
 import { IntegrationDialogs } from './IntegrationDialogs'
 import { INTEGRATION_TYPE_LABELS, PROVIDER_HINT_LABELS } from './integrationFilters'
+import type { IntegrationRead } from './integrationTypes'
 import {
+  getIntegrationPaths,
   getBaseUrl,
   getEnabledResourceCount,
   getProviderHint,
@@ -60,8 +61,6 @@ import { useIntegrationModelsState } from './useIntegrationModelsState'
 import { type IntegrationPermissions, useIntegrationPermissions } from './useIntegrationPermissions'
 import { useItemSelection } from './useItemSelection'
 import { useResourcesSave } from './useResourcesSave'
-
-type IntegrationRead = IntegrationsAPI.components['schemas']['IntegrationRead']
 
 function IntegrationProjectsList({ integrationId }: Readonly<{ integrationId: string }>) {
   const { data, isPending } = integrationsClient.useQuery('get', '/integrations/{integration_id}/projects', {
@@ -125,7 +124,9 @@ function IntegrationDetailsTab({
               {PROVIDER_HINT_LABELS[getProviderHint(integration)] ?? getProviderHint(integration)}
             </SynDetail>
           )}
-          <SynDetail label="URL">{getBaseUrl(integration) || '—'}</SynDetail>
+          <SynDetail label={integration.integration_type === IntegrationTypeEnum.KAFKA ? 'Bootstrap servers' : 'URL'}>
+            {getBaseUrl(integration) || '—'}
+          </SynDetail>
           <SynDetail label="Connection credential">
             {!credentialId || !credentialName ? (
               <>None</>
@@ -278,7 +279,7 @@ function getFooterState({
   return { isDirty: toolsDirty, isSaving: isToolsSaving, onSave: handleToolsSave, saveLabel: 'Save tools' }
 }
 
-function hasResourcesTab(integration: IntegrationsAPI.components['schemas']['IntegrationRead']): boolean {
+function hasResourcesTab(integration: IntegrationRead): boolean {
   return isLLMProvider(integration) || integration.integration_type === IntegrationTypeEnum.MCP_SERVER
 }
 
@@ -286,16 +287,19 @@ type IntegrationDetailTab = 'details' | 'resources' | 'edit'
 
 export function IntegrationDetail() {
   const { integrationId }: { integrationId: string } = useParams({ strict: false })
+  const isKafkaRoute = useRouterState({
+    select: (state) => state.location.pathname.startsWith('/configuration/integrations/kafka/'),
+  })
+  const { resourcePath, detailPath, editPath } = getIntegrationPaths(isKafkaRoute, integrationId)
   const navigate = useNavigate()
-  const integrationBasePath = AppRoute.Configuration.Integrations.Detail.replace(':integrationId', integrationId)
-  const editPath = AppRoute.Configuration.Integrations.Edit.replace(':integrationId', integrationId)
+  const integrationBasePath = detailPath
   const [activeTab] = useUrlTab<IntegrationDetailTab>(integrationBasePath)
   const docLink = useDocLink('integrations')
   const permissions = useIntegrationPermissions()
 
   const query = integrationsClient.useQuery(
     'get',
-    '/integrations/{integration_id}',
+    resourcePath,
     { params: { path: { integration_id: integrationId } } },
     { enabled: integrationId.length > 0 }
   )

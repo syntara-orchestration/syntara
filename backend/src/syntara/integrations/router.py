@@ -8,6 +8,7 @@ from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 import syntara.integrations.adapters.aap  # register AAP adapter
+import syntara.integrations.adapters.kafka  # register Kafka adapter
 import syntara.integrations.adapters.llm_provider  # register LLM provider adapter
 import syntara.integrations.adapters.mcp_server  # noqa: F401 — register MCP adapter
 from syntara.audit.decorators import audit
@@ -25,20 +26,39 @@ from syntara.core.syntara_router import SyntaraRouter
 from syntara.integrations.adapters.protocol import DiscoverResult, ValidateResult
 from syntara.integrations.exceptions import IntegrationNotFoundError, IntegrationTypeMismatchError
 from syntara.integrations.models import (
-    IntegrationCreate,
-    IntegrationListParams,
-    IntegrationListResponse,
     IntegrationProjectAssignmentListParams,
     IntegrationProjectAssignmentListResponse,
     IntegrationProjectAssignmentRead,
-    IntegrationRead,
-    IntegrationUpdate,
 )
 from syntara.integrations.models.integration import (
     Integration,
-    IntegrationTestConnection,
     IntegrationType,
     RefreshResult,
+)
+from syntara.integrations.models.integration import (
+    IntegrationCreate as InternalCreate,
+)
+from syntara.integrations.models.integration import (
+    IntegrationTestConnection as InternalTestConnection,
+)
+from syntara.integrations.models.integration import (
+    IntegrationUpdate as InternalUpdate,
+)
+from syntara.integrations.models.kafka_integration import (
+    KafkaIntegrationCreate,
+    KafkaIntegrationListParams,
+    KafkaIntegrationListResponse,
+    KafkaIntegrationRead,
+    KafkaIntegrationTestConnection,
+    KafkaIntegrationUpdate,
+)
+from syntara.integrations.models.legacy_integration import (
+    IntegrationCreate,
+    IntegrationListParams,
+    IntegrationListResponse,
+    IntegrationRead,
+    IntegrationTestConnection,
+    IntegrationUpdate,
 )
 from syntara.integrations.models.llm_model import (
     LLMModelBulkUpdate,
@@ -90,6 +110,29 @@ def get_integration_service(
     """Dependency provider for IntegrationService."""
     secret_service = create_secret_service(db)
     return IntegrationService(db, current_user, secret_service)
+
+
+def get_legacy_integration_service(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> IntegrationService:
+    """Keep Kafka outside the original contract, including pagination and totals."""
+    return IntegrationService(
+        db,
+        current_user,
+        create_secret_service(db),
+        integration_types=frozenset(kind for kind in IntegrationType if kind != IntegrationType.KAFKA),
+    )
+
+
+def get_kafka_integration_service(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> IntegrationService:
+    """Restrict Kafka resource IDs and list queries to Kafka."""
+    return IntegrationService(
+        db, current_user, create_secret_service(db), integration_types=frozenset({IntegrationType.KAFKA})
+    )
 
 
 _read_gate = VisibilityFilter("integration", "read")
@@ -159,10 +202,12 @@ async def integration_read_visibility(
 @audit(EventCategory.USER_ACTION, event_action="integration_create")
 async def create_integration(
     data: IntegrationCreate,
-    service: Annotated[IntegrationService, Depends(get_integration_service)],
+    service: Annotated[IntegrationService, Depends(get_legacy_integration_service)],
 ) -> IntegrationRead:
     """Create a new integration."""
-    return await service.create_integration(data)
+    return IntegrationRead.model_validate(
+        (await service.create_integration(InternalCreate.model_validate(data.model_dump()))).model_dump()
+    )
 
 
 @router.get(
@@ -173,12 +218,12 @@ async def create_integration(
 )
 async def list_integrations(
     request: Request,
-    service: Annotated[IntegrationService, Depends(get_integration_service)],
+    service: Annotated[IntegrationService, Depends(get_legacy_integration_service)],
     params: Annotated[IntegrationListParams, Query()],
     allowed_projects: Annotated[AllowedProjectsResult, Depends(integration_read_visibility)],
 ) -> IntegrationListResponse:
     """List integrations with filtering and pagination."""
-    return await service.list_integrations(
+    result = await service.list_integrations(
         limit=params.limit,
         cursor=params.cursor,
         sort=params.sort,
@@ -187,6 +232,8 @@ async def list_integrations(
         allowed_projects=allowed_projects,
         project_id=params.project_id,
     )
+
+    return IntegrationListResponse.model_validate(result.model_dump())
 
 
 @router.get(
@@ -197,11 +244,13 @@ async def list_integrations(
 )
 async def get_integration(
     integration_id: UUID,
-    service: Annotated[IntegrationService, Depends(get_integration_service)],
+    service: Annotated[IntegrationService, Depends(get_legacy_integration_service)],
     allowed_projects: Annotated[AllowedProjectsResult, Depends(integration_read_visibility)],
 ) -> IntegrationRead:
     """Get an integration by ID."""
-    return await service.get_integration(integration_id, allowed_projects=allowed_projects)
+    return IntegrationRead.model_validate(
+        (await service.get_integration(integration_id, allowed_projects=allowed_projects)).model_dump()
+    )
 
 
 # No VisibilityFilter on update/delete: these are admin-only permissions,
@@ -216,10 +265,16 @@ async def get_integration(
 async def update_integration(
     integration_id: UUID,
     data: IntegrationUpdate,
-    service: Annotated[IntegrationService, Depends(get_integration_service)],
+    service: Annotated[IntegrationService, Depends(get_legacy_integration_service)],
 ) -> IntegrationRead:
     """Update an integration."""
-    return await service.update_integration(integration_id, data)
+    return IntegrationRead.model_validate(
+        (
+            await service.update_integration(
+                integration_id, InternalUpdate.model_validate(data.model_dump(exclude_unset=True))
+            )
+        ).model_dump()
+    )
 
 
 @router.delete(
@@ -247,7 +302,7 @@ async def delete_integration(
 @audit(EventCategory.USER_ACTION, event_action="integration_discover")
 async def discover_integration_connection(
     data: IntegrationTestConnection,
-    service: Annotated[IntegrationService, Depends(get_integration_service)],
+    service: Annotated[IntegrationService, Depends(get_legacy_integration_service)],
 ) -> DiscoverResult:
     """Test a connection and discover resources without saving an integration.
 
@@ -256,7 +311,7 @@ async def discover_integration_connection(
     including discovered tools (with parameters) or models. No integration
     is persisted.
     """
-    return await service.discover(data)
+    return await service.discover(InternalTestConnection.model_validate(data.model_dump()))
 
 
 @router.post(
@@ -625,3 +680,90 @@ async def update_integration_tool(
 ) -> ToolWithParameters:
     """Update a tool (enable/disable), scoped to an integration."""
     return await service.update_tool_for_integration(integration_id, tool_id, data)
+
+
+@router.get(
+    "/kafka_integrations",
+    dependencies=[Depends(_read_gate), Depends(_read_all_scope)],
+    operation_id="list_kafka_integrations",
+)
+async def list_kafka_integrations(
+    request: Request,
+    service: Annotated[IntegrationService, Depends(get_kafka_integration_service)],
+    params: Annotated[KafkaIntegrationListParams, Query()],
+    allowed_projects: Annotated[AllowedProjectsResult, Depends(integration_read_visibility)],
+) -> KafkaIntegrationListResponse:
+    """List Kafka connections with filtering, pagination, and project visibility."""
+    result = await service.list_integrations(
+        limit=params.limit,
+        cursor=params.cursor,
+        sort=params.sort,
+        query_params_items=request.query_params.items(),
+        include_total=params.include_total,
+        allowed_projects=allowed_projects,
+        project_id=params.project_id,
+    )
+    return KafkaIntegrationListResponse.model_validate(result.model_dump())
+
+
+@router.post(
+    "/kafka_integrations",
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(_perm_create)],
+    operation_id="create_kafka_integration",
+)
+@audit(EventCategory.USER_ACTION, event_action="integration_create")
+async def create_kafka_integration(
+    data: KafkaIntegrationCreate,
+    service: Annotated[IntegrationService, Depends(get_kafka_integration_service)],
+) -> KafkaIntegrationRead:
+    """Create a Kafka connection using the shared integration service."""
+    result = await service.create_integration(InternalCreate.model_validate(data.model_dump()))
+    return KafkaIntegrationRead.model_validate(result.model_dump())
+
+
+@router.post(
+    "/kafka_integrations/discover",
+    dependencies=[Depends(_perm_discover)],
+    operation_id="discover_kafka_integration_connection",
+)
+@audit(EventCategory.USER_ACTION, event_action="integration_discover")
+async def discover_kafka_integration_connection(
+    data: KafkaIntegrationTestConnection,
+    service: Annotated[IntegrationService, Depends(get_kafka_integration_service)],
+) -> DiscoverResult:
+    """Test a Kafka connection without saving it."""
+    return await service.discover(InternalTestConnection.model_validate(data.model_dump()))
+
+
+@router.get(
+    "/kafka_integrations/{integration_id}",
+    dependencies=[Depends(_read_gate), Depends(_read_all_scope)],
+    operation_id="get_kafka_integration",
+)
+async def get_kafka_integration(
+    integration_id: UUID,
+    service: Annotated[IntegrationService, Depends(get_kafka_integration_service)],
+    allowed_projects: Annotated[AllowedProjectsResult, Depends(integration_read_visibility)],
+) -> KafkaIntegrationRead:
+    """Get a Kafka connection visible to the caller."""
+    result = await service.get_integration(integration_id, allowed_projects=allowed_projects)
+    return KafkaIntegrationRead.model_validate(result.model_dump())
+
+
+@router.patch(
+    "/kafka_integrations/{integration_id}",
+    dependencies=[Depends(_perm_update)],
+    operation_id="update_kafka_integration",
+)
+@audit(EventCategory.USER_ACTION, event_action="integration_update", capture_args={"integration_id"})
+async def update_kafka_integration(
+    integration_id: UUID,
+    data: KafkaIntegrationUpdate,
+    service: Annotated[IntegrationService, Depends(get_kafka_integration_service)],
+) -> KafkaIntegrationRead:
+    """Update a Kafka connection, preserving omitted settings."""
+    result = await service.update_integration(
+        integration_id, InternalUpdate.model_validate(data.model_dump(exclude_unset=True))
+    )
+    return KafkaIntegrationRead.model_validate(result.model_dump())

@@ -14,6 +14,7 @@ from pydantic import ConfigDict, Field, field_validator, model_validator
 from sqlmodel import SQLModel
 
 from syntara.core.lib.url_validation import validate_endpoint_url, validate_host_url
+from syntara.credentials.lib.kafka_connection import KafkaSecurityProtocol
 
 
 class LLMProviderHint(StrEnum):
@@ -121,6 +122,119 @@ class LLMProviderConfiguration(IntegrationSecurityMixin):
         return self
 
 
+_MAX_BOOTSTRAP_SERVERS = 20
+_MIN_TCP_PORT = 1
+_MAX_TCP_PORT = 65535
+
+
+class KafkaSaslMechanism(StrEnum):
+    """SASL mechanism used with the Kafka credential username and password.
+
+    Cloud brokers such as Aiven use SCRAM-SHA-256. PLAIN remains available
+    for clusters that authenticate that way.
+    """
+
+    PLAIN = "PLAIN"
+    SCRAM_SHA_256 = "SCRAM-SHA-256"
+    SCRAM_SHA_512 = "SCRAM-SHA-512"
+
+
+def _split_ipv6_bootstrap_server(value: str) -> tuple[str, str]:
+    """Split a ``[ipv6]:port`` bootstrap server into a bracketed host and port text."""
+    end = value.find("]")
+    port_suffix = value[end + 1 :] if end >= 0 else ""
+    host = value[1:end] if end > 0 else ""
+    if not host or not port_suffix.startswith(":"):
+        msg = f"Bootstrap server '{value}' must use [ipv6]:port."
+        raise ValueError(msg)
+    return f"[{host}]", port_suffix[1:]
+
+
+def _split_bootstrap_server(value: str) -> tuple[str, str]:
+    """Split a bootstrap server into a normalized host and port text."""
+    if value.startswith("["):
+        return _split_ipv6_bootstrap_server(value)
+    if value.count(":") != 1:
+        msg = f"Bootstrap server '{value}' must be host:port."
+        raise ValueError(msg)
+    host, port_text = value.split(":", 1)
+    return host, port_text
+
+
+def parse_bootstrap_server(raw: str) -> str:
+    """Validate one Kafka bootstrap server as ``host:port`` or ``[ipv6]:port``."""
+    value = raw.strip()
+    if not value:
+        msg = "A bootstrap server must not be empty."
+        raise ValueError(msg)
+    if any(char in value for char in ("/", "?", "#", "@", " ")):
+        msg = f"Bootstrap server '{value}' must be host:port with no path, query, or userinfo."
+        raise ValueError(msg)
+
+    normalized_host, port_text = _split_bootstrap_server(value)
+    if not normalized_host:
+        msg = f"Bootstrap server '{value}' is missing a host."
+        raise ValueError(msg)
+    try:
+        port = int(port_text)
+    except ValueError as exc:
+        msg = f"Bootstrap server '{value}' has a non-numeric port."
+        raise ValueError(msg) from exc
+    if port < _MIN_TCP_PORT or port > _MAX_TCP_PORT:
+        msg = f"Bootstrap server '{value}' has a port outside 1-65535."
+        raise ValueError(msg)
+    return f"{normalized_host}:{port}"
+
+
+class KafkaConfiguration(IntegrationSecurityMixin):
+    """Configuration for a Kafka cluster integration.
+
+    Broker addresses live here. The username and password stay on the
+    linked Kafka credential when SASL_SSL is selected. Unauthenticated SSL
+    and explicitly opted-in PLAINTEXT do not require a credential.
+    """
+
+    integration_type: Literal["kafka"] = "kafka"
+
+    bootstrap_servers: list[str] = Field(
+        min_length=1,
+        max_length=_MAX_BOOTSTRAP_SERVERS,
+        description="Kafka bootstrap servers as host:port (or [ipv6]:port) values.",
+    )
+
+    security_protocol: KafkaSecurityProtocol = Field(
+        default=KafkaSecurityProtocol.SASL_SSL,
+        description="Kafka transport: SASL_SSL, SSL, or explicitly opted-in PLAINTEXT.",
+    )
+
+    allow_plaintext: bool = Field(
+        default=False,
+        description="Explicitly allow unauthenticated, unencrypted PLAINTEXT connections.",
+    )
+
+    sasl_mechanism: KafkaSaslMechanism = Field(
+        default=KafkaSaslMechanism.SCRAM_SHA_256,
+        description="SASL mechanism for the username and password on the linked credential.",
+    )
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")  # type: ignore[assignment]
+
+    @model_validator(mode="after")
+    def validate_bootstrap_servers(self) -> Self:
+        """Normalize each broker address and reject unencrypted SASL.
+
+        DNS and SSRF checks run later, at connect time.
+        """
+        if self.allow_http:
+            msg = "Kafka does not support SASL_PLAINTEXT. Use SASL_SSL."
+            raise ValueError(msg)
+        if self.security_protocol == KafkaSecurityProtocol.PLAINTEXT and not self.allow_plaintext:
+            msg = "PLAINTEXT requires allow_plaintext=true."
+            raise ValueError(msg)
+        self.bootstrap_servers = [parse_bootstrap_server(server) for server in self.bootstrap_servers]
+        return self
+
+
 class AAPConfiguration(IntegrationSecurityMixin):
     """Configuration for Ansible Automation Platform integrations."""
 
@@ -141,8 +255,11 @@ class AAPConfiguration(IntegrationSecurityMixin):
         return self
 
 
-# Configuration types (used by DB model, read schema, and create/patch)
-IntegrationConfigurationTypes = MCPServerConfigurationInput | LLMProviderConfiguration | AAPConfiguration
+# The v1 input/read union remains frozen at the original integration types.
+# The expanded v2 contract and storage union include Kafka.
+IntegrationConfigurationReadTypes = MCPServerConfigurationInput | LLMProviderConfiguration | AAPConfiguration
+# DB column and v2 create/patch/discover/read payloads.
+IntegrationConfigurationTypes = IntegrationConfigurationReadTypes | KafkaConfiguration
 IntegrationConfiguration = Annotated[
     IntegrationConfigurationTypes,
     Field(discriminator="integration_type"),

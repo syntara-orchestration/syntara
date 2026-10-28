@@ -1,7 +1,13 @@
 /** Help popover body text for integration create/edit form fields. */
 
 export const INTEGRATION_TYPE_HELP =
-  'Registers a connection to an external service. MCP servers expose tools for agent workflows. LLM providers supply models. Automation platform integrations verify gateway connectivity.'
+  'Registers a connection to an external service. MCP servers expose tools for agent workflows. LLM providers supply models. Automation platform integrations verify gateway connectivity. Kafka integrations verify that the saved login can reach the brokers.'
+
+export const KAFKA_BOOTSTRAP_SERVERS_HELP =
+  'Broker addresses for this cluster, one host:port (or [ipv6]:port) per line. The username and password stay on the Kafka credential. The connection uses SASL_SSL.'
+
+export const KAFKA_SASL_MECHANISM_HELP =
+  'How the Kafka credential username and password are presented to the brokers. Cloud clusters such as Aiven use SCRAM-SHA-256. Use PLAIN only when the cluster requires it.'
 
 export const NAME_HELP =
   'A unique name that identifies this integration. Use a name that describes the service or environment, such as "Production MCP" or "Dev LLM Gateway."'
