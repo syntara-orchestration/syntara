@@ -137,7 +137,7 @@ describe('RetryExecutionButton', () => {
     await user.click(screen.getByRole('button', { name: 'Retry run' }))
     await user.click(screen.getByRole('menuitem', { name: 'Retry run from failure' }))
 
-    expect(onRetryFromFailure).toHaveBeenCalledOnce()
+    expect(onRetryFromFailure).toHaveBeenCalledWith(screen.getByRole('button', { name: 'Retry run' }))
     expect(screen.getByRole('button', { name: 'Retry run' })).toHaveAttribute('aria-expanded', 'false')
   })
 

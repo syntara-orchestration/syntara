@@ -348,7 +348,7 @@ function getScopeLabel(scopeMode: RetryScopeMode, selectedCount: number): string
 export function HowRetryWorks() {
   return (
     <>
-      <Title headingLevel="h3" size={TitleSizes.md}>
+      <Title className={styles.sectionTitle} headingLevel="h3" size={TitleSizes.md}>
         How retry works
       </Title>
       <List>

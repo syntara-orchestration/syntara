@@ -6,7 +6,7 @@ import { useCanI } from '../../hooks/useCanI'
 
 type RetryFromFailureButtonProps = Readonly<{
   projectId: string
-  onClick?: () => void
+  onClick?: (trigger: HTMLElement) => void
   asDropdownItem?: boolean
 }>
 
@@ -28,7 +28,13 @@ export function RetryFromFailureButton({ projectId, onClick, asDropdownItem = fa
   return asDropdownItem ? (
     <DropdownItem
       value="retry-from-failure"
-      onClick={isDisabled ? undefined : onClick}
+      onClick={
+        isDisabled
+          ? undefined
+          : () => {
+              if (document.activeElement instanceof HTMLElement) onClick?.(document.activeElement)
+            }
+      }
       isAriaDisabled={isDisabled}
       tooltipProps={permissionDenied ? { content: retryTooltip } : undefined}
       data-testid="retry-from-failure-button"
@@ -39,7 +45,7 @@ export function RetryFromFailureButton({ projectId, onClick, asDropdownItem = fa
     <DisabledWithTooltip isDisabled={permissionDenied} content={retryTooltip}>
       <Button
         variant="secondary"
-        onClick={isDisabled ? undefined : onClick}
+        onClick={isDisabled ? undefined : (event) => onClick?.(event.currentTarget)}
         isAriaDisabled={isDisabled}
         data-testid="retry-from-failure-button"
       >

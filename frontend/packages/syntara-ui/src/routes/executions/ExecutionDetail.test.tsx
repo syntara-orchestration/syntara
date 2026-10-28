@@ -305,6 +305,7 @@ vi.mock('./hooks/useExecutionStepClick', () => ({
 describe('ExecutionDetail', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockExecutionQuery.data.status = 'running'
     mockNavigate.mockClear()
     vi.mocked(useParams).mockReturnValue({ executionId: 'exec-123' })
     vi.mocked(useRouterState).mockReturnValue('' as never)
@@ -335,6 +336,28 @@ describe('ExecutionDetail', () => {
 
     expect(screen.getByText('Test Workflow')).toBeInTheDocument()
     expect(screen.getByText('Running')).toBeInTheDocument()
+  })
+
+  it('moves focus into retry review and restores it to the retry trigger when closed', async () => {
+    const user = userEvent.setup()
+    const originalStatus = mockExecutionQuery.data.status
+    mockExecutionQuery.data.status = 'failed'
+    const queryClient = new QueryClient()
+    render(
+      <QueryClientProvider client={queryClient}>
+        <ExecutionDetail />
+      </QueryClientProvider>
+    )
+
+    const retryTrigger = screen.getByRole('button', { name: 'Retry run' })
+    await user.click(retryTrigger)
+    await user.click(screen.getByRole('menuitem', { name: 'Retry run from failure' }))
+
+    expect(await screen.findByTestId('retry-from-failure-panel')).toHaveFocus()
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+
+    await waitFor(() => expect(retryTrigger).toHaveFocus())
+    mockExecutionQuery.data.status = originalStatus
   })
 
   it('renders BuilderContent with execution view props', () => {

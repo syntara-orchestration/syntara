@@ -22,7 +22,7 @@ type RetryExecutionButtonProps = Readonly<{
   projectId: string
   retryFromFailure?: Readonly<{
     projectId: string
-    onClick?: () => void
+    onClick?: (trigger: HTMLElement) => void
   }>
 }>
 
@@ -61,12 +61,7 @@ export function RetryExecutionButton({
     <Dropdown
       isOpen={isRetryMenuOpen}
       onOpenChange={setIsRetryMenuOpen}
-      onSelect={(_event, value) => {
-        setIsRetryMenuOpen(false)
-        if (value === 'retry-from-failure') {
-          requestAnimationFrame(() => retryMenuToggleRef.current?.focus())
-        }
-      }}
+      onSelect={() => setIsRetryMenuOpen(false)}
       popperProps={{ position: 'end' }}
       toggle={(toggleRef) => (
         <MenuToggle
@@ -93,7 +88,10 @@ export function RetryExecutionButton({
         </DropdownItem>
         <RetryFromFailureButton
           projectId={retryFromFailure.projectId}
-          onClick={retryFromFailure.onClick}
+          onClick={(trigger) => {
+            const returnFocusTarget = retryMenuToggleRef.current ?? trigger
+            retryFromFailure.onClick?.(returnFocusTarget)
+          }}
           asDropdownItem
         />
       </DropdownList>

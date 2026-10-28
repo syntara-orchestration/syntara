@@ -67,6 +67,7 @@ describe('RetryFromFailureSidePanel', () => {
     renderPanel()
 
     expect(screen.getByRole('complementary', { name: 'Retry run from failure review' })).toBeInTheDocument()
+    expect(screen.getByTestId('retry-from-failure-panel')).toHaveFocus()
     expect(screen.getByRole('heading', { name: 'How retry works' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Retry plan' })).toBeInTheDocument()
     expect(screen.getByText('3')).toBeInTheDocument()
@@ -145,6 +146,9 @@ describe('RetryFromFailureSidePanel', () => {
     expect(screen.getByText('1 selected failure point')).toBeInTheDocument()
     expect(screen.getByText('4')).toBeInTheDocument()
     expect(screen.getByText('3 completed results retained')).toBeInTheDocument()
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'Retry plan updated. 1 selected failure point. 4 steps to retry. Retry starts at First Step. 3 completed results retained.'
+    )
     const retryStartsAt = screen.getByTestId('retry-starts-at')
     expect(retryStartsAt).toHaveTextContent('First Step')
     expect(retryStartsAt).not.toHaveTextContent('Second Step')
@@ -153,6 +157,9 @@ describe('RetryFromFailureSidePanel', () => {
     expect(screen.getByText('2 selected failure points')).toBeInTheDocument()
     expect(screen.getByText('5')).toBeInTheDocument()
     expect(screen.getByText('2 completed results retained')).toBeInTheDocument()
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'Retry plan updated. 2 selected failure points. 5 steps to retry. Retry starts at First Step, Second Step. 2 completed results retained.'
+    )
 
     await user.click(screen.getByTestId('retry-from-failure-confirm'))
     expect(mockHandleRetry).toHaveBeenCalledWith(['step-1', 'step-2'])

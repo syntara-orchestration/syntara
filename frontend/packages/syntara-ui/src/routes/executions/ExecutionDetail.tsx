@@ -43,6 +43,7 @@ import { useExecutionStepClick } from './hooks/useExecutionStepClick'
 import { useExecutionStreaming, useSyncActivityStore } from './hooks/useExecutionStreaming'
 import { useExecutionWorkflow } from './hooks/useExecutionWorkflow'
 import { useForkWorkflow } from './hooks/useForkWorkflow'
+import { useRetryFromFailurePanel } from './hooks/useRetryFromFailurePanel'
 import { RetryFromFailureSidePanel } from './RetryFromFailureSidePanel'
 
 /** Returns true when the page should render a fallback (missing ID, loading, or error) instead of the main content. */
@@ -64,32 +65,6 @@ function useResetOnExecutionChange(executionId: string | undefined) {
     }
     prevExecutionIdRef.current = executionId ?? null
   }, [executionId, reset])
-}
-
-function openRetryReview({
-  navigate,
-  executionId,
-  historyCardOpen,
-  closeApprovalPanel,
-  setRetryPanelOpen,
-}: Readonly<{
-  navigate: ReturnType<typeof useNavigate>
-  executionId: string
-  historyCardOpen: boolean
-  closeApprovalPanel: () => void
-  setRetryPanelOpen: (open: boolean) => void
-}>) {
-  closeApprovalPanel()
-  if (historyCardOpen) {
-    detachPromise(
-      navigate({
-        to: '/executions/$executionId',
-        params: { executionId },
-        search: (prev: Record<string, unknown>) => ({ ...prev, history: 'closed' }),
-      })
-    )
-  }
-  setRetryPanelOpen(true)
 }
 
 /** Build activity name and type maps from the retained workflow definition. */
@@ -372,7 +347,12 @@ export default function ExecutionDetail() {
   )
   const approvalNavigation = useApprovalNavigation(currentIndex, navigateToIndex, approvals)
   const copyToEditorDialog = useDialogState<void>()
-  const [retryPanelOpen, setRetryPanelOpen] = useState(false)
+  const retryPanel = useRetryFromFailurePanel({
+    navigate,
+    executionId,
+    historyCardOpen,
+    closeApprovalPanel: approval.close,
+  })
   const isCancellable = isExecutionCancellable(execution?.status)
 
   const { forkAsNewWorkflow, isForkLoading } = useForkWorkflow({
@@ -385,7 +365,7 @@ export default function ExecutionDetail() {
     const willOpen = !historyCardOpen
     if (willOpen) {
       approval.close()
-      setRetryPanelOpen(false)
+      retryPanel.closeWithoutFocus()
     }
     detachPromise(
       navigate({
@@ -394,16 +374,6 @@ export default function ExecutionDetail() {
         search: (prev: Record<string, unknown>) => ({ ...prev, history: willOpen ? 'open' : 'closed' }),
       })
     )
-  }
-
-  const openRetryPanel = () => {
-    openRetryReview({
-      navigate,
-      executionId,
-      historyCardOpen,
-      closeApprovalPanel: approval.close,
-      setRetryPanelOpen,
-    })
   }
 
   if (shouldShowFallbackState(executionId, executionQuery)) {
@@ -449,16 +419,16 @@ export default function ExecutionDetail() {
               isCancellable={isCancellable}
               executionId={executionId}
               execution={execution}
-              onRetryFromFailureClick={openRetryPanel}
+              onRetryFromFailureClick={retryPanel.open}
             />
           }
         />
         <SynPageBody>
           <ExecutionDetailContent
             key={executionId}
-            historyCardOpen={historyCardOpen && !approval.panelOpen && !retryPanelOpen}
+            historyCardOpen={historyCardOpen && !approval.panelOpen && !retryPanel.isOpen}
             approvalPanel={
-              !retryPanelOpen && approval.panelOpen && currentApproval ? (
+              !retryPanel.isOpen && approval.panelOpen && currentApproval ? (
                 <ApprovalSidePanel
                   approval={currentApproval}
                   message={approval.approvalMessage}
@@ -475,10 +445,10 @@ export default function ExecutionDetail() {
                 />
               ) : undefined
             }
-            retryPanelOpen={retryPanelOpen}
+            retryPanelOpen={retryPanel.isOpen}
             activityNameMap={activityNameMap}
             activityTypeMap={activityTypeMap}
-            onRetryPanelClose={() => setRetryPanelOpen(false)}
+            onRetryPanelClose={retryPanel.close}
             workflow={workflow}
             execution={execution}
             activities={activities}

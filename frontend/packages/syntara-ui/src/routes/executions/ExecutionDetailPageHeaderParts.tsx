@@ -66,7 +66,7 @@ export type ExecutionDetailHeaderToolbarProps = Readonly<{
   isCancellable: boolean
   executionId: string
   execution: Execution | undefined
-  onRetryFromFailureClick?: () => void
+  onRetryFromFailureClick?: (trigger: HTMLElement) => void
 }>
 
 export function ExecutionDetailHeaderToolbar({
