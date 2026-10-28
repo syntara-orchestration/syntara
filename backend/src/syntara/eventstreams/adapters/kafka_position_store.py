@@ -568,6 +568,11 @@ class KafkaInitialPositionStore:
                 raise KafkaPositionError(msg)
             rows = await self._deliveries(session, request, row.pending_boundary)
             self._content_gate(rows)
+            # A worker's in-memory request can be weaker than a replacement the
+            # control plane already persisted (e.g. a de-escalated disposition
+            # authority) while this token's hold stayed active. Revalidate
+            # against the stored decision before cancelling any delivery.
+            await self._authorized_recovery(session, request)
             now = cast("datetime", (await session.exec(select(func.clock_timestamp()))).one())
             claims: list[DeliveryClaim] = []
             for delivery in rows:

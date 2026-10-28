@@ -330,6 +330,7 @@ async def test_expired_prepared_work_never_becomes_cancelled_when_repair_cannot_
         result = MagicMock()
         result.one.return_value = NOW
         session.exec.return_value = result
+        session.get.return_value = None
         sessions.append(session)
         return session
 
@@ -388,6 +389,68 @@ async def test_unprepared_reconciliation_preserves_records_at_or_above_recovery_
         assert pending.state == DeliveryState.IN_PROGRESS
         assert pending.resolved_at is None
         assert pending.last_error_code == "fenced_by_gap_recovery"
+
+
+async def test_reconciliation_revalidates_authority_before_cancelling_below_boundary_work(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A control-plane downgrade of disposition authority must block cancellation.
+
+    A worker can still hold an earlier request with ``allow_unscheduled_disposition=True``.
+    While its token's hold stays active, a recovery-only actor can replace the stored
+    decision with the same policy/reason but ``resolve_unscheduled=False``. Reconciliation
+    must catch that before it cancels any below-boundary delivery, not only when the
+    worker later tries to confirm.
+    """
+    session = MagicMock(spec=AsyncSession)
+    session.__aenter__.return_value = session
+    clock = MagicMock()
+    clock.one.return_value = NOW
+    session.exec.return_value = clock
+    repository = KafkaInitialPositionStore(MagicMock(return_value=session))
+    subscription, source = lifecycle()
+    position = row(gap=True)
+    token = UUID(int=42)
+    position.recovery_revision = 1
+    position.recovery_token = token
+    position.pending_policy = RecoveryPolicy.RETAINED_BEGINNING.value
+    position.pending_reason = "offset_expired"
+    position.pending_boundary = 20
+    pending = delivery()
+    pending.record_identity = identity(offset=10).record
+    pending.lease_until = NOW
+    monkeypatch.setattr(repository, "_locked", AsyncMock(return_value=(subscription, source, position)))
+    monkeypatch.setattr(repository, "_deliveries", AsyncMock(return_value=[pending]))
+    # The worker is still running its original, stronger-authority request.
+    request = RecoveryRequest(
+        **position_request().model_dump(),
+        expected_recovery_revision=0,
+        policy=RecoveryPolicy.RETAINED_BEGINNING,
+        reason="offset_expired",
+        allow_unscheduled_disposition=True,
+    )
+    # The control plane has since persisted a weaker decision for the same
+    # policy/reason while this token's hold remained active.
+    authorized = EventSubscriptionRecovery(
+        source_id=source.id,
+        partition=request.partition,
+        configuration_revision=2,
+        expected_recovery_revision=0,
+        policy=RecoveryPolicy.RETAINED_BEGINNING.value,
+        reason="offset_expired",
+        resolve_unscheduled=False,
+        requested_by=PRINCIPAL,
+    )
+    session.get.return_value = authorized
+    with pytest.raises(KafkaPositionError, match="recovery_request_changed") as failure:
+        await repository.reconcile_claims(request, token, "repair")
+    assert failure.value.status == PositionStatus.REVISION_CHANGED
+    assert pending.state == DeliveryState.IN_PROGRESS
+    assert pending.resolved_at is None
+    assert pending.last_error_code != "cancelled_by_gap_recovery"
+    assert pending.claim_token is not None
+    assert pending.owner_worker_id is not None
+    assert pending.lease_until is not None
 
 
 async def test_recovery_selection_reloads_first_winner(monkeypatch: pytest.MonkeyPatch) -> None:
