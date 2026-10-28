@@ -10,8 +10,11 @@
  *
  * Edge cases:
  * - Cleanup deletes the created target via the execution-plane facade DELETE
+ * - Skipped when Execution Plane API is unreachable (compose CI does not start it)
+ * - Create/cluster assertions skipped without exactly one OpenShift integration
  */
 import { test, expect, toAppUrl, appBaseUrl, type Page } from './fixtures'
+import { hasSingleOpenShiftIntegration, isExecutionPlaneListReachable } from './helpers/execution-plane'
 import { buildUniqueName } from './helpers/workflows'
 import { getAuthToken } from './utils/api'
 
@@ -36,7 +39,16 @@ async function openCreateForm(app: Page): Promise<void> {
 }
 
 test.describe('Execution Plane — configure execution target', { tag: '@pr-check' }, () => {
+  test.beforeEach(async ({ app }) => {
+    test.skip(
+      !(await isExecutionPlaneListReachable(app)),
+      'Execution Plane API is not available in this environment (compose CI does not start execution-plane-api)'
+    )
+  })
+
   test('toolbar CTA opens create form with readonly OpenShift cluster', async ({ app }) => {
+    test.skip(!(await hasSingleOpenShiftIntegration(app)), 'Requires exactly one OpenShift integration')
+
     await openCreateForm(app)
 
     await expect(app.getByRole('textbox', { name: 'Execution target name' })).toBeVisible()
@@ -45,6 +57,8 @@ test.describe('Execution Plane — configure execution target', { tag: '@pr-chec
   })
 
   test('submits a valid target and navigates to detail', async ({ app }) => {
+    test.skip(!(await hasSingleOpenShiftIntegration(app)), 'Requires exactly one OpenShift integration')
+
     const name = buildUniqueName('e2e-et')
     let createdId: string | null = null
 
@@ -88,6 +102,8 @@ test.describe('Execution Plane — configure execution target', { tag: '@pr-chec
   })
 
   test('keeps form values when create fails with a duplicate name', async ({ app }) => {
+    test.skip(!(await hasSingleOpenShiftIntegration(app)), 'Requires exactly one OpenShift integration')
+
     await openCreateForm(app)
 
     await app.getByRole('textbox', { name: 'Execution target name' }).fill(SEEDED_TARGET_NAME)

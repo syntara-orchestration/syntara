@@ -21,6 +21,7 @@
 import { loginAsUser } from './authorization/fixtures'
 import { type Page, test, expect, toAppUrl, appBaseUrl } from './fixtures'
 import { clickMainNavEntry, expectDockedNavGroupChildLinks, mainNavGroup, mainNavigation } from './helpers/docked-nav'
+import { isExecutionPlaneListReachable } from './helpers/execution-plane'
 import { openRowKebab } from './helpers/patternfly'
 import { buildUniqueName } from './helpers/workflows'
 import {
@@ -971,7 +972,13 @@ test.describe('Permission gating — Credential actions', () => {
 // disabled create button.
 
 test.describe('Permission gating — Execution target actions', () => {
-  test('auditor: Configure execution target button is disabled with tooltip', async ({ auditorApp }) => {
+  test('auditor: Configure execution target button is disabled with tooltip', async ({ app, auditorApp }) => {
+    // Compose CI does not start execution-plane-api; the list error state has no create CTA.
+    test.skip(
+      !(await isExecutionPlaneListReachable(app)),
+      'Execution Plane API is not available in this environment (compose CI does not start execution-plane-api)'
+    )
+
     await auditorApp.goto(toAppUrl('/execution-plane'))
     await expect(auditorApp.getByRole('heading', { level: 1, name: 'Execution Plane' })).toBeVisible()
 
