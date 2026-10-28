@@ -324,7 +324,7 @@ describe('TaskStepDetails Component', () => {
 
     renderTaskStepDetails(taskData, 'task-aap')
 
-    expect(screen.getByTestId('aap-step-form')).toBeInTheDocument()
+    expect(screen.getByTestId('aap-node-form')).toBeInTheDocument()
   })
 
   it('renders AAPStepForm with minimal config (only job_template_id)', () => {
@@ -339,7 +339,7 @@ describe('TaskStepDetails Component', () => {
 
     renderTaskStepDetails(taskData, 'task-aap-minimal')
 
-    expect(screen.getByTestId('aap-step-form')).toBeInTheDocument()
+    expect(screen.getByTestId('aap-node-form')).toBeInTheDocument()
   })
 
   it('renders AAPStepForm for expression mode config (job_template_name without job_template_id)', () => {
@@ -356,7 +356,7 @@ describe('TaskStepDetails Component', () => {
 
     renderTaskStepDetails(taskData, 'task-aap-expr')
 
-    expect(screen.getByTestId('aap-step-form')).toBeInTheDocument()
+    expect(screen.getByTestId('aap-node-form')).toBeInTheDocument()
   })
 
   it('does not enable use_input_variables for a normally-selected template whose extra_vars contains a dragged expression', () => {
@@ -372,7 +372,7 @@ describe('TaskStepDetails Component', () => {
       },
     }
 
-    renderTaskNodeDetails(taskData, 'task-aap-dragged-var')
+    renderTaskStepDetails(taskData, 'task-aap-dragged-var')
 
     expect(screen.getByTestId('aap-node-form')).toHaveAttribute('data-use-input-variables', 'false')
   })
