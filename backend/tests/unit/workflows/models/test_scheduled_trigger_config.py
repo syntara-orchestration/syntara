@@ -92,13 +92,7 @@ class TestMissedSchedulePolicy:
     )
     def test_enum_from_string(self, value: str) -> None:
         """Every policy string must round-trip through the StrEnum."""
-        import importlib
-
-        import syntara.workflows.workflow_engine.models.workflow_definition as mod
-
-        importlib.reload(mod)
-        reloaded = mod.MissedSchedulePolicy(value)
-        assert reloaded.value == value
+        assert MissedSchedulePolicy(value).value == value
 
     async def test_defaults_to_skip(self) -> None:
         """missed_schedule_policy should default to 'skip'."""
