@@ -80,13 +80,8 @@ spec:
       value: AAP-90779-ep-from-source
     # Execution Plane server revision; keep in sync with the
     # execution-plane-client protocol the syntara branch under test pins.
-    # Pinned to syntara-execution-plane#88 for synchronous cluster
-    # provisioning and removal of ClusterBinding, which this syntara branch
-    # depends on. Restore devel once #88 lands.
     - name: ep-revision
-      value: mvp-03-remove-cluster-binding
-    - name: ep-pr-number
-      value: "88"
+      value: devel
   taskRunTemplate:
     serviceAccountName: konflux-integration-runner
   pipelineSpec:
@@ -156,9 +151,8 @@ spec:
       - name: ep-pr-number
         type: string
         description: >
-          Optional syntara-execution-plane PR. Not needed anymore: devel
-          includes syntara-execution-plane#86 (GRANT CONNECT IF EXISTS for
-          operator BYO postgres, callback wiring, Konflux e2e tooling).
+          Optional syntara-execution-plane PR override. Leave empty to use
+          ep-revision from the upstream repository.
         default: ""
       - name: oci-secret
         type: string
