@@ -59,6 +59,7 @@ class SubWorkflowSetupActivity:
         parent_node_id: str,
         created_by_user_id: str,
         current_depth: int,
+        invocation_node_id: str | None = None,
     ) -> dict[str, Any]:
         """Resolve child workflow and prepare execution record.
 
@@ -68,6 +69,10 @@ class SubWorkflowSetupActivity:
             parent_node_id: Node ID of the SUB_WORKFLOW step in the parent.
             created_by_user_id: User who started the parent execution.
             current_depth: Current sub-workflow nesting depth.
+            invocation_node_id: Iteration-aware invocation identity, used only for
+                child execution ID derivation. Defaults to ``parent_node_id`` (the
+                canvas node id) outside loops; inside a ``for_each`` it carries the
+                ``_iter_{n}`` suffix chain so each iteration gets a distinct child.
 
         Returns:
             Dict with all data needed to call execute_child_workflow.
@@ -101,7 +106,11 @@ class SubWorkflowSetupActivity:
             msg = f"Invalid workflow_id format: {child_workflow_id_str}"
             raise ApplicationError(msg, type="ConfigError", non_retryable=True) from None
 
-        child_execution_id = uuid5(_SUB_WORKFLOW_NAMESPACE, f"{parent_execution_id}:{parent_node_id}")
+        # parent_node_id is the canvas node identity, kept for lineage metadata;
+        # invocation_node_id is the iteration-aware identity used only here so that
+        # distinct for_each iterations derive distinct child executions.
+        invocation_id = invocation_node_id or parent_node_id
+        child_execution_id = uuid5(_SUB_WORKFLOW_NAMESPACE, f"{parent_execution_id}:{invocation_id}")
         child_execution_id_str = str(child_execution_id)
 
         return await self._prepare_child_execution(

@@ -24,8 +24,10 @@ if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Callable, Sequence
 
 import pytest
+from temporalio.api.enums.v1 import EventType
 from temporalio.worker import Worker
 
+from syntara.workflows.workflow_engine.activities.loop import loop
 from syntara.workflows.workflow_engine.activities.manual_trigger import manual_trigger
 from syntara.workflows.workflow_engine.activities.runtime_settings_activity import (
     fetch_workflow_runtime_settings,
@@ -652,3 +654,133 @@ class TestSubWorkflowChildFailure:
 
         assert result["status"] == "failed"
         assert "sub_wf_node" in result["failed_activities"]
+
+
+def _foreach_parent_def() -> dict[str, Any]:
+    """Parent: manual trigger -> for_each over two items -> sub_workflow body -> complete."""
+    return {
+        "schema_version": "2.0.0",
+        "triggers": [{"id": "trigger", "type": "manual_trigger", "parameters": {}}],
+        "nodes": [
+            {"id": "loop_node", "type": "loop", "parameters": {"type": "for_each", "items": ["a", "b"]}},
+            {
+                "id": "sub_wf_node",
+                "type": "sub_workflow",
+                "parameters": {
+                    "workflow_id": str(_CHILD_WF_ID),
+                    "trigger_node_id": "child_trigger",
+                    "input_mapping": {},
+                },
+            },
+            {"id": "after_loop", "type": "script", "parameters": {"language": "bash", "code": "echo done"}},
+        ],
+        "edges": [
+            {"from": "trigger", "to": "loop_node"},
+            {"from": "loop_node", "to": "sub_wf_node", "from_port": "iterate"},
+            {"from": "loop_node", "to": "after_loop", "from_port": "complete"},
+        ],
+    }
+
+
+def _recording_session_factory(
+    created: list[Any],
+) -> Callable[..., contextlib.AbstractAsyncContextManager[_MockSession]]:
+    """Mock session factory that records every added object (child Execution rows)."""
+    mock_workflow = SimpleNamespace(
+        id=_CHILD_WF_ID,
+        name="test-child-workflow",
+        project_id=_CHILD_PROJECT_ID,
+        created_by=_CHILD_CREATED_BY,
+        published_version_id=_CHILD_VERSION_ID,
+        is_enabled=True,
+    )
+    mock_version = SimpleNamespace(id=_CHILD_VERSION_ID, version=1, workflow_definition=_CHILD_WORKFLOW_DEF)
+
+    class _RecordingMockSession(_MockSession):
+        def add(self, obj: object) -> None:
+            created.append(obj)
+
+    call_count = 0
+
+    @contextlib.asynccontextmanager
+    async def factory() -> AsyncIterator[_MockSession]:
+        nonlocal call_count
+        call_count += 1
+        if call_count % 2 == 1:
+            yield _RecordingMockSession(exec_results=[(mock_workflow, mock_version), None])
+        else:
+            yield _RecordingMockSession()
+
+    return factory
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+class TestSubWorkflowForEachLifecycle:
+    """Prove the engine dispatches iteration-aware sub-workflow invocations inside a for_each."""
+
+    async def test_for_each_dispatches_distinct_children(self, temporal_env: object) -> None:
+        """Two for_each iterations each create a distinct child; lineage keeps the canvas id."""
+        from temporalio.testing import WorkflowEnvironment
+
+        assert isinstance(temporal_env, WorkflowEnvironment)
+
+        created: list[Any] = []
+        setup = SubWorkflowSetupActivity(
+            session_factory=_recording_session_factory(created),  # type: ignore[arg-type]
+            task_queue=_TASK_QUEUE,
+        )
+        activities = [
+            manual_trigger,
+            subworkflow_trigger,
+            execute_script_activity,
+            fetch_workflow_runtime_settings,
+            loop,
+            setup.run,
+        ]
+
+        async with Worker(
+            temporal_env.client,
+            task_queue=_TASK_QUEUE,
+            workflows=[OrchestratorWorkflow],
+            activities=activities,
+        ):
+            svc = TemporalExecutionService(temporal_client=temporal_env.client, task_queue=_TASK_QUEUE)
+            start = await svc.start_workflow(
+                workflow_def=_foreach_parent_def(),
+                workflow_name="sub-wf-foreach",
+                trigger_node_id="trigger",
+                include_node_results=True,
+                execution_id=_PARENT_EXECUTION_ID,
+                workflow_metadata=_parent_workflow_metadata(),
+            )
+            handle = temporal_env.client.get_workflow_handle(start.temporal_workflow_id)
+            result: dict[str, Any] = await asyncio.wait_for(handle.result(), timeout=_WORKFLOW_RESULT_TIMEOUT)
+
+            setup_activity_ids: set[str] = set()
+            async for event in handle.fetch_history_events():
+                if event.event_type == EventType.EVENT_TYPE_ACTIVITY_TASK_SCHEDULED:
+                    scheduled_id = event.activity_task_scheduled_event_attributes.activity_id
+                    if scheduled_id.startswith("__internal__setup_sub_workflow_"):
+                        setup_activity_ids.add(scheduled_id)
+
+        # The parent waited for both child iterations and completed.
+        assert result["status"] == "completed"
+
+        # Each iteration scheduled a distinct setup activity (independently verified via history).
+        assert len(setup_activity_ids) == 2
+
+        child_execs = [e for e in created if getattr(e, "execution_metadata", None) is not None]
+        child_ids = {e.id for e in child_execs}
+
+        # Each iteration created a distinct child execution (no collision).
+        assert len(child_execs) == 2
+        assert len(child_ids) == 2
+
+        # The child ids are iteration-aware, not the single non-loop derivation.
+        non_loop_id = uuid5(_SUB_WORKFLOW_NAMESPACE, f"{_PARENT_EXECUTION_ID}:sub_wf_node")
+        assert non_loop_id not in child_ids
+
+        # Lineage metadata keeps the canvas node id, not the iteration-aware identity.
+        for execution in child_execs:
+            assert execution.execution_metadata["parent_node_id"] == "sub_wf_node"

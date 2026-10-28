@@ -56,7 +56,17 @@ from syntara.workflows.workflow_engine.models.workflow_definition import (
     NodeType,
 )
 from syntara.workflows.workflow_engine.unified_eval import safe_eval_with_namespace
-from syntara.workflows.workflow_engine.utils.loop_iteration_ids import loop_control_activity_id
+from syntara.workflows.workflow_engine.utils.loop_iteration_ids import (
+    join_loop_iteration_id,
+    loop_control_activity_id,
+    loop_index_chain,
+)
+
+# Dedicated Temporal patch for iteration-aware sub-workflow child identity. A
+# dedicated id (not the loop-iteration patch) ensures existing in-flight
+# sub-workflow executions replay with their original activity scheduling even
+# when they already marked the loop-iteration patch via a loop or approval.
+_SUBWORKFLOW_ITERATION_IDS_PATCH = "subworkflow-iteration-unique-ids"
 
 # Trigger types allowed for dynamic dispatch via Temporal activities.
 # Each entry must have a corresponding @activity.defn with a matching name.
@@ -1702,18 +1712,41 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         Calls the setup activity to resolve and prepare the child execution,
         then starts the child OrchestratorWorkflow via execute_child_workflow.
         """
+        # Iteration-aware invocation identity: the canvas node id plus one
+        # _iter_{n} suffix per enclosing loop, so a sub_workflow node inside a
+        # for_each derives a distinct child per iteration; outside a loop it is
+        # exactly node.id. The whole scheduling change is gated behind a
+        # dedicated patch so existing in-flight executions replay with their
+        # original (pre-change) activity id and args.
+        if workflow.patched(_SUBWORKFLOW_ITERATION_IDS_PATCH):
+            invocation_node_id = join_loop_iteration_id(
+                node.id, loop_index_chain(node.id, self.loop_body_map, self.node_control_data)
+            )
+            setup_args: list[Any] = [
+                resolved_parameters,
+                self.execution_id,
+                node.id,
+                self._created_by_user_id,
+                self._sub_workflow_depth,
+                invocation_node_id,
+            ]
+            setup_activity_id = f"__internal__setup_sub_workflow_{invocation_node_id}"
+        else:
+            setup_args = [
+                resolved_parameters,
+                self.execution_id,
+                node.id,
+                self._created_by_user_id,
+                self._sub_workflow_depth,
+            ]
+            setup_activity_id = f"__internal__setup_sub_workflow_{node.id}"
+
         setup_result: dict[str, Any] = cast(
             "dict[str, Any]",
             await workflow.execute_activity(
                 ActivityName.SUB_WORKFLOW,
-                args=[
-                    resolved_parameters,
-                    self.execution_id,
-                    node.id,
-                    self._created_by_user_id,
-                    self._sub_workflow_depth,
-                ],
-                activity_id=f"__internal__setup_sub_workflow_{node.id}",
+                args=setup_args,
+                activity_id=setup_activity_id,
                 start_to_close_timeout=timedelta(seconds=DEFAULT_ACTIVITY_TIMEOUT_SECONDS),
                 retry_policy=RetryPolicy(maximum_attempts=3),
             ),
