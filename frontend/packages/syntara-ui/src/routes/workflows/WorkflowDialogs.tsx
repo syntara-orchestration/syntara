@@ -1,27 +1,17 @@
 import type { WorkflowAPI } from '@syntara/contracts'
-import { useCallback, useState } from 'react'
 
 import { SynConfirmationDialog } from '../../components/dialogs/SynConfirmationDialog'
 import type { DialogState } from '../../hooks/useDialogState'
-import { useAlerts } from '../../providers/alerts'
-import { detachPromise } from '../../utils/detachPromise'
 import type { ProjectRead } from '../access/types'
 import { ProjectFormModal } from '../access-management/ProjectFormModal'
 import { ProjectDeleteDialog } from '../access-management/projects/ProjectDeleteDialog'
-import { RunWorkflowModal } from '../builder/components/RunWorkflowModal'
 import { PublishWorkflowDialog } from '../builder/PublishWorkflowDialog'
-import { hasNonEmptyInputSchema } from '../builder/utils/triggerReferenceCheck'
 
 import { ImportWorkflowDialog } from './ImportWorkflowDialog'
-import { resolveWorkflowRunTrigger, type WorkflowRunTrigger } from './resolveWorkflowRunTrigger'
 import { WorkflowDeleteDialog } from './WorkflowDeleteDialog'
+import { WorkflowListRunFlow } from './WorkflowListRunFlow'
 
 type Workflow = WorkflowAPI.components['schemas']['WorkflowRead']
-
-type PendingRunInput = {
-  workflow: Workflow
-  trigger: WorkflowRunTrigger
-}
 
 /**
  * Props for WorkflowDialogs component
@@ -85,86 +75,9 @@ export function WorkflowDialogs({
   isPublishing,
   isDeletingProject,
 }: WorkflowDialogsProps) {
-  const { showError } = useAlerts()
-  const [isResolvingRun, setIsResolvingRun] = useState(false)
-  const [pendingRunInput, setPendingRunInput] = useState<PendingRunInput | null>(null)
-
-  const closeRunInput = useCallback(() => {
-    setPendingRunInput(null)
-  }, [])
-
-  const closeRunDialog = runDialog.close
-  const workflowToRun = runDialog.item
-
-  const handleConfirmRun = useCallback(() => {
-    if (!workflowToRun) return
-
-    setIsResolvingRun(true)
-    detachPromise(
-      resolveWorkflowRunTrigger(workflowToRun)
-        .then((trigger) => {
-          if (!trigger) {
-            showError({ title: 'Cannot run workflow', description: 'Workflow has no triggers configured' })
-            closeRunDialog()
-            return
-          }
-
-          if (!trigger.hasTriggerReferences && !hasNonEmptyInputSchema(trigger.inputSchema)) {
-            onRunWorkflow(workflowToRun, {}, trigger.triggerNodeId)
-            closeRunDialog()
-            return
-          }
-
-          setPendingRunInput({ workflow: workflowToRun, trigger })
-          closeRunDialog()
-        })
-        .catch((error: unknown) => {
-          showError({
-            title: 'Cannot run workflow',
-            description: error instanceof Error ? error.message : 'Failed to load workflow trigger details',
-          })
-          closeRunDialog()
-        })
-        .finally(() => {
-          setIsResolvingRun(false)
-        })
-    )
-  }, [closeRunDialog, onRunWorkflow, showError, workflowToRun])
-
-  const handleRunWithInputs = useCallback(
-    (inputData: Record<string, unknown>, triggerNodeId?: string) => {
-      if (!pendingRunInput) return
-      onRunWorkflow(pendingRunInput.workflow, inputData, triggerNodeId ?? pendingRunInput.trigger.triggerNodeId)
-      setPendingRunInput(null)
-    },
-    [onRunWorkflow, pendingRunInput]
-  )
-
   return (
     <>
-      <SynConfirmationDialog
-        isOpen={runDialog.isOpen}
-        onClose={runDialog.close}
-        onConfirm={handleConfirmRun}
-        title="Run workflow?"
-        confirmLabel="Run now"
-        confirmLoading={isResolvingRun}
-      >
-        You are about to manually run the workflow <strong>{runDialog.item?.name}</strong>. This action will start the
-        workflow immediately, bypassing its normal trigger conditions.
-      </SynConfirmationDialog>
-
-      <RunWorkflowModal
-        key={pendingRunInput ? `open-${pendingRunInput.trigger.triggerNodeId}` : 'closed'}
-        isOpen={pendingRunInput != null}
-        onClose={closeRunInput}
-        onConfirm={handleRunWithInputs}
-        workflowName={pendingRunInput?.workflow.name ?? ''}
-        triggerName={pendingRunInput?.trigger.triggerName ?? 'Trigger'}
-        triggerNodeId={pendingRunInput?.trigger.triggerNodeId}
-        inputSchema={pendingRunInput?.trigger.inputSchema}
-        workflowId={pendingRunInput?.workflow.id}
-      />
+      <WorkflowListRunFlow runDialog={runDialog} onRunWorkflow={onRunWorkflow} />
 
       <WorkflowDeleteDialog
         isOpen={deleteDialog.isOpen}

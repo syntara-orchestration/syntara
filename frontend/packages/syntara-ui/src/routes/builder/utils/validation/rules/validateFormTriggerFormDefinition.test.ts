@@ -37,4 +37,25 @@ describe('validateFormTriggerFormDefinition', () => {
     })
     expect(errors).toEqual([])
   })
+
+  it('flags manual trigger that carries form trigger parameters', () => {
+    const errors = validateFormTriggerFormDefinition([], [], {
+      triggers: [
+        {
+          id: 'form',
+          type: TriggerTypeEnum.MANUAL_TRIGGER,
+          name: 'Intake',
+          parameters: {
+            message: 'Enter details',
+            form_definition: { fields: [{ type: 'text', value_name: 'x', label: 'X' }] },
+            submit_label: 'Submit',
+            success_message: 'Done',
+          },
+        },
+      ],
+    })
+    expect(errors).toHaveLength(1)
+    expect(errors[0].rule).toBe('form-trigger-type-mismatch')
+    expect(errors[0].message).toContain('manual_trigger')
+  })
 })
