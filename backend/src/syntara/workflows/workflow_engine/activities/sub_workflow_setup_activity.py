@@ -164,6 +164,7 @@ class SubWorkflowSetupActivity:
                 raise ApplicationError(msg, type="WorkflowDisabledError", non_retryable=True)
 
             self._validate_trigger(child_version.workflow_definition, trigger_node_id)
+            self._validate_input(child_version.workflow_definition, trigger_node_id, input_mapping)
 
             author_name = await resolve_user_display_name(session, child_workflow.created_by)
 
@@ -272,3 +273,35 @@ class SubWorkflowSetupActivity:
                 return
         msg = f"Trigger node '{trigger_node_id}' not found in child workflow definition"
         raise ApplicationError(msg, type="TriggerNotFoundError", non_retryable=True)
+
+    @staticmethod
+    def _validate_input(
+        workflow_def: dict[str, Any],
+        trigger_node_id: str,
+        input_data: dict[str, Any],
+    ) -> None:
+        """Validate sub-workflow input against the child trigger's declared input schema.
+
+        A no-op when the trigger declares no ``input_schema``. Otherwise fills schema
+        defaults into ``input_data`` and raises a non-retryable error naming the
+        offending field when the input does not conform. Runs before the child
+        execution is created so an invalid invocation fails fast without an orphan
+        child.
+        """
+        import jsonschema  # noqa: PLC0415
+
+        from syntara.workflows.json_schema_validation import apply_schema_defaults  # noqa: PLC0415
+
+        trigger = next(
+            (t for t in workflow_def.get("triggers", []) if t.get("id") == trigger_node_id),
+            None,
+        )
+        input_schema = (trigger or {}).get("parameters", {}).get("input_schema")
+        if not input_schema:
+            return
+
+        try:
+            apply_schema_defaults(input_data, input_schema)
+        except jsonschema.ValidationError as exc:
+            msg = f"Sub-workflow input validation failed for trigger '{trigger_node_id}': {exc.message}"
+            raise ApplicationError(msg, type="SubWorkflowInputValidationError", non_retryable=True) from None
