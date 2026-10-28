@@ -13,7 +13,6 @@ import {
   canConfirmRetryFromFailure,
   eligibleRetryPointIds,
   getRetryPlanPoints,
-  selectedRetryPointId,
   type RetryFromFailurePreview,
 } from './retryFromFailure'
 import styles from './RetryFromFailureSidePanel.module.css'
@@ -23,7 +22,6 @@ type RetryFromFailureSidePanelProps = Readonly<{
   executionId: string
   activityNameMap: ReadonlyMap<string, string>
   activityTypeMap: ReadonlyMap<string, string>
-  selectedNodeId?: string | null
   inputParameterOverrides?: Readonly<Record<string, Record<string, unknown>>>
   hasUnsavedInputOverrides?: boolean
   onRetryPreviewPointIdsChange?: (pointIds: string[]) => void
@@ -38,7 +36,6 @@ export function RetryFromFailureSidePanel({
   executionId,
   activityNameMap,
   activityTypeMap,
-  selectedNodeId,
   inputParameterOverrides = {},
   hasUnsavedInputOverrides = false,
   onRetryPreviewPointIdsChange,
@@ -48,18 +45,15 @@ export function RetryFromFailureSidePanel({
   const navigate = useNavigate()
   const scopeId = useId()
   const panelRef = useRef<HTMLElement | null>(null)
-  const [scopeModeOverride, setScopeModeOverride] = useState<RetryScopeMode>()
+  const [scopeMode, setScopeMode] = useState<RetryScopeMode>('all')
   const [checkedRetryPointIds, setCheckedRetryPointIds] = useState<string[]>([])
   const [shouldAnnounceRetryPlan, setShouldAnnounceRetryPlan] = useState(false)
 
   const defaultPreviewQuery = useRetryFromFailurePreview({ executionId, enabled: true })
   const defaultPoints = getRetryPlanPoints(defaultPreviewQuery.preview, activityNameMap, activityTypeMap)
-  const selectedCanvasPointId = selectedRetryPointId(selectedNodeId, defaultPreviewQuery.preview)
-  const scopeMode = scopeModeOverride ?? (selectedCanvasPointId ? 'selected' : 'all')
-  const selectedPointIds = getSelectedPointIds(scopeModeOverride, selectedCanvasPointId, checkedRetryPointIds)
   const autoIncludedPointIds = new Set(defaultPreviewQuery.preview?.auto_included_node_ids ?? [])
   const selectablePoints = defaultPoints.filter((point) => !autoIncludedPointIds.has(point.id))
-  const selectedPointIdSet = new Set(selectedPointIds)
+  const selectedPointIdSet = new Set(checkedRetryPointIds)
   const requestedRetryPointIds = selectablePoints
     .filter((point) => selectedPointIdSet.has(point.id))
     .map((point) => point.id)
@@ -144,23 +138,22 @@ export function RetryFromFailureSidePanel({
 
   const setAllRetryPoints = () => {
     setShouldAnnounceRetryPlan(true)
-    setScopeModeOverride('all')
+    setScopeMode('all')
     setCheckedRetryPointIds([])
   }
 
   const chooseRetryPoints = () => {
     setShouldAnnounceRetryPlan(true)
-    setScopeModeOverride('selected')
-    setCheckedRetryPointIds(selectedCanvasPointId ? [selectedCanvasPointId] : [])
+    setScopeMode('selected')
+    setCheckedRetryPointIds([])
   }
 
   const updateRetryPoint = (pointId: string, isChecked: boolean) => {
     setShouldAnnounceRetryPlan(true)
-    setScopeModeOverride('selected')
+    setScopeMode('selected')
     setCheckedRetryPointIds((currentIds) => {
-      const currentSelection = getSelectedPointIds(scopeModeOverride, selectedCanvasPointId, currentIds)
-      if (isChecked) return [...new Set([...currentSelection, pointId])]
-      return currentSelection.filter((id) => id !== pointId)
+      if (isChecked) return [...new Set([...currentIds, pointId])]
+      return currentIds.filter((id) => id !== pointId)
     })
   }
 
@@ -306,15 +299,6 @@ function getRetainedResultSummary(retainedCount: number | undefined): string {
   if (retainedCount === undefined) return 'The number of retained results is unavailable.'
   const resultLabel = retainedCount === 1 ? 'result' : 'results'
   return `${retainedCount} completed ${resultLabel} retained.`
-}
-
-function getSelectedPointIds(
-  scopeModeOverride: RetryScopeMode | undefined,
-  selectedCanvasPointId: string | undefined,
-  checkedRetryPointIds: string[]
-): string[] {
-  if (scopeModeOverride === undefined && selectedCanvasPointId) return [selectedCanvasPointId]
-  return checkedRetryPointIds
 }
 
 function getRetryPreviewPointIdsKey({

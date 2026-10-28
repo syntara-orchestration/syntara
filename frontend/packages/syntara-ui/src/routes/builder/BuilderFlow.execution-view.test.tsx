@@ -36,13 +36,27 @@ vi.mock('@xyflow/react', async (importOriginal) => {
     ...(actual as Record<string, unknown>),
     ReactFlow: (props: Record<string, unknown>) => {
       latestReactFlowProps = props
-      const previewNodeIds = Children.toArray(props.children as ReactNode).flatMap((child) =>
-        isValidElement<{ nodeId?: string }>(child) && typeof child.props.nodeId === 'string' ? [child.props.nodeId] : []
+      const previewMarkers = Children.toArray(props.children as ReactNode).flatMap((child) =>
+        isValidElement<{
+          nodeId?: string
+          position?: string
+          align?: string
+          offset?: number
+          'data-testid'?: string
+        }>(child) && typeof child.props.nodeId === 'string'
+          ? [child.props]
+          : []
       )
       return (
         <div data-testid="reactflow">
-          {previewNodeIds.map((nodeId) => (
-            <div key={nodeId} data-testid={`retry-preview-${nodeId}`} />
+          {previewMarkers.map(({ nodeId, position, align, offset, 'data-testid': testId }) => (
+            <div
+              key={nodeId}
+              data-testid={testId ?? `retry-preview-${nodeId}`}
+              data-position={position}
+              data-align={align}
+              data-offset={offset}
+            />
           ))}
         </div>
       )
@@ -262,7 +276,7 @@ describe('BuilderFlow execution view', () => {
     expect(screen.getByRole('progressbar')).toBeInTheDocument()
   })
 
-  it('marks the selected retry start point on the execution canvas', () => {
+  it('anchors the retry origin marker above and close to its execution node', () => {
     setWorkflowState({
       currentWorkflow: {
         id: 'workflow-retry-preview',
@@ -291,8 +305,12 @@ describe('BuilderFlow execution view', () => {
       </ExecutionViewContext.Provider>
     )
 
-    expect(screen.getByTestId('retry-preview-step-a')).toBeInTheDocument()
-    expect(screen.queryByTestId('retry-preview-step-b')).not.toBeInTheDocument()
+    const retryOrigin = screen.getByTestId('retry-origin-step-a')
+    expect(retryOrigin).toBeInTheDocument()
+    expect(retryOrigin).toHaveAttribute('data-position', 'top')
+    expect(retryOrigin).toHaveAttribute('data-align', 'end')
+    expect(retryOrigin).toHaveAttribute('data-offset', '8')
+    expect(screen.queryByTestId('retry-origin-step-b')).not.toBeInTheDocument()
   })
 
   it('keeps edit interactions enabled outside execution view', () => {

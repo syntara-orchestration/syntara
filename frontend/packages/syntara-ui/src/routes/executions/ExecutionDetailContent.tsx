@@ -285,7 +285,6 @@ export function ExecutionDetailContent(props: ExecutionDetailContentProps) {
       executionId={executionId}
       activityNameMap={activityNameMap}
       activityTypeMap={activityTypeMap}
-      selectedNodeId={selectedStepId}
       inputParameterOverrides={retryInputParameterOverrides}
       hasUnsavedInputOverrides={hasUnsavedInputOverrides}
       onRetryPreviewPointIdsChange={setRetryPreviewPointIds}

@@ -79,7 +79,7 @@ describe('RetryFromFailureSidePanel', () => {
     expect(screen.getByText('This retry starts at Second Step and reruns 3 steps.')).toBeInTheDocument()
   })
 
-  it('narrows the plan and request to the selected failed node', async () => {
+  it('defaults the retry scope to all eligible failure points', async () => {
     const user = userEvent.setup()
     vi.mocked(useRetryFromFailurePreview).mockReturnValue({
       preview: {
@@ -106,15 +106,13 @@ describe('RetryFromFailureSidePanel', () => {
         isError: false,
       }
     })
-    renderPanel({ selectedNodeId: 'step-2' })
+    renderPanel()
 
-    const retryStartsAt = screen.getByTestId('retry-starts-at')
-    expect(retryStartsAt).toHaveTextContent('Second Step')
-    expect(retryStartsAt).not.toHaveTextContent('First Step')
-    expect(screen.getByText('3')).toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: 'All eligible failure points' })).toBeChecked()
+    expect(screen.getByText('5')).toBeInTheDocument()
     await user.click(screen.getByTestId('retry-from-failure-confirm'))
 
-    expect(mockHandleRetry).toHaveBeenCalledWith(['step-2'], {})
+    expect(mockHandleRetry).toHaveBeenCalledWith(undefined, {})
   })
 
   it('submits saved input overrides with the retry request', async () => {
@@ -272,7 +270,7 @@ describe('RetryFromFailureSidePanel', () => {
       isLoading: false,
       isError: false,
     })
-    renderPanel({ selectedNodeId: 'step-2' })
+    renderPanel()
 
     expect(screen.getAllByText('—')).toHaveLength(2)
     expect(screen.getByText('Second Step')).toBeInTheDocument()
@@ -295,7 +293,7 @@ describe('RetryFromFailureSidePanel', () => {
     expect(screen.getByText('This retry starts at Second Step and reruns 1 step.')).toBeInTheDocument()
   })
 
-  it('keeps the default plan when the selected node is auto-included', async () => {
+  it('keeps auto-included points in the all-points retry plan', async () => {
     const user = userEvent.setup()
     vi.mocked(useRetryFromFailurePreview).mockReturnValue({
       preview: {
@@ -308,7 +306,7 @@ describe('RetryFromFailureSidePanel', () => {
       isLoading: false,
       isError: false,
     })
-    renderPanel({ selectedNodeId: 'step-2' })
+    renderPanel()
 
     expect(screen.getByText('First Step')).toBeInTheDocument()
     expect(screen.getByText('Second Step')).toBeInTheDocument()

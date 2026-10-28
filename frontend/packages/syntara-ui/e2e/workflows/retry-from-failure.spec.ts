@@ -70,6 +70,32 @@ async function stubWorkflowEditPermission(app: Page, allowed: boolean): Promise<
   })
 }
 
+/** Give the demo run two retry points so the scope selector is rendered. */
+async function stubMultipleRetryFailurePoints(app: Page): Promise<void> {
+  await app.route(`**/api/v1/executions/${FAILED_EXECUTION_ID}/retry_from_failure_preview**`, async (route) => {
+    const requestedPointIds = new URL(route.request().url()).searchParams.getAll('retry_point_ids')
+    const allPointIds = ['step1', 'step2']
+    const eligiblePointIds = requestedPointIds.length > 0 ? requestedPointIds : allPointIds
+    const stepCountByEligiblePoint = Object.fromEntries(eligiblePointIds.map((id) => [id, id === 'step2' ? 2 : 1]))
+
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        eligible: true,
+        reason: null,
+        eligible_point_ids: eligiblePointIds,
+        sanitized_node_ids: [],
+        auto_included_node_ids: [],
+        sanitized_replacements: {},
+        step_count_by_eligible_point: stepCountByEligiblePoint,
+        total_step_count: Object.values(stepCountByEligiblePoint).reduce((total, count) => total + count, 0),
+        retained_result_count: 0,
+      }),
+    })
+  })
+}
+
 /**
  * Scan only the retry panel. The execution detail page embeds a ReactFlow
  * canvas and PatternFly tabs with pre-existing, unrelated axe findings, so a
@@ -123,6 +149,42 @@ test.describe('Retry from failure', () => {
       await expect(panel).not.toBeVisible()
       // Cancelling must not navigate away from the source run.
       await expect(app).toHaveURL(new RegExp(`/executions/${FAILED_EXECUTION_ID}$`))
+    })
+
+    test('canvas selection does not change retry scope and the origin marker stays clear of its step', async ({
+      app,
+    }) => {
+      await stubMultipleRetryFailurePoints(app)
+      await openExecutionDetail(app, FAILED_EXECUTION_ID)
+      const failedStep = app.getByTestId('rf__node-step2').getByRole('heading', { name: 'Second Step', level: 2 })
+      await failedStep.click()
+      await openRetryActionsMenu(app)
+      await app.getByTestId('retry-from-failure-button').click()
+
+      const panel = app.getByRole('complementary', { name: 'Retry run from failure review' })
+      const allPoints = panel.getByRole('radio', { name: 'All eligible failure points' })
+      const choosePoints = panel.getByRole('radio', { name: 'Choose failure points' })
+      const retryOrigin = app.getByTestId('retry-origin-step2')
+      const stepNode = app.locator('.react-flow__node[data-id="step2"]')
+
+      await expect(allPoints).toBeChecked()
+      await expect(choosePoints).not.toBeChecked()
+      await expect(retryOrigin).toBeVisible()
+
+      const markerBox = await retryOrigin.boundingBox()
+      const stepNodeBox = await stepNode.boundingBox()
+      if (markerBox === null || stepNodeBox === null) {
+        throw new Error('Could not measure the retry origin marker and failed step')
+      }
+      const markerGap = stepNodeBox.y - (markerBox.y + markerBox.height)
+      expect(markerGap).toBeGreaterThanOrEqual(0)
+      expect(markerGap).toBeLessThanOrEqual(24)
+
+      await failedStep.click()
+
+      await expect(allPoints).toBeChecked()
+      await expect(choosePoints).not.toBeChecked()
+      await expect(panel.getByRole('button', { name: 'Retry 3 steps' })).toBeVisible()
     })
 
     test('confirming starts a retry and lands on a run marked "Retried from" @pr-check', async ({ app }) => {
