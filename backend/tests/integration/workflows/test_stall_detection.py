@@ -38,10 +38,10 @@ async def _seed_activity(
     stall_alert_at: datetime | None = None,
 ) -> ActivityExecution:
     """Create a test activity execution in the database."""
-    # Create workflow
+    # Create workflow with unique name to avoid uq_workflows_name_project constraint violations
     workflow = Workflow(
         id=uuid4(),
-        name="test-workflow",
+        name=f"test-workflow-{uuid4()}",
         created_by=user.id,
         project_id=project_id,
     )
