@@ -157,7 +157,7 @@ function ExecutionDetailContent({
       executionId={executionId}
       activityNameMap={activityNameMap}
       activityTypeMap={activityTypeMap}
-      selectedNodeId={selectedNodeId}
+      selectedNodeId={selectedStepId}
       onClose={onRetryPanelClose}
     />
   ) : undefined
