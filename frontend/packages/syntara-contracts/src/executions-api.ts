@@ -97,7 +97,7 @@ export interface paths {
     }
     /**
      * Preview retry from failure
-     * @description Report whether an execution can be retried from its failure points, and what would re-run. Optionally accepts repeated retry_point_ids query parameters to preview a selected subset; omitting them previews all currently failed points. Returns the eligible retry points, per-point re-run counts, the deduplicated total for the requested scope, and the number of completed activity results that will be retained. Purely informational: the retry endpoint independently re-validates the same selection and rejects anything unusable. Never mutates any state.
+     * @description Report whether an execution can be retried from its failure points, and what would re-run. An optional retry_point_ids query parameter previews a selected subset; when omitted, the preview uses all currently failed nodes. Returns the eligible retry points, the re-run step count for each, the deduplicated total, and completed results retained outside the retry paths. Purely informational: the retry endpoint independently re-validates the selection and any input parameter overrides. Never mutates any state.
      */
     get: operations['retry_from_failure_preview']
     put?: never
@@ -2268,8 +2268,8 @@ export interface operations {
   retry_from_failure_preview: {
     parameters: {
       query?: {
-        /** @description Optional failure points to preview. Repeat this parameter to preview a subset; omitting it previews all currently failed points. */
-        retry_point_ids?: string[]
+        /** @description Optional failure points to preview. Repeat the parameter to preview a subset; omitting it previews all currently failed points. */
+        retry_point_ids?: string[] | null
       }
       header?: never
       path: {

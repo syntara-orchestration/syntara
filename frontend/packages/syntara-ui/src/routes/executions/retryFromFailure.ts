@@ -1,7 +1,7 @@
 import { ExecutionStatusEnum } from '@syntara/contracts'
 import type { ExecutionsAPI } from '@syntara/contracts'
 
-import { getActivityTypeLabel } from '../builder/panels/utils/getUpstreamNodeDisplayName'
+import { getActivityTypeLabel } from '../builder/panels/utils/getUpstreamStepDisplayName'
 import { parseCompositeKey } from '../workflows/execution/utils/activityState'
 
 type ExecutionStatus = ExecutionsAPI.components['schemas']['ExecutionStatus']
