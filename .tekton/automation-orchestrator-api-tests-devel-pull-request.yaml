@@ -81,7 +81,7 @@ spec:
     # Execution Plane server revision; keep in sync with the
     # execution-plane-client protocol the syntara branch under test pins.
     - name: ep-revision
-      value: devel
+      value: v0.1.6
   taskRunTemplate:
     serviceAccountName: konflux-integration-runner
   pipelineSpec:
@@ -147,7 +147,7 @@ spec:
         description: >
           syntara-execution-plane branch overlaid by aap-dev when
           AO_EXECUTION_PLANE=true.
-        default: devel
+        default: v0.1.6
       - name: ep-pr-number
         type: string
         description: >

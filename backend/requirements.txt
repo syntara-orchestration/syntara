@@ -197,6 +197,10 @@ email-validator==2.3.0 \
     --hash=sha256:80f13f623413e6b197ae73bb10bf4eb0908faf509ad8362c5edeb0be7fd450b4 \
     --hash=sha256:9fc05c37f2f6cf439ff414f8fc46d917929974a82244c20eb10231ba60c54426
     # via pydantic
+execution-plane-client==0.1.6 \
+    --hash=sha256:5ed47adef1d3e66e519f15d55264eb7c5fa11292b97add68c4ee66f286fbe997 \
+    --hash=sha256:da3f341622d9d5bbfb372015766348de73c9e6313e2a1a468e19a53edd4b4d1a
+    # via syntara
 fastapi==0.150.0 \
     --hash=sha256:97583806e6de1b6fc299866bdb88730fa311ff640829af876c9e847f4c3a3b29 \
     --hash=sha256:e566bc3f1347cfacf61f2f9ea1d7ab4576fbcff02eb9747c2807b8ced16d9e9a
