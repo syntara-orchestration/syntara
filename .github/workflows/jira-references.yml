@@ -5,8 +5,8 @@
 #
 # Only lines added by the PR are checked, so existing references don't block
 # unrelated work; touching a line that already has one requires cleaning it up.
-# Allowed paths are listed in JIRA_CHECK_EXCLUDED_PATHS in
-# .github/scripts/src/lib/jira.ts.
+# Paths allowed to contain plain keys are listed in JIRA_CHECK_EXCLUDED_PATHS in
+# .github/scripts/src/lib/jira.ts; Jira URLs are rejected everywhere.
 name: Jira References
 
 on:

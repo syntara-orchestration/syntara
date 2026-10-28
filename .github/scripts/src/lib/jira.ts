@@ -7,13 +7,22 @@ export const JIRA_KEY_SOURCE = `\\b(?:${JIRA_PROJECT_KEYS.join('|')})-\\d+\\b(?!
 /** Hosts of the internal Jira instance (current and legacy); the only place they appear in the repo. */
 export const JIRA_HOSTS = ['redhat.atlassian.net', 'issues.redhat.com'] as const
 
-/** Source of a regex matching an internal Jira browse URL on any of the Jira hosts. */
-const JIRA_URL_SOURCE = `(?:https?://)?(?:${JIRA_HOSTS.map((host) => host.replace(/\./g, '\\.')).join('|')})/browse/[A-Z][A-Z0-9]*-\\d+`
+/** Source of a regex matching any of the Jira hosts, but not a longer hostname that merely starts with one. */
+const JIRA_HOST_SOURCE = `(?:${JIRA_HOSTS.map((host) => host.replace(/\./g, '\\.')).join('|')})(?![\\w-]|\\.\\w)`
 
-/** Matches internal Jira browse URLs. */
+/** Source of a regex matching a URL path, query, or fragment; stops at whitespace and delimiters and drops trailing punctuation. */
+const URL_TAIL_SOURCE = `[/?#](?:[^\\s<>"'\`()\\[\\]]*[^\\s<>"'\`()\\[\\].,;:!?])?`
+
+/**
+ * Source of a regex matching any URL on the Jira hosts, whatever its path (`/browse/KEY-1`, `?selectedIssue=KEY-1`,
+ * boards, filters); without a scheme, a path is required so a bare hostname in prose doesn't match.
+ */
+const JIRA_URL_SOURCE = `(?:https?://${JIRA_HOST_SOURCE}(?:${URL_TAIL_SOURCE})?|\\b${JIRA_HOST_SOURCE}${URL_TAIL_SOURCE})`
+
+/** Matches internal Jira URLs. */
 const JIRA_URL_PATTERN = new RegExp(JIRA_URL_SOURCE, 'g')
 
-/** Matches internal Jira issue keys and internal Jira browse URLs. */
+/** Matches internal Jira issue keys and internal Jira URLs. */
 const JIRA_REFERENCE_PATTERN = new RegExp(`${JIRA_URL_SOURCE}|${JIRA_KEY_SOURCE}`, 'g')
 
 /** Returns every internal Jira reference found in the text, in order of appearance. */
@@ -21,7 +30,7 @@ export function findJiraReferences(text: string): string[] {
   return [...text.matchAll(JIRA_REFERENCE_PATTERN)].map((match) => match[0])
 }
 
-/** Returns every internal Jira browse URL found in the text, in order of appearance. */
+/** Returns every internal Jira URL found in the text, in order of appearance. */
 export function findJiraUrls(text: string): string[] {
   return [...text.matchAll(JIRA_URL_PATTERN)].map((match) => match[0])
 }
@@ -83,7 +92,10 @@ export function parseAddedLines(diff: string): AddedLine[] {
   return added
 }
 
-/** Paths allowed to contain Jira keys: docs and templates that describe this rule, this check's own tests, and generated files. */
+/**
+ * Paths allowed to contain plain Jira keys: docs and templates that describe this rule, this check's own tests, and
+ * generated files. Jira URLs are never allowed, so these paths are still checked for them.
+ */
 export const JIRA_CHECK_EXCLUDED_PATHS: readonly RegExp[] = [
   /^(?:AGENTS|CLAUDE)\.md$/,
   /^docs\/contributing\.md$/,
@@ -92,13 +104,15 @@ export const JIRA_CHECK_EXCLUDED_PATHS: readonly RegExp[] = [
   /(?:^|\/)(?:package-lock\.json|uv\.lock)$/,
 ]
 
-/** Returns every non-excluded added line in the diff that contains an internal Jira reference. */
+/** Returns every added line in the diff that contains an internal Jira reference; excluded paths are checked for URLs only. */
 export function findJiraReferencesInDiff(
   diff: string,
   excludedPaths: readonly RegExp[] = JIRA_CHECK_EXCLUDED_PATHS
 ): JiraReferenceFinding[] {
   return parseAddedLines(diff)
-    .filter(({ path }) => !excludedPaths.some((pattern) => pattern.test(path)))
-    .map((line) => ({ ...line, references: findJiraReferences(line.text) }))
+    .map((line) => {
+      const excluded = excludedPaths.some((pattern) => pattern.test(line.path))
+      return { ...line, references: excluded ? findJiraUrls(line.text) : findJiraReferences(line.text) }
+    })
     .filter(({ references }) => references.length > 0)
 }

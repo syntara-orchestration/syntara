@@ -19,9 +19,25 @@ describe('checkPrDescription', () => {
     [`Related to https://${jiraHost}/browse/AAP-99723`, `https://${jiraHost}/browse/AAP-99723`, 'AAP-99723'],
     [`See [AAP-1](https://${legacyJiraHost}/browse/AAP-1)`, `https://${legacyJiraHost}/browse/AAP-1`, 'AAP-1'],
     [`Ticket: ${jiraHost}/browse/ANSTRAT-1934`, `${jiraHost}/browse/ANSTRAT-1934`, 'ANSTRAT-1934'],
+    [
+      `Related to https://${jiraHost}/jira/core/projects/AAP/list?selectedIssue=AAP-12345.`,
+      `https://${jiraHost}/jira/core/projects/AAP/list?selectedIssue=AAP-12345`,
+      'AAP-12345',
+    ],
+    [
+      `Board: https://${jiraHost}/jira/software/c/projects/AAP/boards/1?selectedIssue=AAP-7&quickFilter=2`,
+      `https://${jiraHost}/jira/software/c/projects/AAP/boards/1?selectedIssue=AAP-7&quickFilter=2`,
+      'AAP-7',
+    ],
   ])('rejects Jira URLs in %j', (body, url, key) => {
     expect(checkPrDescription(body)).toEqual([
       `Jira URLs are not allowed in the PR description. Replace ${url} with the plain key ${key}.`,
+    ])
+  })
+
+  it('rejects Jira URLs that name no issue', () => {
+    expect(checkPrDescription(`Filter: https://${jiraHost}/issues/?filter=12345`)).toEqual([
+      `Jira URLs are not allowed in the PR description. Replace https://${jiraHost}/issues/?filter=12345 with the plain issue key.`,
     ])
   })
 

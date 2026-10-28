@@ -138,7 +138,7 @@ Code and docs in this repo are read by people who can't open the internal Jira, 
 
 This applies to code written by hand, by agents, and by automated pipelines (including the agentic bug-resolution pipeline). Pipelines can keep tracking issues in Jira, but generated code and docs must contain no Jira references.
 
-**Enforced in CI** by the `Jira References` workflow (`.github/workflows/jira-references.yml`). It scans only the PR diff, never the PR description, and fails when lines *added* by the PR contain `AAP-`/`ANSTRAT-` keys or Jira URLs (the hosts are listed in `JIRA_HOSTS` in `.github/scripts/src/lib/jira.ts`). Don't write Jira URLs anywhere in the repo, not even as examples. Existing references only need cleaning up when you touch those lines. Use a placeholder such as `PROJ-123` for examples. The few allowed paths are listed in `JIRA_CHECK_EXCLUDED_PATHS` in `.github/scripts/src/lib/jira.ts`.
+**Enforced in CI** by the `Jira References` workflow (`.github/workflows/jira-references.yml`). It scans only the PR diff, never the PR description, and fails when lines *added* by the PR contain `AAP-`/`ANSTRAT-` keys or Jira URLs (the hosts are listed in `JIRA_HOSTS` in `.github/scripts/src/lib/jira.ts`). Don't write Jira URLs anywhere in the repo, not even as examples. Existing references only need cleaning up when you touch those lines. Use a placeholder such as `PROJ-123` for examples. The few paths allowed to contain plain keys are listed in `JIRA_CHECK_EXCLUDED_PATHS` in `.github/scripts/src/lib/jira.ts`; those paths are still checked for Jira URLs.
 
 ## Cross-Cutting Concerns
 
