@@ -186,4 +186,5 @@ async def test_lineage_metadata_preserves_canvas_node_id(
     async with test_db_session_factory() as session:
         child = await session.get(Execution, UUID(result["execution_id"]))
     assert child is not None
+    assert child.execution_metadata is not None
     assert child.execution_metadata["parent_node_id"] == "sub_wf_node"

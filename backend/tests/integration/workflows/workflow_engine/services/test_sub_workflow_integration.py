@@ -730,7 +730,7 @@ class TestSubWorkflowForEachLifecycle:
             session_factory=_recording_session_factory(created),  # type: ignore[arg-type]
             task_queue=_TASK_QUEUE,
         )
-        activities = [
+        activities: list[Callable[..., Any]] = [
             manual_trigger,
             subworkflow_trigger,
             execute_script_activity,
