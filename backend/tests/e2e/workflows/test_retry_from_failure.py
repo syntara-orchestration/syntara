@@ -17,6 +17,7 @@ from orchestrator_test_sdk.e2e.auth import api_for
 from orchestrator_test_sdk.e2e.helpers import create_and_run_workflow, poll_execution_until_complete
 from syntara_api_client.models import ExecutionCreate, RetryFailureRequest
 from syntara_api_client.models.execution_status import ExecutionStatus
+from syntara_api_client.types import Unset
 
 if TYPE_CHECKING:
     from uuid import UUID
@@ -74,12 +75,9 @@ def _activity_output(activity: ActivityData) -> dict[str, Any]:
 
 def _activity_input(activity: ActivityExecution) -> dict[str, Any]:
     value = activity.input_data
-    if value is None:
+    if isinstance(value, Unset):
         return {}
-    if isinstance(value, Mapping):
-        return dict(value)
-    additional_properties = getattr(value, "additional_properties", None)
-    return dict(additional_properties) if isinstance(additional_properties, Mapping) else {}
+    return dict(value.additional_properties)
 
 
 def _activity_executions_by_name(
