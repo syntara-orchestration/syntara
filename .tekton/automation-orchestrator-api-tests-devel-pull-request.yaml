@@ -882,7 +882,7 @@ spec:
             - name: name
               value: deploy-ao-using-aap-dev
             - name: bundle
-              value: quay.io/aap-ci/tekton-catalog/task/deploy-ao-using-aap-dev:0.1@sha256:0db7eac3406f8aefedb810c8d545d868b47b4214b90cd848b7def9e8cd26df68
+              value: quay.io/aap-ci/tekton-catalog/task/deploy-ao-using-aap-dev:0.1@sha256:45010238f3ef8f9e35ed6a2c82a0d06385e8e8d4bbb86cdba19378e08dbcaef7
             - name: kind
               value: task
             - name: secret
@@ -955,7 +955,7 @@ spec:
             - name: name
               value: run-ao-api-tests
             - name: bundle
-              value: quay.io/aap-ci/tekton-catalog/task/run-ao-api-tests:0.1@sha256:c9ea494c79503a41b5521167a367ce8d941c3116f4202e6481ed7eb37fa86bd5
+              value: quay.io/aap-ci/tekton-catalog/task/run-ao-api-tests:0.1@sha256:b67f917a246e5113b40d985cba69636f148277a5bf1d72556f3b2fa437890a79
             - name: kind
               value: task
             - name: secret
