@@ -68,6 +68,21 @@ class TestValidDefinitions:
 
         validate_form_definition(form)
 
+    def test_partial_date_default_passes(self) -> None:
+        """Partial date defaults are allowed; only complete defaults are coerced."""
+        form = _form(
+            _field(
+                "date",
+                "due",
+                include_date=True,
+                include_time=True,
+                include_timezone=True,
+                default={"date": "2026-03-15"},
+            )
+        )
+
+        validate_form_definition(form)
+
 
 class TestInvalidDefaults:
     """Defaults the responder-time coercer would reject are caught at author time."""

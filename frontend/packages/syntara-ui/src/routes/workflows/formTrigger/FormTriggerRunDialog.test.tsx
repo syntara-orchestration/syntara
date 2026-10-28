@@ -109,6 +109,121 @@ describe('FormTriggerRunDialog', () => {
     expect(mockPost).not.toHaveBeenCalled()
   })
 
+  it('submits optional date fields with a prefilled partial initial answer', async () => {
+    const user = userEvent.setup()
+    renderDialog({
+      formTrigger: {
+        ...formTrigger,
+        definition: parseFormDefinition({
+          fields: [
+            {
+              type: 'date',
+              value_name: 'start',
+              label: 'Start',
+              required: false,
+              include_date: true,
+              include_time: true,
+              include_timezone: true,
+              default: { date: '2026-03-01' },
+            },
+          ],
+        }),
+        submitLabel: 'Run',
+      },
+    })
+
+    expect(screen.getByLabelText('Start date')).toHaveValue('03/01/2026')
+    await user.click(screen.getByRole('button', { name: 'Run' }))
+
+    await waitFor(() => {
+      expect(mockPost).toHaveBeenCalledWith('/executions', {
+        body: {
+          workflow_id: 'wf-1',
+          trigger_node_id: 'form-1',
+          input_data: { start: { date: '2026-03-01' } },
+          use_published: true,
+        },
+      })
+    })
+    expect(screen.queryByText(/Missing required components/i)).not.toBeInTheDocument()
+  })
+
+  it('submits optional date fields when the user enters only the date component', async () => {
+    const user = userEvent.setup()
+    renderDialog({
+      formTrigger: {
+        ...formTrigger,
+        definition: parseFormDefinition({
+          fields: [
+            {
+              type: 'date',
+              value_name: 'start',
+              label: 'Start',
+              required: false,
+              include_date: true,
+              include_time: true,
+              include_timezone: true,
+            },
+          ],
+        }),
+        submitLabel: 'Run',
+      },
+    })
+
+    await user.type(screen.getByLabelText('Start date'), '04/01/2026')
+    await user.click(screen.getByRole('button', { name: 'Run' }))
+
+    await waitFor(() => {
+      expect(mockPost).toHaveBeenCalledWith('/executions', {
+        body: {
+          workflow_id: 'wf-1',
+          trigger_node_id: 'form-1',
+          input_data: { start: { date: '2026-04-01' } },
+          use_published: true,
+        },
+      })
+    })
+    expect(screen.queryByText(/Missing required components/i)).not.toBeInTheDocument()
+  })
+
+  it('submits a required date field with only a prefilled partial initial answer', async () => {
+    const user = userEvent.setup()
+    renderDialog({
+      formTrigger: {
+        ...formTrigger,
+        definition: parseFormDefinition({
+          fields: [
+            {
+              type: 'date',
+              value_name: 'start',
+              label: 'Start',
+              required: true,
+              include_date: true,
+              include_time: true,
+              include_timezone: true,
+              default: { date: '2026-03-01' },
+            },
+          ],
+        }),
+        submitLabel: 'Run',
+      },
+    })
+
+    await user.click(screen.getByRole('button', { name: 'Run' }))
+
+    await waitFor(() => {
+      expect(mockPost).toHaveBeenCalledWith('/executions', {
+        body: {
+          workflow_id: 'wf-1',
+          trigger_node_id: 'form-1',
+          input_data: { start: { date: '2026-03-01' } },
+          use_published: true,
+        },
+      })
+    })
+    expect(screen.queryByText(/Missing required components/i)).not.toBeInTheDocument()
+  })
+
   it('submits via POST /executions, shows a toast, closes, and navigates to the execution', async () => {
     const user = userEvent.setup()
     const onClose = vi.fn()

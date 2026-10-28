@@ -399,3 +399,23 @@ class TestResolveDynamicOptions:
         result = resolve_dynamic_options({"fields": [field]})
 
         assert result["fields"][0] == field
+
+    def test_partial_date_default_passes_final_model_validation(self) -> None:
+        """Form prompt nodes validate the full definition after option resolution."""
+        definition = {
+            "fields": [
+                {
+                    "type": "date",
+                    "value_name": "date",
+                    "label": "Date",
+                    "include_date": True,
+                    "include_time": True,
+                    "include_timezone": True,
+                    "default": {"date": "2026-01-15"},
+                }
+            ]
+        }
+
+        result = resolve_dynamic_options(definition)
+
+        assert result["fields"][0]["default"] == {"date": "2026-01-15"}

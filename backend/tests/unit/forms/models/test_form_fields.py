@@ -477,7 +477,7 @@ class TestDateFieldComponents:
 
 
 class TestDateFieldDefault:
-    """A date default must match the components the field collects, exactly."""
+    """Date defaults may be partial; extra components for uncollected parts are rejected."""
 
     def test_date_only_default(self) -> None:
         """A default covering the single included component is accepted."""
@@ -499,10 +499,24 @@ class TestDateFieldDefault:
         assert field.default is not None
         assert field.default.supplied_components() == ("date", "time", "timezone")
 
-    def test_partial_default_rejected(self) -> None:
-        """A default is substituted wholesale, so an incomplete one is useless."""
-        with pytest.raises(ValidationError, match=r"default is missing timezone"):
-            DateField.model_validate(_date(include_date=False, include_timezone=True, default={}))
+    def test_partial_default_accepted(self) -> None:
+        """A default may omit included components the author did not set."""
+        field = DateField.model_validate(
+            _date(
+                include_time=True,
+                include_timezone=True,
+                default={"date": "2026-01-05"},
+            )
+        )
+
+        assert field.default is not None
+        assert field.default.supplied_components() == ("date",)
+
+    def test_empty_default_object_accepted_when_timezone_only(self) -> None:
+        field = DateField.model_validate(_date(include_date=False, include_timezone=True, default={}))
+
+        assert field.default is not None
+        assert field.default.supplied_components() == ()
 
     def test_default_for_uncollected_component_rejected(self) -> None:
         """Defaulting a component the field never asks for is an authoring mistake."""

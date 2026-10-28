@@ -2,6 +2,7 @@ import type { FormDefinition, FormField } from '@syntara/contracts'
 
 import { isValidIsoCalendarDate } from '../utils/isoCalendarDate'
 
+import { dateDefaultCoversAllIncludedComponents } from './dateFieldUtils'
 import { FormFieldTypeEnum } from './formFieldTypeEnum'
 import type { DateSubmissionValue, FormSubmissionData, FormSubmissionInput } from './formTypes'
 import {
@@ -192,12 +193,15 @@ function validateDateComponent(name: DateComponentName, supplied: unknown): stri
   return supplied
 }
 
+function isRequiredFormField(field: FormField): boolean {
+  return field.required === true
+}
+
 function coerceDate(field: DateFormField, raw: unknown): DateSubmissionValue {
   const included = includedDateComponents(field)
   const entries = toDateComponentEntries(raw, included)
 
   const value: DateSubmissionValue = {}
-  const missing: Array<DateComponentName> = []
 
   for (const name of DATE_COMPONENT_NAMES) {
     // Drop blanks so an untouched input posting "" reads as absent.
@@ -207,15 +211,16 @@ function coerceDate(field: DateFormField, raw: unknown): DateSubmissionValue {
       if (supplied !== undefined) {
         throw new Error(`This field does not collect: ${name}`)
       }
-    } else if (supplied === undefined) {
-      missing.push(name)
-    } else {
-      value[name] = validateDateComponent(name, supplied)
+      continue
     }
+    if (supplied === undefined) {
+      continue
+    }
+    value[name] = validateDateComponent(name, supplied)
   }
 
-  if (missing.length > 0) {
-    throw new Error(`Missing required ${missing.length === 1 ? 'component' : 'components'}: ${missing.join(', ')}`)
+  if (Object.keys(value).length === 0 && isRequiredFormField(field)) {
+    throw new Error('This field is required')
   }
 
   return value
@@ -364,8 +369,28 @@ function resolveSubmittedRaw(field: FormField, submitted: FormSubmissionInput): 
     raw = MISSING
   }
 
+  if (
+    field.type === FormFieldTypeEnum.DATE &&
+    raw !== MISSING &&
+    typeof raw === 'object' &&
+    raw !== null &&
+    !Array.isArray(raw)
+  ) {
+    const entries = raw as Record<string, unknown>
+    const hasPresent = DATE_COMPONENT_NAMES.some((name) => !isEmptyValue(entries[name]))
+    if (!hasPresent) {
+      raw = MISSING
+    }
+  }
+
   if (raw === MISSING && field.default != null) {
-    raw = field.default
+    if (field.type === FormFieldTypeEnum.DATE) {
+      if (dateDefaultCoversAllIncludedComponents(field)) {
+        raw = field.default
+      }
+    } else {
+      raw = field.default
+    }
   }
 
   return raw
@@ -375,7 +400,7 @@ function validateFieldSubmission(field: FormField, submitted: FormSubmissionInpu
   const raw = resolveSubmittedRaw(field, submitted)
 
   if (raw === MISSING) {
-    if (field.required) {
+    if (isRequiredFormField(field)) {
       return { status: 'invalid', error: fieldError(field, 'required', 'This field is required') }
     }
     return { status: 'omit' }
@@ -396,7 +421,18 @@ function validateFieldSubmission(field: FormField, submitted: FormSubmissionInpu
     }
   }
 
-  if (field.type === FormFieldTypeEnum.CHECKBOX && field.required && coerced === false) {
+  if (
+    field.type === FormFieldTypeEnum.DATE &&
+    !isRequiredFormField(field) &&
+    typeof coerced === 'object' &&
+    coerced !== null &&
+    !Array.isArray(coerced) &&
+    Object.keys(coerced).length === 0
+  ) {
+    return { status: 'omit' }
+  }
+
+  if (field.type === FormFieldTypeEnum.CHECKBOX && isRequiredFormField(field) && coerced === false) {
     return { status: 'invalid', error: fieldError(field, 'must_be_checked', 'This checkbox must be checked') }
   }
 
@@ -454,6 +490,9 @@ export function validateFormDefinitionDefaults(form: FormDefinition): void {
 
   for (const field of form.fields) {
     if (field.type === FormFieldTypeEnum.CHECKBOX || field.default == null) {
+      continue
+    }
+    if (field.type === FormFieldTypeEnum.DATE && !dateDefaultCoversAllIncludedComponents(field)) {
       continue
     }
     try {

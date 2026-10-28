@@ -4,10 +4,9 @@ import { Controller, useFormContext, useWatch } from 'react-hook-form'
 
 import { FormFieldTypeEnum, type FormDefinitionSchemaInput } from '../../../forms'
 import {
+  getDateDefaultCompletenessError,
   coerceDateValueShape,
-  DATE_COMPONENT_NAMES,
   includedDateComponents,
-  type DateComponentName,
 } from '../../../forms/dateFieldUtils'
 import { FormFieldError } from '../../FormFieldError'
 import { FormDateValueInputs } from '../FormDateValueInputs'
@@ -23,28 +22,6 @@ type FormFieldBuilderDateDefaultPickerProps = {
   idPrefix: string
   isDisabled?: boolean
   labelHelp?: ReactElement
-}
-
-function getDefaultComponentsError(value: unknown, included: DateComponentName[]): string | undefined {
-  if (value == null) {
-    return undefined
-  }
-
-  const defaultValue = coerceDateValueShape(value)
-  if (defaultValue === null) {
-    return undefined
-  }
-
-  const missing = included.filter((component) => defaultValue[component] == null)
-  const extra = DATE_COMPONENT_NAMES.filter(
-    (component) => !included.includes(component) && defaultValue[component] != null
-  )
-  const messages = [
-    missing.length > 0 ? `Default is missing ${missing.join(', ')}` : undefined,
-    extra.length > 0 ? `Default supplies ${extra.join(', ')}, which this field does not collect` : undefined,
-  ].filter((message): message is string => message !== undefined)
-
-  return messages.length > 0 ? messages.join('. ') : undefined
 }
 
 export function FormFieldBuilderDateDefaultPicker({
@@ -70,7 +47,10 @@ export function FormFieldBuilderDateDefaultPicker({
         name={`fields.${index}.default`}
         render={({ field: rhfField, fieldState }) => {
           const value = coerceDateValueShape(rhfField.value)
-          const componentsError = getDefaultComponentsError(rhfField.value, included)
+          // Only flag a default that supplies components the field does not collect.
+          // Missing components are allowed — partial defaults are valid.
+          const completenessError = getDateDefaultCompletenessError(rhfField.value, included)
+          const showError = Boolean(fieldState.error ?? completenessError)
 
           return (
             <>
@@ -85,12 +65,12 @@ export function FormFieldBuilderDateDefaultPicker({
                 onBlur={rhfField.onBlur}
                 idPrefix={`${idPrefix}-default`}
                 isDisabled={isDisabled}
-                validated={fieldState.error || componentsError ? 'error' : 'default'}
+                validated={showError ? 'error' : 'default'}
                 dateAriaLabel={FORM_FIELD_BUILDER_INITIAL_ANSWER_DATE_ARIA_LABEL}
                 timeAriaLabel="Initial answer time"
                 timezoneAriaLabel="Initial answer time zone"
               />
-              <FormFieldError message={componentsError} error={fieldState.error} />
+              <FormFieldError message={completenessError} error={fieldState.error} />
             </>
           )
         }}

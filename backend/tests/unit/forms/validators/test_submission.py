@@ -496,14 +496,21 @@ class TestDateFieldSubmission:
         with pytest.raises(ValueError, match=r"Missing required component: time"):
             submission_module._require_time_component(DateValue())
 
-    def test_missing_component_rejected(self) -> None:
-        """Every included component is mandatory once the field is answered."""
+    def test_partial_submission_is_accepted(self) -> None:
+        """Responders may supply any subset of included components."""
+        form = self._date_form(required=True, include_time=True, include_timezone=True)
+
+        cleaned = validate_form_submission(form, {"start": {"date": "2026-01-05", "time": "14:30"}})
+
+        assert cleaned["start"] == "2026-01-05T14:30:00"
+
+    def test_optional_partial_date_answer_is_accepted(self) -> None:
+        """Optional date fields may submit a subset of included components."""
         form = self._date_form(include_time=True, include_timezone=True)
 
-        errors = _errors(form, {"start": {"date": "2026-01-05", "time": "14:30"}})
+        cleaned = validate_form_submission(form, {"start": {"date": "2026-04-01"}})
 
-        assert [e.code for e in errors] == ["invalid_format"]
-        assert "Missing required component: timezone" in errors[0].message
+        assert cleaned["start"] == "2026-04-01"
 
     def test_uncollected_component_rejected(self) -> None:
         """Sending a component the field does not collect is an error, not ignored."""
@@ -521,9 +528,10 @@ class TestDateFieldSubmission:
 
     def test_blank_component_reads_as_absent(self) -> None:
         """An untouched input posting "" is missing, not malformed."""
-        errors = _errors(self._date_form(), {"start": {"date": ""}})
+        errors = _errors(self._date_form(required=True), {"start": {"date": ""}})
 
-        assert "Missing required component: date" in errors[0].message
+        assert [e.code for e in errors] == ["required"]
+        assert errors[0].message == "This field is required"
 
     @pytest.mark.parametrize(
         ("bad", "expected_message"),
@@ -576,6 +584,16 @@ class TestDateFieldSubmission:
         cleaned = validate_form_submission(form, {})
 
         assert cleaned["start"] == "2026-03-01T08:00:00+01:00"
+
+    def test_partial_default_does_not_fill_absent_field(self) -> None:
+        """Partial defaults are stored on the definition but not substituted on submit."""
+        form = self._date_form(
+            include_time=True,
+            include_timezone=True,
+            default={"date": "2026-03-01"},
+        )
+
+        assert validate_form_submission(form, {}) == {}
 
     @pytest.mark.parametrize("field_type", ["dropdown", "multi_select"])
     def test_resolved_options_enforce_typed_membership(self, field_type: str) -> None:

@@ -1,5 +1,6 @@
 import type { FormDefinition } from '@syntara/contracts'
 
+import { buildDateFieldFormDefault } from '../../../forms/dateFieldUtils'
 import { FormFieldTypeEnum, type FormSubmissionInput } from '../../../forms'
 
 /**
@@ -17,7 +18,11 @@ export function buildDefaultValues(definition: FormDefinition, overrides?: FormS
     }
 
     if (field.default != null) {
-      values[field.value_name] = field.default
+      if (field.type === FormFieldTypeEnum.DATE) {
+        values[field.value_name] = buildDateFieldFormDefault(field)
+      } else {
+        values[field.value_name] = field.default
+      }
       continue
     }
 

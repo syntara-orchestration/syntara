@@ -86,11 +86,7 @@ export function FormFieldBuilderDesignTab({ isDisabled }: Readonly<FormFieldBuil
     <Stack hasGutter className={styles.designTab}>
       {!definitionValidation.success && (
         <StackItem>
-          <Alert
-            variant="warning"
-            title="Fix validation errors before changes are saved to the parent form."
-            isInline
-          />
+          <Alert variant="warning" title="Fix validation errors before saving the workflow." isInline />
         </StackItem>
       )}
       <StackItem>

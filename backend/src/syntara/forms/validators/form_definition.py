@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 
 from syntara.forms.exceptions import FormDefinitionError
 from syntara.forms.models.form_errors import FormFieldError
+from syntara.forms.models.form_fields import DateField
 from syntara.forms.validators.submission import coerce_field
 
 if TYPE_CHECKING:
@@ -17,15 +18,10 @@ if TYPE_CHECKING:
 
 
 def validate_form_definition(form: FormDefinition, form_id: str | None = None) -> None:
-    """Check that every field default is usable by the coercer during submission.
+    """Check that every field default is usable when it would be applied at submission.
 
-    Args:
-        form: The form definition to check
-        form_id: Optional form/node identifier for error context
-
-    Raises:
-        FormDefinitionError: If any default is invalid (carries all field errors)
-
+    Partial date defaults (some included components blank) are allowed in the
+    definition; they are not coerced here because they are not substituted on submit.
     """
     errors: list[FormFieldError] = []
 
@@ -33,6 +29,9 @@ def validate_form_definition(form: FormDefinition, form_id: str | None = None) -
         # A checkbox default is a concrete bool, never None, and is covered by
         # the model's own typing; every other field treats None as "no default".
         if field.default is None:
+            continue
+
+        if isinstance(field, DateField) and not field.default_covers_all_included_components():
             continue
 
         try:

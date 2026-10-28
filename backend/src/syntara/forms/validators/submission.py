@@ -79,6 +79,25 @@ def validate_prompt_submission_state(prompt: FormPrompt) -> None:
         raise FormPromptExpiredError(prompt.id, prompt.timeout_at)
 
 
+def _resolve_submitted_field_raw(field: FormField, raw: Any) -> Any:  # noqa: ANN401
+    """Normalize empties, treat blank date maps as absent, and apply defaults."""
+    if not isinstance(field, CheckboxField) and _is_empty(raw):
+        raw = _MISSING
+
+    if isinstance(field, DateField) and isinstance(raw, Mapping) and not isinstance(raw, DateValue):
+        present = {key: value for key, value in raw.items() if not _is_empty(value)}
+        if not present:
+            raw = _MISSING
+
+    if raw is _MISSING and field.default is not None:
+        if isinstance(field, DateField):
+            if field.default_covers_all_included_components():
+                raw = field.default
+        else:
+            raw = field.default
+    return raw
+
+
 def validate_form_submission(
     form: FormDefinition,
     submitted: Mapping[str, Any],
@@ -101,15 +120,7 @@ def validate_form_submission(
 
     # Process each field in definition order
     for field in form.fields:
-        raw = submitted.get(field.value_name, _MISSING)
-
-        # Step 2: Empty normalization (except checkbox - False is real)
-        if not isinstance(field, CheckboxField) and _is_empty(raw):
-            raw = _MISSING
-
-        # Step 3: Apply default if absent
-        if raw is _MISSING and field.default is not None:
-            raw = field.default
+        raw = _resolve_submitted_field_raw(field, submitted.get(field.value_name, _MISSING))
 
         # Step 4: Check required
         if raw is _MISSING:
@@ -384,9 +395,12 @@ def _coerce_date(field: DateField, raw: Any) -> str:  # noqa: ANN401
     """
     value = _parse_and_validate_date_value(field, raw)
 
-    if field.include_date:
-        if field.include_time:
-            return _format_datetime_value(value)
+    if field.include_date and value.date is not None:
+        if field.include_time and value.time is not None:
+            if field.include_timezone and value.timezone is not None:
+                return _format_datetime_value(value)
+            local_datetime = datetime.fromisoformat(f"{value.date}T{value.time}")
+            return local_datetime.isoformat()
         return _require_date_component(value)
     if field.include_time:
         if field.include_timezone:
@@ -418,10 +432,6 @@ def _parse_and_validate_date_value(field: DateField, raw: Any) -> DateValue:  # 
 
     included = set(field.included_components())
     supplied = set(value.supplied_components())
-
-    if missing := sorted(included - supplied):
-        msg = f"Missing required {'component' if len(missing) == 1 else 'components'}: {', '.join(missing)}"
-        raise _FormatError(msg)
 
     if extra := sorted(supplied - included):
         msg = f"This field does not collect: {', '.join(extra)}"
