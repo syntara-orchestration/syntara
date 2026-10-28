@@ -20,6 +20,26 @@ export async function isExecutionPlaneListReachable(app: Page): Promise<boolean>
   }
 }
 
+/** True when exactly one OpenShift integration exists (create form cluster binding). */
+export async function hasSingleOpenShiftIntegration(app: Page): Promise<boolean> {
+  const token = await getAuthToken(app)
+  if (!token) return false
+
+  try {
+    const url = new URL(
+      '/api/v1/integrations?integration_type=openshift&limit=2&include_total=true',
+      appBaseUrl
+    ).toString()
+    const response = await app.request.get(url, { headers: { Authorization: `Bearer ${token}` } })
+    if (!response.ok()) return false
+    const body = (await response.json()) as { resources?: unknown[]; total?: number }
+    const count = body.total ?? body.resources?.length ?? 0
+    return count === 1
+  } catch {
+    return false
+  }
+}
+
 type CreateExecutionTargetBody = {
   name: string
   namespace?: string
