@@ -1,5 +1,6 @@
 import {
   Checkbox,
+  Content,
   FormGroup,
   MenuToggle,
   type MenuToggleElement,
@@ -9,6 +10,7 @@ import {
 import { type ReactNode, type Ref, useState } from 'react'
 import { Controller, useWatch, type Control, type FieldPath, type FieldValues } from 'react-hook-form'
 
+import { FormFieldError } from '../../../components/FormFieldError'
 import { SynSelect } from '../../../components/SynSelect'
 
 const PROTOCOLS = [
@@ -80,17 +82,29 @@ export function KafkaTransportFields<T extends FieldValues>({
           control={control}
           name={plaintextName}
           render={({ field, fieldState }) => (
-            <FormGroup fieldId={`${fieldId}-allow-plaintext`}>
+            <FormGroup fieldId={`${fieldId}-allow-plaintext`} isRequired>
               <Checkbox
                 id={`${fieldId}-allow-plaintext`}
                 label="Allow unencrypted, unauthenticated connections"
+                isRequired
+                isValid={!fieldState.error}
+                aria-describedby={`${fieldId}-plaintext-warning${fieldState.error ? ` ${fieldId}-plaintext-error` : ''}`}
+                name={field.name}
+                onBlur={field.onBlur}
                 isChecked={field.value ?? false}
                 onChange={(_event, checked) => field.onChange(checked)}
                 description={
-                  fieldState.error?.message ??
-                  'Anyone with network access may read or modify traffic. Enable only for trusted development environments.'
+                  <Content component="small" id={`${fieldId}-plaintext-warning`}>
+                    Anyone with network access may read or modify traffic. Enable only for trusted development
+                    environments.
+                  </Content>
                 }
               />
+              {fieldState.error && (
+                <div id={`${fieldId}-plaintext-error`}>
+                  <FormFieldError error={fieldState.error} />
+                </div>
+              )}
             </FormGroup>
           )}
         />
