@@ -255,6 +255,16 @@ export const pages: PageEntry[] = [
       await expect(page.getByText('Execution namespace')).toBeVisible()
     },
   },
+  {
+    section: 'execution-plane',
+    name: 'execution-target-create',
+    path: AppRoute.ExecutionPlane.Create,
+    waitFor: async (page) => {
+      await expect(page.getByRole('heading', { level: 1, name: 'Configure execution target' })).toBeVisible()
+      await expect(page.getByRole('textbox', { name: 'Execution target name' })).toBeVisible()
+      await expect(page.getByText('prod-openshift-west')).toBeVisible()
+    },
+  },
 
   // ══════════════════════════════════════════════════════════════════════════
   // ACCESS MANAGEMENT — Users

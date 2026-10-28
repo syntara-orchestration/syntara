@@ -14,11 +14,7 @@ import {
   WorkflowVersionStatusEnum,
 } from '@syntara/contracts'
 import { credentials, credentialTypes, credentialWorkflows } from './resources/credentials'
-import {
-  executionTargets,
-  INSTALLED_EXECUTION_PLANE_CLUSTER_ID,
-  MOCK_DELETE_CONFLICT_LABEL,
-} from './resources/executionTargets'
+import { executionTargets, MOCK_DELETE_CONFLICT_LABEL } from './resources/executionTargets'
 import { integrations } from './resources/integrations'
 import { models } from './resources/models'
 import { workflows } from './resources/workflows'
@@ -642,16 +638,16 @@ export const handlers = [
       )
     }
 
-    const openshiftIntegration = openshiftIntegrations[0]
-    const clusterId = openshiftIntegration?.id ?? INSTALLED_EXECUTION_PLANE_CLUSTER_ID
+    // length === 1 was asserted above
+    const openshiftIntegration = openshiftIntegrations[0]!
     const id = uuidv4()
     const created = {
       id,
-      cluster_id: clusterId,
+      cluster_id: openshiftIntegration.id,
       name,
       backend_type: 'kubernetes',
       endpoint:
-        openshiftIntegration?.configuration && 'base_url' in openshiftIntegration.configuration
+        openshiftIntegration.configuration && 'base_url' in openshiftIntegration.configuration
           ? String(openshiftIntegration.configuration.base_url)
           : 'https://api.openshift.example.com:6443',
       placement: {
@@ -666,7 +662,7 @@ export const handlers = [
       status_message: null,
       labels: {
         ...(body.labels ?? {}),
-        ...(openshiftIntegration ? { integration_id: openshiftIntegration.id } : {}),
+        integration_id: openshiftIntegration.id,
       },
       created_at: mockDate.now,
       last_ran_at: null,
