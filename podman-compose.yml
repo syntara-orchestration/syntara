@@ -216,6 +216,9 @@ services:
     command: [python, -m, syntara.workflows.worker]
     extra_hosts: # Dev mode: resolves 'syntara' to host when API runs outside containers
       - "syntara:host-gateway"
+    networks:
+      - default
+      - execution-plane # EP API reachable as https://api:8443 (cert SAN 'api')
     environment:
       - APP_DB_HOST=database
       - APP_DB_PORT=5432
@@ -239,6 +242,11 @@ services:
       - APP_TEMPORAL_NAMESPACE=default
       - APP_TASK_QUEUE=orchestrator-workflow-queue
       - APP_SCRIPT_NODES_ENABLED=${APP_SCRIPT_NODES_ENABLED:-false}
+      - APP_EXECUTION_PLANE_ENABLED=${APP_EXECUTION_PLANE_ENABLED:-false}
+      - APP_EXECUTION_PLANE_API_URL=${APP_EXECUTION_PLANE_API_URL:-https://api:8443}
+      - APP_EXECUTION_PLANE_API_CA_PATH=${APP_EXECUTION_PLANE_API_CA_PATH:-/run/secrets/execution-plane-ca.pem}
+      - APP_EXECUTION_PLANE_CLIENT_ID=${APP_EXECUTION_PLANE_CLIENT_ID:-syntara-orchestration}
+      - APP_EXECUTION_PLANE_JWT_AUDIENCE=${APP_EXECUTION_PLANE_JWT_AUDIENCE:-execution-plane}
       - APP_ENV_FILE_PATH=${APP_ENV_FILE_PATH:-.env}
       - APP_FALLBACK_LOG_LEVEL=${APP_FALLBACK_LOG_LEVEL:-INFO}
       - APP_CACHE_HOST=redis
@@ -282,6 +290,7 @@ services:
       - ./backend/.secrets/certs/ca.pem:/run/secrets/s2s-ca.pem:ro,z
       - ./backend/.secrets/certs/worker.crt:/run/secrets/s2s-cert.crt:ro,z
       - ./backend/.secrets/certs/worker.key:/run/secrets/s2s-cert.key:ro,z
+      - ./backend/.secrets/execution-plane-ca.pem:/run/secrets/execution-plane-ca.pem:ro,z
     depends_on:
       database:
         condition: service_healthy
@@ -434,6 +443,17 @@ services:
       retries: 5
     profiles:
       - telemetry-e2e
+
+networks:
+  default:
+    # The compose project's own default network, with a stable name so other
+    # projects (and the execution-plane network below) can reference it.
+    name: syntara_default
+  execution-plane:
+    # External network owned by the syntara-execution-plane compose project;
+    # lets the Temporal worker reach the EP API as https://api:8443.
+    name: syntara-execution-plane_default
+    external: true
 
 volumes:
   syntara_postgres_data:

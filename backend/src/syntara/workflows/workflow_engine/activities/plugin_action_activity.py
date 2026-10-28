@@ -14,6 +14,10 @@ that resolution with an optional per-step ``origin`` parameter:
 - Without ``origin``: a simulated execution returns an honest envelope
   describing what would run — it never fabricates the action's business
   outcome.
+- ``custom-runner`` actions dispatch to the Execution Plane when
+  ``APP_EXECUTION_PLANE_ENABLED`` and ``APP_EXECUTION_PLANE_API_URL`` are
+  configured; otherwise they return the honest execution-plane-required
+  envelope.
 """
 
 import asyncio
@@ -21,6 +25,7 @@ import json
 import sys
 import tempfile
 import time
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -31,8 +36,13 @@ from sqlmodel import col, select
 from temporalio import activity
 from temporalio.exceptions import ApplicationError
 
+from syntara.core.config.base import get_settings
 from syntara.core.database.session import AsyncSessionLocal
 from syntara.plugins.models.installed_plugin import InstalledPlugin
+from syntara.plugins.services.execution_plane_client import (
+    ExecutionPlaneClient,
+    ExecutionPlaneError,
+)
 from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName
 
 logger = structlog.stdlib.get_logger(__name__)
@@ -46,7 +56,7 @@ _PATH_TEMPLATE_PREFIX = "{input."
 @activity.defn(name=ActivityName.PLUGIN_ACTION)
 async def execute_plugin_action_activity(
     input_config: dict[str, Any],
-    output_config: dict[str, str] | None,  # noqa: ARG001
+    output_config: dict[str, str] | None,
 ) -> dict[str, Any]:
     """Execute one installed plugin action step.
 
@@ -79,6 +89,20 @@ async def execute_plugin_action_activity(
     implementation_source = action.get("implementation_source")
     if isinstance(implementation_source, str) and implementation_source:
         return await _execute_implementation(plugin_identity, action_identity, implementation_source, step_inputs)
+
+    # Custom-runner actions execute in their own container on the Execution
+    # Plane. When the Execution Plane is configured, dispatch the workload and
+    # wait for its result; otherwise fall back to the honest placeholder
+    # envelope describing the dispatch that would happen.
+    if action.get("runtime_kind") == "custom-runner" or action.get("entry_point"):
+        if _execution_plane_enabled():
+            return await _dispatch_to_execution_plane(
+                activity.info().workflow_run_id or str(uuid.uuid4()),
+                action,
+                step_inputs,
+                output_config,
+            )
+        return _execution_plane_required(plugin_identity, action_identity, action, step_inputs)
 
     method = str(action.get("method") or "GET").upper()
     path_template = str(action.get("path") or "/")
@@ -130,6 +154,124 @@ async def _load_action(plugin_identity: str, action_identity: str) -> dict[str, 
             return candidate
     msg = f"Action '{action_identity}' not found in installed plugin '{plugin_identity}'"
     raise ApplicationError(msg, type="ConfigError", non_retryable=True)
+
+
+def _execution_plane_required(
+    plugin_identity: str,
+    action_identity: str,
+    action: dict[str, Any],
+    step_inputs: dict[str, Any],
+) -> dict[str, Any]:
+    """Describe the Execution Plane dispatch a custom-runner action needs.
+
+    The marketplace POC executes embedded implementations in a subprocess, but
+    custom-runner steps ship as container workloads: they run only on the
+    Execution Plane, which receives the digest-pinned image and the step
+    identity in a ``work.execute`` command. This envelope reports that
+    dispatch without fabricating the action's business outcome.
+    """
+    output = {
+        "status": "completed",
+        "executed_via": "execution-plane-required",
+        "plugin": plugin_identity,
+        "action": action_identity,
+        "step_revision_id": action.get("identity"),
+        "entry_point": action.get("entry_point"),
+        "abi": action.get("abi"),
+        "workload_image": action.get("workload_image"),
+        "inputs": step_inputs,
+        "detail": "Custom-runner step: dispatches to the Execution Plane "
+        "(work.execute with the digest-pinned image and step_revision_id). "
+        "This POC does not wire that dispatch; run the step through the "
+        "Execution Plane's work submission tool.",
+    }
+    logger.info(
+        "plugin action requires execution plane",
+        plugin=plugin_identity,
+        action=action_identity,
+        workload_image=action.get("workload_image"),
+    )
+    return {"output": output}
+
+
+def _execution_plane_enabled() -> bool:
+    """Return whether the Execution Plane dispatch is configured."""
+    settings = get_settings()
+    return bool(settings.execution_plane_enabled and settings.execution_plane_api_url)
+
+
+async def _dispatch_to_execution_plane(
+    workflow_run_id: str,
+    action: dict[str, Any],
+    step_inputs: dict[str, Any],
+    output_config: dict[str, str] | None,  # noqa: ARG001 - reserved for output mapping
+) -> dict[str, Any]:
+    """Run one custom-runner action as an Execution Plane work item.
+
+    Builds a ``work.execute`` command for the action's digest-pinned workload
+    image, polls until the work item is terminal, and maps the result into the
+    normalized ``{"output": {...}}`` envelope. Failures return an honest
+    ``status: "failed"`` envelope, never a fabricated business outcome.
+    """
+    image = action.get("workload_image")
+    if not isinstance(image, str) or not image:
+        output = {
+            "status": "failed",
+            "executed_via": "execution-plane",
+            "error": "custom-runner action has no workload_image",
+        }
+        return {"output": output}
+
+    timeout = int(step_inputs.get("timeout_seconds") or 300)
+    client = ExecutionPlaneClient()
+
+    async def _heartbeat(_item: dict[str, Any]) -> None:
+        activity.heartbeat()
+
+    try:
+        item = await client.submit_and_wait(
+            image=image,
+            step_revision_id=str(action["identity"]),
+            workflow_run_id=workflow_run_id,
+            inputs=step_inputs,
+            timeout_seconds=timeout,
+            output_config={"stdout": "stdout", "stderr": "stderr", "return_code": "return_code"},
+            on_poll=_heartbeat,
+        )
+    except ExecutionPlaneError as error:
+        logger.warning("execution plane dispatch failed", error=str(error))
+        failure: dict[str, Any] = {
+            "status": "failed",
+            "executed_via": "execution-plane",
+            "error": str(error),
+        }
+        return {"output": failure}
+
+    result = item.get("result") or {}
+    if item.get("status") == "completed":
+        completed: dict[str, Any] = {
+            "status": "completed",
+            "executed_via": "execution-plane",
+            "work_item_id": item.get("id"),
+        }
+        mapped = result.get("output")
+        if isinstance(mapped, dict):
+            completed.update(mapped)
+        return {"output": completed}
+
+    error_detail = result.get("error") or result.get("status_message") or item.get("status")
+    failed: dict[str, Any] = {
+        "status": "failed",
+        "executed_via": "execution-plane",
+        "work_item_id": item.get("id"),
+        "error": f"Execution Plane work item {item.get('status')}: {error_detail}",
+    }
+    logger.warning(
+        "execution plane work item failed",
+        work_item_id=item.get("id"),
+        status=item.get("status"),
+    )
+    return {"output": failed}
 
 
 def _resolve_path(path_template: str, inputs: dict[str, Any]) -> str:

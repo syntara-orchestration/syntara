@@ -45,15 +45,27 @@ def summarize_targets(descriptor: dict[str, Any]) -> tuple[list[dict[str, Any]],
     """Extract action and trigger summaries from a plugin descriptor."""
     actions: list[dict[str, Any]] = []
     triggers: list[dict[str, Any]] = []
-    targets = descriptor.get("spec", {}).get("targets", [])
+    spec = descriptor.get("spec", {}) if isinstance(descriptor.get("spec"), dict) else {}
+    targets = spec.get("targets", [])
     if not isinstance(targets, list):
         return actions, triggers
+    workloads = spec.get("workloads", {})
+    if not isinstance(workloads, dict):
+        workloads = {}
     for target in targets:
         if not isinstance(target, dict):
             continue
         metadata = target.get("metadata", {}) if isinstance(target.get("metadata"), dict) else {}
         runtime = target.get("runtime", {}) if isinstance(target.get("runtime"), dict) else {}
         operation = runtime.get("operation", {}) if isinstance(runtime.get("operation"), dict) else {}
+        # Custom-runner targets reference a logical workload image ID; the
+        # compiled descriptor maps it to the digest-pinned image reference.
+        workload_id = runtime.get("workload")
+        workload_binding = (
+            workloads.get(workload_id, {})
+            if isinstance(workload_id, str) and isinstance(workloads.get(workload_id), dict)
+            else {}
+        )
         summary = {
             "identity": target.get("identity"),
             "name": metadata.get("name"),
@@ -65,6 +77,10 @@ def summarize_targets(descriptor: dict[str, Any]) -> tuple[list[dict[str, Any]],
             "path": operation.get("path"),
             "implementation": runtime.get("implementation"),
             "implementation_source": runtime.get("implementation_source"),
+            "entry_point": runtime.get("entryPoint"),
+            "abi": runtime.get("abi") or workload_binding.get("abi"),
+            "workload": workload_id,
+            "workload_image": workload_binding.get("image"),
             "input_schema": target.get("input"),
         }
         if target.get("kind") == "Trigger":
