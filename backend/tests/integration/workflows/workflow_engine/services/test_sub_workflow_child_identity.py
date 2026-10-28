@@ -1,4 +1,4 @@
-"""Replay-safe child-execution identity for sub-workflows (AAP-91263 / OQ-A11).
+"""Replay-safe child-execution identity for sub-workflows.
 
 The child execution id is derived from the iteration-aware invocation identity
 (canvas node id plus an ``_iter_{n}`` suffix per enclosing loop), so a
@@ -6,8 +6,6 @@ The child execution id is derived from the iteration-aware invocation identity
 iteration, while the persisted lineage metadata keeps the canvas node id.
 These tests exercise ``SubWorkflowSetupActivity.run`` against the real,
 alembic-built PostgreSQL schema.
-
-Story: AAP-91263 (OQ-A11 identity correctness).
 """
 
 from __future__ import annotations

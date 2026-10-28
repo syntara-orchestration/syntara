@@ -1,4 +1,4 @@
-"""Derivation of the sub-workflow iteration-aware invocation identity (OQ-A11).
+"""Derivation of the sub-workflow iteration-aware invocation identity.
 
 ``_execute_sub_workflow_node`` derives the invocation identity as
 ``join_loop_iteration_id(node_id, loop_index_chain(node_id, loop_body_map,

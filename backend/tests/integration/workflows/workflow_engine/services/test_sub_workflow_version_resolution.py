@@ -1,4 +1,4 @@
-"""Always-latest published-version resolution for sub-workflows (AAP-91264).
+"""Always-latest published-version resolution for sub-workflows.
 
 The Sub-workflow setup activity resolves the target workflow's currently
 published version at invocation time (not at save time). These tests exercise
@@ -10,8 +10,6 @@ covering:
 * republishing v2 makes the next run resolve v2 without changing the caller,
 * an unpublished target raises a non-retryable error naming the target,
 * the resolved version is pinned on the persisted child execution.
-
-Story: AAP-91264.
 """
 
 from __future__ import annotations

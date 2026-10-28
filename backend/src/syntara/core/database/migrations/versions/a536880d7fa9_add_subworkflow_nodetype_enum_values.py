@@ -4,8 +4,8 @@ Revision ID: a536880d7fa9
 Revises: d5b8c2f04e71
 Create Date: 2026-10-28
 
-The Python ``NodeType`` enum gained ``SUB_WORKFLOW`` ("sub_workflow", #817 /
-AAP-94070) and ``SUBWORKFLOW_TRIGGER`` ("subworkflow_trigger", AAP-96432), but
+The Python ``NodeType`` enum gained ``SUB_WORKFLOW`` ("sub_workflow") and
+``SUBWORKFLOW_TRIGGER`` ("subworkflow_trigger"), but
 the PostgreSQL ``nodetype`` enum created in the baseline migration
 (``b69ef9067e66``) was never extended. Inserting an ``ActivityExecution`` whose
 ``node_type`` is either value fails with ``invalid input value for enum

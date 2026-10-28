@@ -7,9 +7,7 @@ the child runs subworkflow_trigger → script, completes, and the parent receive
 the child result and completes.
 
 Also proves downstream parent nodes can consume SubWorkflowOutput fields via
-the normal template resolver (AAP-91263 output contract).
-
-Story: AAP-94069 — Sub-workflow Reference Mode POC
+the normal template resolver.
 """
 
 from __future__ import annotations
@@ -399,7 +397,7 @@ class TestSubWorkflowLifecycle:
         assert result["failed_activities"] == {}
 
     async def test_sub_workflow_output_validates_against_m1_model(self, temporal_env: object) -> None:
-        """Runtime output validates against PR #817's SubWorkflowOutput model."""
+        """Runtime output validates against the SubWorkflowOutput model."""
         result = await _run_parent_workflow(temporal_env)
 
         sub_wf_output = result["activity_outputs"]["sub_wf_node"]

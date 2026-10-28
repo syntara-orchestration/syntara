@@ -1,12 +1,10 @@
-"""Child input-schema validation for sub-workflow invocation (AAP-91265).
+"""Child input-schema validation for sub-workflow invocation.
 
 The setup activity validates the invocation input against the child
 ``subworkflow_trigger``'s declared ``input_schema`` before creating the child
 execution. These tests exercise that validation against the real,
 alembic-built PostgreSQL schema by calling ``SubWorkflowSetupActivity.run``
 directly (it uses no Temporal activity context).
-
-Story: AAP-91265 (input validation portion).
 """
 
 from __future__ import annotations
