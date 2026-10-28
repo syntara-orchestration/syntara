@@ -40,7 +40,12 @@ export function useRetryFromFailurePanel({
     requestAnimationFrame(() => {
       const trigger = triggerRef.current
       triggerRef.current = null
-      if (trigger?.isConnected) trigger.focus()
+      const focusTarget = trigger?.isConnected
+        ? trigger
+        : document.querySelector<HTMLElement>(
+            '[data-testid="retry-run-menu-toggle"], [data-testid="retry-from-failure-button"]'
+          )
+      focusTarget?.focus()
     })
   }
 
