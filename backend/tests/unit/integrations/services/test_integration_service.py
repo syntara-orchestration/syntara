@@ -27,6 +27,7 @@ from syntara.integrations.models.integration import (
     IntegrationType,
     IntegrationUpdate,
 )
+from syntara.integrations.models.integration_configuration import AAPConfiguration
 from syntara.integrations.services.integration_service import IntegrationService
 
 _UNRESTRICTED = AllowedProjectsResult(all_projects=True, project_ids=[])
@@ -112,7 +113,7 @@ class TestCreateIntegration:
         result = await integration_service.create_integration(data)
 
         assert result.integration_type == IntegrationType.ANSIBLE_AUTOMATION_PLATFORM
-        assert result.configuration is not None
+        assert isinstance(result.configuration, AAPConfiguration)
         assert result.configuration.base_url == "https://gateway.example.com"
         assert result.configuration.insecure_skip_tls_verify is True
 

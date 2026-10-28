@@ -1,4 +1,4 @@
-import type { IntegrationsAPI } from '@syntara/contracts'
+import { IntegrationTypeEnum } from '@syntara/contracts'
 import { useNavigate } from '@tanstack/react-router'
 
 import { AppRoute } from '../../../app/AppRoute'
@@ -8,7 +8,7 @@ import { useAlerts } from '../../../providers/alerts'
 import { getErrorMessage } from '../../../utils/apiErrors'
 import { detachPromise } from '../../../utils/detachPromise'
 
-type IntegrationRead = IntegrationsAPI.components['schemas']['IntegrationRead']
+import type { IntegrationRead } from './integrationTypes'
 
 export function useIntegrationActions(refetch: () => Promise<unknown>) {
   const navigate = useNavigate()
@@ -23,6 +23,10 @@ export function useIntegrationActions(refetch: () => Promise<unknown>) {
     '/integrations/{integration_id}/validate'
   )
   const { mutate: deleteIntegration } = integrationsClient.useMutation('delete', '/integrations/{integration_id}')
+  const { mutate: patchKafkaIntegration } = integrationsClient.useMutation(
+    'patch',
+    '/kafka_integrations/{integration_id}'
+  )
   const { mutate: patchIntegration } = integrationsClient.useMutation('patch', '/integrations/{integration_id}')
 
   function handleValidate() {
@@ -95,7 +99,8 @@ export function useIntegrationActions(refetch: () => Promise<unknown>) {
       return
     }
 
-    patchIntegration(
+    const patch = integration.integration_type === IntegrationTypeEnum.KAFKA ? patchKafkaIntegration : patchIntegration
+    patch(
       {
         params: { path: { integration_id: integration.id } },
         body: { enabled: true },
@@ -118,7 +123,8 @@ export function useIntegrationActions(refetch: () => Promise<unknown>) {
     const item = disableDialog.item
     if (!item?.id) return
 
-    patchIntegration(
+    const patch = item.integration_type === IntegrationTypeEnum.KAFKA ? patchKafkaIntegration : patchIntegration
+    patch(
       {
         params: { path: { integration_id: item.id } },
         body: { enabled: false },

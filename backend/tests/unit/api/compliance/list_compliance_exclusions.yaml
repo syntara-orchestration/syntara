@@ -71,6 +71,9 @@ exclusions:
   - operation_id: list_integrations
     reason: "Uses simple value filters instead of operator-based pattern - integration_type/status/enabled/scope need allOf schema with {eq}"
 
+  - operation_id: list_kafka_integrations
+    reason: "Reuses the original v1 integration service and its simple-value filter contract; operator-schema migration is deferred with list_integrations. Kafka filtering, pagination, and totals are covered by test_kafka_api_compatibility.py."
+
   - operation_id: list_projects
     reason: "Uses simple value filters instead of operator-based pattern - name needs allOf schema with {eq, contains, starts_with, gt, gte, lt, lte}, is_default/is_builtin need {eq}"
 

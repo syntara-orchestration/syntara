@@ -17,7 +17,6 @@ from ..types import UNSET, Unset
 if TYPE_CHECKING:
     from ..models.aap_configuration import AAPConfiguration
     from ..models.integration_read_labels import IntegrationReadLabels
-    from ..models.kafka_configuration import KafkaConfiguration
     from ..models.llm_provider_configuration import LLMProviderConfiguration
     from ..models.mcp_server_configuration_input import MCPServerConfigurationInput
     from ..models.user_reference import UserReference
@@ -33,8 +32,8 @@ class IntegrationRead:
     Attributes:
         name (str): Human-readable name for the resource Example: Authentication Service.
         integration_type (IntegrationType): Type of external integration.
-        configuration (AAPConfiguration | LLMProviderConfiguration | MCPServerConfigurationInput | None): Integration-
-            specific configuration
+        configuration (AAPConfiguration | LLMProviderConfiguration | MCPServerConfigurationInput): Integration-specific
+            configuration
         id (UUID | Unset): Unique identifier for the resource Example: 550e8400-e29b-41d4-a716-446655440000.
         created_at (datetime.datetime | Unset): Timestamp when resource was created Example: 2025-10-09T12:00:00Z.
         updated_at (datetime.datetime | Unset): Timestamp when resource was last updated Example: 2025-10-09T12:30:00Z.
@@ -47,8 +46,6 @@ class IntegrationRead:
         enabled (bool | Unset):  Default: True.
         validation_status (IntegrationStatus | Unset): Validation status of an integration.
         scope (IntegrationScope | Unset): Visibility scope of an integration.
-        kafka_configuration (KafkaConfiguration | None | Unset): Kafka broker configuration. Present only when
-            integration_type is kafka, so the configuration union above stays compatible with existing clients.
         last_validated_at (datetime.datetime | None | Unset):
         management_credential_id (None | Unset | UUID):
         validation_error (None | str | Unset):
@@ -65,7 +62,7 @@ class IntegrationRead:
 
     name: str
     integration_type: IntegrationType
-    configuration: AAPConfiguration | LLMProviderConfiguration | MCPServerConfigurationInput | None
+    configuration: AAPConfiguration | LLMProviderConfiguration | MCPServerConfigurationInput
     id: UUID | Unset = UNSET
     created_at: datetime.datetime | Unset = UNSET
     updated_at: datetime.datetime | Unset = UNSET
@@ -76,7 +73,6 @@ class IntegrationRead:
     enabled: bool | Unset = True
     validation_status: IntegrationStatus | Unset = UNSET
     scope: IntegrationScope | Unset = UNSET
-    kafka_configuration: KafkaConfiguration | None | Unset = UNSET
     last_validated_at: datetime.datetime | None | Unset = UNSET
     management_credential_id: None | Unset | UUID = UNSET
     validation_error: None | str | Unset = UNSET
@@ -91,8 +87,6 @@ class IntegrationRead:
     enabled_model_count: int | Unset = 0
 
     def to_dict(self) -> dict[str, Any]:
-        from ..models.aap_configuration import AAPConfiguration
-        from ..models.kafka_configuration import KafkaConfiguration
         from ..models.llm_provider_configuration import LLMProviderConfiguration
         from ..models.mcp_server_configuration_input import MCPServerConfigurationInput
         from ..models.user_reference import UserReference
@@ -101,15 +95,13 @@ class IntegrationRead:
 
         integration_type = self.integration_type.value
 
-        configuration: dict[str, Any] | None
+        configuration: dict[str, Any]
         if isinstance(self.configuration, MCPServerConfigurationInput):
             configuration = self.configuration.to_dict()
         elif isinstance(self.configuration, LLMProviderConfiguration):
             configuration = self.configuration.to_dict()
-        elif isinstance(self.configuration, AAPConfiguration):
-            configuration = self.configuration.to_dict()
         else:
-            configuration = self.configuration
+            configuration = self.configuration.to_dict()
 
         id: str | Unset = UNSET
         if not isinstance(self.id, Unset):
@@ -158,14 +150,6 @@ class IntegrationRead:
         scope: str | Unset = UNSET
         if not isinstance(self.scope, Unset):
             scope = self.scope.value
-
-        kafka_configuration: dict[str, Any] | None | Unset
-        if isinstance(self.kafka_configuration, Unset):
-            kafka_configuration = UNSET
-        elif isinstance(self.kafka_configuration, KafkaConfiguration):
-            kafka_configuration = self.kafka_configuration.to_dict()
-        else:
-            kafka_configuration = self.kafka_configuration
 
         last_validated_at: None | str | Unset
         if isinstance(self.last_validated_at, Unset):
@@ -263,8 +247,6 @@ class IntegrationRead:
             field_dict["validation_status"] = validation_status
         if scope is not UNSET:
             field_dict["scope"] = scope
-        if kafka_configuration is not UNSET:
-            field_dict["kafka_configuration"] = kafka_configuration
         if last_validated_at is not UNSET:
             field_dict["last_validated_at"] = last_validated_at
         if management_credential_id is not UNSET:
@@ -296,7 +278,6 @@ class IntegrationRead:
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         from ..models.aap_configuration import AAPConfiguration
         from ..models.integration_read_labels import IntegrationReadLabels
-        from ..models.kafka_configuration import KafkaConfiguration
         from ..models.llm_provider_configuration import LLMProviderConfiguration
         from ..models.mcp_server_configuration_input import MCPServerConfigurationInput
         from ..models.user_reference import UserReference
@@ -308,34 +289,28 @@ class IntegrationRead:
 
         def _parse_configuration(
             data: object,
-        ) -> AAPConfiguration | LLMProviderConfiguration | MCPServerConfigurationInput | None:
-            if data is None:
-                return data
+        ) -> AAPConfiguration | LLMProviderConfiguration | MCPServerConfigurationInput:
             try:
                 if not isinstance(data, dict):
                     raise TypeError()
-                configuration_type_0_type_0 = MCPServerConfigurationInput.from_dict(data)
+                configuration_type_0 = MCPServerConfigurationInput.from_dict(data)
 
-                return configuration_type_0_type_0
+                return configuration_type_0
             except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             try:
                 if not isinstance(data, dict):
                     raise TypeError()
-                configuration_type_0_type_1 = LLMProviderConfiguration.from_dict(data)
+                configuration_type_1 = LLMProviderConfiguration.from_dict(data)
 
-                return configuration_type_0_type_1
+                return configuration_type_1
             except (TypeError, ValueError, AttributeError, KeyError):
                 pass
-            try:
-                if not isinstance(data, dict):
-                    raise TypeError()
-                configuration_type_0_type_2 = AAPConfiguration.from_dict(data)
+            if not isinstance(data, dict):
+                raise TypeError()
+            configuration_type_2 = AAPConfiguration.from_dict(data)
 
-                return configuration_type_0_type_2
-            except (TypeError, ValueError, AttributeError, KeyError):
-                pass
-            return cast(AAPConfiguration | LLMProviderConfiguration | MCPServerConfigurationInput | None, data)
+            return configuration_type_2
 
         configuration = _parse_configuration(d.pop("configuration"))
 
@@ -425,23 +400,6 @@ class IntegrationRead:
             scope = UNSET
         else:
             scope = IntegrationScope(_scope)
-
-        def _parse_kafka_configuration(data: object) -> KafkaConfiguration | None | Unset:
-            if data is None:
-                return data
-            if isinstance(data, Unset):
-                return data
-            try:
-                if not isinstance(data, dict):
-                    raise TypeError()
-                kafka_configuration_type_0 = KafkaConfiguration.from_dict(data)
-
-                return kafka_configuration_type_0
-            except (TypeError, ValueError, AttributeError, KeyError):
-                pass
-            return cast(KafkaConfiguration | None | Unset, data)
-
-        kafka_configuration = _parse_kafka_configuration(d.pop("kafka_configuration", UNSET))
 
         def _parse_last_validated_at(data: object) -> datetime.datetime | None | Unset:
             if data is None:
@@ -577,7 +535,6 @@ class IntegrationRead:
             enabled=enabled,
             validation_status=validation_status,
             scope=scope,
-            kafka_configuration=kafka_configuration,
             last_validated_at=last_validated_at,
             management_credential_id=management_credential_id,
             validation_error=validation_error,
