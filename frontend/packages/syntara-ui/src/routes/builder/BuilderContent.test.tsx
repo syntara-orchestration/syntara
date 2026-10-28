@@ -1,4 +1,3 @@
-// AAP-98044: Opening a run from builder history must keep Run history open.
 import type { WorkflowAPI } from '@syntara/contracts'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen, waitFor, act, within } from '@testing-library/react'
