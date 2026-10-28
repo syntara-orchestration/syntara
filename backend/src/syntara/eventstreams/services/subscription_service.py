@@ -279,8 +279,8 @@ class EventSubscriptionService(BaseService):
             or not subscription.desired_enabled
         )
 
+        subscription.published_version_id = version.id
         if config_changed:
-            subscription.published_version_id = version.id
             subscription.runtime_credential_id = parameters.credential_id
             subscription.input_schema = parameters.input_schema
             subscription.desired_enabled = True
