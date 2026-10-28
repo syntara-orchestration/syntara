@@ -276,10 +276,7 @@ describe('OutputPanel', () => {
       expect(mockUnpinOutputMock).toHaveBeenCalledWith(testNodeId)
     })
 
-    it('shows pinned mock data instead of last-run output data when mock is pinned (AAP-89683)', () => {
-      // AAP-89683: when mock data is pinned, the Output panel must display the
-      // pinned mock value (matching the "Edit mock data" dialog), not the last
-      // execution's real output, even if real output data exists.
+    it('shows pinned mock data instead of last-run output data when mock is pinned', () => {
       const mockOutput = { mock: 'data' }
       mockGetOutputMock.mockReturnValue(mockOutput)
 
