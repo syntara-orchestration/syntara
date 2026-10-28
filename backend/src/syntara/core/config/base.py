@@ -1038,6 +1038,63 @@ class PluginMarketplaceSettings(BaseSettings):
     )
 
 
+class ExecutionPlaneSettings(BaseSettings):
+    """Execution Plane dispatch settings (POC).
+
+    Configures how ``plugin_action`` steps with a ``custom-runner`` action are
+    dispatched to the Execution Plane API instead of returning the
+    execution-plane-required placeholder envelope.
+
+    Note: this class should not be instantiated directly. Use Settings via get_settings().
+    """
+
+    execution_plane_enabled: bool = Field(
+        default=False,
+        description=(
+            "Dispatch custom-runner plugin actions to the Execution Plane "
+            "(requires the Execution Plane API to be reachable from the Temporal worker)"
+        ),
+    )
+
+    execution_plane_api_url: str | None = Field(
+        default=None,
+        description="Execution Plane API base URL, e.g. https://127.0.0.1:8001",
+    )
+
+    execution_plane_api_ca_path: str | None = Field(
+        default=None,
+        description="Path to the CA certificate that signed the Execution Plane API TLS cert",
+    )
+
+    execution_plane_client_id: str = Field(
+        default="syntara-orchestration",
+        description="Service identity used in Execution Plane command scopes and JWTs",
+    )
+
+    execution_plane_jwt_issuer: str = Field(
+        default="http://localhost:8000",
+        description="Issuer claim the Execution Plane expects for service JWTs (EP_AO_JWT_ISSUER)",
+    )
+
+    execution_plane_jwt_audience: str = Field(
+        default="execution-plane",
+        description="Audience claim for Execution Plane service JWTs",
+    )
+
+    execution_plane_request_timeout_seconds: float = Field(
+        default=15.0,
+        description="Per-request timeout for Execution Plane API calls",
+        gt=0,
+    )
+
+    execution_plane_poll_interval_seconds: float = Field(
+        default=2.0,
+        description="Interval between work-item status polls while awaiting completion",
+        gt=0,
+        le=60,
+    )
+
+
 # =============================================================================
 # LLM Adapter Retry Configuration
 # =============================================================================
@@ -1993,6 +2050,7 @@ class Settings(
     RetrieverServiceSettings,
     AdapterRetrySettings,
     PluginMarketplaceSettings,
+    ExecutionPlaneSettings,
     LoggingSettings,
     TemporalSettings,
     S2STLSSettings,
