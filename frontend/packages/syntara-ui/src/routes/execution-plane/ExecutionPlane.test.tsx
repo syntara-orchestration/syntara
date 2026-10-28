@@ -5,11 +5,13 @@ import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
+import { AppRoute } from '../../app/AppRoute'
 import { executionPlaneClient } from '../../client'
 import { useCanI } from '../../hooks/useCanI'
 import { AlertProvider } from '../../providers/alerts'
 import { assertUrlParam } from '../../test/filter-test-helpers'
 import { expectPageTitle } from '../../test/pageTitle'
+import { routerTestState } from '../../test/setup'
 
 import ExecutionPlane from './ExecutionPlane'
 
@@ -184,6 +186,18 @@ describe('ExecutionPlane', () => {
 
     expect(await screen.findByText('No execution targets yet')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Configure execution target' })).not.toBeInTheDocument()
+  })
+
+  it('navigates to create from the toolbar configure action', async () => {
+    const user = userEvent.setup()
+    render(<ExecutionPlane />, { wrapper })
+
+    expect(await screen.findByRole('link', { name: 'Prod OpenShift West' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Configure execution target' }))
+
+    expect(routerTestState.navigate).toHaveBeenCalledWith(
+      expect.objectContaining({ to: AppRoute.ExecutionPlane.Create })
+    )
   })
 
   it('shows filter-empty state and toolbar when filters are active but no targets match', async () => {
