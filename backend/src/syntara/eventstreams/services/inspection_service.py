@@ -4,24 +4,31 @@ from collections.abc import Iterable
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
-from sqlalchemy import tuple_
 from sqlmodel import col, select
 
 from syntara.core.exceptions import SafeValueError
 from syntara.core.services import BaseService
 from syntara.credentials.lib.kafka_connection import KafkaSecurityProtocol, resolve_listener_kafka_login
+from syntara.eventstreams.adapters.kafka_initial_position import (
+    KafkaPartitionInitialPosition,
+    KafkaPartitionInitialPositionRead,
+)
 from syntara.eventstreams.adapters.kafka_parameters import KafkaSubscribeParameters
 from syntara.eventstreams.adapters.kafka_preflight import test_kafka_connection
 from syntara.eventstreams.exceptions import EventSubscriptionNotFoundError
+from syntara.eventstreams.models.control import EventSubscriptionRecovery, EventSubscriptionRuntime
 from syntara.eventstreams.models.responses import (
     EventSubscriptionListParams,
     EventSubscriptionListResponse,
     EventSubscriptionRead,
+    EventSubscriptionRecoveryRead,
     EventSubscriptionSourceRead,
     EventSubscriptionTestResponse,
 )
 from syntara.eventstreams.models.source import EventSubscriptionSource
 from syntara.eventstreams.models.subscription import EventSubscription
+from syntara.eventstreams.services.control_service import EventSubscriptionControlService
+from syntara.eventstreams.services.runtime_placement import confirmed_placements
 from syntara.integrations.lib.url_validation import validate_integration_configuration_no_ssrf
 from syntara.integrations.models.integration import Integration
 from syntara.integrations.models.integration_configuration import KafkaConfiguration
@@ -61,6 +68,9 @@ class EventSubscriptionInspectionService(BaseService):
 
         """
         super().__init__(session, user)
+        self.controls = EventSubscriptionControlService(
+            session, user, evaluator, is_cert_authenticated=is_cert_authenticated
+        )
         self.workflows = WorkflowService(session, user, evaluator, is_cert_authenticated=is_cert_authenticated)
         self.secret_service = secret_service
 
@@ -94,21 +104,10 @@ class EventSubscriptionInspectionService(BaseService):
         def scope(query: Any, _filter: Any, _model: Any) -> Any:  # noqa: ANN401
             return query.where(source_query.exists())
 
-        sources: dict[UUID, EventSubscriptionSource] = {}
+        responses: dict[UUID, EventSubscriptionRead] = {}
 
-        async def load_sources(subscriptions: list[EventSubscription]) -> None:
-            if subscriptions:
-                result = await self.session.exec(
-                    select(EventSubscriptionSource).where(
-                        tuple_(
-                            col(EventSubscriptionSource.subscription_id), col(EventSubscriptionSource.generation)
-                        ).in_([(s.id, s.active_source_generation) for s in subscriptions])
-                    )
-                )
-                generations = {s.id: s.active_source_generation for s in subscriptions}
-                sources.update(
-                    {s.subscription_id: s for s in result.all() if s.generation == generations[s.subscription_id]}
-                )
+        async def load_status(subscriptions: list[EventSubscription]) -> None:
+            responses.update(await self._read_subscriptions(subscriptions))
 
         # Parent/lifecycle restrictions are server-owned. Strip bracket variants
         # too so caller filters cannot turn these into OR expressions.
@@ -121,8 +120,8 @@ class EventSubscriptionInspectionService(BaseService):
         return await self.list_resources(
             EventSubscription,
             EventSubscriptionListResponse,
-            response_type_converter=lambda sub: self._shape(sub, sources[sub.id]),
-            post_query_callback=load_sources,
+            response_type_converter=lambda sub: responses[sub.id],
+            post_query_callback=load_status,
             limit=params.limit,
             cursor=params.cursor,
             sort=params.sort,
@@ -132,7 +131,7 @@ class EventSubscriptionInspectionService(BaseService):
         )
 
     async def get_current(self, workflow_id: UUID, subscription_id: UUID) -> EventSubscriptionRead:
-        """Return only a current source belonging to this workflow and project."""
+        """Read current or retired evidence belonging to this workflow and project."""
         workflow = await self.workflows.get_workflow_by_id(workflow_id)
         result = await self.session.exec(
             select(EventSubscription, EventSubscriptionSource)
@@ -141,15 +140,78 @@ class EventSubscriptionInspectionService(BaseService):
                 EventSubscription.id == subscription_id,
                 EventSubscription.workflow_id == workflow.id,
                 EventSubscription.project_id == workflow.project_id,
-                col(EventSubscription.retired).is_(False),
                 EventSubscriptionSource.generation == EventSubscription.active_source_generation,
-                col(EventSubscriptionSource.retired_at).is_(None),
             )
         )
         row = result.one_or_none()
         if row is None:
             raise EventSubscriptionNotFoundError
-        return self._shape(*row)
+        subscription, _source = row
+        return (await self._read_subscriptions([subscription]))[subscription.id]
+
+    async def _read_subscriptions(self, subscriptions: list[EventSubscription]) -> dict[UUID, EventSubscriptionRead]:
+        """Populate list and detail state with a fixed number of page-scoped queries."""
+        if not subscriptions:
+            return {}
+        sources = (
+            await self.session.exec(
+                select(EventSubscriptionSource)
+                .where(col(EventSubscriptionSource.subscription_id).in_([item.id for item in subscriptions]))
+                .order_by(col(EventSubscriptionSource.generation))
+            )
+        ).all()
+        generations = {item.id: item.active_source_generation for item in subscriptions}
+        current_sources = {
+            item.subscription_id: item for item in sources if item.generation == generations[item.subscription_id]
+        }
+        responses = {item.id: self._shape(item, current_sources[item.id]) for item in subscriptions}
+        source_owners = {item.id: item.subscription_id for item in sources}
+        for source in sources:
+            responses[source.subscription_id].sources.append(EventSubscriptionSourceRead.model_validate(source))
+        positions = (
+            await self.session.exec(
+                select(KafkaPartitionInitialPosition)
+                .where(col(KafkaPartitionInitialPosition.source_id).in_(source_owners))
+                .order_by(col(KafkaPartitionInitialPosition.source_id), col(KafkaPartitionInitialPosition.partition))
+            )
+        ).all()
+        for position in positions:
+            responses[source_owners[position.source_id]].initialization.append(
+                KafkaPartitionInitialPositionRead.from_position(position)
+            )
+        requests = (
+            await self.session.exec(
+                select(EventSubscriptionRecovery)
+                .where(col(EventSubscriptionRecovery.source_id).in_(source_owners))
+                .order_by(col(EventSubscriptionRecovery.source_id), col(EventSubscriptionRecovery.partition))
+            )
+        ).all()
+        for request in requests:
+            responses[source_owners[request.source_id]].recovery.append(
+                EventSubscriptionRecoveryRead.model_validate(request)
+            )
+        runtimes = (
+            await self.session.exec(
+                select(EventSubscriptionRuntime).where(col(EventSubscriptionRuntime.source_id).in_(source_owners))
+            )
+        ).all()
+        participants: dict[UUID, list[EventSubscriptionRuntime]] = {item.id: [] for item in subscriptions}
+        for runtime in runtimes:
+            participants[source_owners[runtime.source_id]].append(runtime)
+        placements = await confirmed_placements(
+            self.session, [(subscription, current_sources[subscription.id]) for subscription in subscriptions]
+        )
+        for subscription in subscriptions:
+            convergence = await self.controls.response(
+                subscription,
+                current_sources[subscription.id],
+                runtimes=participants[subscription.id],
+                placements=placements,
+            )
+            response = responses[subscription.id]
+            response.convergence, response.applied_revision = convergence.convergence, convergence.applied_revision
+            response.runtime_state = convergence.runtime_state
+        return responses
 
     async def test_unsaved(
         self, workflow_id: UUID, parameters: KafkaSubscribeParameters

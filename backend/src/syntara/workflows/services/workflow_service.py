@@ -1884,9 +1884,8 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
         if non_terminal_count:
             raise WorkflowHasActiveExecutionsError(non_terminal_count, workflow_id=workflow_id)
 
-        # Conservatively block deletion while event-subscription evidence is still
-        # bound; the RESTRICT FK is the DB backstop. Recovery-aware release is a
-        # later story.
+        # Serialize against admission and release only closed sources with no
+        # retained evidence or recovery dependencies. RESTRICT remains the backstop.
         subscription_service = EventSubscriptionService(self.session, self.user)
         await subscription_service.assert_workflow_not_bound(workflow_id, workflow.name)
 

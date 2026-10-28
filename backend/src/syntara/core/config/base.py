@@ -1536,7 +1536,7 @@ class EventStreamSettings(BaseSettings):
     event_processing_concurrency: int = Field(
         default=EventRunnerDefaults.PROCESSING_CONCURRENCY,
         gt=0,
-        description="Maximum concurrent downstream processing operations per subscription",
+        description="Maximum concurrent downstream processing operations shared by consumers and recovery per worker",
     )
     event_fetch_timeout_ms: int = Field(
         default=EventRunnerDefaults.FETCH_TIMEOUT_MS,

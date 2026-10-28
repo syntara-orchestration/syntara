@@ -10,6 +10,7 @@ from syntara.core.services.secret_service import SecretService
 from syntara.core.services.storage_backend import DatabaseBackend
 from syntara.credentials.lib.injector_resolver import InjectorResolver
 from syntara.eventstreams.adapters.kafka_consumer import KafkaPartitionConsumer
+from syntara.eventstreams.adapters.kafka_position_control import RecoveryCacheCoordination
 from syntara.eventstreams.adapters.kafka_record_runner import KafkaRecordRunner
 from syntara.eventstreams.adapters.kafka_source_configuration import KafkaSourceConfiguration
 from syntara.eventstreams.core.connection import ResolvedKafkaConnection
@@ -19,6 +20,7 @@ from syntara.eventstreams.models.subscription_snapshot import SubscriptionSnapsh
 from syntara.eventstreams.services.admission_service import EventAdmissionService
 from syntara.eventstreams.services.connection_provider import EventConnectionProvider
 from syntara.eventstreams.services.execution_preparation_service import EventExecutionPreparationService
+from syntara.eventstreams.services.recovery_request_service import EventRecoveryRequestService
 from syntara.eventstreams.services.worker_resources import EventWorkerResources
 from syntara.integrations.adapters.kafka import KafkaAdapter
 from syntara.integrations.adapters.kafka_credentials import resolve_kafka_authentication
@@ -40,6 +42,7 @@ class ManagedRunnerFactory:
         *,
         owner_worker_id: str,
         lookup: TerminalDeliveryCache | None = None,
+        cache_coordination: RecoveryCacheCoordination | None = None,
     ) -> None:
         """Receive process-scoped dependencies; no request or shared session is retained."""
         self._session_factory = session_factory
@@ -49,6 +52,7 @@ class ManagedRunnerFactory:
         self._encryptor = encryptor
         self._owner = owner_worker_id
         self._lookup = lookup
+        self._cache_coordination = cache_coordination
 
     async def __call__(self, snapshot: SubscriptionSnapshot) -> SubscriptionRunner:
         """Return one unstarted transport runner for the exact immutable binding."""
@@ -72,6 +76,8 @@ class ManagedRunnerFactory:
             work_semaphore=self._resources.processing,
             lookup=self._lookup,
             gate=self._resources.gate,
+            recovery_requests=EventRecoveryRequestService(self._session_factory),
+            cache_coordination=self._cache_coordination,
         )
 
     async def _resolve_connection(self, snapshot: SubscriptionSnapshot) -> ResolvedKafkaConnection:

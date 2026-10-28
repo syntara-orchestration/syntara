@@ -16,6 +16,7 @@ from syntara.eventstreams.core.placement import PlacementLost, SubscriptionPlace
 from syntara.eventstreams.core.runtime import RuntimeState, SubscriptionRunnerFactory
 from syntara.eventstreams.models.subscription_snapshot import SubscriptionSnapshot
 from syntara.eventstreams.services.placement_service import SubscriptionPlacementService
+from syntara.eventstreams.services.runtime_control_service import EventRuntimeControlService
 from syntara.eventstreams.services.subscription_reader import EventSubscriptionReader
 from syntara.eventstreams.services.subscription_supervisor import SubscriptionSupervisor
 from syntara.eventstreams.services.worker_gate import EventWorkerGate
@@ -43,10 +44,14 @@ class EventWorkerManager:
         runner_factory: SubscriptionRunnerFactory,
         placement: SubscriptionPlacementService,
         resources: EventWorkerResources,
+        *,
+        controls: EventRuntimeControlService | None = None,
     ) -> None:
         """Inject completed provider ports and process-owned limits, never a session."""
         self._reader = reader
         self._factory = runner_factory
+        self._controls = controls
+        self._registered: dict[UUID, SubscriptionSnapshot] = {}
         self._placement = placement
         self._resources = resources
         self._gate = resources.gate if resources.gate is not None else EventWorkerGate(placement)
@@ -325,8 +330,11 @@ class EventWorkerManager:
 
     async def _retire(self, key: UUID) -> None:
         supervisor = self._supervisors.get(key)
+        previous = self._registered.get(key)
         if supervisor is not None:
             status = await supervisor.stop()
+            if self._controls is not None and previous is not None:
+                await self._controls.acknowledge(previous, status)
             if status.state != RuntimeState.STOPPED:
                 if not self._closing:
                     self._pending[key] = None
@@ -340,6 +348,7 @@ class EventWorkerManager:
                     )
                 return
             del self._supervisors[key]
+        self._registered.pop(key, None)
         await self._release(key)
         self._retiring.discard(key)
         self._selected.discard(key)
@@ -348,7 +357,9 @@ class EventWorkerManager:
     async def _apply(self, key: UUID, snapshot: SubscriptionSnapshot | None) -> None:
         if self._closing:
             return
-        if snapshot is None or key in self._retiring:
+        previous = self._registered.get(key)
+        replaced = previous is not None and snapshot is not None and previous.source_id != snapshot.source_id
+        if snapshot is None or key in self._retiring or replaced:
             await self._retire(key)
             return
         snapshot = self._desired.get(key)
@@ -356,6 +367,11 @@ class EventWorkerManager:
             return
         authority = self._placement.authority(key)
         if not authority.is_current() or not self._gate.transport_open(snapshot):
+            return
+        lease = authority.lease
+        if lease is None:
+            return
+        if not await self._register(key, snapshot):
             return
         supervisor = self._supervisors.get(key)
         if supervisor is None:
@@ -366,7 +382,17 @@ class EventWorkerManager:
                 startup_timeout_seconds=EventWorkerDefaults.STARTUP_TIMEOUT_SECONDS,
             )
             self._supervisors[key] = supervisor
-        await supervisor.apply(snapshot)
+        status = await supervisor.apply(snapshot)
+        if self._controls is not None:
+            await self._controls.acknowledge(snapshot, status, lease=lease)
+
+    async def _register(self, key: UUID, snapshot: SubscriptionSnapshot) -> bool:
+        if self._controls is not None and self._registered.get(key) != snapshot:
+            lease = self._placement.authority(key).lease
+            if lease is None or not await self._controls.register(snapshot, lease):
+                return False
+            self._registered[key] = snapshot
+        return True
 
     def _retry_retirement(self, key: UUID) -> None:
         self._retirement_retries.pop(key, None)

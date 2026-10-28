@@ -9,7 +9,25 @@ from sqlmodel import Field, SQLModel
 
 from syntara.core.models.base import BaseListParams
 from syntara.core.models.pagination import ResourcesResponse
+from syntara.eventstreams.adapters.kafka_initial_position import KafkaPartitionInitialPositionRead
 from syntara.eventstreams.adapters.source_configuration import SourceConfiguration
+from syntara.eventstreams.core.runtime import RuntimeState
+
+
+class EventSubscriptionRecoveryRead(SQLModel):
+    """Safe queued recovery status; authority originates in the persisted request."""
+
+    source_id: UUID
+    partition: int
+    configuration_revision: int
+    expected_recovery_revision: int
+    policy: str
+    reason: str
+    acknowledge_duplicate_risk: bool
+    resolve_unscheduled: bool
+    requested_by: UUID
+    completed: bool
+    error_code: str | None
 
 
 class EventSubscriptionSourceRead(SQLModel):
@@ -20,10 +38,13 @@ class EventSubscriptionSourceRead(SQLModel):
     integration_id: UUID | None
     transport: str
     configuration: SourceConfiguration
+    initialized_at: datetime | None = None
+    retired_at: datetime | None = None
+    retirement_completed_at: datetime | None = None
 
 
 class EventSubscriptionRead(SQLModel):
-    """Currently available published configuration; no runtime-health claims."""
+    """Published configuration, recovery evidence and acknowledged runtime convergence."""
 
     id: UUID
     workflow_id: UUID
@@ -38,6 +59,13 @@ class EventSubscriptionRead(SQLModel):
     created_at: datetime
     updated_at: datetime
     source: EventSubscriptionSourceRead
+    retired: bool = False
+    sources: list[EventSubscriptionSourceRead] = []
+    initialization: list[KafkaPartitionInitialPositionRead] = []
+    recovery: list[EventSubscriptionRecoveryRead] = []
+    convergence: Literal["pending", "applied"] = "pending"
+    applied_revision: int | None = None
+    runtime_state: RuntimeState | None = None
 
 
 EventSubscriptionListResponse = ResourcesResponse[EventSubscriptionRead]
