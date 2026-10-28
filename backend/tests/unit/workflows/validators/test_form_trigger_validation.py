@@ -219,69 +219,45 @@ def test_default_that_fails_submission_coercion_is_reported_at_default() -> None
 
 
 @pytest.mark.parametrize(
-    ("options", "source", "message_suffix"),
+    ("options", "expected_findings"),
     [
         pytest.param(
             {"source": "dynamic", "expression": "regions", "label_key": "name", "value_key": "id"},
-            "dynamic",
-            "is not supported on a form trigger. Use 'static'.",
+            [
+                ("options.source", "'dynamic' is not one of ['static']"),
+                ("options.values", "Field required"),
+                ("options.expression", "Extra inputs are not permitted"),
+                ("options.label_key", "Extra inputs are not permitted"),
+                ("options.value_key", "Extra inputs are not permitted"),
+            ],
             id="dynamic",
         ),
         pytest.param(
             {"source": "dynamic_resolved", "values": [{"display_label": "East", "value": "east"}]},
-            "dynamic_resolved",
-            "is not supported on a form trigger. Use 'static'.",
+            [("options.source", "'dynamic_resolved' is not one of ['static']")],
             id="dynamic-resolved",
         ),
     ],
 )
 @pytest.mark.parametrize("field_type", ["dropdown", "multi_select"])
-def test_non_static_options_are_reported_once_with_option_path(
+def test_non_static_options_report_schema_findings(
     options: dict[str, Any],
-    source: str,
-    message_suffix: str,
+    expected_findings: list[tuple[str, str]],
     field_type: str,
 ) -> None:
     field = {"type": field_type, "value_name": "region", "label": "Region", "options": options}
 
     findings = _findings(_parameters(field))
 
-    assert len(findings) == 1, findings
-    assert findings[0].category == ValidationCategory.form_trigger_configuration
-    assert findings[0].field_path == "parameters.form_definition.fields.0.options"
-    assert findings[0].message == f"Field 'region': options source '{source}' {message_suffix}"
-
-
-@pytest.mark.parametrize("value_name", [None, 123, "invalid-name"])
-def test_non_static_options_with_invalid_value_name_use_unnamed_fallback(value_name: str | int | None) -> None:
-    field: dict[str, Any] = {
-        "type": "dropdown",
-        "label": "Region",
-        "options": {
-            "source": "dynamic",
-            "expression": "regions",
-            "label_key": "name",
-            "value_key": "id",
-        },
+    expected_paths_and_messages = {
+        (f"parameters.form_definition.fields.0.{path}", message) for path, message in expected_findings
     }
-    if value_name is not None:
-        field["value_name"] = value_name
-
-    option_findings = [
-        finding
-        for finding in _findings(_parameters(field))
-        if finding.field_path is not None and finding.field_path.endswith(".options")
-    ]
-
-    assert len(option_findings) == 1, option_findings
-    assert option_findings[0].category == ValidationCategory.form_trigger_configuration
-    assert option_findings[0].message == (
-        "Field '<unnamed>': options source 'dynamic' is not supported on a form trigger. Use 'static'."
-    )
+    assert {(finding.field_path, finding.message) for finding in findings} == expected_paths_and_messages
+    assert all(finding.category == ValidationCategory.schema_violation for finding in findings)
 
 
-def test_unsupported_options_short_circuit_default_validation() -> None:
-    """The option-source model error defers other authored-default findings until the next save."""
+def test_unsupported_options_prevent_default_validation() -> None:
+    """An invalid trigger option source prevents typed default validation for the form."""
     parameters = _parameters(
         {
             "type": "dropdown",
@@ -299,12 +275,15 @@ def test_unsupported_options_short_circuit_default_validation() -> None:
 
     findings = _findings(parameters)
 
-    assert len(findings) == 1, findings
-    assert findings[0].category == ValidationCategory.form_trigger_configuration
-    assert findings[0].field_path == "parameters.form_definition.fields.0.options"
-    assert findings[0].message == (
-        "Field 'region': options source 'dynamic' is not supported on a form trigger. Use 'static'."
-    )
+    assert len(findings) == 5, findings
+    assert {finding.field_path for finding in findings} == {
+        "parameters.form_definition.fields.0.options.source",
+        "parameters.form_definition.fields.0.options.values",
+        "parameters.form_definition.fields.0.options.expression",
+        "parameters.form_definition.fields.0.options.label_key",
+        "parameters.form_definition.fields.0.options.value_key",
+    }
+    assert all(finding.category == ValidationCategory.schema_violation for finding in findings)
 
 
 def test_unsafe_css_is_reported_on_css_override() -> None:

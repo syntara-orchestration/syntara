@@ -279,7 +279,7 @@ class TestAuthoredFormDefinitions:
         assert isinstance(field, DropdownField)
         assert isinstance(field.options, DynamicOptions)
 
-        with pytest.raises(ValidationError, match="Use 'static' or 'dynamic'"):
+        with pytest.raises(ValidationError, match="Input tag 'dynamic_resolved'") as exc_info:
             FormPromptDefinition.model_validate(
                 {
                     "fields": [
@@ -293,6 +293,7 @@ class TestAuthoredFormDefinitions:
                     ]
                 }
             )
+        assert len(exc_info.value.errors()) == 1
 
     def test_trigger_allows_static_options_but_rejects_non_static_options(self) -> None:
         static = FormTriggerDefinition.model_validate(
@@ -319,8 +320,13 @@ class TestAuthoredFormDefinitions:
             },
             {"source": "dynamic_resolved", "values": [{"display_label": "East", "value": "east"}]},
         ):
-            with pytest.raises(ValidationError, match="is not supported on a form trigger"):
+            with pytest.raises(ValidationError) as exc_info:
                 FormTriggerDefinition.model_validate({"fields": [_text(type="dropdown", options=options)]})
+
+            errors = exc_info.value.errors()
+            expected_count = 5 if options["source"] == "dynamic" else 1
+            assert len(errors) == expected_count
+            assert any(error["type"] == "literal_error" and error["loc"][-1] == "source" for error in errors)
 
 
 class TestStaticOptionDefaults:

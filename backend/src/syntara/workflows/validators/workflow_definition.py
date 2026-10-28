@@ -528,17 +528,6 @@ def _form_configuration_schema_finding_is_redundant(
     ):
         return False
 
-    # Unsupported authored option sources violate the schema enum and the
-    # corresponding form model's more specific option-source rule.
-    if (
-        form_finding.category
-        in {ValidationCategory.form_prompt_configuration, ValidationCategory.form_trigger_configuration}
-        and form_finding.message.startswith("Field '")
-        and "options source '" in form_finding.message
-        and schema_finding.field_path == f"{form_finding.field_path}.source"
-    ):
-        return True
-
     # Missing form_definition is reported at the parameters object by JSON
     # Schema and at the missing property by Pydantic.
     if (

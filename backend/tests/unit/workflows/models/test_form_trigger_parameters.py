@@ -116,12 +116,9 @@ class TestFormTriggerParameters:
         with pytest.raises(ValidationError) as exc_info:
             FormTriggerParameters.model_validate(parameters)
 
-        assert len(exc_info.value.errors()) == 1
-        error = exc_info.value.errors()[0]
-        assert error["loc"][-1] == "options"
-        assert f"Field 'choice': options source '{source}' is not supported on a form trigger. Use 'static'." in str(
-            exc_info.value
-        )
+        errors = exc_info.value.errors()
+        assert len(errors) == (5 if source == "dynamic" else 1)
+        assert any(error["type"] == "literal_error" and error["loc"][-1] == "source" for error in errors)
 
     @pytest.mark.parametrize(
         "parameter",

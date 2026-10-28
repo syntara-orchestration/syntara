@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import date as calendar_date
-from typing import Annotated, ClassVar, Literal
+from typing import Annotated, Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import BaseModel, ConfigDict, Discriminator, Field, ValidationInfo, field_validator, model_validator
@@ -291,18 +291,7 @@ class ResolvedOptions(BaseModel):
 OptionsSource = Annotated[StaticOptions | DynamicOptions | ResolvedOptions, Discriminator("source")]
 
 
-class _OptionSourceValidationMixin(FormFieldBase):
-    """Apply an authored option-source policy configured by a selection field subclass."""
-
-    _DISALLOWED_OPTION_SOURCES: ClassVar[dict[str, str]] = {}
-
-    @field_validator("options", mode="before", check_fields=False)
-    @classmethod
-    def _validate_option_source(cls, raw: object, info: ValidationInfo) -> object:
-        return _reject_option_sources(raw, info, disallowed=cls._DISALLOWED_OPTION_SOURCES)
-
-
-class DropdownField(_OptionSourceValidationMixin):
+class DropdownField(FormFieldBase):
     """Dropdown field."""
 
     type: Literal["dropdown"]
@@ -329,7 +318,7 @@ class DropdownField(_OptionSourceValidationMixin):
         return default
 
 
-class MultiSelectField(_OptionSourceValidationMixin):
+class MultiSelectField(FormFieldBase):
     """Multi-select field."""
 
     type: Literal["multi_select"]
@@ -405,62 +394,27 @@ AuthoredOptionsSource = Annotated[StaticOptions | DynamicOptions, Discriminator(
 """Option sources a user may author on a form prompt. Excludes engine-produced snapshots."""
 
 
-_TRIGGER_DISALLOWED_SOURCES = {
-    "dynamic": "is not supported on a form trigger. Use 'static'.",
-    "dynamic_resolved": "is not supported on a form trigger. Use 'static'.",
-}
-_PROMPT_DISALLOWED_SOURCES = {
-    "dynamic_resolved": (
-        "is produced by the workflow engine at run time and cannot be authored. Use 'static' or 'dynamic'."
-    ),
-}
-
-
-def _reject_option_sources(
-    raw: object,
-    info: ValidationInfo,
-    *,
-    disallowed: dict[str, str],
-) -> object:
-    """Reject option sources that the authored form type does not allow.
-
-    This runs before option parsing so one unsupported source produces one safe
-    error at the options field, instead of discriminator and extra-key errors.
-    """
-    if isinstance(raw, dict):
-        source = raw.get("source")
-        if isinstance(source, str) and source in disallowed:
-            value_name = info.data.get("value_name", "<unnamed>")
-            msg = f"Field '{value_name}': options source '{source}' {disallowed[source]}"
-            raise SafeValueError(msg)
-    return raw
-
-
 class FormTriggerDropdownField(DropdownField):
     """Dropdown field on a form trigger. Static options only."""
 
-    _DISALLOWED_OPTION_SOURCES: ClassVar[dict[str, str]] = _TRIGGER_DISALLOWED_SOURCES
     options: StaticOptions
 
 
 class FormTriggerMultiSelectField(MultiSelectField):
     """Multi-select field on a form trigger. Static options only."""
 
-    _DISALLOWED_OPTION_SOURCES: ClassVar[dict[str, str]] = _TRIGGER_DISALLOWED_SOURCES
     options: StaticOptions
 
 
 class FormPromptDropdownField(DropdownField):
     """Dropdown field on a form prompt. Static or dynamic options; not engine-resolved."""
 
-    _DISALLOWED_OPTION_SOURCES: ClassVar[dict[str, str]] = _PROMPT_DISALLOWED_SOURCES
     options: AuthoredOptionsSource
 
 
 class FormPromptMultiSelectField(MultiSelectField):
     """Multi-select field on a form prompt. Static or dynamic options; not engine-resolved."""
 
-    _DISALLOWED_OPTION_SOURCES: ClassVar[dict[str, str]] = _PROMPT_DISALLOWED_SOURCES
     options: AuthoredOptionsSource
 
 

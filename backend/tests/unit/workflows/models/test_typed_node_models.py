@@ -476,11 +476,11 @@ class TestFormPromptNodeParameters:
             ]
         }
 
-        with pytest.raises(ValidationError, match="Use 'static' or 'dynamic'") as exc_info:
+        with pytest.raises(ValidationError, match="Input tag 'dynamic_resolved'") as exc_info:
             FormPromptNodeParameters.model_validate({"form_definition": form_definition})
 
         assert len(exc_info.value.errors()) == 1
-        assert "Field 'region': options source 'dynamic_resolved'" in str(exc_info.value)
+        assert "does not match any of the expected tags" in str(exc_info.value)
 
     @pytest.mark.parametrize("field_type", ["dropdown", "multi_select"])
     def test_static_and_dynamic_options_remain_authored_sources(self, field_type: str) -> None:
