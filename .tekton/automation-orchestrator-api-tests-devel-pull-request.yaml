@@ -78,13 +78,6 @@ spec:
     # (automation-orchestrator-operator#1573).
     - name: ao-operator-revision
       value: AAP-90779-ep-from-source
-    # Execution Plane server revision; keep in sync with the
-    # execution-plane-client protocol the syntara branch under test pins.
-    # Pinned to the concurrent-dispatch branch until that lands on EP devel:
-    # the worker otherwise dispatches work items serially, making every
-    # multi-script e2e workflow marginal against its original poll budget.
-    - name: ep-revision
-      value: devel
   taskRunTemplate:
     serviceAccountName: konflux-integration-runner
   pipelineSpec:
@@ -144,19 +137,19 @@ spec:
         default: ""
       - name: ep-git-url
         type: string
-        default: https://github.com/syntara-orchestration/syntara-execution-plane.git
+        description: Optional repository override; otherwise use the execution-plane-client source.
+        default: ""
       - name: ep-revision
         type: string
         description: >
-          syntara-execution-plane branch overlaid by aap-dev when
-          AO_EXECUTION_PLANE=true.
-        default: devel
+          Optional EP branch, tag, or commit override. Otherwise deploy the
+          execution-plane-client Git commit resolved in backend/uv.lock.
+        default: ""
       - name: ep-pr-number
         type: string
         description: >
-          Optional syntara-execution-plane PR. Not needed anymore: devel
-          includes syntara-execution-plane#86 (GRANT CONNECT IF EXISTS for
-          operator BYO postgres, callback wiring, Konflux e2e tooling).
+          Optional EP PR override. Its head takes precedence over the client
+          pin and ep-revision.
         default: ""
       - name: oci-secret
         type: string
@@ -319,7 +312,7 @@ spec:
 
       - name: stage-ep-source
         runAfter:
-          - provision-kind-cluster
+          - stage-pipeline-source
         timeout: "10m"
         params:
           - name: ssh-credentials-secret
@@ -332,12 +325,16 @@ spec:
             value: $(params.ep-revision)
           - name: ep-pr-number
             value: $(params.ep-pr-number)
+          - name: client-git-url
+            value: $(tasks.stage-pipeline-source.results.ep-git-url)
+          - name: client-revision
+            value: $(tasks.stage-pipeline-source.results.ep-revision)
         taskSpec:
           description: |
             Copy syntara-execution-plane to $HOME/syntara-execution-plane on
             the Kind VM so aap-dev can overlay it when AO_EXECUTION_PLANE=true.
-            Must complete before deploy-ao. devel includes the operator-path
-            fixes from syntara-execution-plane#86.
+            Use this syntara checkout's locked client commit unless explicitly
+            overridden. Must complete before deploy-ao.
           params:
             - name: ssh-credentials-secret
               type: string
@@ -348,6 +345,10 @@ spec:
             - name: ep-revision
               type: string
             - name: ep-pr-number
+              type: string
+            - name: client-git-url
+              type: string
+            - name: client-revision
               type: string
           volumes:
             - name: ssh-credentials-volume
@@ -371,6 +372,10 @@ spec:
                   value: $(params.ep-revision)
                 - name: EP_PR_NUMBER
                   value: $(params.ep-pr-number)
+                - name: EP_CLIENT_GIT_URL
+                  value: $(params.client-git-url)
+                - name: EP_CLIENT_REVISION
+                  value: $(params.client-revision)
               script: |
                 #!/usr/bin/env bash
                 set -euo pipefail
@@ -410,16 +415,20 @@ spec:
                   exit 1
                 fi
 
+                EP_GIT_URL="${EP_GIT_URL:-${EP_CLIENT_GIT_URL}}"
+                EP_REVISION="${EP_REVISION:-${EP_CLIENT_REVISION}}"
                 CLONE_URL="${EP_GIT_URL/https:\/\//https://x-access-token:${GH_TOKEN}@}"
                 EP_DIR=/tmp/syntara-execution-plane
                 rm -rf "${EP_DIR}"
                 echo "=== Cloning execution-plane at ${EP_REVISION} ==="
-                GIT_TERMINAL_PROMPT=0 git clone --progress --branch "${EP_REVISION}" \
+                GIT_TERMINAL_PROMPT=0 git clone --progress --no-checkout \
                   "${CLONE_URL}" "${EP_DIR}"
                 if [ -n "${EP_PR_NUMBER}" ]; then
                   git -C "${EP_DIR}" fetch origin "refs/pull/${EP_PR_NUMBER}/head"
-                  git -C "${EP_DIR}" checkout FETCH_HEAD
+                else
+                  git -C "${EP_DIR}" fetch origin "${EP_REVISION}"
                 fi
+                git -C "${EP_DIR}" checkout --detach FETCH_HEAD
                 unset GH_TOKEN
                 git -C "${EP_DIR}" log -1 --oneline
                 test -f "${EP_DIR}/Containerfile"
@@ -461,6 +470,13 @@ spec:
             patch-ao-src-overlay, prepare-execution-plane, and run-e2e can
             use tools/ci and the backend e2e suite before deploy-ao finishes cloning
             ~/syntara for the AO image overlay.
+            Resolve EP server defaults from the client source and lockfile in
+            this exact checkout.
+          results:
+            - name: ep-git-url
+              description: Git repository supplying execution-plane-client.
+            - name: ep-revision
+              description: Locked execution-plane-client Git commit.
           params:
             - name: ssh-credentials-secret
               type: string
@@ -537,6 +553,32 @@ spec:
                 fi
                 git -C "${SRC_DIR}" checkout "$(params.pipeline-github-pr-revision)"
                 unset GH_TOKEN
+                python3 - "${SRC_DIR}/backend" "$(results.ep-git-url.path)" "$(results.ep-revision.path)" <<'PY'
+                import re
+                import sys
+                import tomllib
+                from pathlib import Path
+                from urllib.parse import parse_qs, urlsplit, urlunsplit
+
+                backend, repository_path, revision_path = map(Path, sys.argv[1:])
+                project = tomllib.loads((backend / "pyproject.toml").read_text())
+                source = project["tool"]["uv"]["sources"]["execution-plane-client"]
+                lock = tomllib.loads((backend / "uv.lock").read_text())
+                packages = [p for p in lock["package"] if p["name"] == "execution-plane-client"]
+                if len(packages) != 1:
+                    raise SystemExit("Expected one locked execution-plane-client package")
+                locked = urlsplit(packages[0]["source"]["git"])
+                repository = urlunsplit(locked._replace(query="", fragment=""))
+                if repository != source["git"] or not re.fullmatch(r"[0-9a-f]{40}", locked.fragment):
+                    raise SystemExit("Client source and locked EP repository/commit do not match")
+                query = parse_qs(locked.query)
+                for key in ("tag", "branch", "rev", "subdirectory"):
+                    if key in source and query.get(key) != [source[key]]:
+                        raise SystemExit(f"Client {key} differs from uv.lock; update the lockfile")
+                repository_path.write_text(repository)
+                revision_path.write_text(locked.fragment)
+                print(f"EP server/client source: {source}; locked commit: {locked.fragment}")
+                PY
                 test -f "${SRC_DIR}/tools/ci/wait-for-myao-ready.sh"
                 test -f "${SRC_DIR}/tools/ci/konflux-prepare-execution-plane.sh"
                 test -f "${SRC_DIR}/tools/create_ao_credential.py"
