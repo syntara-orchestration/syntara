@@ -25,6 +25,8 @@ from syntara.core.models import User
 from syntara.core.services import BaseService
 from syntara.core.services.extensions import ConvertResourceMixin, EnrichQueryMixin
 from syntara.core.services.user_reference_resolution import UserReferenceResolverMixin
+from syntara.eventstreams.core.envelope import WorkflowEventEnvelope
+from syntara.eventstreams.core.serialization import validate_payload
 from syntara.metrics.dependencies import get_metrics_recorder
 from syntara.metrics.emission import emit_completion_metrics
 from syntara.metrics.interface_tag import interface_context_var
@@ -234,14 +236,14 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
         trigger_node: dict[str, Any],
         input_data: dict[str, Any],
     ) -> None:
-        """Apply input_schema defaults and validate trigger input data.
+        """Validate trigger inputs, applying defaults except for event envelopes.
 
-        Extracts the trigger's ``input_schema``, fills in missing default
-        values, then validates the result against *input_data* directly.
+        Event Subscribe validates only the envelope payload without mutation.
+        Other triggers fill missing defaults and validate input_data directly.
 
         Args:
             trigger_node: Trigger node dict from the workflow definition.
-            input_data: Mutable input dict — modified in place.
+            input_data: Trigger input dict; event envelopes remain unchanged.
 
         Raises:
             TriggerValidationError: If input_data fails schema validation.
@@ -253,10 +255,27 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
 
         trigger_type = trigger_node.get("type", "")
         trigger_node_id = trigger_node.get("id")
-        target = input_data
+
+        if trigger_type == NodeType.EVENT_SUBSCRIBE_TRIGGER:
+            if "payload" not in input_data:
+                msg = "Event Subscribe input must contain a payload"
+                raise TriggerValidationError(msg)
+            # model_construct skips full envelope validation — only .payload is read
+            # below, and the event decoder already validated the envelope upstream.
+            envelope = WorkflowEventEnvelope.model_construct(payload=input_data["payload"])
+            failure = validate_payload(envelope, input_schema)
+            if failure is not None:
+                logger.warning(
+                    "Trigger input validation failed",
+                    trigger_node_id=trigger_node_id,
+                    trigger_type=trigger_type,
+                    failure_code=failure.code,
+                )
+                raise TriggerValidationError(failure.message)
+            return
 
         try:
-            apply_schema_defaults(target, input_schema)
+            apply_schema_defaults(input_data, input_schema)
         except jsonschema.ValidationError as e:
             logger.warning(
                 "Trigger input validation failed",
@@ -351,7 +370,7 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
             schema_version=workflow_version.schema_version,
         )
 
-        # Step 2: Resolve trigger node and apply input_schema defaults
+        # Step 2: Resolve the trigger and validate its inputs
         workflow_def = workflow_version.workflow_definition
         trigger_node_id, trigger_node = resolve_trigger_node(workflow_def, trigger_node_id)
         self._apply_trigger_schema_defaults(trigger_node, input_data)
