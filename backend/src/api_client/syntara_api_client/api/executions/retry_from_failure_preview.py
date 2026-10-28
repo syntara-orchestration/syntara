@@ -12,16 +12,23 @@ from ...types import UNSET, Response, Unset
 
 
 def _get_kwargs(
-    execution_id: UUID, *, retry_point_ids: list[str] | Unset = UNSET, additional_params: dict[str, Any] | None = None
+    execution_id: UUID,
+    *,
+    retry_point_ids: list[str] | None | Unset = UNSET,
+    additional_params: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     params: dict[str, Any] = {}
     if isinstance(additional_params, dict):
         params = additional_params
 
-    json_retry_point_ids: list[str] | Unset = UNSET
-    if not isinstance(retry_point_ids, Unset):
+    json_retry_point_ids: list[str] | None | Unset
+    if isinstance(retry_point_ids, Unset):
+        json_retry_point_ids = UNSET
+    elif isinstance(retry_point_ids, list):
         json_retry_point_ids = retry_point_ids
 
+    else:
+        json_retry_point_ids = retry_point_ids
     params["retry_point_ids"] = json_retry_point_ids
 
     params = {k: v for k, v in params.items() if v is not UNSET and v is not None}
@@ -106,21 +113,21 @@ def sync_detailed(
     execution_id: UUID,
     *,
     client: AuthenticatedClient,
-    retry_point_ids: list[str] | Unset = UNSET,
+    retry_point_ids: list[str] | None | Unset = UNSET,
     additional_params: dict[str, Any] | None = None,
 ) -> Response[ErrorData | RetryFromFailureValidationResponse]:
     """Preview retry from failure
 
-     Report whether an execution can be retried from its failure points, and what would re-run.
-    Optionally accepts repeated retry_point_ids query parameters to preview a selected subset; omitting
-    them previews all currently failed points. Returns the eligible retry points, per-point re-run
-    counts, the deduplicated total for the requested scope, and the number of completed activity results
-    that will be retained. Purely informational: the retry endpoint independently re-validates the same
-    selection and rejects anything unusable. Never mutates any state.
+     Report whether an execution can be retried from its failure points, and what would re-run. An
+    optional retry_point_ids query parameter previews a selected subset; when omitted, the preview uses
+    all currently failed nodes. Returns the eligible retry points, the re-run step count for each, the
+    deduplicated total, and completed results retained outside the retry paths. Purely informational:
+    the retry endpoint independently re-validates the selection and any input parameter overrides. Never
+    mutates any state.
 
     Args:
         execution_id (UUID):
-        retry_point_ids (list[str] | Unset):
+        retry_point_ids (list[str] | None | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -145,20 +152,20 @@ def sync(
     execution_id: UUID,
     *,
     client: AuthenticatedClient,
-    retry_point_ids: list[str] | Unset = UNSET,
+    retry_point_ids: list[str] | None | Unset = UNSET,
 ) -> ErrorData | RetryFromFailureValidationResponse | None:
     """Preview retry from failure
 
-     Report whether an execution can be retried from its failure points, and what would re-run.
-    Optionally accepts repeated retry_point_ids query parameters to preview a selected subset; omitting
-    them previews all currently failed points. Returns the eligible retry points, per-point re-run
-    counts, the deduplicated total for the requested scope, and the number of completed activity results
-    that will be retained. Purely informational: the retry endpoint independently re-validates the same
-    selection and rejects anything unusable. Never mutates any state.
+     Report whether an execution can be retried from its failure points, and what would re-run. An
+    optional retry_point_ids query parameter previews a selected subset; when omitted, the preview uses
+    all currently failed nodes. Returns the eligible retry points, the re-run step count for each, the
+    deduplicated total, and completed results retained outside the retry paths. Purely informational:
+    the retry endpoint independently re-validates the selection and any input parameter overrides. Never
+    mutates any state.
 
     Args:
         execution_id (UUID):
-        retry_point_ids (list[str] | Unset):
+        retry_point_ids (list[str] | None | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -179,20 +186,20 @@ async def asyncio_detailed(
     execution_id: UUID,
     *,
     client: AuthenticatedClient,
-    retry_point_ids: list[str] | Unset = UNSET,
+    retry_point_ids: list[str] | None | Unset = UNSET,
 ) -> Response[ErrorData | RetryFromFailureValidationResponse]:
     """Preview retry from failure
 
-     Report whether an execution can be retried from its failure points, and what would re-run.
-    Optionally accepts repeated retry_point_ids query parameters to preview a selected subset; omitting
-    them previews all currently failed points. Returns the eligible retry points, per-point re-run
-    counts, the deduplicated total for the requested scope, and the number of completed activity results
-    that will be retained. Purely informational: the retry endpoint independently re-validates the same
-    selection and rejects anything unusable. Never mutates any state.
+     Report whether an execution can be retried from its failure points, and what would re-run. An
+    optional retry_point_ids query parameter previews a selected subset; when omitted, the preview uses
+    all currently failed nodes. Returns the eligible retry points, the re-run step count for each, the
+    deduplicated total, and completed results retained outside the retry paths. Purely informational:
+    the retry endpoint independently re-validates the selection and any input parameter overrides. Never
+    mutates any state.
 
     Args:
         execution_id (UUID):
-        retry_point_ids (list[str] | Unset):
+        retry_point_ids (list[str] | None | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -216,20 +223,20 @@ async def asyncio(
     execution_id: UUID,
     *,
     client: AuthenticatedClient,
-    retry_point_ids: list[str] | Unset = UNSET,
+    retry_point_ids: list[str] | None | Unset = UNSET,
 ) -> ErrorData | RetryFromFailureValidationResponse | None:
     """Preview retry from failure
 
-     Report whether an execution can be retried from its failure points, and what would re-run.
-    Optionally accepts repeated retry_point_ids query parameters to preview a selected subset; omitting
-    them previews all currently failed points. Returns the eligible retry points, per-point re-run
-    counts, the deduplicated total for the requested scope, and the number of completed activity results
-    that will be retained. Purely informational: the retry endpoint independently re-validates the same
-    selection and rejects anything unusable. Never mutates any state.
+     Report whether an execution can be retried from its failure points, and what would re-run. An
+    optional retry_point_ids query parameter previews a selected subset; when omitted, the preview uses
+    all currently failed nodes. Returns the eligible retry points, the re-run step count for each, the
+    deduplicated total, and completed results retained outside the retry paths. Purely informational:
+    the retry endpoint independently re-validates the selection and any input parameter overrides. Never
+    mutates any state.
 
     Args:
         execution_id (UUID):
-        retry_point_ids (list[str] | Unset):
+        retry_point_ids (list[str] | None | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
