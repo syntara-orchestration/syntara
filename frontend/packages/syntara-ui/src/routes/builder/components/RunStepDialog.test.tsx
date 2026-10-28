@@ -1,4 +1,3 @@
-// AAP-89685: Clearing pinned Run Step mock data must require confirmation before execution.
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
@@ -228,7 +227,7 @@ describe('RunStepDialog', () => {
       await waitFor(() => expect(onClose).toHaveBeenCalled(), { timeout: 1500 })
     })
 
-    it('requires confirmation before running with cleared pinned predecessor mock data', async () => {
+    it('running with cleared pinned predecessor mock data', async () => {
       const user = userEvent.setup()
       const pinnedMockData = { first_action: { result: 'test_value', status: 'ok' } }
       render(
