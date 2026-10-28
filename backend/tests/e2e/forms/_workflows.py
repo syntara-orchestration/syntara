@@ -1,4 +1,4 @@
-"""Workflow builders shared by the form-prompt E2E modules."""
+"""Workflow builders and field catalogs shared by form-prompt and Form Trigger E2E modules."""
 
 import json
 from collections.abc import Mapping
@@ -43,6 +43,23 @@ ALL_SUPPORTED_FORM_FIELDS: list[dict[str, Any]] = [
     {"type": "date", "value_name": "date_value", "label": "Date", "required": True},
     {"type": "email", "value_name": "email_value", "label": "Email", "required": True},
 ]
+
+REQUIRED_AND_OPTIONAL_FIELDS: list[dict[str, Any]] = [
+    {"type": "text", "value_name": "required_text", "label": "Required text", "required": True},
+    {"type": "email", "value_name": "required_email", "label": "Required email", "required": True},
+    {"type": "number", "value_name": "optional_number", "label": "Optional number", "required": False},
+]
+
+SCALAR_TYPE_FIELDS: list[dict[str, Any]] = [
+    {"type": "number", "value_name": "number_value", "label": "Number", "required": True},
+    {"type": "checkbox", "value_name": "boolean_value", "label": "Boolean", "required": True},
+    {"type": "text", "value_name": "string_value", "label": "String", "required": True},
+]
+
+SINGLE_NUMBER_FIELD: list[dict[str, Any]] = [
+    {"type": "number", "value_name": "x", "label": "X", "required": True},
+]
+
 _FORM_PROMPT_RESULT_CAPTURE_CODE = 'import os\nprint(os.environ["FORM_PROMPT_RESULT"])'
 
 
@@ -167,6 +184,45 @@ def producer_prompt_consumer_workflow(
             "triggers": [{"id": "trigger", "type": "manual_trigger", "parameters": {}}],
             "nodes": nodes,
             "edges": edges,
+        }
+    )
+
+
+def form_trigger_consumer_workflow(
+    name: str,
+    *,
+    form_fields: list[dict[str, Any]],
+    consumer_code: str = DEFAULT_CONSUMER_CODE,
+    consumer_environment: Mapping[str, str] | None = None,
+) -> WorkflowDefinition:
+    """Build a Form Trigger workflow that exposes submitted values to a script consumer."""
+    consumer_parameters: dict[str, Any] = {"language": "python", "code": consumer_code}
+    if consumer_environment is not None:
+        consumer_parameters["environment"] = dict(consumer_environment)
+
+    return WorkflowDefinition.from_dict(
+        {
+            "name": name,
+            "schema_version": "2.0.0",
+            "triggers": [
+                {
+                    "id": "form",
+                    "type": "form_trigger",
+                    "parameters": {
+                        "message": "Enter the requested values.",
+                        "form_definition": {"fields": form_fields},
+                    },
+                }
+            ],
+            "nodes": [
+                {
+                    "id": "consumer",
+                    "name": "Consumer Node",
+                    "type": "script",
+                    "parameters": consumer_parameters,
+                }
+            ],
+            "edges": [{"from": "form", "to": "consumer"}],
         }
     )
 

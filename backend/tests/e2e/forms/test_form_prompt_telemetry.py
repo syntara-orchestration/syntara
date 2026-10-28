@@ -83,7 +83,7 @@ class TestFormPromptTelemetry:
         syntara_api: SyntaraApiRegistry,
         workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
         first_project_id: UUID,
-        form_prompt_execution_cleanup: Callable[[UUID], None],
+        form_execution_cleanup: Callable[[UUID], None],
     ) -> None:
         """The response is tracked with correlation, timing, and Segment identity.
 
@@ -104,7 +104,7 @@ class TestFormPromptTelemetry:
             first_project_id,
             workflow_name_prefix="e2e-form-prompt-telemetry",
             description="E2E: form-prompt submission telemetry",
-            track_execution=form_prompt_execution_cleanup,
+            track_execution=form_execution_cleanup,
             producer_output={},
             form_fields=[APPROVAL_REASON_FIELD],
         )

@@ -97,7 +97,7 @@ def test_form_prompt_response_routes_to_selected_executor(
     syntara_api: SyntaraApiRegistry,
     workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
     first_project_id: UUID,
-    form_prompt_execution_cleanup: Callable[[UUID], None],
+    form_execution_cleanup: Callable[[UUID], None],
     color: str,
     selected_executor: str,
     other_executor: str,
@@ -116,7 +116,7 @@ def test_form_prompt_response_routes_to_selected_executor(
         syntara_api.executions.create(body=ExecutionCreate(workflow_id=workflow.id, trigger_node_id="trigger"))
     )
     execution_id = UUID(str(execution.id))
-    form_prompt_execution_cleanup(execution_id)
+    form_execution_cleanup(execution_id)
 
     pending_prompt = poll_for_pending_form_prompt(syntara_api, execution_id, timeout=60)
     response = submit_form_prompt(syntara_api, UUID(str(pending_prompt.id)), {"color": color})

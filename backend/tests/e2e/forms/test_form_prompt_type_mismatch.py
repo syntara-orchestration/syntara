@@ -133,7 +133,7 @@ def test_invalid_dynamic_options_fail_before_prompt_creation(
     syntara_api: SyntaraApiRegistry,
     workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
     first_project_id: UUID,
-    form_prompt_execution_cleanup: Callable[[UUID], None],
+    form_execution_cleanup: Callable[[UUID], None],
     producer_output: dict[str, object],
     expression: str,
     expect_in_error: str,
@@ -154,7 +154,7 @@ def test_invalid_dynamic_options_fail_before_prompt_creation(
         syntara_api,
         workflow_factory,
         first_project_id,
-        form_prompt_execution_cleanup,
+        form_execution_cleanup,
         producer_output=producer_output,
         form_fields=[dynamic_option_field("environment", expression)],
     )
@@ -175,7 +175,7 @@ def test_invalid_dynamic_options_continue_on_failure_routes_to_fallback(
     syntara_api: SyntaraApiRegistry,
     workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
     first_project_id: UUID,
-    form_prompt_execution_cleanup: Callable[[UUID], None],
+    form_execution_cleanup: Callable[[UUID], None],
     producer_output: dict[str, object],
     expression: str,
     expect_in_error: str,
@@ -196,7 +196,7 @@ def test_invalid_dynamic_options_continue_on_failure_routes_to_fallback(
         syntara_api,
         workflow_factory,
         first_project_id,
-        form_prompt_execution_cleanup,
+        form_execution_cleanup,
         producer_output=producer_output,
         form_fields=[dynamic_option_field("environment", expression)],
         continue_on_failure=True,
@@ -219,7 +219,7 @@ def test_array_default_on_text_field_fails_definition_validation(
     syntara_api: SyntaraApiRegistry,
     workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
     first_project_id: UUID,
-    form_prompt_execution_cleanup: Callable[[UUID], None],
+    form_execution_cleanup: Callable[[UUID], None],
 ) -> None:
     """An array resolved into a text default fails final form validation.
 
@@ -236,7 +236,7 @@ def test_array_default_on_text_field_fails_definition_validation(
         syntara_api,
         workflow_factory,
         first_project_id,
-        form_prompt_execution_cleanup,
+        form_execution_cleanup,
         producer_output={"env": ["dev", "prod"]},
         form_fields=[
             {

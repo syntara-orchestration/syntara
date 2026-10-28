@@ -57,14 +57,14 @@ def test_retry_waits_for_new_form_prompt_response(
     syntara_api: SyntaraApiRegistry,
     workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
     first_project_id: UUID,
-    form_prompt_execution_cleanup: Callable[[UUID], None],
+    form_execution_cleanup: Callable[[UUID], None],
 ) -> None:
     """Retrying a completed run creates a pending form prompt with no old answer."""
     execution_id, prompt_row = start_pending_form_prompt(
         syntara_api,
         workflow_factory,
         first_project_id,
-        track_execution=form_prompt_execution_cleanup,
+        track_execution=form_execution_cleanup,
         workflow_name_prefix="e2e-form-prompt-retry",
         description="E2E: form prompt lifecycle behavior",
         producer_output={"ready": True},
@@ -84,7 +84,7 @@ def test_retry_waits_for_new_form_prompt_response(
     assert retry_response.status_code == HTTPStatus.CREATED
     retried = retry_response.assert_and_get()
     retried_execution_id = UUID(str(retried.id))
-    form_prompt_execution_cleanup(retried_execution_id)
+    form_execution_cleanup(retried_execution_id)
     assert retried.retried_from_execution_id == execution_id
 
     retried_prompt_row = poll_for_pending_form_prompt(syntara_api, retried_execution_id)
@@ -110,14 +110,14 @@ def test_submission_uses_execution_version_after_node_is_removed_from_current_ve
     syntara_api: SyntaraApiRegistry,
     workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
     first_project_id: UUID,
-    form_prompt_execution_cleanup: Callable[[UUID], None],
+    form_execution_cleanup: Callable[[UUID], None],
 ) -> None:
     """A running execution keeps using its version after a later edit removes the prompt node."""
     execution_id, prompt_row = start_pending_form_prompt(
         syntara_api,
         workflow_factory,
         first_project_id,
-        track_execution=form_prompt_execution_cleanup,
+        track_execution=form_execution_cleanup,
         workflow_name_prefix="e2e-form-prompt-deleted-node",
         description="E2E: form prompt lifecycle behavior",
         producer_output={"ready": True},
@@ -172,14 +172,14 @@ def test_submission_to_prompt_is_rejected_after_execution_is_cancelled(
     syntara_api: SyntaraApiRegistry,
     workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
     first_project_id: UUID,
-    form_prompt_execution_cleanup: Callable[[UUID], None],
+    form_execution_cleanup: Callable[[UUID], None],
 ) -> None:
     """Cancelling the execution cancels its prompt and rejects a later response."""
     execution_id, prompt_row = start_pending_form_prompt(
         syntara_api,
         workflow_factory,
         first_project_id,
-        track_execution=form_prompt_execution_cleanup,
+        track_execution=form_execution_cleanup,
         workflow_name_prefix="e2e-form-prompt-cancelled-submission",
         description="E2E: reject form prompt submission after execution cancellation",
         producer_output={"ready": True},
@@ -219,14 +219,14 @@ def test_duplicate_submission_does_not_change_form_prompt_response(
     syntara_api: SyntaraApiRegistry,
     workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
     first_project_id: UUID,
-    form_prompt_execution_cleanup: Callable[[UUID], None],
+    form_execution_cleanup: Callable[[UUID], None],
 ) -> None:
     """Only the first response can be stored for a form prompt."""
     execution_id, prompt_row = start_pending_form_prompt(
         syntara_api,
         workflow_factory,
         first_project_id,
-        track_execution=form_prompt_execution_cleanup,
+        track_execution=form_execution_cleanup,
         workflow_name_prefix="e2e-form-prompt-duplicate",
         description="E2E: form prompt lifecycle behavior",
         producer_output={"ready": True},

@@ -62,7 +62,7 @@ def test_dropdown_options_resolved_in_get_response(
     syntara_api: SyntaraApiRegistry,
     workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
     first_project_id: UUID,
-    form_prompt_execution_cleanup: Callable[[UUID], None],
+    form_execution_cleanup: Callable[[UUID], None],
 ) -> None:
     """Resolved dropdown options are persisted with the form prompt.
 
@@ -79,7 +79,7 @@ def test_dropdown_options_resolved_in_get_response(
         syntara_api,
         workflow_factory,
         first_project_id,
-        form_prompt_execution_cleanup,
+        form_execution_cleanup,
         response_window=30,
     )
     prompt = get_form_prompt(syntara_api, UUID(str(prompt_row.id)))
@@ -95,7 +95,7 @@ def test_text_field_default_resolved_from_execution_context(
     syntara_api: SyntaraApiRegistry,
     workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
     first_project_id: UUID,
-    form_prompt_execution_cleanup: Callable[[UUID], None],
+    form_execution_cleanup: Callable[[UUID], None],
 ) -> None:
     """A text default expression resolves to its native string value.
 
@@ -111,7 +111,7 @@ def test_text_field_default_resolved_from_execution_context(
         syntara_api,
         workflow_factory,
         first_project_id,
-        form_prompt_execution_cleanup,
+        form_execution_cleanup,
         response_window=30,
     )
     prompt = get_form_prompt(syntara_api, UUID(str(prompt_row.id)))
@@ -126,7 +126,7 @@ def test_submit_resolved_value_resumes_workflow(
     syntara_api: SyntaraApiRegistry,
     workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
     first_project_id: UUID,
-    form_prompt_execution_cleanup: Callable[[UUID], None],
+    form_execution_cleanup: Callable[[UUID], None],
 ) -> None:
     """Submitting values accepted by the resolved form resumes downstream work.
 
@@ -139,7 +139,7 @@ def test_submit_resolved_value_resumes_workflow(
     - The submit returns 200 and execution completes.
     - The consumer completes and the prompt activity records the submission.
     """
-    exec_id, prompt_row = _start(syntara_api, workflow_factory, first_project_id, form_prompt_execution_cleanup)
+    exec_id, prompt_row = _start(syntara_api, workflow_factory, first_project_id, form_execution_cleanup)
     submitted = {"environment": "prod", "version": "v9.9.9"}
     response = submit_form_prompt(syntara_api, UUID(str(prompt_row.id)), submitted)
     assert response.status_code == HTTPStatus.OK
@@ -158,7 +158,7 @@ def test_pending_prompt_listed_for_execution(
     syntara_api: SyntaraApiRegistry,
     workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
     first_project_id: UUID,
-    form_prompt_execution_cleanup: Callable[[UUID], None],
+    form_execution_cleanup: Callable[[UUID], None],
 ) -> None:
     """The list endpoint filters pending form prompts by execution.
 
@@ -173,7 +173,7 @@ def test_pending_prompt_listed_for_execution(
         syntara_api,
         workflow_factory,
         first_project_id,
-        form_prompt_execution_cleanup,
+        form_execution_cleanup,
         response_window=30,
     )
     listed = assert_and_get_with_502_skip(

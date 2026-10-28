@@ -74,7 +74,7 @@ def test_submit_value_not_in_resolved_options_returns_422(
     syntara_api: SyntaraApiRegistry,
     workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
     first_project_id: UUID,
-    form_prompt_execution_cleanup: Callable[[UUID], None],
+    form_execution_cleanup: Callable[[UUID], None],
     bad_value: str,
 ) -> None:
     """A value outside the persisted option snapshot is rejected.
@@ -91,7 +91,7 @@ def test_submit_value_not_in_resolved_options_returns_422(
         syntara_api,
         workflow_factory,
         first_project_id,
-        form_prompt_execution_cleanup,
+        form_execution_cleanup,
         response_window=30,
     )
     prompt_id = UUID(str(prompt_row.id))
@@ -110,7 +110,7 @@ def test_prompt_remains_pending_after_rejected_submission(
     syntara_api: SyntaraApiRegistry,
     workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
     first_project_id: UUID,
-    form_prompt_execution_cleanup: Callable[[UUID], None],
+    form_execution_cleanup: Callable[[UUID], None],
 ) -> None:
     """A rejected submission leaves the prompt live and able to accept valid input.
 
@@ -129,7 +129,7 @@ def test_prompt_remains_pending_after_rejected_submission(
         syntara_api,
         workflow_factory,
         first_project_id,
-        form_prompt_execution_cleanup,
+        form_execution_cleanup,
     )
     prompt_id = UUID(str(prompt_row.id))
     _assert_options_resolved(syntara_api, prompt_id)
@@ -159,7 +159,7 @@ def test_submit_valid_resolved_value_succeeds(
     syntara_api: SyntaraApiRegistry,
     workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
     first_project_id: UUID,
-    form_prompt_execution_cleanup: Callable[[UUID], None],
+    form_execution_cleanup: Callable[[UUID], None],
 ) -> None:
     """A value from the resolved option snapshot is accepted.
 
@@ -175,7 +175,7 @@ def test_submit_valid_resolved_value_succeeds(
         syntara_api,
         workflow_factory,
         first_project_id,
-        form_prompt_execution_cleanup,
+        form_execution_cleanup,
     )
     prompt_id = UUID(str(prompt_row.id))
     _assert_options_resolved(syntara_api, prompt_id)
@@ -189,7 +189,7 @@ def test_multi_select_rejects_partially_invalid_selection(
     syntara_api: SyntaraApiRegistry,
     workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
     first_project_id: UUID,
-    form_prompt_execution_cleanup: Callable[[UUID], None],
+    form_execution_cleanup: Callable[[UUID], None],
 ) -> None:
     """Multi-select validation rejects a mixed valid and invalid selection.
 
@@ -207,7 +207,7 @@ def test_multi_select_rejects_partially_invalid_selection(
         syntara_api,
         workflow_factory,
         first_project_id,
-        form_prompt_execution_cleanup,
+        form_execution_cleanup,
         field_type="multi_select",
         field_name="environments",
         response_window=30,
