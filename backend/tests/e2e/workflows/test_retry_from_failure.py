@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 from orchestrator_test_sdk.e2e import unique_name
+from orchestrator_test_sdk.e2e.auth import api_for
 from orchestrator_test_sdk.e2e.helpers import create_and_run_workflow, poll_execution_until_complete
 from syntara_api_client.models import ExecutionCreate, RetryFailureRequest
 from syntara_api_client.models.execution_status import ExecutionStatus
@@ -20,6 +21,12 @@ from syntara_api_client.models.execution_status import ExecutionStatus
 if TYPE_CHECKING:
     from uuid import UUID
 
+    from orchestrator_test_sdk.factories import (
+        AssignProjectRoleFactory,
+        ProjectFactory,
+        ProjectRoleFactory,
+        UserFactory,
+    )
     from syntara_api_client.api import SyntaraApiRegistry
     from syntara_api_client.models import ExecutionRead
     from syntara_api_client.models.activity_data import ActivityData
@@ -427,3 +434,80 @@ def test_retry_resumes_loop_at_failed_iteration_and_replays_earlier_iteration(
     assert _activity_output(retry_activities["loop_body#iter-1"]).get("stdout", "").strip() == "bravo"
     assert retry_activities["loop_body#iter-2"].status == "completed"
     assert _activity_output(retry_activities["loop_body#iter-2"]).get("stdout", "").strip() == "charlie"
+
+
+def test_retry_input_overrides_require_workflow_update_permission(
+    syntara_api: SyntaraApiRegistry,
+    syntara_base_url: str,
+    create_project: ProjectFactory,
+    create_user: UserFactory,
+    create_project_role: ProjectRoleFactory,
+    assign_project_role_to_user: AssignProjectRoleFactory,
+) -> None:
+    """A run-only user may retry normally but needs workflow edit permission for overrides."""
+    project_id, _ = create_project(syntara_api, "retry-override-authz")
+    name = unique_name("e2e-retry-override-authz")
+    definition = _workflow_definition(
+        name,
+        [_script_node("failure", "raise SystemExit(1)")],
+        [{"from": "trigger", "to": "failure"}],
+    )
+    source = create_and_run_workflow(
+        syntara_api,
+        name,
+        definition,
+        timeout=60,
+        project_id=project_id,
+    )
+    assert source.status == ExecutionStatus.FAILED
+
+    run_only_user_id, run_only_username, run_only_password = create_user(syntara_api, "retry-run-only")
+    run_only_role = create_project_role(syntara_api, project_id, "retry-run-only", ["execution:run:project"])
+    assign_project_role_to_user(syntara_api, project_id, run_only_user_id, run_only_role)
+    run_only_api = api_for(syntara_base_url, run_only_username, run_only_password)
+
+    denied_override = run_only_api.executions.retry_from_failure(
+        execution_id=source.id,
+        body=RetryFailureRequest.from_dict(
+            {
+                "retry_point_ids": ["failure"],
+                "input_parameter_overrides": {"failure": {"code": "print('not authorized')"}},
+            }
+        ),
+    )
+    assert denied_override.status_code == HTTPStatus.FORBIDDEN
+
+    # AC-14 only adds workflow edit permission for overrides; ordinary retries still need run.
+    ordinary_retry = _start_retry(run_only_api, source.id, "failure")
+    ordinary_retry_final = poll_execution_until_complete(syntara_api, ordinary_retry.id, max_polls=60, poll_interval=1)
+    assert ordinary_retry_final.status == ExecutionStatus.FAILED
+
+    editor_user_id, editor_username, editor_password = create_user(syntara_api, "retry-workflow-editor")
+    editor_role = create_project_role(
+        syntara_api,
+        project_id,
+        "retry-workflow-editor",
+        ["execution:run:project", "workflow:update:project"],
+    )
+    assign_project_role_to_user(syntara_api, project_id, editor_user_id, editor_role)
+    editor_api = api_for(syntara_base_url, editor_username, editor_password)
+
+    authorized_retry = _start_retry(
+        editor_api,
+        source.id,
+        "failure",
+        overrides={"failure": {"code": "print('repaired')"}},
+    )
+    assert authorized_retry.retried_from_execution_id == source.id
+    assert authorized_retry.workflow_version_id == source.workflow_version_id
+    authorized_retry_final = poll_execution_until_complete(
+        syntara_api, authorized_retry.id, max_polls=60, poll_interval=1
+    )
+    assert authorized_retry_final.status == ExecutionStatus.COMPLETED, authorized_retry_final.error_details
+
+    # The override belongs only to the retry; a later standard run still executes the failing definition.
+    later_run = syntara_api.executions.create(
+        body=ExecutionCreate(workflow_id=source.workflow_id, trigger_node_id="trigger")
+    ).assert_and_get()
+    later_run_final = poll_execution_until_complete(syntara_api, later_run.id, max_polls=60, poll_interval=1)
+    assert later_run_final.status == ExecutionStatus.FAILED
