@@ -14,7 +14,7 @@ import {
   WorkflowVersionStatusEnum,
 } from '@syntara/contracts'
 import { credentials, credentialTypes, credentialWorkflows } from './resources/credentials'
-import { executionTargets } from './resources/executionTargets'
+import { executionTargets, MOCK_DELETE_CONFLICT_LABEL } from './resources/executionTargets'
 import { integrations } from './resources/integrations'
 import { models } from './resources/models'
 import { workflows } from './resources/workflows'
@@ -566,6 +566,73 @@ export const handlers = [
       )
     }
     return HttpResponse.json(target)
+  }),
+
+  /**
+   * DELETE execution target — 202 Accepted (draining continues independently).
+   * 409 when the target is the current default or marked with the mock in-use label.
+   * Mock removes the row on success for deterministic list/pagination tests; the UI
+   * must still treat 202 as success without requiring immediate absence from the list.
+   */
+  http.delete('/api/execution_plane/v1/execution_targets/:target_id', ({ request, params }) => {
+    const username = getUsernameFromRequest(request)
+    if (username !== 'admin') {
+      return HttpResponse.json(
+        {
+          type: 'https://api.example.com/errors/forbidden',
+          title: 'Forbidden',
+          detail: 'Insufficient permissions for execution_target:delete',
+          code: 'FORBIDDEN',
+          retryable: false,
+        },
+        { status: 403 }
+      )
+    }
+
+    const targetId = params.target_id as string
+    const index = executionTargets.findIndex((item) => item.id === targetId)
+    if (index === -1) {
+      return HttpResponse.json(
+        {
+          type: 'https://api.example.com/errors/not-found',
+          title: 'Not Found',
+          detail: `Execution target ${targetId} not found`,
+          code: 'NOT_FOUND',
+          retryable: false,
+        },
+        { status: 404 }
+      )
+    }
+
+    const target = executionTargets[index]
+    if (target?.is_default) {
+      return HttpResponse.json(
+        {
+          type: 'https://api.example.com/errors/conflict',
+          title: 'Conflict',
+          detail: 'Cannot delete the default execution target; promote another target first',
+          code: 'CONFLICT',
+          retryable: false,
+        },
+        { status: 409 }
+      )
+    }
+
+    if (target?.labels?.[MOCK_DELETE_CONFLICT_LABEL]) {
+      return HttpResponse.json(
+        {
+          type: 'https://api.example.com/errors/conflict',
+          title: 'Conflict',
+          detail: 'Execution target is in use and cannot be deleted',
+          code: 'CONFLICT',
+          retryable: false,
+        },
+        { status: 409 }
+      )
+    }
+
+    executionTargets.splice(index, 1)
+    return HttpResponse.json({ id: targetId, accepted: true as const }, { status: 202 })
   }),
 
   http.get('/api/v1/integrations', ({ request }) => {

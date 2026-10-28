@@ -4,6 +4,15 @@ import { mockDate } from './mockDates'
 
 type ExecutionTargetFacadeRead = ExecutionPlaneAPI.components['schemas']['ExecutionTargetFacadeRead']
 
+/** Seeded default target — DELETE returns 409 until another target is promoted. */
+export const DEFAULT_EXECUTION_TARGET_ID = 'a1000000-0000-4000-8000-000000000001'
+
+/** Seeded non-default target (Worker Pool 01) that DELETE rejects with 409 (in-use). */
+export const IN_USE_DELETE_CONFLICT_TARGET_ID = 'a1000000-0000-4000-8000-000000000101'
+
+/** Label key the DELETE mock uses to force a lifecycle conflict (409). */
+export const MOCK_DELETE_CONFLICT_LABEL = 'mock_delete_conflict'
+
 /** EP `TargetStatus` values used by the seeded mock dataset. */
 const STATUSES = ['active', 'bootstrapping', 'degraded', 'registering', 'failed', 'validating', 'draining'] as const
 const REGIONS = ['us-west', 'us-east', 'eu-central', 'ap-south'] as const
@@ -16,8 +25,9 @@ function buildExtraTargets(count: number): ExecutionTargetFacadeRead[] {
     const idSuffix = String(100 + n).padStart(12, '0')
     const status = STATUSES[index % STATUSES.length]
     const region = REGIONS[index % REGIONS.length]
+    const id = `a1000000-0000-4000-8000-${idSuffix}`
     return {
-      id: `a1000000-0000-4000-8000-${idSuffix}`,
+      id,
       cluster_id: `b1000000-0000-4000-8000-${idSuffix}`,
       name: `Worker Pool ${padded}`,
       backend_type: 'kubernetes',
@@ -36,6 +46,7 @@ function buildExtraTargets(count: number): ExecutionTargetFacadeRead[] {
         region,
         env: index % 2 === 0 ? 'prod' : 'dev',
         pool: `pool-${padded}`,
+        ...(id === IN_USE_DELETE_CONFLICT_TARGET_ID ? { [MOCK_DELETE_CONFLICT_LABEL]: 'in-use' } : {}),
       },
       created_at: mockDate.daysAgo1,
       last_ran_at: index % 4 === 0 ? mockDate.hoursAgo2 : null,
@@ -46,7 +57,7 @@ function buildExtraTargets(count: number): ExecutionTargetFacadeRead[] {
 /** Seeded Execution Plane facade targets for mock API / visual regression / pagination. */
 export const executionTargets: ExecutionTargetFacadeRead[] = [
   {
-    id: 'a1000000-0000-4000-8000-000000000001',
+    id: DEFAULT_EXECUTION_TARGET_ID,
     cluster_id: 'b1000000-0000-4000-8000-000000000001',
     name: 'Prod OpenShift West',
     backend_type: 'kubernetes',
