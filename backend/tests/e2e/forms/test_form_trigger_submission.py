@@ -180,6 +180,7 @@ def test_coerced_submission_reaches_both_trigger_namespaces(
     assert execution.input_data is not None
     assert execution.input_data.to_dict() == {
         "required_text": "test submission",
+        "environment": None,
         "count": 42.0,
         "contact": "Bob@example.com",
     }

@@ -73,11 +73,36 @@ class TestSubmissionFlow:
 
         assert cleaned == {"name": "bob", "age": 30, "subscribe": True, "start": "2026-01-05"}
 
-    def test_absent_optional_key_omitted(self) -> None:
-        """An absent optional field is omitted entirely, not set to None."""
+    def test_absent_optional_text_field_has_empty_output(self) -> None:
+        """An absent optional text field is emitted with its type-compatible empty value."""
         cleaned = validate_form_submission(_form(_field("text", "name")), {})
 
-        assert cleaned == {}
+        assert cleaned == {"name": ""}
+
+    @pytest.mark.parametrize(
+        ("field_type", "overrides", "expected"),
+        [
+            ("text", {}, ""),
+            ("textarea", {}, ""),
+            ("masked_text", {}, ""),
+            ("email", {}, ""),
+            ("date", {}, ""),
+            ("number", {}, None),
+            ("dropdown", {"options": _STATIC_OPTIONS}, None),
+            ("checkbox", {}, False),
+            ("multi_select", {"options": _STATIC_OPTIONS}, []),
+        ],
+    )
+    def test_absent_optional_field_has_type_compatible_empty_output(
+        self,
+        field_type: str,
+        overrides: dict[str, Any],
+        expected: Any,  # noqa: ANN401
+    ) -> None:
+        """Omitted optional fields without defaults still appear in cleaned data."""
+        form = _form(_field(field_type, "answer", **overrides))
+
+        assert validate_form_submission(form, {}) == {"answer": expected}
 
     @pytest.mark.parametrize("empty", ["", [], None])
     def test_explicit_empty_value_clears_default(self, empty: Any) -> None:  # noqa: ANN401
@@ -611,9 +636,9 @@ class TestDateFieldSubmission:
 
         assert "Invalid timezone: 'Mars/Olympus'" in errors[0].message
 
-    def test_absent_optional_date_is_omitted(self) -> None:
-        """An unanswered optional date field contributes no key."""
-        assert validate_form_submission(self._date_form(), {}) == {}
+    def test_absent_optional_date_has_empty_output(self) -> None:
+        """An unanswered optional date is emitted as an empty ISO-string value."""
+        assert validate_form_submission(self._date_form(), {}) == {"start": ""}
 
     def test_absent_required_date_reports_required(self) -> None:
         """The inherited required flag governs skipping the field entirely."""

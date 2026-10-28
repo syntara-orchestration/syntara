@@ -75,15 +75,30 @@ describe('validateFormSubmission', () => {
     })
   })
 
-  it('omits absent optional fields rather than setting null', () => {
+  it('includes absent optional fields with a type-compatible empty value', () => {
     const cleaned = validateFormSubmission(form(field(FormFieldTypeEnum.TEXT, 'name')), {})
-    expect(cleaned).toEqual({})
+    expect(cleaned).toEqual({ name: '' })
   })
 
   it.each(['', [], null] as const)('normalizes explicit empty values without applying defaults', (empty) => {
     const definition = form(field(FormFieldTypeEnum.TEXT, 'name', { default: 'anon' }))
     const cleaned = validateFormSubmission(definition, { name: empty })
     expect(cleaned).toEqual({ name: '' })
+  })
+
+  it.each([
+    [FormFieldTypeEnum.TEXT, {} as const, ''],
+    [FormFieldTypeEnum.TEXTAREA, {} as const, ''],
+    [FormFieldTypeEnum.MASKED_TEXT, {} as const, ''],
+    [FormFieldTypeEnum.EMAIL, {} as const, ''],
+    [FormFieldTypeEnum.DATE, {} as const, ''],
+    [FormFieldTypeEnum.NUMBER, {} as const, null],
+    [FormFieldTypeEnum.DROPDOWN, { options: staticOptions } as const, null],
+    [FormFieldTypeEnum.CHECKBOX, {} as const, false],
+    [FormFieldTypeEnum.MULTI_SELECT, { options: staticOptions } as const, []],
+  ] as const)('includes an omitted optional %s field with its typed empty value', (fieldType, overrides, expected) => {
+    const definition = form(field(fieldType, 'answer', overrides))
+    expect(validateFormSubmission(definition, {})).toEqual({ answer: expected })
   })
 
   it.each([

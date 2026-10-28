@@ -111,8 +111,7 @@ def validate_form_submission(
             raw = field.default
 
         # Step 3: Required fields must resolve to a non-empty value. Optional
-        # explicit empties are normalized to the field's output type; absent
-        # optional fields remain omitted. False is not empty, including for checkboxes.
+        # absent or explicitly empty fields get a type-compatible empty output.
         if raw is _MISSING or _is_empty(raw):
             if field.required:
                 errors.append(
@@ -123,7 +122,7 @@ def validate_form_submission(
                         message="This field is required",
                     )
                 )
-            elif raw is not _MISSING:
+            else:
                 cleaned[field.value_name] = _empty_value_for_field(field)
             continue
 

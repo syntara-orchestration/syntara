@@ -375,9 +375,7 @@ function fieldError(
 }
 
 type FieldSubmissionOutcome =
-  | { status: 'omit' }
-  | { status: 'invalid'; error: FormFieldValidationError }
-  | { status: 'valid'; value: FormSubmissionData[string] }
+  { status: 'invalid'; error: FormFieldValidationError } | { status: 'valid'; value: FormSubmissionData[string] }
 
 function resolveSubmittedRaw(field: FormField, submitted: FormSubmissionInput): unknown {
   let raw: unknown = Object.hasOwn(submitted, field.value_name) ? submitted[field.value_name] : MISSING
@@ -401,9 +399,6 @@ function validateFieldSubmission(field: FormField, submitted: FormSubmissionInpu
   if (raw === MISSING || isEmptyValue(raw)) {
     if (field.required) {
       return { status: 'invalid', error: fieldError(field, 'required', 'This field is required') }
-    }
-    if (raw === MISSING || raw === undefined) {
-      return { status: 'omit' }
     }
     return { status: 'valid', value: emptyValueForField(field) }
   }
@@ -459,7 +454,7 @@ export function validateFormSubmission(form: FormDefinition, submitted: FormSubm
     const outcome = validateFieldSubmission(field, submitted)
     if (outcome.status === 'invalid') {
       errors.push(outcome.error)
-    } else if (outcome.status === 'valid') {
+    } else {
       cleaned[field.value_name] = outcome.value
     }
   }
