@@ -569,9 +569,6 @@ describe('AAPStepForm', () => {
       expect(screen.getByPlaceholderText('{"key": "value"} or drag expression')).toBeInTheDocument()
     })
 
-    // AAP-95762: extra_vars supports dragging an input variable into it while the
-    // template is still selected normally (by job_template_id), so an expression
-    // there alone must not flip the node into full expression mode.
     it('does not enable the toggle for extra_vars expressions and still shows the saved value', () => {
       const savedExtraVars = '{"app_version": "${inputs.version}"}'
       renderWithHeader(

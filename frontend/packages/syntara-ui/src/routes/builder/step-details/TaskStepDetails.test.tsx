@@ -359,9 +359,6 @@ describe('TaskStepDetails Component', () => {
     expect(screen.getByTestId('aap-step-form')).toBeInTheDocument()
   })
 
-  // AAP-95762: dragging an input variable into extra_vars must not flip on
-  // "use input variables" when the template itself was selected normally
-  // (by job_template_id, with plain organization/template names).
   it('does not enable use_input_variables for a normally-selected template whose extra_vars contains a dragged expression', () => {
     const taskData = {
       type: 'aap_job_template' as const,
