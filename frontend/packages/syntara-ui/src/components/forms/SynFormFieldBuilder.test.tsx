@@ -7,7 +7,13 @@ import { useState } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
-import { FormFieldTypeEnum, formDefinitionToJsonSchemaString, parseFormDefinition } from '../../forms'
+import {
+  FormFieldTypeEnum,
+  formDefinitionToJsonSchemaString,
+  parseFormDefinition,
+  safeParseFormDefinition,
+  type FormDefinitionSchemaInput,
+} from '../../forms'
 
 import { createEmptyFormDefinition } from './formFieldBuilder/createDefaultField'
 import { FORM_FIELD_BUILDER_INITIAL_ANSWER_DYNAMIC_UNAVAILABLE_HINT } from './formFieldBuilder/formFieldBuilderInitialAnswerCopy'
@@ -22,7 +28,7 @@ function ControlledSynFormFieldBuilder({
   onChange,
   ...rest
 }: Omit<SynFormFieldBuilderProps, 'value' | 'onChange'> & {
-  onChange?: (definition: FormDefinition) => void
+  onChange?: (definition: FormDefinitionSchemaInput) => void
 }) {
   const [definition, setDefinition] = useState(createEmptyFormDefinition())
   return (
@@ -286,6 +292,74 @@ describe('SynFormFieldBuilder', () => {
       expect(dateInput).toHaveValue('03/15/2026')
     })
 
+    it('accepts a partial initial answer (date only on a date+time field) without showing errors', async () => {
+      const user = userEvent.setup()
+      const definition = parseFormDefinition({
+        fields: [
+          {
+            type: FormFieldTypeEnum.DATE,
+            value_name: 'due',
+            label: 'Due',
+            include_date: true,
+            include_time: true,
+            default: null,
+          },
+        ],
+      })
+      renderBuilder(<SynFormFieldBuilder value={definition} onChange={vi.fn()} />)
+
+      const dateInput = screen.getByRole('textbox', { name: 'Initial answer date' })
+      await user.type(dateInput, '03/15/2026')
+      await user.tab()
+
+      // Partial defaults are valid — no error should appear anywhere.
+      expect(screen.queryByText(/Default is missing/i)).not.toBeInTheDocument()
+      expect(screen.queryByText(/Enter time to save/i)).not.toBeInTheDocument()
+    })
+
+    it('emits the partial initial answer via onChange', async () => {
+      const user = userEvent.setup()
+      const onChange = vi.fn()
+      const definition = parseFormDefinition({
+        fields: [
+          {
+            type: FormFieldTypeEnum.DATE,
+            value_name: 'due',
+            label: 'Due',
+            include_date: true,
+            include_time: true,
+            default: null,
+          },
+        ],
+      })
+      renderBuilder(<SynFormFieldBuilder value={definition} onChange={onChange} />)
+
+      const dateInput = screen.getByRole('textbox', { name: 'Initial answer date' })
+      await user.type(dateInput, '03/15/2026')
+
+      await waitFor(() => expect(onChange).toHaveBeenCalled())
+      const last = onChange.mock.calls[onChange.mock.calls.length - 1][0]
+      expect(last.fields[0].default).toMatchObject({ date: '2026-03-15' })
+    })
+
+    it('does not show errors when initial answer is fully filled', async () => {
+      const definition = parseFormDefinition({
+        fields: [
+          {
+            type: FormFieldTypeEnum.DATE,
+            value_name: 'due',
+            label: 'Due',
+            include_date: true,
+            include_time: true,
+            default: { date: '2026-03-15', time: '09:00' },
+          },
+        ],
+      })
+      renderBuilder(<SynFormFieldBuilder value={definition} onChange={vi.fn()} />)
+
+      expect(screen.queryByText(/Default is missing/i)).not.toBeInTheDocument()
+    })
+
     it('shows initial answer time when time is enabled in show in form', async () => {
       const user = userEvent.setup()
       const definition = parseFormDefinition({
@@ -396,18 +470,29 @@ describe('SynFormFieldBuilder', () => {
 
     it('requires dynamic expression, label key, and value key before saving', async () => {
       const user = userEvent.setup()
-      const onChange = vi.fn<(definition: FormDefinition) => void>()
+      const onChange = vi.fn<(definition: FormDefinitionSchemaInput) => void>()
       renderBuilder(<SynFormFieldBuilder value={dropdownFieldDefinition()} onChange={onChange} />)
 
       await user.click(screen.getByRole('button', { name: 'Dynamic' }))
       expect(screen.getByText(FORM_FIELD_BUILDER_INITIAL_ANSWER_DYNAMIC_UNAVAILABLE_HINT)).toBeInTheDocument()
       await user.type(screen.getByRole('textbox', { name: 'Dynamic options expression' }), 'steps.envs')
       expect(screen.getByRole('textbox', { name: 'Dynamic options expression' })).toHaveValue('steps.envs')
-      expect(onChange).not.toHaveBeenCalled()
+      await waitFor(() => expect(onChange).toHaveBeenCalled())
+      const partialDraft = onChange.mock.calls.at(-1)?.[0]
+      expect(safeParseFormDefinition(partialDraft).success).toBe(false)
+      expect(partialDraft?.fields[0]).toMatchObject({
+        options: expect.objectContaining({
+          source: 'dynamic',
+          expression: 'steps.envs',
+        }),
+      })
 
       await user.type(screen.getByRole('textbox', { name: 'Label key' }), 'name')
       await user.type(screen.getByRole('textbox', { name: 'Value key' }), 'id')
-      await waitFor(() => expect(onChange).toHaveBeenCalled())
+      await waitFor(() => {
+        const last = onChange.mock.calls.at(-1)?.[0]
+        expect(safeParseFormDefinition(last).success).toBe(true)
+      })
       expect(onChange.mock.calls.at(-1)?.[0].fields[0]).toMatchObject({
         options: {
           source: 'dynamic',
@@ -436,7 +521,7 @@ describe('SynFormFieldBuilder', () => {
     })
   })
 
-  it('shows validation alert when value name is invalid and does not persist to parent', async () => {
+  it('shows validation alert when value name is invalid and syncs draft to the parent form', async () => {
     const user = userEvent.setup()
     const onChange = vi.fn()
     const definition = parseFormDefinition({
@@ -450,8 +535,12 @@ describe('SynFormFieldBuilder', () => {
     await user.clear(valueNameInput)
     await user.type(valueNameInput, '1bad')
 
-    expect(screen.getByText('Fix validation errors before changes are saved to the parent form.')).toBeInTheDocument()
-    expect(onChange).not.toHaveBeenCalled()
+    expect(screen.getByText('Fix validation errors before saving the workflow.')).toBeInTheDocument()
+    expect(onChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        fields: [expect.objectContaining({ value_name: '1bad' })],
+      })
+    )
   })
 
   it('shows an error when JSON Schema import is invalid', async () => {

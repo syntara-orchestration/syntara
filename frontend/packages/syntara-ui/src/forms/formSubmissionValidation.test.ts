@@ -305,6 +305,24 @@ describe('validateFormDefinitionDefaults', () => {
 
     expect(() => validateFormDefinitionDefaults(definition)).not.toThrow()
   })
+
+  it('allows a partial date default when the field collects more components', () => {
+    const definition = parseFormDefinition({
+      fields: [
+        {
+          type: FormFieldTypeEnum.DATE,
+          value_name: 'start',
+          label: 'Start',
+          include_date: true,
+          include_time: true,
+          include_timezone: true,
+          default: { date: '2026-01-15' },
+        },
+      ],
+    })
+
+    expect(() => validateFormDefinitionDefaults(definition)).not.toThrow()
+  })
 })
 
 describe('assertValidFormDefinition', () => {
@@ -338,10 +356,12 @@ describe('date field submission', () => {
     expect(validateFormSubmission(dateForm(toggles), { start: submitted })).toEqual({ start: submitted })
   })
 
-  it('rejects a submission missing an included component', () => {
-    const definition = dateForm({ include_time: true, include_timezone: true })
+  it('accepts a partial submission when some included components are blank', () => {
+    const definition = dateForm({ required: true, include_time: true, include_timezone: true })
 
-    expectValidationErrors(definition, { start: { date: '2026-01-05', time: '14:30' } }, [['start', 'invalid_format']])
+    expect(validateFormSubmission(definition, { start: { date: '2026-01-05', time: '14:30' } })).toEqual({
+      start: { date: '2026-01-05', time: '14:30' },
+    })
   })
 
   it('rejects a component the field does not collect', () => {
@@ -355,7 +375,7 @@ describe('date field submission', () => {
   })
 
   it('treats a blank component as absent', () => {
-    expectValidationErrors(dateForm(), { start: { date: '' } }, [['start', 'invalid_format']])
+    expectValidationErrors(dateForm({ required: true }), { start: { date: '' } }, [['start', 'required']])
   })
 
   it('rejects an unknown IANA timezone', () => {
@@ -373,6 +393,61 @@ describe('date field submission', () => {
 
     expect(validateFormSubmission(definition, {})).toEqual({
       start: { date: '2026-03-01', time: '08:00', timezone: 'Europe/Paris' },
+    })
+  })
+
+  it('does not apply a partial date default when the responder omits the field', () => {
+    const definition = dateForm({
+      include_time: true,
+      include_timezone: true,
+      default: { date: '2026-03-01' },
+    })
+
+    expect(validateFormSubmission(definition, {})).toEqual({})
+  })
+
+  it('keeps a partial answer on optional date fields', () => {
+    const definition = dateForm({
+      required: false,
+      include_time: true,
+      include_timezone: true,
+    })
+
+    expect(validateFormSubmission(definition, { start: { date: '2026-04-01' } })).toEqual({
+      start: { date: '2026-04-01' },
+    })
+  })
+
+  it('accepts a required date field when only the date component is supplied', () => {
+    const definition = dateForm({
+      required: true,
+      include_time: true,
+      include_timezone: true,
+    })
+
+    expect(validateFormSubmission(definition, { start: { date: '2026-04-01' } })).toEqual({
+      start: { date: '2026-04-01' },
+    })
+  })
+
+  it('accepts a required date field with a prefilled partial initial answer on submit', () => {
+    const definition = parseFormDefinition({
+      fields: [
+        {
+          type: FormFieldTypeEnum.DATE,
+          value_name: 'start',
+          label: 'Start',
+          required: true,
+          include_date: true,
+          include_time: true,
+          include_timezone: true,
+          default: { date: '2026-03-01' },
+        },
+      ],
+    })
+
+    expect(validateFormSubmission(definition, { start: { date: '2026-03-01' } })).toEqual({
+      start: { date: '2026-03-01' },
     })
   })
 })

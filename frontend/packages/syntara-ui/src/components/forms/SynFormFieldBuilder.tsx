@@ -20,7 +20,7 @@ type BuilderTab = 'design' | 'preview' | 'json'
 
 export type SynFormFieldBuilderProps = {
   value: FormDefinition
-  onChange: (definition: FormDefinition) => void
+  onChange: (definition: FormDefinitionSchemaInput) => void
   isDisabled?: boolean
   /** When true, shows only the field cards (no Design / Preview / JSON tabs). */
   designOnly?: boolean
@@ -71,16 +71,22 @@ export function SynFormFieldBuilder({
 
   const commit = useCallback(() => {
     const raw = methods.getValues()
-    // Keep builder toggles as the user set them (e.g. time on, timezone off). API repair runs on publish via
-    // prepareFormDefinitionForCommit — do not reset RHF here or checkboxes snap back.
     const parsed = safeParseFormDefinition(raw)
-    if (!parsed.success) {
+    if (parsed.success) {
+      const next = JSON.stringify(parsed.data)
+      if (next !== lastEmittedRef.current) {
+        lastEmittedRef.current = next
+        onChange(parsed.data)
+      }
       return
     }
-    const next = JSON.stringify(parsed.data)
-    if (next !== lastEmittedRef.current) {
-      lastEmittedRef.current = next
-      onChange(parsed.data)
+
+    // Keep the parent form in sync while editing so workflow save/run cannot succeed with a
+    // stale valid definition when the builder shows validation errors.
+    const draftKey = JSON.stringify(raw)
+    if (draftKey !== lastEmittedRef.current) {
+      lastEmittedRef.current = draftKey
+      onChange(raw)
     }
   }, [methods, onChange])
 

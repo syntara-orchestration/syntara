@@ -15,7 +15,7 @@ import {
   waitForUIReady,
 } from './workflows'
 
-export const FORM_BUILDER_VALIDATION_ALERT = 'Fix validation errors before changes are saved to the parent form.'
+export const FORM_BUILDER_VALIDATION_ALERT = 'Fix validation errors before saving the workflow.'
 
 export const FORM_FIELD_TYPE_MENU_LABELS = {
   text: 'Text',

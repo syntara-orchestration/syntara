@@ -328,22 +328,6 @@ def test_publish_rejects_invalid_form_definition_and_it_cannot_run_as_published(
             "Invalid timezone",
         ),
         (
-            "date_default_missing_component",
-            [
-                {
-                    "type": "date",
-                    "value_name": "when",
-                    "label": "When",
-                    "include_date": False,
-                    "include_timezone": True,
-                    "default": {},
-                }
-            ],
-            "form_prompt_configuration",
-            "parameters.form_definition.fields.0",
-            "default is missing timezone",
-        ),
-        (
             "date_default_extra_component",
             [
                 {

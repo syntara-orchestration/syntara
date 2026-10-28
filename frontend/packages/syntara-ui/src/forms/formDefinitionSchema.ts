@@ -3,7 +3,10 @@ import { z } from 'zod'
 
 import { isValidIsoCalendarDate } from '../utils/isoCalendarDate'
 
-import { DATE_FIELD_DATE_AND_TIMEZONE_REQUIRES_TIME_MESSAGE } from './dateFieldValidationMessages'
+import {
+  DATE_FIELD_DATE_AND_TIMEZONE_REQUIRES_TIME_MESSAGE,
+  dateDefaultSuppliesExtraComponentsMessage,
+} from './dateFieldValidationMessages'
 import {
   FORM_DEFINITION_MAX_FIELDS,
   FORM_DEFINITION_MIN_FIELDS,
@@ -156,21 +159,16 @@ const dateFieldSchema = formFieldBaseSchema
       })
     }
 
-    // A default stands in for a whole skipped answer, so it must be complete.
+    // A partial default is allowed — the user may leave some components blank.
+    // Only reject a default that supplies components the field does not collect.
     if (field.default == null) return
 
     for (const component of DATE_COMPONENTS) {
       const supplied = field.default[component] != null
-      if (included[component] && !supplied) {
+      if (!included[component] && supplied) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: `Default is missing ${component}`,
-          path: ['default', component],
-        })
-      } else if (!included[component] && supplied) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: `Default supplies ${component}, which this field does not collect`,
+          message: dateDefaultSuppliesExtraComponentsMessage([component]),
           path: ['default', component],
         })
       }

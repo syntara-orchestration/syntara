@@ -1,5 +1,6 @@
 import type { FormDefinition, FormField } from '@syntara/contracts'
 
+import { dateDefaultSuppliesExtraComponentsMessage } from './dateFieldValidationMessages'
 import type { FormDefinitionSchemaInput } from './formDefinitionSchema'
 
 export const DATE_COMPONENT_NAMES = ['date', 'time', 'timezone'] as const
@@ -33,6 +34,25 @@ export function coerceDateValueShape(value: unknown): DateValueShape | null {
     }
   }
   return shape
+}
+
+/** Component names that carry a non-empty value, in canonical order. */
+function suppliedDateComponents(value: DateValueShape): DateComponentName[] {
+  return DATE_COMPONENT_NAMES.filter((name) => {
+    const part = value[name]
+    return part != null && part !== ''
+  })
+}
+
+/** True when the default supplies every component this field collects (substitutable on submit). */
+export function dateDefaultCoversAllIncludedComponents(field: DateFormField): boolean {
+  const shape = coerceDateValueShape(field.default)
+  if (shape === null) {
+    return false
+  }
+  const included = includedDateComponents(field)
+  const supplied = new Set(suppliedDateComponents(shape))
+  return included.every((name) => supplied.has(name))
 }
 
 /** Components this date field collects, in canonical order. */
@@ -103,28 +123,43 @@ export function isSoleIncludedDateComponent(
 }
 
 /**
- * Prune default parts and clear the default when it no longer supplies every included component.
- * Keeps form-definition validation passing after toggling show-in-form checkboxes.
+ * Prune default parts that the field no longer collects.
+ * Partial defaults (some included components blank) are preserved.
  */
 export function normalizeDateDefaultForIncludes(
   value: DateValueShape | null | undefined,
   includes: Record<DateComponentName, boolean>
 ): DateValueShape | null {
-  const pruned = pruneDateValueForIncludes(value, includes)
-  if (!pruned) {
-    return null
+  return pruneDateValueForIncludes(value, includes)
+}
+
+/** Initial answer for SynDynamicForm / form trigger run (partial defaults are prefilled for editing). */
+export function buildDateFieldFormDefault(field: DateFormField): DateValueShape | '' {
+  if (field.default == null) {
+    return ''
+  }
+  const normalized = normalizeDateDefaultForIncludes(coerceDateValueShape(field.default), dateIncludesFromField(field))
+  return normalized ?? ''
+}
+
+/**
+ * Returns an error message when the default supplies components the field does not collect.
+ * Missing components are not flagged — partial defaults are allowed.
+ */
+export function getDateDefaultCompletenessError(value: unknown, included: DateComponentName[]): string | undefined {
+  if (value == null) {
+    return undefined
   }
 
-  for (const name of DATE_COMPONENT_NAMES) {
-    if (!includes[name]) {
-      continue
-    }
-    const part = pruned[name]
-    if (part == null || part === '') {
-      return null
-    }
+  const defaultValue = coerceDateValueShape(value)
+  if (defaultValue === null) {
+    return undefined
   }
-  return pruned
+
+  const extra = DATE_COMPONENT_NAMES.filter(
+    (component) => !included.includes(component) && defaultValue[component] != null
+  )
+  return extra.length > 0 ? dateDefaultSuppliesExtraComponentsMessage(extra) : undefined
 }
 
 /** Apply a single show-in-form toggle; returns null when all components would be off. */

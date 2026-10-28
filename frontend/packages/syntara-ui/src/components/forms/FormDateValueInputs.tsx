@@ -1,5 +1,5 @@
 import { DatePicker, Stack, StackItem, TimePicker, type TimePickerProps } from '@patternfly/react-core'
-import { useCallback } from 'react'
+import { type FocusEvent, useCallback } from 'react'
 
 import type { DateComponentName, DateValueShape } from '../../forms/dateFieldUtils'
 import { formatDateMDY, isoYmdToLocalDate, normalizePickerDateToIsoYmd, parseDateMDY } from '../../utils/dateUtils'
@@ -73,6 +73,20 @@ export function FormDateValueInputs({
   const timeValue = readComponent(value, 'time')
   const timezoneValue = readComponent(value, 'timezone')
 
+  const handleContainerBlur = useCallback(
+    (event: FocusEvent<HTMLDivElement>) => {
+      if (!onBlur) {
+        return
+      }
+      const nextFocus = event.relatedTarget
+      if (nextFocus instanceof Node && event.currentTarget.contains(nextFocus)) {
+        return
+      }
+      onBlur()
+    },
+    [onBlur]
+  )
+
   const handleTimeChange = useCallback<NonNullable<TimePickerProps['onChange']>>(
     (...args) => {
       const [, time, hour, minute, , isValid] = args
@@ -91,64 +105,65 @@ export function FormDateValueInputs({
   )
 
   return (
-    <Stack hasGutter>
-      {(showDate || showTime) && (
-        <StackItem>
-          <div className={styles.dateTimeRow}>
-            {showDate && (
-              <div className={styles.dateInput}>
-                <DatePicker
-                  value={isoDate ? formatDateMDY(isoYmdToLocalDate(isoDate)) : ''}
-                  onChange={(_event, displayValue) => {
-                    if (displayValue === '') {
-                      onChange(mergeComponent(value, 'date', '', included))
-                      return
-                    }
-                    const iso = normalizePickerDateToIsoYmd(displayValue)
-                    if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) {
-                      onChange(mergeComponent(value, 'date', iso, included))
-                    }
-                  }}
-                  dateFormat={formatDateMDY}
-                  dateParse={parseDateMDY}
-                  isDisabled={isDisabled}
-                  aria-label={dateAriaLabel}
-                  inputProps={{
-                    id: `${idPrefix}-date`,
-                    validated,
-                    onBlur,
-                  }}
-                  appendTo={() => document.body}
-                />
-              </div>
-            )}
-            {showTime && (
-              <div className={styles.timeInput}>
-                <TimePicker
-                  id={`${idPrefix}-time`}
-                  aria-label={timeAriaLabel}
-                  time={to12HourTimeString(timeValue)}
-                  onChange={handleTimeChange}
-                  isDisabled={isDisabled}
-                  menuAppendTo="parent"
-                  width="100%"
-                />
-              </div>
-            )}
-          </div>
-        </StackItem>
-      )}
-      {showTimezone && (
-        <StackItem className={styles.timezoneRow}>
-          <FormTimezoneSelect
-            id={`${idPrefix}-timezone`}
-            value={timezoneValue}
-            onChange={(tz) => onChange(mergeComponent(value, 'timezone', tz, included))}
-            isDisabled={isDisabled}
-            ariaLabel={timezoneAriaLabel}
-          />
-        </StackItem>
-      )}
-    </Stack>
+    <div onBlur={handleContainerBlur}>
+      <Stack hasGutter>
+        {(showDate || showTime) && (
+          <StackItem>
+            <div className={styles.dateTimeRow}>
+              {showDate && (
+                <div className={styles.dateInput}>
+                  <DatePicker
+                    value={isoDate ? formatDateMDY(isoYmdToLocalDate(isoDate)) : ''}
+                    onChange={(_event, displayValue) => {
+                      if (displayValue === '') {
+                        onChange(mergeComponent(value, 'date', '', included))
+                        return
+                      }
+                      const iso = normalizePickerDateToIsoYmd(displayValue)
+                      if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) {
+                        onChange(mergeComponent(value, 'date', iso, included))
+                      }
+                    }}
+                    dateFormat={formatDateMDY}
+                    dateParse={parseDateMDY}
+                    isDisabled={isDisabled}
+                    aria-label={dateAriaLabel}
+                    inputProps={{
+                      id: `${idPrefix}-date`,
+                      validated,
+                    }}
+                    appendTo={() => document.body}
+                  />
+                </div>
+              )}
+              {showTime && (
+                <div className={styles.timeInput}>
+                  <TimePicker
+                    id={`${idPrefix}-time`}
+                    aria-label={timeAriaLabel}
+                    time={to12HourTimeString(timeValue)}
+                    onChange={handleTimeChange}
+                    isDisabled={isDisabled}
+                    menuAppendTo="parent"
+                    width="100%"
+                  />
+                </div>
+              )}
+            </div>
+          </StackItem>
+        )}
+        {showTimezone && (
+          <StackItem className={styles.timezoneRow}>
+            <FormTimezoneSelect
+              id={`${idPrefix}-timezone`}
+              value={timezoneValue}
+              onChange={(tz) => onChange(mergeComponent(value, 'timezone', tz, included))}
+              isDisabled={isDisabled}
+              ariaLabel={timezoneAriaLabel}
+            />
+          </StackItem>
+        )}
+      </Stack>
+    </div>
   )
 }

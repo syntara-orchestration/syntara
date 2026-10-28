@@ -11,7 +11,6 @@ import {
   TextArea,
   Title,
 } from '@patternfly/react-core'
-import type { FormDefinition } from '@syntara/contracts'
 import { useState } from 'react'
 import { useFormContext, useWatch } from 'react-hook-form'
 
@@ -89,7 +88,7 @@ export function FormTriggerConfigurationFields({
             optionsMode="static-only"
             serverFieldErrors={serverFieldErrors}
             value={formDefinition ?? createEmptyFormDefinition()}
-            onChange={(definition: FormDefinition) =>
+            onChange={(definition) =>
               setValue('form_definition', definition, {
                 shouldDirty: true,
                 shouldValidate: true,

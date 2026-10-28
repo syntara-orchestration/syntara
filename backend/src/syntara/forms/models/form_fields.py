@@ -181,6 +181,12 @@ class DateField(FormFieldBase):
             if included
         )
 
+    def default_covers_all_included_components(self) -> bool:
+        """Return whether the default supplies every component this field collects for submit substitution."""
+        if self.default is None:
+            return False
+        return set(self.included_components()) <= set(self.default.supplied_components())
+
     @model_validator(mode="after")
     def _check_included_components(self) -> DateField:
         """Require at least one component. Disallow date + timezone combo."""
@@ -199,16 +205,15 @@ class DateField(FormFieldBase):
 
     @model_validator(mode="after")
     def _check_default_covers_components(self) -> DateField:
-        """Require a default to supply exactly the components the field collects."""
+        """Reject defaults that supply components this field does not collect.
+
+        Partial defaults (some included components blank) are allowed.
+        """
         if self.default is None:
             return self
 
         included = set(self.included_components())
         supplied = set(self.default.supplied_components())
-
-        if missing := sorted(included - supplied):
-            msg = f"Field '{self.value_name}': default is missing {', '.join(missing)}"
-            raise SafeValueError(msg)
 
         if extra := sorted(supplied - included):
             msg = f"Field '{self.value_name}': default supplies {', '.join(extra)}, which this field does not collect"
