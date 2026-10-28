@@ -113,6 +113,12 @@ draining write is retried best effort; if PostgreSQL stays unavailable, peers mu
 wait for membership expiry. Unresolved work is retained, and shared clients close
 after bounded cleanup.
 
+Optional compose profiles run the existing Python worker entrypoint and provide
+a disposable local Kafka fixture; see [local Kafka examples](samples/kafka/README.md)
+and [runtime operating guidance](docs/kafka-worker-operations.md).
+Operator-managed deployment, container launchers and deployment health probes are
+deferred to M2. This local packaging adds no autoscaling or per-subscription deployments.
+
 ### Dependency Management
 
 This project uses `uv` for dependency management with two key files:
