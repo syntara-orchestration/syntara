@@ -2,14 +2,15 @@
 # validate-e2e.sh — bring up and validate the full plugin-marketplace →
 # Execution Plane E2E stack on a single host.
 #
-# Phases (all idempotent — safe to re-run):
+# Phases (all idempotent — safe to re-run, also from a torn-down machine):
 #   1. prerequisites and configuration
-#   2. poc-registry on the kind network
-#   3. Execution Plane stack + kind execution target
-#   4. credential-resolution stub (host process, pidfile)
-#   5. kind node prep: containerd mirror + pre-pull the step image
-#   6. syntara stack with APP_EXECUTION_PLANE_ENABLED=true
-#   7. validate: trigger the workflow and assert stdout "2"
+#   2. Execution Plane stack (compose)
+#   3. kind cluster + execution target (created if missing)
+#   4. poc-registry on the kind network + step image pushed
+#   5. credential-resolution stub (host process, pidfile)
+#   6. kind node prep: containerd mirror + pre-pull the step image
+#   7. syntara stack with APP_EXECUTION_PLANE_ENABLED=true
+#   8. validate: trigger the workflow and assert EP steps succeeded
 #
 # Usage:
 #   scripts/validate-e2e.sh              # full bring-up + validation
@@ -20,9 +21,11 @@
 #   SYNTARA_DIR       (default: this script's repo root)
 #   EP_DIR            (default: ../syntara-execution-plane)
 #   STEP_IMAGE        (default: the digest-pinned script-step image)
+#   STEP_IMAGE_TAG    (default: localhost:5000/syntara-script-step:0.1.0,
+#                      the local podman image pushed to a fresh registry)
 #   WORKFLOW_ID       (default: the step-type demo workflow)
 #   TRIGGER_NODE_ID   (default: its manual trigger node)
-#   EXPECTED_STDOUT   (default: empty — only require a completed EP step
+#   EXPECTED_STDOUT   (default: empty — only require completed EP steps
 #                      with return_code 0; set e.g. EXPECTED_STDOUT="2" to
 #                      also assert the exact stdout)
 
@@ -33,12 +36,12 @@ set -euo pipefail
 SYNTARA_DIR="${SYNTARA_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 EP_DIR="${EP_DIR:-$(cd "$SYNTARA_DIR/.." && pwd)/syntara-execution-plane}"
 STEP_IMAGE="${STEP_IMAGE:-localhost:5000/syntara-script-step@sha256:996f8effe4c56d61f24e4ed9a8a4dff5a9fc1b070b2d3df4dd9c9f7b56308986}"
+STEP_IMAGE_TAG="${STEP_IMAGE_TAG:-localhost:5000/syntara-script-step:0.1.0}"
 WORKFLOW_ID="${WORKFLOW_ID:-65a88c64-ded2-45a0-9f9c-15d3472029fd}"
 TRIGGER_NODE_ID="${TRIGGER_NODE_ID:-activity_7ed345ed_8a73_441a_8761_fad0b6989529}"
 EXPECTED_STDOUT="${EXPECTED_STDOUT:-}"
 KIND_NODE="ep-kind-control-plane"
 KIND_NETWORK="kind"
-EP_NETWORK="syntara-execution-plane_default"
 STUB_PORT=8444
 CHECK_ONLY=0
 SKIP_STACK=0
@@ -57,7 +60,7 @@ fail() { printf '\033[1;31m[e2e]\033[0m FAIL: %s\n' "$*"; exit 1; }
 
 # Wait until a command succeeds, or fail with a message.
 wait_for() {
-  local desc="$1" timeout="${2:-120}" shift_shift=2
+  local desc="$1" timeout="$2"
   local deadline=$((SECONDS + timeout))
   until "${@:3}" >/dev/null 2>&1; do
     [ "$SECONDS" -ge "$deadline" ] && fail "timeout waiting for: $desc"
@@ -66,24 +69,19 @@ wait_for() {
   log "ready: $desc"
 }
 
+ep_py() { (cd "$EP_DIR" && uv run python "$@"); }
+
 # --- phase 1: prerequisites ---------------------------------------------------
 
 log "phase 1: prerequisites"
 [ -d "$EP_DIR" ] || fail "EP repo not found at $EP_DIR (set EP_DIR)"
-for tool in podman docker kubectl uv uvx; do
+for tool in podman docker kubectl uv uvx kind; do
   command -v "$tool" >/dev/null || fail "missing tool: $tool"
 done
+[ "$CHECK_ONLY" -eq 1 ] && log "check mode: verifying an already-running stack (no changes)"
 
 # The podman twin of the kind cluster is a trap: kubectl and the EP target
 # talk to the docker one, and node fixes applied to the podman one vanish.
-if podman ps -a --format '{{.Names}}' | grep -qx "$KIND_NODE" && \
-   ! docker ps --format '{{.Names}}' | grep -qx "$KIND_NODE"; then
-  # Podman node exists but the docker one does not — invert of the supported
-  # layout; refuse rather than guess.
-  warn "kind node '$KIND_NODE' exists only in podman (expected docker)."
-  warn "Delete it or recreate the cluster with docker, then re-run."
-  fail "unsupported cluster layout"
-fi
 if podman ps -a --format '{{.Names}}' | grep -qx "$KIND_NODE"; then
   if [ "$CHECK_ONLY" -eq 1 ]; then
     warn "podman twin of '$KIND_NODE' still exists (confusion risk; consider deleting)"
@@ -93,67 +91,84 @@ if podman ps -a --format '{{.Names}}' | grep -qx "$KIND_NODE"; then
   fi
 fi
 
-kubectl config use-context kind-ep-kind >/dev/null 2>&1 || fail "kubectl context kind-ep-kind not found"
-
-if [ "$CHECK_ONLY" -eq 1 ]; then
-  log "check mode: verifying an already-running stack (no changes)"
+if ! kubectl config get-contexts | grep -q kind-ep-kind; then
+  [ "$CHECK_ONLY" -eq 1 ] && fail "kind cluster missing (kubectl context kind-ep-kind not found)"
+  log "kind cluster missing — will be created in phase 3"
 fi
 
-# --- phase 2: poc-registry ----------------------------------------------------
+# --- phase 2: both stacks ---------------------------------------------------------
 
-log "phase 2: poc-registry on network $KIND_NETWORK"
-if [ "$CHECK_ONLY" -eq 0 ]; then
-  REGISTRY_DATA=$(podman inspect poc-registry --format '{{range .Mounts}}{{.Source}}{{end}}' 2>/dev/null || true)
-  if [ -z "$REGISTRY_DATA" ]; then
-    warn "poc-registry missing or has no volume; recreating it loses pushed images"
-    podman rm -f poc-registry >/dev/null 2>&1 || true
-    fail "poc-registry not found — recreate it with its data volume first (see docs)"
-  fi
-  # Attach to the kind network if not already attached (pasta containers
-  # cannot be attached; recreate with the network and the published port).
-  if ! podman inspect poc-registry --format '{{json .NetworkSettings.Networks}}' | grep -q "\"$KIND_NETWORK\""; then
-    warn "poc-registry not on network '$KIND_NETWORK' — recreating attached to it"
-    podman rm -f poc-registry >/dev/null
-    podman run -d --name poc-registry --network "$KIND_NETWORK" -p 5000:5000 \
-      -v "$REGISTRY_DATA:/var/lib/registry" docker.io/library/registry:2 >/dev/null
-  fi
-fi
-wait_for "registry HTTP API" 30 curl -sf http://localhost:5000/v2/ -o /dev/null
-
-# --- phase 3: Execution Plane + kind target ------------------------------------
-
-log "phase 3: execution plane stack"
+log "phase 2: syntara + execution plane stacks"
+# The syntara stack must be up before phase 3: deploy_kind_execution_target.py
+# creates an AO credential through the syntara API.
 if [ "$CHECK_ONLY" -eq 0 ] && [ "$SKIP_STACK" -eq 0 ]; then
+  (cd "$SYNTARA_DIR" && APP_EXECUTION_PLANE_ENABLED=true uvx podman-compose up -d >/dev/null)
   (cd "$EP_DIR" && uvx podman-compose up -d >/dev/null)
 fi
+wait_for "syntara API" 120 curl -sk https://localhost:8000/healthz -o /dev/null
 wait_for "EP API healthz" 60 curl -sk https://127.0.0.1:8001/healthz/ready -o /dev/null
 
-# Register the kind cluster as an execution target (idempotent upsert).
-if [ "$CHECK_ONLY" -eq 0 ]; then
-  TARGETS=$(cd "$EP_DIR" && uv run python - <<'PY'
+# --- phase 3: kind cluster + execution target -----------------------------------
+
+log "phase 3: kind cluster + execution target"
+TARGET_ACTIVE=$(ep_py - <<'PY' || true
 from execution_plane.work_item_client import ep_request, ep_service_token, default_api_url
 import sys
 token = ep_service_token()
 status, body = ep_request("GET", default_api_url() + "/v1/execution-targets", token)
 targets = body.get("resources", []) if isinstance(body, dict) else []
-active = [t for t in targets if t.get("status") == "active"]
-sys.exit(0 if active else 1)
+sys.exit(0 if any(t.get("status") == "active" for t in targets) else 1)
 PY
-  ) || TARGETS=""
-  if [ -z "$TARGETS" ]; then
-    log "registering kind execution target (deploy_kind_execution_target.py)"
-    (cd "$EP_DIR" && uv run python tools/deploy_kind_execution_target.py \
-      --create-ao-credential --ao-insecure \
-      --ao-api-url https://localhost:8000 \
-      --ao-admin-password-file "$SYNTARA_DIR/backend/.secrets/admin-password" >/dev/null)
-  else
-    log "execution target already active"
-  fi
+)
+if [ "$CHECK_ONLY" -eq 1 ]; then
+  kubectl config use-context kind-ep-kind >/dev/null 2>&1 || fail "kubectl context kind-ep-kind not found"
+  [ -n "$TARGET_ACTIVE" ] || fail "no active execution target"
+  log "kind cluster + execution target verified"
+elif [ -z "$TARGET_ACTIVE" ] || ! kubectl config get-contexts | grep -q kind-ep-kind; then
+  # deploy_kind_execution_target.py creates the cluster when absent, applies
+  # RBAC, attaches the EP worker to the kind network, and upserts the
+  # cluster binding (idempotent).
+  log "(re)creating kind cluster and execution target"
+  (cd "$EP_DIR" && uv run python tools/deploy_kind_execution_target.py \
+    --create-ao-credential --ao-insecure \
+    --ao-api-url https://localhost:8000 \
+    --ao-admin-password-file "$SYNTARA_DIR/backend/.secrets/admin-password" >/dev/null)
+  kubectl config use-context kind-ep-kind >/dev/null
+else
+  kubectl config use-context kind-ep-kind >/dev/null
+  log "execution target already active"
 fi
 
-# --- phase 4: credential-resolution stub ---------------------------------------
+# --- phase 4: poc-registry + step image ------------------------------------------
 
-log "phase 4: credential-resolution stub (port $STUB_PORT)"
+log "phase 4: poc-registry on network $KIND_NETWORK"
+if [ "$CHECK_ONLY" -eq 0 ]; then
+  REGISTRY_DATA=$(podman inspect poc-registry --format '{{range .Mounts}}{{.Source}}{{end}}' 2>/dev/null || true)
+  ON_KIND_NET=$(podman inspect poc-registry --format '{{json .NetworkSettings.Networks}}' 2>/dev/null | grep -c "\"$KIND_NETWORK\"" || true)
+  if [ -z "$REGISTRY_DATA" ] || [ "$ON_KIND_NET" = "0" ]; then
+    warn "creating fresh poc-registry on network '$KIND_NETWORK'"
+    [ -n "$REGISTRY_DATA" ] && warn "old registry data exists but is not on the kind network; recreating"
+    podman rm -f poc-registry >/dev/null 2>&1 || true
+    REGISTRY_VOLUME="poc-registry-data"
+    podman volume inspect "$REGISTRY_VOLUME" >/dev/null 2>&1 || podman volume create "$REGISTRY_VOLUME" >/dev/null
+    podman run -d --name poc-registry --network "$KIND_NETWORK" -p 5000:5000 \
+      -v "$REGISTRY_VOLUME:/var/lib/registry" docker.io/library/registry:2 >/dev/null
+  fi
+fi
+wait_for "registry HTTP API" 30 curl -sf http://localhost:5000/v2/ -o /dev/null
+
+# The installed plugin record pins the image by digest; re-push the local
+# image so a fresh registry serves the same digest.
+if ! curl -sf http://localhost:5000/v2/_catalog/ | grep -q syntara-script-step; then
+  [ "$CHECK_ONLY" -eq 1 ] && fail "step image missing from poc-registry"
+  log "pushing step image to poc-registry"
+  podman tag "$STEP_IMAGE_TAG" localhost:5000/syntara-script-step:0.1.0
+  podman push --tls-verify=false localhost:5000/syntara-script-step:0.1.0 >/dev/null
+fi
+
+# --- phase 5: credential-resolution stub -----------------------------------------
+
+log "phase 5: credential-resolution stub (port $STUB_PORT)"
 STUB_PIDFILE="/tmp/syntara-credential-stub.pid"
 if ! curl -sk "https://localhost:$STUB_PORT/healthz" -o /dev/null 2>/dev/null; then
   [ "$CHECK_ONLY" -eq 1 ] && fail "credential stub not running (start it or drop --check)"
@@ -173,9 +188,9 @@ if [ "$CHECK_ONLY" -eq 0 ]; then
   fi
 fi
 
-# --- phase 5: kind node prep ---------------------------------------------------
+# --- phase 6: kind node prep -------------------------------------------------------
 
-log "phase 5: kind node prep (mirror + image)"
+log "phase 6: kind node prep (mirror + image)"
 NODE_MIRROR="/etc/containerd/certs.d/localhost:5000/hosts.toml"
 if [ "$CHECK_ONLY" -eq 0 ]; then
   if ! docker exec "$KIND_NODE" grep -q "172.18.0.1:5000" "$NODE_MIRROR" 2>/dev/null; then
@@ -194,20 +209,18 @@ fi
 docker exec "$KIND_NODE" crictl images 2>/dev/null | grep syntara-script-step >/dev/null \
   || fail "step image not present on kind node"
 
-# --- phase 6: syntara stack ----------------------------------------------------
+# --- phase 7: syntara worker -------------------------------------------------------
 
-log "phase 6: syntara stack"
+log "phase 7: syntara worker"
 if [ "$CHECK_ONLY" -eq 0 ] && [ "$SKIP_STACK" -eq 0 ]; then
-  (cd "$SYNTARA_DIR" && APP_EXECUTION_PLANE_ENABLED=true uvx podman-compose up -d >/dev/null)
   # Source is volume-mounted: compose does not restart the worker on code
   # changes. Restart it so the running code matches the tree.
   podman restart syntara_temporal-worker_1 >/dev/null
 fi
-wait_for "syntara API" 120 curl -sk https://localhost:8000/healthz -o /dev/null
 
-# --- phase 7: validate ---------------------------------------------------------
+# --- phase 8: validate ---------------------------------------------------------------
 
-log "phase 7: validate (workflow → EP → stdout 2)"
+log "phase 8: validate (workflow → EP)"
 cd "$SYNTARA_DIR"
 ADMIN_PASSWORD=$(cat backend/.secrets/admin-password)
 TOKEN=$(curl -sk -X POST https://localhost:8000/api/v1/auth/login \

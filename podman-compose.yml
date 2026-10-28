@@ -446,11 +446,9 @@ services:
 
 networks:
   default:
-    # The compose project's own default network (syntara_default when the
-    # project name is syntara); declared so temporal-worker can also attach
-    # to the Execution Plane network below.
+    # The compose project's own default network, with a stable name so other
+    # projects (and the execution-plane network below) can reference it.
     name: syntara_default
-    external: true
   execution-plane:
     # External network owned by the syntara-execution-plane compose project;
     # lets the Temporal worker reach the EP API as https://api:8443.
