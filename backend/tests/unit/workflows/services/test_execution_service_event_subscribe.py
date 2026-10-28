@@ -159,3 +159,36 @@ def test_existing_triggers_still_fill_defaults(trigger_type: NodeType) -> None:
     inputs: dict[str, Any] = {}
     ExecutionService._apply_trigger_schema_defaults(trigger, inputs)
     assert inputs == {"count": 2}
+
+
+def test_multiple_of_overflow_payload_translates_to_trigger_validation_error(trigger: dict[str, Any]) -> None:
+    """A huge-digit integer with multipleOf must surface as TriggerValidationError, not OverflowError.
+
+    Regression for a plain ``jsonschema.Draft7Validator`` raising OverflowError on a
+    400-digit integer validated against ``multipleOf: 0.1`` — the event decoder's
+    ``validate_payload`` helper already converts that into a schema_mismatch failure.
+    """
+    trigger["parameters"]["input_schema"] = {"multipleOf": 0.1}
+    envelope = _decoded_envelope(("9" * 400).encode())
+    with pytest.raises(TriggerValidationError):
+        ExecutionService._apply_trigger_schema_defaults(trigger, envelope)
+
+
+def test_large_unique_items_payload_uses_hardened_validator(trigger: dict[str, Any]) -> None:
+    """Event Subscribe validation must route through validate_payload's O(n log n) uniqueness check.
+
+    A plain ``jsonschema.Draft7Validator`` falls back to a quadratic pairwise comparison
+    for ``uniqueItems``, which stalls on large mixed arrays. This exercises the same
+    hardened path via ``_apply_trigger_schema_defaults`` to confirm it is wired to
+    ``validate_payload`` rather than a bare ``jsonschema.Draft7Validator``.
+    """
+    trigger["parameters"]["input_schema"] = {"uniqueItems": True}
+    payload = [item for number in range(2000) for item in (number, str(number))]
+
+    envelope = _decoded_envelope(json.dumps(payload, separators=(",", ":")).encode())
+    ExecutionService._apply_trigger_schema_defaults(trigger, envelope)  # no duplicates: passes
+
+    payload.append(0)  # introduce a duplicate
+    dup_envelope = _decoded_envelope(json.dumps(payload, separators=(",", ":")).encode())
+    with pytest.raises(TriggerValidationError):
+        ExecutionService._apply_trigger_schema_defaults(trigger, dup_envelope)
