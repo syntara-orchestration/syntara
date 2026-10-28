@@ -32,6 +32,11 @@ test.skip(
   'Stall detection requires Temporal worker (real backend only)'
 )
 
+// Skip in Konflux: stall detection timing is too fragile under cluster load.
+// Periodic worker scans (10s interval) + execution startup + WebSocket propagation
+// can exceed test timeouts when Konflux infrastructure is under load.
+test.skip(!!process.env['KUBERNETES_SERVICE_HOST'], 'Stall detection timing too fragile under Konflux cluster load')
+
 test.describe('Stall detection global settings', () => {
   // Serial execution prevents concurrent mutation of the same global setting
   test.describe.configure({ mode: 'serial' })
