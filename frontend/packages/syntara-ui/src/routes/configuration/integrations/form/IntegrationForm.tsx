@@ -272,6 +272,7 @@ export function IntegrationForm() {
   const docLink = useDocLink('configureIntegration')
   const form = useSynForm({
     schema: integrationFormSchema,
+    mode: 'onChange',
     defaultValues: integrationFormDefaultValues,
   })
   const {
