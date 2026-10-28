@@ -16,8 +16,9 @@
  * - `exec-3-retry`     — a run created by retrying `exec-3`, carrying the
  *                        "Retried from" indicator.
  *
- * The real-backend E2E suite skips these tests because they depend on those
- * mock-only execution IDs and deterministic activity state.
+ * The seeded UI cases below are skipped in real-backend mode. The companion
+ * retry-from-failure-live.spec.ts provisions real workflows and executions so
+ * Konflux exercises the feature against Temporal instead of relying on seeds.
  *
  * Critical paths covered:
  * - Retry offered on a failed run, hidden on a completed run.
@@ -49,6 +50,9 @@ async function openExecutionDetail(app: Page, executionId: string): Promise<void
 /** Open the retry actions dropdown. */
 async function openRetryActionsMenu(app: Page): Promise<void> {
   await app.getByRole('button', { name: 'Retry' }).click()
+  // Execution permission checks resolve asynchronously; avoid clicking the
+  // menu item while it is still aria-disabled during the check.
+  await expect(app.getByTestId('retry-from-failure-button')).toBeEnabled()
 }
 
 /** Stub only workflow edit permission; let the mock API answer every other check. */
