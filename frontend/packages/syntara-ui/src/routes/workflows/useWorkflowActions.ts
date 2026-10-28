@@ -44,12 +44,20 @@ export function useWorkflowActions({
 
       let resolvedTriggerNodeId = triggerNodeId
       if (!resolvedTriggerNodeId) {
-        const trigger = await resolveWorkflowRunTrigger(workflow)
-        if (!trigger) {
-          showError({ title: 'Cannot run workflow', description: 'Workflow has no triggers configured' })
+        try {
+          const trigger = await resolveWorkflowRunTrigger(workflow)
+          if (!trigger) {
+            showError({ title: 'Cannot run workflow', description: 'Workflow has no triggers configured' })
+            return
+          }
+          resolvedTriggerNodeId = trigger.triggerNodeId
+        } catch (error: unknown) {
+          showError({
+            title: 'Cannot run workflow',
+            description: error instanceof Error ? error.message : 'Failed to load workflow trigger details',
+          })
           return
         }
-        resolvedTriggerNodeId = trigger.triggerNodeId
       }
 
       const { data, error } = await executionsFetchClient.POST('/executions', {

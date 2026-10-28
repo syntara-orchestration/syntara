@@ -3,6 +3,12 @@ import type { WorkflowAPI } from '@syntara/contracts'
 import { workflowFetchClient } from '../../client'
 import { activitiesReferenceTrigger } from '../builder/utils/triggerReferenceCheck'
 
+import {
+  isFormTriggerType,
+  readFormTriggerPresentation,
+  type FormTriggerPresentation,
+} from './formTrigger/formTriggerRunUtils'
+
 type Workflow = WorkflowAPI.components['schemas']['WorkflowRead']
 
 type TriggerLike = {
@@ -11,6 +17,11 @@ type TriggerLike = {
   type?: string
   parameters?: {
     input_schema?: Record<string, unknown>
+    form_definition?: unknown
+    message?: string | null
+    submit_label?: string | null
+    success_message?: string | null
+    css_override?: string | null
   }
 }
 
@@ -20,6 +31,7 @@ export type WorkflowRunTrigger = {
   triggerType?: string
   inputSchema?: Record<string, unknown>
   hasTriggerReferences: boolean
+  formTrigger?: FormTriggerPresentation
 }
 
 function isTriggerLike(value: unknown): value is TriggerLike {
@@ -49,12 +61,15 @@ function buildRunTrigger(trigger: TriggerLike, triggers: TriggerLike[], definiti
   if (!trigger.id) {
     throw new Error('Trigger is missing id')
   }
+  const formTrigger = isFormTriggerType(trigger.type) ? readFormTriggerPresentation(trigger.parameters) : undefined
+
   return {
     triggerNodeId: trigger.id,
     triggerName: trigger.name ?? 'Trigger',
     triggerType: trigger.type,
     inputSchema: inputSchema && typeof inputSchema === 'object' ? inputSchema : undefined,
     hasTriggerReferences: activitiesReferenceTrigger(activities, triggerNodeIds),
+    formTrigger,
   }
 }
 
@@ -86,14 +101,16 @@ export async function resolveWorkflowRunTrigger(workflow: Workflow): Promise<Wor
         params: { path: { workflow_id: workflow.id, version: publishedVersionNumber } },
       }
     )
-    if (!versionError && publishedVersion) {
-      definition = publishedVersion.workflow_definition ?? definition
-      triggers = extractTriggers(definition) ?? triggers
+    if (versionError || !publishedVersion?.workflow_definition) {
+      throw new Error('Could not load the published workflow version. Try again or republish the workflow.')
     }
+    definition = publishedVersion.workflow_definition
+    triggers = extractTriggers(definition) ?? triggers
   }
 
-  const trigger = triggers?.[0]
+  const triggersWithId = (triggers ?? []).filter((t): t is TriggerLike & { id: string } => Boolean(t.id))
+  const trigger = triggersWithId.find((t) => isFormTriggerType(t.type)) ?? triggersWithId[0]
   if (!trigger?.id) return null
 
-  return buildRunTrigger(trigger, triggers ?? [], definition)
+  return buildRunTrigger(trigger, triggersWithId, definition)
 }

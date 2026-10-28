@@ -23,7 +23,12 @@ function renderWithQueryClient(ui: ReactNode) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   })
-  return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>)
+  const view = render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>)
+  return {
+    ...view,
+    rerender: (next: ReactNode) =>
+      view.rerender(<QueryClientProvider client={queryClient}>{next}</QueryClientProvider>),
+  }
 }
 
 describe('SynDynamicForm', () => {
@@ -435,5 +440,23 @@ describe('SynDynamicForm', () => {
 
     const results = await axe(container)
     expect(results).toHaveNoViolations()
+  })
+
+  it('keeps user input when an equivalent definition object is passed again', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+    const definition = parseFormDefinition({
+      fields: [{ type: FormFieldTypeEnum.TEXT, value_name: 'name', label: 'Name' }],
+    })
+    const { rerender } = renderWithQueryClient(
+      <SynDynamicForm definition={definition} onSubmit={onSubmit} hideSubmitButton />
+    )
+
+    await user.type(screen.getByRole('textbox', { name: 'Name' }), 'kept')
+
+    const equivalentDefinition = parseFormDefinition(JSON.parse(JSON.stringify(definition)) as typeof definition)
+    rerender(<SynDynamicForm definition={equivalentDefinition} onSubmit={onSubmit} hideSubmitButton />)
+
+    expect(screen.getByRole('textbox', { name: 'Name' })).toHaveValue('kept')
   })
 })
