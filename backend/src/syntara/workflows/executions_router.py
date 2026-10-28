@@ -362,16 +362,15 @@ async def retry_from_failure(
     # workflow associated with the original execution. A retry without values
     # to override still requires only execution:run.
     if any(body.input_parameter_overrides.values()):
-        workflow_id_result = await db.exec(select(Execution.workflow_id).where(Execution.id == execution_id))
-        workflow_id = workflow_id_result.first()
-        if workflow_id is not None:
-            workflow_result = await db.exec(select(Workflow).where(Workflow.id == workflow_id))
-            workflow = workflow_result.first()
-        else:
-            workflow = None
-        if workflow:
-            project_result = await db.exec(select(Project.name).where(Project.id == workflow.project_id))
-            resource_project = project_result.first() or ""
+        workflow_context_result = await db.exec(
+            select(Execution.workflow_id, Workflow.labels, Project.name)
+            .join(Workflow, Workflow.id == Execution.workflow_id)
+            .outerjoin(Project, Project.id == Workflow.project_id)
+            .where(Execution.id == execution_id)
+        )
+        workflow_context = workflow_context_result.first()
+        if workflow_context is not None:
+            workflow_id, workflow_labels, resource_project = workflow_context
             authz_result = await authorize(
                 db,
                 get_authz_evaluator(request),
@@ -379,9 +378,9 @@ async def retry_from_failure(
                     user_id=current_user.id,
                     action="update",
                     resource_type="workflow",
-                    resource_id=str(workflow.id),
-                    resource_project=resource_project,
-                    resource_labels=workflow.labels,
+                    resource_id=str(workflow_id),
+                    resource_project=resource_project or "",
+                    resource_labels=workflow_labels,
                     user_labels=current_user.labels,
                     user_metadata=current_user.authz_metadata,
                 ),
@@ -392,7 +391,7 @@ async def retry_from_failure(
                     user_id=str(current_user.id),
                     resource_type="workflow",
                     action="update",
-                    resource_id=str(workflow.id),
+                    resource_id=str(workflow_id),
                     denied_by=authz_result.denied_by,
                 )
                 msg = "Not authorized to perform update on workflow"
