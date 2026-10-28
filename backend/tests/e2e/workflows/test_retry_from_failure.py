@@ -30,6 +30,7 @@ if TYPE_CHECKING:
     from syntara_api_client.api import SyntaraApiRegistry
     from syntara_api_client.models import ExecutionRead
     from syntara_api_client.models.activity_data import ActivityData
+    from syntara_api_client.models.activity_execution import ActivityExecution
 
 pytestmark = [pytest.mark.e2e]
 
@@ -71,6 +72,24 @@ def _activity_output(activity: ActivityData) -> dict[str, Any]:
     return dict(additional_properties) if isinstance(additional_properties, Mapping) else {}
 
 
+def _activity_input(activity: ActivityExecution) -> dict[str, Any]:
+    value = activity.input_data
+    if value is None:
+        return {}
+    if isinstance(value, Mapping):
+        return dict(value)
+    additional_properties = getattr(value, "additional_properties", None)
+    return dict(additional_properties) if isinstance(additional_properties, Mapping) else {}
+
+
+def _activity_executions_by_name(
+    syntara_api: SyntaraApiRegistry,
+    execution_id: UUID,
+) -> dict[str, ActivityExecution]:
+    executions = syntara_api.executions.list_activities(execution_id=execution_id).assert_and_get()
+    return {activity.activity_name: activity for activity in executions.resources}
+
+
 def _timestamp(activity: ActivityData, field: str) -> datetime:
     value = getattr(activity, field)
     assert isinstance(value, datetime), f"{activity.activity_id}.{field} must be a timestamp"
@@ -105,11 +124,15 @@ def test_retry_replays_upstream_output_and_applies_override_for_retry_only(
         name,
         [
             _script_node("producer", 'print(\'{"marker": "from-source"}\')'),
-            _script_node("repair", "raise SystemExit(1)"),
+            _script_node(
+                "repair",
+                "import os; print(os.environ['MESSAGE']); raise SystemExit(1)",
+                environment={"MESSAGE": "$" + "{producer.stdout_json.marker}"},
+            ),
             _script_node(
                 "consumer",
                 "import os; print(os.environ['MESSAGE'])",
-                environment={"MESSAGE": "$" + "{producer.stdout_json.marker}"},
+                environment={"MESSAGE": "$" + "{repair.stdout}"},
             ),
         ],
         [
@@ -130,6 +153,8 @@ def test_retry_replays_upstream_output_and_applies_override_for_retry_only(
     source_activities = _activities_by_id(source)
     assert source_activities["producer"].status == "completed"
     assert source_activities["repair"].status == "failed"
+    source_activity_executions = _activity_executions_by_name(syntara_api, source.id)
+    assert _activity_input(source_activity_executions["repair"]).get("environment") == {"MESSAGE": "from-source"}
 
     preview = syntara_api.executions.retry_from_failure_preview(execution_id=source.id).assert_and_get()
     assert preview.eligible is True
@@ -139,7 +164,12 @@ def test_retry_replays_upstream_output_and_applies_override_for_retry_only(
         syntara_api,
         source.id,
         "repair",
-        overrides={"repair": {"code": "print('repaired')"}},
+        overrides={
+            "repair": {
+                "code": "import os; print(os.environ['MESSAGE'])",
+                "environment": {"MESSAGE": "retry-only"},
+            }
+        },
     )
     assert retried.retried_from_execution_id == source.id
     assert retried.workflow_version_id == source.workflow_version_id
@@ -147,6 +177,8 @@ def test_retry_replays_upstream_output_and_applies_override_for_retry_only(
     final = poll_execution_until_complete(syntara_api, retried.id, max_polls=60, poll_interval=1)
     assert final.status == ExecutionStatus.COMPLETED, final.error_details
     retry_activities = _activities_by_id(final)
+    retry_activity_executions = _activity_executions_by_name(syntara_api, final.id)
+    assert _activity_input(retry_activity_executions["repair"]).get("environment") == {"MESSAGE": "retry-only"}
 
     # Replayed activities retain their source timestamps and output.
     assert _activity_output(retry_activities["producer"]) == _activity_output(source_activities["producer"])
@@ -161,7 +193,7 @@ def test_retry_replays_upstream_output_and_applies_override_for_retry_only(
     assert retry_activities["repair"].status == "completed"
     assert _timestamp(retry_activities["repair"], "started_at") > _timestamp(source_activities["repair"], "started_at")
     assert retry_activities["consumer"].status == "completed"
-    assert "from-source" in _activity_output(retry_activities["consumer"]).get("stdout", "")
+    assert "retry-only" in _activity_output(retry_activities["consumer"]).get("stdout", "")
 
     # A later ordinary run uses the unchanged workflow definition and fails again.
     ordinary_run = syntara_api.executions.create(
@@ -174,6 +206,8 @@ def test_retry_replays_upstream_output_and_applies_override_for_retry_only(
         poll_interval=1,
     )
     assert ordinary_final.status == ExecutionStatus.FAILED
+    ordinary_activity_executions = _activity_executions_by_name(syntara_api, ordinary_run.id)
+    assert _activity_input(ordinary_activity_executions["repair"]).get("environment") == {"MESSAGE": "from-source"}
 
 
 def test_completed_execution_is_not_eligible_for_retry_from_failure(
@@ -491,6 +525,18 @@ def test_retry_input_overrides_require_workflow_update_permission(
     )
     assign_project_role_to_user(syntara_api, project_id, editor_user_id, editor_role)
     editor_api = api_for(syntara_base_url, editor_username, editor_password)
+
+    rejected_new_input_key = editor_api.executions.retry_from_failure(
+        execution_id=source.id,
+        body=RetryFailureRequest.from_dict(
+            {
+                "retry_point_ids": ["failure"],
+                "input_parameter_overrides": {"failure": {"new_parameter": "not allowed"}},
+            }
+        ),
+    )
+    assert rejected_new_input_key.status_code == HTTPStatus.CONFLICT
+    assert getattr(rejected_new_input_key.parsed, "code", None) == "EXECUTION_NOT_RETRYABLE_FROM_FAILURE"
 
     authorized_retry = _start_retry(
         editor_api,
