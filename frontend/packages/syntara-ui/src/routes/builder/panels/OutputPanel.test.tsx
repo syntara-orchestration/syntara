@@ -29,7 +29,7 @@ function renderWithProviders(ui: ReactNode) {
  * 3. Mock data pinning and unpinning
  * 4. Mock data editor with valid/invalid JSON
  * 5. buildOutputSkeleton with various node types
- * 6. Data priority (real > mock > empty)
+ * 6. Data priority (mock > real > empty)
  * 7. Error handling and validation
  */
 
