@@ -23,12 +23,14 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any, Self
 from urllib.parse import urlparse
+from uuid import UUID
 
 from pydantic import Field, HttpUrl, SecretStr, computed_field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.engine import URL, make_url
 
-from syntara.core.constants import EventStreamLimits, RequestLimits, RetrieverServiceDefaults
+from syntara.core.config.event_delivery import validate_delivery_cache_trust_inputs
+from syntara.core.constants import EventDeliveryDefaults, EventStreamLimits, RequestLimits, RetrieverServiceDefaults
 from syntara.core.exceptions import SafeValueError
 
 # =============================================================================
@@ -1487,6 +1489,57 @@ class EventStreamSettings(BaseSettings):
         gt=0,
         description="Candidate event header count limit pending release validation",
     )
+    event_delivery_retention_seconds: int = Field(
+        default=EventDeliveryDefaults.RETENTION_SECONDS,
+        gt=0,
+        description="Minimum terminal delivery retention from resolved_at; never expires unresolved evidence",
+    )
+    event_delivery_cache_enabled: bool = Field(
+        default=False, description="Enable terminal proofs only with trusted external epoch and bounded clocks"
+    )
+    event_delivery_cache_epoch: UUID | None = Field(
+        default=None,
+        description="Deployment-managed recovery UUID held outside the restored database; never auto-generated",
+    )
+    event_delivery_cache_ttl_seconds: int = Field(
+        default=EventDeliveryDefaults.TERMINAL_CACHE_TTL_SECONDS,
+        gt=0,
+        description="Terminal proof lifetime measured from original resolved_at, capped by durable retention",
+    )
+    event_delivery_cache_timeout_seconds: float = Field(
+        default=EventDeliveryDefaults.TERMINAL_CACHE_TIMEOUT_SECONDS,
+        gt=0,
+        allow_inf_nan=False,
+        description="Total cache operation deadline including pool acquisition and retries",
+    )
+    event_delivery_cache_skew_seconds: float = Field(
+        default=EventDeliveryDefaults.TERMINAL_CACHE_CLOCK_SKEW_SECONDS,
+        gt=0,
+        allow_inf_nan=False,
+        description="Unvalidated candidate clock-skew safety margin; changes require close/drain and epoch rotation",
+    )
+    event_delivery_cache_clock_error_bound_seconds: float | None = Field(
+        default=None,
+        ge=0,
+        allow_inf_nan=False,
+        description=(
+            "Deployment-attested maximum pairwise worker/Redis/PostgreSQL clock error; not measured here. "
+            "The skew margin must exceed this bound; no assumed default"
+        ),
+    )
+
+    @model_validator(mode="after")
+    def validate_delivery_cache_trust(self) -> Self:
+        """Reject enabled proof caching without its external trust and expiry inputs."""
+        validate_delivery_cache_trust_inputs(
+            enabled=self.event_delivery_cache_enabled,
+            cache_epoch=self.event_delivery_cache_epoch,
+            clock_error_bound_seconds=self.event_delivery_cache_clock_error_bound_seconds,
+            skew_seconds=self.event_delivery_cache_skew_seconds,
+            ttl_seconds=self.event_delivery_cache_ttl_seconds,
+            retention_seconds=self.event_delivery_retention_seconds,
+        )
+        return self
 
 
 class WorkflowEngineSettings(BaseSettings):

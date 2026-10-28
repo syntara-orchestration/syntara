@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -95,6 +97,90 @@ class TestCacheSetex:
 
         with pytest.raises(RedisConnectionError):
             await client.cache_setex("my:key", 60, "value")
+
+
+class TestCacheSetUntil:
+    """Fixed expiry survives idempotent retries without changing SETEX callers."""
+
+    @pytest.mark.asyncio
+    async def test_absolute_expiry_rounds_down_to_milliseconds(self) -> None:
+        client, mock_redis = _make_client()
+        deadline = datetime.now(UTC) + timedelta(seconds=60, microseconds=123)
+        await client.cache_set_until("proof:key", deadline, "proof")
+        milliseconds = (deadline - datetime(1970, 1, 1, tzinfo=UTC)) // timedelta(milliseconds=1)
+        mock_redis.set.assert_awaited_once_with("proof:key", "proof", pxat=milliseconds)
+        mock_redis.setex.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_retries_reuse_exact_absolute_timestamp(self) -> None:
+        client, mock_redis = _make_client()
+        deadline = datetime.now(UTC) + timedelta(seconds=60)
+        mock_redis.set.side_effect = [RedisConnectionError("pool exhausted"), True]
+        await client.cache_set_until("proof:key", deadline, "proof")
+        first, second = mock_redis.set.await_args_list
+        assert first == second
+
+    @pytest.mark.asyncio
+    async def test_insert_only_writes_cannot_extend_an_existing_deadline(self) -> None:
+        client, mock_redis = _make_client()
+        deadline = datetime.now(UTC) + timedelta(seconds=60)
+        stored: list[tuple[str, int]] = []
+
+        async def set_value(_key: str, value: str, *, pxat: int, nx: bool) -> bool | None:
+            if stored and nx:
+                return None
+            stored.append((value, pxat))
+            return True
+
+        mock_redis.set.side_effect = set_value
+        await client.cache_set_until("proof:key", deadline, "first", only_if_absent=True)
+        await client.cache_set_until("proof:key", deadline + timedelta(seconds=60), "later", only_if_absent=True)
+        assert len(stored) == 1
+        assert stored[0][0] == "first"
+        assert stored[0][1] == (deadline - datetime(1970, 1, 1, tzinfo=UTC)) // timedelta(milliseconds=1)
+
+    @pytest.mark.asyncio
+    async def test_expired_write_never_acquires_a_client(self) -> None:
+        client, mock_redis = _make_client()
+        with patch.object(client, "_ensure_connected") as connect:
+            await client.cache_set_until("proof:key", datetime.now(UTC) - timedelta(seconds=1), "proof")
+        connect.assert_not_called()
+        mock_redis.set.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_naive_deadline_is_rejected(self) -> None:
+        client, mock_redis = _make_client()
+        with pytest.raises(ValueError, match="timezone-aware"):
+            await client.cache_set_until("proof:key", datetime(2026, 10, 26, tzinfo=UTC).replace(tzinfo=None), "proof")
+        mock_redis.set.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_retry_skips_a_deadline_that_has_passed(self) -> None:
+        client, mock_redis = _make_client()
+        now = datetime.now(UTC)
+        deadline = now + timedelta(seconds=60)
+        mock_redis.set.side_effect = RedisConnectionError("pool exhausted")
+        with patch("syntara.core.cache.cache_client.datetime", wraps=datetime) as clock:
+            clock.now.side_effect = [now, now, deadline]
+            await client.cache_set_until("proof:key", deadline, "proof")
+        mock_redis.set.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_outer_timeout_bounds_retry_waits(self) -> None:
+        client, mock_redis = _make_client()
+        mock_redis.set.side_effect = RedisConnectionError("pool exhausted")
+        waiting = asyncio.Event()
+
+        async def stalled_backoff(_: float) -> None:
+            waiting.set()
+            await asyncio.Event().wait()
+
+        with patch("syntara.core.cache.base.asyncio.sleep", side_effect=stalled_backoff):
+            with pytest.raises(TimeoutError):
+                async with asyncio.timeout(0.01):
+                    await client.cache_set_until("proof:key", datetime.now(UTC) + timedelta(seconds=60), "proof")
+        assert waiting.is_set()
+        mock_redis.set.assert_awaited_once()
 
 
 class TestCacheDelete:

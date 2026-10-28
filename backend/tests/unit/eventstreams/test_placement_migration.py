@@ -58,5 +58,7 @@ def test_placement_revision_follows_subscription_head() -> None:
     migration = import_module(_MIGRATION)
     assert migration.__file__ is not None
     scripts = ScriptDirectory(str(Path(migration.__file__).parent.parent))
-    assert scripts.get_heads() == [migration.revision]
+    head = scripts.get_current_head()
+    assert head is not None
+    assert migration.revision in {revision.revision for revision in scripts.iterate_revisions(head, "base")}
     assert migration.down_revision == "759a689cc69c"

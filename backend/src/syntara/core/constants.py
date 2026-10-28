@@ -75,6 +75,26 @@ class EventStreamLimits:
     HEADER_JSON_OVERHEAD_BYTES = len('{"name":"","value_base64":""}')
 
 
+class EventDeliveryDefaults:
+    """Delivery ownership and minimum evidence retention; independent lifetimes."""
+
+    CLAIM_LEASE_SECONDS = 60
+    CLAIM_RENEWAL_INTERVAL_SECONDS = 20
+    RETENTION_SECONDS = 3600
+    CAPACITY_PAUSE_ROWS = 3_000_000
+    CAPACITY_RESUME_ROWS = 2_500_000
+    CAPACITY_CHECK_INTERVAL_SECONDS = 30
+    COMMITTED_POSITION_TIMEOUT_SECONDS = 5
+    TERMINAL_CACHE_TIMEOUT_SECONDS = 1
+    TERMINAL_CACHE_TTL_SECONDS = 60
+    # Candidate cache safety/availability bounds; not release-validated tuning.
+    TERMINAL_CACHE_CLOCK_SKEW_SECONDS = 1
+    TERMINAL_CACHE_MAX_ENTRY_BYTES = 4096
+    TERMINAL_CACHE_FAILURE_THRESHOLD = 3
+    TERMINAL_CACHE_PROBE_INITIAL_SECONDS = 1
+    TERMINAL_CACHE_PROBE_MAX_SECONDS = 60
+
+
 class WebSocketConfig:
     """WebSocket configuration constants."""
 
