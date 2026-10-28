@@ -15,7 +15,7 @@ from pydantic import ValidationError
 from syntara.audit.dispatcher import AuditEventDispatcher
 from syntara.audit.emitter import request_id_context_var
 from syntara.forms.exceptions import FormDataValidationError
-from syntara.forms.models.form_fields import DynamicOptions, FormDefinition, ResolvedOptions
+from syntara.forms.models.form_fields import FormTriggerDefinition
 from syntara.forms.validators.submission import validate_form_submission
 from syntara.metrics.types import ComponentLabel, MetricType
 from syntara.workflows.audit.form_trigger import FormTriggerSubmittedEvent
@@ -50,9 +50,8 @@ def validate_form_trigger_submission(
     """Validate and normalize a form-trigger submission.
 
     Returns the cleaned input data and its form-definition metadata. The cleaned values
-    use the same shape as form prompt submissions. Form Triggers additionally
-    reject dynamic options because they have no upstream values from which to
-    resolve them.
+    use the same shape as form prompt submissions. The form-trigger model enforces
+    static options because triggers have no upstream values from which to resolve them.
     """
     trigger_node_id = trigger_node.get("id")
     validation_context = {
@@ -63,7 +62,7 @@ def validate_form_trigger_submission(
     raw_parameters = trigger_node.get("parameters")
     raw_form_definition = raw_parameters.get("form_definition") if isinstance(raw_parameters, dict) else None
     try:
-        form_definition = FormDefinition.model_validate(raw_form_definition)
+        form_definition = FormTriggerDefinition.model_validate(raw_form_definition)
     except ValidationError as exc:
         error_count = len(exc.errors())
         logger.warning(
@@ -74,14 +73,6 @@ def validate_form_trigger_submission(
         )
         msg = "Form trigger has an invalid form definition"
         raise TriggerValidationError(msg) from None
-
-    if any(
-        isinstance(getattr(field, "options", None), (DynamicOptions, ResolvedOptions))
-        for field in form_definition.fields
-    ):
-        logger.error("Form trigger has unsupported dynamic options", **validation_context)
-        msg = "Form trigger form definition contains unsupported dynamic options"
-        raise TriggerValidationError(msg)
 
     try:
         cleaned_input = validate_form_submission(form_definition, input_data)

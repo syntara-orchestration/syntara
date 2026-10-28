@@ -20,7 +20,7 @@ from syntara.aap.models.responses import AAPJobType as AAPJobType  # noqa: PLC04
 from syntara.core.constants import FieldLimits, WebhookLimits
 from syntara.core.exceptions import SafeValueError
 from syntara.core.utils.security import validate_css_security
-from syntara.forms.models.form_fields import FormDefinition, ResolvedOptions
+from syntara.forms.models.form_fields import FormDefinition, FormPromptDefinition, FormTriggerDefinition
 from syntara.forms.validators.form_definition import validate_form_definition
 from syntara.workflows.json_schema_validation import validate_json_schema_definition
 from syntara.workflows.utils.iso8601_interval import parse_iso8601_repeating_interval
@@ -914,6 +914,10 @@ class BaseFormParameters(BaseModel):
 class FormPromptNodeParameters(BaseFormParameters):
     """Parameters for form prompt nodes."""
 
+    form_definition: FormPromptDefinition = Field(
+        description="Form definition describing the fields shown to responders.",
+    )
+
     responder_users: list[str] | None = Field(
         default=None,
         max_length=100,
@@ -937,26 +941,25 @@ class FormPromptNodeParameters(BaseFormParameters):
 
     @field_validator("form_definition", mode="after")
     @classmethod
-    def validate_authored_form_definition(cls, value: FormDefinition) -> FormDefinition:
-        """Reject engine-only options and validate defaults in authored workflows."""
-        for field in value.fields:
-            if isinstance(getattr(field, "options", None), ResolvedOptions):
-                msg = (
-                    f"Field '{field.value_name}': options source 'dynamic_resolved' is produced by the "
-                    "workflow engine at run time and cannot be authored. Use 'static' or 'dynamic'."
-                )
-                raise SafeValueError(msg)
-        return cls._validate_authored_form_defaults(value)
+    def validate_authored_form_definition(cls, value: FormPromptDefinition) -> FormPromptDefinition:
+        """Validate authored defaults; the model type rejects engine-only option sources."""
+        cls._validate_authored_form_defaults(value)
+        return value
 
 
 class FormTriggerParameters(BaseFormParameters):
     """Parameters for form trigger nodes."""
 
+    form_definition: FormTriggerDefinition = Field(
+        description="Form definition describing the fields shown to submitters. Static options only.",
+    )
+
     @field_validator("form_definition", mode="after")
     @classmethod
-    def validate_authored_form_definition(cls, value: FormDefinition) -> FormDefinition:
-        """Validate authored defaults; the workflow schema restricts options to static sources."""
-        return cls._validate_authored_form_defaults(value)
+    def validate_authored_form_definition(cls, value: FormTriggerDefinition) -> FormTriggerDefinition:
+        """Validate authored defaults; the model type restricts options to static sources."""
+        cls._validate_authored_form_defaults(value)
+        return value
 
 
 class WebhookTriggerParameters(TemplateAwareBaseModel):

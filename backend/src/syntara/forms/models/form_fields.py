@@ -343,18 +343,9 @@ class MultiSelectField(FormFieldBase):
         return defaults
 
 
-FormField = Annotated[
-    TextField
-    | TextAreaField
-    | MaskedTextField
-    | EmailField
-    | NumberField
-    | CheckboxField
-    | DateField
-    | DropdownField
-    | MultiSelectField,
-    Discriminator("type"),
-]
+CommonFormField = TextField | TextAreaField | MaskedTextField | EmailField | NumberField | CheckboxField | DateField
+
+FormField = Annotated[CommonFormField | DropdownField | MultiSelectField, Discriminator("type")]
 
 # Discriminator values for FormField and OptionsSource unions.
 # Used by validators to normalize Pydantic error paths by stripping union tags.
@@ -397,3 +388,55 @@ class FormDefinition(BaseModel):
             msg = f"Duplicate field names are not allowed: {', '.join(sorted(duplicates))}"
             raise SafeValueError(msg)
         return self
+
+
+AuthoredOptionsSource = Annotated[StaticOptions | DynamicOptions, Discriminator("source")]
+"""Option sources a user may author on a form prompt. Excludes engine-produced snapshots."""
+
+
+class FormTriggerDropdownField(DropdownField):
+    """Dropdown field on a form trigger. Static options only."""
+
+    options: StaticOptions
+
+
+class FormTriggerMultiSelectField(MultiSelectField):
+    """Multi-select field on a form trigger. Static options only."""
+
+    options: StaticOptions
+
+
+class FormPromptDropdownField(DropdownField):
+    """Dropdown field on a form prompt. Static or dynamic options; not engine-resolved."""
+
+    options: AuthoredOptionsSource
+
+
+class FormPromptMultiSelectField(MultiSelectField):
+    """Multi-select field on a form prompt. Static or dynamic options; not engine-resolved."""
+
+    options: AuthoredOptionsSource
+
+
+FormTriggerField = Annotated[
+    CommonFormField | FormTriggerDropdownField | FormTriggerMultiSelectField,
+    Discriminator("type"),
+]
+
+FormPromptField = Annotated[
+    CommonFormField | FormPromptDropdownField | FormPromptMultiSelectField,
+    Discriminator("type"),
+]
+
+
+# Override the runtime field union with authored unions; list invariance requires these assignment ignores.
+class FormTriggerDefinition(FormDefinition):
+    """Authored form definition for a form trigger; options must be static."""
+
+    fields: list[FormTriggerField] = Field(min_length=1, max_length=100)  # type: ignore[assignment]
+
+
+class FormPromptDefinition(FormDefinition):
+    """Authored form definition for a form prompt; resolved snapshots are engine-only."""
+
+    fields: list[FormPromptField] = Field(min_length=1, max_length=100)  # type: ignore[assignment]

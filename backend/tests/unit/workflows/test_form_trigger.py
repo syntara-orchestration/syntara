@@ -186,21 +186,33 @@ class TestFormTriggerSubmissionFailures:
         with pytest.raises(TriggerValidationError, match="form definition"):
             validate_form_trigger_submission(trigger, {})
 
-    def test_dynamic_options_are_rejected_for_form_triggers(self) -> None:
-        trigger = _form_trigger(
-            _field(
-                "dropdown",
-                "environment",
-                options={
+    @pytest.mark.parametrize("field_type", ["dropdown", "multi_select"])
+    @pytest.mark.parametrize(
+        "options",
+        [
+            pytest.param(
+                {
                     "source": "dynamic",
                     "expression": "${upstream.options}",
                     "label_key": "label",
                     "value_key": "value",
                 },
-            )
-        )
+                id="dynamic",
+            ),
+            pytest.param(
+                {"source": "dynamic_resolved", "values": [{"display_label": "East", "value": "east"}]},
+                id="dynamic-resolved",
+            ),
+        ],
+    )
+    def test_non_static_options_are_rejected_for_form_triggers(
+        self,
+        field_type: str,
+        options: dict[str, Any],
+    ) -> None:
+        trigger = _form_trigger(_field(field_type, "environment", options=options))
 
-        with pytest.raises(TriggerValidationError, match="form definition"):
+        with pytest.raises(TriggerValidationError, match=r"^Form trigger has an invalid form definition$"):
             validate_form_trigger_submission(trigger, {"environment": "staging"})
 
     def test_wrong_typed_default_is_a_trigger_validation_error(self) -> None:

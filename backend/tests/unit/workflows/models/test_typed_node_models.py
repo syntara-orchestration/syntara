@@ -9,7 +9,7 @@ from typing import Any, ClassVar
 import pytest
 from pydantic import ValidationError
 
-from syntara.forms.models.form_fields import FormDefinition, TextField
+from syntara.forms.models.form_fields import FormPromptDefinition, TextField
 from syntara.workflows.models.workflow_definition import (
     WorkflowDefinition,
 )
@@ -437,9 +437,9 @@ class TestFormPromptNodeParameters:
         self.form_def = self._minimal_form_definition()
 
     @staticmethod
-    def _minimal_form_definition() -> FormDefinition:
-        """Return a minimal valid FormDefinition."""
-        return FormDefinition(
+    def _minimal_form_definition() -> FormPromptDefinition:
+        """Return a minimal valid authored prompt definition."""
+        return FormPromptDefinition(
             fields=[
                 TextField(
                     type="text",
@@ -453,18 +453,19 @@ class TestFormPromptNodeParameters:
     def test_minimal_valid(self) -> None:
         """Minimal valid config with form_definition only."""
         p = FormPromptNodeParameters(form_definition=self.form_def)
-        assert isinstance(p.form_definition, FormDefinition)
+        assert isinstance(p.form_definition, FormPromptDefinition)
         assert len(p.form_definition.fields) == 1
         assert p.form_definition.fields[0].value_name == "reason"
         assert p.message is None
         assert p.fallback_decision is None
 
-    def test_resolved_options_rejected_in_authored_definition(self) -> None:
+    @pytest.mark.parametrize("field_type", ["dropdown", "multi_select"])
+    def test_resolved_options_rejected_in_authored_definition(self, field_type: str) -> None:
         """Runtime-materialized option snapshots cannot be authored in workflows."""
         form_definition = {
             "fields": [
                 {
-                    "type": "dropdown",
+                    "type": field_type,
                     "value_name": "region",
                     "label": "Region",
                     "options": {
@@ -475,10 +476,14 @@ class TestFormPromptNodeParameters:
             ]
         }
 
-        with pytest.raises(ValidationError, match="Use 'static' or 'dynamic'"):
-            FormPromptNodeParameters(form_definition=form_definition)  # type: ignore[arg-type]
+        with pytest.raises(ValidationError, match="Input tag 'dynamic_resolved'") as exc_info:
+            FormPromptNodeParameters.model_validate({"form_definition": form_definition})
 
-    def test_static_and_dynamic_options_remain_authored_sources(self) -> None:
+        assert len(exc_info.value.errors()) == 1
+        assert "does not match any of the expected tags" in str(exc_info.value)
+
+    @pytest.mark.parametrize("field_type", ["dropdown", "multi_select"])
+    def test_static_and_dynamic_options_remain_authored_sources(self, field_type: str) -> None:
         """Static and dynamic source definitions remain valid for authors."""
         for options in (
             {"source": "static", "values": [{"display_label": "US", "value": "us"}]},
@@ -489,19 +494,17 @@ class TestFormPromptNodeParameters:
                 "value_key": "value",
             },
         ):
-            form_definition = FormDefinition.model_validate(
-                {
-                    "fields": [
-                        {
-                            "type": "dropdown",
-                            "value_name": "region",
-                            "label": "Region",
-                            "options": options,
-                        }
-                    ]
-                }
-            )
-            parameters = FormPromptNodeParameters(form_definition=form_definition)
+            form_definition = {
+                "fields": [
+                    {
+                        "type": field_type,
+                        "value_name": "region",
+                        "label": "Region",
+                        "options": options,
+                    }
+                ]
+            }
+            parameters = FormPromptNodeParameters.model_validate({"form_definition": form_definition})
             assert parameters.form_definition.model_dump()["fields"][0]["options"]["source"] == options["source"]
 
     def test_fully_populated(self) -> None:
