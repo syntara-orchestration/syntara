@@ -16,6 +16,9 @@
  * - `exec-3-retry`     — a run created by retrying `exec-3`, carrying the
  *                        "Retried from" indicator.
  *
+ * The real-backend E2E suite skips these tests because they depend on those
+ * mock-only execution IDs and deterministic activity state.
+ *
  * Critical paths covered:
  * - Retry offered on a failed run, hidden on a completed run.
  * - Retry review panel: open → plan → cancel.
@@ -29,6 +32,9 @@ import AxeBuilder from '@axe-core/playwright'
 
 import { test, expect, toAppUrl, type Page } from '../fixtures'
 import { WCAG_TAGS } from '../fixtures/accessibility'
+import { isSkipWebServerForPlaywrightTests } from '../playwrightWebServerEnv'
+
+const isRealBackend = isSkipWebServerForPlaywrightTests()
 
 const FAILED_EXECUTION_ID = 'exec-retry-demo'
 const COMPLETED_EXECUTION_ID = 'exec-1'
@@ -109,7 +115,9 @@ async function expectRetryPanelHasNoA11yViolations(page: Page): Promise<void> {
   expect(results.violations).toEqual([])
 }
 
-test.describe('Retry from failure', () => {
+test.describe('Retry from failure', { tag: '@local-only' }, () => {
+  test.skip(isRealBackend, 'relies on mock API seed data')
+
   test.describe('Execution detail — eligibility', () => {
     test('offers retry from failure on a failed run', async ({ app }) => {
       await openExecutionDetail(app, FAILED_EXECUTION_ID)
