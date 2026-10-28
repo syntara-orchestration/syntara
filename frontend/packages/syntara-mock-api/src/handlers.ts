@@ -2041,13 +2041,20 @@ export const handlers = [
       current_activities: [],
     }
 
-    // Seed the new run by replaying every completed step from the source run.
-    activityExecutions[newExecution.id] = (activityExecutions[executionId] ?? []).map((activity) => ({
-      ...activity,
-      id: uuidv4(),
-      execution_id: newExecution.id,
-      completed_at: activity.completed_at,
-    }))
+    // Only successful outputs can be replayed. Failed source activities must
+    // run again in the retry, so carrying them over would incorrectly mark
+    // their failure state as reused output in the new execution.
+    activityExecutions[newExecution.id] = (activityExecutions[executionId] ?? [])
+      .filter(
+        (activity) =>
+          activity.status === MOCK_ACTIVITY_STATUS.COMPLETED && !retryPointIds.includes(activity.activity_name)
+      )
+      .map((activity) => ({
+        ...activity,
+        id: uuidv4(),
+        execution_id: newExecution.id,
+        completed_at: activity.completed_at,
+      }))
 
     executions.unshift(newExecution)
     return HttpResponse.json(newExecution, { status: 201 })
