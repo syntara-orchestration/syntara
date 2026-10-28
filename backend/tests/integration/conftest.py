@@ -14,7 +14,7 @@ import contextlib
 import sys
 from collections.abc import AsyncGenerator, Generator
 from pathlib import Path
-from typing import Any, NamedTuple
+from typing import NamedTuple
 from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID, uuid4
 
@@ -242,14 +242,12 @@ def _mock_evaluator_allow_all(monkeypatch: pytest.MonkeyPatch) -> None:
         }
     )
 
-    def _mock_getter(request: Any = None) -> AsyncMock:  # noqa: ANN401
-        return mock_evaluator
-
-    monkeypatch.setattr("syntara.authz.dependencies.get_authz_evaluator", _mock_getter)
-    monkeypatch.setattr("syntara.authz.dependencies.get_authz_evaluator", _mock_getter)
-    monkeypatch.setattr("syntara.workflows.executions_router.get_authz_evaluator", _mock_getter)
-
-    app.dependency_overrides[get_authz_evaluator] = lambda: mock_evaluator
+    # Keep the provider identity stable: routers discovered during this fixture
+    # must not capture a getter bound to this test's evaluator.
+    monkeypatch.setattr(app.state, "authz_evaluator", mock_evaluator, raising=False)
+    overrides = app.dependency_overrides.copy()
+    overrides[get_authz_evaluator] = lambda: mock_evaluator
+    monkeypatch.setattr(app, "dependency_overrides", overrides)
 
 
 @pytest.fixture

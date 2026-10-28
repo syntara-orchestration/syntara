@@ -78,6 +78,15 @@ def test_unknown_and_account_fields_forbidden(parameters: dict[str, Any], field:
         validate_event_subscribe_parameters(parameters)
 
 
+@pytest.mark.parametrize("integration_type", [None, "kafka"])
+def test_designer_cannot_supply_valid_partition_membership(
+    parameters: dict[str, Any], integration_type: str | None
+) -> None:
+    parameters["initial_partition_ids"] = [0, 2, 5]
+    with pytest.raises(ValidationError, match="extra_forbidden"):
+        validate_event_subscribe_parameters(parameters, integration_type=integration_type)
+
+
 @pytest.mark.parametrize("field", ["integration_id", "credential_id"])
 def test_uuid_expression_references_forbidden(parameters: dict[str, Any], field: str) -> None:
     parameters[field] = "${trigger.value}"
