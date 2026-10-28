@@ -113,7 +113,11 @@ test.describe('Retry from failure', () => {
       await expect(panel.getByRole('heading', { name: 'Retry run from failure' })).toBeVisible()
       await expect(panel.getByRole('heading', { name: 'How retry works' })).toBeVisible()
       await expect(panel.getByRole('heading', { name: 'Retry plan' })).toBeVisible()
-      await expect(panel.getByRole('button', { name: 'Change inputs before retry' })).toBeVisible()
+      await expect(app.getByRole('tab', { name: 'Details' })).toHaveAttribute('aria-selected', 'true')
+      await expect(panel.getByRole('button', { name: 'Retry 2 steps' })).toBeVisible()
+      await expect(app.getByRole('button', { name: 'Copy to editor' })).toHaveCount(0)
+      await expect(app.getByRole('button', { name: 'Back to editor' })).toHaveCount(0)
+      await expect(app.getByRole('button', { name: 'Run history' })).toHaveCount(0)
 
       await panel.getByRole('button', { name: 'Cancel' }).click()
       await expect(panel).not.toBeVisible()
@@ -144,6 +148,44 @@ test.describe('Retry from failure', () => {
       await expect(app.getByTestId('retried-from-badge')).toContainText('Retried from:')
     })
 
+    test('edits resolved inputs in Run details and labels them for retry', async ({ app }, testInfo) => {
+      await stubWorkflowEditPermission(app, true)
+      await openExecutionDetail(app, FAILED_EXECUTION_ID)
+      await app.getByRole('tab', { name: 'Details' }).click()
+      await app.getByRole('row', { name: /First Step/ }).click()
+      await openRetryActionsMenu(app)
+      await app.getByTestId('retry-from-failure-button').click()
+
+      await expect(app.getByRole('tab', { name: 'Details' })).toHaveAttribute('aria-selected', 'true')
+      await expect(app.getByText('Resolved parameters from the original run')).toBeVisible()
+      await expect(app.getByText(/"language": "bash"/, { exact: false })).toBeVisible()
+      await app.getByRole('button', { name: 'Edit inputs' }).click()
+
+      const editor = app.getByRole('textbox', { name: /Input overrides for/ })
+      await editor.fill('{"code":"echo retry"}')
+      await expect(editor).toBeInViewport()
+      await app.screenshot({ path: testInfo.outputPath('retry-input-overrides-editing.png') })
+      const retryButton = app.getByRole('button', { name: 'Retry 2 steps' })
+      await expect(retryButton).toBeDisabled()
+      await app.getByRole('button', { name: 'Save inputs' }).click()
+
+      await expect(app.getByText('Edited for retry')).toBeInViewport()
+      await expect(retryButton).toBeEnabled()
+      await app.screenshot({ path: testInfo.outputPath('retry-input-overrides-saved.png') })
+
+      const retryRequestPromise = app.waitForRequest(
+        (request) =>
+          request.method() === 'POST' &&
+          request.url().endsWith(`/api/v1/executions/${FAILED_EXECUTION_ID}/retry_from_failure`)
+      )
+      await retryButton.click()
+      const retryRequest = await retryRequestPromise
+      expect(retryRequest.postDataJSON()).toMatchObject({
+        input_parameter_overrides: { step2: { code: 'echo retry' } },
+      })
+      await expect(app.getByText('Retry started')).toBeVisible()
+    })
+
     test('allows a normal retry but hides input overrides without workflow edit permission', async ({ app }) => {
       await stubWorkflowEditPermission(app, false)
 
@@ -153,8 +195,9 @@ test.describe('Retry from failure', () => {
 
       const panel = app.getByRole('complementary', { name: 'Retry run from failure review' })
       await expect(panel).toBeVisible()
-      await expect(panel.getByText('Workflow edit permission is required to override retry inputs.')).toBeVisible()
-      await expect(panel.getByRole('button', { name: 'Change inputs before retry' })).toHaveCount(0)
+      await expect(app.getByRole('tab', { name: 'Details' })).toHaveAttribute('aria-selected', 'true')
+      await expect(app.getByText('Workflow edit permission is required to override retry inputs.')).toBeVisible()
+      await expect(app.getByRole('button', { name: 'Edit inputs' })).toHaveCount(0)
       await panel.getByTestId('retry-from-failure-confirm').click()
       await expect(app.getByText('Retry started')).toBeVisible()
     })

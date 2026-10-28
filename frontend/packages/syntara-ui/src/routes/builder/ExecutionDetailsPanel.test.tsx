@@ -302,6 +302,20 @@ describe('ExecutionDetailsPanel', () => {
       expect(screen.getByText('Process data')).toBeInTheDocument()
     })
 
+    it('keeps Run details in Details mode while retry mode is active', () => {
+      render(
+        <ExecutionDetailsPanel
+          executionId="exec-123"
+          workflowDefinition={WORKFLOW_DEF}
+          selectedNodeId="task-1"
+          retryMode
+        />
+      )
+
+      expect(screen.getByRole('tab', { name: 'Details' })).toHaveAttribute('aria-selected', 'true')
+      expect(screen.queryByRole('tab', { name: 'Overview' })).not.toBeInTheDocument()
+    })
+
     it('selects the first activity by default when switching to Details mode', async () => {
       const user = userEvent.setup()
       renderPanel(WORKFLOW_DEF)

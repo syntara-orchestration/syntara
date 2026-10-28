@@ -44,6 +44,7 @@ import { extractApprovalAudit, type ApprovalAudit } from '../workflows/execution
 import { extractAgentTrace } from './agentTraceTypes'
 import { AgentTraceView } from './AgentTraceView'
 import { useStepExecutionDetails } from './hooks/useStepExecutionDetails'
+import { RetryInputOverrideDetails, type RetryInputOverrideDetailsProps } from './RetryInputOverrideDetails'
 import styles from './StepExecutionDetailsPanel.module.css'
 import { extractUsedTools, type UsedTool } from './utils/extractUsedTools'
 
@@ -55,6 +56,7 @@ type StepExecutionDetailsPanelProps = {
   stepState?: ActivityState
   /** Step type from workflow definition (e.g. 'aap_job_template'). */
   stepType?: string
+  retryInputOverride?: Omit<RetryInputOverrideDetailsProps, 'resolvedInputs'>
 }
 
 function NoDataState({ label }: Readonly<{ label: string }>) {
@@ -311,6 +313,7 @@ type StepContentAreaProps = Readonly<{
   stepIsFailed: boolean
   isAgenticStep: boolean
   activeTab: 'io' | 'agent-steps'
+  retryInputOverride?: Omit<RetryInputOverrideDetailsProps, 'resolvedInputs'>
 }>
 
 function StepContentArea({
@@ -323,6 +326,7 @@ function StepContentArea({
   stepIsFailed,
   isAgenticStep,
   activeTab,
+  retryInputOverride,
 }: StepContentAreaProps) {
   const [inputView, setInputView] = useState<PanelView>('json')
   const [outputView, setOutputView] = useState<PanelView>('json')
@@ -345,7 +349,11 @@ function StepContentArea({
       className={styles.dataPaneContainer}
     >
       <FlexItem flex={{ default: 'flex_1' }} className={styles.paneItem}>
-        <DataPane title="Parameters" stepId={stepId} data={inputData} view={inputView} onViewChange={setInputView} />
+        {retryInputOverride ? (
+          <RetryInputOverrideDetails {...retryInputOverride} resolvedInputs={inputData} />
+        ) : (
+          <DataPane title="Parameters" stepId={stepId} data={inputData} view={inputView} onViewChange={setInputView} />
+        )}
       </FlexItem>
       <FlexItem flex={{ default: 'flex_1' }} className={styles.paneItem}>
         <DataPane
@@ -367,6 +375,7 @@ export function StepExecutionDetailsPanel({
   executionId,
   stepState,
   stepType,
+  retryInputOverride,
 }: Readonly<StepExecutionDetailsPanelProps>) {
   const [activeTab, setActiveTab] = useState<'io' | 'agent-steps'>('io')
   const isAgenticStep = stepType === ActivityTypeEnum.AGENTIC
@@ -432,6 +441,7 @@ export function StepExecutionDetailsPanel({
           stepIsFailed={stepIsFailed}
           isAgenticStep={isAgenticStep}
           activeTab={activeTab}
+          retryInputOverride={retryInputOverride}
         />
       </StackItem>
     </Stack>

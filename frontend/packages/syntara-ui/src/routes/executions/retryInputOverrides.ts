@@ -15,6 +15,30 @@ export type RetryInputOverrideTarget = Readonly<{
   failedActivityName?: string
 }>
 
+export type RetryInputOverrideDraftResult = Readonly<{
+  parsed: Record<string, unknown> | undefined
+  error: string | undefined
+}>
+
+export type RetryInputOverridesState = Readonly<{
+  targets: RetryInputOverrideTarget[]
+  canEdit: boolean
+  isDisabled: boolean
+  savedOverrides: Readonly<Record<string, Record<string, unknown>>>
+  drafts: Readonly<Record<string, string>>
+  errors: Readonly<Record<string, string>>
+  editingTargetIds: ReadonlySet<string>
+  onEdit: (targetId: string) => void
+  onCancel: (targetId: string) => void
+  onSave: (targetId: string, overrides: Record<string, unknown> | undefined) => void
+  onDraftChange: (
+    targetId: string,
+    value: string,
+    parsed: Record<string, unknown> | undefined,
+    error: string | undefined
+  ) => void
+}>
+
 export function getRetryInputOverrideTargets(
   pointIds: string[],
   workflowDefinition: WorkflowDefShape | null | undefined,
@@ -32,13 +56,14 @@ export function getRetryInputOverrideTargets(
   }
 
   return pointIds.flatMap((id) => {
-    const node = definitionsById.get(id)
+    const { baseId } = parseCompositeKey(id)
+    const node = definitionsById.get(baseId)
     const parameterNames = node?.parameters ? Object.keys(node.parameters) : []
     if (parameterNames.length === 0) return []
     return [
       {
         id,
-        name: activityNameMap.get(id) ?? node?.name ?? id,
+        name: activityNameMap.get(baseId) ?? activityNameMap.get(id) ?? node?.name ?? id,
         parameterNames,
         failedActivityName: findFailedActivityName(id, activities),
       },
@@ -73,7 +98,39 @@ function findFailedActivityName(nodeId: string, activities: ExecutionActivity[])
         ('created_at' in activity ? activity.created_at : undefined) ??
         '',
     }))
-    .filter(({ name, status }) => status === 'failed' && parseCompositeKey(name).baseId === nodeId)
+    .filter(
+      ({ name, status }) => status === 'failed' && parseCompositeKey(name).baseId === parseCompositeKey(nodeId).baseId
+    )
+
+  const exactActivity = failedActivities.find(({ name }) => name === nodeId)
+  if (exactActivity) return exactActivity.name
 
   return failedActivities.sort((a, b) => a.timestamp.localeCompare(b.timestamp)).at(-1)?.name
+}
+
+export function parseRetryInputOverrideDraft(
+  value: string,
+  allowedParameterNames: string[]
+): RetryInputOverrideDraftResult {
+  let parsedValue: unknown
+  try {
+    parsedValue = JSON.parse(value)
+  } catch {
+    return { parsed: undefined, error: 'Enter a valid JSON object.' }
+  }
+
+  if (parsedValue === null || typeof parsedValue !== 'object' || Array.isArray(parsedValue)) {
+    return { parsed: undefined, error: 'Enter a JSON object of parameter names and values.' }
+  }
+
+  const parsed = parsedValue as Record<string, unknown>
+  const unknownParameters = Object.keys(parsed).filter((key) => !allowedParameterNames.includes(key))
+  if (unknownParameters.length > 0) {
+    return {
+      parsed: undefined,
+      error: `Unknown parameter${unknownParameters.length === 1 ? '' : 's'}: ${unknownParameters.join(', ')}.`,
+    }
+  }
+
+  return { parsed: Object.keys(parsed).length > 0 ? parsed : undefined, error: undefined }
 }

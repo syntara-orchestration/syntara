@@ -368,9 +368,10 @@ type RetryFooterProps = Readonly<{
   onCancel: () => void
   isRetryDisabled: boolean
   isRetryPending: boolean
+  stepCount?: number
 }>
 
-export function RetryFooter({ onRetry, onCancel, isRetryDisabled, isRetryPending }: RetryFooterProps) {
+export function RetryFooter({ onRetry, onCancel, isRetryDisabled, isRetryPending, stepCount }: RetryFooterProps) {
   return (
     <Flex justifyContent={{ default: 'justifyContentSpaceBetween' }} alignItems={{ default: 'alignItemsCenter' }}>
       <FlexItem>
@@ -381,7 +382,7 @@ export function RetryFooter({ onRetry, onCancel, isRetryDisabled, isRetryPending
           isDisabled={isRetryDisabled}
           data-testid="retry-from-failure-confirm"
         >
-          Retry run from failure
+          {getRetryButtonLabel(stepCount)}
         </Button>
       </FlexItem>
       <FlexItem>
@@ -391,4 +392,10 @@ export function RetryFooter({ onRetry, onCancel, isRetryDisabled, isRetryPending
       </FlexItem>
     </Flex>
   )
+}
+
+function getRetryButtonLabel(stepCount: number | undefined): string {
+  if (stepCount === undefined) return 'Retry run from failure'
+  const stepLabel = stepCount === 1 ? 'step' : 'steps'
+  return `Retry ${stepCount} ${stepLabel}`
 }

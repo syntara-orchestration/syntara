@@ -2,7 +2,6 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { axe } from 'vitest-axe'
 
-import { useCanI } from '../../hooks/useCanI'
 import { routerTestState } from '../../test/setup'
 
 import { useRetryFromFailure } from './hooks/useRetryFromFailure'
@@ -10,14 +9,6 @@ import { useRetryFromFailurePreview } from './hooks/useRetryFromFailurePreview'
 import { RetryFromFailureSidePanel } from './RetryFromFailureSidePanel'
 
 const mockHandleRetry = vi.fn()
-
-vi.mock('./RetryFromFailureInputOverrides', () => ({
-  RetryFromFailureInputOverrides: () => 'Retry input override editor',
-}))
-
-vi.mock('../../hooks/useCanI', () => ({
-  useCanI: vi.fn(() => ({ allowed: false, isChecking: false, isError: false })),
-}))
 
 vi.mock('./hooks/useRetryFromFailure', () => ({
   useRetryFromFailure: vi.fn(() => ({ handleRetry: mockHandleRetry, isPending: false })),
@@ -57,7 +48,6 @@ function renderPanel(props?: Partial<React.ComponentProps<typeof RetryFromFailur
 describe('RetryFromFailureSidePanel', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    vi.mocked(useCanI).mockReturnValue({ allowed: false, isChecking: false, isError: false })
     vi.mocked(useRetryFromFailure).mockReturnValue({ handleRetry: mockHandleRetry, isPending: false })
     vi.mocked(useRetryFromFailurePreview).mockReturnValue({
       preview: {
@@ -87,31 +77,6 @@ describe('RetryFromFailureSidePanel', () => {
     expect(screen.getByText('1 completed result retained')).toBeInTheDocument()
     expect(screen.getByText(/Completed results outside the selected retry paths are reused/)).toBeInTheDocument()
     expect(screen.getByText('This retry starts at Second Step and reruns 3 steps.')).toBeInTheDocument()
-  })
-
-  it('shows input overrides to a workflow editor', () => {
-    vi.mocked(useCanI).mockReturnValue({ allowed: true, isChecking: false, isError: false })
-    renderPanel({
-      executionProjectId: 'project-1',
-      workflowDefinition: {
-        nodes: [{ id: 'step-2', name: 'Second Step', parameters: { code: 'exit 1' } }],
-      },
-    })
-
-    expect(screen.getByText('Retry input override editor')).toBeInTheDocument()
-    expect(screen.queryByText('Workflow edit permission is required to override retry inputs.')).not.toBeInTheDocument()
-  })
-
-  it('keeps input overrides unavailable without workflow edit permission', () => {
-    renderPanel({
-      executionProjectId: 'project-1',
-      workflowDefinition: {
-        nodes: [{ id: 'step-2', name: 'Second Step', parameters: { code: 'exit 1' } }],
-      },
-    })
-
-    expect(screen.getByText('Workflow edit permission is required to override retry inputs.')).toBeInTheDocument()
-    expect(screen.queryByText('Retry input override editor')).not.toBeInTheDocument()
   })
 
   it('narrows the plan and request to the selected failed node', async () => {
@@ -150,6 +115,23 @@ describe('RetryFromFailureSidePanel', () => {
     await user.click(screen.getByTestId('retry-from-failure-confirm'))
 
     expect(mockHandleRetry).toHaveBeenCalledWith(['step-2'], {})
+  })
+
+  it('submits saved input overrides with the retry request', async () => {
+    const user = userEvent.setup()
+    const overrides = { 'step-2': { endpoint: 'https://retry.example' } }
+    renderPanel({ inputParameterOverrides: overrides })
+
+    await user.click(screen.getByTestId('retry-from-failure-confirm'))
+
+    expect(mockHandleRetry).toHaveBeenCalledWith(undefined, overrides)
+  })
+
+  it('requires input edits to be saved or cancelled before retrying', () => {
+    renderPanel({ hasUnsavedInputOverrides: true })
+
+    expect(screen.getByText('Save or cancel input changes in Run details before retrying.')).toBeInTheDocument()
+    expect(screen.getByTestId('retry-from-failure-confirm')).toBeDisabled()
   })
 
   it('previews an exact selected subset and retries only the checked failure points', async () => {

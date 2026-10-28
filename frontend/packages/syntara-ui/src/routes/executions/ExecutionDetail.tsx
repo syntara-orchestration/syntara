@@ -44,7 +44,6 @@ import { useExecutionStreaming, useSyncActivityStore } from './hooks/useExecutio
 import { useExecutionWorkflow } from './hooks/useExecutionWorkflow'
 import { useForkWorkflow } from './hooks/useForkWorkflow'
 import { useRetryFromFailurePanel } from './hooks/useRetryFromFailurePanel'
-import { RetryFromFailureSidePanel } from './RetryFromFailureSidePanel'
 
 /** Returns true when the page should render a fallback (missing ID, loading, or error) instead of the main content. */
 function shouldShowFallbackState(
@@ -430,6 +429,7 @@ export default function ExecutionDetail() {
               executionId={executionId}
               execution={execution}
               onRetryFromFailureClick={retryPanel.open}
+              isRetryMode={retryPanel.isOpen}
             />
           }
         />

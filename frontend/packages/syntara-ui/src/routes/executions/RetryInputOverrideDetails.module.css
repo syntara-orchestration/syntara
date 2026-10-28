@@ -1,0 +1,23 @@
+.container {
+  height: 100%;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--pf-t--global--spacer--sm);
+}
+
+.resolvedHeader {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding-block: var(--pf-t--global--spacer--xs);
+  background-color: var(--pf-t--global--background--color--sticky--default);
+}
+
+.inputPreview {
+  max-block-size: 16rem;
+  overflow: auto;
+  padding: var(--pf-t--global--spacer--sm);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: var(--pf-t--global--background--color--secondary--default);
+}
