@@ -1,8 +1,9 @@
+import { Flex } from '@patternfly/react-core'
 import { useNodeId, useStore, useUpdateNodeInternals } from '@xyflow/react'
 import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 
-import { StandardStepHeader } from '../../routes/workflows/canvas/nodes/common/StandardStepHeader'
 import { SemanticZoomBranchSourceHandles } from '../../routes/workflows/canvas/nodes/common/SemanticZoomBranchSourceHandles'
+import { StandardStepHeader } from '../../routes/workflows/canvas/nodes/common/StandardStepHeader'
 import type { StepMenuAction } from '../../routes/workflows/canvas/nodes/hooks/useStepMenuActions'
 import { SEMANTIC_ZOOM_TILE_SIZE_PX } from '../../routes/workflows/canvas/semanticZoom'
 import type { SemanticZoomBranchSource } from '../../routes/workflows/canvas/semanticZoomTypes'
@@ -113,7 +114,15 @@ export function SynStepSemanticZoomBody(props: {
           }}
         >
           <div className={tileClassName} style={tileRadiusStyle}>
-            {props.icon ? <div className={styles.iconSlot}>{props.icon}</div> : null}
+            {props.icon ? (
+              <Flex
+                className={styles.iconSlot}
+                alignItems={{ default: 'alignItemsCenter' }}
+                justifyContent={{ default: 'justifyContentCenter' }}
+              >
+                {props.icon}
+              </Flex>
+            ) : null}
           </div>
         </button>
 

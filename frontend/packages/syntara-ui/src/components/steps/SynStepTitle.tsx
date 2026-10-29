@@ -3,7 +3,7 @@ import { useCallback, useLayoutEffect, useRef, useState } from 'react'
 
 import styles from './SynStepTitle.module.css'
 
-function useOverflowTooltip() {
+function useOverflowTooltip(text: string) {
   const ref = useRef<HTMLDivElement>(null)
   const [showTooltip, setShowTooltip] = useState(false)
 
@@ -23,16 +23,16 @@ function useOverflowTooltip() {
     const observer = new ResizeObserver(() => measure())
     observer.observe(el)
     return () => observer.disconnect()
-  }, [measure])
+  }, [measure, text])
 
-  return { ref, showTooltip, onMouseEnter: measure }
+  return { ref, showTooltip }
 }
 
 function TitleLine(props: { text: string; isSubtitle?: boolean }) {
-  const { ref, showTooltip, onMouseEnter } = useOverflowTooltip()
+  const { ref, showTooltip } = useOverflowTooltip(props.text)
 
   const inner = (
-    <div ref={ref} className={styles.textWrapper} onMouseEnter={onMouseEnter}>
+    <div ref={ref} className={styles.textWrapper}>
       {props.isSubtitle ? (
         <Content component={ContentVariants.small} className={styles.subtitleText}>
           {props.text}
