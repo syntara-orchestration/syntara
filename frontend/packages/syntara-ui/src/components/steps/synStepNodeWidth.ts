@@ -4,7 +4,7 @@ import type { NodeProps } from '@xyflow/react'
 import { FlowNodeType } from '../../constants'
 import { SEMANTIC_ZOOM_TILE_SIZE_PX } from '../../routes/workflows/canvas/semanticZoom'
 
-export const SYN_STEP_DEFAULT_NODE_WIDTH = 240
+export const SYN_STEP_DEFAULT_NODE_WIDTH = 300
 export const SYN_STEP_WIDE_NODE_WIDTH = 360
 
 function isWideTaskNode(nodeProps: NodeProps): boolean {

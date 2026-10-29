@@ -100,7 +100,7 @@ describe('SynStep semantic zoom', () => {
     expect(await axe(container)).toHaveNoViolations()
   })
 
-  it('uses tile width and semantic-zoom connection handles at low zoom', () => {
+  it('uses tile width and semantic-zoom connection handles at low zoom', async () => {
     viewportState.zoom = 0.5
     renderWithFlow(
       <SynStep
@@ -124,6 +124,8 @@ describe('SynStep semantic zoom', () => {
     expect(screen.getByTestId('semantic-zoom-icon')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Branch, Condition' })).toBeInTheDocument()
     expect(screen.getByLabelText('True branch output')).toBeInTheDocument()
+    const user = userEvent.setup()
+    await user.hover(screen.getByRole('button', { name: 'Branch, Condition' }))
     expect(screen.getByRole('button', { name: 'Edit Branch' })).toBeInTheDocument()
   })
 
@@ -268,6 +270,16 @@ describe('SynStep validation and interaction', () => {
     await user.keyboard('a')
 
     expect(onClick).not.toHaveBeenCalled()
+  })
+
+  it('uses default width for standard nodes', () => {
+    renderWithFlow(
+      <SynStep nodeProps={baseNodeProps} rootTestId="node-panel">
+        <span>Content</span>
+      </SynStep>
+    )
+
+    expect(screen.getByTestId('node-panel')).toHaveStyle({ width: '300px' })
   })
 
   it('uses wide width for GENERIC node type', () => {

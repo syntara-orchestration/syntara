@@ -57,7 +57,9 @@ export function ConvergeStepComponent(props: NodeProps<ConvergeNode>) {
         typeLabel: metadata.label,
       }}
       semanticZoomIcon={semanticZoomIcon}
+      semanticZoomPreviewIcon={iconNode}
       semanticZoomMenuActions={menuActions}
+      semanticZoomExpandable
     >
       <StandardStepHeader
         icon={iconNode}

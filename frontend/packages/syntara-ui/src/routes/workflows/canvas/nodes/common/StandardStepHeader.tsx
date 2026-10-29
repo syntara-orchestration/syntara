@@ -1,9 +1,8 @@
-import { Content, Flex, FlexItem, Stack, StackItem } from '@patternfly/react-core'
+import { Flex, FlexItem, Stack, StackItem } from '@patternfly/react-core'
 import { useStore } from '@xyflow/react'
 
-import { SynStepExpandToggle } from '../../../../../components/steps/SynStepExpandToggle'
 import { SynStepHeader } from '../../../../../components/steps/SynStepHeader'
-import { SynStepMenu } from '../../../../../components/steps/SynStepMenu'
+import { SynStepHeaderActions } from '../../../../../components/steps/SynStepHeaderActions'
 import { SynStepTitle } from '../../../../../components/steps/SynStepTitle'
 import { useIsActiveExecution } from '../../../../builder/ActiveExecutionContext'
 import { useIsExecutionView } from '../../../../builder/ExecutionViewContext'
@@ -20,20 +19,6 @@ type StandardStepHeaderProps = {
   menuActions?: StepMenuAction[]
 }
 
-/**
- * Standard step header component that combines icon, title, subtitle, optional expand toggle, and kebab menu.
- * Reduces boilerplate in step component implementations.
- *
- * The kebab menu supports:
- * - Custom actions via additionalActions prop in useStepMenuActions
- * - Automatic separator before delete action when custom actions exist
- * - Danger styling for destructive actions (variant: 'danger')
- * - Icons for menu items
- *
- * The kebab menu is automatically hidden in execution view mode (read-only).
- *
- * Layout: Icon and kebab menu on first line, title and subtitle on second line below.
- */
 const sectionPadding = {
   paddingLeft: 'var(--pf-t--global--spacer--md)',
   paddingRight: 'var(--pf-t--global--spacer--md)',
@@ -45,52 +30,58 @@ const badgeSectionStyle = {
   paddingBottom: 0,
 }
 
-const titleSectionStyle = {
-  ...sectionPadding,
-  paddingTop: 'var(--pf-t--global--spacer--xs)',
-  paddingBottom: 'var(--pf-t--global--spacer--sm)',
-}
-
+/**
+ * Standard step header component that combines icon, title, subtitle, optional expand toggle, and kebab menu.
+ * Reduces boilerplate in step component implementations.
+ *
+ * The kebab menu supports:
+ * - Custom actions via additionalActions prop in useStepMenuActions
+ * - Automatic separator before delete action when custom actions exist
+ * - Danger styling for destructive actions (variant: 'danger')
+ * - Icons for menu items
+ *
+ * The kebab menu is automatically hidden in execution view mode (read-only).
+ */
 export function StandardStepHeader(props: Readonly<StandardStepHeaderProps>) {
   const isExecutionView = useIsExecutionView()
   const isActiveExecution = useIsActiveExecution()
   const nodesConnectable = useStore((s) => s.nodesConnectable)
   const isVersionView = useIsVersionView()
 
+  const stepTitle = props.title ?? props.subtitle ?? ''
+  const showMenuActions =
+    Boolean(props.menuActions?.length) && !isExecutionView && !isActiveExecution && !isVersionView && nodesConnectable
+
   return (
     <Stack>
       <StackItem>
         <SynStepHeader>
-          {props.icon && <FlexItem>{props.icon}</FlexItem>}
-          <FlexItem>
-            <Flex>
-              {props.expandable && (
-                <FlexItem>
-                  <SynStepExpandToggle />
-                </FlexItem>
+          <Flex
+            alignItems={{ default: 'alignItemsFlexStart' }}
+            justifyContent={{ default: 'justifyContentSpaceBetween' }}
+            style={{ gap: 'var(--pf-t--global--spacer--sm)' }}
+          >
+            <Flex
+              alignItems={{ default: 'alignItemsFlexStart' }}
+              style={{ gap: 'var(--pf-t--global--spacer--sm)', minWidth: 0, flex: 1 }}
+            >
+              {props.icon ? <FlexItem shrink={{ default: 'shrink' }}>{props.icon}</FlexItem> : null}
+              {(props.title || props.subtitle) && (
+                <SynStepTitle title={props.title ?? ''} subTitle={props.subtitle ?? ''} />
               )}
-              {props.menuActions &&
-                props.menuActions.length > 0 &&
-                !isExecutionView &&
-                !isActiveExecution &&
-                !isVersionView &&
-                nodesConnectable && (
-                  <FlexItem>
-                    <SynStepMenu menuActions={props.menuActions} />
-                  </FlexItem>
-                )}
             </Flex>
-          </FlexItem>
+            <FlexItem shrink={{ default: 'shrink' }}>
+              <SynStepHeaderActions
+                stepTitle={stepTitle}
+                menuActions={props.menuActions}
+                expandable={props.expandable}
+                showMenuActions={showMenuActions}
+              />
+            </FlexItem>
+          </Flex>
         </SynStepHeader>
       </StackItem>
-      {props.badge && <StackItem style={badgeSectionStyle}>{props.badge}</StackItem>}
-      {(props.title || props.subtitle) && (
-        <StackItem style={titleSectionStyle}>
-          <Content>
-            <SynStepTitle title={props.title ?? ''} subTitle={props.subtitle ?? ''} />
-          </Content>
-        </StackItem>
-      )}
+      {props.badge ? <StackItem style={badgeSectionStyle}>{props.badge}</StackItem> : null}
     </Stack>
   )
 }

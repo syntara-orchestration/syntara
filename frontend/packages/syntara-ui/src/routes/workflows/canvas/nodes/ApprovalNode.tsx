@@ -67,7 +67,9 @@ export function ApprovalStepComponent(props: NodeProps<ApprovalNode>) {
         { id: 'rejected', ariaLabel: 'Rejected branch output' },
       ]}
       semanticZoomIcon={semanticZoomIcon}
+      semanticZoomPreviewIcon={iconNode}
       semanticZoomMenuActions={menuActions}
+      semanticZoomExpandable={metadata.expandable}
     >
       <>
         <StandardStepHeader

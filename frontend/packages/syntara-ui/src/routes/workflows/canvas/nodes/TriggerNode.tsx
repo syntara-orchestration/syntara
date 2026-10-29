@@ -6,7 +6,7 @@ import type { CSSProperties } from 'react'
 import { SynStep } from '../../../../components/steps/SynStep'
 import { SynStepBody } from '../../../../components/steps/SynStepBody'
 import { SynStepHeader } from '../../../../components/steps/SynStepHeader'
-import { SynStepMenu } from '../../../../components/steps/SynStepMenu'
+import { SynStepHeaderActions } from '../../../../components/steps/SynStepHeaderActions'
 import { FlowNodeType } from '../../../../constants'
 import { parseTriggerIndex } from '../../../../utils/triggerNodeIds'
 import { useIsActiveExecution } from '../../../builder/ActiveExecutionContext'
@@ -104,7 +104,9 @@ export function TriggerStepComponent(props: NodeProps<TriggerNode>) {
         typeLabel: triggerTypeLabel,
       }}
       semanticZoomIcon={semanticZoomIcon}
+      semanticZoomPreviewIcon={iconNode}
       semanticZoomMenuActions={menuActions}
+      semanticZoomExpandable={metadata.expandable}
     >
       <TriggerStepDetails
         node={props.data}
@@ -141,21 +143,23 @@ function TriggerStepDetails(
   const isWebhookTrigger = props.triggerKind === TriggerTypeEnum.WEBHOOK_TRIGGER
   const isEdaTrigger = props.triggerKind === TriggerTypeEnum.EDA_TRIGGER
   const normalizedDetails = props.triggerDetails ?? null
+  const showMenuActions =
+    Boolean(props.menuActions?.length) && !isExecutionView && !isActiveExecution && !isVersionView && nodesConnectable
   return (
     <>
       <SynStepHeader>
         <FlexItem>{props.icon}</FlexItem>
         <FlexItem grow={{ default: 'grow' }} />
-        {props.menuActions &&
-          props.menuActions.length > 0 &&
-          !isExecutionView &&
-          !isActiveExecution &&
-          !isVersionView &&
-          nodesConnectable && (
-            <FlexItem>
-              <SynStepMenu menuActions={props.menuActions} />
-            </FlexItem>
-          )}
+        {showMenuActions ? (
+          <FlexItem>
+            <SynStepHeaderActions
+              stepTitle={props.triggerName}
+              menuActions={props.menuActions}
+              expandable={false}
+              showMenuActions={showMenuActions}
+            />
+          </FlexItem>
+        ) : null}
       </SynStepHeader>
       <SynStepBody>
         <div>

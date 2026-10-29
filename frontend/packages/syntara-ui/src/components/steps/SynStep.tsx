@@ -12,6 +12,7 @@ import { STEP_TYPE_COLORS } from '../../routes/workflows/canvas/stepTypeColors'
 import type { ActivityStatus } from '../../routes/workflows/execution/types'
 import { SynPanel } from '../layout/SynPanel'
 
+import stepStyles from './SynStep.module.css'
 import { SynStepConnectionHandles } from './SynStepConnectionHandles'
 import { SynStepExpandedAllContext } from './SynStepExpandedAllContext'
 import { SynStepExpandedContext } from './SynStepExpandedContext'
@@ -95,10 +96,14 @@ export function SynStep(props: {
   topBarColor?: string
   /** When zoomed out, title and type label for the semantic zoom label panel */
   semanticZoomSummary?: { title: string; typeLabel: string }
-  /** Step icon shown in the semantic zoom tile (same as the detailed header icon). */
+  /** Step icon shown in the semantic zoom tile (large, centered). */
   semanticZoomIcon?: React.ReactNode
+  /** Icon in the semantic zoom hover/focus preview header (full-zoom header size). */
+  semanticZoomPreviewIcon?: React.ReactNode
   /** Kebab menu actions for semantic zoom (Edit uses the view-details action when present). */
   semanticZoomMenuActions?: readonly StepMenuAction[]
+  /** When true, semantic zoom preview shows the expand/collapse control. */
+  semanticZoomExpandable?: boolean
   /** Branch source handles at semantic zoom (no labels; stacked on the tile edge) */
   semanticZoomBranchSources?: readonly SemanticZoomBranchSource[]
   /** Optional stable hook for tests (e.g. canvas node root) */
@@ -223,12 +228,22 @@ export function SynStep(props: {
         }),
   }
 
+  const panelClassName = [props.className, !isSemanticZoom && !props.onClick ? stepStyles.stepRoot : undefined]
+    .filter(Boolean)
+    .join(' ')
+  let panelTabIndex: number | undefined = 0
+  if (props.onClick) {
+    panelTabIndex = 0
+  } else if (isSemanticZoom) {
+    panelTabIndex = undefined
+  }
+
   return (
     <SynStepExpandedContext.Provider value={expandedContext}>
       <SynPanel
         hasNoPadding
         variant="raised"
-        className={props.className}
+        className={panelClassName || undefined}
         data-testid={props.rootTestId}
         onClick={props.onClick}
         style={panelStyle}
@@ -239,7 +254,7 @@ export function SynStep(props: {
           }
         }}
         role={props.onClick ? 'button' : undefined}
-        tabIndex={props.onClick ? 0 : undefined}
+        tabIndex={panelTabIndex}
       >
         {isSemanticZoom && summary ? (
           <SynStepSemanticZoomBody
@@ -247,7 +262,9 @@ export function SynStep(props: {
             typeLabel={summary.typeLabel}
             accentColor={semanticFillColor}
             icon={props.semanticZoomIcon}
+            previewIcon={props.semanticZoomPreviewIcon}
             menuActions={props.semanticZoomMenuActions}
+            expandable={props.semanticZoomExpandable}
             branchSources={props.semanticZoomBranchSources}
             selected={isSelected}
             hasDashedBorder={props.hasDashedBorder ?? false}

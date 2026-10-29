@@ -57,7 +57,9 @@ export function LoopStepComponent(props: NodeProps<LoopNode>) {
         { id: 'loop', ariaLabel: 'Loop branch output' },
       ]}
       semanticZoomIcon={semanticZoomIcon}
+      semanticZoomPreviewIcon={iconNode}
       semanticZoomMenuActions={menuActions}
+      semanticZoomExpandable={metadata.expandable}
     >
       <StandardStepHeader
         icon={iconNode}

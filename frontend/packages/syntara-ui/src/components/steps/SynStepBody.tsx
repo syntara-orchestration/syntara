@@ -37,9 +37,10 @@ export function SynStepBody(props: Readonly<SynStepBodyProps>) {
         data-testid="node-body-scroll-container"
         className={`nodrag nopan ${props.className ?? ''}`}
         style={{
+          paddingTop: 'var(--pf-t--global--spacer--sm)',
+          paddingBottom: 'var(--pf-t--global--spacer--sm)',
           paddingLeft: 'var(--pf-t--global--spacer--md)',
           paddingRight: 'var(--pf-t--global--spacer--md)',
-          paddingBottom: 'var(--pf-t--global--spacer--md)',
         }}
       >
         {props.children}

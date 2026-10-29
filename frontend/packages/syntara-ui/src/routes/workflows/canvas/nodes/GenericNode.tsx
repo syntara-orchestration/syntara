@@ -58,6 +58,7 @@ export function GenericStepComponent(props: NodeProps<GenericNode>) {
         typeLabel: 'Generic',
       }}
       semanticZoomIcon={semanticZoomIcon}
+      semanticZoomPreviewIcon={iconNode}
     >
       <StandardStepHeader icon={iconNode} title={showTitle ? 'Click to configure' : undefined} expandable={false} />
       <SynStepBody>
