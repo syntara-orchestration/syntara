@@ -83,7 +83,7 @@ export function KafkaSubscribeFields({
                     isRequired
                     allowCreate={false}
                     isDisabled={isReadOnly || !values.integrationId}
-                    errorMessage={fieldState.error?.message}
+                    errorMessage={resourceErrors.runtimeCredentialId ?? fieldState.error?.message}
                     helpText="Used to authenticate this subscription to Kafka. Select a Kafka credential explicitly; the Integration management credential is not substituted. This does not select the workflow execution identity."
                   />
                 )}

@@ -52,5 +52,19 @@ export function kafkaResourceErrors(data: Partial<TriggerFormData>, resources: K
       errors.integrationId = 'Select an available Kafka Integration'
     }
   }
+  if (data.runtimeCredentialId) {
+    if (resources.credentials.isLoading || resources.types.isPending) {
+      errors.runtimeCredentialId = 'Wait for Kafka credentials to load'
+    } else if (resources.credentials.error || resources.types.isError) {
+      errors.runtimeCredentialId = 'Unable to verify the selected runtime credential'
+    } else if (
+      !resources.credentials.credentials.some(
+        (item) =>
+          item.id === data.runtimeCredentialId && item.enabled && resources.kafkaTypeIds.has(item.credential_type_id)
+      )
+    ) {
+      errors.runtimeCredentialId = 'Select an available Kafka runtime credential you can use'
+    }
+  }
   return errors
 }

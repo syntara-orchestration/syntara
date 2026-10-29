@@ -79,4 +79,35 @@ describe('Kafka resource validation', () => {
       'Select an available Kafka Integration'
     )
   })
+  it.each([false, true])('rejects incompatible or disabled saved credentials (disabled=%s)', async (disabled) => {
+    vi.mocked(useAllCredentials).mockReturnValue({
+      credentials: [
+        {
+          id: credentialId,
+          project_id: 'project-1',
+          name: 'Invalid',
+          credential_type_id: disabled ? 'kafka-type' : 'other-type',
+          enabled: !disabled,
+        },
+      ],
+      isLoading: false,
+      error: null,
+      refetch: vi.fn(),
+    })
+    expect(kafkaResourceErrors(values, await renderResources()).runtimeCredentialId).toBe(
+      'Select an available Kafka runtime credential you can use'
+    )
+  })
+  it('does not treat credential type loading as a settled empty result', async () => {
+    vi.mocked(credentialsClient.useQuery).mockReturnValue({ data: undefined, isPending: true, isError: false })
+    expect(kafkaResourceErrors(values, await renderResources()).runtimeCredentialId).toBe(
+      'Wait for Kafka credentials to load'
+    )
+  })
+  it('blocks resources when a supporting API request fails', async () => {
+    vi.mocked(integrationsFetchClient.GET).mockRejectedValue(new Error('Unavailable'))
+    expect(kafkaResourceErrors(values, await renderResources()).integrationId).toBe(
+      'Unable to verify the selected Kafka Integration'
+    )
+  })
 })
