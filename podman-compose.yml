@@ -411,6 +411,9 @@ services:
 
 
   execution-plane-migrate:
+    build:
+      context: ../syntara-execution-plane
+      dockerfile: Containerfile
     image: ${EP_IMAGE:-localhost/execution-plane:latest}
     command: [alembic, -c, alembic.ini, upgrade, head]
     environment:
@@ -423,6 +426,9 @@ services:
         condition: service_completed_successfully
 
   execution-plane-api:
+    build:
+      context: ../syntara-execution-plane
+      dockerfile: Containerfile
     image: ${EP_IMAGE:-localhost/execution-plane:latest}
     restart: unless-stopped
     command: [execution-plane-api]
