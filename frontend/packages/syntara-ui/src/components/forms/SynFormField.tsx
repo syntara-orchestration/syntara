@@ -49,6 +49,8 @@ export type SynFormFieldProps<
   /**
    * Render prop receiving the RHF field and fieldState. Use these to bind the
    * inner input (`value`, `onChange`, `onBlur`, `name`) and set `validated`.
+   * The render props also include a `describedBy` ID when helper text is
+   * rendered; forward it to the control's `aria-describedby` attribute.
    *
    * @example
    * ```tsx
@@ -69,6 +71,7 @@ export type SynFormFieldProps<
   children: (renderProps: {
     field: ControllerRenderProps<TFieldValues, TName>
     fieldState: ControllerFieldState
+    describedBy: string | undefined
   }) => ReactNode
 }
 
@@ -99,6 +102,8 @@ export function SynFormField<
 }: Readonly<SynFormFieldProps<TFieldValues, TName>>) {
   const { field, fieldState } = useController({ name, control })
   const resolvedFieldId = fieldId ?? name
+  const helperTextId = `${resolvedFieldId}-helper-text`
+  const describedBy = !hideFooter && (Boolean(hint) || Boolean(fieldState.error)) ? helperTextId : undefined
 
   return (
     <FormGroup
@@ -107,12 +112,12 @@ export function SynFormField<
       isRequired={isRequired}
       labelHelp={labelHelp}
     >
-      {children({ field, fieldState })}
+      {children({ field, fieldState, describedBy })}
       {!hideFooter &&
         (hint ? (
-          <FormFieldHintOrError hint={hint} error={fieldState.error} />
+          <FormFieldHintOrError id={helperTextId} hint={hint} error={fieldState.error} />
         ) : (
-          <FormFieldError error={fieldState.error} />
+          <FormFieldError id={helperTextId} error={fieldState.error} />
         ))}
     </FormGroup>
   )
