@@ -73,7 +73,7 @@ export interface paths {
     }
     /**
      * List available resource types and actions
-     * @description Returns the catalog of all resource types and the actions that can be performed on each.
+     * @description Returns the catalog of all resource types and the actions that can be performed on each. Built from route dependency introspection, built-in policies, and explicit non-routed pairs such as step_type:write.
      */
     get: operations['get_resource_actions']
     put?: never
