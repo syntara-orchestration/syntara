@@ -430,10 +430,15 @@ class TestProductionAppWiring:
         for route in matching:
             assert route.include_in_schema is False, f"{path} must have include_in_schema=False"
 
-    def test_version_omits_docs_links_when_disabled(self) -> None:
-        from syntara.api.main import app as real_app
+    def test_version_omits_docs_links_when_disabled(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        import syntara.api.main as main_module
         from syntara.auth.dependencies import get_current_user
         from syntara.core.models.user import User
+
+        monkeypatch.setattr(
+            main_module, "_settings", main_module._settings.model_copy(update={"enable_api_docs": False})
+        )
+        real_app = main_module.app
 
         async def mock_user() -> User:
             return User(username="testuser", email="test@test.com", first_name="Test")
