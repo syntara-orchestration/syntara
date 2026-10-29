@@ -1,5 +1,5 @@
 import { FormGroup } from '@patternfly/react-core'
-import type { ReactElement, ReactNode } from 'react'
+import { useId, type ReactElement, type ReactNode } from 'react'
 import type { Control, ControllerFieldState, ControllerRenderProps, FieldPath, FieldValues } from 'react-hook-form'
 import { useController } from 'react-hook-form'
 
@@ -55,9 +55,10 @@ export type SynFormFieldProps<
    * @example
    * ```tsx
    * <SynFormField name="username" control={control} label="Username">
-   *   {({ field, fieldState }) => (
+   *   {({ field, fieldState, describedBy }) => (
    *     <TextInput
    *       id="username"
+   *       aria-describedby={describedBy}
    *       validated={fieldState.error ? 'error' : 'default'}
    *       value={field.value ?? ''}
    *       onChange={field.onChange}
@@ -102,8 +103,9 @@ export function SynFormField<
 }: Readonly<SynFormFieldProps<TFieldValues, TName>>) {
   const { field, fieldState } = useController({ name, control })
   const resolvedFieldId = fieldId ?? name
-  const helperTextId = `${resolvedFieldId}-helper-text`
-  const describedBy = !hideFooter && (Boolean(hint) || Boolean(fieldState.error)) ? helperTextId : undefined
+  const helperTextId = `${useId()}-helper-text`
+  const hasHelperText = fieldState.error ? Boolean(fieldState.error.message) : Boolean(hint)
+  const describedBy = !hideFooter && hasHelperText ? helperTextId : undefined
 
   return (
     <FormGroup
